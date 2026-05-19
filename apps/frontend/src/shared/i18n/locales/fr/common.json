@@ -1071,5 +1071,6 @@
 		"stopTaskDescription": "Arrêter la tâche et naviguer",
 		"pauseTask": "Mettre en pause",
 		"pauseTaskDescription": "Naviguer et reprendre plus tard"
-	}
+	},
+	"testing": "Test en cours..."
 }
