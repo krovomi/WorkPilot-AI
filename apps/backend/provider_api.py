@@ -6,6 +6,20 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 
+# Windows: force the Proactor event-loop policy BEFORE anything else creates
+# a loop. uvicorn (especially with --reload) defaults to the Selector loop on
+# Python ≥ 3.8, which raises NotImplementedError on `asyncio.create_subprocess_exec`.
+# The Claude Agent SDK spawns the bundled `claude.exe` via subprocess, so the
+# /api/slash-commands/run endpoint (and any future SDK-backed endpoint) would
+# fail with "Failed to start Claude Code" without this fix.
+# Safe no-op on Linux/macOS where the policy attribute doesn't exist.
+if sys.platform == "win32":
+    import asyncio as _asyncio
+
+    _policy_cls = getattr(_asyncio, "WindowsProactorEventLoopPolicy", None)
+    if _policy_cls is not None:
+        _asyncio.set_event_loop_policy(_policy_cls())
+
 logging.basicConfig(level=logging.INFO, stream=sys.stdout, force=True)
 
 # Install the global log redaction filter as early as possible — before
