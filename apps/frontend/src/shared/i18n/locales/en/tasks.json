@@ -168,7 +168,22 @@
 		"columnLocked": "Column width is locked",
 		"expandAll": "Expand all columns",
 		"azureDevOpsNotConnected": "Azure DevOps not connected — click to configure",
-		"jiraNotConnected": "Jira not connected — click to configure"
+		"jiraNotConnected": "Jira not connected — click to configure",
+		"quickCommand": {
+			"placeholder": "Quick command (e.g. /compact, /review)",
+			"buttonLabel": "Run command",
+			"running": "Running…",
+			"hint": "Type / then a command name. Tab to autocomplete.",
+			"noResults": "No matching command",
+			"sourceProject": "Project",
+			"sourceUser": "User",
+			"sourceBuiltIn": "Built-in",
+			"missingProject": "Select a project first",
+			"errorTitle": "Slash command failed",
+			"successTitle": "Slash command completed",
+			"successBody": "Output was logged to the console.",
+			"ariaListLabel": "Available slash commands"
+		}
 	},
 	"queue": {
 		"limitReached": "Parallel task limit reached ({{current}}/{{max}}). Task moved to queue.",

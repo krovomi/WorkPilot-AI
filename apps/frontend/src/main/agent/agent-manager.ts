@@ -463,11 +463,18 @@ export class AgentManager extends EventEmitter {
 			options,
 		});
 
+		// Inject the Claude SDK resume session_id into the subprocess env.
+		// The Python side reads AUTO_CLAUDE_RESUME_SESSION_ID inside create_client()
+		// (apps/backend/core/client.py) and passes it to ClaudeAgentOptions(resume=...).
+		const spawnEnv = options.resumeSessionId
+			? { ...combinedEnv, AUTO_CLAUDE_RESUME_SESSION_ID: options.resumeSessionId }
+			: combinedEnv;
+
 		await this.processManager.spawnProcess(
 			taskId,
 			autoBuildSource,
 			args,
-			combinedEnv,
+			spawnEnv,
 			"task-execution",
 			projectId,
 		);

@@ -833,6 +833,36 @@ async def run_agent_session(
 
         print("\n" + "-" * 70 + "\n")
 
+        # Persist SDK session_id so the Kanban UI can offer "Resume" on
+        # cards that hit max_turns/max_budget_usd. Best-effort: never fail
+        # the session just because we couldn't write the marker file.
+        if _sdk_result_msg is not None:
+            try:
+                _sid = getattr(_sdk_result_msg, "session_id", None)
+                if _sid:
+                    import json as _json
+
+                    _state_path = spec_dir / ".session.json"
+                    _state = {
+                        "session_id": _sid,
+                        "subtype": getattr(_sdk_result_msg, "subtype", None),
+                        "model": getattr(
+                            getattr(client, "options", None), "model", None
+                        ),
+                        "phase": phase.value,
+                    }
+                    _state_path.write_text(
+                        _json.dumps(_state, indent=2), encoding="utf-8"
+                    )
+                    logger.debug(
+                        "[session] Persisted session_id=%s subtype=%s to %s",
+                        _sid,
+                        _state["subtype"],
+                        _state_path,
+                    )
+            except Exception as _se:
+                logger.debug("[session] Could not persist session_id: %s", _se)
+
         # Record token usage from the SDK ResultMessage (best-effort)
         if _sdk_result_msg is not None and _record_usage is not None:
             try:
@@ -842,6 +872,19 @@ async def run_agent_session(
                 )
                 output_tokens = (
                     usage.get("output_tokens", 0) if isinstance(usage, dict) else 0
+                )
+                # Cache token breakdown (SDK uses prompt caching automatically).
+                # cache_creation: tokens written into a new cache entry (premium rate)
+                # cache_read:     tokens served from cache (discounted rate)
+                cache_creation = (
+                    usage.get("cache_creation_input_tokens", 0)
+                    if isinstance(usage, dict)
+                    else 0
+                )
+                cache_read = (
+                    usage.get("cache_read_input_tokens", 0)
+                    if isinstance(usage, dict)
+                    else 0
                 )
                 cost_usd = getattr(_sdk_result_msg, "total_cost_usd", None) or 0.0
                 # Derive project_dir from spec_dir (spec_dir = project/.workpilot/specs/XXX)
@@ -871,6 +914,8 @@ async def run_agent_session(
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     cost_usd=cost_usd,
+                    cache_creation_input_tokens=cache_creation,
+                    cache_read_input_tokens=cache_read,
                 )
             except Exception as _ute:
                 logger.debug("[usage_tracker] SDK usage recording failed: %s", _ute)
@@ -1195,6 +1240,35 @@ async def _run_agent_client_session(
 
         print("\n" + "-" * 70 + "\n")
 
+        # Persist SDK session_id on the AgentClient path too, mirroring the
+        # raw SDK branch above. Without this the "Reprendre" button in the
+        # Kanban UI has no .session.json to read when the user runs through
+        # the provider-agnostic factory (i.e. nearly every flow today).
+        _agent_session_id = getattr(client, "last_session_id", None)
+        if _agent_session_id:
+            try:
+                import json as _json_session
+
+                _state_path = spec_dir / ".session.json"
+                _state = {
+                    "session_id": _agent_session_id,
+                    "subtype": getattr(
+                        getattr(client, "last_result_msg", None), "subtype", None
+                    ),
+                    "model": getattr(client, "model", None),
+                    "phase": phase.value,
+                }
+                _state_path.write_text(
+                    _json_session.dumps(_state, indent=2), encoding="utf-8"
+                )
+                logger.debug(
+                    "[session] Persisted session_id=%s (AgentClient) to %s",
+                    _agent_session_id,
+                    _state_path,
+                )
+            except Exception as _se:
+                logger.debug("[session] AgentClient session_id persist failed: %s", _se)
+
         # Record token usage from AgentClient (best-effort via duck typing)
         if _record_usage is not None:
             try:
@@ -1211,6 +1285,12 @@ async def _run_agent_client_session(
                         input_tokens=_usage.get("input_tokens", 0),
                         output_tokens=_usage.get("output_tokens", 0),
                         cost_usd=_usage.get("cost_usd", 0.0),
+                        cache_creation_input_tokens=_usage.get(
+                            "cache_creation_input_tokens", 0
+                        ),
+                        cache_read_input_tokens=_usage.get(
+                            "cache_read_input_tokens", 0
+                        ),
                     )
             except Exception as _ute:
                 logger.debug(

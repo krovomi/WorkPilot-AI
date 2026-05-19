@@ -1768,6 +1768,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import qa_promotion router: {e}")
 
+# --- Slash Commands API (Kanban Quick-Command bar: list + run .claude/commands) ---
+try:
+    from slash_commands.api import router as slash_commands_router
+
+    app.include_router(slash_commands_router)
+except ImportError as e:
+    print(f"Warning: Could not import slash_commands router: {e}")
+
 # --- Parallel Variations API (local Arena: scaffold + compare, never auto-merge) ---
 try:
     from parallel_variations.api import router as parallel_variations_router

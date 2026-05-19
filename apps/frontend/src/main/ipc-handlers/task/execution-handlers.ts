@@ -707,6 +707,82 @@ export function registerTaskExecutionHandlers(
 	);
 
 	/**
+	 * Resume a Claude SDK session for a task that hit max_turns or max_budget_usd.
+	 *
+	 * Reads the session_id persisted by the Python backend in
+	 * `<specDir>/.session.json` and re-spawns the build subprocess with
+	 * AUTO_CLAUDE_RESUME_SESSION_ID set. The backend's create_client()
+	 * picks it up and passes it to ClaudeAgentOptions(resume=...), so the
+	 * SDK rehydrates the prior transcript instead of replaying from scratch.
+	 *
+	 * Distinct from TASK_RESUME_PAUSED which handles rate-limit/auth pauses.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_RESUME_SESSION,
+		async (_, taskId: string): Promise<IPCResult> => {
+			const { task, project } = findTaskAndProject(taskId);
+			if (!task || !project) {
+				return { success: false, error: "Task not found" };
+			}
+
+			const specsBaseDir = getSpecsDir(project.autoBuildPath);
+			const specDir = path.join(project.path, specsBaseDir, task.specId);
+			const sessionFile = path.join(specDir, ".session.json");
+
+			if (!existsSync(sessionFile)) {
+				return {
+					success: false,
+					error: "No persisted SDK session found for this task — run it once first.",
+				};
+			}
+
+			let sessionId: string | undefined;
+			try {
+				const raw = readFileSync(sessionFile, "utf-8");
+				const parsed = JSON.parse(raw) as { session_id?: string };
+				sessionId = parsed.session_id;
+			} catch (err) {
+				return {
+					success: false,
+					error: `Could not read .session.json: ${(err as Error).message}`,
+				};
+			}
+
+			if (!sessionId) {
+				return {
+					success: false,
+					error: ".session.json is missing the session_id field.",
+				};
+			}
+
+			// Spawn the build subprocess with the resume flag carried in env.
+			// Reuse startTaskExecution so the same auth/path checks fire.
+			const executionOptions = {
+				parallel: false,
+				workers: 1,
+				baseBranch: task.metadata?.baseBranch || project.settings?.mainBranch,
+				useWorktree: task.metadata?.useWorktree,
+				useLocalBranch: task.metadata?.useLocalBranch,
+				enableStreaming: true,
+				streamingSessionId: taskId,
+				resumeSessionId: sessionId,
+			};
+			agentManager.startTaskExecution(
+				taskId,
+				project.path,
+				task.specId,
+				executionOptions,
+				project.id,
+			);
+
+			appLog.info(
+				`[TASK_RESUME_SESSION] Resumed task ${task.specId} with session_id=${sessionId}`,
+			);
+			return { success: true };
+		},
+	);
+
+	/**
 	 * Stop a task
 	 */
 	ipcMain.on(IPC_CHANNELS.TASK_STOP, (_, taskId: string) => {

@@ -35,6 +35,7 @@ export const IPC_CHANNELS = {
 	TASK_RECOVER_STUCK: "task:recoverStuck",
 	TASK_CHECK_RUNNING: "task:checkRunning",
 	TASK_RESUME_PAUSED: "task:resumePaused", // Resume a rate-limited or auth-paused task
+	TASK_RESUME_SESSION: "task:resumeSession", // Resume a Claude SDK session (uses .session.json)
 	TASK_LOAD_IMAGE_THUMBNAIL: "task:loadImageThumbnail",
 
 	// Workspace management (for human review)

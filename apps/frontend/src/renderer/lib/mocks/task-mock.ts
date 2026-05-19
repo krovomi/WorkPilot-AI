@@ -87,6 +87,8 @@ export const taskMock = {
 
 	resumePausedTask: async () => ({ success: true }),
 
+	resumeTaskSession: async () => ({ success: true }),
+
 	// Image operations
 	loadImageThumbnail: async (
 		_projectPath: string,

@@ -208,8 +208,18 @@ class ClaudeAgentClient(AgentClient):
             sdk_client: A configured ClaudeSDKClient instance.
         """
         self._client = sdk_client
+        # Captured during the last receive_response() iteration so callers
+        # on the provider-agnostic path (session.py:_run_agent_client_session)
+        # can persist session_id / usage just like the raw SDK path does.
+        self.last_result_msg: Any | None = None
+        self.last_session_id: str | None = None
+        self.last_usage: dict | None = None
 
     async def query(self, prompt: str) -> None:
+        # Reset per-query observables so callers always see fresh data.
+        self.last_result_msg = None
+        self.last_session_id = None
+        self.last_usage = None
         await self._client.query(prompt)
 
     async def receive_response(self) -> AsyncIterator[AgentMessage]:
@@ -220,6 +230,25 @@ class ClaudeAgentClient(AgentClient):
         to work during the migration period.
         """
         async for raw_msg in self._client.receive_response():
+            # Snapshot the ResultMessage for post-loop consumers (usage,
+            # session_id persistence). This is the only place we can see it
+            # on the AgentClient path — without it, the Kanban "Reprendre"
+            # button can't find a session_id when the user uses the
+            # provider-agnostic factory.
+            if type(raw_msg).__name__ == "ResultMessage":
+                self.last_result_msg = raw_msg
+                self.last_session_id = getattr(raw_msg, "session_id", None)
+                _u = getattr(raw_msg, "usage", None)
+                if isinstance(_u, dict):
+                    self.last_usage = {
+                        "input_tokens": _u.get("input_tokens", 0),
+                        "output_tokens": _u.get("output_tokens", 0),
+                        "cost_usd": getattr(raw_msg, "total_cost_usd", None) or 0.0,
+                        "cache_creation_input_tokens": _u.get(
+                            "cache_creation_input_tokens", 0
+                        ),
+                        "cache_read_input_tokens": _u.get("cache_read_input_tokens", 0),
+                    }
             yield self._wrap_sdk_message(raw_msg)
 
     def _wrap_sdk_message(self, raw_msg: Any) -> AgentMessage:

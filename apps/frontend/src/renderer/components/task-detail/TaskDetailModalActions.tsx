@@ -3,12 +3,13 @@ import {
 	GitPullRequest,
 	Loader2,
 	Play,
+	RefreshCw,
 	RotateCcw,
 	Square,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { TASK_STATUS_LABELS } from "../../../shared/constants";
-import type { Project, Task } from "../../../shared/types";
+import { IPC_CHANNELS, TASK_STATUS_LABELS } from "../../../shared/constants";
+import type { IPCResult, Project, Task } from "../../../shared/types";
 import { AgentToolsButton, ProgressIndicatorBadge } from "../agent-tools";
 import { StreamingSessionButton } from "../streaming/StreamingSessionButton";
 import { Button } from "../ui/button";
@@ -201,6 +202,31 @@ export function TaskDetailModalActions({
 
 	if (task.status === "ai_review" || task.status === "human_review") {
 		return <ReviewableActions task={task} activeProject={activeProject} />;
+	}
+
+	// Card landed in `error` state — typically after `error_max_turns` or
+	// `error_max_budget_usd`. Offer "Reprendre" which resumes the persisted
+	// Claude SDK session_id from <spec_dir>/.session.json instead of replaying
+	// the whole transcript. The IPC handler validates the session file and
+	// surfaces a useful error if none exists.
+	if (task.status === "error") {
+		return (
+			<Button
+				variant="default"
+				onClick={async () => {
+					const res = (await globalThis.electronAPI.invoke(
+						IPC_CHANNELS.TASK_RESUME_SESSION,
+						task.id,
+					)) as IPCResult;
+					if (!res?.success && res?.error) {
+						globalThis.window.alert(res.error);
+					}
+				}}
+			>
+				<RefreshCw className="mr-2 h-4 w-4" />
+				{t("tasks:modal.actions.resumeSession", "Reprendre la session")}
+			</Button>
+		);
 	}
 
 	if (task.status === "done" && task.metadata?.prUrl) {

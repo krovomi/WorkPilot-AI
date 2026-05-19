@@ -168,7 +168,22 @@
 		"columnLocked": "La largeur de la colonne est verrouillée",
 		"expandAll": "Développer toutes les colonnes",
 		"azureDevOpsNotConnected": "Azure DevOps non connecté — cliquez pour configurer",
-		"jiraNotConnected": "Jira non connecté — cliquez pour configurer"
+		"jiraNotConnected": "Jira non connecté — cliquez pour configurer",
+		"quickCommand": {
+			"placeholder": "Commande rapide (ex. /compact, /review)",
+			"buttonLabel": "Exécuter",
+			"running": "Exécution…",
+			"hint": "Tape / puis le nom de la commande. Tab pour autocompléter.",
+			"noResults": "Aucune commande correspondante",
+			"sourceProject": "Projet",
+			"sourceUser": "Utilisateur",
+			"sourceBuiltIn": "Intégrée",
+			"missingProject": "Sélectionne d'abord un projet",
+			"errorTitle": "Échec de la commande",
+			"successTitle": "Commande terminée",
+			"successBody": "La sortie a été écrite dans la console.",
+			"ariaListLabel": "Commandes slash disponibles"
+		}
 	},
 	"queue": {
 		"limitReached": "Limite de tâches parallèles atteinte ({{current}}/{{max}}). Tâche déplacée vers la file d'attente.",

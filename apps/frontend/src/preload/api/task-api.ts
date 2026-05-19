@@ -56,6 +56,7 @@ export interface TaskAPI {
 	) => Promise<IPCResult<TaskRecoveryResult>>;
 	checkTaskRunning: (taskId: string) => Promise<IPCResult<boolean>>;
 	resumePausedTask: (taskId: string) => Promise<IPCResult>;
+	resumeTaskSession: (taskId: string) => Promise<IPCResult>;
 
 	// Image Operations
 	loadImageThumbnail: (
@@ -267,6 +268,9 @@ export const createTaskAPI = (): TaskAPI => ({
 
 	resumePausedTask: (taskId: string): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_RESUME_PAUSED, taskId),
+
+	resumeTaskSession: (taskId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_RESUME_SESSION, taskId),
 
 	// Image Operations
 	loadImageThumbnail: (

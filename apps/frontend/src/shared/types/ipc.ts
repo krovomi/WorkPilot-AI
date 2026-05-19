@@ -283,6 +283,7 @@ export interface ElectronAPI {
 	) => Promise<IPCResult<TaskRecoveryResult>>;
 	checkTaskRunning: (taskId: string) => Promise<IPCResult<boolean>>;
 	resumePausedTask: (taskId: string) => Promise<IPCResult>;
+	resumeTaskSession: (taskId: string) => Promise<IPCResult>;
 
 	// Image operations
 	loadImageThumbnail: (
