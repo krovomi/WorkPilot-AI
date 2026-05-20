@@ -960,14 +960,20 @@ export function UsageIndicator() {
 		}
 
 		if (isCopilot) {
+			const tokens = formatUsageValue(
+				usage.copilotUsageDetails?.totalTokens,
+				i18n.language,
+			);
 			return (
 				<div className="flex items-center gap-0.5 text-xs font-semibold font-mono">
-					<span className="text-blue-500" title="Copilot Cost">
-						{formatUsageValue(
-							usage.copilotUsageDetails?.totalTokens,
-							i18n.language,
-						)}
-						T
+					<span
+						className="text-blue-500"
+						title={t("common:usage.copilotTokensTitle")}
+					>
+						{tokens ?? "0"}
+						<span className="ml-0.5 text-[10px] font-normal opacity-80">
+							{t("common:usage.copilotTokensSuffix")}
+						</span>
 					</span>
 				</div>
 			);
