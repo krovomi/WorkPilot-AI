@@ -254,7 +254,13 @@
 		"targetAudience": "Public cible",
 		"dependencies": "Dépendances",
 		"acceptanceCriteria": "Critères d'acceptation",
-		"affectedFiles": "Fichiers affectés"
+		"affectedFiles": "Fichiers affectés",
+		"extraNote": "Note supplémentaire",
+		"extraNotePlaceholder": "Ajoutez des précisions, contraintes ou indices. Ces notes sont transmises à toutes les phases du pipeline (plan, code, QA, review).",
+		"extraNoteHelp": "Enregistré dans requirements.json comme additional_context.",
+		"extraNoteSaved": "Enregistré.",
+		"extraNoteSave": "Enregistrer la note",
+		"extraNoteSaving": "Enregistrement…"
 	},
 	"images": {
 		"removeImageAriaLabel": "Supprimer l'image {{filename}}",

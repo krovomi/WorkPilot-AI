@@ -25,6 +25,10 @@ import type {
 } from "../../shared/types";
 import type { AgentManager } from "../agent";
 import { projectStore } from "../project-store";
+import {
+	formatAcceptanceCriteriaMarkdown,
+	parseAcceptanceCriteriaText,
+} from "../../shared/utils/acceptance-criteria";
 import { sanitizeText, sanitizeUrl } from "./shared/sanitize";
 import { parseEnvFile } from "./utils";
 
@@ -179,6 +183,7 @@ try:
             'areaPath': item.area_path,
             'iterationPath': item.iteration_path,
             'url': item.url,
+            'acceptanceCriteria': item.acceptance_criteria,
         } for item in items]
         print(json.dumps({'data': result}))
     
@@ -655,6 +660,10 @@ except Exception as e:
 							else if (item.priority >= 3) priority = "low";
 						}
 
+						const acceptanceCriteriaList = parseAcceptanceCriteriaText(
+							item.acceptanceCriteria,
+						);
+
 						const metadata: TaskMetadata = {
 							sourceType: "imported",
 							category: category as import("../../shared/types").TaskCategory,
@@ -663,6 +672,9 @@ except Exception as e:
 							azureDevOpsUrl: safeUrl,
 							azureDevOpsState: item.state,
 							azureDevOpsType: item.workItemType,
+							...(acceptanceCriteriaList.length > 0 && {
+								acceptanceCriteria: acceptanceCriteriaList,
+							}),
 							...(options?.requireReviewBeforeCoding && {
 								requireReviewBeforeCoding: true,
 							}),
@@ -731,9 +743,18 @@ except Exception as e:
 							descriptionParts.push(safeTitle);
 						}
 
+						if (acceptanceCriteriaList.length > 0) {
+							descriptionParts.push("");
+							descriptionParts.push("## Acceptance Criteria");
+							descriptionParts.push("");
+							for (const criterion of acceptanceCriteriaList) {
+								descriptionParts.push(`- ${criterion}`);
+							}
+						}
+
 						const richDescription = descriptionParts.join("\n");
 
-						const requirements = {
+						const requirements: Record<string, unknown> = {
 							task_description: richDescription,
 							workflow_type:
 								category === "bug"
@@ -742,6 +763,9 @@ except Exception as e:
 										? "feature"
 										: category,
 						};
+						if (acceptanceCriteriaList.length > 0) {
+							requirements.acceptance_criteria = acceptanceCriteriaList;
+						}
 						const requirementsPath = path.join(
 							specDir,
 							AUTO_BUILD_PATHS.REQUIREMENTS,

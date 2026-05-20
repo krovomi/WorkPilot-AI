@@ -138,6 +138,7 @@ try:
             'createdDate': issue.created.isoformat() if issue.created else None,
             'projectKey': issue.project_key,
             'url': f"{instance_url}/browse/{issue.key}",
+            'acceptanceCriteria': issue.acceptance_criteria or None,
         } for issue in issues]
         print(json.dumps({'data': result}))
 

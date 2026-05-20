@@ -55,6 +55,10 @@ import type {
 	AzureDevOpsWorkItem,
 	JiraWorkItem,
 } from "../../shared/types/integrations";
+import {
+	formatAcceptanceCriteriaMarkdown,
+	parseAcceptanceCriteriaText,
+} from "../../shared/utils/acceptance-criteria";
 // Import logos
 import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
 import JiraLogo from "../assets/logos/jira.svg";
@@ -1622,6 +1626,13 @@ export function KanbanBoard({
 						metadata.jiraType = jiraItem.workItemType;
 						metadata.importSource = "jira";
 
+						const jiraAc = parseAcceptanceCriteriaText(
+							jiraItem.acceptanceCriteria,
+						);
+						if (jiraAc.length > 0) {
+							metadata.acceptanceCriteria = jiraAc;
+						}
+
 						const jiraPriority = jiraItem.priority?.toLowerCase();
 						if (jiraPriority === "highest" || jiraPriority === "critical") {
 							metadata.priority = "urgent";
@@ -1651,6 +1662,13 @@ export function KanbanBoard({
 						metadata.azureDevOpsType = adoItem.workItemType;
 						metadata.importSource = "azure-devops";
 
+						const adoAc = parseAcceptanceCriteriaText(
+							adoItem.acceptanceCriteria,
+						);
+						if (adoAc.length > 0) {
+							metadata.acceptanceCriteria = adoAc;
+						}
+
 						if (adoItem.priority === 1) {
 							metadata.priority = "urgent";
 						} else if (adoItem.priority === 2) {
@@ -1676,10 +1694,17 @@ export function KanbanBoard({
 						metadata.requireReviewBeforeCoding = true;
 					}
 
+					const acList = Array.isArray(metadata.acceptanceCriteria)
+						? (metadata.acceptanceCriteria as string[])
+						: [];
+					const descriptionWithAc =
+						(workItem.description || "") +
+						formatAcceptanceCriteriaMarkdown(acList);
+
 					const result = await createTask(
 						projectId,
 						workItem.title,
-						workItem.description || "",
+						descriptionWithAc,
 						metadata,
 					);
 

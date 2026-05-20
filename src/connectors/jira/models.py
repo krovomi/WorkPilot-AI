@@ -134,6 +134,9 @@ class JiraIssue:
         updated: Last update datetime, or None.
         project_key: The parent project key.
         custom_fields: Additional custom fields as key-value pairs.
+        acceptance_criteria: Plain-text acceptance criteria extracted from
+            the matching custom field (autodetected by name), or empty
+            string if no such field is set on the issue.
     """
 
     key: str
@@ -150,6 +153,7 @@ class JiraIssue:
     updated: datetime | None = None
     project_key: str = ""
     custom_fields: dict[str, Any] = field(default_factory=dict)
+    acceptance_criteria: str = ""
 
     @classmethod
     def from_api_response(cls, data: dict[str, Any]) -> "JiraIssue":
