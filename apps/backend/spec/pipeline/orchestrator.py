@@ -506,6 +506,12 @@ class SpecOrchestrator:
         with open(requirements_file, encoding="utf-8") as f:
             req = json.load(f)
             self.task_description = req.get("task_description", self.task_description)
+            extra_note = (req.get("additional_context") or "").strip()
+            extra_note_block = (
+                f"\n**Additional Notes (from Kanban card)**:\n{extra_note}\n"
+                if extra_note
+                else ""
+            )
             return f"""
 **Task Description**: {req.get("task_description", "Not provided")}
 **Workflow Type**: {req.get("workflow_type", "Not specified")}
@@ -516,7 +522,7 @@ class SpecOrchestrator:
 {chr(10).join(f"- {c}" for c in req.get("acceptance_criteria", []))}
 **Constraints**:
 {chr(10).join(f"- {c}" for c in req.get("constraints", []))}
-"""
+{extra_note_block}"""
 
     def _create_override_assessment(self) -> complexity.ComplexityAssessment:
         """Create a complexity assessment from manual override.

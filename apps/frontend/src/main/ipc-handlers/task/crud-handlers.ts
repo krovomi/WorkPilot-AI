@@ -281,6 +281,21 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				workflow_type: taskMetadata.category || "feature",
 			};
 
+			// Propagate acceptance criteria so they reach every pipeline phase
+			// (planner, spec_writer, qa_reviewer all read this from requirements.json).
+			if (
+				taskMetadata.acceptanceCriteria &&
+				taskMetadata.acceptanceCriteria.length > 0
+			) {
+				requirements.acceptance_criteria = taskMetadata.acceptanceCriteria;
+			}
+
+			// Propagate free-form extra note as `additional_context` so it gets
+			// surfaced to the orchestrator (see _load_requirements_context).
+			if (taskMetadata.extraNote?.trim()) {
+				requirements.additional_context = taskMetadata.extraNote.trim();
+			}
+
 			// Add attached images to requirements if present
 			if (
 				taskMetadata.attachedImages &&
@@ -684,6 +699,18 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 						}
 						if (updates.metadata.category) {
 							requirements.workflow_type = updates.metadata.category;
+						}
+						if (updates.metadata.acceptanceCriteria !== undefined) {
+							requirements.acceptance_criteria =
+								updates.metadata.acceptanceCriteria;
+						}
+						if (updates.metadata.extraNote !== undefined) {
+							const trimmed = updates.metadata.extraNote.trim();
+							if (trimmed) {
+								requirements.additional_context = trimmed;
+							} else {
+								delete requirements.additional_context;
+							}
 						}
 
 						writeFileSync(

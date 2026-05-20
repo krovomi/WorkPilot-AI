@@ -25,10 +25,7 @@ import type {
 } from "../../shared/types";
 import type { AgentManager } from "../agent";
 import { projectStore } from "../project-store";
-import {
-	formatAcceptanceCriteriaMarkdown,
-	parseAcceptanceCriteriaText,
-} from "../../shared/utils/acceptance-criteria";
+import { parseAcceptanceCriteriaText } from "../../shared/utils/acceptance-criteria";
 import { sanitizeText, sanitizeUrl } from "./shared/sanitize";
 import { parseEnvFile } from "./utils";
 

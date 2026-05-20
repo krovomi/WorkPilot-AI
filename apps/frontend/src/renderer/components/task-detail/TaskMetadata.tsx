@@ -1,7 +1,9 @@
 import DOMPurify from "dompurify";
 import {
 	Bug,
+	Check,
 	ChevronDown,
+	ChevronRight,
 	Clock,
 	ExternalLink,
 	FileCode,
@@ -12,17 +14,25 @@ import {
 	ListChecks,
 	Palette,
 	Shield,
+	StickyNote,
 	Target,
 	Users,
 	Wrench,
 } from "lucide-react";
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { persistUpdateTask } from "../../stores/task-store";
 import { Badge } from "../ui/badge";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "../ui/collapsible";
+import { Textarea } from "../ui/textarea";
 
 // Schéma de sanitization personnalisé permettant les styles inline
 const customSanitizeSchema = {
@@ -681,21 +691,16 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 						</div>
 					)}
 
-					{/* Acceptance Criteria */}
+					{/* Acceptance Criteria — collapsible */}
 					{task.metadata.acceptanceCriteria &&
 						task.metadata.acceptanceCriteria.length > 0 && (
-							<div>
-								<h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-									<ListChecks className="h-3 w-3 text-success" />
-									{t("tasks:metadata.acceptanceCriteria")}
-								</h3>
-								<ul className="text-sm text-foreground/80 list-disc list-inside space-y-0.5">
-									{task.metadata.acceptanceCriteria.map((criteria) => (
-										<li key={criteria.trim()}>{criteria}</li>
-									))}
-								</ul>
-							</div>
+							<AcceptanceCriteriaSection
+								criteria={task.metadata.acceptanceCriteria}
+							/>
 						)}
+
+					{/* Extra note — editable, persisted as additional_context */}
+					<ExtraNoteSection task={task} />
 
 					{/* Affected Files */}
 					{task.metadata.affectedFiles &&
@@ -727,5 +732,122 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 				</div>
 			)}
 		</div>
+	);
+}
+
+interface AcceptanceCriteriaSectionProps {
+	readonly criteria: string[];
+}
+
+function AcceptanceCriteriaSection({ criteria }: AcceptanceCriteriaSectionProps) {
+	const { t } = useTranslation(["tasks"]);
+	const [open, setOpen] = useState(true);
+
+	return (
+		<Collapsible open={open} onOpenChange={setOpen}>
+			<CollapsibleTrigger asChild>
+				<button
+					type="button"
+					className="flex w-full items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 hover:text-foreground transition-colors"
+					aria-expanded={open}
+				>
+					{open ? (
+						<ChevronDown className="h-3 w-3" aria-hidden="true" />
+					) : (
+						<ChevronRight className="h-3 w-3" aria-hidden="true" />
+					)}
+					<ListChecks className="h-3 w-3 text-success" />
+					<span>{t("tasks:metadata.acceptanceCriteria")}</span>
+					<Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
+						{criteria.length}
+					</Badge>
+				</button>
+			</CollapsibleTrigger>
+			<CollapsibleContent>
+				<ul className="text-sm text-foreground/80 list-disc list-inside space-y-0.5 pl-5">
+					{criteria.map((criterion) => (
+						<li key={criterion.trim()}>{criterion}</li>
+					))}
+				</ul>
+			</CollapsibleContent>
+		</Collapsible>
+	);
+}
+
+interface ExtraNoteSectionProps {
+	readonly task: Task;
+}
+
+function ExtraNoteSection({ task }: ExtraNoteSectionProps) {
+	const { t } = useTranslation(["tasks"]);
+	const initial = task.metadata?.extraNote ?? "";
+	const [open, setOpen] = useState(initial.length > 0);
+	const [draft, setDraft] = useState(initial);
+	const [isSaving, setIsSaving] = useState(false);
+	const [savedAt, setSavedAt] = useState<number | null>(null);
+
+	useEffect(() => {
+		setDraft(task.metadata?.extraNote ?? "");
+	}, [task.metadata?.extraNote]);
+
+	const isDirty = draft !== initial;
+
+	const handleSave = async () => {
+		setIsSaving(true);
+		const ok = await persistUpdateTask(task.id, {
+			metadata: { extraNote: draft },
+		});
+		setIsSaving(false);
+		if (ok) {
+			setSavedAt(Date.now());
+		}
+	};
+
+	return (
+		<Collapsible open={open} onOpenChange={setOpen}>
+			<CollapsibleTrigger asChild>
+				<button
+					type="button"
+					className="flex w-full items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 hover:text-foreground transition-colors"
+					aria-expanded={open}
+				>
+					{open ? (
+						<ChevronDown className="h-3 w-3" aria-hidden="true" />
+					) : (
+						<ChevronRight className="h-3 w-3" aria-hidden="true" />
+					)}
+					<StickyNote className="h-3 w-3 text-warning" />
+					<span>{t("tasks:metadata.extraNote")}</span>
+					{initial.length > 0 && (
+						<Check className="h-3 w-3 text-success" aria-hidden="true" />
+					)}
+				</button>
+			</CollapsibleTrigger>
+			<CollapsibleContent>
+				<Textarea
+					value={draft}
+					onChange={(e) => setDraft(e.target.value)}
+					placeholder={t("tasks:metadata.extraNotePlaceholder")}
+					rows={4}
+					className="text-sm"
+				/>
+				<div className="flex items-center justify-between mt-2 gap-2">
+					<span className="text-xs text-muted-foreground">
+						{savedAt && !isDirty
+							? t("tasks:metadata.extraNoteSaved")
+							: t("tasks:metadata.extraNoteHelp")}
+					</span>
+					<Button
+						size="sm"
+						onClick={handleSave}
+						disabled={!isDirty || isSaving}
+					>
+						{isSaving
+							? t("tasks:metadata.extraNoteSaving")
+							: t("tasks:metadata.extraNoteSave")}
+					</Button>
+				</div>
+			</CollapsibleContent>
+		</Collapsible>
 	);
 }

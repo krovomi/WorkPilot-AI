@@ -263,6 +263,8 @@ export interface TaskMetadata {
 	affectedFiles?: string[]; // Files likely to be modified
 	dependencies?: string[]; // Other features/tasks this depends on
 	acceptanceCriteria?: string[]; // What defines "done"
+	extraNote?: string; // Free-form note added on the Kanban card; injected
+	// into requirements.json as additional_context for every pipeline phase.
 
 	// Effort estimation
 	estimatedEffort?: TaskComplexity;
