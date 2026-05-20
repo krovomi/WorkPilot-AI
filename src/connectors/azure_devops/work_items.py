@@ -162,6 +162,7 @@ class AzureWorkItemsClient:
                     wit_client.get_work_items(
                         ids=batch,
                         project=project,
+                        expand="fields",
                         error_policy="omit",
                     )
                 )
@@ -219,6 +220,7 @@ class AzureWorkItemsClient:
             wit_client = self._get_wit_client()
             api_work_item = wit_client.get_work_item(
                 id=work_item_id,
+                expand="fields",
             )
         except AzureDevOpsError:
             raise

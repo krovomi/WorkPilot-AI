@@ -260,6 +260,7 @@ export const IPC_CHANNELS = {
 	AZURE_DEVOPS_CHECK_CONNECTION: "azureDevOps:checkConnection",
 	AZURE_DEVOPS_LIST_REPOSITORIES: "azureDevOps:listRepositories",
 	AZURE_DEVOPS_DETECT_REPOSITORY: "azureDevOps:detectRepository",
+	AZURE_DEVOPS_SYNC_TASK_AC: "azureDevOps:syncTaskAC",
 
 	// Azure DevOps PR Review
 	AZURE_DEVOPS_PR_REVIEW: "azureDevOps:prReview",
@@ -608,6 +609,7 @@ export const IPC_CHANNELS = {
 	// Copilot CLI operations (mirrors Claude Code CLI pattern)
 	COPILOT_CLI_CHECK_VERSION: "copilotCli:checkVersion",
 	COPILOT_CLI_INSTALL: "copilotCli:install",
+	COPILOT_CLI_INSTALL_SILENT: "copilotCli:installSilent",
 	COPILOT_CLI_GET_INSTALLATIONS: "copilotCli:getInstallations",
 	COPILOT_CLI_SET_ACTIVE_PATH: "copilotCli:setActivePath",
 	COPILOT_CLI_CHECK_AUTH: "copilotCli:checkAuth",

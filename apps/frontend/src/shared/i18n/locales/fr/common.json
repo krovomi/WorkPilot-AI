@@ -509,7 +509,7 @@
 		"providerCursor": "Cursor",
 		"providerAWS": "AWS Bedrock",
 		"providerUnknown": "Inconnu",
-		"copilotTokensSuffix": "tok",
+		"copilotTokensSuffix": " Tok",
 		"copilotTokensTitle": "Tokens consommés (Copilot)",
 		"profile": "Profil",
 		"id": "ID",

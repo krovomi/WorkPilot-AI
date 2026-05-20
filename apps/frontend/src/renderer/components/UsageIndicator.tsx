@@ -964,6 +964,7 @@ export function UsageIndicator() {
 				usage.copilotUsageDetails?.totalTokens,
 				i18n.language,
 			);
+
 			return (
 				<div className="flex items-center gap-0.5 text-xs font-semibold font-mono">
 					<span

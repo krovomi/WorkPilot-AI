@@ -219,6 +219,16 @@ try:
 
         print(json.dumps({'data': info}))
     
+    elif operation == 'get_work_item':
+        work_item_id = int(params.get('work_item_id'))
+        item = connector.get_item(project=project, item_id=work_item_id)
+        result = {
+            'id': item.id,
+            'title': item.title,
+            'acceptanceCriteria': item.acceptance_criteria,
+        }
+        print(json.dumps({'data': result}))
+    
     else:
         print(json.dumps({'error': f'Unknown operation: {operation}'}))
         sys.exit(1)
@@ -816,6 +826,82 @@ except Exception as e:
 						tasks: importedTasks,
 					},
 				};
+			} catch (error: unknown) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				return { success: false, error: errorMessage };
+			}
+		},
+	);
+
+	// ============================================
+	// Azure DevOps AC Sync Operation
+	// ============================================
+
+	ipcMain.handle(
+		IPC_CHANNELS.AZURE_DEVOPS_SYNC_TASK_AC,
+		async (
+			_,
+			projectId: string,
+			taskId: string,
+			workItemId: number,
+		): Promise<IPCResult<{ acceptanceCriteria: string[] }>> => {
+			const project = projectStore.getProject(projectId);
+			if (!project?.autoBuildPath) {
+				return { success: false, error: "Project not found or not initialized" };
+			}
+
+			const config = getAzureDevOpsConfig(project);
+			const envOverrides: Record<string, string> = {};
+			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
+			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
+			const normalizedProject = normalizeProjectName(config.projectName);
+			if (normalizedProject) envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
+			if (!config.pat || !config.orgUrl) {
+				return { success: false, error: "Azure DevOps not configured" };
+			}
+
+			try {
+				const projectPath = path.join(project.path, project.autoBuildPath || "");
+
+				const rawItem = (await callAzureDevOpsPython(
+					projectPath,
+					"get_work_item",
+					{ work_item_id: workItemId },
+					envOverrides,
+				)) as { id: number; title: string; acceptanceCriteria?: string };
+
+				const acceptanceCriteriaList = parseAcceptanceCriteriaText(
+					rawItem.acceptanceCriteria ?? undefined,
+				);
+
+				// Persist to disk via TASK_UPDATE path (task_metadata.json + requirements.json)
+				const task = projectStore.getTasks(projectId).find((t) => t.id === taskId);
+				if (task?.specsPath) {
+					const specDir = task.specsPath;
+					const metadataPath = path.join(specDir, "task_metadata.json");
+					const requirementsPath = path.join(specDir, "requirements.json");
+
+					if (existsSync(metadataPath)) {
+						const meta = JSON.parse(readFileSync(metadataPath, "utf-8"));
+						meta.acceptanceCriteria = acceptanceCriteriaList;
+						writeFileSync(metadataPath, JSON.stringify(meta, null, 2), "utf-8");
+					}
+
+					if (existsSync(requirementsPath)) {
+						const reqs = JSON.parse(readFileSync(requirementsPath, "utf-8"));
+						reqs.acceptance_criteria = acceptanceCriteriaList;
+						writeFileSync(
+							requirementsPath,
+							JSON.stringify(reqs, null, 2),
+							"utf-8",
+						);
+					}
+
+					projectStore.invalidateTasksCache(projectId);
+				}
+
+				return { success: true, data: { acceptanceCriteria: acceptanceCriteriaList } };
 			} catch (error: unknown) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);

@@ -35,6 +35,11 @@ export interface AzureDevOpsAPI {
 	checkAzureDevOpsConnection: (
 		projectId: string,
 	) => Promise<IPCResult<AzureDevOpsSyncStatus>>;
+	syncAzureDevOpsTaskAC: (
+		projectId: string,
+		taskId: string,
+		workItemId: number,
+	) => Promise<IPCResult<{ acceptanceCriteria: string[] }>>;
 }
 
 /**
@@ -86,4 +91,16 @@ export const createAzureDevOpsAPI = (): AzureDevOpsAPI => ({
 		projectId: string,
 	): Promise<IPCResult<AzureDevOpsSyncStatus>> =>
 		invokeIpc(IPC_CHANNELS.AZURE_DEVOPS_CHECK_CONNECTION, projectId),
+
+	syncAzureDevOpsTaskAC: (
+		projectId: string,
+		taskId: string,
+		workItemId: number,
+	): Promise<IPCResult<{ acceptanceCriteria: string[] }>> =>
+		invokeIpc(
+			IPC_CHANNELS.AZURE_DEVOPS_SYNC_TASK_AC,
+			projectId,
+			taskId,
+			workItemId,
+		),
 });

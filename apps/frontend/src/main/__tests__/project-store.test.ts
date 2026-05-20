@@ -1077,6 +1077,165 @@ describe("ProjectStore", () => {
 		});
 	});
 
+	describe("loadTaskMetadata - acceptanceCriteria fallback", () => {
+		it("should load acceptanceCriteria from task_metadata.json when present", async () => {
+			const specsDir = path.join(
+				TEST_PROJECT_PATH,
+				".workpilot",
+				"specs",
+				"008-ac-from-metadata",
+			);
+			mkdirSync(specsDir, { recursive: true });
+
+			const plan = {
+				feature: "AC from Metadata",
+				workflow_type: "feature",
+				services_involved: [],
+				phases: [],
+				final_acceptance: [],
+				created_at: "2024-01-01T00:00:00Z",
+				updated_at: "2024-01-01T00:00:00Z",
+				spec_file: "spec.md",
+			};
+			writeFileSync(
+				path.join(specsDir, "implementation_plan.json"),
+				JSON.stringify(plan),
+			);
+			writeFileSync(
+				path.join(specsDir, "task_metadata.json"),
+				JSON.stringify({ acceptanceCriteria: ["Criterion A", "Criterion B"] }),
+			);
+
+			const { ProjectStore } = await import("../project-store");
+			const store = new ProjectStore();
+
+			const project = store.addProject(TEST_PROJECT_PATH);
+			const tasks = store.getTasks(project.id);
+
+			expect(tasks[0].metadata?.acceptanceCriteria).toEqual([
+				"Criterion A",
+				"Criterion B",
+			]);
+		});
+
+		it("should fall back to requirements.json when task_metadata.json has no acceptanceCriteria", async () => {
+			const specsDir = path.join(
+				TEST_PROJECT_PATH,
+				".workpilot",
+				"specs",
+				"009-ac-fallback",
+			);
+			mkdirSync(specsDir, { recursive: true });
+
+			const plan = {
+				feature: "AC Fallback",
+				workflow_type: "feature",
+				services_involved: [],
+				phases: [],
+				final_acceptance: [],
+				created_at: "2024-01-01T00:00:00Z",
+				updated_at: "2024-01-01T00:00:00Z",
+				spec_file: "spec.md",
+			};
+			writeFileSync(
+				path.join(specsDir, "implementation_plan.json"),
+				JSON.stringify(plan),
+			);
+			// Old-format task_metadata.json without acceptanceCriteria
+			writeFileSync(
+				path.join(specsDir, "task_metadata.json"),
+				JSON.stringify({ azureDevopsId: 1234 }),
+			);
+			writeFileSync(
+				path.join(specsDir, "requirements.json"),
+				JSON.stringify({
+					acceptance_criteria: ["L'utilisateur peut se connecter", "L'utilisateur peut se déconnecter"],
+				}),
+			);
+
+			const { ProjectStore } = await import("../project-store");
+			const store = new ProjectStore();
+
+			const project = store.addProject(TEST_PROJECT_PATH);
+			const tasks = store.getTasks(project.id);
+
+			expect(tasks[0].metadata?.acceptanceCriteria).toEqual([
+				"L'utilisateur peut se connecter",
+				"L'utilisateur peut se déconnecter",
+			]);
+		});
+
+		it("should fall back to requirements.json when task_metadata.json is absent", async () => {
+			const specsDir = path.join(
+				TEST_PROJECT_PATH,
+				".workpilot",
+				"specs",
+				"010-ac-no-metadata",
+			);
+			mkdirSync(specsDir, { recursive: true });
+
+			const plan = {
+				feature: "AC No Metadata",
+				workflow_type: "feature",
+				services_involved: [],
+				phases: [],
+				final_acceptance: [],
+				created_at: "2024-01-01T00:00:00Z",
+				updated_at: "2024-01-01T00:00:00Z",
+				spec_file: "spec.md",
+			};
+			writeFileSync(
+				path.join(specsDir, "implementation_plan.json"),
+				JSON.stringify(plan),
+			);
+			writeFileSync(
+				path.join(specsDir, "requirements.json"),
+				JSON.stringify({ acceptance_criteria: ["Critère unique"] }),
+			);
+
+			const { ProjectStore } = await import("../project-store");
+			const store = new ProjectStore();
+
+			const project = store.addProject(TEST_PROJECT_PATH);
+			const tasks = store.getTasks(project.id);
+
+			expect(tasks[0].metadata?.acceptanceCriteria).toEqual(["Critère unique"]);
+		});
+
+		it("should have undefined acceptanceCriteria when neither source has it", async () => {
+			const specsDir = path.join(
+				TEST_PROJECT_PATH,
+				".workpilot",
+				"specs",
+				"011-ac-absent",
+			);
+			mkdirSync(specsDir, { recursive: true });
+
+			const plan = {
+				feature: "No AC",
+				workflow_type: "feature",
+				services_involved: [],
+				phases: [],
+				final_acceptance: [],
+				created_at: "2024-01-01T00:00:00Z",
+				updated_at: "2024-01-01T00:00:00Z",
+				spec_file: "spec.md",
+			};
+			writeFileSync(
+				path.join(specsDir, "implementation_plan.json"),
+				JSON.stringify(plan),
+			);
+
+			const { ProjectStore } = await import("../project-store");
+			const store = new ProjectStore();
+
+			const project = store.addProject(TEST_PROJECT_PATH);
+			const tasks = store.getTasks(project.id);
+
+			expect(tasks[0].metadata?.acceptanceCriteria).toBeUndefined();
+		});
+	});
+
 	describe("getTasks - worktree deduplication", () => {
 		it("should not duplicate tasks that exist in both main and worktree", async () => {
 			// Create same task in both main and worktree

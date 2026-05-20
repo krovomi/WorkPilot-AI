@@ -48,6 +48,7 @@ import type { ProjectSettingsSection } from "./components/settings/ProjectSettin
 import { TerminalGrid } from "./components/TerminalGrid";
 import { Toaster } from "./components/ui/toaster";
 import { CliStatusProvider } from "./contexts/CliStatusContext";
+import { useToast } from "./hooks/use-toast";
 
 const Roadmap = lazy(() =>
 	import("./components/Roadmap").then((m) => ({ default: m.Roadmap })),
@@ -417,6 +418,7 @@ function ProjectTabBarWithContext({
 }
 
 export function App() {
+	const { toast } = useToast();
 	// Load IPC listeners for real-time updates
 	useIpcListeners();
 
@@ -927,7 +929,15 @@ export function App() {
 				try {
 					const path = await globalThis.electronAPI.selectDirectory();
 					if (path) {
-						const project = await addProject(path);
+						const added = await addProject(path);
+						const project = added?.project;
+						if (added?.warning) {
+							toast({
+								title: "Possible misconfiguration",
+								description: added.warning,
+								variant: "default",
+							});
+						}
 						if (project) {
 							openProjectTab(project.id);
 							if (!project.autoBuildPath) {

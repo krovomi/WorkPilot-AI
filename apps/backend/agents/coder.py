@@ -127,6 +127,46 @@ AGENT_NAME = "Claude Code"
 # =============================================================================
 
 
+def _find_git_root(start: Path) -> Path | None:
+    """Walk up from `start` looking for a directory containing `.git`. Return it, or None."""
+    current = start.resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def _suggest_project_dir_fix(project_dir: Path, invalid_paths: list[str]) -> str:
+    """
+    Build an actionable suggestion when paths escape project_dir.
+
+    The common cause is that project_dir points to a sub-folder of the actual project
+    root. If a Git root exists above project_dir AND the escaping paths resolve inside
+    that Git root, recommend reconfiguring the project to point at the Git root.
+    """
+    resolved_project = Path(project_dir).resolve()
+    git_root = _find_git_root(resolved_project)
+
+    if git_root and git_root != resolved_project:
+        all_resolve_inside_git_root = all(
+            (resolved_project / p).resolve().is_relative_to(git_root)
+            for p in invalid_paths
+        )
+        if all_resolve_inside_git_root:
+            return (
+                f"Project misconfiguration likely: project_dir is set to a sub-folder "
+                f"({resolved_project}). All offending paths resolve inside the Git root "
+                f"at {git_root}. Reconfigure the project in WorkPilot to point at "
+                f"{git_root} instead, then re-plan. As an interim fix, you may also "
+                f"rewrite the paths to be relative to project_dir (without `../`)."
+            )
+
+    return (
+        "Update implementation plan to use paths within the project directory "
+        "(no `../` segments, no absolute paths)."
+    )
+
+
 def validate_subtask_files(subtask: dict, project_dir: Path) -> dict:
     """
     Validate all files_to_modify exist before subtask execution.
@@ -161,7 +201,7 @@ def validate_subtask_files(subtask: dict, project_dir: Path) -> dict:
             "error": f"Paths resolve outside project boundary: {', '.join(invalid_paths)}",
             "missing_files": missing_files,
             "invalid_paths": invalid_paths,
-            "suggestion": "Update implementation plan to use paths within the project directory",
+            "suggestion": _suggest_project_dir_fix(project_dir, invalid_paths),
         }
 
     if missing_files:

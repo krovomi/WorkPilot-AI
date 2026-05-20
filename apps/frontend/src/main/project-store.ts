@@ -851,21 +851,42 @@ export class ProjectStore {
 	}
 
 	/**
-	 * Load task metadata
+	 * Load task metadata, enriching acceptanceCriteria from requirements.json
+	 * when not already present in task_metadata.json (backward-compat for old imports).
 	 */
 	private loadTaskMetadata(specPath: string): TaskMetadata | undefined {
 		const metadataPath = path.join(specPath, "task_metadata.json");
 
-		if (!existsSync(metadataPath)) {
-			return undefined;
+		let metadata: TaskMetadata | undefined;
+		if (existsSync(metadataPath)) {
+			try {
+				const content = readFileSync(metadataPath, "utf-8");
+				metadata = JSON.parse(content);
+			} catch {
+				metadata = undefined;
+			}
 		}
 
-		try {
-			const content = readFileSync(metadataPath, "utf-8");
-			return JSON.parse(content);
-		} catch {
-			return undefined;
+		// Fallback: populate acceptanceCriteria from requirements.json when absent
+		if (!metadata?.acceptanceCriteria?.length) {
+			const requirementsPath = path.join(specPath, AUTO_BUILD_PATHS.REQUIREMENTS);
+			if (existsSync(requirementsPath)) {
+				try {
+					const reqContent = readFileSync(requirementsPath, "utf-8");
+					const requirements = JSON.parse(reqContent);
+					if (Array.isArray(requirements.acceptance_criteria) && requirements.acceptance_criteria.length > 0) {
+						metadata = {
+							...metadata,
+							acceptanceCriteria: requirements.acceptance_criteria,
+						};
+					}
+				} catch {
+					// silently ignore parse errors
+				}
+			}
 		}
+
+		return metadata;
 	}
 
 	/**

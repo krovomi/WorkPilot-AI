@@ -24,7 +24,12 @@ import type {
 	CopilotInstallationInfo,
 	CopilotInstallationList,
 } from "../../shared/types/cli";
-import { configureTools, getToolInfo, getToolPath } from "../cli-tool-manager";
+import {
+	clearToolCache,
+	configureTools,
+	getToolInfo,
+	getToolPath,
+} from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
 import { isWindows } from "../platform";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
@@ -557,6 +562,105 @@ export function registerCopilotCliHandlers(): void {
 					success: false,
 					error: `Failed to open terminal for installation: ${errorMsg}`,
 				};
+			}
+		},
+	);
+
+	// Silent install/update of Copilot CLI extension — runs `gh copilot install`
+	// or `gh copilot update` in the background without opening a terminal.
+	// Requires the gh CLI to be installed and authenticated.
+	ipcMain.handle(
+		IPC_CHANNELS.COPILOT_CLI_INSTALL_SILENT,
+		async (): Promise<IPCResult<{ stdout: string; stderr: string }>> => {
+			try {
+				const ghInfo = getToolInfo("gh");
+				if (!ghInfo.found || !ghInfo.path) {
+					return {
+						success: false,
+						error:
+							"gh_missing: GitHub CLI (gh) is required to install or update Copilot.",
+					};
+				}
+
+				let isUpdate = false;
+				try {
+					const detectionResult = getToolInfo("copilot");
+					isUpdate = detectionResult.found && !!detectionResult.version;
+				} catch {
+					isUpdate = false;
+				}
+
+				const subCommand = isUpdate ? "update" : "install";
+				console.warn(
+					`[Copilot CLI] Starting silent gh copilot ${subCommand}`,
+				);
+
+				const env = getAugmentedEnv();
+				const child = spawn(ghInfo.path, ["copilot", subCommand], {
+					shell: false,
+					windowsHide: true,
+					env: { ...env, CI: "1" },
+				});
+
+				let stdout = "";
+				let stderr = "";
+				child.stdout?.on("data", (chunk: Buffer) => {
+					stdout += chunk.toString("utf-8");
+				});
+				child.stderr?.on("data", (chunk: Buffer) => {
+					stderr += chunk.toString("utf-8");
+				});
+
+				const result = await new Promise<{
+					code: number | null;
+					stdout: string;
+					stderr: string;
+				}>((resolve, reject) => {
+					const timeout = setTimeout(
+						() => {
+							child.kill("SIGKILL");
+							reject(
+								new Error(
+									`gh copilot ${subCommand} timed out after 5 minutes`,
+								),
+							);
+						},
+						5 * 60 * 1000,
+					);
+					child.on("error", (err) => {
+						clearTimeout(timeout);
+						reject(err);
+					});
+					child.on("close", (code) => {
+						clearTimeout(timeout);
+						resolve({ code, stdout, stderr });
+					});
+				});
+
+				cachedLatestCopilotVersion = null;
+				// Invalidate the cli-tool-manager cache so the next getToolInfo
+				// re-detects the freshly-installed copilot extension version.
+				clearToolCache();
+
+				if (result.code !== 0) {
+					return {
+						success: false,
+						error: `gh copilot ${subCommand} exited with code ${result.code}: ${
+							(result.stderr || result.stdout).trim().slice(0, 500) ||
+							"unknown error"
+						}`,
+					};
+				}
+
+				return {
+					success: true,
+					data: { stdout: result.stdout, stderr: result.stderr },
+				};
+			} catch (error) {
+				const errorMsg =
+					error instanceof Error ? error.message : "Unknown error";
+				console.error("[Copilot CLI] Silent install failed:", errorMsg, error);
+				return { success: false, error: errorMsg };
 			}
 		},
 	);

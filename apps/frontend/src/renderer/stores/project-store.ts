@@ -371,9 +371,12 @@ export async function loadProjects(): Promise<void> {
 }
 
 /**
- * Add a new project
+ * Add a new project. Returns the created project plus an optional warning
+ * (e.g. when the chosen path is a Git sub-folder instead of the Git root).
  */
-export async function addProject(projectPath: string): Promise<Project | null> {
+export async function addProject(
+	projectPath: string,
+): Promise<{ project: Project; warning?: string } | null> {
 	const store = useProjectStore.getState();
 
 	try {
@@ -383,7 +386,7 @@ export async function addProject(projectPath: string): Promise<Project | null> {
 			store.selectProject(result.data.id);
 			// Also open a tab for the new project
 			store.openProjectTab(result.data.id);
-			return result.data;
+			return { project: result.data, warning: result.warning };
 		} else {
 			store.setError(result.error || "Failed to add project");
 			return null;

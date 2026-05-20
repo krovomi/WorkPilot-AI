@@ -13,6 +13,7 @@ import {
 	Lightbulb,
 	ListChecks,
 	Palette,
+	Pencil,
 	Shield,
 	StickyNote,
 	Target,
@@ -691,13 +692,8 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 						</div>
 					)}
 
-					{/* Acceptance Criteria — collapsible */}
-					{task.metadata.acceptanceCriteria &&
-						task.metadata.acceptanceCriteria.length > 0 && (
-							<AcceptanceCriteriaSection
-								criteria={task.metadata.acceptanceCriteria}
-							/>
-						)}
+					{/* Acceptance Criteria — always visible, editable */}
+					<AcceptanceCriteriaSection task={task} />
 
 					{/* Extra note — editable, persisted as additional_context */}
 					<ExtraNoteSection task={task} />
@@ -736,12 +732,76 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 }
 
 interface AcceptanceCriteriaSectionProps {
-	readonly criteria: string[];
+	readonly task: Task;
 }
 
-function AcceptanceCriteriaSection({ criteria }: AcceptanceCriteriaSectionProps) {
+function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 	const { t } = useTranslation(["tasks"]);
-	const [open, setOpen] = useState(true);
+	const initialCriteria = task.metadata?.acceptanceCriteria ?? [];
+	const initialText = initialCriteria.join("\n");
+
+	// Extract ADO work item ID from "ADO-603226" format
+	const adoWorkItemId = task.metadata?.azureDevOpsIdentifier
+		? Number(task.metadata.azureDevOpsIdentifier.replace(/^ADO-/i, ""))
+		: null;
+	const isAdoTask = adoWorkItemId !== null && !Number.isNaN(adoWorkItemId);
+
+	const [open, setOpen] = useState(initialCriteria.length > 0);
+	const [isEditing, setIsEditing] = useState(false);
+	const [draft, setDraft] = useState(initialText);
+	const [isSaving, setIsSaving] = useState(false);
+	const [isSyncing, setIsSyncing] = useState(false);
+	const [savedAt, setSavedAt] = useState<number | null>(null);
+
+	useEffect(() => {
+		const fresh = task.metadata?.acceptanceCriteria ?? [];
+		setDraft(fresh.join("\n"));
+	}, [task.metadata?.acceptanceCriteria]);
+
+	const parsedDraft = draft
+		.split("\n")
+		.map((l) => l.trim().replace(/^[-*•]\s*/, ""))
+		.filter(Boolean);
+
+	const isDirty = parsedDraft.join("\n") !== initialCriteria.join("\n");
+
+	const handleSave = async () => {
+		setIsSaving(true);
+		const ok = await persistUpdateTask(task.id, {
+			metadata: { acceptanceCriteria: parsedDraft },
+		});
+		setIsSaving(false);
+		if (ok) {
+			setSavedAt(Date.now());
+			setIsEditing(false);
+			if (parsedDraft.length > 0) setOpen(true);
+		}
+	};
+
+	const handleCancel = () => {
+		setDraft(initialCriteria.join("\n"));
+		setIsEditing(false);
+	};
+
+	const handleSyncFromAdo = async () => {
+		if (!isAdoTask || !adoWorkItemId) return;
+		setIsSyncing(true);
+		try {
+			const result = await globalThis.electronAPI.syncAzureDevOpsTaskAC(
+				task.projectId,
+				task.id,
+				adoWorkItemId,
+			);
+			if (result.success && result.data) {
+				const synced = result.data.acceptanceCriteria;
+				await persistUpdateTask(task.id, { metadata: { acceptanceCriteria: synced } });
+				setOpen(synced.length > 0);
+				setSavedAt(Date.now());
+			}
+		} finally {
+			setIsSyncing(false);
+		}
+	};
 
 	return (
 		<Collapsible open={open} onOpenChange={setOpen}>
@@ -758,17 +818,91 @@ function AcceptanceCriteriaSection({ criteria }: AcceptanceCriteriaSectionProps)
 					)}
 					<ListChecks className="h-3 w-3 text-success" />
 					<span>{t("tasks:metadata.acceptanceCriteria")}</span>
-					<Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
-						{criteria.length}
-					</Badge>
+					{initialCriteria.length > 0 && (
+						<Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
+							{initialCriteria.length}
+						</Badge>
+					)}
 				</button>
 			</CollapsibleTrigger>
 			<CollapsibleContent>
-				<ul className="text-sm text-foreground/80 list-disc list-inside space-y-0.5 pl-5">
-					{criteria.map((criterion) => (
-						<li key={criterion.trim()}>{criterion}</li>
-					))}
-				</ul>
+				{isEditing ? (
+					<>
+						<Textarea
+							value={draft}
+							onChange={(e) => setDraft(e.target.value)}
+							placeholder={t("tasks:metadata.acPlaceholder")}
+							rows={5}
+							className="text-sm"
+						/>
+						<div className="flex items-center justify-between mt-2 gap-2">
+							<span className="text-xs text-muted-foreground">
+								{savedAt && !isDirty
+									? t("tasks:metadata.acSaved")
+									: t("tasks:metadata.acHelp")}
+							</span>
+							<div className="flex gap-1.5">
+								<Button
+									size="sm"
+									variant="ghost"
+									onClick={handleCancel}
+									disabled={isSaving}
+								>
+									{t("tasks:metadata.acCancel")}
+								</Button>
+								<Button
+									size="sm"
+									onClick={handleSave}
+									disabled={!isDirty || isSaving}
+								>
+									{isSaving
+										? t("tasks:metadata.acSaving")
+										: t("tasks:metadata.acSave")}
+								</Button>
+							</div>
+						</div>
+					</>
+				) : (
+					<>
+						{initialCriteria.length > 0 ? (
+							<ul className="text-sm text-foreground/80 list-disc list-inside space-y-0.5 pl-5 mb-2">
+								{initialCriteria.map((criterion, idx) => (
+									<li key={`ac-${idx}`}>{criterion}</li>
+								))}
+							</ul>
+						) : (
+							<p className="text-xs text-muted-foreground italic mb-2">
+								{t("tasks:metadata.acEmpty")}
+							</p>
+						)}
+						<div className="flex items-center gap-3 flex-wrap">
+							<button
+								type="button"
+								onClick={() => {
+									setIsEditing(true);
+									setOpen(true);
+								}}
+								className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+							>
+								<Pencil className="h-3 w-3" />
+								{t("tasks:metadata.acEdit")}
+							</button>
+							{isAdoTask && (
+								<button
+									type="button"
+									onClick={handleSyncFromAdo}
+									disabled={isSyncing}
+									className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+								>
+									<Check className="h-3 w-3" />
+									{isSyncing
+										? t("tasks:metadata.acSyncing")
+										: t("tasks:metadata.acSyncFromAdo")}
+								</button>
+							)}
+						</div>
+					</>
+				)}
 			</CollapsibleContent>
 		</Collapsible>
 	);

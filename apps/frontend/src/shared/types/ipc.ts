@@ -835,6 +835,11 @@ export interface ElectronAPI {
 	checkAzureDevOpsConnection: (
 		projectId: string,
 	) => Promise<IPCResult<AzureDevOpsSyncStatus>>;
+	syncAzureDevOpsTaskAC: (
+		projectId: string,
+		taskId: string,
+		workItemId: number,
+	) => Promise<IPCResult<{ acceptanceCriteria: string[] }>>;
 
 	// Jira integration operations
 	getJiraIssues: (
