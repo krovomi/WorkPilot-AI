@@ -286,6 +286,7 @@ class TestGetWorkItem:
 
         mock_wit_client.get_work_item.assert_called_once_with(
             id=42,
+            expand="fields",
         )
 
     def test_404_raises_work_item_not_found(self, work_items_client, mock_wit_client):
