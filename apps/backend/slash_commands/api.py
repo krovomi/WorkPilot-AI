@@ -114,25 +114,20 @@ def _scan_commands_dir(dir_path: Path, source: str) -> list[dict[str, Any]]:
     return items
 
 
-# Built-in slash commands the SDK / CLI recognises. We surface a small
-# curated set in the picker so users discover them without typing — the
-# full CLI list is much larger but most are noise for the Kanban UI.
+# Built-in slash commands the SDK / CLI recognises AND that make sense in
+# our one-shot Quick-Command bar. Commands that operate on a persistent
+# conversation (/compact, /clear, /save, /resume…) are intentionally
+# omitted: each click here spawns a fresh SDK client with an empty
+# transcript, so those commands would always return "No messages to …".
+# Self-contained commands like /review and /help work without prior context.
 _BUILT_IN_COMMANDS: list[dict[str, str]] = [
     {
-        "name": "compact",
-        "description": "Compact the current conversation to free context window space",
-    },
-    {
-        "name": "clear",
-        "description": "Clear the conversation transcript (does not affect files)",
+        "name": "review",
+        "description": "Run the bundled code review skill on the current branch",
     },
     {
         "name": "help",
         "description": "Show built-in slash command help",
-    },
-    {
-        "name": "review",
-        "description": "Run the bundled code review skill on the current branch",
     },
 ]
 

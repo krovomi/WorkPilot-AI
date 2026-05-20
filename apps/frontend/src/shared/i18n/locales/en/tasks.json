@@ -170,7 +170,7 @@
 		"azureDevOpsNotConnected": "Azure DevOps not connected — click to configure",
 		"jiraNotConnected": "Jira not connected — click to configure",
 		"quickCommand": {
-			"placeholder": "Quick command (e.g. /compact, /review)",
+			"placeholder": "Quick command (e.g. /review, /help)",
 			"buttonLabel": "Run command",
 			"running": "Running…",
 			"hint": "Type / then a command name. Tab to autocomplete.",
