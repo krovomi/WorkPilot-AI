@@ -265,16 +265,25 @@ export function CleanProviderSection({
 		// Passing 'anthropic' forces getUsageForProvider() which makes a real OAuth API call,
 		// unlike requestUsageUpdate() with no args which only returns the cached currentUsage.
 		// The result is emitted as usage-updated → handleUsageUpdated overwrites stale data.
-		try {
-			const freshResult =
-				await globalThis.electronAPI?.requestUsageUpdate?.("anthropic");
-			const freshSnapshot = freshResult?.data ?? null;
-			if (freshResult?.success && freshSnapshot) {
-				handleUsageUpdated(freshSnapshot);
-			}
-		} catch (err) {
-			console.warn("[CleanProviderSection] Failed to fetch fresh usage:", err);
-		}
+		// Also fetch Copilot Premium Requests so the card shows real consumption.
+		const providersWithLiveUsage = ["anthropic", "copilot"] as const;
+		await Promise.all(
+			providersWithLiveUsage.map(async (provider) => {
+				try {
+					const freshResult =
+						await globalThis.electronAPI?.requestUsageUpdate?.(provider);
+					const freshSnapshot = freshResult?.data ?? null;
+					if (freshResult?.success && freshSnapshot) {
+						handleUsageUpdated(freshSnapshot);
+					}
+				} catch (err) {
+					console.warn(
+						`[CleanProviderSection] Failed to fetch fresh usage for ${provider}:`,
+						err,
+					);
+				}
+			}),
+		);
 	};
 
 	// Load usage data from CredentialManager (Windsurf, etc.)
