@@ -596,7 +596,19 @@
 		"copilotMetricsDesc": "GitHub Copilot usage data for the last 28 days.",
 		"copilotAcceptancesLabel": "Acceptances",
 		"copilotAcceptanceRateLabel": "Acceptance rate",
-		"copilotTokensUsedLabel": "Tokens used"
+		"copilotTokensUsedLabel": "Tokens used",
+		"copilotPremiumTitle": "Copilot Premium Requests",
+		"copilotPremiumDescPlan": "{{plan}} plan — current billing cycle usage.",
+		"copilotPremiumDescDefault": "Copilot usage for the current billing cycle.",
+		"copilotPremiumUsedLabel": "Used",
+		"copilotPremiumEntitlementLabel": "Allowance",
+		"copilotPremiumRemainingLabel": "Remaining",
+		"copilotPremiumPercentLabel": "Consumed",
+		"copilotPremiumUnlimited": "Unlimited",
+		"copilotPremiumResetOn": "Resets on {{date}}",
+		"copilotPremiumOverageHint": "Beyond the quota, requests will be billed as overage.",
+		"copilotPlanLabel": "Plan",
+		"copilotOrganizationLabel": "Organization"
 	},
 	"oauth": {
 		"enterCode": "Manual Code Entry (Fallback)",
