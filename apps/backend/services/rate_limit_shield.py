@@ -87,9 +87,7 @@ async def handle_rate_limit_pause(
         wait_minutes,
         reset_timestamp,
     )
-    print(
-        f"\n⏸  Rate limit reached. Pausing {phase} for {wait_minutes:.0f} minutes..."
-    )
+    print(f"\n⏸  Rate limit reached. Pausing {phase} for {wait_minutes:.0f} minutes...")
 
     pause_data = {
         "paused_at": datetime.now().isoformat(),

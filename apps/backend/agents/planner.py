@@ -199,9 +199,11 @@ async def run_followup_planner(
                     runtime, prompt, spec_dir, verbose, phase=LogPhase.PLANNING
                 )
 
-            if status == "error" and isinstance(error_info, dict) and error_info.get(
-                "type"
-            ) == "rate_limit":
+            if (
+                status == "error"
+                and isinstance(error_info, dict)
+                and error_info.get("type") == "rate_limit"
+            ):
                 err_msg = error_info.get("message", "")
                 if await handle_rate_limit_pause(
                     RuntimeError(err_msg), spec_dir, "planner"

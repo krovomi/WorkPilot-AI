@@ -17,7 +17,8 @@ try:
 except ImportError:
     ClaudeSDKClient = None  # type: ignore[assignment,misc]
 
-from core.agent_client import AgentClient, ContentBlockType
+from core.agent_client import AgentClient, AgentMessage, ContentBlock, ContentBlockType, MessageRole
+from core.conversation_log import append_message as _log_append_message
 from debug import debug, debug_detailed, debug_error, debug_section, debug_success
 from insight_extractor import extract_session_insights
 from linear_updater import (
@@ -67,6 +68,94 @@ except ImportError:
     _get_replay_recorder = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
+
+
+def _read_current_subtask_id(spec_dir: Path) -> str | None:
+    """Best-effort lookup of the current subtask id from task_metadata.json.
+
+    Stored as `current_subtask_id` by the coder when it picks the next pending
+    subtask. May be absent (planner, qa, spec phases) — in which case None is
+    fine; the conversation log just won't carry a subtask attribution.
+    """
+    try:
+        import json as _json
+
+        metadata_file = spec_dir / "task_metadata.json"
+        if not metadata_file.exists():
+            return None
+        data = _json.loads(metadata_file.read_text(encoding="utf-8"))
+        value = data.get("current_subtask_id")
+        return str(value) if value else None
+    except Exception:
+        return None
+
+
+async def _maybe_replay_conversation(
+    client: AgentClient,
+    spec_dir: Path,
+    provider: str,
+    model: str,
+) -> None:
+    """If a prior conversation log exists for this spec, deserialize it and
+    hand it to `client.resume()` so the new provider picks up the context.
+
+    Silent on failure: the conversation log is best-effort and must never
+    take down a session start.
+    """
+    try:
+        from core.conversation_log import (
+            CONVERSATION_LOG_FILENAME,
+            deserialize_message,
+            read_log,
+        )
+
+        log_file = spec_dir / CONVERSATION_LOG_FILENAME
+        if not log_file.exists():
+            return
+        entries = read_log(spec_dir)
+        if not entries:
+            return
+        history = [deserialize_message(e) for e in entries]
+        debug(
+            "session",
+            f"Replaying {len(history)} prior message(s) from conversation log "
+            f"into [{provider}/{model}]",
+        )
+        await client.resume(history)
+    except Exception as e:
+        logger.warning(
+            "Could not replay conversation log from %s: %s — starting fresh",
+            spec_dir,
+            e,
+        )
+
+
+def _maybe_inject_pending_tool_use_note(message: str, spec_dir: Path) -> str:
+    """If the conversation log ends on an assistant turn with a tool_use that
+    never received its tool_result, prepend a directive to the user message
+    telling the LLM to re-issue the tool call before continuing.
+
+    Without this, the new provider would resume mid-thought without realising
+    it had asked for an action that was never executed.
+    """
+    try:
+        from core.conversation_log import has_pending_tool_use, read_log
+
+        entries = read_log(spec_dir)
+        if not entries or not has_pending_tool_use(entries):
+            return message
+        directive = (
+            "[Resume directive] The previous session ended while a tool call "
+            "was in flight and never received its result. Please re-issue the "
+            "tool call you intended at the end of the prior conversation, then "
+            "continue with the task below.\n\n"
+        )
+        return directive + message
+    except Exception as e:
+        logger.warning(
+            "Could not check for pending tool_use in %s: %s", spec_dir, e
+        )
+        return message
 
 
 def is_tool_concurrency_error(error: Exception) -> bool:
@@ -1057,7 +1146,35 @@ async def _run_agent_client_session(
     message_count = 0
     tool_count = 0
 
+    # Conversation log context: provider, model and subtask_id are persisted on
+    # every message so a different provider can replay the transcript later.
+    log_model = str(getattr(client, "model", "unknown"))
+    log_subtask_id = _read_current_subtask_id(spec_dir)
+
+    # If a prior session for this spec left a conversation log, replay it into
+    # the client so the LLM has the same context — even when this run uses a
+    # different provider than the one that originally produced the transcript.
+    # If the last assistant message ended on an un-dispatched tool_use, append
+    # a directive nudging the LLM to redo it.
+    await _maybe_replay_conversation(client, spec_dir, provider, log_model)
+    message = _maybe_inject_pending_tool_use_note(message, spec_dir)
+
     try:
+        # Persist the initial user message before the network call so a process
+        # crash between query() and the first stream chunk still leaves a usable
+        # log for replay.
+        _log_append_message(
+            spec_dir,
+            AgentMessage(
+                role=MessageRole.USER,
+                content=[ContentBlock(type=ContentBlockType.TEXT, text=message)],
+            ),
+            phase=phase.value,
+            provider=provider,
+            model=log_model,
+            subtask_id=log_subtask_id,
+        )
+
         debug("session", f"Sending query to {provider}...")
         await client.query(message)
         debug_success("session", "Query sent successfully")
@@ -1237,6 +1354,19 @@ async def _run_agent_client_session(
                             pass
 
                     current_tool = None
+
+            # Persist this assistant message in the conversation log AFTER all
+            # its blocks have been processed. This way the log mirrors what the
+            # agent actually emitted (text + tool_use + tool_result), making it
+            # safe to replay against a different provider after a pause.
+            _log_append_message(
+                spec_dir,
+                agent_msg,
+                phase=phase.value,
+                provider=provider,
+                model=log_model,
+                subtask_id=log_subtask_id,
+            )
 
         print("\n" + "-" * 70 + "\n")
 
