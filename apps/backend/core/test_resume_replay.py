@@ -13,7 +13,6 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
-
 from core.agent_client import (
     AgentClient,
     AgentMessage,
@@ -122,9 +121,7 @@ def test_consume_resumed_history_injects_system_message() -> None:
     client = ClaudeAgentClient(sdk_client=object())
     client._resumed_history = [_make_text_msg(MessageRole.USER, "earlier turn")]
 
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": "you are helpful"}
-    ]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": "you are helpful"}]
     client._consume_resumed_history_as_system_message(messages)
 
     # Should now have the original system + the preamble system message.

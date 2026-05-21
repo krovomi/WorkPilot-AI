@@ -176,7 +176,9 @@ class SpecOrchestrator:
             # the reset time from it.
             _, _, raw_err = response.split("::", 2)
             paused = await handle_rate_limit_pause(
-                RuntimeError(raw_err), self.spec_dir, f"spec:{phase_name or prompt_file}"
+                RuntimeError(raw_err),
+                self.spec_dir,
+                f"spec:{phase_name or prompt_file}",
             )
             if not paused:
                 # Shield couldn't handle it (unparseable wait time, too long, ...)

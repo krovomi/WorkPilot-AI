@@ -178,7 +178,7 @@ class AgentClient(ABC):
         """Return the provider identifier (e.g., 'claude', 'copilot')."""
         ...
 
-    async def resume(self, history: list["AgentMessage"]) -> None:
+    async def resume(self, history: list[AgentMessage]) -> None:
         """Preload a conversation history before the next query() call.
 
         Used when a task was paused (rate-limit, auth, user) and is being
@@ -234,7 +234,7 @@ class AgentClient(ABC):
         self._resumed_history = []  # consume
 
     @staticmethod
-    def _format_history_as_preamble(history: list["AgentMessage"]) -> str:
+    def _format_history_as_preamble(history: list[AgentMessage]) -> str:
         """Render a conversation history as a plain-text preamble.
 
         Used by subclasses whose SDK doesn't expose a structured messages

@@ -17,7 +17,13 @@ try:
 except ImportError:
     ClaudeSDKClient = None  # type: ignore[assignment,misc]
 
-from core.agent_client import AgentClient, AgentMessage, ContentBlock, ContentBlockType, MessageRole
+from core.agent_client import (
+    AgentClient,
+    AgentMessage,
+    ContentBlock,
+    ContentBlockType,
+    MessageRole,
+)
 from core.conversation_log import append_message as _log_append_message
 from debug import debug, debug_detailed, debug_error, debug_section, debug_success
 from insight_extractor import extract_session_insights
@@ -152,9 +158,7 @@ def _maybe_inject_pending_tool_use_note(message: str, spec_dir: Path) -> str:
         )
         return directive + message
     except Exception as e:
-        logger.warning(
-            "Could not check for pending tool_use in %s: %s", spec_dir, e
-        )
+        logger.warning("Could not check for pending tool_use in %s: %s", spec_dir, e)
         return message
 
 

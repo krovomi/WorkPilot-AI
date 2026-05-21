@@ -15,7 +15,6 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
-
 from core.agent_client import (
     AgentMessage,
     ContentBlock,
@@ -28,9 +27,7 @@ from core.conversation_log import CONVERSATION_LOG_FILENAME, append_message
 def _write_history(spec_dir: Path, messages: list[AgentMessage]) -> None:
     """Persist a fake conversation by reusing the real append_message()."""
     for m in messages:
-        append_message(
-            spec_dir, m, phase="coding", provider="claude", model="opus-4-7"
-        )
+        append_message(spec_dir, m, phase="coding", provider="claude", model="opus-4-7")
 
 
 @pytest.mark.asyncio
@@ -104,7 +101,9 @@ def test_inject_pending_tool_use_note_prepends_directive(tmp_path: Path) -> None
         [
             AgentMessage(
                 role=MessageRole.USER,
-                content=[ContentBlock(type=ContentBlockType.TEXT, text="please read foo.py")],
+                content=[
+                    ContentBlock(type=ContentBlockType.TEXT, text="please read foo.py")
+                ],
             ),
             AgentMessage(
                 role=MessageRole.ASSISTANT,

@@ -1537,6 +1537,73 @@ print(json.dumps(result))
 	);
 
 	/**
+	 * Resume a paused task under a different LLM provider (Niveau 3b).
+	 *
+	 * Writes a RESUME_WITH_PROVIDER marker file in the task's spec dir,
+	 * then triggers the same restart flow as a provider-change resume. The
+	 * Python backend reads the marker on the next session start via
+	 * core.client._consume_resume_with_provider_marker() and switches the
+	 * active provider for that one session (the marker is single-shot).
+	 *
+	 * The persisted conversation log (conversation.jsonl) is replayed into
+	 * the new provider's client so context is preserved across the switch.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_RESUME_WITH_PROVIDER,
+		async (
+			_,
+			taskId: string,
+			providerName: string,
+		): Promise<IPCResult> => {
+			const { task, project } = findTaskAndProject(taskId);
+			if (!task || !project) {
+				return { success: false, error: "Task not found" };
+			}
+			if (!providerName || typeof providerName !== "string") {
+				return {
+					success: false,
+					error: "Missing or invalid providerName argument",
+				};
+			}
+
+			const specsBaseDir = getSpecsDir(project.autoBuildPath);
+			const specDir =
+				task.specsPath || path.join(project.path, specsBaseDir, task.specId);
+
+			try {
+				// Write the single-shot marker that the Python backend will consume.
+				const markerPath = path.join(specDir, "RESUME_WITH_PROVIDER");
+				writeFileSync(markerPath, providerName.trim(), "utf-8");
+				appLog.info(
+					`[TASK_RESUME_WITH_PROVIDER] Wrote marker for task ${taskId}: ` +
+						`spec=${specDir}, provider=${providerName}`,
+				);
+			} catch (err) {
+				appLog.error(
+					`[TASK_RESUME_WITH_PROVIDER] Failed to write marker for task ${taskId}:`,
+					err,
+				);
+				return {
+					success: false,
+					error:
+						err instanceof Error
+							? err.message
+							: "Failed to write provider override marker",
+				};
+			}
+
+			// Restart the subprocess so the next session boots with the new
+			// provider (and replays the conversation log).
+			return await restartTaskWithNewProvider(
+				task,
+				project,
+				specDir,
+				providerName.trim(),
+			);
+		},
+	);
+
+	/**
 	 * Update task metadata with new provider configuration
 	 */
 	async function updateTaskMetadata(

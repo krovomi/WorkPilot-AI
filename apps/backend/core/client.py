@@ -1310,11 +1310,59 @@ def create_client(
 # =============================================================================
 
 
+# Filename for the single-shot "resume task X under provider Y" marker. The
+# frontend writes this when the user picks a different provider from the
+# paused-task modal. _get_active_provider() consumes it on the very next
+# session start and deletes the file so it doesn't keep overriding.
+RESUME_WITH_PROVIDER_FILE = "RESUME_WITH_PROVIDER"
+
+
+def _consume_resume_with_provider_marker(spec_dir: Path) -> str | None:
+    """Read and remove the RESUME_WITH_PROVIDER marker, returning the provider
+    name the user picked (or None if no marker exists).
+
+    The file can be either plain text containing the provider id
+    (``copilot``) or JSON ``{"provider": "copilot"}``. Anything else is
+    treated as no override and the file is left in place for inspection.
+
+    Failures here must NEVER prevent session startup — log and return None.
+    """
+    marker = spec_dir / RESUME_WITH_PROVIDER_FILE
+    if not marker.exists():
+        return None
+    try:
+        raw = marker.read_text(encoding="utf-8").strip()
+        if not raw:
+            marker.unlink(missing_ok=True)
+            return None
+        # Try JSON first, fall back to plain text.
+        provider: str | None
+        try:
+            import json as _json
+
+            data = _json.loads(raw)
+            provider = (
+                str(data.get("provider", "")).strip()
+                if isinstance(data, dict)
+                else None
+            )
+        except Exception:
+            provider = raw
+        marker.unlink(missing_ok=True)  # single-shot
+        return provider or None
+    except Exception as e:
+        logger.warning(
+            "[_get_active_provider] could not read %s: %s", marker, e
+        )
+        return None
+
+
 def _get_active_provider(spec_dir: Path | None = None) -> str:
     """
     Determine the active AI provider from IPC selection, environment or project settings.
 
     Resolution order:
+    0. RESUME_WITH_PROVIDER marker file (single-shot, "Reprendre avec X")
     1. Provider selected via IPC (from frontend UI selection)
     2. AUTO_CLAUDE_PROVIDER environment variable
     3. Project-level _AUTO_CLAUDE_DIR/.env → AI_PROVIDER key
@@ -1343,6 +1391,22 @@ def _get_active_provider(spec_dir: Path | None = None) -> str:
         "cursor": "cursor",
         "custom": "custom",
     }
+
+    # 0. Highest priority: explicit "resume with X" marker written by the
+    # frontend when the user picked a different provider from the paused-task
+    # modal (Niveau 3b). Consumed once and removed so subsequent sessions
+    # for the same spec don't keep overriding.
+    if spec_dir:
+        override = _consume_resume_with_provider_marker(Path(spec_dir))
+        if override:
+            mapped_override = provider_mapping.get(override.lower(), override.lower())
+            logger.info(
+                "[_get_active_provider] Resolved from RESUME_WITH_PROVIDER marker: "
+                "'%s' -> '%s'",
+                override,
+                mapped_override,
+            )
+            return mapped_override
 
     # 1. Check provider selected via IPC (from frontend UI)
     try:
