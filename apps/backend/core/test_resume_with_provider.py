@@ -57,9 +57,7 @@ def test_empty_marker_returns_none_and_is_removed(tmp_path: Path) -> None:
 
 
 def test_whitespace_around_provider_is_trimmed(tmp_path: Path) -> None:
-    (tmp_path / RESUME_WITH_PROVIDER_FILE).write_text(
-        "  copilot\n", encoding="utf-8"
-    )
+    (tmp_path / RESUME_WITH_PROVIDER_FILE).write_text("  copilot\n", encoding="utf-8")
     assert _consume_resume_with_provider_marker(tmp_path) == "copilot"
 
 

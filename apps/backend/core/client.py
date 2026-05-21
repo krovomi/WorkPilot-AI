@@ -1351,9 +1351,7 @@ def _consume_resume_with_provider_marker(spec_dir: Path) -> str | None:
         marker.unlink(missing_ok=True)  # single-shot
         return provider or None
     except Exception as e:
-        logger.warning(
-            "[_get_active_provider] could not read %s: %s", marker, e
-        )
+        logger.warning("[_get_active_provider] could not read %s: %s", marker, e)
         return None
 
 
