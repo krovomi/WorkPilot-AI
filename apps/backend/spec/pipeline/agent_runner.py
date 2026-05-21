@@ -368,7 +368,10 @@ class AgentRunner:
                 print(f"\n⚠️  {cap_msg}", flush=True)
                 if self.task_logger:
                     self.task_logger.log_error(cap_msg, LogPhase.PLANNING)
-                return False, cap_msg
+                # Prefix with a sentinel the orchestrator recognises so it can
+                # invoke the rate-limit shield and retry the same phase instead
+                # of failing the spec pipeline outright.
+                return False, f"RATE_LIMIT_RETRY_REQUIRED::{cap_msg}::{e}"
 
             if self.task_logger:
                 self.task_logger.log_error(f"Agent error: {e}", LogPhase.PLANNING)

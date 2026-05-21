@@ -6,10 +6,8 @@ Main QA loop that coordinates reviewer and fixer sessions until
 approval or max iterations.
 """
 
-import json
 import os
 import time as time_module
-from datetime import datetime
 from pathlib import Path
 
 from core.client import create_agent_client
@@ -61,84 +59,14 @@ async def _handle_rate_limit_in_qa(
     source_spec_dir: Path | None,
 ) -> bool:
     """
-    Detect and ride out an Anthropic rate-limit error encountered during QA.
+    Thin wrapper around the shared rate-limit shield.
 
-    The QA loop used to treat rate-limit errors as generic failures, count them
-    toward MAX_CONSECUTIVE_ERRORS, and escalate to human after 3 retries — even
-    though the next retry would just hit the same wall. The coder phase handles
-    this properly; this helper ports the same behavior to QA so that hitting the
-    session limit during QA pauses-and-resumes instead of poisoning the task.
-
-    Imports are deferred so that test modules which mock out the `agents`
-    package (e.g. tests/test_qa_criteria.py) can still import qa.loop without
-    pulling in the Claude SDK.
-
-    Args:
-        error: The exception raised by the QA reviewer/fixer session
-        spec_dir: Spec directory inside the worktree (where pause/resume files live)
-        source_spec_dir: Optional main project spec dir as fallback for RESUME signal
-
-    Returns:
-        True if the error was a rate-limit and we paused-then-resumed (so the
-        caller should retry the iteration without incrementing error counters).
-        False if the error wasn't a rate-limit (caller handles as before).
+    Kept as a module-local alias so existing call sites and tests that patch
+    `qa.loop._handle_rate_limit_in_qa` don't need to change.
     """
-    from agents.base import MAX_RATE_LIMIT_WAIT_SECONDS, RATE_LIMIT_PAUSE_FILE
-    from agents.coder import parse_rate_limit_reset_time, wait_for_rate_limit_reset
-    from agents.session import is_rate_limit_error
+    from services.rate_limit_shield import handle_rate_limit_pause
 
-    if not is_rate_limit_error(error):
-        return False
-
-    error_info = {"message": str(error), "type": "rate_limit"}
-    reset_timestamp = parse_rate_limit_reset_time(error_info)
-
-    if not reset_timestamp:
-        debug_warning(
-            "qa_loop",
-            "Rate limit hit but reset time could not be parsed — falling back "
-            "to standard error handling",
-        )
-        return False
-
-    wait_seconds = reset_timestamp - datetime.now().timestamp()
-    if wait_seconds <= 0:
-        debug("qa_loop", "Rate limit already reset, retrying immediately")
-        return True
-    if wait_seconds > MAX_RATE_LIMIT_WAIT_SECONDS:
-        debug_error(
-            "qa_loop",
-            f"Rate limit wait time too long ({wait_seconds / 3600:.1f}h) — "
-            f"giving up rather than waiting",
-        )
-        return False
-
-    wait_minutes = wait_seconds / 60
-    debug_warning(
-        "qa_loop",
-        f"Rate limit hit during QA — pausing for {wait_minutes:.0f} minutes",
-        reset_timestamp=reset_timestamp,
-    )
-    print(f"\n⏸  Rate limit reached. Pausing QA for {wait_minutes:.0f} minutes...")
-
-    pause_data = {
-        "paused_at": datetime.now().isoformat(),
-        "reset_timestamp": reset_timestamp,
-        "error": str(error)[:500],
-        "phase": "qa",
-    }
-    pause_file = spec_dir / RATE_LIMIT_PAUSE_FILE
-    pause_file.write_text(json.dumps(pause_data), encoding="utf-8")
-
-    resumed_early = await wait_for_rate_limit_reset(
-        spec_dir, wait_seconds, source_spec_dir
-    )
-    if resumed_early:
-        print("▶  Resumed early by user")
-    else:
-        print("▶  Rate limit window elapsed, resuming QA")
-
-    return True
+    return await handle_rate_limit_pause(error, spec_dir, "qa", source_spec_dir)
 
 
 # =============================================================================

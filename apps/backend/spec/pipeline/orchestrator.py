@@ -136,6 +136,11 @@ class SpecOrchestrator:
     ) -> tuple[bool, str]:
         """Run an agent with the given prompt.
 
+        Wraps the underlying agent_runner call with the rate-limit shield: if
+        the runner reports ``RATE_LIMIT_RETRY_REQUIRED`` we pause until the
+        quota window resets and retry the same phase rather than letting one
+        rate-limit error fail the whole spec pipeline.
+
         Args:
             prompt_file: The prompt file to use
             additional_context: Additional context to add
@@ -145,6 +150,8 @@ class SpecOrchestrator:
         Returns:
             Tuple of (success, response_text)
         """
+        from services.rate_limit_shield import handle_rate_limit_pause
+
         runner = self._get_agent_runner()
 
         # Use user's configured thinking level for all spec phases
@@ -153,13 +160,29 @@ class SpecOrchestrator:
         # Format prior phase summaries for context
         prior_summaries = format_phase_summaries(self._phase_summaries)
 
-        return await runner.run_agent(
-            prompt_file,
-            additional_context,
-            interactive,
-            thinking_budget=thinking_budget,
-            prior_phase_summaries=prior_summaries if prior_summaries else None,
-        )
+        while True:
+            success, response = await runner.run_agent(
+                prompt_file,
+                additional_context,
+                interactive,
+                thinking_budget=thinking_budget,
+                prior_phase_summaries=prior_summaries if prior_summaries else None,
+            )
+
+            if success or not response.startswith("RATE_LIMIT_RETRY_REQUIRED::"):
+                return success, response
+
+            # Extract the original SDK error message so the shield can parse
+            # the reset time from it.
+            _, _, raw_err = response.split("::", 2)
+            paused = await handle_rate_limit_pause(
+                RuntimeError(raw_err), self.spec_dir, f"spec:{phase_name or prompt_file}"
+            )
+            if not paused:
+                # Shield couldn't handle it (unparseable wait time, too long, ...)
+                # — surface the original error to the caller.
+                return False, response
+            # Pause-and-resume succeeded — loop to retry the same phase.
 
     async def _store_phase_summary(self, phase_name: str) -> None:
         """Summarize and store phase output for subsequent phases.
