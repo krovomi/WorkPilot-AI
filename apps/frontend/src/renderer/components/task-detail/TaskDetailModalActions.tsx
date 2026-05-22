@@ -13,6 +13,7 @@ import type { IPCResult, Project, Task } from "../../../shared/types";
 import { AgentToolsButton, ProgressIndicatorBadge } from "../agent-tools";
 import { StreamingSessionButton } from "../streaming/StreamingSessionButton";
 import { Button } from "../ui/button";
+import { ResumeWithProviderDropdown } from "./ResumeWithProviderDropdown";
 
 interface TaskDetailModalActionsProps {
 	readonly task: Task;
@@ -165,23 +166,30 @@ export function TaskDetailModalActions({
 
 	if (state.isIncomplete) {
 		return (
-			<Button
-				variant="default"
-				onClick={handleStartStop}
-				disabled={state.isLoadingPlan}
-			>
-				{state.isLoadingPlan ? (
-					<>
-						<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-						Loading Plan...
-					</>
-				) : (
-					<>
-						<Play className="mr-2 h-4 w-4" />
-						Resume Task
-					</>
-				)}
-			</Button>
+			<div className="flex items-center gap-2">
+				<Button
+					variant="default"
+					onClick={handleStartStop}
+					disabled={state.isLoadingPlan}
+				>
+					{state.isLoadingPlan ? (
+						<>
+							<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+							Loading Plan...
+						</>
+					) : (
+						<>
+							<Play className="mr-2 h-4 w-4" />
+							Resume Task
+						</>
+					)}
+				</Button>
+				<ResumeWithProviderDropdown
+					taskId={task.id}
+					currentProvider={task.metadata?.provider}
+					disabled={state.isLoadingPlan}
+				/>
+			</div>
 		);
 	}
 
@@ -211,21 +219,27 @@ export function TaskDetailModalActions({
 	// surfaces a useful error if none exists.
 	if (task.status === "error") {
 		return (
-			<Button
-				variant="default"
-				onClick={async () => {
-					const res = (await globalThis.electronAPI.invoke(
-						IPC_CHANNELS.TASK_RESUME_SESSION,
-						task.id,
-					)) as IPCResult;
-					if (!res?.success && res?.error) {
-						globalThis.window.alert(res.error);
-					}
-				}}
-			>
-				<RefreshCw className="mr-2 h-4 w-4" />
-				{t("tasks:modal.actions.resumeSession", "Reprendre la session")}
-			</Button>
+			<div className="flex items-center gap-2">
+				<Button
+					variant="default"
+					onClick={async () => {
+						const res = (await globalThis.electronAPI.invoke(
+							IPC_CHANNELS.TASK_RESUME_SESSION,
+							task.id,
+						)) as IPCResult;
+						if (!res?.success && res?.error) {
+							globalThis.window.alert(res.error);
+						}
+					}}
+				>
+					<RefreshCw className="mr-2 h-4 w-4" />
+					{t("tasks:modal.actions.resumeSession", "Reprendre la session")}
+				</Button>
+				<ResumeWithProviderDropdown
+					taskId={task.id}
+					currentProvider={task.metadata?.provider}
+				/>
+			</div>
 		);
 	}
 
