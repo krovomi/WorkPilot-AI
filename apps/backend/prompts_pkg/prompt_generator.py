@@ -163,7 +163,9 @@ def generate_environment_context(project_dir: Path, spec_dir: Path) -> str:
         )
 
     # Resolve actual project root (parent if in worktree, otherwise project_dir itself)
-    probe_dir = parent_project_path if (is_worktree and parent_project_path) else project_dir
+    probe_dir = (
+        parent_project_path if (is_worktree and parent_project_path) else project_dir
+    )
 
     sections.append(f"""## YOUR ENVIRONMENT
 

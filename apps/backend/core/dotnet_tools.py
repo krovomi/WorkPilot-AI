@@ -19,6 +19,7 @@ from pathlib import Path
 try:
     from core.platform import is_windows as _is_windows
 except ImportError:
+
     def _is_windows() -> bool:  # type: ignore[misc]
         return sys.platform == "win32"
 
@@ -68,12 +69,16 @@ def _find_msbuild_via_vswhere() -> str | None:
     for vswhere in vswhere_paths:
         if not Path(vswhere).exists():
             continue
-        output = _run_silent([
-            vswhere,
-            "-latest",
-            "-requires", "Microsoft.Component.MSBuild",
-            "-find", r"MSBuild\**\Bin\MSBuild.exe",
-        ])
+        output = _run_silent(
+            [
+                vswhere,
+                "-latest",
+                "-requires",
+                "Microsoft.Component.MSBuild",
+                "-find",
+                r"MSBuild\**\Bin\MSBuild.exe",
+            ]
+        )
         if output:
             # vswhere may return multiple lines; take the last (highest version)
             candidates = [line.strip() for line in output.splitlines() if line.strip()]
@@ -143,7 +148,7 @@ def is_legacy_framework_project(project_dir: Path) -> bool:
                 content = csproj.read_text(encoding="utf-8", errors="replace")
                 # SDK-style projects always contain 'Sdk=' near the top
                 first_2k = content[:2048].lower()
-                if 'sdk=' not in first_2k and '<project' in first_2k:
+                if "sdk=" not in first_2k and "<project" in first_2k:
                     return True
             except OSError:
                 pass
