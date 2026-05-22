@@ -20,7 +20,7 @@ import type {
 	WorktreeCreatePROptions,
 } from "../../../shared/types";
 import { useToast } from "../../hooks/use-toast";
-import { calculateProgress, cn } from "../../lib/utils";
+import { calculateProgress, cn, extractTextFromHtml } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import {
 	deleteTask,
@@ -67,6 +67,26 @@ interface TaskDetailModalProps {
 	readonly open: boolean;
 	readonly task: Task | null;
 	readonly onOpenChange: (open: boolean) => void;
+}
+
+/**
+ * Strip HTML tags from a task title before rendering it in the modal header.
+ *
+ * Some imported tasks (Azure DevOps, Jira) carry their description into the
+ * `title` field as raw HTML, e.g. `<div><span><b>Description:</b><br></span></div>…`.
+ * React renders that verbatim — tags included — because JSX escapes strings.
+ * For the title we don't want to honour the HTML structure (it would dominate
+ * the header), just extract the human-readable text and let it `truncate`.
+ *
+ * If the title doesn't look like HTML we return it unchanged so the common
+ * case stays a cheap pass-through.
+ */
+function cleanTitleForDisplay(title: string): string {
+	if (!title) return "";
+	const trimmed = title.trim();
+	if (!trimmed.startsWith("<")) return title;
+	const text = extractTextFromHtml(title);
+	return text || title;
 }
 
 const renderTaskStatusBadges = (
@@ -577,7 +597,7 @@ function TaskDetailModalContent({
 							<div className="flex items-start justify-between gap-4">
 								<div className="flex-1 min-w-0 overflow-hidden">
 									<DialogPrimitive.Title className="text-xl font-semibold leading-tight text-foreground truncate">
-										{task.title}
+										{cleanTitleForDisplay(task.title)}
 									</DialogPrimitive.Title>
 									<DialogPrimitive.Description asChild>
 										<div className="mt-2.5 flex items-center gap-2 flex-wrap">
@@ -601,19 +621,6 @@ function TaskDetailModalContent({
 											)}
 										</div>
 									</DialogPrimitive.Description>
-									{globalThis.DEBUG && (
-										<div className="mt-1 text-[11px] text-muted-foreground font-mono">
-											status={task.status} reviewReason=
-											{task.reviewReason ?? "none"} phase=
-											{task.executionProgress?.phase ?? "none"} reviewRequired=
-											{task.metadata?.requireReviewBeforeCoding
-												? "true"
-												: "false"}
-											<br />
-											projectId={activeProject?.id ?? "none"} projectName=
-											{activeProject?.name ?? "none"}
-										</div>
-									)}
 								</div>
 								<div className="flex items-center gap-1 shrink-0 electron-no-drag">
 									{/* Sync from branch — available for any status that may have a worktree */}

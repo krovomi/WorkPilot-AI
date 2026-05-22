@@ -48,7 +48,7 @@ import type {
 	TaskStatus,
 } from "../../shared/types";
 import { setPendingTaskDetailTab } from "../lib/task-detail-nav";
-import { cn, sanitizeMarkdownForDisplay } from "../lib/utils";
+import { cn, extractTextFromHtml, sanitizeMarkdownForDisplay } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
 import {
 	archiveTasks,
@@ -812,13 +812,19 @@ export const TaskCard = memo(function TaskCard({
 		return sanitizeMarkdownForDisplay(task.description, 120);
 	}, [task.description, t]);
 
-	// Memoize title with JSON error suffix handling
+	// Memoize title with JSON error suffix handling.
+	// Strip HTML tags too: tasks imported from Azure DevOps / Jira sometimes
+	// carry raw <div><span><b>Description:</b>… into the title field, which
+	// React would otherwise render verbatim as text.
 	const displayTitle = useMemo(() => {
-		if (task.title.endsWith(JSON_ERROR_TITLE_SUFFIX)) {
-			const baseName = task.title.slice(0, -JSON_ERROR_TITLE_SUFFIX.length);
+		const stripped = task.title.trim().startsWith("<")
+			? extractTextFromHtml(task.title) || task.title
+			: task.title;
+		if (stripped.endsWith(JSON_ERROR_TITLE_SUFFIX)) {
+			const baseName = stripped.slice(0, -JSON_ERROR_TITLE_SUFFIX.length);
 			return `${baseName} ${t("errors:task.jsonError.titleSuffix")}`;
 		}
-		return task.title;
+		return stripped;
 	}, [task.title, t]);
 
 	// Memoize relative time (recalculates only when updatedAt changes)
