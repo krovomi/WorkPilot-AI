@@ -47,6 +47,40 @@ logger = logging.getLogger(__name__)
 
 CONTENT_TYPE_JSON = "application/json"
 
+# Copilot API enforces a prompt token limit that varies by model.
+# These are safe upper bounds (in characters, ≈ 4 chars/token) for the
+# history preamble injected on provider switch.  We leave ~20 % headroom
+# for the system prompt, tool definitions, and user message.
+# Key: Copilot model id as used in the API payload.
+_COPILOT_HISTORY_CHAR_LIMIT: dict[str, int] = {
+    # 1 M-token models — generous budget
+    "gpt-4.1": 2_000_000,
+    "gemini-2.5-pro": 2_000_000,
+    # 200 k-token models (Claude 4.x, o-series) — 160 k token budget
+    "claude-opus-4.7": 640_000,
+    "claude-opus-4.6": 640_000,
+    "claude-opus-4.5": 640_000,
+    "claude-sonnet-4.6": 640_000,
+    "claude-sonnet-4.5": 640_000,
+    "claude-3.7-sonnet": 640_000,
+    "o1": 640_000,
+    "o3": 640_000,
+    "o3-mini": 640_000,
+    "o4-mini": 640_000,
+    # GPT-5.x — assume 200 k by default
+    "gpt-5.5": 640_000,
+    "gpt-5.4": 640_000,
+    # 128 k-token models — 100 k token budget
+    "gpt-4o": 400_000,
+    "gpt-4o-mini": 400_000,
+    "gpt-4.1-mini": 400_000,
+    "claude-haiku-4.5": 400_000,
+    "gemini-2.0-flash": 400_000,
+    "o1-mini": 400_000,
+}
+# Default for unknown Copilot models: 100 k tokens (~400 k chars)
+_COPILOT_HISTORY_CHAR_LIMIT_DEFAULT = 400_000
+
 # =============================================================================
 # Message Types for provider-agnostic stream processing
 # =============================================================================
@@ -782,6 +816,52 @@ class CopilotAgentClient(AgentClient):
                     raise ValueError(
                         f"Copilot token exchange failed ({resp.status}): {error_text}{token_hint}"
                     )
+
+    async def resume(self, history: list[AgentMessage]) -> None:
+        """Preload conversation history, truncating to Copilot's context window.
+
+        Copilot models have varying prompt-token limits (128 k – 1 M).  When
+        switching from a provider with a larger context (e.g. Claude Code at
+        200 k+), the accumulated conversation can easily exceed those limits,
+        causing a 400 ``model_max_prompt_tokens_exceeded`` error.
+
+        This override drops the *oldest* messages one-by-one until the
+        rendered preamble fits within the model's safe character budget.
+        """
+        if not history:
+            await super().resume(history)
+            return
+
+        char_limit = _COPILOT_HISTORY_CHAR_LIMIT.get(
+            self.model, _COPILOT_HISTORY_CHAR_LIMIT_DEFAULT
+        )
+
+        truncated = list(history)
+        while len(truncated) > 1:
+            preamble = self._format_history_as_preamble(truncated)
+            if len(preamble) <= char_limit:
+                break
+            truncated = truncated[1:]  # drop oldest message
+
+        dropped = len(history) - len(truncated)
+        if dropped:
+            logger.warning(
+                "[CopilotAgentClient] History truncated on provider switch: "
+                "dropped %d oldest message(s) to fit within the %s context window "
+                "(%d → %d messages, limit ≈ %d chars).",
+                dropped,
+                self.model,
+                len(history),
+                len(truncated),
+                char_limit,
+            )
+            print(
+                f"[CopilotAgentClient] ⚠️  History truncated: {dropped} old "
+                f"message(s) dropped to respect {self.model} context limit.",
+                flush=True,
+            )
+
+        await super().resume(truncated)
 
     async def query(self, prompt: str) -> None:
         """Queue a prompt for the next receive_response() call."""

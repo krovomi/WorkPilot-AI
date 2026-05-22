@@ -71,19 +71,64 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 
 	// ---- GitHub Copilot ----
 	// Source: docs.github.com/en/copilot/reference/ai-models/supported-models
+	// Updated: May 2026 — includes Claude 4.x Opus/Sonnet, GPT-5.x, o3/o4 families
 	copilot: [
-		{ value: "gpt-4o", label: "GPT-4o (Copilot)", tier: "flagship" },
-		{ value: "gpt-4.1", label: "GPT-4.1 (Copilot)", tier: "flagship" },
+		// ── Flagship ─────────────────────────────────────────────────────────
 		{
-			value: "claude-sonnet-4-5",
-			label: "Claude Sonnet 4.5 (Copilot)",
+			value: "claude-opus-4.7",
+			label: "Claude Opus 4.7 (Copilot)",
 			tier: "flagship",
 			supportsThinking: true,
 		},
 		{
-			value: "claude-opus-4-5",
+			value: "claude-opus-4.6",
+			label: "Claude Opus 4.6 (Copilot)",
+			tier: "flagship",
+			supportsThinking: true,
+		},
+		{
+			value: "claude-opus-4.5",
 			label: "Claude Opus 4.5 (Copilot)",
 			tier: "flagship",
+			supportsThinking: true,
+		},
+		{
+			value: "gpt-5.5",
+			label: "GPT-5.5 (Copilot)",
+			tier: "flagship",
+			supportsThinking: true,
+		},
+		{
+			value: "gpt-5.4",
+			label: "GPT-5.4 (Copilot)",
+			tier: "flagship",
+			supportsThinking: true,
+		},
+		{ value: "gpt-4.1", label: "GPT-4.1 (Copilot)", tier: "flagship" },
+		{ value: "gpt-4o", label: "GPT-4o (Copilot)", tier: "flagship" },
+		// ── Standard ─────────────────────────────────────────────────────────
+		{
+			value: "claude-sonnet-4.6",
+			label: "Claude Sonnet 4.6 (Copilot)",
+			tier: "standard",
+			supportsThinking: true,
+		},
+		{
+			value: "claude-sonnet-4.5",
+			label: "Claude Sonnet 4.5 (Copilot)",
+			tier: "standard",
+			supportsThinking: true,
+		},
+		{
+			value: "o4-mini",
+			label: "o4-mini (Copilot)",
+			tier: "standard",
+			supportsThinking: true,
+		},
+		{
+			value: "o3",
+			label: "o3 (Copilot)",
+			tier: "standard",
 			supportsThinking: true,
 		},
 		{
@@ -99,17 +144,6 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 			supportsThinking: true,
 		},
 		{
-			value: "o1-mini",
-			label: "o1-mini (Copilot)",
-			tier: "standard",
-			supportsThinking: true,
-		},
-		{
-			value: "gpt-4.1-mini",
-			label: "GPT-4.1 mini (Copilot)",
-			tier: "standard",
-		},
-		{
 			value: "claude-3.7-sonnet",
 			label: "Claude 3.7 Sonnet (Copilot)",
 			tier: "standard",
@@ -121,8 +155,9 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 			tier: "standard",
 			supportsThinking: true,
 		},
+		// ── Fast ─────────────────────────────────────────────────────────────
 		{
-			value: "claude-haiku-4-5",
+			value: "claude-haiku-4.5",
 			label: "Claude Haiku 4.5 (Copilot)",
 			tier: "fast",
 		},
@@ -130,6 +165,17 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 			value: "gemini-2.0-flash",
 			label: "Gemini 2.0 Flash (Copilot)",
 			tier: "fast",
+		},
+		{
+			value: "gpt-4.1-mini",
+			label: "GPT-4.1 mini (Copilot)",
+			tier: "fast",
+		},
+		{
+			value: "o1-mini",
+			label: "o1-mini (Copilot)",
+			tier: "fast",
+			supportsThinking: true,
 		},
 		{ value: "gpt-4o-mini", label: "GPT-4o mini (Copilot)", tier: "fast" },
 	],

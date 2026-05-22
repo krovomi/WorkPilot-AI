@@ -202,14 +202,19 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	useEffect(() => {
 		const isReverseOrder = logOrder === "reverse-chronological";
 
-		if (activeTab === "logs" && !isUserScrolledUp) {
+		if (activeTab !== "logs" || isUserScrolledUp) return;
+
+		// Small timeout to ensure the DOM has rendered (tab switch or new log entry)
+		const timer = setTimeout(() => {
 			if (isReverseOrder && logsContainerRef.current) {
 				logsContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
 			} else if (!isReverseOrder && logsEndRef.current) {
 				logsEndRef.current.scrollIntoView({ behavior: "smooth" });
 			}
-		}
-	}, [activeTab, isUserScrolledUp, logOrder]);
+		}, 50);
+
+		return () => clearTimeout(timer);
+	}, [activeTab, isUserScrolledUp, logOrder, phaseLogs]);
 
 	// Reset scroll state when switching to logs tab
 	useEffect(() => {

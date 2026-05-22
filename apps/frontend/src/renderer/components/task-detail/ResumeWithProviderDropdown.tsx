@@ -36,12 +36,12 @@ import {
 } from "../ui/dropdown-menu";
 
 interface ResumeWithProviderDropdownProps {
-	taskId: string;
+	readonly taskId: string;
 	/** Current provider running this task, hidden from the menu (no-op switch). */
-	currentProvider?: string;
+	readonly currentProvider?: string;
 	/** Render the dropdown trigger as a small button next to the primary action. */
-	variant?: "default" | "outline";
-	disabled?: boolean;
+	readonly variant?: "default" | "outline";
+	readonly disabled?: boolean;
 }
 
 interface AvailableProvider {
@@ -79,9 +79,7 @@ export function ResumeWithProviderDropdown({
 				const configured: AvailableProvider[] = res.providers
 					.filter((p) => res.status[p.name] === true)
 					.filter(
-						(p) =>
-							!currentProvider ||
-							p.name.toLowerCase() !== currentProvider.toLowerCase(),
+						(p) => p.name.toLowerCase() !== currentProvider?.toLowerCase(),
 					)
 					.map((p) => ({ name: p.name, label: p.label }));
 				setProviders(configured);

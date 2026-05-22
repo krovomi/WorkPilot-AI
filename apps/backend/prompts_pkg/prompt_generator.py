@@ -16,6 +16,8 @@ import json
 import re
 from pathlib import Path
 
+from core.dotnet_tools import generate_dotnet_env_section
+
 # Worktree path patterns for detection
 # Matches paths like: .workpilot/worktrees/tasks/{spec-name}/
 WORKTREE_PATH_PATTERNS = [
@@ -139,6 +141,7 @@ def generate_environment_context(project_dir: Path, spec_dir: Path) -> str:
 
     This explicitly tells the AI where it is working, preventing path confusion.
     When running in a worktree, includes an isolation warning to prevent escaping.
+    For .NET projects on Windows, injects build tool paths and shell restrictions.
 
     Args:
         project_dir: The working directory for the AI
@@ -158,6 +161,9 @@ def generate_environment_context(project_dir: Path, spec_dir: Path) -> str:
         sections.append(
             generate_worktree_isolation_warning(project_dir, parent_project_path)
         )
+
+    # Resolve actual project root (parent if in worktree, otherwise project_dir itself)
+    probe_dir = parent_project_path if (is_worktree and parent_project_path) else project_dir
 
     sections.append(f"""## YOUR ENVIRONMENT
 
@@ -182,6 +188,15 @@ coder prompt for detailed examples.
 ---
 
 """)
+
+    # Inject .NET build tools section if the project contains C#/F#/VB project files
+    try:
+        dotnet_section = generate_dotnet_env_section(probe_dir)
+        if dotnet_section:
+            sections.append(dotnet_section)
+            sections.append("\n---\n\n")
+    except Exception:
+        pass  # Silently skip on any detection error
 
     return "".join(sections)
 

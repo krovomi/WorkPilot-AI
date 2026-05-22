@@ -83,7 +83,7 @@ _WINDSURF_ENTRY = get_default("windsurf")
 WINDSURF_MODEL = _WINDSURF_ENTRY.model_id if _WINDSURF_ENTRY else "swe-1.6"
 
 _COPILOT_ENTRY = get_default("copilot")
-COPILOT_MODEL = _COPILOT_ENTRY.model_id if _COPILOT_ENTRY else "claude-sonnet-4-6"
+COPILOT_MODEL = _COPILOT_ENTRY.model_id if _COPILOT_ENTRY else "claude-sonnet-4.6"
 
 PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
     # Anthropic / Claude — use Claude shorthands (resolved by resolve_model_id)
@@ -353,12 +353,14 @@ def _resolve_provider_model(model: str, provider: str | None) -> str:
         # Caller should handle this; just pass through resolve_model_id as fallback
         return resolve_model_id(model)
 
-    # Detect Anthropic versioned model IDs (e.g. "claude-sonnet-4-5-20250929",
-    # "claude-opus-4-6") that are NOT valid for non-Anthropic providers.
+    # Detect Anthropic-native versioned model IDs (dash-separated versions, e.g.
+    # "claude-sonnet-4-5-20250929", "claude-opus-4-6") that are NOT valid for
+    # non-Anthropic providers.  Copilot uses dot-separated notation (e.g.
+    # "claude-sonnet-4.5", "claude-opus-4.7") which must NOT be intercepted here.
     # This happens when a task was started with Anthropic and its task_metadata.json
     # still contains the old versioned model after the provider was switched.
     # Fall back to the provider's default model instead of sending an invalid ID.
-    if re.match(r"^claude-(opus|sonnet|haiku)-\d", model):
+    if re.match(r"^claude-(opus|sonnet|haiku)-\d+-\d", model):
         provider_defaults = PROVIDER_DEFAULT_MODELS.get(provider, {})
         fallback = provider_defaults.get("spec") or provider_defaults.get("coding")
         if fallback:
