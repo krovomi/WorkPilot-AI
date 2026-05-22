@@ -218,6 +218,41 @@ def is_rate_limit_error(error: Exception) -> bool:
     )
 
 
+def is_prompt_too_long_error(error: Exception) -> bool:
+    """
+    Check if an error is a "prompt too long" error from any LLM provider.
+
+    These come back as HTTP 400 + a message like:
+    - Anthropic: "Prompt is too long"
+    - OpenAI: "context length exceeded" / "maximum context length"
+    - Generic: "input is too long"
+
+    Unlike rate limits, these errors will NEVER succeed on retry with the
+    same conversation — retrying just burns more attempts. Callers should
+    escalate to human review with a clear reason instead of looping.
+
+    Args:
+        error: The exception to check
+
+    Returns:
+        True if this is a prompt-too-long error, False otherwise
+    """
+    error_str = str(error).lower()
+    patterns = [
+        "prompt is too long",
+        "prompt too long",
+        "context length exceeded",
+        "context_length_exceeded",
+        "maximum context length",
+        "max_tokens_to_sample",  # Anthropic SDK shape
+        "input is too long",
+        "input too long",
+        "request too large",
+        "token limit",
+    ]
+    return any(p in error_str for p in patterns)
+
+
 def is_authentication_error(error: Exception) -> bool:
     """
     Check if an error is an authentication error (401, token expired, etc.).

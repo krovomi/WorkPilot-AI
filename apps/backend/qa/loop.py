@@ -345,6 +345,23 @@ async def run_qa_validation_loop(
                     previous_error=last_error_context,  # Pass error context for self-correction
                 )
         except Exception as e:
+            # Prompt-too-long errors are not retryable — the conversation
+            # is already too big for the model's context window, so the next
+            # attempt would fail identically. Halt the loop and let the UI
+            # surface "reset conversation / switch provider" actions.
+            from services.rate_limit_shield import handle_prompt_too_long
+
+            if handle_prompt_too_long(e, spec_dir, "qa"):
+                debug_error("qa_loop", "QA halted: prompt too long")
+                print("\n⛔ QA halted: prompt too long. See task detail.")
+                if task_logger:
+                    task_logger.end_phase(
+                        LogPhase.VALIDATION,
+                        success=False,
+                        message="QA halted: prompt too long for the LLM context window",
+                    )
+                return False
+
             # Rate-limit errors must not count toward MAX_CONSECUTIVE_ERRORS or
             # we escalate to human after 3 limit-hits in a row instead of waiting
             # for the quota window to reset (the same iteration would have succeeded).
@@ -704,6 +721,20 @@ async def run_qa_validation_loop(
                         fix_client, spec_dir, qa_iteration, verbose
                     )
             except Exception as e:
+                # Prompt-too-long is permanent — see the reviewer block above.
+                from services.rate_limit_shield import handle_prompt_too_long
+
+                if handle_prompt_too_long(e, spec_dir, "qa"):
+                    debug_error("qa_loop", "QA fixer halted: prompt too long")
+                    print("\n⛔ QA fixer halted: prompt too long. See task detail.")
+                    if task_logger:
+                        task_logger.end_phase(
+                            LogPhase.VALIDATION,
+                            success=False,
+                            message="QA fixer halted: prompt too long for the LLM context window",
+                        )
+                    return False
+
                 # Same rate-limit shield as the reviewer above: pause-and-resume
                 # instead of counting toward consecutive errors.
                 if await _handle_rate_limit_in_qa(e, spec_dir, source_spec_dir):

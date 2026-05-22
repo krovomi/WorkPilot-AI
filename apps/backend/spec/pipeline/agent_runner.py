@@ -352,6 +352,28 @@ class AgentRunner:
                 exception_type=type(e).__name__,
             )
 
+            # Detect "prompt too long" errors — these are permanent for the
+            # current conversation, so we surface a sentinel the orchestrator
+            # recognises to halt the pipeline instead of looping.
+            if (
+                "prompt is too long" in error_str
+                or "prompt too long" in error_str
+                or "context length exceeded" in error_str
+                or "context_length_exceeded" in error_str
+                or "maximum context length" in error_str
+                or "input is too long" in error_str
+            ):
+                halt_msg = (
+                    f"Prompt too long for the LLM context window: {e}. "
+                    f"Reset the conversation or switch to a provider with a "
+                    f"larger context."
+                )
+                debug_error("agent_runner", halt_msg)
+                print(f"\n⛔ {halt_msg}", flush=True)
+                if self.task_logger:
+                    self.task_logger.log_error(halt_msg, LogPhase.PLANNING)
+                return False, f"PROMPT_TOO_LONG_HALT::{halt_msg}::{e}"
+
             # Detect rate/usage limit exceptions from the SDK.
             # The Claude Agent SDK may raise exceptions like:
             #   "Unknown message type: rate_limit_event"

@@ -1604,6 +1604,63 @@ print(json.dumps(result))
 	);
 
 	/**
+	 * Reset the persisted conversation log for a task.
+	 *
+	 * Use case: the LLM returned a "prompt too long" error (HTTP 400) and
+	 * the task is parked in human_review with reviewReason="prompt_too_long".
+	 * Retrying with the same conversation log will fail identically, so the
+	 * user explicitly wipes the transcript and the halt marker, then restarts
+	 * the task with a fresh context.
+	 *
+	 * Removed:
+	 *   - {spec_dir}/conversation.jsonl  (the replay log)
+	 *   - {spec_dir}/PROMPT_TOO_LONG_HALT (the backend halt marker)
+	 *
+	 * The user's plan, subtasks, code, etc. are left untouched.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_RESET_CONVERSATION,
+		async (_, taskId: string): Promise<IPCResult> => {
+			const { task, project } = findTaskAndProject(taskId);
+			if (!task || !project) {
+				return { success: false, error: "Task not found" };
+			}
+
+			const specsBaseDir = getSpecsDir(project.autoBuildPath);
+			const specDir =
+				task.specsPath || path.join(project.path, specsBaseDir, task.specId);
+
+			try {
+				const conversationLog = path.join(specDir, "conversation.jsonl");
+				const haltMarker = path.join(specDir, "PROMPT_TOO_LONG_HALT");
+				let removed = 0;
+				for (const target of [conversationLog, haltMarker]) {
+					if (existsSync(target)) {
+						unlinkSync(target);
+						removed++;
+					}
+				}
+				appLog.info(
+					`[TASK_RESET_CONVERSATION] task=${taskId} removed=${removed} files in ${specDir}`,
+				);
+				return { success: true };
+			} catch (err) {
+				appLog.error(
+					`[TASK_RESET_CONVERSATION] failed for task ${taskId}:`,
+					err,
+				);
+				return {
+					success: false,
+					error:
+						err instanceof Error
+							? err.message
+							: "Failed to reset conversation log",
+				};
+			}
+		},
+	);
+
+	/**
 	 * Update task metadata with new provider configuration
 	 */
 	async function updateTaskMetadata(

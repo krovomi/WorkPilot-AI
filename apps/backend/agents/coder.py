@@ -98,7 +98,11 @@ from .base import (
     sanitize_error_message,
 )
 from .memory_manager import debug_memory_system_status, get_graphiti_context
-from .session import post_session_processing, run_agent_session
+from .session import (
+    is_prompt_too_long_error,
+    post_session_processing,
+    run_agent_session,
+)
 from .utils import (
     find_phase_for_subtask,
     get_commit_count,
@@ -1396,6 +1400,32 @@ async def run_autonomous_agent(
                 current_retry_delay = min(
                     current_retry_delay * 2, MAX_RETRY_DELAY_SECONDS
                 )
+
+            elif error_info and is_prompt_too_long_error(
+                RuntimeError(error_info.get("message", ""))
+            ):
+                # Prompt too long for the LLM context window — retrying with
+                # the same conversation will fail identically. Halt the loop
+                # and surface the right remediation to the user.
+                _reset_concurrency_state()
+                from services.rate_limit_shield import handle_prompt_too_long
+
+                handle_prompt_too_long(
+                    RuntimeError(error_info.get("message", "")),
+                    spec_dir,
+                    "coder",
+                )
+                print_status(
+                    "Prompt too long — task halted (reset conversation or "
+                    "switch provider)",
+                    "error",
+                )
+                emit_phase(
+                    ExecutionPhase.FAILED,
+                    "Prompt too long for LLM context window",
+                )
+                status_manager.update(state=BuildState.ERROR)
+                break
 
             elif error_info and error_info.get("type") == "rate_limit":
                 # Rate limit error - intelligent wait for reset

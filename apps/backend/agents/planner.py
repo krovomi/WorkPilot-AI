@@ -191,7 +191,10 @@ async def run_followup_planner(
     try:
         # Outer retry loop so the rate-limit shield can pause-and-resume the
         # planning session instead of failing the follow-up planning outright.
-        from services.rate_limit_shield import handle_rate_limit_pause
+        from services.rate_limit_shield import (
+            handle_prompt_too_long,
+            handle_rate_limit_pause,
+        )
 
         while True:
             async with runtime:
@@ -199,14 +202,16 @@ async def run_followup_planner(
                     runtime, prompt, spec_dir, verbose, phase=LogPhase.PLANNING
                 )
 
-            if (
-                status == "error"
-                and isinstance(error_info, dict)
-                and error_info.get("type") == "rate_limit"
-            ):
+            if status == "error" and isinstance(error_info, dict):
                 err_msg = error_info.get("message", "")
-                if await handle_rate_limit_pause(
-                    RuntimeError(err_msg), spec_dir, "planner"
+                # Prompt-too-long is permanent — halt and let the UI surface
+                # "reset conversation / switch provider" remediation.
+                if handle_prompt_too_long(RuntimeError(err_msg), spec_dir, "planner"):
+                    break
+                if error_info.get("type") == "rate_limit" and (
+                    await handle_rate_limit_pause(
+                        RuntimeError(err_msg), spec_dir, "planner"
+                    )
                 ):
                     # Pause-and-resume succeeded — retry the planning session.
                     continue

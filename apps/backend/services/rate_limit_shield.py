@@ -107,3 +107,75 @@ async def handle_rate_limit_pause(
         print(f"▶  Rate limit window elapsed, resuming {phase}")
 
     return True
+
+
+# Filename of the marker the backend writes when an LLM call fails with a
+# "prompt too long" error. The frontend watches for this and surfaces an
+# explanation + remediation actions (reset conversation / switch provider)
+# instead of letting the task loop on a permanent failure.
+PROMPT_TOO_LONG_HALT_FILE = "PROMPT_TOO_LONG_HALT"
+
+
+def handle_prompt_too_long(
+    error: Exception,
+    spec_dir: Path,
+    phase: str,
+) -> bool:
+    """
+    Detect a "prompt too long" error and, if recognised, halt the task and
+    record a marker the frontend can read to surface the right remediation.
+
+    Unlike rate limits, this kind of error CANNOT be retried — the conversation
+    will be just as long the next attempt. The right user-facing answer is:
+    reset the conversation log, or switch to a provider with a larger context
+    window. We mark the task accordingly and return True so the caller knows
+    to stop looping and escalate to human review.
+
+    Args:
+        error: The exception raised by the LLM session
+        spec_dir: Spec directory where the halt marker file should be written
+        phase: Short tag describing the calling phase ("coder", "qa", "planner",
+            "spec", "auto_fix"). Written into the marker so the UI can show
+            "Halted during QA" etc.
+
+    Returns:
+        True  — error was a prompt-too-long error. The caller MUST stop
+                retrying and escalate to human review with
+                reviewReason="prompt_too_long".
+        False — error was not a prompt-too-long error. Caller falls back
+                to its normal error handling path.
+    """
+    from agents.session import is_prompt_too_long_error
+
+    if not is_prompt_too_long_error(error):
+        return False
+
+    logger.error(
+        "[%s] Prompt too long — halting (retrying with the same conversation "
+        "will never succeed). Reset the conversation log or switch to a "
+        "provider with a larger context window.",
+        phase,
+    )
+    print(
+        f"\n⛔ Prompt too long during {phase}. "
+        "Reset the conversation or pick a provider with a larger context window."
+    )
+
+    halt_data = {
+        "halted_at": datetime.now().isoformat(),
+        "error": str(error)[:500],
+        "phase": phase,
+        "remediation": (
+            "Reset the conversation log (clears conversation.jsonl) OR "
+            "resume under a provider with a larger context window."
+        ),
+    }
+    halt_file = spec_dir / PROMPT_TOO_LONG_HALT_FILE
+    try:
+        halt_file.write_text(json.dumps(halt_data), encoding="utf-8")
+    except OSError as e:
+        # Marker is best-effort — escalation must still happen even if we
+        # couldn't write it.
+        logger.warning("Could not write prompt-too-long halt marker: %s", e)
+
+    return True

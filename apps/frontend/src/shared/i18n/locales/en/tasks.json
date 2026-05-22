@@ -449,6 +449,8 @@
 			"resumeWithProviderSuccessTitle": "Resuming with {{provider}}",
 			"resumeWithProviderSuccessDesc": "The previous conversation will be replayed into the new provider.",
 			"resumeWithProviderErrorTitle": "Resume failed",
+			"resetConversation": "Reset conversation",
+			"resetConversationTooltip": "Clear the conversation history so the task can resume with a fresh LLM context",
 			"stopTask": "Stop Task",
 			"startTask": "Start Task",
 			"deleteTask": "Delete Task",

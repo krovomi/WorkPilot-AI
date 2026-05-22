@@ -209,6 +209,41 @@ export function TaskDetailModalActions({
 	}
 
 	if (task.status === "ai_review" || task.status === "human_review") {
+		// Special-case the "prompt too long" halt: the conversation log grew
+		// past the LLM context window, so the normal review UI is useless.
+		// Offer the two real remediations: reset the conversation log (clears
+		// the replay history) or switch to a provider with a larger context.
+		if (task.reviewReason === "prompt_too_long") {
+			return (
+				<div className="flex items-center gap-2">
+					<Button
+						variant="default"
+						onClick={async () => {
+							const res = await globalThis.electronAPI.resetTaskConversation(
+								task.id,
+							);
+							if (!res?.success && res?.error) {
+								globalThis.window.alert(res.error);
+							}
+						}}
+						title={t(
+							"tasks:modal.actions.resetConversationTooltip",
+							"Effacer l'historique de la conversation pour repartir avec un contexte vierge",
+						)}
+					>
+						<RotateCcw className="mr-2 h-4 w-4" />
+						{t(
+							"tasks:modal.actions.resetConversation",
+							"Réinitialiser la conversation",
+						)}
+					</Button>
+					<ResumeWithProviderDropdown
+						taskId={task.id}
+						currentProvider={task.metadata?.provider}
+					/>
+				</div>
+			);
+		}
 		return <ReviewableActions task={task} activeProject={activeProject} />;
 	}
 

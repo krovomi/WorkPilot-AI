@@ -449,6 +449,8 @@
 			"resumeWithProviderSuccessTitle": "Reprise avec {{provider}}",
 			"resumeWithProviderSuccessDesc": "La conversation précédente sera rejouée vers le nouveau provider.",
 			"resumeWithProviderErrorTitle": "Échec de la reprise",
+			"resetConversation": "Réinitialiser la conversation",
+			"resetConversationTooltip": "Effacer l'historique de la conversation pour repartir avec un contexte vierge",
 			"stopTask": "Arrêter la tâche",
 			"startTask": "Démarrer la tâche",
 			"deleteTask": "Supprimer la tâche",

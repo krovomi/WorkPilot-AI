@@ -30,12 +30,17 @@ export type TaskOrderState = Record<TaskStatus, string[]>;
 // - 'errors': Subtasks failed during execution
 // - 'qa_rejected': QA found issues that need fixing
 // - 'plan_review': Spec/plan created and awaiting approval before coding starts
+// - 'prompt_too_long': The accumulated conversation exceeded the LLM context
+//                     limit; retrying with the same context will never succeed.
+//                     User should reset the conversation or switch to a provider
+//                     with a larger context window.
 export type ReviewReason =
 	| "completed"
 	| "errors"
 	| "qa_rejected"
 	| "plan_review"
-	| "stopped";
+	| "stopped"
+	| "prompt_too_long";
 
 export type SubtaskStatus = "pending" | "in_progress" | "completed" | "failed";
 

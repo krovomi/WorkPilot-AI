@@ -117,3 +117,84 @@ async def test_qa_loop_wrapper_still_works(tmp_path: Path) -> None:
     assert handled is True
     content = (tmp_path / RATE_LIMIT_PAUSE_FILE).read_text(encoding="utf-8")
     assert '"phase": "qa"' in content
+
+
+# ---------------------------------------------------------------------------
+# handle_prompt_too_long — permanent halt path (different from rate-limit which
+# is a temporary pause-and-resume). These errors come from the LLM saying
+# "your conversation exceeds my context window" — retrying with the same
+# transcript will fail identically.
+# ---------------------------------------------------------------------------
+
+
+def test_prompt_too_long_returns_false_for_other_errors(tmp_path: Path) -> None:
+    """Non-prompt-too-long errors must NOT trigger the halt path — the caller
+    should fall through to its normal error handling."""
+    from services.rate_limit_shield import (
+        PROMPT_TOO_LONG_HALT_FILE,
+        handle_prompt_too_long,
+    )
+
+    assert handle_prompt_too_long(RuntimeError("boom"), tmp_path, "qa") is False
+    assert (
+        handle_prompt_too_long(RuntimeError("429 rate limit"), tmp_path, "coder")
+        is False
+    )
+    # No marker file should have been written.
+    assert not (tmp_path / PROMPT_TOO_LONG_HALT_FILE).exists()
+
+
+def test_prompt_too_long_writes_halt_marker_and_returns_true(tmp_path: Path) -> None:
+    """When the LLM says the prompt is too long, the helper must write the
+    halt marker file and return True so the caller knows to stop retrying."""
+    from services.rate_limit_shield import (
+        PROMPT_TOO_LONG_HALT_FILE,
+        handle_prompt_too_long,
+    )
+
+    err = RuntimeError("Anthropic: 400 prompt is too long: 250000 tokens")
+    handled = handle_prompt_too_long(err, tmp_path, "coder")
+
+    assert handled is True
+    marker = tmp_path / PROMPT_TOO_LONG_HALT_FILE
+    assert marker.exists()
+    content = marker.read_text(encoding="utf-8")
+    assert '"phase": "coder"' in content
+    assert "Reset the conversation" in content
+
+
+def test_prompt_too_long_marker_records_phase_tag(tmp_path: Path) -> None:
+    """The phase tag in the marker lets the UI tell the user where the halt
+    happened ('Halted during QA' vs 'Halted during planning')."""
+    from services.rate_limit_shield import (
+        PROMPT_TOO_LONG_HALT_FILE,
+        handle_prompt_too_long,
+    )
+
+    err = RuntimeError("context_length_exceeded")
+    handle_prompt_too_long(err, tmp_path, "auto_fix")
+
+    content = (tmp_path / PROMPT_TOO_LONG_HALT_FILE).read_text(encoding="utf-8")
+    assert '"phase": "auto_fix"' in content
+
+
+def test_prompt_too_long_detects_various_message_shapes(tmp_path: Path) -> None:
+    """The helper should recognise the common phrasings used by Anthropic,
+    OpenAI, and other providers — not just one exact string."""
+    from services.rate_limit_shield import handle_prompt_too_long
+
+    samples = [
+        "Prompt is too long",
+        "prompt too long",
+        "context length exceeded",
+        "maximum context length exceeded for model X",
+        "input is too long",
+    ]
+    for msg in samples:
+        # Each call uses a fresh tmp dir via a unique sub-path to avoid the
+        # marker from a previous iteration tainting the result.
+        sub = tmp_path / f"sub_{hash(msg)}"
+        sub.mkdir()
+        assert handle_prompt_too_long(RuntimeError(msg), sub, "qa") is True, (
+            f"should have matched: {msg!r}"
+        )

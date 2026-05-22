@@ -65,6 +65,7 @@ export interface TaskAPI {
 		taskId: string,
 		providerName: string,
 	) => Promise<IPCResult>;
+	resetTaskConversation: (taskId: string) => Promise<IPCResult>;
 
 	// Image Operations
 	loadImageThumbnail: (
@@ -293,6 +294,9 @@ export const createTaskAPI = (): TaskAPI => ({
 			taskId,
 			providerName,
 		),
+
+	resetTaskConversation: (taskId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_RESET_CONVERSATION, taskId),
 
 	// Image Operations
 	loadImageThumbnail: (

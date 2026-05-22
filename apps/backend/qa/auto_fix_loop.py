@@ -597,7 +597,10 @@ The automated tests have failed. Please analyze the test output below and apply 
         a rate-limit, we pause until the quota window resets and retry the same
         attempt rather than burning one of the limited attempts on a 429.
         """
-        from services.rate_limit_shield import handle_rate_limit_pause
+        from services.rate_limit_shield import (
+            handle_prompt_too_long,
+            handle_rate_limit_pause,
+        )
 
         # Get model and thinking budget
         qa_model = get_phase_model(self.spec_dir, "qa", self.model)
@@ -624,6 +627,11 @@ The automated tests have failed. Please analyze the test output below and apply 
                     )
                 return fix_status, fix_response
             except Exception as e:
+                # Prompt-too-long is a permanent failure; stop retrying and
+                # surface a "reset conversation / switch provider" choice
+                # to the user via the halt marker file.
+                if handle_prompt_too_long(e, self.spec_dir, "auto_fix"):
+                    raise
                 if await handle_rate_limit_pause(e, self.spec_dir, "auto_fix"):
                     # Shield paused-and-resumed; retry the same attempt.
                     continue

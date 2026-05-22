@@ -150,7 +150,10 @@ class SpecOrchestrator:
         Returns:
             Tuple of (success, response_text)
         """
-        from services.rate_limit_shield import handle_rate_limit_pause
+        from services.rate_limit_shield import (
+            handle_prompt_too_long,
+            handle_rate_limit_pause,
+        )
 
         runner = self._get_agent_runner()
 
@@ -169,7 +172,21 @@ class SpecOrchestrator:
                 prior_phase_summaries=prior_summaries if prior_summaries else None,
             )
 
-            if success or not response.startswith("RATE_LIMIT_RETRY_REQUIRED::"):
+            if success:
+                return success, response
+
+            # Prompt-too-long is permanent — write the halt marker and stop
+            # retrying. The frontend will surface the right remediation.
+            if response.startswith("PROMPT_TOO_LONG_HALT::"):
+                _, _, raw_err = response.split("::", 2)
+                handle_prompt_too_long(
+                    RuntimeError(raw_err),
+                    self.spec_dir,
+                    f"spec:{phase_name or prompt_file}",
+                )
+                return False, response
+
+            if not response.startswith("RATE_LIMIT_RETRY_REQUIRED::"):
                 return success, response
 
             # Extract the original SDK error message so the shield can parse
