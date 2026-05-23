@@ -125,6 +125,32 @@ export function validateWorktreeBranch(
 	};
 }
 
+/**
+ * Extract the last well-formed JSON object found in a multi-line stdout
+ * blob. The Python backend interleaves DEBUG log lines with its final
+ * `print(json.dumps(result))`, so JSON.parse on the whole stream fails.
+ *
+ * Walks the lines bottom-up, returns the first one that parses as an
+ * object (not a primitive). Returns null when no parseable object is
+ * found — callers should treat that as an error.
+ */
+function extractLastJsonObject(stdout: string): Record<string, unknown> | null {
+	const lines = stdout.split(/\r?\n/);
+	for (let i = lines.length - 1; i >= 0; i--) {
+		const trimmed = lines[i].trim();
+		if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) continue;
+		try {
+			const parsed = JSON.parse(trimmed);
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+				return parsed as Record<string, unknown>;
+			}
+		} catch {
+			// Not valid JSON on this line — keep walking up.
+		}
+	}
+	return null;
+}
+
 // Maximum PR title length (GitHub's limit is 256 characters)
 const MAX_PR_TITLE_LENGTH = 256;
 
@@ -3423,8 +3449,23 @@ export function registerWorktreeHandlers(
 						console.warn("[IPC] merge-preview process exited with code:", code);
 						if (code === 0) {
 							try {
-								// Parse JSON output from Python
-								const result = JSON.parse(stdout.trim());
+								// The Python backend interleaves DEBUG log lines with the
+								// final `print(json.dumps(result))` on the same stdout
+								// stream. JSON.parse on the whole blob fails. Walk the
+								// lines bottom-up and pick the last one that parses as
+								// a JSON object — that's the result line.
+								const parsed = extractLastJsonObject(stdout);
+								if (!parsed) {
+									throw new Error(
+										"No JSON object found in backend stdout",
+									);
+								}
+								// The shape comes straight from the Python CLI; we
+								// re-cast it to the consumer shape below. Treating it
+								// as `any` here keeps the existing typing of the IPC
+								// response unchanged.
+								// biome-ignore lint/suspicious/noExplicitAny: dynamic JSON from Python CLI
+								const result = parsed as any;
 								console.warn(
 									"[IPC] merge-preview result:",
 									JSON.stringify(result, null, 2),

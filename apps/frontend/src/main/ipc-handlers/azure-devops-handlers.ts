@@ -25,7 +25,10 @@ import type {
 } from "../../shared/types";
 import type { AgentManager } from "../agent";
 import { projectStore } from "../project-store";
-import { parseAcceptanceCriteriaText } from "../../shared/utils/acceptance-criteria";
+import {
+	parseAcceptanceCriteriaText,
+	stripAcceptanceCriteriaSection,
+} from "../../shared/utils/acceptance-criteria";
 import { sanitizeText, sanitizeUrl } from "./shared/sanitize";
 import { parseEnvFile } from "./utils";
 
@@ -626,7 +629,9 @@ except Exception as e:
 						// Sanitize inputs
 						const safeTitle = sanitizeText(item.title, 200);
 						const safeDescription = item.description
-							? sanitizeText(item.description, 5000)
+							? stripAcceptanceCriteriaSection(
+									sanitizeText(item.description, 5000),
+								)
 							: "";
 						const safeIdentifier = sanitizeText(`ADO-${item.id}`, 100);
 						const safeUrl = item.url ? sanitizeUrl(item.url) : "";
