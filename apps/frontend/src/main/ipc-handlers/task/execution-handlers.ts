@@ -8,7 +8,14 @@ import {
 	writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { type BrowserWindow, ipcMain } from "electron";
+
+// ESM doesn't expose __dirname out of the box. The main process is bundled
+// as ESM (apps/frontend/package.json sets "type": "module"), so we have to
+// derive the directory of this module from import.meta.url ourselves.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import {
 	AUTO_BUILD_PATHS,
 	getSpecsDir,

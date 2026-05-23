@@ -1748,8 +1748,36 @@ function getEffectiveBaseBranch(
 		return projectMainBranch;
 	}
 
-	// 3. Try to detect main/master branch
-	for (const branch of ["main", "master"]) {
+	// 3. Ask the remote what its default branch is. This is the source of
+	// truth for repos that don't use 'main' or 'master' (e.g. 'develop',
+	// 'trunk', 'production'). Without this the count of files / commits in
+	// the "Build ready for review" panel comes back as 0 against a branch
+	// that doesn't exist locally.
+	try {
+		const symref = execFileSync(
+			getToolPath("git"),
+			["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+			{
+				cwd: projectPath,
+				encoding: "utf-8",
+				stdio: ["pipe", "pipe", "pipe"],
+			},
+		).trim();
+		// Output is "origin/<branch>" — strip the remote prefix.
+		const detected = symref.startsWith("origin/")
+			? symref.slice("origin/".length)
+			: symref;
+		if (detected && GIT_BRANCH_REGEX.test(detected)) {
+			return detected;
+		}
+	} catch {
+		// symbolic-ref fails when origin/HEAD isn't set locally — fall through
+		// to the per-branch heuristic below.
+	}
+
+	// 4. Try to detect the usual default branches. 'develop' is included so
+	// GitFlow repos without an explicit project mainBranch still resolve.
+	for (const branch of ["main", "master", "develop"]) {
 		try {
 			execFileSync(getToolPath("git"), ["rev-parse", "--verify", branch], {
 				cwd: projectPath,
@@ -1762,7 +1790,7 @@ function getEffectiveBaseBranch(
 		}
 	}
 
-	// 4. Fallback to 'main'
+	// 5. Last-resort fallback.
 	return "main";
 }
 
