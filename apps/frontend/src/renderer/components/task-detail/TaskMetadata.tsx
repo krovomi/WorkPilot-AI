@@ -755,10 +755,16 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 	const [isSyncing, setIsSyncing] = useState(false);
 	const [savedAt, setSavedAt] = useState<number | null>(null);
 
+	// Sync the textarea draft from the source of truth — but ONLY when the
+	// user isn't actively editing. Otherwise every store-triggered re-render
+	// (incoming task refresh, kanban poll, etc.) would silently wipe what
+	// the user has been typing and lock `isDirty` to false, making the
+	// "Enregistrer" button uncliquable.
 	useEffect(() => {
+		if (isEditing) return;
 		const fresh = task.metadata?.acceptanceCriteria ?? [];
 		setDraft(fresh.join("\n"));
-	}, [task.metadata?.acceptanceCriteria]);
+	}, [task.metadata?.acceptanceCriteria, isEditing]);
 
 	const parsedDraft = draft
 		.split("\n")
@@ -870,7 +876,14 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 								<Button
 									size="sm"
 									onClick={handleSave}
-									disabled={!isDirty || isSaving}
+									// Only disable during the actual save round-trip.
+									// We deliberately allow clicking when isDirty is
+									// false: re-render races (a kanban poll firing
+									// while the user is editing) can momentarily reset
+									// the draft to match the original, which used to
+									// lock the button uncliquable. Letting the user
+									// click is harmless — handleSave is idempotent.
+									disabled={isSaving}
 								>
 									{isSaving
 										? t("tasks:metadata.acSaving")
