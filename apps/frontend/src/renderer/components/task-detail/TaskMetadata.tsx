@@ -26,6 +26,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { useToast } from "../../hooks/use-toast";
 import { persistUpdateTask } from "../../stores/task-store";
 import { Badge } from "../ui/badge";
 import {
@@ -737,6 +738,7 @@ interface AcceptanceCriteriaSectionProps {
 
 function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 	const { t } = useTranslation(["tasks"]);
+	const { toast } = useToast();
 	const initialCriteria = task.metadata?.acceptanceCriteria ?? [];
 	const initialText = initialCriteria.join("\n");
 
@@ -775,6 +777,21 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 			setSavedAt(Date.now());
 			setIsEditing(false);
 			if (parsedDraft.length > 0) setOpen(true);
+		} else {
+			// Without this toast the button silently bounces back to "Enregistrer"
+			// and the user has no way to know whether the IPC failed, the file
+			// couldn't be written, or something else went wrong.
+			toast({
+				title: t(
+					"tasks:metadata.acSaveErrorTitle",
+					"Échec de l'enregistrement",
+				),
+				description: t(
+					"tasks:metadata.acSaveErrorDesc",
+					"Impossible de sauvegarder les critères d'acceptation. Voir la console pour les détails.",
+				),
+				variant: "destructive",
+			});
 		}
 	};
 

@@ -264,6 +264,8 @@
 		"acSaved": "Enregistré.",
 		"acCancel": "Annuler",
 		"acHelp": "Un critère par ligne. Enregistré dans task_metadata.json.",
+		"acSaveErrorTitle": "Échec de l'enregistrement",
+		"acSaveErrorDesc": "Impossible de sauvegarder les critères d'acceptation. Voir la console pour les détails.",
 		"affectedFiles": "Fichiers affectés",
 		"extraNote": "Note supplémentaire",
 		"extraNotePlaceholder": "Ajoutez des précisions, contraintes ou indices. Ces notes sont transmises à toutes les phases du pipeline (plan, code, QA, review).",

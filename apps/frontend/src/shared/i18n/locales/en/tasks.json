@@ -260,6 +260,8 @@
 		"acSaved": "Saved.",
 		"acCancel": "Cancel",
 		"acHelp": "One criterion per line. Saved in task_metadata.json.",
+		"acSaveErrorTitle": "Save failed",
+		"acSaveErrorDesc": "Could not save the acceptance criteria. See the console for details.",
 		"affectedFiles": "Affected files",
 		"dependencies": "Dependencies",
 		"problemSolved": "Problem solved",

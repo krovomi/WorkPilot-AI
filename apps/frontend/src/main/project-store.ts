@@ -870,7 +870,9 @@ export class ProjectStore {
 		const metadataPath = path.join(specPath, "task_metadata.json");
 
 		let metadata: TaskMetadata | undefined;
+		let metadataExists = false;
 		if (existsSync(metadataPath)) {
+			metadataExists = true;
 			try {
 				const content = readFileSync(metadataPath, "utf-8");
 				metadata = JSON.parse(content);
@@ -879,14 +881,28 @@ export class ProjectStore {
 			}
 		}
 
-		// Fallback: populate acceptanceCriteria from requirements.json when absent
-		if (!metadata?.acceptanceCriteria?.length) {
+		// Fallback: populate acceptanceCriteria from requirements.json ONLY when
+		// task_metadata.json doesn't exist yet (or has no `acceptanceCriteria`
+		// key at all — meaning the task pre-dates the metadata-stored AC era).
+		// Once the user has edited the AC via the UI, task_metadata.json has the
+		// key set — possibly to an empty array if the user deleted everything —
+		// and that user choice is authoritative. The previous version restored
+		// from requirements.json whenever the array was empty/length-0, which
+		// silently undid user deletions and, more importantly, made
+		// `persistUpdateTask` look like a no-op on the next refresh.
+		const hasAcKey =
+			metadata !== undefined &&
+			Object.prototype.hasOwnProperty.call(metadata, "acceptanceCriteria");
+		if (!metadataExists || (metadata && !hasAcKey)) {
 			const requirementsPath = path.join(specPath, AUTO_BUILD_PATHS.REQUIREMENTS);
 			if (existsSync(requirementsPath)) {
 				try {
 					const reqContent = readFileSync(requirementsPath, "utf-8");
 					const requirements = JSON.parse(reqContent);
-					if (Array.isArray(requirements.acceptance_criteria) && requirements.acceptance_criteria.length > 0) {
+					if (
+						Array.isArray(requirements.acceptance_criteria) &&
+						requirements.acceptance_criteria.length > 0
+					) {
 						metadata = {
 							...metadata,
 							acceptanceCriteria: requirements.acceptance_criteria,
