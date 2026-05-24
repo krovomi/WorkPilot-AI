@@ -44,6 +44,7 @@ import type {
 	WorktreeStatus,
 } from "../../../shared/types";
 import { stripAnsiCodes } from "../../../shared/utils/ansi-sanitizer";
+import { parseEnvFile } from "../utils";
 import { getAppLanguage } from "../../app-language";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
@@ -123,6 +124,34 @@ export function validateWorktreeBranch(
 		usedFallback: true,
 		reason: "invalid_pattern",
 	};
+}
+
+/**
+ * Load the project's `.workpilot/.env` and return it as a flat key→value
+ * map suitable for injecting into a Python subprocess via `env: { ... }`.
+ *
+ * Why this exists: PR creation (and similar AzDO/Jira/GitHub operations)
+ * needs to forward `AZURE_DEVOPS_PAT`, `AZURE_DEVOPS_ORG_URL`,
+ * `AZURE_DEVOPS_PROJECT`, `AZURE_DEVOPS_REPO`, `GITHUB_TOKEN`, etc. to
+ * the Python subprocess. The PAT is stored in the per-project .env file,
+ * not in the Electron main process env, so the subprocess would see an
+ * empty `os.environ.get("AZURE_DEVOPS_PAT")` without this helper.
+ *
+ * Returns an empty object when the file is missing or unreadable — the
+ * caller can still spawn the subprocess; auth-required operations will
+ * fail downstream with their own error.
+ */
+function loadProjectEnvForSubprocess(
+	project: { path: string; autoBuildPath?: string | null },
+): Record<string, string> {
+	if (!project.autoBuildPath) return {};
+	const envPath = path.join(project.path, project.autoBuildPath, ".env");
+	if (!existsSync(envPath)) return {};
+	try {
+		return parseEnvFile(readFileSync(envPath, "utf-8"));
+	} catch {
+		return {};
+	}
 }
 
 /**
@@ -4216,6 +4245,13 @@ export function registerWorktreeHandlers(
 				const profileResult = getBestAvailableProfileEnv();
 				const profileEnv = profileResult.env;
 
+				// Forward project-level credentials (.workpilot/.env) into the
+				// Python subprocess so PR creation can authenticate against
+				// Azure DevOps / GitHub / GitLab. Without this the Python
+				// _get_azure_devops_credentials() sees an empty PAT and the
+				// API call returns HTTP 401 ("authentication failed").
+				const projectEnv = loadProjectEnvForSubprocess(project);
+
 				return new Promise((resolve) => {
 					let timeoutId: NodeJS.Timeout | null = null;
 					let resolved = false;
@@ -4238,6 +4274,7 @@ export function registerWorktreeHandlers(
 								...getIsolatedGitEnv(),
 								...pythonEnv,
 								...profileEnv,
+								...projectEnv,
 								GITHUB_CLI_PATH: ghCliPath,
 								APP_LANGUAGE: getAppLanguage(),
 								PYTHONUNBUFFERED: "1",

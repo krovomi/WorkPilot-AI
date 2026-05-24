@@ -55,10 +55,7 @@ import type {
 	AzureDevOpsWorkItem,
 	JiraWorkItem,
 } from "../../shared/types/integrations";
-import {
-	formatAcceptanceCriteriaMarkdown,
-	parseAcceptanceCriteriaText,
-} from "../../shared/utils/acceptance-criteria";
+import { parseAcceptanceCriteriaText } from "../../shared/utils/acceptance-criteria";
 // Import logos
 import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
 import JiraLogo from "../assets/logos/jira.svg";
@@ -1694,17 +1691,14 @@ export function KanbanBoard({
 						metadata.requireReviewBeforeCoding = true;
 					}
 
-					const acList = Array.isArray(metadata.acceptanceCriteria)
-						? (metadata.acceptanceCriteria as string[])
-						: [];
-					const descriptionWithAc =
-						(workItem.description || "") +
-						formatAcceptanceCriteriaMarkdown(acList);
-
+					// task.description = raw description from the tracker; the
+					// AcceptanceCriteriaSection component renders metadata.acceptanceCriteria
+					// in its own UI block. Concatenating them here would double the
+					// criteria the user sees (once in description, once in the AC list).
 					const result = await createTask(
 						projectId,
 						workItem.title,
-						descriptionWithAc,
+						workItem.description || "",
 						metadata,
 					);
 

@@ -87,6 +87,34 @@ describe("stripAcceptanceCriteriaSection", () => {
 			"<p>second list</p>";
 		expect(stripAcceptanceCriteriaSection(html)).toBe("<div>Intro.</div>");
 	});
+
+	// Markdown-heading path: covers descriptions that were already flattened
+	// to markdown before reaching us (e.g. the KanbanBoard ADO import path
+	// that used to concatenate "## Acceptance Criteria" manually).
+
+	it("trims at a markdown '## Acceptance Criteria' heading", () => {
+		const md =
+			"Description line one.\n\nDescription line two.\n\n" +
+			"## Acceptance Criteria\n\n- Scénario 1\n- Scénario 2";
+		expect(stripAcceptanceCriteriaSection(md)).toBe(
+			"Description line one.\n\nDescription line two.",
+		);
+	});
+
+	it("trims at a markdown '### Critères d'acceptation' heading", () => {
+		const md = "Some context.\n### Critères d'acceptation\n- crit 1";
+		expect(stripAcceptanceCriteriaSection(md)).toBe("Some context.");
+	});
+
+	it("tolerates bold markdown wrapping around the heading text", () => {
+		const md = "Intro\n\n## **Critères d'acceptation**\n- a";
+		expect(stripAcceptanceCriteriaSection(md)).toBe("Intro");
+	});
+
+	it("does not trim plain '## Notes' headings (false-positive guard)", () => {
+		const md = "Intro\n\n## Notes\n- nothing AC about this";
+		expect(stripAcceptanceCriteriaSection(md)).toBe(md);
+	});
 });
 
 describe("parseAcceptanceCriteriaText (regression sanity)", () => {

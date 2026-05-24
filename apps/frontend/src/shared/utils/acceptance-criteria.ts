@@ -72,6 +72,8 @@ const HEADING_BLOCK = /<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi;
  */
 export function stripAcceptanceCriteriaSection(html: string): string {
 	if (!html) return html;
+
+	// 1) HTML heading path (AzDO rich-text descriptions, Jira ADF→HTML).
 	HEADING_BLOCK.lastIndex = 0;
 	let match: RegExpExecArray | null;
 	while ((match = HEADING_BLOCK.exec(html)) !== null) {
@@ -83,6 +85,20 @@ export function stripAcceptanceCriteriaSection(html: string): string {
 			return html.slice(0, match.index).trimEnd();
 		}
 	}
+
+	// 2) Markdown heading path (descriptions already flattened to markdown,
+	// or imports that concatenated "## Acceptance Criteria" manually).
+	const lines = html.split(/\r?\n/);
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const mdMatch = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*$/);
+		if (!mdMatch) continue;
+		const heading = mdMatch[1].replace(/[*_`]+/g, "").trim();
+		if (AC_HEADING_LABELS.some((re) => re.test(heading))) {
+			return lines.slice(0, i).join("\n").trimEnd();
+		}
+	}
+
 	return html;
 }
 
