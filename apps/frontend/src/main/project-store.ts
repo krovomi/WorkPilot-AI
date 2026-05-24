@@ -30,6 +30,7 @@ import type {
 	TaskMetadata,
 	TaskStatus,
 } from "../shared/types";
+import { stripAcceptanceCriteriaSection } from "../shared/utils/acceptance-criteria";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
 import { ensureAbsolutePath } from "./utils/path-helpers";
 import { findAllSpecPaths } from "./utils/spec-path-helpers";
@@ -796,19 +797,30 @@ export class ProjectStore {
 			return "";
 		}
 
+		// Pick whichever source has content (plan → requirements → spec.md),
+		// then strip any Acceptance Criteria section. AC are surfaced by the
+		// dedicated UI panel, so having them inside the description too is
+		// just a visual duplicate the user has to scroll past. This runs on
+		// every load, so tasks imported before the import-time fix get
+		// cleaned up automatically the next time the kanban refreshes.
+		let raw: string | null = null;
+
 		// PRIORITY 1: From implementation plan
 		if (plan?.description) {
-			return plan.description;
+			raw = plan.description;
 		}
 
 		// PRIORITY 2: From requirements.json
-		const requirementsDescription = this.getRequirementsDescription(specPath);
-		if (requirementsDescription) {
-			return requirementsDescription;
+		if (!raw) {
+			const requirementsDescription =
+				this.getRequirementsDescription(specPath);
+			if (requirementsDescription) raw = requirementsDescription;
 		}
 
 		// PRIORITY 3: From spec.md Overview
-		return this.getSpecOverview(specPath);
+		if (!raw) raw = this.getSpecOverview(specPath);
+
+		return raw ? stripAcceptanceCriteriaSection(raw) : "";
 	}
 
 	/**
