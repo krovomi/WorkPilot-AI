@@ -214,6 +214,19 @@ export function CopilotCliStatusBadge({
 					setTimeout(() => refreshCopilot(), VERSION_RECHECK_DELAY_MS);
 					return;
 				}
+				if (result.error?.startsWith("copilot_pkg_locked:")) {
+					// Translatable, actionable variant of the raw EPERM/rename
+					// stack trace from gh copilot update. Tells the user what
+					// to actually do (close running Copilot sessions) instead
+					// of dumping internal Node.js filesystem errors.
+					setInstallError(
+						t(
+							"settings:copilot.updateLocked",
+							"Mise à jour bloquée : un processus Copilot CLI utilise actuellement les fichiers à mettre à jour. Fermez les terminaux ou sessions Copilot ouverts, puis réessayez. Si le problème persiste, redémarrez WorkPilot.",
+						),
+					);
+					return;
+				}
 				if (!result.error?.startsWith("gh_missing")) {
 					setInstallError(result.error || "Installation failed");
 					return;

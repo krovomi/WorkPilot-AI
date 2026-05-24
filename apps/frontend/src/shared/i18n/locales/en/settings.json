@@ -2020,6 +2020,7 @@
 		"checkingCopilotCli": "Checking Copilot CLI...",
 		"copilotCliUpToDate": "Copilot CLI is up to date",
 		"copilotCliExtensionNotInstalled": "Copilot CLI extension not installed",
+		"updateLocked": "Update blocked: a running Copilot CLI process is holding the package files open. Close any open Copilot terminals or sessions and try again. If the problem persists, restart WorkPilot.",
 		"gitHubCliNotFound": "GitHub CLI (gh) not found — required for Copilot",
 		"errorCheckingCopilotCli": "Error checking Copilot CLI",
 		"loadingInstallations": "Loading installations...",

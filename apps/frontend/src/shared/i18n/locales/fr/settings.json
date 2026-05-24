@@ -1962,6 +1962,7 @@
 		"checkingCopilotCli": "Vérification Copilot CLI...",
 		"copilotCliUpToDate": "Copilot CLI est à jour",
 		"copilotCliExtensionNotInstalled": "Extension Copilot CLI non installée",
+		"updateLocked": "Mise à jour bloquée : un processus Copilot CLI utilise actuellement les fichiers à mettre à jour. Fermez les terminaux ou sessions Copilot ouverts, puis réessayez. Si le problème persiste, redémarrez WorkPilot.",
 		"gitHubCliNotFound": "GitHub CLI (gh) introuvable — requis pour Copilot",
 		"errorCheckingCopilotCli": "Erreur lors de la vérification Copilot CLI",
 		"loadingInstallations": "Chargement des installations...",

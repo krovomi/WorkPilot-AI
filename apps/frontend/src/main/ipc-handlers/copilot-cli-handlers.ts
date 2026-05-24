@@ -12,7 +12,11 @@
  * - Version registry: GitHub releases (github/copilot-cli), not npm
  */
 
-import { execFile, spawn } from "node:child_process";
+import {
+	type ChildProcessWithoutNullStreams,
+	execFile,
+	spawn,
+} from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -596,46 +600,97 @@ export function registerCopilotCliHandlers(): void {
 				);
 
 				const env = getAugmentedEnv();
-				const child = spawn(ghInfo.path, ["copilot", subCommand], {
-					shell: false,
-					windowsHide: true,
-					env: { ...env, CI: "1" },
-				});
+				// Lock the narrowing of ghInfo.path inside the closure below.
+				const ghPath = ghInfo.path;
 
-				let stdout = "";
-				let stderr = "";
-				child.stdout?.on("data", (chunk: Buffer) => {
-					stdout += chunk.toString("utf-8");
-				});
-				child.stderr?.on("data", (chunk: Buffer) => {
-					stderr += chunk.toString("utf-8");
-				});
-
-				const result = await new Promise<{
+				// Spawn `gh copilot <subCommand>` once and capture the result.
+				// Pulled into a closure so we can retry the call without
+				// duplicating the spawn / timeout boilerplate.
+				type SpawnResult = {
 					code: number | null;
 					stdout: string;
 					stderr: string;
-				}>((resolve, reject) => {
-					const timeout = setTimeout(
-						() => {
-							child.kill("SIGKILL");
-							reject(
-								new Error(
-									`gh copilot ${subCommand} timed out after 5 minutes`,
-								),
-							);
-						},
-						5 * 60 * 1000,
+				};
+				const runOnce = (): Promise<SpawnResult> => {
+					// Cast explicitly: the `{shell, windowsHide, env}` combo
+					// matches several spawn() overloads and TS reduces the
+					// intersection to `never`, hiding the .on / .stdout API
+					// we use below. With shell:false the actual return type
+					// is ChildProcessWithoutNullStreams.
+					const child = spawn(ghPath, ["copilot", subCommand], {
+						shell: false,
+						windowsHide: true,
+						env: { ...env, CI: "1" },
+					}) as ChildProcessWithoutNullStreams;
+
+					let stdout = "";
+					let stderr = "";
+					child.stdout?.on("data", (chunk: Buffer) => {
+						stdout += chunk.toString("utf-8");
+					});
+					child.stderr?.on("data", (chunk: Buffer) => {
+						stderr += chunk.toString("utf-8");
+					});
+
+					return new Promise<SpawnResult>((resolve, reject) => {
+						const timeout = setTimeout(
+							() => {
+								child.kill("SIGKILL");
+								reject(
+									new Error(
+										`gh copilot ${subCommand} timed out after 5 minutes`,
+									),
+								);
+							},
+							5 * 60 * 1000,
+						);
+						child.on("error", (err: Error) => {
+							clearTimeout(timeout);
+							reject(err);
+						});
+						child.on("close", (code: number | null) => {
+							clearTimeout(timeout);
+							resolve({ code, stdout, stderr });
+						});
+					});
+				};
+
+				// Windows-specific: gh copilot's package extractor sometimes hits
+				// EPERM on `rename` when another copilot.exe process (or AV
+				// scanner) still holds a handle on a file under ~/.copilot/pkg/.
+				// The lock is usually transient — give the OS a moment and
+				// retry once. If it sticks, we surface a translatable sentinel
+				// so the renderer can show actionable guidance.
+				const MAX_RETRIES = 2;
+				const RETRY_DELAY_MS = 1500;
+				const isLockedPkgError = (msg: string): boolean => {
+					const m = msg.toLowerCase();
+					return (
+						m.includes("eperm") &&
+						m.includes("rename") &&
+						m.includes(".copilot")
 					);
-					child.on("error", (err) => {
-						clearTimeout(timeout);
-						reject(err);
-					});
-					child.on("close", (code) => {
-						clearTimeout(timeout);
-						resolve({ code, stdout, stderr });
-					});
-				});
+				};
+
+				let result: { code: number | null; stdout: string; stderr: string } = {
+					code: null,
+					stdout: "",
+					stderr: "",
+				};
+				for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+					result = await runOnce();
+					if (result.code === 0) break;
+
+					const combined = `${result.stderr}\n${result.stdout}`;
+					if (!isLockedPkgError(combined) || attempt === MAX_RETRIES) break;
+
+					console.warn(
+						`[Copilot CLI] EPERM/rename on ~/.copilot/pkg — likely a ` +
+							`running copilot.exe holds a lock. Retrying in ${RETRY_DELAY_MS}ms ` +
+							`(attempt ${attempt + 1}/${MAX_RETRIES})`,
+					);
+					await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+				}
 
 				cachedLatestCopilotVersion = null;
 				// Invalidate the cli-tool-manager cache so the next getToolInfo
@@ -643,6 +698,20 @@ export function registerCopilotCliHandlers(): void {
 				clearToolCache();
 
 				if (result.code !== 0) {
+					const combined = `${result.stderr}\n${result.stdout}`;
+					if (isLockedPkgError(combined)) {
+						// Sentinel prefix: the renderer matches `copilot_pkg_locked:`
+						// and shows a translated, actionable toast instead of the
+						// raw stack trace from gh.
+						return {
+							success: false,
+							error:
+								"copilot_pkg_locked: A running Copilot CLI process is " +
+								"holding files in ~/.copilot/pkg/ open. Close any open " +
+								"Copilot terminals / sessions and try again. If the " +
+								"problem persists, restart WorkPilot to release the locks.",
+						};
+					}
 					return {
 						success: false,
 						error: `gh copilot ${subCommand} exited with code ${result.code}: ${
