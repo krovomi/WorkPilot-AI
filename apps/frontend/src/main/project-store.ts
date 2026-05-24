@@ -892,7 +892,7 @@ export class ProjectStore {
 		// `persistUpdateTask` look like a no-op on the next refresh.
 		const hasAcKey =
 			metadata !== undefined &&
-			Object.prototype.hasOwnProperty.call(metadata, "acceptanceCriteria");
+			Object.hasOwn(metadata, "acceptanceCriteria");
 		if (!metadataExists || (metadata && !hasAcKey)) {
 			const requirementsPath = path.join(specPath, AUTO_BUILD_PATHS.REQUIREMENTS);
 			if (existsSync(requirementsPath)) {
