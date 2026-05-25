@@ -25,9 +25,19 @@ vi.mock("../../../../preload/api", () => ({}));
 
 // Mock window.electronAPI
 const mockOpenExternal = vi.fn();
+const mockAnalyzeWorktreeImpact = vi.fn().mockResolvedValue({
+	success: true,
+	data: {
+		success: true,
+		body: "## Summary\n\nMocked body.",
+		rating: "2",
+		features: "Mocked feature",
+	},
+});
 Object.defineProperty(window, "electronAPI", {
 	value: {
 		openExternal: mockOpenExternal,
+		analyzeWorktreeImpact: mockAnalyzeWorktreeImpact,
 	},
 	writable: true,
 });
@@ -187,11 +197,13 @@ describe("CreatePRDialog", () => {
 		fireEvent.click(createButton);
 
 		await waitFor(() => {
-			expect(mockOnCreatePR).toHaveBeenCalledWith({
-				targetBranch: "develop",
-				title: "Implement user authentication",
-				draft: false,
-			});
+			expect(mockOnCreatePR).toHaveBeenCalledWith(
+				expect.objectContaining({
+					targetBranch: "develop",
+					title: "Implement user authentication",
+					draft: false,
+				}),
+			);
 		});
 	});
 
@@ -221,11 +233,13 @@ describe("CreatePRDialog", () => {
 		fireEvent.click(createButton);
 
 		await waitFor(() => {
-			expect(mockOnCreatePR).toHaveBeenCalledWith({
-				targetBranch: "develop",
-				title: "Custom PR Title",
-				draft: false,
-			});
+			expect(mockOnCreatePR).toHaveBeenCalledWith(
+				expect.objectContaining({
+					targetBranch: "develop",
+					title: "Custom PR Title",
+					draft: false,
+				}),
+			);
 		});
 	});
 
@@ -384,11 +398,13 @@ describe("CreatePRDialog", () => {
 		fireEvent.click(createButton);
 
 		await waitFor(() => {
-			expect(mockOnCreatePR).toHaveBeenCalledWith({
-				targetBranch: "develop",
-				title: "Implement user authentication",
-				draft: true,
-			});
+			expect(mockOnCreatePR).toHaveBeenCalledWith(
+				expect.objectContaining({
+					targetBranch: "develop",
+					title: "Implement user authentication",
+					draft: true,
+				}),
+			);
 		});
 	});
 

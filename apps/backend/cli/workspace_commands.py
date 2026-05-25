@@ -1213,6 +1213,7 @@ def handle_create_pr_command(
     target_branch: str | None = None,
     title: str | None = None,
     draft: bool = False,
+    body: str | None = None,
 ) -> CreatePRResult:
     """
     Handle the --create-pr command: push branch and create a GitHub PR.
@@ -1223,6 +1224,8 @@ def handle_create_pr_command(
         target_branch: Target branch for PR (defaults to base branch)
         title: Custom PR title (defaults to spec name)
         draft: Whether to create as draft PR
+        body: Optional PR body. If provided, used verbatim (no AI generation,
+              no impact block auto-injection).
 
     Returns:
         CreatePRResult with success status, pr_url, and any errors
@@ -1264,6 +1267,7 @@ def handle_create_pr_command(
             target_branch=target_branch,
             title=title,
             draft=draft,
+            body=body,
         )
     except Exception as e:
         debug_error(MODULE, f"Exception during PR creation: {e}")
@@ -1316,6 +1320,51 @@ def handle_create_pr_command(
         # Output JSON for frontend parsing
         print(json.dumps(result))
         return result
+
+
+def handle_analyze_impact_command(
+    project_dir: Path,
+    spec_name: str,
+    target_branch: str | None = None,
+) -> dict:
+    """
+    Handle the --analyze-impact command: compute what the PR body and impact
+    analysis WOULD be, without pushing or creating a PR. Used by the frontend
+    review modal to pre-fill editable fields before the user confirms creation.
+
+    Outputs a single JSON line to stdout for the frontend to parse:
+        {"success": true, "body": "...", "rating": "3", "features": "..."}
+
+    On hard failure (no worktree, etc.):
+        {"success": false, "error": "..."}
+    """
+    worktree_path = get_existing_build_worktree(project_dir, spec_name)
+    if not worktree_path:
+        result = {"success": False, "error": "No build worktree found for this spec"}
+        print(json.dumps(result))
+        return result
+
+    try:
+        manager = WorktreeManager(project_dir, base_branch=target_branch)
+        preview = manager.preview_pr_body(
+            spec_name=spec_name,
+            target_branch=target_branch,
+            include_impact=True,
+        )
+    except Exception as e:
+        debug_warning("workspace_commands", f"analyze-impact failed: {e}")
+        result = {"success": False, "error": str(e)}
+        print(json.dumps(result))
+        return result
+
+    result = {
+        "success": True,
+        "body": preview.get("body", ""),
+        "rating": preview.get("rating", "N/A"),
+        "features": preview.get("features", "Non evalue"),
+    }
+    print(json.dumps(result))
+    return result
 
 
 def cleanup_old_worktrees_command(

@@ -1320,6 +1320,7 @@ class WorktreeManager:
         target_branch: str | None = None,
         title: str | None = None,
         draft: bool = False,
+        body: str | None = None,
     ) -> PullRequestResult:
         """
         Create an Azure DevOps pull request using the REST API.
@@ -1332,6 +1333,8 @@ class WorktreeManager:
             target_branch: Target branch for PR (defaults to base_branch)
             title: PR title (defaults to spec name)
             draft: Whether to create as draft PR
+            body: PR body. If provided, used as-is (no AI generation, no
+                  impact block injection); otherwise body is auto-generated.
 
         Returns:
             PullRequestResult with keys:
@@ -1352,22 +1355,36 @@ class WorktreeManager:
         target = target_branch or self.base_branch
         pr_title = title or f"feat: {spec_name}"
 
-        # Try AI-powered PR body from project's PR template, fall back to spec summary
-        pr_body: str | None = None
-        try:
-            diff_summary, commit_log = self._gather_pr_context(spec_name, target)
-            pr_body = self._try_ai_pr_body(
+        # Caller-provided body wins. Otherwise try AI-powered PR body from
+        # project's PR template, falling back to spec summary, then append
+        # the impact block.
+        pr_body: str | None = body
+        caller_provided_body = body is not None
+        diff_summary: str = ""
+        commit_log: str = ""
+        if pr_body is None:
+            try:
+                diff_summary, commit_log = self._gather_pr_context(spec_name, target)
+                pr_body = self._try_ai_pr_body(
+                    spec_name=spec_name,
+                    target_branch=target,
+                    branch_name=info.branch,
+                    diff_summary=diff_summary,
+                    commit_log=commit_log,
+                )
+            except Exception as e:
+                logger.warning(f"AI PR body generation encountered an error: {e}")
+
+            if not pr_body:
+                pr_body = self._extract_spec_summary(spec_name)
+
+        if not caller_provided_body:
+            pr_body = self._inject_impact_block(
                 spec_name=spec_name,
-                target_branch=target,
-                branch_name=info.branch,
+                body=pr_body,
                 diff_summary=diff_summary,
                 commit_log=commit_log,
             )
-        except Exception as e:
-            logger.warning(f"AI PR body generation encountered an error: {e}")
-
-        if not pr_body:
-            pr_body = self._extract_spec_summary(spec_name)
 
         # Extract Azure DevOps coordinates from git remote
         org = extract_azure_devops_org(self.project_dir)
@@ -1615,6 +1632,9 @@ class WorktreeManager:
         # Caller-provided body wins. Otherwise try AI-powered PR body from
         # project's PR template, falling back to spec summary.
         pr_body: str | None = body
+        caller_provided_body = body is not None
+        diff_summary: str = ""
+        commit_log: str = ""
         if pr_body is None:
             try:
                 diff_summary, commit_log = self._gather_pr_context(spec_name, target)
@@ -1630,6 +1650,17 @@ class WorktreeManager:
 
             if not pr_body:
                 pr_body = self._extract_spec_summary(spec_name)
+
+        # Append impact block only when we composed the body ourselves; if the
+        # caller provided a body they are responsible for it (they likely
+        # included or edited the impact block via the review modal).
+        if not caller_provided_body:
+            pr_body = self._inject_impact_block(
+                spec_name=spec_name,
+                body=pr_body,
+                diff_summary=diff_summary,
+                commit_log=commit_log,
+            )
 
         # Find gh executable before attempting PR creation
         gh_executable = get_gh_executable()
@@ -1757,6 +1788,7 @@ class WorktreeManager:
         target_branch: str | None = None,
         title: str | None = None,
         draft: bool = False,
+        body: str | None = None,
     ) -> PullRequestResult:
         """
         Create a GitLab merge request for a spec's branch using glab CLI with retry logic.
@@ -1766,6 +1798,8 @@ class WorktreeManager:
             target_branch: Target branch for MR (defaults to base_branch)
             title: MR title (defaults to spec name)
             draft: Whether to create as draft MR
+            body: MR body. If provided, used as-is (no auto-generation, no
+                  impact block injection); otherwise body is auto-generated.
 
         Returns:
             PullRequestResult with keys:
@@ -1784,8 +1818,22 @@ class WorktreeManager:
         target = target_branch or self.base_branch
         mr_title = title or f"feat: {spec_name}"
 
-        # Get MR body from spec.md if available
-        mr_body = self._extract_spec_summary(spec_name)
+        # Caller-provided body wins. Otherwise spec summary + impact block.
+        if body is not None:
+            mr_body = body
+        else:
+            mr_body = self._extract_spec_summary(spec_name)
+            try:
+                diff_summary, commit_log = self._gather_pr_context(spec_name, target)
+            except Exception as e:
+                logger.warning(f"Could not gather PR context for impact block: {e}")
+                diff_summary, commit_log = "", ""
+            mr_body = self._inject_impact_block(
+                spec_name=spec_name,
+                body=mr_body,
+                diff_summary=diff_summary,
+                commit_log=commit_log,
+            )
 
         # Find glab executable before attempting MR creation
         glab_executable = get_glab_executable()
@@ -2070,6 +2118,131 @@ class WorktreeManager:
             logger.warning(f"AI PR body generation failed: {e}")
             return None
 
+    def _run_impact_analysis(
+        self,
+        spec_name: str,
+        diff_summary: str,
+        commit_log: str,
+    ) -> "ImpactAnalysis":
+        """
+        Run the impact analyzer and return its result, falling back to
+        the "N/A / Non evalue" analysis on any failure. Never raises.
+
+        Returns:
+            An ImpactAnalysis (always non-None thanks to the fallback).
+        """
+        from agents.impact_analyzer import (
+            fallback_analysis,
+            run_impact_analyzer_sync,
+        )
+
+        spec_dir = self.project_dir / ".workpilot" / "specs" / spec_name
+        if not spec_dir.is_dir():
+            worktree_path = self.get_worktree_path(spec_name)
+            spec_dir = worktree_path / ".workpilot" / "specs" / spec_name
+            if not spec_dir.is_dir():
+                spec_dir = self.project_dir  # last resort, analyzer tolerates this
+
+        model, thinking_budget = get_utility_model_config()
+
+        analysis = run_impact_analyzer_sync(
+            project_dir=self.project_dir,
+            spec_dir=spec_dir,
+            model=model,
+            thinking_budget=thinking_budget,
+            diff_summary=diff_summary,
+            commit_log=commit_log,
+        )
+        return analysis if analysis is not None else fallback_analysis()
+
+    def _inject_impact_block(
+        self,
+        spec_name: str,
+        body: str,
+        diff_summary: str,
+        commit_log: str,
+    ) -> str:
+        """
+        Append a French-language impact block to a PR/MR body.
+
+        Runs the impact_analyzer agent on the diff and appends a standardized
+        block at the end of the body:
+
+            ---
+            <!-- workpilot-impact-block -->
+            Note de l'impact (1 a 5) : 3
+            Fonctionnalite(s) impactee(s) : Fiche vehicule, doc de vente
+
+        On any failure, falls back to "N/A" / "Non evalue" so the block is
+        always present (per user spec). Never raises.
+        """
+        try:
+            from agents.impact_analyzer import append_impact_block
+        except ImportError:
+            logger.warning("impact_analyzer module not available, skipping impact block")
+            return body
+
+        analysis = self._run_impact_analysis(spec_name, diff_summary, commit_log)
+        return append_impact_block(body, analysis)
+
+    def preview_pr_body(
+        self,
+        spec_name: str,
+        target_branch: str | None = None,
+        include_impact: bool = True,
+    ) -> dict:
+        """
+        Compute what the PR body and impact analysis would be, WITHOUT
+        actually pushing or creating any PR. Intended for the frontend
+        review modal so the user can edit values before creation.
+
+        Returns a dict with:
+            - body: str  (PR body markdown, with impact block appended if include_impact)
+            - rating: str  ("1".."5" or "N/A")
+            - features: str  (French free-text summary, possibly "Non evalue")
+            - error: str  (set only on hard failure; other fields still present)
+        """
+        try:
+            from agents.impact_analyzer import append_impact_block
+        except ImportError:
+            append_impact_block = None  # type: ignore[assignment]
+
+        target = target_branch or self.base_branch
+        info = self.get_worktree_info(spec_name)
+        branch_name = info.branch if info else ""
+
+        try:
+            diff_summary, commit_log = self._gather_pr_context(spec_name, target)
+        except Exception as e:
+            logger.warning(f"preview_pr_body: could not gather context: {e}")
+            diff_summary, commit_log = "", ""
+
+        body: str | None = None
+        try:
+            body = self._try_ai_pr_body(
+                spec_name=spec_name,
+                target_branch=target,
+                branch_name=branch_name,
+                diff_summary=diff_summary,
+                commit_log=commit_log,
+            )
+        except Exception as e:
+            logger.warning(f"preview_pr_body: AI body failed: {e}")
+        if not body:
+            body = self._extract_spec_summary(spec_name)
+
+        analysis = self._run_impact_analysis(spec_name, diff_summary, commit_log)
+
+        body_with_block = body
+        if include_impact and append_impact_block is not None:
+            body_with_block = append_impact_block(body, analysis)
+
+        return {
+            "body": body_with_block,
+            "rating": analysis.rating,
+            "features": analysis.features,
+        }
+
     def _extract_spec_summary(self, spec_name: str) -> str:
         """
         Build a rich Markdown PR/MR body from the spec summary.
@@ -2252,6 +2425,7 @@ class WorktreeManager:
         title: str | None = None,
         draft: bool = False,
         force_push: bool = False,
+        body: str | None = None,
     ) -> PushAndCreatePRResult:
         """
         Push branch and create a pull request/merge request in one operation.
@@ -2263,6 +2437,9 @@ class WorktreeManager:
             title: PR/MR title (defaults to spec name)
             draft: Whether to create as draft PR/MR
             force_push: Whether to force push the branch
+            body: Optional PR/MR body. If provided, used verbatim (no AI
+                  generation, no impact block injection) - the caller is
+                  responsible for the full content including any impact block.
 
         Returns:
             PushAndCreatePRResult with keys:
@@ -2296,6 +2473,7 @@ class WorktreeManager:
                 target_branch=target_branch,
                 title=title,
                 draft=draft,
+                body=body,
             )
         elif provider == "github":
             pr_result = self.create_pull_request(
@@ -2303,6 +2481,7 @@ class WorktreeManager:
                 target_branch=target_branch,
                 title=title,
                 draft=draft,
+                body=body,
             )
         elif provider == "gitlab":
             pr_result = self.create_merge_request(
@@ -2310,6 +2489,7 @@ class WorktreeManager:
                 target_branch=target_branch,
                 title=title,
                 draft=draft,
+                body=body,
             )
         else:
             # Unknown provider

@@ -550,6 +550,13 @@ export interface WorktreeCreatePROptions {
 	targetBranch?: string;
 	title?: string;
 	draft?: boolean;
+	/**
+	 * If provided, used verbatim as the PR body (no AI generation, no impact
+	 * block auto-injection). Caller is responsible for the full content,
+	 * including any impact block at the end. Used by the review modal after
+	 * the user has edited the auto-filled values.
+	 */
+	customBody?: string;
 }
 
 /**
@@ -561,6 +568,20 @@ export interface WorktreeCreatePRResult {
 	error?: string;
 	message?: string; // Human-readable message for both success and error cases
 	alreadyExists?: boolean;
+}
+
+/**
+ * Result of a preview impact analysis (no PR creation, no push).
+ */
+export interface WorktreeAnalyzeImpactResult {
+	success: boolean;
+	/** Full PR body markdown including the impact block at the end. */
+	body?: string;
+	/** Rating "1".."5" or "N/A" on failure. */
+	rating?: string;
+	/** French free-text feature list, or "Non evalue" on failure. */
+	features?: string;
+	error?: string;
 }
 
 /**

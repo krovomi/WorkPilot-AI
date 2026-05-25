@@ -8,11 +8,14 @@ import {
 import {
 	existsSync,
 	promises as fsPromises,
+	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	rmSync,
 	statSync,
+	writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { app, type BrowserWindow, ipcMain, shell } from "electron";
@@ -2029,6 +2032,7 @@ function buildCreatePRArgs(
 	projectPath: string,
 	options: WorktreeCreatePROptions | undefined,
 	taskBaseBranch: string | undefined,
+	bodyFilePath?: string,
 ): { args: string[]; validationError?: string } {
 	const args = [
 		runScript,
@@ -2065,6 +2069,9 @@ function buildCreatePRArgs(
 	}
 	if (options?.draft) {
 		args.push("--pr-draft");
+	}
+	if (bodyFilePath) {
+		args.push("--pr-body-file", bodyFilePath);
 	}
 
 	// Add --base-branch if task was created with a specific base branch
@@ -4220,6 +4227,39 @@ export function registerWorktreeHandlers(
 				}
 				debug("Worktree path:", worktreePath);
 
+				// If a customBody was provided (review modal), write it to a
+				// temporary file so we can pass --pr-body-file to the Python
+				// CLI without dealing with command-line escaping / size limits.
+				let customBodyTempDir: string | null = null;
+				let customBodyFilePath: string | undefined;
+				if (options?.customBody !== undefined) {
+					try {
+						customBodyTempDir = mkdtempSync(
+							path.join(tmpdir(), "workpilot-pr-body-"),
+						);
+						customBodyFilePath = path.join(customBodyTempDir, "body.md");
+						writeFileSync(customBodyFilePath, options.customBody, "utf-8");
+					} catch (writeErr) {
+						debug("Failed to write custom body temp file:", writeErr);
+						return {
+							success: false,
+							error: "Failed to write custom PR body to temporary file",
+						};
+					}
+				}
+
+				// Cleanup helper - safe to call multiple times
+				const cleanupCustomBodyFile = () => {
+					if (customBodyTempDir) {
+						try {
+							rmSync(customBodyTempDir, { recursive: true, force: true });
+						} catch (cleanupErr) {
+							debug("Failed to clean up custom body temp dir:", cleanupErr);
+						}
+						customBodyTempDir = null;
+					}
+				};
+
 				// Build arguments using helper function
 				const taskBaseBranch = getTaskBaseBranch(specDir);
 				const { args, validationError } = buildCreatePRArgs(
@@ -4228,8 +4268,10 @@ export function registerWorktreeHandlers(
 					project.path,
 					options,
 					taskBaseBranch,
+					customBodyFilePath,
 				);
 				if (validationError) {
+					cleanupCustomBodyFile();
 					return { success: false, error: validationError };
 				}
 				if (taskBaseBranch) {
@@ -4252,7 +4294,7 @@ export function registerWorktreeHandlers(
 				// API call returns HTTP 401 ("authentication failed").
 				const projectEnv = loadProjectEnvForSubprocess(project);
 
-				return new Promise((resolve) => {
+				return new Promise<IPCResult<WorktreeCreatePRResult>>((resolve) => {
 					let timeoutId: NodeJS.Timeout | null = null;
 					let resolved = false;
 
@@ -4430,12 +4472,189 @@ export function registerWorktreeHandlers(
 							error: `Failed to run create-pr: ${err.message}`,
 						});
 					});
-				});
+				}).finally(cleanupCustomBodyFile);
 			} catch (error) {
 				console.error("[CREATE_PR] Exception in handler:", error);
 				return {
 					success: false,
 					error: error instanceof Error ? error.message : "Failed to create PR",
+				};
+			}
+		},
+	);
+
+	/**
+	 * Preview the PR body + impact analysis WITHOUT pushing or creating a PR.
+	 * Used by the PR review modal to pre-fill editable fields (rating 1-5 +
+	 * impacted features) before the user confirms creation.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_WORKTREE_ANALYZE_IMPACT,
+		async (
+			_,
+			taskId: string,
+			targetBranch?: string,
+		): Promise<
+			IPCResult<import("../../../shared/types").WorktreeAnalyzeImpactResult>
+		> => {
+			try {
+				const pythonEnvError = await initializePythonEnvForPR(pythonEnvManager);
+				if (pythonEnvError) {
+					return { success: false, error: pythonEnvError };
+				}
+
+				const { task, project } = findTaskAndProject(taskId);
+				if (!task || !project) {
+					return { success: false, error: "Task not found" };
+				}
+
+				const sourcePath = getEffectiveSourcePath();
+				if (!sourcePath) {
+					return { success: false, error: "WorkPilot AI source not found" };
+				}
+
+				const runScript = path.join(sourcePath, "run.py");
+
+				const args: string[] = [
+					runScript,
+					"--spec",
+					task.specId,
+					"--project-dir",
+					project.path,
+					"--analyze-impact",
+				];
+				if (targetBranch) {
+					if (!GIT_BRANCH_REGEX.test(targetBranch)) {
+						return { success: false, error: "Invalid target branch name" };
+					}
+					args.push("--pr-target", targetBranch);
+				}
+
+				const pythonPath = getConfiguredPythonPath();
+				const profileEnv = getBestAvailableProfileEnv().env;
+				const projectEnv = loadProjectEnvForSubprocess(project);
+				const pythonEnv = pythonEnvManagerSingleton.getPythonEnv();
+				const ghCliPath = getToolPath("gh");
+				const [pythonCommand, pythonBaseArgs] = parsePythonCommand(pythonPath);
+
+				return new Promise<
+					IPCResult<
+						import("../../../shared/types").WorktreeAnalyzeImpactResult
+					>
+				>((resolve) => {
+					const proc = spawn(
+						pythonCommand,
+						[...pythonBaseArgs, ...args],
+						{
+							cwd: sourcePath,
+							env: {
+								...getIsolatedGitEnv(),
+								...pythonEnv,
+								...profileEnv,
+								...projectEnv,
+								GITHUB_CLI_PATH: ghCliPath,
+								APP_LANGUAGE: getAppLanguage(),
+								PYTHONUNBUFFERED: "1",
+								PYTHONUTF8: "1",
+							},
+							stdio: ["ignore", "pipe", "pipe"],
+						},
+					);
+
+					let stdout = "";
+					let stderr = "";
+					let resolved = false;
+
+					// LLM analysis can take a while; give it 60s.
+					const timeoutId = setTimeout(() => {
+						if (resolved) return;
+						resolved = true;
+						killProcessGracefully(proc, {
+							debugPrefix: "[ANALYZE_IMPACT]",
+							debug: false,
+						});
+						resolve({
+							success: false,
+							error: "Impact analysis timed out after 60s",
+						});
+					}, 60_000);
+
+					proc.stdout.on("data", (d: Buffer) => {
+						stdout += d.toString("utf-8");
+					});
+					proc.stderr.on("data", (d: Buffer) => {
+						stderr += d.toString("utf-8");
+					});
+
+					const onExit = (code: number | null) => {
+						if (resolved) return;
+						resolved = true;
+						clearTimeout(timeoutId);
+
+						// Parse the last JSON line from stdout (CLI prints banner +
+						// progress lines before the final JSON).
+						const trimmed = stdout.trim();
+						const lines = trimmed
+							.split(/\r?\n/)
+							.map((l) => l.trim())
+							.filter(Boolean);
+						let parsed: Record<string, unknown> | null = null;
+						for (let i = lines.length - 1; i >= 0; i--) {
+							const line = lines[i];
+							if (line.startsWith("{") && line.endsWith("}")) {
+								try {
+									parsed = JSON.parse(line) as Record<string, unknown>;
+									break;
+								} catch {
+									// keep looking
+								}
+							}
+						}
+
+						if (parsed && parsed.success === true) {
+							resolve({
+								success: true,
+								data: {
+									success: true,
+									body: typeof parsed.body === "string" ? parsed.body : "",
+									rating:
+										typeof parsed.rating === "string"
+											? parsed.rating
+											: "N/A",
+									features:
+										typeof parsed.features === "string"
+											? parsed.features
+											: "Non evalue",
+								},
+							});
+							return;
+						}
+
+						const err =
+							(parsed && typeof parsed.error === "string"
+								? parsed.error
+								: undefined) ||
+							stderr.trim() ||
+							`Impact analysis failed (exit code ${code})`;
+						resolve({ success: false, error: err });
+					};
+
+					proc.on("close", (code) => onExit(code));
+					proc.on("error", (err) => {
+						if (resolved) return;
+						resolved = true;
+						clearTimeout(timeoutId);
+						resolve({
+							success: false,
+							error: `Failed to run analyze-impact: ${err.message}`,
+						});
+					});
+				});
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error ? error.message : "Failed to analyze impact",
 				};
 			}
 		},

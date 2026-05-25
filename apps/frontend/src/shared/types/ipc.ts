@@ -145,6 +145,7 @@ import type {
 	TaskRecoveryResult,
 	TaskStartOptions,
 	TaskStatus,
+	WorktreeAnalyzeImpactResult,
 	WorktreeCreatePROptions,
 	WorktreeCreatePRResult,
 	WorktreeDiff,
@@ -307,6 +308,10 @@ export interface ElectronAPI {
 		taskId: string,
 		options?: WorktreeCreatePROptions,
 	) => Promise<IPCResult<WorktreeCreatePRResult>>;
+	analyzeWorktreeImpact: (
+		taskId: string,
+		targetBranch?: string,
+	) => Promise<IPCResult<WorktreeAnalyzeImpactResult>>;
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,

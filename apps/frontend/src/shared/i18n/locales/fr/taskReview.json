@@ -121,6 +121,19 @@
 		"hints": {
 			"targetBranch": "Laissez vide pour utiliser la branche par défaut",
 			"prTitle": "Laissez vide pour utiliser le titre de la tâche"
+		},
+		"impact": {
+			"title": "Analyse d'impact",
+			"analyzing": "Analyse en cours...",
+			"analysisFailed": "L'analyse d'impact a échoué",
+			"analysisFailedHint": "L'analyse automatique a échoué — le bloc sera rempli avec « N/A » dans la PR. Vous pouvez aussi le remplir à la main ci-dessous.",
+			"ratingLabel": "Note de l'impact (1 à 5)",
+			"ratingHint": "1 = pas trop d'impact · 5 = énorme impact",
+			"rating1": "pas trop d'impact",
+			"rating5": "énorme impact",
+			"featuresLabel": "Fonctionnalité(s) impactée(s)",
+			"featuresPlaceholder": "Ex : Fiche véhicule, doc de vente, ...",
+			"featuresHint": "Liste courte, séparée par des virgules"
 		}
 	},
 	"mergeProgress": {

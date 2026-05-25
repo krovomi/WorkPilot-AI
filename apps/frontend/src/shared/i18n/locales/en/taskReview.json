@@ -121,6 +121,19 @@
 		"hints": {
 			"targetBranch": "Leave empty to use the default branch",
 			"prTitle": "Leave empty to use the task title"
+		},
+		"impact": {
+			"title": "Impact analysis",
+			"analyzing": "Analyzing...",
+			"analysisFailed": "Impact analysis failed",
+			"analysisFailedHint": "Automatic analysis failed — the block will be filled with \"N/A\" in the PR. You can also fill it in manually below.",
+			"ratingLabel": "Impact rating (1 to 5)",
+			"ratingHint": "1 = low impact · 5 = huge impact",
+			"rating1": "low impact",
+			"rating5": "huge impact",
+			"featuresLabel": "Impacted feature(s)",
+			"featuresPlaceholder": "e.g. Vehicle form, sales document, ...",
+			"featuresHint": "Short list, comma-separated"
 		}
 	},
 	"mergeProgress": {

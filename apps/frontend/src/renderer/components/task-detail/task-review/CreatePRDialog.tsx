@@ -6,6 +6,7 @@ import type {
 	WorktreeCreatePRResult,
 	WorktreeStatus,
 } from "../../../../shared/types";
+import { appendImpactBlock } from "../../../../shared/utils/pr-impact-block";
 import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
 import {
@@ -18,6 +19,14 @@ import {
 } from "../../ui/dialog";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "../../ui/select";
+import { Textarea } from "../../ui/textarea";
 
 interface CreatePRDialogProps {
 	open: boolean;
@@ -28,6 +37,7 @@ interface CreatePRDialogProps {
 		targetBranch?: string;
 		title?: string;
 		draft?: boolean;
+		customBody?: string;
 	}) => Promise<WorktreeCreatePRResult | null>;
 }
 
@@ -50,6 +60,13 @@ export function CreatePRDialog({
 	const [result, setResult] = useState<WorktreeCreatePRResult | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
+	// Impact analysis state
+	const [impactRating, setImpactRating] = useState<string>("N/A");
+	const [impactFeatures, setImpactFeatures] = useState<string>("");
+	const [analyzedBody, setAnalyzedBody] = useState<string | null>(null);
+	const [isAnalyzing, setIsAnalyzing] = useState(false);
+	const [analysisError, setAnalysisError] = useState<string | null>(null);
+
 	// Reset state when dialog opens
 	useEffect(() => {
 		if (open) {
@@ -59,8 +76,51 @@ export function CreatePRDialog({
 			setIsCreating(false);
 			setResult(null);
 			setError(null);
+			setImpactRating("N/A");
+			setImpactFeatures("");
+			setAnalyzedBody(null);
+			setAnalysisError(null);
 		}
 	}, [open, worktreeStatus?.baseBranch, task.title]);
+
+	// Kick off impact analysis once when the dialog opens. The analyzer reads
+	// the worktree diff and returns a suggested rating + impacted-features
+	// summary plus the AI-composed PR body. The user can edit values before
+	// submission; we re-build the final body from the edited values.
+	useEffect(() => {
+		if (!open) return;
+		let cancelled = false;
+		setIsAnalyzing(true);
+		setAnalysisError(null);
+		globalThis.window.electronAPI
+			.analyzeWorktreeImpact(task.id, worktreeStatus?.baseBranch || undefined)
+			.then((res) => {
+				if (cancelled) return;
+				if (res.success && res.data?.success) {
+					setAnalyzedBody(res.data.body ?? "");
+					setImpactRating(res.data.rating ?? "N/A");
+					setImpactFeatures(res.data.features ?? "");
+				} else {
+					setAnalysisError(
+						res.data?.error || res.error || t("taskReview:pr.impact.analysisFailed"),
+					);
+				}
+			})
+			.catch((err: unknown) => {
+				if (cancelled) return;
+				setAnalysisError(
+					err instanceof Error
+						? err.message
+						: t("taskReview:pr.impact.analysisFailed"),
+				);
+			})
+			.finally(() => {
+				if (!cancelled) setIsAnalyzing(false);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [open, task.id, worktreeStatus?.baseBranch, t]);
 
 	// Frontend validation functions
 	const validateBranchName = (branch: string): string | null => {
@@ -97,11 +157,22 @@ export function CreatePRDialog({
 		setError(null);
 		setResult(null);
 
+		// If the analyzer produced a body, rebuild the final body from the
+		// (possibly user-edited) rating + features and send it as customBody.
+		// Otherwise let the backend auto-generate (with N/A fallback).
+		let customBody: string | undefined;
+		if (analyzedBody !== null) {
+			const rating = impactRating.trim() || "N/A";
+			const features = impactFeatures.trim() || "Non evalue";
+			customBody = appendImpactBlock(analyzedBody, rating, features);
+		}
+
 		try {
 			const prResult = await onCreatePR({
 				targetBranch: targetBranch || undefined,
 				title: prTitle || undefined,
 				draft: isDraft,
+				customBody,
 			});
 
 			if (prResult) {
@@ -261,6 +332,75 @@ export function CreatePRDialog({
 							<p className="text-xs text-muted-foreground">
 								{t("taskReview:pr.hints.prTitle")}
 							</p>
+						</div>
+
+						{/* Impact Analysis */}
+						<div className="space-y-3 border-t pt-3">
+							<div className="flex items-center justify-between">
+								<Label className="text-sm font-medium">
+									{t("taskReview:pr.impact.title")}
+								</Label>
+								{isAnalyzing && (
+									<span className="text-xs text-muted-foreground flex items-center gap-1">
+										<Loader2 className="h-3 w-3 animate-spin" />
+										{t("taskReview:pr.impact.analyzing")}
+									</span>
+								)}
+							</div>
+
+							{analysisError && !isAnalyzing && (
+								<p className="text-xs text-muted-foreground italic">
+									{t("taskReview:pr.impact.analysisFailedHint")}
+								</p>
+							)}
+
+							<div className="space-y-2">
+								<Label htmlFor="impact-rating" className="text-xs">
+									{t("taskReview:pr.impact.ratingLabel")}
+								</Label>
+								<Select
+									value={impactRating}
+									onValueChange={setImpactRating}
+									disabled={isAnalyzing}
+								>
+									<SelectTrigger id="impact-rating" className="w-32">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="N/A">N/A</SelectItem>
+										<SelectItem value="1">
+											1 — {t("taskReview:pr.impact.rating1")}
+										</SelectItem>
+										<SelectItem value="2">2</SelectItem>
+										<SelectItem value="3">3</SelectItem>
+										<SelectItem value="4">4</SelectItem>
+										<SelectItem value="5">
+											5 — {t("taskReview:pr.impact.rating5")}
+										</SelectItem>
+									</SelectContent>
+								</Select>
+								<p className="text-xs text-muted-foreground">
+									{t("taskReview:pr.impact.ratingHint")}
+								</p>
+							</div>
+
+							<div className="space-y-2">
+								<Label htmlFor="impact-features" className="text-xs">
+									{t("taskReview:pr.impact.featuresLabel")}
+								</Label>
+								<Textarea
+									id="impact-features"
+									value={impactFeatures}
+									onChange={(e) => setImpactFeatures(e.target.value)}
+									placeholder={t("taskReview:pr.impact.featuresPlaceholder")}
+									disabled={isAnalyzing}
+									rows={2}
+									className="resize-none"
+								/>
+								<p className="text-xs text-muted-foreground">
+									{t("taskReview:pr.impact.featuresHint")}
+								</p>
+							</div>
 						</div>
 
 						{/* Draft PR Checkbox */}

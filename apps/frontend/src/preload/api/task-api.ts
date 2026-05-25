@@ -16,6 +16,7 @@ import type {
 	TaskRecoveryResult,
 	TaskStartOptions,
 	TaskStatus,
+	WorktreeAnalyzeImpactResult,
 	WorktreeCreatePROptions,
 	WorktreeCreatePRResult,
 } from "../../shared/types";
@@ -147,6 +148,10 @@ export interface TaskAPI {
 		taskId: string,
 		options?: WorktreeCreatePROptions,
 	) => Promise<IPCResult<WorktreeCreatePRResult>>;
+	analyzeWorktreeImpact: (
+		taskId: string,
+		targetBranch?: string,
+	) => Promise<IPCResult<WorktreeAnalyzeImpactResult>>;
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -435,6 +440,16 @@ export const createTaskAPI = (): TaskAPI => ({
 		options?: WorktreeCreatePROptions,
 	): Promise<IPCResult<WorktreeCreatePRResult>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_WORKTREE_CREATE_PR, taskId, options),
+
+	analyzeWorktreeImpact: (
+		taskId: string,
+		targetBranch?: string,
+	): Promise<IPCResult<WorktreeAnalyzeImpactResult>> =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.TASK_WORKTREE_ANALYZE_IMPACT,
+			taskId,
+			targetBranch,
+		),
 
 	getPRDetails: (
 		prNumber: number,

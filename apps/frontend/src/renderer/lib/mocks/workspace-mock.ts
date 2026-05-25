@@ -62,6 +62,16 @@ export const workspaceMock = {
 		},
 	}),
 
+	analyzeWorktreeImpact: async () => ({
+		success: true,
+		data: {
+			success: true,
+			body: "## Summary\n\nMocked PR body.\n\n---\n<!-- workpilot-impact-block -->\nNote de l'impact (1 à 5) : 2\nFonctionnalité(s) impactée(s) : Mocked feature",
+			rating: "2",
+			features: "Mocked feature",
+		},
+	}),
+
 	discardWorktree: async (_taskId: string, _skipStatusChange?: boolean) => ({
 		success: true,
 		data: {
