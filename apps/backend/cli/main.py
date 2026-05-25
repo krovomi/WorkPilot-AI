@@ -529,8 +529,6 @@ Environment Variables:
 
 
 def handle_provider_command(args):
-    import json
-
     from src.connectors.llm_config import (
         delete_provider_config,
         get_active_provider,

@@ -26,7 +26,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TypedDict, TypeVar
+from typing import TYPE_CHECKING, TypedDict, TypeVar
+
+if TYPE_CHECKING:
+    from agents.impact_analyzer import ImpactAnalysis
 
 from core.gh_executable import get_gh_executable, invalidate_gh_cache
 from core.git_executable import get_git_executable, get_isolated_git_env, run_git
@@ -2179,7 +2182,9 @@ class WorktreeManager:
         try:
             from agents.impact_analyzer import append_impact_block
         except ImportError:
-            logger.warning("impact_analyzer module not available, skipping impact block")
+            logger.warning(
+                "impact_analyzer module not available, skipping impact block"
+            )
             return body
 
         analysis = self._run_impact_analysis(spec_name, diff_summary, commit_log)

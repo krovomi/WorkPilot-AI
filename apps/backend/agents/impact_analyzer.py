@@ -285,7 +285,9 @@ async def run_impact_analyzer(
 
     from .session import run_agent_session
 
-    spec_overview = _load_spec_overview(spec_dir) if spec_dir else "(No spec overview available)"
+    spec_overview = (
+        _load_spec_overview(spec_dir) if spec_dir else "(No spec overview available)"
+    )
     prompt = _build_prompt(
         diff_summary=_truncate_diff(diff_summary),
         spec_overview=spec_overview,
