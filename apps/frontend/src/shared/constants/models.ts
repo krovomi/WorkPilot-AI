@@ -26,6 +26,12 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 	// ---- Anthropic (Claude) ----
 	anthropic: [
 		{
+			value: "claude-opus-4-8",
+			label: "Claude Opus 4.8",
+			tier: "flagship",
+			supportsThinking: true,
+		},
+		{
 			value: "claude-opus-4-7",
 			label: "Claude Opus 4.7",
 			tier: "flagship",
@@ -74,6 +80,12 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 	// Updated: May 2026 — includes Claude 4.x Opus/Sonnet, GPT-5.x, o3/o4 families
 	copilot: [
 		// ── Flagship ─────────────────────────────────────────────────────────
+		{
+			value: "claude-opus-4.8",
+			label: "Claude Opus 4.8 (Copilot)",
+			tier: "flagship",
+			supportsThinking: true,
+		},
 		{
 			value: "claude-opus-4.7",
 			label: "Claude Opus 4.7 (Copilot)",
@@ -347,6 +359,18 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 	// ---- AWS Bedrock ----
 	aws: [
 		{
+			value: "anthropic.claude-opus-4-8-v1",
+			label: "Claude Opus 4.8 (Bedrock)",
+			tier: "flagship",
+			supportsThinking: true,
+		},
+		{
+			value: "anthropic.claude-opus-4-7-v1",
+			label: "Claude Opus 4.7 (Bedrock)",
+			tier: "flagship",
+			supportsThinking: true,
+		},
+		{
 			value: "anthropic.claude-opus-4-6-v1",
 			label: "Claude Opus 4.6 (Bedrock)",
 			tier: "flagship",
@@ -441,6 +465,12 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 		{ value: "swe-1.6", label: "SWE-1.6", tier: "flagship" },
 		{ value: "swe-1.5", label: "SWE-1.5", tier: "standard" },
 		{
+			value: "claude-opus-4-8",
+			label: "Claude Opus 4.8 (Windsurf)",
+			tier: "flagship",
+			supportsThinking: true,
+		},
+		{
 			value: "claude-opus-4-7",
 			label: "Claude Opus 4.7 (Windsurf)",
 			tier: "flagship",
@@ -510,6 +540,7 @@ export function providerSupportsThinking(provider: string): boolean {
 // ============================================
 
 export const AVAILABLE_MODELS = [
+	{ value: "opus-4-8", label: "Claude Opus 4.8" },
 	{ value: "opus-4-7", label: "Claude Opus 4.7" },
 	{ value: "opus", label: "Claude Opus 4.6" },
 	{ value: "sonnet", label: "Claude Sonnet 4.6" },
@@ -524,13 +555,14 @@ export const AVAILABLE_MODELS = [
 // existing tasks persisted with these values keep working. Newer versions
 // are exposed under explicit version-suffixed keys (e.g. "opus-4-7").
 export const MODEL_ID_MAP: Record<string, string> = {
+	"opus-4-8": "claude-opus-4-8",
 	"opus-4-7": "claude-opus-4-7",
 	opus: "claude-opus-4-6",
 	sonnet: "claude-sonnet-4-6",
 	haiku: "claude-haiku-4-6",
-	"opus-4-5": "claude-opus-4-5-20251101",
-	"sonnet-4-5": "claude-sonnet-4-5-20250929",
-	"haiku-4-5": "claude-haiku-4-5-20251001",
+	"opus-4-5": "claude-opus-4-5",
+	"sonnet-4-5": "claude-sonnet-4-5",
+	"haiku-4-5": "claude-haiku-4-5",
 } as const;
 
 // Maps thinking levels to budget tokens (null = no extended thinking)

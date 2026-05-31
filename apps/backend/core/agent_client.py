@@ -57,6 +57,7 @@ _COPILOT_HISTORY_CHAR_LIMIT: dict[str, int] = {
     "gpt-4.1": 2_000_000,
     "gemini-2.5-pro": 2_000_000,
     # 200 k-token models (Claude 4.x, o-series) — 160 k token budget
+    "claude-opus-4.8": 640_000,
     "claude-opus-4.7": 640_000,
     "claude-opus-4.6": 640_000,
     "claude-opus-4.5": 640_000,

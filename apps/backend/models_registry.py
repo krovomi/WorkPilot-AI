@@ -41,6 +41,16 @@ _ANTHROPIC_MODELS = [
     # Flagship
     ModelEntry(
         "anthropic",
+        "claude-opus-4-8",
+        "Claude Opus 4.8",
+        "flagship",
+        supports_thinking=True,
+        price_input=15.0,
+        price_output=75.0,
+        is_default=False,
+    ),
+    ModelEntry(
+        "anthropic",
         "claude-opus-4-7",
         "Claude Opus 4.7",
         "flagship",
@@ -681,6 +691,13 @@ _WINDSURF_MODELS = [
     ModelEntry("windsurf", "MODEL_SWE_1_6", "SWE 1.6", "flagship", is_default=False),
     ModelEntry(
         "windsurf",
+        "MODEL_CLAUDE_OPUS_4_8",
+        "Claude Opus 4.8",
+        "flagship",
+        is_default=False,
+    ),
+    ModelEntry(
+        "windsurf",
         "MODEL_CLAUDE_OPUS_4_7",
         "Claude Opus 4.7",
         "flagship",
@@ -708,6 +725,26 @@ _WINDSURF_MODELS = [
 # =============================================================================
 
 _AWS_MODELS = [
+    ModelEntry(
+        "aws",
+        "anthropic.claude-opus-4-8",
+        "Claude Opus 4.8 (Bedrock)",
+        "flagship",
+        supports_thinking=True,
+        price_input=15.0,
+        price_output=75.0,
+        is_default=False,
+    ),
+    ModelEntry(
+        "aws",
+        "anthropic.claude-opus-4-8-v1",
+        "Claude Opus 4.8 v1 (Bedrock)",
+        "flagship",
+        supports_thinking=True,
+        price_input=15.0,
+        price_output=75.0,
+        is_default=False,
+    ),
     ModelEntry(
         "aws",
         "anthropic.claude-opus-4-6",
@@ -753,6 +790,14 @@ _AWS_MODELS = [
 
 _COPILOT_MODELS = [
     # ── Flagship / Opus ───────────────────────────────────────────────────
+    ModelEntry(
+        "copilot",
+        "claude-opus-4.8",
+        "Claude Opus 4.8 (Copilot)",
+        "flagship",
+        supports_thinking=True,
+        is_default=False,
+    ),
     ModelEntry(
         "copilot",
         "claude-opus-4.7",
