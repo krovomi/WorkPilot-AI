@@ -397,16 +397,43 @@ def _validate_meridiem_hour(hour: int, meridiem: str) -> bool:
 
 
 def _parse_absolute_time(message: str) -> int | None:
-    """Parse 'at HH:MM' pattern from message."""
-    at_time_match = re.search(r"at\s+(\d{1,2}):(\d{2})(?:\s*(am|pm))?", message, re.I)
-    if not at_time_match:
-        return None
+    """Parse absolute clock times from CLI messages.
 
-    try:
-        hour = int(at_time_match.group(1))
-        minute = int(at_time_match.group(2))
+    Handles both shapes the Claude CLI emits:
+      - ``"resets at 10:30 pm"`` / ``"resets at 22:30"`` (legacy)
+      - ``"resets 3:20pm (Europe/Paris)"`` / ``"resets 10am"`` (newer session-limit
+        and weekly-limit banners — no ``at`` prefix, minute portion sometimes
+        omitted)
+
+    Missing the no-``at`` variant let the rate-limit shield fail to compute a
+    reset timestamp, so the caller fell back to its retry loop and the
+    conversation summary kept re-injecting until the prompt overflowed.
+    """
+    # Try minute-precision first (HH:MM with optional meridiem).
+    at_time_match = re.search(
+        r"(?:at|resets)\s+(\d{1,2}):(\d{2})\s*(am|pm)?", message, re.I
+    )
+    if not at_time_match:
+        # Fall back to hour-only ("resets 10am" / "resets 3pm").
+        hour_only = re.search(r"(?:at|resets)\s+(\d{1,2})\s*(am|pm)", message, re.I)
+        if not hour_only:
+            return None
+        # Synthesise a zero-minute match so the rest of the function stays one branch.
+        try:
+            hour = int(hour_only.group(1))
+        except ValueError:
+            return None
+        minute = 0
+        meridiem = hour_only.group(2)
+    else:
+        try:
+            hour = int(at_time_match.group(1))
+            minute = int(at_time_match.group(2))
+        except ValueError:
+            return None
         meridiem = at_time_match.group(3)
 
+    try:
         # Validate hour range when meridiem is present
         if meridiem and not _validate_meridiem_hour(hour, meridiem):
             return None
@@ -783,6 +810,15 @@ async def run_autonomous_agent(
     concurrency_error_context: str | None = (
         None  # Context to pass to agent after concurrency error
     )
+
+    # Generic-error de-duplication: if the same error message recurs more than
+    # MAX_REPEATED_GENERIC_ERRORS times back-to-back we bail out instead of
+    # retrying forever. This is what prevented the session-limit / prompt-too-
+    # long loop from filling the logs with duplicated "session limit · resets …"
+    # banners while the conversation summary kept growing.
+    MAX_REPEATED_GENERIC_ERRORS = 3
+    last_generic_error_signature: str | None = None
+    repeated_generic_error_count = 0
 
     def _reset_concurrency_state() -> None:
         """Reset concurrency error tracking state after a successful session or non-concurrency error."""
@@ -1401,12 +1437,17 @@ async def run_autonomous_agent(
                     current_retry_delay * 2, MAX_RETRY_DELAY_SECONDS
                 )
 
-            elif error_info and is_prompt_too_long_error(
-                RuntimeError(error_info.get("message", ""))
+            elif error_info and (
+                error_info.get("type") == "prompt_too_long"
+                or is_prompt_too_long_error(RuntimeError(error_info.get("message", "")))
             ):
                 # Prompt too long for the LLM context window — retrying with
                 # the same conversation will fail identically. Halt the loop
                 # and surface the right remediation to the user.
+                #
+                # We accept BOTH the new explicit type tag and the legacy
+                # string-match path so a partial deploy (only one side updated)
+                # still breaks the loop instead of spinning on the error.
                 _reset_concurrency_state()
                 from services.rate_limit_shield import handle_prompt_too_long
 
@@ -1557,7 +1598,46 @@ async def run_autonomous_agent(
                 continue  # Resume the loop
 
             else:
-                # Other errors - use standard retry logic
+                # Other errors - use standard retry logic, but bail out if the
+                # same error keeps recurring so we don't loop forever (and don't
+                # pollute the logs with duplicate banners). This catches the
+                # case where, for whatever reason, the rate-limit / prompt-too-
+                # long detectors don't match a new CLI banner shape: instead of
+                # retrying with the conversation-continuation summary (which
+                # makes the prompt grow every iteration) we surface the failure.
+                current_signature = (
+                    (error_info or {}).get("message", "")
+                    if error_info
+                    else str(error_info)
+                )
+                # Normalise the signature so timestamps / reset-time tails don't
+                # defeat the comparison ("resets 3:20pm" vs "resets 3:21pm").
+                normalised_signature = re.sub(
+                    r"\s+", " ", current_signature[:200]
+                ).strip()
+
+                if (
+                    last_generic_error_signature is not None
+                    and normalised_signature == last_generic_error_signature
+                ):
+                    repeated_generic_error_count += 1
+                else:
+                    last_generic_error_signature = normalised_signature
+                    repeated_generic_error_count = 1
+
+                if repeated_generic_error_count >= MAX_REPEATED_GENERIC_ERRORS:
+                    print_status(
+                        f"Same error repeated {repeated_generic_error_count} times — halting "
+                        "instead of growing the conversation summary further.",
+                        "error",
+                    )
+                    emit_phase(
+                        ExecutionPhase.FAILED,
+                        "Repeated error (retry would not change outcome)",
+                    )
+                    status_manager.update(state=BuildState.ERROR)
+                    break
+
                 print_status("Session encountered an error", "error")
                 print(muted("Will retry with a fresh session..."))
                 status_manager.update(state=BuildState.ERROR)

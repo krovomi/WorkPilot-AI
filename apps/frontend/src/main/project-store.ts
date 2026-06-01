@@ -62,6 +62,10 @@ export class ProjectStore {
 	private readonly data: StoreData;
 	private readonly tasksCache: Map<string, TasksCacheEntry> = new Map();
 	private readonly CACHE_TTL_MS = 3000; // 3 seconds TTL for task cache
+	// Per-spec parse errors captured by loadImplementationPlan. Used by
+	// getJsonErrorInfo to distinguish "file missing" (no entry) from
+	// "file malformed" (entry contains the real JSON.parse message).
+	private readonly planLoadErrors: Map<string, string> = new Map();
 
 	constructor() {
 		// Store in app's userData directory
@@ -745,7 +749,13 @@ export class ProjectStore {
 	}
 
 	/**
-	 * Load implementation plan from spec directory
+	 * Load implementation plan from spec directory.
+	 *
+	 * Returns `null` for two very different cases — missing file vs. malformed
+	 * JSON. Callers must distinguish them, so the actual parse failure is also
+	 * stashed on `this.planLoadErrors` keyed by spec name; absence of an entry
+	 * there means "no plan file yet", which is normal during early task setup
+	 * and must NOT be reported as a JSON parse error.
 	 */
 	private loadImplementationPlan(
 		specPath: string,
@@ -753,12 +763,20 @@ export class ProjectStore {
 	): ImplementationPlan | null {
 		const planPath = path.join(specPath, AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN);
 
+		// Clear any previous error entry so a now-valid plan no longer surfaces
+		// the old "JSON parse error" toast.
+		this.planLoadErrors.delete(specName);
+
 		if (!existsSync(planPath)) {
 			return null;
 		}
 
 		try {
 			const content = readFileSync(planPath, "utf-8");
+			// Empty file is a transient mid-write state, not a malformed plan.
+			if (content.trim() === "") {
+				return null;
+			}
 			return JSON.parse(content);
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : String(err);
@@ -766,23 +784,41 @@ export class ProjectStore {
 				`[ProjectStore] JSON parse error for spec ${specName}:`,
 				errorMessage,
 			);
+			this.planLoadErrors.set(specName, errorMessage);
 			return null;
 		}
 	}
 
 	/**
-	 * Get JSON error information
+	 * Get JSON error information.
+	 *
+	 * A null plan can mean two things:
+	 *   1. The implementation_plan.json file isn't there yet (newly created
+	 *      spec, planner hasn't run, or the file was just deleted) — this is
+	 *      NOT an error and the UI must show the User Story description from
+	 *      the spec instead of a scary "malformed JSON" banner.
+	 *   2. The file exists but couldn't be parsed — this IS the case we want
+	 *      to surface, with the real parser message so the user knows where
+	 *      to look.
+	 *
+	 * We tell the two apart via `planLoadErrors`, populated by
+	 * loadImplementationPlan when JSON.parse throws.
 	 */
 	private getJsonErrorInfo(
 		plan: ImplementationPlan | null,
-		_specName: string,
+		specName: string,
 	): { hasJsonError: boolean; jsonErrorMessage: string } {
 		if (plan !== null) {
 			return { hasJsonError: false, jsonErrorMessage: "" };
 		}
 
-		// This indicates a JSON parse error occurred during loading
-		return { hasJsonError: true, jsonErrorMessage: "JSON parse error" };
+		const recordedError = this.planLoadErrors.get(specName);
+		if (!recordedError) {
+			// No plan file (or empty/in-flight write) — not a parse error.
+			return { hasJsonError: false, jsonErrorMessage: "" };
+		}
+
+		return { hasJsonError: true, jsonErrorMessage: recordedError };
 	}
 
 	/**

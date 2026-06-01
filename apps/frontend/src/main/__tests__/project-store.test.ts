@@ -360,6 +360,88 @@ describe("ProjectStore", () => {
 			expect(tasks[0].status).toBe("in_progress"); // Some completed, some pending
 		});
 
+		// Regression: when implementation_plan.json is missing OR empty we used
+		// to flag the task as "JSON parse error", which replaced the User Story
+		// description with a scary "malformed JSON" banner. Missing/empty file
+		// is NOT a parse error — only files that throw on JSON.parse are.
+		it("should NOT flag missing implementation_plan.json as JSON parse error", async () => {
+			const specsDir = path.join(
+				TEST_PROJECT_PATH,
+				".workpilot",
+				"specs",
+				"007-no-plan",
+			);
+			mkdirSync(specsDir, { recursive: true });
+			// No implementation_plan.json file written — only a spec.md fallback.
+			writeFileSync(
+				path.join(specsDir, "spec.md"),
+				"# VAT Feature\n\n## Overview\n\nUser story description.\n",
+			);
+
+			const { ProjectStore } = await import("../project-store");
+			const store = new ProjectStore();
+			const project = store.addProject(TEST_PROJECT_PATH);
+			const tasks = store.getTasks(project.id);
+
+			expect(tasks).toHaveLength(1);
+			expect(tasks[0].description).not.toContain("JSON parse error");
+			// Should fall back to the spec.md Overview, not the error banner.
+			expect(tasks[0].description).toContain("User story description");
+		});
+
+		it("should NOT flag an empty implementation_plan.json as JSON parse error", async () => {
+			// An empty file is an in-flight write (the planner just truncated
+			// before re-writing) — surfacing this transient state as a parse
+			// error spammed the UI every refresh tick.
+			const specsDir = path.join(
+				TEST_PROJECT_PATH,
+				".workpilot",
+				"specs",
+				"008-empty-plan",
+			);
+			mkdirSync(specsDir, { recursive: true });
+			writeFileSync(path.join(specsDir, "implementation_plan.json"), "");
+			writeFileSync(
+				path.join(specsDir, "spec.md"),
+				"# Empty Plan\n\n## Overview\n\nUser story content.\n",
+			);
+
+			const { ProjectStore } = await import("../project-store");
+			const store = new ProjectStore();
+			const project = store.addProject(TEST_PROJECT_PATH);
+			const tasks = store.getTasks(project.id);
+
+			expect(tasks).toHaveLength(1);
+			expect(tasks[0].description).not.toContain("JSON parse error");
+		});
+
+		it("should flag a truly malformed implementation_plan.json", async () => {
+			// Sanity check: actual JSON syntax errors must still surface so the
+			// user has something to act on.
+			const specsDir = path.join(
+				TEST_PROJECT_PATH,
+				".workpilot",
+				"specs",
+				"009-bad-plan",
+			);
+			mkdirSync(specsDir, { recursive: true });
+			writeFileSync(
+				path.join(specsDir, "implementation_plan.json"),
+				'{ "feature": "broken", ',
+			);
+
+			const { ProjectStore } = await import("../project-store");
+			const store = new ProjectStore();
+			const project = store.addProject(TEST_PROJECT_PATH);
+			const tasks = store.getTasks(project.id);
+
+			expect(tasks).toHaveLength(1);
+			// The "__JSON_ERROR__:" marker prefix is what the TaskCard /
+			// TaskMetadata renderers key off of to swap in the localised error
+			// banner; everything after it is the real JSON.parse message.
+			expect(tasks[0].description).toMatch(/^__JSON_ERROR__:/);
+		});
+
 		it("should determine status as backlog when no subtasks completed", async () => {
 			const specsDir = path.join(
 				TEST_PROJECT_PATH,

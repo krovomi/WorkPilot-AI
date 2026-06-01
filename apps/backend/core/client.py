@@ -1250,13 +1250,21 @@ def create_client(
     # and rehydrates context, saving the cost of replaying earlier turns.
     # Resolution order: explicit kwarg > env var > none. The env var path is
     # how the frontend's "Reprendre" button signals a session resume: it spawns
-    # the subprocess with AUTO_CLAUDE_RESUME_SESSION_ID set, and the value is
-    # consumed exactly once for this client.
+    # the subprocess with AUTO_CLAUDE_RESUME_SESSION_ID set, and the value MUST
+    # be consumed exactly once for this client — leaving the env var set across
+    # iterations of the coder loop made every subsequent session re-rehydrate
+    # the same on-disk transcript, which is what caused the
+    # "Continuing implementation… / Prompt is too long" cascade once the
+    # transcript grew past the model's context window.
     # See: code.claude.com/docs/en/agent-sdk/sessions
     _resume_id = resume or os.environ.get("AUTO_CLAUDE_RESUME_SESSION_ID")
     if _resume_id:
         options_kwargs["resume"] = _resume_id
         logger.info(f"Resuming Claude SDK session: {_resume_id}")
+        # Pop the env var so the NEXT iteration creates a fresh session instead
+        # of re-replaying the same transcript. Explicit `resume=` kwargs still
+        # work — they're per-call, not process-wide.
+        os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
 
     # Permission mode hardening for read-only phases. "plan" lets Claude
     # explore and reason but refuses every write/exec tool call — a strong

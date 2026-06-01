@@ -160,7 +160,126 @@ def test_prompt_too_long_writes_halt_marker_and_returns_true(tmp_path: Path) -> 
     assert marker.exists()
     content = marker.read_text(encoding="utf-8")
     assert '"phase": "coder"' in content
-    assert "Reset the conversation" in content
+    # The remediation message tells the user the conversation log has been
+    # archived and how to recover. The exact wording is allowed to evolve as
+    # long as it mentions the archive and the provider-switch alternative.
+    assert "archived" in content.lower() or "conversation" in content.lower()
+    assert "provider" in content.lower()
+
+
+def test_prompt_too_long_archives_existing_conversation_log(tmp_path: Path) -> None:
+    """When the prompt overflowed, the conversation log MUST be moved aside —
+    otherwise the next session start replays it and triggers the same error
+    again ('Continuing implementation… / Prompt is too long' loop).
+    """
+    from services.rate_limit_shield import (
+        PROMPT_TOO_LONG_HALT_FILE,
+        handle_prompt_too_long,
+    )
+
+    # Seed a fake conversation log.
+    log_file = tmp_path / "conversation.jsonl"
+    log_file.write_text('{"role": "user", "content": "x"}\n', encoding="utf-8")
+
+    err = RuntimeError("Prompt is too long")
+    handled = handle_prompt_too_long(err, tmp_path, "coder")
+
+    assert handled is True
+    assert (tmp_path / PROMPT_TOO_LONG_HALT_FILE).exists()
+    # Original log file must be gone.
+    assert not log_file.exists(), (
+        "conversation.jsonl must be archived, not left in place"
+    )
+    # An archive file with the .too-long.jsonl suffix must exist instead.
+    archives = list(tmp_path.glob("conversation.*.too-long.jsonl"))
+    assert len(archives) == 1, f"expected exactly one archive, found {archives}"
+
+
+def test_prompt_too_long_archives_session_json_resume_marker(tmp_path: Path) -> None:
+    """The frontend's "Reprendre" button reads .session.json to re-inject
+    AUTO_CLAUDE_RESUME_SESSION_ID, which makes the Claude SDK rehydrate the
+    on-disk transcript. After a prompt-too-long, that resume marker MUST be
+    archived too — otherwise the next "Reprendre" click re-poisons the
+    session by replaying the same oversized transcript."""
+    from services.rate_limit_shield import handle_prompt_too_long
+
+    session_state = tmp_path / ".session.json"
+    session_state.write_text(
+        '{"session_id": "abc-123", "subtype": "error_max_turns"}',
+        encoding="utf-8",
+    )
+
+    handle_prompt_too_long(RuntimeError("Prompt is too long"), tmp_path, "coder")
+
+    assert not session_state.exists(), (
+        ".session.json must be archived, not left in place"
+    )
+    archives = list(tmp_path.glob(".session.*.too-long.json"))
+    assert len(archives) == 1, f"expected exactly one archive, found {archives}"
+
+
+def test_response_text_detector_matches_bare_error_string() -> None:
+    """The Claude Agent SDK surfaces "Prompt is too long" as a normal text
+    response, not as an exception. The response-text detector must catch
+    that exact shape and ignore real assistant turns that mention the
+    phrase incidentally."""
+    from agents.session import _response_text_indicates_prompt_too_long
+
+    assert _response_text_indicates_prompt_too_long("Prompt is too long") is True
+    assert _response_text_indicates_prompt_too_long("  Prompt is too long  \n") is True
+    assert (
+        _response_text_indicates_prompt_too_long("Prompt is too long: 250000 tokens")
+        is True
+    )
+    # Real assistant work that happens to mention the phrase must NOT trip.
+    long_response = (
+        "I've reviewed the prior session and noticed that the prompt is too "
+        "long to fit in the model's context window. Let me suggest a smaller "
+        "approach: " + "x" * 200
+    )
+    assert _response_text_indicates_prompt_too_long(long_response) is False
+    # Empty / unrelated content stays a no-op.
+    assert _response_text_indicates_prompt_too_long("") is False
+    assert _response_text_indicates_prompt_too_long("Task complete.") is False
+
+
+def test_prompt_too_long_clears_resume_env_var(tmp_path: Path, monkeypatch) -> None:
+    """The in-process AUTO_CLAUDE_RESUME_SESSION_ID env var is what
+    create_client() reads on every iteration to decide whether to resume the
+    prior SDK session. Leaving it set after a prompt-too-long means every
+    subsequent iteration of the coder loop re-resumes the poisoned session.
+    """
+    from services.rate_limit_shield import handle_prompt_too_long
+
+    monkeypatch.setenv("AUTO_CLAUDE_RESUME_SESSION_ID", "doomed-session")
+
+    handle_prompt_too_long(RuntimeError("Prompt is too long"), tmp_path, "coder")
+
+    import os as _os
+
+    assert _os.environ.get("AUTO_CLAUDE_RESUME_SESSION_ID") is None, (
+        "env var must be cleared so the next create_client() doesn't re-resume"
+    )
+
+
+def test_prompt_too_long_no_archive_when_no_conversation_log(tmp_path: Path) -> None:
+    """If there's no conversation log to archive, the helper must still halt
+    cleanly — not raise. (Some early-phase errors fire before any log entry
+    has been written.)
+    """
+    from services.rate_limit_shield import (
+        PROMPT_TOO_LONG_HALT_FILE,
+        handle_prompt_too_long,
+    )
+
+    assert not (tmp_path / "conversation.jsonl").exists()
+
+    handled = handle_prompt_too_long(
+        RuntimeError("Prompt is too long"), tmp_path, "planner"
+    )
+
+    assert handled is True
+    assert (tmp_path / PROMPT_TOO_LONG_HALT_FILE).exists()
 
 
 def test_prompt_too_long_marker_records_phase_tag(tmp_path: Path) -> None:
@@ -198,3 +317,55 @@ def test_prompt_too_long_detects_various_message_shapes(tmp_path: Path) -> None:
         assert handle_prompt_too_long(RuntimeError(msg), sub, "qa") is True, (
             f"should have matched: {msg!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Regression: the Claude CLI started emitting "You've hit your session limit"
+# and "You've hit your weekly limit" banners (instead of the older bare
+# "You've hit your limit"). The detector used to require the literal word
+# "limit" right after "your", so the new banner slipped through, was treated
+# as a generic error, and got retried with a continuation summary appended
+# every iteration — which grew the prompt until it tripped "Prompt is too long"
+# AND polluted the logs with duplicated banners.
+# ---------------------------------------------------------------------------
+
+
+def test_is_rate_limit_error_matches_session_and_weekly_variants() -> None:
+    """The new CLI shapes 'hit your session limit' and 'hit your weekly limit'
+    must classify as rate-limit errors — not generic ones."""
+    from agents.session import is_rate_limit_error
+
+    samples = [
+        "You've hit your limit · resets 10am (Europe/Paris)",
+        "You've hit your session limit · resets 3:20pm (Europe/Paris)",
+        "You've hit your weekly limit · resets Dec 17 at 6am (Europe/Oslo)",
+        "session limit reached",
+        "weekly limit reached",
+    ]
+    for msg in samples:
+        assert is_rate_limit_error(RuntimeError(msg)) is True, (
+            f"should classify as rate-limit: {msg!r}"
+        )
+
+
+def test_parse_rate_limit_reset_time_handles_resets_without_at() -> None:
+    """The new CLI banner uses 'resets 3:20pm' (no 'at' prefix). The parser
+    must extract a valid future timestamp from that shape too, otherwise the
+    rate-limit shield can't compute a wait window and the caller falls back
+    to its retry loop — the exact bug behind the prompt-too-long avalanche."""
+    from agents.coder import parse_rate_limit_reset_time
+
+    error_info = {
+        "message": "You've hit your session limit · resets 3:20pm (Europe/Paris)",
+        "type": "rate_limit",
+    }
+    ts = parse_rate_limit_reset_time(error_info)
+    assert ts is not None and ts > 0
+
+    # Hour-only shape ("resets 10am") must also parse.
+    error_info_hour_only = {
+        "message": "You've hit your limit · resets 10am (Europe/Paris)",
+        "type": "rate_limit",
+    }
+    ts2 = parse_rate_limit_reset_time(error_info_hour_only)
+    assert ts2 is not None and ts2 > 0

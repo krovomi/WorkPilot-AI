@@ -161,13 +161,67 @@ def handle_prompt_too_long(
         "Reset the conversation or pick a provider with a larger context window."
     )
 
+    # Break every mechanism that could replay the oversized transcript on the
+    # next iteration. Three layers must all be cleared, otherwise the
+    # "Continuing implementation… / Prompt is too long" cascade resumes:
+    #
+    #   1. Our own conversation.jsonl (replayed by _maybe_replay_conversation)
+    #   2. The Claude SDK's on-disk transcript pointer .session.json
+    #      (consumed by the frontend's "Reprendre" button and re-injected as
+    #      AUTO_CLAUDE_RESUME_SESSION_ID, which then makes the SDK rehydrate
+    #      ~/.claude/projects/<encoded-cwd>/<session_id>.jsonl)
+    #   3. The live AUTO_CLAUDE_RESUME_SESSION_ID env var in the current
+    #      process — left set, it would make every subsequent
+    #      create_client() in the same loop re-resume the doomed session.
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    try:
+        log_file = spec_dir / "conversation.jsonl"
+        if log_file.exists():
+            archive = spec_dir / f"conversation.{timestamp}.too-long.jsonl"
+            log_file.rename(archive)
+            logger.info(
+                "[%s] Archived oversized conversation log to %s",
+                phase,
+                archive.name,
+            )
+    except OSError as e:
+        logger.warning("Could not archive conversation log: %s", e)
+
+    # Layer 2: archive .session.json so the frontend's "Reprendre" can't replay
+    # the doomed SDK session_id. We rename rather than delete to keep an audit
+    # trail for diagnostics.
+    try:
+        session_state = spec_dir / ".session.json"
+        if session_state.exists():
+            archive = spec_dir / f".session.{timestamp}.too-long.json"
+            session_state.rename(archive)
+            logger.info(
+                "[%s] Archived .session.json (resume marker) to %s",
+                phase,
+                archive.name,
+            )
+    except OSError as e:
+        logger.warning("Could not archive .session.json: %s", e)
+
+    # Layer 3: pop the in-process resume env var. Without this, the next
+    # create_client() inside the same Python process would re-apply the
+    # poisoned session_id even after we cleaned up the on-disk markers.
+    import os as _os
+
+    if _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None) is not None:
+        logger.info(
+            "[%s] Cleared AUTO_CLAUDE_RESUME_SESSION_ID from process env", phase
+        )
+
     halt_data = {
         "halted_at": datetime.now().isoformat(),
         "error": str(error)[:500],
         "phase": phase,
         "remediation": (
-            "Reset the conversation log (clears conversation.jsonl) OR "
-            "resume under a provider with a larger context window."
+            "Conversation log archived (conversation.<timestamp>.too-long.jsonl). "
+            "Resume to start a fresh session, OR switch to a provider with a "
+            "larger context window."
         ),
     }
     halt_file = spec_dir / PROMPT_TOO_LONG_HALT_FILE

@@ -96,6 +96,88 @@ def _read_current_subtask_id(spec_dir: Path) -> str | None:
         return None
 
 
+# Cap on how many historical messages we re-inject into a new session.
+# Above this the resume preamble dominates the prompt and the very next query
+# trips "Prompt is too long" — replaying 1000+ turns is also useless context-
+# wise because the model can't reason over that much detail anyway. Keep the
+# tail (most recent context) and archive the rest. Empirically ~200 turns is
+# the sweet spot for keeping useful continuity without burning the budget.
+MAX_REPLAY_MESSAGES = 200
+
+# Even after the message-count cap above, replay can still blow the context
+# window if individual messages are huge (e.g. the system prompt with its
+# WORKTREE preamble is ~25k chars × N repeats). Cap the total replay payload
+# at a fraction of a typical 200k-token window so the preamble never crowds
+# out the actual task. 600 KB ≈ 150k tokens, leaving headroom for the new
+# prompt + assistant response.
+MAX_REPLAY_TOTAL_CHARS = 600_000
+
+
+def _entry_is_useful_for_replay(entry: dict) -> bool:
+    """Decide whether a conversation log entry should be re-injected.
+
+    The log accumulates a lot of cruft that's useful for diagnostics but
+    actively harmful when fed back to the model:
+
+    * ``role: system`` with no content — pure noise from internal bookkeeping.
+    * ``role: system`` with only ``result`` blocks — tool results that have
+      already been consumed by their assistant turn.
+    * The system preamble re-sent on every session start (``⛔ ISOLATED
+      WORKTREE``, project index, instructions block). It's ~25k chars and the
+      next session will receive a fresh copy from generate_planner_prompt /
+      similar, so replaying the old one is pure duplication.
+    * Bare ``"Prompt is too long"`` assistant turns — the very thing that
+      poisoned the log in the first place. Replaying them invites the model
+      to mimic the pattern.
+
+    Returns True iff the entry should be kept for replay.
+    """
+    role = entry.get("role")
+    content = entry.get("content") or []
+
+    if not content:
+        # Empty content is purely structural; nothing to inject.
+        return False
+
+    block_types = [b.get("type") for b in content]
+
+    # System turns with only tool-result blocks are useless without the
+    # surrounding assistant tool_use turn, and they're noisy.
+    if role == "system":
+        if not any(
+            t == "text" and (content[i].get("text") or "").strip()
+            for i, t in enumerate(block_types)
+        ):
+            return False
+
+    # Drop bare prompt-too-long echoes so we don't seed the next session with
+    # the same failure mode.
+    if role == "assistant" and block_types == ["text"]:
+        only_text = (content[0].get("text") or "").strip()
+        if 0 < len(only_text) <= 80 and is_prompt_too_long_error(
+            RuntimeError(only_text)
+        ):
+            return False
+
+    # Drop the recurring "⛔ ISOLATED WORKTREE" / planner-prompt preamble.
+    # It's recreated fresh on every session start by the prompt generators,
+    # so replaying old copies is duplication AND the single biggest source of
+    # context-window pressure (we measured 137 copies × ~24700 chars in one
+    # poisoned log).
+    if role == "user" and block_types == ["text"]:
+        first_text = (content[0].get("text") or "").lstrip()
+        # Markers come from prompts/coder_prompt.py and prompts/planner_prompt.py.
+        preamble_markers = (
+            "## ⛔ ISOLATED WORKTREE",
+            "⛔ ISOLATED WORKTREE",
+            "## CRITICAL: TOOL CONCURRENCY ERROR",
+        )
+        if any(first_text.startswith(m) for m in preamble_markers):
+            return False
+
+    return True
+
+
 async def _maybe_replay_conversation(
     client: AgentClient,
     spec_dir: Path,
@@ -103,7 +185,15 @@ async def _maybe_replay_conversation(
     model: str,
 ) -> None:
     """If a prior conversation log exists for this spec, deserialize it and
-    hand it to `client.resume()` so the new provider picks up the context.
+    hand it to ``client.resume()`` so the new provider picks up the context.
+
+    If the log is larger than ``MAX_REPLAY_MESSAGES`` we keep only the most
+    recent messages and archive the full history alongside. Without this
+    cap, a long-running task accumulated hundreds of turns and every session
+    start re-injected the whole thing as a "transcript preamble", which is
+    what caused the
+    ``Replaying 1057 prior message(s) … / Prompt is too long`` cascade
+    the user kept hitting.
 
     Silent on failure: the conversation log is best-effort and must never
     take down a session start.
@@ -121,6 +211,89 @@ async def _maybe_replay_conversation(
         entries = read_log(spec_dir)
         if not entries:
             return
+
+        # First pass: drop entries that have no business being re-injected
+        # (system noise, the giant WORKTREE preamble we recreate every session,
+        # bare "Prompt is too long" echoes). This is what actually shrinks the
+        # replay payload — the count cap alone wasn't enough because the
+        # preamble was being replayed up to 137 times in a single 200-message
+        # window.
+        original_count = len(entries)
+        entries = [e for e in entries if _entry_is_useful_for_replay(e)]
+        dropped = original_count - len(entries)
+        if dropped:
+            logger.info(
+                "[session] Filtered %d/%d log entries from replay "
+                "(system noise / duplicate preambles / prompt-too-long echoes)",
+                dropped,
+                original_count,
+            )
+
+        if len(entries) > MAX_REPLAY_MESSAGES:
+            # Archive the full log so we never lose the audit trail, then
+            # truncate the on-disk file to the trimmed tail so subsequent
+            # sessions also start from the smaller window.
+            try:
+                from datetime import datetime as _dt
+
+                _timestamp = _dt.now().strftime("%Y%m%d-%H%M%S")
+                _archive = spec_dir / f"conversation.{_timestamp}.trimmed.jsonl"
+                log_file.rename(_archive)
+                logger.info(
+                    "[session] Archived %d-message conversation log to %s "
+                    "(keeping last %d for replay)",
+                    len(entries),
+                    _archive.name,
+                    MAX_REPLAY_MESSAGES,
+                )
+                # Rewrite the trimmed + filtered tail back to the live log path
+                # so the next iteration sees a small file.
+                import json as _json
+
+                tail = entries[-MAX_REPLAY_MESSAGES:]
+                with log_file.open("wb") as f:
+                    for entry in tail:
+                        f.write(
+                            (_json.dumps(entry, ensure_ascii=False) + "\n").encode(
+                                "utf-8"
+                            )
+                        )
+                entries = tail
+            except OSError as _trim_err:
+                logger.warning(
+                    "[session] Could not trim oversized conversation log: %s — "
+                    "falling back to skipping replay entirely",
+                    _trim_err,
+                )
+                return
+
+        # Second pass: even after dropping noise, enforce a hard cap on the
+        # total payload size. Walk from the tail and stop once we've collected
+        # enough recent context. This is the safety net that keeps a small
+        # number of huge tool outputs (e.g. a 100k-line file read) from
+        # blowing the context window on its own.
+        sized: list[dict] = []
+        running = 0
+        for entry in reversed(entries):
+            entry_chars = sum(
+                len(b.get("text") or "") for b in (entry.get("content") or [])
+            )
+            if running + entry_chars > MAX_REPLAY_TOTAL_CHARS and sized:
+                # Keep at least one message (sized non-empty), but stop here.
+                break
+            sized.append(entry)
+            running += entry_chars
+        sized.reverse()
+        if len(sized) < len(entries):
+            logger.info(
+                "[session] Capped replay at %d/%d messages (~%d KB) to stay "
+                "under the context window",
+                len(sized),
+                len(entries),
+                running // 1024,
+            )
+        entries = sized
+
         history = [deserialize_message(e) for e in entries]
         debug(
             "session",
@@ -203,19 +376,54 @@ def is_rate_limit_error(error: Exception) -> bool:
     if re.search(r"\b429\b", error_str):
         return True
 
-    # Check for other rate limit indicators
+    # Check for other rate limit indicators. The "hit your" patterns cover
+    # the Claude CLI shapes "You've hit your limit · resets …" AND the newer
+    # "You've hit your session limit · resets …" / "weekly limit" variants —
+    # missing the session/weekly word here caused the orchestration loop to
+    # treat the error as a generic failure and retry, which in turn polluted
+    # the conversation summary until the prompt itself blew the context window
+    # ("Prompt is too long").
     return any(
         p in error_str
         for p in [
             "limit reached",
             "rate limit",
             "rate_limit",  # SDK may use underscore variant (e.g., "rate_limit_event")
-            "hit your limit",  # Claude CLI format: "You've hit your limit"
+            "hit your limit",
+            "hit your session limit",
+            "hit your weekly limit",
+            "session limit",
+            "weekly limit",
             "too many requests",
             "usage limit",
             "quota exceeded",
         ]
     )
+
+
+def _response_text_indicates_prompt_too_long(response_text: str) -> bool:
+    """Return True if the LLM's *response text* (not exception) signals that
+    the prompt was rejected for being too long.
+
+    Some providers — notably the Claude Agent SDK in newer versions — surface
+    "Prompt is too long" as a normal assistant TextBlock instead of raising,
+    so the stream completes cleanly with status="continue" and the caller's
+    error handlers never run. Without this check the coder loop keeps
+    iterating, the conversation log keeps growing, and the user sees the same
+    one-line response forever.
+
+    The check is intentionally narrow: we only fire on very short responses
+    that are essentially the error string, never on long assistant turns that
+    happen to mention the phrase in passing.
+    """
+    if not response_text:
+        return False
+    stripped = response_text.strip()
+    # Real responses are paragraphs; the SDK echo is just the bare error.
+    # 80 chars covers shapes like "Prompt is too long: 250000 tokens".
+    if len(stripped) > 80:
+        return False
+    return is_prompt_too_long_error(RuntimeError(stripped))
 
 
 def is_prompt_too_long_error(error: Exception) -> bool:
@@ -1064,6 +1272,51 @@ async def run_agent_session(
                     pass
             return "complete", response_text, {}
 
+        # Provider may surface "Prompt is too long" as a normal short text
+        # response instead of an exception (Claude Agent SDK does this when
+        # the resume preamble blew the context window). Reclassify so the
+        # coder loop sees error_type="prompt_too_long" and halts cleanly,
+        # otherwise the response just gets stored, the stream ends with
+        # "continue", and the next iteration replays the same oversized log.
+        if _response_text_indicates_prompt_too_long(response_text):
+            debug_error(
+                "session",
+                "Reclassifying short prompt-too-long response as error",
+                response_preview=response_text[:120],
+            )
+            error_info = {
+                "type": "prompt_too_long",
+                "message": response_text.strip(),
+                "exception_type": "PromptTooLongResponse",
+            }
+            # Same defense-in-depth cleanup as the exception path so the next
+            # session doesn't trip the same wall — see the equivalent block
+            # below in `except Exception as e:` for the rationale.
+            try:
+                import os as _os
+                from datetime import datetime as _dt
+
+                _timestamp = _dt.now().strftime("%Y%m%d-%H%M%S")
+                _log_file = spec_dir / "conversation.jsonl"
+                if _log_file.exists():
+                    _log_file.rename(
+                        spec_dir / f"conversation.{_timestamp}.too-long.jsonl"
+                    )
+                _session_state = spec_dir / ".session.json"
+                if _session_state.exists():
+                    _session_state.rename(
+                        spec_dir / f".session.{_timestamp}.too-long.json"
+                    )
+                _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
+            except OSError:
+                pass
+            if _rr and _rs_id:
+                try:
+                    _rr.end_session(_rs_id)
+                except Exception:
+                    pass
+            return "error", response_text, error_info
+
         debug_success(
             "session",
             "Session completed - continuing",
@@ -1083,10 +1336,16 @@ async def run_agent_session(
         is_concurrency = is_tool_concurrency_error(e)
         is_rate_limit = is_rate_limit_error(e)
         is_auth = is_authentication_error(e)
+        # Prompt-too-long check must run here so the caller can short-circuit
+        # the retry loop with a single classification check, instead of having
+        # to re-match the message string in every branch.
+        is_too_long = is_prompt_too_long_error(e)
 
         # Classify error type for appropriate handling
         if is_concurrency:
             error_type = "tool_concurrency"
+        elif is_too_long:
+            error_type = "prompt_too_long"
         elif is_rate_limit:
             error_type = "rate_limit"
         elif is_auth:
@@ -1112,6 +1371,9 @@ async def run_agent_session(
             print("\n⚠️  Tool concurrency limit reached (400 error)")
             print("   Claude API limits concurrent tool use in a single request")
             print(f"   Error: {sanitized_error[:200]}\n")
+        elif is_too_long:
+            print("\n⛔ Prompt too long — context window exceeded")
+            print("   Retrying would fail identically. Halting.\n")
         elif is_rate_limit:
             print("\n⚠️  Rate limit reached")
             print("   API usage quota exceeded - waiting for reset")
@@ -1125,6 +1387,46 @@ async def run_agent_session(
 
         if task_logger:
             task_logger.log_error(f"Session error: {sanitized_error}", phase)
+
+        # Defense in depth: if the prompt overflowed the model's context, we
+        # MUST break all three replay channels before returning, otherwise the
+        # next session start re-injects the same giant transcript and trips
+        # the same error again:
+        #   1) our own conversation.jsonl (replayed by _maybe_replay_conversation)
+        #   2) the SDK's .session.json resume pointer
+        #   3) the in-process AUTO_CLAUDE_RESUME_SESSION_ID env var
+        # See services/rate_limit_shield.handle_prompt_too_long for the same
+        # cleanup chain — it's duplicated here because run_agent_session can
+        # be reached without going through that shield (e.g. callers that
+        # haven't wired the shield in yet).
+        if is_too_long:
+            try:
+                import os as _os
+                from datetime import datetime as _dt
+
+                _timestamp = _dt.now().strftime("%Y%m%d-%H%M%S")
+                _log_file = spec_dir / "conversation.jsonl"
+                if _log_file.exists():
+                    _archive = spec_dir / f"conversation.{_timestamp}.too-long.jsonl"
+                    _log_file.rename(_archive)
+                    logger.info(
+                        "[session] Archived oversized conversation log to %s",
+                        _archive.name,
+                    )
+                _session_state = spec_dir / ".session.json"
+                if _session_state.exists():
+                    _state_archive = spec_dir / f".session.{_timestamp}.too-long.json"
+                    _session_state.rename(_state_archive)
+                    logger.info(
+                        "[session] Archived .session.json resume marker to %s",
+                        _state_archive.name,
+                    )
+                _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
+            except OSError as _archive_err:
+                logger.warning(
+                    "[session] Could not archive oversized session state: %s",
+                    _archive_err,
+                )
 
         error_info = {
             "type": error_type,
@@ -1476,6 +1778,43 @@ async def _run_agent_client_session(
             )
             return "complete", response_text, {}
 
+        # Same reclassification as in the SDK-direct runner — providers can
+        # surface "Prompt is too long" as a plain text response. See the
+        # corresponding block in run_agent_session() for the full rationale.
+        if _response_text_indicates_prompt_too_long(response_text):
+            debug_error(
+                "session",
+                "Reclassifying short prompt-too-long response as error (AgentClient)",
+                response_preview=response_text[:120],
+            )
+            try:
+                import os as _os
+                from datetime import datetime as _dt
+
+                _timestamp = _dt.now().strftime("%Y%m%d-%H%M%S")
+                _log_file = spec_dir / "conversation.jsonl"
+                if _log_file.exists():
+                    _log_file.rename(
+                        spec_dir / f"conversation.{_timestamp}.too-long.jsonl"
+                    )
+                _session_state = spec_dir / ".session.json"
+                if _session_state.exists():
+                    _session_state.rename(
+                        spec_dir / f".session.{_timestamp}.too-long.json"
+                    )
+                _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
+            except OSError:
+                pass
+            return (
+                "error",
+                response_text,
+                {
+                    "type": "prompt_too_long",
+                    "message": response_text.strip(),
+                    "exception_type": "PromptTooLongResponse",
+                },
+            )
+
         debug_success(
             "session",
             "Session completed - continuing",
@@ -1489,9 +1828,12 @@ async def _run_agent_client_session(
         is_concurrency = is_tool_concurrency_error(e)
         is_rate_limit_err = is_rate_limit_error(e)
         is_auth = is_authentication_error(e)
+        is_too_long = is_prompt_too_long_error(e)
 
         if is_concurrency:
             error_type = "tool_concurrency"
+        elif is_too_long:
+            error_type = "prompt_too_long"
         elif is_rate_limit_err:
             error_type = "rate_limit"
         elif is_auth:
@@ -1513,6 +1855,9 @@ async def _run_agent_client_session(
         if is_concurrency:
             print("\n⚠️  Tool concurrency limit reached (400 error)")
             print(f"   Error: {sanitized_error[:200]}\n")
+        elif is_too_long:
+            print("\n⛔ Prompt too long — context window exceeded")
+            print("   Retrying would fail identically. Halting.\n")
         elif is_rate_limit_err:
             print("\n⚠️  Rate limit reached")
             print(f"   Error: {sanitized_error[:200]}\n")
