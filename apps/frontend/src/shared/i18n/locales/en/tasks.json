@@ -48,6 +48,19 @@
 		"needsRecovery": "Needs Recovery",
 		"needsResume": "Needs Resume"
 	},
+	"warnings": {
+		"stuck": {
+			"title": "Task Appears Stuck",
+			"description": "This task is marked as running but no active process was found. This can happen if the app crashed or the process was terminated unexpectedly.",
+			"button": "Recover & Restart Task",
+			"recovering": "Recovering..."
+		},
+		"incomplete": {
+			"title": "Task Incomplete",
+			"description": "This task has a spec and implementation plan but never completed any subtasks ({{completed}}/{{total}}). The process likely crashed during spec creation. Click Resume to continue implementation.",
+			"button": "Resume Task"
+		}
+	},
 	"reviewReason": {
 		"completed": "Completed",
 		"hasErrors": "Has Errors",

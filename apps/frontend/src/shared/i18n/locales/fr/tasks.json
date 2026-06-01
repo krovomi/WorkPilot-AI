@@ -48,6 +48,19 @@
 		"needsRecovery": "Récupération requise",
 		"needsResume": "Reprise requise"
 	},
+	"warnings": {
+		"stuck": {
+			"title": "Tâche Bloquée",
+			"description": "Cette tâche est marquée comme en cours mais aucun processus actif n'a été trouvé. Cela peut se produire si l'application s'est bloquée ou si le processus a été arrêté de manière inattendue.",
+			"button": "Récupérer et Relancer la Tâche",
+			"recovering": "Récupération en cours..."
+		},
+		"incomplete": {
+			"title": "Tâche Incomplète",
+			"description": "Cette tâche a une spécification et un plan d'implémentation mais n'a jamais complété aucune sous-tâche ({{completed}}/{{total}}). Le processus s'est probablement bloqué lors de la création de la spécification. Cliquez sur Reprendre pour continuer l'implémentation.",
+			"button": "Reprendre la Tâche"
+		}
+	},
 	"reviewReason": {
 		"completed": "Terminé",
 		"hasErrors": "Contient des erreurs",

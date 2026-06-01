@@ -7,6 +7,9 @@
 	"merge": {
 		"buildReadyForReview": "Build Ready for Review",
 		"view": "View",
+		"viewPR": "View PR",
+		"prStatusMessage": "This task's changes are available in the pull request above.",
+		"notMergeable": "Cannot be merged",
 		"checkForConflicts": "Check for Conflicts",
 		"checkingForConflicts": "Checking for conflicts...",
 		"commits": "commits",
