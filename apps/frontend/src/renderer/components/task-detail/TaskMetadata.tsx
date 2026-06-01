@@ -763,28 +763,31 @@ function AcceptanceCriteriaList({ criteria }: AcceptanceCriteriaListProps) {
 
 	return (
 		<div className="text-sm text-foreground/80 space-y-3 mb-2">
-			{groups.map((group, gIdx) => (
-				<div key={`ac-group-${gIdx}`} className="space-y-1">
-					{group.title && (
-						<div className="font-semibold text-foreground">
-							{group.title}
-						</div>
-					)}
-					{group.lines.length > 0 && (
-						<div
-							className={
-								group.title
-									? "pl-3 border-l-2 border-border space-y-0.5"
-									: "space-y-0.5"
-							}
-						>
-							{group.lines.map((line, lIdx) => (
-								<div key={`ac-line-${gIdx}-${lIdx}`}>{line}</div>
-							))}
-						</div>
-					)}
-				</div>
-			))}
+			{groups.map((group) => {
+				const groupKey = `${group.title ?? "intro"}::${group.lines[0] ?? ""}`;
+				return (
+					<div key={groupKey} className="space-y-1">
+						{group.title && (
+							<div className="font-semibold text-foreground">
+								{group.title}
+							</div>
+						)}
+						{group.lines.length > 0 && (
+							<div
+								className={
+									group.title
+										? "pl-3 border-l-2 border-border space-y-0.5"
+										: "space-y-0.5"
+								}
+							>
+								{group.lines.map((line) => (
+									<div key={`${groupKey}::${line}`}>{line}</div>
+								))}
+							</div>
+						)}
+					</div>
+				);
+			})}
 		</div>
 	);
 }
