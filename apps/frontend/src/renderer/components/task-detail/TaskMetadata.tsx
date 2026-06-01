@@ -732,6 +732,63 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 	);
 }
 
+interface AcceptanceCriteriaListProps {
+	readonly criteria: readonly string[];
+}
+
+// Renders a flat AC list as visually-grouped Gherkin scenarios.
+// A line starting with "Scénario"/"Scenario" (case-insensitive) opens a new
+// group rendered as a header; following lines are indented plain text. Lines
+// that are not part of a scenario fall into an unlabeled group so the list
+// still renders something readable when the AC isn't BDD-shaped.
+function AcceptanceCriteriaList({ criteria }: AcceptanceCriteriaListProps) {
+	const scenarioRe = /^\s*sc[ée]nario\b/i;
+	const groups: { title: string | null; lines: string[] }[] = [];
+	let current: { title: string | null; lines: string[] } | null = null;
+
+	for (const raw of criteria) {
+		const line = raw.trim();
+		if (!line) continue;
+		if (scenarioRe.test(line)) {
+			current = { title: line, lines: [] };
+			groups.push(current);
+			continue;
+		}
+		if (!current) {
+			current = { title: null, lines: [] };
+			groups.push(current);
+		}
+		current.lines.push(line);
+	}
+
+	return (
+		<div className="text-sm text-foreground/80 space-y-3 mb-2">
+			{groups.map((group, gIdx) => (
+				<div key={`ac-group-${gIdx}`} className="space-y-1">
+					{group.title && (
+						<div className="font-semibold text-foreground">
+							{group.title}
+						</div>
+					)}
+					{group.lines.length > 0 && (
+						<div
+							className={
+								group.title
+									? "pl-3 border-l-2 border-border space-y-0.5"
+									: "space-y-0.5"
+							}
+						>
+							{group.lines.map((line, lIdx) => (
+								<div key={`ac-line-${gIdx}-${lIdx}`}>{line}</div>
+							))}
+						</div>
+					)}
+				</div>
+			))}
+		</div>
+	);
+}
+
 interface AcceptanceCriteriaSectionProps {
 	readonly task: Task;
 }
@@ -895,11 +952,7 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 				) : (
 					<>
 						{initialCriteria.length > 0 ? (
-							<ul className="text-sm text-foreground/80 list-disc list-inside space-y-0.5 pl-5 mb-2">
-								{initialCriteria.map((criterion, idx) => (
-									<li key={`ac-${idx}`}>{criterion}</li>
-								))}
-							</ul>
+							<AcceptanceCriteriaList criteria={initialCriteria} />
 						) : (
 							<p className="text-xs text-muted-foreground italic mb-2">
 								{t("tasks:metadata.acEmpty")}
