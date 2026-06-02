@@ -4072,7 +4072,7 @@ export function registerWorktreeHandlers(
 						continue;
 					}
 
-					// Discard changes: remove from git tracking so it doesn't appear in diffs
+					// Discard changes: sync file state with develop branch
 					const statusResult = await execAsync(
 						`git status --porcelain -- "${relativePath}"`,
 						{ cwd: resolvedWorktree },
@@ -4081,14 +4081,30 @@ export function registerWorktreeHandlers(
 
 					if (statusOutput.startsWith("??")) {
 						// Untracked file, just remove it
-						await fsPromises.unlink(resolved);
+						try {
+							await fsPromises.unlink(resolved);
+						} catch (err) {
+							// Ignore if file doesn't exist
+							if (
+								!(err instanceof Error) ||
+								!err.message.includes("ENOENT")
+							) {
+								throw err;
+							}
+						}
 					} else if (statusOutput) {
-						// File is tracked but modified or deleted
-						// Remove from git index so it doesn't appear in merge diff
-						// Use --force to allow removing modified files
-						await execAsync(`git rm --force "${relativePath}"`, {
-							cwd: resolvedWorktree,
-						});
+						// File is tracked: reset to develop's version using git reset
+						// This removes the file from the index and working tree if develop doesn't have it
+						// Or restores it if develop does have it
+						await execAsync(
+							`git reset develop -- "${relativePath}"`,
+							{ cwd: resolvedWorktree },
+						);
+						// Then checkout the file from develop to match exactly
+						await execAsync(
+							`git checkout develop -- "${relativePath}"`,
+							{ cwd: resolvedWorktree },
+						);
 					}
 
 					deleted.push(relativePath);
