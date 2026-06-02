@@ -2,6 +2,7 @@ import {
 	AlertCircle,
 	CheckCircle2,
 	Clock,
+	Code2,
 	Edit3,
 	FileCode,
 	ListChecks,
@@ -11,12 +12,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Task } from "../../../shared/types";
+import type { Subtask, Task } from "../../../shared/types";
 import { calculateProgress, cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { TaskCodeEditor } from "./TaskCodeEditor";
 
 interface Phase {
 	name: string;
@@ -69,6 +71,8 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 	const { t } = useTranslation(["tasks"]);
 	const [isEditing, setIsEditing] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
+	const [selectedSubtaskForCodeEdit, setSelectedSubtaskForCodeEdit] =
+		useState<Subtask | null>(null);
 	const [editedPhases, setEditedPhases] = useState<Phase[]>(
 		task.subtasks.length > 0
 			? [
@@ -81,6 +85,24 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 	);
 
 	const progress = calculateProgress(task.subtasks);
+
+	const handleCodeEditorUpdate = async (updatedSubtask: Subtask) => {
+		// Update the subtask in editedPhases
+		const newPhases = editedPhases.map((phase) => ({
+			...phase,
+			subtasks: phase.subtasks.map((s) =>
+				s.id === updatedSubtask.id ? updatedSubtask : s,
+			),
+		}));
+		setEditedPhases(newPhases);
+
+		// Call onUpdatePlan to save
+		if (onUpdatePlan) {
+			await onUpdatePlan(newPhases);
+		}
+
+		setSelectedSubtaskForCodeEdit(null);
+	};
 
 	async function handleSaveChanges() {
 		if (!onUpdatePlan) return;
@@ -132,6 +154,35 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 			field
 		] = value;
 		setEditedPhases(newPhases);
+	}
+
+	if (selectedSubtaskForCodeEdit) {
+		return (
+			<div className="h-full flex flex-col">
+				<div className="p-3 border-b border-border bg-muted/50 flex items-center justify-between">
+					<div className="flex items-center gap-2">
+						<Code2 className="h-4 w-4" />
+						<span className="text-sm font-medium">
+							Edit Files: {selectedSubtaskForCodeEdit.title}
+						</span>
+					</div>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => setSelectedSubtaskForCodeEdit(null)}
+						className="h-6"
+					>
+						Back
+					</Button>
+				</div>
+				<div className="flex-1 overflow-hidden">
+					<TaskCodeEditor
+						subtask={selectedSubtaskForCodeEdit}
+						onUpdate={handleCodeEditorUpdate}
+					/>
+				</div>
+			</div>
+		);
 	}
 
 	if (task.subtasks.length === 0) {
@@ -348,7 +399,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 												)}
 										</Tooltip>
 										{subtask.files && subtask.files.length > 0 && (
-											<div className="mt-2 flex flex-wrap gap-1">
+											<div className="mt-2 flex flex-wrap gap-1 items-center">
 												{subtask.files.map((file: string) => (
 													<Tooltip key={file}>
 														<TooltipTrigger asChild>
@@ -368,6 +419,21 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 														</TooltipContent>
 													</Tooltip>
 												))}
+												{subtask.status === "pending" && (
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<Button
+																size="sm"
+																variant="ghost"
+																onClick={() => setSelectedSubtaskForCodeEdit(subtask)}
+																className="h-6 w-6 p-0 ml-1"
+															>
+																<Edit3 className="h-3 w-3" />
+															</Button>
+														</TooltipTrigger>
+														<TooltipContent>Edit files</TooltipContent>
+													</Tooltip>
+												)}
 											</div>
 										)}
 									</div>

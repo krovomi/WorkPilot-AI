@@ -286,6 +286,15 @@ function useTaskDetailHandlers(
 		// Reload tasks to show newly generated subtasks from feedback
 		if (task) {
 			await loadTasks(task.projectId);
+			// Update task in store with the reloaded data
+			const store = useTaskStore.getState();
+			const reloadedTask = store.tasks.find((t) => t.id === task.id);
+			if (reloadedTask && reloadedTask.subtasks.length > 0) {
+				// Force a re-render by updating the task
+				store.updateTask(task.id, {
+					...reloadedTask,
+				});
+			}
 		}
 	};
 
