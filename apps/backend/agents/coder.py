@@ -1088,7 +1088,7 @@ async def run_autonomous_agent(
                 continue  # Skip to next iteration
 
             # PRE-CHECK: If this is a manual verification task, skip the coder session
-            # and mark it as blocked immediately to avoid the "should I mark as blocked?" question
+            # and mark it as completed to remove from queue
             verification = next_subtask.get("verification", {})
             if verification.get("type") == "manual":
                 print()
@@ -1097,36 +1097,38 @@ async def run_autonomous_agent(
                     "warning",
                 )
                 print(
-                    muted("Skipping coder session - marking as blocked without asking")
+                    muted(
+                        "Skipping coder session - marking as completed for human review"
+                    )
                 )
 
-                # Mark as blocked directly
+                # Mark as completed (not blocked) so it's removed from queue
+                # This prevents infinite waiting since no automated testing can run
                 plan = load_implementation_plan(spec_dir)
                 if plan:
                     subtask = find_subtask_in_plan(plan, subtask_id)
                     if subtask:
-                        subtask["status"] = "blocked"
-                        subtask["_blocked_reason"] = (
-                            "Manual verification required - awaiting human tester"
-                        )
+                        subtask["status"] = "completed"
+                        # Add metadata that this requires manual review
+                        subtask["_manual_review_required"] = True
 
                         try:
                             save_implementation_plan(spec_dir, plan)
                             print_status(
-                                f"✓ Subtask {subtask_id} marked as BLOCKED",
+                                f"✓ Subtask {subtask_id} marked as COMPLETED (manual review needed)",
                                 "warning",
                             )
 
                             # Log the decision
                             if task_logger:
                                 task_logger.log(
-                                    f"Subtask {subtask_id}: Manual verification task - marked as blocked",
+                                    f"Subtask {subtask_id}: Manual verification task - marked completed for human review",
                                     LogEntryType.TEXT,
                                     LogPhase.CODING,
                                 )
                         except Exception as e:
-                            logger.error(f"Failed to mark as blocked: {e}")
-                            print(f"  ✗ Warning: Could not mark as blocked: {e}")
+                            logger.error(f"Failed to mark as completed: {e}")
+                            print(f"  ✗ Warning: Could not mark as completed: {e}")
 
                 # Continue to next subtask without launching coder
                 await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
