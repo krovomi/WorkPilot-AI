@@ -4061,6 +4061,22 @@ export function registerWorktreeHandlers(
 			const failed: string[] = [];
 			const resolvedWorktree = path.resolve(worktreePath);
 
+			// Load existing discard list
+			const discardListPath = path.join(
+				resolvedWorktree,
+				".workpilot-discard-list",
+			);
+			let discardedFiles: string[] = [];
+			try {
+				const content = await fsPromises.readFile(discardListPath, "utf-8");
+				discardedFiles = content
+					.split("\n")
+					.map((line) => line.trim())
+					.filter((line) => line && !line.startsWith("#"));
+			} catch {
+				// File doesn't exist yet
+			}
+
 			for (const relativePath of relativePaths) {
 				try {
 					// Security: validate path stays within worktree
@@ -4094,8 +4110,6 @@ export function registerWorktreeHandlers(
 						}
 					} else if (statusOutput) {
 						// File is tracked: reset to develop's version using git reset
-						// This removes the file from the index and working tree if develop doesn't have it
-						// Or restores it if develop does have it
 						await execAsync(
 							`git reset develop -- "${relativePath}"`,
 							{ cwd: resolvedWorktree },
@@ -4107,6 +4121,11 @@ export function registerWorktreeHandlers(
 						);
 					}
 
+					// Add to discard list so backend excludes it from merge preview
+					if (!discardedFiles.includes(relativePath)) {
+						discardedFiles.push(relativePath);
+					}
+
 					deleted.push(relativePath);
 				} catch (error) {
 					console.error(
@@ -4115,6 +4134,21 @@ export function registerWorktreeHandlers(
 					);
 					failed.push(relativePath);
 				}
+			}
+
+			// Write discard list for backend to read
+			if (discardedFiles.length > 0) {
+				await fsPromises.writeFile(
+					discardListPath,
+					discardedFiles
+						.map((f) => f.trim())
+						.join("\n")
+						.concat("\n"),
+					"utf-8",
+				);
+				console.log(
+					`[WORKTREE_DISCARD] Wrote ${discardedFiles.length} files to discard list`,
+				);
 			}
 
 			return { success: true, data: { deleted, failed } };

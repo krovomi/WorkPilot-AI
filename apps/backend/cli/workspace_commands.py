@@ -982,6 +982,35 @@ def handle_merge_preview_command(
             changed_files=all_changed_files[:10],  # Log first 10
         )
 
+        # Load discard list and filter out discarded files
+        discard_list_path = Path(worktree_path) / ".workpilot-discard-list"
+        discarded_files: list[str] = []
+        if discard_list_path.exists():
+            try:
+                with open(discard_list_path) as f:
+                    discarded_files = [
+                        line.strip()
+                        for line in f.readlines()
+                        if line.strip() and not line.strip().startswith("#")
+                    ]
+                debug(
+                    MODULE,
+                    f"Loaded {len(discarded_files)} discarded files from .workpilot-discard-list",
+                    discarded_files=discarded_files,
+                )
+            except Exception as e:
+                warning(
+                    MODULE,
+                    f"Failed to load discard list: {e}",
+                )
+
+        # Filter out discarded files from the changed files list
+        all_changed_files = [f for f in all_changed_files if f not in discarded_files]
+        debug(
+            MODULE,
+            f"After filtering discarded files: {len(all_changed_files)} files remain",
+        )
+
         # OPTIMIZATION: Skip expensive refresh_from_git() and preview_merge() calls
         # For merge-preview, we only need to detect:
         # 1. Git conflicts (task vs base branch) - already calculated in _check_git_merge_conflicts()
