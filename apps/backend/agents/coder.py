@@ -1003,6 +1003,32 @@ async def run_autonomous_agent(
                 if sync_spec_to_source(spec_dir, source_spec_dir):
                     print_status("Phase transition synced to main project", "success")
 
+            # PRE-CHECK: Look for any pending subtask with manual verification
+            # even if it's in a phase that depends on others
+            if not next_subtask:
+                plan = load_implementation_plan(spec_dir)
+                if plan:
+                    for phase in plan.get("phases", []):
+                        for subtask in phase.get("subtasks", []):
+                            if subtask.get("status") == "pending":
+                                verification = subtask.get("verification", {})
+                                if verification.get("type") == "manual":
+                                    # Found a manual verification task - treat it as next
+                                    next_subtask = {
+                                        **subtask,
+                                        "phase_id": phase.get("id"),
+                                        "phase_name": phase.get("name"),
+                                        "phase_num": phase.get("phase"),
+                                    }
+                                    subtask_id = next_subtask.get("id")
+                                    print_status(
+                                        f"Found manual verification subtask: {subtask_id}",
+                                        "warning",
+                                    )
+                                    break
+                        if next_subtask:
+                            break
+
             if not next_subtask:
                 # FIX for Issue #495: Race condition after planning phase
                 # The implementation_plan.json may not be fully flushed to disk yet,
