@@ -115,8 +115,15 @@ export function TaskPauseControls({
 
 	return (
 		<div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-			<div className="text-sm font-medium">
-				{isPaused ? t("tasks:modal.actions.taskIsPaused") : t("tasks:modal.actions.taskControls")}
+			<div>
+				<div className="text-sm font-medium">
+					{isPaused ? t("tasks:modal.actions.providerSwitchPaused") : t("tasks:modal.actions.providerSwitch")}
+				</div>
+				<div className="text-xs text-muted-foreground mt-1">
+					{isPaused
+						? t("tasks:modal.actions.providerSwitchPausedDesc")
+						: t("tasks:modal.actions.providerSwitchDesc")}
+				</div>
 			</div>
 
 			{!isPaused && (
@@ -129,11 +136,11 @@ export function TaskPauseControls({
 							disabled={isLoading}
 							className="w-full"
 						>
-							<Pause className="h-4 w-4 mr-2" />
-							Pause
+							<RotateCcw className="h-4 w-4 mr-2" />
+							{t("tasks:modal.actions.pauseToSwitch")}
 						</Button>
 					</TooltipTrigger>
-					<TooltipContent>Pause execution and save current state</TooltipContent>
+					<TooltipContent>{t("tasks:modal.actions.pauseToSwitchTooltip")}</TooltipContent>
 				</Tooltip>
 			)}
 

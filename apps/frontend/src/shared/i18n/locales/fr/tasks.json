@@ -477,7 +477,13 @@
 			"activating": "Activation...",
 			"syncFromBranch": "Synchroniser depuis une branche",
 			"taskControls": "Contrôles de la tâche",
-			"taskIsPaused": "Tâche en pause"
+			"taskIsPaused": "Tâche en pause",
+			"providerSwitch": "Changement de provider LLM",
+			"providerSwitchDesc": "Mettez en pause pour changer le provider LLM sans arrêter la tâche",
+			"providerSwitchPaused": "Tâche en pause",
+			"providerSwitchPausedDesc": "Choisissez un provider LLM pour reprendre",
+			"pauseToSwitch": "Sauvegarder et changer de provider",
+			"pauseToSwitchTooltip": "Mettez en pause la tâche pour changer de provider LLM. Elle restera en cours d'exécution"
 		},
 		"badges": {
 			"stuck": "Bloqué",

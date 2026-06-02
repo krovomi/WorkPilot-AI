@@ -477,7 +477,13 @@
 			"activating": "Activating...",
 			"syncFromBranch": "Sync from branch",
 			"taskControls": "Task controls",
-			"taskIsPaused": "Task is paused"
+			"taskIsPaused": "Task is paused",
+			"providerSwitch": "Switch LLM Provider",
+			"providerSwitchDesc": "Pause to change the LLM provider without stopping the task",
+			"providerSwitchPaused": "Task is paused",
+			"providerSwitchPausedDesc": "Choose an LLM provider to resume",
+			"pauseToSwitch": "Pause and switch provider",
+			"pauseToSwitchTooltip": "Pause the task to switch LLM providers. It will remain in progress"
 		},
 		"badges": {
 			"stuck": "Stuck",
