@@ -4063,7 +4063,9 @@ export function registerWorktreeHandlers(
 
 			for (const relativePath of relativePaths) {
 				try {
-					const fullPath = path.join(resolvedWorktree, relativePath);
+					// Normalize the relative path to use forward slashes then convert to platform-specific
+					const normalizedPath = relativePath.replace(/\\/g, "/").replace(/\//g, path.sep);
+					const fullPath = path.join(resolvedWorktree, normalizedPath);
 					const resolved = path.resolve(fullPath);
 
 					// Security: ensure the resolved path is still inside the worktree
