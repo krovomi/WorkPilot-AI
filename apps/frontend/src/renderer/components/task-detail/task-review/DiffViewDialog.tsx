@@ -9,7 +9,7 @@ import {
 	Save,
 	Trash2,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { WorktreeDiff, WorktreeDiffFile } from "../../../../shared/types";
 import { cn } from "../../../lib/utils";
@@ -307,7 +307,7 @@ export function DiffViewDialog({
 				console.error("[DiffViewDialog] No worktreePath provided to edit file");
 				return;
 			}
-			const api = (globalThis as any).electron;
+			const api = (globalThis as any).electronAPI;
 			if (!api?.worktreeReadFile) {
 				console.error("[DiffViewDialog] electron.worktreeReadFile not available");
 				return;
@@ -343,7 +343,7 @@ export function DiffViewDialog({
 			return;
 		}
 
-		const api = (globalThis as any).electron;
+		const api = (globalThis as any).electronAPI;
 		if (!api?.worktreeWriteFile) {
 			console.error("[DiffViewDialog] electron.worktreeWriteFile not available");
 			return;
@@ -385,7 +385,7 @@ export function DiffViewDialog({
 			return;
 		}
 
-		const api = (globalThis as any).electron;
+		const api = (globalThis as any).electronAPI;
 		if (!api?.worktreeDeleteFiles) {
 			console.error("[DiffViewDialog] electron.worktreeDeleteFiles not available");
 			return;
@@ -420,7 +420,7 @@ export function DiffViewDialog({
 			return;
 		}
 
-		const api = (globalThis as any).electron;
+		const api = (globalThis as any).electronAPI;
 		if (!api?.worktreeWriteFile) {
 			console.error("[DiffViewDialog] electron.worktreeWriteFile not available");
 			return;
