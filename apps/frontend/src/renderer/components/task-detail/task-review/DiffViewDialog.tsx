@@ -116,7 +116,7 @@ function FileTreeNode({
 	onFileClick,
 	selectedPaths,
 	onToggleSelect,
-	isSelectionMode,
+	canSelect,
 }: {
 	readonly node: TreeNode;
 	readonly depth: number;
@@ -125,7 +125,7 @@ function FileTreeNode({
 	readonly onFileClick?: (file: WorktreeDiffFile) => void;
 	readonly selectedPaths?: Set<string>;
 	readonly onToggleSelect?: (path: string) => void;
-	readonly isSelectionMode?: boolean;
+	readonly canSelect?: boolean;
 }) {
 	const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -171,7 +171,7 @@ function FileTreeNode({
 							onFileClick={onFileClick}
 							selectedPaths={selectedPaths}
 							onToggleSelect={onToggleSelect}
-							isSelectionMode={isSelectionMode}
+							canSelect={canSelect}
 						/>
 					))}
 			</>
@@ -192,16 +192,16 @@ function FileTreeNode({
 		>
 			<div
 				className="flex items-center gap-1.5 min-w-0 flex-1"
-				onClick={() => !isSelectionMode && onFileClick?.(file)}
+				onClick={() => canSelect || onFileClick?.(file)}
 			>
-				{isSelectionMode && (
+				{canSelect && (
 					<Checkbox
 						checked={isSelected}
 						onCheckedChange={() => onToggleSelect?.(file.path)}
 						onClick={(e) => e.stopPropagation()}
 					/>
 				)}
-				{!isSelectionMode && <span className="w-4 shrink-0" />}
+				{!canSelect && <span className="w-4 shrink-0" />}
 				<FileCode
 					className={cn(
 						"h-4 w-4 shrink-0",
@@ -280,7 +280,6 @@ export function DiffViewDialog({
 
 	const hasFiles = worktreeDiff?.files && worktreeDiff.files.length > 0;
 	const isEditMode = !!editingFile && !selectedPaths.size;
-	const isSelectionMode = selectedPaths.size > 0;
 
 	const handleFileClick = useCallback((file: WorktreeDiffFile) => {
 		setSelectedFile(file);
@@ -304,9 +303,15 @@ export function DiffViewDialog({
 
 	const handleEditFile = useCallback(
 		async (file: WorktreeDiffFile) => {
-			if (!worktreePath) return;
+			if (!worktreePath) {
+				console.error("[DiffViewDialog] No worktreePath provided to edit file");
+				return;
+			}
 			const api = (globalThis as any).electron;
-			if (!api?.worktreeReadFile) return;
+			if (!api?.worktreeReadFile) {
+				console.error("[DiffViewDialog] electron.worktreeReadFile not available");
+				return;
+			}
 			setEditingFile(file);
 			setIsLoadingEdit(true);
 			try {
@@ -316,7 +321,11 @@ export function DiffViewDialog({
 				);
 				if (result.success) {
 					setEditContent(result.data);
+				} else {
+					console.error("[DiffViewDialog] Failed to read file:", result);
 				}
+			} catch (error) {
+				console.error("[DiffViewDialog] Error reading file:", error);
 			} finally {
 				setIsLoadingEdit(false);
 			}
@@ -326,11 +335,19 @@ export function DiffViewDialog({
 
 	const handleSaveEdit = useCallback(async () => {
 		if (!editingFile || !worktreePath || !onRefresh) {
+			console.error("[DiffViewDialog] Missing required params for save:", {
+				hasEditingFile: !!editingFile,
+				hasWorktreePath: !!worktreePath,
+				hasOnRefresh: !!onRefresh,
+			});
 			return;
 		}
 
 		const api = (globalThis as any).electron;
-		if (!api?.worktreeWriteFile) return;
+		if (!api?.worktreeWriteFile) {
+			console.error("[DiffViewDialog] electron.worktreeWriteFile not available");
+			return;
+		}
 
 		setIsSavingEdit(true);
 		try {
@@ -343,7 +360,11 @@ export function DiffViewDialog({
 				setEditingFile(null);
 				setEditContent("");
 				onRefresh();
+			} else {
+				console.error("[DiffViewDialog] Failed to save file:", result);
 			}
+		} catch (error) {
+			console.error("[DiffViewDialog] Error saving file:", error);
 		} finally {
 			setIsSavingEdit(false);
 		}
@@ -356,11 +377,19 @@ export function DiffViewDialog({
 
 	const handleDeleteSelected = useCallback(async () => {
 		if (selectedPaths.size === 0 || !worktreePath || !onRefresh) {
+			console.error("[DiffViewDialog] Missing required params for delete:", {
+				hasSelectedPaths: selectedPaths.size > 0,
+				hasWorktreePath: !!worktreePath,
+				hasOnRefresh: !!onRefresh,
+			});
 			return;
 		}
 
 		const api = (globalThis as any).electron;
-		if (!api?.worktreeDeleteFiles) return;
+		if (!api?.worktreeDeleteFiles) {
+			console.error("[DiffViewDialog] electron.worktreeDeleteFiles not available");
+			return;
+		}
 
 		setIsDeletingSelected(true);
 		try {
@@ -371,7 +400,11 @@ export function DiffViewDialog({
 			if (result.success) {
 				setSelectedPaths(new Set());
 				onRefresh();
+			} else {
+				console.error("[DiffViewDialog] Failed to delete files:", result);
 			}
+		} catch (error) {
+			console.error("[DiffViewDialog] Error deleting files:", error);
 		} finally {
 			setIsDeletingSelected(false);
 		}
@@ -379,11 +412,19 @@ export function DiffViewDialog({
 
 	const handleAddFile = useCallback(async () => {
 		if (!newFilePath || !worktreePath || !onRefresh) {
+			console.error("[DiffViewDialog] Missing required params for add file:", {
+				hasNewFilePath: !!newFilePath,
+				hasWorktreePath: !!worktreePath,
+				hasOnRefresh: !!onRefresh,
+			});
 			return;
 		}
 
 		const api = (globalThis as any).electron;
-		if (!api?.worktreeWriteFile) return;
+		if (!api?.worktreeWriteFile) {
+			console.error("[DiffViewDialog] electron.worktreeWriteFile not available");
+			return;
+		}
 
 		setIsSavingNewFile(true);
 		try {
@@ -397,7 +438,11 @@ export function DiffViewDialog({
 				setNewFilePath("");
 				setNewFileContent("");
 				onRefresh();
+			} else {
+				console.error("[DiffViewDialog] Failed to add file:", result);
 			}
+		} catch (error) {
+			console.error("[DiffViewDialog] Error adding file:", error);
 		} finally {
 			setIsSavingNewFile(false);
 		}
@@ -493,13 +538,9 @@ export function DiffViewDialog({
 							>
 								<div
 									className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
-									onClick={() =>
-										isSelectionMode
-											? handleToggleSelect(file.path)
-											: handleFileClick(file)
-									}
+									onClick={() => handleFileClick(file)}
 								>
-									{isSelectionMode && (
+									{worktreePath && (
 										<Checkbox
 											checked={isSelected}
 											onCheckedChange={() =>
@@ -508,7 +549,7 @@ export function DiffViewDialog({
 											onClick={(e) => e.stopPropagation()}
 										/>
 									)}
-									{!isSelectionMode && <span className="w-4 shrink-0" />}
+									{!worktreePath && <span className="w-4 shrink-0" />}
 									<FileCode
 										className={cn(
 											"h-4 w-4 shrink-0",
@@ -546,7 +587,7 @@ export function DiffViewDialog({
 									<span className="text-xs text-destructive">
 										-{file.deletions}
 									</span>
-									{!isSelectionMode && worktreePath && (
+									{worktreePath && selectedPaths.size === 0 && (
 										<Button
 											size="sm"
 											variant="ghost"
@@ -579,7 +620,7 @@ export function DiffViewDialog({
 						onFileClick={handleFileClick}
 						selectedPaths={selectedPaths}
 						onToggleSelect={handleToggleSelect}
-						isSelectionMode={isSelectionMode}
+						canSelect={!!worktreePath}
 					/>
 				))}
 			</div>
@@ -641,7 +682,7 @@ export function DiffViewDialog({
 
 						{!selectedFile && !editingFile && !showAddFile && hasFiles && (
 							<div className="flex items-center gap-2">
-								{isSelectionMode && (
+								{selectedPaths.size > 0 && (
 									<span className="text-sm text-muted-foreground">
 										{selectedPaths.size} {t("taskReview:diff.filesSelected")}
 									</span>
@@ -649,7 +690,7 @@ export function DiffViewDialog({
 								<Select
 									value={viewMode}
 									onValueChange={(v) => setViewMode(v as ViewMode)}
-									disabled={isSelectionMode}
+									disabled={selectedPaths.size > 0}
 								>
 									<SelectTrigger className="w-[140px] h-8 text-xs">
 										<SelectValue />
@@ -681,7 +722,7 @@ export function DiffViewDialog({
 					{renderContent()}
 				</div>
 
-				{isSelectionMode && (
+				{selectedPaths.size > 0 && (
 					<div className="border-t pt-4 flex items-center justify-between bg-secondary/50 -mx-6 px-6 py-4 rounded-b-lg">
 						<span className="text-sm font-medium">
 							{selectedPaths.size} {t("taskReview:diff.filesSelected")}
@@ -743,7 +784,7 @@ export function DiffViewDialog({
 					)}
 					{!editingFile && !showAddFile && (
 						<>
-							{worktreePath && !isSelectionMode && (
+							{worktreePath && selectedPaths.size === 0 && (
 								<Button
 									variant="outline"
 									size="sm"
