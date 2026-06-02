@@ -274,13 +274,22 @@ export function DiffViewDialog({
 	const [newFilePath, setNewFilePath] = useState("");
 	const [newFileContent, setNewFileContent] = useState("");
 	const [isSavingNewFile, setIsSavingNewFile] = useState(false);
+	const [localHiddenFiles, setLocalHiddenFiles] = useState<Set<string>>(new Set());
 
-	const tree = useMemo(
-		() => (worktreeDiff?.files ? buildFileTree(worktreeDiff.files) : []),
-		[worktreeDiff?.files],
+	const filteredFiles = useMemo(
+		() =>
+			worktreeDiff?.files?.filter(
+				(file) => !localHiddenFiles.has(file.path),
+			) || [],
+		[worktreeDiff?.files, localHiddenFiles],
 	);
 
-	const hasFiles = worktreeDiff?.files && worktreeDiff.files.length > 0;
+	const tree = useMemo(
+		() => (filteredFiles.length > 0 ? buildFileTree(filteredFiles) : []),
+		[filteredFiles],
+	);
+
+	const hasFiles = filteredFiles.length > 0;
 	const isEditMode = !!editingFile && !selectedPaths.size;
 
 	const handleFileClick = useCallback((file: WorktreeDiffFile) => {
@@ -304,13 +313,13 @@ export function DiffViewDialog({
 	}, []);
 
 	const handleSelectAll = useCallback(() => {
-		if (!worktreeDiff?.files) return;
-		if (selectedPaths.size === worktreeDiff.files.length) {
+		if (filteredFiles.length === 0) return;
+		if (selectedPaths.size === filteredFiles.length) {
 			setSelectedPaths(new Set());
 		} else {
-			setSelectedPaths(new Set(worktreeDiff.files.map((f) => f.path)));
+			setSelectedPaths(new Set(filteredFiles.map((f) => f.path)));
 		}
-	}, [worktreeDiff?.files, selectedPaths.size]);
+	}, [filteredFiles, selectedPaths.size]);
 
 	const handleEditFile = useCallback(
 		async (file: WorktreeDiffFile) => {
@@ -421,8 +430,10 @@ export function DiffViewDialog({
 			if (result.success) {
 				toast({
 					title: "Success",
-					description: `${result.data.deleted.length} file(s) deleted`,
+					description: `${result.data.deleted.length} file(s) discarded`,
 				});
+				// Immediately hide deleted files from view while we refresh
+				setLocalHiddenFiles(new Set([...localHiddenFiles, ...result.data.deleted]));
 				setSelectedPaths(new Set());
 				// Force refresh to update the list
 				await onRefresh();
@@ -443,7 +454,7 @@ export function DiffViewDialog({
 		} finally {
 			setIsDeletingSelected(false);
 		}
-	}, [selectedPaths, worktreePath, onRefresh, toast, t]);
+	}, [selectedPaths, worktreePath, onRefresh, toast, t, localHiddenFiles]);
 
 	const handleAddFile = useCallback(async () => {
 		if (!newFilePath || !worktreePath || !onRefresh) {
@@ -563,18 +574,18 @@ export function DiffViewDialog({
 					{worktreePath && hasFiles && (
 						<div className="flex items-center gap-2 p-2 pb-0">
 							<Checkbox
-								checked={selectedPaths.size === worktreeDiff?.files?.length}
+								checked={selectedPaths.size === filteredFiles.length}
 								onCheckedChange={handleSelectAll}
 							/>
 							<span className="text-sm font-medium">
 								{t("taskReview:diff.selectAll")}
 								{selectedPaths.size > 0 &&
-									selectedPaths.size < worktreeDiff?.files?.length &&
+									selectedPaths.size < filteredFiles.length &&
 									` (${selectedPaths.size} selected)`}
 							</span>
 						</div>
 					)}
-					{worktreeDiff?.files.map((file, idx) => {
+					{filteredFiles.map((file, idx) => {
 						const isSelected = selectedPaths.has(file.path);
 						return (
 							// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
