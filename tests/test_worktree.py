@@ -335,6 +335,47 @@ class TestWorktreeRemoval:
         )
         assert branch_name not in result.stdout
 
+    def test_remove_worktree_with_uncommitted_changes_raises_error(self, temp_git_repo: Path):
+        """Removing worktree with uncommitted changes raises RuntimeError."""
+        manager = WorktreeManager(temp_git_repo)
+        manager.setup()
+        info = manager.create_worktree("test-spec")
+
+        # Create an uncommitted change in the worktree
+        (info.path / "new-file.txt").write_text("uncommitted content")
+
+        # Should raise RuntimeError instead of silently deleting
+        with pytest.raises(RuntimeError) as exc_info:
+            manager.remove_worktree("test-spec")
+
+        assert "uncommitted" in str(exc_info.value).lower()
+        assert "new-file.txt" in str(exc_info.value)
+        # Worktree should still exist
+        assert info.path.exists()
+
+    def test_remove_worktree_after_committing_changes(self, temp_git_repo: Path):
+        """Can remove worktree after committing changes."""
+        manager = WorktreeManager(temp_git_repo)
+        manager.setup()
+        info = manager.create_worktree("test-spec")
+
+        # Create and commit a change in the worktree
+        (info.path / "new-file.txt").write_text("committed content")
+        subprocess.run(
+            ["git", "add", "."],
+            cwd=info.path,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Test commit"],
+            cwd=info.path,
+            capture_output=True,
+        )
+
+        # Should remove successfully now
+        manager.remove_worktree("test-spec")
+        assert not info.path.exists()
+
 
 class TestWorktreeCommitAndMerge:
     """Tests for commit and merge operations."""
@@ -521,6 +562,47 @@ class TestWorktreeCommitAndMerge:
         assert branch_name not in branch_list_result.stdout, (
             f"Branch {branch_name} should be deleted"
         )
+
+    def test_merge_with_delete_after_but_uncommitted_changes(self, temp_git_repo: Path):
+        """merge_worktree with delete_after=True preserves worktree if it has uncommitted changes."""
+        manager = WorktreeManager(temp_git_repo)
+        manager.setup()
+
+        # Create a worktree with changes
+        worker_info = manager.create_worktree("worker-spec")
+        (worker_info.path / "worker-file.txt").write_text("worker content")
+        add_result = subprocess.run(
+            ["git", "add", "."], cwd=worker_info.path, capture_output=True
+        )
+        assert add_result.returncode == 0, f"git add failed: {add_result.stderr}"
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", "Worker commit"],
+            cwd=worker_info.path,
+            capture_output=True,
+        )
+        assert commit_result.returncode == 0, (
+            f"git commit failed: {commit_result.stderr}"
+        )
+
+        # First merge succeeds
+        result = manager.merge_worktree("worker-spec", delete_after=False)
+        assert result is True
+
+        # Now create an uncommitted change in the worktree
+        (worker_info.path / "uncommitted.txt").write_text("uncommitted content")
+
+        # Second merge with delete_after=True should succeed but NOT delete worktree
+        # because it has uncommitted changes
+        result = manager.merge_worktree("worker-spec", delete_after=True)
+        assert result is True
+
+        # Worktree should STILL exist (not deleted)
+        assert worker_info.path.exists(), (
+            "Worktree should be preserved because it has uncommitted changes"
+        )
+
+        # But the uncommitted file should still be there
+        assert (worker_info.path / "uncommitted.txt").exists()
 
     def test_merge_worktree_conflict_detection(self, temp_git_repo: Path):
         """merge_worktree correctly detects and handles merge conflicts."""

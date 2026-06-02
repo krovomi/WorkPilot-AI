@@ -829,6 +829,44 @@ class WorktreeManager:
 
         return self.create_worktree(spec_name)
 
+    def _has_uncommitted_changes(self, spec_name: str) -> tuple[bool, list[str]]:
+        """
+        Check if a worktree has uncommitted changes.
+
+        Args:
+            spec_name: The spec folder name
+
+        Returns:
+            Tuple of (has_changes: bool, file_list: list[str])
+        """
+        worktree_path = self.get_worktree_path(spec_name)
+        if not worktree_path.exists():
+            return False, []
+
+        # Check for modified/untracked files in the worktree
+        result = self._run_git(
+            ["status", "--porcelain"],
+            cwd=worktree_path,
+        )
+
+        if result.returncode != 0:
+            return False, []
+
+        if not result.stdout.strip():
+            return False, []
+
+        # Parse status output: each line is <status> <filename>
+        # M = modified, A = added, ? = untracked, etc.
+        changed_files = []
+        for line in result.stdout.strip().split("\n"):
+            if line.strip():
+                # Extract filename (after the status indicator and space)
+                parts = line.split(None, 1)
+                if len(parts) >= 2:
+                    changed_files.append(parts[1])
+
+        return len(changed_files) > 0, changed_files
+
     def remove_worktree(self, spec_name: str, delete_branch: bool = False) -> None:
         """
         Remove a spec's worktree.
@@ -836,9 +874,30 @@ class WorktreeManager:
         Args:
             spec_name: The spec folder name
             delete_branch: Whether to also delete the branch
+
+        Raises:
+            RuntimeError: If the worktree has uncommitted changes
         """
         worktree_path = self.get_worktree_path(spec_name)
         branch_name = self.get_branch_name(spec_name)
+
+        # Check for uncommitted changes before removing
+        has_changes, changed_files = self._has_uncommitted_changes(spec_name)
+        if has_changes:
+            error_msg = (
+                f"Cannot remove worktree for '{spec_name}': "
+                f"has {len(changed_files)} uncommitted file(s):\n"
+            )
+            for file in changed_files[:10]:  # Show first 10 files
+                error_msg += f"  - {file}\n"
+            if len(changed_files) > 10:
+                error_msg += f"  ... and {len(changed_files) - 10} more\n"
+            error_msg += (
+                "\nPlease commit or stash these changes before removing the worktree.\n"
+                f"In the worktree, run: git add . && git commit -m 'Save changes'\n"
+                f"Or use: git stash"
+            )
+            raise RuntimeError(error_msg)
 
         if worktree_path.exists():
             result = self._run_git(
@@ -954,7 +1013,18 @@ class WorktreeManager:
             print(f"Successfully merged {info.branch}")
 
         if delete_after:
-            self.remove_worktree(spec_name, delete_branch=True)
+            try:
+                self.remove_worktree(spec_name, delete_branch=True)
+            except RuntimeError as e:
+                # Worktree has uncommitted changes - log but don't fail merge
+                print()
+                print("WARNING: Worktree cleanup failed")
+                print(str(e))
+                print()
+                print(
+                    "The merge completed successfully, but the worktree still has "
+                    "uncommitted changes and was not removed."
+                )
 
         return True
 
