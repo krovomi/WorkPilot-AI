@@ -4072,10 +4072,25 @@ export function registerWorktreeHandlers(
 						continue;
 					}
 
-					// Discard changes using git checkout
-					await execAsync(`git checkout HEAD -- "${relativePath}"`, {
-						cwd: resolvedWorktree,
-					});
+					// Discard changes: restore tracked files, remove untracked files
+					try {
+						await execAsync(`git restore "${relativePath}"`, {
+							cwd: resolvedWorktree,
+						});
+					} catch (restoreError) {
+						// If restore fails, try to remove as untracked file
+						const gitStatusResult = await execAsync(
+							`git ls-files "${relativePath}"`,
+							{ cwd: resolvedWorktree },
+						);
+						if (!gitStatusResult.stdout.trim()) {
+							// File is untracked, remove it
+							await fsPromises.unlink(resolved);
+						} else {
+							// File is tracked, restore failed for another reason
+							throw restoreError;
+						}
+					}
 					deleted.push(relativePath);
 				} catch (error) {
 					console.error(
