@@ -4065,9 +4065,11 @@ export function registerWorktreeHandlers(
 				try {
 					const fullPath = path.join(resolvedWorktree, relativePath);
 					const resolved = path.resolve(fullPath);
+					const normalizedWorktree = path.normalize(resolvedWorktree);
 
 					// Security: ensure the resolved path is still inside the worktree
-					if (!resolved.startsWith(resolvedWorktree)) {
+					const normalizedResolved = path.normalize(resolved);
+					if (!normalizedResolved.startsWith(normalizedWorktree + path.sep) && normalizedResolved !== normalizedWorktree) {
 						failed.push(relativePath);
 						continue;
 					}
