@@ -2499,4 +2499,177 @@ print(json.dumps(result))
 			return { success: true };
 		},
 	);
+
+	/**
+	 * Pause task execution
+	 * Saves current state so execution can resume later
+	 */
+	ipcMain.handle(
+		"TASK_PAUSE",
+		async (
+			_,
+			taskId: string,
+			subtaskId?: string,
+		): Promise<IPCResult> => {
+			try {
+				const { task, project } = findTaskAndProject(taskId);
+				if (!task || !project) {
+					return { success: false, error: "Task not found" };
+				}
+
+				const planPath = getPlanPath(project, task);
+				if (!existsSync(planPath)) {
+					return { success: false, error: "Implementation plan not found" };
+				}
+
+				const planContent = readFileSync(planPath, "utf-8");
+				const plan = JSON.parse(planContent);
+
+				// Update pause state
+				plan.paused = {
+					enabled: true,
+					paused_at: new Date().toISOString(),
+					paused_subtask_id: subtaskId || null,
+					provider: task.metadata?.provider || "anthropic",
+					model: task.metadata?.model || "claude-opus-4-7",
+				};
+
+				writeFileSync(planPath, JSON.stringify(plan, null, 2));
+				appLog.info(`[TASK_PAUSE] Task ${taskId} paused at subtask ${subtaskId || "none"}`);
+
+				return {
+					success: true,
+					data: { taskId, paused: true, pausedAt: plan.paused.paused_at },
+				};
+			} catch (error) {
+				appLog.error("[TASK_PAUSE] Error:", error);
+				return { success: false, error: String(error) };
+			}
+		},
+	);
+
+	/**
+	 * Resume task execution
+	 * Continues from the paused checkpoint
+	 */
+	ipcMain.handle(
+		"TASK_RESUME",
+		async (_, taskId: string): Promise<IPCResult> => {
+			try {
+				const { task, project } = findTaskAndProject(taskId);
+				if (!task || !project) {
+					return { success: false, error: "Task not found" };
+				}
+
+				const planPath = getPlanPath(project, task);
+				if (!existsSync(planPath)) {
+					return { success: false, error: "Implementation plan not found" };
+				}
+
+				const planContent = readFileSync(planPath, "utf-8");
+				const plan = JSON.parse(planContent);
+
+				// Clear pause state
+				plan.paused = {
+					enabled: false,
+					paused_at: null,
+					paused_subtask_id: null,
+					provider: plan.paused?.provider || "anthropic",
+					model: plan.paused?.model || "claude-opus-4-7",
+				};
+
+				writeFileSync(planPath, JSON.stringify(plan, null, 2));
+				appLog.info(`[TASK_RESUME] Task ${taskId} resumed`);
+
+				// Start execution from pause checkpoint
+				const projectProvider = project.settings?.provider ?? "anthropic";
+				const baseBranch = task.metadata?.baseBranch || project.settings?.mainBranch;
+
+				agentManager.startTaskExecution(
+					taskId,
+					project.path,
+					task.specId,
+					{
+						parallel: false,
+						workers: 1,
+						baseBranch,
+						useWorktree: task.metadata?.useWorktree,
+						useLocalBranch: task.metadata?.useLocalBranch,
+					},
+					project.id,
+				);
+
+				return {
+					success: true,
+					data: { taskId, resumed: true },
+				};
+			} catch (error) {
+				appLog.error("[TASK_RESUME] Error:", error);
+				return { success: false, error: String(error) };
+			}
+		},
+	);
+
+	/**
+	 * Switch LLM provider for a paused task
+	 * Changes the provider before resuming
+	 */
+	ipcMain.handle(
+		"TASK_SWITCH_PROVIDER",
+		async (
+			_,
+			taskId: string,
+			provider: string,
+			model: string,
+		): Promise<IPCResult> => {
+			try {
+				const { task, project } = findTaskAndProject(taskId);
+				if (!task || !project) {
+					return { success: false, error: "Task not found" };
+				}
+
+				const planPath = getPlanPath(project, task);
+				if (!existsSync(planPath)) {
+					return { success: false, error: "Implementation plan not found" };
+				}
+
+				const planContent = readFileSync(planPath, "utf-8");
+				const plan = JSON.parse(planContent);
+
+				// Update provider in pause state
+				if (!plan.paused) {
+					plan.paused = {
+						enabled: true,
+						paused_at: new Date().toISOString(),
+						paused_subtask_id: null,
+					};
+				}
+
+				const oldProvider = plan.paused.provider;
+				plan.paused.provider = provider;
+				plan.paused.model = model;
+
+				// Also update task metadata
+				if (!task.metadata) task.metadata = {};
+				task.metadata.provider = provider;
+				task.metadata.model = model;
+
+				writeFileSync(planPath, JSON.stringify(plan, null, 2));
+				appLog.info(`[TASK_SWITCH_PROVIDER] Switched from ${oldProvider} to ${provider}`);
+
+				return {
+					success: true,
+					data: {
+						taskId,
+						provider,
+						model,
+						message: `Switched provider from ${oldProvider} to ${provider}`,
+					},
+				};
+			} catch (error) {
+				appLog.error("[TASK_SWITCH_PROVIDER] Error:", error);
+				return { success: false, error: String(error) };
+			}
+		},
+	);
 }
