@@ -475,7 +475,9 @@
 			"close": "Fermer",
 			"watchLive": "Regarder en direct",
 			"activating": "Activation...",
-			"syncFromBranch": "Synchroniser depuis une branche"
+			"syncFromBranch": "Synchroniser depuis une branche",
+			"taskControls": "Contrôles de la tâche",
+			"taskIsPaused": "Tâche en pause"
 		},
 		"badges": {
 			"stuck": "Bloqué",

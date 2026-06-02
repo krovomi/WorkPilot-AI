@@ -116,7 +116,7 @@ export function TaskPauseControls({
 	return (
 		<div className="space-y-4 p-4 border rounded-lg bg-muted/20">
 			<div className="text-sm font-medium">
-				{isPaused ? "Task is paused" : "Task controls"}
+				{isPaused ? t("tasks:modal.actions.taskIsPaused") : t("tasks:modal.actions.taskControls")}
 			</div>
 
 			{!isPaused && (

@@ -733,36 +733,6 @@ function TaskDetailModalContent({
 							)}
 						</div>
 
-						{/* Pause/Resume Controls */}
-						<TaskPauseControls
-							task={task}
-							isPaused={task.metadata?.paused?.enabled}
-							onPause={async (subtaskId) => {
-								await pauseTask(task.id, subtaskId);
-							}}
-							onResume={async () => {
-								await resumeTask(task.id);
-								await handleStartStop();
-							}}
-							onSwitchProvider={async (provider, model) => {
-								await switchTaskProvider(task.id, provider, model);
-								// Update local task metadata
-								const updatedTask = {
-									...task,
-									metadata: {
-										...task.metadata,
-										provider,
-										model,
-									},
-								};
-								useTaskStore.setState((state) => ({
-									tasks: state.tasks.map((t) =>
-										t.id === task.id ? updatedTask : t
-									),
-								}));
-							}}
-						/>
-
 						{/* Body - Single Column with Tabs */}
 						<div className="flex-1 min-h-0 overflow-hidden">
 							<Tabs
@@ -898,23 +868,60 @@ function TaskDetailModalContent({
 							</Tabs>
 						</div>
 
-						{/* Footer - Actions */}
-						<div className="flex items-center gap-3 px-5 py-3 border-t border-border shrink-0">
-							<Button
-								variant="ghost"
-								size="sm"
-								className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-								onClick={() => state.setShowDeleteDialog(true)}
-								disabled={state.isRunning && !state.isStuck}
-							>
-								<Trash2 className="mr-2 h-4 w-4" />
-								{t("tasks:modal.actions.deleteTask")}
-							</Button>
-							<div className="flex-1" />
-							{renderPrimaryAction()}
-							<Button variant="outline" onClick={handleClose}>
-								{t("tasks:modal.actions.close")}
-							</Button>
+						{/* Footer */}
+						<div className="border-t border-border shrink-0">
+							{/* Pause/Resume Controls - shown at bottom when paused or running */}
+							{(task.metadata?.paused?.enabled || (state.isRunning && !state.isStuck)) && (
+								<div className="px-5 py-3 border-b border-border">
+									<TaskPauseControls
+										task={task}
+										isPaused={task.metadata?.paused?.enabled}
+										onPause={async (subtaskId) => {
+											await pauseTask(task.id, subtaskId);
+										}}
+										onResume={async () => {
+											await resumeTask(task.id);
+											await handleStartStop();
+										}}
+										onSwitchProvider={async (provider, model) => {
+											await switchTaskProvider(task.id, provider, model);
+											// Update local task metadata
+											const updatedTask = {
+												...task,
+												metadata: {
+													...task.metadata,
+													provider,
+													model,
+												},
+											};
+											useTaskStore.setState((state) => ({
+												tasks: state.tasks.map((t) =>
+													t.id === task.id ? updatedTask : t
+												),
+											}));
+										}}
+									/>
+								</div>
+							)}
+
+							{/* Action buttons */}
+							<div className="flex items-center gap-3 px-5 py-3">
+								<Button
+									variant="ghost"
+									size="sm"
+									className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+									onClick={() => state.setShowDeleteDialog(true)}
+									disabled={state.isRunning && !state.isStuck}
+								>
+									<Trash2 className="mr-2 h-4 w-4" />
+									{t("tasks:modal.actions.deleteTask")}
+								</Button>
+								<div className="flex-1" />
+								{renderPrimaryAction()}
+								<Button variant="outline" onClick={handleClose}>
+									{t("tasks:modal.actions.close")}
+								</Button>
+							</div>
 						</div>
 					</DialogPrimitive.Content>
 				</DialogPrimitive.Portal>

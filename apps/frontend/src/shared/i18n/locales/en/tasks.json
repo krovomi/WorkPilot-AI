@@ -475,7 +475,9 @@
 			"close": "Close",
 			"watchLive": "Watch Live",
 			"activating": "Activating...",
-			"syncFromBranch": "Sync from branch"
+			"syncFromBranch": "Sync from branch",
+			"taskControls": "Task controls",
+			"taskIsPaused": "Task is paused"
 		},
 		"badges": {
 			"stuck": "Stuck",
