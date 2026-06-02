@@ -13,6 +13,7 @@ import {
 	Monitor,
 	MoreVertical,
 	Palette,
+	Pause,
 	Play,
 	RotateCcw,
 	Shield,
@@ -55,9 +56,12 @@ import {
 	checkTaskRunning,
 	hasRecentActivity,
 	isIncompleteHumanReview,
+	pauseTask,
 	recoverStuckTask,
+	resumeTask,
 	startTask,
 	stopTask,
+	switchTaskProvider,
 	useTaskStore,
 } from "../stores/task-store";
 import { PhaseProgressIndicator } from "./PhaseProgressIndicator";
@@ -924,6 +928,16 @@ export const TaskCard = memo(function TaskCard({
 		}
 	};
 
+	const handlePause = async (e: React.MouseEvent) => {
+		e.stopPropagation();
+		await pauseTask(task.id);
+	};
+
+	const handleResume = async (e: React.MouseEvent) => {
+		e.stopPropagation();
+		await resumeTask(task.id);
+	};
+
 	const handleDelete = async (e: React.MouseEvent) => {
 		e.stopPropagation();
 		if (onDelete) {
@@ -1092,6 +1106,29 @@ export const TaskCard = memo(function TaskCard({
 							</div>
 
 							<div className="flex items-center gap-1.5">
+								{/* Pause/Resume button - always visible */}
+								{task.metadata?.paused?.enabled ? (
+									<Button
+										variant="outline"
+										size="sm"
+										className="h-7 w-7 p-0"
+										onClick={handleResume}
+										title={t("tooltips.resumeTask")}
+									>
+										<Play className="h-3.5 w-3.5" />
+									</Button>
+								) : (
+									<Button
+										variant="ghost"
+										size="sm"
+										className="h-7 w-7 p-0"
+										onClick={handlePause}
+										title={t("tooltips.pauseTask")}
+									>
+										<Pause className="h-3.5 w-3.5" />
+									</Button>
+								)}
+
 								<ActionButtons
 									isStuck={isStuck}
 									isRecovering={isRecovering}

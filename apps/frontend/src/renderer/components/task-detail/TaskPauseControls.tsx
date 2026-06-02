@@ -113,13 +113,6 @@ export function TaskPauseControls({
 		}
 	}, [selectedProvider, selectedModel, onSwitchProvider, toast]);
 
-	// Only show pause/resume controls during execution or when paused
-	const isExecuting = task.status === "in_progress" || isPaused;
-
-	if (!isExecuting) {
-		return null;
-	}
-
 	return (
 		<div className="space-y-4 p-4 border rounded-lg bg-muted/20">
 			<div className="text-sm font-medium">

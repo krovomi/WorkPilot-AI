@@ -304,6 +304,15 @@ export interface TaskMetadata {
 	useWorktree?: boolean; // If false, use direct mode (no worktree isolation) - default is true for safety
 	useLocalBranch?: boolean; // If true, use the local branch directly instead of preferring origin/branch (preserves gitignored files)
 
+	// Pause/Resume state (from implementation_plan.json)
+	paused?: {
+		enabled: boolean;
+		paused_at: string | null;
+		paused_subtask_id: string | null;
+		provider?: string;
+		model?: string;
+	};
+
 	// Archive status
 	archivedAt?: string; // ISO date when task was archived
 	archivedInVersion?: string; // Version in which task was archived (from changelog)

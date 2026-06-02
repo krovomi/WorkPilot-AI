@@ -739,7 +739,6 @@ function TaskDetailModalContent({
 							isPaused={task.metadata?.paused?.enabled}
 							onPause={async (subtaskId) => {
 								await pauseTask(task.id, subtaskId);
-								state.setIsRunning(false);
 							}}
 							onResume={async () => {
 								await resumeTask(task.id);

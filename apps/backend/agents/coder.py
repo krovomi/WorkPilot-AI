@@ -885,7 +885,8 @@ async def run_autonomous_agent(
             logger.debug(f"Loop detection check skipped: {exc}")
 
         # Check for pause state in implementation plan
-        from .utils import is_paused, get_pause_state
+        from .utils import get_pause_state, is_paused
+
         plan = load_implementation_plan(spec_dir)
         if plan and is_paused(plan):
             pause_state = get_pause_state(plan)
@@ -895,7 +896,11 @@ async def run_autonomous_agent(
             if pause_state.get("paused_subtask_id"):
                 print(muted(f"Paused subtask: {pause_state.get('paused_subtask_id')}"))
             if pause_state.get("provider"):
-                print(muted(f"Provider: {pause_state.get('provider')} ({pause_state.get('model')})"))
+                print(
+                    muted(
+                        f"Provider: {pause_state.get('provider')} ({pause_state.get('model')})"
+                    )
+                )
 
             # Check if provider has changed since pause
             if pause_state.get("provider") and pause_state.get("provider") != model:
@@ -1032,15 +1037,30 @@ async def run_autonomous_agent(
             if not next_subtask:
                 plan = load_implementation_plan(spec_dir)
                 if plan:
-                    print(muted(f"[DEBUG] Scanning {len(plan.get('phases', []))} phases for manual tasks"))
+                    print(
+                        muted(
+                            f"[DEBUG] Scanning {len(plan.get('phases', []))} phases for manual tasks"
+                        )
+                    )
                     for phase in plan.get("phases", []):
-                        print(muted(f"  Phase '{phase.get('name')}': {len(phase.get('subtasks', []))} subtasks"))
+                        print(
+                            muted(
+                                f"  Phase '{phase.get('name')}': {len(phase.get('subtasks', []))} subtasks"
+                            )
+                        )
                         for subtask in phase.get("subtasks", []):
                             status = subtask.get("status")
                             verification = subtask.get("verification", {})
-                            print(muted(f"    - {subtask.get('id')}: status={status}, verification={verification.get('type')}"))
+                            print(
+                                muted(
+                                    f"    - {subtask.get('id')}: status={status}, verification={verification.get('type')}"
+                                )
+                            )
                             # Check for manual verification tasks in pending or blocked state
-                            if status in ("pending", "blocked") and verification.get("type") == "manual":
+                            if (
+                                status in ("pending", "blocked")
+                                and verification.get("type") == "manual"
+                            ):
                                 # Found a manual verification task - treat it as next
                                 next_subtask = {
                                     **subtask,
