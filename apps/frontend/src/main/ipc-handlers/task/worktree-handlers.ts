@@ -2466,14 +2466,54 @@ export function registerWorktreeHandlers(
 					console.error("Error getting diff:", diffError);
 				}
 
+				// Load and apply discard list filter
+				const discardListPath = path.join(
+					worktreePath,
+					".workpilot-discard-list",
+				);
+				let discardedFiles: string[] = [];
+				try {
+					const content = await fsPromises.readFile(
+						discardListPath,
+						"utf-8",
+					);
+					discardedFiles = content
+						.split("\n")
+						.map((line) => line.trim())
+						.filter((line) => line && !line.startsWith("#"));
+					if (discardedFiles.length > 0) {
+						console.log(
+							`[TASK_WORKTREE_DIFF] Loaded ${discardedFiles.length} discarded files from .workpilot-discard-list`,
+						);
+					}
+				} catch {
+					// File doesn't exist yet - no discarded files
+				}
+
+				// Filter out discarded files from the diff
+				const filteredFiles = files.filter(
+					(file) => !discardedFiles.includes(file.path),
+				);
+				if (discardedFiles.length > 0) {
+					console.log(
+						`[TASK_WORKTREE_DIFF] Filtered from ${files.length} to ${filteredFiles.length} files`,
+					);
+				}
+
 				// Generate summary
-				const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0);
-				const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0);
-				const summary = `${files.length} files changed, ${totalAdditions} insertions(+), ${totalDeletions} deletions(-)`;
+				const totalAdditions = filteredFiles.reduce(
+					(sum, f) => sum + f.additions,
+					0,
+				);
+				const totalDeletions = filteredFiles.reduce(
+					(sum, f) => sum + f.deletions,
+					0,
+				);
+				const summary = `${filteredFiles.length} files changed, ${totalAdditions} insertions(+), ${totalDeletions} deletions(-)`;
 
 				return {
 					success: true,
-					data: { files, summary },
+					data: { files: filteredFiles, summary },
 				};
 			} catch (error) {
 				console.error("Failed to get worktree diff:", error);

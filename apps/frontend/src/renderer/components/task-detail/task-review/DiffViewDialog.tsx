@@ -274,14 +274,10 @@ export function DiffViewDialog({
 	const [newFilePath, setNewFilePath] = useState("");
 	const [newFileContent, setNewFileContent] = useState("");
 	const [isSavingNewFile, setIsSavingNewFile] = useState(false);
-	const [localHiddenFiles, setLocalHiddenFiles] = useState<Set<string>>(new Set());
 
 	const filteredFiles = useMemo(
-		() =>
-			worktreeDiff?.files?.filter(
-				(file) => !localHiddenFiles.has(file.path),
-			) || [],
-		[worktreeDiff?.files, localHiddenFiles],
+		() => worktreeDiff?.files || [],
+		[worktreeDiff?.files],
 	);
 
 	const tree = useMemo(
@@ -432,10 +428,8 @@ export function DiffViewDialog({
 					title: "Success",
 					description: `${result.data.deleted.length} file(s) discarded`,
 				});
-				// Immediately hide deleted files from view while we refresh
-				setLocalHiddenFiles(new Set([...localHiddenFiles, ...result.data.deleted]));
 				setSelectedPaths(new Set());
-				// Force refresh to update the list
+				// Force refresh to update the list with filtered files
 				await onRefresh();
 			} else {
 				toast({
@@ -454,7 +448,7 @@ export function DiffViewDialog({
 		} finally {
 			setIsDeletingSelected(false);
 		}
-	}, [selectedPaths, worktreePath, onRefresh, toast, t, localHiddenFiles]);
+	}, [selectedPaths, worktreePath, onRefresh, toast, t]);
 
 	const handleAddFile = useCallback(async () => {
 		if (!newFilePath || !worktreePath || !onRefresh) {
