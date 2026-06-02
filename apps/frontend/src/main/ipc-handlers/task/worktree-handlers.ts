@@ -2481,11 +2481,6 @@ export function registerWorktreeHandlers(
 						.split("\n")
 						.map((line) => line.trim())
 						.filter((line) => line && !line.startsWith("#"));
-					if (discardedFiles.length > 0) {
-						console.log(
-							`[TASK_WORKTREE_DIFF] Loaded ${discardedFiles.length} discarded files from .workpilot-discard-list`,
-						);
-					}
 				} catch {
 					// File doesn't exist yet - no discarded files
 				}
@@ -2494,11 +2489,6 @@ export function registerWorktreeHandlers(
 				const filteredFiles = files.filter(
 					(file) => !discardedFiles.includes(file.path),
 				);
-				if (discardedFiles.length > 0) {
-					console.log(
-						`[TASK_WORKTREE_DIFF] Filtered from ${files.length} to ${filteredFiles.length} files`,
-					);
-				}
 
 				// Generate summary
 				const totalAdditions = filteredFiles.reduce(
@@ -4185,9 +4175,6 @@ export function registerWorktreeHandlers(
 						.join("\n")
 						.concat("\n"),
 					"utf-8",
-				);
-				console.log(
-					`[WORKTREE_DISCARD] Wrote ${discardedFiles.length} files to discard list`,
 				);
 			}
 

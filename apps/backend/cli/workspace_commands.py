@@ -999,7 +999,7 @@ def handle_merge_preview_command(
                     discarded_files=discarded_files,
                 )
             except Exception as e:
-                warning(
+                debug(
                     MODULE,
                     f"Failed to load discard list: {e}",
                 )
