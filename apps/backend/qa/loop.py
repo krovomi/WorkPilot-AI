@@ -7,6 +7,7 @@ approval or max iterations.
 """
 
 import os
+import subprocess
 import time as time_module
 from pathlib import Path
 
@@ -51,6 +52,72 @@ from .reviewer import run_qa_agent_session
 # Configuration
 MAX_QA_ITERATIONS = 50
 MAX_CONSECUTIVE_ERRORS = 3  # Stop after 3 consecutive errors without progress
+
+
+async def _run_dotnet_tests(project_dir: Path) -> bool:
+    """
+    Attempt to run dotnet test on the project.
+
+    Returns:
+        True if tests were found and executed, False otherwise.
+    """
+    try:
+        # Search for test projects (*.csproj files with test frameworks)
+        test_projects = []
+        for csproj in project_dir.glob("**/*.csproj"):
+            try:
+                content = csproj.read_text(encoding="utf-8", errors="ignore")
+                if any(
+                    fw in content
+                    for fw in ["NUnit", "xunit", "MSTest", "Microsoft.NET.Test.Sdk"]
+                ):
+                    test_projects.append(csproj)
+            except OSError:
+                pass
+
+        if not test_projects:
+            return False
+
+        debug("qa_loop", f"Found {len(test_projects)} test project(s)")
+        print(f"   Found {len(test_projects)} test project(s)")
+
+        # Run dotnet test on each test project
+        for test_project in test_projects:
+            print(f"   Running tests in: {test_project.relative_to(project_dir)}")
+            try:
+                result = subprocess.run(
+                    ["dotnet", "test", str(test_project), "-c", "Debug"],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    cwd=str(project_dir),
+                )
+                if result.returncode == 0:
+                    print(f"      ✅ Tests passed")
+                    debug("qa_loop", f"dotnet test passed for {test_project.name}")
+                else:
+                    print(f"      ⚠️  Tests failed or no tests found")
+                    debug_warning(
+                        "qa_loop",
+                        f"dotnet test returned {result.returncode} for {test_project.name}",
+                    )
+                    if result.stdout:
+                        debug("qa_loop", f"stdout: {result.stdout[:500]}")
+                    if result.stderr:
+                        debug_error("qa_loop", f"stderr: {result.stderr[:500]}")
+            except FileNotFoundError:
+                debug_error("qa_loop", "dotnet CLI not found on PATH")
+                return False
+            except subprocess.TimeoutExpired:
+                debug_error("qa_loop", "dotnet test timed out after 300 seconds")
+                print(f"      ❌ Tests timed out")
+                return False
+
+        return True
+
+    except Exception as e:
+        debug_error("qa_loop", f"Error running dotnet tests: {e}")
+        return False
 
 
 async def _handle_rate_limit_in_qa(
@@ -259,12 +326,35 @@ async def run_qa_validation_loop(
         print(f"   ℹ️  Security scan skipped: {_sec_err}")
     # ── End Security Scan ─────────────────────────────────────────────────────
 
-    # Check for no-test projects
+    # Check for no-test projects and attempt .NET test execution
     if is_no_test_project(spec_dir, project_dir):
         print("\n⚠️  No test framework detected in project.")
-        print("Creating manual test plan...")
-        manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
-        print(f"📝 Manual test plan created: {manual_plan}")
+
+        # Check if this is a .NET project with test projects available
+        from core.dotnet_tools import detect_dotnet_project
+
+        if detect_dotnet_project(project_dir):
+            print("Detected .NET project — attempting to run dotnet test...")
+            try:
+                result = await _run_dotnet_tests(project_dir)
+                if result:
+                    print("✅ dotnet test executed successfully")
+                else:
+                    print("⚠️  dotnet test found no test projects")
+                    print("Creating manual test plan as fallback...")
+                    manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
+                    print(f"📝 Manual test plan created: {manual_plan}")
+            except Exception as e:
+                debug_error("qa_loop", f"dotnet test failed: {e}")
+                print(f"⚠️  dotnet test execution failed: {e}")
+                print("Creating manual test plan as fallback...")
+                manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
+                print(f"📝 Manual test plan created: {manual_plan}")
+        else:
+            print("Creating manual test plan...")
+            manual_plan = create_manual_test_plan(spec_dir, spec_dir.name)
+            print(f"📝 Manual test plan created: {manual_plan}")
+
         print("\nNote: Automated testing will be limited for this project.")
 
     # Start validation phase in task logger

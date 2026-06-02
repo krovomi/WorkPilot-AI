@@ -486,6 +486,32 @@ export async function createPlanIfNotExists(
 }
 
 /**
+ * Update plan phases and subtasks.
+ * This allows adding, modifying, or removing pending subtasks from the implementation plan.
+ *
+ * @param planPath - Path to the implementation_plan.json file
+ * @param phases - The updated phases array with potentially modified subtasks
+ * @param projectId - Optional project ID to invalidate cache
+ * @returns The updated plan, or null if the file doesn't exist
+ */
+export async function updatePlanSubtasks(
+	planPath: string,
+	phases: Array<Record<string, unknown>>,
+	projectId?: string,
+): Promise<Record<string, unknown> | null> {
+	return updatePlanFile(planPath, (plan) => {
+		plan.phases = phases;
+		return plan;
+	}).then((updatedPlan) => {
+		// Invalidate cache after successful update
+		if (updatedPlan && projectId) {
+			projectStore.invalidateTasksCache(projectId);
+		}
+		return updatedPlan;
+	});
+}
+
+/**
  * Update task_metadata.json to add PR URL.
  * This is a simple JSON file update (no locking needed as it's rarely updated concurrently).
  *

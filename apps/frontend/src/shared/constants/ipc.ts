@@ -32,6 +32,7 @@ export const IPC_CHANNELS = {
 	TASK_STOP: "task:stop",
 	TASK_REVIEW: "task:review",
 	TASK_UPDATE_STATUS: "task:updateStatus",
+	TASK_UPDATE_PLAN: "task:updatePlan", // Update plan phases and subtasks
 	TASK_RECOVER_STUCK: "task:recoverStuck",
 	TASK_CHECK_RUNNING: "task:checkRunning",
 	TASK_RESUME_PAUSED: "task:resumePaused", // Resume a rate-limited or auth-paused task

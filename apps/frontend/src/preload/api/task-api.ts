@@ -55,6 +55,10 @@ export interface TaskAPI {
 		status: TaskStatus,
 		options?: { forceCleanup?: boolean },
 	) => Promise<IPCResult & { worktreeExists?: boolean; worktreePath?: string }>;
+	updatePlanSubtasks: (
+		taskId: string,
+		phases: Array<Record<string, unknown>>,
+	) => Promise<IPCResult>;
 	recoverStuckTask: (
 		taskId: string,
 		options?: import("../../shared/types").TaskRecoveryOptions,
@@ -274,6 +278,12 @@ export const createTaskAPI = (): TaskAPI => ({
 			status,
 			options,
 		),
+
+	updatePlanSubtasks: (
+		taskId: string,
+		phases: Array<Record<string, unknown>>,
+	): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_UPDATE_PLAN, taskId, phases),
 
 	recoverStuckTask: (
 		taskId: string,

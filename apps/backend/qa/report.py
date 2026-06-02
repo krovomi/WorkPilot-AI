@@ -520,4 +520,20 @@ def is_no_test_project(spec_dir: Path, project_dir: Path) -> bool:
                 ):
                     return False
 
+    # Check for .NET test frameworks
+    for csproj in project_dir.glob("**/*.csproj"):
+        try:
+            content = csproj.read_text(encoding="utf-8", errors="ignore")
+            if any(
+                fw in content
+                for fw in ["NUnit", "xunit", "MSTest", "Microsoft.NET.Test.Sdk"]
+            ):
+                return False
+        except OSError:
+            pass
+
+    # Check for .sln (solution = likely has test projects)
+    if any(project_dir.glob("*.sln")):
+        return False
+
     return True

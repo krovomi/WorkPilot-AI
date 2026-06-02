@@ -54,6 +54,7 @@ import {
 	createPlanIfNotExists,
 	getPlanPath,
 	persistPlanStatus,
+	updatePlanSubtasks,
 } from "./plan-file-utils";
 import { findTaskAndProject } from "./shared";
 
@@ -2462,4 +2463,40 @@ print(json.dumps(result))
 			},
 		};
 	}
+
+	/**
+	 * Update plan phases and subtasks
+	 * Allows modifying pending subtasks or adding new ones
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_UPDATE_PLAN,
+		async (
+			_,
+			taskId: string,
+			phases: Array<Record<string, unknown>>,
+		): Promise<IPCResult> => {
+			const { task, project } = findTaskAndProject(taskId);
+			if (!task || !project) {
+				return { success: false, error: "Task not found" };
+			}
+
+			const planPath = getPlanPath(project, task);
+			const updatedPlan = await updatePlanSubtasks(
+				planPath,
+				phases,
+				project.id,
+			);
+
+			if (!updatedPlan) {
+				return {
+					success: false,
+					error:
+						"Failed to update plan - file may not exist or be corrupted",
+				};
+			}
+
+			appLog.info(`[TASK_UPDATE_PLAN] Successfully updated plan for task ${taskId}`);
+			return { success: true };
+		},
+	);
 }
