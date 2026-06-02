@@ -4065,18 +4065,22 @@ export function registerWorktreeHandlers(
 				try {
 					const fullPath = path.join(resolvedWorktree, relativePath);
 					const resolved = path.resolve(fullPath);
-					const normalizedWorktree = path.normalize(resolvedWorktree);
 
 					// Security: ensure the resolved path is still inside the worktree
-					const normalizedResolved = path.normalize(resolved);
-					if (!normalizedResolved.startsWith(normalizedWorktree + path.sep) && normalizedResolved !== normalizedWorktree) {
+					// Use relative() to check if path is inside worktree
+					const relative = path.relative(resolvedWorktree, resolved);
+					if (relative.startsWith("..")) {
 						failed.push(relativePath);
 						continue;
 					}
 
 					await fsPromises.unlink(resolved);
 					deleted.push(relativePath);
-				} catch {
+				} catch (error) {
+					console.error(
+						`[WORKTREE_DELETE] Failed to delete ${relativePath}:`,
+						error,
+					);
 					failed.push(relativePath);
 				}
 			}
