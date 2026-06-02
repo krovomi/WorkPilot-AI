@@ -4072,34 +4072,24 @@ export function registerWorktreeHandlers(
 						continue;
 					}
 
-					// Discard changes: check git status and handle accordingly
+					// Discard changes: restore file from the target branch (develop)
+					// This ensures the merge preview no longer shows the file as changed
 					const statusResult = await execAsync(
 						`git status --porcelain -- "${relativePath}"`,
 						{ cwd: resolvedWorktree },
 					);
 					const statusOutput = statusResult.stdout.trim();
 
-					if (!statusOutput) {
-						// File not in git at all (untracked), just remove it if it exists
-						try {
-							await fsPromises.unlink(resolved);
-						} catch (err) {
-							// File might not exist, ignore
-							if (
-								!(err instanceof Error) ||
-								!err.message.includes("ENOENT")
-							) {
-								throw err;
-							}
-						}
-					} else if (statusOutput.startsWith("??")) {
-						// Untracked file (??), remove it
+					if (statusOutput.startsWith("??")) {
+						// Untracked file, remove it
 						await fsPromises.unlink(resolved);
-					} else {
-						// Tracked or staged file, use git restore to discard changes
-						await execAsync(`git restore "${relativePath}"`, {
-							cwd: resolvedWorktree,
-						});
+					} else if (statusOutput) {
+						// File is tracked but modified or deleted
+						// Restore from develop branch so merge preview no longer shows it as changed
+						await execAsync(
+							`git checkout develop -- "${relativePath}"`,
+							{ cwd: resolvedWorktree },
+						);
 					}
 					deleted.push(relativePath);
 				} catch (error) {
