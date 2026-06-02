@@ -1003,8 +1003,8 @@ async def run_autonomous_agent(
                 if sync_spec_to_source(spec_dir, source_spec_dir):
                     print_status("Phase transition synced to main project", "success")
 
-            # PRE-CHECK: Look for any pending subtask with manual verification
-            # even if it's in a phase that depends on others
+            # PRE-CHECK: Look for any subtask with manual verification
+            # These may be pending OR blocked (blocked by post-processing after 0 commits)
             if not next_subtask:
                 plan = load_implementation_plan(spec_dir)
                 if plan:
@@ -1015,21 +1015,21 @@ async def run_autonomous_agent(
                             status = subtask.get("status")
                             verification = subtask.get("verification", {})
                             print(muted(f"    - {subtask.get('id')}: status={status}, verification={verification.get('type')}"))
-                            if status == "pending":
-                                if verification.get("type") == "manual":
-                                    # Found a manual verification task - treat it as next
-                                    next_subtask = {
-                                        **subtask,
-                                        "phase_id": phase.get("id"),
-                                        "phase_name": phase.get("name"),
-                                        "phase_num": phase.get("phase"),
-                                    }
-                                    subtask_id = next_subtask.get("id")
-                                    print_status(
-                                        f"Found manual verification subtask: {subtask_id}",
-                                        "warning",
-                                    )
-                                    break
+                            # Check for manual verification tasks in pending or blocked state
+                            if status in ("pending", "blocked") and verification.get("type") == "manual":
+                                # Found a manual verification task - treat it as next
+                                next_subtask = {
+                                    **subtask,
+                                    "phase_id": phase.get("id"),
+                                    "phase_name": phase.get("name"),
+                                    "phase_num": phase.get("phase"),
+                                }
+                                subtask_id = next_subtask.get("id")
+                                print_status(
+                                    f"Found manual verification subtask: {subtask_id} (status={status})",
+                                    "warning",
+                                )
+                                break
                         if next_subtask:
                             break
                 else:
