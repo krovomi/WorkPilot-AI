@@ -2481,14 +2481,28 @@ export function registerWorktreeHandlers(
 						.split("\n")
 						.map((line) => line.trim())
 						.filter((line) => line && !line.startsWith("#"));
-				} catch {
-					// File doesn't exist yet - no discarded files
+					if (discardedFiles.length > 0) {
+						console.error(
+							`[TASK_WORKTREE_DIFF] Loaded ${discardedFiles.length} discarded files:`,
+							discardedFiles,
+						);
+					}
+				} catch (err) {
+					console.error(
+						"[TASK_WORKTREE_DIFF] Error reading discard list:",
+						err,
+					);
 				}
 
 				// Filter out discarded files from the diff
 				const filteredFiles = files.filter(
 					(file) => !discardedFiles.includes(file.path),
 				);
+				if (discardedFiles.length > 0) {
+					console.error(
+						`[TASK_WORKTREE_DIFF] Filtered from ${files.length} to ${filteredFiles.length} files`,
+					);
+				}
 
 				// Generate summary
 				const totalAdditions = filteredFiles.reduce(
