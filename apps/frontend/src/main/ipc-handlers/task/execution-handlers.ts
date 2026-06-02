@@ -2582,7 +2582,6 @@ print(json.dumps(result))
 				appLog.info(`[TASK_RESUME] Task ${taskId} resumed`);
 
 				// Start execution from pause checkpoint
-				const projectProvider = project.settings?.provider ?? "anthropic";
 				const baseBranch = task.metadata?.baseBranch || project.settings?.mainBranch;
 
 				agentManager.startTaskExecution(

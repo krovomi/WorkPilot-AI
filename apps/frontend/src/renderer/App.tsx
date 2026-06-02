@@ -956,7 +956,7 @@ export function App() {
 
 		globalThis.addEventListener("keydown", handleKeyDown);
 		return () => globalThis.removeEventListener("keydown", handleKeyDown);
-	}, [activeView, openProjectTab]);
+	}, [activeView, openProjectTab, toast]);
 
 	// Load tasks when project changes
 	useEffect(() => {
