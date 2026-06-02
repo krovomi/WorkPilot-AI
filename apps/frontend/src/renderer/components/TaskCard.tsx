@@ -61,7 +61,6 @@ import {
 	resumeTask,
 	startTask,
 	stopTask,
-	switchTaskProvider,
 	useTaskStore,
 } from "../stores/task-store";
 import { PhaseProgressIndicator } from "./PhaseProgressIndicator";
