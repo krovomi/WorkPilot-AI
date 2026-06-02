@@ -985,6 +985,11 @@ def handle_merge_preview_command(
         # Load discard list and filter out discarded files
         discard_list_path = Path(worktree_path) / ".workpilot-discard-list"
         discarded_files: list[str] = []
+        debug(
+            MODULE,
+            f"Checking for discard list at: {discard_list_path}",
+            exists=discard_list_path.exists(),
+        )
         if discard_list_path.exists():
             try:
                 with open(discard_list_path) as f:
