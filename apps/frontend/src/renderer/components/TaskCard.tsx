@@ -1123,7 +1123,7 @@ export const TaskCard = memo(function TaskCard({
 								/>
 
 								{/* More options menu - includes pause/resume and status changes */}
-								{(statusMenuItems || isRunning) && (
+								{(statusMenuItems || isRunning || task.metadata?.paused?.enabled) && (
 									<DropdownMenu>
 										<DropdownMenuTrigger asChild>
 											<Button
@@ -1140,7 +1140,7 @@ export const TaskCard = memo(function TaskCard({
 											align="end"
 											onClick={(e) => e.stopPropagation()}
 										>
-											{/* Pause/Resume - only show when task is running or paused */}
+											{/* Pause/Resume - show when task is running or paused */}
 											{(isRunning || task.metadata?.paused?.enabled) && (
 												<>
 													{task.metadata?.paused?.enabled ? (
