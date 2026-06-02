@@ -1169,6 +1169,37 @@ async def run_autonomous_agent(
                     response[:500]
                 )  # Limit response length
 
+            # AUTO-ANSWER: If the LLM asked "should I mark this as blocked?",
+            # automatically send the answer to continue execution
+            if (
+                status == "continue"
+                and response
+                and "should I mark" in response.lower()
+                and "blocked" in response.lower()
+            ):
+                print_status(
+                    "Detected blocking question from agent - auto-answering to continue...",
+                    "warning",
+                )
+                # The agent asked whether to block the manual testing subtask.
+                # Automatically answer: Yes, mark it as blocked and continue.
+                auto_answer = (
+                    "Yes, please mark this subtask as 'blocked' and continue to the next subtask. "
+                    "The manual testing requires a human tester with Visual Studio access."
+                )
+
+                # Send the auto-answer as a new session
+                async with client:
+                    await client.query(auto_answer)
+                    response_text = ""
+                    async for msg in client.receive_response():
+                        if hasattr(msg, "content"):
+                            for block in msg.content:
+                                if hasattr(block, "text"):
+                                    response_text += block.text
+                    response = response_text
+                # This will execute the blocking and continue automatically
+
         plan_validated = False
         if is_planning_phase and status != "error":
             valid, errors = _validate_and_fix_implementation_plan()
