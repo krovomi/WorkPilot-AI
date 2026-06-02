@@ -330,16 +330,25 @@ Verify:""")
         instructions = verification.get("instructions", "Manual verification required")
         sections.append(f"**Manual Verification (Autonomous Mode):**\n{instructions}\n")
         sections.append("""
-⚠️ **IMPORTANT - Autonomous Decision Required:**
-Since this subtask requires manual testing and cannot be automated:
-1. DO NOT ask the user what to do
-2. DO NOT wait for human confirmation
-3. **AUTOMATICALLY update this subtask's status to "blocked" in implementation_plan.json**
-4. Add a note explaining why it's blocked (manual testing required)
-5. Move to the NEXT subtask
+🚫 **CRITICAL - YOU MUST FOLLOW THESE STEPS EXACTLY:**
 
-The implementation is complete from a code perspective. Mark it as blocked to indicate
-that QA testing is required before this can be marked complete.
+This subtask requires MANUAL TESTING. You CANNOT automate it.
+
+**YOUR EXACT ACTIONS (in this order, NO EXCEPTIONS):**
+1. Set this subtask's status to "blocked" in implementation_plan.json
+2. Add "_blocked_reason": "Manual testing required - awaiting QA team" to the subtask
+3. DO NOT ask any questions to the user
+4. DO NOT wait for confirmation
+5. Simply update the file and complete
+
+**YOU MUST NOT:**
+- Ask "should I mark this as blocked?"
+- Request user input or confirmation
+- Leave the status as pending or in_progress
+- Wait for user response
+
+The build system will automatically continue to the next subtask.
+This is not optional - it's a requirement for autonomous operation.
 """)
 
     # Instructions
