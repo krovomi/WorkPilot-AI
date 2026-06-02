@@ -582,22 +582,22 @@ async def post_session_processing(
     verification = subtask.get("verification", {})
     is_manual_verification = verification.get("type") == "manual"
 
-    if (
-        is_manual_verification
-        and new_commits == 0
-        and subtask_status == "pending"
-    ):
+    # Force block for manual testing tasks with zero commits
+    # This covers cases where subtask_status is "pending", "in_progress", or anything else
+    if is_manual_verification and new_commits == 0:
         # Automatically mark as blocked - no commits means no code implementation,
         # just the agent asking questions
+        old_status = subtask.get("status", "pending")
         subtask["status"] = "blocked"
         subtask["_blocked_reason"] = "Manual testing required - no code changes"
 
         # Update implementation plan
         from qa.criteria import save_implementation_plan
+
         try:
             save_implementation_plan(spec_dir, plan)
             print_status(
-                f"Auto-marked subtask {subtask_id} as BLOCKED (manual testing required)",
+                f"Auto-marked subtask {subtask_id} as BLOCKED (manual testing required, was {old_status})",
                 "info",
             )
             subtask_status = "blocked"
