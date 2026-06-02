@@ -187,6 +187,8 @@
 		"create": "Create",
 		"creating": "Creating...",
 		"loading": "Loading...",
+		"selectAll": "Select all",
+		"error": "Error",
 		"status": {
 			"added": "added",
 			"deleted": "deleted",

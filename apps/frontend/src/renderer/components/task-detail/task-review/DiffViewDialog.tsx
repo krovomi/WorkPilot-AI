@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useToast } from "../../../hooks/use-toast";
 import type { WorktreeDiff, WorktreeDiffFile } from "../../../../shared/types";
 import { cn } from "../../../lib/utils";
 import {
@@ -258,6 +259,7 @@ export function DiffViewDialog({
 	onRefresh,
 }: DiffViewDialogProps) {
 	const { t } = useTranslation(["taskReview"]);
+	const { toast } = useToast();
 	const [viewMode, setViewMode] = useState<ViewMode>("list");
 	const [selectedFile, setSelectedFile] = useState<WorktreeDiffFile | null>(
 		null,
@@ -300,6 +302,15 @@ export function DiffViewDialog({
 			return next;
 		});
 	}, []);
+
+	const handleSelectAll = useCallback(() => {
+		if (!worktreeDiff?.files) return;
+		if (selectedPaths.size === worktreeDiff.files.length) {
+			setSelectedPaths(new Set());
+		} else {
+			setSelectedPaths(new Set(worktreeDiff.files.map((f) => f.path)));
+		}
+	}, [worktreeDiff?.files, selectedPaths.size]);
 
 	const handleEditFile = useCallback(
 		async (file: WorktreeDiffFile) => {
@@ -377,38 +388,62 @@ export function DiffViewDialog({
 
 	const handleDeleteSelected = useCallback(async () => {
 		if (selectedPaths.size === 0 || !worktreePath || !onRefresh) {
-			console.error("[DiffViewDialog] Missing required params for delete:", {
-				hasSelectedPaths: selectedPaths.size > 0,
-				hasWorktreePath: !!worktreePath,
-				hasOnRefresh: !!onRefresh,
+			toast({
+				title: t("taskReview:diff.error"),
+				description: "Missing required information to delete files",
+				variant: "destructive",
 			});
 			return;
 		}
 
 		const api = (globalThis as any).electronAPI;
 		if (!api?.worktreeDeleteFiles) {
-			console.error("[DiffViewDialog] electron.worktreeDeleteFiles not available");
+			toast({
+				title: t("taskReview:diff.error"),
+				description: "File operations not available",
+				variant: "destructive",
+			});
 			return;
 		}
 
 		setIsDeletingSelected(true);
 		try {
+			const filesToDelete = Array.from(selectedPaths);
+			console.log("[DiffViewDialog] Deleting files:", filesToDelete);
+
 			const result = await api.worktreeDeleteFiles(
 				worktreePath,
-				Array.from(selectedPaths),
+				filesToDelete,
 			);
+
+			console.log("[DiffViewDialog] Delete result:", result);
+
 			if (result.success) {
+				toast({
+					title: "Success",
+					description: `${result.data.deleted.length} file(s) deleted`,
+				});
 				setSelectedPaths(new Set());
-				onRefresh();
+				// Force refresh to update the list
+				await onRefresh();
 			} else {
-				console.error("[DiffViewDialog] Failed to delete files:", result);
+				toast({
+					title: t("taskReview:diff.error"),
+					description: `Failed to delete files: ${result.data?.failed?.join(", ") || "Unknown error"}`,
+					variant: "destructive",
+				});
 			}
 		} catch (error) {
 			console.error("[DiffViewDialog] Error deleting files:", error);
+			toast({
+				title: t("taskReview:diff.error"),
+				description: error instanceof Error ? error.message : "Unknown error",
+				variant: "destructive",
+			});
 		} finally {
 			setIsDeletingSelected(false);
 		}
-	}, [selectedPaths, worktreePath, onRefresh]);
+	}, [selectedPaths, worktreePath, onRefresh, toast, t]);
 
 	const handleAddFile = useCallback(async () => {
 		if (!newFilePath || !worktreePath || !onRefresh) {
@@ -525,6 +560,20 @@ export function DiffViewDialog({
 		if (viewMode === "list") {
 			return (
 				<div className="space-y-2">
+					{worktreePath && hasFiles && (
+						<div className="flex items-center gap-2 pb-2 border-b">
+							<Checkbox
+								checked={selectedPaths.size === worktreeDiff?.files?.length}
+								onCheckedChange={handleSelectAll}
+							/>
+							<span className="text-sm font-medium">
+								{t("taskReview:diff.selectAll")}
+								{selectedPaths.size > 0 &&
+									selectedPaths.size < worktreeDiff?.files?.length &&
+									` (${selectedPaths.size} selected)`}
+							</span>
+						</div>
+					)}
 					{worktreeDiff?.files.map((file, idx) => {
 						const isSelected = selectedPaths.has(file.path);
 						return (
