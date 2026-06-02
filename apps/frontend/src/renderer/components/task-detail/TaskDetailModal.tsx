@@ -58,6 +58,12 @@ import {
 import { useTaskDetail } from "./hooks/useTaskDetail";
 import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
+import { TaskPauseControls } from "./TaskPauseControls";
+import {
+	pauseTask,
+	resumeTask,
+	switchTaskProvider,
+} from "../../stores/task-store";
 import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
 import { TaskReview } from "./TaskReview";
 import { TaskSubtasks } from "./TaskSubtasks";
@@ -726,6 +732,37 @@ function TaskDetailModalContent({
 								</div>
 							)}
 						</div>
+
+						{/* Pause/Resume Controls */}
+						<TaskPauseControls
+							task={task}
+							isPaused={task.metadata?.paused?.enabled}
+							onPause={async (subtaskId) => {
+								await pauseTask(task.id, subtaskId);
+								state.setIsRunning(false);
+							}}
+							onResume={async () => {
+								await resumeTask(task.id);
+								await handleStartStop();
+							}}
+							onSwitchProvider={async (provider, model) => {
+								await switchTaskProvider(task.id, provider, model);
+								// Update local task metadata
+								const updatedTask = {
+									...task,
+									metadata: {
+										...task.metadata,
+										provider,
+										model,
+									},
+								};
+								useTaskStore.setState((state) => ({
+									tasks: state.tasks.map((t) =>
+										t.id === task.id ? updatedTask : t
+									),
+								}));
+							}}
+						/>
 
 						{/* Body - Single Column with Tabs */}
 						<div className="flex-1 min-h-0 overflow-hidden">
