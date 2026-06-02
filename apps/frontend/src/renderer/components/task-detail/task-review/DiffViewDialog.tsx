@@ -561,7 +561,7 @@ export function DiffViewDialog({
 			return (
 				<div className="space-y-2">
 					{worktreePath && hasFiles && (
-						<div className="flex items-center gap-2 pb-2 border-b">
+						<div className="flex items-center gap-2 p-2 pb-0">
 							<Checkbox
 								checked={selectedPaths.size === worktreeDiff?.files?.length}
 								onCheckedChange={handleSelectAll}

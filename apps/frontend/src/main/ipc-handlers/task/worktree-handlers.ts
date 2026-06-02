@@ -4063,7 +4063,7 @@ export function registerWorktreeHandlers(
 
 			for (const relativePath of relativePaths) {
 				try {
-					const fullPath = path.join(worktreePath, relativePath);
+					const fullPath = path.join(resolvedWorktree, relativePath);
 					const resolved = path.resolve(fullPath);
 
 					// Security: ensure the resolved path is still inside the worktree
