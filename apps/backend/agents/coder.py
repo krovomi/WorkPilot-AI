@@ -1008,10 +1008,14 @@ async def run_autonomous_agent(
             if not next_subtask:
                 plan = load_implementation_plan(spec_dir)
                 if plan:
+                    print(muted(f"[DEBUG] Scanning {len(plan.get('phases', []))} phases for manual tasks"))
                     for phase in plan.get("phases", []):
+                        print(muted(f"  Phase '{phase.get('name')}': {len(phase.get('subtasks', []))} subtasks"))
                         for subtask in phase.get("subtasks", []):
-                            if subtask.get("status") == "pending":
-                                verification = subtask.get("verification", {})
+                            status = subtask.get("status")
+                            verification = subtask.get("verification", {})
+                            print(muted(f"    - {subtask.get('id')}: status={status}, verification={verification.get('type')}"))
+                            if status == "pending":
                                 if verification.get("type") == "manual":
                                     # Found a manual verification task - treat it as next
                                     next_subtask = {
@@ -1028,6 +1032,8 @@ async def run_autonomous_agent(
                                     break
                         if next_subtask:
                             break
+                else:
+                    print(muted("[DEBUG] Could not load implementation plan"))
 
             if not next_subtask:
                 # FIX for Issue #495: Race condition after planning phase
