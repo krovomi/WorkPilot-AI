@@ -17,6 +17,7 @@
 	"actions": {
 		"start": "Démarrer",
 		"stop": "Arrêter",
+		"pause": "Mettre en pause",
 		"recover": "Récupérer",
 		"resume": "Reprendre",
 		"archive": "Archiver",
@@ -74,7 +75,9 @@
 		"archiveAllDone": "Archiver toutes les tâches terminées",
 		"viewPR": "Ouvrir la pull request dans le navigateur",
 		"viewPRFiles": "Voir les fichiers modifiés",
-		"previewApp": "Prévisualiser l'application"
+		"previewApp": "Prévisualiser l'application",
+		"pauseTask": "Mettre en pause la tâche",
+		"resumeTask": "Reprendre la tâche"
 	},
 	"prFiles": {
 		"short": "Fichiers"

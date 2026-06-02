@@ -1565,6 +1565,24 @@ export async function pauseTask(
 			"task-store",
 			`Task ${taskId} paused at subtask ${subtaskId || "none"}`,
 		);
+		// Update the task metadata to reflect paused state
+		const store = useTaskStore.getState();
+		const task = store.tasks.find((t) => t.id === taskId);
+		if (task) {
+			store.updateTask(taskId, {
+				...task,
+				metadata: {
+					...task.metadata,
+					paused: {
+						enabled: true,
+						paused_at: new Date().toISOString(),
+						paused_subtask_id: subtaskId || null,
+						provider: task.metadata?.provider || "anthropic",
+						model: task.metadata?.model || "claude-opus-4-7",
+					},
+				},
+			});
+		}
 	} else {
 		debugWarn(
 			"task-store",
@@ -1586,6 +1604,24 @@ export async function resumeTask(taskId: string): Promise<boolean> {
 
 	if (result?.success) {
 		debugLog("task-store", `Task ${taskId} resumed`);
+		// Update the task metadata to reflect resumed state
+		const store = useTaskStore.getState();
+		const task = store.tasks.find((t) => t.id === taskId);
+		if (task) {
+			store.updateTask(taskId, {
+				...task,
+				metadata: {
+					...task.metadata,
+					paused: {
+						enabled: false,
+						paused_at: null,
+						paused_subtask_id: null,
+						provider: task.metadata?.paused?.provider || task.metadata?.provider || "anthropic",
+						model: task.metadata?.paused?.model || task.metadata?.model || "claude-opus-4-7",
+					},
+				},
+			});
+		}
 	} else {
 		debugWarn("task-store", `Failed to resume task ${taskId}: ${result?.error}`);
 	}

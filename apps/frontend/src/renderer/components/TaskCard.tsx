@@ -1105,29 +1105,6 @@ export const TaskCard = memo(function TaskCard({
 							</div>
 
 							<div className="flex items-center gap-1.5">
-								{/* Pause/Resume button - always visible */}
-								{task.metadata?.paused?.enabled ? (
-									<Button
-										variant="outline"
-										size="sm"
-										className="h-7 w-7 p-0"
-										onClick={handleResume}
-										title={t("tooltips.resumeTask")}
-									>
-										<Play className="h-3.5 w-3.5" />
-									</Button>
-								) : (
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-7 w-7 p-0"
-										onClick={handlePause}
-										title={t("tooltips.pauseTask")}
-									>
-										<Pause className="h-3.5 w-3.5" />
-									</Button>
-								)}
-
 								<ActionButtons
 									isStuck={isStuck}
 									isRecovering={isRecovering}
@@ -1145,8 +1122,8 @@ export const TaskCard = memo(function TaskCard({
 									t={t}
 								/>
 
-								{/* Move to menu for keyboard accessibility */}
-								{statusMenuItems && (
+								{/* More options menu - includes pause/resume and status changes */}
+								{(statusMenuItems || isRunning) && (
 									<DropdownMenu>
 										<DropdownMenuTrigger asChild>
 											<Button
@@ -1163,6 +1140,33 @@ export const TaskCard = memo(function TaskCard({
 											align="end"
 											onClick={(e) => e.stopPropagation()}
 										>
+											{/* Pause/Resume - only show when task is running or paused */}
+											{(isRunning || task.metadata?.paused?.enabled) && (
+												<>
+													{task.metadata?.paused?.enabled ? (
+														<DropdownMenuItem
+															onClick={(e) => {
+																e.stopPropagation();
+																handleResume(e as React.MouseEvent);
+															}}
+														>
+															<Play className="mr-2 h-4 w-4" />
+															{t("actions.resume")}
+														</DropdownMenuItem>
+													) : (
+														<DropdownMenuItem
+															onClick={(e) => {
+																e.stopPropagation();
+																handlePause(e as React.MouseEvent);
+															}}
+														>
+															<Pause className="mr-2 h-4 w-4" />
+															{t("actions.pause")}
+														</DropdownMenuItem>
+													)}
+													<DropdownMenuSeparator />
+												</>
+											)}
 											{task.status !== "done" && (
 												<>
 													<DropdownMenuItem
@@ -1178,11 +1182,15 @@ export const TaskCard = memo(function TaskCard({
 													<DropdownMenuSeparator />
 												</>
 											)}
-											<DropdownMenuLabel>
-												{t("actions.moveTo")}
-											</DropdownMenuLabel>
-											<DropdownMenuSeparator />
-											{statusMenuItems}
+											{statusMenuItems && (
+												<>
+													<DropdownMenuLabel>
+														{t("actions.moveTo")}
+													</DropdownMenuLabel>
+													<DropdownMenuSeparator />
+													{statusMenuItems}
+												</>
+											)}
 										</DropdownMenuContent>
 									</DropdownMenu>
 								)}

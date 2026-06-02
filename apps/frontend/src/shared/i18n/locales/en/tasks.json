@@ -17,6 +17,7 @@
 	"actions": {
 		"start": "Start",
 		"stop": "Stop",
+		"pause": "Pause",
 		"recover": "Recover",
 		"resume": "Resume",
 		"archive": "Archive",
@@ -74,7 +75,9 @@
 		"archiveAllDone": "Archive all done tasks",
 		"viewPR": "Open pull request in browser",
 		"viewPRFiles": "View modified files",
-		"previewApp": "Preview application"
+		"previewApp": "Preview application",
+		"pauseTask": "Pause task",
+		"resumeTask": "Resume task"
 	},
 	"prFiles": {
 		"short": "Files"
