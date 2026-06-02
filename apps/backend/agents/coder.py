@@ -23,6 +23,7 @@ from agents.feature_wiring import (
 from core.client import create_agent_client
 from core.task_event import TaskEventEmitter
 from core.workflow_logger import workflow_logger
+from qa.criteria import save_implementation_plan
 
 try:
     from core.usage_tracker import (
@@ -65,6 +66,7 @@ from prompts import is_first_run
 from recovery import RecoveryManager
 from security.constants import PROJECT_DIR_ENV_VAR
 from task_logger import (
+    LogEntryType,
     LogPhase,
     get_task_logger,
 )
@@ -105,6 +107,7 @@ from .session import (
 )
 from .utils import (
     find_phase_for_subtask,
+    find_subtask_in_plan,
     get_commit_count,
     get_latest_commit,
     load_implementation_plan,
@@ -1083,6 +1086,51 @@ async def run_autonomous_agent(
                 # Small delay before retry
                 await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
                 continue  # Skip to next iteration
+
+            # PRE-CHECK: If this is a manual verification task, skip the coder session
+            # and mark it as blocked immediately to avoid the "should I mark as blocked?" question
+            verification = next_subtask.get("verification", {})
+            if verification.get("type") == "manual":
+                print()
+                print_status(
+                    f"Subtask {subtask_id} requires manual verification",
+                    "warning",
+                )
+                print(
+                    muted("Skipping coder session - marking as blocked without asking")
+                )
+
+                # Mark as blocked directly
+                plan = load_implementation_plan(spec_dir)
+                if plan:
+                    subtask = find_subtask_in_plan(plan, subtask_id)
+                    if subtask:
+                        subtask["status"] = "blocked"
+                        subtask["_blocked_reason"] = (
+                            "Manual verification required - awaiting human tester"
+                        )
+
+                        try:
+                            save_implementation_plan(spec_dir, plan)
+                            print_status(
+                                f"✓ Subtask {subtask_id} marked as BLOCKED",
+                                "warning",
+                            )
+
+                            # Log the decision
+                            if task_logger:
+                                task_logger.log(
+                                    f"Subtask {subtask_id}: Manual verification task - marked as blocked",
+                                    LogEntryType.TEXT,
+                                    LogPhase.CODING,
+                                )
+                        except Exception as e:
+                            logger.error(f"Failed to mark as blocked: {e}")
+                            print(f"  ✗ Warning: Could not mark as blocked: {e}")
+
+                # Continue to next subtask without launching coder
+                await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
+                continue
 
             # Get attempt count for recovery context
             attempt_count = recovery_manager.get_attempt_count(subtask_id)
