@@ -4072,24 +4072,34 @@ export function registerWorktreeHandlers(
 						continue;
 					}
 
-					// Discard changes: restore tracked files, remove untracked files
-					try {
+					// Discard changes: check git status and handle accordingly
+					const statusResult = await execAsync(
+						`git status --porcelain -- "${relativePath}"`,
+						{ cwd: resolvedWorktree },
+					);
+					const statusOutput = statusResult.stdout.trim();
+
+					if (!statusOutput) {
+						// File not in git at all (untracked), just remove it if it exists
+						try {
+							await fsPromises.unlink(resolved);
+						} catch (err) {
+							// File might not exist, ignore
+							if (
+								!(err instanceof Error) ||
+								!err.message.includes("ENOENT")
+							) {
+								throw err;
+							}
+						}
+					} else if (statusOutput.startsWith("??")) {
+						// Untracked file (??), remove it
+						await fsPromises.unlink(resolved);
+					} else {
+						// Tracked or staged file, use git restore to discard changes
 						await execAsync(`git restore "${relativePath}"`, {
 							cwd: resolvedWorktree,
 						});
-					} catch (restoreError) {
-						// If restore fails, try to remove as untracked file
-						const gitStatusResult = await execAsync(
-							`git ls-files "${relativePath}"`,
-							{ cwd: resolvedWorktree },
-						);
-						if (!gitStatusResult.stdout.trim()) {
-							// File is untracked, remove it
-							await fsPromises.unlink(resolved);
-						} else {
-							// File is tracked, restore failed for another reason
-							throw restoreError;
-						}
 					}
 					deleted.push(relativePath);
 				} catch (error) {
