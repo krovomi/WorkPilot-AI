@@ -93,10 +93,10 @@ async def _run_dotnet_tests(project_dir: Path) -> bool:
                     cwd=str(project_dir),
                 )
                 if result.returncode == 0:
-                    print(f"      ✅ Tests passed")
+                    print("      ✅ Tests passed")
                     debug("qa_loop", f"dotnet test passed for {test_project.name}")
                 else:
-                    print(f"      ⚠️  Tests failed or no tests found")
+                    print("      ⚠️  Tests failed or no tests found")
                     debug_warning(
                         "qa_loop",
                         f"dotnet test returned {result.returncode} for {test_project.name}",
@@ -110,7 +110,7 @@ async def _run_dotnet_tests(project_dir: Path) -> bool:
                 return False
             except subprocess.TimeoutExpired:
                 debug_error("qa_loop", "dotnet test timed out after 300 seconds")
-                print(f"      ❌ Tests timed out")
+                print("      ❌ Tests timed out")
                 return False
 
         return True

@@ -2,19 +2,41 @@ import {
 	AlertCircle,
 	CheckCircle2,
 	Clock,
+	Edit3,
 	FileCode,
 	ListChecks,
+	Plus,
+	Trash2,
 	XCircle,
 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Task } from "../../../shared/types";
 import { calculateProgress, cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
+interface Phase {
+	name: string;
+	subtasks: Array<{
+		id: string;
+		title?: string;
+		description?: string;
+		status: "pending" | "in_progress" | "completed" | "failed";
+		files?: string[];
+		verification?: {
+			type: "command" | "browser";
+			run?: string;
+			scenario?: string;
+		};
+	}>;
+}
+
 interface TaskSubtasksProps {
-	task: Task;
+	readonly task: Task;
+	readonly onUpdatePlan?: (phases: Phase[]) => Promise<void>;
 }
 
 function getSubtaskStatusIcon(status: string) {
@@ -30,14 +52,92 @@ function getSubtaskStatusIcon(status: string) {
 	}
 }
 
-export function TaskSubtasks({ task }: TaskSubtasksProps) {
+function getStatusBadgeClass(status: string): string {
+	switch (status) {
+		case "completed":
+			return "bg-success/20 text-success";
+		case "in_progress":
+			return "bg-info/20 text-info";
+		case "failed":
+			return "bg-destructive/20 text-destructive";
+		default:
+			return "bg-muted text-muted-foreground";
+	}
+}
+
+export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 	const { t } = useTranslation(["tasks"]);
+	const [isEditing, setIsEditing] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
+	const [editedPhases, setEditedPhases] = useState<Phase[]>(
+		task.subtasks.length > 0
+			? [
+					{
+						name: "Implementation",
+						subtasks: task.subtasks,
+					},
+				]
+			: [],
+	);
+
 	const progress = calculateProgress(task.subtasks);
 
-	return (
-		<ScrollArea className="h-full">
-			<div className="p-4 space-y-3">
-				{task.subtasks.length === 0 ? (
+	async function handleSaveChanges() {
+		if (!onUpdatePlan) return;
+
+		setIsSaving(true);
+		try {
+			const phases = editedPhases.map((phase) => ({
+				name: phase.name,
+				subtasks: phase.subtasks,
+			}));
+
+			await onUpdatePlan(phases);
+			setIsEditing(false);
+		} catch (error) {
+			console.error("Failed to save changes:", error);
+		} finally {
+			setIsSaving(false);
+		}
+	}
+
+	function handleDeleteSubtask(phaseIndex: number, subtaskIndex: number) {
+		const newPhases = [...editedPhases];
+		newPhases[phaseIndex].subtasks.splice(subtaskIndex, 1);
+
+		// Remove empty phases
+		setEditedPhases(newPhases.filter((phase) => phase.subtasks.length > 0));
+	}
+
+	function handleAddSubtask(phaseIndex: number) {
+		const newPhases = [...editedPhases];
+		newPhases[phaseIndex].subtasks.push({
+			id: `new-${Date.now()}`,
+			title: "",
+			description: "",
+			status: "pending",
+			files: [],
+		});
+		setEditedPhases(newPhases);
+	}
+
+	function handleUpdateSubtask(
+		phaseIndex: number,
+		subtaskIndex: number,
+		field: string,
+		value: string,
+	) {
+		const newPhases = [...editedPhases];
+		(newPhases[phaseIndex].subtasks[subtaskIndex] as Record<string, unknown>)[
+			field
+		] = value;
+		setEditedPhases(newPhases);
+	}
+
+	if (task.subtasks.length === 0) {
+		return (
+			<ScrollArea className="h-full">
+				<div className="p-4 space-y-3">
 					<div className="text-center py-12">
 						<ListChecks className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
 						<p className="text-sm font-medium text-muted-foreground mb-1">
@@ -47,15 +147,154 @@ export function TaskSubtasks({ task }: TaskSubtasksProps) {
 							Implementation subtasks will appear here after planning
 						</p>
 					</div>
+				</div>
+			</ScrollArea>
+		);
+	}
+
+	return (
+		<ScrollArea className="h-full">
+			<div className="p-4 space-y-3">
+				{/* Header with edit button */}
+				<div className="flex items-center justify-between mb-3">
+					<div className="flex items-center justify-between text-xs text-muted-foreground flex-1">
+						<span>
+							{task.subtasks.filter((c) => c.status === "completed").length} of{" "}
+							{task.subtasks.length} completed
+						</span>
+						<span className="tabular-nums">{progress}%</span>
+					</div>
+					{!isEditing && onUpdatePlan && (
+						<Button
+							size="sm"
+							variant="ghost"
+							onClick={() => setIsEditing(true)}
+							className="ml-2 h-7 w-7 p-0"
+							title={t("tasks:plan.edit")}
+						>
+							<Edit3 className="h-3.5 w-3.5" />
+						</Button>
+					)}
+				</div>
+
+				{isEditing ? (
+					// Edit mode
+					<div className="space-y-4">
+						{editedPhases.map((phase, phaseIndex) => (
+							<div key={`phase-${phase.name}`} className="border rounded-lg p-3 space-y-2">
+								<h3 className="font-medium text-sm text-foreground">
+									{phase.name}
+								</h3>
+
+								{phase.subtasks.map((subtask, subtaskIndex) => (
+									<div
+										key={subtask.id}
+										className="flex gap-2 items-start bg-secondary/30 p-2 rounded"
+									>
+										<div className="flex-1 space-y-1">
+											<input
+												type="text"
+												value={subtask.title || ""}
+												onChange={(e) =>
+													handleUpdateSubtask(
+														phaseIndex,
+														subtaskIndex,
+														"title",
+														e.target.value,
+													)
+												}
+												placeholder={t("tasks:plan.subtaskTitle")}
+												className="w-full text-sm font-medium bg-background/50 rounded px-2 py-1 border border-border/50"
+											/>
+											<textarea
+												value={subtask.description || ""}
+												onChange={(e) =>
+													handleUpdateSubtask(
+														phaseIndex,
+														subtaskIndex,
+														"description",
+														e.target.value,
+													)
+												}
+												placeholder={t("tasks:plan.subtaskDescription")}
+												className="w-full text-xs bg-background/50 rounded px-2 py-1 border border-border/50 resize-none"
+												rows={2}
+											/>
+										</div>
+										{subtask.status === "pending" && (
+											<Button
+												size="sm"
+												variant="ghost"
+												onClick={() =>
+													handleDeleteSubtask(phaseIndex, subtaskIndex)
+												}
+												className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+											>
+												<Trash2 className="h-3.5 w-3.5" />
+											</Button>
+										)}
+									</div>
+								))}
+
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={() => handleAddSubtask(phaseIndex)}
+									className="w-full text-xs h-7"
+								>
+									<Plus className="h-3 w-3 mr-1" />
+									{t("tasks:plan.addSubtask")}
+								</Button>
+							</div>
+						))}
+
+						<div className="flex gap-2 pt-2 border-t border-border/50">
+							<Button
+								size="sm"
+								onClick={handleSaveChanges}
+								disabled={isSaving}
+								className="flex-1"
+							>
+								{isSaving ? (
+									<>
+										<span className="animate-spin">⟳</span>
+										{t("tasks:plan.savingChanges")}
+									</>
+								) : (
+									t("tasks:plan.save")
+								)}
+							</Button>
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => {
+									setIsEditing(false);
+									setEditedPhases(
+										task.subtasks.length > 0
+											? [
+													{
+														name: "Implementation",
+														subtasks: task.subtasks,
+													},
+												]
+											: [],
+									);
+								}}
+								disabled={isSaving}
+								className="flex-1"
+							>
+								{t("tasks:plan.cancel")}
+							</Button>
+						</div>
+					</div>
 				) : (
+					// View mode
 					<>
-						{/* Progress summary */}
 						<div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border/50">
 							<span>
-								{task.subtasks.filter((c) => c.status === "completed").length}{" "}
-								of {task.subtasks.length} completed
+								{task.subtasks.filter((c) => c.status === "completed").length} of{" "}
+								{task.subtasks.length} completed
 							</span>
-							<span className="tabular-nums">{progress}%</span>
 						</div>
 						{task.subtasks.map((subtask, index) => (
 							<div
@@ -77,13 +316,7 @@ export function TaskSubtasks({ task }: TaskSubtasksProps) {
 											<span
 												className={cn(
 													"text-[10px] font-medium px-1.5 py-0.5 rounded-full",
-													subtask.status === "completed"
-														? "bg-success/20 text-success"
-														: subtask.status === "in_progress"
-															? "bg-info/20 text-info"
-															: subtask.status === "failed"
-																? "bg-destructive/20 text-destructive"
-																: "bg-muted text-muted-foreground",
+													getStatusBadgeClass(subtask.status),
 												)}
 											>
 												#{index + 1}
@@ -116,7 +349,7 @@ export function TaskSubtasks({ task }: TaskSubtasksProps) {
 										</Tooltip>
 										{subtask.files && subtask.files.length > 0 && (
 											<div className="mt-2 flex flex-wrap gap-1">
-												{subtask.files.map((file) => (
+												{subtask.files.map((file: string) => (
 													<Tooltip key={file}>
 														<TooltipTrigger asChild>
 															<Badge

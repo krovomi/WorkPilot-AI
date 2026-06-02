@@ -1519,3 +1519,30 @@ export function getTaskProgress(task: Task): {
 	const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 	return { completed, total, percentage };
 }
+
+/**
+ * Update plan phases and subtasks
+ */
+export async function updatePlanSubtasks(
+	taskId: string,
+	phases: Array<Record<string, unknown>>,
+): Promise<boolean> {
+	const result = await globalThis.electronAPI.updatePlanSubtasks(
+		taskId,
+		phases,
+	);
+
+	if (result.success) {
+		debugLog(
+			"task-store",
+			`Plan updated for task ${taskId}`,
+		);
+	} else {
+		debugWarn(
+			"task-store",
+			`Failed to update plan for task ${taskId}: ${result.error}`,
+		);
+	}
+
+	return result.success;
+}

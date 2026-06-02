@@ -506,6 +506,26 @@
 			"cancel": "Cancel",
 			"deleting": "Deleting...",
 			"deletePermanently": "Delete Permanently"
+		},
+		"plan": {
+			"edit": "Edit Plan",
+			"save": "Save Changes",
+			"cancel": "Cancel",
+			"addSubtask": "Add Subtask",
+			"deleteSubtask": "Delete",
+			"editingNotAllowed": "Cannot edit completed or in-progress subtasks",
+			"pendingOnly": "Only pending subtasks can be modified",
+			"addPhase": "Add Phase",
+			"deletePhase": "Delete Phase",
+			"phaseTitle": "Phase Title",
+			"subtaskTitle": "Subtask Title",
+			"subtaskDescription": "Description",
+			"files": "Files",
+			"verification": "Verification",
+			"savingChanges": "Saving...",
+			"changesSaved": "Changes saved successfully",
+			"saveError": "Failed to save changes",
+			"emptyTitle": "Title cannot be empty"
 		}
 	}
 }

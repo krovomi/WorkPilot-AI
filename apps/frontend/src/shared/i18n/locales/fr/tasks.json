@@ -506,6 +506,26 @@
 			"cancel": "Annuler",
 			"deleting": "Suppression...",
 			"deletePermanently": "Supprimer définitivement"
+		},
+		"plan": {
+			"edit": "Modifier le plan",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"addSubtask": "Ajouter une sous-tâche",
+			"deleteSubtask": "Supprimer",
+			"editingNotAllowed": "Impossible de modifier les sous-tâches complétées ou en cours",
+			"pendingOnly": "Seules les sous-tâches en attente peuvent être modifiées",
+			"addPhase": "Ajouter une phase",
+			"deletePhase": "Supprimer la phase",
+			"phaseTitle": "Titre de la phase",
+			"subtaskTitle": "Titre de la sous-tâche",
+			"subtaskDescription": "Description",
+			"files": "Fichiers",
+			"verification": "Vérification",
+			"savingChanges": "Enregistrement...",
+			"changesSaved": "Modifications enregistrées",
+			"saveError": "Erreur lors de l'enregistrement",
+			"emptyTitle": "Le titre ne peut pas être vide"
 		}
 	}
 }

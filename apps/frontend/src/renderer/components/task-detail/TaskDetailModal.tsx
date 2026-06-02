@@ -28,6 +28,7 @@ import {
 	startTask,
 	stopTask,
 	submitReview,
+	updatePlanSubtasks,
 	useTaskStore,
 } from "../../stores/task-store";
 import { StreamingSessionButton } from "../streaming/StreamingSessionButton";
@@ -300,12 +301,45 @@ function useTaskDetailHandlers(
 		onOpenChange(false);
 	};
 
+	const handleUpdatePlan = async (
+		phases: Array<{
+			name: string;
+			subtasks: Array<{
+				id: string;
+				title?: string;
+				description?: string;
+				status: string;
+				files?: string[];
+				verification?: {
+					type: string;
+					run?: string;
+					scenario?: string;
+				};
+			}>;
+		}>,
+	) => {
+		const success = await updatePlanSubtasks(task.id, phases as Array<Record<string, unknown>>);
+		if (success) {
+			toast({
+				title: t("tasks:plan.changesSaved"),
+				duration: 3000,
+			});
+		} else {
+			toast({
+				title: t("tasks:plan.saveError"),
+				variant: "destructive",
+				duration: 5000,
+			});
+		}
+	};
+
 	return {
 		handleStartStop,
 		handleRecover,
 		handleReject,
 		handleDelete,
 		handleClose,
+		handleUpdatePlan,
 	};
 }
 
@@ -340,6 +374,7 @@ function TaskDetailModalContent({
 		handleReject,
 		handleDelete,
 		handleClose,
+		handleUpdatePlan,
 	} = useTaskDetailHandlers(task, state, onOpenChange);
 
 	const handleMerge = async () => {
@@ -794,7 +829,7 @@ function TaskDetailModalContent({
 									value="subtasks"
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
-									<TaskSubtasks task={task} />
+									<TaskSubtasks task={task} onUpdatePlan={handleUpdatePlan} />
 								</TabsContent>
 
 								{/* Logs Tab */}
