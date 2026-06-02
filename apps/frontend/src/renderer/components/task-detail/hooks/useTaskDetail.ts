@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
 	GitConflictInfo,
 	ImageAttachment,
+	IPCResult,
 	MergeConflict,
 	MergeStats,
 	Task,
@@ -375,6 +376,26 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		}
 	}, [task.id]);
 
+	// Helper to process a single API result and collect errors
+	const processAPIResult = <T,>(
+		result: PromiseSettledResult<IPCResult<T>>,
+		label: string,
+		onSuccess: (data: T) => void,
+		errors: string[],
+	) => {
+		if (result.status === "fulfilled") {
+			const res = result.value;
+			if (res.success && res.data) {
+				onSuccess(res.data);
+			} else if (!res.success && res.error) {
+				errors.push(`${label}: ${res.error}`);
+			}
+		} else {
+			console.error(`[useTaskDetail] Failed to load ${label}:`, result.reason);
+			errors.push(`Failed to load ${label}`);
+		}
+	};
+
 	// Load merge preview (conflict detection) and refresh worktree status
 	const loadMergePreview = useCallback(async () => {
 		setIsLoadingPreview(true);
@@ -382,49 +403,41 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		setWorkspaceError(null);
 
 		try {
-			// Fetch both merge preview and updated worktree status in parallel
+			// Fetch merge preview, worktree diff, and updated worktree status in parallel
 			// This ensures the branch information (currentProjectBranch) is refreshed
 			// when the user clicks the refresh button after switching branches locally
 			// Use Promise.allSettled to handle partial failures - if one API call fails,
 			// the other's result is still processed rather than being discarded
-			const [previewResult, statusResult] = await Promise.allSettled([
+			const [previewResult, statusResult, diffResult] = await Promise.allSettled([
 				window.electronAPI.mergeWorktreePreview(task.id),
 				window.electronAPI.getWorktreeStatus(task.id),
+				window.electronAPI.getWorktreeDiff(task.id),
 			]);
 
 			const errors: string[] = [];
 
-			// Process merge preview result if fulfilled
-			if (previewResult.status === "fulfilled") {
-				const result = previewResult.value;
-				if (result.success && result.data?.preview) {
-					setMergePreview(result.data.preview);
-				} else if (!result.success && result.error) {
-					errors.push(`Merge preview: ${result.error}`);
-				}
-			} else {
-				console.error(
-					"[useTaskDetail] Failed to load merge preview:",
-					previewResult.reason,
-				);
-				errors.push("Failed to load merge preview");
-			}
+			processAPIResult(
+				previewResult,
+				"Merge preview",
+				(data: any) => {
+					setMergePreview(data?.preview);
+				},
+				errors,
+			);
 
-			// Update worktree status with fresh branch information if fulfilled
-			if (statusResult.status === "fulfilled") {
-				const result = statusResult.value;
-				if (result.success && result.data) {
-					setWorktreeStatus(result.data);
-				} else if (!result.success && result.error) {
-					errors.push(`Worktree status: ${result.error}`);
-				}
-			} else {
-				console.error(
-					"[useTaskDetail] Failed to load worktree status:",
-					statusResult.reason,
-				);
-				errors.push("Failed to load worktree status");
-			}
+			processAPIResult(
+				statusResult,
+				"Worktree status",
+				(data: WorktreeStatus) => setWorktreeStatus(data),
+				errors,
+			);
+
+			processAPIResult(
+				diffResult,
+				"Worktree diff",
+				(data: WorktreeDiff) => setWorktreeDiff(data),
+				errors,
+			);
 
 			// Set workspace error if any API calls failed
 			if (errors.length > 0) {
