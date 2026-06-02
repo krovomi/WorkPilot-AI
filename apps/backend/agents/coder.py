@@ -884,6 +884,30 @@ async def run_autonomous_agent(
         except Exception as exc:
             logger.debug(f"Loop detection check skipped: {exc}")
 
+        # Check for pause state in implementation plan
+        from .utils import is_paused, get_pause_state
+        plan = load_implementation_plan(spec_dir)
+        if plan and is_paused(plan):
+            pause_state = get_pause_state(plan)
+            print()
+            print_status("TASK PAUSED", "warning")
+            print(muted(f"Paused at: {pause_state.get('paused_at')}"))
+            if pause_state.get("paused_subtask_id"):
+                print(muted(f"Paused subtask: {pause_state.get('paused_subtask_id')}"))
+            if pause_state.get("provider"):
+                print(muted(f"Provider: {pause_state.get('provider')} ({pause_state.get('model')})"))
+
+            # Check if provider has changed since pause
+            if pause_state.get("provider") and pause_state.get("provider") != model:
+                model = pause_state.get("provider")
+                print_status(f"Provider updated to {model}", "success")
+
+            # Resume from paused subtask if specified
+            if pause_state.get("paused_subtask_id"):
+                print_status("Resuming from paused subtask", "success")
+
+            return
+
         # Check for human intervention (PAUSE file)
         pause_file = spec_dir / HUMAN_INTERVENTION_FILE
         if pause_file.exists():
