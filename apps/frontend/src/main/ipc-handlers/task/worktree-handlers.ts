@@ -3980,6 +3980,110 @@ export function registerWorktreeHandlers(
 	);
 
 	/**
+	 * Read a file from a worktree
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_WORKTREE_READ_FILE,
+		async (
+			_,
+			worktreePath: string,
+			relativePath: string,
+		): Promise<IPCResult<string>> => {
+			try {
+				const fullPath = path.join(worktreePath, relativePath);
+				const resolved = path.resolve(fullPath);
+				const resolvedWorktree = path.resolve(worktreePath);
+
+				// Security: ensure the resolved path is still inside the worktree
+				if (!resolved.startsWith(resolvedWorktree)) {
+					return { success: false, error: "Path traversal not allowed" };
+				}
+
+				const content = await fsPromises.readFile(resolved, "utf-8");
+				return { success: true, data: content };
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error ? error.message : "Failed to read file",
+				};
+			}
+		},
+	);
+
+	/**
+	 * Write a file to a worktree
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_WORKTREE_WRITE_FILE,
+		async (
+			_,
+			worktreePath: string,
+			relativePath: string,
+			content: string,
+		): Promise<IPCResult<{ written: boolean }>> => {
+			try {
+				const fullPath = path.join(worktreePath, relativePath);
+				const resolved = path.resolve(fullPath);
+				const resolvedWorktree = path.resolve(worktreePath);
+
+				// Security: ensure the resolved path is still inside the worktree
+				if (!resolved.startsWith(resolvedWorktree)) {
+					return { success: false, error: "Path traversal not allowed" };
+				}
+
+				// Ensure parent directory exists
+				await fsPromises.mkdir(path.dirname(resolved), { recursive: true });
+				await fsPromises.writeFile(resolved, content, "utf-8");
+
+				return { success: true, data: { written: true } };
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error ? error.message : "Failed to write file",
+				};
+			}
+		},
+	);
+
+	/**
+	 * Delete files from a worktree
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_WORKTREE_DELETE_FILES,
+		async (
+			_,
+			worktreePath: string,
+			relativePaths: string[],
+		): Promise<IPCResult<{ deleted: string[]; failed: string[] }>> => {
+			const deleted: string[] = [];
+			const failed: string[] = [];
+			const resolvedWorktree = path.resolve(worktreePath);
+
+			for (const relativePath of relativePaths) {
+				try {
+					const fullPath = path.join(worktreePath, relativePath);
+					const resolved = path.resolve(fullPath);
+
+					// Security: ensure the resolved path is still inside the worktree
+					if (!resolved.startsWith(resolvedWorktree)) {
+						failed.push(relativePath);
+						continue;
+					}
+
+					await fsPromises.unlink(resolved);
+					deleted.push(relativePath);
+				} catch {
+					failed.push(relativePath);
+				}
+			}
+
+			return { success: true, data: { deleted, failed } };
+		},
+	);
+
+	/**
 	 * Open a worktree directory in the specified IDE
 	 */
 	ipcMain.handle(

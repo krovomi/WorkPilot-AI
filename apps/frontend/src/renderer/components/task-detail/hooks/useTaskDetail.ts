@@ -124,6 +124,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const [isLoadingPlan, setIsLoadingPlan] = useState(false);
 	const logsEndRef = useRef<HTMLDivElement>(null);
 	const logsContainerRef = useRef<HTMLDivElement>(null);
+	const prevStatusRef = useRef<string | undefined>(task.status);
 
 	// Merge preview state
 	const [mergePreview, setMergePreview] = useState<{
@@ -184,6 +185,21 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 
 		return () => clearInterval(intervalId);
 	}, [task.id, isActiveTask]);
+
+	// Cache buster: when task transitions from human_review → in_progress (QA process starts),
+	// force a fresh load to bust the 3-second cache and allow incremental plan updates
+	useEffect(() => {
+		const prevStatus = prevStatusRef.current;
+		prevStatusRef.current = task.status;
+
+		if (
+			prevStatus === "human_review" &&
+			task.status === "in_progress" &&
+			selectedProject
+		) {
+			loadTasks(selectedProject.id, { forceRefresh: true });
+		}
+	}, [task.status, selectedProject]);
 
 	// Handle scroll events in logs to detect if user scrolled away from anchor
 	const handleLogsScroll = (e: React.UIEvent<HTMLDivElement>) => {

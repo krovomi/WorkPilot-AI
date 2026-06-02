@@ -282,20 +282,8 @@ function useTaskDetailHandlers(
 		state.setIsSubmitting(false);
 		state.setFeedback("");
 		state.setFeedbackImages([]);
-
-		// Reload tasks to show newly generated subtasks from feedback
-		if (task) {
-			await loadTasks(task.projectId);
-			// Update task in store with the reloaded data
-			const store = useTaskStore.getState();
-			const reloadedTask = store.tasks.find((t) => t.id === task.id);
-			if (reloadedTask && reloadedTask.subtasks.length > 0) {
-				// Force a re-render by updating the task
-				store.updateTask(task.id, {
-					...reloadedTask,
-				});
-			}
-		}
+		// No manual reload — the file watcher will push plan updates via TASK_PROGRESS
+		// when the QA subprocess writes new subtasks to implementation_plan.json
 	};
 
 	const handleDelete = async () => {

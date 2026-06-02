@@ -362,6 +362,19 @@ export interface ElectronAPI {
 			}>;
 		}>
 	>;
+	worktreeReadFile: (
+		worktreePath: string,
+		relativePath: string,
+	) => Promise<IPCResult<string>>;
+	worktreeWriteFile: (
+		worktreePath: string,
+		relativePath: string,
+		content: string,
+	) => Promise<IPCResult<{ written: boolean }>>;
+	worktreeDeleteFiles: (
+		worktreePath: string,
+		relativePaths: string[],
+	) => Promise<IPCResult<{ deleted: string[]; failed: string[] }>>;
 
 	// Task archive operations
 	archiveTasks: (

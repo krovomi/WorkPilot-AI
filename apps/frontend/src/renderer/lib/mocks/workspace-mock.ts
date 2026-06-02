@@ -138,4 +138,19 @@ export const workspaceMock = {
 			],
 		},
 	}),
+
+	worktreeReadFile: async () => ({
+		success: true,
+		data: "// Mock file content",
+	}),
+
+	worktreeWriteFile: async () => ({
+		success: true,
+		data: { written: true },
+	}),
+
+	worktreeDeleteFiles: async () => ({
+		success: true,
+		data: { deleted: [], failed: [] },
+	}),
 };

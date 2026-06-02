@@ -221,7 +221,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 							variant="ghost"
 							onClick={() => setIsEditing(true)}
 							className="ml-2 h-7 w-7 p-0"
-							title={t("tasks:plan.edit")}
+							title={t("tasks:modal.plan.edit")}
 						>
 							<Edit3 className="h-3.5 w-3.5" />
 						</Button>
@@ -254,7 +254,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 														e.target.value,
 													)
 												}
-												placeholder={t("tasks:plan.subtaskTitle")}
+												placeholder={t("tasks:modal.plan.subtaskTitle")}
 												className="w-full text-sm font-medium bg-background/50 rounded px-2 py-1 border border-border/50"
 											/>
 											<textarea
@@ -267,7 +267,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 														e.target.value,
 													)
 												}
-												placeholder={t("tasks:plan.subtaskDescription")}
+												placeholder={t("tasks:modal.plan.subtaskDescription")}
 												className="w-full text-xs bg-background/50 rounded px-2 py-1 border border-border/50 resize-none"
 												rows={2}
 											/>
@@ -294,7 +294,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 									className="w-full text-xs h-7"
 								>
 									<Plus className="h-3 w-3 mr-1" />
-									{t("tasks:plan.addSubtask")}
+									{t("tasks:modal.plan.addSubtask")}
 								</Button>
 							</div>
 						))}
@@ -309,10 +309,10 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 								{isSaving ? (
 									<>
 										<span className="animate-spin">⟳</span>
-										{t("tasks:plan.savingChanges")}
+										{t("tasks:modal.plan.savingChanges")}
 									</>
 								) : (
-									t("tasks:plan.save")
+									t("tasks:modal.plan.save")
 								)}
 							</Button>
 							<Button
@@ -334,7 +334,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 								disabled={isSaving}
 								className="flex-1"
 							>
-								{t("tasks:plan.cancel")}
+								{t("tasks:modal.plan.cancel")}
 							</Button>
 						</div>
 					</div>

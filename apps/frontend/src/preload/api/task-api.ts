@@ -139,6 +139,19 @@ export interface TaskAPI {
 			}>;
 		}>
 	>;
+	worktreeReadFile: (
+		worktreePath: string,
+		relativePath: string,
+	) => Promise<IPCResult<string>>;
+	worktreeWriteFile: (
+		worktreePath: string,
+		relativePath: string,
+		content: string,
+	) => Promise<IPCResult<{ written: boolean }>>;
+	worktreeDeleteFiles: (
+		worktreePath: string,
+		relativePaths: string[],
+	) => Promise<IPCResult<{ deleted: string[]; failed: string[] }>>;
 	archiveTasks: (
 		projectId: string,
 		taskIds: string[],
@@ -431,6 +444,32 @@ export const createTaskAPI = (): TaskAPI => ({
 			}>;
 		}>
 	> => ipcRenderer.invoke(IPC_CHANNELS.TASK_WORKTREE_DETECT_TOOLS),
+
+	worktreeReadFile: (worktreePath: string, relativePath: string) =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.TASK_WORKTREE_READ_FILE,
+			worktreePath,
+			relativePath,
+		),
+
+	worktreeWriteFile: (
+		worktreePath: string,
+		relativePath: string,
+		content: string,
+	) =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.TASK_WORKTREE_WRITE_FILE,
+			worktreePath,
+			relativePath,
+			content,
+		),
+
+	worktreeDeleteFiles: (worktreePath: string, relativePaths: string[]) =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.TASK_WORKTREE_DELETE_FILES,
+			worktreePath,
+			relativePaths,
+		),
 
 	archiveTasks: (
 		projectId: string,
