@@ -24,6 +24,7 @@ import { calculateProgress, cn, extractTextFromHtml } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import {
 	deleteTask,
+	loadTasks,
 	recoverStuckTask,
 	startTask,
 	stopTask,
@@ -281,6 +282,11 @@ function useTaskDetailHandlers(
 		state.setIsSubmitting(false);
 		state.setFeedback("");
 		state.setFeedbackImages([]);
+
+		// Reload tasks to show newly generated subtasks from feedback
+		if (task) {
+			await loadTasks(task.projectId);
+		}
 	};
 
 	const handleDelete = async () => {
