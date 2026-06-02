@@ -826,6 +826,7 @@ function TaskDetailModalContent({
 														isCreatingPR={state.isCreatingPR}
 														onShowPRDialog={state.setShowPRDialog}
 														onCreatePR={handleCreatePR}
+														onRefreshDiff={state.loadMergePreview}
 													/>
 												</>
 											)}

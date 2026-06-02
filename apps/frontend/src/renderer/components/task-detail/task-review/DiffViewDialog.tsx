@@ -5,8 +5,11 @@ import {
 	FileCode,
 	Folder,
 	FolderOpen,
+	Plus,
+	Save,
+	Trash2,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { WorktreeDiff, WorktreeDiffFile } from "../../../../shared/types";
 import { cn } from "../../../lib/utils";
@@ -20,7 +23,9 @@ import {
 	AlertDialogTitle,
 } from "../../ui/alert-dialog";
 import { Badge } from "../../ui/badge";
+import { Button } from "../../ui/button";
 import { DiffViewer } from "../../ui/diff-viewer";
+import { Input } from "../../ui/input";
 import {
 	Select,
 	SelectContent,
@@ -28,6 +33,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../../ui/select";
+import { Checkbox } from "../../ui/checkbox";
 
 // ── Tree data structure ──────────────────────────────────────────────
 
@@ -108,12 +114,18 @@ function FileTreeNode({
 	defaultExpanded,
 	t,
 	onFileClick,
+	selectedPaths,
+	onToggleSelect,
+	isSelectionMode,
 }: {
 	readonly node: TreeNode;
 	readonly depth: number;
 	readonly defaultExpanded: boolean;
 	readonly t: (key: string) => string;
 	readonly onFileClick?: (file: WorktreeDiffFile) => void;
+	readonly selectedPaths?: Set<string>;
+	readonly onToggleSelect?: (path: string) => void;
+	readonly isSelectionMode?: boolean;
 }) {
 	const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -157,6 +169,9 @@ function FileTreeNode({
 							defaultExpanded={false}
 							t={t}
 							onFileClick={onFileClick}
+							selectedPaths={selectedPaths}
+							onToggleSelect={onToggleSelect}
+							isSelectionMode={isSelectionMode}
 						/>
 					))}
 			</>
@@ -165,6 +180,8 @@ function FileTreeNode({
 
 	// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 	const file = node.file!;
+	const isSelected = selectedPaths?.has(file.path) ?? false;
+
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
 		// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere
@@ -172,10 +189,19 @@ function FileTreeNode({
 		<div
 			className="flex items-center justify-between p-1.5 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
 			style={{ paddingLeft: depth * 16 + 8 }}
-			onClick={() => onFileClick?.(file)}
 		>
-			<div className="flex items-center gap-1.5 min-w-0 flex-1">
-				<span className="w-3.5 shrink-0" />
+			<div
+				className="flex items-center gap-1.5 min-w-0 flex-1"
+				onClick={() => !isSelectionMode && onFileClick?.(file)}
+			>
+				{isSelectionMode && (
+					<Checkbox
+						checked={isSelected}
+						onCheckedChange={() => onToggleSelect?.(file.path)}
+						onClick={(e) => e.stopPropagation()}
+					/>
+				)}
+				{!isSelectionMode && <span className="w-4 shrink-0" />}
 				<FileCode
 					className={cn(
 						"h-4 w-4 shrink-0",
@@ -215,22 +241,37 @@ interface DiffViewDialogProps {
 	readonly open: boolean;
 	readonly worktreeDiff: WorktreeDiff | null;
 	readonly onOpenChange: (open: boolean) => void;
+	readonly worktreePath?: string;
+	readonly onRefresh?: () => void;
 }
 
 /**
  * Dialog displaying the list of changed files with their status and line changes.
  * Supports flat list and tree view modes, switchable via a dropdown.
+ * Allows editing, deleting, and adding files when worktreePath is provided.
  */
 export function DiffViewDialog({
 	open,
 	worktreeDiff,
 	onOpenChange,
+	worktreePath,
+	onRefresh,
 }: DiffViewDialogProps) {
 	const { t } = useTranslation(["taskReview"]);
 	const [viewMode, setViewMode] = useState<ViewMode>("list");
 	const [selectedFile, setSelectedFile] = useState<WorktreeDiffFile | null>(
 		null,
 	);
+	const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+	const [editingFile, setEditingFile] = useState<WorktreeDiffFile | null>(null);
+	const [editContent, setEditContent] = useState<string>("");
+	const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+	const [isSavingEdit, setIsSavingEdit] = useState(false);
+	const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+	const [showAddFile, setShowAddFile] = useState(false);
+	const [newFilePath, setNewFilePath] = useState("");
+	const [newFileContent, setNewFileContent] = useState("");
+	const [isSavingNewFile, setIsSavingNewFile] = useState(false);
 
 	const tree = useMemo(
 		() => (worktreeDiff?.files ? buildFileTree(worktreeDiff.files) : []),
@@ -238,6 +279,8 @@ export function DiffViewDialog({
 	);
 
 	const hasFiles = worktreeDiff?.files && worktreeDiff.files.length > 0;
+	const isEditMode = !!editingFile && !selectedPaths.size;
+	const isSelectionMode = selectedPaths.size > 0;
 
 	const handleFileClick = useCallback((file: WorktreeDiffFile) => {
 		setSelectedFile(file);
@@ -247,8 +290,145 @@ export function DiffViewDialog({
 		setSelectedFile(null);
 	}, []);
 
+	const handleToggleSelect = useCallback((path: string) => {
+		setSelectedPaths((prev) => {
+			const next = new Set(prev);
+			if (next.has(path)) {
+				next.delete(path);
+			} else {
+				next.add(path);
+			}
+			return next;
+		});
+	}, []);
+
+	const handleEditFile = useCallback(
+		async (file: WorktreeDiffFile) => {
+			if (!worktreePath) return;
+			const api = (globalThis as any).electron;
+			if (!api?.worktreeReadFile) return;
+			setEditingFile(file);
+			setIsLoadingEdit(true);
+			try {
+				const result = await api.worktreeReadFile(
+					worktreePath,
+					file.path,
+				);
+				if (result.success) {
+					setEditContent(result.data);
+				}
+			} finally {
+				setIsLoadingEdit(false);
+			}
+		},
+		[worktreePath],
+	);
+
+	const handleSaveEdit = useCallback(async () => {
+		if (!editingFile || !worktreePath || !onRefresh) {
+			return;
+		}
+
+		const api = (globalThis as any).electron;
+		if (!api?.worktreeWriteFile) return;
+
+		setIsSavingEdit(true);
+		try {
+			const result = await api.worktreeWriteFile(
+				worktreePath,
+				editingFile.path,
+				editContent,
+			);
+			if (result.success) {
+				setEditingFile(null);
+				setEditContent("");
+				onRefresh();
+			}
+		} finally {
+			setIsSavingEdit(false);
+		}
+	}, [editingFile, worktreePath, editContent, onRefresh]);
+
+	const handleCancelEdit = useCallback(() => {
+		setEditingFile(null);
+		setEditContent("");
+	}, []);
+
+	const handleDeleteSelected = useCallback(async () => {
+		if (selectedPaths.size === 0 || !worktreePath || !onRefresh) {
+			return;
+		}
+
+		const api = (globalThis as any).electron;
+		if (!api?.worktreeDeleteFiles) return;
+
+		setIsDeletingSelected(true);
+		try {
+			const result = await api.worktreeDeleteFiles(
+				worktreePath,
+				Array.from(selectedPaths),
+			);
+			if (result.success) {
+				setSelectedPaths(new Set());
+				onRefresh();
+			}
+		} finally {
+			setIsDeletingSelected(false);
+		}
+	}, [selectedPaths, worktreePath, onRefresh]);
+
+	const handleAddFile = useCallback(async () => {
+		if (!newFilePath || !worktreePath || !onRefresh) {
+			return;
+		}
+
+		const api = (globalThis as any).electron;
+		if (!api?.worktreeWriteFile) return;
+
+		setIsSavingNewFile(true);
+		try {
+			const result = await api.worktreeWriteFile(
+				worktreePath,
+				newFilePath,
+				newFileContent,
+			);
+			if (result.success) {
+				setShowAddFile(false);
+				setNewFilePath("");
+				setNewFileContent("");
+				onRefresh();
+			}
+		} finally {
+			setIsSavingNewFile(false);
+		}
+	}, [newFilePath, newFileContent, worktreePath, onRefresh]);
+
 	// Helper function to render the appropriate content based on selection and view mode
 	const renderContent = () => {
+		// Edit mode: show textarea editor
+		if (editingFile) {
+			return (
+				<div className="h-full flex flex-col gap-4">
+					<div className="text-sm text-muted-foreground">
+						{editingFile.path}
+					</div>
+					{isLoadingEdit ? (
+						<div className="text-center py-8 text-muted-foreground">
+							{t("taskReview:diff.loading")}
+						</div>
+					) : (
+						<textarea
+							value={editContent}
+							onChange={(e) => setEditContent(e.target.value)}
+							className="flex-1 p-3 font-mono text-sm bg-muted border rounded resize-none"
+							spellCheck={false}
+						/>
+					)}
+				</div>
+			);
+		}
+
+		// View diff mode
 		if (selectedFile) {
 			return (
 				<div className="h-full">
@@ -256,6 +436,35 @@ export function DiffViewDialog({
 						patch={selectedFile.patch || ""}
 						className="h-full max-h-[75vh] overflow-auto border rounded"
 					/>
+				</div>
+			);
+		}
+
+		// Add file mode
+		if (showAddFile) {
+			return (
+				<div className="h-full flex flex-col gap-4">
+					<div className="space-y-2">
+						<label className="text-sm font-medium">
+							{t("taskReview:diff.filePath")}
+						</label>
+						<Input
+							placeholder="src/example.ts"
+							value={newFilePath}
+							onChange={(e) => setNewFilePath(e.target.value)}
+						/>
+					</div>
+					<div className="flex-1 flex flex-col gap-2">
+						<label className="text-sm font-medium">
+							{t("taskReview:diff.fileContent")}
+						</label>
+						<textarea
+							value={newFileContent}
+							onChange={(e) => setNewFileContent(e.target.value)}
+							className="flex-1 p-3 font-mono text-sm bg-muted border rounded resize-none"
+							spellCheck={false}
+						/>
+					</div>
 				</div>
 			);
 		}
@@ -271,49 +480,88 @@ export function DiffViewDialog({
 		if (viewMode === "list") {
 			return (
 				<div className="space-y-2">
-					{worktreeDiff?.files.map((file, idx) => (
-						// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-						// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere
-						// biome-ignore lint/a11y/noNoninteractiveElementInteractions: selectable file row
-						<div
-							// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
-							key={idx}
-							className="flex items-center justify-between p-2 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
-							onClick={() => handleFileClick(file)}
-						>
-							<div className="flex items-center gap-2 min-w-0 flex-1">
-								<FileCode
-									className={cn(
-										"h-4 w-4 shrink-0",
-										file.status === "added" && "text-success",
-										file.status === "deleted" && "text-destructive",
-										file.status === "modified" && "text-info",
-										file.status === "renamed" && "text-warning",
-									)}
-								/>
-								<span className="text-sm font-mono truncate">{file.path}</span>
-							</div>
-							<div className="flex items-center gap-2 shrink-0 ml-2">
-								<Badge
-									variant="secondary"
-									className={cn(
-										"text-xs",
-										file.status === "added" && "bg-success/10 text-success",
-										file.status === "deleted" &&
-											"bg-destructive/10 text-destructive",
-										file.status === "modified" && "bg-info/10 text-info",
-										file.status === "renamed" && "bg-warning/10 text-warning",
-									)}
+					{worktreeDiff?.files.map((file, idx) => {
+						const isSelected = selectedPaths.has(file.path);
+						return (
+							// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
+							// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere
+							// biome-ignore lint/a11y/noNoninteractiveElementInteractions: selectable file row
+							<div
+								// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
+								key={idx}
+								className="flex items-center justify-between p-2 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+							>
+								<div
+									className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
+									onClick={() =>
+										isSelectionMode
+											? handleToggleSelect(file.path)
+											: handleFileClick(file)
+									}
 								>
-									{t(`taskReview:diff.status.${file.status}`)}
-								</Badge>
-								<span className="text-xs text-success">+{file.additions}</span>
-								<span className="text-xs text-destructive">
-									-{file.deletions}
-								</span>
+									{isSelectionMode && (
+										<Checkbox
+											checked={isSelected}
+											onCheckedChange={() =>
+												handleToggleSelect(file.path)
+											}
+											onClick={(e) => e.stopPropagation()}
+										/>
+									)}
+									{!isSelectionMode && <span className="w-4 shrink-0" />}
+									<FileCode
+										className={cn(
+											"h-4 w-4 shrink-0",
+											file.status === "added" && "text-success",
+											file.status === "deleted" &&
+												"text-destructive",
+											file.status === "modified" && "text-info",
+											file.status === "renamed" && "text-warning",
+										)}
+									/>
+									<span className="text-sm font-mono truncate">
+										{file.path}
+									</span>
+								</div>
+								<div className="flex items-center gap-2 shrink-0 ml-2">
+									<Badge
+										variant="secondary"
+										className={cn(
+											"text-xs",
+											file.status === "added" &&
+												"bg-success/10 text-success",
+											file.status === "deleted" &&
+												"bg-destructive/10 text-destructive",
+											file.status === "modified" &&
+												"bg-info/10 text-info",
+											file.status === "renamed" &&
+												"bg-warning/10 text-warning",
+										)}
+									>
+										{t(`taskReview:diff.status.${file.status}`)}
+									</Badge>
+									<span className="text-xs text-success">
+										+{file.additions}
+									</span>
+									<span className="text-xs text-destructive">
+										-{file.deletions}
+									</span>
+									{!isSelectionMode && worktreePath && (
+										<Button
+											size="sm"
+											variant="ghost"
+											onClick={(e) => {
+												e.stopPropagation();
+												handleEditFile(file);
+											}}
+										>
+											{t("taskReview:diff.edit")}
+										</Button>
+									)}
+								</div>
 							</div>
-						</div>
-					))}
+						);
+					})}
 				</div>
 			);
 		}
@@ -329,6 +577,9 @@ export function DiffViewDialog({
 						defaultExpanded={true}
 						t={t}
 						onFileClick={handleFileClick}
+						selectedPaths={selectedPaths}
+						onToggleSelect={handleToggleSelect}
+						isSelectionMode={isSelectionMode}
 					/>
 				))}
 			</div>
@@ -339,9 +590,35 @@ export function DiffViewDialog({
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
 			<AlertDialogContent className="max-w-7xl max-h-[95vh] w-[95vw] h-[90vh] overflow-hidden flex flex-col">
 				<AlertDialogHeader>
-					<div className="flex items-center justify-between">
+					<div className="flex items-center justify-between gap-4">
 						<AlertDialogTitle className="flex items-center gap-2">
-							{selectedFile ? (
+							{editingFile ? (
+								<>
+									<button
+										type="button"
+										onClick={handleCancelEdit}
+										className="mr-2 p-1 hover:bg-muted rounded transition-colors"
+										title={t("taskReview:diff.cancel")}
+									>
+										<ChevronRight className="h-4 w-4 rotate-180" />
+									</button>
+									<FileCode className="h-5 w-5 text-blue-400" />
+									{t("taskReview:diff.editFile")}
+								</>
+							) : showAddFile ? (
+								<>
+									<button
+										type="button"
+										onClick={() => setShowAddFile(false)}
+										className="mr-2 p-1 hover:bg-muted rounded transition-colors"
+										title={t("taskReview:diff.cancel")}
+									>
+										<ChevronRight className="h-4 w-4 rotate-180" />
+									</button>
+									<Plus className="h-5 w-5 text-green-400" />
+									{t("taskReview:diff.addFile")}
+								</>
+							) : selectedFile ? (
 								<>
 									<button
 										type="button"
@@ -361,29 +638,42 @@ export function DiffViewDialog({
 								</>
 							)}
 						</AlertDialogTitle>
-						{!selectedFile && hasFiles && (
-							<Select
-								value={viewMode}
-								onValueChange={(v) => setViewMode(v as ViewMode)}
-							>
-								<SelectTrigger className="w-[140px] h-8 text-xs">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="list">
-										{t("taskReview:diff.flatList")}
-									</SelectItem>
-									<SelectItem value="tree">
-										{t("taskReview:diff.treeView")}
-									</SelectItem>
-								</SelectContent>
-							</Select>
+
+						{!selectedFile && !editingFile && !showAddFile && hasFiles && (
+							<div className="flex items-center gap-2">
+								{isSelectionMode && (
+									<span className="text-sm text-muted-foreground">
+										{selectedPaths.size} {t("taskReview:diff.filesSelected")}
+									</span>
+								)}
+								<Select
+									value={viewMode}
+									onValueChange={(v) => setViewMode(v as ViewMode)}
+									disabled={isSelectionMode}
+								>
+									<SelectTrigger className="w-[140px] h-8 text-xs">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="list">
+											{t("taskReview:diff.flatList")}
+										</SelectItem>
+										<SelectItem value="tree">
+											{t("taskReview:diff.treeView")}
+										</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
 						)}
 					</div>
 					<AlertDialogDescription>
-						{selectedFile
-							? `${selectedFile.path} - ${t(`taskReview:diff.status.${selectedFile.status}`)} (+${selectedFile.additions}, -${selectedFile.deletions})`
-							: worktreeDiff?.summary || t("taskReview:diff.noChanges")}
+						{editingFile
+							? editingFile.path
+							: showAddFile
+								? t("taskReview:diff.addingNewFile")
+								: selectedFile
+									? `${selectedFile.path} - ${t(`taskReview:diff.status.${selectedFile.status}`)} (+${selectedFile.additions}, -${selectedFile.deletions})`
+									: worktreeDiff?.summary || t("taskReview:diff.noChanges")}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 
@@ -391,8 +681,83 @@ export function DiffViewDialog({
 					{renderContent()}
 				</div>
 
+				{isSelectionMode && (
+					<div className="border-t pt-4 flex items-center justify-between bg-secondary/50 -mx-6 px-6 py-4 rounded-b-lg">
+						<span className="text-sm font-medium">
+							{selectedPaths.size} {t("taskReview:diff.filesSelected")}
+						</span>
+						<Button
+							variant="destructive"
+							size="sm"
+							onClick={handleDeleteSelected}
+							disabled={isDeletingSelected}
+						>
+							<Trash2 className="h-4 w-4 mr-2" />
+							{isDeletingSelected
+								? t("taskReview:diff.deleting")
+								: t("taskReview:diff.deleteSelected")}
+						</Button>
+					</div>
+				)}
+
 				<AlertDialogFooter className="mt-4">
-					<AlertDialogCancel>{t("taskReview:diff.close")}</AlertDialogCancel>
+					{editingFile && (
+						<>
+							<Button
+								variant="outline"
+								onClick={handleCancelEdit}
+								disabled={isSavingEdit}
+							>
+								{t("taskReview:diff.cancel")}
+							</Button>
+							<Button
+								onClick={handleSaveEdit}
+								disabled={isSavingEdit}
+							>
+								<Save className="h-4 w-4 mr-2" />
+								{isSavingEdit
+									? t("taskReview:diff.saving")
+									: t("taskReview:diff.save")}
+							</Button>
+						</>
+					)}
+					{showAddFile && (
+						<>
+							<Button
+								variant="outline"
+								onClick={() => setShowAddFile(false)}
+								disabled={isSavingNewFile}
+							>
+								{t("taskReview:diff.cancel")}
+							</Button>
+							<Button
+								onClick={handleAddFile}
+								disabled={isSavingNewFile || !newFilePath}
+							>
+								<Plus className="h-4 w-4 mr-2" />
+								{isSavingNewFile
+									? t("taskReview:diff.creating")
+									: t("taskReview:diff.create")}
+							</Button>
+						</>
+					)}
+					{!editingFile && !showAddFile && (
+						<>
+							{worktreePath && !isSelectionMode && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setShowAddFile(true)}
+								>
+									<Plus className="h-4 w-4 mr-2" />
+									{t("taskReview:diff.addFile")}
+								</Button>
+							)}
+							<AlertDialogCancel>
+								{t("taskReview:diff.close")}
+							</AlertDialogCancel>
+						</>
+					)}
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>

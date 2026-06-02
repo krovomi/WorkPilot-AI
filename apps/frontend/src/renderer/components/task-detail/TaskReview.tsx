@@ -74,6 +74,7 @@ interface TaskReviewProps {
 		title?: string;
 		draft?: boolean;
 	}) => Promise<WorktreeCreatePRResult | null>;
+	readonly onRefreshDiff?: () => void;
 }
 
 /**
@@ -121,6 +122,7 @@ export function TaskReview({
 	isCreatingPR,
 	onShowPRDialog,
 	onCreatePR,
+	onRefreshDiff,
 }: TaskReviewProps) {
 	// Extract nested ternary into a clear variable
 	const workspaceStatusComponent = (() => {
@@ -214,6 +216,8 @@ export function TaskReview({
 				open={showDiffDialog}
 				worktreeDiff={worktreeDiff}
 				onOpenChange={onShowDiffDialog}
+				worktreePath={worktreeStatus?.worktreePath}
+				onRefresh={onRefreshDiff}
 			/>
 
 			{/* Conflict Details Dialog */}
