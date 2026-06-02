@@ -4048,7 +4048,7 @@ export function registerWorktreeHandlers(
 	);
 
 	/**
-	 * Delete files from a worktree
+	 * Discard changes to files in a worktree (git checkout)
 	 */
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_WORKTREE_DELETE_FILES,
@@ -4063,24 +4063,23 @@ export function registerWorktreeHandlers(
 
 			for (const relativePath of relativePaths) {
 				try {
-					// Normalize the relative path to use forward slashes then convert to platform-specific
-					const normalizedPath = relativePath.replace(/\\/g, "/").replace(/\//g, path.sep);
-					const fullPath = path.join(resolvedWorktree, normalizedPath);
+					// Security: validate path stays within worktree
+					const fullPath = path.join(resolvedWorktree, relativePath);
 					const resolved = path.resolve(fullPath);
-
-					// Security: ensure the resolved path is still inside the worktree
-					// Use relative() to check if path is inside worktree
 					const relative = path.relative(resolvedWorktree, resolved);
 					if (relative.startsWith("..")) {
 						failed.push(relativePath);
 						continue;
 					}
 
-					await fsPromises.unlink(resolved);
+					// Discard changes using git checkout
+					await execAsync(`git checkout HEAD -- "${relativePath}"`, {
+						cwd: resolvedWorktree,
+					});
 					deleted.push(relativePath);
 				} catch (error) {
 					console.error(
-						`[WORKTREE_DELETE] Failed to delete ${relativePath}:`,
+						`[WORKTREE_DISCARD] Failed to discard changes to ${relativePath}:`,
 						error,
 					);
 					failed.push(relativePath);
