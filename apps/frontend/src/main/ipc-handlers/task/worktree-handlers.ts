@@ -4072,8 +4072,7 @@ export function registerWorktreeHandlers(
 						continue;
 					}
 
-					// Discard changes: restore file from the target branch (develop)
-					// This ensures the merge preview no longer shows the file as changed
+					// Discard changes: remove from git tracking so it doesn't appear in diffs
 					const statusResult = await execAsync(
 						`git status --porcelain -- "${relativePath}"`,
 						{ cwd: resolvedWorktree },
@@ -4081,16 +4080,17 @@ export function registerWorktreeHandlers(
 					const statusOutput = statusResult.stdout.trim();
 
 					if (statusOutput.startsWith("??")) {
-						// Untracked file, remove it
+						// Untracked file, just remove it
 						await fsPromises.unlink(resolved);
 					} else if (statusOutput) {
 						// File is tracked but modified or deleted
-						// Restore from develop branch so merge preview no longer shows it as changed
-						await execAsync(
-							`git checkout develop -- "${relativePath}"`,
-							{ cwd: resolvedWorktree },
-						);
+						// Remove from git index so it doesn't appear in merge diff
+						// Use --force to allow removing modified files
+						await execAsync(`git rm --force "${relativePath}"`, {
+							cwd: resolvedWorktree,
+						});
 					}
+
 					deleted.push(relativePath);
 				} catch (error) {
 					console.error(
