@@ -588,6 +588,8 @@ async def post_session_processing(
         # Automatically mark as blocked - no commits means no code implementation,
         # just the agent asking questions
         old_status = subtask.get("status", "pending")
+
+        # FORCE the status to "blocked" - ignore whatever the LLM set it to
         subtask["status"] = "blocked"
         subtask["_blocked_reason"] = "Manual testing required - no code changes"
 
@@ -597,12 +599,13 @@ async def post_session_processing(
         try:
             save_implementation_plan(spec_dir, plan)
             print_status(
-                f"Auto-marked subtask {subtask_id} as BLOCKED (manual testing required, was {old_status})",
-                "info",
+                f"✓ Auto-blocked subtask {subtask_id} (manual verification, {new_commits} commits, was {old_status})",
+                "warning",
             )
             subtask_status = "blocked"
         except Exception as e:
-            print(f"  Warning: Could not auto-mark as blocked: {e}")
+            logger.error(f"Could not auto-mark as blocked: {e}")
+            print(f"  ✗ Warning: Could not auto-mark as blocked: {e}")
 
     if subtask_status == "completed":
         # Success! Record the attempt and good commit
