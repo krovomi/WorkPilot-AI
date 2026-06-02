@@ -328,7 +328,19 @@ Verify:""")
         sections.append("")
     else:
         instructions = verification.get("instructions", "Manual verification required")
-        sections.append(f"**Manual Verification:**\n{instructions}\n")
+        sections.append(f"**Manual Verification (Autonomous Mode):**\n{instructions}\n")
+        sections.append("""
+⚠️ **IMPORTANT - Autonomous Decision Required:**
+Since this subtask requires manual testing and cannot be automated:
+1. DO NOT ask the user what to do
+2. DO NOT wait for human confirmation
+3. **AUTOMATICALLY update this subtask's status to "blocked" in implementation_plan.json**
+4. Add a note explaining why it's blocked (manual testing required)
+5. Move to the NEXT subtask
+
+The implementation is complete from a code perspective. Mark it as blocked to indicate
+that QA testing is required before this can be marked complete.
+""")
 
     # Instructions
     sections.append(f"""## Instructions

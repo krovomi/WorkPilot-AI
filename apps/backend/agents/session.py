@@ -576,6 +576,34 @@ async def post_session_processing(
     print_key_value("Subtask status", subtask_status)
     print_key_value("New commits", str(new_commits))
 
+    # AUTO-BLOCK: If this is a manual verification task and no commits were made,
+    # automatically mark it as "blocked" without waiting for human input.
+    # This prevents the coder from asking "should I mark this as blocked?" indefinitely.
+    verification = subtask.get("verification", {})
+    is_manual_verification = verification.get("type") == "manual"
+
+    if (
+        is_manual_verification
+        and new_commits == 0
+        and subtask_status == "pending"
+    ):
+        # Automatically mark as blocked - no commits means no code implementation,
+        # just the agent asking questions
+        subtask["status"] = "blocked"
+        subtask["_blocked_reason"] = "Manual testing required - no code changes"
+
+        # Update implementation plan
+        from qa.criteria import save_implementation_plan
+        try:
+            save_implementation_plan(spec_dir, plan)
+            print_status(
+                f"Auto-marked subtask {subtask_id} as BLOCKED (manual testing required)",
+                "info",
+            )
+            subtask_status = "blocked"
+        except Exception as e:
+            print(f"  Warning: Could not auto-mark as blocked: {e}")
+
     if subtask_status == "completed":
         # Success! Record the attempt and good commit
         print_status(f"Subtask {subtask_id} completed successfully", "success")
@@ -662,6 +690,42 @@ async def post_session_processing(
             print_status("Memory save failed", "warning")
 
         return True
+
+    elif subtask_status == "blocked":
+        # Subtask marked as blocked (waiting for manual testing/human intervention)
+        print_status(
+            f"Subtask {subtask_id} blocked: {subtask.get('_blocked_reason', 'waiting for manual testing')}",
+            "warning",
+        )
+
+        # Record the blocked attempt
+        recovery_manager.record_attempt(
+            subtask_id=subtask_id,
+            session=session_num,
+            success=True,  # Blocking is considered success from code perspective
+            approach=f"Marked as blocked: {subtask.get('_blocked_reason', 'manual testing required')}",
+        )
+
+        # Update status file
+        if status_manager:
+            subtasks = count_subtasks_detailed(spec_dir)
+            status_manager.update_subtasks(
+                completed=subtasks["completed"],
+                total=subtasks["total"],
+                in_progress=0,
+            )
+
+        # Record Linear session result (if enabled)
+        if linear_enabled:
+            attempt_count = recovery_manager.get_attempt_count(subtask_id)
+            await linear_subtask_failed(
+                spec_dir=spec_dir,
+                subtask_id=subtask_id,
+                attempt=attempt_count,
+                error_summary=f"Blocked: {subtask.get('_blocked_reason', 'manual testing required')}",
+            )
+
+        return True  # Blocking is considered success - move to next subtask
 
     elif subtask_status == "in_progress":
         # Session ended without completion
