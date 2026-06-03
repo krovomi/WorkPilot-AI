@@ -1,6 +1,7 @@
 import {
 	AlertCircle,
 	CheckCircle2,
+	ChevronRight,
 	Clock,
 	Code2,
 	Edit3,
@@ -19,6 +20,7 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { TaskCodeEditor } from "./TaskCodeEditor";
+import { SubtaskFilesViewer } from "./SubtaskFilesViewer";
 
 interface Phase {
 	name: string;
@@ -72,6 +74,8 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [selectedSubtaskForCodeEdit, setSelectedSubtaskForCodeEdit] =
+		useState<Subtask | null>(null);
+	const [selectedSubtaskForFilesView, setSelectedSubtaskForFilesView] =
 		useState<Subtask | null>(null);
 	const [editedPhases, setEditedPhases] = useState<Phase[]>(
 		task.subtasks.length > 0
@@ -154,6 +158,16 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 			field
 		] = value;
 		setEditedPhases(newPhases);
+	}
+
+	if (selectedSubtaskForFilesView) {
+		return (
+			<SubtaskFilesViewer
+				files={selectedSubtaskForFilesView.files || []}
+				subtaskTitle={selectedSubtaskForFilesView.title}
+				onClose={() => setSelectedSubtaskForFilesView(null)}
+			/>
+		);
 	}
 
 	if (selectedSubtaskForCodeEdit) {
@@ -350,8 +364,11 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 						{task.subtasks.map((subtask, index) => (
 							<div
 								key={subtask.id}
+								onClick={() => {
+									setSelectedSubtaskForFilesView(subtask);
+								}}
 								className={cn(
-									"rounded-xl border border-border bg-secondary/30 p-3 transition-all duration-200 hover:bg-secondary/50",
+									"rounded-xl border border-border bg-secondary/30 p-3 transition-all duration-200 hover:bg-secondary/50 cursor-pointer group",
 									subtask.status === "in_progress" &&
 										"border-[var(--info)]/50 bg-[var(--info-light)] ring-1 ring-info/20",
 									subtask.status === "completed" &&
@@ -360,10 +377,10 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 										"border-[var(--error)]/50 bg-[var(--error-light)]",
 								)}
 							>
-								<div className="flex items-start gap-2">
+								<div className="flex items-start gap-2 w-full">
 									{getSubtaskStatusIcon(subtask.status)}
 									<div className="flex-1 min-w-0">
-										<div className="flex items-center gap-2 min-w-0">
+										<div className="flex items-center gap-2 min-w-0 w-full">
 											<span
 												className={cn(
 													"text-[10px] font-medium px-1.5 py-0.5 rounded-full",
@@ -385,22 +402,25 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 												</TooltipContent>
 											</Tooltip>
 										</div>
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<p className="mt-1 text-xs text-muted-foreground line-clamp-2 cursor-default">
-													{subtask.description}
-												</p>
-											</TooltipTrigger>
-											{subtask.description &&
-												subtask.description.length > 80 && (
-													<TooltipContent side="bottom" className="max-w-sm">
-														<p className="text-xs">{subtask.description}</p>
-													</TooltipContent>
-												)}
-										</Tooltip>
+										<div className="flex items-start justify-between gap-2 w-full">
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<p className="text-xs text-muted-foreground line-clamp-2 cursor-default">
+														{subtask.description}
+													</p>
+												</TooltipTrigger>
+												{subtask.description &&
+													subtask.description.length > 80 && (
+														<TooltipContent side="bottom" className="max-w-sm">
+															<p className="text-xs">{subtask.description}</p>
+														</TooltipContent>
+													)}
+											</Tooltip>
+											<ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+										</div>
 										{subtask.files && subtask.files.length > 0 && (
-											<div className="mt-2 flex flex-wrap gap-1 items-center">
-												{subtask.files.map((file: string) => (
+											<div className="flex flex-wrap gap-1 items-center">
+												{subtask.files.slice(0, 2).map((file: string) => (
 													<Tooltip key={file}>
 														<TooltipTrigger asChild>
 															<Badge
@@ -419,13 +439,21 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 														</TooltipContent>
 													</Tooltip>
 												))}
+												{subtask.files.length > 2 && (
+													<Badge variant="outline" className="text-xs">
+														+{subtask.files.length - 2} more
+													</Badge>
+												)}
 												{subtask.status === "pending" && (
 													<Tooltip>
 														<TooltipTrigger asChild>
 															<Button
 																size="sm"
 																variant="ghost"
-																onClick={() => setSelectedSubtaskForCodeEdit(subtask)}
+																onClick={(e) => {
+																	e.stopPropagation();
+																	setSelectedSubtaskForCodeEdit(subtask);
+																}}
 																className="h-6 w-6 p-0 ml-1"
 															>
 																<Edit3 className="h-3 w-3" />

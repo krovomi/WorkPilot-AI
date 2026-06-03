@@ -811,7 +811,7 @@ git add . ':!.workpilot'
 # 2. Run git status to see what git sees
 # 3. Adjust your paths accordingly
 
-git commit -m "auto-claude: Complete [subtask-id] - [subtask description]
+git commit -m "workpilot-ai: Complete [subtask-id] - [subtask description]
 
 - Files modified: [list]
 - Verification: [type] - passed
