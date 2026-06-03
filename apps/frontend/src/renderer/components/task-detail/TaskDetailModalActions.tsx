@@ -152,12 +152,12 @@ export function TaskDetailModalActions({
 				{state.isRecovering ? (
 					<>
 						<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-						Recovering...
+						{t("tasks:modal.actions.recovering")}
 					</>
 				) : (
 					<>
 						<RotateCcw className="mr-2 h-4 w-4" />
-						Recover Task
+						{t("tasks:modal.actions.recoverTask")}
 					</>
 				)}
 			</Button>

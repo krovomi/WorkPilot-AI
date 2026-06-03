@@ -502,12 +502,12 @@ function TaskDetailModalContent({
 					{state.isRecovering ? (
 						<>
 							<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-							Recovering...
+							{t("tasks:modal.actions.recovering")}
 						</>
 					) : (
 						<>
 							<RotateCcw className="mr-2 h-4 w-4" />
-							Recover Task
+							{t("tasks:modal.actions.recoverTask")}
 						</>
 					)}
 				</Button>
@@ -524,12 +524,12 @@ function TaskDetailModalContent({
 					{state.isLoadingPlan ? (
 						<>
 							<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-							Loading Plan...
+							{t("tasks:modal.actions.loadingPlan")}
 						</>
 					) : (
 						<>
 							<Play className="mr-2 h-4 w-4" />
-							Resume Task
+							{t("tasks:modal.actions.resumeTask")}
 						</>
 					)}
 				</Button>
