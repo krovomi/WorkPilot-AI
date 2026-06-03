@@ -79,22 +79,22 @@ export function PlanApprovalSection({
 			<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
 				<h3 className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
 					<CheckCircle2 className="h-4 w-4 text-amber-500" />
-					{t("plan.approvalRequired")}
+					{t("tasks:modal.plan.approvalRequired")}
 				</h3>
 				<p className="text-sm text-muted-foreground mb-4">
-					{t("plan.approvalDescription")}
+					{t("tasks:modal.plan.approvalDescription")}
 				</p>
 
 				{/* Rejection reason textarea - shown when user wants to reject */}
 				{isRejecting && (
 					<div className="mb-4">
 						<label className="text-xs font-medium text-foreground mb-2 block">
-							{t("plan.rejectionReason")}
+							{t("tasks:modal.plan.rejectionReason")}
 						</label>
 						<textarea
 							value={rejectionReason}
 							onChange={(e) => setRejectionReason(e.target.value)}
-							placeholder={t("plan.rejectionPlaceholder")}
+							placeholder={t("tasks:modal.plan.rejectionPlaceholder")}
 							className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
 							rows={3}
 							disabled={isSubmitting}
@@ -114,12 +114,12 @@ export function PlanApprovalSection({
 						{isApproving ? (
 							<>
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								{t("plan.approving")}
+								{t("tasks:modal.plan.approving")}
 							</>
 						) : (
 							<>
 								<CheckCircle2 className="h-4 w-4 mr-2" />
-								{t("plan.approvePlan")}
+								{t("tasks:modal.plan.approvePlan")}
 							</>
 						)}
 					</Button>
@@ -134,12 +134,12 @@ export function PlanApprovalSection({
 						{isRejecting ? (
 							<>
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								{t("plan.rejecting")}
+								{t("tasks:modal.plan.rejecting")}
 							</>
 						) : (
 							<>
 								<XCircle className="h-4 w-4 mr-2" />
-								{t("plan.rejectPlan")}
+								{t("tasks:modal.plan.rejectPlan")}
 							</>
 						)}
 					</Button>
