@@ -20,6 +20,7 @@ import {
 	StagedSuccessMessage,
 	WorkspaceStatus,
 } from "./task-review";
+import { PlanApprovalSection } from "./PlanApprovalSection";
 
 interface TaskReviewProps {
 	readonly task: Task;
@@ -179,6 +180,9 @@ export function TaskReview({
 		<div className="space-y-4">
 			{/* Section divider */}
 			<div className="section-divider-gradient" />
+
+			{/* Plan Approval Section - shown when task requires plan review before coding */}
+			<PlanApprovalSection task={task} isSubmitting={isSubmitting} />
 
 			{/* Staged Success Message */}
 			{stagedSuccess && (

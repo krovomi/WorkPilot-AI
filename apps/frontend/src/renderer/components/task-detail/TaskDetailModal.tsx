@@ -60,6 +60,7 @@ import { useTaskDetail } from "./hooks/useTaskDetail";
 import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
+import { TaskPhaseBar } from "./TaskPhaseBar";
 import {
 	pauseTask,
 	resumeTask,
@@ -773,6 +774,8 @@ function TaskDetailModalContent({
 										</TabsTrigger>
 									)}
 								</TabsList>
+
+								<TaskPhaseBar phaseLogs={state.phaseLogs} />
 
 								{/* Overview Tab */}
 								<TabsContent

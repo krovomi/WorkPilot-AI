@@ -229,6 +229,7 @@
 			"auth_failure_paused": "Auth Required",
 			"reviewing": "Reviewing",
 			"fixing": "Fixing",
+			"validation": "Validation",
 			"complete": "Complete",
 			"failed": "Failed"
 		},
@@ -536,7 +537,15 @@
 			"savingChanges": "Saving...",
 			"changesSaved": "Changes saved successfully",
 			"saveError": "Failed to save changes",
-			"emptyTitle": "Title cannot be empty"
+			"emptyTitle": "Title cannot be empty",
+			"approvalRequired": "Plan Approval Required",
+			"approvalDescription": "Review the implementation plan above. Approve to proceed with coding, or request changes.",
+			"approvePlan": "Approve Plan",
+			"rejectPlan": "Request Changes",
+			"approving": "Approving...",
+			"rejecting": "Rejecting...",
+			"rejectionReason": "Reason for changes (optional)",
+			"rejectionPlaceholder": "Describe what needs to be changed in the plan..."
 		}
 	}
 }

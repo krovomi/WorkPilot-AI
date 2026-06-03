@@ -229,6 +229,7 @@
 			"auth_failure_paused": "Auth requise",
 			"reviewing": "Révision",
 			"fixing": "Correction",
+			"validation": "Validation",
 			"complete": "Terminé",
 			"failed": "Échoué"
 		},
@@ -536,7 +537,15 @@
 			"savingChanges": "Enregistrement...",
 			"changesSaved": "Modifications enregistrées",
 			"saveError": "Erreur lors de l'enregistrement",
-			"emptyTitle": "Le titre ne peut pas être vide"
+			"emptyTitle": "Le titre ne peut pas être vide",
+			"approvalRequired": "Approbation du plan requise",
+			"approvalDescription": "Vérifiez le plan d'implémentation ci-dessus. Approuvez pour procéder au codage, ou demandez des modifications.",
+			"approvePlan": "Approuver le plan",
+			"rejectPlan": "Demander des modifications",
+			"approving": "Approbation en cours...",
+			"rejecting": "Rejet en cours...",
+			"rejectionReason": "Raison des modifications (optionnel)",
+			"rejectionPlaceholder": "Décrivez ce qui doit être modifié dans le plan..."
 		}
 	}
 }
