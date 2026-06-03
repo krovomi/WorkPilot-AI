@@ -1184,11 +1184,22 @@ export function registerTaskExecutionHandlers(
 			// Validate status transition - 'done' creates a PR for human review
 			// A worktree must exist with uncommitted or unpushed changes
 			if (status === "done") {
+				// If a PR already exists for this task, skip PR creation
+				// (e.g. task moved out of "done" column and back in)
+				const existingPrUrl =
+					task.prUrl || task.metadata?.prUrl;
+				if (existingPrUrl) {
+					console.warn(
+						`[TASK_UPDATE_STATUS] PR already exists for task ${taskId}: ${existingPrUrl} — skipping creation`,
+					);
+					status = "pr_created";
+				}
+
 				// Check if worktree exists (task.specId matches worktree folder name)
 				const worktreePath = findTaskWorktree(project.path, task.specId);
 				const hasWorktree = worktreePath !== null;
 
-				if (hasWorktree) {
+				if (!existingPrUrl && hasWorktree) {
 					// Worktree exists - create PR for human validation
 					console.warn(
 						`[TASK_UPDATE_STATUS] Creating PR for task ${taskId} (status: done)`,
@@ -1207,7 +1218,6 @@ export function registerTaskExecutionHandlers(
 
 						const backendPath = path.join(
 							__dirname,
-							"..",
 							"..",
 							"..",
 							"..",
@@ -1256,6 +1266,8 @@ print(json.dumps(result))
 							"develop";
 
 						// Execute Python script to create PR
+						// Run from backendPath so Python resolves all
+						// internal imports (core.*, debug, services.*) correctly.
 						const result = execFileSync(
 							pythonExecutable,
 							[
@@ -1267,7 +1279,7 @@ print(json.dumps(result))
 								baseBranch,
 							],
 							{
-								cwd: project.path,
+								cwd: backendPath,
 								encoding: "utf-8",
 								timeout: 60000, // 60 seconds timeout for PR creation
 								env: {
