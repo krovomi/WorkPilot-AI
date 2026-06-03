@@ -3036,45 +3036,16 @@ export function registerWorktreeHandlers(
 								staged = true;
 							} else {
 								// Full merge (not stage-only)
-								newStatus = "done";
-								planStatus = "completed";
-								message = "Changes merged successfully";
+								// Keep in human_review to allow user validation before completion
+								newStatus = "human_review";
+								planStatus = "review";
+								message = "Changes merged successfully. Review and mark complete when ready.";
 								staged = false;
 
-								// Clean up worktree after successful full merge (fixes #243)
-								// This allows drag-to-Done workflow since TASK_UPDATE_STATUS blocks 'done' when worktree exists
-								// Uses shared cleanup utility for robust Windows support (fixes #1539)
-								if (worktreePath && existsSync(worktreePath)) {
-									const cleanupResult = await cleanupWorktree({
-										worktreePath,
-										projectPath: project.path,
-										specId: task.specId,
-										commitMessage: "Auto-save before merge cleanup",
-										logPrefix: "[TASK_WORKTREE_MERGE]",
-										deleteBranch: true,
-									});
-
-									if (cleanupResult.success) {
-										debug(
-											"Worktree cleaned up after full merge:",
-											worktreePath,
-										);
-										if (cleanupResult.branch) {
-											debug("Task branch deleted:", cleanupResult.branch);
-										}
-									} else {
-										debug(
-											"Worktree cleanup failed (non-fatal):",
-											cleanupResult.warnings,
-										);
-										// Non-fatal - merge succeeded, cleanup can be done manually
-									}
-
-									// Log any warnings for debugging
-									if (cleanupResult.warnings.length > 0) {
-										debug("Cleanup warnings:", cleanupResult.warnings);
-									}
-								}
+								// NOTE: Do NOT auto-cleanup worktree after merge
+								// User must explicitly drag task to "Done" column to confirm cleanup
+								// This prevents accidental data loss and ensures user validates merge first.
+								// The worktree will be cleaned up when user moves task to "Done" status.
 							}
 
 							debug(

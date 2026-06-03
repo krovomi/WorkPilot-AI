@@ -50,6 +50,7 @@ import { readSettingsFile } from "../../settings-utils";
 import { taskStateManager } from "../../task-state-manager";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
 import { findTaskWorktree } from "../../worktree-paths";
+import { cleanupWorktree } from "../../utils/worktree-cleanup";
 import {
 	createPlanIfNotExists,
 	getPlanPath,
@@ -1300,6 +1301,41 @@ print(json.dumps(result))
 									{ prUrl: prResult.pr_url },
 									project.id,
 								);
+							}
+
+							// Clean up worktree after successful PR creation
+							const worktreePath = findTaskWorktree(project.path, task.specId);
+							if (worktreePath && existsSync(worktreePath)) {
+								try {
+									console.warn(
+										`[TASK_UPDATE_STATUS] Cleaning up worktree after PR creation: ${worktreePath}`,
+									);
+									const cleanupResult = await cleanupWorktree({
+										worktreePath,
+										projectPath: project.path,
+										specId: task.specId,
+										commitMessage: "Auto-save before cleanup after PR creation",
+										logPrefix: "[TASK_UPDATE_STATUS]",
+										deleteBranch: true,
+									});
+
+									if (cleanupResult.success) {
+										console.warn(
+											`[TASK_UPDATE_STATUS] Worktree cleaned up after PR creation`,
+										);
+									} else {
+										console.warn(
+											`[TASK_UPDATE_STATUS] Worktree cleanup had warnings:`,
+											cleanupResult.warnings,
+										);
+									}
+								} catch (cleanupError) {
+									console.error(
+										`[TASK_UPDATE_STATUS] Error during worktree cleanup:`,
+										cleanupError,
+									);
+									// Non-fatal - PR was created successfully
+								}
 							}
 
 							// Transition to pr_created status
