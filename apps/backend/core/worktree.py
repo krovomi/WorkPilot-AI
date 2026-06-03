@@ -894,8 +894,8 @@ class WorktreeManager:
                 error_msg += f"  ... and {len(changed_files) - 10} more\n"
             error_msg += (
                 "\nPlease commit or stash these changes before removing the worktree.\n"
-                f"In the worktree, run: git add . && git commit -m 'Save changes'\n"
-                f"Or use: git stash"
+                "In the worktree, run: git add . && git commit -m 'Save changes'\n"
+                "Or use: git stash"
             )
             raise RuntimeError(error_msg)
 
