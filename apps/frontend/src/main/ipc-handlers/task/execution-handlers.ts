@@ -1216,12 +1216,9 @@ export function registerTaskExecutionHandlers(
 
 						// Prepare the script to call the task completion service
 						const scriptContent = `
-import sys
 import json
+import sys
 from pathlib import Path
-
-# Add backend to path
-sys.path.insert(0, '${backendPath.replaceAll("\\", "\\\\")}')
 
 from services.task_completion_service import create_task_completion_service
 
@@ -1273,7 +1270,11 @@ print(json.dumps(result))
 								cwd: project.path,
 								encoding: "utf-8",
 								timeout: 60000, // 60 seconds timeout for PR creation
-								env: { ...process.env, APP_LANGUAGE: getAppLanguage() },
+								env: {
+									...process.env,
+									APP_LANGUAGE: getAppLanguage(),
+									PYTHONPATH: backendPath,
+								},
 							},
 						);
 
