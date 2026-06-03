@@ -552,7 +552,7 @@ class MigrationService {
 	private async startMigration(config: MigrationConfig): Promise<any> {
 		return new Promise((resolve, reject) => {
 			const pythonPath: string = process.env.PYTHON_PATH || "python";
-			const backendPath = path.join(__dirname, "..", "..", "..", "backend");
+			const backendPath = path.join(__dirname, "..", "..", "..", "..", "backend");
 
 			const args = [
 				"-m",
@@ -625,7 +625,7 @@ class MigrationService {
 	): Promise<MigrationStatus> {
 		return new Promise((resolve, reject) => {
 			const pythonPath: string = process.env.PYTHON_PATH || "python";
-			const backendPath = path.join(__dirname, "..", "..", "..", "backend");
+			const backendPath = path.join(__dirname, "..", "..", "..", "..", "backend");
 
 			const childProcess = spawn(
 				pythonPath,
@@ -668,7 +668,7 @@ class MigrationService {
 	private async pauseMigration(migrationId: string): Promise<void> {
 		return new Promise((resolve, reject) => {
 			const pythonPath: string = process.env.PYTHON_PATH || "python";
-			const backendPath = path.join(__dirname, "..", "..", "..", "backend");
+			const backendPath = path.join(__dirname, "..", "..", "..", "..", "backend");
 
 			const childProcess = spawn(
 				pythonPath,
@@ -696,7 +696,7 @@ class MigrationService {
 	private async resumeMigration(migrationId: string): Promise<any> {
 		return new Promise((resolve, reject) => {
 			const pythonPath: string = process.env.PYTHON_PATH || "python";
-			const backendPath = path.join(__dirname, "..", "..", "..", "backend");
+			const backendPath = path.join(__dirname, "..", "..", "..", "..", "backend");
 
 			const childProcess = spawn(
 				pythonPath,
@@ -726,7 +726,7 @@ class MigrationService {
 	): Promise<void> {
 		return new Promise((resolve, reject) => {
 			const pythonPath: string = process.env.PYTHON_PATH || "python";
-			const backendPath = path.join(__dirname, "..", "..", "..", "backend");
+			const backendPath = path.join(__dirname, "..", "..", "..", "..", "backend");
 
 			const args = [
 				"-m",
