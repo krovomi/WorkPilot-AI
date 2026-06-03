@@ -55,6 +55,8 @@ import {
 	getPlanPath,
 	persistPlanStatus,
 	updatePlanSubtasks,
+	getModifiedFilesFromWorktree,
+	generateSubtasksFromModifiedFiles,
 } from "./plan-file-utils";
 import { findTaskAndProject } from "./shared";
 
@@ -1049,6 +1051,87 @@ export function registerTaskExecutionHandlers(
 					};
 				}
 
+				// Generate subtasks from modified files and feedback
+				// This creates new subtasks in the implementation plan with the modified files attached
+				if (hasWorktree && worktreePath) {
+					try {
+						console.warn("[TASK_REVIEW] Generating subtasks from modified files...");
+
+						// Get modified files from the worktree
+						const modifiedFiles = getModifiedFilesFromWorktree(worktreePath);
+
+						if (modifiedFiles.length > 0) {
+							// Generate subtasks grouped by directory
+							const newSubtasks = generateSubtasksFromModifiedFiles(
+								modifiedFiles,
+								feedback || "Needs fixes based on user feedback",
+							);
+
+							// Load the current implementation plan
+							const planPath = path.join(
+								worktreeSpecDir || specDir,
+								AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
+							);
+
+							try {
+								const planContent = readFileSync(planPath, "utf-8");
+								const plan = JSON.parse(planContent);
+
+								// Add new subtasks to the Implementation phase or create it
+								if (!plan.phases) {
+									plan.phases = [];
+								}
+
+								let implPhase = plan.phases.find(
+									(p: Record<string, unknown>) => p.name === "Implementation",
+								);
+								if (!implPhase) {
+									implPhase = { name: "Implementation", subtasks: [] };
+									plan.phases.push(implPhase);
+								}
+
+								// Add the new subtasks
+								if (!Array.isArray(implPhase.subtasks)) {
+									implPhase.subtasks = [];
+								}
+								implPhase.subtasks.push(...newSubtasks);
+
+								// Update the plan file
+								writeFileSync(planPath, JSON.stringify(plan, null, 2), "utf-8");
+
+								console.warn(
+									`[TASK_REVIEW] Added ${newSubtasks.length} new subtasks to implementation plan`,
+								);
+								appLog.info(
+									`[TASK_REVIEW] Generated ${newSubtasks.length} subtasks from ${modifiedFiles.length} modified files`,
+								);
+							} catch (planError) {
+								console.warn(
+									"[TASK_REVIEW] Could not update implementation plan with subtasks:",
+									planError,
+								);
+								// Log but don't fail - the QA process will still run
+								appLog.warning(
+									`[TASK_REVIEW] Failed to generate subtasks from modified files: ${planError instanceof Error ? planError.message : String(planError)}`,
+								);
+							}
+						} else {
+							console.warn(
+								"[TASK_REVIEW] No modified files detected in worktree",
+							);
+						}
+					} catch (subtaskError) {
+						console.warn(
+							"[TASK_REVIEW] Error generating subtasks:",
+							subtaskError,
+						);
+						// Don't fail the review - continue with QA process
+						appLog.warning(
+							`[TASK_REVIEW] Failed to generate subtasks: ${subtaskError instanceof Error ? subtaskError.message : String(subtaskError)}`,
+						);
+					}
+				}
+
 				// Restart QA process - use worktree path if it exists, otherwise main project
 				// The QA process needs to run where the implementation_plan.json with completed subtasks is
 				const qaProjectPath = hasWorktree ? worktreePath : project.path;
@@ -1123,6 +1206,7 @@ export function registerTaskExecutionHandlers(
 
 						const backendPath = path.join(
 							__dirname,
+							"..",
 							"..",
 							"..",
 							"..",
