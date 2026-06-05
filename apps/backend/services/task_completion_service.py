@@ -272,9 +272,7 @@ class TaskCompletionService:
                     pr_already_exists=False,
                     error=error_msg,
                 )
-            logger.info(
-                f"[TaskCompletionService] Committed {len(changed_files)} files"
-            )
+            logger.info(f"[TaskCompletionService] Committed {len(changed_files)} files")
 
         # Étape 1: Push de la branche vers origin
         logger.info("[TaskCompletionService] Push de la branche vers origin...")

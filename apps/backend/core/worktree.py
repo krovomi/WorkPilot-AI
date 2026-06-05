@@ -884,9 +884,7 @@ class WorktreeManager:
 
         return len(changed_files) > 0, changed_files
 
-    def _count_commits_ahead(
-        self, spec_name: str, target_branch: str
-    ) -> int | None:
+    def _count_commits_ahead(self, spec_name: str, target_branch: str) -> int | None:
         """
         Compte les commits de la branche du worktree en avance sur ``target_branch``.
 
@@ -971,7 +969,9 @@ class WorktreeManager:
                 print(f"Removed worktree: {worktree_path.name}")
             else:
                 # Don't silently delete on git failure - raise exception instead
-                stderr_msg = result.stderr[:200] if result.stderr else "<no error details>"
+                stderr_msg = (
+                    result.stderr[:200] if result.stderr else "<no error details>"
+                )
                 raise RuntimeError(
                     f"Failed to remove worktree '{spec_name}' via git: {stderr_msg}\n"
                     f"Worktree path: {worktree_path}\n"
@@ -1157,9 +1157,7 @@ class WorktreeManager:
         patterns = [".workpilot", ".workpilot-*"]
 
         # Détecte les fichiers suivis correspondant aux motifs WorkPilot.
-        ls = self._run_git(
-            ["ls-files", "--", *patterns], cwd=worktree_path
-        )
+        ls = self._run_git(["ls-files", "--", *patterns], cwd=worktree_path)
         tracked = [line.strip() for line in ls.stdout.splitlines() if line.strip()]
         if not tracked:
             return []
@@ -1199,7 +1197,6 @@ class WorktreeManager:
             spec_name,
         )
         return tracked
-
 
     # ==================== Listing & Discovery ====================
 

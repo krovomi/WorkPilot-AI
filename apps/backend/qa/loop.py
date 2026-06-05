@@ -140,6 +140,7 @@ def _ensure_fix_request_file(
         )
         return False
 
+
 # Configuration
 MAX_QA_ITERATIONS = 50
 MAX_CONSECUTIVE_ERRORS = 3  # Stop after 3 consecutive errors without progress
