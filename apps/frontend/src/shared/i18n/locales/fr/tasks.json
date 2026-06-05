@@ -288,6 +288,16 @@
 			"skipped": "ignorée"
 		}
 	},
+	"emulator": {
+		"tab": "Émulateur",
+		"title": "Émulateur manuel",
+		"description": "Démarrez l'application et laissez-la tourner pour réaliser des tests manuels.",
+		"persistenceHint": "L'émulateur reste actif tant que vous n'appuyez pas sur Arrêter ou que l'application n'est pas fermée.",
+		"runtimePath": "Chemin démarré",
+		"noProjectTitle": "Projet introuvable",
+		"noProjectDescription": "Impossible de démarrer l'émulateur sans le chemin du projet associé à cette tâche.",
+		"otherProjectWarning": "Un émulateur semble déjà actif pour un autre projet. Redémarrez pour basculer vers cette tâche."
+	},
 	"metadata": {
 		"severity": "sévérité",
 		"pullRequest": "Pull Request",

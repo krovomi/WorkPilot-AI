@@ -288,6 +288,16 @@
 			"skipped": "skipped"
 		}
 	},
+	"emulator": {
+		"tab": "Emulator",
+		"title": "Manual emulator",
+		"description": "Start the application and keep it running for manual testing.",
+		"persistenceHint": "The emulator stays active until you press Stop or close the application.",
+		"runtimePath": "Started path",
+		"noProjectTitle": "Project not found",
+		"noProjectDescription": "The emulator cannot start without the project path associated with this task.",
+		"otherProjectWarning": "An emulator appears to be active for another project. Restart it to switch to this task."
+	},
 	"metadata": {
 		"severity": "severity",
 		"pullRequest": "Pull Request",

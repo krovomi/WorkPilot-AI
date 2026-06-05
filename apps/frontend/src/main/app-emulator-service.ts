@@ -195,6 +195,72 @@ export class AppEmulatorService extends EventEmitter {
 		return false;
 	}
 
+	private findNestedProjectDir(rootDir: string, maxDepth: number): string | null {
+		const skipDirs = new Set([
+			".git",
+			".workpilot",
+			".vs",
+			"bin",
+			"obj",
+			"node_modules",
+			"packages",
+			"TestResults",
+			"dist",
+			"build",
+		]);
+		const preferredNames = new Set(["src", "source", "sources", "app", "web"]);
+		const queue: Array<{ dir: string; depth: number }> = [
+			{ dir: rootDir, depth: 0 },
+		];
+		const candidates: Array<{ dir: string; score: number }> = [];
+
+		while (queue.length > 0) {
+			const current = queue.shift();
+			if (!current || current.depth > maxDepth) continue;
+
+			let entries: string[];
+			try {
+				entries = readdirSync(current.dir);
+			} catch {
+				continue;
+			}
+
+			if (current.dir !== rootDir && this.hasProjectMarkers(current.dir)) {
+				const baseName = path.basename(current.dir).toLowerCase();
+				const hasSolution = entries.some((entry) => entry.endsWith(".sln"));
+				const hasCsproj = entries.some((entry) => entry.endsWith(".csproj"));
+				const score =
+					current.depth * 10 +
+					(hasSolution ? 0 : hasCsproj ? 1 : 3) +
+					(preferredNames.has(baseName) ? -2 : 0);
+				candidates.push({ dir: current.dir, score });
+				continue;
+			}
+
+			const directories = entries
+				.filter((entry) => !entry.startsWith(".") && !skipDirs.has(entry))
+				.sort((left, right) => {
+					const leftPreferred = preferredNames.has(left.toLowerCase()) ? 0 : 1;
+					const rightPreferred = preferredNames.has(right.toLowerCase()) ? 0 : 1;
+					return leftPreferred - rightPreferred || left.localeCompare(right);
+				});
+
+			for (const entry of directories) {
+				const fullPath = path.join(current.dir, entry);
+				try {
+					if (statSync(fullPath).isDirectory()) {
+						queue.push({ dir: fullPath, depth: current.depth + 1 });
+					}
+				} catch {
+					/* ignore */
+				}
+			}
+		}
+
+		candidates.sort((left, right) => left.score - right.score);
+		return candidates[0]?.dir ?? null;
+	}
+
 	/**
 	 * If `projectDir` is a WorkPilot workspace stub (contains .workpilot/ but no
 	 * actual source), try the parent and its sibling directories (preferring ones
@@ -202,6 +268,9 @@ export class AppEmulatorService extends EventEmitter {
 	 */
 	private resolveSourceDir(projectDir: string): string {
 		if (this.hasProjectMarkers(projectDir)) return projectDir;
+
+		const nestedProjectDir = this.findNestedProjectDir(projectDir, 5);
+		if (nestedProjectDir) return nestedProjectDir;
 
 		const hasWorkpilot = existsSync(path.join(projectDir, ".workpilot"));
 		if (!hasWorkpilot) return projectDir;
@@ -516,51 +585,22 @@ export class AppEmulatorService extends EventEmitter {
 			};
 		}
 
-		// .NET projects (*.sln at root)
+		// .NET projects (*.sln or *.csproj at root)
 		try {
 			const rootFiles = readdirSync(projectDir);
-			if (rootFiles.some((f) => f.endsWith(".sln"))) {
+			const rootCsproj = rootFiles.find((file) => file.endsWith(".csproj"));
+			if (rootFiles.some((f) => f.endsWith(".sln")) || rootCsproj) {
 				// Find the .NET project directory (contains *.csproj) and read its HTTP port.
 				// findDotnetProjectDir looks for a dir with a .csproj + Program.cs/Startup.cs.
 				// If it returns null (e.g. multiple .csproj without a clear entry point), fall back
 				// to locating any .csproj file and using its parent directory.
 				let dotnetDir = this.findDotnetProjectDir(projectDir, 4);
-				if (!dotnetDir) {
-					const csprojFile = this.findFirstCsprojFile(projectDir, 5);
-					dotnetDir = csprojFile ? path.dirname(csprojFile) : projectDir;
-				}
-				const dotnetPort = this.readDotnetPort(dotnetDir) ?? 5000;
-				const frontendResult = this.findFrontendInSubdirs(projectDir, 3);
-
-				if (frontendResult) {
-					// Fullstack: launch .NET backend AND frontend separately so both are reachable.
-					// The backend port becomes the API Studio base URL; the frontend runs in parallel.
-					const frontendDir = frontendResult.projectDir ?? projectDir;
-					return this.buildFullstackConfig(
-						{
-							framework: "dotnet",
-							startCommand: "dotnet run",
-							port: dotnetPort,
-							projectDir: dotnetDir,
-						},
-						{
-							framework: frontendResult.framework,
-							startCommand: frontendResult.startCommand,
-							port: frontendResult.port,
-							projectDir: frontendDir,
-						},
-					);
-				}
-
-				// Pure .NET backend — single service
-				return {
-					type: "web",
-					framework: "dotnet",
-					startCommand: "dotnet run",
-					port: dotnetPort,
-					isWeb: true,
-					projectDir: dotnetDir,
-				};
+				const csprojFile =
+					rootCsproj && dotnetDir === projectDir
+						? path.join(projectDir, rootCsproj)
+						: this.findFirstCsprojFile(projectDir, 5);
+				dotnetDir = dotnetDir ?? (csprojFile ? path.dirname(csprojFile) : projectDir);
+				return this.buildDotnetConfig(projectDir, dotnetDir, csprojFile);
 			}
 		} catch {
 			/* ignore */
@@ -733,6 +773,126 @@ export class AppEmulatorService extends EventEmitter {
 		} catch {
 			return false;
 		}
+	}
+
+	private readCsprojContent(csprojPath: string): string {
+		try {
+			return readFileSync(csprojPath, "utf-8");
+		} catch {
+			return "";
+		}
+	}
+
+	private isLegacyDotnetFrameworkProject(csprojPath: string): boolean {
+		const content = this.readCsprojContent(csprojPath);
+		return (
+			/<TargetFrameworkVersion>\s*v4(?:\.\d+)?\s*<\/TargetFrameworkVersion>/i.test(
+				content,
+			) || /<TargetFramework>\s*net4\d+\s*<\/TargetFramework>/i.test(content)
+		);
+	}
+
+	private isLegacyWebProject(csprojPath: string): boolean {
+		const content = this.readCsprojContent(csprojPath);
+		const projectDir = path.dirname(csprojPath);
+		return (
+			/\{349c5851-65df-11da-9384-00065b846f21\}/i.test(content) ||
+			/Microsoft\.WebApplication\.targets/i.test(content) ||
+			existsSync(path.join(projectDir, "Web.config")) ||
+			existsSync(path.join(projectDir, "Global.asax"))
+		);
+	}
+
+	private buildIisExpressCommand(projectDir: string, port: number): string {
+		const candidates = [
+			process.env["PROGRAMFILES(X86)"],
+			process.env.ProgramFiles,
+		]
+			.filter((base): base is string => Boolean(base))
+			.map((base) => path.join(base, "IIS Express", "iisexpress.exe"));
+		const iisExpressPath =
+			candidates.find((candidate) => existsSync(candidate)) ?? "iisexpress";
+		return `"${iisExpressPath}" /path:"${projectDir}" /port:${port}`;
+	}
+
+	private readAssemblyName(csprojPath: string): string {
+		const content = this.readCsprojContent(csprojPath);
+		const assemblyMatch = content.match(/<AssemblyName>\s*([^<]+)\s*<\/AssemblyName>/i);
+		if (assemblyMatch?.[1]) return assemblyMatch[1].trim();
+		return path.basename(csprojPath, path.extname(csprojPath));
+	}
+
+	private buildLegacyDesktopCommand(csprojPath: string): string {
+		const projectDir = path.dirname(csprojPath);
+		const assemblyName = this.readAssemblyName(csprojPath);
+		const escapedCsproj = csprojPath.replaceAll("'", "''");
+		const escapedBinDir = path.join(projectDir, "bin", "Debug").replaceAll("'", "''");
+		const escapedAssemblyName = assemblyName.replaceAll("'", "''");
+		return [
+			"powershell",
+			"-NoProfile",
+			"-ExecutionPolicy Bypass",
+			"-Command",
+			`"$ErrorActionPreference='Stop'; msbuild '${escapedCsproj}' /p:Configuration=Debug; $exe=Get-ChildItem -Path '${escapedBinDir}' -Recurse -Filter '${escapedAssemblyName}.exe' | Select-Object -First 1; if (-not $exe) { throw 'No executable produced' }; & $exe.FullName"`,
+		].join(" ");
+	}
+
+	private buildDotnetConfig(
+		rootDir: string,
+		dotnetDir: string,
+		csprojPath: string | null,
+	): AppEmulatorConfig {
+		if (csprojPath && this.isLegacyDotnetFrameworkProject(csprojPath)) {
+			const port = this.readDotnetPort(dotnetDir) ?? 8080;
+			if (this.isLegacyWebProject(csprojPath)) {
+				return {
+					type: "web",
+					framework: "dotnet-framework-iis-express",
+					startCommand: this.buildIisExpressCommand(dotnetDir, port),
+					port,
+					isWeb: true,
+					projectDir: dotnetDir,
+				};
+			}
+			return {
+				type: "desktop",
+				framework: "dotnet-framework-desktop",
+				startCommand: this.buildLegacyDesktopCommand(csprojPath),
+				port: 0,
+				isWeb: false,
+				projectDir: dotnetDir,
+			};
+		}
+
+		const dotnetPort = this.readDotnetPort(dotnetDir) ?? 5000;
+		const frontendResult = this.findFrontendInSubdirs(rootDir, 3);
+
+		if (frontendResult) {
+			const frontendDir = frontendResult.projectDir ?? rootDir;
+			return this.buildFullstackConfig(
+				{
+					framework: "dotnet",
+					startCommand: "dotnet run",
+					port: dotnetPort,
+					projectDir: dotnetDir,
+				},
+				{
+					framework: frontendResult.framework,
+					startCommand: frontendResult.startCommand,
+					port: frontendResult.port,
+					projectDir: frontendDir,
+				},
+			);
+		}
+
+		return {
+			type: "web",
+			framework: "dotnet",
+			startCommand: "dotnet run",
+			port: dotnetPort,
+			isWeb: true,
+			projectDir: dotnetDir,
+		};
 	}
 
 	/**
@@ -966,11 +1126,14 @@ export class AppEmulatorService extends EventEmitter {
 		// .NET: check this dir AND one level of subdirs (covers nested project layouts)
 		try {
 			const entries = readdirSync(dir);
-			if (entries.some((f) => f.endsWith(".csproj"))) {
+			const csproj = entries.find((f) => f.endsWith(".csproj"));
+			if (csproj) {
+				const config = this.buildDotnetConfig(dir, dir, path.join(dir, csproj));
 				return {
-					framework: "dotnet",
-					startCommand: "dotnet run",
-					port: this.readDotnetPort(dir) ?? 5000,
+					framework: config.framework,
+					startCommand: config.startCommand,
+					port: config.port,
+					projectDir: config.projectDir,
 				};
 			}
 			// One level deeper (e.g. solution root → project subdir)
@@ -985,12 +1148,18 @@ export class AppEmulatorService extends EventEmitter {
 				const sub = path.join(dir, entry);
 				try {
 					if (!statSync(sub).isDirectory()) continue;
-					if (readdirSync(sub).some((f) => f.endsWith(".csproj"))) {
+					const subCsproj = readdirSync(sub).find((f) => f.endsWith(".csproj"));
+					if (subCsproj) {
+						const config = this.buildDotnetConfig(
+							dir,
+							sub,
+							path.join(sub, subCsproj),
+						);
 						return {
-							framework: "dotnet",
-							startCommand: "dotnet run",
-							port: this.readDotnetPort(sub) ?? 5000,
-							projectDir: sub,
+							framework: config.framework,
+							startCommand: config.startCommand,
+							port: config.port,
+							projectDir: config.projectDir,
 						};
 					}
 				} catch {
@@ -1523,10 +1692,11 @@ export class AppEmulatorService extends EventEmitter {
 
 			this.emit("status", `Starting: ${config.startCommand}`);
 
-			// Parse command
 			const isWindows = process.platform === "win32";
 			const shell = isWindows ? true : undefined;
-			const [cmd, ...args] = config.startCommand.split(" ");
+			const [cmd, ...args] = isWindows
+				? [config.startCommand]
+				: config.startCommand.split(" ");
 
 			const proc = spawn(cmd, args, {
 				cwd: projectDir,
@@ -1675,7 +1845,9 @@ export class AppEmulatorService extends EventEmitter {
 		for (const svc of secondaries) {
 			if (skipSpawn.has(svc.label)) continue;
 			this.emit("output", `[${svc.label}] Starting: ${svc.startCommand}`);
-			const [cmd, ...args] = svc.startCommand.split(" ");
+			const [cmd, ...args] = isWindows
+				? [svc.startCommand]
+				: svc.startCommand.split(" ");
 			// Patch @ngtools/webpack to fix the %20 encoding bug (paths with spaces).
 			// Angular must run from the real path so TypeScript & webpack use the same paths.
 			if (svc.framework === "angular") {
@@ -1722,7 +1894,9 @@ export class AppEmulatorService extends EventEmitter {
 
 		// Spawn primary service — drives 'ready' and waitForPort checks
 		this.emit("status", `Starting: ${primary.startCommand}`);
-		const [primaryCmd, ...primaryArgs] = primary.startCommand.split(" ");
+		const [primaryCmd, ...primaryArgs] = isWindows
+			? [primary.startCommand]
+			: primary.startCommand.split(" ");
 		// Patch @ngtools/webpack for the %20 bug if primary is Angular.
 		if (primary.framework === "angular") {
 			await this.patchAngularWebpack(primary.projectDir);
@@ -1822,9 +1996,12 @@ export class AppEmulatorService extends EventEmitter {
 		newPort: number,
 	): string {
 		return cmd.replaceAll(
-			new RegExp(String.raw`(--port\s+)${oldPort}|(\bPORT=)${oldPort}`, "g"),
-			(_m: string, p1: string, p2: string) =>
-				p1 ? `${p1}${newPort}` : `${p2}${newPort}`,
+			new RegExp(
+				String.raw`(--port\s+)${oldPort}|(\bPORT=)${oldPort}|(/port:)${oldPort}`,
+				"g",
+			),
+			(_m: string, p1: string, p2: string, p3: string) =>
+				p1 ? `${p1}${newPort}` : p2 ? `${p2}${newPort}` : `${p3}${newPort}`,
 		);
 	}
 

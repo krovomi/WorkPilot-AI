@@ -74,6 +74,7 @@ import { TaskSubtasks } from "./TaskSubtasks";
 import { TaskVisualProof } from "./TaskVisualProof";
 import { TaskWarnings } from "./TaskWarnings";
 import { SyncFromBranchDialog } from "./task-review/SyncFromBranchDialog";
+import { TaskEmulator } from "./TaskEmulator";
 
 interface TaskDetailModalProps {
 	readonly open: boolean;
@@ -880,6 +881,12 @@ function TaskDetailModalContent({
 									>
 										{t("tasks:visualProof.tab")}
 									</TabsTrigger>
+									<TabsTrigger
+										value="emulator"
+										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+									>
+										{t("tasks:emulator.tab")}
+									</TabsTrigger>
 								</TabsList>
 
 								{/* Overview Tab */}
@@ -993,6 +1000,18 @@ function TaskDetailModalContent({
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
 									<TaskVisualProof task={task} />
+								</TabsContent>
+
+								{/* Emulator Tab */}
+								<TabsContent
+									value="emulator"
+									className="flex-1 min-h-0 overflow-hidden mt-0"
+								>
+									<TaskEmulator
+										taskId={task.id}
+										project={taskProject ?? activeProject}
+										worktreePath={state.worktreeStatus?.worktreePath}
+									/>
 								</TabsContent>
 							</Tabs>
 						</div>
