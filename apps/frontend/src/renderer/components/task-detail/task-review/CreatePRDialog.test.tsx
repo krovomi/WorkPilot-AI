@@ -466,4 +466,36 @@ describe("CreatePRDialog", () => {
 			expect(screen.queryByTestId("pr-link-button")).not.toBeInTheDocument();
 		});
 	});
+
+	// Régression : l'URL de la PR est stockée dans metadata.prUrl. Le dialog
+	// doit détecter la PR existante même si task.prUrl (legacy) est absent.
+	describe("existing PR detection via metadata.prUrl", () => {
+		it("should switch to update mode when only metadata.prUrl is set", async () => {
+			const azurePrUrl =
+				"https://dev.azure.com/org/project/_git/repo/pullrequest/109169";
+			const taskWithMetadataPr: Task = {
+				...mockTask,
+				metadata: { prUrl: azurePrUrl },
+			};
+
+			render(
+				<CreatePRDialog
+					open={true}
+					task={taskWithMetadataPr}
+					worktreeStatus={mockWorktreeStatus}
+					onOpenChange={mockOnOpenChange}
+					onCreatePR={mockOnCreatePR}
+				/>,
+			);
+
+			await waitFor(() => {
+				expect(
+					screen.getByRole("heading", { name: /update pull request/i }),
+				).toBeInTheDocument();
+			});
+
+			// Le lien vers la PR existante doit être affiché.
+			expect(screen.getByText(azurePrUrl)).toBeInTheDocument();
+		});
+	});
 });

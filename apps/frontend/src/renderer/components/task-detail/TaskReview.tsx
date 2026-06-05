@@ -162,7 +162,7 @@ export function TaskReview({
 					isMerging={isMerging}
 					isDiscarding={isDiscarding}
 					isCreatingPR={isCreatingPR}
-					existingPrUrl={task.prUrl}
+					existingPrUrl={task.prUrl ?? task.metadata?.prUrl}
 					onShowDiffDialog={onShowDiffDialog}
 					onShowDiscardDialog={onShowDiscardDialog}
 					onShowConflictDialog={onShowConflictDialog}

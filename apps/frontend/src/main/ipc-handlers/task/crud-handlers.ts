@@ -392,7 +392,7 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					deleteBranch: true,
 					// Ferme la PR distante associée pour éviter une PR
 					// orpheline pointant vers une branche supprimée.
-					prUrl: task.prUrl,
+					prUrl: task.prUrl ?? task.metadata?.prUrl,
 				});
 
 				if (!cleanupResult.success) {

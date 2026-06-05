@@ -53,7 +53,10 @@ export function CreatePRDialog({
 	onCreatePR,
 }: CreatePRDialogProps) {
 	const { t } = useTranslation(["taskReview", "common"]);
-	const hasExistingPr = Boolean(task.prUrl);
+	// L'URL de la PR est stockée dans metadata.prUrl ; on garde task.prUrl en
+	// repli pour rester compatible avec d'éventuels appelants legacy.
+	const existingPrUrl = task.prUrl ?? task.metadata?.prUrl;
+	const hasExistingPr = Boolean(existingPrUrl);
 	const [targetBranch, setTargetBranch] = useState("");
 	const [prTitle, setPrTitle] = useState("");
 	const [isDraft, setIsDraft] = useState(false);
@@ -205,8 +208,8 @@ export function CreatePRDialog({
 	};
 
 	const handleOpenExistingPR = () => {
-		if (task.prUrl && window.electronAPI?.openExternal) {
-			window.electronAPI.openExternal(task.prUrl);
+		if (existingPrUrl && window.electronAPI?.openExternal) {
+			window.electronAPI.openExternal(existingPrUrl);
 		}
 	};
 
@@ -288,7 +291,7 @@ export function CreatePRDialog({
 									onClick={handleOpenExistingPR}
 									className="text-xs text-primary hover:underline flex items-center gap-1 bg-transparent border-none cursor-pointer p-0 break-all text-left"
 								>
-									{task.prUrl}
+									{existingPrUrl}
 									<ExternalLink className="h-3 w-3 shrink-0" />
 								</button>
 							</div>

@@ -29,6 +29,7 @@ import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
 import {
 	EXECUTION_PHASE_BADGE_COLORS,
 	EXECUTION_PHASE_LABELS,
+	isExecutionPhaseActive,
 	JSON_ERROR_PREFIX,
 	JSON_ERROR_TITLE_SUFFIX,
 	TASK_CATEGORY_COLORS,
@@ -790,11 +791,14 @@ export const TaskCard = memo(function TaskCard({
 
 	const isRunning = task.status === "in_progress";
 	const executionPhase = task.executionProgress?.phase;
-	const hasActiveExecution =
-		executionPhase &&
-		executionPhase !== "idle" &&
-		executionPhase !== "complete" &&
-		executionPhase !== "failed";
+	// La phase d'exécution (avec son spinner) ne doit être considérée comme
+	// active que lorsque la tâche tourne réellement (in_progress / ai_review).
+	// Sans ce garde-fou, une tâche terminée conservant une phase obsolète
+	// (ex. "qa_review") afficherait à tort le badge "AI Review" animé.
+	const hasActiveExecution = isExecutionPhaseActive(
+		task.status,
+		executionPhase,
+	);
 
 	// Check if task is in human_review but has no completed subtasks (crashed/incomplete)
 	const isIncomplete = isIncompleteHumanReview(task);
