@@ -188,6 +188,8 @@
 		"creating": "Creating...",
 		"loading": "Loading...",
 		"selectAll": "Select all",
+		"expandAll": "Expand all",
+		"collapseAll": "Collapse all",
 		"error": "Error",
 		"status": {
 			"added": "added",

@@ -188,6 +188,8 @@
 		"creating": "Création en cours...",
 		"loading": "Chargement...",
 		"selectAll": "Sélectionner tout",
+		"expandAll": "Tout développer",
+		"collapseAll": "Tout réduire",
 		"error": "Erreur",
 		"status": {
 			"added": "ajouté",

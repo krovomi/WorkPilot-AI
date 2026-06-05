@@ -9,7 +9,7 @@ import {
 	Save,
 	Trash2,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../../../hooks/use-toast";
 import type { WorktreeDiff, WorktreeDiffFile } from "../../../../shared/types";
@@ -35,6 +35,11 @@ import {
 	SelectValue,
 } from "../../ui/select";
 import { Checkbox } from "../../ui/checkbox";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "../../ui/tooltip";
 
 // ── Tree data structure ──────────────────────────────────────────────
 
@@ -113,8 +118,11 @@ function FileTreeNode({
 	node,
 	depth,
 	defaultExpanded,
+	expandSignal,
 	t,
 	onFileClick,
+	onEditFile,
+	canEdit,
 	selectedPaths,
 	onToggleSelect,
 	canSelect,
@@ -122,13 +130,24 @@ function FileTreeNode({
 	readonly node: TreeNode;
 	readonly depth: number;
 	readonly defaultExpanded: boolean;
+	readonly expandSignal?: { version: number; value: boolean };
 	readonly t: (key: string) => string;
 	readonly onFileClick?: (file: WorktreeDiffFile) => void;
+	readonly onEditFile?: (file: WorktreeDiffFile) => void;
+	readonly canEdit?: boolean;
 	readonly selectedPaths?: Set<string>;
 	readonly onToggleSelect?: (path: string) => void;
 	readonly canSelect?: boolean;
 }) {
 	const [expanded, setExpanded] = useState(defaultExpanded);
+	const signalVersionRef = useRef(0);
+
+	useEffect(() => {
+		if (expandSignal && expandSignal.version !== signalVersionRef.current) {
+			signalVersionRef.current = expandSignal.version;
+			setExpanded(expandSignal.value);
+		}
+	}, [expandSignal]);
 
 	const toggleExpanded = useCallback(() => setExpanded((v) => !v), []);
 
@@ -168,8 +187,11 @@ function FileTreeNode({
 							node={child}
 							depth={depth + 1}
 							defaultExpanded={false}
+							expandSignal={expandSignal}
 							t={t}
 							onFileClick={onFileClick}
+							onEditFile={onEditFile}
+							canEdit={canEdit}
 							selectedPaths={selectedPaths}
 							onToggleSelect={onToggleSelect}
 							canSelect={canSelect}
@@ -229,6 +251,21 @@ function FileTreeNode({
 				</Badge>
 				<span className="text-xs text-success">+{file.additions}</span>
 				<span className="text-xs text-destructive">-{file.deletions}</span>
+				{canEdit && file.status !== "deleted" && (
+					<Button
+						size="sm"
+						variant="ghost"
+						className={
+							selectedPaths && selectedPaths.size > 0 ? "invisible" : ""
+						}
+						onClick={(e) => {
+							e.stopPropagation();
+							onEditFile?.(file);
+						}}
+					>
+						{t("taskReview:diff.edit")}
+					</Button>
+				)}
 			</div>
 		</div>
 	);
@@ -260,7 +297,11 @@ export function DiffViewDialog({
 }: DiffViewDialogProps) {
 	const { t } = useTranslation(["taskReview"]);
 	const { toast } = useToast();
-	const [viewMode, setViewMode] = useState<ViewMode>("list");
+	const [viewMode, setViewMode] = useState<ViewMode>("tree");
+	const [expandSignal, setExpandSignal] = useState<
+		{ version: number; value: boolean } | undefined
+	>();
+	const expandVersionRef = useRef(0);
 	const [selectedFile, setSelectedFile] = useState<WorktreeDiffFile | null>(
 		null,
 	);
@@ -316,6 +357,16 @@ export function DiffViewDialog({
 			setSelectedPaths(new Set(filteredFiles.map((f) => f.path)));
 		}
 	}, [filteredFiles, selectedPaths.size]);
+
+	const handleExpandAll = useCallback(() => {
+		expandVersionRef.current += 1;
+		setExpandSignal({ version: expandVersionRef.current, value: true });
+	}, []);
+
+	const handleCollapseAll = useCallback(() => {
+		expandVersionRef.current += 1;
+		setExpandSignal({ version: expandVersionRef.current, value: false });
+	}, []);
 
 	const handleEditFile = useCallback(
 		async (file: WorktreeDiffFile) => {
@@ -671,8 +722,11 @@ export function DiffViewDialog({
 						node={node}
 						depth={0}
 						defaultExpanded={true}
+						expandSignal={expandSignal}
 						t={t}
 						onFileClick={handleFileClick}
+						onEditFile={handleEditFile}
+						canEdit={!!worktreePath}
 						selectedPaths={selectedPaths}
 						onToggleSelect={handleToggleSelect}
 						canSelect={!!worktreePath}
@@ -741,6 +795,41 @@ export function DiffViewDialog({
 									<span className="text-sm text-muted-foreground">
 										{selectedPaths.size} {t("taskReview:diff.filesSelected")}
 									</span>
+								)}
+								{viewMode === "tree" && selectedPaths.size === 0 && (
+									<div className="flex items-center gap-0.5 border border-border rounded-md p-0.5 bg-secondary/30">
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<button
+													type="button"
+													onClick={handleExpandAll}
+													className="flex items-center justify-center h-7 w-7 rounded hover:bg-secondary/80 transition-colors text-muted-foreground hover:text-foreground"
+													aria-label={t("taskReview:diff.expandAll")}
+												>
+													<FolderOpen className="h-3.5 w-3.5" />
+												</button>
+											</TooltipTrigger>
+											<TooltipContent side="bottom">
+												{t("taskReview:diff.expandAll")}
+											</TooltipContent>
+										</Tooltip>
+										<div className="w-px h-4 bg-border" />
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<button
+													type="button"
+													onClick={handleCollapseAll}
+													className="flex items-center justify-center h-7 w-7 rounded hover:bg-secondary/80 transition-colors text-muted-foreground hover:text-foreground"
+													aria-label={t("taskReview:diff.collapseAll")}
+												>
+													<Folder className="h-3.5 w-3.5" />
+												</button>
+											</TooltipTrigger>
+											<TooltipContent side="bottom">
+												{t("taskReview:diff.collapseAll")}
+											</TooltipContent>
+										</Tooltip>
+									</div>
 								)}
 								<Select
 									value={viewMode}
