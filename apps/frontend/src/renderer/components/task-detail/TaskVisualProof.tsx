@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Task, VisualProofRun } from "../../../shared/types";
+import { IPC_CHANNELS } from "../../../shared/constants";
+import type { IPCResult, Task, VisualProofRun } from "../../../shared/types";
 import { cn } from "../../lib/utils";
 import { useTaskStore } from "../../stores/task-store";
 import { Badge } from "../ui/badge";
@@ -20,12 +21,32 @@ interface TaskVisualProofProps {
 	task: Task;
 }
 
-function toFileUrl(filePath: string): string {
-	return encodeURI(`file:///${filePath.replaceAll("\\", "/")}`);
+interface ScreenshotImagePayload {
+	base64: string;
+	mimeType: string;
 }
 
-function getScreenshotSource(screenshot: VisualProofRun["screenshots"][number]) {
-	return screenshot.url ?? toFileUrl(screenshot.absolutePath);
+function getScreenshotKey(screenshot: VisualProofRun["screenshots"][number]): string {
+	return `${screenshot.relativePath}-${screenshot.capturedAt}`;
+}
+
+function isScreenshotImageResult(
+	value: unknown,
+): value is IPCResult<ScreenshotImagePayload> {
+	if (!value || typeof value !== "object" || !("success" in value)) return false;
+	const result = value as IPCResult<Partial<ScreenshotImagePayload>>;
+	if (!result.success || !result.data) return true;
+	return (
+		typeof result.data.base64 === "string" &&
+		typeof result.data.mimeType === "string"
+	);
+}
+
+function getScreenshotSource(
+	screenshot: VisualProofRun["screenshots"][number],
+	localSources: Record<string, string>,
+): string | null {
+	return screenshot.url ?? localSources[getScreenshotKey(screenshot)] ?? null;
 }
 
 function getStatusVariant(
@@ -50,11 +71,65 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 	);
 	const [isRunning, setIsRunning] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [imageLoadError, setImageLoadError] = useState<string | null>(null);
+	const [localScreenshotSources, setLocalScreenshotSources] = useState<
+		Record<string, string>
+	>({});
 
 	useEffect(() => {
 		setProof(task.metadata?.visualProof);
 		setError(null);
+		setImageLoadError(null);
+		setLocalScreenshotSources({});
 	}, [task.metadata?.visualProof]);
+
+	useEffect(() => {
+		const localScreenshots =
+			proof?.screenshots.filter((screenshot) => !screenshot.url) ?? [];
+		setLocalScreenshotSources({});
+		setImageLoadError(null);
+		if (localScreenshots.length === 0) return;
+
+		let cancelled = false;
+		const loadLocalScreenshots = async () => {
+			const nextSources: Record<string, string> = {};
+			let firstError: string | null = null;
+
+			for (const screenshot of localScreenshots) {
+				try {
+					const result = await globalThis.electronAPI.invoke(
+						IPC_CHANNELS.BROWSER_AGENT_GET_SCREENSHOT_IMAGE,
+						screenshot.absolutePath,
+					);
+					if (!isScreenshotImageResult(result)) {
+						firstError ??= t("tasks:visualProof.imageLoadFailed");
+						continue;
+					}
+					if (!result.success || !result.data) {
+						firstError ??= result.error ?? t("tasks:visualProof.imageLoadFailed");
+						continue;
+					}
+					nextSources[getScreenshotKey(screenshot)] =
+						`data:${result.data.mimeType};base64,${result.data.base64}`;
+				} catch (err) {
+					firstError ??=
+						err instanceof Error
+							? err.message
+							: t("tasks:visualProof.imageLoadFailed");
+				}
+			}
+
+			if (!cancelled) {
+				setLocalScreenshotSources(nextSources);
+				setImageLoadError(firstError);
+			}
+		};
+
+		void loadLocalScreenshots();
+		return () => {
+			cancelled = true;
+		};
+	}, [proof?.screenshots, t]);
 
 	const latestScreenshot = useMemo(
 		() => proof?.screenshots[0],
@@ -232,27 +307,39 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 							)}
 						</div>
 						<div className="grid gap-4">
-							{proof.screenshots.map((screenshot) => (
-								<figure
-									key={`${screenshot.relativePath}-${screenshot.capturedAt}`}
-									className="overflow-hidden rounded-lg border border-border bg-background"
-								>
-									<img
-										src={getScreenshotSource(screenshot)}
-										alt={screenshot.label}
-										className="max-h-[560px] w-full object-contain bg-black/20"
-									/>
-									<figcaption className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
-										<span className="font-medium text-foreground">
-											{screenshot.label}
-										</span>
-										<span>
-											{screenshot.width} × {screenshot.height} ·{" "}
-											{new Date(screenshot.capturedAt).toLocaleString()}
-										</span>
-									</figcaption>
-								</figure>
-							))}
+							{proof.screenshots.map((screenshot) => {
+								const source = getScreenshotSource(
+									screenshot,
+									localScreenshotSources,
+								);
+								return (
+									<figure
+										key={getScreenshotKey(screenshot)}
+										className="overflow-hidden rounded-lg border border-border bg-background"
+									>
+										{source ? (
+											<img
+												src={source}
+												alt={screenshot.label}
+												className="max-h-[560px] w-full object-contain bg-black/20"
+											/>
+										) : (
+											<div className="flex min-h-64 items-center justify-center bg-black/20 text-sm text-muted-foreground">
+												{t("tasks:visualProof.loadingScreenshot")}
+											</div>
+										)}
+										<figcaption className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
+											<span className="font-medium text-foreground">
+												{screenshot.label}
+											</span>
+											<span>
+												{screenshot.width} × {screenshot.height} ·{" "}
+												{new Date(screenshot.capturedAt).toLocaleString()}
+											</span>
+										</figcaption>
+									</figure>
+								);
+							})}
 						</div>
 					</div>
 				) : (
@@ -272,6 +359,9 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 						<CheckCircle2 className="h-4 w-4" />
 						<span>{t("tasks:visualProof.passedHint")}</span>
 					</div>
+				)}
+				{imageLoadError && (
+					<p className="text-sm text-destructive">{imageLoadError}</p>
 				)}
 				{error && <p className="text-sm text-destructive">{error}</p>}
 			</div>

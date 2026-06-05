@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../shared/i18n";
+import { IPC_CHANNELS } from "../../../shared/constants";
 import type { Task, VisualProofRun } from "../../../shared/types";
 import { TaskVisualProof } from "./TaskVisualProof";
 
@@ -55,11 +56,13 @@ const task: Task = {
 
 const mockOpenExternal = vi.fn();
 const mockRunVisualProof = vi.fn();
+const mockInvoke = vi.fn();
 
 Object.defineProperty(window, "electronAPI", {
 	value: {
 		openExternal: mockOpenExternal,
 		runVisualProof: mockRunVisualProof,
+		invoke: mockInvoke,
 	},
 	writable: true,
 });
@@ -67,6 +70,10 @@ Object.defineProperty(window, "electronAPI", {
 describe("TaskVisualProof", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockInvoke.mockResolvedValue({
+			success: true,
+			data: { base64: "cG5n", mimeType: "image/png" },
+		});
 		mockRunVisualProof.mockResolvedValue({
 			success: true,
 			data: {
@@ -87,6 +94,45 @@ describe("TaskVisualProof", () => {
 		expect(screen.getByAltText("Home page")).toHaveAttribute(
 			"src",
 			initialProof.screenshots[0].url,
+		);
+		expect(mockInvoke).not.toHaveBeenCalled();
+	});
+
+	it("loads local screenshots through IPC instead of file URLs", async () => {
+		const localProof: VisualProofRun = {
+			...initialProof,
+			screenshots: [
+				{
+					...initialProof.screenshots[0],
+					relativePath: "visual-proof/run/desktop.png",
+					absolutePath: "C:\\tmp\\visual-proof\\desktop.png",
+					url: undefined,
+				},
+			],
+		};
+
+		render(
+			<TaskVisualProof
+				task={{
+					...task,
+					metadata: { ...task.metadata, visualProof: localProof },
+				}}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(mockInvoke).toHaveBeenCalledWith(
+				IPC_CHANNELS.BROWSER_AGENT_GET_SCREENSHOT_IMAGE,
+				"C:\\tmp\\visual-proof\\desktop.png",
+			);
+		});
+		expect(screen.getByAltText("Home page")).toHaveAttribute(
+			"src",
+			"data:image/png;base64,cG5n",
+		);
+		expect(screen.getByAltText("Home page")).not.toHaveAttribute(
+			"src",
+			expect.stringContaining("file://"),
 		);
 	});
 

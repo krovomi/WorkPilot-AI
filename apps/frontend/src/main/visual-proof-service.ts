@@ -27,6 +27,21 @@ import type {
 import { logger } from "./app-logger";
 import type { AppEmulatorConfig } from "./app-emulator-service";
 import { appEmulatorService } from "./app-emulator-service";
+import {
+	findCommandInPath,
+	findMsBuildInvocation,
+	LEGACY_MSBUILD_UNAVAILABLE_MESSAGE,
+} from "./dotnet-msbuild";
+import {
+	LEGACY_COMPATIBLE_MSBUILD_REQUIRED_MESSAGE,
+	createLegacyCompilerBuildArgs,
+	createLegacyPackageReferencesTarget,
+	createLegacySdkBuildArgs,
+	ensureLegacyWorktreeBuildAssets,
+	LEGACY_RESOURCE_PROPERTY,
+	runWithShortLegacySolutionPath,
+	runWithLegacyXmlNamespacePatch,
+} from "./legacy-dotnet-build";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_VIEWPORT = { width: 1440, height: 1000 };
@@ -38,7 +53,9 @@ const HYPERV_ARGS_ENV = "WORKPILOT_VISUAL_PROOF_HYPERV_ARGS";
 const WSL_COMMAND_ENV = "WORKPILOT_VISUAL_PROOF_WSL_COMMAND";
 const WSL_ARGS_ENV = "WORKPILOT_VISUAL_PROOF_WSL_ARGS";
 const IIS_EXPRESS_ENV = "WORKPILOT_IIS_EXPRESS_PATH";
-const MSBUILD_ENV = "WORKPILOT_MSBUILD_PATH";
+const LEGACY_DOTNET_BUILD_MAX_BUFFER = 100 * 1024 * 1024;
+const LEGACY_WEB_HOST_UNAVAILABLE_MESSAGE =
+	"IIS Express/xsp was not found for this legacy .NET Framework web app.";
 
 const WEB_FRAMEWORKS = new Set([
 	"angular",
@@ -100,6 +117,20 @@ interface VisualProofProvider {
 	run(context: VisualProofProviderContext): Promise<VisualProofProviderResult>;
 }
 
+interface DesktopCaptureSourceLike {
+	id: string;
+	name: string;
+}
+
+interface DesktopCaptureSelectionOptions {
+	excludeSourceIds?: ReadonlySet<string>;
+	requireWindowMatch?: boolean;
+}
+
+interface DesktopImageCaptureOptions extends DesktopCaptureSelectionOptions {
+	preferredNames?: readonly string[];
+}
+
 function createRunId(): string {
 	const timestamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
 	return `visual-proof-${timestamp}`;
@@ -149,6 +180,24 @@ function requestedProvider(
 	);
 }
 
+function isLikelyTestProjectPath(candidatePath: string): boolean {
+	const segments = candidatePath
+		.toLowerCase()
+		.split(/[\\/]+/)
+		.map((segment) => segment.replace(/\.csproj$/i, ""));
+	return segments.some(
+		(segment) =>
+			segment === "tests" ||
+			segment === "test" ||
+			segment === "unittests" ||
+			segment === "automatedtests" ||
+			segment.endsWith(".tests") ||
+			segment.endsWith(".test") ||
+			segment.endsWith(".testapplication") ||
+			segment.includes("testapplication"),
+	);
+}
+
 function scanFiles(
 	rootDir: string,
 	maxDepth: number,
@@ -164,7 +213,12 @@ function scanFiles(
 			return;
 		}
 		for (const entry of entries) {
-			if (entry === "node_modules" || entry === ".git" || entry === "dist") {
+			if (
+				entry === "node_modules" ||
+				entry === ".git" ||
+				entry === "dist" ||
+				isLikelyTestProjectPath(entry)
+			) {
 				continue;
 			}
 			const full = path.join(dir, entry);
@@ -210,10 +264,11 @@ function analyzeDotNetProject(csprojPath: string): DotNetProjectInfo {
 		/<OutputType>\s*WinExe\s*<\/OutputType>/i.test(content) ||
 		/System\.Windows\.Forms/i.test(content) ||
 		/PresentationFramework/i.test(content);
-	const isWeb =
+	const hasExplicitWebMarkers =
 		/System\.Web/i.test(content) ||
 		/Microsoft\.WebApplication\.targets/i.test(content) ||
 		/{349c5851-65df-11da-9384-00065b846f21}/i.test(content);
+	const isWeb = hasExplicitWebMarkers && !isDesktop;
 
 	return {
 		csprojPath,
@@ -226,7 +281,7 @@ function analyzeDotNetProject(csprojPath: string): DotNetProjectInfo {
 
 export function analyzeDotNetProjects(searchDir: string): DotNetProjectInfo[] {
 	return scanFiles(searchDir, 4, (_filePath, entry) =>
-		entry.toLowerCase().endsWith(".csproj"),
+		entry.toLowerCase().endsWith(".csproj") && !isLikelyTestProjectPath(entry),
 	).map(analyzeDotNetProject);
 }
 
@@ -393,25 +448,28 @@ async function captureWebPage(
 
 async function captureDesktopImage(
 	outputPath: string,
-	preferredName?: string,
+	options: DesktopImageCaptureOptions = {},
 ): Promise<{ width: number; height: number }> {
 	const sources = await desktopCapturer.getSources({
-		types: ["window", "screen"],
+		types: options.requireWindowMatch ? ["window"] : ["window", "screen"],
 		thumbnailSize: DEFAULT_VIEWPORT,
 	});
 	if (sources.length === 0) {
 		throw new Error("No desktop or window source was available for capture");
 	}
 
-	const normalizedName = preferredName?.toLowerCase();
-	const source =
-		(normalizedName
-			? sources.find((candidate) =>
-					candidate.name.toLowerCase().includes(normalizedName),
-				)
-			: undefined) ??
-		sources.find((candidate) => candidate.id.startsWith("window:")) ??
-		sources[0];
+	const source = selectDesktopCaptureSource(sources, options.preferredNames, {
+		excludeSourceIds: options.excludeSourceIds,
+		requireWindowMatch: options.requireWindowMatch,
+	});
+	if (!source) {
+		const names = normalizePreferredWindowNames(options.preferredNames);
+		throw new Error(
+			names.length > 0
+				? `No desktop application window matched ${names.join(", ")}`
+				: "No desktop application window was available for capture",
+		);
+	}
 	const size = source.thumbnail.getSize();
 	writeFileSync(outputPath, source.thumbnail.toPNG());
 	return {
@@ -420,8 +478,109 @@ async function captureDesktopImage(
 	};
 }
 
-function waitForProcessWindow(): Promise<void> {
-	return delay(3000);
+async function getDesktopWindowSourceIds(): Promise<Set<string>> {
+	const sources = await desktopCapturer.getSources({
+		types: ["window"],
+		thumbnailSize: { width: 1, height: 1 },
+	});
+	return new Set(sources.map((source) => source.id));
+}
+
+function normalizePreferredWindowNames(names: readonly string[] = []): string[] {
+	return [
+		...new Set(
+			names
+				.map((name) => name.trim().toLowerCase())
+				.filter((name) => name.length > 0),
+		),
+	];
+}
+
+function isWindowSource(source: DesktopCaptureSourceLike): boolean {
+	return source.id.startsWith("window:");
+}
+
+function isWorkPilotWindowName(name: string): boolean {
+	return /workpilot|auto-claude|visual studio code|vscode|copilot/i.test(name);
+}
+
+export function selectDesktopCaptureSource<T extends DesktopCaptureSourceLike>(
+	sources: readonly T[],
+	preferredNames: readonly string[] = [],
+	options: DesktopCaptureSelectionOptions = {},
+): T | null {
+	const preferred = normalizePreferredWindowNames(preferredNames);
+	const windows = sources.filter(isWindowSource);
+	const eligibleWindows = windows.filter(
+		(source) => !isWorkPilotWindowName(source.name),
+	);
+	const candidateWindows = eligibleWindows.filter(
+		(source) => !options.excludeSourceIds?.has(source.id),
+	);
+	const matchesPreferred = (source: T) => {
+		const normalizedSourceName = source.name.toLowerCase();
+		return preferred.some((name) => normalizedSourceName.includes(name));
+	};
+
+	if (preferred.length > 0) {
+		const preferredMatch =
+			candidateWindows.find(matchesPreferred) ??
+			(options.excludeSourceIds ? undefined : eligibleWindows.find(matchesPreferred));
+		if (preferredMatch) {
+			return preferredMatch;
+		}
+	}
+
+	if (candidateWindows[0]) {
+		return candidateWindows[0];
+	}
+
+	if (options.requireWindowMatch) {
+		return null;
+	}
+
+	return eligibleWindows[0] ?? windows[0] ?? sources[0] ?? null;
+}
+
+async function readWindowsProcessWindowTitle(pid: number): Promise<string | null> {
+	try {
+		const { stdout } = await execFileAsync(
+			"powershell",
+			[
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				`$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; if ($p) { $p.MainWindowTitle }`,
+			],
+			{ windowsHide: true, maxBuffer: 64 * 1024 },
+		);
+		const title = stdout.trim();
+		return title.length > 0 ? title : null;
+	} catch {
+		return null;
+	}
+}
+
+async function waitForProcessWindowNames(
+	child: ChildProcessWithoutNullStreams,
+	fallbackNames: readonly string[],
+): Promise<string[]> {
+	const names = new Set(fallbackNames.filter((name) => name.trim().length > 0));
+	if (process.platform !== "win32" || !child.pid) {
+		await delay(3000);
+		return [...names];
+	}
+
+	const deadline = Date.now() + 10000;
+	while (Date.now() < deadline) {
+		const title = await readWindowsProcessWindowTitle(child.pid);
+		if (title) {
+			names.add(title);
+			break;
+		}
+		await delay(500);
+	}
+	return [...names];
 }
 
 async function waitForHttp(url: string, timeoutMs = 30000): Promise<void> {
@@ -467,42 +626,221 @@ function findFirstDotNetProject(
 	return projects.find(predicate);
 }
 
-function findIisExpressPath(): string | null {
+interface LegacyWebHostInvocation {
+	command: string;
+	args: string[];
+	providerDetails: string;
+}
+
+function isXspCommand(commandPath: string): boolean {
+	const baseName = path.basename(commandPath, path.extname(commandPath)).toLowerCase();
+	return baseName === "xsp" || baseName === "xsp4";
+}
+
+function createLegacyWebHostInvocation(
+	command: string,
+	projectDir: string,
+	port: number,
+): LegacyWebHostInvocation {
+	if (isXspCommand(command)) {
+		return {
+			command,
+			args: ["--root", projectDir, "--port", String(port)],
+			providerDetails: "Classic ASP.NET app hosted through Mono xsp.",
+		};
+	}
+	return {
+		command,
+		args: ["/path:" + projectDir, "/port:" + String(port)],
+		providerDetails: "Classic ASP.NET app hosted through IIS Express.",
+	};
+}
+
+function findLegacyWebHostInvocation(
+	projectDir: string,
+	port: number,
+): LegacyWebHostInvocation | null {
 	const candidates = [
 		process.env[IIS_EXPRESS_ENV],
 		"C:\\Program Files\\IIS Express\\iisexpress.exe",
 		"C:\\Program Files (x86)\\IIS Express\\iisexpress.exe",
 	].filter((candidate): candidate is string => Boolean(candidate));
-	return candidates.find((candidate) => existsSync(candidate)) ?? null;
+	const candidate = candidates.find((item) => existsSync(item));
+	if (candidate) return createLegacyWebHostInvocation(candidate, projectDir, port);
+
+	const pathIisExpress = findCommandInPath("iisexpress");
+	if (pathIisExpress) {
+		return createLegacyWebHostInvocation(pathIisExpress, projectDir, port);
+	}
+
+	const pathXsp4 = findCommandInPath("xsp4");
+	if (pathXsp4) return createLegacyWebHostInvocation(pathXsp4, projectDir, port);
+
+	const pathXsp = findCommandInPath("xsp");
+	return pathXsp ? createLegacyWebHostInvocation(pathXsp, projectDir, port) : null;
 }
 
-function findMsBuildPath(): string | null {
-	const candidates = [
-		process.env[MSBUILD_ENV],
-		"C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools\\MSBuild\\Current\\Bin\\MSBuild.exe",
-		"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
-		"C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\MSBuild\\Current\\Bin\\MSBuild.exe",
-		"C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\MSBuild\\Current\\Bin\\MSBuild.exe",
-		"C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\MSBuild\\Current\\Bin\\MSBuild.exe",
-		"C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
-	].filter((candidate): candidate is string => Boolean(candidate));
-	return candidates.find((candidate) => existsSync(candidate)) ?? null;
+function formatCommandFailure(error: unknown, fallback: string): string {
+	if (!(error instanceof Error)) return String(error);
+	const details = [error.message];
+	const withOutput = error as Error & {
+		stdout?: string;
+		stderr?: string;
+		code?: number | string;
+	};
+	if (withOutput.code !== undefined) {
+		details.push(`Exit code: ${withOutput.code}`);
+	}
+	for (const [label, value] of [
+		["stdout", withOutput.stdout],
+		["stderr", withOutput.stderr],
+	] as const) {
+		const trimmed = value?.trim();
+		if (trimmed) {
+			details.push(`${label}:\n${trimmed.slice(-6000)}`);
+		}
+	}
+	return details.join("\n\n") || fallback;
+}
+
+function findContainingSolutionDir(csprojPath: string): string {
+	const normalizedCsprojPath = path.normalize(csprojPath).toLowerCase();
+	let currentDir = path.dirname(csprojPath);
+	for (let depth = 0; depth < 6; depth += 1) {
+		let entries: string[];
+		try {
+			entries = readdirSync(currentDir);
+		} catch {
+			return `${path.dirname(csprojPath)}${path.sep}`;
+		}
+		for (const entry of entries.filter((file) => file.endsWith(".sln"))) {
+			const content = readTextFile(path.join(currentDir, entry)) ?? "";
+			const matches = content.matchAll(
+				/Project\("[^"]+"\)\s*=\s*"[^"]+",\s*"([^"]+\.csproj)"/gi,
+			);
+			for (const match of matches) {
+				const candidatePath = path
+					.resolve(currentDir, match[1])
+					.toLowerCase();
+				if (path.normalize(candidatePath) === normalizedCsprojPath) {
+					return `${currentDir}${path.sep}`;
+				}
+			}
+		}
+		const parentDir = path.dirname(currentDir);
+		if (!parentDir || parentDir === currentDir) break;
+		currentDir = parentDir;
+	}
+	return `${path.dirname(csprojPath)}${path.sep}`;
+}
+
+function isMsBuildNamespaceError(error: unknown): boolean {
+	if (!(error instanceof Error)) return false;
+	const withOutput = error as Error & { stdout?: string; stderr?: string };
+	return [error.message, withOutput.stdout, withOutput.stderr].some((value) =>
+		value?.includes("MSB4097"),
+	);
+}
+
+function isLegacyCompilerTooOldError(error: unknown): boolean {
+	if (!(error instanceof Error)) return false;
+	const withOutput = error as Error & { stdout?: string; stderr?: string };
+	return [error.message, withOutput.stdout, withOutput.stderr].some((value) =>
+		/CS1617|Option\s+'.+'\s+non valide pour\s+\/langversion|Invalid option.*\/langversion/i.test(
+			value ?? "",
+		),
+	);
 }
 
 async function buildLegacyDotNetProject(csprojPath: string): Promise<void> {
-	const msbuild = findMsBuildPath();
+	const msbuild = findMsBuildInvocation({ allowDotnetMsBuild: false });
 	if (!msbuild) {
-		throw new Error(
-			"MSBuild was not found. Set WORKPILOT_MSBUILD_PATH or install Visual Studio Build Tools.",
-		);
+		throw new Error(LEGACY_MSBUILD_UNAVAILABLE_MESSAGE);
 	}
-	await execFileAsync(
-		msbuild,
-		[csprojPath, "/t:Build", "/p:Configuration=Debug"],
-		{
-			cwd: path.dirname(csprojPath),
-			maxBuffer: 10 * 1024 * 1024,
+	const solutionDir = findContainingSolutionDir(csprojPath);
+	ensureLegacyWorktreeBuildAssets(solutionDir, (message) =>
+		logger.info(`[VisualProof] ${message}`),
+	);
+	await runWithShortLegacySolutionPath(
+		csprojPath,
+		solutionDir,
+		async (buildPaths) => {
+			const dotnet = findCommandInPath("dotnet");
+			if (dotnet) {
+				try {
+					await execFileAsync(
+						dotnet,
+						[
+							"restore",
+							buildPaths.csprojPath,
+							`/p:SolutionDir=${buildPaths.solutionDir}`,
+						],
+						{
+							cwd: path.dirname(buildPaths.csprojPath),
+							maxBuffer: LEGACY_DOTNET_BUILD_MAX_BUFFER,
+						},
+					);
+				} catch (restoreError) {
+					throw new Error(formatCommandFailure(restoreError, "dotnet restore failed"));
+				}
+			}
+			const referencesTarget = createLegacyPackageReferencesTarget(
+				buildPaths.csprojPath,
+				buildPaths.solutionDir,
+			);
+			const buildArgs = [
+				buildPaths.csprojPath,
+				"/t:Build",
+				"/nologo",
+				"/v:minimal",
+				"/clp:ErrorsOnly;Summary",
+				"/p:Configuration=Debug",
+				`/p:SolutionDir=${buildPaths.solutionDir}`,
+				LEGACY_RESOURCE_PROPERTY,
+				...createLegacyCompilerBuildArgs(msbuild.command),
+				...createLegacySdkBuildArgs(msbuild.command),
+				...(referencesTarget
+					? [`/p:CustomBeforeMicrosoftCommonTargets=${referencesTarget}`]
+					: []),
+			];
+			const runMsBuild = () =>
+				execFileAsync(msbuild.command, [...msbuild.argsPrefix, ...buildArgs], {
+					cwd: path.dirname(buildPaths.csprojPath),
+					maxBuffer: LEGACY_DOTNET_BUILD_MAX_BUFFER,
+				});
+			try {
+				await runMsBuild();
+			} catch (error) {
+				if (isMsBuildNamespaceError(error)) {
+					try {
+						await runWithLegacyXmlNamespacePatch(buildPaths.solutionDir, runMsBuild);
+						return;
+					} catch (patchedError) {
+						if (isLegacyCompilerTooOldError(patchedError)) {
+							throw new Error(
+								`${LEGACY_COMPATIBLE_MSBUILD_REQUIRED_MESSAGE}\n\n${formatCommandFailure(
+									patchedError,
+									"Patched MSBuild failed",
+								)}`,
+							);
+						}
+						throw new Error(
+							formatCommandFailure(patchedError, "Patched MSBuild failed"),
+						);
+					}
+				}
+				if (isLegacyCompilerTooOldError(error)) {
+					throw new Error(
+						`${LEGACY_COMPATIBLE_MSBUILD_REQUIRED_MESSAGE}\n\n${formatCommandFailure(
+							error,
+							"MSBuild failed",
+						)}`,
+					);
+				}
+				throw new Error(formatCommandFailure(error, "MSBuild failed"));
+			}
 		},
+		(message) => logger.info(`[VisualProof] ${message}`),
 	);
 }
 
@@ -526,6 +864,48 @@ function findDesktopExecutable(projectDir: string): string | null {
 		return rank(left) - rank(right);
 	});
 	return ranked[0] ?? null;
+}
+
+interface DesktopRuntimeInvocation {
+	command: string;
+	args: string[];
+	cwd: string;
+	providerDetails: string;
+}
+
+function findDesktopRuntimeInvocation(
+	executablePath: string,
+): DesktopRuntimeInvocation | null {
+	if (process.platform === "win32") {
+		return {
+			command: executablePath,
+			args: [],
+			cwd: path.dirname(executablePath),
+			providerDetails: "Visible Windows desktop capture.",
+		};
+	}
+
+	const mono = findCommandInPath("mono");
+	if (mono) {
+		return {
+			command: mono,
+			args: [executablePath],
+			cwd: path.dirname(executablePath),
+			providerDetails: "Visible desktop capture through Mono.",
+		};
+	}
+
+	const wine = findCommandInPath("wine");
+	if (wine) {
+		return {
+			command: wine,
+			args: [executablePath],
+			cwd: path.dirname(executablePath),
+			providerDetails: "Visible desktop capture through Wine.",
+		};
+	}
+
+	return null;
 }
 
 function createScreenshot(
@@ -658,7 +1038,7 @@ class LocalIisExpressProvider implements VisualProofProvider {
 		return Boolean(
 			findFirstDotNetProject(
 				context.dotnetProjects,
-				(project) => project.isLegacy && project.isWeb,
+				(project) => project.isLegacy && project.isWeb && !project.isDesktop,
 			),
 		);
 	}
@@ -668,10 +1048,13 @@ class LocalIisExpressProvider implements VisualProofProvider {
 	): Promise<VisualProofProviderResult> {
 		const project = findFirstDotNetProject(
 			context.dotnetProjects,
-			(candidate) => candidate.isLegacy && candidate.isWeb,
+			(candidate) => candidate.isLegacy && candidate.isWeb && !candidate.isDesktop,
 		);
-		const iisExpress = findIisExpressPath();
-		if (!project || !iisExpress) {
+		const port = Number(process.env.WORKPILOT_VISUAL_PROOF_PORT) || DEFAULT_IIS_EXPRESS_PORT;
+		const host = project
+			? findLegacyWebHostInvocation(project.projectDir, port)
+			: null;
+		if (!project || !host) {
 			return {
 				status: "skipped",
 				targetKind: "web",
@@ -679,20 +1062,15 @@ class LocalIisExpressProvider implements VisualProofProvider {
 				providerDetails: `${IIS_EXPRESS_ENV} can override the IIS Express path.`,
 				framework: "dotnet-framework",
 				screenshots: [],
-				error: "IIS Express was not found for this legacy .NET Framework web app.",
+				error: LEGACY_WEB_HOST_UNAVAILABLE_MESSAGE,
 			};
 		}
 
-		const port = Number(process.env.WORKPILOT_VISUAL_PROOF_PORT) || DEFAULT_IIS_EXPRESS_PORT;
 		const appUrl = `http://localhost:${port}/`;
-		const child = spawn(
-			iisExpress,
-			["/path:" + project.projectDir, "/port:" + String(port)],
-			{
-				cwd: project.projectDir,
-				windowsHide: true,
-			},
-		);
+		const child = spawn(host.command, host.args, {
+			cwd: project.projectDir,
+			windowsHide: true,
+		});
 		try {
 			await waitForHttp(appUrl);
 			mkdirSync(context.artifactDir, { recursive: true });
@@ -703,7 +1081,7 @@ class LocalIisExpressProvider implements VisualProofProvider {
 				status: "passed",
 				targetKind: "web",
 				isolated: false,
-				providerDetails: "Classic ASP.NET app hosted through IIS Express.",
+				providerDetails: host.providerDetails,
 				framework: "dotnet-framework",
 				appUrl,
 				screenshots: [
@@ -727,7 +1105,8 @@ class LocalWindowsDesktopProvider implements VisualProofProvider {
 
 	canHandle(context: VisualProofProviderContext): boolean {
 		return (
-			process.platform === "win32" &&
+			(process.platform === "win32" ||
+				Boolean(findCommandInPath("mono") ?? findCommandInPath("wine"))) &&
 			Boolean(
 				findFirstDotNetProject(
 					context.dotnetProjects,
@@ -755,36 +1134,49 @@ class LocalWindowsDesktopProvider implements VisualProofProvider {
 			};
 		}
 
-		let executablePath = findDesktopExecutable(project.projectDir);
-		if (!executablePath) {
-			await buildLegacyDotNetProject(project.csprojPath);
-			executablePath = findDesktopExecutable(project.projectDir);
-		}
+		await buildLegacyDotNetProject(project.csprojPath);
+		const executablePath = findDesktopExecutable(project.projectDir);
 		if (!executablePath) {
 			throw new Error(
 				"Could not locate a built desktop executable after MSBuild completed.",
 			);
 		}
+		const runtime = findDesktopRuntimeInvocation(executablePath);
+		if (!runtime) {
+			return {
+				status: "skipped",
+				targetKind: "desktop",
+				isolated: false,
+				framework: "dotnet-framework",
+				screenshots: [],
+				error: "Mono/Wine was not found for this .NET Framework desktop app.",
+			};
+		}
 
 		mkdirSync(context.artifactDir, { recursive: true });
-		const child = spawn(executablePath, [], {
-			cwd: path.dirname(executablePath),
+		const existingWindowIds = await getDesktopWindowSourceIds();
+		const child = spawn(runtime.command, runtime.args, {
+			cwd: runtime.cwd,
 			windowsHide: false,
 		});
 		try {
-			await waitForProcessWindow();
+			const preferredNames = await waitForProcessWindowNames(child, [
+				path.basename(executablePath, ".exe"),
+				path.basename(project.projectDir),
+			]);
 			const fileName = "desktop.png";
 			const screenshotPath = path.join(context.artifactDir, fileName);
-			const size = await captureDesktopImage(
-				screenshotPath,
-				path.basename(executablePath, ".exe"),
-			);
+			const size = await captureDesktopImage(screenshotPath, {
+				excludeSourceIds: existingWindowIds,
+				preferredNames,
+				requireWindowMatch: true,
+			});
 			return {
 				status: "passed",
 				targetKind: "desktop",
 				isolated: false,
 				providerDetails:
-					"Visible Windows desktop capture. Use Hyper-V or remote-runner for isolation.",
+					`${runtime.providerDetails} Use Hyper-V or remote-runner for isolation.`,
 				framework: "dotnet-framework",
 				screenshots: [
 					createScreenshot(
@@ -890,6 +1282,12 @@ function selectProvider(
 	return providers.find((provider) => provider.canHandle(context));
 }
 
+function targetKindForConfig(config: AppEmulatorConfig): VisualProofTargetKind {
+	if (config.type === "desktop") return "desktop";
+	if (config.isWeb || WEB_FRAMEWORKS.has(config.framework)) return "web";
+	return "remote";
+}
+
 function createSkippedProviderResult(
 	context: VisualProofProviderContext,
 	providerId?: VisualProofProviderId,
@@ -899,7 +1297,7 @@ function createSkippedProviderResult(
 		: "No provider can render this task automatically.";
 	return {
 		status: "skipped",
-		targetKind: "remote",
+		targetKind: targetKindForConfig(context.config),
 		isolated: false,
 		providerDetails: details,
 		framework: context.config.framework,
@@ -907,6 +1305,22 @@ function createSkippedProviderResult(
 		error:
 			`${details} Available provider families: remote-runner, hyper-v, wsl, ` +
 			"local-iis-express, local-windows-desktop, docker, local-web.",
+	};
+}
+
+function createFailedProviderResult(
+	context: VisualProofProviderContext,
+	providerId: VisualProofProviderId,
+	error: unknown,
+): VisualProofProviderResult {
+	return {
+		status: "failed",
+		targetKind: targetKindForConfig(context.config),
+		isolated: providerId === "docker" || providerId === "wsl" || providerId === "hyper-v",
+		providerDetails: `Provider "${providerId}" failed before a screenshot could be captured.`,
+		framework: context.config.framework,
+		screenshots: [],
+		error: error instanceof Error ? error.message : String(error),
 	};
 }
 
@@ -952,8 +1366,9 @@ export class VisualProofService {
 
 		try {
 			const config = await appEmulatorService.detectProject(runPath);
-			const dotnetProjects =
-				config.framework === "dotnet" ? analyzeDotNetProjects(runPath) : [];
+			const dotnetProjects = config.framework.startsWith("dotnet")
+				? analyzeDotNetProjects(config.projectDir ?? runPath)
+				: [];
 			const context: VisualProofProviderContext = {
 				options,
 				runPath,
@@ -964,7 +1379,11 @@ export class VisualProofService {
 			};
 			const provider = selectProvider(context);
 			const providerResult = provider
-				? await provider.run(context)
+				? await provider
+						.run(context)
+						.catch((error: unknown) =>
+							createFailedProviderResult(context, provider.id, error),
+						)
 				: createSkippedProviderResult(context, requestedProvider(options) ?? undefined);
 
 			let branch: string | null = null;

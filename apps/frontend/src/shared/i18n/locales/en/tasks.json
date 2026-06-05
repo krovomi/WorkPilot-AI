@@ -279,6 +279,8 @@
 		"local": "local",
 		"screenshots": "{{count}} screenshot",
 		"screenshots_other": "{{count}} screenshots",
+		"loadingScreenshot": "Loading screenshot...",
+		"imageLoadFailed": "Unable to load the local screenshot",
 		"noScreenshots": "No screenshot was generated for this run.",
 		"passedHint": "These screenshots were added as proof in the PR.",
 		"status": {

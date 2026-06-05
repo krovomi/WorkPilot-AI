@@ -16,6 +16,7 @@ import {
 	hasLegacyDotNetWebProject,
 	isLegacyDotNetFramework,
 	parseGitHubPrUrl,
+	selectDesktopCaptureSource,
 } from "./visual-proof-service";
 
 describe("parseGitHubPrUrl", () => {
@@ -32,6 +33,69 @@ describe("parseGitHubPrUrl", () => {
 	it("returns null for a non-PR URL", () => {
 		expect(parseGitHubPrUrl("https://github.com/acme/widgets")).toBeNull();
 		expect(parseGitHubPrUrl("not a url")).toBeNull();
+	});
+});
+
+describe("selectDesktopCaptureSource", () => {
+	it("prefers the target application window over WorkPilot", () => {
+		const source = selectDesktopCaptureSource(
+			[
+				{ id: "window:1:0", name: "WorkPilot AI" },
+				{ id: "window:2:0", name: "EBP Invoicing - Article TVA" },
+				{ id: "screen:0:0", name: "Entire Screen" },
+			],
+			["EBP Invoicing"],
+			{ requireWindowMatch: true },
+		);
+
+		expect(source?.id).toBe("window:2:0");
+	});
+
+	it("uses a newly opened non-WorkPilot window when the title is unknown", () => {
+		const source = selectDesktopCaptureSource(
+			[
+				{ id: "window:1:0", name: "Existing Browser" },
+				{ id: "window:2:0", name: "WorkPilot AI" },
+				{ id: "window:3:0", name: "Document sans titre" },
+			],
+			["EBP.Invoicing.Application"],
+			{
+				excludeSourceIds: new Set(["window:1:0", "window:2:0"]),
+				requireWindowMatch: true,
+			},
+		);
+
+		expect(source?.id).toBe("window:3:0");
+	});
+
+	it("ignores pre-existing editor windows even when they match the project name", () => {
+		const source = selectDesktopCaptureSource(
+			[
+				{ id: "window:1:0", name: "EBP.Invoicing.Application - Visual Studio Code" },
+				{ id: "window:2:0", name: "WorkPilot AI" },
+				{ id: "window:3:0", name: "Limitation TVA" },
+			],
+			["EBP.Invoicing.Application"],
+			{
+				excludeSourceIds: new Set(["window:1:0", "window:2:0"]),
+				requireWindowMatch: true,
+			},
+		);
+
+		expect(source?.id).toBe("window:3:0");
+	});
+
+	it("does not fall back to WorkPilot when a target window is required", () => {
+		const source = selectDesktopCaptureSource(
+			[
+				{ id: "window:1:0", name: "WorkPilot AI" },
+				{ id: "screen:0:0", name: "Entire Screen" },
+			],
+			["EBP.Invoicing.Application"],
+			{ requireWindowMatch: true },
+		);
+
+		expect(source).toBeNull();
 	});
 });
 
@@ -116,6 +180,18 @@ describe("isLegacyDotNetFramework", () => {
 		writeFileSync(
 			path.join(dir, "App.csproj"),
 			"<Project>\n<PropertyGroup>\n<TargetFrameworkVersion>v4.8</TargetFrameworkVersion>\n<OutputType>WinExe</OutputType>\n<UseWindowsForms>true</UseWindowsForms>\n</PropertyGroup>\n</Project>",
+		);
+		expect(hasLegacyDotNetDesktopProject(dir)).toBe(true);
+		expect(hasLegacyDotNetWebProject(dir)).toBe(false);
+		const [project] = analyzeDotNetProjects(dir);
+		expect(project.isDesktop).toBe(true);
+		expect(project.isWeb).toBe(false);
+	});
+
+	it("keeps a legacy WinExe desktop app as desktop even when it references System.Web", () => {
+		writeFileSync(
+			path.join(dir, "App.csproj"),
+			"<Project>\n<PropertyGroup>\n<TargetFrameworkVersion>v4.8</TargetFrameworkVersion>\n<OutputType>WinExe</OutputType>\n</PropertyGroup>\n<ItemGroup><Reference Include=\"System.Web\" /></ItemGroup>\n</Project>",
 		);
 		expect(hasLegacyDotNetDesktopProject(dir)).toBe(true);
 		expect(hasLegacyDotNetWebProject(dir)).toBe(false);

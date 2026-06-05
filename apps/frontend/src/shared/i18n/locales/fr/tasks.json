@@ -279,6 +279,8 @@
 		"local": "local",
 		"screenshots": "{{count}} capture",
 		"screenshots_other": "{{count}} captures",
+		"loadingScreenshot": "Chargement de la capture...",
+		"imageLoadFailed": "Impossible de charger la capture locale",
 		"noScreenshots": "Aucune capture n'a été générée pour ce run.",
 		"passedHint": "Ces captures ont été ajoutées comme preuve dans la PR.",
 		"status": {
