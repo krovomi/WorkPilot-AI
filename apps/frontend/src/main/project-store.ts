@@ -983,7 +983,7 @@ export class ProjectStore {
 					title: subtask.description,
 					description: subtask.description,
 					status: subtask.status,
-					files: [],
+					files: subtask.files || [],
 				}));
 			}) || []
 		);

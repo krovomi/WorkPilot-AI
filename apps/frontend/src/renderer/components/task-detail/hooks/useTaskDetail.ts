@@ -122,6 +122,9 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const [expandedPhases, setExpandedPhases] = useState<Set<TaskLogPhase>>(
 		new Set(),
 	);
+	const [currentLogPhase, setCurrentLogPhase] = useState<TaskLogPhase | null>(
+		null,
+	);
 	const [isLoadingPlan, setIsLoadingPlan] = useState(false);
 	const logsEndRef = useRef<HTMLDivElement>(null);
 	const logsContainerRef = useRef<HTMLDivElement>(null);
@@ -256,11 +259,20 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 				window.electronAPI.getWorktreeDiff(task.id),
 			])
 				.then(([statusResult, diffResult]) => {
-					if (statusResult.success && statusResult.data) {
-						setWorktreeStatus(statusResult.data);
+					const status = statusResult.success ? statusResult.data : null;
+					const diff = diffResult.success ? diffResult.data : null;
+					// Reconcile status stats with diff data: the diff already filters
+					// out discarded files, so derive accurate counts from it
+					if (status && diff) {
+						status.filesChanged = diff.files.length;
+						status.additions = diff.files.reduce((s, f) => s + f.additions, 0);
+						status.deletions = diff.files.reduce((s, f) => s + f.deletions, 0);
 					}
-					if (diffResult.success && diffResult.data) {
-						setWorktreeDiff(diffResult.data);
+					if (status) {
+						setWorktreeStatus(status);
+					}
+					if (diff) {
+						setWorktreeDiff(diff);
 					}
 				})
 				.catch((err) => {
@@ -425,19 +437,40 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 				errors,
 			);
 
-			processAPIResult(
-				statusResult,
-				"Worktree status",
-				(data: WorktreeStatus) => setWorktreeStatus(data),
-				errors,
-			);
+			// Collect errors for status/diff (side-effect only); the actual
+			// values are extracted directly from the settled results below so
+			// TS control-flow analysis can narrow them correctly.
+			processAPIResult(statusResult, "Worktree status", () => {}, errors);
+			processAPIResult(diffResult, "Worktree diff", () => {}, errors);
 
-			processAPIResult(
-				diffResult,
-				"Worktree diff",
-				(data: WorktreeDiff) => setWorktreeDiff(data),
-				errors,
-			);
+			const latestStatus: WorktreeStatus | null =
+				statusResult.status === "fulfilled" &&
+				statusResult.value.success &&
+				statusResult.value.data
+					? statusResult.value.data
+					: null;
+			const latestDiff: WorktreeDiff | null =
+				diffResult.status === "fulfilled" &&
+				diffResult.value.success &&
+				diffResult.value.data
+					? diffResult.value.data
+					: null;
+
+			if (latestDiff) {
+				setWorktreeDiff(latestDiff);
+			}
+
+			// Reconcile status stats with diff data: the diff already filters
+			// out discarded files, so derive accurate counts from it.
+			if (latestStatus) {
+				if (latestDiff) {
+					const files = latestDiff.files;
+					latestStatus.filesChanged = files.length;
+					latestStatus.additions = files.reduce((s, f) => s + f.additions, 0);
+					latestStatus.deletions = files.reduce((s, f) => s + f.deletions, 0);
+				}
+				setWorktreeStatus(latestStatus);
+			}
 
 			// Set workspace error if any API calls failed
 			if (errors.length > 0) {
@@ -478,11 +511,19 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 				window.electronAPI.getWorktreeStatus(task.id),
 				window.electronAPI.getWorktreeDiff(task.id),
 			]);
-			if (statusResult.success && statusResult.data) {
-				setWorktreeStatus(statusResult.data);
+			const status = statusResult.success ? statusResult.data : null;
+			const diff = diffResult.success ? diffResult.data : null;
+			// Reconcile status stats with diff data (diff filters discarded files)
+			if (status && diff) {
+				status.filesChanged = diff.files.length;
+				status.additions = diff.files.reduce((s, f) => s + f.additions, 0);
+				status.deletions = diff.files.reduce((s, f) => s + f.deletions, 0);
 			}
-			if (diffResult.success && diffResult.data) {
-				setWorktreeDiff(diffResult.data);
+			if (status) {
+				setWorktreeStatus(status);
+			}
+			if (diff) {
+				setWorktreeDiff(diff);
 			}
 
 			// Reload task data from store to reflect cleared staged state
@@ -496,6 +537,35 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 			setIsLoadingWorktree(false);
 		}
 	}, [task.id, selectedProject]);
+
+	// Lightweight refresh of the worktree diff only (status + diff), WITHOUT the
+	// expensive Python merge-preview subprocess. Used after discarding/adding/
+	// editing files in the diff dialog so the list updates immediately instead of
+	// waiting on loadMergePreview (1-30s) or forcing the user to reopen the popup.
+	const refreshWorktreeDiff = useCallback(async () => {
+		try {
+			const [statusResult, diffResult] = await Promise.all([
+				window.electronAPI.getWorktreeStatus(task.id),
+				window.electronAPI.getWorktreeDiff(task.id),
+			]);
+			const status = statusResult.success ? statusResult.data : null;
+			const diff = diffResult.success ? diffResult.data : null;
+			// Reconcile status stats with diff data (diff filters discarded files)
+			if (status && diff) {
+				status.filesChanged = diff.files.length;
+				status.additions = diff.files.reduce((s, f) => s + f.additions, 0);
+				status.deletions = diff.files.reduce((s, f) => s + f.deletions, 0);
+			}
+			if (status) {
+				setWorktreeStatus(status);
+			}
+			if (diff) {
+				setWorktreeDiff(diff);
+			}
+		} catch (err) {
+			console.error("[useTaskDetail] Failed to refresh worktree diff:", err);
+		}
+	}, [task.id]);
 
 	// NOTE: Merge preview is NO LONGER auto-loaded on modal open.
 	// User must click "Check for Conflicts" button to trigger the expensive preview operation.
@@ -615,6 +685,8 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		phaseLogs,
 		isLoadingLogs,
 		expandedPhases,
+		currentLogPhase,
+		setCurrentLogPhase,
 		logsEndRef,
 		logsContainerRef,
 		selectedProject,
@@ -671,6 +743,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		handleLogsScroll,
 		togglePhase,
 		loadMergePreview,
+		refreshWorktreeDiff,
 		addFeedbackImage,
 		addFeedbackImages,
 		removeFeedbackImage,

@@ -205,7 +205,7 @@ export function CreatePRDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-[500px]">
+			<DialogContent className="sm:max-w-[720px]">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<GitPullRequest className="h-5 w-5 text-primary" />
@@ -301,6 +301,26 @@ export function CreatePRDialog({
 								</>
 							)}
 						</div>
+
+						{/* Garde-fou : avertir l'utilisateur quand la branche du worktree
+							n'a aucun commit en avance de la cible (PR vide garantie). */}
+						{worktreeStatus?.exists &&
+							(worktreeStatus.commitCount ?? 0) === 0 &&
+							(worktreeStatus.filesChanged ?? 0) === 0 && (
+								<div
+									className="rounded-lg border border-warning/50 bg-warning/10 p-3 text-sm text-warning-foreground"
+									data-testid="pr-empty-warning"
+									role="alert"
+								>
+									{t("taskReview:pr.warnings.emptyBranch", {
+										base:
+											worktreeStatus.baseBranch ||
+											t("taskReview:pr.labels.unknown"),
+										defaultValue:
+											"Aucun commit à pousser : la branche est identique à « {{base}} ». La PR serait vide. Vérifiez que l'agent a bien commité ses changements ou qu'il ne s'agit pas d'une tâche dupliquée déjà fusionnée.",
+									})}
+								</div>
+							)}
 
 						{/* Target Branch */}
 						<div className="space-y-2">
@@ -426,7 +446,15 @@ export function CreatePRDialog({
 							>
 								{t("common:buttons.cancel")}
 							</Button>
-							<Button onClick={handleCreatePR} disabled={isCreating}>
+							<Button
+								onClick={handleCreatePR}
+								disabled={
+									isCreating ||
+									(worktreeStatus?.exists === true &&
+										(worktreeStatus.commitCount ?? 0) === 0 &&
+										(worktreeStatus.filesChanged ?? 0) === 0)
+								}
+							>
 								{isCreating ? (
 									<>
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />

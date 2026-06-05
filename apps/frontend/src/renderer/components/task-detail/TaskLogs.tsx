@@ -17,7 +17,7 @@ import {
 	Wrench,
 	XCircle,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
 	Task,
 	TaskLogEntry,
@@ -49,7 +49,10 @@ interface TaskLogsProps {
 	logsContainerRef: React.RefObject<HTMLDivElement | null>;
 	onLogsScroll: (e: React.UIEvent<HTMLDivElement>) => void;
 	onTogglePhase: (phase: TaskLogPhase) => void;
+	onVisiblePhaseChange?: (phase: TaskLogPhase | null) => void;
 }
+
+const PHASE_ORDER: TaskLogPhase[] = ["planning", "coding", "validation"];
 
 const PHASE_LABELS: Record<TaskLogPhase, string> = {
 	planning: "Planning",
@@ -140,12 +143,55 @@ export function TaskLogs({
 	logsContainerRef,
 	onLogsScroll,
 	onTogglePhase,
+	onVisiblePhaseChange,
 }: TaskLogsProps) {
+	// Refs to each rendered phase section so we can detect which phase is
+	// currently scrolled to the top of the viewport.
+	const phaseRefs = useRef<Partial<Record<TaskLogPhase, HTMLDivElement | null>>>(
+		{},
+	);
+
+	// Determine which phase section currently sits at the top of the scroll
+	// container and notify the parent so the sticky phase bar can follow.
+	const computeVisiblePhase = useCallback(() => {
+		const container = logsContainerRef.current;
+		if (!container || !onVisiblePhaseChange) return;
+
+		const containerTop = container.getBoundingClientRect().top;
+		let current: TaskLogPhase | null = null;
+		for (const phase of PHASE_ORDER) {
+			const el = phaseRefs.current[phase];
+			if (!el) continue;
+			// The last phase whose header has reached (or passed) the top edge of
+			// the viewport is the one we are currently reading.
+			if (el.getBoundingClientRect().top - containerTop <= 8) {
+				current = phase;
+			}
+		}
+		onVisiblePhaseChange(current);
+	}, [logsContainerRef, onVisiblePhaseChange]);
+
+	const handleScroll = useCallback(
+		(e: React.UIEvent<HTMLDivElement>) => {
+			onLogsScroll(e);
+			computeVisiblePhase();
+		},
+		[onLogsScroll, computeVisiblePhase],
+	);
+
+	// Recompute when logs content changes (new entries, expand/collapse, load).
+	// These deps trigger DOM layout changes even though computeVisiblePhase
+	// reads layout via refs rather than these values directly.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: layout-driven recompute
+	useEffect(() => {
+		computeVisiblePhase();
+	}, [computeVisiblePhase, phaseLogs, expandedPhases, isLoadingLogs]);
+
 	return (
 		<div
 			ref={logsContainerRef}
 			className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
-			onScroll={onLogsScroll}
+			onScroll={handleScroll}
 		>
 			<div className="p-4 space-y-2">
 				{isLoadingLogs ? (
@@ -155,10 +201,14 @@ export function TaskLogs({
 				) : phaseLogs ? (
 					<>
 						{/* Phase-based collapsible logs */}
-						{(["planning", "coding", "validation"] as TaskLogPhase[]).map(
-							(phase) => (
+						{PHASE_ORDER.map((phase) => (
+							<div
+								key={phase}
+								ref={(el) => {
+									phaseRefs.current[phase] = el;
+								}}
+							>
 								<PhaseLogSection
-									key={phase}
 									phase={phase}
 									phaseLog={phaseLogs.phases[phase]}
 									isExpanded={expandedPhases.has(phase)}
@@ -166,8 +216,8 @@ export function TaskLogs({
 									isTaskStuck={isStuck}
 									phaseConfig={getPhaseConfig(task.metadata, phase)}
 								/>
-							),
-						)}
+							</div>
+						))}
 						<div ref={logsEndRef} />
 					</>
 				) : task.logs && task.logs.length > 0 ? (
@@ -441,15 +491,15 @@ function LogEntry({ entry }: LogEntryProps) {
 			<div className="flex flex-col">
 				<div
 					className={cn(
-						"inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs",
+						"flex items-start gap-2 rounded-md px-2 py-1 text-xs",
 						color,
 					)}
 				>
-					<Icon className="h-3 w-3 animate-pulse" />
-					<span className="font-medium">{label}</span>
+					<Icon className="h-3 w-3 mt-0.5 shrink-0 animate-pulse" />
+					<span className="font-medium shrink-0 mt-px">{label}</span>
 					{entry.tool_input && (
 						<span
-							className="text-muted-foreground truncate max-w-[500px]"
+							className="text-muted-foreground break-all whitespace-pre-wrap flex-1 min-w-0"
 							title={entry.tool_input}
 						>
 							{entry.tool_input}

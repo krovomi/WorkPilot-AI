@@ -1410,8 +1410,19 @@ async def run_autonomous_agent(
 
         # Handle session status
         if status == "complete":
-            # Don't emit COMPLETE here - subtasks are done but QA hasn't run yet
-            # QA loop will emit COMPLETE after actual approval
+            # Emit ALL_SUBTASKS_DONE so frontend XState transitions coding → qa_review.
+            # Without this, the process may exit without a terminal event, causing
+            # the kanban card to stay stuck in the "In Progress" column.
+            try:
+                completed, total = count_subtasks(spec_dir)
+                task_event_emitter = TaskEventEmitter.from_spec_dir(spec_dir)
+                task_event_emitter.emit(
+                    "ALL_SUBTASKS_DONE",
+                    {"totalCount": total},
+                )
+            except Exception:
+                logger.debug("Failed to emit ALL_SUBTASKS_DONE event", exc_info=True)
+
             print_build_complete_banner(spec_dir)
             status_manager.update(state=BuildState.COMPLETE)
 

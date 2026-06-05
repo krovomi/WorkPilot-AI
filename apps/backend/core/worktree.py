@@ -276,8 +276,25 @@ class WorktreeManager:
                     f"Warning: DEFAULT_BRANCH '{env_branch}' not found, auto-detecting..."
                 )
 
-        # 2. Auto-detect main/master
-        for branch in ["main", "master"]:
+        # 2. Ask the remote what its default branch is. Source of truth for
+        #    repos that don't use 'main'/'master' (GitFlow with 'develop',
+        #    'trunk', 'production', etc.). Without this we silently fall
+        #    through to the current branch and end up creating PRs against
+        #    the wrong base.
+        symref = run_git(
+            ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+            cwd=self.project_dir,
+        )
+        if symref.returncode == 0:
+            detected = symref.stdout.strip()
+            if detected.startswith("origin/"):
+                detected = detected[len("origin/") :]
+            if detected:
+                return detected
+
+        # 3. Auto-detect usual default branches. 'develop' is included so
+        #    GitFlow repos resolve without DEFAULT_BRANCH being set.
+        for branch in ["main", "master", "develop"]:
             result = run_git(
                 ["rev-parse", "--verify", branch],
                 cwd=self.project_dir,
@@ -285,9 +302,9 @@ class WorktreeManager:
             if result.returncode == 0:
                 return branch
 
-        # 3. Fall back to current branch with warning
+        # 4. Fall back to current branch with warning
         current = self._get_current_branch()
-        print("Warning: Could not find 'main' or 'master' branch.")
+        print("Warning: Could not find 'main', 'master' or 'develop' branch.")
         print(f"Warning: Using current branch '{current}' as base for worktree.")
         print("Tip: Set DEFAULT_BRANCH=your-branch in .env to avoid this.")
         return current
@@ -866,6 +883,53 @@ class WorktreeManager:
                     changed_files.append(parts[1])
 
         return len(changed_files) > 0, changed_files
+
+    def _count_commits_ahead(
+        self, spec_name: str, target_branch: str
+    ) -> int | None:
+        """
+        Compte les commits de la branche du worktree en avance sur ``target_branch``.
+
+        Utilise ``git rev-list --count <target>..HEAD`` pour préserver la
+        sémantique de l'UI Kanban ("commits à pousser"). Tente une résolution
+        locale puis remote (``origin/<target>``) si la référence locale est
+        absente.
+
+        Args:
+            spec_name: Nom du dossier spec (worktree).
+            target_branch: Branche cible de la PR (ex: ``develop``).
+
+        Returns:
+            Nombre de commits en avance, ou ``None`` si la comparaison est
+            impossible (ex: target inconnu localement et sans remote).
+        """
+        worktree_path = self.get_worktree_path(spec_name)
+        if not worktree_path.exists():
+            return None
+
+        candidates: list[str] = []
+        if target_branch:
+            candidates.append(target_branch)
+            if not target_branch.startswith("origin/"):
+                candidates.append(f"origin/{target_branch}")
+
+        for ref in candidates:
+            verify = self._run_git(
+                ["rev-parse", "--verify", "--quiet", ref],
+                cwd=worktree_path,
+            )
+            if verify.returncode != 0:
+                continue
+            count = self._run_git(
+                ["rev-list", "--count", f"{ref}..HEAD"],
+                cwd=worktree_path,
+            )
+            if count.returncode == 0:
+                try:
+                    return int(count.stdout.strip() or "0")
+                except ValueError:
+                    return None
+        return None
 
     def remove_worktree(self, spec_name: str, delete_branch: bool = False) -> None:
         """
@@ -2498,6 +2562,113 @@ class WorktreeManager:
 
         return None
 
+    def _apply_discard_list(self, spec_name: str, target_branch: str) -> list[str]:
+        """Applique la ``.workpilot-discard-list`` au worktree avant le push.
+
+        L'UI affiche un diff filtré (``origin/base...origin/head`` moins les
+        fichiers présents dans ``.workpilot-discard-list``). Sans cette étape,
+        la branche poussée contient toujours les commits d'origine et la PR
+        embarque les fichiers abandonnés : il y a décorrélation entre l'aperçu
+        et la PR.
+
+        Pour chaque fichier abandonné, on aligne la HEAD du worktree sur la
+        branche cible :
+        - fichier présent dans la cible -> ``git checkout <cible> -- <fichier>``
+          (annule les modifications de la tâche) ;
+        - fichier ajouté par la tâche (absent de la cible) -> ``git rm`` (on le
+          retire complètement).
+
+        ``git checkout``/``git rm`` mettent déjà à jour l'index : on commit donc
+        uniquement ces changements, sans ``git add -A``, pour éviter d'inclure
+        ``.workpilot-discard-list`` elle-même dans la PR.
+
+        Args:
+            spec_name: Nom du dossier spec (worktree).
+            target_branch: Branche cible de la PR (ex: ``develop``).
+
+        Returns:
+            Liste des fichiers effectivement réappliqués (revertés).
+        """
+        worktree_path = self.get_worktree_path(spec_name)
+        if not worktree_path.exists():
+            return []
+
+        discard_path = worktree_path / ".workpilot-discard-list"
+        if not discard_path.exists():
+            return []
+
+        try:
+            discarded = [
+                line.strip()
+                for line in discard_path.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.strip().startswith("#")
+            ]
+        except OSError as exc:
+            logger.warning("[_apply_discard_list] Cannot read discard list: %s", exc)
+            return []
+
+        if not discarded:
+            return []
+
+        # Résout la ref qui contient le contenu "cible" : préfère
+        # origin/<target> si présent (aligné avec la PR), sinon <target>.
+        base_ref = target_branch
+        remote_ref = f"origin/{target_branch}"
+        if (
+            self._run_git(
+                ["rev-parse", "--verify", "--quiet", remote_ref], cwd=worktree_path
+            ).returncode
+            == 0
+        ):
+            base_ref = remote_ref
+
+        reverted: list[str] = []
+        for rel_path in discarded:
+            exists_in_base = (
+                self._run_git(
+                    ["cat-file", "-e", f"{base_ref}:{rel_path}"], cwd=worktree_path
+                ).returncode
+                == 0
+            )
+            if exists_in_base:
+                res = self._run_git(
+                    ["checkout", base_ref, "--", rel_path], cwd=worktree_path
+                )
+            else:
+                res = self._run_git(
+                    ["rm", "-f", "--ignore-unmatch", "--", rel_path],
+                    cwd=worktree_path,
+                )
+
+            if res.returncode == 0:
+                reverted.append(rel_path)
+            else:
+                logger.warning(
+                    "[_apply_discard_list] Failed to revert %s against %s: %s",
+                    rel_path,
+                    base_ref,
+                    res.stderr,
+                )
+
+        if reverted:
+            commit = self._run_git(
+                [
+                    "commit",
+                    "-m",
+                    f"workpilot: exclude {len(reverted)} user-discarded file(s)",
+                ],
+                cwd=worktree_path,
+            )
+            if commit.returncode != 0 and "nothing to commit" not in (
+                commit.stdout + commit.stderr
+            ):
+                logger.warning(
+                    "[_apply_discard_list] Commit of discarded reverts failed: %s",
+                    commit.stderr,
+                )
+
+        return reverted
+
     def push_and_create_pr(
         self,
         spec_name: str,
@@ -2530,6 +2701,58 @@ class WorktreeManager:
                 - already_exists: bool (if PR/MR already exists)
                 - error: str (if failed)
         """
+        # Step 0: Commit any uncommitted changes before pushing
+        has_changes, changed_files = self._has_uncommitted_changes(spec_name)
+        if has_changes:
+            logger.info(
+                f"[push_and_create_pr] Found {len(changed_files)} uncommitted files in '{spec_name}', committing..."
+            )
+            commit_msg = title or f"auto-claude: {spec_name}"
+            self.commit_in_worktree(spec_name, commit_msg)
+
+        # Step 0.4: Applique la discard list pour que la branche poussée
+        # corresponde exactement au diff filtré affiché dans l'UI. Sans cela,
+        # les fichiers abandonnés par l'utilisateur (présents uniquement dans
+        # .workpilot-discard-list, un filtre d'affichage) resteraient dans les
+        # commits et seraient embarqués dans la PR -> décorrélation.
+        effective_target = target_branch or self.base_branch
+        reverted = self._apply_discard_list(spec_name, effective_target)
+        if reverted:
+            logger.info(
+                "[push_and_create_pr] Applied discard list: excluded %d file(s) "
+                "from '%s' before push.",
+                len(reverted),
+                spec_name,
+            )
+
+        # Step 0.5: Garde-fou contre la création d'une PR vide.
+        # Si la branche du worktree n'a aucun commit en avance de la cible,
+        # la PR créée serait vide (cas typique : tâche dupliquée déjà mergée
+        # via une autre branche, ou agent qui n'a rien commité). On échoue
+        # explicitement avec un message exploitable côté UI plutôt que de
+        # pousser silencieusement une PR sans contenu.
+        ahead = self._count_commits_ahead(spec_name, effective_target)
+        if ahead == 0:
+            logger.warning(
+                "[push_and_create_pr] Refusing to create empty PR: branch for "
+                "spec '%s' has 0 commits ahead of '%s'.",
+                spec_name,
+                effective_target,
+            )
+            return PushAndCreatePRResult(
+                success=False,
+                pushed=False,
+                branch="",
+                remote="",
+                error=(
+                    f"Aucun commit à pousser : la branche du worktree est "
+                    f"identique à '{effective_target}'. Vérifiez que l'agent "
+                    f"a bien commité ses changements, ou que le travail n'a "
+                    f"pas déjà été fusionné via une autre branche (tâche "
+                    f"dupliquée)."
+                ),
+            )
+
         # Step 1: Push the branch
         push_result = self.push_branch(spec_name, force=force_push)
         if not push_result.get("success"):

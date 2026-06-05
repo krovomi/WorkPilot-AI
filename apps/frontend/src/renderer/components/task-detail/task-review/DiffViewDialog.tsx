@@ -641,10 +641,11 @@ export function DiffViewDialog({
 									<span className="text-xs text-destructive">
 										-{file.deletions}
 									</span>
-									{worktreePath && selectedPaths.size === 0 && (
+									{worktreePath && (
 										<Button
 											size="sm"
 											variant="ghost"
+											className={selectedPaths.size > 0 ? "invisible" : ""}
 											onClick={(e) => {
 												e.stopPropagation();
 												handleEditFile(file);

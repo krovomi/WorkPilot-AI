@@ -390,6 +390,9 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					commitMessage: "Auto-save before task deletion",
 					logPrefix: "[TASK_DELETE]",
 					deleteBranch: true,
+					// Ferme la PR distante associée pour éviter une PR
+					// orpheline pointant vers une branche supprimée.
+					prUrl: task.prUrl,
 				});
 
 				if (!cleanupResult.success) {
@@ -403,6 +406,11 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					if (cleanupResult.autoCommitted) {
 						console.warn(
 							`[TASK_DELETE] Auto-committed uncommitted work before deletion`,
+						);
+					}
+					if (cleanupResult.prClosed && cleanupResult.closedPrNumber) {
+						console.warn(
+							`[TASK_DELETE] PR #${cleanupResult.closedPrNumber} fermée automatiquement`,
 						);
 					}
 					if (cleanupResult.warnings.length > 0) {

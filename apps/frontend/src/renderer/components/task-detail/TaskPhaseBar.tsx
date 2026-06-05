@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 
 interface TaskPhaseBarProps {
 	phaseLogs: TaskLogs | null;
+	/** Phase currently visible at the top of the logs viewport (scroll-driven). */
+	currentPhase?: TaskLogPhase | null;
 }
 
 const PHASE_ORDER: TaskLogPhase[] = ["planning", "coding", "validation"];
@@ -32,7 +34,7 @@ const PHASE_I18N_KEYS: Record<TaskLogPhase, string> = {
 	validation: "execution.phases.validation",
 };
 
-export function TaskPhaseBar({ phaseLogs }: TaskPhaseBarProps) {
+export function TaskPhaseBar({ phaseLogs, currentPhase }: TaskPhaseBarProps) {
 	const { t } = useTranslation("tasks");
 
 	if (!phaseLogs) return null;
@@ -41,10 +43,14 @@ export function TaskPhaseBar({ phaseLogs }: TaskPhaseBarProps) {
 		(p) => phaseLogs.phases[p]?.status === "active",
 	);
 
-	if (!activePhase) return null;
+	// Prefer the phase the user is currently scrolled to; fall back to the
+	// running phase so the bar still reflects progress before any scroll.
+	const displayPhase = currentPhase ?? activePhase;
 
-	const phaseNumber = PHASE_ORDER.indexOf(activePhase) + 1;
-	const styles = PHASE_STYLES[activePhase];
+	if (!displayPhase) return null;
+
+	const phaseNumber = PHASE_ORDER.indexOf(displayPhase) + 1;
+	const styles = PHASE_STYLES[displayPhase];
 
 	return (
 		<div
@@ -54,7 +60,7 @@ export function TaskPhaseBar({ phaseLogs }: TaskPhaseBarProps) {
 			)}
 		>
 			<span className={cn("text-xs font-medium", styles.text)}>
-				{t(PHASE_I18N_KEYS[activePhase])}
+				{t(PHASE_I18N_KEYS[displayPhase])}
 			</span>
 			<span className="text-xs text-muted-foreground">•</span>
 			<span className="text-xs text-muted-foreground">

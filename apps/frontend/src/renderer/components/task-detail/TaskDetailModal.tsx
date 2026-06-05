@@ -775,8 +775,6 @@ function TaskDetailModalContent({
 									)}
 								</TabsList>
 
-								<TaskPhaseBar phaseLogs={state.phaseLogs} />
-
 								{/* Overview Tab */}
 								<TabsContent
 									value="overview"
@@ -829,7 +827,7 @@ function TaskDetailModalContent({
 														isCreatingPR={state.isCreatingPR}
 														onShowPRDialog={state.setShowPRDialog}
 														onCreatePR={handleCreatePR}
-														onRefreshDiff={state.loadMergePreview}
+														onRefreshDiff={state.refreshWorktreeDiff}
 													/>
 												</>
 											)}
@@ -844,6 +842,14 @@ function TaskDetailModalContent({
 								>
 									<TaskSubtasks task={task} onUpdatePlan={handleUpdatePlan} />
 								</TabsContent>
+
+								{/* Phase bar - only visible on Logs tab */}
+								{state.activeTab === "logs" && (
+									<TaskPhaseBar
+										phaseLogs={state.phaseLogs}
+										currentPhase={state.currentLogPhase}
+									/>
+								)}
 
 								{/* Logs Tab */}
 								<TabsContent
@@ -860,6 +866,7 @@ function TaskDetailModalContent({
 										logsContainerRef={state.logsContainerRef}
 										onLogsScroll={state.handleLogsScroll}
 										onTogglePhase={state.togglePhase}
+										onVisiblePhaseChange={state.setCurrentLogPhase}
 									/>
 								</TabsContent>
 

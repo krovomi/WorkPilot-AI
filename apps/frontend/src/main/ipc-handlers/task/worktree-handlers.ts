@@ -1852,6 +1852,62 @@ function getEffectiveBaseBranch(
 	return "main";
 }
 
+/**
+ * Vérifie qu'une ref git existe dans le worktree donné.
+ * Utilisé pour basculer sur `origin/<branch>` quand la branche distante
+ * existe (cas d'une PR pushée), afin que le compteur de fichiers/diff
+ * reflète l'état réellement publié plutôt que l'état local divergent.
+ */
+function gitRefExists(cwd: string, ref: string): boolean {
+	try {
+		execFileSync(getToolPath("git"), ["rev-parse", "--verify", ref], {
+			cwd,
+			encoding: "utf-8",
+			stdio: ["pipe", "pipe", "pipe"],
+		});
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Résultat de la résolution des refs à utiliser pour calculer le diff
+ * d'un worktree.
+ */
+interface ResolvedDiffRefs {
+	/** Ref de la base (ex: `origin/develop` ou `develop`). */
+	baseRef: string;
+	/** Ref de la HEAD effective (ex: `origin/feature/x` ou `HEAD`). */
+	headRef: string;
+	/** True si on est tombé sur une ref distante pour la HEAD. */
+	usingRemoteHead: boolean;
+}
+
+/**
+ * Détermine les refs à utiliser pour `git diff` dans un worktree :
+ * - HEAD distante (`origin/<branch>`) prioritaire si elle existe ; sinon HEAD.
+ * - Base distante (`origin/<baseBranch>`) prioritaire si elle existe ; sinon base locale.
+ *
+ * Cela permet à l'UI WorkPilot de refléter l'état tel qu'il apparaît dans la PR
+ * (origin), même si le worktree local a divergé après un push depuis ailleurs,
+ * un reset ou un rebase.
+ */
+function resolveDiffRefs(
+	worktreePath: string,
+	branch: string,
+	baseBranch: string,
+): ResolvedDiffRefs {
+	const remoteHead = `origin/${branch}`;
+	const remoteBase = `origin/${baseBranch}`;
+	const usingRemoteHead = gitRefExists(worktreePath, remoteHead);
+	const headRef = usingRemoteHead ? remoteHead : "HEAD";
+	const baseRef = gitRefExists(worktreePath, remoteBase)
+		? remoteBase
+		: baseBranch;
+	return { baseRef, headRef, usingRemoteHead };
+}
+
 // ============================================
 // Helper functions for TASK_WORKTREE_CREATE_PR
 // ============================================
@@ -2208,6 +2264,15 @@ export function registerWorktreeHandlers(
 						project.settings?.mainBranch,
 					);
 
+					// Préférer les refs distantes (origin/...) quand elles existent
+					// pour que le compteur reflète l'état publié dans la PR plutôt
+					// qu'un HEAD local potentiellement divergent.
+					const diffRefs = resolveDiffRefs(
+						worktreePath,
+						branch,
+						baseBranch,
+					);
+
 					// Get user's current branch in main project (this is where changes will merge INTO)
 					let currentProjectBranch: string | undefined;
 					try {
@@ -2228,7 +2293,11 @@ export function registerWorktreeHandlers(
 					try {
 						const countOutput = execFileSync(
 							getToolPath("git"),
-							["rev-list", "--count", `${baseBranch}..HEAD`],
+							[
+								"rev-list",
+								"--count",
+								`${diffRefs.baseRef}..${diffRefs.headRef}`,
+							],
 							{
 								cwd: worktreePath,
 								encoding: "utf-8",
@@ -2240,16 +2309,21 @@ export function registerWorktreeHandlers(
 						commitCount = 0;
 					}
 
-					// Get diff stats
+					// Get diff stats — utilise --numstat pour pouvoir exclure
+					// les fichiers que l'utilisateur a annulés via
+					// .workpilot-discard-list (cohérent avec TASK_WORKTREE_DIFF).
 					let filesChanged = 0;
 					let additions = 0;
 					let deletions = 0;
 
-					let diffStat = "";
 					try {
-						diffStat = execFileSync(
+						const numstat = execFileSync(
 							getToolPath("git"),
-							["diff", "--stat", `${baseBranch}...HEAD`],
+							[
+								"diff",
+								"--numstat",
+								`${diffRefs.baseRef}...${diffRefs.headRef}`,
+							],
 							{
 								cwd: worktreePath,
 								encoding: "utf-8",
@@ -2257,15 +2331,44 @@ export function registerWorktreeHandlers(
 							},
 						).trim();
 
-						// Parse the summary line (e.g., "3 files changed, 50 insertions(+), 10 deletions(-)")
-						const summaryMatch = diffStat.match(
-							/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/,
+						// Charge la discard list (optionnelle) pour exclure
+						// les fichiers que l'utilisateur ne veut pas voir.
+						const discardListPath = path.join(
+							worktreePath,
+							".workpilot-discard-list",
 						);
-						if (summaryMatch) {
-							filesChanged = parseInt(summaryMatch[1], 10) || 0;
-							additions = parseInt(summaryMatch[2], 10) || 0;
-							deletions = parseInt(summaryMatch[3], 10) || 0;
+						let discardedFiles: string[] = [];
+						try {
+							const content = readFileSync(discardListPath, "utf-8");
+							discardedFiles = content
+								.split("\n")
+								.map((line) => line.trim())
+								.filter((line) => line && !line.startsWith("#"));
+						} catch (err) {
+							const isMissing =
+								err instanceof Error &&
+								(err as NodeJS.ErrnoException).code === "ENOENT";
+							if (!isMissing) {
+								console.error(
+									"[TASK_WORKTREE_STATUS] Error reading discard list:",
+									err,
+								);
+							}
 						}
+
+						const discardSet = new Set(discardedFiles);
+						numstat
+							.split("\n")
+							.filter(Boolean)
+							.forEach((line: string) => {
+								const [adds, dels, filePath] = line.split("\t");
+								if (!filePath || discardSet.has(filePath)) {
+									return;
+								}
+								filesChanged += 1;
+								additions += parseInt(adds, 10) || 0;
+								deletions += parseInt(dels, 10) || 0;
+							});
 					} catch {
 						// Ignore diff errors
 					}
@@ -2333,6 +2436,29 @@ export function registerWorktreeHandlers(
 					project.settings?.mainBranch,
 				);
 
+				// Récupère la branche du worktree pour pouvoir préférer
+				// `origin/<branch>` quand elle existe (alignement avec la PR).
+				let worktreeBranch = "HEAD";
+				try {
+					worktreeBranch = execFileSync(
+						getToolPath("git"),
+						["rev-parse", "--abbrev-ref", "HEAD"],
+						{
+							cwd: worktreePath,
+							encoding: "utf-8",
+							stdio: ["pipe", "pipe", "pipe"],
+						},
+					).trim();
+				} catch {
+					// fallback à HEAD - resolveDiffRefs gérera l'absence de origin/
+				}
+				const diffRefs = resolveDiffRefs(
+					worktreePath,
+					worktreeBranch,
+					baseBranch,
+				);
+				const diffRange = `${diffRefs.baseRef}...${diffRefs.headRef}`;
+
 				// Get the diff with file stats
 				const files: WorktreeDiffFile[] = [];
 
@@ -2343,7 +2469,7 @@ export function registerWorktreeHandlers(
 					// Get numstat for additions/deletions per file (cross-platform)
 					numstat = execFileSync(
 						getToolPath("git"),
-						["diff", "--numstat", `${baseBranch}...HEAD`],
+						["diff", "--numstat", diffRange],
 						{
 							cwd: worktreePath,
 							encoding: "utf-8",
@@ -2354,7 +2480,7 @@ export function registerWorktreeHandlers(
 					// Get name-status for file status (cross-platform)
 					nameStatus = execFileSync(
 						getToolPath("git"),
-						["diff", "--name-status", `${baseBranch}...HEAD`],
+						["diff", "--name-status", diffRange],
 						{
 							cwd: worktreePath,
 							encoding: "utf-8",
@@ -2365,7 +2491,7 @@ export function registerWorktreeHandlers(
 					// Get full diff for patch content
 					fullDiff = execFileSync(
 						getToolPath("git"),
-						["diff", `${baseBranch}...HEAD`],
+						["diff", diffRange],
 						{
 							cwd: worktreePath,
 							encoding: "utf-8",
@@ -2488,10 +2614,18 @@ export function registerWorktreeHandlers(
 						);
 					}
 				} catch (err) {
-					console.error(
-						"[TASK_WORKTREE_DIFF] Error reading discard list:",
-						err,
-					);
+					// .workpilot-discard-list est optionnel : ENOENT est normal
+					// quand l'utilisateur n'a discardé aucun fichier. Seuls les
+					// autres types d'erreur (permissions, EIO…) sont remontés.
+					const isMissing =
+						err instanceof Error &&
+						(err as NodeJS.ErrnoException).code === "ENOENT";
+					if (!isMissing) {
+						console.error(
+							"[TASK_WORKTREE_DIFF] Error reading discard list:",
+							err,
+						);
+					}
 				}
 
 				// Filter out discarded files from the diff

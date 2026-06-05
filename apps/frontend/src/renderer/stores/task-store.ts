@@ -465,7 +465,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 					title,
 					description,
 					status,
-					files: [],
+					files: Array.isArray(subtask.files) ? subtask.files : [],
 					verification: subtask.verification as Subtask["verification"],
 				};
 			};

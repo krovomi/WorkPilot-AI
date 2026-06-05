@@ -379,6 +379,7 @@ export interface PlanSubtask {
 	id: string;
 	description: string;
 	status: SubtaskStatus;
+	files?: string[];
 	verification?: {
 		type: string;
 		run?: string;

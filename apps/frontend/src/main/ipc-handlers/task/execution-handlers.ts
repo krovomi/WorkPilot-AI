@@ -1133,17 +1133,62 @@ export function registerTaskExecutionHandlers(
 					}
 				}
 
-				// Restart QA process - use worktree path if it exists, otherwise main project
-				// The QA process needs to run where the implementation_plan.json with completed subtasks is
+				// Reset existing subtasks to "pending" in the implementation plan
+				// so the full pipeline (planning → coding → QA) will re-process them
+				const resetPlanPath = path.join(
+					hasWorktree && worktreeSpecDir ? worktreeSpecDir : specDir,
+					AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
+				);
+				try {
+					const resetPlanContent = readFileSync(resetPlanPath, "utf-8");
+					const resetPlan = JSON.parse(resetPlanContent);
+					if (resetPlan.phases) {
+						for (const phase of resetPlan.phases) {
+							if (Array.isArray(phase.subtasks)) {
+								for (const subtask of phase.subtasks) {
+									// Only reset completed/failed subtasks back to pending
+									if (subtask.status === "completed" || subtask.status === "failed") {
+										subtask.status = "pending";
+									}
+								}
+							}
+						}
+					}
+					// Reset QA signoff so the full pipeline runs again
+					if (resetPlan.qa_signoff) {
+						resetPlan.qa_signoff.status = "pending";
+					}
+					resetPlan.status = "in_progress";
+					resetPlan.planStatus = "in_progress";
+					resetPlan.updated_at = new Date().toISOString();
+					writeFileSync(resetPlanPath, JSON.stringify(resetPlan, null, 2), "utf-8");
+					appLog.info("[TASK_REVIEW] Reset subtasks to pending for full pipeline re-execution");
+				} catch (resetError) {
+					appLog.warning(
+						`[TASK_REVIEW] Could not reset subtasks in plan: ${resetError instanceof Error ? resetError.message : String(resetError)}`,
+					);
+				}
+
+				// Start full pipeline (planning → coding → QA) instead of QA-only
+				// This ensures changes requested by the user go through the complete workflow
 				const qaProjectPath = hasWorktree ? worktreePath : project.path;
+				const baseBranch =
+					task.metadata?.baseBranch || project.settings?.mainBranch;
 				console.warn(
-					"[TASK_REVIEW] Starting QA process with projectPath:",
+					"[TASK_REVIEW] Starting full pipeline with projectPath:",
 					qaProjectPath,
 				);
-				agentManager.startQAProcess(
+				agentManager.startTaskExecution(
 					taskId,
 					qaProjectPath,
 					task.specId,
+					{
+						baseBranch,
+						useWorktree: task.metadata?.useWorktree,
+						useLocalBranch: task.metadata?.useLocalBranch,
+						enableStreaming: true,
+						streamingSessionId: taskId,
+					},
 					project.id,
 				);
 
@@ -1369,8 +1414,8 @@ print(json.dumps(result))
 							error: `Error creating PR: ${prError instanceof Error ? prError.message : String(prError)}`,
 						};
 					}
-				} else {
-					// No worktree - allow marking as done (limbo state recovery)
+				} else if (!existingPrUrl) {
+					// No worktree and no existing PR - allow marking as done (limbo state recovery)
 					console.warn(
 						`[TASK_UPDATE_STATUS] Allowing status 'done' for task ${taskId} (no worktree found - limbo state)`,
 					);

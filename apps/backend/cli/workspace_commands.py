@@ -795,12 +795,13 @@ def _check_git_merge_conflicts(
         # Use git merge-tree to check for conflicts WITHOUT touching working directory
         # This is a plumbing command that does a 3-way merge in memory
         # Note: --write-tree mode only accepts 2 branches (it auto-finds the merge base)
+        # IMPORTANT: Do NOT pass --no-messages - it suppresses the CONFLICT markers
+        # needed to identify the exact conflicting files (see _parse_merge_tree_conflicts).
         merge_tree_result = subprocess.run(
             [
                 "git",
                 "merge-tree",
                 "--write-tree",
-                "--no-messages",
                 result["base_branch"],  # Use branch names, not commit hashes
                 spec_branch,
             ],
@@ -814,28 +815,18 @@ def _check_git_merge_conflicts(
             result["has_conflicts"] = True
             debug(MODULE, "Git merge-tree detected conflicts")
 
-            # Parse the output for conflicting files
-            # merge-tree --write-tree outputs conflict info to stderr
-            output = merge_tree_result.stdout + merge_tree_result.stderr
-            for line in output.split("\n"):
-                # Look for lines indicating conflicts
-                if "CONFLICT" in line:
-                    # Extract file path from conflict message
-                    import re
+            # Parse the output for the exact conflicting files
+            from core.workspace import _parse_merge_tree_conflicts
 
-                    match = re.search(
-                        r"(?:Merge conflict in|CONFLICT.*?:)\s*(.+?)(?:\s*$|\s+\()",
-                        line,
-                    )
-                    if match:
-                        file_path = match.group(1).strip()
-                        # Skip .workpilot files - they should never be merged
-                        if (
-                            file_path
-                            and file_path not in result["conflicting_files"]
-                            and not _is_workpilot_file(file_path)
-                        ):
-                            result["conflicting_files"].append(file_path)
+            output = merge_tree_result.stdout + merge_tree_result.stderr
+            for file_path in _parse_merge_tree_conflicts(output):
+                # Skip .workpilot files - they should never be merged
+                if (
+                    file_path
+                    and file_path not in result["conflicting_files"]
+                    and not _is_workpilot_file(file_path)
+                ):
+                    result["conflicting_files"].append(file_path)
 
             # Fallback: if we didn't parse conflicts, use diff to find files changed in both branches
             if not result["conflicting_files"]:
