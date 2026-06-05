@@ -109,6 +109,23 @@ function cleanTitleForDisplay(title: string): string {
 	return text || title;
 }
 
+/**
+ * Empêche la popin de se fermer lorsque l'utilisateur interagit avec les
+ * chevrons de navigation. Ces boutons sont rendus dans le Portal mais hors
+ * du `Content`, donc Radix les considère comme « extérieurs » et déclenche la
+ * fermeture (pointerdown, focus ou interaction). On annule cette fermeture
+ * quand la cible appartient à un élément marqué `data-task-nav`.
+ */
+function preventCloseOnTaskNav(
+	event: { detail: { originalEvent: Event }; preventDefault: () => void },
+): void {
+	const target = event.detail.originalEvent.target as HTMLElement | null;
+	if (target?.closest("[data-task-nav]")) {
+		event.preventDefault();
+	}
+}
+
+
 const renderTaskStatusBadges = (
 	task: Task,
 	state: ReturnType<typeof import("./hooks/useTaskDetail").useTaskDetail>,
@@ -717,6 +734,9 @@ function TaskDetailModalContent({
 							"data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
 							"duration-200",
 						)}
+						onPointerDownOutside={preventCloseOnTaskNav}
+						onFocusOutside={preventCloseOnTaskNav}
+						onInteractOutside={preventCloseOnTaskNav}
 					>
 						{/* Header */}
 						<div className="p-5 pb-4 border-b border-border shrink-0">
@@ -1027,11 +1047,12 @@ function TaskDetailModalContent({
 								<TooltipTrigger asChild>
 									<button
 										type="button"
+										data-task-nav="previous"
 										aria-label={t("tasks:modal.actions.previousTask")}
 										onClick={() => hasPrevious && onNavigatePrevious?.()}
 										disabled={!hasPrevious}
 										className={cn(
-											"group fixed top-1/2 z-50 -translate-y-1/2",
+											"group fixed top-1/2 z-50 -translate-y-1/2 pointer-events-auto",
 											"left-[max(0.75rem,calc(50%-min(47.5vw,32rem)-3.25rem))]",
 											"flex h-11 w-11 items-center justify-center rounded-full",
 											"border border-border/60 bg-card/80 backdrop-blur-md",
@@ -1054,11 +1075,12 @@ function TaskDetailModalContent({
 								<TooltipTrigger asChild>
 									<button
 										type="button"
+										data-task-nav="next"
 										aria-label={t("tasks:modal.actions.nextTask")}
 										onClick={() => hasNext && onNavigateNext?.()}
 										disabled={!hasNext}
 										className={cn(
-											"group fixed top-1/2 z-50 -translate-y-1/2",
+											"group fixed top-1/2 z-50 -translate-y-1/2 pointer-events-auto",
 											"right-[max(0.75rem,calc(50%-min(47.5vw,32rem)-3.25rem))]",
 											"flex h-11 w-11 items-center justify-center rounded-full",
 											"border border-border/60 bg-card/80 backdrop-blur-md",
