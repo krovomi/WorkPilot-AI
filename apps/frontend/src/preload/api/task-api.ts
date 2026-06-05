@@ -16,6 +16,7 @@ import type {
 	TaskRecoveryResult,
 	TaskStartOptions,
 	TaskStatus,
+	VisualProofRun,
 	WorktreeAnalyzeImpactResult,
 	WorktreeCreatePROptions,
 	WorktreeCreatePRResult,
@@ -169,6 +170,7 @@ export interface TaskAPI {
 		taskId: string,
 		targetBranch?: string,
 	) => Promise<IPCResult<WorktreeAnalyzeImpactResult>>;
+	runVisualProof: (taskId: string) => Promise<IPCResult<VisualProofRun>>;
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -499,6 +501,9 @@ export const createTaskAPI = (): TaskAPI => ({
 			taskId,
 			targetBranch,
 		),
+
+	runVisualProof: (taskId: string): Promise<IPCResult<VisualProofRun>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_VISUAL_PROOF_RUN, taskId),
 
 	getPRDetails: (
 		prNumber: number,

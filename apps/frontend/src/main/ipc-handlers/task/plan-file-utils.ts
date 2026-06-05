@@ -25,6 +25,7 @@ import type { Project, Task, TaskStatus } from "../../../shared/types";
 import type { TaskEventPayload } from "../../agent/task-event-schema";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
 import { projectStore } from "../../project-store";
+import type { VisualProofRun } from "../../../shared/types";
 
 // In-memory locks for plan file operations
 // Key: plan file path, Value: Promise chain for serializing operations
@@ -551,6 +552,38 @@ export function updateTaskMetadataPrUrl(
 	} catch (err) {
 		console.warn(
 			`[plan-file-utils] Could not update metadata at ${metadataPath}:`,
+			err,
+		);
+		return false;
+	}
+}
+
+/**
+ * Update task_metadata.json with the latest automated visual proof run.
+ */
+export function updateTaskMetadataVisualProof(
+	metadataPath: string,
+	visualProof: VisualProofRun,
+): boolean {
+	try {
+		let metadata: Record<string, unknown> = {};
+
+		try {
+			const content = readFileSync(metadataPath, "utf-8");
+			metadata = JSON.parse(content);
+		} catch (err) {
+			if (!isFileNotFoundError(err)) {
+				throw err;
+			}
+		}
+
+		metadata.visualProof = visualProof;
+		mkdirSync(path.dirname(metadataPath), { recursive: true });
+		writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+		return true;
+	} catch (err) {
+		console.warn(
+			`[plan-file-utils] Could not update visual proof at ${metadataPath}:`,
 			err,
 		);
 		return false;

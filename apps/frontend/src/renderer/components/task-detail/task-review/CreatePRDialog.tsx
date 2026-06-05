@@ -70,6 +70,22 @@ export function CreatePRDialog({
 	const [analyzedBody, setAnalyzedBody] = useState<string | null>(null);
 	const [isAnalyzing, setIsAnalyzing] = useState(false);
 	const [analysisError, setAnalysisError] = useState<string | null>(null);
+	const [isRetryingProof, setIsRetryingProof] = useState(false);
+
+	// Relance la preuve visuelle automatisée sur la PR existante.
+	const handleRetryVisualProof = async () => {
+		setIsRetryingProof(true);
+		try {
+			const response = await window.electronAPI?.runVisualProof?.(task.id);
+			if (response?.success && response.data) {
+				setResult((prev) =>
+					prev ? { ...prev, visualProof: response.data } : prev,
+				);
+			}
+		} finally {
+			setIsRetryingProof(false);
+		}
+	};
 
 	// Reset state when dialog opens
 	useEffect(() => {
@@ -251,6 +267,56 @@ export function CreatePRDialog({
 									{result.prUrl}
 									<ExternalLink className="h-3 w-3" />
 								</button>
+							)}
+							{result.visualProof && (
+								<div className="mt-3 rounded-md border border-border bg-background/60 p-3 text-sm">
+									<p className="font-medium">
+										{t("taskReview:pr.visualProof.title")}:{" "}
+										{t(
+											`taskReview:pr.visualProof.status.${result.visualProof.status}`,
+										)}
+									</p>
+									{result.visualProof.screenshots.length > 0 && (
+										<p className="text-muted-foreground">
+											{t("taskReview:pr.visualProof.screenshots", {
+												count: result.visualProof.screenshots.length,
+											})}
+										</p>
+									)}
+									{result.visualProof.error && (
+										<p className="text-muted-foreground">
+											{result.visualProof.error}
+										</p>
+									)}
+									{result.visualProof.commentUrl && (
+										<button
+											type="button"
+											onClick={() => {
+												const url = result.visualProof?.commentUrl;
+												if (url) window.electronAPI?.openExternal?.(url);
+											}}
+											className="mt-2 text-xs text-primary hover:underline flex items-center gap-1 bg-transparent border-none cursor-pointer p-0"
+										>
+											{t("taskReview:pr.visualProof.openComment")}
+											<ExternalLink className="h-3 w-3" />
+										</button>
+									)}
+									{result.visualProof.status !== "passed" && (
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											className="mt-2"
+											disabled={isRetryingProof}
+											onClick={handleRetryVisualProof}
+										>
+											{isRetryingProof && (
+												<Loader2 className="h-3 w-3 animate-spin" />
+											)}
+											{t("taskReview:pr.visualProof.retry")}
+										</Button>
+									)}
+								</div>
 							)}
 						</div>
 						<DialogFooter>

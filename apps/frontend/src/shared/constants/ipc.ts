@@ -52,6 +52,7 @@ export const IPC_CHANNELS = {
 	TASK_WORKTREE_SYNC_FROM_BRANCH: "task:worktreeSyncFromBranch", // Merge or rebase worktree from any branch
 	TASK_WORKTREE_CREATE_PR: "task:worktreeCreatePR",
 	TASK_WORKTREE_ANALYZE_IMPACT: "task:worktreeAnalyzeImpact", // Preview PR body + impact analysis WITHOUT pushing
+	TASK_VISUAL_PROOF_RUN: "task:visualProofRun", // Run emulator + screenshot proof for PR
 	TASK_WORKTREE_OPEN_IN_IDE: "task:worktreeOpenInIDE",
 	TASK_WORKTREE_OPEN_IN_TERMINAL: "task:worktreeOpenInTerminal",
 	TASK_WORKTREE_DETECT_TOOLS: "task:worktreeDetectTools", // Detect installed IDEs/terminals

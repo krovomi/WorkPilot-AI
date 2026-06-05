@@ -301,6 +301,7 @@ export interface TaskMetadata {
 	// Git/Worktree configuration
 	baseBranch?: string; // Override base branch for this task's worktree
 	prUrl?: string; // GitHub PR URL if task has been submitted as a PR
+	visualProof?: VisualProofRun; // Latest automated emulator/screenshots proof for the PR
 	useWorktree?: boolean; // If false, use direct mode (no worktree isolation) - default is true for safety
 	useLocalBranch?: boolean; // If true, use the local branch directly instead of preferring origin/branch (preserves gitignored files)
 
@@ -567,6 +568,11 @@ export interface WorktreeCreatePROptions {
 	 * the user has edited the auto-filled values.
 	 */
 	customBody?: string;
+	/**
+	 * Run automated app emulation and screenshot proof after the PR is created.
+	 * Defaults to true.
+	 */
+	runVisualProof?: boolean;
 }
 
 /**
@@ -578,6 +584,45 @@ export interface WorktreeCreatePRResult {
 	error?: string;
 	message?: string; // Human-readable message for both success and error cases
 	alreadyExists?: boolean;
+	visualProof?: VisualProofRun;
+}
+
+export type VisualProofStatus = "pending" | "passed" | "failed" | "skipped";
+
+export interface VisualProofScreenshot {
+	label: string;
+	relativePath: string;
+	absolutePath: string;
+	url?: string;
+	width: number;
+	height: number;
+	capturedAt: string;
+}
+
+export interface VisualProofRun {
+	id: string;
+	status: VisualProofStatus;
+	taskId: string;
+	specId: string;
+	prUrl: string;
+	framework?: string;
+	appUrl?: string;
+	artifactDir?: string;
+	commentUrl?: string;
+	commitSha?: string;
+	screenshots: VisualProofScreenshot[];
+	error?: string;
+	startedAt: string;
+	completedAt?: string;
+}
+
+export interface VisualProofRunOptions {
+	taskId: string;
+	projectPath: string;
+	specId: string;
+	prUrl: string;
+	worktreePath?: string;
+	autoBuildPath?: string;
 }
 
 /**

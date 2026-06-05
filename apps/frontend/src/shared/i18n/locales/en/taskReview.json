@@ -111,6 +111,19 @@
 			"created": "Pull request created successfully!",
 			"alreadyExists": "A pull request already exists for this branch"
 		},
+		"visualProof": {
+			"title": "Visual proof",
+			"openComment": "Open proof comment",
+			"retry": "Retry visual proof",
+			"screenshots": "{{count}} screenshot added to the PR",
+			"screenshots_other": "{{count}} screenshots added to the PR",
+			"status": {
+				"pending": "pending",
+				"passed": "passed",
+				"failed": "failed",
+				"skipped": "skipped"
+			}
+		},
 		"actions": {
 			"retry": "Retry",
 			"creating": "Creating PR...",

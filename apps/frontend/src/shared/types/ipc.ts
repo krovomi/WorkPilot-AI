@@ -145,6 +145,7 @@ import type {
 	TaskRecoveryResult,
 	TaskStartOptions,
 	TaskStatus,
+	VisualProofRun,
 	WorktreeAnalyzeImpactResult,
 	WorktreeCreatePROptions,
 	WorktreeCreatePRResult,
@@ -312,6 +313,7 @@ export interface ElectronAPI {
 		taskId: string,
 		targetBranch?: string,
 	) => Promise<IPCResult<WorktreeAnalyzeImpactResult>>;
+	runVisualProof: (taskId: string) => Promise<IPCResult<VisualProofRun>>;
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,

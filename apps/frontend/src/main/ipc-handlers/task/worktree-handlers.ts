@@ -45,6 +45,7 @@ import type {
 	WorktreeListResult,
 	WorktreeMergeResult,
 	WorktreeStatus,
+	VisualProofRun,
 } from "../../../shared/types";
 import { stripAnsiCodes } from "../../../shared/utils/ansi-sanitizer";
 import { parseEnvFile } from "../utils";
@@ -63,8 +64,13 @@ import { taskStateManager } from "../../task-state-manager";
 import { getEffectiveSourcePath } from "../../updater/path-resolver";
 import { getIsolatedGitEnv, refreshGitIndex } from "../../utils/git-isolation";
 import { cleanupWorktree } from "../../utils/worktree-cleanup";
+import { visualProofService } from "../../visual-proof-service";
 import { findTaskWorktree, getTaskWorktreeDir } from "../../worktree-paths";
-import { persistPlanStatus, updateTaskMetadataPrUrl } from "./plan-file-utils";
+import {
+	persistPlanStatus,
+	updateTaskMetadataPrUrl,
+	updateTaskMetadataVisualProof,
+} from "./plan-file-utils";
 import { findTaskAndProject } from "./shared";
 
 // Regex pattern for validating git branch names
@@ -2005,6 +2011,11 @@ interface TaskStatusUpdateResult {
 	worktreeMetadata: boolean;
 }
 
+interface VisualProofMetadataUpdateResult {
+	mainProjectMetadata: boolean;
+	worktreeMetadata: boolean;
+}
+
 /**
  * Update task status and metadata after PR creation
  * Updates both main project and worktree locations
@@ -2074,6 +2085,46 @@ async function updateTaskStatusAfterPRCreation(
 			prUrl,
 		);
 		debug("Worktree metadata updated with prUrl:", result.worktreeMetadata);
+	}
+
+	return result;
+}
+
+function updateVisualProofMetadata(
+	specDir: string,
+	worktreePath: string | null,
+	autoBuildPath: string | undefined,
+	specId: string,
+	visualProof: VisualProofRun,
+	debug: (...args: unknown[]) => void,
+): VisualProofMetadataUpdateResult {
+	const result: VisualProofMetadataUpdateResult = {
+		mainProjectMetadata: false,
+		worktreeMetadata: false,
+	};
+	const metadataPath = path.join(specDir, "task_metadata.json");
+	result.mainProjectMetadata = updateTaskMetadataVisualProof(
+		metadataPath,
+		visualProof,
+	);
+	debug(
+		"Main project metadata updated with visual proof:",
+		result.mainProjectMetadata,
+	);
+
+	if (worktreePath) {
+		const specsBaseDir = getSpecsDir(autoBuildPath);
+		const worktreeMetadataPath = path.join(
+			worktreePath,
+			specsBaseDir,
+			specId,
+			"task_metadata.json",
+		);
+		result.worktreeMetadata = updateTaskMetadataVisualProof(
+			worktreeMetadataPath,
+			visualProof,
+		);
+		debug("Worktree metadata updated with visual proof:", result.worktreeMetadata);
 	}
 
 	return result;
@@ -4726,6 +4777,7 @@ export function registerWorktreeHandlers(
 								// have one — including when the PR already existed (the
 								// user is pushing a new commit onto an existing PR). This
 								// guarantees the Kanban item always carries the PR link.
+								let visualProof: VisualProofRun | undefined;
 								if (result.success !== false && result.prUrl) {
 									await updateTaskStatusAfterPRCreation(
 										specDir,
@@ -4740,6 +4792,34 @@ export function registerWorktreeHandlers(
 											"PR already exists, refreshed task status with existing PR URL",
 										);
 									}
+									if (options?.runVisualProof !== false) {
+										visualProof = await visualProofService.run({
+											taskId: task.id,
+											projectPath: project.path,
+											specId: task.specId,
+											prUrl: result.prUrl,
+											worktreePath,
+											autoBuildPath: project.autoBuildPath,
+										});
+										updateVisualProofMetadata(
+											specDir,
+											worktreePath,
+											project.autoBuildPath,
+											task.specId,
+											visualProof,
+											debug,
+										);
+
+										const mainWindow = getMainWindow();
+										if (mainWindow) {
+											mainWindow.webContents.send(
+												IPC_CHANNELS.TASK_UPDATE,
+												task.id,
+												{ metadata: { visualProof } },
+												project.id,
+											);
+										}
+									}
 								}
 
 								resolve({
@@ -4749,6 +4829,7 @@ export function registerWorktreeHandlers(
 										prUrl: result.prUrl,
 										error: result.error,
 										alreadyExists: result.alreadyExists,
+										visualProof,
 									},
 								});
 							} else {
@@ -4812,6 +4893,69 @@ export function registerWorktreeHandlers(
 				return {
 					success: false,
 					error: error instanceof Error ? error.message : "Failed to create PR",
+				};
+			}
+		},
+	);
+
+	/**
+	 * Run or retry automated visual proof for an existing PR.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_VISUAL_PROOF_RUN,
+		async (_, taskId: string): Promise<IPCResult<VisualProofRun>> => {
+			try {
+				const { task, project } = findTaskAndProject(taskId);
+				if (!task || !project) {
+					return { success: false, error: "Task not found" };
+				}
+
+				const prUrl = task.prUrl ?? task.metadata?.prUrl;
+				if (!prUrl) {
+					return { success: false, error: "Task has no PR URL" };
+				}
+
+				const specDir = path.join(
+					project.path,
+					project.autoBuildPath || ".workpilot",
+					"specs",
+					task.specId,
+				);
+				const worktreePath = findTaskWorktree(project.path, task.specId);
+				const visualProof = await visualProofService.run({
+					taskId: task.id,
+					projectPath: project.path,
+					specId: task.specId,
+					prUrl,
+					worktreePath: worktreePath ?? undefined,
+					autoBuildPath: project.autoBuildPath,
+				});
+
+				updateVisualProofMetadata(
+					specDir,
+					worktreePath,
+					project.autoBuildPath,
+					task.specId,
+					visualProof,
+					(...args: unknown[]) => console.warn("[VISUAL_PROOF]", ...args),
+				);
+
+				const mainWindow = getMainWindow();
+				if (mainWindow) {
+					mainWindow.webContents.send(
+						IPC_CHANNELS.TASK_UPDATE,
+						task.id,
+						{ metadata: { visualProof } },
+						project.id,
+					);
+				}
+
+				return { success: true, data: visualProof };
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error ? error.message : "Failed to run visual proof",
 				};
 			}
 		},

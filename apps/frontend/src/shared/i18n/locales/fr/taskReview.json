@@ -111,6 +111,19 @@
 			"created": "Pull request créée avec succès !",
 			"alreadyExists": "Une pull request existe déjà pour cette branche"
 		},
+		"visualProof": {
+			"title": "Preuve visuelle",
+			"openComment": "Ouvrir le commentaire de preuve",
+			"retry": "Relancer la preuve visuelle",
+			"screenshots": "{{count}} capture ajoutée à la PR",
+			"screenshots_other": "{{count}} captures ajoutées à la PR",
+			"status": {
+				"pending": "en attente",
+				"passed": "réussie",
+				"failed": "échouée",
+				"skipped": "ignorée"
+			}
+		},
 		"actions": {
 			"retry": "Réessayer",
 			"creating": "Création en cours...",
