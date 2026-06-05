@@ -589,6 +589,17 @@ export interface WorktreeCreatePRResult {
 
 export type VisualProofStatus = "pending" | "passed" | "failed" | "skipped";
 
+export type VisualProofTargetKind = "web" | "desktop" | "remote";
+
+export type VisualProofProviderId =
+	| "local-web"
+	| "local-iis-express"
+	| "local-windows-desktop"
+	| "docker"
+	| "wsl"
+	| "hyper-v"
+	| "remote-runner";
+
 export interface VisualProofScreenshot {
 	label: string;
 	relativePath: string;
@@ -606,6 +617,10 @@ export interface VisualProofRun {
 	specId: string;
 	prUrl: string;
 	framework?: string;
+	provider?: VisualProofProviderId;
+	targetKind?: VisualProofTargetKind;
+	isolated?: boolean;
+	providerDetails?: string;
 	appUrl?: string;
 	artifactDir?: string;
 	commentUrl?: string;
@@ -623,6 +638,7 @@ export interface VisualProofRunOptions {
 	prUrl: string;
 	worktreePath?: string;
 	autoBuildPath?: string;
+	provider?: VisualProofProviderId | "auto";
 }
 
 /**

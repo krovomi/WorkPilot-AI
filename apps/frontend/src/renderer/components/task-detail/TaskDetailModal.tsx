@@ -27,7 +27,6 @@ import { calculateProgress, cn, extractTextFromHtml } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import {
 	deleteTask,
-	loadTasks,
 	recoverStuckTask,
 	startTask,
 	stopTask,
@@ -72,6 +71,7 @@ import {
 import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
 import { TaskReview } from "./TaskReview";
 import { TaskSubtasks } from "./TaskSubtasks";
+import { TaskVisualProof } from "./TaskVisualProof";
 import { TaskWarnings } from "./TaskWarnings";
 import { SyncFromBranchDialog } from "./task-review/SyncFromBranchDialog";
 
@@ -874,6 +874,12 @@ function TaskDetailModalContent({
 											{t("tasks:files.tab")}
 										</TabsTrigger>
 									)}
+									<TabsTrigger
+										value="visualProof"
+										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+									>
+										{t("tasks:visualProof.tab")}
+									</TabsTrigger>
 								</TabsList>
 
 								{/* Overview Tab */}
@@ -980,6 +986,14 @@ function TaskDetailModalContent({
 										<TaskFiles task={task} />
 									</TabsContent>
 								)}
+
+								{/* Visual Proof Tab */}
+								<TabsContent
+									value="visualProof"
+									className="flex-1 min-h-0 overflow-hidden mt-0"
+								>
+									<TaskVisualProof task={task} />
+								</TabsContent>
 							</Tabs>
 						</div>
 

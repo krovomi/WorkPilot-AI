@@ -259,6 +259,35 @@
 		"selectFile": "Sélectionnez un fichier pour voir son contenu",
 		"openInIDE": "Ouvrir dans l'IDE"
 	},
+	"visualProof": {
+		"tab": "Preuves visuelles",
+		"title": "Preuve visuelle de la PR",
+		"emptyTitle": "Aucune preuve visuelle pour cette tâche",
+		"emptyDescription": "Lancez l'émulateur pour générer des captures et les publier dans la PR.",
+		"run": "Lancer la preuve visuelle",
+		"retry": "Relancer",
+		"runFailed": "Échec du lancement de la preuve visuelle",
+		"openComment": "Ouvrir le commentaire",
+		"openPr": "Ouvrir la PR",
+		"openCapturedUrl": "Ouvrir l'URL capturée",
+		"provider": "Provider",
+		"target": "Cible",
+		"framework": "Framework",
+		"completedAt": "Terminé le",
+		"defaultDetails": "Capture automatisée générée par WorkPilot.",
+		"isolated": "isolé",
+		"local": "local",
+		"screenshots": "{{count}} capture",
+		"screenshots_other": "{{count}} captures",
+		"noScreenshots": "Aucune capture n'a été générée pour ce run.",
+		"passedHint": "Ces captures ont été ajoutées comme preuve dans la PR.",
+		"status": {
+			"pending": "en attente",
+			"passed": "réussie",
+			"failed": "échouée",
+			"skipped": "ignorée"
+		}
+	},
 	"metadata": {
 		"severity": "sévérité",
 		"pullRequest": "Pull Request",

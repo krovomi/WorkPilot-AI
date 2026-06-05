@@ -10,7 +10,10 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { VisualProofRun } from "../shared/types";
 import {
+	analyzeDotNetProjects,
 	buildProofComment,
+	hasLegacyDotNetDesktopProject,
+	hasLegacyDotNetWebProject,
 	isLegacyDotNetFramework,
 	parseGitHubPrUrl,
 } from "./visual-proof-service";
@@ -48,6 +51,9 @@ describe("buildProofComment", () => {
 	it("renders a markdown image when a screenshot URL is present", () => {
 		const comment = buildProofComment({
 			...baseRun,
+			provider: "local-web",
+			targetKind: "web",
+			isolated: false,
 			screenshots: [
 				{
 					label: "Home page",
@@ -62,6 +68,9 @@ describe("buildProofComment", () => {
 		});
 		expect(comment).toContain("Status: **passed**");
 		expect(comment).toContain("Framework: `vite`");
+		expect(comment).toContain("Provider: `local-web`");
+		expect(comment).toContain("Target: `web`");
+		expect(comment).toContain("Isolation: **local**");
 		expect(comment).toContain(
 			"![Home page](https://github.com/acme/widgets/blob/feat/home.png?raw=1)",
 		);
@@ -101,6 +110,30 @@ describe("isLegacyDotNetFramework", () => {
 			"<Project>\n<PropertyGroup>\n<TargetFrameworkVersion>v4.8</TargetFrameworkVersion>\n</PropertyGroup>\n</Project>",
 		);
 		expect(isLegacyDotNetFramework(dir)).toBe(true);
+	});
+
+	it("classifies a legacy WinForms client as desktop", () => {
+		writeFileSync(
+			path.join(dir, "App.csproj"),
+			"<Project>\n<PropertyGroup>\n<TargetFrameworkVersion>v4.8</TargetFrameworkVersion>\n<OutputType>WinExe</OutputType>\n<UseWindowsForms>true</UseWindowsForms>\n</PropertyGroup>\n</Project>",
+		);
+		expect(hasLegacyDotNetDesktopProject(dir)).toBe(true);
+		expect(hasLegacyDotNetWebProject(dir)).toBe(false);
+		const [project] = analyzeDotNetProjects(dir);
+		expect(project.isDesktop).toBe(true);
+		expect(project.isWeb).toBe(false);
+	});
+
+	it("classifies a legacy ASP.NET project as web", () => {
+		writeFileSync(
+			path.join(dir, "Web.csproj"),
+			"<Project>\n<PropertyGroup>\n<TargetFrameworkVersion>v4.8</TargetFrameworkVersion>\n</PropertyGroup>\n<ItemGroup><Reference Include=\"System.Web\" /></ItemGroup>\n</Project>",
+		);
+		expect(hasLegacyDotNetWebProject(dir)).toBe(true);
+		expect(hasLegacyDotNetDesktopProject(dir)).toBe(false);
+		const [project] = analyzeDotNetProjects(dir);
+		expect(project.isWeb).toBe(true);
+		expect(project.isDesktop).toBe(false);
 	});
 
 	it("detects a legacy net48 moniker csproj", () => {
