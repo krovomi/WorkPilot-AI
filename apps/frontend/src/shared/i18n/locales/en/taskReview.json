@@ -72,6 +72,10 @@
 	"pr": {
 		"title": "Create Pull Request",
 		"description": "Push branch and create a pull request for \"{{taskTitle}}\"",
+		"updateTitle": "Update Pull Request",
+		"updateDescription": "A PR already exists for \"{{taskTitle}}\". Push a new commit to the existing PR.",
+		"updateTooltip": "A PR already exists: a new commit will be pushed to it instead of creating another one.",
+		"existingNotice": "A pull request already exists for this task. Submitting will simply push a new commit to it.",
 		"logs": {
 			"waitingForLogs": "Waiting for logs...",
 			"reviewStarting": "Review is starting",
@@ -110,7 +114,9 @@
 		"actions": {
 			"retry": "Retry",
 			"creating": "Creating PR...",
-			"create": "Create Pull Request"
+			"create": "Create Pull Request",
+			"update": "Update PR",
+			"updating": "Updating PR..."
 		},
 		"labels": {
 			"sourceBranch": "Source branch",

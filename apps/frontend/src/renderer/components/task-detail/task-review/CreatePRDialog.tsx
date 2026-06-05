@@ -53,6 +53,7 @@ export function CreatePRDialog({
 	onCreatePR,
 }: CreatePRDialogProps) {
 	const { t } = useTranslation(["taskReview", "common"]);
+	const hasExistingPr = Boolean(task.prUrl);
 	const [targetBranch, setTargetBranch] = useState("");
 	const [prTitle, setPrTitle] = useState("");
 	const [isDraft, setIsDraft] = useState(false);
@@ -203,16 +204,28 @@ export function CreatePRDialog({
 		}
 	};
 
+	const handleOpenExistingPR = () => {
+		if (task.prUrl && window.electronAPI?.openExternal) {
+			window.electronAPI.openExternal(task.prUrl);
+		}
+	};
+
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-[720px]">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<GitPullRequest className="h-5 w-5 text-primary" />
-						{t("taskReview:pr.title")}
+						{hasExistingPr
+							? t("taskReview:pr.updateTitle")
+							: t("taskReview:pr.title")}
 					</DialogTitle>
 					<DialogDescription>
-						{t("taskReview:pr.description", { taskTitle: task.title })}
+						{hasExistingPr
+							? t("taskReview:pr.updateDescription", {
+									taskTitle: task.title,
+								})
+							: t("taskReview:pr.description", { taskTitle: task.title })}
 					</DialogDescription>
 				</DialogHeader>
 
@@ -263,6 +276,24 @@ export function CreatePRDialog({
 				{/* Form State */}
 				{!result?.success && !error && (
 					<div className="space-y-4">
+						{/* Existing PR banner — when a PR already exists, creating
+							again just pushes a new commit onto it. Make that explicit. */}
+						{hasExistingPr && (
+							<div className="bg-info/10 border border-info/30 rounded-lg p-3 space-y-1">
+								<p className="text-sm text-info font-medium">
+									{t("taskReview:pr.existingNotice")}
+								</p>
+								<button
+									type="button"
+									onClick={handleOpenExistingPR}
+									className="text-xs text-primary hover:underline flex items-center gap-1 bg-transparent border-none cursor-pointer p-0 break-all text-left"
+								>
+									{task.prUrl}
+									<ExternalLink className="h-3 w-3 shrink-0" />
+								</button>
+							</div>
+						)}
+
 						{/* Branch Info */}
 						<div
 							className="bg-muted/50 rounded-lg p-3 text-sm"
@@ -458,12 +489,16 @@ export function CreatePRDialog({
 								{isCreating ? (
 									<>
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-										{t("taskReview:pr.actions.creating")}
+										{hasExistingPr
+											? t("taskReview:pr.actions.updating")
+											: t("taskReview:pr.actions.creating")}
 									</>
 								) : (
 									<>
 										<GitPullRequest className="mr-2 h-4 w-4" />
-										{t("taskReview:pr.actions.create")}
+										{hasExistingPr
+											? t("taskReview:pr.actions.update")
+											: t("taskReview:pr.actions.create")}
 									</>
 								)}
 							</Button>

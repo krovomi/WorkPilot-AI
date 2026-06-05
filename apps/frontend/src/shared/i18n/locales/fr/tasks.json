@@ -484,7 +484,9 @@
 			"providerSwitchPaused": "Tâche en pause",
 			"providerSwitchPausedDesc": "Choisissez un provider LLM pour reprendre",
 			"pauseToSwitch": "Sauvegarder et changer de provider",
-			"pauseToSwitchTooltip": "Mettez en pause la tâche pour changer de provider LLM. Elle restera en cours d'exécution"
+			"pauseToSwitchTooltip": "Mettez en pause la tâche pour changer de provider LLM. Elle restera en cours d'exécution",
+			"previousTask": "Tâche précédente",
+			"nextTask": "Tâche suivante"
 		},
 		"badges": {
 			"stuck": "Bloqué",

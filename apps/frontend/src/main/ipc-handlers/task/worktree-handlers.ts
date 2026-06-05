@@ -2629,8 +2629,18 @@ export function registerWorktreeHandlers(
 				}
 
 				// Filter out discarded files from the diff
+				const isWorkpilotArtifact = (p: string): boolean => {
+					const normalized = p.replaceAll("\\", "/");
+					return (
+						normalized === ".workpilot" ||
+						normalized.startsWith(".workpilot/") ||
+						normalized.startsWith(".workpilot-")
+					);
+				};
 				const filteredFiles = files.filter(
-					(file) => !discardedFiles.includes(file.path),
+					(file) =>
+						!discardedFiles.includes(file.path) &&
+						!isWorkpilotArtifact(file.path),
 				);
 				if (discardedFiles.length > 0) {
 					console.error(
@@ -4712,12 +4722,11 @@ export function registerWorktreeHandlers(
 							if (result) {
 								debug("Parsed result:", result);
 
-								// Only update task status if a NEW PR was created (not if it already exists)
-								if (
-									result.success !== false &&
-									result.prUrl &&
-									!result.alreadyExists
-								) {
+								// Persist the PR URL onto the task in ALL cases where we
+								// have one — including when the PR already existed (the
+								// user is pushing a new commit onto an existing PR). This
+								// guarantees the Kanban item always carries the PR link.
+								if (result.success !== false && result.prUrl) {
 									await updateTaskStatusAfterPRCreation(
 										specDir,
 										worktreePath,
@@ -4726,8 +4735,11 @@ export function registerWorktreeHandlers(
 										task.specId,
 										debug,
 									);
-								} else if (result.alreadyExists) {
-									debug("PR already exists, not updating task status");
+									if (result.alreadyExists) {
+										debug(
+											"PR already exists, refreshed task status with existing PR URL",
+										);
+									}
 								}
 
 								resolve({

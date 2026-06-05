@@ -1,7 +1,10 @@
 ﻿import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useEffect } from "react";
 import {
 	AlertTriangle,
 	CheckCircle2,
+	ChevronLeft,
+	ChevronRight,
 	GitMerge,
 	GitPullRequest,
 	Loader2,
@@ -76,6 +79,14 @@ interface TaskDetailModalProps {
 	readonly open: boolean;
 	readonly task: Task | null;
 	readonly onOpenChange: (open: boolean) => void;
+	/** Navigue vers la tâche précédente dans l'ordre du Kanban. */
+	readonly onNavigatePrevious?: () => void;
+	/** Navigue vers la tâche suivante dans l'ordre du Kanban. */
+	readonly onNavigateNext?: () => void;
+	/** Indique s'il existe une tâche précédente. */
+	readonly hasPrevious?: boolean;
+	/** Indique s'il existe une tâche suivante. */
+	readonly hasNext?: boolean;
 }
 
 /**
@@ -197,6 +208,10 @@ export function TaskDetailModal({
 	open,
 	task,
 	onOpenChange,
+	onNavigatePrevious,
+	onNavigateNext,
+	hasPrevious,
+	hasNext,
 }: TaskDetailModalProps) {
 	// Don't render anything if no task
 	if (!task) {
@@ -209,6 +224,10 @@ export function TaskDetailModal({
 			task={task}
 			onOpenChange={onOpenChange}
 			onCloseTask={() => onOpenChange(false)}
+			onNavigatePrevious={onNavigatePrevious}
+			onNavigateNext={onNavigateNext}
+			hasPrevious={hasPrevious}
+			hasNext={hasNext}
 		/>
 	);
 }
@@ -359,11 +378,19 @@ function TaskDetailModalContent({
 	task,
 	onOpenChange,
 	onCloseTask,
+	onNavigatePrevious,
+	onNavigateNext,
+	hasPrevious,
+	hasNext,
 }: {
 	readonly open: boolean;
 	readonly task: Task;
 	readonly onOpenChange: (open: boolean) => void;
 	readonly onCloseTask?: () => void;
+	readonly onNavigatePrevious?: () => void;
+	readonly onNavigateNext?: () => void;
+	readonly hasPrevious?: boolean;
+	readonly hasNext?: boolean;
 }) {
 	const { t } = useTranslation(["tasks"]);
 	const state = useTaskDetail({ task });
@@ -386,6 +413,60 @@ function TaskDetailModalContent({
 		handleClose,
 		handleUpdatePlan,
 	} = useTaskDetailHandlers(task, state, onOpenChange);
+
+	// Navigation clavier (← / →) entre les tâches, dans l'ordre du Kanban.
+	// Ignorée lorsqu'un champ est en cours d'édition ou qu'une sous-popin est ouverte.
+	useEffect(() => {
+		if (!open) return;
+		if (!onNavigatePrevious && !onNavigateNext) return;
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+			if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+			const target = event.target as HTMLElement | null;
+			if (target) {
+				const tag = target.tagName;
+				if (
+					tag === "INPUT" ||
+					tag === "TEXTAREA" ||
+					tag === "SELECT" ||
+					target.isContentEditable
+				) {
+					return;
+				}
+			}
+
+			// Ne pas naviguer quand une popin secondaire est ouverte.
+			if (
+				state.isEditDialogOpen ||
+				state.showDeleteDialog ||
+				state.showSyncDialog
+			) {
+				return;
+			}
+
+			if (event.key === "ArrowLeft" && hasPrevious && onNavigatePrevious) {
+				event.preventDefault();
+				onNavigatePrevious();
+			} else if (event.key === "ArrowRight" && hasNext && onNavigateNext) {
+				event.preventDefault();
+				onNavigateNext();
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [
+		open,
+		hasPrevious,
+		hasNext,
+		onNavigatePrevious,
+		onNavigateNext,
+		state.isEditDialogOpen,
+		state.showDeleteDialog,
+		state.showSyncDialog,
+	]);
 
 	const handleMerge = async () => {
 		state.setIsMerging(true);
@@ -938,6 +1019,65 @@ function TaskDetailModalContent({
 							</div>
 						</div>
 					</DialogPrimitive.Content>
+
+					{/* Chevrons de navigation entre tâches (ordre du Kanban) */}
+					{(onNavigatePrevious || onNavigateNext) && (
+						<>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<button
+										type="button"
+										aria-label={t("tasks:modal.actions.previousTask")}
+										onClick={() => hasPrevious && onNavigatePrevious?.()}
+										disabled={!hasPrevious}
+										className={cn(
+											"group fixed top-1/2 z-50 -translate-y-1/2",
+											"left-[max(0.75rem,calc(50%-min(47.5vw,32rem)-3.25rem))]",
+											"flex h-11 w-11 items-center justify-center rounded-full",
+											"border border-border/60 bg-card/80 backdrop-blur-md",
+											"text-muted-foreground shadow-lg shadow-black/20",
+											"transition-all duration-200",
+											"hover:scale-110 hover:bg-primary hover:text-primary-foreground hover:border-primary",
+											"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+											"disabled:pointer-events-none disabled:opacity-0",
+										)}
+									>
+										<ChevronLeft className="h-5 w-5 transition-transform duration-200 group-hover:-translate-x-0.5" />
+									</button>
+								</TooltipTrigger>
+								<TooltipContent side="right">
+									{t("tasks:modal.actions.previousTask")}
+								</TooltipContent>
+							</Tooltip>
+
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<button
+										type="button"
+										aria-label={t("tasks:modal.actions.nextTask")}
+										onClick={() => hasNext && onNavigateNext?.()}
+										disabled={!hasNext}
+										className={cn(
+											"group fixed top-1/2 z-50 -translate-y-1/2",
+											"right-[max(0.75rem,calc(50%-min(47.5vw,32rem)-3.25rem))]",
+											"flex h-11 w-11 items-center justify-center rounded-full",
+											"border border-border/60 bg-card/80 backdrop-blur-md",
+											"text-muted-foreground shadow-lg shadow-black/20",
+											"transition-all duration-200",
+											"hover:scale-110 hover:bg-primary hover:text-primary-foreground hover:border-primary",
+											"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+											"disabled:pointer-events-none disabled:opacity-0",
+										)}
+									>
+										<ChevronRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />
+									</button>
+								</TooltipTrigger>
+								<TooltipContent side="left">
+									{t("tasks:modal.actions.nextTask")}
+								</TooltipContent>
+							</Tooltip>
+						</>
+					)}
 				</DialogPrimitive.Portal>
 			</DialogPrimitive.Root>
 

@@ -1098,12 +1098,29 @@ class WorktreeManager:
         return True
 
     def commit_in_worktree(self, spec_name: str, message: str) -> bool:
-        """Commit all changes in a spec's worktree."""
+        """Commit all changes in a spec's worktree.
+
+        Les artefacts internes de WorkPilot (``.workpilot/`` et fichiers
+        ``.workpilot-*``) sont volontairement exclus du staging : ils ne
+        doivent jamais polluer la PR (ils restent présents sur le disque pour
+        le fonctionnement de l'app). Voir aussi ``_strip_workpilot_artifacts``
+        pour les fichiers éventuellement déjà commités par l'agent.
+        """
         worktree_path = self.get_worktree_path(spec_name)
         if not worktree_path.exists():
             return False
 
-        self._run_git(["add", "."], cwd=worktree_path)
+        self._run_git(
+            [
+                "add",
+                "-A",
+                "--",
+                ".",
+                ":!.workpilot",
+                ":!.workpilot-*",
+            ],
+            cwd=worktree_path,
+        )
         result = self._run_git(["commit", "-m", message], cwd=worktree_path)
 
         if result.returncode == 0:
@@ -1113,6 +1130,76 @@ class WorktreeManager:
         else:
             print(f"Commit failed: {result.stderr}")
             return False
+
+    def _strip_workpilot_artifacts(self, spec_name: str) -> list[str]:
+        """Retire les artefacts internes de WorkPilot de la branche poussée.
+
+        WorkPilot écrit ses propres fichiers de travail à la racine du worktree
+        (``.workpilot/specs/...``, ``.workpilot-status``, ``.workpilot-discard-list``,
+        ``.workpilot-security.json``...). Le ``.gitignore`` du projet cible ne les
+        connaît pas : si l'agent les a commités pendant son travail, ils se
+        retrouvent dans la PR et la polluent.
+
+        On les retire de l'index (``git rm -r --cached``) puis on commit la
+        suppression : les fichiers restent sur le disque (l'app en a besoin)
+        mais disparaissent de l'historique poussé donc de la PR.
+
+        Args:
+            spec_name: Nom du dossier spec (worktree).
+
+        Returns:
+            Liste des chemins effectivement retirés de l'index.
+        """
+        worktree_path = self.get_worktree_path(spec_name)
+        if not worktree_path.exists():
+            return []
+
+        patterns = [".workpilot", ".workpilot-*"]
+
+        # Détecte les fichiers suivis correspondant aux motifs WorkPilot.
+        ls = self._run_git(
+            ["ls-files", "--", *patterns], cwd=worktree_path
+        )
+        tracked = [line.strip() for line in ls.stdout.splitlines() if line.strip()]
+        if not tracked:
+            return []
+
+        rm = self._run_git(
+            ["rm", "-r", "--cached", "--ignore-unmatch", "--", *patterns],
+            cwd=worktree_path,
+        )
+        if rm.returncode != 0:
+            logger.warning(
+                "[_strip_workpilot_artifacts] git rm --cached failed: %s",
+                rm.stderr,
+            )
+            return []
+
+        commit = self._run_git(
+            [
+                "commit",
+                "-m",
+                "workpilot: exclude internal WorkPilot artifacts from PR",
+            ],
+            cwd=worktree_path,
+        )
+        if commit.returncode != 0 and "nothing to commit" not in (
+            commit.stdout + commit.stderr
+        ):
+            logger.warning(
+                "[_strip_workpilot_artifacts] Commit of artifact removal failed: %s",
+                commit.stderr,
+            )
+            return []
+
+        logger.info(
+            "[_strip_workpilot_artifacts] Removed %d WorkPilot artifact(s) "
+            "from PR branch of '%s'.",
+            len(tracked),
+            spec_name,
+        )
+        return tracked
+
 
     # ==================== Listing & Discovery ====================
 
@@ -2722,6 +2809,18 @@ class WorktreeManager:
                 "[push_and_create_pr] Applied discard list: excluded %d file(s) "
                 "from '%s' before push.",
                 len(reverted),
+                spec_name,
+            )
+
+        # Step 0.45: Retire les artefacts internes de WorkPilot (.workpilot/,
+        # .workpilot-*) de la branche pour ne jamais polluer la PR. Gère le cas
+        # où l'agent les aurait déjà commités pendant son travail.
+        stripped = self._strip_workpilot_artifacts(spec_name)
+        if stripped:
+            logger.info(
+                "[push_and_create_pr] Stripped %d WorkPilot artifact(s) from "
+                "'%s' before push.",
+                len(stripped),
                 spec_name,
             )
 

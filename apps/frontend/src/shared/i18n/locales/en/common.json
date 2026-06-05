@@ -79,6 +79,7 @@
 		"retry": "Retry",
 		"create": "Create",
 		"createPR": "Create PR",
+		"updatePR": "Update PR",
 		"openPR": "Open PR",
 		"open": "Open",
 		"start": "Start",

@@ -484,7 +484,9 @@
 			"providerSwitchPaused": "Task is paused",
 			"providerSwitchPausedDesc": "Choose an LLM provider to resume",
 			"pauseToSwitch": "Pause and switch provider",
-			"pauseToSwitchTooltip": "Pause the task to switch LLM providers. It will remain in progress"
+			"pauseToSwitchTooltip": "Pause the task to switch LLM providers. It will remain in progress",
+			"previousTask": "Previous task",
+			"nextTask": "Next task"
 		},
 		"badges": {
 			"stuck": "Stuck",

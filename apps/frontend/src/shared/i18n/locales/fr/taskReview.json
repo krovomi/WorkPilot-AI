@@ -72,6 +72,10 @@
 	"pr": {
 		"title": "Créer une Pull Request",
 		"description": "Pousser la branche et créer une pull request pour \"{{taskTitle}}\"",
+		"updateTitle": "Mettre à jour la Pull Request",
+		"updateDescription": "Une PR existe déjà pour \"{{taskTitle}}\". Pousser un nouveau commit sur la PR existante.",
+		"updateTooltip": "Une PR existe déjà : un nouveau commit y sera ajouté plutôt que d'en créer une autre.",
+		"existingNotice": "Une pull request existe déjà pour cette tâche. La validation poussera simplement un nouveau commit dessus.",
 		"logs": {
 			"waitingForLogs": "En attente des logs...",
 			"reviewStarting": "La révision démarre",
@@ -110,7 +114,9 @@
 		"actions": {
 			"retry": "Réessayer",
 			"creating": "Création en cours...",
-			"create": "Créer la Pull Request"
+			"create": "Créer la Pull Request",
+			"update": "Mettre à jour la PR",
+			"updating": "Mise à jour en cours..."
 		},
 		"labels": {
 			"sourceBranch": "Branche source",
