@@ -1112,7 +1112,7 @@ export function registerTaskExecutionHandlers(
 									planError,
 								);
 								// Log but don't fail - the QA process will still run
-								appLog.warning(
+								appLog.warn(
 									`[TASK_REVIEW] Failed to generate subtasks from modified files: ${planError instanceof Error ? planError.message : String(planError)}`,
 								);
 							}
@@ -1127,7 +1127,7 @@ export function registerTaskExecutionHandlers(
 							subtaskError,
 						);
 						// Don't fail the review - continue with QA process
-						appLog.warning(
+						appLog.warn(
 							`[TASK_REVIEW] Failed to generate subtasks: ${subtaskError instanceof Error ? subtaskError.message : String(subtaskError)}`,
 						);
 					}
@@ -1164,7 +1164,7 @@ export function registerTaskExecutionHandlers(
 					writeFileSync(resetPlanPath, JSON.stringify(resetPlan, null, 2), "utf-8");
 					appLog.info("[TASK_REVIEW] Reset subtasks to pending for full pipeline re-execution");
 				} catch (resetError) {
-					appLog.warning(
+					appLog.warn(
 						`[TASK_REVIEW] Could not reset subtasks in plan: ${resetError instanceof Error ? resetError.message : String(resetError)}`,
 					);
 				}
