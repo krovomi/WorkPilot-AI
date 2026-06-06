@@ -6,6 +6,7 @@ import {
 	Clock,
 	FileCode,
 	FileText,
+	FlaskConical,
 	Gauge,
 	GitMerge,
 	GitPullRequest,
@@ -247,6 +248,17 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					className="text-[10px] px-1.5 py-0.5"
 				>
 					{reviewReasonInfo.label}
+				</Badge>
+			)}
+
+			{/* TDD override badge - task-level strict TDD enabled */}
+			{task.metadata?.tddMode && (
+				<Badge
+					variant="outline"
+					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+				>
+					<FlaskConical className="h-2.5 w-2.5" />
+					{t("labels.tdd")}
 				</Badge>
 			)}
 

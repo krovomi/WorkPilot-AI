@@ -193,6 +193,7 @@ export interface TaskDraft {
 	images: ImageAttachment[];
 	referencedFiles: ReferencedFile[];
 	requireReviewBeforeCoding?: boolean;
+	tddMode?: boolean;
 	savedAt: Date;
 }
 
@@ -288,6 +289,10 @@ export interface TaskMetadata {
 
 	// Review settings
 	requireReviewBeforeCoding?: boolean; // Require human review of spec/plan before coding starts
+
+	// TDD override (per-task). When set, overrides project.settings.tddMode:
+	// true -> force strict TDD, false -> force disabled, undefined -> inherit project default.
+	tddMode?: boolean;
 
 	// Agent configuration (from agent profile or manual selection)
 	provider?: string; // Active LLM provider (e.g. 'anthropic', 'openai', 'google', 'ollama', ...)

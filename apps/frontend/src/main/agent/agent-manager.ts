@@ -13,6 +13,7 @@ import { AgentEvents } from "./agent-events";
 import { AgentProcessManager } from "./agent-process";
 import { AgentQueueManager } from "./agent-queue";
 import { AgentState } from "./agent-state";
+import { applyTddOverride } from "./env-utils";
 import type {
 	RoadmapConfig,
 	SpecCreationMetadata,
@@ -255,7 +256,10 @@ export class AgentManager extends EventEmitter {
 		}
 
 		// Get combined environment variables
-		const combinedEnv = this.processManager.getCombinedEnv(projectPath);
+		const combinedEnv = applyTddOverride(
+			this.processManager.getCombinedEnv(projectPath),
+			metadata?.tddMode,
+		);
 
 		// spec_runner.py will auto-start run.py after spec creation completes
 		const args = [
@@ -409,7 +413,10 @@ export class AgentManager extends EventEmitter {
 		}
 
 		// Get combined environment variables
-		const combinedEnv = this.processManager.getCombinedEnv(projectPath);
+		const combinedEnv = applyTddOverride(
+			this.processManager.getCombinedEnv(projectPath),
+			options.tddMode,
+		);
 
 		const args = [runPath, "--spec", specId, "--project-dir", projectPath];
 

@@ -96,6 +96,7 @@ function convertTaskMetadataToSpecCreation(metadata?: any): any {
 		thinkingLevel: metadata.thinkingLevel,
 		useWorktree: metadata.useWorktree,
 		useLocalBranch: metadata.useLocalBranch,
+		tddMode: metadata.tddMode,
 	};
 }
 
@@ -589,6 +590,7 @@ export function registerTaskExecutionHandlers(
 			baseBranch,
 			useWorktree: task.metadata?.useWorktree,
 			useLocalBranch: task.metadata?.useLocalBranch,
+			tddMode: task.metadata?.tddMode,
 			enableStreaming: options?.enableStreaming ?? true,
 			streamingSessionId: options?.streamingSessionId ?? taskId,
 		};

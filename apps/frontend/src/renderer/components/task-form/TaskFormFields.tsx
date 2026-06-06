@@ -100,6 +100,10 @@ interface TaskFormFieldsProps {
 	requireReviewBeforeCoding: boolean;
 	onRequireReviewChange: (require: boolean) => void;
 
+	// TDD override (per-task)
+	tddMode: boolean;
+	onTddModeChange: (tdd: boolean) => void;
+
 	// Form state
 	disabled?: boolean;
 	error?: string | null;
@@ -149,6 +153,8 @@ export function TaskFormFields({
 	onImagesChange,
 	requireReviewBeforeCoding,
 	onRequireReviewChange,
+	tddMode,
+	onTddModeChange,
 	disabled = false,
 	error,
 	onError,
@@ -602,6 +608,28 @@ export function TaskFormFields({
 						</Label>
 						<p className="text-xs text-muted-foreground">
 							{t("tasks:form.requireReviewDescription")}
+						</p>
+					</div>
+				</div>
+
+				{/* TDD Override Toggle */}
+				<div className="flex items-start gap-3 p-4 rounded-lg border border-border bg-muted/30">
+					<Checkbox
+						id={`${prefix}tdd-mode`}
+						checked={tddMode}
+						onCheckedChange={(checked) => onTddModeChange(checked === true)}
+						disabled={disabled}
+						className="mt-0.5"
+					/>
+					<div className="flex-1 space-y-1">
+						<Label
+							htmlFor={`${prefix}tdd-mode`}
+							className="text-sm font-medium text-foreground cursor-pointer"
+						>
+							{t("tasks:form.tddModeLabel")}
+						</Label>
+						<p className="text-xs text-muted-foreground">
+							{t("tasks:form.tddModeDescription")}
 						</p>
 					</div>
 				</div>
