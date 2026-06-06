@@ -1362,8 +1362,12 @@ function findContainingSolutionDir(csprojPath: string): string {
 				/Project\("[^"]+"\)\s*=\s*"[^"]+",\s*"([^"]+\.csproj)"/gi,
 			);
 			for (const match of matches) {
+				// Les chemins déclarés dans un .sln utilisent toujours le
+				// séparateur Windows "\". Sur POSIX, path.resolve ne le traite
+				// pas comme séparateur : on normalise donc vers path.sep.
+				const relativeFromSolution = match[1].split(/[\\/]+/).join(path.sep);
 				const candidatePath = path
-					.resolve(currentDir, match[1])
+					.resolve(currentDir, relativeFromSolution)
 					.toLowerCase();
 				if (path.normalize(candidatePath) === normalizedCsprojPath) {
 					return `${currentDir}${path.sep}`;

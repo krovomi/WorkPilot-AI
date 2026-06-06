@@ -53,7 +53,9 @@ describe("AppEmulatorService project detection", () => {
 		expect(config.startCommand).toContain(appDir);
 	});
 
-	it("classifies a nested legacy WinForms project as a desktop app", async () => {
+	it.skipIf(process.platform !== "win32")(
+		"classifies a nested legacy WinForms project as a desktop app",
+		async () => {
 		const appDir = path.join(tempDir, "src", "HeavyClient");
 		mkdirSync(appDir, { recursive: true });
 		writeFileSync(
@@ -122,7 +124,8 @@ describe("AppEmulatorService project detection", () => {
 		);
 		expect(msbuildLookupIndex).toBeGreaterThan(-1);
 		expect(executableLookupIndex).toBeGreaterThan(msbuildLookupIndex);
-	});
+		},
+	);
 
 	it("prefers the first runnable non-test project declared in a solution", async () => {
 		const sourcesDir = path.join(tempDir, "Sources");
@@ -167,12 +170,16 @@ describe("AppEmulatorService project detection", () => {
 
 		expect(config.framework).toBe("dotnet-framework-desktop");
 		expect(config.projectDir).toBe(appDir);
-		const script = readFileSync(
-			path.join(appDir, "obj", "workpilot-run-legacy-desktop.ps1"),
-			"utf-8",
-		);
-		expect(script).toContain("EBP.Invoicing.Application.csproj");
-		expect(script).toContain("/t:Build");
+		// La lecture du script PowerShell n'a de sens que sur Windows :
+		// sur POSIX, la commande de lancement est un script shell, pas un .ps1.
+		if (process.platform === "win32") {
+			const script = readFileSync(
+				path.join(appDir, "obj", "workpilot-run-legacy-desktop.ps1"),
+				"utf-8",
+			);
+			expect(script).toContain("EBP.Invoicing.Application.csproj");
+			expect(script).toContain("/t:Build");
+		}
 		expect(config.startCommand).not.toContain("Hub.TestApplication");
 	});
 
