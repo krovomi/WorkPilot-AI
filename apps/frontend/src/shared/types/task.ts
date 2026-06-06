@@ -386,11 +386,14 @@ export interface PlanSubtask {
 	description: string;
 	status: SubtaskStatus;
 	/**
-	 * Files impacted by this subtask. The backend planner emits
-	 * `files_to_modify` / `files_to_create`; `files` is kept as a legacy
-	 * fallback. Use `extractSubtaskFiles()` to read a normalized flat list.
+	 * Files impacted by this subtask. `files_changed` is the actual git diff
+	 * recorded once the subtask completes (ground truth); the planner emits the
+	 * `files_to_modify` / `files_to_create` predictions before coding; `files`
+	 * is a legacy fallback. Use `extractSubtaskFiles()` to read a normalized
+	 * flat list that prefers the ground truth.
 	 */
 	files?: string[];
+	files_changed?: string[];
 	files_to_modify?: string[];
 	files_to_create?: string[];
 	verification?: {

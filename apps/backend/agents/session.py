@@ -516,6 +516,57 @@ def is_authentication_error(error: Exception) -> bool:
     )
 
 
+def _persist_subtask_changed_files(
+    spec_dir: Path,
+    project_dir: Path,
+    plan: dict,
+    subtask: dict,
+    subtask_id: str,
+    commit_before: str | None,
+    commit_after: str | None,
+) -> None:
+    """Persist the files a completed subtask actually changed (git ground truth).
+
+    The planner's ``files_to_modify`` / ``files_to_create`` are *predictions*
+    made before any code is written and are frequently empty or inaccurate. Once
+    a subtask completes we know the commits it produced, so we record the *real*
+    diff in ``files_changed`` and let the UI prefer it for the per-subtask
+    "files modified" view.
+
+    Uses a union with any previously recorded files: ``commit_before`` is
+    recaptured at the start of each coder session, so a subtask that spans
+    multiple sessions (retries) would otherwise only keep its last session's
+    diff. Failures here are non-fatal — file attribution is a UI nicety and must
+    never block subtask completion.
+    """
+    try:
+        from analysis.insight_extractor import get_changed_files
+
+        changed = get_changed_files(project_dir, commit_before, commit_after)
+        if not changed:
+            return
+
+        existing = subtask.get("files_changed") or []
+        # Union, preserving first-seen order.
+        merged = list(dict.fromkeys([*existing, *changed]))
+        if merged == existing:
+            return
+
+        subtask["files_changed"] = merged
+
+        from qa.criteria import save_implementation_plan
+
+        save_implementation_plan(spec_dir, plan)
+        print_status(
+            f"Recorded {len(merged)} changed file(s) for subtask {subtask_id}",
+            "success",
+        )
+    except Exception as e:
+        logger.warning(
+            f"Could not persist changed files for subtask {subtask_id}: {e}"
+        )
+
+
 async def post_session_processing(
     spec_dir: Path,
     project_dir: Path,
@@ -632,6 +683,19 @@ async def post_session_processing(
         if commit_after and commit_after != commit_before:
             recovery_manager.record_good_commit(commit_after, subtask_id)
             print_status(f"Recorded good commit: {commit_after[:8]}", "success")
+
+        # Record the actual files this subtask changed (ground truth from git),
+        # so the per-subtask "files modified" view reflects reality instead of
+        # the planner's pre-coding prediction.
+        _persist_subtask_changed_files(
+            spec_dir=spec_dir,
+            project_dir=project_dir,
+            plan=plan,
+            subtask=subtask,
+            subtask_id=subtask_id,
+            commit_before=commit_before,
+            commit_after=commit_after,
+        )
 
         # Record Linear session result (if enabled)
         if linear_enabled:

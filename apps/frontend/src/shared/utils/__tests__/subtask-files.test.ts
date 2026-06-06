@@ -11,6 +11,33 @@ import { describe, expect, it } from "vitest";
 import { extractSubtaskFiles } from "../subtask-files";
 
 describe("extractSubtaskFiles", () => {
+	it("prefers files_changed (ground truth) over the planner prediction", () => {
+		expect(
+			extractSubtaskFiles({
+				files_changed: ["src/actual.ts"],
+				files_to_modify: ["src/predicted.ts"],
+				files_to_create: ["src/also-predicted.ts"],
+			}),
+		).toEqual(["src/actual.ts"]);
+	});
+
+	it("de-duplicates files_changed", () => {
+		expect(
+			extractSubtaskFiles({
+				files_changed: ["src/a.ts", "src/a.ts", "src/b.ts"],
+			}),
+		).toEqual(["src/a.ts", "src/b.ts"]);
+	});
+
+	it("falls back to the prediction when files_changed is empty", () => {
+		expect(
+			extractSubtaskFiles({
+				files_changed: [],
+				files_to_modify: ["src/predicted.ts"],
+			}),
+		).toEqual(["src/predicted.ts"]);
+	});
+
 	it("reads files_to_modify from the planner output", () => {
 		expect(
 			extractSubtaskFiles({ files_to_modify: ["src/a.ts", "src/b.ts"] }),
