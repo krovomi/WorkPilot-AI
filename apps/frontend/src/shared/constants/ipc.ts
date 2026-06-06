@@ -53,6 +53,7 @@ export const IPC_CHANNELS = {
 	TASK_WORKTREE_CREATE_PR: "task:worktreeCreatePR",
 	TASK_WORKTREE_ANALYZE_IMPACT: "task:worktreeAnalyzeImpact", // Preview PR body + impact analysis WITHOUT pushing
 	TASK_VISUAL_PROOF_RUN: "task:visualProofRun", // Run emulator + screenshot proof for PR
+	TASK_VISUAL_PROOF_STATUS: "task:visualProofStatus", // Query whether a visual proof run is in progress for a task
 	TASK_WORKTREE_OPEN_IN_IDE: "task:worktreeOpenInIDE",
 	TASK_WORKTREE_OPEN_IN_TERMINAL: "task:worktreeOpenInTerminal",
 	TASK_WORKTREE_DETECT_TOOLS: "task:worktreeDetectTools", // Detect installed IDEs/terminals
@@ -70,6 +71,7 @@ export const IPC_CHANNELS = {
 	TASK_LOG: "task:log",
 	TASK_STATUS_CHANGE: "task:statusChange",
 	TASK_EXECUTION_PROGRESS: "task:executionProgress",
+	TASK_VISUAL_PROOF_RUNNING: "task:visualProofRunning", // Event: visual proof run started/finished (main -> renderer)
 
 	// Task phase logs (persistent, collapsible logs by phase)
 	TASK_LOGS_GET: "task:logsGet", // Load logs from spec dir

@@ -4962,6 +4962,37 @@ export function registerWorktreeHandlers(
 	);
 
 	/**
+	 * Report whether a visual proof run is currently in progress for a task. The
+	 * renderer queries this on mount so the spinner is restored after the tab was
+	 * closed/reopened, and so a second run cannot be triggered while one is live.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_VISUAL_PROOF_STATUS,
+		async (_, taskId: string): Promise<IPCResult<{ running: boolean }>> => {
+			return {
+				success: true,
+				data: { running: visualProofService.isRunning(taskId) },
+			};
+		},
+	);
+
+	// Forward visual proof start/finish to the renderer so every open tab can keep
+	// its spinner in sync, even one that did not initiate the run. Registered once
+	// (registerWorktreeHandlers runs at startup) to avoid stacking listeners.
+	if (visualProofService.listenerCount("running-changed") === 0) {
+		visualProofService.on(
+			"running-changed",
+			(taskId: string, running: boolean) => {
+				getMainWindow()?.webContents.send(
+					IPC_CHANNELS.TASK_VISUAL_PROOF_RUNNING,
+					taskId,
+					running,
+				);
+			},
+		);
+	}
+
+	/**
 	 * Preview the PR body + impact analysis WITHOUT pushing or creating a PR.
 	 * Used by the PR review modal to pre-fill editable fields (rating 1-5 +
 	 * impacted features) before the user confirms creation.

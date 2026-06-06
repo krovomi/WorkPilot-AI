@@ -642,6 +642,44 @@ export interface VisualProofRunOptions {
 }
 
 /**
+ * A single navigation/interaction step performed before capturing a screenshot.
+ *
+ * Web fields drive a headless BrowserWindow (route navigation + DOM actions),
+ * desktop fields drive Windows UI Automation (invoke controls / set text by name)
+ * on the running heavy client. Fields not relevant to the active target are
+ * simply ignored, so the same plan shape works for both worlds.
+ */
+export interface VisualProofNavigationStep {
+	/** Label used for the screenshot taken after this step. */
+	label?: string;
+	/** Web: route (relative to the app origin) or absolute URL to open. */
+	path?: string;
+	/** Web: CSS selector to wait for before continuing. */
+	waitForSelector?: string;
+	/** Web: CSS selector to click. */
+	click?: string;
+	/** Web: fill a form control. */
+	fill?: { selector: string; value: string };
+	/** Desktop: name of the UI Automation element to invoke (menu item/button). */
+	invoke?: string;
+	/** Desktop: set text into an edit control identified by name. */
+	setText?: { name: string; value: string };
+	/** Milliseconds to wait after the step so the UI can settle. */
+	delayMs?: number;
+	/** Capture a screenshot after this step (default true). */
+	capture?: boolean;
+}
+
+/**
+ * Navigation plan describing how to reach the implemented feature before taking
+ * visual proof screenshots. Steps can be split per target or shared by both.
+ */
+export interface VisualProofNavigationPlan {
+	web?: VisualProofNavigationStep[];
+	desktop?: VisualProofNavigationStep[];
+}
+
+/**
  * Result of a preview impact analysis (no PR creation, no push).
  */
 export interface WorktreeAnalyzeImpactResult {

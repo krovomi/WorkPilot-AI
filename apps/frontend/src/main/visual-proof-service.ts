@@ -3,6 +3,7 @@ import {
 	spawn,
 	type ChildProcessWithoutNullStreams,
 } from "node:child_process";
+import { EventEmitter } from "node:events";
 import {
 	existsSync,
 	mkdirSync,
@@ -17,6 +18,8 @@ import { promisify } from "node:util";
 import { BrowserWindow, desktopCapturer } from "electron";
 import { getSpecsDir } from "../shared/constants";
 import type {
+	VisualProofNavigationPlan,
+	VisualProofNavigationStep,
 	VisualProofProviderId,
 	VisualProofRun,
 	VisualProofRunOptions,
@@ -53,6 +56,14 @@ const HYPERV_ARGS_ENV = "WORKPILOT_VISUAL_PROOF_HYPERV_ARGS";
 const WSL_COMMAND_ENV = "WORKPILOT_VISUAL_PROOF_WSL_COMMAND";
 const WSL_ARGS_ENV = "WORKPILOT_VISUAL_PROOF_WSL_ARGS";
 const IIS_EXPRESS_ENV = "WORKPILOT_IIS_EXPRESS_PATH";
+const DESKTOP_CAPTURE_COUNT_ENV = "WORKPILOT_VISUAL_PROOF_DESKTOP_CAPTURES";
+/** When set, the desktop app is launched without UAC elevation (no Start-Process -Verb RunAs). */
+const NO_ELEVATE_ENV = "WORKPILOT_VISUAL_PROOF_NO_ELEVATE";
+const DESKTOP_CAPTURE_INTERVAL_MS = 2500;
+const NAVIGATION_ENV = "WORKPILOT_VISUAL_PROOF_NAVIGATION";
+const NAVIGATION_FILE_NAME = "visual-proof-navigation.json";
+const NAVIGATION_STEP_SETTLE_MS = 1200;
+const NAVIGATION_WAIT_TIMEOUT_MS = 15000;
 const LEGACY_DOTNET_BUILD_MAX_BUFFER = 100 * 1024 * 1024;
 const LEGACY_WEB_HOST_UNAVAILABLE_MESSAGE =
 	"IIS Express/xsp was not found for this legacy .NET Framework web app.";
@@ -446,6 +457,182 @@ async function captureWebPage(
 	}
 }
 
+type WebContentsLike = Pick<
+	BrowserWindow["webContents"],
+	"loadURL" | "executeJavaScript" | "capturePage"
+>;
+
+function buildWaitForSelectorScript(selector: string, timeoutMs: number): string {
+	const sel = JSON.stringify(selector);
+	return `new Promise((resolve) => {
+		const deadline = Date.now() + ${timeoutMs};
+		const tick = () => {
+			if (document.querySelector(${sel})) { resolve(true); return; }
+			if (Date.now() > deadline) { resolve(false); return; }
+			setTimeout(tick, 200);
+		};
+		tick();
+	})`;
+}
+
+function buildClickScript(selector: string): string {
+	const sel = JSON.stringify(selector);
+	return `(() => {
+		const el = document.querySelector(${sel});
+		if (!el) return false;
+		el.scrollIntoView({ block: 'center' });
+		el.click();
+		return true;
+	})()`;
+}
+
+function buildFillScript(selector: string, value: string): string {
+	const sel = JSON.stringify(selector);
+	const val = JSON.stringify(value);
+	return `(() => {
+		const el = document.querySelector(${sel});
+		if (!el) return false;
+		const setter = Object.getOwnPropertyDescriptor(el.__proto__, 'value');
+		if (setter && setter.set) { setter.set.call(el, ${val}); }
+		else { el.value = ${val}; }
+		el.dispatchEvent(new Event('input', { bubbles: true }));
+		el.dispatchEvent(new Event('change', { bubbles: true }));
+		return true;
+	})()`;
+}
+
+/**
+ * Exécute une étape de navigation web dans la page chargée. Best-effort : un
+ * sélecteur introuvable est journalisé sans interrompre la séquence, afin de
+ * toujours produire des preuves visuelles même si l'UI a légèrement changé.
+ */
+async function runWebNavigationStep(
+	webContents: WebContentsLike,
+	step: VisualProofNavigationStep,
+	baseUrl: string,
+): Promise<void> {
+	if (step.path) {
+		const target = new URL(step.path, baseUrl).toString();
+		await webContents.loadURL(target);
+		await delay(500);
+	}
+	if (step.waitForSelector) {
+		const found = await webContents.executeJavaScript(
+			buildWaitForSelectorScript(step.waitForSelector, NAVIGATION_WAIT_TIMEOUT_MS),
+		);
+		if (found === false) {
+			logger.warn(
+				`[VisualProof] Selector never appeared: ${step.waitForSelector}`,
+			);
+		}
+	}
+	if (step.fill) {
+		const ok = await webContents.executeJavaScript(
+			buildFillScript(step.fill.selector, step.fill.value),
+		);
+		if (ok === false) {
+			logger.warn(`[VisualProof] Fill target not found: ${step.fill.selector}`);
+		}
+	}
+	if (step.click) {
+		const ok = await webContents.executeJavaScript(buildClickScript(step.click));
+		if (ok === false) {
+			logger.warn(`[VisualProof] Click target not found: ${step.click}`);
+		}
+	}
+	await delay(step.delayMs ?? NAVIGATION_STEP_SETTLE_MS);
+}
+
+function navigationScreenshotFileName(index: number, label?: string): string {
+	const safeLabel = label
+		?.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	return safeLabel
+		? `feature-${index + 1}-${safeLabel}.png`
+		: `feature-${index + 1}.png`;
+}
+
+/**
+ * Navigue jusqu'à la feature implémentée puis capture une ou plusieurs preuves
+ * visuelles. Sans plan, retombe sur une simple capture de la page d'accueil.
+ */
+async function captureWebFeatureScreenshots(
+	baseUrl: string,
+	context: VisualProofProviderContext,
+	steps: readonly VisualProofNavigationStep[],
+): Promise<VisualProofScreenshot[]> {
+	if (steps.length === 0) {
+		const fileName = "home.png";
+		const screenshotPath = path.join(context.artifactDir, fileName);
+		const viewport = await captureWebPage(baseUrl, screenshotPath);
+		return [
+			createScreenshot(
+				"Home page",
+				context.relativeArtifactDir,
+				fileName,
+				screenshotPath,
+				viewport,
+			),
+		];
+	}
+
+	const window = new BrowserWindow({
+		show: false,
+		width: DEFAULT_VIEWPORT.width,
+		height: DEFAULT_VIEWPORT.height,
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: true,
+		},
+	});
+	const screenshots: VisualProofScreenshot[] = [];
+	try {
+		await window.loadURL(baseUrl);
+		await delay(1500);
+		let captureIndex = 0;
+		for (const step of steps) {
+			await runWebNavigationStep(window.webContents, step, baseUrl);
+			if (step.capture === false) continue;
+			const fileName = navigationScreenshotFileName(captureIndex, step.label);
+			const screenshotPath = path.join(context.artifactDir, fileName);
+			const image = await window.webContents.capturePage();
+			writeFileSync(screenshotPath, image.toPNG());
+			screenshots.push(
+				createScreenshot(
+					step.label ?? `Feature step ${captureIndex + 1}`,
+					context.relativeArtifactDir,
+					fileName,
+					screenshotPath,
+					DEFAULT_VIEWPORT,
+				),
+			);
+			captureIndex += 1;
+		}
+	} finally {
+		if (!window.isDestroyed()) {
+			window.close();
+		}
+	}
+
+	if (screenshots.length === 0) {
+		const fileName = "home.png";
+		const screenshotPath = path.join(context.artifactDir, fileName);
+		const viewport = await captureWebPage(baseUrl, screenshotPath);
+		screenshots.push(
+			createScreenshot(
+				"Home page",
+				context.relativeArtifactDir,
+				fileName,
+				screenshotPath,
+				viewport,
+			),
+		);
+	}
+	return screenshots;
+}
+
 async function captureDesktopImage(
 	outputPath: string,
 	options: DesktopImageCaptureOptions = {},
@@ -562,18 +749,18 @@ async function readWindowsProcessWindowTitle(pid: number): Promise<string | null
 }
 
 async function waitForProcessWindowNames(
-	child: ChildProcessWithoutNullStreams,
+	pid: number | undefined,
 	fallbackNames: readonly string[],
 ): Promise<string[]> {
 	const names = new Set(fallbackNames.filter((name) => name.trim().length > 0));
-	if (process.platform !== "win32" || !child.pid) {
+	if (process.platform !== "win32" || !pid) {
 		await delay(3000);
 		return [...names];
 	}
 
 	const deadline = Date.now() + 10000;
 	while (Date.now() < deadline) {
-		const title = await readWindowsProcessWindowTitle(child.pid);
+		const title = await readWindowsProcessWindowTitle(pid);
 		if (title) {
 			names.add(title);
 			break;
@@ -581,6 +768,317 @@ async function waitForProcessWindowNames(
 		await delay(500);
 	}
 	return [...names];
+}
+
+function resolveDesktopCaptureCount(): number {
+	const raw = process.env[DESKTOP_CAPTURE_COUNT_ENV];
+	const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+	if (Number.isNaN(parsed)) return 3;
+	return Math.min(Math.max(parsed, 1), 10);
+}
+
+function isNavigationStep(value: unknown): value is VisualProofNavigationStep {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Normalise une valeur JSON arbitraire en plan de navigation. Accepte soit un
+ * objet `{ web?, desktop? }`, soit un tableau simple d'étapes (appliqué aux deux
+ * cibles). Les entrées invalides sont ignorées silencieusement.
+ */
+export function normalizeNavigationPlan(
+	value: unknown,
+): VisualProofNavigationPlan | null {
+	if (Array.isArray(value)) {
+		const steps = value.filter(isNavigationStep);
+		if (steps.length === 0) return null;
+		return { web: steps, desktop: steps };
+	}
+	if (!isNavigationStep(value)) return null;
+	const candidate = value as {
+		web?: unknown;
+		desktop?: unknown;
+		steps?: unknown;
+	};
+	const web = Array.isArray(candidate.web)
+		? candidate.web.filter(isNavigationStep)
+		: Array.isArray(candidate.steps)
+			? candidate.steps.filter(isNavigationStep)
+			: [];
+	const desktop = Array.isArray(candidate.desktop)
+		? candidate.desktop.filter(isNavigationStep)
+		: Array.isArray(candidate.steps)
+			? candidate.steps.filter(isNavigationStep)
+			: [];
+	if (web.length === 0 && desktop.length === 0) return null;
+	return {
+		web: web.length > 0 ? web : undefined,
+		desktop: desktop.length > 0 ? desktop : undefined,
+	};
+}
+
+function parseNavigationJson(raw: string): VisualProofNavigationPlan | null {
+	try {
+		return normalizeNavigationPlan(JSON.parse(raw));
+	} catch (error) {
+		logger.warn(
+			`[VisualProof] Could not parse navigation plan: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
+		);
+		return null;
+	}
+}
+
+/**
+ * Charge le plan de navigation vers la feature. Priorité :
+ *   1. Env WORKPILOT_VISUAL_PROOF_NAVIGATION (JSON inline ou chemin vers un .json)
+ *   2. Fichier .workpilot/visual-proof-navigation.json dans worktreePath puis projectPath
+ * Retourne null si aucun plan exploitable.
+ */
+export function loadVisualProofNavigationPlan(
+	options: Partial<Pick<VisualProofRunOptions, "worktreePath" | "projectPath">>,
+): VisualProofNavigationPlan | null {
+	const envValue = process.env[NAVIGATION_ENV]?.trim();
+	if (envValue) {
+		if (envValue.startsWith("{") || envValue.startsWith("[")) {
+			const inline = parseNavigationJson(envValue);
+			if (inline) return inline;
+		} else if (existsSync(envValue)) {
+			const fileContent = readTextFile(envValue);
+			if (fileContent) {
+				const parsed = parseNavigationJson(fileContent);
+				if (parsed) return parsed;
+			}
+		}
+	}
+
+	const searchRoots = [options.worktreePath, options.projectPath].filter(
+		(root): root is string => Boolean(root),
+	);
+	for (const root of searchRoots) {
+		const candidate = path.join(root, ".workpilot", NAVIGATION_FILE_NAME);
+		if (existsSync(candidate)) {
+			const fileContent = readTextFile(candidate);
+			if (fileContent) {
+				const parsed = parseNavigationJson(fileContent);
+				if (parsed) return parsed;
+			}
+		}
+	}
+	return null;
+}
+
+interface DesktopCaptureSequenceOptions {
+	excludeSourceIds: ReadonlySet<string>;
+	preferredNames: readonly string[];
+}
+
+/**
+ * Capture une séquence de screenshots de la fenêtre de l'application cible.
+ * Plusieurs captures espacées laissent le temps à l'application de charger et,
+ * le cas échéant, à l'utilisateur/automation de naviguer jusqu'à la feature
+ * implémentée. Le nombre de captures est configurable via
+ * WORKPILOT_VISUAL_PROOF_DESKTOP_CAPTURES (défaut: 3).
+ */
+async function captureDesktopScreenshotSequence(
+	context: VisualProofProviderContext,
+	options: DesktopCaptureSequenceOptions,
+): Promise<VisualProofScreenshot[]> {
+	const total = resolveDesktopCaptureCount();
+	const screenshots: VisualProofScreenshot[] = [];
+	let lastError: unknown;
+	for (let index = 0; index < total; index += 1) {
+		if (index > 0) {
+			await delay(DESKTOP_CAPTURE_INTERVAL_MS);
+		}
+		const fileName = total === 1 ? "desktop.png" : `desktop-${index + 1}.png`;
+		const screenshotPath = path.join(context.artifactDir, fileName);
+		try {
+			const size = await captureDesktopImage(screenshotPath, {
+				excludeSourceIds: options.excludeSourceIds,
+				preferredNames: options.preferredNames,
+				requireWindowMatch: true,
+			});
+			screenshots.push(
+				createScreenshot(
+					total === 1
+						? "Desktop application"
+						: `Desktop application (${index + 1}/${total})`,
+					context.relativeArtifactDir,
+					fileName,
+					screenshotPath,
+					size,
+				),
+			);
+		} catch (error) {
+			lastError = error;
+		}
+	}
+	if (screenshots.length === 0) {
+		throw lastError instanceof Error
+			? lastError
+			: new Error("Could not capture the desktop application window");
+	}
+	return screenshots;
+}
+
+function escapePowerShellSingleQuoted(value: string): string {
+	return value.replaceAll("'", "''");
+}
+
+/**
+ * Génère un script PowerShell qui pilote la fenêtre du process cible via
+ * Windows UI Automation (System.Windows.Automation). Selon l'étape, il invoque
+ * un contrôle par nom (menu/bouton) ou écrit du texte dans un champ. Retourne
+ * null si l'étape ne contient aucune action desktop exploitable.
+ *
+ * Limite connue (UIPI) : si l'app cible est élevée (admin) et que WorkPilot ne
+ * l'est pas, l'invoke peut être refusé. La capture d'écran reste fonctionnelle.
+ */
+export function buildUiAutomationStepScript(
+	pid: number,
+	step: VisualProofNavigationStep,
+): string | null {
+	let action: string | null = null;
+	if (step.invoke) {
+		const name = escapePowerShellSingleQuoted(step.invoke);
+		action = `$nameCond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, '${name}')
+$el = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $nameCond)
+if (-not $el) { exit 3 }
+try {
+  $pattern = $el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+  $pattern.Invoke()
+} catch {
+  try {
+    $sel = $el.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
+    $sel.Select()
+  } catch { exit 4 }
+}`;
+	} else if (step.setText) {
+		const name = escapePowerShellSingleQuoted(step.setText.name);
+		const value = escapePowerShellSingleQuoted(step.setText.value);
+		action = `$nameCond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, '${name}')
+$el = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $nameCond)
+if (-not $el) { exit 3 }
+try {
+  $value = $el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+  $value.SetValue('${value}')
+} catch { exit 4 }`;
+	}
+	if (!action) return null;
+	return `$ErrorActionPreference='Stop'
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$root = [System.Windows.Automation.AutomationElement]::RootElement
+$procCond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, ${pid})
+$win = $root.FindFirst([System.Windows.Automation.TreeScope]::Children, $procCond)
+if (-not $win) { exit 2 }
+${action}
+exit 0`;
+}
+
+/**
+ * Exécute une étape de navigation desktop via UI Automation. Best-effort : toute
+ * erreur (fenêtre/contrôle introuvable, UIPI) est journalisée sans interrompre
+ * la séquence afin de toujours produire des preuves visuelles.
+ */
+async function runDesktopNavigationStep(
+	pid: number | undefined,
+	step: VisualProofNavigationStep,
+	canDrive: boolean,
+): Promise<void> {
+	if (
+		canDrive &&
+		process.platform === "win32" &&
+		pid &&
+		(step.invoke || step.setText)
+	) {
+		const script = buildUiAutomationStepScript(pid, step);
+		if (script) {
+			try {
+				await execFileAsync(
+					"powershell",
+					["-NoProfile", "-NonInteractive", "-Command", script],
+					{ windowsHide: true, maxBuffer: 256 * 1024 },
+				);
+			} catch (error) {
+				logger.warn(
+					`[VisualProof] UI Automation step failed (${
+						step.invoke ?? step.setText?.name ?? "unknown"
+					}): ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
+		}
+	}
+	await delay(step.delayMs ?? NAVIGATION_STEP_SETTLE_MS);
+}
+
+interface DesktopFeatureSequenceOptions extends DesktopCaptureSequenceOptions {
+	pid?: number;
+	steps: readonly VisualProofNavigationStep[];
+	/** Whether UI Automation can drive the app (false ⇒ UIPI blocks input → capture only). */
+	canDrive: boolean;
+}
+
+/**
+ * Navigue jusqu'à la feature dans le client lourd (UI Automation) puis capture
+ * une preuve par étape. Sans plan desktop, retombe sur la séquence
+ * settle-and-capture classique.
+ */
+async function captureDesktopFeatureSequence(
+	context: VisualProofProviderContext,
+	options: DesktopFeatureSequenceOptions,
+): Promise<VisualProofScreenshot[]> {
+	if (options.steps.length === 0) {
+		return captureDesktopScreenshotSequence(context, options);
+	}
+
+	if (
+		!options.canDrive &&
+		options.steps.some((step) => step.invoke || step.setText)
+	) {
+		logger.warn(
+			"[VisualProof] Skipping automated desktop navigation: WorkPilot is not " +
+				"elevated while the app is (Windows UIPI). Relaunch WorkPilot as " +
+				"administrator to drive the app; capturing screenshots only.",
+		);
+	}
+
+	const screenshots: VisualProofScreenshot[] = [];
+	let lastError: unknown;
+	let captureIndex = 0;
+	for (const step of options.steps) {
+		await runDesktopNavigationStep(options.pid, step, options.canDrive);
+		if (step.capture === false) continue;
+		const fileName = navigationScreenshotFileName(captureIndex, step.label);
+		const screenshotPath = path.join(context.artifactDir, fileName);
+		try {
+			const size = await captureDesktopImage(screenshotPath, {
+				excludeSourceIds: options.excludeSourceIds,
+				preferredNames: options.preferredNames,
+				requireWindowMatch: true,
+			});
+			screenshots.push(
+				createScreenshot(
+					step.label ?? `Feature step ${captureIndex + 1}`,
+					context.relativeArtifactDir,
+					fileName,
+					screenshotPath,
+					size,
+				),
+			);
+			captureIndex += 1;
+		} catch (error) {
+			lastError = error;
+		}
+	}
+
+	if (screenshots.length === 0) {
+		if (lastError instanceof Error) throw lastError;
+		return captureDesktopScreenshotSequence(context, options);
+	}
+	return screenshots;
 }
 
 async function waitForHttp(url: string, timeoutMs = 30000): Promise<void> {
@@ -617,6 +1115,151 @@ function stopChildProcess(child: ChildProcessWithoutNullStreams): void {
 	if (!child.killed) {
 		child.kill();
 	}
+}
+
+interface DesktopLaunchHandle {
+	pid?: number;
+	/** Whether the launched app runs elevated (admin). */
+	elevated: boolean;
+	stop: () => Promise<void>;
+}
+
+let cachedElevation: boolean | null = null;
+
+/**
+ * Whether the current WorkPilot process runs elevated (admin on Windows, root
+ * elsewhere). Cached for the process lifetime. Drives the UI Automation decision:
+ * a non-elevated process cannot send input to an elevated window (Windows UIPI),
+ * so we must know our own integrity level to decide whether navigation can run.
+ */
+async function isCurrentProcessElevated(): Promise<boolean> {
+	if (cachedElevation !== null) return cachedElevation;
+	if (process.platform !== "win32") {
+		cachedElevation =
+			typeof process.getuid === "function" && process.getuid() === 0;
+		return cachedElevation;
+	}
+	try {
+		const { stdout } = await execFileAsync(
+			"powershell",
+			[
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"[bool]([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)",
+			],
+			{ windowsHide: true, maxBuffer: 64 * 1024 },
+		);
+		cachedElevation = stdout.trim().toLowerCase() === "true";
+	} catch {
+		cachedElevation = false;
+	}
+	return cachedElevation;
+}
+
+/**
+ * Decide whether UI Automation can drive the launched desktop app, and produce a
+ * user-facing note when it cannot. Windows UIPI forbids a lower-integrity process
+ * from sending input to a higher-integrity window, so a non-elevated WorkPilot
+ * cannot click/type into an elevated app — only screenshots remain possible.
+ */
+export function resolveDesktopUiAutomation(
+	appElevated: boolean,
+	workpilotElevated: boolean,
+): { canDrive: boolean; note?: string } {
+	if (!appElevated || workpilotElevated) {
+		return { canDrive: true };
+	}
+	return {
+		canDrive: false,
+		note:
+			"Automated navigation is disabled because the desktop app runs elevated " +
+			"and WorkPilot does not (Windows UIPI). Relaunch WorkPilot as administrator " +
+			"to drive the app; screenshots are still captured.",
+	};
+}
+
+/**
+ * Lance l'exécutable desktop. Sous Windows, les clients lourds EBP exigent les
+ * droits administrateur (réparation de la base de registre). Si WorkPilot est déjà
+ * élevé (ou si l'élévation est désactivée via WORKPILOT_VISUAL_PROOF_NO_ELEVATE),
+ * on lance directement : l'enfant hérite alors de l'intégrité du parent et reste
+ * pilotable inline par UI Automation, sans second UAC. Sinon on élève via
+ * Start-Process -Verb RunAs (déclenche UAC) et on récupère le PID élevé ; dans ce
+ * cas, WorkPilot non élevé ne pourra pas piloter la fenêtre (UIPI), mais la
+ * capture d'écran reste fonctionnelle. Sous mono/wine, lancement direct.
+ */
+async function launchDesktopApplication(
+	runtime: DesktopRuntimeInvocation,
+): Promise<DesktopLaunchHandle> {
+	const spawnDirect = (elevated: boolean): DesktopLaunchHandle => {
+		const child = spawn(runtime.command, runtime.args, {
+			cwd: runtime.cwd,
+			windowsHide: false,
+		});
+		return {
+			pid: child.pid,
+			elevated,
+			stop: async () => stopChildProcess(child),
+		};
+	};
+
+	if (process.platform !== "win32") {
+		return spawnDirect(false);
+	}
+
+	// When WorkPilot is already elevated, a direct child inherits admin rights
+	// (no extra UAC) and stays drivable by inline UI Automation. The opt-out env
+	// launches non-elevated on purpose (caller accepts the registry-repair prompt).
+	const workpilotElevated = await isCurrentProcessElevated();
+	if (workpilotElevated || process.env[NO_ELEVATE_ENV]) {
+		return spawnDirect(workpilotElevated);
+	}
+
+	const psExe = `'${runtime.command.replaceAll("'", "''")}'`;
+	const psCwd = `'${runtime.cwd.replaceAll("'", "''")}'`;
+	const psArgs =
+		runtime.args.length > 0
+			? ` -ArgumentList @(${runtime.args
+					.map((arg) => `'${arg.replaceAll("'", "''")}'`)
+					.join(",")})`
+			: "";
+	const { stdout } = await execFileAsync(
+		"powershell",
+		[
+			"-NoProfile",
+			"-NonInteractive",
+			"-Command",
+			`$ErrorActionPreference='Stop'; $p = Start-Process -FilePath ${psExe} -WorkingDirectory ${psCwd} -Verb RunAs -PassThru${psArgs}; [Console]::Out.Write($p.Id)`,
+		],
+		{ windowsHide: true, maxBuffer: 64 * 1024 },
+	);
+	const pid = Number.parseInt(stdout.trim(), 10);
+	return {
+		pid: Number.isNaN(pid) ? undefined : pid,
+		elevated: true,
+		stop: async () => {
+			if (Number.isNaN(pid)) return;
+			try {
+				await execFileAsync(
+					"powershell",
+					[
+						"-NoProfile",
+						"-NonInteractive",
+						"-Command",
+						`Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue`,
+					],
+					{ windowsHide: true, maxBuffer: 64 * 1024 },
+				);
+			} catch (error) {
+				logger.warn(
+					`[VisualProof] Could not stop elevated desktop process ${pid}: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				);
+			}
+		},
+	};
 }
 
 function findFirstDotNetProject(
@@ -734,14 +1377,6 @@ function findContainingSolutionDir(csprojPath: string): string {
 	return `${path.dirname(csprojPath)}${path.sep}`;
 }
 
-function isMsBuildNamespaceError(error: unknown): boolean {
-	if (!(error instanceof Error)) return false;
-	const withOutput = error as Error & { stdout?: string; stderr?: string };
-	return [error.message, withOutput.stdout, withOutput.stderr].some((value) =>
-		value?.includes("MSB4097"),
-	);
-}
-
 function isLegacyCompilerTooOldError(error: unknown): boolean {
 	if (!(error instanceof Error)) return false;
 	const withOutput = error as Error & { stdout?: string; stderr?: string };
@@ -809,26 +1444,12 @@ async function buildLegacyDotNetProject(csprojPath: string): Promise<void> {
 					maxBuffer: LEGACY_DOTNET_BUILD_MAX_BUFFER,
 				});
 			try {
-				await runMsBuild();
+				// Le patch xmlns="" est appliqué de façon proactive : les projets
+				// legacy EBP contiennent des éléments <Compile ... xmlns=""> qui
+				// déclenchent MSB4097. On nettoie avant le build pour éviter un
+				// double build et garder les logs lisibles.
+				await runWithLegacyXmlNamespacePatch(buildPaths.solutionDir, runMsBuild);
 			} catch (error) {
-				if (isMsBuildNamespaceError(error)) {
-					try {
-						await runWithLegacyXmlNamespacePatch(buildPaths.solutionDir, runMsBuild);
-						return;
-					} catch (patchedError) {
-						if (isLegacyCompilerTooOldError(patchedError)) {
-							throw new Error(
-								`${LEGACY_COMPATIBLE_MSBUILD_REQUIRED_MESSAGE}\n\n${formatCommandFailure(
-									patchedError,
-									"Patched MSBuild failed",
-								)}`,
-							);
-						}
-						throw new Error(
-							formatCommandFailure(patchedError, "Patched MSBuild failed"),
-						);
-					}
-				}
 				if (isLegacyCompilerTooOldError(error)) {
 					throw new Error(
 						`${LEGACY_COMPATIBLE_MSBUILD_REQUIRED_MESSAGE}\n\n${formatCommandFailure(
@@ -1074,9 +1695,12 @@ class LocalIisExpressProvider implements VisualProofProvider {
 		try {
 			await waitForHttp(appUrl);
 			mkdirSync(context.artifactDir, { recursive: true });
-			const fileName = "home.png";
-			const screenshotPath = path.join(context.artifactDir, fileName);
-			const viewport = await captureWebPage(appUrl, screenshotPath);
+			const navigationPlan = loadVisualProofNavigationPlan(context.options);
+			const screenshots = await captureWebFeatureScreenshots(
+				appUrl,
+				context,
+				navigationPlan?.web ?? [],
+			);
 			return {
 				status: "passed",
 				targetKind: "web",
@@ -1084,15 +1708,7 @@ class LocalIisExpressProvider implements VisualProofProvider {
 				providerDetails: host.providerDetails,
 				framework: "dotnet-framework",
 				appUrl,
-				screenshots: [
-					createScreenshot(
-						"Home page",
-						context.relativeArtifactDir,
-						fileName,
-						screenshotPath,
-						viewport,
-					),
-				],
+				screenshots,
 			};
 		} finally {
 			stopChildProcess(child);
@@ -1155,41 +1771,41 @@ class LocalWindowsDesktopProvider implements VisualProofProvider {
 
 		mkdirSync(context.artifactDir, { recursive: true });
 		const existingWindowIds = await getDesktopWindowSourceIds();
-		const child = spawn(runtime.command, runtime.args, {
-			cwd: runtime.cwd,
-			windowsHide: false,
-		});
+		const handle = await launchDesktopApplication(runtime);
 		try {
-			const preferredNames = await waitForProcessWindowNames(child, [
+			const preferredNames = await waitForProcessWindowNames(handle.pid, [
 				path.basename(executablePath, ".exe"),
 				path.basename(project.projectDir),
 			]);
-			const fileName = "desktop.png";
-			const screenshotPath = path.join(context.artifactDir, fileName);
-			const size = await captureDesktopImage(screenshotPath, {
+			const navigationPlan = loadVisualProofNavigationPlan(context.options);
+			const desktopSteps = navigationPlan?.desktop ?? [];
+			const workpilotElevated = await isCurrentProcessElevated();
+			const driving = resolveDesktopUiAutomation(
+				handle.elevated,
+				workpilotElevated,
+			);
+			const screenshots = await captureDesktopFeatureSequence(context, {
 				excludeSourceIds: existingWindowIds,
 				preferredNames,
-				requireWindowMatch: true,
+				pid: handle.pid,
+				steps: desktopSteps,
+				canDrive: driving.canDrive,
 			});
+			const drivingNote =
+				driving.note && desktopSteps.some((step) => step.invoke || step.setText)
+					? ` ${driving.note}`
+					: "";
 			return {
 				status: "passed",
 				targetKind: "desktop",
 				isolated: false,
 				providerDetails:
-					`${runtime.providerDetails} Use Hyper-V or remote-runner for isolation.`,
+					`${runtime.providerDetails} Use Hyper-V or remote-runner for isolation.${drivingNote}`,
 				framework: "dotnet-framework",
-				screenshots: [
-					createScreenshot(
-						"Desktop application",
-						context.relativeArtifactDir,
-						fileName,
-						screenshotPath,
-						size,
-					),
-				],
+				screenshots,
 			};
 		} finally {
-			stopChildProcess(child);
+			await handle.stop();
 		}
 	}
 }
@@ -1220,9 +1836,12 @@ class LocalWebProvider implements VisualProofProvider {
 			}
 
 			mkdirSync(context.artifactDir, { recursive: true });
-			const fileName = "home.png";
-			const screenshotPath = path.join(context.artifactDir, fileName);
-			const viewport = await captureWebPage(appUrl, screenshotPath);
+			const navigationPlan = loadVisualProofNavigationPlan(context.options);
+			const screenshots = await captureWebFeatureScreenshots(
+				appUrl,
+				context,
+				navigationPlan?.web ?? [],
+			);
 			return {
 				status: "passed",
 				targetKind: "web",
@@ -1233,15 +1852,7 @@ class LocalWebProvider implements VisualProofProvider {
 						: "Local web preview through the app emulator.",
 				framework: context.config.framework,
 				appUrl,
-				screenshots: [
-					createScreenshot(
-						"Home page",
-						context.relativeArtifactDir,
-						fileName,
-						screenshotPath,
-						viewport,
-					),
-				],
+				screenshots,
 			};
 		} finally {
 			appEmulatorService.stopServer();
@@ -1340,8 +1951,42 @@ function attachGitHubUrls(
 	}
 }
 
-export class VisualProofService {
-	async run(options: VisualProofRunOptions): Promise<VisualProofRun> {
+export class VisualProofService extends EventEmitter {
+	/**
+	 * In-flight runs keyed by task id. Concurrent requests for the same task share
+	 * a single run so switching tabs / double-clicking never launches the emulator
+	 * (or the elevated desktop app) twice.
+	 */
+	private readonly inFlightRuns = new Map<string, Promise<VisualProofRun>>();
+
+	/** Whether a visual proof run is currently in progress for the given task. */
+	isRunning(taskId: string): boolean {
+		return this.inFlightRuns.has(taskId);
+	}
+
+	/**
+	 * Run — or attach to an already running — visual proof for a task.
+	 *
+	 * The actual work happens in {@link execute}; this wrapper makes the run
+	 * idempotent per task and emits `running-changed` (taskId, running) so the
+	 * renderer can keep its spinner in sync even when it did not initiate the run
+	 * (e.g. the tab was reopened while a previous run is still capturing).
+	 */
+	run(options: VisualProofRunOptions): Promise<VisualProofRun> {
+		const existing = this.inFlightRuns.get(options.taskId);
+		if (existing) return existing;
+
+		const promise = this.execute(options);
+		this.inFlightRuns.set(options.taskId, promise);
+		this.emit("running-changed", options.taskId, true);
+		void promise.finally(() => {
+			this.inFlightRuns.delete(options.taskId);
+			this.emit("running-changed", options.taskId, false);
+		});
+		return promise;
+	}
+
+	private async execute(options: VisualProofRunOptions): Promise<VisualProofRun> {
 		const startedAt = new Date().toISOString();
 		const id = createRunId();
 		const runBase: VisualProofRun = {

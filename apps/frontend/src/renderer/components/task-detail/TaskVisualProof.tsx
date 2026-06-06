@@ -7,7 +7,7 @@ import {
 	RefreshCw,
 	Shield,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult, Task, VisualProofRun } from "../../../shared/types";
@@ -75,6 +75,14 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 	const [localScreenshotSources, setLocalScreenshotSources] = useState<
 		Record<string, string>
 	>({});
+	const isMountedRef = useRef(true);
+
+	useEffect(() => {
+		isMountedRef.current = true;
+		return () => {
+			isMountedRef.current = false;
+		};
+	}, []);
 
 	useEffect(() => {
 		setProof(task.metadata?.visualProof);
@@ -82,6 +90,36 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 		setImageLoadError(null);
 		setLocalScreenshotSources({});
 	}, [task.metadata?.visualProof]);
+
+	// Keep the spinner in sync with the main process: a run started earlier (e.g.
+	// before this tab was reopened) keeps spinning, and the button stays disabled
+	// so the emulator/desktop app is never relaunched while a run is in flight.
+	useEffect(() => {
+		const api = globalThis.electronAPI;
+		let cancelled = false;
+		if (typeof api?.getVisualProofStatus === "function") {
+			void api
+				.getVisualProofStatus(task.id)
+				.then((result) => {
+					if (!cancelled && result.success && result.data) {
+						setIsRunning(result.data.running);
+					}
+				})
+				.catch(() => {
+					// Best-effort: the running broadcast still keeps the tab in sync.
+				});
+		}
+		const unsubscribe =
+			typeof api?.onVisualProofRunning === "function"
+				? api.onVisualProofRunning((taskId, running) => {
+						if (taskId === task.id) setIsRunning(running);
+					})
+				: undefined;
+		return () => {
+			cancelled = true;
+			unsubscribe?.();
+		};
+	}, [task.id]);
 
 	useEffect(() => {
 		const localScreenshots =
@@ -146,14 +184,21 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 			if (!result.success || !result.data) {
 				throw new Error(result.error || t("tasks:visualProof.runFailed"));
 			}
+			if (!isMountedRef.current) return;
 			setProof(result.data);
 			useTaskStore.getState().updateTask(task.id, {
 				metadata: { ...task.metadata, visualProof: result.data },
 			});
 		} catch (err) {
-			setError(err instanceof Error ? err.message : t("tasks:visualProof.runFailed"));
+			if (isMountedRef.current) {
+				setError(
+					err instanceof Error ? err.message : t("tasks:visualProof.runFailed"),
+				);
+			}
 		} finally {
-			setIsRunning(false);
+			// The running broadcast is the source of truth; only touch local state
+			// while still mounted to avoid a post-unmount React warning.
+			if (isMountedRef.current) setIsRunning(false);
 		}
 	};
 

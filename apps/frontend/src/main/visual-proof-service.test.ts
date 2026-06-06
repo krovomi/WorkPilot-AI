@@ -12,10 +12,14 @@ import type { VisualProofRun } from "../shared/types";
 import {
 	analyzeDotNetProjects,
 	buildProofComment,
+	buildUiAutomationStepScript,
 	hasLegacyDotNetDesktopProject,
 	hasLegacyDotNetWebProject,
 	isLegacyDotNetFramework,
+	loadVisualProofNavigationPlan,
+	normalizeNavigationPlan,
 	parseGitHubPrUrl,
+	resolveDesktopUiAutomation,
 	selectDesktopCaptureSource,
 } from "./visual-proof-service";
 
@@ -241,5 +245,125 @@ describe("isLegacyDotNetFramework", () => {
 	it("returns false when there is no csproj", () => {
 		writeFileSync(path.join(dir, "package.json"), "{}");
 		expect(isLegacyDotNetFramework(dir)).toBe(false);
+	});
+});
+
+describe("normalizeNavigationPlan", () => {
+	it("treats a bare array as steps shared by web and desktop", () => {
+		const plan = normalizeNavigationPlan([{ invoke: "Ventes" }]);
+		expect(plan?.web).toEqual([{ invoke: "Ventes" }]);
+		expect(plan?.desktop).toEqual([{ invoke: "Ventes" }]);
+	});
+
+	it("splits explicit web and desktop steps", () => {
+		const plan = normalizeNavigationPlan({
+			web: [{ path: "/invoices" }],
+			desktop: [{ invoke: "Facturation" }],
+		});
+		expect(plan?.web).toEqual([{ path: "/invoices" }]);
+		expect(plan?.desktop).toEqual([{ invoke: "Facturation" }]);
+	});
+
+	it("applies a shared steps array to both targets", () => {
+		const plan = normalizeNavigationPlan({ steps: [{ click: "#save" }] });
+		expect(plan?.web).toEqual([{ click: "#save" }]);
+		expect(plan?.desktop).toEqual([{ click: "#save" }]);
+	});
+
+	it("returns null for empty or invalid input", () => {
+		expect(normalizeNavigationPlan([])).toBeNull();
+		expect(normalizeNavigationPlan({})).toBeNull();
+		expect(normalizeNavigationPlan("nope")).toBeNull();
+		expect(normalizeNavigationPlan(null)).toBeNull();
+	});
+});
+
+describe("loadVisualProofNavigationPlan", () => {
+	const ENV = "WORKPILOT_VISUAL_PROOF_NAVIGATION";
+	let dir: string;
+	let previous: string | undefined;
+
+	beforeEach(() => {
+		dir = mkdtempSync(path.join(tmpdir(), "vp-nav-"));
+		previous = process.env[ENV];
+		delete process.env[ENV];
+	});
+
+	afterEach(() => {
+		if (previous === undefined) delete process.env[ENV];
+		else process.env[ENV] = previous;
+		rmSync(dir, { recursive: true, force: true });
+	});
+
+	it("loads an inline JSON plan from the environment", () => {
+		process.env[ENV] = JSON.stringify({ web: [{ path: "/feature" }] });
+		const plan = loadVisualProofNavigationPlan({ projectPath: dir });
+		expect(plan?.web).toEqual([{ path: "/feature" }]);
+	});
+
+	it("loads a plan from a file path given in the environment", () => {
+		const file = path.join(dir, "plan.json");
+		writeFileSync(file, JSON.stringify([{ invoke: "Ventes" }]));
+		process.env[ENV] = file;
+		const plan = loadVisualProofNavigationPlan({ projectPath: dir });
+		expect(plan?.desktop).toEqual([{ invoke: "Ventes" }]);
+	});
+
+	it("falls back to the .workpilot file in the worktree", () => {
+		mkdirSync(path.join(dir, ".workpilot"), { recursive: true });
+		writeFileSync(
+			path.join(dir, ".workpilot", "visual-proof-navigation.json"),
+			JSON.stringify({ desktop: [{ invoke: "Facturation" }] }),
+		);
+		const plan = loadVisualProofNavigationPlan({ worktreePath: dir });
+		expect(plan?.desktop).toEqual([{ invoke: "Facturation" }]);
+	});
+
+	it("returns null when no plan is configured", () => {
+		expect(loadVisualProofNavigationPlan({ projectPath: dir })).toBeNull();
+	});
+});
+
+describe("resolveDesktopUiAutomation", () => {
+	it("allows driving when the app is not elevated", () => {
+		expect(resolveDesktopUiAutomation(false, false)).toEqual({ canDrive: true });
+	});
+
+	it("allows driving an elevated app when WorkPilot is elevated too", () => {
+		expect(resolveDesktopUiAutomation(true, true)).toEqual({ canDrive: true });
+	});
+
+	it("blocks driving an elevated app from a non-elevated WorkPilot (UIPI)", () => {
+		const result = resolveDesktopUiAutomation(true, false);
+		expect(result.canDrive).toBe(false);
+		expect(result.note).toContain("administrator");
+	});
+});
+
+describe("buildUiAutomationStepScript", () => {
+	it("generates an invoke script targeting the process and control name", () => {
+		const script = buildUiAutomationStepScript(1234, { invoke: "Ventes" });
+		expect(script).toContain("Add-Type -AssemblyName UIAutomationClient");
+		expect(script).toContain("ProcessIdProperty, 1234");
+		expect(script).toContain("NameProperty, 'Ventes'");
+		expect(script).toContain("InvokePattern");
+	});
+
+	it("generates a set-value script for text input", () => {
+		const script = buildUiAutomationStepScript(42, {
+			setText: { name: "Numero TVA", value: "FR123" },
+		});
+		expect(script).toContain("NameProperty, 'Numero TVA'");
+		expect(script).toContain("ValuePattern");
+		expect(script).toContain("SetValue('FR123')");
+	});
+
+	it("escapes single quotes in control names", () => {
+		const script = buildUiAutomationStepScript(7, { invoke: "L'article" });
+		expect(script).toContain("NameProperty, 'L''article'");
+	});
+
+	it("returns null when the step has no desktop action", () => {
+		expect(buildUiAutomationStepScript(7, { path: "/x" })).toBeNull();
 	});
 });

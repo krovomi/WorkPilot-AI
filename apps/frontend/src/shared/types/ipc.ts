@@ -314,6 +314,9 @@ export interface ElectronAPI {
 		targetBranch?: string,
 	) => Promise<IPCResult<WorktreeAnalyzeImpactResult>>;
 	runVisualProof: (taskId: string) => Promise<IPCResult<VisualProofRun>>;
+	getVisualProofStatus: (
+		taskId: string,
+	) => Promise<IPCResult<{ running: boolean }>>;
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -1404,6 +1407,9 @@ export interface ElectronAPI {
 	) => () => void;
 	onMergeProgress: (
 		callback: (taskId: string, progress: MergeProgress) => void,
+	) => () => void;
+	onVisualProofRunning: (
+		callback: (taskId: string, running: boolean) => void,
 	) => () => void;
 
 	// File explorer operations

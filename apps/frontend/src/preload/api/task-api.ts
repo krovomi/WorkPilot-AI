@@ -171,6 +171,9 @@ export interface TaskAPI {
 		targetBranch?: string,
 	) => Promise<IPCResult<WorktreeAnalyzeImpactResult>>;
 	runVisualProof: (taskId: string) => Promise<IPCResult<VisualProofRun>>;
+	getVisualProofStatus: (
+		taskId: string,
+	) => Promise<IPCResult<{ running: boolean }>>;
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -224,6 +227,11 @@ export interface TaskAPI {
 	// Merge Progress Events
 	onMergeProgress: (
 		callback: (taskId: string, progress: MergeProgress) => void,
+	) => () => void;
+
+	// Visual Proof Events
+	onVisualProofRunning: (
+		callback: (taskId: string, running: boolean) => void,
 	) => () => void;
 }
 
@@ -505,6 +513,11 @@ export const createTaskAPI = (): TaskAPI => ({
 	runVisualProof: (taskId: string): Promise<IPCResult<VisualProofRun>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_VISUAL_PROOF_RUN, taskId),
 
+	getVisualProofStatus: (
+		taskId: string,
+	): Promise<IPCResult<{ running: boolean }>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_VISUAL_PROOF_STATUS, taskId),
+
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -670,6 +683,22 @@ export const createTaskAPI = (): TaskAPI => ({
 		ipcRenderer.on(IPC_CHANNELS.TASK_MERGE_PROGRESS, handler);
 		return () => {
 			ipcRenderer.removeListener(IPC_CHANNELS.TASK_MERGE_PROGRESS, handler);
+		};
+	},
+
+	onVisualProofRunning: (
+		callback: (taskId: string, running: boolean) => void,
+	): (() => void) => {
+		const handler = (
+			_event: Electron.IpcRendererEvent,
+			taskId: string,
+			running: boolean,
+		): void => {
+			callback(taskId, running);
+		};
+		ipcRenderer.on(IPC_CHANNELS.TASK_VISUAL_PROOF_RUNNING, handler);
+		return () => {
+			ipcRenderer.removeListener(IPC_CHANNELS.TASK_VISUAL_PROOF_RUNNING, handler);
 		};
 	},
 });

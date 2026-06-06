@@ -87,6 +87,13 @@ describe("AppEmulatorService project detection", () => {
 		expect(script).toContain("& $dotnet.Source restore");
 		expect(script).toContain("New-LegacyPackageReferencesTarget");
 		expect(script).toContain("Invoke-WithLegacyXmlNamespacePatch");
+		expect(script).not.toContain("-match 'MSB4097'");
+		const patchIndex = script.indexOf(
+			"$output = Invoke-WithLegacyXmlNamespacePatch {",
+		);
+		const buildExitIndex = script.indexOf("if ($script:buildExit -ne 0) {");
+		expect(patchIndex).toBeGreaterThan(-1);
+		expect(buildExitIndex).toBeGreaterThan(patchIndex);
 		expect(script).toContain("MSBuild 15+ / Roslyn C# compiler");
 		expect(script).toContain("WORKPILOT_CSC_TOOL_PATH");
 		expect(script).toContain("CscToolPath");

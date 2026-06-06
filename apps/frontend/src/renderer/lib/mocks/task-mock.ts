@@ -147,4 +147,11 @@ export const taskMock = {
 			completedAt: new Date().toISOString(),
 		},
 	}),
+	getVisualProofStatus: async () => ({
+		success: true as const,
+		data: { running: false },
+	}),
+	onVisualProofRunning: () => () => {
+		/* noop */
+	},
 };

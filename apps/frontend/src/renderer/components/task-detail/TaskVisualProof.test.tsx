@@ -57,12 +57,16 @@ const task: Task = {
 const mockOpenExternal = vi.fn();
 const mockRunVisualProof = vi.fn();
 const mockInvoke = vi.fn();
+const mockGetVisualProofStatus = vi.fn();
+const mockOnVisualProofRunning = vi.fn();
 
 Object.defineProperty(window, "electronAPI", {
 	value: {
 		openExternal: mockOpenExternal,
 		runVisualProof: mockRunVisualProof,
 		invoke: mockInvoke,
+		getVisualProofStatus: mockGetVisualProofStatus,
+		onVisualProofRunning: mockOnVisualProofRunning,
 	},
 	writable: true,
 });
@@ -70,6 +74,13 @@ Object.defineProperty(window, "electronAPI", {
 describe("TaskVisualProof", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockGetVisualProofStatus.mockResolvedValue({
+			success: true,
+			data: { running: false },
+		});
+		mockOnVisualProofRunning.mockReturnValue(() => {
+			/* unsubscribe noop */
+		});
 		mockInvoke.mockResolvedValue({
 			success: true,
 			data: { base64: "cG5n", mimeType: "image/png" },
@@ -134,6 +145,20 @@ describe("TaskVisualProof", () => {
 			"src",
 			expect.stringContaining("file://"),
 		);
+	});
+
+	it("restores the running spinner when a run is already in progress", async () => {
+		mockGetVisualProofStatus.mockResolvedValue({
+			success: true,
+			data: { running: true },
+		});
+
+		render(<TaskVisualProof task={task} />);
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: /retry/i })).toBeDisabled();
+		});
+		expect(mockOnVisualProofRunning).toHaveBeenCalled();
 	});
 
 	it("can retry the visual proof run", async () => {

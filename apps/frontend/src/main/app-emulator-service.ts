@@ -1415,29 +1415,20 @@ try {
 		if ($sdkToolsPath -and (Should-UseExternalRoslynCompiler $msbuild)) {
 			$buildArgs += "/p:TargetFrameworkSDKToolsDirectory=$sdkToolsPath"
 		}
-		$output = & $msbuild @buildArgs 2>&1
-		$exit = $LASTEXITCODE
+		# Le patch xmlns="" est appliqué de façon proactive : les projets legacy
+		# EBP contiennent des éléments <Compile ... xmlns=""> qui déclenchent
+		# MSB4097. On nettoie avant le build pour éviter un double build.
+		$script:buildExit = 0
+		$output = Invoke-WithLegacyXmlNamespacePatch {
+			& $msbuild @buildArgs 2>&1
+			$script:buildExit = $LASTEXITCODE
+		}
 		$output | Write-Output
-		if ($exit -ne 0) {
-			if (($output -join [Environment]::NewLine) -match 'MSB4097') {
-				$script:patchedExit = 0
-				$patchedOutput = Invoke-WithLegacyXmlNamespacePatch {
-					& $msbuild @buildArgs 2>&1
-					$script:patchedExit = $LASTEXITCODE
-				}
-				$patchedOutput | Write-Output
-				if ($script:patchedExit -ne 0) {
-					if (($patchedOutput -join [Environment]::NewLine) -match 'CS1617|Option .+ langversion|Invalid option.*/langversion') {
-						Throw-CompatibleMsBuildRequired
-					}
-					exit $script:patchedExit
-				}
-			} else {
-				if (($output -join [Environment]::NewLine) -match 'CS1617|Option .+ langversion|Invalid option.*/langversion') {
-					Throw-CompatibleMsBuildRequired
-				}
-				exit $exit
+		if ($script:buildExit -ne 0) {
+			if (($output -join [Environment]::NewLine) -match 'CS1617|Option .+ langversion|Invalid option.*/langversion') {
+				Throw-CompatibleMsBuildRequired
 			}
+			exit $script:buildExit
 		}
 	} else {
 		$exe = Get-ChildItem -Path $binDir -Recurse -Filter $assemblyFilter -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -1453,7 +1444,11 @@ try {
 }
 
 if (-not $exe) { throw 'No executable produced' }
-& $exe.FullName
+# Les applications client lourd EBP exigent les droits administrateur (réparation
+# de la base de registre). On élève via Start-Process -Verb RunAs (UAC).
+$launched = Start-Process -FilePath $exe.FullName -WorkingDirectory $exe.DirectoryName -Verb RunAs -PassThru
+$launched.WaitForExit()
+exit $launched.ExitCode
 `;
 		writeFileSync(scriptPath, script, "utf-8");
 		return scriptPath;
