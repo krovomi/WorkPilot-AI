@@ -562,9 +562,7 @@ def _persist_subtask_changed_files(
             "success",
         )
     except Exception as e:
-        logger.warning(
-            f"Could not persist changed files for subtask {subtask_id}: {e}"
-        )
+        logger.warning(f"Could not persist changed files for subtask {subtask_id}: {e}")
 
 
 async def post_session_processing(

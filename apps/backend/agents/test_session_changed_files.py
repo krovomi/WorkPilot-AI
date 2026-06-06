@@ -80,9 +80,7 @@ class TestPersistSubtaskChangedFiles:
         assert "files_changed" not in subtask
         assert captured["save_calls"] == 0
 
-    def test_no_save_when_nothing_new(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_no_save_when_nothing_new(self, monkeypatch: pytest.MonkeyPatch) -> None:
         captured = self._patch(monkeypatch, ["src/a.ts"])
         subtask = {"id": "s1", "files_changed": ["src/a.ts"]}
         plan = {"phases": [{"subtasks": [subtask]}]}
