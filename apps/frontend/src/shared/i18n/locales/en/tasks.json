@@ -527,7 +527,9 @@
 			"pauseToSwitch": "Pause and switch provider",
 			"pauseToSwitchTooltip": "Pause the task to switch LLM providers. It will remain in progress",
 			"previousTask": "Previous task",
-			"nextTask": "Next task"
+			"nextTask": "Next task",
+			"maximize": "Fullscreen",
+			"restore": "Restore"
 		},
 		"badges": {
 			"stuck": "Stuck",

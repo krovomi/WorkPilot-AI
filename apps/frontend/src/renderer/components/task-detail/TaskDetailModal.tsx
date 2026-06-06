@@ -48,6 +48,10 @@ import {
 } from "../ui/alert-dialog";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import {
+	DialogMaximizeButton,
+	useDialogMaximize,
+} from "../ui/dialog-maximize";
 import { Progress } from "../ui/progress";
 import { ScrollArea } from "../ui/scroll-area";
 import { Separator } from "../ui/separator";
@@ -412,6 +416,9 @@ function TaskDetailModalContent({
 }) {
 	const { t } = useTranslation(["tasks"]);
 	const state = useTaskDetail({ task });
+	const { maximized, toggle: toggleMaximized } = useDialogMaximize(
+		"workpilot:task-detail-maximized",
+	);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const allProjects = useProjectStore((s) => s.projects);
 	const taskProject = allProjects.find((p) => p.id === task.projectId);
@@ -730,10 +737,13 @@ function TaskDetailModalContent({
 							"w-[95vw] max-w-5xl h-[calc(100vh-32px)]",
 							"bg-card border border-border rounded-xl",
 							"shadow-2xl overflow-hidden flex flex-col",
+							"transition-[top,width,max-width,height,border-radius] ease-out",
 							"data-[state=open]:animate-in data-[state=closed]:animate-out",
 							"data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
 							"data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
 							"duration-200",
+							// Appended last so tailwind-merge overrides the default sizing.
+							maximized && "top-0 w-screen max-w-none h-screen rounded-none",
 						)}
 						onPointerDownOutside={preventCloseOnTaskNav}
 						onFocusOutside={preventCloseOnTaskNav}
@@ -797,6 +807,22 @@ function TaskDetailModalContent({
 									>
 										<Pencil className="h-4 w-4" />
 									</Button>
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<DialogMaximizeButton
+												maximized={maximized}
+												onToggle={toggleMaximized}
+												className="h-10 w-10 hover:bg-primary/10 hover:text-primary"
+												maximizeLabel={t("tasks:modal.actions.maximize")}
+												restoreLabel={t("tasks:modal.actions.restore")}
+											/>
+										</TooltipTrigger>
+										<TooltipContent side="bottom">
+											{maximized
+												? t("tasks:modal.actions.restore")
+												: t("tasks:modal.actions.maximize")}
+										</TooltipContent>
+									</Tooltip>
 									<DialogPrimitive.Close asChild>
 										<Button
 											variant="ghost"

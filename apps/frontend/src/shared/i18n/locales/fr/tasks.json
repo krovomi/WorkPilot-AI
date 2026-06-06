@@ -527,7 +527,9 @@
 			"pauseToSwitch": "Sauvegarder et changer de provider",
 			"pauseToSwitchTooltip": "Mettez en pause la tâche pour changer de provider LLM. Elle restera en cours d'exécution",
 			"previousTask": "Tâche précédente",
-			"nextTask": "Tâche suivante"
+			"nextTask": "Tâche suivante",
+			"maximize": "Plein écran",
+			"restore": "Réduire"
 		},
 		"badges": {
 			"stuck": "Bloqué",
