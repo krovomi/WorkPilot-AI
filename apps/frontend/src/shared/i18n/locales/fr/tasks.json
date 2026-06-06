@@ -14,6 +14,17 @@
 		"title": "Provider mis à jour",
 		"description": "La tâche va maintenant s'exécuter avec {{to}} au lieu de {{from}}"
 	},
+	"tdd": {
+		"toggleAria": "Activer ou désactiver le mode TDD strict pour cette tâche",
+		"tooltipOn": "Mode TDD strict activé pour cette tâche (Red-Green-Refactor). Cliquez pour désactiver.",
+		"tooltipOff": "Mode TDD strict désactivé. Cliquez pour activer le cycle Red-Green-Refactor sur cette tâche.",
+		"enabledTitle": "Mode TDD activé",
+		"enabledDescription": "L'agent suivra un cycle TDD strict pour cette tâche.",
+		"disabledTitle": "Mode TDD désactivé",
+		"disabledDescription": "Cette tâche n'utilisera plus le cycle TDD strict.",
+		"errorTitle": "Échec de la mise à jour",
+		"errorDescription": "Impossible de modifier le mode TDD. Veuillez réessayer."
+	},
 	"actions": {
 		"start": "Démarrer",
 		"stop": "Arrêter",

@@ -5,6 +5,7 @@ import {
 	CheckCircle2,
 	ChevronLeft,
 	ChevronRight,
+	FlaskConical,
 	GitMerge,
 	GitPullRequest,
 	Loader2,
@@ -27,6 +28,7 @@ import { calculateProgress, cn, extractTextFromHtml } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import {
 	deleteTask,
+	persistUpdateTask,
 	recoverStuckTask,
 	startTask,
 	stopTask,
@@ -384,6 +386,40 @@ function useTaskDetailHandlers(
 		}
 	};
 
+	const handleToggleTdd = async () => {
+		const project = useProjectStore
+			.getState()
+			.projects.find((p) => p.id === task.projectId);
+		const effective =
+			(task.metadata as TaskMetadata)?.tddMode ??
+			project?.settings?.tddMode ??
+			false;
+		const next = !effective;
+
+		const ok = await persistUpdateTask(task.id, {
+			metadata: { tddMode: next },
+		});
+
+		if (ok) {
+			toast({
+				title: next
+					? t("tasks:tdd.enabledTitle")
+					: t("tasks:tdd.disabledTitle"),
+				description: next
+					? t("tasks:tdd.enabledDescription")
+					: t("tasks:tdd.disabledDescription"),
+				duration: 3000,
+			});
+		} else {
+			toast({
+				title: t("tasks:tdd.errorTitle"),
+				description: t("tasks:tdd.errorDescription"),
+				variant: "destructive",
+				duration: 5000,
+			});
+		}
+	};
+
 	return {
 		handleStartStop,
 		handleRecover,
@@ -391,6 +427,7 @@ function useTaskDetailHandlers(
 		handleDelete,
 		handleClose,
 		handleUpdatePlan,
+		handleToggleTdd,
 	};
 }
 
@@ -437,7 +474,15 @@ function TaskDetailModalContent({
 		handleDelete,
 		handleClose,
 		handleUpdatePlan,
+		handleToggleTdd,
 	} = useTaskDetailHandlers(task, state, onOpenChange);
+
+	// Effective per-task TDD state: explicit task override, else project default.
+	const tddEnabled =
+		(task.metadata as TaskMetadata)?.tddMode ??
+		taskProject?.settings?.tddMode ??
+		false;
+	const tddToggleDisabled = state.isRunning && !state.isStuck;
 
 	// Navigation clavier (← / →) entre les tâches, dans l'ordre du Kanban.
 	// Ignorée lorsqu'un champ est en cours d'édition ou qu'une sous-popin est ouverte.
@@ -780,6 +825,49 @@ function TaskDetailModalContent({
 									</DialogPrimitive.Description>
 								</div>
 								<div className="flex items-center gap-1 shrink-0 electron-no-drag">
+									{/* TDD override toggle — sexy emerald pill */}
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<button
+												type="button"
+												role="switch"
+												aria-checked={tddEnabled}
+												aria-label={t("tasks:tdd.toggleAria")}
+												onClick={handleToggleTdd}
+												disabled={tddToggleDisabled}
+												className={cn(
+													"group mr-1 inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-50",
+													tddEnabled
+														? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 shadow-[0_0_14px_-3px_rgba(16,185,129,0.7)] hover:bg-emerald-500/20"
+														: "border-border bg-transparent text-muted-foreground hover:border-emerald-500/30 hover:text-emerald-300/80",
+												)}
+											>
+												<FlaskConical
+													className={cn(
+														"h-3.5 w-3.5 transition-transform duration-200",
+														tddEnabled
+															? "scale-110"
+															: "group-hover:scale-110",
+													)}
+												/>
+												<span>{t("tasks:labels.tdd")}</span>
+												<span
+													className={cn(
+														"h-1.5 w-1.5 rounded-full transition-all duration-200",
+														tddEnabled
+															? "bg-emerald-400 shadow-[0_0_6px_1px_rgba(16,185,129,0.9)]"
+															: "bg-muted-foreground/40",
+													)}
+												/>
+											</button>
+										</TooltipTrigger>
+										<TooltipContent side="bottom" className="max-w-[230px]">
+											{tddEnabled
+												? t("tasks:tdd.tooltipOn")
+												: t("tasks:tdd.tooltipOff")}
+										</TooltipContent>
+									</Tooltip>
+
 									{/* Sync from branch — available for any status that may have a worktree */}
 									{task.status !== "done" && (
 										<Tooltip>

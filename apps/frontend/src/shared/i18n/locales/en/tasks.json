@@ -14,6 +14,17 @@
 		"title": "Provider updated",
 		"description": "Task will now run with {{to}} instead of {{from}}"
 	},
+	"tdd": {
+		"toggleAria": "Toggle strict TDD mode for this task",
+		"tooltipOn": "Strict TDD mode enabled for this task (Red-Green-Refactor). Click to disable.",
+		"tooltipOff": "Strict TDD mode disabled. Click to enable the Red-Green-Refactor cycle for this task.",
+		"enabledTitle": "TDD mode enabled",
+		"enabledDescription": "The agent will follow a strict TDD cycle for this task.",
+		"disabledTitle": "TDD mode disabled",
+		"disabledDescription": "This task will no longer use the strict TDD cycle.",
+		"errorTitle": "Update failed",
+		"errorDescription": "Could not change TDD mode. Please try again."
+	},
 	"actions": {
 		"start": "Start",
 		"stop": "Stop",
