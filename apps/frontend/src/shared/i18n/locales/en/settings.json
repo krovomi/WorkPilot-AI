@@ -783,7 +783,9 @@
 			"description": "Auto-Build and agent config",
 			"configureFor": "Configure Auto-Build, agent model, and notifications for {{projectName}}",
 			"useClaudeMd": "Use CLAUDE.md",
-			"useClaudeMdDescription": "Include CLAUDE.md instructions in agent context"
+			"useClaudeMdDescription": "Include CLAUDE.md instructions in agent context",
+			"tddMode": "TDD Mode",
+			"tddModeDescription": "Enforce strict TDD (Red-Green-Refactor): the agent writes the test, watches it fail, then implements"
 		},
 		"autoBuild": {
 			"title": "Auto-Build Integration",

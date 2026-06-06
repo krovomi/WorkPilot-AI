@@ -467,6 +467,11 @@ Use ONLY these values for the `type` field in phases:
 
 After creating the phases and subtasks, define the verification strategy based on the task's complexity assessment.
 
+> **TDD mode:** If a "TDD MODE ENABLED" section is present at the end of this prompt,
+> set `verification_strategy.test_creation_phase` to `"pre_implementation"` (tests are
+> written before the production code) and follow the test-first rules in that section.
+> Otherwise keep the default `"post_implementation"`.
+
 ### Read Complexity Assessment
 
 If `complexity_assessment.json` exists in the spec directory, read it:

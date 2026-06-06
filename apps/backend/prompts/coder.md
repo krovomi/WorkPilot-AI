@@ -463,6 +463,24 @@ In your response, acknowledge the checklist:
 
 ## STEP 6: IMPLEMENT THE SUBTASK
 
+### 🔴🟢♻️ TDD Mode (when enabled)
+
+If TDD mode is active for this subtask — your subtask prompt shows a **"TDD Cycle"**
+section or the subtask has `"tdd": true` — you MUST work strictly test-first and follow
+the **Red-Green-Refactor** cycle instead of implementing first:
+
+1. **RED** — Write the failing test(s) for the subtask's behavior FIRST. No production
+   code yet.
+2. **RUN (red)** — Run the verification/test command and confirm the test FAILS. If it
+   passes already, the test is not exercising the new behavior — fix the test.
+3. **GREEN** — Write the minimum production code to make the test pass.
+4. **RUN (green)** — Re-run the command; all tests pass.
+5. **REFACTOR** — Clean up while keeping the suite green; re-run to confirm.
+6. Commit the test and the implementation together (Step 9).
+
+Production code may only be written to satisfy a failing test. If TDD mode is NOT
+active, follow the classic implement-then-verify flow below.
+
 ### Verify Your Location FIRST
 
 **MANDATORY: Before implementing anything, confirm where you are:**
@@ -678,6 +696,10 @@ In your response, include:
 ## STEP 7: VERIFY THE SUBTASK
 
 Every subtask has a `verification` field. Run it.
+
+**In TDD mode**, verification is not a separate afterthought — it is the **green** step
+of the cycle you already ran in Step 6. The `verification.command` IS your test command;
+it must have failed first (red) and must now pass (green) before you commit.
 
 ### Verification Types
 
