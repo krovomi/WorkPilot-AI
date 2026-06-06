@@ -31,6 +31,7 @@ import type {
 	TaskStatus,
 } from "../shared/types";
 import { stripAcceptanceCriteriaSection } from "../shared/utils/acceptance-criteria";
+import { extractSubtaskFiles } from "../shared/utils/subtask-files";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
 import { ensureAbsolutePath } from "./utils/path-helpers";
 import { findAllSpecPaths } from "./utils/spec-path-helpers";
@@ -983,7 +984,7 @@ export class ProjectStore {
 					title: subtask.description,
 					description: subtask.description,
 					status: subtask.status,
-					files: subtask.files || [],
+					files: extractSubtaskFiles(subtask),
 				}));
 			}) || []
 		);

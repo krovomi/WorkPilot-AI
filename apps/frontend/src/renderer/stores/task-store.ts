@@ -14,6 +14,7 @@ import type {
 	TaskStatus,
 } from "../../shared/types";
 import { debugLog, debugWarn } from "../../shared/utils/debug-logger";
+import { extractSubtaskFiles } from "../../shared/utils/subtask-files";
 
 interface TaskState {
 	tasks: Task[];
@@ -465,7 +466,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 					title,
 					description,
 					status,
-					files: Array.isArray(subtask.files) ? subtask.files : [],
+					files: extractSubtaskFiles(subtask),
 					verification: subtask.verification as Subtask["verification"],
 				};
 			};

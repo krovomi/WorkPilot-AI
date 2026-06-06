@@ -385,7 +385,14 @@ export interface PlanSubtask {
 	id: string;
 	description: string;
 	status: SubtaskStatus;
+	/**
+	 * Files impacted by this subtask. The backend planner emits
+	 * `files_to_modify` / `files_to_create`; `files` is kept as a legacy
+	 * fallback. Use `extractSubtaskFiles()` to read a normalized flat list.
+	 */
 	files?: string[];
+	files_to_modify?: string[];
+	files_to_create?: string[];
 	verification?: {
 		type: string;
 		run?: string;

@@ -19,13 +19,6 @@ import {
 } from "../../ui/dialog";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "../../ui/select";
 import { Textarea } from "../../ui/textarea";
 
 interface CreatePRDialogProps {
@@ -474,31 +467,28 @@ export function CreatePRDialog({
 								</p>
 							)}
 
+							{/* Champs renseignés automatiquement par l'IA, en lecture seule */}
+							<p className="text-xs text-muted-foreground italic">
+								{t("taskReview:pr.impact.aiFilledHint")}
+							</p>
+
 							<div className="space-y-2">
 								<Label htmlFor="impact-rating" className="text-xs">
 									{t("taskReview:pr.impact.ratingLabel")}
 								</Label>
-								<Select
-									value={impactRating}
-									onValueChange={setImpactRating}
-									disabled={isAnalyzing}
+								<output
+									id="impact-rating"
+									aria-label={t("taskReview:pr.impact.ratingLabel")}
+									className="flex h-9 w-32 items-center rounded-md border border-input bg-muted px-3 text-sm"
 								>
-									<SelectTrigger id="impact-rating" className="w-32">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="N/A">N/A</SelectItem>
-										<SelectItem value="1">
-											1 — {t("taskReview:pr.impact.rating1")}
-										</SelectItem>
-										<SelectItem value="2">2</SelectItem>
-										<SelectItem value="3">3</SelectItem>
-										<SelectItem value="4">4</SelectItem>
-										<SelectItem value="5">
-											5 — {t("taskReview:pr.impact.rating5")}
-										</SelectItem>
-									</SelectContent>
-								</Select>
+									{isAnalyzing
+										? "…"
+										: impactRating === "1"
+											? `1 — ${t("taskReview:pr.impact.rating1")}`
+											: impactRating === "5"
+												? `5 — ${t("taskReview:pr.impact.rating5")}`
+												: impactRating}
+								</output>
 								<p className="text-xs text-muted-foreground">
 									{t("taskReview:pr.impact.ratingHint")}
 								</p>
@@ -511,11 +501,11 @@ export function CreatePRDialog({
 								<Textarea
 									id="impact-features"
 									value={impactFeatures}
-									onChange={(e) => setImpactFeatures(e.target.value)}
+									readOnly
 									placeholder={t("taskReview:pr.impact.featuresPlaceholder")}
 									disabled={isAnalyzing}
 									rows={2}
-									className="resize-none"
+									className="resize-none bg-muted"
 								/>
 								<p className="text-xs text-muted-foreground">
 									{t("taskReview:pr.impact.featuresHint")}
