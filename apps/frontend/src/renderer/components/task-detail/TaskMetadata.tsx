@@ -157,6 +157,42 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 	// Détecter si le contenu est du HTML pur (commence par une balise HTML)
 	const isHtmlContent = displayDescription?.trim().startsWith("<") || false;
 
+	// Les anciens imports Azure DevOps stockent des <img> pointant vers des pièces
+	// jointes protégées par PAT : le renderer ne peut pas les charger
+	// (ERR_TIMED_OUT). On demande au main process de les inliner (téléchargement
+	// avec le PAT → data URI base64), puis on affiche le HTML nettoyé. Le résultat
+	// est persisté côté main pour les prochains rendus.
+	const [inlinedDescription, setInlinedDescription] = useState<string | null>(
+		null,
+	);
+
+	useEffect(() => {
+		setInlinedDescription(null);
+		if (!isHtmlContent || !displayDescription) return;
+		if (!displayDescription.includes("/_apis/wit/attachments/")) return;
+
+		let cancelled = false;
+		(async () => {
+			try {
+				const res = await globalThis.electronAPI?.inlineAzureDevOpsTaskImages?.(
+					task.projectId,
+					task.id,
+				);
+				if (!cancelled && res?.success && res.data?.html) {
+					setInlinedDescription(res.data.html);
+				}
+			} catch {
+				// Non bloquant : on conserve la description d'origine.
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [task.id, task.projectId, displayDescription, isHtmlContent]);
+
+	// HTML effectivement rendu : version inlinée si disponible, sinon l'originale.
+	const htmlToRender = inlinedDescription ?? displayDescription;
+
 	// Transformer le HTML pour appliquer les styles du thème
 	const transformHtmlStyles = (html: string): string => {
 		if (!html) return "";
@@ -534,7 +570,7 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 									// biome-ignore lint/security/noDangerouslySetInnerHtml: content is sanitized before use
 									dangerouslySetInnerHTML={{
 										__html: DOMPurify.sanitize(
-											transformHtmlStyles(displayDescription || ""),
+											transformHtmlStyles(htmlToRender || ""),
 											{
 												ADD_TAGS: [
 													"span",

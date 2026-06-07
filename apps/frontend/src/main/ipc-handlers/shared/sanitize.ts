@@ -70,6 +70,13 @@ export function stripHtml(value: unknown): string {
 		text = text.replace(/<[^>]+>/g, "");
 	}
 
+	// Supprimer une balise tronquée en fin de chaîne (ex. un titre Azure coupé
+	// en plein milieu : « …<b style=… » sans `>` final). Les regex ci-dessus
+	// exigent un `>` fermant, donc une balise sans fermeture leur échappe et
+	// s'afficherait telle quelle. On retire tout depuis le dernier `<` ouvrant
+	// une balise (suivi d'une lettre ou `/`) jusqu'à la fin.
+	text = text.replace(/<\/?[a-zA-Z][^>]*$/g, "");
+
 	// Décoder les entités (décoder &amp; en dernier pour éviter un double décodage).
 	text = text
 		.replace(/&nbsp;/g, " ")

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	inlineAzureDevOpsImages,
 	isAzureDevOpsAttachmentUrl,
+	stripAzureAttachmentImages,
 } from "../azure-attachments";
 
 describe("isAzureDevOpsAttachmentUrl", () => {
@@ -110,5 +111,27 @@ describe("inlineAzureDevOpsImages", () => {
 			await inlineAzureDevOpsImages(html, "https://dev.azure.com", "pat"),
 		).toBe(html);
 		expect(fetchMock).not.toHaveBeenCalled();
+	});
+});
+
+describe("stripAzureAttachmentImages", () => {
+	it("retire une <img> pointant vers une pièce jointe Azure non inlinée", () => {
+		const html =
+			'<p>Avant</p><img src="https://dev.azure.com/org/proj/_apis/wit/attachments/abc?fileName=a.png" alt=Image><p>Après</p>';
+		const out = stripAzureAttachmentImages(html);
+		expect(out).not.toContain("_apis/wit/attachments");
+		expect(out).toContain("Avant");
+		expect(out).toContain("Après");
+	});
+
+	it("conserve les images externes et déjà inlinées (data URI)", () => {
+		const html =
+			'<img src="https://example.com/a.png"><img src="data:image/png;base64,AAAA">';
+		expect(stripAzureAttachmentImages(html)).toBe(html);
+	});
+
+	it("ne touche pas un HTML sans image", () => {
+		const html = "<p>Pas d'image ici</p>";
+		expect(stripAzureAttachmentImages(html)).toBe(html);
 	});
 });

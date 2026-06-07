@@ -304,6 +304,100 @@ class TestWorktreeCreation:
         assert not (info2.path / "stale-file.txt").exists()
 
 
+class TestWorktreeAddRetry:
+    """Tests for the transient-failure retry around `git worktree add`.
+
+    `git worktree add` is flaky on Windows CI: it intermittently exits non-zero
+    with an empty stderr while antivirus/indexing briefly locks a just-created
+    file during checkout. These tests pin the retry/cleanup behaviour.
+    """
+
+    def test_empty_stderr_is_retryable(self):
+        """An empty stderr (the Windows CI signature) is treated as transient."""
+        from core.worktree import _is_retryable_worktree_add_error
+
+        assert _is_retryable_worktree_add_error("")
+        assert _is_retryable_worktree_add_error("   \n")
+
+    def test_lock_messages_are_retryable(self):
+        """Known file-locking messages are treated as transient."""
+        from core.worktree import _is_retryable_worktree_add_error
+
+        assert _is_retryable_worktree_add_error(
+            "fatal: Unable to create '.../index.lock': File exists"
+        )
+        assert _is_retryable_worktree_add_error(
+            "error: The process cannot access the file because it is "
+            "being used by another process"
+        )
+
+    def test_genuine_errors_are_not_retryable(self):
+        """A real, non-transient git error is not retried."""
+        from core.worktree import _is_retryable_worktree_add_error
+
+        assert not _is_retryable_worktree_add_error(
+            "fatal: invalid reference: does-not-exist"
+        )
+
+    def test_create_worktree_retries_transient_failure(
+        self, temp_git_repo: Path, monkeypatch
+    ):
+        """A transient `worktree add` failure is retried and then succeeds."""
+        manager = WorktreeManager(temp_git_repo)
+        manager.setup()
+
+        real_run_git = manager._run_git
+        calls = {"add": 0}
+
+        def flaky_run_git(args, *a, **kw):
+            # Fail the first `worktree add` with an empty stderr (Windows CI
+            # signature), then let the real command run on the retry.
+            if len(args) >= 2 and args[0] == "worktree" and args[1] == "add":
+                calls["add"] += 1
+                if calls["add"] == 1:
+                    return subprocess.CompletedProcess(
+                        args=args, returncode=1, stdout="", stderr=""
+                    )
+            return real_run_git(args, *a, **kw)
+
+        monkeypatch.setattr(manager, "_run_git", flaky_run_git)
+
+        info = manager.create_worktree("test-spec")
+
+        assert calls["add"] >= 2, "worktree add should have been retried"
+        assert info.path.exists()
+        assert info.branch == "workpilot/test-spec"
+        assert (info.path / "README.md").exists()
+
+    def test_create_worktree_reports_output_on_persistent_failure(
+        self, temp_git_repo: Path, monkeypatch
+    ):
+        """A non-transient failure surfaces git's output instead of an empty msg."""
+        manager = WorktreeManager(temp_git_repo)
+        manager.setup()
+
+        real_run_git = manager._run_git
+
+        def failing_run_git(args, *a, **kw):
+            if len(args) >= 2 and args[0] == "worktree" and args[1] == "add":
+                return subprocess.CompletedProcess(
+                    args=args,
+                    returncode=128,
+                    stdout="",
+                    stderr="fatal: invalid reference: boom",
+                )
+            return real_run_git(args, *a, **kw)
+
+        monkeypatch.setattr(manager, "_run_git", failing_run_git)
+
+        with pytest.raises(Exception) as exc_info:
+            manager.create_worktree("test-spec")
+
+        message = str(exc_info.value)
+        assert "git exit 128" in message
+        assert "invalid reference: boom" in message
+
+
 class TestWorktreeRemoval:
     """Tests for removing worktrees."""
 

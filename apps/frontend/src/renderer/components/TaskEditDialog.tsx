@@ -370,6 +370,7 @@ export function TaskEditDialog({
 				specId={task.specId}
 				description={description}
 				onDescriptionChange={setDescription}
+				richText
 				title={title}
 				onTitleChange={setTitle}
 				profileId={profileId}

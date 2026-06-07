@@ -328,4 +328,18 @@ describe("stripHtml", () => {
 	it("should collapse excessive blank lines", () => {
 		expect(stripHtml("a<p></p><p></p><p></p>b")).not.toContain("\n\n\n");
 	});
+
+	it("should drop a trailing truncated tag with no closing '>'", () => {
+		// Azure spec titles get truncated mid-attribute (e.g. "…<b style=…").
+		// Such a fragment has no closing '>' so the normal tag regex can't match
+		// it — it must still be stripped, not leak into the title.
+		const html = '<div><div style="box-sizing:border-box;"><b style=';
+		expect(stripHtml(html).replace(/\s+/g, " ").trim()).toBe("");
+	});
+
+	it("should keep meaningful text before a dangling tag", () => {
+		expect(stripHtml("N° de version <b style=").replace(/\s+/g, " ").trim()).toBe(
+			"N° de version",
+		);
+	});
 });

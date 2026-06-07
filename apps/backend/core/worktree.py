@@ -115,6 +115,37 @@ def _is_retryable_http_error(stderr: str) -> bool:
     return False
 
 
+# Fragments of `git worktree add` stderr that indicate a transient filesystem
+# failure worth retrying. These show up mostly on Windows, where antivirus or
+# the search indexer can briefly lock a just-created file during checkout.
+_WORKTREE_ADD_TRANSIENT_TERMS = (
+    "could not",
+    "unable to",
+    "permission denied",
+    "access is denied",
+    "used by another process",
+    "cannot lock",
+    "lock ref",
+    "index.lock",
+    "another git process",
+    "file exists",
+)
+
+
+def _is_retryable_worktree_add_error(stderr: str) -> bool:
+    """Whether a failed ``git worktree add`` looks transient and worth retrying.
+
+    On Windows CI, ``git worktree add`` intermittently exits non-zero while
+    writing *nothing* to stderr -- a just-created file is momentarily locked by
+    antivirus/indexing during checkout. An empty/whitespace stderr is therefore
+    treated as retryable, alongside the known file-locking messages above.
+    """
+    text = stderr.strip().lower()
+    if not text:
+        return True
+    return any(term in text for term in _WORKTREE_ADD_TRANSIENT_TERMS)
+
+
 def _with_retry(
     operation: Callable[[], tuple[bool, T | None, str]],
     max_retries: int = 3,
@@ -787,7 +818,8 @@ class WorktreeManager:
         if branch_exists:
             # Branch exists - attach worktree to existing branch (no -b flag)
             print(f"Reusing existing branch: {branch_name}")
-            result = self._run_git(["worktree", "add", str(worktree_path), branch_name])
+            add_args = ["worktree", "add", str(worktree_path), branch_name]
+            created_branch = None
         else:
             # Branch doesn't exist - create new branch from remote or local base
             # Determine the start point for the worktree
@@ -810,13 +842,29 @@ class WorktreeManager:
                     )
 
             # Create worktree with new branch from the start point
-            result = self._run_git(
-                ["worktree", "add", "-b", branch_name, str(worktree_path), start_point]
-            )
+            add_args = [
+                "worktree",
+                "add",
+                "-b",
+                branch_name,
+                str(worktree_path),
+                start_point,
+            ]
+            created_branch = branch_name
+
+        # `git worktree add` is flaky on Windows: it intermittently exits
+        # non-zero (often with an empty stderr) when antivirus/indexing briefly
+        # locks a just-created file during checkout. Retry transient failures,
+        # cleaning up any partial state between attempts.
+        result = self._run_worktree_add(
+            add_args, worktree_path=worktree_path, created_branch=created_branch
+        )
 
         if result.returncode != 0:
+            details = result.stderr.strip() or result.stdout.strip() or "(no output)"
             raise WorktreeError(
-                f"Failed to create worktree for {spec_name}: {result.stderr}"
+                f"Failed to create worktree for {spec_name} "
+                f"(git exit {result.returncode}): {details}"
             )
 
         print(f"Created worktree: {worktree_path.name} on branch {branch_name}")
@@ -828,6 +876,52 @@ class WorktreeManager:
             base_branch=self.base_branch,
             is_active=True,
         )
+
+    def _run_worktree_add(
+        self,
+        add_args: list[str],
+        worktree_path: Path,
+        created_branch: str | None,
+        max_attempts: int = 3,
+    ) -> subprocess.CompletedProcess:
+        """Run ``git worktree add``, retrying transient (often Windows) failures.
+
+        ``git worktree add`` intermittently fails on Windows with a momentary
+        filesystem lock (and, on CI, an empty stderr). Between attempts any
+        partially-created worktree directory and branch are removed so the retry
+        starts from a clean slate. Returns the final ``CompletedProcess`` -- the
+        success, or the last failure for the caller to report.
+        """
+        result = self._run_git(add_args)
+        for attempt in range(1, max_attempts):
+            if result.returncode == 0:
+                return result
+            if not _is_retryable_worktree_add_error(result.stderr):
+                return result
+            print(
+                f"Worktree add failed (attempt {attempt}/{max_attempts}, "
+                f"git exit {result.returncode}); cleaning up and retrying..."
+            )
+            self._cleanup_partial_worktree(worktree_path, created_branch)
+            time.sleep(0.5 * attempt)
+            result = self._run_git(add_args)
+        return result
+
+    def _cleanup_partial_worktree(
+        self, worktree_path: Path, created_branch: str | None
+    ) -> None:
+        """Remove partial state left by a failed ``git worktree add``.
+
+        Best-effort: drops any half-registered worktree, the leftover directory,
+        and the branch we were creating, so the next attempt is not blocked by an
+        "already exists" error. Errors are ignored -- the state may not exist.
+        """
+        self._run_git(["worktree", "remove", "--force", str(worktree_path)])
+        self._run_git(["worktree", "prune"])
+        if worktree_path.exists():
+            shutil.rmtree(worktree_path, ignore_errors=True)
+        if created_branch:
+            self._run_git(["branch", "-D", created_branch])
 
     def get_or_create_worktree(self, spec_name: str) -> WorktreeInfo:
         """

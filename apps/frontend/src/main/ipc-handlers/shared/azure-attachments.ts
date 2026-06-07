@@ -97,3 +97,23 @@ export async function inlineAzureDevOpsImages(
 
 	return result;
 }
+
+/**
+ * Retire les balises `<img>` qui pointent encore vers une pièce jointe Azure
+ * DevOps protégée par PAT (c.-à-d. non inlinées en data URI).
+ *
+ * Utilisé en repli quand l'inlining est impossible (pas de PAT) ou a échoué :
+ * sans cela, le renderer émet une requête réseau vers `dev.azure.com` sans
+ * authentification qui finit en `ERR_TIMED_OUT` et affiche une image cassée.
+ */
+export function stripAzureAttachmentImages(
+	html: string,
+	orgUrl?: string,
+): string {
+	if (!html?.includes("<img")) return html;
+	return html.replace(
+		/<img\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\1[^>]*>/gi,
+		(full, _quote, src) =>
+			isAzureDevOpsAttachmentUrl(src, orgUrl) ? "" : full,
+	);
+}

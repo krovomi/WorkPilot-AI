@@ -1041,7 +1041,9 @@ export class ProjectStore {
 			return `${dirName}${JSON_ERROR_TITLE_SUFFIX}`;
 		}
 
-		// Get title from plan
+		// Get title from plan. The spec-folder name (dirName) is a clean,
+		// slugified fallback we hold onto in case richer sources turn out to be
+		// HTML garbage (see below).
 		let title = plan?.feature || plan?.title || dirName;
 
 		// If it looks like a spec ID, try to extract title from spec file
@@ -1056,11 +1058,18 @@ export class ProjectStore {
 		// Les titres issus d'imports (US/RsD Azure DevOps) peuvent contenir du
 		// HTML enrichi : on le réduit en texte brut sur une seule ligne pour ne
 		// jamais afficher de balises. Répare aussi les tâches déjà importées.
-		if (title.includes("<") && title.includes(">")) {
+		//
+		// Cas limite : certaines tâches anciennes ont un titre de spec qui est en
+		// réalité la description HTML brute, parfois tronquée en pleine balise
+		// (« …<b style=… »). Une fois le HTML retiré il ne reste rien d'utile :
+		// on revient alors au nom du dossier de spec (propre) plutôt que d'afficher
+		// un fragment de balise.
+		if (title.includes("<")) {
 			const plain = stripHtml(title).replace(/\s+/g, " ").trim();
-			if (plain) {
-				title = plain.length > 200 ? `${plain.slice(0, 200)}…` : plain;
-			}
+			title = plain.length >= 3 ? plain : dirName;
+		}
+		if (title.length > 200) {
+			title = `${title.slice(0, 200)}…`;
 		}
 
 		return title;

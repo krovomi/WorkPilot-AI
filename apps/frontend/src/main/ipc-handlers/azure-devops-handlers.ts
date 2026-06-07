@@ -29,7 +29,10 @@ import {
 	parseAcceptanceCriteriaText,
 	stripAcceptanceCriteriaSection,
 } from "../../shared/utils/acceptance-criteria";
-import { inlineAzureDevOpsImages } from "./shared/azure-attachments";
+import {
+	inlineAzureDevOpsImages,
+	stripAzureAttachmentImages,
+} from "./shared/azure-attachments";
 import {
 	sanitizeText,
 	sanitizeUrl,
@@ -845,6 +848,13 @@ except Exception as e:
 										? "feature"
 										: category,
 						};
+						// HTML enrichi (images Azure DevOps inlinées en data URIs) conservé
+						// séparément pour l'affichage. La scanner le sert en priorité 0
+						// (getRequirementsDisplayDescription) afin que les captures de l'US/RsD
+						// s'affichent sans authentification ni accès réseau au rendu.
+						if (displayDescription) {
+							requirements.display_description = displayDescription;
+						}
 						if (acceptanceCriteriaList.length > 0) {
 							requirements.acceptance_criteria = acceptanceCriteriaList;
 						}
@@ -901,6 +911,114 @@ except Exception as e:
 						tasks: importedTasks,
 					},
 				};
+			} catch (error: unknown) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				return { success: false, error: errorMessage };
+			}
+		},
+	);
+
+	// ============================================
+	// Azure DevOps attachment image inlining (on demand)
+	// ============================================
+
+	/**
+	 * Inline the Azure DevOps attachment images embedded in a task's description.
+	 *
+	 * Older imports stored the raw work-item HTML (with
+	 * `<img src="https://dev.azure.com/.../_apis/wit/attachments/...">`) directly
+	 * in requirements.json. Those URLs require PAT auth, so the renderer can't
+	 * load them (ERR_TIMED_OUT) and shows broken images.
+	 *
+	 * The renderer calls this when it detects un-inlined attachment images. We
+	 * download them here (main process, with the project's PAT), base64-inline
+	 * them, persist the result as requirements.display_description so the scanner
+	 * serves it directly next time, and return the cleaned HTML. Any image that
+	 * still can't be fetched is stripped so it never re-triggers a failed request.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.AZURE_DEVOPS_INLINE_TASK_IMAGES,
+		async (
+			_,
+			projectId: string,
+			taskId: string,
+		): Promise<IPCResult<{ html: string }>> => {
+			try {
+				const project = projectStore.getProject(projectId);
+				if (!project) {
+					return { success: false, error: "Project not found" };
+				}
+
+				const task = projectStore
+					.getTasks(projectId)
+					.find((t) => t.id === taskId);
+				const specDir = task?.specsPath;
+				if (!specDir) {
+					return { success: false, error: "Task spec directory not found" };
+				}
+
+				const requirementsPath = path.join(
+					specDir,
+					AUTO_BUILD_PATHS.REQUIREMENTS,
+				);
+				if (!existsSync(requirementsPath)) {
+					return { success: false, error: "requirements.json not found" };
+				}
+
+				let requirements: Record<string, unknown>;
+				try {
+					requirements = JSON.parse(readFileSync(requirementsPath, "utf-8"));
+				} catch {
+					return { success: false, error: "requirements.json is malformed" };
+				}
+
+				// Prefer an already-inlined display description, else the raw one.
+				const sourceHtml =
+					typeof requirements.display_description === "string" &&
+					requirements.display_description
+						? requirements.display_description
+						: typeof requirements.task_description === "string"
+							? requirements.task_description
+							: "";
+
+				if (!sourceHtml.includes("<img")) {
+					return { success: true, data: { html: sourceHtml } };
+				}
+
+				const config = getAzureDevOpsConfig(project);
+
+				let html = sourceHtml;
+				if (config.pat && config.orgUrl) {
+					html = await inlineAzureDevOpsImages(
+						sourceHtml,
+						config.orgUrl,
+						config.pat,
+					);
+				}
+				// Strip any attachment image that couldn't be inlined (no PAT, or
+				// the download failed) so the renderer never fires a failing request.
+				html = stripAzureAttachmentImages(html, config.orgUrl ?? undefined);
+
+				// Persist so the scanner serves it via priority-0 display_description.
+				if (html !== requirements.display_description) {
+					requirements.display_description = html;
+					try {
+						writeFileSync(
+							requirementsPath,
+							JSON.stringify(requirements, null, 2),
+							"utf-8",
+						);
+						projectStore.invalidateTasksCache(projectId);
+					} catch (err) {
+						console.warn(
+							"[AZURE_DEVOPS_INLINE_TASK_IMAGES] Could not persist display_description:",
+							err,
+						);
+					}
+				}
+
+				return { success: true, data: { html } };
 			} catch (error: unknown) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
