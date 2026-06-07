@@ -13,6 +13,7 @@ import {
 	Loader2,
 	Pencil,
 	Search,
+	Server,
 	Terminal,
 	Wrench,
 	XCircle,
@@ -34,9 +35,14 @@ import { persistUpdateTask } from "../../stores/task-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import { THINKING_LEVELS } from "../../../shared/constants/models";
 import {
+	buildModelMetadataUpdate,
+	buildProviderMetadataUpdate,
 	buildThinkingMetadataUpdate,
 	LOG_PHASE_TO_CONFIG_PHASE,
 } from "../../../shared/utils/task-thinking";
+import { getStaticProviders } from "../../../shared/utils/providers";
+import { debugError } from "../../../shared/utils/debug-logger";
+import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { Badge } from "../ui/badge";
 import {
 	Collapsible,
@@ -108,10 +114,17 @@ const THINKING_SHORT_LABELS: Record<ThinkingLevel, string> = {
 function getPhaseConfig(
 	metadata: TaskMetadata | undefined,
 	logPhase: TaskLogPhase,
-): { model: string; thinking: string; thinkingValue: ThinkingLevel } | null {
+): {
+	model: string;
+	modelValue: string;
+	thinking: string;
+	thinkingValue: ThinkingLevel;
+	provider: string;
+} | null {
 	if (!metadata) return null;
 
 	const configPhase = LOG_PHASE_TO_CONFIG_PHASE[logPhase];
+	const fallbackProvider = metadata.provider || "anthropic";
 
 	// Auto profile with per-phase config
 	if (
@@ -121,10 +134,13 @@ function getPhaseConfig(
 	) {
 		const model = metadata.phaseModels[configPhase];
 		const thinking = metadata.phaseThinking[configPhase];
+		const provider = metadata.phaseProviders?.[configPhase] || fallbackProvider;
 		return {
 			model: MODEL_SHORT_LABELS[model] || model,
+			modelValue: model,
 			thinking: THINKING_SHORT_LABELS[thinking] || thinking,
 			thinkingValue: thinking,
+			provider,
 		};
 	}
 
@@ -132,9 +148,11 @@ function getPhaseConfig(
 	if (metadata.model && metadata.thinkingLevel) {
 		return {
 			model: MODEL_SHORT_LABELS[metadata.model] || metadata.model,
+			modelValue: metadata.model,
 			thinking:
 				THINKING_SHORT_LABELS[metadata.thinkingLevel] || metadata.thinkingLevel,
 			thinkingValue: metadata.thinkingLevel,
+			provider: fallbackProvider,
 		};
 	}
 
@@ -157,28 +175,55 @@ export function TaskLogs({
 	const { t } = useTranslation(["tasks"]);
 	const { toast } = useToast();
 	const [savingPhase, setSavingPhase] = useState<TaskLogPhase | null>(null);
+	const settings = useSettingsStore((s) => s.settings);
+	const profiles = useSettingsStore((s) => s.profiles);
 
-	// Persist a per-phase thinking-effort change. For Auto-profile tasks this
-	// updates only the targeted phase; for single-model tasks it updates the
-	// shared thinking level. The change applies when that phase next runs.
-	const handleThinkingChange = useCallback(
-		async (logPhase: TaskLogPhase, level: ThinkingLevel) => {
+	// Configured providers shown in each phase's provider dropdown. Loaded once
+	// (and refreshed when settings/profiles change) so adding an API key in
+	// Settings surfaces the provider here without a remount.
+	const [providers, setProviders] = useState<
+		readonly { name: string; label: string }[]
+	>([]);
+
+	useEffect(() => {
+		let cancelled = false;
+		getStaticProviders(
+			profiles,
+			settings as unknown as Record<string, unknown>,
+		)
+			.then((res) => {
+				if (cancelled) return;
+				setProviders(
+					res.providers
+						.filter((p) => res.status[p.name] === true)
+						.map((p) => ({ name: p.name, label: p.label })),
+				);
+			})
+			.catch((err) => {
+				debugError("[TaskLogs] getStaticProviders failed", err);
+				if (!cancelled) setProviders([]);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [profiles, settings]);
+
+	// Persist a per-phase metadata change (thinking / model / provider). For
+	// Auto-profile tasks the targeted phase is updated in isolation; for
+	// single-model tasks the shared field is updated. The change applies when
+	// that phase next runs.
+	const persistPhaseMetadata = useCallback(
+		async (
+			logPhase: TaskLogPhase,
+			metadata: Partial<NonNullable<Task["metadata"]>>,
+			updatedTitle: string,
+			updatedDesc: string,
+		) => {
 			setSavingPhase(logPhase);
 			try {
-				const metadata = buildThinkingMetadataUpdate(
-					task.metadata,
-					logPhase,
-					level,
-				);
 				const ok = await persistUpdateTask(task.id, { metadata });
 				if (!ok) throw new Error("update failed");
-				toast({
-					title: t("tasks:logs.thinking.updatedTitle", "Réflexion mise à jour"),
-					description: t(
-						"tasks:logs.thinking.updatedDesc",
-						"Le niveau de réflexion sera appliqué au démarrage de cette phase.",
-					),
-				});
+				toast({ title: updatedTitle, description: updatedDesc });
 			} catch (error) {
 				toast({
 					title: t("tasks:logs.thinking.updateFailed", "Échec de la mise à jour"),
@@ -189,7 +234,49 @@ export function TaskLogs({
 				setSavingPhase(null);
 			}
 		},
-		[task.id, task.metadata, toast, t],
+		[task.id, toast, t],
+	);
+
+	const handleThinkingChange = useCallback(
+		(logPhase: TaskLogPhase, level: ThinkingLevel) =>
+			persistPhaseMetadata(
+				logPhase,
+				buildThinkingMetadataUpdate(task.metadata, logPhase, level),
+				t("tasks:logs.thinking.updatedTitle", "Réflexion mise à jour"),
+				t(
+					"tasks:logs.thinking.updatedDesc",
+					"Le niveau de réflexion sera appliqué au démarrage de cette phase.",
+				),
+			),
+		[persistPhaseMetadata, task.metadata, t],
+	);
+
+	const handleModelChange = useCallback(
+		(logPhase: TaskLogPhase, model: string) =>
+			persistPhaseMetadata(
+				logPhase,
+				buildModelMetadataUpdate(task.metadata, logPhase, model),
+				t("tasks:logs.model.updatedTitle", "Modèle mis à jour"),
+				t(
+					"tasks:logs.model.updatedDesc",
+					"Le modèle sera appliqué au démarrage de cette phase.",
+				),
+			),
+		[persistPhaseMetadata, task.metadata, t],
+	);
+
+	const handleProviderChange = useCallback(
+		(logPhase: TaskLogPhase, provider: string) =>
+			persistPhaseMetadata(
+				logPhase,
+				buildProviderMetadataUpdate(task.metadata, logPhase, provider),
+				t("tasks:logs.provider.updatedTitle", "Fournisseur mis à jour"),
+				t(
+					"tasks:logs.provider.updatedDesc",
+					"Le fournisseur sera appliqué au démarrage de cette phase.",
+				),
+			),
+		[persistPhaseMetadata, task.metadata, t],
 	);
 
 	// Refs to each rendered phase section so we can detect which phase is
@@ -262,8 +349,11 @@ export function TaskLogs({
 									onToggle={() => onTogglePhase(phase)}
 									isTaskStuck={isStuck}
 									phaseConfig={getPhaseConfig(task.metadata, phase)}
+									providers={providers}
 									onThinkingChange={handleThinkingChange}
-									isSavingThinking={savingPhase === phase}
+									onModelChange={handleModelChange}
+									onProviderChange={handleProviderChange}
+									isSavingPhase={savingPhase === phase}
 								/>
 							</div>
 						))}
@@ -298,11 +388,16 @@ interface PhaseLogSectionProps {
 	isTaskStuck?: boolean;
 	phaseConfig?: {
 		model: string;
+		modelValue: string;
 		thinking: string;
 		thinkingValue: ThinkingLevel;
+		provider: string;
 	} | null;
+	providers?: readonly { name: string; label: string }[];
 	onThinkingChange?: (phase: TaskLogPhase, level: ThinkingLevel) => void;
-	isSavingThinking?: boolean;
+	onModelChange?: (phase: TaskLogPhase, model: string) => void;
+	onProviderChange?: (phase: TaskLogPhase, provider: string) => void;
+	isSavingPhase?: boolean;
 }
 
 function PhaseLogSection({
@@ -312,14 +407,49 @@ function PhaseLogSection({
 	onToggle,
 	isTaskStuck,
 	phaseConfig,
+	providers,
 	onThinkingChange,
-	isSavingThinking,
+	onModelChange,
+	onProviderChange,
+	isSavingPhase,
 }: PhaseLogSectionProps) {
 	const { t } = useTranslation(["tasks"]);
 	const Icon = PHASE_ICONS[phase];
 	const logOrder = useSettingsStore((s) => s.settings.logOrder);
 	const status = phaseLog?.status || "pending";
 	const hasEntries = (phaseLog?.entries.length || 0) > 0;
+
+	// Live model catalog for the phase's currently-selected provider. The hook
+	// is always called (provider may be "") so it complies with the rules of
+	// hooks; an empty provider just yields the static fallback list.
+	const { models: catalogModels } = useProviderModelCatalog(
+		phaseConfig?.provider ?? "",
+	);
+
+	// Provider options: the configured providers, augmented with the current
+	// one so a previously-saved (now unconfigured) provider stays visible.
+	const providerOptions = useMemo(() => {
+		const list = [...(providers ?? [])];
+		const current = phaseConfig?.provider;
+		if (current && !list.some((p) => p.name === current)) {
+			list.unshift({ name: current, label: current });
+		}
+		return list;
+	}, [providers, phaseConfig?.provider]);
+
+	// Model options: catalog entries, augmented with the current model value so
+	// it remains selectable even if the live catalog hasn't loaded it.
+	const modelOptions = useMemo(() => {
+		const list = catalogModels.map((m) => ({ value: m.value, label: m.label }));
+		const current = phaseConfig?.modelValue;
+		if (current && !list.some((m) => m.value === current)) {
+			list.unshift({
+				value: current,
+				label: MODEL_SHORT_LABELS[current] || current,
+			});
+		}
+		return list;
+	}, [catalogModels, phaseConfig?.modelValue]);
 
 	// Memoize sorted entries to avoid re-calculating on every render
 	// Entries are naturally in chronological order (oldest first from append())
@@ -425,27 +555,98 @@ function PhaseLogSection({
 					</button>
 				</CollapsibleTrigger>
 				<div className="flex items-center gap-2">
-					{/* Model and thinking level indicator */}
+					{/* Provider / model / thinking selectors (per phase) */}
 					{phaseConfig && (
 						<div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-							<div
-								className="flex items-center gap-0.5"
-								title={`Model: ${phaseConfig.model}`}
-							>
-								<Cpu className="h-3 w-3" />
-								<span>{phaseConfig.model}</span>
-							</div>
+							{/* Provider selector */}
+							{onProviderChange ? (
+								<Select
+									value={phaseConfig.provider}
+									onValueChange={(value) => onProviderChange(phase, value)}
+									disabled={isSavingPhase}
+								>
+									<SelectTrigger
+										className="h-6 w-auto shrink-0 gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:line-clamp-none [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										aria-label={t(
+											"tasks:logs.provider.selectAria",
+											"Fournisseur pour cette phase",
+										)}
+										title={t(
+											"tasks:logs.provider.selectTooltip",
+											"Changer le fournisseur pour cette phase",
+										)}
+									>
+										<Server className="h-3 w-3" />
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{providerOptions.map((p) => (
+											<SelectItem key={p.name} value={p.name}>
+												{p.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							) : (
+								<div
+									className="flex items-center gap-0.5"
+									title={`Provider: ${phaseConfig.provider}`}
+								>
+									<Server className="h-3 w-3" />
+									<span>{phaseConfig.provider}</span>
+								</div>
+							)}
 							<span className="text-muted-foreground/50">|</span>
+							{/* Model selector */}
+							{onModelChange ? (
+								<Select
+									value={phaseConfig.modelValue}
+									onValueChange={(value) => onModelChange(phase, value)}
+									disabled={isSavingPhase}
+								>
+									<SelectTrigger
+										className="h-6 w-auto shrink-0 gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:line-clamp-none [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										aria-label={t(
+											"tasks:logs.model.selectAria",
+											"Modèle pour cette phase",
+										)}
+										title={t(
+											"tasks:logs.model.selectTooltip",
+											"Changer le modèle pour cette phase",
+										)}
+									>
+										<Cpu className="h-3 w-3" />
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{modelOptions.map((m) => (
+											<SelectItem key={m.value} value={m.value}>
+												{m.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							) : (
+								<div
+									className="flex items-center gap-0.5"
+									title={`Model: ${phaseConfig.model}`}
+								>
+									<Cpu className="h-3 w-3" />
+									<span>{phaseConfig.model}</span>
+								</div>
+							)}
+							<span className="text-muted-foreground/50">|</span>
+							{/* Thinking-effort selector */}
 							{onThinkingChange ? (
 								<Select
 									value={phaseConfig.thinkingValue}
 									onValueChange={(value) =>
 										onThinkingChange(phase, value as ThinkingLevel)
 									}
-									disabled={isSavingThinking}
+									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-5 gap-1 border-0 bg-transparent px-1 py-0 text-[10px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>svg]:h-3 [&>svg]:w-3"
+										className="h-6 w-auto shrink-0 gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:line-clamp-none [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.thinking.selectAria",
 											"Niveau de réflexion pour cette phase",
@@ -455,7 +656,7 @@ function PhaseLogSection({
 											"Changer le niveau de réflexion pour cette phase",
 										)}
 									>
-										{isSavingThinking ? (
+										{isSavingPhase ? (
 											<Loader2 className="h-3 w-3 animate-spin" />
 										) : (
 											<Brain className="h-3 w-3" />

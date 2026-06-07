@@ -523,6 +523,18 @@
 			"updatedTitle": "Réflexion mise à jour",
 			"updatedDesc": "Le niveau de réflexion sera appliqué au démarrage de cette phase.",
 			"updateFailed": "Échec de la mise à jour"
+		},
+		"provider": {
+			"selectAria": "Fournisseur pour cette phase",
+			"selectTooltip": "Changer le fournisseur pour cette phase",
+			"updatedTitle": "Fournisseur mis à jour",
+			"updatedDesc": "Le fournisseur sera appliqué au démarrage de cette phase."
+		},
+		"model": {
+			"selectAria": "Modèle pour cette phase",
+			"selectTooltip": "Changer le modèle pour cette phase",
+			"updatedTitle": "Modèle mis à jour",
+			"updatedDesc": "Le modèle sera appliqué au démarrage de cette phase."
 		}
 	},
 	"modal": {

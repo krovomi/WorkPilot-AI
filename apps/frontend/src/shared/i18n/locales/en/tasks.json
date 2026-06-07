@@ -523,6 +523,18 @@
 			"updatedTitle": "Thinking effort updated",
 			"updatedDesc": "The thinking effort will be applied when this phase starts.",
 			"updateFailed": "Update failed"
+		},
+		"provider": {
+			"selectAria": "Provider for this phase",
+			"selectTooltip": "Change the provider for this phase",
+			"updatedTitle": "Provider updated",
+			"updatedDesc": "The provider will be applied when this phase starts."
+		},
+		"model": {
+			"selectAria": "Model for this phase",
+			"selectTooltip": "Change the model for this phase",
+			"updatedTitle": "Model updated",
+			"updatedDesc": "The model will be applied when this phase starts."
 		}
 	},
 	"modal": {

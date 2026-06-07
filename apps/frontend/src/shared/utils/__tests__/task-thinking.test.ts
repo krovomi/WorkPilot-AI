@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { TaskMetadata } from "../../types";
 import {
+	buildModelMetadataUpdate,
+	buildProviderMetadataUpdate,
 	buildThinkingMetadataUpdate,
 	isPerPhaseThinkingTask,
 	LOG_PHASE_TO_CONFIG_PHASE,
@@ -69,5 +71,68 @@ describe("buildThinkingMetadataUpdate", () => {
 		const update = buildThinkingMetadataUpdate(singleMeta, "coding", "high");
 		expect(update.thinkingLevel).toBe("high");
 		expect(update.phaseThinking).toBeUndefined();
+	});
+});
+
+describe("buildModelMetadataUpdate", () => {
+	it("met à jour uniquement le modèle de la phase ciblée (profil par phase)", () => {
+		const update = buildModelMetadataUpdate(perPhaseMeta, "coding", "sonnet");
+		expect(update.phaseModels).toEqual({
+			spec: "opus",
+			planning: "opus",
+			coding: "sonnet",
+			qa: "opus",
+		});
+		expect(update.model).toBeUndefined();
+	});
+
+	it("mappe 'validation' vers la clé 'qa'", () => {
+		const update = buildModelMetadataUpdate(perPhaseMeta, "validation", "haiku");
+		expect(update.phaseModels?.qa).toBe("haiku");
+		expect(update.phaseModels?.coding).toBe("opus");
+	});
+
+	it("met à jour le model global pour un profil mono-modèle", () => {
+		const update = buildModelMetadataUpdate(singleMeta, "coding", "sonnet");
+		expect(update.model).toBe("sonnet");
+		expect(update.phaseModels).toBeUndefined();
+	});
+});
+
+describe("buildProviderMetadataUpdate", () => {
+	it("met à jour uniquement le provider de la phase ciblée (profil par phase)", () => {
+		const update = buildProviderMetadataUpdate(perPhaseMeta, "coding", "copilot");
+		expect(update.phaseProviders).toEqual({
+			spec: "anthropic",
+			planning: "anthropic",
+			coding: "copilot",
+			qa: "anthropic",
+		});
+		expect(update.provider).toBeUndefined();
+	});
+
+	it("conserve les providers per-phase existants", () => {
+		const meta: TaskMetadata = {
+			...perPhaseMeta,
+			phaseProviders: {
+				spec: "anthropic",
+				planning: "openai",
+				coding: "anthropic",
+				qa: "anthropic",
+			},
+		};
+		const update = buildProviderMetadataUpdate(meta, "validation", "copilot");
+		expect(update.phaseProviders).toEqual({
+			spec: "anthropic",
+			planning: "openai",
+			coding: "anthropic",
+			qa: "copilot",
+		});
+	});
+
+	it("met à jour le provider global pour un profil mono-modèle", () => {
+		const update = buildProviderMetadataUpdate(singleMeta, "coding", "openai");
+		expect(update.provider).toBe("openai");
+		expect(update.phaseProviders).toBeUndefined();
 	});
 });

@@ -193,6 +193,13 @@ class PhaseThinkingConfig(TypedDict, total=False):
     qa: str
 
 
+class PhaseProviderConfig(TypedDict, total=False):
+    spec: str
+    planning: str
+    coding: str
+    qa: str
+
+
 class TaskMetadataConfig(TypedDict, total=False):
     """Structure of model-related fields in task_metadata.json"""
 
@@ -200,6 +207,7 @@ class TaskMetadataConfig(TypedDict, total=False):
     isAutoProfile: bool
     phaseModels: PhaseModelConfig
     phaseThinking: PhaseThinkingConfig
+    phaseProviders: PhaseProviderConfig
     model: str
     thinkingLevel: str
 
@@ -287,22 +295,39 @@ def load_task_metadata(spec_dir: Path) -> TaskMetadataConfig | None:
         return None
 
 
+def _metadata_phase_provider(
+    metadata: TaskMetadataConfig | None, phase: Phase | None
+) -> str | None:
+    """Return the per-phase provider from metadata.phaseProviders, if any."""
+    if not metadata or phase is None:
+        return None
+    phase_providers = metadata.get("phaseProviders")
+    if phase_providers:
+        provider = phase_providers.get(phase)
+        if provider:
+            return provider
+    return None
+
+
 def get_phase_provider(
     spec_dir: Path,
     cli_provider: str | None = None,
+    phase: Phase | None = None,
 ) -> str | None:
     """
     Get the LLM provider configured for this task.
 
     Priority:
     1. CLI argument (if provided)
-    2. Provider from task_metadata.json
-    3. Provider selected via IPC (from frontend UI)
-    4. None (let downstream code use its default)
+    2. Per-phase provider from task_metadata.json (phaseProviders[phase])
+    3. Task-wide provider from task_metadata.json
+    4. Provider selected via IPC (from frontend UI)
+    5. None (let downstream code use its default)
 
     Args:
         spec_dir: Path to the spec directory
         cli_provider: Provider from CLI argument (optional)
+        phase: Execution phase (spec, planning, coding, qa) for per-phase lookup
 
     Returns:
         Provider string (e.g. 'anthropic', 'openai', 'ollama') or None
@@ -311,6 +336,12 @@ def get_phase_provider(
         return cli_provider
 
     metadata = load_task_metadata(spec_dir)
+
+    # Per-phase provider takes precedence over the task-wide provider.
+    phase_provider = _metadata_phase_provider(metadata, phase)
+    if phase_provider:
+        return phase_provider
+
     if metadata and metadata.get("provider"):
         return metadata["provider"]
 
@@ -385,7 +416,11 @@ def _resolve_auto_profile_model(
         return None
 
     phase_models = metadata["phaseModels"]
-    provider = cli_provider or metadata.get("provider")
+    provider = (
+        cli_provider
+        or _metadata_phase_provider(metadata, phase)
+        or metadata.get("provider")
+    )
     model = phase_models.get(phase, DEFAULT_PHASE_MODELS[phase])
     return _resolve_provider_model(model, provider)
 
@@ -419,7 +454,11 @@ def _resolve_complexity_routing(
             return None
 
         model = routing.phase_models.get(phase, DEFAULT_PHASE_MODELS[phase])
-        provider = cli_provider or (metadata.get("provider") if metadata else None)
+        provider = (
+            cli_provider
+            or _metadata_phase_provider(metadata, phase)
+            or (metadata.get("provider") if metadata else None)
+        )
         return _resolve_provider_model(model, provider)
     except ImportError:
         return None
@@ -433,10 +472,12 @@ def _resolve_provider_default(
 ) -> str | None:
     """Resolve model from provider-specific defaults."""
     provider = cli_provider
+    if not provider:
+        provider = _metadata_phase_provider(metadata, phase)
     if not provider and metadata:
         provider = metadata.get("provider")
     if not provider:
-        provider = get_phase_provider(spec_dir)
+        provider = get_phase_provider(spec_dir, phase=phase)
 
     if provider and provider in PROVIDER_DEFAULT_MODELS:
         provider_models = PROVIDER_DEFAULT_MODELS[provider]
