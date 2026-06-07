@@ -27,7 +27,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { useToast } from "../../hooks/use-toast";
-import { persistUpdateTask } from "../../stores/task-store";
+import { persistUpdateTask, useTaskStore } from "../../stores/task-store";
 import { Badge } from "../ui/badge";
 import {
 	Collapsible,
@@ -157,38 +157,68 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 	// Détecter si le contenu est du HTML pur (commence par une balise HTML)
 	const isHtmlContent = displayDescription?.trim().startsWith("<") || false;
 
-	// Les anciens imports Azure DevOps stockent des <img> pointant vers des pièces
-	// jointes protégées par PAT : le renderer ne peut pas les charger
-	// (ERR_TIMED_OUT). On demande au main process de les inliner (téléchargement
-	// avec le PAT → data URI base64), puis on affiche le HTML nettoyé. Le résultat
-	// est persisté côté main pour les prochains rendus.
+	// Hydratation des tâches importées d'Azure DevOps, à l'ouverture :
+	//  - le titre slugifié a perdu ses accents (« fen-tre-… ») → on récupère le
+	//    vrai System.Title (avec accents) via le PAT côté main ;
+	//  - les <img> pointant vers des pièces jointes protégées par PAT ne se
+	//    chargent pas dans le renderer (ERR_TIMED_OUT) → on les inline en data URI.
+	// Le résultat est persisté côté main et reflété immédiatement ici.
 	const [inlinedDescription, setInlinedDescription] = useState<string | null>(
 		null,
 	);
+	// Hydrate au plus une fois par tâche : mettre à jour le titre dans le store
+	// fait re-jouer cet effet, on ne veut ni re-fetch ni flicker de la description.
+	const hydratedTaskIdRef = useRef<string | null>(null);
 
 	useEffect(() => {
-		setInlinedDescription(null);
-		if (!isHtmlContent || !displayDescription) return;
-		if (!displayDescription.includes("/_apis/wit/attachments/")) return;
+		// Nouvelle tâche ouverte → on réinitialise l'état d'hydratation.
+		if (hydratedTaskIdRef.current !== task.id) {
+			setInlinedDescription(null);
+		}
+
+		const isImported = task.metadata?.sourceType === "imported";
+		const hasAttachmentImages =
+			isHtmlContent &&
+			!!displayDescription?.includes("/_apis/wit/attachments/");
+		// Un titre encore slugifié (ex. « 003-fen-tre-… ») = titre non hydraté.
+		const titleLooksSlugified = /^\d{3}-/.test(task.title || "");
+
+		if (!isImported || (!hasAttachmentImages && !titleLooksSlugified)) return;
+		if (hydratedTaskIdRef.current === task.id) return; // déjà hydraté
+		hydratedTaskIdRef.current = task.id;
 
 		let cancelled = false;
 		(async () => {
 			try {
-				const res = await globalThis.electronAPI?.inlineAzureDevOpsTaskImages?.(
-					task.projectId,
-					task.id,
-				);
-				if (!cancelled && res?.success && res.data?.html) {
+				const res =
+					await globalThis.electronAPI?.hydrateAzureDevOpsTaskDisplay?.(
+						task.projectId,
+						task.id,
+					);
+				if (cancelled || !res?.success) return;
+				if (res.data?.html) {
 					setInlinedDescription(res.data.html);
 				}
+				// Reflète immédiatement le titre accentué dans l'en-tête (la version
+				// persistée sera reprise par le scanner au prochain rafraîchissement).
+				if (res.data?.title && res.data.title !== task.title) {
+					useTaskStore.getState().updateTask(task.id, { title: res.data.title });
+				}
 			} catch {
-				// Non bloquant : on conserve la description d'origine.
+				// Non bloquant : on conserve l'affichage d'origine.
 			}
 		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [task.id, task.projectId, displayDescription, isHtmlContent]);
+	}, [
+		task.id,
+		task.projectId,
+		task.title,
+		task.metadata?.sourceType,
+		displayDescription,
+		isHtmlContent,
+	]);
 
 	// HTML effectivement rendu : version inlinée si disponible, sinon l'originale.
 	const htmlToRender = inlinedDescription ?? displayDescription;

@@ -242,6 +242,37 @@ export function TaskEditDialog({
 		selectedProfile.phaseThinking,
 	]);
 
+	// Resolve Azure DevOps attachment images (PAT-protected URLs the renderer
+	// cannot load) into inlined data URIs so they render in the WYSIWYG editor,
+	// mirroring the read-only detail view. Only applies while the description is
+	// still untouched, so it never clobbers in-progress edits.
+	useEffect(() => {
+		if (!open) return;
+		if (!task.description?.includes("/_apis/wit/attachments/")) return;
+
+		let cancelled = false;
+		(async () => {
+			try {
+				const res =
+					await globalThis.electronAPI?.hydrateAzureDevOpsTaskDisplay?.(
+						task.projectId,
+						task.id,
+					);
+				const html = res?.data?.html;
+				if (!cancelled && res?.success && html) {
+					setDescription((current) =>
+						current === task.description ? html : current,
+					);
+				}
+			} catch {
+				// Non-blocking: keep the original description.
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [open, task.id, task.projectId, task.description]);
+
 	/**
 	 * Handle file reference drop from FileTreeItem drag
 	 * Appends @filename to the end of the description (no textarea ref in edit dialog)

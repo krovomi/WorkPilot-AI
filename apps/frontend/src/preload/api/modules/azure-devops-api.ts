@@ -44,10 +44,10 @@ export interface AzureDevOpsAPI {
 		taskId: string,
 		workItemId: number,
 	) => Promise<IPCResult<{ acceptanceCriteria: string[] }>>;
-	inlineAzureDevOpsTaskImages: (
+	hydrateAzureDevOpsTaskDisplay: (
 		projectId: string,
 		taskId: string,
-	) => Promise<IPCResult<{ html: string }>>;
+	) => Promise<IPCResult<{ html: string; title?: string }>>;
 }
 
 /**
@@ -118,12 +118,12 @@ export const createAzureDevOpsAPI = (): AzureDevOpsAPI => ({
 			workItemId,
 		),
 
-	inlineAzureDevOpsTaskImages: (
+	hydrateAzureDevOpsTaskDisplay: (
 		projectId: string,
 		taskId: string,
-	): Promise<IPCResult<{ html: string }>> =>
+	): Promise<IPCResult<{ html: string; title?: string }>> =>
 		invokeIpc(
-			IPC_CHANNELS.AZURE_DEVOPS_INLINE_TASK_IMAGES,
+			IPC_CHANNELS.AZURE_DEVOPS_HYDRATE_TASK_DISPLAY,
 			projectId,
 			taskId,
 		),

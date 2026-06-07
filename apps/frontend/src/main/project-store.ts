@@ -898,6 +898,29 @@ export class ProjectStore {
 	}
 
 	/**
+	 * Get the clean, accented display title from requirements.json, if any.
+	 * Renseigné à l'import (Azure DevOps) ou par l'hydratation à l'ouverture.
+	 * Évite de retomber sur le nom de dossier slugifié (accents perdus).
+	 */
+	private getRequirementsDisplayTitle(specPath: string): string {
+		const requirementsPath = path.join(specPath, AUTO_BUILD_PATHS.REQUIREMENTS);
+
+		if (!existsSync(requirementsPath)) {
+			return "";
+		}
+
+		try {
+			const reqContent = readFileSync(requirementsPath, "utf-8");
+			const requirements = JSON.parse(reqContent);
+			return typeof requirements.display_title === "string"
+				? requirements.display_title.trim()
+				: "";
+		} catch {
+			return "";
+		}
+	}
+
+	/**
 	 * Get description from requirements.json
 	 */
 	private getRequirementsDescription(specPath: string): string {
@@ -1039,6 +1062,17 @@ export class ProjectStore {
 		// For JSON error tasks, use directory name with marker
 		if (hasJsonError) {
 			return `${dirName}${JSON_ERROR_TITLE_SUFFIX}`;
+		}
+
+		// Highest priority: a clean, accented title persisted at import time or by
+		// the on-open hydration (requirements.display_title). This is what keeps
+		// imported US/RsD titles readable ("Fenêtre d'avertissement…") instead of
+		// the slugified folder name that has lost its accents.
+		const displayTitle = this.getRequirementsDisplayTitle(specPath);
+		if (displayTitle) {
+			return displayTitle.length > 200
+				? `${displayTitle.slice(0, 200)}…`
+				: displayTitle;
 		}
 
 		// Get title from plan. The spec-folder name (dirName) is a clean,

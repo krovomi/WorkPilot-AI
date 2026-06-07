@@ -207,7 +207,7 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			// Create spec ID with zero-padded number and slugified title
 			const slugifiedTitle = finalTitle
 				.toLowerCase()
-				.replace(/[^a-z0-9]+/g, "-")
+				.replace(/[^\p{L}\p{N}]+/gu, "-")
 				.replace(/^-|-$/g, "")
 				.substring(0, 50);
 			const specId = `${String(specNumber).padStart(3, "0")}-${slugifiedTitle}`;
@@ -570,11 +570,47 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					return { success: false, error: "Spec directory not found" };
 				}
 
+				// Derive AI-facing plain text and display HTML from the (possibly
+				// HTML) description, mirroring task creation:
+				//  - AI-consumed fields (plan, spec.md, task_description) get plain
+				//    text so the prompt is never polluted with markup or multi-MB
+				//    inlined image data URIs;
+				//  - the rich HTML — including inlined Azure DevOps images — is kept
+				//    in `display_description` for the UI.
+				const descriptionProvided = updates.description !== undefined;
+				const descriptionIsHtml =
+					descriptionProvided &&
+					(updates.description as string).trimStart().startsWith("<");
+				let aiDescription = updates.description;
+				let displayDescription = updates.description;
+				if (descriptionIsHtml) {
+					const html = updates.description as string;
+					aiDescription = stripHtml(html) || html;
+					displayDescription = html;
+					if (task.metadata?.importSource === "azure-devops") {
+						const az = loadAzureDevOpsConfig(
+							project.path,
+							project.autoBuildPath || "",
+						);
+						if (az.pat && az.orgUrl) {
+							try {
+								displayDescription = await inlineAzureDevOpsImages(
+									html,
+									az.orgUrl,
+									az.pat,
+								);
+							} catch (err) {
+								console.error("[TASK_UPDATE] Image inlining failed:", err);
+							}
+						}
+					}
+				}
+
 				// Auto-generate title if empty
 				let finalTitle = updates.title;
 				if (updates.title !== undefined && !updates.title.trim()) {
-					// Get description to use for title generation
-					const descriptionToUse = updates.description ?? task.description;
+					// Get description to use for title generation (plain text)
+					const descriptionToUse = aiDescription ?? task.description;
 					console.warn(
 						"[TASK_UPDATE] Title is empty, generating with Claude AI...",
 					);
@@ -613,8 +649,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					if (finalTitle !== undefined) {
 						plan.feature = finalTitle;
 					}
-					if (updates.description !== undefined) {
-						plan.description = updates.description;
+					if (descriptionProvided) {
+						plan.description = aiDescription;
 					}
 					plan.updated_at = new Date().toISOString();
 
@@ -640,11 +676,11 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					}
 
 					// Update description (## Overview section content)
-					if (updates.description !== undefined) {
+					if (descriptionProvided) {
 						// Replace content between ## Overview and the next ## section
 						specContent = specContent.replace(
 							/(## Overview\n)([\s\S]*?)((?=\n## )|$)/,
-							`$1${updates.description}\n\n$3`,
+							`$1${aiDescription}\n\n$3`,
 						);
 					}
 
@@ -765,8 +801,15 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 						const requirementsContent = readFileSync(requirementsPath, "utf-8");
 						const requirements = JSON.parse(requirementsContent);
 
-						if (updates.description !== undefined) {
-							requirements.task_description = updates.description;
+						if (descriptionProvided) {
+							requirements.task_description = aiDescription;
+							// Keep the rich HTML (with inlined images) for display only,
+							// without polluting the AI-consumed task_description.
+							if (descriptionIsHtml && displayDescription !== aiDescription) {
+								requirements.display_description = displayDescription;
+							} else {
+								delete requirements.display_description;
+							}
 						}
 						if (updates.metadata.category) {
 							requirements.workflow_type = updates.metadata.category;
@@ -796,11 +839,13 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					}
 				}
 
-				// Build the updated task object
+				// Build the updated task object. Surface the display HTML (with
+				// inlined images) so the UI matches what is persisted as
+				// display_description, consistent with task creation.
 				const updatedTask: Task = {
 					...task,
 					title: finalTitle ?? task.title,
-					description: updates.description ?? task.description,
+					description: displayDescription ?? task.description,
 					metadata: updatedMetadata,
 					updatedAt: new Date(),
 				};

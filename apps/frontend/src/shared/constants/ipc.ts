@@ -272,7 +272,7 @@ export const IPC_CHANNELS = {
 	AZURE_DEVOPS_LIST_REPOSITORIES: "azureDevOps:listRepositories",
 	AZURE_DEVOPS_DETECT_REPOSITORY: "azureDevOps:detectRepository",
 	AZURE_DEVOPS_SYNC_TASK_AC: "azureDevOps:syncTaskAC",
-	AZURE_DEVOPS_INLINE_TASK_IMAGES: "azureDevOps:inlineTaskImages",
+	AZURE_DEVOPS_HYDRATE_TASK_DISPLAY: "azureDevOps:hydrateTaskDisplay",
 
 	// Azure DevOps PR Review
 	AZURE_DEVOPS_PR_REVIEW: "azureDevOps:prReview",

@@ -1,4 +1,4 @@
-﻿import { spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -732,7 +732,7 @@ except Exception as e:
 						const slugifiedTitle =
 							safeTitle
 								.toLowerCase()
-								.replace(/[^a-z0-9]+/g, "-")
+								.replace(/[^\p{L}\p{N}]+/gu, "-")
 								.replace(/^-|-$/g, "")
 								.substring(0, 50) || "task";
 						const specId = `${String(specNumber).padStart(3, "0")}-${slugifiedTitle}`;
@@ -848,6 +848,12 @@ except Exception as e:
 										? "feature"
 										: category,
 						};
+						// Titre propre et accentué du work item, conservé pour l'affichage.
+						// Le scanner le sert en priorité dans extractTitle, ce qui évite de
+						// retomber sur le nom de dossier slugifié (accents perdus).
+						if (safeTitle) {
+							requirements.display_title = safeTitle;
+						}
 						// HTML enrichi (images Azure DevOps inlinées en data URIs) conservé
 						// séparément pour l'affichage. La scanner le sert en priorité 0
 						// (getRequirementsDisplayDescription) afin que les captures de l'US/RsD
@@ -920,30 +926,34 @@ except Exception as e:
 	);
 
 	// ============================================
-	// Azure DevOps attachment image inlining (on demand)
+	// Azure DevOps imported-task display hydration (on demand)
 	// ============================================
 
 	/**
-	 * Inline the Azure DevOps attachment images embedded in a task's description.
+	 * Hydrate the display fields of an imported Azure DevOps task on open.
 	 *
-	 * Older imports stored the raw work-item HTML (with
-	 * `<img src="https://dev.azure.com/.../_apis/wit/attachments/...">`) directly
-	 * in requirements.json. Those URLs require PAT auth, so the renderer can't
-	 * load them (ERR_TIMED_OUT) and shows broken images.
+	 * Older imports stored the raw work-item HTML in requirements.json and lost
+	 * the clean title (the spec-folder name is slugified, so accents are gone:
+	 * "Fenêtre…" → "fen-tre-…"). Two repairs, both lazy and one-shot:
 	 *
-	 * The renderer calls this when it detects un-inlined attachment images. We
-	 * download them here (main process, with the project's PAT), base64-inline
-	 * them, persist the result as requirements.display_description so the scanner
-	 * serves it directly next time, and return the cleaned HTML. Any image that
-	 * still can't be fetched is stripped so it never re-triggers a failed request.
+	 *  - Title: when requirements.display_title is missing, fetch the work item's
+	 *    System.Title via the PAT (accents intact), and persist it. extractTitle
+	 *    serves it with top priority.
+	 *  - Images: `<img src="https://dev.azure.com/.../_apis/wit/attachments/...">`
+	 *    need PAT auth, so the renderer can't load them (ERR_TIMED_OUT). We
+	 *    download + base64-inline them (display_description); any that still fail
+	 *    are stripped so they never re-fire a failing request.
+	 *
+	 * Returns the (cleaned) html and the resolved title so the renderer can show
+	 * them immediately; both are also persisted for subsequent scans.
 	 */
 	ipcMain.handle(
-		IPC_CHANNELS.AZURE_DEVOPS_INLINE_TASK_IMAGES,
+		IPC_CHANNELS.AZURE_DEVOPS_HYDRATE_TASK_DISPLAY,
 		async (
 			_,
 			projectId: string,
 			taskId: string,
-		): Promise<IPCResult<{ html: string }>> => {
+		): Promise<IPCResult<{ html: string; title?: string }>> => {
 			try {
 				const project = projectStore.getProject(projectId);
 				if (!project) {
@@ -973,6 +983,61 @@ except Exception as e:
 					return { success: false, error: "requirements.json is malformed" };
 				}
 
+				const config = getAzureDevOpsConfig(project);
+				let changed = false;
+
+				// --- Title backfill (accented System.Title) -------------------------
+				let resolvedTitle =
+					typeof requirements.display_title === "string"
+						? requirements.display_title
+						: undefined;
+				const identifier = task?.metadata?.azureDevOpsIdentifier ?? "";
+				const workItemId = Number.parseInt(identifier.replace(/\D/g, ""), 10);
+				if (
+					!resolvedTitle &&
+					Number.isFinite(workItemId) &&
+					workItemId > 0 &&
+					config.pat &&
+					config.orgUrl
+				) {
+					try {
+						const projectPath = path.join(
+							project.path,
+							project.autoBuildPath || "",
+						);
+						const envOverrides: Record<string, string> = {
+							AZURE_DEVOPS_PAT: config.pat,
+							AZURE_DEVOPS_ORG_URL: config.orgUrl,
+						};
+						const normalizedProject = normalizeProjectName(config.projectName);
+						if (normalizedProject)
+							envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
+
+						const rawItem = (await callAzureDevOpsPython(
+							projectPath,
+							"get_work_item",
+							{ work_item_id: workItemId },
+							envOverrides,
+						)) as { id: number; title?: string };
+
+						const cleanTitle = sanitizeText(
+							stripHtml(rawItem.title ?? "").replace(/\s+/g, " "),
+							200,
+						);
+						if (cleanTitle) {
+							requirements.display_title = cleanTitle;
+							resolvedTitle = cleanTitle;
+							changed = true;
+						}
+					} catch (err) {
+						console.warn(
+							"[AZURE_DEVOPS_HYDRATE_TASK_DISPLAY] Title fetch failed (non-fatal):",
+							err,
+						);
+					}
+				}
+
+				// --- Image inlining --------------------------------------------------
 				// Prefer an already-inlined display description, else the raw one.
 				const sourceHtml =
 					typeof requirements.display_description === "string" &&
@@ -982,27 +1047,27 @@ except Exception as e:
 							? requirements.task_description
 							: "";
 
-				if (!sourceHtml.includes("<img")) {
-					return { success: true, data: { html: sourceHtml } };
-				}
-
-				const config = getAzureDevOpsConfig(project);
-
 				let html = sourceHtml;
-				if (config.pat && config.orgUrl) {
-					html = await inlineAzureDevOpsImages(
-						sourceHtml,
-						config.orgUrl,
-						config.pat,
-					);
-				}
-				// Strip any attachment image that couldn't be inlined (no PAT, or
-				// the download failed) so the renderer never fires a failing request.
-				html = stripAzureAttachmentImages(html, config.orgUrl ?? undefined);
+				if (sourceHtml.includes("<img")) {
+					if (config.pat && config.orgUrl) {
+						html = await inlineAzureDevOpsImages(
+							sourceHtml,
+							config.orgUrl,
+							config.pat,
+						);
+					}
+					// Strip any attachment image that couldn't be inlined (no PAT, or
+					// the download failed) so the renderer never fires a failed request.
+					html = stripAzureAttachmentImages(html, config.orgUrl ?? undefined);
 
-				// Persist so the scanner serves it via priority-0 display_description.
-				if (html !== requirements.display_description) {
-					requirements.display_description = html;
+					if (html !== requirements.display_description) {
+						requirements.display_description = html;
+						changed = true;
+					}
+				}
+
+				// Persist both fields together so the scanner serves them next time.
+				if (changed) {
 					try {
 						writeFileSync(
 							requirementsPath,
@@ -1012,13 +1077,13 @@ except Exception as e:
 						projectStore.invalidateTasksCache(projectId);
 					} catch (err) {
 						console.warn(
-							"[AZURE_DEVOPS_INLINE_TASK_IMAGES] Could not persist display_description:",
+							"[AZURE_DEVOPS_HYDRATE_TASK_DISPLAY] Could not persist display fields:",
 							err,
 						);
 					}
 				}
 
-				return { success: true, data: { html } };
+				return { success: true, data: { html, title: resolvedTitle } };
 			} catch (error: unknown) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
