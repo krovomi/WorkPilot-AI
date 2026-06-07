@@ -47,6 +47,41 @@ logger = logging.getLogger(__name__)
 
 CONTENT_TYPE_JSON = "application/json"
 
+# Copilot API enforces a prompt token limit that varies by model.
+# These are safe upper bounds (in characters, ≈ 4 chars/token) for the
+# history preamble injected on provider switch.  We leave ~20 % headroom
+# for the system prompt, tool definitions, and user message.
+# Key: Copilot model id as used in the API payload.
+_COPILOT_HISTORY_CHAR_LIMIT: dict[str, int] = {
+    # 1 M-token models — generous budget
+    "gpt-4.1": 2_000_000,
+    "gemini-2.5-pro": 2_000_000,
+    # 200 k-token models (Claude 4.x, o-series) — 160 k token budget
+    "claude-opus-4.8": 640_000,
+    "claude-opus-4.7": 640_000,
+    "claude-opus-4.6": 640_000,
+    "claude-opus-4.5": 640_000,
+    "claude-sonnet-4.6": 640_000,
+    "claude-sonnet-4.5": 640_000,
+    "claude-3.7-sonnet": 640_000,
+    "o1": 640_000,
+    "o3": 640_000,
+    "o3-mini": 640_000,
+    "o4-mini": 640_000,
+    # GPT-5.x — assume 200 k by default
+    "gpt-5.5": 640_000,
+    "gpt-5.4": 640_000,
+    # 128 k-token models — 100 k token budget
+    "gpt-4o": 400_000,
+    "gpt-4o-mini": 400_000,
+    "gpt-4.1-mini": 400_000,
+    "claude-haiku-4.5": 400_000,
+    "gemini-2.0-flash": 400_000,
+    "o1-mini": 400_000,
+}
+# Default for unknown Copilot models: 100 k tokens (~400 k chars)
+_COPILOT_HISTORY_CHAR_LIMIT_DEFAULT = 400_000
+
 # =============================================================================
 # Message Types for provider-agnostic stream processing
 # =============================================================================
@@ -178,6 +213,33 @@ class AgentClient(ABC):
         """Return the provider identifier (e.g., 'claude', 'copilot')."""
         ...
 
+    async def resume(self, history: list[AgentMessage]) -> None:
+        """Preload a conversation history before the next query() call.
+
+        Used when a task was paused (rate-limit, auth, user) and is being
+        resumed — possibly under a different provider than the one that
+        produced the original transcript. Implementations should preseed
+        their internal message buffer (when the SDK exposes one) or stash
+        the history for the next query() to prepend it as context.
+
+        Default implementation stores history on `self._resumed_history` and
+        relies on subclasses to consult it from `query()`. Override entirely
+        when a provider exposes a native `messages=[...]` parameter.
+
+        Args:
+            history: Ordered list of past AgentMessage objects to replay
+                (oldest first). May contain user, assistant and system
+                messages with text/tool_use/tool_result blocks.
+        """
+        self._resumed_history = history or []
+        if history:
+            logger.info(
+                "[%s] resume queued: %d historical messages will be injected "
+                "into the next query as a transcript preamble.",
+                self.provider_name(),
+                len(history),
+            )
+
     # Async context manager protocol
     async def __aenter__(self):
         return self
@@ -185,6 +247,65 @@ class AgentClient(ABC):
     @abstractmethod
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
+
+    # ------------------------------------------------------------------
+    # Helpers for subclasses implementing resume()
+    # ------------------------------------------------------------------
+    def _consume_resumed_history_as_system_message(
+        self, messages: list[dict[str, Any]]
+    ) -> None:
+        """If resume(history) was queued, append a system message containing the
+        formatted preamble to `messages` (mutates in place) and clear the queue.
+
+        Call this once per request, after `system_prompt` is added and before
+        the user message. No-op when no resume() has been called.
+        """
+        history = getattr(self, "_resumed_history", None)
+        if not history:
+            return
+        preamble = self._format_history_as_preamble(history)
+        if preamble:
+            messages.append({"role": "system", "content": preamble})
+        self._resumed_history = []  # consume
+
+    @staticmethod
+    def _format_history_as_preamble(history: list[AgentMessage]) -> str:
+        """Render a conversation history as a plain-text preamble.
+
+        Used by subclasses whose SDK doesn't expose a structured messages
+        parameter. The output is condensed but lossless enough for the LLM
+        to reconstruct context: each message becomes a role-labeled block,
+        each tool_use becomes a "called tool X with input ..." line, and
+        each tool_result becomes a "got: ..." line.
+        """
+        if not history:
+            return ""
+
+        lines: list[str] = [
+            "=== PRIOR CONVERSATION (replayed after provider switch) ===",
+            "",
+        ]
+        for msg in history:
+            role = msg.role.value if isinstance(msg.role, Enum) else str(msg.role)
+            lines.append(f"[{role}]")
+            for block in msg.content:
+                if block.type == ContentBlockType.TEXT and block.text:
+                    lines.append(block.text)
+                elif block.type == ContentBlockType.THINKING and block.text:
+                    # Drop thinking by default — it's provider-specific
+                    # metadata that doesn't replay well across SDKs.
+                    continue
+                elif block.type == ContentBlockType.TOOL_USE:
+                    tool = block.tool_name or "unknown"
+                    inp = block.tool_input or {}
+                    lines.append(f"<tool_use name={tool}> {inp!r}")
+                elif block.type == ContentBlockType.TOOL_RESULT:
+                    res = str(block.result_content or "")[:1000]
+                    flag = " [ERROR]" if block.is_error else ""
+                    lines.append(f"<tool_result{flag}> {res}")
+            lines.append("")
+        lines.append("=== END PRIOR CONVERSATION — continue from here ===")
+        return "\n".join(lines)
 
 
 # =============================================================================
@@ -214,12 +335,20 @@ class ClaudeAgentClient(AgentClient):
         self.last_result_msg: Any | None = None
         self.last_session_id: str | None = None
         self.last_usage: dict | None = None
+        # Optional history queued by resume() for the next query() call.
+        self._resumed_history: list[AgentMessage] = []
 
     async def query(self, prompt: str) -> None:
         # Reset per-query observables so callers always see fresh data.
         self.last_result_msg = None
         self.last_session_id = None
         self.last_usage = None
+        # If resume(history) was called, prepend the transcript so the LLM
+        # has the same context the previous provider had. Consumed once.
+        if self._resumed_history:
+            preamble = self._format_history_as_preamble(self._resumed_history)
+            self._resumed_history = []  # consume
+            prompt = preamble + "\n\n" + prompt
         await self._client.query(prompt)
 
     async def receive_response(self) -> AsyncIterator[AgentMessage]:
@@ -689,6 +818,52 @@ class CopilotAgentClient(AgentClient):
                         f"Copilot token exchange failed ({resp.status}): {error_text}{token_hint}"
                     )
 
+    async def resume(self, history: list[AgentMessage]) -> None:
+        """Preload conversation history, truncating to Copilot's context window.
+
+        Copilot models have varying prompt-token limits (128 k – 1 M).  When
+        switching from a provider with a larger context (e.g. Claude Code at
+        200 k+), the accumulated conversation can easily exceed those limits,
+        causing a 400 ``model_max_prompt_tokens_exceeded`` error.
+
+        This override drops the *oldest* messages one-by-one until the
+        rendered preamble fits within the model's safe character budget.
+        """
+        if not history:
+            await super().resume(history)
+            return
+
+        char_limit = _COPILOT_HISTORY_CHAR_LIMIT.get(
+            self.model, _COPILOT_HISTORY_CHAR_LIMIT_DEFAULT
+        )
+
+        truncated = list(history)
+        while len(truncated) > 1:
+            preamble = self._format_history_as_preamble(truncated)
+            if len(preamble) <= char_limit:
+                break
+            truncated = truncated[1:]  # drop oldest message
+
+        dropped = len(history) - len(truncated)
+        if dropped:
+            logger.warning(
+                "[CopilotAgentClient] History truncated on provider switch: "
+                "dropped %d oldest message(s) to fit within the %s context window "
+                "(%d → %d messages, limit ≈ %d chars).",
+                dropped,
+                self.model,
+                len(history),
+                len(truncated),
+                char_limit,
+            )
+            print(
+                f"[CopilotAgentClient] ⚠️  History truncated: {dropped} old "
+                f"message(s) dropped to respect {self.model} context limit.",
+                flush=True,
+            )
+
+        await super().resume(truncated)
+
     async def query(self, prompt: str) -> None:
         """Queue a prompt for the next receive_response() call."""
         self._pending_query = prompt
@@ -717,6 +892,9 @@ class CopilotAgentClient(AgentClient):
         messages: list[dict[str, Any]] = []
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
+        # If resume(history) was queued, inject the prior transcript so this
+        # provider sees the same context the previous one had.
+        self._consume_resumed_history_as_system_message(messages)
         messages.append({"role": "user", "content": prompt})
 
         # Build OpenAI-format tool definitions
@@ -1253,6 +1431,9 @@ class OpenAIAgentClient(AgentClient):
         messages: list[dict[str, Any]] = []
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
+        # If resume(history) was queued, inject the prior transcript so this
+        # provider sees the same context the previous one had.
+        self._consume_resumed_history_as_system_message(messages)
         messages.append({"role": "user", "content": prompt})
 
         tools = [
@@ -1872,6 +2053,9 @@ class WindsurfAgentClient(AgentClient):
 
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
+        # If resume(history) was queued, inject the prior transcript so this
+        # provider sees the same context the previous one had.
+        self._consume_resumed_history_as_system_message(messages)
         messages.append({"role": "user", "content": prompt})
 
         last_error: Exception | None = None
@@ -2116,6 +2300,9 @@ class WindsurfAgentClient(AgentClient):
         messages: list[dict[str, str]] = []
         if full_system_prompt:
             messages.append({"role": "system", "content": full_system_prompt})
+        # If resume(history) was queued, inject the prior transcript so this
+        # provider sees the same context the previous one had.
+        self._consume_resumed_history_as_system_message(messages)
         messages.append({"role": "user", "content": prompt})
 
         logger.info(
@@ -2418,6 +2605,9 @@ class WindsurfAgentClient(AgentClient):
         messages: list[dict[str, Any]] = []
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
+        # If resume(history) was queued, inject the prior transcript so this
+        # provider sees the same context the previous one had.
+        self._consume_resumed_history_as_system_message(messages)
         messages.append({"role": "user", "content": prompt})
 
         tools = self._get_openai_tools()

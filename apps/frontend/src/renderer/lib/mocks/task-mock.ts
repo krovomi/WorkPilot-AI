@@ -134,4 +134,24 @@ export const taskMock = {
 	onMergeProgress: () => () => {
 		/* noop */
 	},
+	runVisualProof: async () => ({
+		success: true as const,
+		data: {
+			id: "mock",
+			status: "skipped" as const,
+			taskId: "mock",
+			specId: "mock",
+			prUrl: "",
+			screenshots: [],
+			startedAt: new Date().toISOString(),
+			completedAt: new Date().toISOString(),
+		},
+	}),
+	getVisualProofStatus: async () => ({
+		success: true as const,
+		data: { running: false },
+	}),
+	onVisualProofRunning: () => () => {
+		/* noop */
+	},
 };

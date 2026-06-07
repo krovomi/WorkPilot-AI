@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sys
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -113,25 +114,20 @@ def _scan_commands_dir(dir_path: Path, source: str) -> list[dict[str, Any]]:
     return items
 
 
-# Built-in slash commands the SDK / CLI recognises. We surface a small
-# curated set in the picker so users discover them without typing — the
-# full CLI list is much larger but most are noise for the Kanban UI.
+# Built-in slash commands the SDK / CLI recognises AND that make sense in
+# our one-shot Quick-Command bar. Commands that operate on a persistent
+# conversation (/compact, /clear, /save, /resume…) are intentionally
+# omitted: each click here spawns a fresh SDK client with an empty
+# transcript, so those commands would always return "No messages to …".
+# Self-contained commands like /review and /help work without prior context.
 _BUILT_IN_COMMANDS: list[dict[str, str]] = [
     {
-        "name": "compact",
-        "description": "Compact the current conversation to free context window space",
-    },
-    {
-        "name": "clear",
-        "description": "Clear the conversation transcript (does not affect files)",
+        "name": "review",
+        "description": "Run the bundled code review skill on the current branch",
     },
     {
         "name": "help",
         "description": "Show built-in slash command help",
-    },
-    {
-        "name": "review",
-        "description": "Run the bundled code review skill on the current branch",
     },
 ]
 
@@ -155,6 +151,82 @@ def list_slash_commands(project_dir: Annotated[str, Query()]):
         "success": True,
         "commands": project_cmds + user_cmds + built_ins,
     }
+
+
+async def _invoke_sdk_in_proactor_thread(proj: Path, prompt: str) -> tuple[bool, str]:
+    """Run the SDK call on a dedicated thread with its own Proactor loop.
+
+    Why: uvicorn's running event loop is sometimes a SelectorEventLoop on
+    Windows (depending on Python / uvicorn / FastAPI versions), and
+    SelectorEventLoop.subprocess_exec raises NotImplementedError. The Claude
+    Agent SDK launches `claude.exe` as a subprocess, so we MUST run it on a
+    loop that supports subprocess. Solution: spawn a worker thread, force a
+    Proactor loop there, and execute the whole SDK conversation inside it.
+
+    This pattern is robust regardless of how uvicorn is started (`--reload`,
+    no-reload, `--loop asyncio`, `--loop uvloop`, etc.).
+
+    Returns (success, text). On failure, text is the error message.
+    """
+    import asyncio as _a
+
+    def _worker() -> tuple[bool, str]:
+        # On Windows, force a Proactor loop in this thread. On POSIX, this
+        # branch is a no-op (WindowsProactorEventLoopPolicy is undefined).
+        if sys.platform == "win32":
+            _policy_cls = getattr(_a, "WindowsProactorEventLoopPolicy", None)
+            if _policy_cls is not None:
+                _a.set_event_loop_policy(_policy_cls())
+        loop = _a.new_event_loop()
+        try:
+            _a.set_event_loop(loop)
+            return loop.run_until_complete(_sdk_call(proj, prompt))
+        finally:
+            try:
+                loop.close()
+            except Exception:
+                pass
+
+    # asyncio.to_thread schedules the worker on the default executor and
+    # awaits its return value without blocking the FastAPI event loop.
+    return await _a.to_thread(_worker)
+
+
+async def _sdk_call(proj: Path, prompt: str) -> tuple[bool, str]:
+    """The actual SDK conversation. Runs on the Proactor worker loop."""
+    try:
+        from core.simple_client import create_simple_client
+    except ImportError as exc:
+        return False, f"Claude Agent SDK not available: {exc}"
+
+    try:
+        client = create_simple_client(
+            # "analyzer" is read-only with no MCP — safe baseline for a
+            # one-shot user-triggered prompt.
+            agent_type="analyzer",
+            cwd=proj,
+            max_turns=1,
+        )
+    except Exception as exc:
+        logger.exception("[slash-commands] failed to build client")
+        return False, f"failed to build SDK client: {exc}"
+
+    response_text = ""
+    try:
+        async with client:
+            await client.query(prompt)
+            async for msg in client.receive_response():
+                if type(msg).__name__ == "AssistantMessage" and hasattr(msg, "content"):
+                    for block in msg.content:
+                        if type(block).__name__ == "TextBlock" and hasattr(
+                            block, "text"
+                        ):
+                            response_text += block.text
+    except Exception as exc:
+        logger.exception("[slash-commands] SDK call failed")
+        return False, f"SDK call failed: {exc}"
+
+    return True, response_text.strip()
 
 
 @router.post("/api/slash-commands/run")
@@ -195,54 +267,7 @@ async def run_slash_command(payload: Annotated[dict, Body()]):
     if args.strip():
         prompt = f"{prompt} {args.strip()}"
 
-    # Lazy import so the router stays importable in test environments where
-    # the SDK isn't installed (we still want list_slash_commands to work).
-    try:
-        from core.simple_client import create_simple_client
-    except ImportError as exc:
-        return {
-            "success": False,
-            "error": f"Claude Agent SDK not available: {exc}",
-            "prompt": prompt,
-        }
-
-    try:
-        client = create_simple_client(
-            # "analyzer" is read-only with no MCP — safe baseline for a
-            # one-shot user-triggered prompt.
-            agent_type="analyzer",
-            cwd=proj,
-            max_turns=1,
-        )
-    except Exception as exc:
-        logger.exception("[slash-commands] failed to build client")
-        return {
-            "success": False,
-            "error": f"failed to build SDK client: {exc}",
-            "prompt": prompt,
-        }
-
-    response_text = ""
-    try:
-        async with client:
-            await client.query(prompt)
-            async for msg in client.receive_response():
-                if type(msg).__name__ == "AssistantMessage" and hasattr(msg, "content"):
-                    for block in msg.content:
-                        if type(block).__name__ == "TextBlock" and hasattr(
-                            block, "text"
-                        ):
-                            response_text += block.text
-    except Exception as exc:
-        logger.exception("[slash-commands] SDK call failed")
-        return {
-            "success": False,
-            "error": f"SDK call failed: {exc}",
-            "prompt": prompt,
-        }
-
-    return {
-        "success": True,
-        "prompt": prompt,
-        "result": response_text.strip(),
-    }
+    ok, text = await _invoke_sdk_in_proactor_thread(proj, prompt)
+    if ok:
+        return {"success": True, "prompt": prompt, "result": text}
+    return {"success": False, "prompt": prompt, "error": text}

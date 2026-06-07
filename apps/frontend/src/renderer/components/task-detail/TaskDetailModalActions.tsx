@@ -13,6 +13,7 @@ import type { IPCResult, Project, Task } from "../../../shared/types";
 import { AgentToolsButton, ProgressIndicatorBadge } from "../agent-tools";
 import { StreamingSessionButton } from "../streaming/StreamingSessionButton";
 import { Button } from "../ui/button";
+import { ResumeWithProviderDropdown } from "./ResumeWithProviderDropdown";
 
 interface TaskDetailModalActionsProps {
 	readonly task: Task;
@@ -151,12 +152,12 @@ export function TaskDetailModalActions({
 				{state.isRecovering ? (
 					<>
 						<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-						Recovering...
+						{t("tasks:modal.actions.recovering")}
 					</>
 				) : (
 					<>
 						<RotateCcw className="mr-2 h-4 w-4" />
-						Recover Task
+						{t("tasks:modal.actions.recoverTask")}
 					</>
 				)}
 			</Button>
@@ -165,23 +166,30 @@ export function TaskDetailModalActions({
 
 	if (state.isIncomplete) {
 		return (
-			<Button
-				variant="default"
-				onClick={handleStartStop}
-				disabled={state.isLoadingPlan}
-			>
-				{state.isLoadingPlan ? (
-					<>
-						<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-						Loading Plan...
-					</>
-				) : (
-					<>
-						<Play className="mr-2 h-4 w-4" />
-						Resume Task
-					</>
-				)}
-			</Button>
+			<div className="flex items-center gap-2">
+				<Button
+					variant="default"
+					onClick={handleStartStop}
+					disabled={state.isLoadingPlan}
+				>
+					{state.isLoadingPlan ? (
+						<>
+							<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+							Loading Plan...
+						</>
+					) : (
+						<>
+							<Play className="mr-2 h-4 w-4" />
+							Resume Task
+						</>
+					)}
+				</Button>
+				<ResumeWithProviderDropdown
+					taskId={task.id}
+					currentProvider={task.metadata?.provider}
+					disabled={state.isLoadingPlan}
+				/>
+			</div>
 		);
 	}
 
@@ -201,6 +209,41 @@ export function TaskDetailModalActions({
 	}
 
 	if (task.status === "ai_review" || task.status === "human_review") {
+		// Special-case the "prompt too long" halt: the conversation log grew
+		// past the LLM context window, so the normal review UI is useless.
+		// Offer the two real remediations: reset the conversation log (clears
+		// the replay history) or switch to a provider with a larger context.
+		if (task.reviewReason === "prompt_too_long") {
+			return (
+				<div className="flex items-center gap-2">
+					<Button
+						variant="default"
+						onClick={async () => {
+							const res = await globalThis.electronAPI.resetTaskConversation(
+								task.id,
+							);
+							if (!res?.success && res?.error) {
+								globalThis.window.alert(res.error);
+							}
+						}}
+						title={t(
+							"tasks:modal.actions.resetConversationTooltip",
+							"Effacer l'historique de la conversation pour repartir avec un contexte vierge",
+						)}
+					>
+						<RotateCcw className="mr-2 h-4 w-4" />
+						{t(
+							"tasks:modal.actions.resetConversation",
+							"Réinitialiser la conversation",
+						)}
+					</Button>
+					<ResumeWithProviderDropdown
+						taskId={task.id}
+						currentProvider={task.metadata?.provider}
+					/>
+				</div>
+			);
+		}
 		return <ReviewableActions task={task} activeProject={activeProject} />;
 	}
 
@@ -211,21 +254,27 @@ export function TaskDetailModalActions({
 	// surfaces a useful error if none exists.
 	if (task.status === "error") {
 		return (
-			<Button
-				variant="default"
-				onClick={async () => {
-					const res = (await globalThis.electronAPI.invoke(
-						IPC_CHANNELS.TASK_RESUME_SESSION,
-						task.id,
-					)) as IPCResult;
-					if (!res?.success && res?.error) {
-						globalThis.window.alert(res.error);
-					}
-				}}
-			>
-				<RefreshCw className="mr-2 h-4 w-4" />
-				{t("tasks:modal.actions.resumeSession", "Reprendre la session")}
-			</Button>
+			<div className="flex items-center gap-2">
+				<Button
+					variant="default"
+					onClick={async () => {
+						const res = (await globalThis.electronAPI.invoke(
+							IPC_CHANNELS.TASK_RESUME_SESSION,
+							task.id,
+						)) as IPCResult;
+						if (!res?.success && res?.error) {
+							globalThis.window.alert(res.error);
+						}
+					}}
+				>
+					<RefreshCw className="mr-2 h-4 w-4" />
+					{t("tasks:modal.actions.resumeSession", "Reprendre la session")}
+				</Button>
+				<ResumeWithProviderDropdown
+					taskId={task.id}
+					currentProvider={task.metadata?.provider}
+				/>
+			</div>
 		);
 	}
 

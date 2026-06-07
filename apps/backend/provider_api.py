@@ -1439,6 +1439,46 @@ async def get_provider_usage(provider: str):
                     ),
                 }
 
+            # Branche "personal-quotas": quotas Premium Requests via
+            # /copilot_internal/user — c'est ce que la UI github.com affiche.
+            if usage_data.get("scope") == "personal-quotas":
+                premium = usage_data.get("premium_requests", {}) or {}
+                chat = usage_data.get("chat", {}) or {}
+                completions = usage_data.get("completions", {}) or {}
+                return {
+                    "provider": "copilot",
+                    "available": True,
+                    "usage": {
+                        "scope": "personal-quotas",
+                        "plan": usage_data.get("plan"),
+                        "login": usage_data.get("login"),
+                        "organization": usage_data.get("organization"),
+                        "premium_requests": premium,
+                        "chat": chat,
+                        "completions": completions,
+                        "quota_reset_date": usage_data.get("quota_reset_date"),
+                        "level": "user",
+                    },
+                    "fetched_at": usage_data.get("fetched_at"),
+                    "copilotUsageDetails": {
+                        "scope": "personal-quotas",
+                        "plan": usage_data.get("plan"),
+                        "organization": usage_data.get("organization"),
+                        "premiumRequestsUsed": premium.get("used", 0),
+                        "premiumRequestsEntitlement": premium.get("entitlement", 0),
+                        "premiumRequestsRemaining": premium.get("remaining", 0),
+                        "premiumRequestsPercentUsed": premium.get("percent_used", 0),
+                        "premiumRequestsPercentRemaining": premium.get(
+                            "percent_remaining"
+                        ),
+                        "premiumRequestsUnlimited": premium.get("unlimited", False),
+                        "chatUnlimited": chat.get("unlimited", False),
+                        "completionsUnlimited": completions.get("unlimited", False),
+                        "quotaResetDate": usage_data.get("quota_reset_date"),
+                    },
+                }
+
+            # Branche legacy: métriques agrégées enterprise/org (admin-only)
             return {
                 "provider": "copilot",
                 "available": True,
@@ -1459,6 +1499,7 @@ async def get_provider_usage(provider: str):
                 },
                 "fetched_at": usage_data.get("fetched_at"),
                 "copilotUsageDetails": {
+                    "scope": "aggregated-metrics",
                     "suggestions": usage_data.get("total_suggestions", 0),
                     "acceptances": usage_data.get("total_acceptances", 0),
                     "acceptanceRate": usage_data.get("acceptance_rate_percent", 0),
@@ -1468,7 +1509,7 @@ async def get_provider_usage(provider: str):
                         "line_acceptance_rate_percent", 0
                     ),
                 },
-            }  # Added closing bracket here
+            }
         except ImportError as e:
             return {"error": f"Module Copilot non disponible: {_safe_error_message(e)}"}
         except Exception as e:

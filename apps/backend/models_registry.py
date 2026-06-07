@@ -41,6 +41,16 @@ _ANTHROPIC_MODELS = [
     # Flagship
     ModelEntry(
         "anthropic",
+        "claude-opus-4-8",
+        "Claude Opus 4.8",
+        "flagship",
+        supports_thinking=True,
+        price_input=15.0,
+        price_output=75.0,
+        is_default=False,
+    ),
+    ModelEntry(
+        "anthropic",
         "claude-opus-4-7",
         "Claude Opus 4.7",
         "flagship",
@@ -681,6 +691,13 @@ _WINDSURF_MODELS = [
     ModelEntry("windsurf", "MODEL_SWE_1_6", "SWE 1.6", "flagship", is_default=False),
     ModelEntry(
         "windsurf",
+        "MODEL_CLAUDE_OPUS_4_8",
+        "Claude Opus 4.8",
+        "flagship",
+        is_default=False,
+    ),
+    ModelEntry(
+        "windsurf",
         "MODEL_CLAUDE_OPUS_4_7",
         "Claude Opus 4.7",
         "flagship",
@@ -708,6 +725,26 @@ _WINDSURF_MODELS = [
 # =============================================================================
 
 _AWS_MODELS = [
+    ModelEntry(
+        "aws",
+        "anthropic.claude-opus-4-8",
+        "Claude Opus 4.8 (Bedrock)",
+        "flagship",
+        supports_thinking=True,
+        price_input=15.0,
+        price_output=75.0,
+        is_default=False,
+    ),
+    ModelEntry(
+        "aws",
+        "anthropic.claude-opus-4-8-v1",
+        "Claude Opus 4.8 v1 (Bedrock)",
+        "flagship",
+        supports_thinking=True,
+        price_input=15.0,
+        price_output=75.0,
+        is_default=False,
+    ),
     ModelEntry(
         "aws",
         "anthropic.claude-opus-4-6",
@@ -748,26 +785,175 @@ _AWS_MODELS = [
 
 # =============================================================================
 # COPILOT MODELS
+# Source: docs.github.com/en/copilot/reference/ai-models/supported-models
 # =============================================================================
 
 _COPILOT_MODELS = [
+    # ── Flagship / Opus ───────────────────────────────────────────────────
     ModelEntry(
         "copilot",
-        "gpt-4o",
-        "GPT-4o (Copilot)",
-        "standard",
-        price_input=2.50,
-        price_output=10.0,
+        "claude-opus-4.8",
+        "Claude Opus 4.8 (Copilot)",
+        "flagship",
+        supports_thinking=True,
         is_default=False,
     ),
+    ModelEntry(
+        "copilot",
+        "claude-opus-4.7",
+        "Claude Opus 4.7 (Copilot)",
+        "flagship",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "claude-opus-4.6",
+        "Claude Opus 4.6 (Copilot)",
+        "flagship",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "claude-opus-4.5",
+        "Claude Opus 4.5 (Copilot)",
+        "flagship",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    # ── GPT-5 family ─────────────────────────────────────────────────────
+    ModelEntry(
+        "copilot",
+        "gpt-5.5",
+        "GPT-5.5 (Copilot)",
+        "flagship",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "gpt-5.4",
+        "GPT-5.4 (Copilot)",
+        "flagship",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    # ── Standard ─────────────────────────────────────────────────────────
     ModelEntry(
         "copilot",
         "claude-sonnet-4.6",
         "Claude Sonnet 4.6 (Copilot)",
         "standard",
-        price_input=3.0,
-        price_output=15.0,
+        supports_thinking=True,
         is_default=True,
+    ),
+    ModelEntry(
+        "copilot",
+        "claude-sonnet-4.5",
+        "Claude Sonnet 4.5 (Copilot)",
+        "standard",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "gpt-4.1",
+        "GPT-4.1 (Copilot)",
+        "standard",
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "gpt-4o",
+        "GPT-4o (Copilot)",
+        "standard",
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "o4-mini",
+        "o4-mini (Copilot)",
+        "standard",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "o3",
+        "o3 (Copilot)",
+        "standard",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "o3-mini",
+        "o3-mini (Copilot)",
+        "standard",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "o1",
+        "o1 (Copilot)",
+        "standard",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "claude-3.7-sonnet",
+        "Claude 3.7 Sonnet (Copilot)",
+        "standard",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "gemini-2.5-pro",
+        "Gemini 2.5 Pro (Copilot)",
+        "standard",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    # ── Fast ─────────────────────────────────────────────────────────────
+    ModelEntry(
+        "copilot",
+        "claude-haiku-4.5",
+        "Claude Haiku 4.5 (Copilot)",
+        "fast",
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "gemini-2.0-flash",
+        "Gemini 2.0 Flash (Copilot)",
+        "fast",
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "gpt-4.1-mini",
+        "GPT-4.1 mini (Copilot)",
+        "fast",
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "o1-mini",
+        "o1-mini (Copilot)",
+        "fast",
+        supports_thinking=True,
+        is_default=False,
+    ),
+    ModelEntry(
+        "copilot",
+        "gpt-4o-mini",
+        "GPT-4o mini (Copilot)",
+        "fast",
+        is_default=False,
     ),
 ]
 
