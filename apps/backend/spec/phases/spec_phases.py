@@ -106,9 +106,7 @@ Create:
                 )
 
         if spec_file.exists() and plan_file.exists():
-            self.ui.print_status(
-                "Spec created via STANDARD escalation", "success"
-            )
+            self.ui.print_status("Spec created via STANDARD escalation", "success")
             return PhaseResult(
                 "quick_spec",
                 True,
