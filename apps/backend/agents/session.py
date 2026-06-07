@@ -76,6 +76,41 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+# Maximum length for the tool-input string shown in the live activity feed
+# and task logs. Generous enough that real-world commands and file paths are
+# displayed in full so the user can see exactly what the agent is doing; only
+# pathological inputs (e.g. an inline heredoc embedding a whole file) are
+# trimmed so they can't flood the console or task log.
+MAX_TOOL_INPUT_DISPLAY = 2000
+
+
+def _format_tool_input_display(inp: dict[str, Any] | None) -> str | None:
+    """Build a human-readable one-liner describing a tool call's input.
+
+    Commands and paths are shown in full (up to MAX_TOOL_INPUT_DISPLAY) so the
+    activity feed reveals the complete command rather than a truncated head.
+    For over-long inputs we keep the head of a command and the tail of a path
+    (the filename is the most useful part of a long path).
+    """
+    if not inp:
+        return None
+    if "pattern" in inp:
+        return f"pattern: {inp['pattern']}"
+    if "file_path" in inp:
+        fp = str(inp["file_path"])
+        if len(fp) > MAX_TOOL_INPUT_DISPLAY:
+            fp = "..." + fp[-(MAX_TOOL_INPUT_DISPLAY - 3) :]
+        return fp
+    if "command" in inp:
+        cmd = str(inp["command"])
+        if len(cmd) > MAX_TOOL_INPUT_DISPLAY:
+            cmd = cmd[: MAX_TOOL_INPUT_DISPLAY - 3] + "..."
+        return cmd
+    if "path" in inp:
+        return str(inp["path"])
+    return None
+
+
 def _read_current_subtask_id(spec_dir: Path) -> str | None:
     """Best-effort lookup of the current subtask id from task_metadata.json.
 
@@ -1083,22 +1118,8 @@ async def run_agent_session(
                         # Safely extract tool input (handles None, non-dict, etc.)
                         inp = get_safe_tool_input(block)
 
-                        # Extract meaningful tool input for display
-                        if inp:
-                            if "pattern" in inp:
-                                tool_input_display = f"pattern: {inp['pattern']}"
-                            elif "file_path" in inp:
-                                fp = inp["file_path"]
-                                if len(fp) > 50:
-                                    fp = "..." + fp[-47:]
-                                tool_input_display = fp
-                            elif "command" in inp:
-                                cmd = inp["command"]
-                                if len(cmd) > 50:
-                                    cmd = cmd[:47] + "..."
-                                tool_input_display = cmd
-                            elif "path" in inp:
-                                tool_input_display = inp["path"]
+                        # Extract meaningful tool input for display (full command)
+                        tool_input_display = _format_tool_input_display(inp)
 
                         debug(
                             "session",
@@ -1683,24 +1704,8 @@ async def _run_agent_client_session(
                 elif block.type == ContentBlockType.TOOL_USE:
                     tool_name = block.tool_name or ""
                     tool_count += 1
-                    tool_input_display = None
                     inp = block.tool_input or {}
-
-                    if inp:
-                        if "pattern" in inp:
-                            tool_input_display = f"pattern: {inp['pattern']}"
-                        elif "file_path" in inp:
-                            fp = inp["file_path"]
-                            if len(fp) > 50:
-                                fp = "..." + fp[-47:]
-                            tool_input_display = fp
-                        elif "command" in inp:
-                            cmd = inp["command"]
-                            if len(cmd) > 50:
-                                cmd = cmd[:47] + "..."
-                            tool_input_display = cmd
-                        elif "path" in inp:
-                            tool_input_display = inp["path"]
+                    tool_input_display = _format_tool_input_display(inp)
 
                     debug(
                         "session",

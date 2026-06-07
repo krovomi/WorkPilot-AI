@@ -545,17 +545,19 @@ class AgentRunner:
         if not isinstance(inp, dict):
             return None
 
+        # Show commands and paths in full so the activity feed reveals exactly
+        # what the agent is doing; only pathologically long inputs are trimmed.
         if "pattern" in inp:
             return f"pattern: {inp['pattern']}"
         elif "file_path" in inp:
-            fp = inp["file_path"]
-            if len(fp) > 50:
-                fp = "..." + fp[-47:]
+            fp = str(inp["file_path"])
+            if len(fp) > 2000:
+                fp = "..." + fp[-1997:]
             return fp
         elif "command" in inp:
-            cmd = inp["command"]
-            if len(cmd) > 50:
-                cmd = cmd[:47] + "..."
+            cmd = str(inp["command"])
+            if len(cmd) > 2000:
+                cmd = cmd[:1997] + "..."
             return cmd
         elif "path" in inp:
             return inp["path"]

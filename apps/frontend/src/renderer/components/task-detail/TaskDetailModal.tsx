@@ -1208,6 +1208,9 @@ function TaskDetailModalContent({
 											"hover:scale-110 hover:bg-primary hover:text-primary-foreground hover:border-primary",
 											"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
 											"disabled:pointer-events-none disabled:opacity-0",
+											// En plein écran le modal occupe tout l'écran : on épingle le
+											// chevron au bord plutôt qu'à la largeur du modal centré.
+											maximized && "left-3",
 										)}
 									>
 										<ChevronLeft className="h-5 w-5 transition-transform duration-200 group-hover:-translate-x-0.5" />
@@ -1236,6 +1239,9 @@ function TaskDetailModalContent({
 											"hover:scale-110 hover:bg-primary hover:text-primary-foreground hover:border-primary",
 											"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
 											"disabled:pointer-events-none disabled:opacity-0",
+											// En plein écran le modal occupe tout l'écran : on épingle le
+											// chevron au bord plutôt qu'à la largeur du modal centré.
+											maximized && "right-3",
 										)}
 									>
 										<ChevronRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />

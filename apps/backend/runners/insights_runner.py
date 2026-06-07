@@ -270,10 +270,11 @@ Current question: {message}"""
                                     if "pattern" in inp:
                                         tool_input = f"pattern: {inp['pattern']}"
                                     elif "file_path" in inp:
-                                        # Shorten path for display
-                                        fp = inp["file_path"]
-                                        if len(fp) > 50:
-                                            fp = "..." + fp[-47:]
+                                        # Show the full path so the UI reveals
+                                        # exactly which file is being touched.
+                                        fp = str(inp["file_path"])
+                                        if len(fp) > 2000:
+                                            fp = "..." + fp[-1997:]
                                         tool_input = fp
                                     elif "path" in inp:
                                         tool_input = inp["path"]
