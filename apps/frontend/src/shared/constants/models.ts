@@ -519,6 +519,82 @@ export function getDefaultModelForProvider(provider: string): string {
 	return flagship?.value ?? "";
 }
 
+/**
+ * Détecte un identifiant de modèle Claude au format natif Anthropic, c.-à-d.
+ * versionné avec des tirets (ex. "claude-sonnet-4-5-20250929", "claude-opus-4-6").
+ *
+ * Ces IDs ne sont PAS valides pour les fournisseurs non-Anthropic (Copilot,
+ * etc.). Copilot utilise la notation pointée (ex. "claude-opus-4.8",
+ * "claude-sonnet-4.6") qui doit être préservée et NE DOIT PAS être interceptée.
+ *
+ * Le motif exige au moins deux groupes numériques séparés par un tiret après le
+ * nom du modèle (`-\d+-\d`), ce qui distingue la forme Anthropic (tirets) de la
+ * forme Copilot (point). Ce comportement reflète celui du backend
+ * (`phase_config._resolve_provider_model`).
+ */
+export function isAnthropicNativeVersionedModelId(model: string): boolean {
+	return /^claude-(opus|sonnet|haiku)-\d+-\d/.test(model);
+}
+
+// ============================================
+// Fenêtres de contexte des modèles (tokens)
+// ============================================
+
+/**
+ * Fenêtre de contexte par défaut quand le modèle est inconnu.
+ * 128k est la valeur la plus courante (GPT-4o, GPT-4.1 via Copilot, etc.).
+ */
+export const DEFAULT_CONTEXT_WINDOW = 128_000;
+
+/**
+ * Fenêtres de contexte natives (approximatives) par préfixe d'identifiant de
+ * modèle. La recherche se fait par sous-chaîne (premier préfixe correspondant),
+ * ce qui couvre les variantes datées/suffixées (ex. "claude-sonnet-4-5-2025...").
+ *
+ * Sert à calculer le « % de fenêtre de contexte consommée » façon Claude Code.
+ * Les valeurs sont indicatives : à ajuster si GitHub/les fournisseurs évoluent.
+ */
+export const CONTEXT_WINDOW_BY_MODEL_PREFIX: ReadonlyArray<
+	readonly [prefix: string, contextWindow: number]
+> = [
+	// Anthropic / Claude (natif 200k)
+	["claude-opus", 200_000],
+	["claude-sonnet", 200_000],
+	["claude-haiku", 200_000],
+	["claude-3.7", 200_000],
+	["claude-3-7", 200_000],
+	["claude", 200_000],
+	// OpenAI GPT-5.x (256k)
+	["gpt-5", 256_000],
+	// OpenAI GPT-4.1 (1M natif)
+	["gpt-4.1", 1_000_000],
+	["gpt-4-1", 1_000_000],
+	// OpenAI GPT-4o / 4-turbo (128k)
+	["gpt-4o", 128_000],
+	["gpt-4", 128_000],
+	// OpenAI raisonnement o-series (200k)
+	["o4", 200_000],
+	["o3", 200_000],
+	["o1", 200_000],
+	// Google Gemini 2.5 (1M)
+	["gemini", 1_000_000],
+];
+
+/**
+ * Retourne la fenêtre de contexte (en tokens) pour un modèle donné.
+ *
+ * @param model Identifiant du modèle (ex. "gpt-4o", "claude-sonnet-4.6").
+ * @returns Taille de la fenêtre de contexte, ou {@link DEFAULT_CONTEXT_WINDOW}.
+ */
+export function getContextWindowForModel(model: string | undefined): number {
+	if (!model) return DEFAULT_CONTEXT_WINDOW;
+	const normalized = model.toLowerCase().trim();
+	for (const [prefix, window] of CONTEXT_WINDOW_BY_MODEL_PREFIX) {
+		if (normalized.includes(prefix)) return window;
+	}
+	return DEFAULT_CONTEXT_WINDOW;
+}
+
 /** Returns whether the selected provider supports extended thinking */
 export function providerSupportsThinking(provider: string): boolean {
 	return [

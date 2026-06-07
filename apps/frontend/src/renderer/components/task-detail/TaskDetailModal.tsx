@@ -462,6 +462,16 @@ function TaskDetailModalContent({
 	).length;
 	const totalSubtasks = task.subtasks.length;
 
+	// Activité en cours affichée dans la barre de phase : on privilégie le
+	// sous-tâche actuellement traité, avec repli sur les informations de
+	// progression d'exécution (message de phase, ex: « Creating implementation
+	// plan... »). Indispensable pour les phases sans sous-tâches (planning).
+	const currentPhaseActivity =
+		task.subtasks.find((s) => s.status === "in_progress")?.title ??
+		task.executionProgress?.currentSubtask ??
+		task.executionProgress?.message ??
+		null;
+
 	// Extract handlers using custom hook
 	const {
 		handleStartStop,
@@ -1072,6 +1082,7 @@ function TaskDetailModalContent({
 									<TaskPhaseBar
 										phaseLogs={state.phaseLogs}
 										currentPhase={state.currentLogPhase}
+										currentActivity={currentPhaseActivity}
 									/>
 								)}
 

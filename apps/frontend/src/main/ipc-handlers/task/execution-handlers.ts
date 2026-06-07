@@ -21,6 +21,7 @@ import {
 	getSpecsDir,
 	IPC_CHANNELS,
 } from "../../../shared/constants";
+import { isAnthropicNativeVersionedModelId } from "../../../shared/constants/models";
 import type { TaskEvent } from "../../../shared/state-machines/task-machine";
 import type {
 	ImageAttachment,
@@ -289,13 +290,18 @@ function persistProviderToMetadata(
 		// versioned model ID (e.g. "claude-sonnet-4-5-20250929") from the single
 		// model field so the backend falls back to PROVIDER_DEFAULT_MODELS for the
 		// new provider instead of sending an invalid model ID to the API.
+		//
+		// IMPORTANT: Copilot exposes Claude models in dot notation (e.g.
+		// "claude-opus-4.8", "claude-sonnet-4.6") which ARE valid and must be
+		// preserved. Only dash-versioned Anthropic-native IDs are cleared — see
+		// isAnthropicNativeVersionedModelId.
 		const isNonAnthropicProvider =
 			projectProvider &&
 			projectProvider !== "anthropic" &&
 			projectProvider !== "claude";
 		const hasAnthropicVersionedModel =
 			typeof meta.model === "string" &&
-			/^claude-(opus|sonnet|haiku)-\d/.test(meta.model);
+			isAnthropicNativeVersionedModelId(meta.model);
 		if (isNonAnthropicProvider && hasAnthropicVersionedModel) {
 			delete meta.model;
 		}

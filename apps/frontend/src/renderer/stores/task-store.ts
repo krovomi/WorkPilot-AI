@@ -615,6 +615,31 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 				}),
 			};
 		});
+
+		// Self-healing reconciliation (fix bouton figé sur « Démarrer la tâche ») :
+		// Si une phase d'exécution active arrive du backend alors que la tâche est
+		// encore dans un statut « pré-exécution » (backlog/queue), c'est la preuve
+		// que le process tourne réellement. On promeut donc le statut vers
+		// in_progress. Cela rattrape les cas où l'événement TASK_STATUS_CHANGE a été
+		// manqué ou supprimé (course XState), pendant que les logs/progress arrivent.
+		const incomingPhase = progress.phase;
+		const isActiveRunPhase =
+			!!incomingPhase &&
+			incomingPhase !== "idle" &&
+			incomingPhase !== "complete" &&
+			incomingPhase !== "failed";
+
+		if (isActiveRunPhase) {
+			const current = get().tasks.find(
+				(t) => t.id === taskId || t.specId === taskId,
+			);
+			if (
+				current &&
+				(current.status === "backlog" || current.status === "queue")
+			) {
+				get().updateTaskStatus(current.id, "in_progress");
+			}
+		}
 	},
 
 	appendLog: (taskId, log) =>

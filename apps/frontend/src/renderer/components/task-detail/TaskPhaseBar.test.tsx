@@ -38,7 +38,7 @@ describe("TaskPhaseBar", () => {
 	it("affiche la phase active quand aucune phase de défilement n'est fournie", () => {
 		render(<TaskPhaseBar phaseLogs={makePhaseLogs("validation")} />);
 		expect(screen.getByText("Validation")).toBeInTheDocument();
-		expect(screen.getByText("Phase 3/3")).toBeInTheDocument();
+		expect(screen.getByText("Step 3/3")).toBeInTheDocument();
 	});
 
 	it("privilégie la phase de défilement sur la phase active", () => {
@@ -49,7 +49,7 @@ describe("TaskPhaseBar", () => {
 			/>,
 		);
 		expect(screen.getByText("Coding")).toBeInTheDocument();
-		expect(screen.getByText("Phase 2/3")).toBeInTheDocument();
+		expect(screen.getByText("Step 2/3")).toBeInTheDocument();
 		expect(screen.queryByText("Validation")).not.toBeInTheDocument();
 	});
 
@@ -58,7 +58,7 @@ describe("TaskPhaseBar", () => {
 			<TaskPhaseBar phaseLogs={makePhaseLogs("coding")} currentPhase={null} />,
 		);
 		expect(screen.getByText("Coding")).toBeInTheDocument();
-		expect(screen.getByText("Phase 2/3")).toBeInTheDocument();
+		expect(screen.getByText("Step 2/3")).toBeInTheDocument();
 	});
 
 	it("ne rend rien quand aucune phase active ni de défilement", () => {
@@ -66,5 +66,52 @@ describe("TaskPhaseBar", () => {
 			<TaskPhaseBar phaseLogs={makePhaseLogs()} currentPhase={null} />,
 		);
 		expect(container).toBeEmptyDOMElement();
+	});
+
+	it("affiche l'activité fournie après le numéro de phase", () => {
+		render(
+			<TaskPhaseBar
+				phaseLogs={makePhaseLogs("coding")}
+				currentActivity="Implémentation du paiement"
+			/>,
+		);
+		expect(screen.getByText("Step 2/3")).toBeInTheDocument();
+		expect(
+			screen.getByText("Implémentation du paiement"),
+		).toBeInTheDocument();
+	});
+
+	it("dérive l'activité depuis le dernier sous-titre des logs", () => {
+		const logs = {
+			phases: {
+				planning: {
+					status: "active",
+					entries: [{ subphase: "DÉCOUVERTE" }, { subphase: "ANALYSE" }],
+				},
+				coding: { status: "pending", entries: [] },
+				validation: { status: "pending", entries: [] },
+			},
+		} as unknown as TaskLogs;
+		render(<TaskPhaseBar phaseLogs={logs} />);
+		expect(screen.getByText("Step 1/3")).toBeInTheDocument();
+		expect(screen.getByText("ANALYSE")).toBeInTheDocument();
+	});
+
+	it("privilégie l'activité fournie sur le sous-titre des logs", () => {
+		const logs = {
+			phases: {
+				planning: {
+					status: "active",
+					entries: [{ subphase: "ANALYSE" }],
+				},
+				coding: { status: "pending", entries: [] },
+				validation: { status: "pending", entries: [] },
+			},
+		} as unknown as TaskLogs;
+		render(
+			<TaskPhaseBar phaseLogs={logs} currentActivity="Rédaction du plan" />,
+		);
+		expect(screen.getByText("Rédaction du plan")).toBeInTheDocument();
+		expect(screen.queryByText("ANALYSE")).not.toBeInTheDocument();
 	});
 });

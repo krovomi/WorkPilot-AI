@@ -1,13 +1,74 @@
 import type { UsageSnapshot } from "@shared/types";
 import { AlertCircle, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useContextUsage } from "../../hooks/useContextUsage";
 
 interface CopilotUsageContentProps {
 	readonly usage: UsageSnapshot;
 }
 
 export function CopilotUsageContent({ usage }: CopilotUsageContentProps) {
-	return <div className="py-2 space-y-3">{renderCopilotErrorState(usage)}</div>;
+	return (
+		<div className="py-2 space-y-3">
+			<CopilotContextWindow usage={usage} />
+			{renderCopilotErrorState(usage)}
+		</div>
+	);
+}
+
+/**
+ * Section « fenêtre de contexte » (façon Claude Code) : % du contexte du modèle
+ * consommé par le dernier tour. Masquée s'il n'y a pas de données réelles.
+ */
+function CopilotContextWindow({ usage }: CopilotUsageContentProps) {
+	const { t, i18n } = useTranslation(["common"]);
+	const contextUsage = useContextUsage(usage.providerName ?? null);
+	if (!contextUsage) return null;
+
+	const pct = contextUsage.percentUsed;
+	const barColor =
+		pct >= 90 ? "bg-red-500" : pct >= 75 ? "bg-orange-500" : "bg-blue-500";
+	const nf = new Intl.NumberFormat(i18n.language);
+
+	return (
+		<div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+			<TrendingUp className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+			<div className="space-y-1.5 w-full min-w-0">
+				<div className="flex items-center justify-between gap-2">
+					<p className="text-xs font-medium text-blue-500">
+						{t("common:usage.copilotContextTitleShort")}
+					</p>
+					<span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+						{contextUsage.model}
+					</span>
+				</div>
+				<p className="text-[10px] text-muted-foreground leading-relaxed">
+					{t("common:usage.copilotContextDesc")}
+				</p>
+				<div className="flex items-baseline justify-between gap-2 mt-1">
+					<span className="text-[10px] text-muted-foreground">
+						{t("common:usage.copilotContextPercentLabel")}
+					</span>
+					<span className="font-mono text-xs text-foreground">
+						{pct.toFixed(1)}%
+					</span>
+				</div>
+				<div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+					<div
+						className={`h-full ${barColor}`}
+						style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }}
+					/>
+				</div>
+				<div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+					<span>{t("common:usage.copilotContextUsedLabel")}</span>
+					<span className="font-mono">
+						{nf.format(contextUsage.contextTokens)} /{" "}
+						{nf.format(contextUsage.contextWindow)}
+					</span>
+				</div>
+			</div>
+		</div>
+	);
 }
 
 function renderCopilotErrorState(usage: UsageSnapshot) {

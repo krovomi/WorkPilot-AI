@@ -6,6 +6,12 @@ interface TaskPhaseBarProps {
 	phaseLogs: TaskLogs | null;
 	/** Phase currently visible at the top of the logs viewport (scroll-driven). */
 	currentPhase?: TaskLogPhase | null;
+	/**
+	 * Libellé de l'activité en cours (ex: titre du sous-tâche en cours de
+	 * traitement). Affiché après le numéro de phase pour préciser ce qui est
+	 * réellement traité. Prioritaire sur le sous-titre dérivé des logs.
+	 */
+	currentActivity?: string | null;
 }
 
 const PHASE_ORDER: TaskLogPhase[] = ["planning", "coding", "validation"];
@@ -34,7 +40,11 @@ const PHASE_I18N_KEYS: Record<TaskLogPhase, string> = {
 	validation: "execution.phases.validation",
 };
 
-export function TaskPhaseBar({ phaseLogs, currentPhase }: TaskPhaseBarProps) {
+export function TaskPhaseBar({
+	phaseLogs,
+	currentPhase,
+	currentActivity,
+}: TaskPhaseBarProps) {
 	const { t } = useTranslation("tasks");
 
 	if (!phaseLogs) return null;
@@ -52,20 +62,47 @@ export function TaskPhaseBar({ phaseLogs, currentPhase }: TaskPhaseBarProps) {
 	const phaseNumber = PHASE_ORDER.indexOf(displayPhase) + 1;
 	const styles = PHASE_STYLES[displayPhase];
 
+	// Détermine ce qui est réellement traité dans la phase affichée.
+	// - Pour la phase en cours d'exécution, on privilégie l'activité fournie
+	//   par le parent (titre du sous-tâche en cours).
+	// - Sinon (ou à défaut), on dérive le dernier sous-titre rencontré dans les
+	//   logs de la phase affichée.
+	const phaseEntries = phaseLogs.phases[displayPhase]?.entries ?? [];
+	const lastSubphase = [...phaseEntries]
+		.reverse()
+		.find((entry) => entry.subphase?.trim())?.subphase;
+	const liveActivity =
+		displayPhase === activePhase ? currentActivity?.trim() : undefined;
+	const activity = liveActivity || lastSubphase?.trim() || null;
+
 	return (
 		<div
 			className={cn(
-				"flex items-center gap-2 px-5 py-1.5 shrink-0",
+				"flex items-center gap-2 px-5 py-1.5 shrink-0 min-w-0",
 				styles.bg,
 			)}
 		>
-			<span className={cn("text-xs font-medium", styles.text)}>
+			<span className={cn("text-xs font-medium shrink-0", styles.text)}>
 				{t(PHASE_I18N_KEYS[displayPhase])}
 			</span>
-			<span className="text-xs text-muted-foreground">•</span>
-			<span className="text-xs text-muted-foreground">
-				Phase {phaseNumber}/{PHASE_ORDER.length}
+			<span className="text-xs text-muted-foreground shrink-0">•</span>
+			<span className="text-xs text-muted-foreground shrink-0">
+				{t("execution.labels.step", {
+					current: phaseNumber,
+					total: PHASE_ORDER.length,
+				})}
 			</span>
+			{activity && (
+				<>
+					<span className="text-xs text-muted-foreground shrink-0">:</span>
+					<span
+						className={cn("text-xs font-medium truncate", styles.text)}
+						title={activity}
+					>
+						{activity}
+					</span>
+				</>
+			)}
 		</div>
 	);
 }

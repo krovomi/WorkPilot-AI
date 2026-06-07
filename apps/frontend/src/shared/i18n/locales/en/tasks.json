@@ -249,7 +249,8 @@
 			"interrupted": "Interrupted",
 			"progress": "Progress",
 			"entry": "entry",
-			"entries": "entries"
+			"entries": "entries",
+			"step": "Step {{current}}/{{total}}"
 		},
 		"shortPhases": {
 			"plan": "Plan",
