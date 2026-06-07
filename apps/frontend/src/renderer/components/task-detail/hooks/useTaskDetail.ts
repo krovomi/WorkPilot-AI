@@ -11,6 +11,7 @@ import type {
 	WorktreeDiff,
 	WorktreeStatus,
 } from "../../../../shared/types";
+import { isTaskPaused } from "../../../../shared/utils/task-pause";
 import { consumePendingTaskDetailTab } from "../../../lib/task-detail-nav";
 import { useProjectStore } from "../../../stores/project-store";
 import { useSettingsStore } from "../../../stores/settings-store";
@@ -161,11 +162,41 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const isIncomplete = isIncompleteHumanReview(task);
 	const taskProgress = getTaskProgress(task);
 
+	// A cooperative pause (e.g. to switch LLM provider) finishes the current step
+	// and lets the subprocess exit while the task status stays "in_progress".
+	// That dead-process-but-in_progress state must NOT be treated as stuck, and
+	// the pause controls need the real subprocess liveness to know when the step
+	// has actually finished.
+	const isPaused = isTaskPaused(task);
+	const [pauseProcessAlive, setPauseProcessAlive] = useState<boolean | null>(
+		null,
+	);
+
+	useEffect(() => {
+		if (!isPaused) {
+			setPauseProcessAlive(null);
+			return;
+		}
+		let cancelled = false;
+		const poll = () => {
+			checkTaskRunning(task.id).then((alive) => {
+				if (!cancelled) setPauseProcessAlive(alive);
+			});
+		};
+		poll();
+		const intervalId = setInterval(poll, 3_000);
+		return () => {
+			cancelled = true;
+			clearInterval(intervalId);
+		};
+	}, [task.id, isPaused]);
+
 	// Catastrophic stuck detection — last-resort safety net.
 	// XState handles all normal process-exit transitions via PROCESS_EXITED events.
 	// This only fires if XState somehow fails to transition after 60s with no activity.
+	// A deliberately-paused task is excluded: its subprocess is expected to be gone.
 	useEffect(() => {
-		if (!isActiveTask) {
+		if (!isActiveTask || isPaused) {
 			setIsStuck(false);
 			setHasCheckedRunning(false);
 			return;
@@ -188,7 +219,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		}, 60_000);
 
 		return () => clearInterval(intervalId);
-	}, [task.id, isActiveTask]);
+	}, [task.id, isActiveTask, isPaused]);
 
 	// Cache buster: when task transitions from human_review → in_progress (QA process starts),
 	// force a fresh load to bust the 3-second cache and allow incremental plan updates
@@ -691,6 +722,8 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		logsContainerRef,
 		selectedProject,
 		isRunning,
+		isPaused,
+		pauseProcessAlive,
 		needsReview,
 		executionPhase,
 		hasActiveExecution,

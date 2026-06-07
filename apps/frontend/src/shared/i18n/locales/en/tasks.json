@@ -515,6 +515,15 @@
 		"title": "Reference Images (optional)",
 		"description": "Add visual references like screenshots or designs to help the AI understand your requirements."
 	},
+	"logs": {
+		"thinking": {
+			"selectAria": "Thinking effort for this phase",
+			"selectTooltip": "Change the thinking effort for this phase",
+			"updatedTitle": "Thinking effort updated",
+			"updatedDesc": "The thinking effort will be applied when this phase starts.",
+			"updateFailed": "Update failed"
+		}
+	},
 	"modal": {
 		"tabs": {
 			"overview": "Overview",

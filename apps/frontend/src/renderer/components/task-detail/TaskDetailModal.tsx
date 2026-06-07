@@ -1134,7 +1134,11 @@ function TaskDetailModalContent({
 									<TaskPauseControls
 										task={task}
 										isPaused={task.metadata?.paused?.enabled}
-										isRunning={state.isRunning}
+										isRunning={
+											task.metadata?.paused?.enabled
+												? state.pauseProcessAlive !== false
+												: state.isRunning
+										}
 										onPause={async (subtaskId) => {
 											await pauseTask(task.id, subtaskId);
 										}}
