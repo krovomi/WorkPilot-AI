@@ -1620,6 +1620,7 @@
 	},
 	"azureDevOpsImport": {
 		"title": "Import Azure DevOps Work Items",
+		"titleWithRepository": "Import work items from {{repository}}",
 		"description": "Select Azure DevOps work items to import into WorkPilot AI",
 		"importSuccess": "{{count}} work item(s) imported successfully",
 		"importSuccessSingle": "Work item \"{{title}}\" imported successfully",
@@ -1635,6 +1636,7 @@
 		"errorNoProject": "No project selected",
 		"projectLabel": "Project:",
 		"searchPlaceholder": "Search work items...",
+		"searchingById": "Searching for work item…",
 		"filterTypeLabel": "Work Item Type",
 		"filterTypeAll": "All Types",
 		"filterStateLabel": "State",
@@ -1832,6 +1834,7 @@
 	},
 	"jiraImport": {
 		"title": "Import Jira Issues",
+		"titleWithProject": "Import issues from {{project}}",
 		"description": "Select Jira issues to import into WorkPilot AI",
 		"importSuccess": "{{count}} issue(s) imported successfully",
 		"successTitle": "Import Successful!",
@@ -1846,6 +1849,7 @@
 		"errorNoProject": "No project selected",
 		"projectLabel": "Project:",
 		"searchPlaceholder": "Search issues...",
+		"searchingByKey": "Searching for issue…",
 		"filterTypeLabel": "Issue Type",
 		"filterTypeAll": "All Types",
 		"filterStateLabel": "State",

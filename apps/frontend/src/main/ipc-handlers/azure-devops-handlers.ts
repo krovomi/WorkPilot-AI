@@ -228,6 +228,16 @@ try:
         result = {
             'id': item.id,
             'title': item.title,
+            'description': item.description,
+            'state': item.state,
+            'workItemType': item.work_item_type,
+            'assignedTo': item.assigned_to,
+            'tags': item.tags,
+            'priority': item.priority,
+            'createdDate': item.created_date.isoformat() if hasattr(item.created_date, 'isoformat') else item.created_date,
+            'areaPath': item.area_path,
+            'iterationPath': item.iteration_path,
+            'url': item.url,
             'acceptanceCriteria': item.acceptance_criteria,
         }
         print(json.dumps({'data': result}))
@@ -537,6 +547,58 @@ except Exception as e:
 				)) as AzureDevOpsWorkItem[];
 
 				return { success: true, data: items };
+			} catch (error: unknown) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				return { success: false, error: errorMessage };
+			}
+		},
+	);
+
+	// Fetch a single work item directly by its global ID. Unlike
+	// GET_WORK_ITEMS (which lists the backlog and is capped/filtered), this
+	// resolves any work item — including custom types (e.g. RSD) or items
+	// outside the backlog window — so the import search can find it by ID.
+	ipcMain.handle(
+		IPC_CHANNELS.AZURE_DEVOPS_GET_WORK_ITEM,
+		async (
+			_,
+			projectId: string,
+			workItemId: number,
+		): Promise<IPCResult<AzureDevOpsWorkItem>> => {
+			const project = projectStore.getProject(projectId);
+			if (!project) {
+				return { success: false, error: "Project not found" };
+			}
+
+			const config = getAzureDevOpsConfig(project);
+			const envOverrides: Record<string, string> = {};
+			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
+			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
+			const normalizedProject = normalizeProjectName(config.projectName);
+			if (normalizedProject)
+				envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
+			if (!config.pat || !config.orgUrl) {
+				return {
+					success: false,
+					error: "Azure DevOps not configured for this project",
+				};
+			}
+
+			try {
+				const projectPath = path.join(
+					project.path,
+					project.autoBuildPath || "",
+				);
+
+				const item = (await callAzureDevOpsPython(
+					projectPath,
+					"get_work_item",
+					{ work_item_id: workItemId },
+					envOverrides,
+				)) as AzureDevOpsWorkItem;
+
+				return { success: true, data: item };
 			} catch (error: unknown) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);

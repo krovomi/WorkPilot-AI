@@ -266,6 +266,7 @@ export const IPC_CHANNELS = {
 	// Azure DevOps integration
 	AZURE_DEVOPS_GET_PROJECTS: "azureDevOps:getProjects",
 	AZURE_DEVOPS_GET_WORK_ITEMS: "azureDevOps:getWorkItems",
+	AZURE_DEVOPS_GET_WORK_ITEM: "azureDevOps:getWorkItem",
 	AZURE_DEVOPS_IMPORT_WORK_ITEMS: "azureDevOps:importWorkItems",
 	AZURE_DEVOPS_CHECK_CONNECTION: "azureDevOps:checkConnection",
 	AZURE_DEVOPS_LIST_REPOSITORIES: "azureDevOps:listRepositories",
@@ -280,6 +281,7 @@ export const IPC_CHANNELS = {
 
 	// Jira integration
 	JIRA_GET_ISSUES: "jira:getIssues",
+	JIRA_GET_ISSUE: "jira:getIssue",
 	JIRA_CHECK_CONNECTION: "jira:checkConnection",
 	JIRA_TEST_CONNECTION: "jira:testConnection",
 

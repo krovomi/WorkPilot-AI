@@ -265,6 +265,12 @@ class JiraConnector:
         jql = f"project = {project_key}"
         if jql_filter:
             jql = f"{jql} AND {jql_filter}"
+        # No issuetype restriction is applied so every issue type — including
+        # sub-tasks and custom types — stays findable. Order by newest first
+        # so recently created issues (e.g. a bug just added to a story) fall
+        # within the result window. Skip if the caller already ordered.
+        if "order by" not in jql.lower():
+            jql = f"{jql} ORDER BY created DESC"
 
         logger.info("Searching Jira issues: %s (max=%d).", jql, max_results)
 

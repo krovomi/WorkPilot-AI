@@ -950,6 +950,7 @@
 		"noWorkItems": "Aucun élément de travail trouvé",
 		"projectLabel": "Projet :",
 		"searchPlaceholder": "Rechercher des éléments de travail...",
+		"searchingById": "Recherche de l'élément de travail…",
 		"selectedItems": "{{count}} élément(s) sélectionné(s)",
 		"selectionCount": "{{selected}} sur {{total}} sélectionné(s)",
 		"sidePanelDescription": "Glissez-déposez les éléments dans les colonnes Kanban",
@@ -959,6 +960,7 @@
 		"successFailedSuffix": "{{count}} échoué(s).",
 		"successTitle": "Import réussi !",
 		"title": "Importer les éléments Azure DevOps",
+		"titleWithRepository": "Importer les éléments de {{repository}}",
 		"toggleSelection": "Basculer la sélection pour l'élément de travail {{id}}"
 	},
 	"collaboration": {
@@ -1359,6 +1361,7 @@
 		"noIssues": "Aucun ticket trouvé",
 		"projectLabel": "Projet :",
 		"searchPlaceholder": "Rechercher des tickets...",
+		"searchingByKey": "Recherche du ticket…",
 		"selectedItems": "{{count}} élément(s) sélectionné(s)",
 		"selectionCount": "{{selected}} sur {{total}} sélectionné(s)",
 		"sidePanelDescription": "Glissez-déposez les éléments dans les colonnes Kanban",
@@ -1367,7 +1370,8 @@
 		"successCount_plural": "{{count}} tickets importés.",
 		"successFailedSuffix": "{{count}} échoué(s).",
 		"successTitle": "Import réussi !",
-		"title": "Importer les tickets Jira"
+		"title": "Importer les tickets Jira",
+		"titleWithProject": "Importer les tickets de {{project}}"
 	},
 	"language": {
 		"description": "Sélectionnez la langue de l'interface de l'application",

@@ -28,6 +28,10 @@ export interface AzureDevOpsAPI {
 		itemTypes?: string[],
 		maxItems?: number,
 	) => Promise<IPCResult<AzureDevOpsWorkItem[]>>;
+	getAzureDevOpsWorkItem: (
+		projectId: string,
+		workItemId: number,
+	) => Promise<IPCResult<AzureDevOpsWorkItem>>;
 	importAzureDevOpsWorkItems: (
 		projectId: string,
 		workItemIds: number[],
@@ -74,6 +78,12 @@ export const createAzureDevOpsAPI = (): AzureDevOpsAPI => ({
 			itemTypes,
 			maxItems,
 		),
+
+	getAzureDevOpsWorkItem: (
+		projectId: string,
+		workItemId: number,
+	): Promise<IPCResult<AzureDevOpsWorkItem>> =>
+		invokeIpc(IPC_CHANNELS.AZURE_DEVOPS_GET_WORK_ITEM, projectId, workItemId),
 
 	importAzureDevOpsWorkItems: (
 		projectId: string,
