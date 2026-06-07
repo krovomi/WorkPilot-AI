@@ -29,13 +29,96 @@ import {
 	parseAcceptanceCriteriaText,
 	stripAcceptanceCriteriaSection,
 } from "../../shared/utils/acceptance-criteria";
-import { sanitizeText, sanitizeUrl } from "./shared/sanitize";
+import {
+	sanitizeText,
+	sanitizeUrl,
+	stripControlChars,
+	stripHtml,
+} from "./shared/sanitize";
 import { parseEnvFile } from "./utils";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const connectorSrcPath = path.resolve(__dirname, "..", "..", "..", "..", "src");
 const backendPath = path.resolve(__dirname, "..", "..", "..", "backend");
+
+/** Taille maximale d'une pièce jointe image inlinée en data URI (5 Mo). */
+const MAX_INLINE_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Télécharge les images en pièce jointe Azure DevOps (qui nécessitent une
+ * authentification PAT) et les remplace par des data URIs base64 dans le HTML.
+ *
+ * Les descriptions de work items référencent les captures via
+ * `https://dev.azure.com/<org>/_apis/wit/attachments/<guid>?fileName=...`.
+ * Ces URLs renvoient un 401/timeout dans le renderer (pas de PAT), d'où des
+ * images cassées. En les inlinant à l'import, elles s'affichent sans authent.
+ */
+async function inlineAzureDevOpsImages(
+	html: string,
+	orgUrl: string,
+	pat: string,
+): Promise<string> {
+	if (!html?.includes("<img")) return html;
+
+	const authHeader = `Basic ${Buffer.from(`:${pat}`).toString("base64")}`;
+	let orgHost = "";
+	try {
+		orgHost = new URL(orgUrl).host.toLowerCase();
+	} catch {
+		orgHost = "";
+	}
+
+	const imgRegex = /<img\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\1[^>]*>/gi;
+	const sources = new Set<string>();
+	for (const match of html.matchAll(imgRegex)) {
+		const src = match[2];
+		if (src) sources.add(src);
+	}
+
+	let result = html;
+	for (const src of sources) {
+		if (src.startsWith("data:")) continue;
+
+		let host = "";
+		try {
+			host = new URL(src).host.toLowerCase();
+		} catch {
+			continue;
+		}
+
+		const isAzureAttachment =
+			host === orgHost ||
+			host.endsWith(".dev.azure.com") ||
+			host === "dev.azure.com" ||
+			host.endsWith(".visualstudio.com");
+		if (!isAzureAttachment) continue;
+
+		try {
+			const response = await fetch(src, {
+				headers: { Authorization: authHeader },
+			});
+			if (!response.ok) continue;
+
+			const buffer = Buffer.from(await response.arrayBuffer());
+			if (buffer.length === 0 || buffer.length > MAX_INLINE_IMAGE_BYTES) {
+				continue;
+			}
+
+			const contentType =
+				response.headers.get("content-type")?.split(";")[0]?.trim() ||
+				"image/png";
+			if (!contentType.startsWith("image/")) continue;
+
+			const dataUri = `data:${contentType};base64,${buffer.toString("base64")}`;
+			result = result.split(src).join(dataUri);
+		} catch {
+			// En cas d'échec, conserver l'URL d'origine sans bloquer l'import.
+		}
+	}
+
+	return result;
+}
 
 /**
  * Register all Azure DevOps-related IPC handlers
@@ -688,13 +771,35 @@ except Exception as e:
 
 				for (const item of selectedItems) {
 					try {
-						// Sanitize inputs
-						const safeTitle = sanitizeText(item.title, 200);
+						// Sanitize inputs.
+						// Le titre Azure DevOps peut contenir du HTML enrichi : on le
+						// réduit en texte brut sur une seule ligne (pas d'interprétation HTML).
+						const safeTitle = sanitizeText(
+							stripHtml(item.title).replace(/\s+/g, " "),
+							200,
+						);
 						const safeDescription = item.description
 							? stripAcceptanceCriteriaSection(
 									sanitizeText(item.description, 5000),
 								)
 							: "";
+
+						// Description HTML conservée pour l'affichage (rendu enrichi).
+						// On inline les images en pièce jointe Azure DevOps (auth PAT)
+						// en data URIs pour qu'elles s'affichent dans le renderer.
+						let displayDescription = item.description
+							? stripAcceptanceCriteriaSection(
+									stripControlChars(item.description, true),
+								)
+							: "";
+						if (displayDescription && config.pat && config.orgUrl) {
+							displayDescription = await inlineAzureDevOpsImages(
+								displayDescription,
+								config.orgUrl,
+								config.pat,
+							);
+						}
+
 						const safeIdentifier = sanitizeText(`ADO-${item.id}`, 100);
 						const safeUrl = item.url ? sanitizeUrl(item.url) : "";
 
@@ -789,29 +894,9 @@ except Exception as e:
 						descriptionParts.push("## Description");
 						descriptionParts.push("");
 						if (safeDescription) {
-							// Strip HTML tags from Azure DevOps rich text descriptions
-							// Use a loop to handle nested/reconstructed tags (e.g., <<script>script>)
-							let cleanDescription = safeDescription
-								.replace(/<br\s*\/?>/gi, "\n")
-								.replace(
-									/<\/?(p|div|li|ul|ol|h[1-6]|span|strong|em|b|i|a|table|tr|td|th|thead|tbody)[^>]*>/gi,
-									"\n",
-								);
-							// Repeatedly strip remaining tags until stable
-							let prev = "";
-							while (prev !== cleanDescription) {
-								prev = cleanDescription;
-								cleanDescription = cleanDescription.replace(/<[^>]+>/g, "");
-							}
-							// Decode HTML entities (order matters: decode &amp; last to avoid double-decode)
-							cleanDescription = cleanDescription
-								.replace(/&nbsp;/g, " ")
-								.replace(/&lt;/g, "<")
-								.replace(/&gt;/g, ">")
-								.replace(/&quot;/g, '"')
-								.replace(/&amp;/g, "&")
-								.replace(/\n{3,}/g, "\n\n")
-								.trim();
+							// Réduire la description HTML enrichie Azure DevOps en texte brut
+							// pour le pipeline de spec (les images sont retirées ici).
+							const cleanDescription = stripHtml(safeDescription);
 							descriptionParts.push(cleanDescription || safeTitle);
 						} else {
 							descriptionParts.push(safeTitle);
@@ -862,7 +947,7 @@ except Exception as e:
 							specId,
 							projectId: project.id,
 							title: safeTitle,
-							description: safeDescription,
+							description: displayDescription || safeDescription,
 							status: "backlog",
 							subtasks: [],
 							logs: [],

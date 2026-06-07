@@ -70,6 +70,7 @@ export interface TaskAPI {
 	resumeTaskWithProvider: (
 		taskId: string,
 		providerName: string,
+		model?: string,
 	) => Promise<IPCResult>;
 	resetTaskConversation: (taskId: string) => Promise<IPCResult>;
 
@@ -326,11 +327,13 @@ export const createTaskAPI = (): TaskAPI => ({
 	resumeTaskWithProvider: (
 		taskId: string,
 		providerName: string,
+		model?: string,
 	): Promise<IPCResult> =>
 		ipcRenderer.invoke(
 			IPC_CHANNELS.TASK_RESUME_WITH_PROVIDER,
 			taskId,
 			providerName,
+			model,
 		),
 
 	resetTaskConversation: (taskId: string): Promise<IPCResult> =>

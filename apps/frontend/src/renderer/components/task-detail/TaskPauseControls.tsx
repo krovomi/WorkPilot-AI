@@ -1,12 +1,12 @@
-import {
-	Pause,
-	Play,
-	RotateCcw,
-} from "lucide-react";
-import { useCallback, useState } from "react";
+import { Loader2, Play, RotateCcw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { getModelsForProvider } from "../../../shared/services/providerRegistry";
 import type { Task } from "../../../shared/types";
+import { getStaticProviders } from "../../../shared/utils/providers";
+import { debugError } from "../../../shared/utils/debug-logger";
 import { useToast } from "../../hooks/use-toast";
+import { useSettingsStore } from "../../stores/settings-store";
 import { Button } from "../ui/button";
 import {
 	Select,
@@ -23,109 +23,182 @@ import {
 
 interface TaskPauseControlsProps {
 	task: Task;
+	/** True once the pause flag is set on disk (task.metadata.paused.enabled). */
 	isPaused?: boolean;
+	/** True while the backend subprocess is still alive. */
+	isRunning?: boolean;
 	onPause?: (subtaskId?: string) => Promise<void>;
-	onResume?: () => Promise<void>;
-	onSwitchProvider?: (provider: string, model: string) => Promise<void>;
+	/** Resume keeping the current provider (clears the flag + restarts). */
+	onResumeSameProvider?: () => Promise<void>;
 }
 
-const LLM_OPTIONS = [
-	{ provider: "anthropic", label: "Claude (Anthropic)", models: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"] },
-	{ provider: "openai", label: "OpenAI", models: ["gpt-4o", "gpt-4-turbo", "gpt-4"] },
-	{ provider: "google", label: "Google (Gemini)", models: ["gemini-pro", "gemini-2.0-flash"] },
-];
+interface ProviderOption {
+	name: string;
+	label: string;
+}
 
 export function TaskPauseControls({
 	task,
 	isPaused = false,
+	isRunning = false,
 	onPause,
-	onResume,
-	onSwitchProvider,
+	onResumeSameProvider,
 }: TaskPauseControlsProps) {
 	const { t } = useTranslation(["tasks"]);
 	const { toast } = useToast();
+	const settings = useSettingsStore((s) => s.settings);
+	const profiles = useSettingsStore((s) => s.profiles);
+
 	const [isLoading, setIsLoading] = useState(false);
+	const [isResuming, setIsResuming] = useState(false);
+	const [providers, setProviders] = useState<ProviderOption[]>([]);
 	const [selectedProvider, setSelectedProvider] = useState(
-		task.metadata?.provider || "anthropic"
+		task.metadata?.paused?.provider || task.metadata?.provider || "anthropic",
 	);
 	const [selectedModel, setSelectedModel] = useState(
-		task.metadata?.model || "claude-opus-4-7"
+		task.metadata?.paused?.model || task.metadata?.model || "",
 	);
 
-	const currentProviderOptions = LLM_OPTIONS.find(
-		(opt) => opt.provider === selectedProvider
+	// The task has finished its current step and the process exited — only then
+	// can the user actually switch and resume. While it is still running, the
+	// pause is "in flight" (finishing the current step).
+	const isFullyPaused = isPaused && !isRunning;
+
+	// Build the list of configured providers (same detection as the rest of the
+	// app) once the user reaches the paused-and-stopped state.
+	useEffect(() => {
+		if (!isFullyPaused) return;
+		let cancelled = false;
+		setIsLoading(true);
+		getStaticProviders(profiles, settings as unknown as Record<string, unknown>)
+			.then((res) => {
+				if (cancelled) return;
+				const configured = res.providers
+					.filter((p) => res.status[p.name] === true)
+					.map((p) => ({ name: p.name, label: p.label }));
+				setProviders(configured);
+				// If the current selection isn't configured, fall back to the first.
+				if (
+					configured.length > 0 &&
+					!configured.some((p) => p.name === selectedProvider)
+				) {
+					setSelectedProvider(configured[0].name);
+				}
+			})
+			.catch((err) => {
+				debugError("[TaskPauseControls] getStaticProviders failed", err);
+				if (!cancelled) setProviders([]);
+			})
+			.finally(() => {
+				if (!cancelled) setIsLoading(false);
+			});
+		return () => {
+			cancelled = true;
+		};
+		// selectedProvider intentionally excluded — we only seed it once per open.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isFullyPaused, profiles, settings]);
+
+	const models = useMemo(
+		() => getModelsForProvider(selectedProvider),
+		[selectedProvider],
 	);
+
+	// Keep the model selection valid whenever the provider changes.
+	useEffect(() => {
+		if (models.length === 0) {
+			setSelectedModel("");
+			return;
+		}
+		if (!models.some((m) => m.value === selectedModel)) {
+			setSelectedModel(models[0].value);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [selectedProvider]);
 
 	const handlePause = useCallback(async () => {
 		setIsLoading(true);
 		try {
 			await onPause?.();
 			toast({
-				title: "Task paused",
-				description: "You can resume later or switch providers",
+				title: t("tasks:modal.actions.pauseRequestedTitle", "Pause demandée"),
+				description: t(
+					"tasks:modal.actions.pauseRequestedDesc",
+					"La tâche s'arrêtera à la fin de l'étape en cours.",
+				),
 			});
 		} catch (error) {
 			toast({
-				title: "Failed to pause",
+				title: t("tasks:modal.actions.pauseFailed", "Échec de la mise en pause"),
 				description: String(error),
 				variant: "destructive",
 			});
 		} finally {
 			setIsLoading(false);
 		}
-	}, [onPause, toast]);
+	}, [onPause, toast, t]);
 
-	const handleResume = useCallback(async () => {
-		setIsLoading(true);
+	const handleResumeWithProvider = useCallback(async () => {
+		setIsResuming(true);
 		try {
-			await onResume?.();
-			toast({
-				title: "Task resumed",
-				description: "Continuing from where you paused",
-			});
+			const res = await globalThis.electronAPI?.resumeTaskWithProvider?.(
+				task.id,
+				selectedProvider,
+				selectedModel || undefined,
+			);
+			if (res?.success) {
+				toast({
+					title: t(
+						"tasks:modal.actions.resumeWithProviderSuccessTitle",
+						"Reprise avec {{provider}}",
+						{ provider: selectedProvider },
+					),
+					description: t(
+						"tasks:modal.actions.resumeWithProviderSuccessDesc",
+						"La conversation précédente sera rejouée vers le nouveau provider.",
+					),
+				});
+			} else {
+				toast({
+					title: t(
+						"tasks:modal.actions.resumeWithProviderErrorTitle",
+						"Échec de la reprise",
+					),
+					description: res?.error || "Unknown error",
+					variant: "destructive",
+				});
+			}
 		} catch (error) {
+			debugError("[TaskPauseControls] resumeTaskWithProvider failed", error);
 			toast({
-				title: "Failed to resume",
-				description: String(error),
+				title: t(
+					"tasks:modal.actions.resumeWithProviderErrorTitle",
+					"Échec de la reprise",
+				),
+				description: error instanceof Error ? error.message : String(error),
 				variant: "destructive",
 			});
 		} finally {
-			setIsLoading(false);
+			setIsResuming(false);
 		}
-	}, [onResume, toast]);
-
-	const handleSwitchProvider = useCallback(async () => {
-		setIsLoading(true);
-		try {
-			await onSwitchProvider?.(selectedProvider, selectedModel);
-			toast({
-				title: "Provider switched",
-				description: `Switched to ${selectedProvider} (${selectedModel})`,
-			});
-		} catch (error) {
-			toast({
-				title: "Failed to switch provider",
-				description: String(error),
-				variant: "destructive",
-			});
-		} finally {
-			setIsLoading(false);
-		}
-	}, [selectedProvider, selectedModel, onSwitchProvider, toast]);
+	}, [task.id, selectedProvider, selectedModel, toast, t]);
 
 	return (
 		<div className="space-y-4 p-4 border rounded-lg bg-muted/20">
 			<div>
 				<div className="text-sm font-medium">
-					{isPaused ? t("tasks:modal.actions.providerSwitchPaused") : t("tasks:modal.actions.providerSwitch")}
+					{isFullyPaused
+						? t("tasks:modal.actions.providerSwitchPaused")
+						: t("tasks:modal.actions.providerSwitch")}
 				</div>
 				<div className="text-xs text-muted-foreground mt-1">
-					{isPaused
+					{isFullyPaused
 						? t("tasks:modal.actions.providerSwitchPausedDesc")
 						: t("tasks:modal.actions.providerSwitchDesc")}
 				</div>
 			</div>
 
+			{/* State 1 — running, not paused: offer to pause */}
 			{!isPaused && (
 				<Tooltip>
 					<TooltipTrigger asChild>
@@ -140,67 +213,123 @@ export function TaskPauseControls({
 							{t("tasks:modal.actions.pauseToSwitch")}
 						</Button>
 					</TooltipTrigger>
-					<TooltipContent>{t("tasks:modal.actions.pauseToSwitchTooltip")}</TooltipContent>
+					<TooltipContent>
+						{t("tasks:modal.actions.pauseToSwitchTooltip")}
+					</TooltipContent>
 				</Tooltip>
 			)}
 
-			{isPaused && (
-				<>
-					<div className="space-y-2">
-						<label className="text-xs font-medium">Switch LLM Provider</label>
-						<div className="space-y-2">
-							<Select value={selectedProvider} onValueChange={setSelectedProvider}>
-								<SelectTrigger className="h-8">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{LLM_OPTIONS.map((opt) => (
-										<SelectItem key={opt.provider} value={opt.provider}>
-											{opt.label}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+			{/* State 2 — pause requested but the step is still finishing */}
+			{isPaused && isRunning && (
+				<div className="flex items-center gap-2 text-sm text-muted-foreground">
+					<Loader2 className="h-4 w-4 animate-spin" />
+					<span>
+						{t(
+							"tasks:modal.actions.pausingInProgress",
+							"Pause en cours… fin de l'étape en cours",
+						)}
+					</span>
+				</div>
+			)}
 
-							{currentProviderOptions && (
-								<Select value={selectedModel} onValueChange={setSelectedModel}>
+			{/* State 3 — fully paused: choose provider + model and resume */}
+			{isFullyPaused && (
+				<>
+					{isLoading ? (
+						<div className="flex items-center gap-2 text-sm text-muted-foreground">
+							<Loader2 className="h-4 w-4 animate-spin" />
+							<span>
+								{t("tasks:modal.actions.loadingProviders", "Chargement…")}
+							</span>
+						</div>
+					) : providers.length === 0 ? (
+						<div className="text-xs text-muted-foreground">
+							{t(
+								"tasks:modal.actions.noConfiguredProviders",
+								"Aucun provider configuré. Ajoutez une clé API dans les Paramètres.",
+							)}
+						</div>
+					) : (
+						<div className="space-y-2">
+							<div className="space-y-1">
+								<label className="text-xs font-medium">
+									{t("tasks:modal.actions.chooseProvider", "Provider")}
+								</label>
+								<Select
+									value={selectedProvider}
+									onValueChange={setSelectedProvider}
+								>
 									<SelectTrigger className="h-8">
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										{currentProviderOptions.models.map((model) => (
-											<SelectItem key={model} value={model}>
-												{model}
+										{providers.map((p) => (
+											<SelectItem key={p.name} value={p.name}>
+												{p.label}
 											</SelectItem>
 										))}
 									</SelectContent>
 								</Select>
+							</div>
+
+							{models.length > 0 && (
+								<div className="space-y-1">
+									<label className="text-xs font-medium">
+										{t("tasks:modal.actions.chooseModel", "Modèle")}
+									</label>
+									<Select
+										value={selectedModel}
+										onValueChange={setSelectedModel}
+									>
+										<SelectTrigger className="h-8">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											{models.map((m) => (
+												<SelectItem key={m.value} value={m.value}>
+													{m.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
 							)}
 						</div>
-					</div>
+					)}
 
-					<div className="flex gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleSwitchProvider}
-							disabled={isLoading}
-							className="flex-1"
-						>
-							<RotateCcw className="h-4 w-4 mr-2" />
-							Apply
-						</Button>
-
+					<div className="flex flex-col gap-2">
 						<Button
 							variant="default"
 							size="sm"
-							onClick={handleResume}
-							disabled={isLoading}
-							className="flex-1"
+							onClick={handleResumeWithProvider}
+							disabled={isResuming || isLoading || providers.length === 0}
+							className="w-full"
 						>
-							<Play className="h-4 w-4 mr-2" />
-							Resume
+							{isResuming ? (
+								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+							) : (
+								<Play className="h-4 w-4 mr-2" />
+							)}
+							{t("tasks:modal.actions.resumeWithChosenLlm", "Reprendre avec ce LLM")}
 						</Button>
+
+						{onResumeSameProvider && (
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => {
+									setIsResuming(true);
+									onResumeSameProvider().finally(() => setIsResuming(false));
+								}}
+								disabled={isResuming}
+								className="w-full"
+							>
+								{t(
+									"tasks:modal.actions.resumeSameProvider",
+									"Reprendre sans changer de LLM",
+								)}
+							</Button>
+						)}
 					</div>
 				</>
 			)}

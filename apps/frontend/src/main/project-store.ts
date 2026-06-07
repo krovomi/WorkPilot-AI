@@ -701,7 +701,15 @@ export class ProjectStore {
 			);
 
 			const description = this.extractDescription(specPath, plan, hasJsonError);
-			const metadata = this.loadTaskMetadata(specPath);
+			const loadedMetadata = this.loadTaskMetadata(specPath);
+			// The pause flag lives in implementation_plan.json (the backend reads
+			// it there), not task_metadata.json. Surface it on task.metadata so the
+			// paused controls survive task-list reloads — otherwise the only source
+			// is the optimistic store update, which every rescan wipes.
+			const metadata =
+				plan?.paused !== undefined
+					? { ...(loadedMetadata ?? {}), paused: plan.paused }
+					: loadedMetadata;
 			const { status: finalStatus, reviewReason: finalReviewReason } =
 				this.determineFinalStatus(plan, hasJsonError);
 			const subtasks = this.extractSubtasks(plan);

@@ -1742,6 +1742,7 @@ print(json.dumps(result))
 			_,
 			taskId: string,
 			providerName: string,
+			model?: string,
 		): Promise<IPCResult> => {
 			const { task, project } = findTaskAndProject(taskId);
 			if (!task || !project) {
@@ -1754,21 +1755,100 @@ print(json.dumps(result))
 				};
 			}
 
-			const specsBaseDir = getSpecsDir(project.autoBuildPath);
-			const specDir =
-				task.specsPath || path.join(project.path, specsBaseDir, task.specId);
+			const provider = providerName.trim();
+			const chosenModel = model?.trim() || undefined;
+			const specPaths = getSpecPaths(task, project);
+
+			// Distinct spec dirs (worktree + main) that may hold a backend copy.
+			const specDirs = [
+				specPaths.specDir,
+				specPaths.mainSpecDir,
+				specPaths.worktreeSpecDir,
+			].filter(
+				(d, i, arr): d is string =>
+					!!d && existsSync(d) && arr.indexOf(d) === i,
+			);
 
 			try {
-				// Write the single-shot marker that the Python backend will consume.
-				const markerPath = path.join(specDir, "RESUME_WITH_PROVIDER");
-				writeFileSync(markerPath, providerName.trim(), "utf-8");
+				// 1. Clear the pause flag on every plan copy so the restarted
+				//    backend doesn't immediately re-pause at the next iteration.
+				const planPaths = getPlanPaths(specPaths, project);
+				for (const planFile of planPaths.all) {
+					if (!existsSync(planFile)) continue;
+					try {
+						const plan = JSON.parse(readFileSync(planFile, "utf-8"));
+						plan.paused = {
+							enabled: false,
+							paused_at: null,
+							paused_subtask_id: null,
+							provider,
+							...(chosenModel ? { model: chosenModel } : {}),
+						};
+						writeFileSync(planFile, JSON.stringify(plan, null, 2));
+					} catch (err) {
+						appLog.warn(
+							`[TASK_RESUME_WITH_PROVIDER] Could not clear pause in ${planFile}:`,
+							err,
+						);
+					}
+				}
+
+				// 2. Persist provider + model to task_metadata.json so the backend
+				//    resolves the chosen model (phase_config._resolve_single_model
+				//    reads metadata.model). isAutoProfile:false forces the single
+				//    model to win over any leftover phase-model config.
+				for (const dir of specDirs) {
+					const metadataPath = path.join(dir, "task_metadata.json");
+					try {
+						const existing = existsSync(metadataPath)
+							? JSON.parse(safeReadFileSync(metadataPath) || "{}")
+							: {};
+						existing.provider = provider;
+						if (chosenModel) {
+							existing.model = chosenModel;
+							existing.isAutoProfile = false;
+						}
+						atomicWriteFileSync(
+							metadataPath,
+							JSON.stringify(existing, null, 2),
+						);
+					} catch (err) {
+						appLog.warn(
+							`[TASK_RESUME_WITH_PROVIDER] Could not update ${metadataPath}:`,
+							err,
+						);
+					}
+				}
+
+				// 3. Write the single-shot provider marker the backend consumes on
+				//    the next session start (core.client._consume_resume_with_provider_marker).
+				const markerPayload = JSON.stringify({
+					provider,
+					...(chosenModel ? { model: chosenModel } : {}),
+				});
+				for (const dir of specDirs) {
+					writeFileSync(
+						path.join(dir, "RESUME_WITH_PROVIDER"),
+						markerPayload,
+						"utf-8",
+					);
+				}
+
+				// Keep in-memory metadata + cache in sync for the UI.
+				if (!task.metadata) task.metadata = {};
+				task.metadata.provider = provider;
+				if (chosenModel) task.metadata.model = chosenModel;
+				if (task.metadata.paused) task.metadata.paused.enabled = false;
+				projectStore.invalidateTasksCache(project.id);
+
 				appLog.info(
-					`[TASK_RESUME_WITH_PROVIDER] Wrote marker for task ${taskId}: ` +
-						`spec=${specDir}, provider=${providerName}`,
+					`[TASK_RESUME_WITH_PROVIDER] Resuming task ${taskId} with ` +
+						`provider=${provider}${chosenModel ? `, model=${chosenModel}` : ""} ` +
+						`(${specDirs.length} spec dir(s)). Conversation log will be replayed.`,
 				);
 			} catch (err) {
 				appLog.error(
-					`[TASK_RESUME_WITH_PROVIDER] Failed to write marker for task ${taskId}:`,
+					`[TASK_RESUME_WITH_PROVIDER] Failed to prepare resume for task ${taskId}:`,
 					err,
 				);
 				return {
@@ -1781,12 +1861,12 @@ print(json.dumps(result))
 			}
 
 			// Restart the subprocess so the next session boots with the new
-			// provider (and replays the conversation log).
+			// provider/model (and replays the conversation log).
 			return await restartTaskWithNewProvider(
 				task,
 				project,
-				specDir,
-				providerName.trim(),
+				specPaths.specDir,
+				provider,
 			);
 		},
 	);
@@ -2697,16 +2777,14 @@ print(json.dumps(result))
 					return { success: false, error: "Task not found" };
 				}
 
-				const planPath = getPlanPath(project, task);
-				if (!existsSync(planPath)) {
-					return { success: false, error: "Implementation plan not found" };
-				}
+				// The running backend reads the pause flag from its own plan copy.
+				// For worktree tasks that's the worktree's implementation_plan.json,
+				// NOT the main repo's — so we must write the flag to every existing
+				// copy or the cooperative stop in the coder loop never fires.
+				const specPaths = getSpecPaths(task, project);
+				const planPaths = getPlanPaths(specPaths, project);
 
-				const planContent = readFileSync(planPath, "utf-8");
-				const plan = JSON.parse(planContent);
-
-				// Update pause state
-				plan.paused = {
+				const pausedState = {
 					enabled: true,
 					paused_at: new Date().toISOString(),
 					paused_subtask_id: subtaskId || null,
@@ -2714,12 +2792,47 @@ print(json.dumps(result))
 					model: task.metadata?.model || "claude-opus-4-7",
 				};
 
-				writeFileSync(planPath, JSON.stringify(plan, null, 2));
-				appLog.info(`[TASK_PAUSE] Task ${taskId} paused at subtask ${subtaskId || "none"}`);
+				let written = 0;
+				for (const planFile of planPaths.all) {
+					if (!existsSync(planFile)) continue;
+					try {
+						const plan = JSON.parse(readFileSync(planFile, "utf-8"));
+						plan.paused = pausedState;
+						writeFileSync(planFile, JSON.stringify(plan, null, 2));
+						written++;
+					} catch (err) {
+						appLog.warn(
+							`[TASK_PAUSE] Could not update plan copy ${planFile}:`,
+							err,
+						);
+					}
+				}
+
+				if (written === 0) {
+					return {
+						success: false,
+						error: "Implementation plan not found",
+					};
+				}
+
+				// Re-scan so the scanner surfaces plan.paused on task.metadata; the
+				// UI uses that to switch the controls into the paused state.
+				projectStore.invalidateTasksCache(project.id);
+
+				appLog.info(
+					`[TASK_PAUSE] Pause requested for task ${taskId} at subtask ` +
+						`${subtaskId || "none"} (${written} plan cop[y/ies]). The backend ` +
+						`finishes the current step, then stops.`,
+				);
 
 				return {
 					success: true,
-					data: { taskId, paused: true, pausedAt: plan.paused.paused_at },
+					data: {
+						taskId,
+						paused: true,
+						pausedAt: pausedState.paused_at,
+						planCopies: written,
+					},
 				};
 			} catch (error) {
 				appLog.error("[TASK_PAUSE] Error:", error);
@@ -2789,66 +2902,8 @@ print(json.dumps(result))
 		},
 	);
 
-	/**
-	 * Switch LLM provider for a paused task
-	 * Changes the provider before resuming
-	 */
-	ipcMain.handle(
-		"TASK_SWITCH_PROVIDER",
-		async (
-			_,
-			taskId: string,
-			provider: string,
-			model: string,
-		): Promise<IPCResult> => {
-			try {
-				const { task, project } = findTaskAndProject(taskId);
-				if (!task || !project) {
-					return { success: false, error: "Task not found" };
-				}
-
-				const planPath = getPlanPath(project, task);
-				if (!existsSync(planPath)) {
-					return { success: false, error: "Implementation plan not found" };
-				}
-
-				const planContent = readFileSync(planPath, "utf-8");
-				const plan = JSON.parse(planContent);
-
-				// Update provider in pause state
-				if (!plan.paused) {
-					plan.paused = {
-						enabled: true,
-						paused_at: new Date().toISOString(),
-						paused_subtask_id: null,
-					};
-				}
-
-				const oldProvider = plan.paused.provider;
-				plan.paused.provider = provider;
-				plan.paused.model = model;
-
-				// Also update task metadata
-				if (!task.metadata) task.metadata = {};
-				task.metadata.provider = provider;
-				task.metadata.model = model;
-
-				writeFileSync(planPath, JSON.stringify(plan, null, 2));
-				appLog.info(`[TASK_SWITCH_PROVIDER] Switched from ${oldProvider} to ${provider}`);
-
-				return {
-					success: true,
-					data: {
-						taskId,
-						provider,
-						model,
-						message: `Switched provider from ${oldProvider} to ${provider}`,
-					},
-				};
-			} catch (error) {
-				appLog.error("[TASK_SWITCH_PROVIDER] Error:", error);
-				return { success: false, error: String(error) };
-			}
-		},
-	);
+	// Provider switching mid-task is handled by TASK_RESUME_WITH_PROVIDER
+	// (marker + conversation replay). The former TASK_SWITCH_PROVIDER handler
+	// only wrote a flag with a hardcoded model list and never restarted the
+	// run, so it was removed in favour of the single source of truth.
 }

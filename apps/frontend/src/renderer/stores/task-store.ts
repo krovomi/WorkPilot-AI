@@ -1629,30 +1629,3 @@ export async function resumeTask(taskId: string): Promise<boolean> {
 
 	return result?.success ?? false;
 }
-
-/**
- * Switch LLM provider for a paused task
- */
-export async function switchTaskProvider(
-	taskId: string,
-	provider: string,
-	model: string,
-): Promise<boolean> {
-	const result = await globalThis.electronAPI?.invoke?.(
-		"TASK_SWITCH_PROVIDER",
-		taskId,
-		provider,
-		model,
-	);
-
-	if (result?.success) {
-		debugLog("task-store", `Task ${taskId} switched to ${provider}/${model}`);
-	} else {
-		debugWarn(
-			"task-store",
-			`Failed to switch provider for task ${taskId}: ${result?.error}`,
-		);
-	}
-
-	return result?.success ?? false;
-}

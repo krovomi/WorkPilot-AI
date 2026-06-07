@@ -371,6 +371,16 @@ export interface ImplementationPlan {
 	};
 	recoveryNote?: string;
 	description?: string;
+	// Pause/Resume state. Written by the TASK_PAUSE handler and read back by the
+	// backend coder loop (cooperative stop) and the task scanner (so the UI's
+	// paused controls survive task-list reloads).
+	paused?: {
+		enabled: boolean;
+		paused_at: string | null;
+		paused_subtask_id: string | null;
+		provider?: string;
+		model?: string;
+	};
 }
 
 export interface Phase {
