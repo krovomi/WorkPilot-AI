@@ -32,6 +32,7 @@ import type {
 } from "../shared/types";
 import { stripAcceptanceCriteriaSection } from "../shared/utils/acceptance-criteria";
 import { extractSubtaskFiles } from "../shared/utils/subtask-files";
+import { stripHtml } from "./ipc-handlers/shared/sanitize";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
 import { ensureAbsolutePath } from "./utils/path-helpers";
 import { findAllSpecPaths } from "./utils/spec-path-helpers";
@@ -850,6 +851,14 @@ export class ProjectStore {
 		// cleaned up automatically the next time the kanban refreshes.
 		let raw: string | null = null;
 
+		// PRIORITY 0: HTML enrichi conservé pour l'affichage (imports tracker).
+		// Contient les images inlinées ; on l'affiche tel quel sans toucher aux AC
+		// (le HTML n'utilise pas les sections markdown nettoyées plus bas).
+		const displayDescription = this.getRequirementsDisplayDescription(specPath);
+		if (displayDescription) {
+			return displayDescription;
+		}
+
 		// PRIORITY 1: From implementation plan
 		if (plan?.description) {
 			raw = plan.description;
@@ -866,6 +875,26 @@ export class ProjectStore {
 		if (!raw) raw = this.getSpecOverview(specPath);
 
 		return raw ? stripAcceptanceCriteriaSection(raw) : "";
+	}
+
+	/**
+	 * Get the rich HTML display description from requirements.json, if any.
+	 * Renseigné à l'import (Azure DevOps) avec les images inlinées.
+	 */
+	private getRequirementsDisplayDescription(specPath: string): string {
+		const requirementsPath = path.join(specPath, AUTO_BUILD_PATHS.REQUIREMENTS);
+
+		if (!existsSync(requirementsPath)) {
+			return "";
+		}
+
+		try {
+			const reqContent = readFileSync(requirementsPath, "utf-8");
+			const requirements = JSON.parse(reqContent);
+			return requirements.display_description || "";
+		} catch {
+			return "";
+		}
 	}
 
 	/**
@@ -1022,6 +1051,16 @@ export class ProjectStore {
 			existsSync(path.join(specPath, AUTO_BUILD_PATHS.SPEC_FILE))
 		) {
 			title = this.extractTitleFromSpec(specPath) || title;
+		}
+
+		// Les titres issus d'imports (US/RsD Azure DevOps) peuvent contenir du
+		// HTML enrichi : on le réduit en texte brut sur une seule ligne pour ne
+		// jamais afficher de balises. Répare aussi les tâches déjà importées.
+		if (title.includes("<") && title.includes(">")) {
+			const plain = stripHtml(title).replace(/\s+/g, " ").trim();
+			if (plain) {
+				title = plain.length > 200 ? `${plain.slice(0, 200)}…` : plain;
+			}
 		}
 
 		return title;

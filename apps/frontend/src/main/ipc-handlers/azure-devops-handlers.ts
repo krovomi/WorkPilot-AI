@@ -29,6 +29,7 @@ import {
 	parseAcceptanceCriteriaText,
 	stripAcceptanceCriteriaSection,
 } from "../../shared/utils/acceptance-criteria";
+import { inlineAzureDevOpsImages } from "./shared/azure-attachments";
 import {
 	sanitizeText,
 	sanitizeUrl,
@@ -41,84 +42,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const connectorSrcPath = path.resolve(__dirname, "..", "..", "..", "..", "src");
 const backendPath = path.resolve(__dirname, "..", "..", "..", "backend");
-
-/** Taille maximale d'une pièce jointe image inlinée en data URI (5 Mo). */
-const MAX_INLINE_IMAGE_BYTES = 5 * 1024 * 1024;
-
-/**
- * Télécharge les images en pièce jointe Azure DevOps (qui nécessitent une
- * authentification PAT) et les remplace par des data URIs base64 dans le HTML.
- *
- * Les descriptions de work items référencent les captures via
- * `https://dev.azure.com/<org>/_apis/wit/attachments/<guid>?fileName=...`.
- * Ces URLs renvoient un 401/timeout dans le renderer (pas de PAT), d'où des
- * images cassées. En les inlinant à l'import, elles s'affichent sans authent.
- */
-async function inlineAzureDevOpsImages(
-	html: string,
-	orgUrl: string,
-	pat: string,
-): Promise<string> {
-	if (!html?.includes("<img")) return html;
-
-	const authHeader = `Basic ${Buffer.from(`:${pat}`).toString("base64")}`;
-	let orgHost = "";
-	try {
-		orgHost = new URL(orgUrl).host.toLowerCase();
-	} catch {
-		orgHost = "";
-	}
-
-	const imgRegex = /<img\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\1[^>]*>/gi;
-	const sources = new Set<string>();
-	for (const match of html.matchAll(imgRegex)) {
-		const src = match[2];
-		if (src) sources.add(src);
-	}
-
-	let result = html;
-	for (const src of sources) {
-		if (src.startsWith("data:")) continue;
-
-		let host = "";
-		try {
-			host = new URL(src).host.toLowerCase();
-		} catch {
-			continue;
-		}
-
-		const isAzureAttachment =
-			host === orgHost ||
-			host.endsWith(".dev.azure.com") ||
-			host === "dev.azure.com" ||
-			host.endsWith(".visualstudio.com");
-		if (!isAzureAttachment) continue;
-
-		try {
-			const response = await fetch(src, {
-				headers: { Authorization: authHeader },
-			});
-			if (!response.ok) continue;
-
-			const buffer = Buffer.from(await response.arrayBuffer());
-			if (buffer.length === 0 || buffer.length > MAX_INLINE_IMAGE_BYTES) {
-				continue;
-			}
-
-			const contentType =
-				response.headers.get("content-type")?.split(";")[0]?.trim() ||
-				"image/png";
-			if (!contentType.startsWith("image/")) continue;
-
-			const dataUri = `data:${contentType};base64,${buffer.toString("base64")}`;
-			result = result.split(src).join(dataUri);
-		} catch {
-			// En cas d'échec, conserver l'URL d'origine sans bloquer l'import.
-		}
-	}
-
-	return result;
-}
 
 /**
  * Register all Azure DevOps-related IPC handlers

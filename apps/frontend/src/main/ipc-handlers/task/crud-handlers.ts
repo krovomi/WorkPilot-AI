@@ -22,7 +22,28 @@ import { titleGenerator } from "../../title-generator";
 import { findAllSpecPaths, isValidTaskId } from "../../utils/spec-path-helpers";
 import { cleanupWorktree } from "../../utils/worktree-cleanup";
 import { findTaskWorktree, isPathWithinBase } from "../../worktree-paths";
+import { inlineAzureDevOpsImages } from "../shared/azure-attachments";
+import { stripHtml } from "../shared/sanitize";
+import { parseEnvFile } from "../utils";
 import { findTaskAndProject } from "./shared";
+
+/** Charge le PAT et l'URL d'organisation Azure DevOps depuis le `.env` projet. */
+function loadAzureDevOpsConfig(
+	projectPath: string,
+	autoBuildPath: string,
+): { pat: string | null; orgUrl: string | null } {
+	try {
+		const envPath = path.join(projectPath, autoBuildPath, ".env");
+		if (!existsSync(envPath)) return { pat: null, orgUrl: null };
+		const vars = parseEnvFile(readFileSync(envPath, "utf-8"));
+		return {
+			pat: vars.AZURE_DEVOPS_PAT || null,
+			orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
+		};
+	} catch {
+		return { pat: null, orgUrl: null };
+	}
+}
 
 /**
  * Register task CRUD (Create, Read, Update, Delete) handlers
@@ -82,21 +103,56 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				return { success: false, error: "Project not found" };
 			}
 
-			// Auto-generate title if empty using Claude AI
-			let finalTitle = title;
+			// Les descriptions importées depuis un tracker (Azure DevOps, Jira)
+			// arrivent en HTML enrichi. On en dérive :
+			//  - `aiDescription` : texte brut (titres/spec/prompt IA, pas de HTML) ;
+			//  - `displayDescription` : HTML conservé pour l'affichage, avec les
+			//    images en pièce jointe Azure DevOps inlinées en data URIs (sinon
+			//    elles nécessitent un PAT et échouent dans le renderer).
+			const descriptionIsHtml =
+				typeof description === "string" &&
+				description.trimStart().startsWith("<");
+			let aiDescription = description;
+			let displayDescription = description;
+			if (descriptionIsHtml) {
+				aiDescription = stripHtml(description) || description;
+				displayDescription = description;
+				if (metadata?.importSource === "azure-devops") {
+					const az = loadAzureDevOpsConfig(
+						project.path,
+						project.autoBuildPath || "",
+					);
+					if (az.pat && az.orgUrl) {
+						try {
+							displayDescription = await inlineAzureDevOpsImages(
+								description,
+								az.orgUrl,
+								az.pat,
+							);
+						} catch (err) {
+							console.error("[TASK_CREATE] Image inlining failed:", err);
+						}
+					}
+				}
+			}
+
+			// Auto-generate title if empty using Claude AI.
+			// Le titre est toujours réduit en texte brut : un titre HTML enrichi
+			// (US/RsD Azure DevOps) ne doit jamais être affiché tel quel.
+			let finalTitle = title?.trim() ? stripHtml(title) || title : title;
 			if (!title?.trim()) {
 				console.warn(
 					"[TASK_CREATE] Title is empty, generating with Claude AI...",
 				);
 				try {
 					const generatedTitle =
-						await titleGenerator.generateTitle(description);
+						await titleGenerator.generateTitle(aiDescription);
 					if (generatedTitle) {
 						finalTitle = generatedTitle;
 						console.warn("[TASK_CREATE] Generated title:", finalTitle);
 					} else {
 						// Fallback: create title from first line of description
-						finalTitle = description.split("\n")[0].substring(0, 60);
+						finalTitle = aiDescription.split("\n")[0].substring(0, 60);
 						if (finalTitle.length === 60) finalTitle += "...";
 						console.warn(
 							"[TASK_CREATE] AI generation failed, using fallback:",
@@ -106,7 +162,7 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				} catch (err) {
 					console.error("[TASK_CREATE] Title generation error:", err);
 					// Fallback: create title from first line of description
-					finalTitle = description.split("\n")[0].substring(0, 60);
+					finalTitle = aiDescription.split("\n")[0].substring(0, 60);
 					if (finalTitle.length === 60) finalTitle += "...";
 				}
 			}
@@ -251,7 +307,7 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			const now = new Date().toISOString();
 			const implementationPlan = {
 				feature: finalTitle,
-				description: description,
+				description: aiDescription,
 				created_at: now,
 				updated_at: now,
 				status: "pending",
@@ -277,9 +333,16 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 
 			// Create requirements.json with attached images
 			const requirements: Record<string, unknown> = {
-				task_description: description,
+				task_description: aiDescription,
 				workflow_type: taskMetadata.category || "feature",
 			};
+
+			// Conserver le HTML enrichi (images inlinées comprises) pour l'UI sans
+			// polluer `task_description` consommé par l'IA. project-store privilégie
+			// ce champ pour l'affichage de la description.
+			if (descriptionIsHtml && displayDescription !== aiDescription) {
+				requirements.display_description = displayDescription;
+			}
 
 			// Propagate acceptance criteria so they reach every pipeline phase
 			// (planner, spec_writer, qa_reviewer all read this from requirements.json).
@@ -326,7 +389,7 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				specId: specId,
 				projectId,
 				title: finalTitle,
-				description,
+				description: displayDescription,
 				status: "backlog",
 				subtasks: [],
 				logs: [],

@@ -78,12 +78,12 @@ export function TaskPauseControls({
 					.map((p) => ({ name: p.name, label: p.label }));
 				setProviders(configured);
 				// If the current selection isn't configured, fall back to the first.
-				if (
-					configured.length > 0 &&
-					!configured.some((p) => p.name === selectedProvider)
-				) {
-					setSelectedProvider(configured[0].name);
-				}
+				// Functional update so the effect doesn't depend on selectedProvider.
+				setSelectedProvider((prev) =>
+					configured.length > 0 && !configured.some((p) => p.name === prev)
+						? configured[0].name
+						: prev,
+				);
 			})
 			.catch((err) => {
 				debugError("[TaskPauseControls] getStaticProviders failed", err);
@@ -95,8 +95,6 @@ export function TaskPauseControls({
 		return () => {
 			cancelled = true;
 		};
-		// selectedProvider intentionally excluded — we only seed it once per open.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isFullyPaused, profiles, settings]);
 
 	const models = useMemo(
@@ -104,16 +102,16 @@ export function TaskPauseControls({
 		[selectedProvider],
 	);
 
-	// Keep the model selection valid whenever the provider changes.
+	// Keep the model selection valid whenever the provider changes. Recompute the
+	// model list locally and use a functional update so the only dependency is
+	// the provider itself.
 	useEffect(() => {
-		if (models.length === 0) {
-			setSelectedModel("");
-			return;
-		}
-		if (!models.some((m) => m.value === selectedModel)) {
-			setSelectedModel(models[0].value);
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+		const available = getModelsForProvider(selectedProvider);
+		setSelectedModel((prev) =>
+			available.some((m) => m.value === prev)
+				? prev
+				: (available[0]?.value ?? ""),
+		);
 	}, [selectedProvider]);
 
 	const handlePause = useCallback(async () => {
@@ -252,9 +250,9 @@ export function TaskPauseControls({
 					) : (
 						<div className="space-y-2">
 							<div className="space-y-1">
-								<label className="text-xs font-medium">
+								<div className="text-xs font-medium">
 									{t("tasks:modal.actions.chooseProvider", "Provider")}
-								</label>
+								</div>
 								<Select
 									value={selectedProvider}
 									onValueChange={setSelectedProvider}
@@ -274,9 +272,9 @@ export function TaskPauseControls({
 
 							{models.length > 0 && (
 								<div className="space-y-1">
-									<label className="text-xs font-medium">
+									<div className="text-xs font-medium">
 										{t("tasks:modal.actions.chooseModel", "Modèle")}
-									</label>
+									</div>
 									<Select
 										value={selectedModel}
 										onValueChange={setSelectedModel}

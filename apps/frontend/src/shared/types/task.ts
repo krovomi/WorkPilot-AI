@@ -254,6 +254,10 @@ export interface TaskMetadata {
 	jiraState?: string; // Jira issue state
 	jiraType?: string; // Jira issue type (Bug, Story, Task, etc.)
 
+	// Tracker d'origine de l'import (pilote le post-traitement : strip HTML,
+	// inlining des images en pièce jointe, etc.).
+	importSource?: "azure-devops" | "jira";
+
 	// Classification
 	category?: TaskCategory;
 	complexity?: TaskComplexity;
