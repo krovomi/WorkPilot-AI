@@ -1,5 +1,7 @@
 import {
 	AlertTriangle,
+	ArrowDown,
+	ArrowUp,
 	Brain,
 	CheckCircle2,
 	ChevronDown,
@@ -71,12 +73,6 @@ interface TaskLogsProps {
 }
 
 const PHASE_ORDER: TaskLogPhase[] = ["planning", "coding", "validation"];
-
-const PHASE_LABELS: Record<TaskLogPhase, string> = {
-	planning: "Planning",
-	coding: "Coding",
-	validation: "Validation",
-};
 
 const PHASE_ICONS: Record<TaskLogPhase, typeof Pencil> = {
 	planning: Pencil,
@@ -285,6 +281,47 @@ export function TaskLogs({
 		{},
 	);
 
+	// Affiche les boutons flottants « remonter au début » / « descendre en bas »
+	// selon la position de défilement dans le conteneur de logs.
+	const [showScrollTop, setShowScrollTop] = useState(false);
+	const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+	const scrollToTop = useCallback(() => {
+		logsContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+	}, [logsContainerRef]);
+
+	const scrollToBottom = useCallback(() => {
+		const container = logsContainerRef.current;
+		if (!container) return;
+		container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+	}, [logsContainerRef]);
+
+	// Raccourcis clavier quand le conteneur de logs a le focus :
+	// - Home → remonter tout en haut, End → descendre tout en bas.
+	// Le focus + les attributs ARIA sont posés impérativement pour garder un
+	// viewport accessible sans alourdir le JSX d'attributs conflictuels.
+	useEffect(() => {
+		const container = logsContainerRef.current;
+		if (!container) return;
+
+		container.tabIndex = 0;
+		container.setAttribute("role", "region");
+		container.setAttribute("aria-label", t("tasks:logs.viewportAria"));
+
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Home") {
+				e.preventDefault();
+				scrollToTop();
+			} else if (e.key === "End") {
+				e.preventDefault();
+				scrollToBottom();
+			}
+		};
+
+		container.addEventListener("keydown", onKeyDown);
+		return () => container.removeEventListener("keydown", onKeyDown);
+	}, [logsContainerRef, scrollToTop, scrollToBottom, t]);
+
 	// Determine which phase section currently sits at the top of the scroll
 	// container and notify the parent so the sticky phase bar can follow.
 	const computeVisiblePhase = useCallback(() => {
@@ -305,12 +342,26 @@ export function TaskLogs({
 		onVisiblePhaseChange(current);
 	}, [logsContainerRef, onVisiblePhaseChange]);
 
+	// Met à jour la visibilité des boutons flottants selon la position : on
+	// affiche « haut » dès qu'on s'éloigne du sommet et « bas » tant qu'on n'a
+	// pas atteint le bas (avec une marge pour absorber les arrondis de layout).
+	const updateScrollButtons = useCallback(() => {
+		const el = logsContainerRef.current;
+		if (!el) return;
+		const distanceFromBottom =
+			el.scrollHeight - el.scrollTop - el.clientHeight;
+		const isScrollable = el.scrollHeight - el.clientHeight > 16;
+		setShowScrollTop(el.scrollTop > 240);
+		setShowScrollBottom(isScrollable && distanceFromBottom > 240);
+	}, [logsContainerRef]);
+
 	const handleScroll = useCallback(
 		(e: React.UIEvent<HTMLDivElement>) => {
 			onLogsScroll(e);
 			computeVisiblePhase();
+			updateScrollButtons();
 		},
-		[onLogsScroll, computeVisiblePhase],
+		[onLogsScroll, computeVisiblePhase, updateScrollButtons],
 	);
 
 	// Recompute when logs content changes (new entries, expand/collapse, load).
@@ -319,61 +370,124 @@ export function TaskLogs({
 	// biome-ignore lint/correctness/useExhaustiveDependencies: layout-driven recompute
 	useEffect(() => {
 		computeVisiblePhase();
-	}, [computeVisiblePhase, phaseLogs, expandedPhases, isLoadingLogs]);
+		updateScrollButtons();
+	}, [
+		computeVisiblePhase,
+		updateScrollButtons,
+		phaseLogs,
+		expandedPhases,
+		isLoadingLogs,
+	]);
 
 	return (
-		<div
-			ref={logsContainerRef}
-			className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
-			onScroll={handleScroll}
-		>
-			<div className="p-4 space-y-2">
-				{isLoadingLogs ? (
-					<div className="flex items-center justify-center py-8">
-						<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-					</div>
-				) : phaseLogs ? (
-					<>
-						{/* Phase-based collapsible logs */}
-						{PHASE_ORDER.map((phase) => (
-							<div
-								key={phase}
-								ref={(el) => {
-									phaseRefs.current[phase] = el;
-								}}
-							>
-								<PhaseLogSection
-									phase={phase}
-									phaseLog={phaseLogs.phases[phase]}
-									isExpanded={expandedPhases.has(phase)}
-									onToggle={() => onTogglePhase(phase)}
-									isTaskStuck={isStuck}
-									phaseConfig={getPhaseConfig(task.metadata, phase)}
-									providers={providers}
-									onThinkingChange={handleThinkingChange}
-									onModelChange={handleModelChange}
-									onProviderChange={handleProviderChange}
-									isSavingPhase={savingPhase === phase}
-								/>
-							</div>
-						))}
-						<div ref={logsEndRef} />
-					</>
-				) : task.logs && task.logs.length > 0 ? (
-					// Fallback to legacy raw logs if no phase logs exist
-					<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all">
-						{task.logs.join("")}
-						<div ref={logsEndRef} />
-					</pre>
-				) : (
-					<div className="text-center text-sm text-muted-foreground py-8">
-						<Terminal className="mx-auto mb-2 h-8 w-8 opacity-50" />
-						<p>No logs yet</p>
-						<p className="text-xs mt-1">
-							Logs will appear here when the task runs
-						</p>
-					</div>
-				)}
+		<div className="relative h-full">
+			<div
+				ref={logsContainerRef}
+				className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent focus:outline-none"
+				onScroll={handleScroll}
+			>
+				<div className="p-4 space-y-2">
+					{isLoadingLogs ? (
+						<div className="flex items-center justify-center py-8">
+							<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+						</div>
+					) : phaseLogs ? (
+						<>
+							{/* Phase-based collapsible logs */}
+							{PHASE_ORDER.map((phase) => (
+								<div
+									key={phase}
+									ref={(el) => {
+										phaseRefs.current[phase] = el;
+									}}
+								>
+									<PhaseLogSection
+										phase={phase}
+										phaseLog={phaseLogs.phases[phase]}
+										isExpanded={expandedPhases.has(phase)}
+										onToggle={() => onTogglePhase(phase)}
+										isTaskStuck={isStuck}
+										phaseConfig={getPhaseConfig(task.metadata, phase)}
+										providers={providers}
+										onThinkingChange={handleThinkingChange}
+										onModelChange={handleModelChange}
+										onProviderChange={handleProviderChange}
+										isSavingPhase={savingPhase === phase}
+									/>
+								</div>
+							))}
+							<div ref={logsEndRef} />
+						</>
+					) : task.logs && task.logs.length > 0 ? (
+						// Fallback to legacy raw logs if no phase logs exist
+						<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all">
+							{task.logs.join("")}
+							<div ref={logsEndRef} />
+						</pre>
+					) : (
+						<div className="text-center text-sm text-muted-foreground py-8">
+							<Terminal className="mx-auto mb-2 h-8 w-8 opacity-50" />
+							<p>{t("tasks:logs.empty.title")}</p>
+							<p className="text-xs mt-1">
+								{t("tasks:logs.empty.description")}
+							</p>
+						</div>
+					)}
+				</div>
+			</div>
+
+			{/* Contrôles flottants de défilement : FAB circulaires centrés en bas
+			    qui se déploient en pilule au survol pour révéler leur libellé. Le
+			    bouton « haut » apparaît dès qu'on s'éloigne du sommet, le bouton
+			    « bas » tant qu'on n'a pas atteint la fin des logs. */}
+			<div className="pointer-events-none absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+				<button
+					type="button"
+					onClick={scrollToTop}
+					aria-label={t("tasks:logs.scrollToTop")}
+					title={t("tasks:logs.scrollToTopHint")}
+					className={cn(
+						"group flex items-center",
+						"rounded-full border border-border/60 bg-background/80 p-2.5",
+						"text-muted-foreground shadow-lg shadow-black/20 backdrop-blur-md",
+						"transition-all duration-300 ease-out",
+						"hover:border-primary/50 hover:bg-background/90 hover:text-foreground",
+						"hover:shadow-primary/20",
+						"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+						showScrollTop
+							? "pointer-events-auto translate-y-0 scale-100 opacity-100"
+							: "pointer-events-none translate-y-3 scale-90 opacity-0",
+					)}
+				>
+					<ArrowUp className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover:-translate-y-0.5" />
+					<span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 transition-all duration-300 group-hover:ml-1.5 group-hover:max-w-[160px] group-hover:opacity-100">
+						{t("tasks:logs.scrollToTop")}
+					</span>
+				</button>
+
+				<button
+					type="button"
+					onClick={scrollToBottom}
+					aria-label={t("tasks:logs.scrollToBottom")}
+					title={t("tasks:logs.scrollToBottomHint")}
+					className={cn(
+						"group flex items-center",
+						"rounded-full border border-border/60 bg-background/80 p-2.5",
+						"text-muted-foreground shadow-lg shadow-black/20 backdrop-blur-md",
+						"transition-all duration-300 ease-out",
+						"hover:border-primary/50 hover:bg-background/90 hover:text-foreground",
+						"hover:shadow-primary/20",
+						"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+						showScrollBottom
+							? "pointer-events-auto translate-y-0 scale-100 opacity-100"
+							: "pointer-events-none translate-y-3 scale-90 opacity-0",
+					)}
+				>
+					<ArrowDown className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover:translate-y-0.5" />
+					<span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 transition-all duration-300 group-hover:ml-1.5 group-hover:max-w-[160px] group-hover:opacity-100">
+						{t("tasks:logs.scrollToBottom")}
+					</span>
+				</button>
 			</div>
 		</div>
 	);
@@ -470,7 +584,7 @@ function PhaseLogSection({
 							className="text-xs bg-warning/10 text-warning border-warning/30 flex items-center gap-1"
 						>
 							<AlertTriangle className="h-3 w-3" />
-							Interrupted
+							{t("tasks:execution.labels.interrupted")}
 						</Badge>
 					);
 				}
@@ -480,7 +594,7 @@ function PhaseLogSection({
 						className="text-xs bg-info/10 text-info border-info/30 flex items-center gap-1"
 					>
 						<Loader2 className="h-3 w-3 animate-spin" />
-						Running
+						{t("tasks:execution.phases.running")}
 					</Badge>
 				);
 			case "completed":
@@ -490,7 +604,7 @@ function PhaseLogSection({
 						className="text-xs bg-success/10 text-success border-success/30 flex items-center gap-1"
 					>
 						<CheckCircle2 className="h-3 w-3" />
-						Complete
+						{t("tasks:execution.phases.complete")}
 					</Badge>
 				);
 			case "failed":
@@ -500,13 +614,13 @@ function PhaseLogSection({
 						className="text-xs bg-destructive/10 text-destructive border-destructive/30 flex items-center gap-1"
 					>
 						<XCircle className="h-3 w-3" />
-						Failed
+						{t("tasks:execution.phases.failed")}
 					</Badge>
 				);
 			default:
 				return (
 					<Badge variant="secondary" className="text-xs text-muted-foreground">
-						Pending
+						{t("tasks:execution.phases.pending")}
 					</Badge>
 				);
 		}
@@ -546,10 +660,18 @@ function PhaseLogSection({
 										: "text-muted-foreground",
 							)}
 						/>
-						<span className="font-medium text-sm">{PHASE_LABELS[phase]}</span>
+						<span className="font-medium text-sm">
+							{t(`tasks:execution.phases.${phase}`)}
+						</span>
 						{hasEntries && (
 							<span className="text-xs text-muted-foreground">
-								({phaseLog?.entries.length} entries)
+								({phaseLog?.entries.length}{" "}
+								{t(
+									phaseLog?.entries.length === 1
+										? "tasks:execution.labels.entry"
+										: "tasks:execution.labels.entries",
+								)}
+								)
 							</span>
 						)}
 					</button>
@@ -688,7 +810,9 @@ function PhaseLogSection({
 			<CollapsibleContent>
 				<div className="mt-1 ml-6 border-l-2 border-border pl-4 py-2 space-y-1">
 					{!hasEntries ? (
-						<p className="text-xs text-muted-foreground italic">No logs yet</p>
+						<p className="text-xs text-muted-foreground italic">
+							{t("tasks:logs.phaseEmpty")}
+						</p>
 					) : (
 						displayedEntries.map((entry) => (
 							<LogEntry
@@ -709,6 +833,7 @@ interface LogEntryProps {
 }
 
 function LogEntry({ entry }: LogEntryProps) {
+	const { t } = useTranslation(["tasks"]);
 	const [isExpanded, setIsExpanded] = useState(false);
 	const hasDetail = Boolean(entry.detail);
 
@@ -836,12 +961,12 @@ function LogEntry({ entry }: LogEntryProps) {
 							{isExpanded ? (
 								<>
 									<ChevronDown className="h-2.5 w-2.5" />
-									<span>Hide output</span>
+									<span>{t("tasks:logs.hideOutput")}</span>
 								</>
 							) : (
 								<>
 									<ChevronRight className="h-2.5 w-2.5" />
-									<span>Show output</span>
+									<span>{t("tasks:logs.showOutput")}</span>
 								</>
 							)}
 						</button>

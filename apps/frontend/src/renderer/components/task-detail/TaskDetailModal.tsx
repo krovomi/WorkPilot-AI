@@ -69,6 +69,7 @@ import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
 import { TaskPhaseBar } from "./TaskPhaseBar";
+import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask, resumeTask } from "../../stores/task-store";
 import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
 import { TaskReview } from "./TaskReview";
@@ -469,7 +470,7 @@ function TaskDetailModalContent({
 	const currentPhaseActivity =
 		task.subtasks.find((s) => s.status === "in_progress")?.title ??
 		task.executionProgress?.currentSubtask ??
-		task.executionProgress?.message ??
+		translateActivityMessage(t, task.executionProgress?.message) ??
 		null;
 
 	// Extract handlers using custom hook

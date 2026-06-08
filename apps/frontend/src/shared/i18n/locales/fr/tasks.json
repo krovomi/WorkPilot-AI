@@ -243,20 +243,37 @@
 			"fixing": "Correction",
 			"validation": "Validation",
 			"complete": "Terminé",
-			"failed": "Échoué"
+			"failed": "Échoué",
+			"running": "En cours",
+			"pending": "En attente"
 		},
 		"labels": {
 			"interrupted": "Interrompu",
 			"progress": "Progression",
 			"entry": "entrée",
 			"entries": "entrées",
-			"step": "Étape {{current}}/{{total}}"
+			"step": "Étape {{current}}/{{total}}",
+			"thinking": "Traitement en cours"
 		},
 		"shortPhases": {
 			"plan": "Plan",
 			"code": "Code",
 			"qa": "QA",
 			"planTooltip": "Voir le plan d'implémentation"
+		},
+		"activity": {
+			"discoveringContext": "Découverte du contexte du projet…",
+			"gatheringRequirements": "Collecte des exigences…",
+			"writingSpec": "Rédaction de la spécification…",
+			"validatingSpec": "Validation de la spécification…",
+			"specComplete": "Spécification terminée",
+			"creatingPlan": "Création du plan d'implémentation…",
+			"implementingCode": "Implémentation des modifications…",
+			"workingOnSubtask": "Traitement de la sous-tâche {{subtask}}…",
+			"subtaskCompleted": "Sous-tâche {{subtask}} terminée",
+			"fixingQa": "Correction des problèmes QA…",
+			"runningQa": "Revue QA en cours…",
+			"buildPaused": "Build en pause — sous-tâches encore en attente"
 		}
 	},
 	"files": {
@@ -517,6 +534,18 @@
 		"description": "Ajoutez des références visuelles comme des captures d'écran ou des conceptions pour aider l'IA à comprendre vos exigences."
 	},
 	"logs": {
+		"scrollToTop": "Remonter au début",
+		"scrollToTopHint": "Remonter au début (Origine)",
+		"scrollToBottom": "Aller au plus récent",
+		"scrollToBottomHint": "Aller au plus récent (Fin)",
+		"viewportAria": "Journaux de la tâche — Origine pour remonter, Fin pour descendre",
+		"empty": {
+			"title": "Aucun log pour l'instant",
+			"description": "Les logs apparaîtront ici lorsque la tâche s'exécutera"
+		},
+		"phaseEmpty": "Aucun log pour l'instant",
+		"hideOutput": "Masquer la sortie",
+		"showOutput": "Afficher la sortie",
 		"thinking": {
 			"selectAria": "Niveau de réflexion pour cette phase",
 			"selectTooltip": "Changer le niveau de réflexion pour cette phase",
@@ -567,12 +596,13 @@
 			"syncFromBranch": "Synchroniser depuis une branche",
 			"taskControls": "Contrôles de la tâche",
 			"taskIsPaused": "Tâche en pause",
-			"providerSwitch": "Changement de provider LLM",
-			"providerSwitchDesc": "Met la tâche en pause à la fin de l'étape en cours, puis vous laisse choisir un autre LLM.",
+			"providerSwitch": "Changer de LLM en cours d'exécution",
+			"providerSwitchDesc": "Override à chaud : met la tâche en pause à la fin de l'étape en cours, puis la reprend avec un autre LLM. Pour les étapes non démarrées, utilisez plutôt les sélecteurs LLM de chaque phase ci-dessus.",
 			"providerSwitchPaused": "Tâche en pause",
 			"providerSwitchPausedDesc": "Choisissez un provider et un modèle, puis reprenez la tâche.",
 			"pauseToSwitch": "Mettre en pause et changer de LLM",
 			"pauseToSwitchTooltip": "La tâche termine l'étape en cours puis s'arrête. Vous pourrez alors choisir un provider et un modèle, puis reprendre.",
+			"pauseUnavailableTooltip": "Le changement à chaud n'est possible que pendant l'exécution. Pour les étapes non démarrées, choisissez le LLM directement dans les sélecteurs de chaque phase ci-dessus.",
 			"pauseRequestedTitle": "Pause demandée",
 			"pauseRequestedDesc": "La tâche s'arrêtera à la fin de l'étape en cours.",
 			"pauseFailed": "Échec de la mise en pause",

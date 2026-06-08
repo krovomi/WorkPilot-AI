@@ -200,19 +200,23 @@ export function TaskPauseControls({
 			{!isPaused && (
 				<Tooltip>
 					<TooltipTrigger asChild>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handlePause}
-							disabled={isLoading}
-							className="w-full"
-						>
-							<RotateCcw className="h-4 w-4 mr-2" />
-							{t("tasks:modal.actions.pauseToSwitch")}
-						</Button>
+						<span className="block w-full">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handlePause}
+								disabled={isLoading || !isRunning}
+								className="w-full"
+							>
+								<RotateCcw className="h-4 w-4 mr-2" />
+								{t("tasks:modal.actions.pauseToSwitch")}
+							</Button>
+						</span>
 					</TooltipTrigger>
 					<TooltipContent>
-						{t("tasks:modal.actions.pauseToSwitchTooltip")}
+						{isRunning
+							? t("tasks:modal.actions.pauseToSwitchTooltip")
+							: t("tasks:modal.actions.pauseUnavailableTooltip")}
 					</TooltipContent>
 				</Tooltip>
 			)}
