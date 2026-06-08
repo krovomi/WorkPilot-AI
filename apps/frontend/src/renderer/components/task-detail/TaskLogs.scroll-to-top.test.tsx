@@ -89,11 +89,24 @@ describe("TaskLogs — bouton remonter au début", () => {
 		renderLogs(ref);
 
 		const container = ref.current as HTMLDivElement;
+		fireEvent.mouseEnter(container.parentElement as HTMLElement);
 		fireEvent.scroll(container, { target: { scrollTop: 300 } });
 
 		const button = screen.getByLabelText("tasks:logs.scrollToTop");
 		expect(button.className).toContain("opacity-100");
 		expect(button.className).not.toContain("pointer-events-none");
+	});
+
+	it("garde le bouton masqué hors survol même après défilement", () => {
+		const ref = createRef<HTMLDivElement>();
+		renderLogs(ref);
+
+		const container = ref.current as HTMLDivElement;
+		fireEvent.scroll(container, { target: { scrollTop: 300 } });
+
+		const button = screen.getByLabelText("tasks:logs.scrollToTop");
+		expect(button.className).toContain("opacity-0");
+		expect(button.className).toContain("pointer-events-none");
 	});
 
 	it("remonte le conteneur en douceur au clic", () => {
@@ -160,6 +173,7 @@ describe("TaskLogs — bouton remonter au début", () => {
 		const bottomButton = screen.getByLabelText("tasks:logs.scrollToBottom");
 		expect(bottomButton.className).toContain("opacity-0");
 
+		fireEvent.mouseEnter(container.parentElement as HTMLElement);
 		fireEvent.scroll(container, { target: { scrollTop: 0 } });
 		expect(bottomButton.className).toContain("opacity-100");
 		expect(bottomButton.className).not.toContain("pointer-events-none");

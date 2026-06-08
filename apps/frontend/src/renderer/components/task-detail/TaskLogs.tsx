@@ -299,6 +299,10 @@ export function TaskLogs({
 	const [showScrollTop, setShowScrollTop] = useState(false);
 	const [showScrollBottom, setShowScrollBottom] = useState(false);
 
+	// Les boutons flottants ne sont révélés que lorsque la souris survole la
+	// frame des logs, afin de ne pas encombrer le viewport au repos.
+	const [isHoveringLogs, setIsHoveringLogs] = useState(false);
+
 	const scrollToTop = useCallback(() => {
 		logsContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 	}, [logsContainerRef]);
@@ -393,7 +397,11 @@ export function TaskLogs({
 	]);
 
 	return (
-		<div className="relative h-full">
+		<div
+			className="relative h-full"
+			onMouseEnter={() => setIsHoveringLogs(true)}
+			onMouseLeave={() => setIsHoveringLogs(false)}
+		>
 			<div
 				ref={logsContainerRef}
 				className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent focus:outline-none"
@@ -467,7 +475,7 @@ export function TaskLogs({
 						"hover:border-primary/50 hover:bg-background/90 hover:text-foreground",
 						"hover:shadow-primary/20",
 						"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-						showScrollTop
+						showScrollTop && isHoveringLogs
 							? "pointer-events-auto translate-y-0 scale-100 opacity-100"
 							: "pointer-events-none translate-y-3 scale-90 opacity-0",
 					)}
@@ -491,7 +499,7 @@ export function TaskLogs({
 						"hover:border-primary/50 hover:bg-background/90 hover:text-foreground",
 						"hover:shadow-primary/20",
 						"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-						showScrollBottom
+						showScrollBottom && isHoveringLogs
 							? "pointer-events-auto translate-y-0 scale-100 opacity-100"
 							: "pointer-events-none translate-y-3 scale-90 opacity-0",
 					)}
