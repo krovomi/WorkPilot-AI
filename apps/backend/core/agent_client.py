@@ -31,6 +31,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -40,6 +41,22 @@ from typing import Any
 from apps.backend.models_registry import get_pricing
 
 logger = logging.getLogger(__name__)
+
+
+def _env_float(name: str, default: float) -> float:
+    """Read a float tunable from the environment, falling back to ``default``.
+
+    Lets operators widen the Copilot HTTP timeouts for slow/reasoning models
+    without editing code (e.g. ``COPILOT_REQUEST_TOTAL_TIMEOUT=900``).
+    """
+    raw = os.environ.get(name)
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        logger.warning("[CopilotAgentClient] Invalid %s=%r — using %.0f", name, raw, default)
+        return default
 
 # =============================================================================
 # Constants
@@ -94,17 +111,38 @@ _WRITE_NUDGE_TURNS_REMAINING = 8
 _FILE_WRITE_TOOL_NAMES = ("Write", "write_file")
 
 # Per-request HTTP timeouts for the Copilot chat-completions call. Without an
-# explicit timeout a hung/stalled API response freezes the whole agent loop
+# explicit timeout a genuinely hung response freezes the whole agent loop
 # (the socket stays open, no bytes arrive), which surfaces as a build that is
-# "stuck and never restarts" and a frozen frontend. ``sock_read`` is the key
-# guard: it fires when no data is received for this many seconds even though the
-# connection is alive. ``total`` bounds a single attempt end-to-end.
-_COPILOT_REQUEST_TOTAL_TIMEOUT = 180.0
-_COPILOT_REQUEST_CONNECT_TIMEOUT = 20.0
-_COPILOT_REQUEST_SOCK_READ_TIMEOUT = 90.0
-# A stalled/transient request is retried this many times before the turn fails,
-# so a single hung response no longer kills the whole planning phase.
+# "stuck and never restarts" and a frozen frontend.
+#
+# CRITICAL: these requests are sent with ``stream: False``. A non-streaming
+# completion sends NO bytes until the ENTIRE response has been generated, so
+# ``sock_read`` measures the full generation time — NOT connection liveness.
+# A reasoning model (e.g. Opus 4.8 with "Ultra Think") working over a large
+# prompt legitimately produces no bytes for several minutes; a tight 90 s
+# ``sock_read`` therefore kills healthy slow turns. The symptom: a turn that
+# takes >90 s to generate is aborted, retried ~4× (≈6 min of invisible
+# stalls), then the phase loops and repeats — the task "seems blocked".
+#
+# The values below must accommodate the slowest expected SINGLE-TURN
+# generation while still eventually catching a truly dead socket. They are
+# env-overridable so operators can widen them further for very slow models.
+_COPILOT_REQUEST_TOTAL_TIMEOUT = _env_float("COPILOT_REQUEST_TOTAL_TIMEOUT", 600.0)
+_COPILOT_REQUEST_CONNECT_TIMEOUT = _env_float("COPILOT_REQUEST_CONNECT_TIMEOUT", 20.0)
+# Silence-between-reads guard. For non-streaming requests this is effectively
+# "max time the model may take to produce the whole completion". Kept slightly
+# below ``total`` so a stall is attributed to read-silence (clearer logs)
+# rather than the overall ceiling.
+_COPILOT_REQUEST_SOCK_READ_TIMEOUT = _env_float("COPILOT_REQUEST_SOCK_READ_TIMEOUT", 540.0)
+# A transient CONNECTION error (reset/disconnect/DNS) is cheap to retry — it
+# usually fails within seconds — so we retry it several times before failing.
 _COPILOT_REQUEST_MAX_RETRIES = 3
+# A full-duration TIMEOUT is different: the server held the connection open for
+# the entire (now generous) ceiling without completing. Retrying the identical
+# payload rarely helps and each retry costs another full ceiling, so cap timeout
+# retries to bound the worst-case "stuck" window (2 retries → at most 3 ×
+# ceiling before the turn surfaces an error instead of looping invisibly).
+_COPILOT_TIMEOUT_MAX_RETRIES = int(_env_float("COPILOT_TIMEOUT_MAX_RETRIES", 2))
 # Base back-off (seconds) between retries; grows linearly per attempt.
 _COPILOT_REQUEST_RETRY_BACKOFF = 2.0
 
@@ -117,6 +155,21 @@ _COPILOT_REQUEST_RETRY_BACKOFF = 2.0
 # counter resets to zero as soon as a turn produces actual work (a tool call or
 # a genuine stop), so legitimate intermittent empties never trip it.
 _COPILOT_MAX_CONSECUTIVE_EMPTY_TOOL_CALLS = 5
+
+# The Copilot API occasionally returns a 200 response whose ``choices`` array is
+# EMPTY — no message, no tool call, nothing. This is almost always a transient
+# server-side hiccup (rate limiting, content filtering, a momentary glitch)
+# rather than a real "the model is done" signal. Previously a single empty
+# response ended the whole session ("(Empty response from Copilot)"), aborting
+# the phase mid-cycle. Instead we re-issue the same turn after a short back-off,
+# up to this many CONSECUTIVE times, before finally giving up. The counter
+# resets to zero as soon as a turn returns a usable response, so isolated
+# empties never accumulate toward the cap.
+_COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES = int(
+    _env_float("COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES", 4)
+)
+# Base back-off (seconds) between empty-response re-samples; grows linearly.
+_COPILOT_EMPTY_RESPONSE_BACKOFF = _env_float("COPILOT_EMPTY_RESPONSE_BACKOFF", 2.0)
 
 # =============================================================================
 # Message Types for provider-agnostic stream processing
@@ -986,6 +1039,9 @@ class CopilotAgentClient(AgentClient):
         # Number of CONSECUTIVE turns that returned finish_reason=tool_calls with
         # an empty tool_calls array. Reset whenever a turn does real work.
         consecutive_empty_tool_calls = 0
+        # Number of CONSECUTIVE turns whose response contained no usable choices
+        # (a transient API hiccup). Reset whenever a turn returns a real choice.
+        consecutive_empty_responses = 0
 
         for turn in range(self.max_turns):
             try:
@@ -1130,28 +1186,37 @@ class CopilotAgentClient(AgentClient):
                     _asyncio.TimeoutError,
                     aiohttp.ClientError,
                 ) as e:
-                    # A hung/stalled or transient connection error. Retry a few
-                    # times before failing so a single bad response no longer
-                    # freezes the whole planning phase.
-                    if attempt < _COPILOT_REQUEST_MAX_RETRIES:
+                    # A hung/stalled or transient connection error. Retry before
+                    # failing so a single bad response no longer freezes the whole
+                    # phase. A full-duration TIMEOUT gets a tighter retry budget
+                    # than a (cheap, fast-failing) connection error: each timeout
+                    # retry costs another full ceiling, so we cap it to bound the
+                    # worst-case "stuck" window.
+                    is_timeout = isinstance(e, _asyncio.TimeoutError)
+                    max_retries = (
+                        _COPILOT_TIMEOUT_MAX_RETRIES
+                        if is_timeout
+                        else _COPILOT_REQUEST_MAX_RETRIES
+                    )
+                    if attempt < max_retries:
                         backoff = _COPILOT_REQUEST_RETRY_BACKOFF * (attempt + 1)
                         logger.warning(
                             f"[CopilotAgentClient] Request stalled/failed "
                             f"({type(e).__name__}: {e}) — retry "
-                            f"{attempt + 1}/{_COPILOT_REQUEST_MAX_RETRIES} "
+                            f"{attempt + 1}/{max_retries} "
                             f"in {backoff:.0f}s"
                         )
                         print(
                             "[CopilotAgentClient] [WARN] Copilot API request "
                             f"stalled — retrying ({attempt + 1}/"
-                            f"{_COPILOT_REQUEST_MAX_RETRIES})...",
+                            f"{max_retries})...",
                             flush=True,
                         )
                         await _asyncio.sleep(backoff)
                         continue
                     logger.error(
                         f"[CopilotAgentClient] Request failed after "
-                        f"{_COPILOT_REQUEST_MAX_RETRIES} retries: {e}"
+                        f"{attempt + 1} attempt(s): {e}"
                     )
                     yield AgentMessage(
                         role=MessageRole.SYSTEM,
@@ -1187,7 +1252,36 @@ class CopilotAgentClient(AgentClient):
 
             choices = data.get("choices", [])
             if not choices:
-                logger.warning("[CopilotAgentClient] Empty choices in response")
+                # A 200 response with no choices is almost always a transient
+                # server-side hiccup, not a genuine "done" signal. Re-issue the
+                # same turn after a short back-off instead of killing the whole
+                # session on the first empty response. Only give up once the
+                # consecutive-empty budget is exhausted.
+                consecutive_empty_responses += 1
+                if (
+                    consecutive_empty_responses
+                    <= _COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES
+                ):
+                    backoff = _COPILOT_EMPTY_RESPONSE_BACKOFF * consecutive_empty_responses
+                    logger.warning(
+                        f"[CopilotAgentClient] Turn {turn + 1}: empty choices in "
+                        f"response — retrying "
+                        f"({consecutive_empty_responses}/"
+                        f"{_COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES}) "
+                        f"in {backoff:.0f}s"
+                    )
+                    print(
+                        "[CopilotAgentClient] [WARN] Empty response from Copilot "
+                        f"— retrying ({consecutive_empty_responses}/"
+                        f"{_COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES})...",
+                        flush=True,
+                    )
+                    await _asyncio.sleep(backoff)
+                    continue  # retry — don't end the session on a transient empty
+                logger.error(
+                    f"[CopilotAgentClient] {consecutive_empty_responses} consecutive "
+                    "empty responses — giving up"
+                )
                 yield AgentMessage(
                     role=MessageRole.ASSISTANT,
                     content=[
@@ -1198,6 +1292,9 @@ class CopilotAgentClient(AgentClient):
                     ],
                 )
                 return
+
+            # A usable choice arrived — clear the transient-empty guard counter.
+            consecutive_empty_responses = 0
 
             message = choices[0].get("message", {})
             content = message.get("content") or ""

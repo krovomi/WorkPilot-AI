@@ -500,7 +500,32 @@
 		}
 	},
 	"subtasks": {
-		"untitled": "Sous-tâche sans titre"
+		"untitled": "Sous-tâche sans titre",
+		"filesViewer": {
+			"filesModified_one": "{{count}} fichier modifié",
+			"filesModified_other": "{{count}} fichiers modifiés",
+			"expandAll": "Tout déplier",
+			"collapseAll": "Tout replier",
+			"noFiles": "Aucun fichier modifié pour l'instant",
+			"noFilesHint": "Les fichiers apparaîtront ici au fil des modifications",
+			"loading": "Chargement des modifications…",
+			"loadError": "Impossible de charger les modifications de cette tâche",
+			"viewDiff": "Voir les modifications",
+			"hideDiff": "Masquer les modifications",
+			"noDiff": "Aucune modification enregistrée pour ce fichier",
+			"stats": {
+				"files": "Fichiers",
+				"folders": "Dossiers",
+				"additions": "Ajouts",
+				"deletions": "Suppressions"
+			},
+			"status": {
+				"added": "Ajouté",
+				"modified": "Modifié",
+				"deleted": "Supprimé",
+				"renamed": "Renommé"
+			}
+		}
 	},
 	"bulkPR": {
 		"selectAllInColumn": "Sélectionner toutes les tâches de la colonne",

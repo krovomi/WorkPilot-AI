@@ -818,9 +818,12 @@ class TestCopilotRequestRetry:
         client._tool_executor.execute = AsyncMock(return_value="ok")
         return client
 
-    def _flaky_session(self, fail_times: int, attempts_counter: list):
-        """Session whose .post raises TimeoutError ``fail_times`` times, then
-        returns a clean 'stop' response."""
+    def _flaky_session(self, fail_times: int, attempts_counter: list, exc=None):
+        """Session whose .post raises ``exc`` ``fail_times`` times, then returns
+        a clean 'stop' response. ``exc`` defaults to a TimeoutError factory."""
+
+        if exc is None:
+            exc = lambda: asyncio.TimeoutError("simulated stalled response")
 
         class _Resp:
             def __init__(self, data):
@@ -847,7 +850,7 @@ class TestCopilotRequestRetry:
                 self._calls += 1
                 attempts_counter.append(self._calls)
                 if self._calls <= fail_times:
-                    raise asyncio.TimeoutError("simulated stalled response")
+                    raise exc()
                 return _Resp(
                     {
                         "choices": [
@@ -901,7 +904,42 @@ class TestCopilotRequestRetry:
         with patch("asyncio.sleep", new=AsyncMock()):
             asyncio.run(_drive())
 
-        # max_retries + 1 = 4 attempts, then a terminal error message.
+        # A full-duration timeout gets a tighter retry budget than a connection
+        # error (each timeout retry costs another full ceiling). With
+        # _COPILOT_TIMEOUT_MAX_RETRIES=2 that is 1 initial + 2 retries = 3
+        # attempts, then a terminal error message — not the connection-error
+        # budget of 4.
+        assert len(attempts) == 3
+        assert any("timeout/connection" in t.lower() for t in texts)
+
+    def test_connection_error_gets_larger_retry_budget(self):
+        """A transient CONNECTION error keeps the full (cheap) retry budget.
+
+        Unlike a full-duration timeout, a connection error fails fast, so it is
+        retried _COPILOT_REQUEST_MAX_RETRIES times: 1 initial + 3 retries = 4
+        attempts before giving up. This locks in the timeout-vs-connection
+        distinction so the two budgets can't silently collapse together.
+        """
+        import aiohttp
+
+        client = self._make_client()
+        attempts: list = []
+        client._get_http_client = lambda: self._flaky_session(
+            99, attempts, exc=lambda: aiohttp.ClientConnectionError("reset")
+        )
+
+        texts: list = []
+
+        async def _drive():
+            client._pending_query = "plan it"
+            async for msg in client.receive_response():
+                for block in msg.content:
+                    if getattr(block, "text", None):
+                        texts.append(block.text)
+
+        with patch("asyncio.sleep", new=AsyncMock()):
+            asyncio.run(_drive())
+
         assert len(attempts) == 4
         assert any("timeout/connection" in t.lower() for t in texts)
 

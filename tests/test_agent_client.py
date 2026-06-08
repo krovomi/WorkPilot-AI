@@ -543,6 +543,103 @@ class TestCopilotAgentClient:
         assert "Tool executor not available" in result_blocks[0].result_content
 
     @pytest.mark.asyncio
+    async def test_receive_response_empty_choices_retries_then_recovers(self):
+        """A transient empty-choices response should be retried, not abort the session."""
+        import core.agent_client as agent_client_module
+
+        client = CopilotAgentClient(github_token="ghp_test", max_turns=5)
+        await client.query("hello")
+
+        def make_response(payload):
+            resp = MagicMock()
+            resp.status = 200
+            resp.json = AsyncMock(return_value=payload)
+            resp.__aenter__ = AsyncMock(return_value=resp)
+            resp.__aexit__ = AsyncMock(return_value=None)
+            return resp
+
+        # First two turns return empty choices (transient hiccup), third succeeds.
+        responses = iter(
+            [
+                make_response({"choices": []}),
+                make_response({"choices": []}),
+                make_response(
+                    {"choices": [{"message": {"content": "Recovered!"}}]}
+                ),
+            ]
+        )
+
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(side_effect=lambda *a, **k: next(responses))
+        client._http_client = mock_session
+
+        with patch.object(client, "_get_copilot_token", return_value="mock_token"), \
+            patch.object(
+                agent_client_module,
+                "_COPILOT_EMPTY_RESPONSE_BACKOFF",
+                0.0,
+            ), \
+            patch("asyncio.sleep", new=AsyncMock()):
+            messages = []
+            async for msg in client.receive_response():
+                messages.append(msg)
+
+        # Session must NOT have surfaced "(Empty response from Copilot)" — it
+        # retried and recovered with the real content instead.
+        texts = [
+            b.text
+            for m in messages
+            for b in m.content
+            if b.type == ContentBlockType.TEXT
+        ]
+        assert "Recovered!" in texts
+        assert "(Empty response from Copilot)" not in texts
+
+    @pytest.mark.asyncio
+    async def test_receive_response_empty_choices_gives_up_after_cap(self):
+        """Persistent empty choices eventually surface the empty-response message."""
+        import core.agent_client as agent_client_module
+
+        client = CopilotAgentClient(github_token="ghp_test", max_turns=20)
+        await client.query("hello")
+
+        def make_empty():
+            resp = MagicMock()
+            resp.status = 200
+            resp.json = AsyncMock(return_value={"choices": []})
+            resp.__aenter__ = AsyncMock(return_value=resp)
+            resp.__aexit__ = AsyncMock(return_value=None)
+            return resp
+
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(side_effect=lambda *a, **k: make_empty())
+        client._http_client = mock_session
+
+        with patch.object(client, "_get_copilot_token", return_value="mock_token"), \
+            patch.object(
+                agent_client_module,
+                "_COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES",
+                2,
+            ), \
+            patch.object(
+                agent_client_module,
+                "_COPILOT_EMPTY_RESPONSE_BACKOFF",
+                0.0,
+            ), \
+            patch("asyncio.sleep", new=AsyncMock()):
+            messages = []
+            async for msg in client.receive_response():
+                messages.append(msg)
+
+        texts = [
+            b.text
+            for m in messages
+            for b in m.content
+            if b.type == ContentBlockType.TEXT
+        ]
+        assert "(Empty response from Copilot)" in texts
+
+    @pytest.mark.asyncio
     async def test_run_subagents_parallel(self):
         """Test parallel sub-agent execution."""
         client = CopilotAgentClient(model="gpt-4o", github_token="ghp_test")

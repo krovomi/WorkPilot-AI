@@ -500,7 +500,32 @@
 		}
 	},
 	"subtasks": {
-		"untitled": "Untitled subtask"
+		"untitled": "Untitled subtask",
+		"filesViewer": {
+			"filesModified_one": "{{count}} file modified",
+			"filesModified_other": "{{count}} files modified",
+			"expandAll": "Expand all",
+			"collapseAll": "Collapse all",
+			"noFiles": "No files modified yet",
+			"noFilesHint": "Files will appear here as changes are made",
+			"loading": "Loading changes…",
+			"loadError": "Unable to load changes for this task",
+			"viewDiff": "View changes",
+			"hideDiff": "Hide changes",
+			"noDiff": "No recorded changes for this file",
+			"stats": {
+				"files": "Files",
+				"folders": "Folders",
+				"additions": "Additions",
+				"deletions": "Deletions"
+			},
+			"status": {
+				"added": "Added",
+				"modified": "Modified",
+				"deleted": "Deleted",
+				"renamed": "Renamed"
+			}
+		}
 	},
 	"bulkPR": {
 		"selectAllInColumn": "Select all tasks in column",
