@@ -366,10 +366,12 @@ describe("StreamingSession", () => {
 			).toBeInTheDocument();
 		});
 
-		// Switch to the Files tab and verify both paths are listed
+		// Switch to the Files tab and verify both paths are listed.
+		// (b.ts is also echoed in the left-panel header as the latest file, so
+		// it can appear more than once — assert "at least one".)
 		fireEvent.mouseDown(screen.getByText((content) => content.includes("Files (2)")));
-		expect(screen.getByText("/p/a.ts")).toBeInTheDocument();
-		expect(screen.getByText("/p/b.ts")).toBeInTheDocument();
+		expect(screen.getAllByText("/p/a.ts").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("/p/b.ts").length).toBeGreaterThan(0);
 	});
 
 	it("handles command events", async () => {
