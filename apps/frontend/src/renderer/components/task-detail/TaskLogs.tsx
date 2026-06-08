@@ -41,6 +41,8 @@ import {
 	buildProviderMetadataUpdate,
 	buildThinkingMetadataUpdate,
 	LOG_PHASE_TO_CONFIG_PHASE,
+	type PhaseDefaults,
+	resolvePhaseDefaults,
 } from "../../../shared/utils/task-thinking";
 import { getStaticProviders } from "../../../shared/utils/providers";
 import { debugError } from "../../../shared/utils/debug-logger";
@@ -106,10 +108,19 @@ const THINKING_SHORT_LABELS: Record<ThinkingLevel, string> = {
 	ultrathink: "Ultra",
 };
 
-// Helper to get model and thinking info for a log phase
+// Helper to get model and thinking info for a log phase.
+//
+// Résolution par phase (du plus prioritaire au moins prioritaire) :
+//   1. Override explicite sur la tâche (phaseModels/phaseThinking/phaseProviders)
+//   2. Défaut configuré dans les Settings (résolu par provider effectif)
+// Le provider effectif retombe sur le provider de la tâche puis sur le provider
+// sélectionné dans les Settings. On renvoie donc toujours une config : les
+// sélecteurs par phase affichent les défauts Settings tant qu'aucun override
+// par phase n'est défini.
 function getPhaseConfig(
 	metadata: TaskMetadata | undefined,
 	logPhase: TaskLogPhase,
+	settings?: Parameters<typeof resolvePhaseDefaults>[0],
 ): {
 	model: string;
 	modelValue: string;
@@ -120,39 +131,28 @@ function getPhaseConfig(
 	if (!metadata) return null;
 
 	const configPhase = LOG_PHASE_TO_CONFIG_PHASE[logPhase];
-	const fallbackProvider = metadata.provider || "anthropic";
 
-	// Auto profile with per-phase config
-	if (
-		metadata.isAutoProfile &&
-		metadata.phaseModels &&
-		metadata.phaseThinking
-	) {
-		const model = metadata.phaseModels[configPhase];
-		const thinking = metadata.phaseThinking[configPhase];
-		const provider = metadata.phaseProviders?.[configPhase] || fallbackProvider;
-		return {
-			model: MODEL_SHORT_LABELS[model] || model,
-			modelValue: model,
-			thinking: THINKING_SHORT_LABELS[thinking] || thinking,
-			thinkingValue: thinking,
-			provider,
-		};
-	}
+	const provider =
+		metadata.phaseProviders?.[configPhase] ||
+		metadata.provider ||
+		settings?.selectedProvider ||
+		"anthropic";
 
-	// Non-auto profile with single model/thinking
-	if (metadata.model && metadata.thinkingLevel) {
-		return {
-			model: MODEL_SHORT_LABELS[metadata.model] || metadata.model,
-			modelValue: metadata.model,
-			thinking:
-				THINKING_SHORT_LABELS[metadata.thinkingLevel] || metadata.thinkingLevel,
-			thinkingValue: metadata.thinkingLevel,
-			provider: fallbackProvider,
-		};
-	}
+	const defaults: PhaseDefaults = resolvePhaseDefaults(settings, provider);
 
-	return null;
+	const modelValue =
+		metadata.phaseModels?.[configPhase] || defaults.phaseModels[configPhase];
+	const thinkingValue =
+		metadata.phaseThinking?.[configPhase] ||
+		defaults.phaseThinking[configPhase];
+
+	return {
+		model: MODEL_SHORT_LABELS[modelValue] || modelValue,
+		modelValue,
+		thinking: THINKING_SHORT_LABELS[thinkingValue] || thinkingValue,
+		thinkingValue,
+		provider,
+	};
 }
 
 // biome-ignore lint/suspicious/noRedeclare: redeclaration is intentional in this context
@@ -204,10 +204,18 @@ export function TaskLogs({
 		};
 	}, [profiles, settings]);
 
-	// Persist a per-phase metadata change (thinking / model / provider). For
-	// Auto-profile tasks the targeted phase is updated in isolation; for
-	// single-model tasks the shared field is updated. The change applies when
-	// that phase next runs.
+	// Défauts par phase résolus depuis les Settings (provider, modèles, thinking).
+	// Servent à la fois à l'affichage (valeur par défaut des sélecteurs) et à
+	// l'amorçage de la config par phase lors d'une modification.
+	const phaseDefaults = useMemo(
+		() => resolvePhaseDefaults(settings, task.metadata?.provider),
+		[settings, task.metadata?.provider],
+	);
+
+	// Persist a per-phase metadata change (thinking / model / provider). The
+	// targeted phase is updated in isolation: the config is written per phase
+	// (seeded from the resolved Settings defaults), so the other phases keep
+	// their own values. The change applies when that phase next runs.
 	const persistPhaseMetadata = useCallback(
 		async (
 			logPhase: TaskLogPhase,
@@ -237,42 +245,47 @@ export function TaskLogs({
 		(logPhase: TaskLogPhase, level: ThinkingLevel) =>
 			persistPhaseMetadata(
 				logPhase,
-				buildThinkingMetadataUpdate(task.metadata, logPhase, level),
+				buildThinkingMetadataUpdate(task.metadata, logPhase, level, phaseDefaults),
 				t("tasks:logs.thinking.updatedTitle", "Réflexion mise à jour"),
 				t(
 					"tasks:logs.thinking.updatedDesc",
 					"Le niveau de réflexion sera appliqué au démarrage de cette phase.",
 				),
 			),
-		[persistPhaseMetadata, task.metadata, t],
+		[persistPhaseMetadata, task.metadata, phaseDefaults, t],
 	);
 
 	const handleModelChange = useCallback(
 		(logPhase: TaskLogPhase, model: string) =>
 			persistPhaseMetadata(
 				logPhase,
-				buildModelMetadataUpdate(task.metadata, logPhase, model),
+				buildModelMetadataUpdate(task.metadata, logPhase, model, phaseDefaults),
 				t("tasks:logs.model.updatedTitle", "Modèle mis à jour"),
 				t(
 					"tasks:logs.model.updatedDesc",
 					"Le modèle sera appliqué au démarrage de cette phase.",
 				),
 			),
-		[persistPhaseMetadata, task.metadata, t],
+		[persistPhaseMetadata, task.metadata, phaseDefaults, t],
 	);
 
 	const handleProviderChange = useCallback(
 		(logPhase: TaskLogPhase, provider: string) =>
 			persistPhaseMetadata(
 				logPhase,
-				buildProviderMetadataUpdate(task.metadata, logPhase, provider),
+				buildProviderMetadataUpdate(
+					task.metadata,
+					logPhase,
+					provider,
+					phaseDefaults,
+				),
 				t("tasks:logs.provider.updatedTitle", "Fournisseur mis à jour"),
 				t(
 					"tasks:logs.provider.updatedDesc",
 					"Le fournisseur sera appliqué au démarrage de cette phase.",
 				),
 			),
-		[persistPhaseMetadata, task.metadata, t],
+		[persistPhaseMetadata, task.metadata, phaseDefaults, t],
 	);
 
 	// Refs to each rendered phase section so we can detect which phase is
@@ -407,7 +420,7 @@ export function TaskLogs({
 										isExpanded={expandedPhases.has(phase)}
 										onToggle={() => onTogglePhase(phase)}
 										isTaskStuck={isStuck}
-										phaseConfig={getPhaseConfig(task.metadata, phase)}
+										phaseConfig={getPhaseConfig(task.metadata, phase, settings)}
 										providers={providers}
 										onThinkingChange={handleThinkingChange}
 										onModelChange={handleModelChange}

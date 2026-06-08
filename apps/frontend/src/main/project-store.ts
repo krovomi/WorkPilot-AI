@@ -1086,7 +1086,19 @@ export class ProjectStore {
 			looksLikeSpecId &&
 			existsSync(path.join(specPath, AUTO_BUILD_PATHS.SPEC_FILE))
 		) {
-			title = this.extractTitleFromSpec(specPath) || title;
+			const specTitle = this.extractTitleFromSpec(specPath);
+			// Anciens imports Azure DevOps (US/RsD) sans requirements.display_title :
+			// le générateur de spec a recopié la description de la tâche comme titre
+			// H1 (« # Specification: N° de version… », « # Specification: Description :… »).
+			// Ce H1 n'est jamais un vrai titre — on le détecte en comparant au
+			// task_description, et on retombe sur le nom de dossier (slugifié depuis
+			// le vrai titre Azure). L'hydratation à l'ouverture restaurera ensuite le
+			// System.Title exact (accents inclus).
+			if (specTitle && this.titleLooksLikeDescription(specTitle, specPath)) {
+				title = this.titleFromDirName(dirName);
+			} else {
+				title = specTitle || title;
+			}
 		}
 
 		// Les titres issus d'imports (US/RsD Azure DevOps) peuvent contenir du
@@ -1102,11 +1114,63 @@ export class ProjectStore {
 			const plain = stripHtml(title).replace(/\s+/g, " ").trim();
 			title = plain.length >= 3 ? plain : dirName;
 		}
+
+		// Filet de sécurité : si après tout ça le titre est encore un identifiant
+		// de spec brut (spec.md absent), on le rend lisible via le nom de dossier.
+		if (/^\d{3}-/.test(title)) {
+			title = this.titleFromDirName(dirName);
+		}
+
 		if (title.length > 200) {
 			title = `${title.slice(0, 200)}…`;
 		}
 
 		return title;
+	}
+
+	/**
+	 * Derive a human-readable title from a spec-folder name.
+	 *
+	 * Strips the "NNN-" spec-number prefix, turns hyphens into spaces, collapses
+	 * whitespace, drops a dangling trailing hyphen, and capitalizes the first
+	 * letter. Used as an offline fallback when no clean title source
+	 * (requirements.display_title or a real spec.md H1) is available.
+	 */
+	private titleFromDirName(dirName: string): string {
+		const cleaned = dirName
+			.replace(/^\d+-/, "")
+			.replace(/-+/g, " ")
+			.replace(/\s+/g, " ")
+			.trim();
+		if (!cleaned) return dirName;
+		return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+	}
+
+	/**
+	 * Detect whether a spec.md H1 title is in fact the task description.
+	 *
+	 * Legacy Azure DevOps imports (before requirements.display_title existed)
+	 * had their spec H1 generated from the raw work-item description, e.g.
+	 * "# Specification: N° de versionConditions de reproduction :…". Such a
+	 * title is never a real feature name. We detect it by normalizing both the
+	 * candidate title and the persisted task_description (lowercasing and
+	 * stripping every non-alphanumeric character, including the spaces/newlines
+	 * the generator collapsed) and checking whether the description begins with
+	 * the title. Genuine app-authored specs have a concise H1 distinct from
+	 * their long description, so this stays false for them.
+	 */
+	private titleLooksLikeDescription(title: string, specPath: string): string {
+		const description = this.getRequirementsDescription(specPath);
+		if (!description) return "";
+
+		const normalize = (value: string) =>
+			value.toLowerCase().replace(/[^a-z0-9]/gi, "");
+		const normalizedTitle = normalize(title);
+		const normalizedDescription = normalize(description);
+		if (normalizedTitle.length < 8) return "";
+
+		const probe = normalizedTitle.slice(0, 25);
+		return normalizedDescription.startsWith(probe) ? title : "";
 	}
 
 	/**

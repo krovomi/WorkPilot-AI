@@ -82,6 +82,42 @@ _COPILOT_HISTORY_CHAR_LIMIT: dict[str, int] = {
 # Default for unknown Copilot models: 100 k tokens (~400 k chars)
 _COPILOT_HISTORY_CHAR_LIMIT_DEFAULT = 400_000
 
+# Planner/spec_writer sessions MUST finish by writing their output file
+# (implementation_plan.json) via the Write tool. On large brownfield codebases
+# the model can burn its whole turn budget on investigation (run_command /
+# read_file / list_files) and never write the plan, making the planning phase
+# fail with "Did not create plan file". When this many turns (or fewer) remain
+# and the Write tool is still unused, we inject a one-time directive forcing the
+# model to stop exploring and produce the file now.
+_WRITE_NUDGE_TURNS_REMAINING = 8
+# Tool names that satisfy the "produced the required output file" condition.
+_FILE_WRITE_TOOL_NAMES = ("Write", "write_file")
+
+# Per-request HTTP timeouts for the Copilot chat-completions call. Without an
+# explicit timeout a hung/stalled API response freezes the whole agent loop
+# (the socket stays open, no bytes arrive), which surfaces as a build that is
+# "stuck and never restarts" and a frozen frontend. ``sock_read`` is the key
+# guard: it fires when no data is received for this many seconds even though the
+# connection is alive. ``total`` bounds a single attempt end-to-end.
+_COPILOT_REQUEST_TOTAL_TIMEOUT = 180.0
+_COPILOT_REQUEST_CONNECT_TIMEOUT = 20.0
+_COPILOT_REQUEST_SOCK_READ_TIMEOUT = 90.0
+# A stalled/transient request is retried this many times before the turn fails,
+# so a single hung response no longer kills the whole planning phase.
+_COPILOT_REQUEST_MAX_RETRIES = 3
+# Base back-off (seconds) between retries; grows linearly per attempt.
+_COPILOT_REQUEST_RETRY_BACKOFF = 2.0
+
+# Claude served through the OpenAI-compatible Copilot API occasionally returns
+# ``finish_reason=tool_calls`` with an EMPTY ``tool_calls`` array — the model
+# "intended" to call a tool but no call materialised. We re-prompt ("nudge") and
+# retry, which normally recovers on the next turn. This caps the number of
+# CONSECUTIVE empty re-samples so a pathological model that never emits a real
+# tool call can no longer burn the entire turn budget spinning in place. The
+# counter resets to zero as soon as a turn produces actual work (a tool call or
+# a genuine stop), so legitimate intermittent empties never trip it.
+_COPILOT_MAX_CONSECUTIVE_EMPTY_TOOL_CALLS = 5
+
 # =============================================================================
 # Message Types for provider-agnostic stream processing
 # =============================================================================
@@ -712,8 +748,16 @@ class CopilotAgentClient(AgentClient):
             try:
                 import aiohttp
 
+                # Explicit timeout so a hung/stalled response is detected and
+                # retried instead of freezing the agent loop indefinitely.
+                timeout = aiohttp.ClientTimeout(
+                    total=_COPILOT_REQUEST_TOTAL_TIMEOUT,
+                    sock_connect=_COPILOT_REQUEST_CONNECT_TIMEOUT,
+                    sock_read=_COPILOT_REQUEST_SOCK_READ_TIMEOUT,
+                )
                 # Authorization is injected per-request (token refreshes)
                 self._http_client = aiohttp.ClientSession(
+                    timeout=timeout,
                     headers={
                         "Content-Type": CONTENT_TYPE_JSON,
                         "Accept": CONTENT_TYPE_JSON,
@@ -931,6 +975,18 @@ class CopilotAgentClient(AgentClient):
 
         session = self._get_http_client()
 
+        # Track whether this session must end by writing an output file (planner/
+        # spec_writer sessions expose the Write tool) and whether it has done so.
+        # Used to inject a budget-aware "write now" nudge before turns run out.
+        has_write_tool = any(
+            td.get("name") in _FILE_WRITE_TOOL_NAMES for td in self._tool_definitions
+        )
+        write_tool_used = False
+        write_nudge_sent = False
+        # Number of CONSECUTIVE turns that returned finish_reason=tool_calls with
+        # an empty tool_calls array. Reset whenever a turn does real work.
+        consecutive_empty_tool_calls = 0
+
         for turn in range(self.max_turns):
             try:
                 copilot_token = await self._get_copilot_token()
@@ -947,6 +1003,37 @@ class CopilotAgentClient(AgentClient):
                 return
 
             request_headers["Authorization"] = f"Bearer {copilot_token}"
+
+            # Budget-aware "write now" nudge: when a planner/spec_writer session
+            # is about to run out of turns but has never called the Write tool,
+            # force it to stop investigating and produce its output file. Without
+            # this, large-codebase planning loops exhaust max_turns on read-only
+            # exploration and the phase fails with "Did not create plan file".
+            if (
+                has_write_tool
+                and not write_tool_used
+                and not write_nudge_sent
+                and (self.max_turns - turn) <= _WRITE_NUDGE_TURNS_REMAINING
+            ):
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "You are about to run out of turns. STOP investigating "
+                            "now — do not run any more exploration commands. "
+                            "Immediately call the Write tool to create the required "
+                            "output file (implementation_plan.json) in the spec "
+                            "directory with the COMPLETE JSON content, based on what "
+                            "you already know. This is mandatory: if you do not write "
+                            "the file now, the whole task fails."
+                        ),
+                    }
+                )
+                write_nudge_sent = True
+                logger.warning(
+                    "[CopilotAgentClient] Injected write-now nudge "
+                    f"(turn {turn + 1}/{self.max_turns}, Write tool still unused)"
+                )
 
             payload: dict[str, Any] = {
                 "model": self.model,
@@ -973,74 +1060,130 @@ class CopilotAgentClient(AgentClient):
             if self._using_github_models:
                 request_headers["Authorization"] = f"Bearer {self.github_token}"
 
-            try:
-                async with session.post(
-                    api_url, json=payload, headers=request_headers
-                ) as resp:
-                    if resp.status == 403 and not self._using_github_models:
-                        # Copilot API blocked (org restriction) — fallback to GitHub Models API
-                        error_text = await resp.text()
+            import asyncio as _asyncio
+
+            import aiohttp
+
+            data = None
+            for attempt in range(_COPILOT_REQUEST_MAX_RETRIES + 1):
+                try:
+                    async with session.post(
+                        api_url, json=payload, headers=request_headers
+                    ) as resp:
+                        if resp.status == 403 and not self._using_github_models:
+                            # Copilot API blocked (org restriction) — fallback to GitHub Models API
+                            error_text = await resp.text()
+                            logger.warning(
+                                f"[CopilotAgentClient] Copilot API returned 403 — "
+                                f"falling back to GitHub Models API at {self._github_models_api_base}"
+                            )
+                            print(
+                                "[CopilotAgentClient] [INFO] Copilot API blocked by org. "
+                                "Falling back to GitHub Models API.",
+                                flush=True,
+                            )
+                            self._using_github_models = True
+                            request_headers["Authorization"] = (
+                                f"Bearer {self.github_token}"
+                            )
+                            # Retry this turn with the GitHub Models API
+                            async with session.post(
+                                self._github_models_api_base,
+                                json=payload,
+                                headers=request_headers,
+                            ) as retry_resp:
+                                if retry_resp.status != 200:
+                                    retry_error = await retry_resp.text()
+                                    logger.error(
+                                        f"[CopilotAgentClient] GitHub Models API error ({retry_resp.status}): {retry_error[:500]}"
+                                    )
+                                    yield AgentMessage(
+                                        role=MessageRole.SYSTEM,
+                                        content=[
+                                            ContentBlock(
+                                                type=ContentBlockType.TEXT,
+                                                text=f"GitHub Models API error ({retry_resp.status}): {retry_error}",
+                                            )
+                                        ],
+                                    )
+                                    return
+                                data = await retry_resp.json()
+                        elif resp.status != 200:
+                            error_text = await resp.text()
+                            logger.error(
+                                f"[CopilotAgentClient] API error ({resp.status}): {error_text[:500]}"
+                            )
+                            yield AgentMessage(
+                                role=MessageRole.SYSTEM,
+                                content=[
+                                    ContentBlock(
+                                        type=ContentBlockType.TEXT,
+                                        text=f"Copilot API error ({resp.status}): {error_text}",
+                                    )
+                                ],
+                            )
+                            return
+                        else:
+                            data = await resp.json()
+                    break  # request succeeded — leave the retry loop
+                except (
+                    _asyncio.TimeoutError,
+                    aiohttp.ClientError,
+                ) as e:
+                    # A hung/stalled or transient connection error. Retry a few
+                    # times before failing so a single bad response no longer
+                    # freezes the whole planning phase.
+                    if attempt < _COPILOT_REQUEST_MAX_RETRIES:
+                        backoff = _COPILOT_REQUEST_RETRY_BACKOFF * (attempt + 1)
                         logger.warning(
-                            f"[CopilotAgentClient] Copilot API returned 403 — "
-                            f"falling back to GitHub Models API at {self._github_models_api_base}"
+                            f"[CopilotAgentClient] Request stalled/failed "
+                            f"({type(e).__name__}: {e}) — retry "
+                            f"{attempt + 1}/{_COPILOT_REQUEST_MAX_RETRIES} "
+                            f"in {backoff:.0f}s"
                         )
                         print(
-                            "[CopilotAgentClient] [INFO] Copilot API blocked by org. "
-                            "Falling back to GitHub Models API.",
+                            "[CopilotAgentClient] [WARN] Copilot API request "
+                            f"stalled — retrying ({attempt + 1}/"
+                            f"{_COPILOT_REQUEST_MAX_RETRIES})...",
                             flush=True,
                         )
-                        self._using_github_models = True
-                        request_headers["Authorization"] = f"Bearer {self.github_token}"
-                        # Retry this turn with the GitHub Models API
-                        async with session.post(
-                            self._github_models_api_base,
-                            json=payload,
-                            headers=request_headers,
-                        ) as retry_resp:
-                            if retry_resp.status != 200:
-                                retry_error = await retry_resp.text()
-                                logger.error(
-                                    f"[CopilotAgentClient] GitHub Models API error ({retry_resp.status}): {retry_error[:500]}"
-                                )
-                                yield AgentMessage(
-                                    role=MessageRole.SYSTEM,
-                                    content=[
-                                        ContentBlock(
-                                            type=ContentBlockType.TEXT,
-                                            text=f"GitHub Models API error ({retry_resp.status}): {retry_error}",
-                                        )
-                                    ],
-                                )
-                                return
-                            data = await retry_resp.json()
-                    elif resp.status != 200:
-                        error_text = await resp.text()
-                        logger.error(
-                            f"[CopilotAgentClient] API error ({resp.status}): {error_text[:500]}"
-                        )
-                        yield AgentMessage(
-                            role=MessageRole.SYSTEM,
-                            content=[
-                                ContentBlock(
-                                    type=ContentBlockType.TEXT,
-                                    text=f"Copilot API error ({resp.status}): {error_text}",
-                                )
-                            ],
-                        )
-                        return
-                    else:
-                        data = await resp.json()
-            except Exception as e:
-                logger.error(f"[CopilotAgentClient] Request failed: {e}")
-                yield AgentMessage(
-                    role=MessageRole.SYSTEM,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT, text=f"Copilot API error: {e}"
-                        )
-                    ],
+                        await _asyncio.sleep(backoff)
+                        continue
+                    logger.error(
+                        f"[CopilotAgentClient] Request failed after "
+                        f"{_COPILOT_REQUEST_MAX_RETRIES} retries: {e}"
+                    )
+                    yield AgentMessage(
+                        role=MessageRole.SYSTEM,
+                        content=[
+                            ContentBlock(
+                                type=ContentBlockType.TEXT,
+                                text=f"Copilot API error (timeout/connection): {e}",
+                            )
+                        ],
+                    )
+                    return
+                except Exception as e:
+                    logger.error(f"[CopilotAgentClient] Request failed: {e}")
+                    yield AgentMessage(
+                        role=MessageRole.SYSTEM,
+                        content=[
+                            ContentBlock(
+                                type=ContentBlockType.TEXT,
+                                text=f"Copilot API error: {e}",
+                            )
+                        ],
+                    )
+                    return
+
+            if data is None:
+                # All retries exhausted without a usable response.
+                logger.error(
+                    "[CopilotAgentClient] No response data after retries"
                 )
                 return
+
+
 
             choices = data.get("choices", [])
             if not choices:
@@ -1080,9 +1223,41 @@ class CopilotAgentClient(AgentClient):
                     # Copilot API returned finish_reason=tool_calls but no actual tool_calls —
                     # this can occur with Claude models via the OpenAI-compatible Copilot API.
                     # Add the partial assistant message and prompt the model to proceed with tools.
+                    consecutive_empty_tool_calls += 1
+                    if (
+                        consecutive_empty_tool_calls
+                        > _COPILOT_MAX_CONSECUTIVE_EMPTY_TOOL_CALLS
+                    ):
+                        # The model keeps "intending" to call a tool but never
+                        # emits one. Stop re-sampling so we don't spin through the
+                        # entire turn budget producing no work. End the session
+                        # with whatever content we have so the phase can surface a
+                        # real failure instead of silently looping.
+                        logger.error(
+                            f"[CopilotAgentClient] Turn {turn + 1}: "
+                            f"{consecutive_empty_tool_calls} consecutive empty "
+                            "tool_calls responses — aborting to avoid a spin loop"
+                        )
+                        yield AgentMessage(
+                            role=MessageRole.SYSTEM,
+                            content=[
+                                ContentBlock(
+                                    type=ContentBlockType.TEXT,
+                                    text=(
+                                        "Copilot API returned no actionable tool "
+                                        f"calls for {consecutive_empty_tool_calls} "
+                                        "consecutive turns — stopping to avoid an "
+                                        "infinite loop."
+                                    ),
+                                )
+                            ],
+                        )
+                        return
                     logger.warning(
                         f"[CopilotAgentClient] Turn {turn + 1}: finish_reason=tool_calls "
-                        "but no tool_calls in response — retrying with nudge"
+                        "but no tool_calls in response — retrying with nudge "
+                        f"({consecutive_empty_tool_calls}/"
+                        f"{_COPILOT_MAX_CONSECUTIVE_EMPTY_TOOL_CALLS})"
                     )
                     if content:
                         messages.append({"role": "assistant", "content": content})
@@ -1093,6 +1268,41 @@ class CopilotAgentClient(AgentClient):
                         }
                     )
                     continue  # retry — don't return early
+
+                # The model wants to STOP. For planner/spec_writer sessions the
+                # output file (implementation_plan.json) is mandatory, yet the
+                # model often "finishes" by DESCRIBING the plan in prose without
+                # ever calling the Write tool — leaving the planning phase to fail
+                # with "Did not create plan file". If Write is required and still
+                # unused, refuse the early stop once and force the model to write.
+                if (
+                    has_write_tool
+                    and not write_tool_used
+                    and not write_nudge_sent
+                    and turn < self.max_turns - 1
+                ):
+                    if content:
+                        messages.append({"role": "assistant", "content": content})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                "You have NOT yet created the required output file. "
+                                "Do not stop and do not just describe the plan in "
+                                "text. You MUST call the Write tool now to create "
+                                "implementation_plan.json in the spec directory with "
+                                "the COMPLETE JSON content, based on your "
+                                "investigation so far. Call the Write tool now."
+                            ),
+                        }
+                    )
+                    write_nudge_sent = True
+                    logger.warning(
+                        f"[CopilotAgentClient] Turn {turn + 1}: model tried to stop "
+                        "without writing the plan — forcing a Write retry"
+                    )
+                    continue  # retry — don't return early
+
                 if not content:
                     yield AgentMessage(
                         role=MessageRole.ASSISTANT,
@@ -1109,6 +1319,9 @@ class CopilotAgentClient(AgentClient):
                 return
 
             # Add assistant message (with tool_calls) to conversation history
+            # Real tool calls arrived — the model is making progress, so clear the
+            # empty-response guard counter.
+            consecutive_empty_tool_calls = 0
             assistant_msg: dict[str, Any] = {"role": "assistant"}
             if content:
                 assistant_msg["content"] = content
@@ -1130,6 +1343,9 @@ class CopilotAgentClient(AgentClient):
                     f"[CopilotAgentClient] Turn {turn + 1}: tool_call {tool_name}({list(args.keys())})"
                 )
                 print(f"[CopilotAgentClient] 🔧 Tool: {tool_name}", flush=True)
+
+                if tool_name in _FILE_WRITE_TOOL_NAMES:
+                    write_tool_used = True
 
                 # Yield TOOL_USE block so session handler can log it
                 yield AgentMessage(
