@@ -486,6 +486,106 @@ class TestCopilotAgentClient:
         assert "401" in messages[0].content[0].text
 
     @pytest.mark.asyncio
+    async def test_receive_response_429_retries_then_recovers(self):
+        """A 429 rate-limit must be retried (not aborted) and then recover.
+
+        Reproduces the "I still have tokens but get a 429" symptom: GitHub
+        Copilot's per-minute request rate limit returns 429 even with quota
+        left. The client should ride out the short window and continue
+        processing instead of surfacing a "Copilot API error (429)".
+        """
+        import core.agent_client as agent_client_module
+
+        client = CopilotAgentClient(github_token="ghp_test", max_turns=5)
+        await client.query("hello")
+
+        def make_429():
+            resp = MagicMock()
+            resp.status = 429
+            resp.headers = {"Retry-After": "1"}
+            resp.text = AsyncMock(
+                return_value='{"error":{"message":"rate-limited"}}'
+            )
+            resp.__aenter__ = AsyncMock(return_value=resp)
+            resp.__aexit__ = AsyncMock(return_value=None)
+            return resp
+
+        def make_ok():
+            resp = MagicMock()
+            resp.status = 200
+            resp.json = AsyncMock(
+                return_value={
+                    "choices": [
+                        {"message": {"content": "Recovered!", "tool_calls": []}}
+                    ]
+                }
+            )
+            resp.__aenter__ = AsyncMock(return_value=resp)
+            resp.__aexit__ = AsyncMock(return_value=None)
+            return resp
+
+        # Two 429s (transient per-minute limit), then a successful turn.
+        responses = iter([make_429(), make_429(), make_ok()])
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(side_effect=lambda *a, **k: next(responses))
+        client._http_client = mock_session
+
+        with patch.object(
+            client, "_get_copilot_token", return_value="mock_token"
+        ), patch.object(
+            agent_client_module, "_COPILOT_RATE_LIMIT_BACKOFF", 0.0
+        ), patch("asyncio.sleep", new=AsyncMock()):
+            messages = []
+            async for msg in client.receive_response():
+                messages.append(msg)
+
+        texts = [
+            b.text
+            for m in messages
+            for b in m.content
+            if b.type == ContentBlockType.TEXT
+        ]
+        assert "Recovered!" in texts
+        assert not any("429" in t for t in texts)
+
+    @pytest.mark.asyncio
+    async def test_receive_response_429_gives_up_after_cap(self):
+        """Persistent 429s eventually surface the error after the retry budget."""
+        import core.agent_client as agent_client_module
+
+        client = CopilotAgentClient(github_token="ghp_test", max_turns=5)
+        await client.query("hello")
+
+        def make_429():
+            resp = MagicMock()
+            resp.status = 429
+            resp.headers = {}
+            resp.text = AsyncMock(return_value="rate-limited")
+            resp.__aenter__ = AsyncMock(return_value=resp)
+            resp.__aexit__ = AsyncMock(return_value=None)
+            return resp
+
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(side_effect=lambda *a, **k: make_429())
+        client._http_client = mock_session
+
+        with patch.object(
+            client, "_get_copilot_token", return_value="mock_token"
+        ), patch.object(
+            agent_client_module, "_COPILOT_RATE_LIMIT_MAX_RETRIES", 2
+        ), patch.object(
+            agent_client_module, "_COPILOT_RATE_LIMIT_BACKOFF", 0.0
+        ), patch("asyncio.sleep", new=AsyncMock()) as mock_sleep:
+            messages = []
+            async for msg in client.receive_response():
+                messages.append(msg)
+
+        # Retried exactly the budgeted number of times before giving up.
+        assert mock_sleep.await_count == 2
+        assert messages[-1].role == MessageRole.SYSTEM
+        assert "429" in messages[-1].content[0].text
+
+    @pytest.mark.asyncio
     async def test_receive_response_with_tool_calls(self):
         """Test response with function-calling tool_calls."""
         client = CopilotAgentClient(github_token="ghp_test", max_turns=1)

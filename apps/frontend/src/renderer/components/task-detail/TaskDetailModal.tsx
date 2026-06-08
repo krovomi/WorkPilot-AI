@@ -24,7 +24,12 @@ import type {
 	WorktreeCreatePROptions,
 } from "../../../shared/types";
 import { useToast } from "../../hooks/use-toast";
-import { calculateProgress, cn, extractTextFromHtml } from "../../lib/utils";
+import {
+	calculateProgress,
+	cn,
+	extractTextFromHtml,
+	getDisplayProgress,
+} from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import {
 	deleteTask,
@@ -462,6 +467,17 @@ function TaskDetailModalContent({
 		(s) => s.status === "completed",
 	).length;
 	const totalSubtasks = task.subtasks.length;
+
+	// Pendant une exécution active, l'avancement par sous-tâches terminées ne se
+	// met à jour qu'au passage d'une sous-tâche à « completed », ce qui donne
+	// l'impression d'un pourcentage figé. On privilégie donc la progression
+	// temps réel calculée côté backend (overallProgress, pondérée par phase),
+	// avec repli sur l'avancement par sous-tâches.
+	const headerProgressPercent = getDisplayProgress(
+		progressPercent,
+		task.executionProgress?.overallProgress,
+		!!state.hasActiveExecution,
+	);
 
 	// Activité en cours affichée dans la barre de phase : on privilégie le
 	// sous-tâche actuellement traité, avec repli sur les informations de
@@ -933,14 +949,14 @@ function TaskDetailModalContent({
 
 							{/* Progress bar - only show when running or has progress */}
 							{(state.isRunning || completedSubtasks > 0) &&
-								totalSubtasks > 0 && (
+								(totalSubtasks > 0 || state.hasActiveExecution) && (
 									<div className="mt-3 flex items-center gap-3">
 										<Progress
-											value={progressPercent}
+											value={headerProgressPercent}
 											className="h-1.5 flex-1"
 										/>
 										<span className="text-xs text-muted-foreground tabular-nums w-10 text-right">
-											{progressPercent}%
+											{headerProgressPercent}%
 										</span>
 									</div>
 								)}

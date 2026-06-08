@@ -58,6 +58,48 @@ def _env_float(name: str, default: float) -> float:
         logger.warning("[CopilotAgentClient] Invalid %s=%r — using %.0f", name, raw, default)
         return default
 
+
+def _parse_retry_after(headers: object, cap_seconds: float) -> float | None:
+    """Extract a wait time (seconds) from an HTTP ``Retry-After`` header.
+
+    GitHub Copilot (and most APIs) return ``Retry-After`` on a 429 to say how
+    long to wait before retrying. It can be either an integer number of seconds
+    or an HTTP-date. We support both, clamp the result to ``[0, cap_seconds]``,
+    and return ``None`` when the header is absent or unparseable so the caller
+    can fall back to exponential back-off.
+    """
+    if headers is None:
+        return None
+    try:
+        raw = headers.get("Retry-After") or headers.get("retry-after")
+    except AttributeError:
+        return None
+    if not raw:
+        return None
+    raw = str(raw).strip()
+
+    # Shape 1: delta in seconds (e.g. "Retry-After: 30").
+    try:
+        seconds = float(raw)
+        return max(0.0, min(seconds, cap_seconds))
+    except (TypeError, ValueError):
+        pass
+
+    # Shape 2: HTTP-date (e.g. "Wed, 21 Oct 2026 07:28:00 GMT").
+    try:
+        from email.utils import parsedate_to_datetime
+
+        reset_dt = parsedate_to_datetime(raw)
+        if reset_dt is None:
+            return None
+        from datetime import datetime, timezone
+
+        now = datetime.now(reset_dt.tzinfo or timezone.utc)
+        seconds = (reset_dt - now).total_seconds()
+        return max(0.0, min(seconds, cap_seconds))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
 # =============================================================================
 # Constants
 # =============================================================================
@@ -145,6 +187,31 @@ _COPILOT_REQUEST_MAX_RETRIES = 3
 _COPILOT_TIMEOUT_MAX_RETRIES = int(_env_float("COPILOT_TIMEOUT_MAX_RETRIES", 2))
 # Base back-off (seconds) between retries; grows linearly per attempt.
 _COPILOT_REQUEST_RETRY_BACKOFF = 2.0
+
+# HTTP statuses that are TRANSIENT and should be ridden out with a back-off
+# retry instead of aborting the turn:
+#   * 429 — GitHub Copilot enforces a per-MINUTE request-rate limit that is
+#     entirely separate from the token/usage quota. Bursting subtasks (the loop
+#     auto-continues every few seconds) can trip it even when plenty of tokens
+#     remain — exactly the "I still have tokens but get 429" symptom. The right
+#     answer is to wait the short reset window (honouring ``Retry-After`` when
+#     present) and retry, NOT to surface an error and burn an attempt.
+#   * 500/502/503/529 — momentary server-side hiccups that usually clear on the
+#     next request.
+_COPILOT_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 529})
+# How many times to retry a transient/rate-limited response before giving up.
+# Generous because a per-minute window can need several short waits to clear.
+_COPILOT_RATE_LIMIT_MAX_RETRIES = int(
+    _env_float("COPILOT_RATE_LIMIT_MAX_RETRIES", 6)
+)
+# Base back-off (seconds) when the server does NOT send a ``Retry-After``
+# header; grows exponentially per attempt, capped by the MAX below.
+_COPILOT_RATE_LIMIT_BACKOFF = _env_float("COPILOT_RATE_LIMIT_BACKOFF", 5.0)
+# Upper bound (seconds) for a single rate-limit back-off wait, whether derived
+# from ``Retry-After`` or exponential growth. Keeps the worst-case stall sane.
+_COPILOT_RATE_LIMIT_MAX_BACKOFF = _env_float(
+    "COPILOT_RATE_LIMIT_MAX_BACKOFF", 60.0
+)
 
 # Claude served through the OpenAI-compatible Copilot API occasionally returns
 # ``finish_reason=tool_calls`` with an EMPTY ``tool_calls`` array — the model
@@ -1121,7 +1188,11 @@ class CopilotAgentClient(AgentClient):
             import aiohttp
 
             data = None
-            for attempt in range(_COPILOT_REQUEST_MAX_RETRIES + 1):
+            # Two independent retry budgets so a burst of rate-limit (429)
+            # responses never eats the connection-error budget and vice-versa.
+            connection_attempts = 0
+            rate_limit_attempts = 0
+            while True:
                 try:
                     async with session.post(
                         api_url, json=payload, headers=request_headers
@@ -1164,6 +1235,63 @@ class CopilotAgentClient(AgentClient):
                                     )
                                     return
                                 data = await retry_resp.json()
+                        elif resp.status in _COPILOT_RETRYABLE_STATUSES:
+                            # Transient failure (429 rate-limit or 5xx hiccup).
+                            # Wait — honouring ``Retry-After`` when the server
+                            # sends it, else exponential back-off — and retry
+                            # instead of aborting the turn. This is what keeps
+                            # subtasks flowing through short Copilot per-minute
+                            # rate-limit windows rather than surfacing a 429.
+                            error_text = await resp.text()
+                            if rate_limit_attempts < _COPILOT_RATE_LIMIT_MAX_RETRIES:
+                                rate_limit_attempts += 1
+                                retry_after = _parse_retry_after(
+                                    resp.headers, _COPILOT_RATE_LIMIT_MAX_BACKOFF
+                                )
+                                if retry_after is not None:
+                                    wait_s = retry_after
+                                else:
+                                    wait_s = min(
+                                        _COPILOT_RATE_LIMIT_BACKOFF
+                                        * (2 ** (rate_limit_attempts - 1)),
+                                        _COPILOT_RATE_LIMIT_MAX_BACKOFF,
+                                    )
+                                kind = (
+                                    "rate limited"
+                                    if resp.status == 429
+                                    else f"transient error {resp.status}"
+                                )
+                                logger.warning(
+                                    f"[CopilotAgentClient] {kind} — retry "
+                                    f"{rate_limit_attempts}/"
+                                    f"{_COPILOT_RATE_LIMIT_MAX_RETRIES} "
+                                    f"in {wait_s:.0f}s"
+                                )
+                                print(
+                                    f"[CopilotAgentClient] [WARN] Copilot {kind} "
+                                    f"— waiting {wait_s:.0f}s then retrying "
+                                    f"({rate_limit_attempts}/"
+                                    f"{_COPILOT_RATE_LIMIT_MAX_RETRIES})...",
+                                    flush=True,
+                                )
+                                await _asyncio.sleep(wait_s)
+                                continue
+                            # Budget exhausted — surface the error as before.
+                            logger.error(
+                                f"[CopilotAgentClient] API error ({resp.status}) "
+                                f"after {rate_limit_attempts} retries: "
+                                f"{error_text[:500]}"
+                            )
+                            yield AgentMessage(
+                                role=MessageRole.SYSTEM,
+                                content=[
+                                    ContentBlock(
+                                        type=ContentBlockType.TEXT,
+                                        text=f"Copilot API error ({resp.status}): {error_text}",
+                                    )
+                                ],
+                            )
+                            return
                         elif resp.status != 200:
                             error_text = await resp.text()
                             logger.error(
@@ -1198,25 +1326,28 @@ class CopilotAgentClient(AgentClient):
                         if is_timeout
                         else _COPILOT_REQUEST_MAX_RETRIES
                     )
-                    if attempt < max_retries:
-                        backoff = _COPILOT_REQUEST_RETRY_BACKOFF * (attempt + 1)
+                    if connection_attempts < max_retries:
+                        backoff = _COPILOT_REQUEST_RETRY_BACKOFF * (
+                            connection_attempts + 1
+                        )
                         logger.warning(
                             f"[CopilotAgentClient] Request stalled/failed "
                             f"({type(e).__name__}: {e}) — retry "
-                            f"{attempt + 1}/{max_retries} "
+                            f"{connection_attempts + 1}/{max_retries} "
                             f"in {backoff:.0f}s"
                         )
                         print(
                             "[CopilotAgentClient] [WARN] Copilot API request "
-                            f"stalled — retrying ({attempt + 1}/"
+                            f"stalled — retrying ({connection_attempts + 1}/"
                             f"{max_retries})...",
                             flush=True,
                         )
+                        connection_attempts += 1
                         await _asyncio.sleep(backoff)
                         continue
                     logger.error(
                         f"[CopilotAgentClient] Request failed after "
-                        f"{attempt + 1} attempt(s): {e}"
+                        f"{connection_attempts + 1} attempt(s): {e}"
                     )
                     yield AgentMessage(
                         role=MessageRole.SYSTEM,

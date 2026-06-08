@@ -2,7 +2,7 @@
 import { type MouseEvent, memo, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ExecutionPhase, Subtask, TaskLogs } from "../../shared/types";
-import { cn } from "../lib/utils";
+import { cn, getDisplayProgress } from "../lib/utils";
 
 interface PhaseProgressIndicatorProps {
 	phase?: ExecutionPhase;
@@ -10,6 +10,13 @@ interface PhaseProgressIndicatorProps {
 	phaseLogs?: TaskLogs | null;
 	/** Fallback progress percentage (0-100) when phaseLogs unavailable */
 	phaseProgress?: number;
+	/**
+	 * Progression temps réel pondérée par phase (0-100) émise par le backend.
+	 * Pendant une exécution active, elle prime sur l'avancement par sous-tâches
+	 * (qui ne bouge qu'au passage d'une sous-tâche à « completed » et paraît
+	 * donc figé). Voir getDisplayProgress.
+	 */
+	overallProgress?: number;
 	isStuck?: boolean;
 	isRunning?: boolean;
 	className?: string;
@@ -57,6 +64,7 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 	subtasks,
 	phaseLogs,
 	phaseProgress,
+	overallProgress,
 	isStuck = false,
 	isRunning = false,
 	className,
@@ -103,6 +111,17 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 		totalSubtasks > 0
 			? Math.round((completedSubtasks / totalSubtasks) * 100)
 			: 0;
+
+	// Pourcentage affiché : pendant une exécution active, on privilégie la
+	// progression temps réel pondérée par phase (overallProgress) plutôt que
+	// l'avancement par sous-tâches, pour rester cohérent avec la pop-in de
+	// détail et éviter un pourcentage figé (ex. 25% bloqué alors que le backend
+	// est à 38%).
+	const displayProgress = getDisplayProgress(
+		subtaskProgress,
+		overallProgress,
+		isRunning && !isStuck,
+	);
 
 	// Get log entry counts for activity indication
 	const planningEntries = phaseLogs?.phases?.planning?.entries?.length || 0;
@@ -171,7 +190,7 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 				</div>
 				<span className="text-xs font-medium text-foreground">
 					{showSubtaskProgress ? (
-						`${subtaskProgress}%`
+						`${displayProgress}%`
 					) : activeEntries > 0 ? (
 						<span className="text-muted-foreground">
 							{activeEntries}{" "}
@@ -217,7 +236,7 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 							key="determinate"
 							className={cn("h-full rounded-full", colors.color)}
 							initial={{ width: 0 }}
-							animate={{ width: `${subtaskProgress}%` }}
+							animate={{ width: `${displayProgress}%` }}
 							transition={{ duration: 0.5, ease: "easeOut" }}
 						/>
 					) : shouldAnimate && isIndeterminatePhase ? (

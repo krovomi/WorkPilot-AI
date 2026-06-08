@@ -716,6 +716,8 @@ function taskCardPropsAreEqual(
 		prevTask.executionProgress?.phase === nextTask.executionProgress?.phase &&
 		prevTask.executionProgress?.phaseProgress ===
 			nextTask.executionProgress?.phaseProgress &&
+		prevTask.executionProgress?.overallProgress ===
+			nextTask.executionProgress?.overallProgress &&
 		prevTask.subtasks.length === nextTask.subtasks.length &&
 		prevTask.metadata?.category === nextTask.metadata?.category &&
 		prevTask.metadata?.complexity === nextTask.metadata?.complexity &&
@@ -1104,6 +1106,7 @@ export const TaskCard = memo(function TaskCard({
 									phase={executionPhase}
 									subtasks={task.subtasks}
 									phaseProgress={task.executionProgress?.phaseProgress}
+									overallProgress={task.executionProgress?.overallProgress}
 									isStuck={isStuck}
 									isRunning={isRunning}
 									onPlanClick={

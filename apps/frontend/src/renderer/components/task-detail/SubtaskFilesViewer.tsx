@@ -11,7 +11,7 @@ import {
 	Package,
 	X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { WorktreeDiffFile } from "../../../shared/types";
 import { cn } from "../../lib/utils";
@@ -155,8 +155,10 @@ interface FileTreeItemProps {
 	level: number;
 	expanded: Record<string, boolean>;
 	openDiffs: Record<string, boolean>;
+	lazyDiffs: Record<string, WorktreeDiffFile>;
+	loadingPaths: Record<string, boolean>;
 	onToggle: (path: string) => void;
-	onToggleDiff: (path: string) => void;
+	onToggleDiff: (node: FileTreeNode) => void;
 	t: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -165,6 +167,8 @@ function FileTreeItem({
 	level,
 	expanded,
 	openDiffs,
+	lazyDiffs,
+	loadingPaths,
 	onToggle,
 	onToggleDiff,
 	t,
@@ -172,14 +176,18 @@ function FileTreeItem({
 	const isExpanded = expanded[node.path];
 	const hasChildren = node.children && node.children.length > 0;
 	const isDiffOpen = openDiffs[node.path];
-	const diff = node.diff;
-	const canShowDiff = !node.isFolder && !!diff;
+	// Diff effectif : priorité au diff chargé à la demande, repli sur l'agrégat.
+	const diff = lazyDiffs[node.path] ?? node.diff;
+	const isLoadingDiff = loadingPaths[node.path];
+	// Tous les fichiers (non-dossiers) sont cliquables pour révéler leurs lignes.
+	const canShowDiff = !node.isFolder;
+	const hasPatch = !!diff?.patch && diff.patch.trim() !== "";
 
 	const handleClick = () => {
 		if (hasChildren) {
 			onToggle(node.path);
 		} else if (!node.isFolder) {
-			onToggleDiff(node.path);
+			onToggleDiff(node);
 		}
 	};
 
@@ -188,7 +196,13 @@ function FileTreeItem({
 			<button
 				type="button"
 				onClick={handleClick}
-				title={canShowDiff ? (isDiffOpen ? t("subtasks.filesViewer.hideDiff") : t("subtasks.filesViewer.viewDiff")) : undefined}
+				title={
+					canShowDiff
+						? isDiffOpen
+							? t("subtasks.filesViewer.hideDiff")
+							: t("subtasks.filesViewer.viewDiff")
+						: undefined
+				}
 				className={cn(
 					"w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/60 transition-colors text-sm group",
 					"text-foreground hover:text-foreground",
@@ -221,7 +235,7 @@ function FileTreeItem({
 					{node.name}
 				</span>
 
-				{diff && (
+				{diff && (diff.additions > 0 || diff.deletions > 0) && (
 					<span className="flex items-center gap-1.5 flex-shrink-0">
 						{diff.additions > 0 && (
 							<span className="text-[10px] font-semibold tabular-nums text-emerald-500">
@@ -234,16 +248,13 @@ function FileTreeItem({
 							</span>
 						)}
 						<span
-							className={cn(
-								"h-2 w-2 rounded-full",
-								STATUS_DOT[diff.status],
-							)}
+							className={cn("h-2 w-2 rounded-full", STATUS_DOT[diff.status])}
 							title={t(`subtasks.filesViewer.status.${diff.status}`)}
 						/>
 					</span>
 				)}
 
-				{!node.isFolder && !diff && (
+				{!node.isFolder && !(diff && (diff.additions > 0 || diff.deletions > 0)) && (
 					<Badge
 						variant="outline"
 						className="text-xs h-5 px-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -259,9 +270,14 @@ function FileTreeItem({
 					className="my-1.5 rounded-lg border border-border/60 bg-card/40 overflow-hidden shadow-sm"
 					style={{ marginLeft: `${28 + level * 16}px` }}
 				>
-					{diff?.patch && diff.patch.trim() !== "" ? (
+					{isLoadingDiff ? (
+						<div className="flex items-center justify-center gap-2 px-3 py-4 text-xs text-muted-foreground">
+							<Loader2 className="h-4 w-4 animate-spin" />
+							{t("subtasks.filesViewer.loading")}
+						</div>
+					) : hasPatch ? (
 						<ScrollArea className="max-h-72">
-							<DiffViewer patch={diff.patch} />
+							<DiffViewer patch={diff?.patch} />
 						</ScrollArea>
 					) : (
 						<div className="px-3 py-4 text-center text-xs text-muted-foreground">
@@ -280,6 +296,8 @@ function FileTreeItem({
 							level={level + 1}
 							expanded={expanded}
 							openDiffs={openDiffs}
+							lazyDiffs={lazyDiffs}
+							loadingPaths={loadingPaths}
 							onToggle={onToggle}
 							onToggleDiff={onToggleDiff}
 							t={t}
@@ -305,6 +323,11 @@ export function SubtaskFilesViewer({
 	);
 	const [isLoading, setIsLoading] = useState(false);
 	const [loadError, setLoadError] = useState(false);
+	// Diffs chargés à la demande au clic sur un fichier (taskId requis).
+	const [lazyDiffs, setLazyDiffs] = useState<Record<string, WorktreeDiffFile>>(
+		{},
+	);
+	const [loadingPaths, setLoadingPaths] = useState<Record<string, boolean>>({});
 
 	useEffect(() => {
 		if (!taskId) return;
@@ -347,37 +370,89 @@ export function SubtaskFilesViewer({
 	const totals = useMemo(() => {
 		let additions = 0;
 		let deletions = 0;
-		for (const diff of diffByPath.values()) {
+		// Évite de compter deux fois un fichier présent dans l'agrégat ET en lazy.
+		const counted = new Set<string>();
+		for (const [path, diff] of Object.entries(lazyDiffs)) {
+			additions += diff.additions;
+			deletions += diff.deletions;
+			counted.add(path);
+		}
+		for (const [path, diff] of diffByPath.entries()) {
+			if (counted.has(path)) continue;
 			additions += diff.additions;
 			deletions += diff.deletions;
 		}
 		return { additions, deletions };
-	}, [diffByPath]);
+	}, [diffByPath, lazyDiffs]);
 
 	const handleToggle = (path: string) => {
 		setExpanded((prev) => ({ ...prev, [path]: !prev[path] }));
 	};
 
-	const handleToggleDiff = (path: string) => {
-		setOpenDiffs((prev) => ({ ...prev, [path]: !prev[path] }));
-	};
+	const fetchFileDiff = useCallback(
+		(node: FileTreeNode) => {
+			if (!taskId) return;
+			// Déjà chargé (agrégat avec patch ou lazy) ou en cours → ne pas refetch.
+			const alreadyLoaded =
+				lazyDiffs[node.path] !== undefined ||
+				(node.diff?.patch && node.diff.patch.trim() !== "");
+			if (alreadyLoaded || loadingPaths[node.path]) return;
+
+			setLoadingPaths((prev) => ({ ...prev, [node.path]: true }));
+			window.electronAPI
+				.getFileDiff(taskId, node.path)
+				.then((result) => {
+					if (result.success && result.data) {
+						const data = result.data;
+						setLazyDiffs((prev) => ({ ...prev, [node.path]: data }));
+					}
+				})
+				.catch(() => {
+					/* l'UI retombe sur « no diff » */
+				})
+				.finally(() => {
+					setLoadingPaths((prev) => {
+						const next = { ...prev };
+						delete next[node.path];
+						return next;
+					});
+				});
+		},
+		[taskId, lazyDiffs, loadingPaths],
+	);
+
+	const handleToggleDiff = useCallback(
+		(node: FileTreeNode) => {
+			const willOpen = !openDiffs[node.path];
+			setOpenDiffs((prev) => ({ ...prev, [node.path]: !prev[node.path] }));
+			if (willOpen) {
+				fetchFileDiff(node);
+			}
+		},
+		[openDiffs, fetchFileDiff],
+	);
 
 	const handleExpandAll = () => {
 		const allFolders: Record<string, boolean> = {};
 		const allFiles: Record<string, boolean> = {};
+		const leaves: FileTreeNode[] = [];
 		const collect = (nodes: FileTreeNode[]) => {
 			for (const node of nodes) {
 				if (node.isFolder) {
 					allFolders[node.path] = true;
 					if (node.children) collect(node.children);
-				} else if (node.diff) {
+				} else {
 					allFiles[node.path] = true;
+					leaves.push(node);
 				}
 			}
 		};
 		collect(fileTree);
 		setExpanded(allFolders);
 		setOpenDiffs(allFiles);
+		for (const leaf of leaves) {
+			fetchFileDiff(leaf);
+		}
 	};
 
 	const handleCollapseAll = () => {
@@ -488,6 +563,8 @@ export function SubtaskFilesViewer({
 								level={0}
 								expanded={expanded}
 								openDiffs={openDiffs}
+								lazyDiffs={lazyDiffs}
+								loadingPaths={loadingPaths}
 								onToggle={handleToggle}
 								onToggleDiff={handleToggleDiff}
 								t={t}
