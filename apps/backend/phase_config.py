@@ -85,6 +85,18 @@ WINDSURF_MODEL = _WINDSURF_ENTRY.model_id if _WINDSURF_ENTRY else "swe-1.6"
 _COPILOT_ENTRY = get_default("copilot")
 COPILOT_MODEL = _COPILOT_ENTRY.model_id if _COPILOT_ENTRY else "claude-sonnet-4.6"
 
+_OPENAI_ENTRY = get_default("openai")
+OPENAI_MODEL = _OPENAI_ENTRY.model_id if _OPENAI_ENTRY else "gpt-5.5"
+
+_MISTRAL_ENTRY = get_default("mistral")
+MISTRAL_MODEL = _MISTRAL_ENTRY.model_id if _MISTRAL_ENTRY else "mistral-large-3"
+
+_DEEPSEEK_ENTRY = get_default("deepseek")
+DEEPSEEK_MODEL = _DEEPSEEK_ENTRY.model_id if _DEEPSEEK_ENTRY else "deepseek-v3"
+
+_GROK_ENTRY = get_default("grok")
+GROK_MODEL = _GROK_ENTRY.model_id if _GROK_ENTRY else "grok-4.3"
+
 PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
     # Anthropic / Claude — use Claude shorthands (resolved by resolve_model_id)
     "anthropic": {
@@ -101,10 +113,10 @@ PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
     },
     # OpenAI
     "openai": {
-        "spec": "gpt-4o",
-        "planning": "gpt-4o",
-        "coding": "gpt-4o",
-        "qa": "gpt-4o",
+        "spec": OPENAI_MODEL,
+        "planning": OPENAI_MODEL,
+        "coding": OPENAI_MODEL,
+        "qa": OPENAI_MODEL,
     },
     # GitHub Copilot
     "copilot": {
@@ -122,24 +134,24 @@ PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
     },
     # Mistral AI
     "mistral": {
-        "spec": "mistral-large-2",
-        "planning": "mistral-large-2",
-        "coding": "mistral-large-2",
-        "qa": "mistral-large-2",
+        "spec": MISTRAL_MODEL,
+        "planning": MISTRAL_MODEL,
+        "coding": MISTRAL_MODEL,
+        "qa": MISTRAL_MODEL,
     },
     # DeepSeek
     "deepseek": {
-        "spec": "deepseek-v3",
-        "planning": "deepseek-v3",
-        "coding": "deepseek-v3",
-        "qa": "deepseek-v3",
+        "spec": DEEPSEEK_MODEL,
+        "planning": DEEPSEEK_MODEL,
+        "coding": DEEPSEEK_MODEL,
+        "qa": DEEPSEEK_MODEL,
     },
     # Grok (xAI)
     "grok": {
-        "spec": "grok-2",
-        "planning": "grok-2",
-        "coding": "grok-2",
-        "qa": "grok-2",
+        "spec": GROK_MODEL,
+        "planning": GROK_MODEL,
+        "coding": GROK_MODEL,
+        "qa": GROK_MODEL,
     },
     # Meta (LLaMA)
     "meta": {

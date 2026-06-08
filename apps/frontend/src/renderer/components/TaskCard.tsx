@@ -1109,6 +1109,7 @@ export const TaskCard = memo(function TaskCard({
 									overallProgress={task.executionProgress?.overallProgress}
 									isStuck={isStuck}
 									isRunning={isRunning}
+									hasActiveExecution={hasActiveExecution}
 									onPlanClick={
 										task.subtasks.length > 0 ? handlePlanClick : undefined
 									}

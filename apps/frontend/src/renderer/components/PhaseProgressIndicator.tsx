@@ -19,6 +19,14 @@ interface PhaseProgressIndicatorProps {
 	overallProgress?: number;
 	isStuck?: boolean;
 	isRunning?: boolean;
+	/**
+	 * Indique qu'une phase d'exécution est active (in_progress OU ai_review).
+	 * Contrairement à `isRunning` (limité à in_progress), ce flag couvre aussi
+	 * la revue QA, ce qui permet de privilégier `overallProgress` plutôt que
+	 * l'avancement par sous-tâches (figé à ce moment-là). Voir getDisplayProgress.
+	 * Repli sur `isRunning` quand non fourni.
+	 */
+	hasActiveExecution?: boolean;
 	className?: string;
 	/** Called when the user clicks the completed Plan pill to view the implementation plan */
 	onPlanClick?: () => void;
@@ -67,6 +75,7 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 	overallProgress,
 	isStuck = false,
 	isRunning = false,
+	hasActiveExecution,
 	className,
 	onPlanClick,
 }: PhaseProgressIndicatorProps) {
@@ -117,10 +126,11 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 	// l'avancement par sous-tâches, pour rester cohérent avec la pop-in de
 	// détail et éviter un pourcentage figé (ex. 25% bloqué alors que le backend
 	// est à 38%).
+	const isExecutionActive = hasActiveExecution ?? isRunning;
 	const displayProgress = getDisplayProgress(
 		subtaskProgress,
 		overallProgress,
-		isRunning && !isStuck,
+		isExecutionActive && !isStuck,
 	);
 
 	// Get log entry counts for activity indication

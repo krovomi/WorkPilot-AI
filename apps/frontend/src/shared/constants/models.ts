@@ -460,37 +460,30 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 	],
 
 	// ---- Windsurf (Codeium) ----
-	// Source: docs.windsurf.com/windsurf/models — supports Opus 4.7, GPT-5.5, SWE-1.6
+	// Source: docs.windsurf.com/windsurf/models
+	// Model IDs MUST be the friendly slugs resolved by the Windsurf proxy
+	// (apps/backend/integrations/windsurf_proxy/models.py → MODEL_NAME_TO_ENUM).
+	// Generic future IDs (claude-opus-4-8, gpt-5.5, gemini-3.1-pro) are NOT
+	// served by the Windsurf gRPC backend and must not be exposed here.
 	windsurf: [
 		{ value: "swe-1.6", label: "SWE-1.6", tier: "flagship" },
-		{ value: "swe-1.5", label: "SWE-1.5", tier: "standard" },
+		{ value: "swe-1.6-fast", label: "SWE-1.6 Fast", tier: "fast" },
+		{ value: "swe-1.5", label: "SWE-1.5", tier: "flagship" },
 		{
-			value: "claude-opus-4-8",
-			label: "Claude Opus 4.8 (Windsurf)",
+			value: "swe-1.5-thinking",
+			label: "SWE-1.5 Thinking",
 			tier: "flagship",
 			supportsThinking: true,
 		},
 		{
-			value: "claude-opus-4-7",
-			label: "Claude Opus 4.7 (Windsurf)",
+			value: "claude-opus-4",
+			label: "Claude Opus 4 (Windsurf)",
 			tier: "flagship",
 			supportsThinking: true,
 		},
 		{
-			value: "claude-sonnet-4-6",
-			label: "Claude Sonnet 4.6 (Windsurf)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "gpt-5.5",
-			label: "GPT-5.5 (Windsurf)",
-			tier: "flagship",
-			supportsThinking: true,
-		},
-		{
-			value: "gemini-3.1-pro",
-			label: "Gemini 3.1 Pro (Windsurf)",
+			value: "claude-sonnet-4",
+			label: "Claude Sonnet 4 (Windsurf)",
 			tier: "flagship",
 			supportsThinking: true,
 		},
@@ -499,6 +492,30 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 			label: "Claude 3.7 Sonnet (Windsurf)",
 			tier: "standard",
 			supportsThinking: true,
+		},
+		{ value: "gpt-4.1", label: "GPT-4.1 (Windsurf)", tier: "standard" },
+		{ value: "gpt-4o", label: "GPT-4o (Windsurf)", tier: "standard" },
+		{
+			value: "gemini-2.5-pro",
+			label: "Gemini 2.5 Pro (Windsurf)",
+			tier: "standard",
+			supportsThinking: true,
+		},
+		{
+			value: "deepseek-r1",
+			label: "DeepSeek R1 (Windsurf)",
+			tier: "standard",
+			supportsThinking: true,
+		},
+		{
+			value: "deepseek-v3",
+			label: "DeepSeek V3 (Windsurf)",
+			tier: "standard",
+		},
+		{
+			value: "gemini-2.0-flash",
+			label: "Gemini 2.0 Flash (Windsurf)",
+			tier: "fast",
 		},
 		{ value: "swe-1.5-fast", label: "SWE-1.5 Fast", tier: "fast" },
 	],
