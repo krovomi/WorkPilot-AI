@@ -32,6 +32,7 @@ import type {
 } from "../shared/types";
 import { stripAcceptanceCriteriaSection } from "../shared/utils/acceptance-criteria";
 import { extractSubtaskFiles } from "../shared/utils/subtask-files";
+import { isMeaningfulFeatureTitle } from "../shared/utils/task-title";
 import { stripHtml } from "./ipc-handlers/shared/sanitize";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
 import { ensureAbsolutePath } from "./utils/path-helpers";
@@ -1077,8 +1078,18 @@ export class ProjectStore {
 
 		// Get title from plan. The spec-folder name (dirName) is a clean,
 		// slugified fallback we hold onto in case richer sources turn out to be
-		// HTML garbage (see below).
-		let title = plan?.feature || plan?.title || dirName;
+		// HTML garbage (see below). A plan.feature that is itself a spec-folder
+		// slug or the "Unnamed Feature" placeholder (both written by the backend
+		// auto-fixer when no real feature exists) is NOT a usable title: we treat
+		// it like a missing feature so we fall through to spec.md / the readable
+		// folder name instead of surfacing the worktree directory name.
+		const planFeature = plan?.feature || plan?.title;
+		const featureIsMeaningful = isMeaningfulFeatureTitle(planFeature);
+		// Tracks whether the title we end up with is merely a readable form of the
+		// spec-folder name (the worktree directory). We must never persist such a
+		// fallback as the durable display_title (see backfill below).
+		let usedFolderFallback = !featureIsMeaningful;
+		let title = featureIsMeaningful ? planFeature : dirName;
 
 		// If it looks like a spec ID, try to extract title from spec file
 		const looksLikeSpecId = /^\d{3}-/.test(title);
@@ -1096,9 +1107,12 @@ export class ProjectStore {
 			// System.Title exact (accents inclus).
 			if (specTitle && this.titleLooksLikeDescription(specTitle, specPath)) {
 				title = this.titleFromDirName(dirName);
-			} else {
-				title = specTitle || title;
+				usedFolderFallback = true;
+			} else if (specTitle) {
+				title = specTitle;
+				usedFolderFallback = false;
 			}
+			// else: no usable H1 — keep the folder-name fallback (flag already set).
 		}
 
 		// Les titres issus d'imports (US/RsD Azure DevOps) peuvent contenir du
@@ -1112,20 +1126,71 @@ export class ProjectStore {
 		// un fragment de balise.
 		if (title.includes("<")) {
 			const plain = stripHtml(title).replace(/\s+/g, " ").trim();
-			title = plain.length >= 3 ? plain : dirName;
+			if (plain.length >= 3) {
+				title = plain;
+			} else {
+				title = dirName;
+				usedFolderFallback = true;
+			}
 		}
 
 		// Filet de sécurité : si après tout ça le titre est encore un identifiant
 		// de spec brut (spec.md absent), on le rend lisible via le nom de dossier.
 		if (/^\d{3}-/.test(title)) {
 			title = this.titleFromDirName(dirName);
+			usedFolderFallback = true;
 		}
 
 		if (title.length > 200) {
 			title = `${title.slice(0, 200)}…`;
 		}
 
+		// Durabilité : on vient de résoudre un vrai titre US/RsD (plan.feature ou
+		// H1 de spec.md) mais requirements.json n'a pas de display_title. On l'y
+		// persiste pour que les scans suivants le servent en priorité — sinon, un
+		// scan qui tombe sur implementation_plan.json en cours d'écriture
+		// (plan === null) retomberait sur le nom de dossier slugifié, d'où le titre
+		// qui « s'inspire du dossier du worktree » par intermittence.
+		if (!usedFolderFallback && isMeaningfulFeatureTitle(title)) {
+			this.persistDisplayTitle(specPath, title);
+		}
+
 		return title;
+	}
+
+	/**
+	 * Persist a resolved US/RsD title as requirements.display_title so later
+	 * scans serve it with top priority and never regress to the slugified
+	 * spec-folder name.
+	 *
+	 * Best-effort and idempotent: it only writes when requirements.json exists
+	 * and has no display_title yet (once set, extractTitle returns early and
+	 * never reaches here again), so it runs at most once per legacy task and
+	 * cannot loop with the file watcher. Never creates requirements.json.
+	 */
+	private persistDisplayTitle(specPath: string, title: string): void {
+		const requirementsPath = path.join(specPath, AUTO_BUILD_PATHS.REQUIREMENTS);
+		if (!existsSync(requirementsPath)) {
+			return;
+		}
+
+		try {
+			const requirements = JSON.parse(readFileSync(requirementsPath, "utf-8"));
+			if (
+				typeof requirements.display_title === "string" &&
+				requirements.display_title.trim().length > 0
+			) {
+				return;
+			}
+			requirements.display_title = title;
+			writeFileSync(
+				requirementsPath,
+				JSON.stringify(requirements, null, 2),
+				"utf-8",
+			);
+		} catch {
+			// Non-fatal: durable persistence is an optimization, not correctness.
+		}
 	}
 
 	/**
