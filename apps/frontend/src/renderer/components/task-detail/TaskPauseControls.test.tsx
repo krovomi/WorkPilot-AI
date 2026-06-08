@@ -24,6 +24,7 @@ vi.mock("../../hooks/use-toast", () => ({
 
 import type { Task } from "../../../shared/types";
 import { useSettingsStore } from "../../stores/settings-store";
+import { TooltipProvider } from "../ui/tooltip";
 import { TaskPauseControls } from "./TaskPauseControls";
 
 const fakeStoreState = { settings: {}, profiles: [] };
@@ -35,6 +36,14 @@ function makeTask(): Task {
 	} as unknown as Task;
 }
 
+function renderControls(props: Parameters<typeof TaskPauseControls>[0]) {
+	return render(
+		<TooltipProvider>
+			<TaskPauseControls {...props} />
+		</TooltipProvider>,
+	);
+}
+
 beforeEach(() => {
 	(useSettingsStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(
 		(selector: (s: typeof fakeStoreState) => unknown) =>
@@ -44,23 +53,19 @@ beforeEach(() => {
 
 describe("TaskPauseControls", () => {
 	it("désactive le bouton de pause quand la tâche n'est pas en cours d'exécution", () => {
-		render(
-			<TaskPauseControls task={makeTask()} isPaused={false} isRunning={false} />,
-		);
+		renderControls({ task: makeTask(), isPaused: false, isRunning: false });
 		const button = screen.getByRole("button", { name: /pause and switch llm/i });
 		expect(button).toBeDisabled();
 	});
 
 	it("active le bouton et déclenche onPause quand la tâche est en cours d'exécution", async () => {
 		const onPause = vi.fn().mockResolvedValue(undefined);
-		render(
-			<TaskPauseControls
-				task={makeTask()}
-				isPaused={false}
-				isRunning={true}
-				onPause={onPause}
-			/>,
-		);
+		renderControls({
+			task: makeTask(),
+			isPaused: false,
+			isRunning: true,
+			onPause,
+		});
 		const button = screen.getByRole("button", { name: /pause and switch llm/i });
 		expect(button).toBeEnabled();
 		fireEvent.click(button);
