@@ -1579,23 +1579,27 @@ def _get_active_provider(spec_dir: Path | None = None) -> str:
     return "claude"
 
 
-# Per-spec record of the last (provider, model) an agent client was created with.
-# Used to detect "context switching" — i.e. when the active LLM provider and/or
-# model changes mid-task (e.g. the user switches Anthropic → Copilot from the
-# paused-task modal, or a per-phase override kicks in) — so we can leave a trace
-# in the task activity feed showing from when which provider/model was in use.
+# Per-spec record of the last (provider, model, effort) an agent client was
+# created with. Used to detect "context switching" — i.e. when the active LLM
+# provider, model and/or thinking effort changes mid-task (e.g. the user switches
+# Anthropic → Copilot from the paused-task modal, or a per-phase override kicks
+# in) — so we can leave a trace in the task activity feed showing from when which
+# provider/model/effort was in use.
 LLM_CONTEXT_STATE_FILE = ".llm_context.json"
 
 
-def _log_llm_context_switch(spec_dir: Path, provider: str, model: str) -> None:
-    """Record the active LLM provider+model and, when it differs from the last
-    recorded context for this spec, emit a human-readable trace into the task
-    activity feed.
+def _log_llm_context_switch(
+    spec_dir: Path, provider: str, model: str, thinking: str
+) -> None:
+    """Record the active LLM provider+model+effort and, when it differs from the
+    last recorded context for this spec, emit a human-readable trace into the
+    task activity feed.
 
     This is the single source of truth for "context switching" traces: every
     execution phase resolves its client through ``create_agent_client``, so
     comparing against the persisted ``.llm_context.json`` catches every change
-    (provider switch, per-phase model change, resume-with-provider) exactly once.
+    (provider switch, per-phase model change, effort change, resume-with-provider)
+    exactly once.
 
     Resilient by design — context logging must NEVER break client creation, so
     every step is guarded and failures degrade to a debug log.
@@ -1612,25 +1616,32 @@ def _log_llm_context_switch(spec_dir: Path, provider: str, model: str) -> None:
 
         prev_provider = (previous or {}).get("provider")
         prev_model = (previous or {}).get("model")
+        prev_thinking = (previous or {}).get("thinking")
 
         # No change since the last client creation — nothing to trace.
-        if prev_provider == provider and prev_model == model:
+        if (
+            prev_provider == provider
+            and prev_model == model
+            and prev_thinking == thinking
+        ):
             return
 
         if previous is None:
             message = (
-                f"▶️ Contexte LLM initial — Fournisseur : {provider} · Modèle : {model}"
-            )
-        elif prev_provider != provider:
-            message = (
-                f"🔄 Changement de fournisseur LLM : {prev_provider} → {provider} "
-                f"· Modèle : {prev_model or '?'} → {model}"
+                f"▶️ Contexte LLM initial — Fournisseur : {provider} "
+                f"· Modèle : {model} · Effort : {thinking}"
             )
         else:
-            message = (
-                f"🔄 Changement de modèle LLM : {prev_model} → {model} "
-                f"· Fournisseur : {provider}"
-            )
+            # List only the fields that actually changed so the trace pinpoints
+            # the switch (provider, model and/or thinking effort).
+            changes: list[str] = []
+            if prev_provider != provider:
+                changes.append(f"Fournisseur : {prev_provider} → {provider}")
+            if prev_model != model:
+                changes.append(f"Modèle : {prev_model} → {model}")
+            if prev_thinking != thinking:
+                changes.append(f"Effort : {prev_thinking or '?'} → {thinking}")
+            message = "🔄 Changement de contexte LLM — " + " · ".join(changes)
 
         logger.info("[llm-context] %s", message)
 
@@ -1651,7 +1662,10 @@ def _log_llm_context_switch(spec_dir: Path, provider: str, model: str) -> None:
 
         try:
             state_path.write_text(
-                json.dumps({"provider": provider, "model": model}, ensure_ascii=False),
+                json.dumps(
+                    {"provider": provider, "model": model, "thinking": thinking},
+                    ensure_ascii=False,
+                ),
                 encoding="utf-8",
             )
         except OSError:
@@ -1713,12 +1727,33 @@ def create_agent_client(
     if provider is None:
         provider = _get_active_provider(spec_dir)
 
+    # Anthropic rejects dotted Copilot-style ids (e.g. "claude-opus-4.8"); rewrite
+    # to the dashed native form before it reaches the SDK or the context trace.
+    # This is the guaranteed net — every phase (spec/planning/coding/qa) funnels
+    # through here, regardless of how the model id was resolved upstream.
+    if provider in ("claude", "anthropic"):
+        try:
+            from phase_config import normalize_anthropic_model_id
+
+            model = normalize_anthropic_model_id(model)
+        except Exception:
+            pass
+
     logger.info(
         f"Creating agent client: provider={provider}, agent_type={agent_type}, model={model}"
     )
 
-    # Trace LLM context switches (provider/model changes) into the task feed.
-    _log_llm_context_switch(spec_dir, provider, model)
+    # Trace LLM context switches (provider/model/effort changes) into the task
+    # feed. Map the thinking budget back to its effort level for readability.
+    try:
+        from phase_config import thinking_level_from_budget
+
+        effort = thinking_level_from_budget(max_thinking_tokens)
+    except Exception:
+        effort = (
+            "none" if max_thinking_tokens is None else f"{max_thinking_tokens} tokens"
+        )
+    _log_llm_context_switch(spec_dir, provider, model, effort)
 
     if provider == "copilot":
         # Build system prompt (reuse logic from create_client)
