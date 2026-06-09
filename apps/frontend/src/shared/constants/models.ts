@@ -658,6 +658,105 @@ export const MODEL_ID_MAP: Record<string, string> = {
 	"haiku-4-5": "claude-haiku-4-5",
 } as const;
 
+// ============================================
+// Déduplication des modèles par identité canonique
+// ============================================
+
+/**
+ * Réduit un identifiant de modèle à une **clé d'identité canonique** qui
+ * regroupe toutes les écritures d'une même version pour un même provider :
+ *
+ *  - alias court (`opus`, `sonnet`, `opus-4-8`) → id complet via {@link MODEL_ID_MAP}
+ *  - notation pointée Copilot (`claude-opus-4.6`) et tirets Anthropic
+ *    (`claude-opus-4-6`) → forme unifiée à tirets
+ *  - snapshot daté (`claude-opus-4-5-20251101`) → version sans la date
+ *  - préfixe Gemini `models/` retiré
+ *
+ * Sert de clé de regroupement pour {@link dedupeModelCatalog} et
+ * {@link resolveCatalogModelValue}. Ne PAS l'envoyer à une API : c'est une clé
+ * interne, pas un id de modèle valide.
+ */
+export function getCanonicalModelKey(value: string): string {
+	if (!value) return value;
+	// 1. Alias court → id complet (ex. "opus" → "claude-opus-4-6").
+	let id = MODEL_ID_MAP[value] ?? value;
+	id = id.toLowerCase().trim();
+	// 2. Préfixe Gemini live ("models/gemini-3.1-pro").
+	if (id.startsWith("models/")) id = id.slice("models/".length);
+	// 3. Unifier séparateurs de version pointés (Copilot) et tirets (Anthropic).
+	id = id.replace(/\./g, "-");
+	// 4. Retirer un snapshot daté final "-YYYYMMDD" (8 chiffres).
+	id = id.replace(/-\d{8}$/, "");
+	return id;
+}
+
+/** Vrai si `value` est un alias court (clé de {@link MODEL_ID_MAP}). */
+function isShortAlias(value: string): boolean {
+	return Object.hasOwn(MODEL_ID_MAP, value);
+}
+
+/** Vrai si `value` se termine par un snapshot daté "-YYYYMMDD". */
+function isDatedSnapshot(value: string): boolean {
+	return /-\d{8}$/.test(value);
+}
+
+/**
+ * Score de préférence pour choisir l'entrée unique à garder lorsqu'une même
+ * version est représentée plusieurs fois. Préférence :
+ * id explicite non-daté (2) > snapshot daté (1) > alias court (0).
+ */
+function representativeScore(value: string): number {
+	if (isShortAlias(value)) return 0;
+	if (isDatedSnapshot(value)) return 1;
+	return 2;
+}
+
+/**
+ * Déduplique un catalogue de modèles par {@link getCanonicalModelKey}, en ne
+ * gardant qu'**une seule entrée par version** (la mieux notée :
+ * id explicite versionné de préférence). L'ordre des versions rencontrées est
+ * préservé (donc la priorité live > statique du hook est respectée).
+ */
+export function dedupeModelCatalog<T extends { value: string }>(
+	models: readonly T[],
+): T[] {
+	const best = new Map<string, T>();
+	const order: string[] = [];
+	for (const m of models) {
+		if (!m.value) continue;
+		const key = getCanonicalModelKey(m.value);
+		const existing = best.get(key);
+		if (!existing) {
+			best.set(key, m);
+			order.push(key);
+		} else if (
+			representativeScore(m.value) > representativeScore(existing.value)
+		) {
+			best.set(key, m);
+		}
+	}
+	return order.map((k) => best.get(k) as T);
+}
+
+/**
+ * Mappe une valeur de modèle persistée (potentiellement un alias court ou un
+ * snapshot daté désormais masqué) vers la valeur réellement présente dans le
+ * catalogue dédupliqué `models`, en comparant par identité canonique.
+ *
+ * Garantit qu'un `<Select>` affiche l'entrée correcte même si la valeur stockée
+ * n'est plus exposée telle quelle. Renvoie `value` inchangée si aucune
+ * correspondance (ex. valeur d'un autre provider).
+ */
+export function resolveCatalogModelValue(
+	value: string,
+	models: readonly { value: string }[],
+): string {
+	if (!value) return value;
+	const key = getCanonicalModelKey(value);
+	const match = models.find((m) => getCanonicalModelKey(m.value) === key);
+	return match ? match.value : value;
+}
+
 // Maps thinking levels to budget tokens (null = no extended thinking)
 export const THINKING_BUDGET_MAP: Record<string, number | null> = {
 	none: null,

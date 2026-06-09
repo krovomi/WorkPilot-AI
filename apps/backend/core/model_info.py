@@ -58,8 +58,10 @@ def _detect_provider_from_env() -> str | None:
     # Anthropic-compatible token (CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY) and
     # would otherwise be mislabelled as the "anthropic" provider in the logs.
     explicit = (
-        os.getenv("SELECTED_LLM_PROVIDER") or os.getenv("AUTO_CLAUDE_PROVIDER") or ""
-    ).strip().lower()
+        (os.getenv("SELECTED_LLM_PROVIDER") or os.getenv("AUTO_CLAUDE_PROVIDER") or "")
+        .strip()
+        .lower()
+    )
     if explicit:
         # "claude" is an alias used by some frontend code paths for Anthropic.
         return "anthropic" if explicit == "claude" else explicit

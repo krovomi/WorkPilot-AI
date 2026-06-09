@@ -728,9 +728,7 @@ _WINDSURF_MODELS = [
     ModelEntry(
         "windsurf", "gpt-4.1", "GPT-4.1 (Windsurf)", "standard", is_default=False
     ),
-    ModelEntry(
-        "windsurf", "gpt-4o", "GPT-4o (Windsurf)", "standard", is_default=False
-    ),
+    ModelEntry("windsurf", "gpt-4o", "GPT-4o (Windsurf)", "standard", is_default=False),
     ModelEntry(
         "windsurf",
         "gemini-2.5-pro",
@@ -748,7 +746,11 @@ _WINDSURF_MODELS = [
         is_default=False,
     ),
     ModelEntry(
-        "windsurf", "deepseek-v3", "DeepSeek V3 (Windsurf)", "standard", is_default=False
+        "windsurf",
+        "deepseek-v3",
+        "DeepSeek V3 (Windsurf)",
+        "standard",
+        is_default=False,
     ),
     ModelEntry(
         "windsurf",

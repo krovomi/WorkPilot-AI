@@ -1821,9 +1821,7 @@ async def _run_agent_client_session(
                             await streaming_wrapper.emit_tool_use(
                                 tool_name, tool_input_display
                             )
-                            file_change = _extract_streaming_file_change(
-                                tool_name, inp
-                            )
+                            file_change = _extract_streaming_file_change(tool_name, inp)
                             command = _extract_streaming_command(tool_name, inp)
                             if file_change:
                                 fc_path, fc_content = file_change

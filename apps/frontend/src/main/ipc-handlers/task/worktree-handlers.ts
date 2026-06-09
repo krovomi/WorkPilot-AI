@@ -2513,34 +2513,12 @@ export function registerWorktreeHandlers(
 				// Get the diff with file stats
 				const files: WorktreeDiffFile[] = [];
 
-				let numstat = "";
-				let nameStatus = "";
-				let fullDiff = "";
 				try {
-					// Get numstat for additions/deletions per file (cross-platform)
-					numstat = execFileSync(
-						getToolPath("git"),
-						["diff", "--numstat", diffRange],
-						{
-							cwd: worktreePath,
-							encoding: "utf-8",
-							stdio: ["pipe", "pipe", "pipe"],
-						},
-					).trim();
-
-					// Get name-status for file status (cross-platform)
-					nameStatus = execFileSync(
-						getToolPath("git"),
-						["diff", "--name-status", diffRange],
-						{
-							cwd: worktreePath,
-							encoding: "utf-8",
-							stdio: ["pipe", "pipe", "pipe"],
-						},
-					).trim();
-
-					// Get full diff for patch content
-					fullDiff = execFileSync(
+					// Single atomic git call: status, stats and patch all come from the
+					// same snapshot, preventing a race where separate numstat/fullDiff
+					// invocations could see different HEAD commits on an
+					// actively-committing worktree (causing additions > 0 but patch = "").
+					const fullDiff = execFileSync(
 						getToolPath("git"),
 						["diff", diffRange],
 						{
@@ -2550,95 +2528,49 @@ export function registerWorktreeHandlers(
 						},
 					).trim();
 
-					// Parse name-status to get file statuses
-					const statusMap: Record<
-						string,
-						"added" | "modified" | "deleted" | "renamed"
-					> = {};
-					nameStatus
-						.split("\n")
-						.filter(Boolean)
-						.forEach((line: string) => {
-							const [status, ...pathParts] = line.split("\t");
-							const filePath = pathParts.join("\t"); // Handle files with tabs in name
-							switch (status[0]) {
-								case "A":
-									statusMap[filePath] = "added";
-									break;
-								case "M":
-									statusMap[filePath] = "modified";
-									break;
-								case "D":
-									statusMap[filePath] = "deleted";
-									break;
-								case "R":
-									statusMap[pathParts[1] || filePath] = "renamed";
-									break;
-								default:
-									statusMap[filePath] = "modified";
-							}
-						});
+					// Split into per-file sections by walking the diff line by line.
+					const sections: string[] = [];
+					let currentLines: string[] = [];
+					for (const line of fullDiff.split("\n")) {
+						if (line.startsWith("diff --git ")) {
+							if (currentLines.length > 0) sections.push(currentLines.join("\n"));
+							currentLines = [line];
+						} else {
+							currentLines.push(line);
+						}
+					}
+					if (currentLines.length > 0) sections.push(currentLines.join("\n"));
 
-					// Function to extract patch for a specific file from full diff
-					const extractFilePatch = (
-						filePath: string,
-						_fileStatus: string,
-					): string => {
-						const lines = fullDiff.split("\n");
-						let fileLines: string[] = [];
-						let foundFile = false;
+					for (const section of sections) {
+						const headerMatch = section.match(/^diff --git a\/(.*) b\/(.*)$/m);
+						if (!headerMatch) continue;
 
-						for (let i = 0; i < lines.length; i++) {
-							const line = lines[i];
+						// Use the b/ (destination) path as canonical — correct for renames too.
+						const filePath = headerMatch[2];
 
-							// Look for the diff header for this file
-							if (line.startsWith("diff --git")) {
-								// Extract file paths from the diff header
-								const match = line.match(/diff --git a\/(.*) b\/(.*)/);
-								if (match && (match[1] === filePath || match[2] === filePath)) {
-									foundFile = true;
-									fileLines = [line];
-									continue;
-								}
-							}
+						let status: "added" | "modified" | "deleted" | "renamed" =
+							"modified";
+						if (/^new file mode/m.test(section)) status = "added";
+						else if (/^deleted file mode/m.test(section)) status = "deleted";
+						else if (/^rename from /m.test(section)) status = "renamed";
 
-							// If we found the file and hit the next file, stop
-							if (foundFile && line.startsWith("diff --git")) {
-								// Check if this is a new file's diff
-								const match = line.match(/diff --git a\/(.*) b\/(.*)/);
-								if (match && match[1] !== filePath && match[2] !== filePath) {
-									break;
-								}
-							}
-
-							// Add lines if we're in this file's section
-							if (foundFile) {
-								fileLines.push(line);
-							}
+						// Count additions/deletions from the same content as the patch.
+						let additions = 0;
+						let deletions = 0;
+						for (const line of section.split("\n")) {
+							if (line.startsWith("+") && !line.startsWith("+++")) additions++;
+							else if (line.startsWith("-") && !line.startsWith("---"))
+								deletions++;
 						}
 
-						const patch = fileLines.join("\n");
-
-						return patch;
-					};
-
-					// Parse numstat for additions/deletions and create file objects
-					numstat
-						.split("\n")
-						.filter(Boolean)
-						.forEach((line: string) => {
-							const [adds, dels, filePath] = line.split("\t");
-							const fileStatus = statusMap[filePath] || "modified";
-							const patch = extractFilePatch(filePath, fileStatus);
-
-							files.push({
-								path: filePath,
-								status: fileStatus,
-								additions: parseInt(adds, 10) || 0,
-								deletions: parseInt(dels, 10) || 0,
-								patch: patch || undefined, // Only include patch if it exists
-							});
+						files.push({
+							path: filePath,
+							status,
+							additions,
+							deletions,
+							patch: section || undefined,
 						});
+					}
 				} catch (diffError) {
 					console.error("Error getting diff:", diffError);
 				}

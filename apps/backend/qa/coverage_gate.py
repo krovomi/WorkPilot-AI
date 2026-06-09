@@ -331,9 +331,7 @@ def render_coverage_fix_request(report: CoverageGateReport) -> str:
         "2. Relancer les tests avec couverture et enregistrer les pourcentages "
         "dans `implementation_plan.json` → `qa_signoff.coverage`."
     )
-    lines.append(
-        "3. Mettre `ready_for_qa_revalidation: true` pour relancer la QA."
-    )
+    lines.append("3. Mettre `ready_for_qa_revalidation: true` pour relancer la QA.")
     lines.append("")
     return "\n".join(lines)
 

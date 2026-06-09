@@ -179,14 +179,13 @@ def _claude_options_supports(field_name: str) -> bool:
         import inspect
 
         params = inspect.signature(ClaudeAgentOptions.__init__).parameters
-        if any(
-            p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
-        ):
+        if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
             # Accepts **kwargs — assume the field is supported.
             return True
         return field_name in params
     except (TypeError, ValueError):
         return False
+
 
 # BUG FIX #12: Monkey-patch SDK message parser to handle unknown message types
 # gracefully instead of raising MessageParseError. The Claude CLI may send message

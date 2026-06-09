@@ -195,7 +195,9 @@ def generate_spec_name(task_description: str) -> str:
     normalized = unicodedata.normalize("NFKD", task_description)
     normalized = "".join(c for c in normalized if not unicodedata.combining(c))
     text = normalized.lower()
-    text = "".join(c if (c.isascii() and c.isalnum()) or c == " " else " " for c in text)
+    text = "".join(
+        c if (c.isascii() and c.isalnum()) or c == " " else " " for c in text
+    )
     words = text.split()
 
     # Filter out skip words and short words

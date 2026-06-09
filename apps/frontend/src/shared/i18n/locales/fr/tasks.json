@@ -626,6 +626,8 @@
 			"providerSwitchPaused": "Tâche en pause",
 			"providerSwitchPausedDesc": "Choisissez un provider et un modèle, puis reprenez la tâche.",
 			"pauseToSwitch": "Mettre en pause et changer de LLM",
+			"pauseToSwitchShort": "Mettre en pause",
+			"providerSwitchInfoAria": "Détails du changement de LLM",
 			"pauseToSwitchTooltip": "La tâche termine l'étape en cours puis s'arrête. Vous pourrez alors choisir un provider et un modèle, puis reprendre.",
 			"pauseUnavailableTooltip": "Le changement à chaud n'est possible que pendant l'exécution. Pour les étapes non démarrées, choisissez le LLM directement dans les sélecteurs de chaque phase ci-dessus.",
 			"pauseRequestedTitle": "Pause demandée",

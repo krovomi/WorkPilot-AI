@@ -585,6 +585,96 @@ class TestCopilotAgentClient:
         assert messages[-1].role == MessageRole.SYSTEM
         assert "429" in messages[-1].content[0].text
 
+    def test_init_normalizes_anthropic_versioned_model_for_copilot(self):
+        """Dash-versioned Anthropic ids are converted to Copilot dotted notation.
+
+        Copilot rejects "claude-sonnet-4-5" with 400 model_not_supported; the
+        client must send "claude-sonnet-4.5" instead.
+        """
+        client = CopilotAgentClient(
+            model="claude-sonnet-4-5-20250929", github_token="ghp_test"
+        )
+        assert client.model == "claude-sonnet-4.5"
+
+        client2 = CopilotAgentClient(model="claude-opus-4-6", github_token="ghp_test")
+        assert client2.model == "claude-opus-4.6"
+
+        # Already-dotted / non-Claude ids are left untouched.
+        assert (
+            CopilotAgentClient(
+                model="claude-opus-4.8", github_token="ghp_test"
+            ).model
+            == "claude-opus-4.8"
+        )
+        assert (
+            CopilotAgentClient(model="gpt-5.5", github_token="ghp_test").model
+            == "gpt-5.5"
+        )
+
+    @pytest.mark.asyncio
+    async def test_receive_response_400_model_not_supported_falls_back(self):
+        """A 400 model_not_supported swaps the model and retries (no phase fail).
+
+        Reproduces the QA validation failure where Copilot rejected the model
+        with `{"code":"model_not_supported"}`. The client must fall back to a
+        supported model and recover instead of surfacing the 400 error.
+        """
+        client = CopilotAgentClient(
+            model="claude-opus-4.8", github_token="ghp_test", max_turns=5
+        )
+        await client.query("hello")
+
+        def make_400():
+            resp = MagicMock()
+            resp.status = 400
+            resp.headers = {}
+            resp.text = AsyncMock(
+                return_value=(
+                    '{"error":{"message":"The requested model is not '
+                    'supported.","code":"model_not_supported","param":"model",'
+                    '"type":"invalid_request_error"}}'
+                )
+            )
+            resp.__aenter__ = AsyncMock(return_value=resp)
+            resp.__aexit__ = AsyncMock(return_value=None)
+            return resp
+
+        def make_ok():
+            resp = MagicMock()
+            resp.status = 200
+            resp.json = AsyncMock(
+                return_value={
+                    "choices": [
+                        {"message": {"content": "Recovered!", "tool_calls": []}}
+                    ]
+                }
+            )
+            resp.__aenter__ = AsyncMock(return_value=resp)
+            resp.__aexit__ = AsyncMock(return_value=None)
+            return resp
+
+        # First call rejects the model, second (after fallback) succeeds.
+        responses = iter([make_400(), make_ok()])
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(side_effect=lambda *a, **k: next(responses))
+        client._http_client = mock_session
+
+        with patch.object(client, "_get_copilot_token", return_value="mock_token"):
+            messages = []
+            async for msg in client.receive_response():
+                messages.append(msg)
+
+        texts = [
+            b.text
+            for m in messages
+            for b in m.content
+            if b.type == ContentBlockType.TEXT
+        ]
+        assert "Recovered!" in texts
+        assert not any("model_not_supported" in t for t in texts)
+        # Model was swapped to the supported fallback before retrying.
+        assert client.model == "claude-sonnet-4.5"
+
     @pytest.mark.asyncio
     async def test_receive_response_with_tool_calls(self):
         """Test response with function-calling tool_calls."""

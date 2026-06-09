@@ -626,6 +626,8 @@
 			"providerSwitchPaused": "Task is paused",
 			"providerSwitchPausedDesc": "Choose a provider and model, then resume the task.",
 			"pauseToSwitch": "Pause and switch LLM",
+			"pauseToSwitchShort": "Pause & switch",
+			"providerSwitchInfoAria": "About switching the LLM",
 			"pauseToSwitchTooltip": "The task finishes the current step, then stops. You can then pick a provider and model and resume.",
 			"pauseUnavailableTooltip": "Hot switching is only available while the task is running. For steps that haven't started, pick the LLM directly in each phase's selectors above.",
 			"pauseRequestedTitle": "Pause requested",

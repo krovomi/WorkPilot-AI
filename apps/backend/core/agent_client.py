@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -55,7 +56,9 @@ def _env_float(name: str, default: float) -> float:
     try:
         return float(raw)
     except (TypeError, ValueError):
-        logger.warning("[CopilotAgentClient] Invalid %s=%r — using %.0f", name, raw, default)
+        logger.warning(
+            "[CopilotAgentClient] Invalid %s=%r — using %.0f", name, raw, default
+        )
         return default
 
 
@@ -100,6 +103,7 @@ def _parse_retry_after(headers: object, cap_seconds: float) -> float | None:
     except (TypeError, ValueError, OverflowError):
         return None
 
+
 # =============================================================================
 # Constants
 # =============================================================================
@@ -141,6 +145,54 @@ _COPILOT_HISTORY_CHAR_LIMIT: dict[str, int] = {
 # Default for unknown Copilot models: 100 k tokens (~400 k chars)
 _COPILOT_HISTORY_CHAR_LIMIT_DEFAULT = 400_000
 
+# L'API GitHub Copilot exige la notation pointée pour les modèles Claude
+# (ex. "claude-sonnet-4.5"). Les identifiants au format natif Anthropic,
+# versionnés par tirets (ex. "claude-sonnet-4-5-20250929", "claude-opus-4-6"),
+# sont rejetés avec « 400 model_not_supported ». Cette regex capture la famille
+# et la version pour reconstruire la forme pointée attendue par Copilot.
+_COPILOT_VERSIONED_MODEL_RE = re.compile(
+    r"^(claude-(?:opus|sonnet|haiku))-(\d+)-(\d+)(?:-\d+)?$"
+)
+
+# Modèle Copilot de repli largement disponible, utilisé lorsqu'un modèle reste
+# rejeté après normalisation (ex. un flagship pas encore servi par le plan
+# Copilot de l'utilisateur, comme "claude-opus-4.8").
+_COPILOT_DEFAULT_FALLBACK_MODEL = "claude-sonnet-4.5"
+
+
+def _normalize_copilot_model_id(model: str | None) -> str | None:
+    """Convertit un id Claude au format natif Anthropic vers la notation Copilot.
+
+    L'API Copilot utilise la notation pointée (``claude-sonnet-4.5``) alors que
+    les tâches peuvent transporter l'id natif Anthropic versionné par tirets
+    (``claude-sonnet-4-5-20250929``), que Copilot rejette avec
+    ``400 model_not_supported``. La date de version éventuelle est supprimée.
+
+    Les identifiants déjà au bon format (point) ou non-Claude sont renvoyés tels
+    quels. Reflète le comportement de ``phase_config._resolve_provider_model``.
+    """
+    if not model:
+        return model
+    match = _COPILOT_VERSIONED_MODEL_RE.match(model)
+    if match:
+        family, major, minor = match.group(1), match.group(2), match.group(3)
+        return f"{family}-{major}.{minor}"
+    return model
+
+
+def _copilot_fallback_model(model: str) -> str:
+    """Retourne un modèle Copilot de repli quand ``model`` est rejeté (400).
+
+    Tente d'abord la normalisation tirets→point (qui récupère l'intention du
+    modèle d'origine) ; si l'id est déjà au format pointé mais reste non
+    supporté, bascule vers un modèle Copilot par défaut.
+    """
+    normalized = _normalize_copilot_model_id(model)
+    if normalized and normalized != model:
+        return normalized
+    return _COPILOT_DEFAULT_FALLBACK_MODEL
+
+
 # Planner/spec_writer sessions MUST finish by writing their output file
 # (implementation_plan.json) via the Write tool. On large brownfield codebases
 # the model can burn its whole turn budget on investigation (run_command /
@@ -175,7 +227,9 @@ _COPILOT_REQUEST_CONNECT_TIMEOUT = _env_float("COPILOT_REQUEST_CONNECT_TIMEOUT",
 # "max time the model may take to produce the whole completion". Kept slightly
 # below ``total`` so a stall is attributed to read-silence (clearer logs)
 # rather than the overall ceiling.
-_COPILOT_REQUEST_SOCK_READ_TIMEOUT = _env_float("COPILOT_REQUEST_SOCK_READ_TIMEOUT", 540.0)
+_COPILOT_REQUEST_SOCK_READ_TIMEOUT = _env_float(
+    "COPILOT_REQUEST_SOCK_READ_TIMEOUT", 540.0
+)
 # A transient CONNECTION error (reset/disconnect/DNS) is cheap to retry — it
 # usually fails within seconds — so we retry it several times before failing.
 _COPILOT_REQUEST_MAX_RETRIES = 3
@@ -201,17 +255,13 @@ _COPILOT_REQUEST_RETRY_BACKOFF = 2.0
 _COPILOT_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 529})
 # How many times to retry a transient/rate-limited response before giving up.
 # Generous because a per-minute window can need several short waits to clear.
-_COPILOT_RATE_LIMIT_MAX_RETRIES = int(
-    _env_float("COPILOT_RATE_LIMIT_MAX_RETRIES", 6)
-)
+_COPILOT_RATE_LIMIT_MAX_RETRIES = int(_env_float("COPILOT_RATE_LIMIT_MAX_RETRIES", 6))
 # Base back-off (seconds) when the server does NOT send a ``Retry-After``
 # header; grows exponentially per attempt, capped by the MAX below.
 _COPILOT_RATE_LIMIT_BACKOFF = _env_float("COPILOT_RATE_LIMIT_BACKOFF", 5.0)
 # Upper bound (seconds) for a single rate-limit back-off wait, whether derived
 # from ``Retry-After`` or exponential growth. Keeps the worst-case stall sane.
-_COPILOT_RATE_LIMIT_MAX_BACKOFF = _env_float(
-    "COPILOT_RATE_LIMIT_MAX_BACKOFF", 60.0
-)
+_COPILOT_RATE_LIMIT_MAX_BACKOFF = _env_float("COPILOT_RATE_LIMIT_MAX_BACKOFF", 60.0)
 
 # Claude served through the OpenAI-compatible Copilot API occasionally returns
 # ``finish_reason=tool_calls`` with an EMPTY ``tool_calls`` array — the model
@@ -743,7 +793,7 @@ class CopilotAgentClient(AgentClient):
     ):
         import os
 
-        self.model = model or "gpt-4o"
+        self.model = _normalize_copilot_model_id(model) or "gpt-4o"
         self.system_prompt = system_prompt
         self.allowed_tools = allowed_tools or []
         self.agents = agents or {}
@@ -882,7 +932,7 @@ class CopilotAgentClient(AgentClient):
                         "Content-Type": CONTENT_TYPE_JSON,
                         "Accept": CONTENT_TYPE_JSON,
                         **self._IDE_HEADERS,
-                    }
+                    },
                 )
             except ImportError:
                 raise ImportError(
@@ -1109,6 +1159,10 @@ class CopilotAgentClient(AgentClient):
         # Number of CONSECUTIVE turns whose response contained no usable choices
         # (a transient API hiccup). Reset whenever a turn returns a real choice.
         consecutive_empty_responses = 0
+        # Whether we already swapped the model after a 400 "model_not_supported"
+        # rejection. Guards against an infinite retry loop if even the fallback
+        # model is unavailable on the user's Copilot plan.
+        model_fallback_attempted = False
 
         for turn in range(self.max_turns):
             try:
@@ -1185,7 +1239,20 @@ class CopilotAgentClient(AgentClient):
 
             import asyncio as _asyncio
 
-            import aiohttp
+            # aiohttp is an optional dependency (see _get_http_client): a live
+            # session always has it installed, but tests inject a mock
+            # _http_client and run without it. Guard the import so the request
+            # loop degrades to retrying on timeouts only instead of crashing on
+            # a missing module.
+            try:
+                import aiohttp
+
+                _retryable_request_errors: tuple[type[BaseException], ...] = (
+                    _asyncio.TimeoutError,
+                    aiohttp.ClientError,
+                )
+            except ImportError:
+                _retryable_request_errors = (_asyncio.TimeoutError,)
 
             data = None
             # Two independent retry budgets so a burst of rate-limit (429)
@@ -1292,6 +1359,49 @@ class CopilotAgentClient(AgentClient):
                                 ],
                             )
                             return
+                        elif (
+                            resp.status == 400
+                            and not model_fallback_attempted
+                            and not self._using_github_models
+                        ):
+                            # The Copilot API rejected the requested model. This
+                            # happens when a task carries an Anthropic-native
+                            # versioned id (e.g. "claude-sonnet-4-5") or a
+                            # flagship not yet served by the user's Copilot plan
+                            # (e.g. "claude-opus-4.8"). Swap to a supported model
+                            # and retry the turn instead of failing the phase.
+                            error_text = await resp.text()
+                            if "model_not_supported" in error_text:
+                                fallback = _copilot_fallback_model(self.model)
+                                model_fallback_attempted = True
+                                logger.warning(
+                                    "[CopilotAgentClient] Model "
+                                    f"'{self.model}' not supported by Copilot — "
+                                    f"falling back to '{fallback}' and retrying."
+                                )
+                                print(
+                                    "[CopilotAgentClient] [WARN] Model "
+                                    f"'{self.model}' not supported — switching to "
+                                    f"'{fallback}'.",
+                                    flush=True,
+                                )
+                                self.model = fallback
+                                payload["model"] = fallback
+                                continue
+                            # A different 400 (e.g. malformed request) — surface.
+                            logger.error(
+                                f"[CopilotAgentClient] API error (400): {error_text[:500]}"
+                            )
+                            yield AgentMessage(
+                                role=MessageRole.SYSTEM,
+                                content=[
+                                    ContentBlock(
+                                        type=ContentBlockType.TEXT,
+                                        text=f"Copilot API error (400): {error_text}",
+                                    )
+                                ],
+                            )
+                            return
                         elif resp.status != 200:
                             error_text = await resp.text()
                             logger.error(
@@ -1310,10 +1420,7 @@ class CopilotAgentClient(AgentClient):
                         else:
                             data = await resp.json()
                     break  # request succeeded — leave the retry loop
-                except (
-                    _asyncio.TimeoutError,
-                    aiohttp.ClientError,
-                ) as e:
+                except _retryable_request_errors as e:
                     # A hung/stalled or transient connection error. Retry before
                     # failing so a single bad response no longer freezes the whole
                     # phase. A full-duration TIMEOUT gets a tighter retry budget
@@ -1374,12 +1481,8 @@ class CopilotAgentClient(AgentClient):
 
             if data is None:
                 # All retries exhausted without a usable response.
-                logger.error(
-                    "[CopilotAgentClient] No response data after retries"
-                )
+                logger.error("[CopilotAgentClient] No response data after retries")
                 return
-
-
 
             choices = data.get("choices", [])
             if not choices:
@@ -1393,7 +1496,9 @@ class CopilotAgentClient(AgentClient):
                     consecutive_empty_responses
                     <= _COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES
                 ):
-                    backoff = _COPILOT_EMPTY_RESPONSE_BACKOFF * consecutive_empty_responses
+                    backoff = (
+                        _COPILOT_EMPTY_RESPONSE_BACKOFF * consecutive_empty_responses
+                    )
                     logger.warning(
                         f"[CopilotAgentClient] Turn {turn + 1}: empty choices in "
                         f"response — retrying "
@@ -1666,7 +1771,11 @@ class CopilotAgentClient(AgentClient):
             copilot_token = await self._get_copilot_token()
             session = self._get_http_client()
             payload = {
-                "model": defn.model if defn.model != "inherit" else self.model,
+                "model": (
+                    _normalize_copilot_model_id(defn.model)
+                    if defn.model != "inherit"
+                    else self.model
+                ),
                 "messages": messages,
                 "stream": False,
             }
