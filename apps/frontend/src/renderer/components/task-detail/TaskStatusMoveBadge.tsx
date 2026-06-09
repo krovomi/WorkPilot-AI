@@ -1,4 +1,5 @@
 import { ChevronDown } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	TASK_STATUS_COLUMNS,
@@ -35,6 +36,16 @@ interface TaskStatusMoveBadgeProps {
 	readonly variant: BadgeProps["variant"];
 	readonly isRunning: boolean;
 	readonly onMove: (newStatus: TaskStatus) => void;
+	/**
+	 * Libellé affiché à la place du nom de la colonne courante.
+	 * Utilisé pour les états spéciaux (« Bloqué », « Incomplet ») afin de
+	 * conserver leur sémantique visuelle tout en gardant le menu de déplacement.
+	 */
+	readonly label?: ReactNode;
+	/** Icône optionnelle affichée avant le libellé (ex. triangle d'alerte). */
+	readonly leadingIcon?: ReactNode;
+	/** Anime la pastille pour signaler un état nécessitant une attention. */
+	readonly pulse?: boolean;
 }
 
 /**
@@ -43,12 +54,19 @@ interface TaskStatusMoveBadgeProps {
  * Affiche le statut courant et, au clic, propose de déplacer la tâche vers une
  * autre colonne du Kanban — équivalent du menu « Déplacer vers » des cartes,
  * mais intégré de façon discrète au badge existant (chevron + pastilles).
+ *
+ * Les états spéciaux (Bloqué / Incomplet) réutilisent ce même badge via les
+ * props `label`/`leadingIcon`/`pulse`, pour rester déplaçables sans alourdir
+ * l'en-tête de la popin.
  */
 export function TaskStatusMoveBadge({
 	task,
 	variant,
 	isRunning,
 	onMove,
+	label,
+	leadingIcon,
+	pulse = false,
 }: TaskStatusMoveBadgeProps) {
 	const { t } = useTranslation(["tasks"]);
 
@@ -68,10 +86,15 @@ export function TaskStatusMoveBadge({
 						variant={variant}
 						className={cn(
 							"text-xs gap-1 cursor-pointer ring-1 ring-transparent transition-all group-hover:ring-border group-data-[state=open]:ring-border",
-							task.status === "in_progress" && isRunning && "status-running",
+							pulse
+								? "animate-pulse"
+								: task.status === "in_progress" &&
+										isRunning &&
+										"status-running",
 						)}
 					>
-						{t(TASK_STATUS_LABELS[task.status])}
+						{leadingIcon}
+						{label ?? t(TASK_STATUS_LABELS[task.status])}
 						<ChevronDown className="h-3 w-3 opacity-50 transition-all group-hover:opacity-90 group-data-[state=open]:rotate-180" />
 					</Badge>
 				</button>

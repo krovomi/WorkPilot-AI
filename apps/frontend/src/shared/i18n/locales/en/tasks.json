@@ -654,6 +654,13 @@
 			"stopped": "Stopped",
 			"qaIssues": "QA Issues"
 		},
+		"move": {
+			"trigger": "Move task to another column",
+			"label": "Move to",
+			"successTitle": "Task moved",
+			"successDescription": "Task moved to “{{status}}”.",
+			"worktreeBlocked": "Can't move: an active worktree exists for this task. Confirm worktree cleanup from the Kanban board."
+		},
 		"progress": {
 			"subtasks": "{{completed}}/{{total}} subtasks"
 		},

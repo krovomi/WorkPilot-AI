@@ -161,22 +161,28 @@ const renderTaskStatusBadges = (
 ) => {
 	if (state.isStuck) {
 		return (
-			<Badge
+			<TaskStatusMoveBadge
+				task={task}
 				variant="warning"
-				className="text-xs flex items-center gap-1 animate-pulse"
-			>
-				<AlertTriangle className="h-3 w-3" />
-				Stuck
-			</Badge>
+				isRunning={state.isRunning}
+				onMove={onMove}
+				pulse
+				leadingIcon={<AlertTriangle className="h-3 w-3" />}
+				label={t("tasks:modal.badges.stuck")}
+			/>
 		);
 	}
 
 	if (state.isIncomplete) {
 		return (
-			<Badge variant="warning" className="text-xs flex items-center gap-1">
-				<AlertTriangle className="h-3 w-3" />
-				Incomplete
-			</Badge>
+			<TaskStatusMoveBadge
+				task={task}
+				variant="warning"
+				isRunning={state.isRunning}
+				onMove={onMove}
+				leadingIcon={<AlertTriangle className="h-3 w-3" />}
+				label={t("tasks:modal.badges.incomplete")}
+			/>
 		);
 	}
 

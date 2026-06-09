@@ -654,6 +654,13 @@
 			"stopped": "Arrêté",
 			"qaIssues": "Problèmes QA"
 		},
+		"move": {
+			"trigger": "Déplacer la tâche vers une autre colonne",
+			"label": "Déplacer vers",
+			"successTitle": "Tâche déplacée",
+			"successDescription": "Tâche déplacée vers « {{status}} ».",
+			"worktreeBlocked": "Déplacement impossible : un worktree actif existe pour cette tâche. Confirmez le nettoyage du worktree depuis le tableau Kanban."
+		},
 		"progress": {
 			"subtasks": "{{completed}}/{{total}} sous-tâches"
 		},
