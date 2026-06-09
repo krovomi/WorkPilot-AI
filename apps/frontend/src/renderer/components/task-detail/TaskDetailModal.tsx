@@ -481,10 +481,17 @@ function TaskDetailModalContent({
 	// l'impression d'un pourcentage figé. On privilégie donc la progression
 	// temps réel calculée côté backend (overallProgress, pondérée par phase),
 	// avec repli sur l'avancement par sous-tâches.
+	//
+	// Garde-fou : tant que des sous-tâches de code ne sont pas terminées, on
+	// empêche la barre d'entrer dans la bande QA (≥ 80%). Sinon une tâche coincée
+	// en QA (p.ex. QA qui échoue en boucle) afficherait ~94% avec 2/3 sous-tâches.
+	const codingSubtasksComplete =
+		totalSubtasks > 0 ? completedSubtasks === totalSubtasks : undefined;
 	const headerProgressPercent = getDisplayProgress(
 		progressPercent,
 		task.executionProgress?.overallProgress,
 		!!state.hasActiveExecution,
+		codingSubtasksComplete,
 	);
 
 	// Activité en cours affichée dans la barre de phase : on privilégie le

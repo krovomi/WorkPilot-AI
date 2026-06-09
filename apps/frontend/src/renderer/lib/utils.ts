@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { EXECUTION_PHASE_WEIGHTS } from "../../shared/constants/task";
 
 /**
  * Utility function to merge Tailwind CSS classes
@@ -29,18 +30,32 @@ export function calculateProgress(subtasks: { status: string }[]): number {
  * sous-tâches. Le max évite toute régression visuelle si overallProgress n'a pas
  * encore été reçu.
  *
+ * Garde-fou d'honnêteté : la progression pondérée par phase saute dans la bande
+ * QA (>= coding.end, soit 80%) dès que la QA démarre, créditant toute la phase de
+ * codage même si certaines sous-tâches de code ne se sont jamais terminées. Sans
+ * ce garde-fou, une tâche bloquée dans une boucle QA en échec afficherait p.ex.
+ * 94% alors que seules 2/3 sous-tâches sont faites. Tant que des sous-tâches de
+ * code restent à faire, on maintient la barre dans la bande de codage.
+ *
  * @param subtaskProgress Pourcentage calculé depuis les sous-tâches (0-100)
  * @param overallProgress Progression temps réel du backend (0-100), optionnelle
  * @param hasActiveExecution Indique si une phase d'exécution est en cours
+ * @param codingSubtasksComplete `false` si des sous-tâches de code restent à
+ *   faire (plafonne la barre), `true`/`undefined` sinon (pas de plafond)
  * @returns Pourcentage à afficher (0-100)
  */
 export function getDisplayProgress(
 	subtaskProgress: number,
 	overallProgress: number | undefined,
 	hasActiveExecution: boolean,
+	codingSubtasksComplete?: boolean,
 ): number {
 	if (!hasActiveExecution) return subtaskProgress;
-	return Math.max(overallProgress ?? 0, subtaskProgress);
+	const display = Math.max(overallProgress ?? 0, subtaskProgress);
+	if (codingSubtasksComplete === false) {
+		return Math.min(display, EXECUTION_PHASE_WEIGHTS.coding.end);
+	}
+	return display;
 }
 
 /**
