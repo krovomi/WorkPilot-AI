@@ -1579,6 +1579,90 @@ def _get_active_provider(spec_dir: Path | None = None) -> str:
     return "claude"
 
 
+# Per-spec record of the last (provider, model) an agent client was created with.
+# Used to detect "context switching" — i.e. when the active LLM provider and/or
+# model changes mid-task (e.g. the user switches Anthropic → Copilot from the
+# paused-task modal, or a per-phase override kicks in) — so we can leave a trace
+# in the task activity feed showing from when which provider/model was in use.
+LLM_CONTEXT_STATE_FILE = ".llm_context.json"
+
+
+def _log_llm_context_switch(spec_dir: Path, provider: str, model: str) -> None:
+    """Record the active LLM provider+model and, when it differs from the last
+    recorded context for this spec, emit a human-readable trace into the task
+    activity feed.
+
+    This is the single source of truth for "context switching" traces: every
+    execution phase resolves its client through ``create_agent_client``, so
+    comparing against the persisted ``.llm_context.json`` catches every change
+    (provider switch, per-phase model change, resume-with-provider) exactly once.
+
+    Resilient by design — context logging must NEVER break client creation, so
+    every step is guarded and failures degrade to a debug log.
+    """
+    try:
+        state_path = Path(spec_dir) / LLM_CONTEXT_STATE_FILE
+
+        previous: dict | None = None
+        if state_path.exists():
+            try:
+                previous = json.loads(state_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError, ValueError):
+                previous = None
+
+        prev_provider = (previous or {}).get("provider")
+        prev_model = (previous or {}).get("model")
+
+        # No change since the last client creation — nothing to trace.
+        if prev_provider == provider and prev_model == model:
+            return
+
+        if previous is None:
+            message = (
+                f"▶️ Contexte LLM initial — Fournisseur : {provider} "
+                f"· Modèle : {model}"
+            )
+        elif prev_provider != provider:
+            message = (
+                f"🔄 Changement de fournisseur LLM : {prev_provider} → {provider} "
+                f"· Modèle : {prev_model or '?'} → {model}"
+            )
+        else:
+            message = (
+                f"🔄 Changement de modèle LLM : {prev_model} → {model} "
+                f"· Fournisseur : {provider}"
+            )
+
+        logger.info("[llm-context] %s", message)
+
+        # Surface in the task activity feed, but only when the globally-active
+        # task logger belongs to this spec — otherwise (e.g. GitHub PR review
+        # runners, ideation) there's no kanban feed to write into and we must
+        # not contaminate an unrelated task's logs. The running phase has
+        # already set ``current_phase`` on the global logger, so the entry is
+        # attributed to the correct phase.
+        try:
+            from task_logger import get_task_logger
+
+            tl = get_task_logger()
+            if tl is not None and Path(tl.spec_dir) == Path(spec_dir):
+                tl.log_info(message)
+        except Exception:
+            pass
+
+        try:
+            state_path.write_text(
+                json.dumps(
+                    {"provider": provider, "model": model}, ensure_ascii=False
+                ),
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+    except Exception as e:  # pragma: no cover - defensive guard
+        logger.debug("Could not record LLM context switch: %s", e)
+
+
 def create_agent_client(
     project_dir: Path,
     spec_dir: Path,
@@ -1635,6 +1719,9 @@ def create_agent_client(
     logger.info(
         f"Creating agent client: provider={provider}, agent_type={agent_type}, model={model}"
     )
+
+    # Trace LLM context switches (provider/model changes) into the task feed.
+    _log_llm_context_switch(spec_dir, provider, model)
 
     if provider == "copilot":
         # Build system prompt (reuse logic from create_client)

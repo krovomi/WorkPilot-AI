@@ -38,6 +38,7 @@ import { useSettingsStore } from "../../stores/settings-store";
 import { THINKING_LEVELS } from "../../../shared/constants/models";
 import {
 	buildModelMetadataUpdate,
+	buildModelSelectOptions,
 	buildProviderMetadataUpdate,
 	buildThinkingMetadataUpdate,
 	LOG_PHASE_TO_CONFIG_PHASE,
@@ -573,18 +574,20 @@ function PhaseLogSection({
 	}, [providers, phaseConfig?.provider]);
 
 	// Model options: catalog entries, augmented with the current model value so
-	// it remains selectable even if the live catalog hasn't loaded it.
-	const modelOptions = useMemo(() => {
-		const list = catalogModels.map((m) => ({ value: m.value, label: m.label }));
-		const current = phaseConfig?.modelValue;
-		if (current && !list.some((m) => m.value === current)) {
-			list.unshift({
-				value: current,
-				label: MODEL_SHORT_LABELS[current] || current,
-			});
-		}
-		return list;
-	}, [catalogModels, phaseConfig?.modelValue]);
+	// it remains selectable even if the live catalog hasn't loaded it. The
+	// dedupe-check compares by canonical identity (not raw `value`) so a model
+	// persisted under an alternate spelling (e.g. dotted "claude-opus-4.8" left
+	// over from another provider) collapses onto its single canonical catalog
+	// entry instead of appearing twice.
+	const { options: modelOptions, value: modelSelectValue } = useMemo(
+		() =>
+			buildModelSelectOptions(
+				catalogModels,
+				phaseConfig?.modelValue,
+				MODEL_SHORT_LABELS,
+			),
+		[catalogModels, phaseConfig?.modelValue],
+	);
 
 	// Memoize sorted entries to avoid re-calculating on every render
 	// Entries are naturally in chronological order (oldest first from append())
@@ -743,7 +746,7 @@ function PhaseLogSection({
 							{/* Model selector */}
 							{onModelChange ? (
 								<Select
-									value={phaseConfig.modelValue}
+									value={modelSelectValue}
 									onValueChange={(value) => onModelChange(phase, value)}
 									disabled={isSavingPhase}
 								>
