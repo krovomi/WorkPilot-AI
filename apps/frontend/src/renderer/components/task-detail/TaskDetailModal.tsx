@@ -12,7 +12,6 @@ import {
 	Pencil,
 	Play,
 	RotateCcw,
-	Square,
 	Trash2,
 	X,
 } from "lucide-react";
@@ -76,9 +75,10 @@ import { TaskStatusMoveBadge } from "./TaskStatusMoveBadge";
 import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
+import { TaskRunControls } from "./TaskRunControls";
 import { TaskPhaseBar } from "./TaskPhaseBar";
 import { translateActivityMessage } from "./translateActivityMessage";
-import { pauseTask, resumeTask } from "../../stores/task-store";
+import { pauseTask } from "../../stores/task-store";
 import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
 import { TaskReview } from "./TaskReview";
 import { TaskSubtasks } from "./TaskSubtasks";
@@ -759,22 +759,22 @@ function TaskDetailModalContent({
 						/>
 					)}
 
-					<Button
-						variant={state.isRunning ? "destructive" : "default"}
-						onClick={handleStartStop}
-					>
-						{state.isRunning ? (
-							<>
-								<Square className="mr-2 h-4 w-4" />
-								{t("tasks:modal.actions.stopTask")}
-							</>
-						) : (
-							<>
-								<Play className="mr-2 h-4 w-4" />
-								{t("tasks:modal.actions.startTask")}
-							</>
-						)}
-					</Button>
+					{state.isRunning ? (
+						// Running (or cooperatively paused): first-class Pause /
+						// Reprendre / Arrêter instead of stop-only. Pausing keeps the
+						// task in its current kanban column and lets the user resume.
+						<TaskRunControls
+							task={task}
+							isPaused={state.isPaused}
+							pauseProcessAlive={state.pauseProcessAlive}
+							onStop={handleStartStop}
+						/>
+					) : (
+						<Button variant="default" onClick={handleStartStop}>
+							<Play className="mr-2 h-4 w-4" />
+							{t("tasks:modal.actions.startTask")}
+						</Button>
+					)}
 				</div>
 			);
 		}
@@ -1191,23 +1191,18 @@ function TaskDetailModalContent({
 
 						{/* Footer */}
 						<div className="border-t border-border shrink-0">
-							{/* Pause/Resume Controls - shown at bottom when paused or running */}
-							{(task.metadata?.paused?.enabled || (state.isRunning && !state.isStuck)) && (
+							{/* Advanced resume panel — only once the task is paused. Quick
+							    pause/reprise/stop now lives in the action bar
+							    (TaskRunControls); this panel adds the "resume with a
+							    different provider/model" flow on top. */}
+							{task.metadata?.paused?.enabled && (
 								<div className="px-5 py-3 border-b border-border">
 									<TaskPauseControls
 										task={task}
 										isPaused={task.metadata?.paused?.enabled}
-										isRunning={
-											task.metadata?.paused?.enabled
-												? state.pauseProcessAlive !== false
-												: state.isRunning
-										}
+										isRunning={state.pauseProcessAlive !== false}
 										onPause={async (subtaskId) => {
 											await pauseTask(task.id, subtaskId);
-										}}
-										onResumeSameProvider={async () => {
-											await resumeTask(task.id);
-											await handleStartStop();
 										}}
 									/>
 								</div>

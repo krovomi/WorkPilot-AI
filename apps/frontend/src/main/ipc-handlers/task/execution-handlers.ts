@@ -2835,10 +2835,19 @@ print(json.dumps(result))
 				// UI uses that to switch the controls into the paused state.
 				projectStore.invalidateTasksCache(project.id);
 
+				// Immediate pause: stop the running subprocess NOW rather than waiting
+				// for the backend to reach the next cooperative checkpoint (end of the
+				// current step). killTask marks the spawn as killed, so its exit handler
+				// returns early WITHOUT emitting "exit" — no PROCESS_EXITED / USER_STOPPED
+				// is sent, so the card keeps its current kanban column (in_progress) and
+				// stays resumable. The paused flag written above drives the UI and a
+				// clean resume from the last checkpoint (the in-flight step re-runs).
+				const wasRunning = agentManager.killTask(taskId);
+
 				appLog.info(
-					`[TASK_PAUSE] Pause requested for task ${taskId} at subtask ` +
-						`${subtaskId || "none"} (${written} plan cop[y/ies]). The backend ` +
-						`finishes the current step, then stops.`,
+					`[TASK_PAUSE] Task ${taskId} paused immediately at subtask ` +
+						`${subtaskId || "none"} (${written} plan cop[y/ies]); ` +
+						`subprocess ${wasRunning ? "killed" : "was not running"}.`,
 				);
 
 				return {

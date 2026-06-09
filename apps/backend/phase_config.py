@@ -614,8 +614,9 @@ def get_phase_thinking(
 
     Priority:
     1. CLI argument (if provided)
-    2. Phase-specific config from task_metadata.json (if auto profile)
-    3. Single thinking level from task_metadata.json (if not auto profile)
+    2. Per-phase thinking from task_metadata.json (phaseThinking[phase]) whenever
+       present — regardless of isAutoProfile
+    3. Single thinking level from task_metadata.json
     4. Default phase configuration
 
     Args:
@@ -634,12 +635,17 @@ def get_phase_thinking(
     metadata = load_task_metadata(spec_dir)
 
     if metadata:
-        # Check for auto profile with phase-specific config
-        if metadata.get("isAutoProfile") and metadata.get("phaseThinking"):
-            phase_thinking = metadata["phaseThinking"]
-            return phase_thinking.get(phase, DEFAULT_PHASE_THINKING[phase])
+        # Per-phase thinking wins whenever the phase is present — regardless of
+        # isAutoProfile. This mirrors the frontend selector, whose `getPhaseConfig`
+        # reads `metadata.phaseThinking[phase]` unconditionally. A single-model
+        # resume (RESUME_WITH_PROVIDER sets isAutoProfile=false to force its chosen
+        # model) must keep honouring the per-phase effort the user still sees;
+        # otherwise the UI shows e.g. "Low" while the run uses the "high" default.
+        phase_thinking = metadata.get("phaseThinking") or {}
+        if phase_thinking.get(phase):
+            return phase_thinking[phase]
 
-        # Non-auto profile: use single thinking level
+        # Otherwise honour a single thinking level if one was set.
         if metadata.get("thinkingLevel"):
             return metadata["thinkingLevel"]
 
