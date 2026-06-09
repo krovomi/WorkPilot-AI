@@ -1239,20 +1239,7 @@ class CopilotAgentClient(AgentClient):
 
             import asyncio as _asyncio
 
-            # aiohttp is an optional dependency (see _get_http_client): a live
-            # session always has it installed, but tests inject a mock
-            # _http_client and run without it. Guard the import so the request
-            # loop degrades to retrying on timeouts only instead of crashing on
-            # a missing module.
-            try:
-                import aiohttp
-
-                _retryable_request_errors: tuple[type[BaseException], ...] = (
-                    _asyncio.TimeoutError,
-                    aiohttp.ClientError,
-                )
-            except ImportError:
-                _retryable_request_errors = (_asyncio.TimeoutError,)
+            import aiohttp
 
             data = None
             # Two independent retry budgets so a burst of rate-limit (429)
@@ -1420,7 +1407,10 @@ class CopilotAgentClient(AgentClient):
                         else:
                             data = await resp.json()
                     break  # request succeeded — leave the retry loop
-                except _retryable_request_errors as e:
+                except (
+                    _asyncio.TimeoutError,
+                    aiohttp.ClientError,
+                ) as e:
                     # A hung/stalled or transient connection error. Retry before
                     # failing so a single bad response no longer freezes the whole
                     # phase. A full-duration TIMEOUT gets a tighter retry budget

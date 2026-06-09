@@ -21,6 +21,7 @@ import { TASK_STATUS_LABELS } from "../../../shared/constants";
 import type {
 	Task,
 	TaskMetadata,
+	TaskStatus,
 	WorktreeCreatePROptions,
 } from "../../../shared/types";
 import { useToast } from "../../hooks/use-toast";
@@ -33,6 +34,7 @@ import {
 import { useProjectStore } from "../../stores/project-store";
 import {
 	deleteTask,
+	persistTaskStatus,
 	persistUpdateTask,
 	recoverStuckTask,
 	startTask,
@@ -70,6 +72,7 @@ import {
 	TooltipTrigger,
 } from "../ui/tooltip";
 import { useTaskDetail } from "./hooks/useTaskDetail";
+import { TaskStatusMoveBadge } from "./TaskStatusMoveBadge";
 import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
@@ -154,6 +157,7 @@ const renderTaskStatusBadges = (
 		| "muted"
 		| null
 		| undefined,
+	onMove: (newStatus: TaskStatus) => void,
 ) => {
 	if (state.isStuck) {
 		return (
@@ -178,15 +182,12 @@ const renderTaskStatusBadges = (
 
 	return (
 		<>
-			<Badge
+			<TaskStatusMoveBadge
+				task={task}
 				variant={getStatusBadgeVariant(task.status, state.isStuck)}
-				className={cn(
-					"text-xs",
-					task.status === "in_progress" && !state.isStuck && "status-running",
-				)}
-			>
-				{t(TASK_STATUS_LABELS[task.status])}
-			</Badge>
+				isRunning={state.isRunning}
+				onMove={onMove}
+			/>
 			{task.status === "human_review" && task.reviewReason && (
 				<Badge
 					variant={getReviewReasonBadgeVariant(task.reviewReason)}
@@ -454,6 +455,7 @@ function TaskDetailModalContent({
 	readonly hasNext?: boolean;
 }) {
 	const { t } = useTranslation(["tasks"]);
+	const { toast } = useToast();
 	const state = useTaskDetail({ task });
 	const { maximized, toggle: toggleMaximized } = useDialogMaximize(
 		"workpilot:task-detail-maximized",
@@ -649,6 +651,32 @@ function TaskDetailModalContent({
 		}
 	};
 
+	/**
+	 * Déplace la tâche vers une autre colonne depuis le header de la modale.
+	 * Réutilise la même persistance que le Kanban ; un échec (worktree, IO) est
+	 * remonté via un toast plutôt que de bloquer la popin.
+	 */
+	const handleMoveStatus = async (newStatus: TaskStatus) => {
+		if (newStatus === task.status) return;
+		const result = await persistTaskStatus(task.id, newStatus);
+		if (result.success) {
+			toast({
+				title: t("tasks:modal.move.successTitle"),
+				description: t("tasks:modal.move.successDescription", {
+					status: t(TASK_STATUS_LABELS[newStatus]),
+				}),
+			});
+			return;
+		}
+		toast({
+			title: t("common:errors.operationFailed"),
+			description: result.worktreeExists
+				? t("tasks:modal.move.worktreeBlocked")
+				: result.error || t("common:errors.unknownError"),
+			variant: "destructive",
+		});
+	};
+
 	// Helper function to get status badge variant
 	const getStatusBadgeVariant = (status: string, isStuck: boolean) => {
 		if (isStuck) return "warning";
@@ -834,6 +862,7 @@ function TaskDetailModalContent({
 												state,
 												t,
 												getStatusBadgeVariant,
+												handleMoveStatus,
 											)}
 											{/* Compact progress indicator */}
 											{totalSubtasks > 0 && (
