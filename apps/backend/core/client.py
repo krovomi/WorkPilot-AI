@@ -1619,8 +1619,7 @@ def _log_llm_context_switch(spec_dir: Path, provider: str, model: str) -> None:
 
         if previous is None:
             message = (
-                f"▶️ Contexte LLM initial — Fournisseur : {provider} "
-                f"· Modèle : {model}"
+                f"▶️ Contexte LLM initial — Fournisseur : {provider} · Modèle : {model}"
             )
         elif prev_provider != provider:
             message = (
@@ -1652,9 +1651,7 @@ def _log_llm_context_switch(spec_dir: Path, provider: str, model: str) -> None:
 
         try:
             state_path.write_text(
-                json.dumps(
-                    {"provider": provider, "model": model}, ensure_ascii=False
-                ),
+                json.dumps({"provider": provider, "model": model}, ensure_ascii=False),
                 encoding="utf-8",
             )
         except OSError:
