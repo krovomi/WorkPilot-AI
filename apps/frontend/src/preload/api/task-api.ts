@@ -73,6 +73,10 @@ export interface TaskAPI {
 		model?: string,
 	) => Promise<IPCResult>;
 	resetTaskConversation: (taskId: string) => Promise<IPCResult>;
+	resetTask: (taskId: string) => Promise<IPCResult<Task>>;
+	generateSpecInterview: (
+		taskId: string,
+	) => Promise<IPCResult<import("../../shared/types").SpecInterviewQuestion[]>>;
 
 	// Image Operations
 	loadImageThumbnail: (
@@ -342,6 +346,14 @@ export const createTaskAPI = (): TaskAPI => ({
 
 	resetTaskConversation: (taskId: string): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_RESET_CONVERSATION, taskId),
+
+	resetTask: (taskId: string): Promise<IPCResult<Task>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_RESET, taskId),
+
+	generateSpecInterview: (
+		taskId: string,
+	): Promise<IPCResult<import("../../shared/types").SpecInterviewQuestion[]>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_SPEC_INTERVIEW, taskId),
 
 	// Image Operations
 	loadImageThumbnail: (

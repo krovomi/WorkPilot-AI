@@ -290,6 +290,10 @@
 		"openInIDE": "Ouvrir dans l'IDE"
 	},
 	"visualProof": {
+		"apiSmoke": {
+			"title": "Smoke API —",
+			"summary": "{{passed}}/{{total}} endpoints OK"
+		},
 		"tab": "Preuves visuelles",
 		"title": "Preuve visuelle de la PR",
 		"emptyTitle": "Aucune preuve visuelle pour cette tâche",
@@ -498,6 +502,55 @@
 				}
 			}
 		}
+	},
+	"testGen": {
+		"title": "Tests pour les fichiers modifiés",
+		"description": "Génère des tests adaptés à chaque type de fichier, écrits dans le worktree et livrés avec la PR.",
+		"generate_one": "Générer ({{count}})",
+		"generate_other": "Générer ({{count}})",
+		"strategy": {
+			"unit": "Unitaire",
+			"api": "API",
+			"e2e-web": "E2E web",
+			"desktop-ui": "UI desktop"
+		},
+		"written": "Écrit",
+		"failed": "Échec",
+		"emptyResult": "Le générateur n'a produit aucun test.",
+		"doneTitle": "Tests générés",
+		"doneDescription_one": "{{count}} fichier de test écrit dans le worktree.",
+		"doneDescription_other": "{{count}} fichiers de test écrits dans le worktree."
+	},
+	"interview": {
+		"banner": "Clarifiez la spec avant de lancer : l'agent vous pose 3-5 questions ciblées.",
+		"openButton": "Interview de spec",
+		"title": "Interview de spec",
+		"description": "L'agent a analysé la spécification et pose les questions dont les réponses changeraient l'implémentation. Répondez à celles qui vous semblent utiles — les réponses sont ajoutées à la spec.",
+		"generating": "Analyse de la spec et génération des questions… (jusqu'à 1 min)",
+		"generationFailed": "Impossible de générer les questions. Vérifiez vos identifiants LLM puis réessayez.",
+		"retry": "Réessayer",
+		"answerPlaceholder": "Votre réponse (laissez vide pour ignorer cette question)",
+		"useSuggestion": "Utiliser la suggestion",
+		"answeredCount": "{{answered}}/{{total}} réponses",
+		"addToSpec": "Ajouter à la spec",
+		"addAndStart": "Ajouter et lancer",
+		"sectionTitle": "Clarifications (interview)",
+		"savedTitle": "Spec enrichie",
+		"savedDescription_one": "{{count}} réponse ajoutée à la spécification.",
+		"savedDescription_other": "{{count}} réponses ajoutées à la spécification.",
+		"saveErrorTitle": "Échec de l'enregistrement des clarifications"
+	},
+	"reset": {
+		"button": "Réinitialiser la tâche",
+		"confirmTitle": "Réinitialiser complètement la tâche ?",
+		"confirmDescription": "Le plan, les sous-tâches, le worktree et tous les artefacts d'exécution seront supprimés (le travail non commité est sauvegardé dans l'historique git). La spécification est conservée et la tâche retourne dans le backlog. Cette action est irréversible.",
+		"confirm": "Tout réinitialiser",
+		"cancel": "Annuler",
+		"resetting": "Réinitialisation…",
+		"successTitle": "Tâche réinitialisée",
+		"successDescription": "La tâche est revenue dans le backlog avec sa spécification intacte.",
+		"errorTitle": "Échec de la réinitialisation",
+		"errorDescription": "Impossible de réinitialiser la tâche. Consultez les logs pour plus de détails."
 	},
 	"subtasks": {
 		"untitled": "Sous-tâche sans titre",

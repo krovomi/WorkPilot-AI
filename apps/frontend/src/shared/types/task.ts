@@ -90,6 +90,19 @@ export interface Subtask {
 	};
 }
 
+/**
+ * A clarifying question produced by the pre-planning spec interview.
+ * Answers are appended to the task description before planning starts.
+ */
+export interface SpecInterviewQuestion {
+	id: string;
+	question: string;
+	/** Why this question matters for the implementation. */
+	rationale?: string;
+	/** A plausible default answer the user can accept as-is. */
+	suggestion?: string;
+}
+
 export interface QAReport {
 	status: "passed" | "failed" | "pending";
 	issues: QAIssue[];
@@ -658,6 +671,33 @@ export interface VisualProofScreenshot {
 	capturedAt: string;
 }
 
+/** One endpoint call performed during the API smoke proof. */
+export interface ApiSmokeEndpointResult {
+	method: string;
+	path: string;
+	/** HTTP status, absent when the request itself failed (network/timeout). */
+	status?: number;
+	ok: boolean;
+	durationMs: number;
+	error?: string;
+}
+
+/**
+ * Result of the API smoke proof: when the emulated app exposes an
+ * OpenAPI/Swagger document, parameterless GET endpoints are called and the
+ * outcome is recorded alongside the visual screenshots.
+ */
+export interface VisualProofApiSmoke {
+	specUrl: string;
+	swaggerUiUrl?: string;
+	attempted: number;
+	passed: number;
+	failed: number;
+	results: ApiSmokeEndpointResult[];
+	/** Markdown report file, relative to the artifact dir. */
+	reportFileName: string;
+}
+
 export interface VisualProofRun {
 	id: string;
 	status: VisualProofStatus;
@@ -674,6 +714,8 @@ export interface VisualProofRun {
 	commentUrl?: string;
 	commitSha?: string;
 	screenshots: VisualProofScreenshot[];
+	/** API smoke proof, present when an OpenAPI document was discovered. */
+	apiSmoke?: VisualProofApiSmoke;
 	error?: string;
 	startedAt: string;
 	completedAt?: string;

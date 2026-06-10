@@ -1587,6 +1587,33 @@ export async function updatePlanSubtasks(
 }
 
 /**
+ * Fully reset a task: discard plan/subtasks, worktree and runtime artifacts,
+ * keep the spec, and move the task back to backlog. Used from plan review
+ * when the proposed subtasks are not satisfying.
+ */
+export async function resetTask(
+	taskId: string,
+): Promise<{ success: boolean; error?: string }> {
+	try {
+		const result = await globalThis.electronAPI.resetTask(taskId);
+		if (result.success && result.data) {
+			const store = useTaskStore.getState();
+			store.updateTask(taskId, result.data);
+			debugLog("task-store", `Task ${taskId} fully reset to backlog`);
+			return { success: true };
+		}
+		debugWarn(
+			"task-store",
+			`Failed to reset task ${taskId}: ${result.error}`,
+		);
+		return { success: false, error: result.error };
+	} catch (error) {
+		debugWarn("task-store", `Error resetting task ${taskId}: ${error}`);
+		return { success: false, error: String(error) };
+	}
+}
+
+/**
  * Pause task execution and save current state
  */
 export async function pauseTask(

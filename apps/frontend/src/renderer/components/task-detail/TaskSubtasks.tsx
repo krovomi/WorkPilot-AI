@@ -20,7 +20,9 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { PlanApprovalSection } from "./PlanApprovalSection";
 import { TaskCodeEditor } from "./TaskCodeEditor";
+import { TaskResetButton } from "./TaskResetButton";
 import { SubtaskFilesViewer } from "./SubtaskFilesViewer";
 
 interface Phase {
@@ -236,7 +238,10 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-4 space-y-3">
-				{/* Header with edit button */}
+				{/* Plan validation - approve/reject the proposed subtasks before coding */}
+				<PlanApprovalSection task={task} />
+
+				{/* Header with edit/reset buttons */}
 				<div className="flex items-center justify-between mb-3">
 					<div className="flex items-center justify-between text-xs text-muted-foreground flex-1">
 						<span className="flex items-center gap-1.5">
@@ -259,6 +264,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 						</span>
 						<span className="tabular-nums">{progress}%</span>
 					</div>
+					{!isEditing && <TaskResetButton task={task} className="ml-2 h-7" />}
 					{!isEditing && onUpdatePlan && (
 						<Button
 							size="sm"

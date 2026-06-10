@@ -80,6 +80,7 @@ import { TaskRunControls } from "./TaskRunControls";
 import { TaskPhaseBar } from "./TaskPhaseBar";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
+import { SpecInterviewBanner } from "./SpecInterviewDialog";
 import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
 import { TaskReview } from "./TaskReview";
 import { TaskSubtasks } from "./TaskSubtasks";
@@ -1088,6 +1089,9 @@ function TaskDetailModalContent({
 								>
 									<ScrollArea className="h-full">
 										<div className="p-5 space-y-5 overflow-x-hidden max-w-full">
+											{/* Spec interview - clarify the spec before planning */}
+											<SpecInterviewBanner task={task} />
+
 											{/* Metadata */}
 											<TaskMetadataComponent task={task} />
 

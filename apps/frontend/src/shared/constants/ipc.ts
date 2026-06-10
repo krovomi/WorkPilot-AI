@@ -39,6 +39,8 @@ export const IPC_CHANNELS = {
 	TASK_RESUME_SESSION: "task:resumeSession", // Resume a Claude SDK session (uses .session.json)
 	TASK_RESUME_WITH_PROVIDER: "task:resumeWithProvider", // Resume a paused task under a different LLM provider (Niveau 3b)
 	TASK_RESET_CONVERSATION: "task:resetConversation", // Clear conversation.jsonl + PROMPT_TOO_LONG_HALT marker so the task can restart with a fresh context
+	TASK_RESET: "task:reset", // Full reset: discard plan/subtasks, worktree and runtime artifacts; keep the spec and go back to backlog
+	TASK_SPEC_INTERVIEW: "task:specInterview", // Generate 3-5 clarifying questions about the spec before planning (answers are appended to the description)
 	TASK_LOAD_IMAGE_THUMBNAIL: "task:loadImageThumbnail",
 
 	// Workspace management (for human review)
