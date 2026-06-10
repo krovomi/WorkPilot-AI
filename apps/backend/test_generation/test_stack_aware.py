@@ -47,7 +47,7 @@ class TestDetectStack:
         )
         _write(
             tmp_path / "App" / "App.csproj",
-            "<Project><Reference Include=\"System.Windows.Forms\" /></Project>",
+            '<Project><Reference Include="System.Windows.Forms" /></Project>',
         )
         profile = detect_stack(tmp_path)
         assert profile.dotnet

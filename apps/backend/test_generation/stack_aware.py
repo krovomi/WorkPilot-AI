@@ -102,7 +102,10 @@ def _detect_dotnet(project_dir: Path, profile: StackProfile) -> None:
 
     if "<usewindowsforms>true" in lower or "system.windows.forms" in lower:
         profile.winforms = True
-    if "microsoft.aspnetcore" in lower or "<project sdk=\"microsoft.net.sdk.web\"" in lower:
+    if (
+        "microsoft.aspnetcore" in lower
+        or '<project sdk="microsoft.net.sdk.web"' in lower
+    ):
         profile.aspnet = True
 
     if "xunit" in lower:
@@ -185,7 +188,12 @@ def _detect_node(project_dir: Path, profile: StackProfile) -> None:
 
 def _detect_python(project_dir: Path, profile: StackProfile) -> None:
     blob = ""
-    for name in ("requirements.txt", "requirements-dev.txt", "pyproject.toml", "Pipfile"):
+    for name in (
+        "requirements.txt",
+        "requirements-dev.txt",
+        "pyproject.toml",
+        "Pipfile",
+    ):
         candidate = project_dir / name
         if candidate.is_file():
             blob += "\n" + _read(candidate)
@@ -266,7 +274,9 @@ def classify_file(file_path: str, profile: StackProfile) -> str | None:
         return None
 
     if suffix in {".cs", ".vb"}:
-        if _API_PATH_HINTS.search(normalized) and (profile.aspnet or not profile.winforms):
+        if _API_PATH_HINTS.search(normalized) and (
+            profile.aspnet or not profile.winforms
+        ):
             return KIND_API
         if profile.winforms and _WINFORMS_NAME_HINTS.search(name):
             return KIND_WINFORMS
