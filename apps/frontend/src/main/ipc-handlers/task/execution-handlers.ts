@@ -815,13 +815,37 @@ export function registerTaskExecutionHandlers(
 	 * Stop a task
 	 */
 	ipcMain.on(IPC_CHANNELS.TASK_STOP, (_, taskId: string) => {
-		agentManager.killTask(taskId);
+		// haltTask (not killTask) also unregisters the task from the
+		// OperationRegistry so a proactive profile-swap can't resurrect it after
+		// the user stopped it.
+		agentManager.haltTask(taskId);
 		fileWatcher.unwatch(taskId);
 
 		// Find task and project to emit USER_STOPPED with plan context
 		const { task, project } = findTaskAndProject(taskId);
 
 		if (!task || !project) return;
+
+		// Clear any cooperative-pause flag so a stopped task isn't left looking
+		// "paused" after it transitions out (e.g. to human_review).
+		try {
+			const planPaths = getPlanPaths(getSpecPaths(task, project), project);
+			for (const planFile of planPaths.all) {
+				if (!existsSync(planFile)) continue;
+				const plan = JSON.parse(readFileSync(planFile, "utf-8"));
+				if (plan.paused?.enabled) {
+					plan.paused = {
+						...plan.paused,
+						enabled: false,
+						paused_at: null,
+						paused_subtask_id: null,
+					};
+					writeFileSync(planFile, JSON.stringify(plan, null, 2));
+				}
+			}
+		} catch (err) {
+			appLog.warn(`[TASK_STOP] Could not clear pause flag for ${taskId}:`, err);
+		}
 
 		let hasPlan = false;
 		try {
@@ -2837,12 +2861,14 @@ print(json.dumps(result))
 
 				// Immediate pause: stop the running subprocess NOW rather than waiting
 				// for the backend to reach the next cooperative checkpoint (end of the
-				// current step). killTask marks the spawn as killed, so its exit handler
-				// returns early WITHOUT emitting "exit" — no PROCESS_EXITED / USER_STOPPED
-				// is sent, so the card keeps its current kanban column (in_progress) and
-				// stays resumable. The paused flag written above drives the UI and a
-				// clean resume from the last checkpoint (the in-flight step re-runs).
-				const wasRunning = agentManager.killTask(taskId);
+				// current step). haltTask marks the spawn as killed (its exit handler
+				// returns early WITHOUT emitting "exit" — no PROCESS_EXITED/USER_STOPPED,
+				// so the card keeps its current column) AND unregisters the task from the
+				// OperationRegistry so the proactive profile-swap / usage monitor can't
+				// resurrect the paused process when a token limit is hit. The paused flag
+				// written above drives the UI and a clean resume (the in-flight step
+				// re-runs, re-registering the task).
+				const wasRunning = agentManager.haltTask(taskId);
 
 				appLog.info(
 					`[TASK_PAUSE] Task ${taskId} paused immediately at subtask ` +
