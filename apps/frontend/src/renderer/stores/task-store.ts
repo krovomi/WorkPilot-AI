@@ -13,6 +13,7 @@ import type {
 	TaskOrderState,
 	TaskStatus,
 } from "../../shared/types";
+import { isSubtaskDone } from "../../shared/progress";
 import { debugLog, debugWarn } from "../../shared/utils/debug-logger";
 import { extractSubtaskFiles } from "../../shared/utils/subtask-files";
 import { isMeaningfulFeatureTitle } from "../../shared/utils/task-title";
@@ -1549,8 +1550,10 @@ export function getTaskProgress(task: Task): {
 	percentage: number;
 } {
 	const total = task.subtasks?.length || 0;
+	// Count completed OR blocked as done, matching the backend (a blocked
+	// subtask, e.g. a manual e2e test, doesn't make the build look incomplete).
 	const completed =
-		task.subtasks?.filter((s) => s.status === "completed").length || 0;
+		task.subtasks?.filter((s) => isSubtaskDone(s.status)).length || 0;
 	const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 	return { completed, total, percentage };
 }

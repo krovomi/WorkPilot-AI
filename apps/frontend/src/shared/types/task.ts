@@ -43,7 +43,16 @@ export type ReviewReason =
 	| "stopped"
 	| "prompt_too_long";
 
-export type SubtaskStatus = "pending" | "in_progress" | "completed" | "failed";
+// "blocked" = the agent did all it could but the subtask needs manual action
+// (e.g. an e2e test that must be run by a human). The backend treats it as DONE
+// for build-completion (see core/progress.py count_subtasks), so the frontend
+// must too — otherwise a finished build shows e.g. 2/3 and an undersized %.
+export type SubtaskStatus =
+	| "pending"
+	| "in_progress"
+	| "completed"
+	| "blocked"
+	| "failed";
 
 // Re-exported from constants - single source of truth
 export type ExecutionPhase = ExecutionPhaseType;

@@ -352,6 +352,8 @@ interface ActionButtonsProps {
 	onPreviewApp?: () => void;
 	handleRecover: (e: React.MouseEvent) => void;
 	handleStartStop: (e: React.MouseEvent) => void;
+	handlePause: (e: React.MouseEvent) => void;
+	handleResume: (e: React.MouseEvent) => void;
 	handleViewPR: (e: React.MouseEvent) => void;
 	handleArchive: (e: React.MouseEvent) => void;
 	statusMenuItems: React.ReactNode;
@@ -370,12 +372,30 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 	onPreviewApp,
 	handleRecover,
 	handleStartStop,
+	handlePause,
+	handleResume,
 	handleViewPR,
 	handleArchive,
 	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
 	statusMenuItems,
 	t,
 }) => {
+	// A cooperatively-paused task (flag on disk) shows Reprendre instead of Pause.
+	const isPaused = task.metadata?.paused?.enabled === true;
+	// Compact Pause / Reprendre toggle reused by the active-task branches below.
+	const pauseResumeButton = (
+		<Button
+			variant="outline"
+			size="sm"
+			className="h-7 w-7 p-0"
+			onClick={isPaused ? handleResume : handlePause}
+			title={isPaused ? t("actions.resume") : t("actions.pause")}
+			aria-label={isPaused ? t("actions.resume") : t("actions.pause")}
+		>
+			{isPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+		</Button>
+	);
+
 	if (isStuck) {
 		return (
 			<Button
@@ -525,7 +545,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 		);
 	}
 
-	// Preview button for ai_review tasks (inspect rendering during AI validation)
+	// ai_review tasks: QA is actively running, so offer Pause / Reprendre /
+	// Arrêter (and the preview button) right on the card — the user can pause the
+	// AI review at any moment without opening the modal.
 	if (task.status === "ai_review") {
 		return (
 			<div className="flex gap-1">
@@ -543,6 +565,16 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 						<Monitor className="h-3 w-3" />
 					</Button>
 				)}
+				{pauseResumeButton}
+				<Button
+					variant="destructive"
+					size="sm"
+					className="h-7 px-2.5"
+					onClick={handleStartStop}
+				>
+					<Square className="mr-1.5 h-3 w-3" />
+					{t("actions.stop")}
+				</Button>
 			</div>
 		);
 	}
@@ -560,6 +592,8 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 						projectPath={currentProject.path}
 					/>
 				)}
+				{/* Pause / Reprendre — only meaningful while the task is running. */}
+				{(isRunning || isPaused) && pauseResumeButton}
 				<Button
 					variant={isRunning ? "destructive" : "default"}
 					size="sm"
@@ -906,7 +940,9 @@ export const TaskCard = memo(function TaskCard({
 
 	const handleStartStop = (e: React.MouseEvent) => {
 		e.stopPropagation();
-		if (isRunning && !isStuck) {
+		// Stop covers any actively-executing task — in_progress AND ai_review
+		// (QA running) — so the card's Stop works during the AI review too.
+		if ((isRunning || task.status === "ai_review") && !isStuck) {
 			stopTask(task.id);
 		} else {
 			startTask(task.id);
@@ -1136,6 +1172,8 @@ export const TaskCard = memo(function TaskCard({
 									onPreviewApp={onPreviewApp}
 									handleRecover={handleRecover}
 									handleStartStop={handleStartStop}
+									handlePause={handlePause}
+									handleResume={handleResume}
 									handleViewPR={handleViewPR}
 									handleArchive={handleArchive}
 									statusMenuItems={statusMenuItems}

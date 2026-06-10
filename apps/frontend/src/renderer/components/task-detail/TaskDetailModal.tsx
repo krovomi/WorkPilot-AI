@@ -30,6 +30,7 @@ import {
 	extractTextFromHtml,
 	getDisplayProgress,
 } from "../../lib/utils";
+import { isSubtaskDone } from "../../../shared/progress";
 import { useProjectStore } from "../../stores/project-store";
 import {
 	deleteTask,
@@ -282,7 +283,12 @@ function useTaskDetailHandlers(
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 
 	const handleStartStop = async () => {
-		if (state.isRunning && !state.isStuck) {
+		// Stop applies to any actively-executing task — in_progress AND ai_review
+		// (QA review/fixing) — so the user can interrupt the QA phase too.
+		if (
+			(state.isRunning || task.status === "ai_review") &&
+			!state.isStuck
+		) {
 			stopTask(task.id);
 			return;
 		}
@@ -471,8 +477,10 @@ function TaskDetailModalContent({
 	const taskProject = allProjects.find((p) => p.id === task.projectId);
 	const showFilesTab = isFilesTabEnabled();
 	const progressPercent = calculateProgress(task.subtasks);
-	const completedSubtasks = task.subtasks.filter(
-		(s) => s.status === "completed",
+	// "Done" = completed or blocked (a blocked subtask, e.g. a manual e2e test,
+	// is handled by the build and counts toward completion — matches the backend).
+	const completedSubtasks = task.subtasks.filter((s) =>
+		isSubtaskDone(s.status),
 	).length;
 	const totalSubtasks = task.subtasks.length;
 
@@ -482,16 +490,15 @@ function TaskDetailModalContent({
 	// temps réel calculée côté backend (overallProgress, pondérée par phase),
 	// avec repli sur l'avancement par sous-tâches.
 	//
-	// Garde-fou : tant que des sous-tâches de code ne sont pas terminées, on
-	// empêche la barre d'entrer dans la bande QA (≥ 80%). Sinon une tâche coincée
-	// en QA (p.ex. QA qui échoue en boucle) afficherait ~94% avec 2/3 sous-tâches.
-	const codingSubtasksComplete =
-		totalSubtasks > 0 ? completedSubtasks === totalSubtasks : undefined;
+	// Dès qu'il y a des sous-tâches, leur avancement reflète le travail réel : on
+	// l'affiche tel quel (2/3 → 67%) plutôt que la progression pondérée par phase
+	// qui gonflerait à ~94% en QA. Sans sous-tâches (spec/planning), repli sur la
+	// progression de phase.
 	const headerProgressPercent = getDisplayProgress(
 		progressPercent,
 		task.executionProgress?.overallProgress,
 		!!state.hasActiveExecution,
-		codingSubtasksComplete,
+		totalSubtasks > 0,
 	);
 
 	// Activité en cours affichée dans la barre de phase : on privilégie le
@@ -754,8 +761,14 @@ function TaskDetailModalContent({
 		if (
 			task.status === "backlog" ||
 			task.status === "queue" ||
-			task.status === "in_progress"
+			task.status === "in_progress" ||
+			task.status === "ai_review"
 		) {
+			// Actively executing = in_progress OR ai_review (QA running). Both get
+			// the first-class Pause / Reprendre / Arrêter control so the user can
+			// pause at any moment, including during the AI review.
+			const isActivelyRunning =
+				state.isRunning || task.status === "ai_review";
 			return (
 				<div className="flex items-center gap-2">
 					{/* Watch Live button - show when project path is available */}
@@ -766,7 +779,7 @@ function TaskDetailModalContent({
 						/>
 					)}
 
-					{state.isRunning ? (
+					{isActivelyRunning ? (
 						// Running (or cooperatively paused): first-class Pause /
 						// Reprendre / Arrêter instead of stop-only. Pausing keeps the
 						// task in its current kanban column and lets the user resume.
