@@ -467,7 +467,9 @@ class TestWorktreeRemoval:
         )
         assert branch_name not in result.stdout
 
-    def test_remove_worktree_with_uncommitted_changes_raises_error(self, temp_git_repo: Path):
+    def test_remove_worktree_with_uncommitted_changes_raises_error(
+        self, temp_git_repo: Path
+    ):
         """Removing worktree with uncommitted changes raises RuntimeError."""
         manager = WorktreeManager(temp_git_repo)
         manager.setup()
@@ -1223,9 +1225,7 @@ class TestEmptyPRGuard:
 
         assert ahead == 1
 
-    def test_count_commits_ahead_unknown_target_returns_none(
-        self, temp_git_repo: Path
-    ):
+    def test_count_commits_ahead_unknown_target_returns_none(self, temp_git_repo: Path):
         """Une cible inconnue (ni locale ni distante) renvoie None pour
         permettre au caller de décider quoi faire."""
         manager = WorktreeManager(temp_git_repo)
@@ -1351,5 +1351,3 @@ class TestApplyDiscardList:
         diff_files = self._diff_files_against_base(manager, "corr-spec")
         assert "secret.txt" not in diff_files
         assert "wanted.txt" in diff_files
-
-
