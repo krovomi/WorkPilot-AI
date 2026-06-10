@@ -1162,22 +1162,17 @@ class TestWorktreeCleanup:
         manager.setup()
 
         # No warning with few worktrees
-        warning = manager.get_worktree_count_warning(warning_threshold=10)
+        warning = manager.get_worktree_count_warning(warning_threshold=3)
         assert warning is None
 
-        # Create 11 worktrees to trigger warning
-        for i in range(11):
-            info = manager.create_worktree(f"test-spec-{i}")
-            test_file = info.path / "test.txt"
-            test_file.write_text("test")
-            subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
-            subprocess.run(
-                ["git", "commit", "-m", "test commit"],
-                cwd=info.path,
-                capture_output=True,
-            )
+        # The warning only depends on the worktree COUNT (list_all_worktrees),
+        # so use a low threshold instead of creating 11 real worktrees: each
+        # create_worktree spawns several git processes, and spawning dozens in
+        # a tight loop intermittently fails on Windows CI (0xC0000142).
+        for i in range(3):
+            manager.create_worktree(f"test-spec-{i}")
 
-        warning = manager.get_worktree_count_warning(warning_threshold=10)
+        warning = manager.get_worktree_count_warning(warning_threshold=3)
         assert warning is not None
         assert "WARNING" in warning
 
@@ -1186,19 +1181,14 @@ class TestWorktreeCleanup:
         manager = WorktreeManager(temp_git_repo)
         manager.setup()
 
-        # Create 21 worktrees to trigger critical warning
-        for i in range(21):
-            info = manager.create_worktree(f"test-spec-{i}")
-            test_file = info.path / "test.txt"
-            test_file.write_text("test")
-            subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
-            subprocess.run(
-                ["git", "commit", "-m", "test commit"],
-                cwd=info.path,
-                capture_output=True,
-            )
+        # Same as the warning test: only the count matters, so keep the number
+        # of real worktrees (and git process spawns) low for Windows CI.
+        for i in range(4):
+            manager.create_worktree(f"test-spec-{i}")
 
-        warning = manager.get_worktree_count_warning(critical_threshold=20)
+        warning = manager.get_worktree_count_warning(
+            warning_threshold=3, critical_threshold=4
+        )
         assert warning is not None
         assert "CRITICAL" in warning
 

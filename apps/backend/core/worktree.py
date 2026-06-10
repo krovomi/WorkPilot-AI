@@ -906,15 +906,19 @@ class WorktreeManager:
         add_args: list[str],
         worktree_path: Path,
         created_branch: str | None,
-        max_attempts: int = 3,
+        max_attempts: int = 5,
     ) -> subprocess.CompletedProcess:
         """Run ``git worktree add``, retrying transient (often Windows) failures.
 
         ``git worktree add`` intermittently fails on Windows with a momentary
-        filesystem lock (and, on CI, an empty stderr). Between attempts any
-        partially-created worktree directory and branch are removed so the retry
-        starts from a clean slate. Returns the final ``CompletedProcess`` -- the
-        success, or the last failure for the caller to report.
+        filesystem lock (and, on CI, an empty stderr). On loaded CI runners git
+        can also die before producing any output with STATUS_DLL_INIT_FAILED
+        (exit 3221225794 / 0xC0000142) -- a process-spawn failure that needs a
+        longer pause than a file lock, hence the exponential backoff. Between
+        attempts any partially-created worktree directory and branch are removed
+        so the retry starts from a clean slate. Returns the final
+        ``CompletedProcess`` -- the success, or the last failure for the caller
+        to report.
         """
         result = self._run_git(add_args)
         for attempt in range(1, max_attempts):
@@ -927,7 +931,7 @@ class WorktreeManager:
                 f"git exit {result.returncode}); cleaning up and retrying..."
             )
             self._cleanup_partial_worktree(worktree_path, created_branch)
-            time.sleep(0.5 * attempt)
+            time.sleep(min(0.5 * (2 ** (attempt - 1)), 5.0))
             result = self._run_git(add_args)
         return result
 
