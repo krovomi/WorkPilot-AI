@@ -100,3 +100,15 @@ def test_resolve_provider_model_preserves_dotted_for_copilot(tmp_path: Path) -> 
     )
 
     assert get_phase_model(tmp_path, "qa") == "claude-opus-4.8"
+
+
+def test_resolve_provider_model_falls_back_fable_on_non_anthropic() -> None:
+    """A « Mythos-class » Anthropic id (claude-fable-5) left in metadata after a
+    switch to a non-Anthropic provider must fall back to that provider's default,
+    not be sent verbatim to an incompatible API."""
+    from phase_config import _resolve_provider_model
+
+    # Non-Anthropic provider: the native id is dropped for the provider default.
+    assert _resolve_provider_model("claude-fable-5", "openai") != "claude-fable-5"
+    # Anthropic provider: the native id is a valid model and is preserved.
+    assert _resolve_provider_model("claude-fable-5", "anthropic") == "claude-fable-5"

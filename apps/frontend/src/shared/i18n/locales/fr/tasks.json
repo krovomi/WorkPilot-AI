@@ -501,6 +501,13 @@
 	},
 	"subtasks": {
 		"untitled": "Sous-tâche sans titre",
+		"completedCount": "{{completed}} sur {{total}} terminées",
+		"blockedCount_one": "{{count}} bloquée",
+		"blockedCount_other": "{{count}} bloquées",
+		"failedCount_one": "{{count}} échouée",
+		"failedCount_other": "{{count}} échouées",
+		"blockedReason": "Bloquée : {{reason}}",
+		"blockedGeneric": "Bloquée — intervention manuelle requise",
 		"filesViewer": {
 			"filesModified_one": "{{count}} fichier modifié",
 			"filesModified_other": "{{count}} fichiers modifiés",
@@ -513,6 +520,10 @@
 			"viewDiff": "Voir les modifications",
 			"hideDiff": "Masquer les modifications",
 			"noDiff": "Aucune modification enregistrée pour ce fichier",
+			"viewMode": {
+				"unified": "Vue unifiée",
+				"split": "Vue côte à côte"
+			},
 			"stats": {
 				"files": "Fichiers",
 				"folders": "Dossiers",

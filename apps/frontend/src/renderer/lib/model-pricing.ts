@@ -25,6 +25,8 @@ export interface ModelPricing {
 const RAW: Record<string, Record<string, { input: number; output: number }>> = {
 	anthropic: {
 		"claude-opus-4-8": { input: 15.0, output: 75.0 },
+		// Fable 5 (Mythos-class, GA 2026-06-09) — prix public $10 / $50 par MTok.
+		"claude-fable-5": { input: 10.0, output: 50.0 },
 		"claude-sonnet-4-8": { input: 3.0, output: 15.0 },
 		"claude-haiku-4-8": { input: 0.8, output: 4.0 },
 		"claude-opus-4-7": { input: 15.0, output: 75.0 },
@@ -93,6 +95,7 @@ const RAW: Record<string, Record<string, { input: number; output: number }>> = {
 	aws: {
 		"anthropic.claude-opus-4-8": { input: 15.0, output: 75.0 },
 		"anthropic.claude-opus-4-8-v1": { input: 15.0, output: 75.0 },
+		"anthropic.claude-fable-5": { input: 10.0, output: 50.0 },
 		"anthropic.claude-opus-4-6": { input: 15.0, output: 75.0 },
 		"anthropic.claude-sonnet-4-6": { input: 3.0, output: 15.0 },
 		"meta.llama-3.3-70b": { input: 0.72, output: 0.72 },

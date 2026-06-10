@@ -77,6 +77,12 @@ export interface Subtask {
 	description: string;
 	status: SubtaskStatus;
 	files: string[];
+	/**
+	 * Why a subtask ended up "blocked" (e.g. "Failed after 5 attempts"). Set by
+	 * the backend when the agent gives up; surfaced in the UI so a blocked
+	 * subtask reads as "needs attention" rather than a silent gray state.
+	 */
+	blockedReason?: string;
 	verification?: {
 		type: "command" | "browser";
 		run?: string;
@@ -421,6 +427,8 @@ export interface PlanSubtask {
 	files_changed?: string[];
 	files_to_modify?: string[];
 	files_to_create?: string[];
+	/** Backend-emitted reason a subtask was marked "blocked". */
+	blocked_reason?: string;
 	verification?: {
 		type: string;
 		run?: string;

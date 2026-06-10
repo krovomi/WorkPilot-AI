@@ -1047,6 +1047,7 @@ export class ProjectStore {
 					description: subtask.description,
 					status: subtask.status,
 					files: extractSubtaskFiles(subtask),
+					blockedReason: subtask.blocked_reason,
 				}));
 			}) || []
 		);

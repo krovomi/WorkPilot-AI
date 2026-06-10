@@ -62,6 +62,15 @@ _DEFAULT_CATALOG: dict[str, dict[str, dict[str, float]]] = {
             "cache_read": 1.50,
             "thinking": 75.0,
         },
+        # Fable 5 — « Mythos-class » (GA 2026-06-09). Prix public $10/$50 ; cache
+        # aux multiplicateurs standard Anthropic (1.25× / 0.1× l'entrée).
+        "claude-fable-5": {
+            "input": 10.0,
+            "output": 50.0,
+            "cache_write": 12.50,
+            "cache_read": 1.00,
+            "thinking": 50.0,
+        },
         "claude-sonnet-4-8": {
             "input": 3.0,
             "output": 15.0,
@@ -162,6 +171,7 @@ _DEFAULT_CATALOG: dict[str, dict[str, dict[str, float]]] = {
     "aws": {
         "anthropic.claude-opus-4-8": {"input": 15.0, "output": 75.0},
         "anthropic.claude-opus-4-8-v1": {"input": 15.0, "output": 75.0},
+        "anthropic.claude-fable-5": {"input": 10.0, "output": 50.0},
         "anthropic.claude-opus-4-6": {"input": 15.0, "output": 75.0},
         "anthropic.claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
         "meta.llama-3.3-70b": {"input": 0.72, "output": 0.72},

@@ -448,7 +448,11 @@ def _resolve_provider_model(model: str, provider: str | None) -> str:
     # This happens when a task was started with Anthropic and its task_metadata.json
     # still contains the old versioned model after the provider was switched.
     # Fall back to the provider's default model instead of sending an invalid ID.
-    if re.match(r"^claude-(opus|sonnet|haiku)-\d+-\d", model):
+    # The « Mythos-class » family (claude-fable-5, claude-mythos-5) has a single
+    # version group and is matched by a second pattern.
+    if re.match(r"^claude-(opus|sonnet|haiku)-\d+-\d", model) or re.match(
+        r"^claude-(fable|mythos)-\d", model
+    ):
         provider_defaults = PROVIDER_DEFAULT_MODELS.get(provider, {})
         fallback = provider_defaults.get("spec") or provider_defaults.get("coding")
         if fallback:

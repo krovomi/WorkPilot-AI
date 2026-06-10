@@ -501,6 +501,13 @@
 	},
 	"subtasks": {
 		"untitled": "Untitled subtask",
+		"completedCount": "{{completed}} of {{total}} completed",
+		"blockedCount_one": "{{count}} blocked",
+		"blockedCount_other": "{{count}} blocked",
+		"failedCount_one": "{{count}} failed",
+		"failedCount_other": "{{count}} failed",
+		"blockedReason": "Blocked: {{reason}}",
+		"blockedGeneric": "Blocked — needs manual attention",
 		"filesViewer": {
 			"filesModified_one": "{{count}} file modified",
 			"filesModified_other": "{{count}} files modified",
@@ -513,6 +520,10 @@
 			"viewDiff": "View changes",
 			"hideDiff": "Hide changes",
 			"noDiff": "No recorded changes for this file",
+			"viewMode": {
+				"unified": "Unified view",
+				"split": "Side-by-side view"
+			},
 			"stats": {
 				"files": "Files",
 				"folders": "Folders",
