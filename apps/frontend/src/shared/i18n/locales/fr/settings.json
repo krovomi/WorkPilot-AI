@@ -1326,6 +1326,27 @@
 		"triggerTaskDone": "Quand une tâche Kanban passe en 'Terminé' et qu'une PR est créée",
 		"triggerPrCreated": "Quand une PR est automatiquement créée pour validation humaine"
 	},
+	"cicd": {
+		"title": "Pipeline CI/CD",
+		"description": "Affichez le statut du pipeline sur les cartes kanban et laissez l'agent rÃ©parer les builds rouges",
+		"initGuardDescription": "Initialisez WorkPilot AI pour ce projet afin de configurer la boucle de pipeline CI/CD",
+		"introDescription": "Le dernier run de pipeline de chaque branche de tÃ¢che est affichÃ© sur sa carte kanban. Quand un build passe au rouge, la tÃ¢che bascule dans la colonne Â« Build rouge Â» et l'agent peut la rÃ©parer automatiquement.",
+		"providerLabel": "Fournisseur CI/CD",
+		"providerDescription": "Choisissez un fournisseur explicitement, ou laissez WorkPilot l'auto-dÃ©tecter Ã  partir des jetons d'accÃ¨s configurÃ©s pour ce projet",
+		"providerAuto": "Auto-dÃ©tection (Azure â GitHub â GitLab â Jenkins)",
+		"providerNone": "DÃ©sactivÃ©",
+		"reusedCredentials": "Utilise les jetons d'accÃ¨s de la section d'intÃ©gration {{section}}. Configurez-les lÃ -bas au prÃ©alable si besoin.",
+		"autoDetectNote": "Le premier fournisseur avec une configuration complÃ¨te est utilisÃ©, dans cet ordre : Azure DevOps, GitHub, GitLab, Jenkins.",
+		"jenkinsUrlLabel": "URL Jenkins",
+		"jenkinsJobLabel": "Job (pipeline multibranch)",
+		"jenkinsJobDescription": "Nom du job multibranch contenant un sous-job par branche",
+		"jenkinsUserLabel": "Utilisateur",
+		"jenkinsTokenLabel": "Jeton d'API",
+		"autoFixLabel": "RÃ©paration automatique",
+		"autoFixDescription": "Quand un build passe au rouge, lancer automatiquement l'agent pour le corriger",
+		"pollLabel": "Intervalle de vÃ©rification (secondes)",
+		"pollDescription": "FrÃ©quence de vÃ©rification du statut du pipeline (minimum 15 s, dÃ©faut 60 s)"
+	},
 	"jiraImport": {
 		"cancel": "Annuler",
 		"configureButton": "Configurer Jira",

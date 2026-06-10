@@ -29,6 +29,7 @@ const STATUS_DOT_CLASS: Record<TaskStatusColumn, string> = {
 	in_progress: "bg-info",
 	ai_review: "bg-warning",
 	human_review: "bg-purple-400",
+	build_failed: "bg-destructive",
 	done: "bg-success",
 };
 

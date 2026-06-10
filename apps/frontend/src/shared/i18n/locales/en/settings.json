@@ -1832,6 +1832,27 @@
 		"triggerTaskDone": "When a Kanban task reaches 'Done' and a PR is created",
 		"triggerPrCreated": "When a PR is automatically created for human review"
 	},
+	"cicd": {
+		"title": "CI/CD Pipeline",
+		"description": "Show pipeline status on kanban cards and let the agent repair red builds",
+		"initGuardDescription": "Initialize WorkPilot AI for this project to configure the CI/CD pipeline loop",
+		"introDescription": "The latest pipeline run of each task branch is displayed on its kanban card. When a build goes red, the task moves to the âRed Buildâ column and the agent can repair it automatically.",
+		"providerLabel": "CI/CD provider",
+		"providerDescription": "Pick a provider explicitly, or let WorkPilot auto-detect it from the access tokens configured for this project",
+		"providerAuto": "Auto-detect (Azure â GitHub â GitLab â Jenkins)",
+		"providerNone": "Disabled",
+		"reusedCredentials": "Uses the access tokens from the {{section}} integration section. Configure them there first if needed.",
+		"autoDetectNote": "The first provider with a complete configuration is used, in this order: Azure DevOps, GitHub, GitLab, Jenkins.",
+		"jenkinsUrlLabel": "Jenkins URL",
+		"jenkinsJobLabel": "Job (multibranch pipeline)",
+		"jenkinsJobDescription": "Name of the multibranch pipeline job that contains one sub-job per branch",
+		"jenkinsUserLabel": "User",
+		"jenkinsTokenLabel": "API Token",
+		"autoFixLabel": "Automatic repair",
+		"autoFixDescription": "When a build goes red, launch the agent automatically to fix it",
+		"pollLabel": "Polling interval (seconds)",
+		"pollDescription": "How often the pipeline status is checked (minimum 15s, default 60s)"
+	},
 	"jiraImport": {
 		"title": "Import Jira Issues",
 		"titleWithProject": "Import issues from {{project}}",

@@ -369,6 +369,17 @@ export interface ProjectEnvConfig {
 	jiraProjectKey?: string; // Jira project key (e.g., PROJ)
 	jiraAutoSync?: boolean; // Auto-sync issues on project load
 
+	// CI/CD pipeline loop (« Build rouge » — see ci-pipeline-service.ts)
+	// Azure DevOps / GitHub / GitLab credentials are reused from the sections
+	// above; only the provider choice, the loop knobs and Jenkins live here.
+	cicdProvider?: "" | "azure" | "github" | "gitlab" | "jenkins" | "none"; // "" = auto-detect
+	cicdAutoFix?: boolean; // default true: agent repairs red builds automatically
+	cicdPollSeconds?: number; // default 60
+	cicdJenkinsUrl?: string; // Jenkins base URL
+	cicdJenkinsJob?: string; // Multibranch pipeline job name
+	cicdJenkinsUser?: string; // User for basic auth (with API token)
+	cicdJenkinsToken?: string; // Jenkins API token
+
 	// Git/Worktree Settings
 	defaultBranch?: string; // Base branch for worktree creation (e.g., 'main', 'develop')
 

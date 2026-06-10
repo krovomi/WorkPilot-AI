@@ -13,6 +13,7 @@ import { GeneralSettings } from "../../project-settings/GeneralSettings";
 import { SecuritySettings } from "../../project-settings/SecuritySettings";
 import { InitializationGuard } from "../common/InitializationGuard";
 import { AzureDevOpsIntegration } from "../integrations/AzureDevOpsIntegration";
+import { CICDPipelineIntegration } from "../integrations/CICDPipelineIntegration";
 import { GitHubIntegration } from "../integrations/GitHubIntegration";
 import { GitLabIntegration } from "../integrations/GitLabIntegration";
 import { JiraIntegration } from "../integrations/JiraIntegration";
@@ -215,6 +216,25 @@ export function SectionRouter({
 							azureDevOpsConnectionStatus={azureDevOpsConnectionStatus}
 							isCheckingAzureDevOps={isCheckingAzureDevOps}
 							onOpenAzureDevOpsImport={onOpenAzureDevOpsImport}
+						/>
+					</InitializationGuard>
+				</SettingsSection>
+			);
+
+		case "cicd":
+			return (
+				<SettingsSection
+					title={t("cicd.title")}
+					description={t("cicd.description")}
+				>
+					<InitializationGuard
+						initialized={!!project.autoBuildPath}
+						title={t("cicd.title")}
+						description={t("cicd.initGuardDescription")}
+					>
+						<CICDPipelineIntegration
+							envConfig={envConfig}
+							updateEnvConfig={updateEnvConfig}
 						/>
 					</InitializationGuard>
 				</SettingsSection>

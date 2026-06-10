@@ -1506,6 +1506,24 @@ print(json.dumps(result))
 			const specDir = path.join(project.path, specsBaseDir, task.specId);
 			const planPath = getPlanPath(project, task);
 
+			// Validate status transition - 'ai_review' relaunches the QA validation,
+			// which needs a spec and an implementation plan to validate against.
+			// Validated BEFORE persisting: otherwise the task would be stored as
+			// ai_review with no process and immediately flagged as stuck.
+			if (status === "ai_review" && !agentManager.isRunning(taskId)) {
+				const specFileForQa = path.join(specDir, AUTO_BUILD_PATHS.SPEC_FILE);
+				if (!existsSync(specFileForQa) || task.subtasks.length === 0) {
+					console.warn(
+						`[TASK_UPDATE_STATUS] Blocked attempt to set status 'ai_review' for task ${taskId}. No spec or implementation plan to validate.`,
+					);
+					return {
+						success: false,
+						error:
+							"Cannot start AI review - the task has no spec or implementation plan yet. The task must be implemented before QA validation.",
+					};
+				}
+			}
+
 			try {
 				const handledByMachine = taskStateManager.handleManualStatusChange(
 					taskId,
@@ -1537,6 +1555,98 @@ print(json.dumps(result))
 						taskId,
 					);
 					agentManager.killTask(taskId);
+				}
+
+				// Auto-start QA validation when status changes to 'ai_review' and no
+				// process is running. Without this, moving a task to "AI Review" only
+				// persists the status while the renderer's stuck-detection expects a
+				// live process — the task would show as "needs recovery" after 60s.
+				// (killTask above removes process tracking synchronously, so a task
+				// dragged straight from in_progress lands here with isRunning false.)
+				if (status === "ai_review" && !agentManager.isRunning(taskId)) {
+					const mainWindow = getMainWindow();
+
+					// Check git status before auto-starting
+					const gitStatusCheckForQa = checkGitStatus(project.path);
+					if (!gitStatusCheckForQa.isGitRepo || !gitStatusCheckForQa.hasCommits) {
+						console.warn(
+							"[TASK_UPDATE_STATUS] Git check failed, cannot start QA validation",
+						);
+						if (mainWindow) {
+							mainWindow.webContents.send(
+								IPC_CHANNELS.TASK_ERROR,
+								taskId,
+								gitStatusCheckForQa.error ||
+									"Git repository with commits required to run tasks.",
+							);
+						}
+						return {
+							success: false,
+							error: gitStatusCheckForQa.error || "Git repository required",
+						};
+					}
+
+					// Check authentication before auto-starting
+					const initResultForQa = await ensureProfileManagerInitialized();
+					if (!initResultForQa.success) {
+						if (mainWindow) {
+							mainWindow.webContents.send(
+								IPC_CHANNELS.TASK_ERROR,
+								taskId,
+								initResultForQa.error,
+							);
+						}
+						return { success: false, error: initResultForQa.error };
+					}
+					if (
+						requiresClaudeAuth() &&
+						!initResultForQa.profileManager.hasValidAuth()
+					) {
+						console.warn(
+							"[TASK_UPDATE_STATUS] No valid authentication for active profile",
+						);
+						if (mainWindow) {
+							mainWindow.webContents.send(
+								IPC_CHANNELS.TASK_ERROR,
+								taskId,
+								"Claude authentication required. Please go to Settings > Claude Profiles and authenticate your account, or set an OAuth token.",
+							);
+						}
+						return { success: false, error: "Claude authentication required" };
+					}
+
+					console.warn(
+						"[TASK_UPDATE_STATUS] Starting QA validation for:",
+						task.specId,
+					);
+
+					// Start file watcher for this task
+					fileWatcher.watch(taskId, specDir);
+
+					// Synchronise le provider avec le projet (permet le switch de provider entre deux runs)
+					const prevProviderForQa = syncTaskProvider(task, project, specDir);
+					if (prevProviderForQa) {
+						console.warn(
+							`[TASK_UPDATE_STATUS] Provider switched: ${prevProviderForQa} -> ${task.metadata?.provider}`,
+						);
+					}
+
+					await agentManager.startQAProcess(
+						taskId,
+						project.path,
+						task.specId,
+						project.id,
+					);
+
+					// Notify renderer about status change
+					if (mainWindow) {
+						mainWindow.webContents.send(
+							IPC_CHANNELS.TASK_STATUS_CHANGE,
+							taskId,
+							"ai_review",
+							project.id,
+						);
+					}
 				}
 
 				// Auto-start task when status changes to 'in_progress' and no process is running

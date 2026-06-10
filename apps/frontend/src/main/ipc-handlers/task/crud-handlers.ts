@@ -16,6 +16,7 @@ import {
 } from "../../../shared/constants";
 import type {
 	IPCResult,
+	PlanConflictReport,
 	SpecInterviewQuestion,
 	Task,
 	TaskMetadata,
@@ -27,6 +28,7 @@ import { projectStore } from "../../project-store";
 import { specInterviewService } from "../../spec-interview-service";
 import { taskStateManager } from "../../task-state-manager";
 import { titleGenerator } from "../../title-generator";
+import { computePlanConflicts } from "../../utils/plan-conflicts";
 import { findAllSpecPaths, isValidTaskId } from "../../utils/spec-path-helpers";
 import { cleanupWorktree } from "../../utils/worktree-cleanup";
 import { findTaskWorktree, isPathWithinBase } from "../../worktree-paths";
@@ -647,6 +649,24 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			};
 			console.warn(`[TASK_RESET] Task ${taskId} reset to backlog`);
 			return { success: true, data: resetTask };
+		},
+	);
+
+	/**
+	 * Plan-time conflict detection: compare the files this task's plan touches
+	 * with the plans/diffs of every other active task in the same project, so
+	 * parallel worktrees on the same files raise an alert at plan review
+	 * instead of a merge conflict at the end.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_CHECK_PLAN_CONFLICTS,
+		async (_, taskId: string): Promise<IPCResult<PlanConflictReport>> => {
+			const { task, project } = findTaskAndProject(taskId);
+			if (!task || !project) {
+				return { success: false, error: "Task not found" };
+			}
+			const allTasks = projectStore.getTasks(project.id);
+			return { success: true, data: computePlanConflicts(task, allTasks) };
 		},
 	);
 

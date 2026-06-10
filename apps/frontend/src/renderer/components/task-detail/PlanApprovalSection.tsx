@@ -5,6 +5,7 @@ import type { Task } from "../../../shared/types";
 import { startTask, submitReview } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
+import { PlanConflictAlert } from "./PlanConflictAlert";
 import { TaskResetButton } from "./TaskResetButton";
 
 interface PlanApprovalSectionProps {
@@ -85,6 +86,12 @@ export function PlanApprovalSection({
 				<p className="text-sm text-muted-foreground mb-4">
 					{t("tasks:modal.plan.approvalDescription")}
 				</p>
+
+				{/* Worktree conflict alert: other active tasks planning to touch the
+				    same files — better caught here than as a merge conflict later */}
+				<div className="mb-4">
+					<PlanConflictAlert task={task} />
+				</div>
 
 				{/* Rejection reason textarea - shown when user wants to reject */}
 				{isRejecting && (

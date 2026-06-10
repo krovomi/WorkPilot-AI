@@ -53,6 +53,19 @@ const TEAMS_ENV_KEYS = {
 	WEBHOOK_URL: "TEAMS_WEBHOOK_URL",
 } as const;
 
+// CI/CD pipeline loop environment variable keys (« Build rouge »)
+// Read by ci-pipeline-service.ts / ci-pipeline-providers.ts. Azure DevOps,
+// GitHub and GitLab credentials are reused from their own sections above.
+const CICD_ENV_KEYS = {
+	PROVIDER: "CICD_PROVIDER",
+	AUTO_FIX: "CICD_AUTO_FIX",
+	POLL_SECONDS: "CICD_POLL_SECONDS",
+	JENKINS_URL: "CICD_JENKINS_URL",
+	JENKINS_JOB: "CICD_JENKINS_JOB",
+	JENKINS_USER: "CICD_JENKINS_USER",
+	JENKINS_TOKEN: "CICD_JENKINS_TOKEN",
+} as const;
+
 /**
  * Helper to generate .env line (DRY)
  * Uses explicit undefined/null check instead of truthiness to avoid
@@ -297,6 +310,42 @@ export function registerEnvHandlers(
 				? "true"
 				: "false";
 		}
+		// CI/CD pipeline loop (« Build rouge »)
+		if (config.cicdProvider !== undefined) {
+			existingVars[CICD_ENV_KEYS.PROVIDER] = config.cicdProvider;
+		}
+		if (config.cicdAutoFix !== undefined) {
+			existingVars[CICD_ENV_KEYS.AUTO_FIX] = config.cicdAutoFix
+				? "true"
+				: "false";
+		}
+		if (config.cicdPollSeconds !== undefined) {
+			existingVars[CICD_ENV_KEYS.POLL_SECONDS] = config.cicdPollSeconds
+				? String(config.cicdPollSeconds)
+				: "";
+		}
+		if (
+			config.cicdJenkinsUrl !== undefined &&
+			(config.cicdJenkinsUrl || !existingVars[CICD_ENV_KEYS.JENKINS_URL])
+		) {
+			existingVars[CICD_ENV_KEYS.JENKINS_URL] = config.cicdJenkinsUrl;
+		}
+		if (
+			config.cicdJenkinsJob !== undefined &&
+			(config.cicdJenkinsJob || !existingVars[CICD_ENV_KEYS.JENKINS_JOB])
+		) {
+			existingVars[CICD_ENV_KEYS.JENKINS_JOB] = config.cicdJenkinsJob;
+		}
+		if (config.cicdJenkinsUser !== undefined) {
+			existingVars[CICD_ENV_KEYS.JENKINS_USER] = config.cicdJenkinsUser;
+		}
+		// Guard: don't overwrite an existing token with an empty string
+		if (
+			config.cicdJenkinsToken !== undefined &&
+			(config.cicdJenkinsToken || !existingVars[CICD_ENV_KEYS.JENKINS_TOKEN])
+		) {
+			existingVars[CICD_ENV_KEYS.JENKINS_TOKEN] = config.cicdJenkinsToken;
+		}
 		// Microsoft Teams Notifications
 		if (config.teamsNotificationsEnabled !== undefined) {
 			existingVars[TEAMS_ENV_KEYS.ENABLED] = config.teamsNotificationsEnabled
@@ -485,6 +534,19 @@ ${envLine(existingVars, JIRA_ENV_KEYS.EMAIL)}
 ${envLine(existingVars, JIRA_ENV_KEYS.API_TOKEN)}
 ${envLine(existingVars, JIRA_ENV_KEYS.PROJECT_KEY, "PROJ")}
 ${existingVars[JIRA_ENV_KEYS.AUTO_SYNC] ? `${JIRA_ENV_KEYS.AUTO_SYNC}=${existingVars[JIRA_ENV_KEYS.AUTO_SYNC]}` : `# ${JIRA_ENV_KEYS.AUTO_SYNC}=false`}
+
+# =============================================================================
+# CI/CD PIPELINE LOOP (OPTIONAL) — « Build rouge » column + auto-repair
+# Provider: azure | github | gitlab | jenkins | none (empty = auto-detect).
+# Azure/GitHub/GitLab credentials are reused from their sections above.
+# =============================================================================
+${envLine(existingVars, CICD_ENV_KEYS.PROVIDER, "azure")}
+${existingVars[CICD_ENV_KEYS.AUTO_FIX] ? `${CICD_ENV_KEYS.AUTO_FIX}=${existingVars[CICD_ENV_KEYS.AUTO_FIX]}` : `# ${CICD_ENV_KEYS.AUTO_FIX}=true`}
+${envLine(existingVars, CICD_ENV_KEYS.POLL_SECONDS, "60")}
+${envLine(existingVars, CICD_ENV_KEYS.JENKINS_URL, "https://jenkins.example.com")}
+${envLine(existingVars, CICD_ENV_KEYS.JENKINS_JOB, "my-multibranch-job")}
+${envLine(existingVars, CICD_ENV_KEYS.JENKINS_USER)}
+${envLine(existingVars, CICD_ENV_KEYS.JENKINS_TOKEN)}
 
 # =============================================================================
 # MICROSOFT TEAMS NOTIFICATIONS (OPTIONAL)
@@ -735,6 +797,37 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 			}
 			if (vars[JIRA_ENV_KEYS.AUTO_SYNC]?.toLowerCase() === "true") {
 				config.jiraAutoSync = true;
+			}
+
+			// CI/CD pipeline loop (« Build rouge »)
+			if (vars[CICD_ENV_KEYS.PROVIDER] !== undefined) {
+				config.cicdProvider = vars[
+					CICD_ENV_KEYS.PROVIDER
+				] as ProjectEnvConfig["cicdProvider"];
+			}
+			// Default true: only an explicit "false" disables the auto-repair
+			config.cicdAutoFix =
+				vars[CICD_ENV_KEYS.AUTO_FIX]?.toLowerCase() !== "false";
+			if (vars[CICD_ENV_KEYS.POLL_SECONDS]) {
+				const pollSeconds = Number.parseInt(
+					vars[CICD_ENV_KEYS.POLL_SECONDS],
+					10,
+				);
+				if (Number.isFinite(pollSeconds) && pollSeconds > 0) {
+					config.cicdPollSeconds = pollSeconds;
+				}
+			}
+			if (vars[CICD_ENV_KEYS.JENKINS_URL]) {
+				config.cicdJenkinsUrl = vars[CICD_ENV_KEYS.JENKINS_URL];
+			}
+			if (vars[CICD_ENV_KEYS.JENKINS_JOB]) {
+				config.cicdJenkinsJob = vars[CICD_ENV_KEYS.JENKINS_JOB];
+			}
+			if (vars[CICD_ENV_KEYS.JENKINS_USER]) {
+				config.cicdJenkinsUser = vars[CICD_ENV_KEYS.JENKINS_USER];
+			}
+			if (vars[CICD_ENV_KEYS.JENKINS_TOKEN]) {
+				config.cicdJenkinsToken = vars[CICD_ENV_KEYS.JENKINS_TOKEN];
 			}
 
 			// Microsoft Teams Notifications

@@ -4,6 +4,7 @@
  */
 
 export { AzureDevOpsIntegration } from "./AzureDevOpsIntegration";
+export { CICDPipelineIntegration } from "./CICDPipelineIntegration";
 export { GitHubIntegration } from "./GitHubIntegration";
 export { LinearIntegration } from "./LinearIntegration";
 export { TeamsIntegration } from "./TeamsIntegration";

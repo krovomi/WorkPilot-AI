@@ -19,6 +19,7 @@ export type TaskStatus =
 	| "in_progress"
 	| "ai_review"
 	| "human_review"
+	| "build_failed" // CI pipeline (any provider) went red on this task's branch — "Build rouge" column
 	| "done"
 	| "pr_created"
 	| "error";
@@ -473,6 +474,83 @@ export interface WorktreeDiffFile {
 	additions: number;
 	deletions: number;
 	patch?: string; // Git patch/diff content for the file
+}
+
+// ============================================
+// CI/CD pipeline loop (provider-agnostic)
+// ============================================
+
+/** Supported CI/CD providers for the « Build rouge » loop. */
+export type PipelineProviderId =
+	| "azure-devops"
+	| "github-actions"
+	| "gitlab-ci"
+	| "jenkins";
+
+/** Normalized state of the latest pipeline run on a task's branch. */
+export type PipelineRunState =
+	| "none" // No build found for the branch (or pipeline not configured)
+	| "queued"
+	| "running"
+	| "succeeded"
+	| "partiallySucceeded"
+	| "failed"
+	| "canceled";
+
+/**
+ * Latest CI pipeline run observed for a task's worktree branch
+ * (`workpilot/{specId}`), whatever the provider (Azure DevOps, GitHub
+ * Actions, GitLab CI, Jenkins). Pushed from the main-process polling service
+ * to the renderer so the kanban card can display a live pipeline badge, and
+ * used to drive the « Build rouge » column + automatic repair loop.
+ */
+export interface TaskPipelineStatus {
+	taskId: string;
+	projectId: string;
+	state: PipelineRunState;
+	/** CI provider that produced this run. */
+	provider?: PipelineProviderId;
+	/** Human-readable provider name ("GitHub Actions", "Jenkins"…). */
+	providerLabel?: string;
+	buildId?: number | string;
+	buildNumber?: string;
+	definitionName?: string;
+	branch?: string;
+	/** Web URL of the run on the CI provider (clickable from the kanban card). */
+	webUrl?: string;
+	queueTime?: string;
+	finishTime?: string;
+	checkedAt: string;
+	/** True while an automatic repair run for this red build is in flight. */
+	autoFixInProgress?: boolean;
+}
+
+// ============================================
+// Plan-time worktree conflict detection
+// ============================================
+
+/**
+ * A task whose planned/modified files overlap with the inspected task.
+ * Computed at planning time (plan review) so parallel tasks touching the
+ * same files raise an alert BEFORE coding starts, instead of surfacing as
+ * a merge conflict at the end.
+ */
+export interface PlanConflictTask {
+	taskId: string;
+	taskTitle: string;
+	taskStatus: TaskStatus;
+	/** Files shared between the two task plans (normalized, deduplicated). */
+	files: string[];
+}
+
+export interface PlanConflictReport {
+	/** Task the report was computed for. */
+	taskId: string;
+	/** Other active tasks sharing at least one file with this task's plan. */
+	conflictingTasks: PlanConflictTask[];
+	/** Total number of distinct overlapping files across all conflicting tasks. */
+	totalConflictingFiles: number;
+	checkedAt: string;
 }
 
 // Conflict severity levels from merge system

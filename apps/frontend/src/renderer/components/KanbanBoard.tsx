@@ -140,6 +140,9 @@ const VALID_BULK_TRANSITIONS: Record<
 	in_progress: ["queue", "ai_review"],
 	ai_review: ["in_progress", "human_review"],
 	human_review: ["ai_review", "done"],
+	// build_failed is CI-driven: tasks land there when the pipeline goes red;
+	// from there the user can only send them back to work manually.
+	build_failed: ["queue", "in_progress"],
 	done: [],
 };
 
@@ -328,6 +331,12 @@ const getEmptyStateContent = (
 				icon: <Eye className="h-6 w-6 text-muted-foreground/50" />,
 				message: t("kanban.emptyHumanReview"),
 				subtext: t("kanban.emptyHumanReviewHint"),
+			};
+		case "build_failed":
+			return {
+				icon: <CheckCircle2 className="h-6 w-6 text-success/50" />,
+				message: t("kanban.emptyBuildFailed"),
+				subtext: t("kanban.emptyBuildFailedHint"),
 			};
 		case "done":
 			return {
@@ -1254,6 +1263,7 @@ export function KanbanBoard({
 			in_progress: [],
 			ai_review: [],
 			human_review: [],
+			build_failed: [],
 			done: [],
 		};
 
@@ -2540,6 +2550,7 @@ export function KanbanBoard({
 			in_progress: [],
 			ai_review: [],
 			human_review: [],
+			build_failed: [],
 			done: [],
 			pr_created: [],
 			error: [],

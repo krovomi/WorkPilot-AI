@@ -59,7 +59,10 @@
 		"recovering": "Recovering...",
 		"needsRecovery": "Needs Recovery",
 		"needsResume": "Needs Resume",
-		"tdd": "TDD"
+		"tdd": "TDD",
+		"pipeline": "Pipeline",
+		"repairBuild": "Repair build",
+		"buildFailed": "Red build"
 	},
 	"warnings": {
 		"stuck": {
@@ -124,6 +127,7 @@
 		"in_progress": "In Progress",
 		"ai_review": "AI Review",
 		"human_review": "Human Review",
+		"build_failed": "Red Build",
 		"done": "Done",
 		"pr_created": "PR Created",
 		"error": "Error"
@@ -133,6 +137,8 @@
 		"emptyBacklogHint": "Add a task to get started",
 		"emptyQueue": "Queue is empty",
 		"emptyQueueHint": "Tasks will wait here when parallel task limit is reached",
+		"emptyBuildFailed": "No red builds",
+		"emptyBuildFailedHint": "Tasks land here when their CI/CD pipeline fails — the agent repairs them automatically",
 		"emptyInProgress": "Nothing running",
 		"emptyInProgressHint": "Start a task from Planning",
 		"emptyAiReview": "No tasks in review",
@@ -783,7 +789,12 @@
 			"approving": "Approving...",
 			"rejecting": "Rejecting...",
 			"rejectionReason": "Reason for changes (optional)",
-			"rejectionPlaceholder": "Describe what needs to be changed in the plan..."
+			"rejectionPlaceholder": "Describe what needs to be changed in the plan...",
+			"conflictsChecking": "Checking for file overlaps with parallel tasks...",
+			"conflictsNone": "No file overlap with other active tasks",
+			"conflictsTitle": "Potential conflicts with parallel tasks",
+			"conflictsDescription": "{{count}} file(s) in this plan are also touched by other active tasks. Merging both worktrees will likely conflict — consider finishing one task first or re-scoping the plan.",
+			"conflictsMoreFiles": "+{{count}} more file(s)"
 		}
 	}
 }

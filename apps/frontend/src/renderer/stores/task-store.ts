@@ -11,6 +11,7 @@ import type {
 	TaskDraft,
 	TaskMetadata,
 	TaskOrderState,
+	TaskPipelineStatus,
 	TaskStatus,
 } from "../../shared/types";
 import { isSubtaskDone } from "../../shared/progress";
@@ -25,6 +26,8 @@ interface TaskState {
 	isLoading: boolean;
 	error: string | null;
 	taskOrder: TaskOrderState | null; // Per-column task ordering for kanban board
+	// Latest CI pipeline run per task, any provider (pushed by the main-process poller)
+	pipelineStatuses: Record<string, TaskPipelineStatus>;
 
 	// Actions
 	setTasks: (tasks: Task[]) => void;
@@ -40,6 +43,7 @@ interface TaskState {
 		taskId: string,
 		progress: Partial<ExecutionProgress>,
 	) => void;
+	setPipelineStatus: (status: TaskPipelineStatus) => void;
 	appendLog: (taskId: string, log: string) => void;
 	batchAppendLogs: (taskId: string, logs: string[]) => void;
 	selectTask: (taskId: string | null) => void;
@@ -243,6 +247,7 @@ function createEmptyTaskOrder(): TaskOrderState {
 		in_progress: [],
 		ai_review: [],
 		human_review: [],
+		build_failed: [],
 		done: [],
 		pr_created: [],
 		error: [],
@@ -256,6 +261,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 	isLoading: false,
 	error: null,
 	taskOrder: null,
+	pipelineStatuses: {},
 
 	setTasks: (tasks) => {
 		debugLog("[TaskStore.setTasks] Hydrating tasks:", {
@@ -537,6 +543,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 			};
 		}),
 
+	setPipelineStatus: (status) => {
+		set((state) => ({
+			pipelineStatuses: {
+				...state.pipelineStatuses,
+				[status.taskId]: status,
+			},
+		}));
+	},
+
 	updateExecutionProgress: (taskId, progress) => {
 		// Record activity for stuck detection (outside of set() to avoid triggering extra renders)
 		recordTaskActivity(taskId);
@@ -808,6 +823,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 				human_review: isValidColumnArray(parsed.human_review)
 					? parsed.human_review
 					: emptyOrder.human_review,
+				build_failed: isValidColumnArray(parsed.build_failed)
+					? parsed.build_failed
+					: emptyOrder.build_failed,
 				done: isValidColumnArray(parsed.done) ? parsed.done : emptyOrder.done,
 				pr_created: isValidColumnArray(parsed.pr_created)
 					? parsed.pr_created

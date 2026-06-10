@@ -59,7 +59,10 @@
 		"recovering": "Récupération...",
 		"needsRecovery": "Récupération requise",
 		"needsResume": "Reprise requise",
-		"tdd": "TDD"
+		"tdd": "TDD",
+		"pipeline": "Pipeline",
+		"repairBuild": "Réparer le build",
+		"buildFailed": "Build rouge"
 	},
 	"warnings": {
 		"stuck": {
@@ -124,6 +127,7 @@
 		"in_progress": "En cours",
 		"ai_review": "Révision IA",
 		"human_review": "Révision humaine",
+		"build_failed": "Build rouge",
 		"done": "Terminé",
 		"pr_created": "PR créée",
 		"error": "Erreur"
@@ -133,6 +137,8 @@
 		"emptyBacklogHint": "Ajoutez une tâche pour commencer",
 		"emptyQueue": "La file d'attente est vide",
 		"emptyQueueHint": "Les tâches attendront ici lorsque la limite de tâches parallèles sera atteinte",
+		"emptyBuildFailed": "Aucun build rouge",
+		"emptyBuildFailedHint": "Les tâches arrivent ici quand leur pipeline CI/CD échoue — l'agent les répare automatiquement",
 		"emptyInProgress": "Rien en cours",
 		"emptyInProgressHint": "Démarrez une tâche depuis le Backlog",
 		"emptyAiReview": "Aucune tâche en révision",
@@ -783,7 +789,12 @@
 			"approving": "Approbation en cours...",
 			"rejecting": "Rejet en cours...",
 			"rejectionReason": "Raison des modifications (optionnel)",
-			"rejectionPlaceholder": "Décrivez ce qui doit être modifié dans le plan..."
+			"rejectionPlaceholder": "Décrivez ce qui doit être modifié dans le plan...",
+			"conflictsChecking": "Vérification des chevauchements de fichiers avec les tâches parallèles...",
+			"conflictsNone": "Aucun chevauchement de fichiers avec les autres tâches actives",
+			"conflictsTitle": "Conflits potentiels avec des tâches parallèles",
+			"conflictsDescription": "{{count}} fichier(s) de ce plan sont aussi modifiés par d'autres tâches actives. La fusion des deux worktrees provoquera probablement un conflit — terminez une tâche d'abord ou ajustez le plan.",
+			"conflictsMoreFiles": "+{{count}} autre(s) fichier(s)"
 		}
 	}
 }

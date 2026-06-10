@@ -23,6 +23,7 @@ import {
 	Sparkles,
 	Terminal,
 	Users,
+	Workflow,
 	Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -132,6 +133,7 @@ export type ProjectSettingsSection =
 	| "general"
 	| "azure-devops"
 	| "jira"
+	| "cicd"
 	| "github"
 	| "gitlab"
 	| "linear"
@@ -196,6 +198,12 @@ const createSettingsThemes = (t: {
 				type: "project",
 			},
 			{ id: "jira", icon: JiraIcon, label: "Jira", type: "project" },
+			{
+				id: "cicd",
+				icon: Workflow,
+				label: t("cicd.title", "Pipeline CI/CD"),
+				type: "project",
+			},
 			{ id: "github", icon: Globe, label: "GitHub", type: "project" },
 			{ id: "gitlab", icon: GitLabIcon, label: "GitLab", type: "project" },
 			{ id: "linear", icon: Zap, label: "Linear", type: "project" },

@@ -1419,6 +1419,7 @@ export class ProjectStore {
 			error: "error",
 			queue: "queue",
 			queued: "queue",
+			build_failed: "build_failed",
 		};
 
 		const storedStatus = statusMap[plan.status] || "backlog";
