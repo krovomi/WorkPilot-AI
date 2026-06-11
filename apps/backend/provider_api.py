@@ -206,6 +206,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# --- Multi-user server mode (no-op unless WORKPILOT_SERVER_MODE is enabled) ---
+try:
+    from server.integration import mount_server_mode
+
+    mount_server_mode(app)
+except Exception as e:  # noqa: BLE001 — never block local-mode boot on this
+    logging.getLogger(__name__).warning("Could not initialize server mode: %s", e)
+
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

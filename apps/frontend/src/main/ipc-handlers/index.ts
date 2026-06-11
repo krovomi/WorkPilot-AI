@@ -107,6 +107,7 @@ import { setupQualityHandlers } from "./quality-handlers";
 import { registerRoadmapHandlers } from "./roadmap-handlers";
 import { registerScreenshotHandlers } from "./screenshot-handlers";
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
+import { registerServerAuthHandlers } from "./server-auth-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
 import { setupSmartEstimationHandlers } from "./smart-estimation-handlers";
 import { registerAgentCoachHandlers } from "./agent-coach-handlers";
@@ -285,6 +286,9 @@ export function setupIpcHandlers(
 
 	// Settings and dialog handlers
 	registerSettingsHandlers(agentManager, getMainWindow);
+
+	// Multi-user server mode: connection + login (local / Entra ID)
+	registerServerAuthHandlers(getMainWindow);
 
 	// File explorer handlers
 	registerFileHandlers();

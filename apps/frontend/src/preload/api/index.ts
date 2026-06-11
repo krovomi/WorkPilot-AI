@@ -190,6 +190,10 @@ import { createProfileAPI, type ProfileAPI } from "./profile-api";
 import { createProjectAPI, type ProjectAPI } from "./project-api";
 import { createQueueAPI, type QueueAPI } from "./queue-api";
 import { createScreenshotAPI, type ScreenshotAPI } from "./screenshot-api";
+import {
+	createServerAuthAPI,
+	type ServerAuthAPI,
+} from "./modules/server-auth-api";
 import { createSettingsAPI, type SettingsAPI } from "./settings-api";
 import { createTaskAPI, type TaskAPI } from "./task-api";
 import { createTerminalAPI, type TerminalAPI } from "./terminal-api";
@@ -264,6 +268,8 @@ export interface ElectronAPI
 		OfflineModeAPI,
 		VisualProgrammingAPI {
 	github: GitHubAPI;
+	/** Multi-user server mode: connection + login (local / Entra ID) */
+	serverAuth: ServerAuthAPI;
 	/** Queue routing API for rate limit recovery */
 	queue: QueueAPI;
 	/** Code quality analysis API */
@@ -392,6 +398,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
 		github: createGitHubAPI(),
+		serverAuth: createServerAuthAPI(), // Multi-user server mode
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
 		quality: createQualityAPI(), // Code quality analysis
 		selfHealing: createSelfHealingAPI(),

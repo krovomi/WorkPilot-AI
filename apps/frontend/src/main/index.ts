@@ -75,6 +75,11 @@ import {
 import { preWarmToolCache } from "./cli-tool-manager";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
+import {
+	isServerMode,
+	loadPersistedState,
+	restoreSession,
+} from "./server-connection";
 import { initializeCredentialIntegration } from "./services/credential-integration";
 import { ensureOAuthServerRunning } from "./oauth-server";
 import { isMacOS, isWindows } from "./platform";
@@ -481,6 +486,14 @@ async function waitForBackendReady(url: string, timeoutMs = 10000) {
 
 // Fonction pour lancer le backend si nécessaire
 async function launchBackendIfNeeded() {
+	// Mode serveur multi-utilisateurs : le backend tourne sur un serveur
+	// distant, on ne spawne rien en local.
+	if (isServerMode()) {
+		console.log(
+			"[main] Server mode active — skipping local backend spawn",
+		);
+		return;
+	}
 	// Vérifie si le backend répond déjà
 	try {
 		await waitForBackendReady("http://127.0.0.1:9000/providers", 1500);
@@ -933,6 +946,13 @@ async function main() {
 	app.on("browser-window-created", (_, window) => {
 		optimizer.watchWindowShortcuts(window);
 	});
+
+	// Multi-user server mode: restore persisted connection (mode, URL,
+	// encrypted refresh token) before anything queries the backend.
+	loadPersistedState();
+	restoreSession().catch((err) =>
+		console.warn("[main] Could not restore server session:", err),
+	);
 
 	// Initialize agent manager
 	agentManager = new AgentManager();
