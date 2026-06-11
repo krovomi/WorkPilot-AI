@@ -1137,17 +1137,12 @@ def create_client(
                 server_config["headers"] = custom["headers"]
             mcp_servers[server_id] = server_config
 
-    # Build system prompt
-    base_prompt = (
-        f"You are an expert full-stack developer building production-quality software. "
-        f"Your working directory is: {project_dir.resolve()}\n"
-        f"Your filesystem access is RESTRICTED to this directory only. "
-        f"Use relative paths (starting with ./) for all file operations. "
-        f"Never use absolute paths or try to access files outside your working directory.\n\n"
-        f"You follow existing code patterns, write clean maintainable code, and verify "
-        f"your work through thorough testing. You communicate progress through Git commits "
-        f"and build-progress.txt updates."
-    )
+    # Build system prompt (single source — core/llm_optimization.py).
+    # Byte-stable across sessions of the same task so the SDK's prompt cache
+    # (1h TTL enabled above) keeps hitting between Kanban cards.
+    from core.llm_optimization import build_base_system_prompt
+
+    base_prompt = build_base_system_prompt(project_dir)
 
     # CLAUDE.md loading strategy: hybrid (setting_sources + manual fallback).
     #
@@ -1756,17 +1751,10 @@ def create_agent_client(
     _log_llm_context_switch(spec_dir, provider, model, effort)
 
     if provider == "copilot":
-        # Build system prompt (reuse logic from create_client)
-        base_prompt = (
-            f"You are an expert full-stack developer building production-quality software. "
-            f"Your working directory is: {project_dir.resolve()}\n"
-            f"Your filesystem access is RESTRICTED to this directory only. "
-            f"Use relative paths (starting with ./) for all file operations. "
-            f"Never use absolute paths or try to access files outside your working directory.\n\n"
-            f"You follow existing code patterns, write clean maintainable code, and verify "
-            f"your work through thorough testing. You communicate progress through Git commits "
-            f"and build-progress.txt updates."
-        )
+        # Shared system prompt (single source — core/llm_optimization.py)
+        from core.llm_optimization import build_base_system_prompt
+
+        base_prompt = build_base_system_prompt(project_dir)
         base_prompt = _inject_domain_addendum(base_prompt, agent_type, spec_dir)
 
         # Convert agents dict to SubagentDefinition if provided
@@ -1829,19 +1817,11 @@ def create_agent_client(
         # execution so that Windsurf credits are consumed.
         from core.agent_client import WindsurfAgentClient
 
-        # Build system prompt (same pattern as CopilotAgentClient)
-        windsurf_system_prompt = (
-            f"You are an expert full-stack developer building production-quality software. "
-            f"Your working directory is: {project_dir.resolve()}\n"
-            f"Your filesystem access is RESTRICTED to this directory only. "
-            f"Use relative paths (starting with ./) for all file operations. "
-            f"Never use absolute paths or try to access files outside your working directory.\n\n"
-            f"You follow existing code patterns, write clean maintainable code, and verify "
-            f"your work through thorough testing. You communicate progress through Git commits "
-            f"and build-progress.txt updates.\n\n"
-            f"You MUST use the provided tools (read_file, write_file, list_files, run_command) "
-            f"to interact with the filesystem and execute commands. Do not just describe what to do — "
-            f"actually do it by calling the tools."
+        # Shared system prompt (single source — core/llm_optimization.py)
+        from core.llm_optimization import build_base_system_prompt
+
+        windsurf_system_prompt = build_base_system_prompt(
+            project_dir, tool_use_hint=True
         )
         windsurf_system_prompt = _inject_domain_addendum(
             windsurf_system_prompt, agent_type, spec_dir
@@ -1863,35 +1843,43 @@ def create_agent_client(
 
     elif provider == "openai":
         from core.agent_client import OpenAIAgentClient
-
-        openai_system_prompt = (
-            f"You are an expert full-stack developer building production-quality software. "
-            f"Your working directory is: {project_dir.resolve()}\n"
-            f"Your filesystem access is RESTRICTED to this directory only. "
-            f"Use relative paths (starting with ./) for all file operations. "
-            f"Never use absolute paths or try to access files outside your working directory.\n\n"
-            f"You follow existing code patterns, write clean maintainable code, and verify "
-            f"your work through thorough testing. You communicate progress through Git commits "
-            f"and build-progress.txt updates.\n\n"
-            f"You MUST use the provided tools (read_file, write_file, list_files, run_command) "
-            f"to interact with the filesystem and execute commands. Do not just describe what to do — "
-            f"actually do it by calling the tools."
+        from core.llm_optimization import (
+            build_base_system_prompt,
+            openai_prompt_cache_key,
+            openai_reasoning_effort,
         )
+
+        openai_system_prompt = build_base_system_prompt(project_dir, tool_use_hint=True)
         openai_system_prompt = _inject_domain_addendum(
             openai_system_prompt, agent_type, spec_dir
         )
 
+        # Provider-specific token optimizations layered on the common trunk:
+        # - reasoning_effort: maps the Kanban thinking level to OpenAI's native
+        #   effort control (reasoning models only — omitted otherwise)
+        # - prompt_cache_key: routes consecutive sessions of the same task/phase
+        #   to the same automatic-prompt-cache shard
+        resolved_openai_model = model or "gpt-4o"
+        reasoning_effort = openai_reasoning_effort(
+            resolved_openai_model, max_thinking_tokens
+        )
+        prompt_cache_key = openai_prompt_cache_key(spec_dir, agent_type)
+
         logger.info(
-            "[create_agent_client] Using OpenAIAgentClient (model=%s, agent_type=%s)",
+            "[create_agent_client] Using OpenAIAgentClient (model=%s, agent_type=%s, "
+            "reasoning_effort=%s)",
             model,
             agent_type,
+            reasoning_effort,
         )
         return OpenAIAgentClient(
-            model=model or "gpt-4o",
+            model=resolved_openai_model,
             system_prompt=openai_system_prompt,
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            reasoning_effort=reasoning_effort,
+            prompt_cache_key=prompt_cache_key,
         )
 
     else:
