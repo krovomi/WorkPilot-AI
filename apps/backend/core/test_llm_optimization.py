@@ -9,6 +9,7 @@ from core.llm_optimization import (
     compact_messages,
     openai_prompt_cache_key,
     openai_reasoning_effort,
+    should_inline_file_context,
     truncate_tool_result,
 )
 
@@ -125,6 +126,46 @@ class TestTruncateToolResult:
     def test_invalid_env_falls_back(self, monkeypatch):
         monkeypatch.setenv("LLM_TOOL_RESULT_MAX_CHARS", "not-a-number")
         assert truncate_tool_result("z" * 5000) == "z" * 5000  # under 10k default
+
+
+# ---------------------------------------------------------------------------
+# File-context inlining policy
+# ---------------------------------------------------------------------------
+
+
+class TestShouldInlineFileContext:
+    def test_claude_never_inlines(self):
+        # The Claude Agent SDK coder re-reads files via its Read tool — inline
+        # content would be duplicated input paid on every turn.
+        assert should_inline_file_context("claude", None) is False
+        assert should_inline_file_context("anthropic", 16384) is False
+
+    def test_unresolved_provider_defaults_to_claude_behavior(self):
+        assert should_inline_file_context(None, 1024) is False
+
+    @pytest.mark.parametrize("budget", [None, 1024, 4096])  # none/low/medium
+    def test_generic_providers_inline_at_low_effort(self, budget):
+        assert should_inline_file_context("copilot", budget) is True
+        assert should_inline_file_context("openai", budget) is True
+        assert should_inline_file_context("windsurf", budget) is True
+
+    @pytest.mark.parametrize("budget", [16384, 63999])  # high/ultrathink
+    def test_generic_providers_skip_at_high_effort(self, budget):
+        assert should_inline_file_context("copilot", budget) is False
+        assert should_inline_file_context("openai", budget) is False
+
+    def test_env_override_always(self, monkeypatch):
+        monkeypatch.setenv("LLM_INLINE_FILE_CONTEXT", "always")
+        assert should_inline_file_context("claude", 63999) is True
+
+    def test_env_override_never(self, monkeypatch):
+        monkeypatch.setenv("LLM_INLINE_FILE_CONTEXT", "never")
+        assert should_inline_file_context("copilot", None) is False
+
+    def test_invalid_env_falls_back_to_auto(self, monkeypatch):
+        monkeypatch.setenv("LLM_INLINE_FILE_CONTEXT", "whatever")
+        assert should_inline_file_context("copilot", 1024) is True
+        assert should_inline_file_context("claude", 1024) is False
 
 
 # ---------------------------------------------------------------------------

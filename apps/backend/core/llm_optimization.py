@@ -247,6 +247,46 @@ def _message_len(message: dict) -> int:
     return len(content) if isinstance(content, str) else 0
 
 
+def should_inline_file_context(
+    provider: str | None,
+    thinking_budget: int | None,
+) -> bool:
+    """Decide whether the coder prompt should inline file contents.
+
+    The subtask prompt can embed up to ~200 lines of every `files_to_modify`
+    and `patterns_from` file. Whether that helps depends on the
+    (provider, effort) pair:
+
+    - **Claude/Anthropic** (or unresolved → defaults to Claude): the Agent SDK
+      coder always re-reads files with its Read tool before editing (the
+      prompt instructs it to), so inline content is duplicated input paid on
+      every turn of the session. Skip it.
+    - **Generic providers at none/low/medium effort**: the model is expected
+      to minimize tool round-trips; guided inline context keeps it performant
+      and one inline costs about the same as one read_file round-trip.
+    - **Generic providers at high/ultrathink effort**: the model explores by
+      itself (and must re-read any file longer than the 200-line inline cap
+      anyway) — inline is mostly duplicated. Skip it.
+
+    Env override: LLM_INLINE_FILE_CONTEXT = always | never | auto (default).
+
+    Note for callers: resolve `provider` WITHOUT side effects (e.g.
+    `phase_config.get_phase_provider`) — never via
+    `core.client._get_active_provider`, which consumes the single-shot
+    RESUME_WITH_PROVIDER marker.
+    """
+    policy = os.environ.get("LLM_INLINE_FILE_CONTEXT", "auto").strip().lower()
+    if policy == "always":
+        return True
+    if policy == "never":
+        return False
+
+    if provider is None or provider in ("claude", "anthropic"):
+        return False
+    level = _thinking_level_from_budget(thinking_budget)
+    return level in ("none", "low", "medium")
+
+
 def compact_messages(
     messages: list[dict],
     *,
