@@ -413,9 +413,22 @@ export interface ProjectEnvConfig {
 		chromeDevtoolsEnabled?: boolean;
 	};
 
-	// Microsoft Teams Notifications
+	// Channel Notifications (task done → PR ready announcement)
+	// Microsoft Teams
 	teamsNotificationsEnabled?: boolean;
 	teamsWebhookUrl?: string; // Incoming Webhook URL from Teams channel connector
+	// Slack
+	slackNotificationsEnabled?: boolean;
+	slackWebhookUrl?: string; // Slack Incoming Webhook URL
+	// Discord
+	discordNotificationsEnabled?: boolean;
+	discordWebhookUrl?: string; // Discord channel webhook URL
+	// Google Chat
+	googleChatNotificationsEnabled?: boolean;
+	googleChatWebhookUrl?: string; // Google Chat space webhook URL
+	// Generic webhook (flat JSON POST)
+	notifyWebhookEnabled?: boolean;
+	notifyWebhookUrl?: string;
 
 	// Per-agent MCP overrides (add/remove MCPs from specific agents)
 	agentMcpOverrides?: AgentMcpOverrides;

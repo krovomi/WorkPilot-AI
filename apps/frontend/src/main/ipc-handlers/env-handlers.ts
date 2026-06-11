@@ -53,6 +53,30 @@ const TEAMS_ENV_KEYS = {
 	WEBHOOK_URL: "TEAMS_WEBHOOK_URL",
 } as const;
 
+// Slack notification environment variable keys
+const SLACK_ENV_KEYS = {
+	ENABLED: "SLACK_NOTIFICATIONS_ENABLED",
+	WEBHOOK_URL: "SLACK_WEBHOOK_URL",
+} as const;
+
+// Discord notification environment variable keys
+const DISCORD_ENV_KEYS = {
+	ENABLED: "DISCORD_NOTIFICATIONS_ENABLED",
+	WEBHOOK_URL: "DISCORD_WEBHOOK_URL",
+} as const;
+
+// Google Chat notification environment variable keys
+const GOOGLE_CHAT_ENV_KEYS = {
+	ENABLED: "GOOGLE_CHAT_NOTIFICATIONS_ENABLED",
+	WEBHOOK_URL: "GOOGLE_CHAT_WEBHOOK_URL",
+} as const;
+
+// Generic webhook notification environment variable keys
+const NOTIFY_WEBHOOK_ENV_KEYS = {
+	ENABLED: "NOTIFY_WEBHOOK_ENABLED",
+	WEBHOOK_URL: "NOTIFY_WEBHOOK_URL",
+} as const;
+
 // CI/CD pipeline loop environment variable keys (« Build rouge »)
 // Read by ci-pipeline-service.ts / ci-pipeline-providers.ts. Azure DevOps,
 // GitHub and GitLab credentials are reused from their own sections above.
@@ -346,7 +370,8 @@ export function registerEnvHandlers(
 		) {
 			existingVars[CICD_ENV_KEYS.JENKINS_TOKEN] = config.cicdJenkinsToken;
 		}
-		// Microsoft Teams Notifications
+		// Channel Notifications (Teams / Slack / Discord / Google Chat / webhook)
+		// Guard: don't overwrite existing non-empty webhook URLs with empty strings
 		if (config.teamsNotificationsEnabled !== undefined) {
 			existingVars[TEAMS_ENV_KEYS.ENABLED] = config.teamsNotificationsEnabled
 				? "true"
@@ -357,6 +382,52 @@ export function registerEnvHandlers(
 			(config.teamsWebhookUrl || !existingVars[TEAMS_ENV_KEYS.WEBHOOK_URL])
 		) {
 			existingVars[TEAMS_ENV_KEYS.WEBHOOK_URL] = config.teamsWebhookUrl;
+		}
+		if (config.slackNotificationsEnabled !== undefined) {
+			existingVars[SLACK_ENV_KEYS.ENABLED] = config.slackNotificationsEnabled
+				? "true"
+				: "false";
+		}
+		if (
+			config.slackWebhookUrl !== undefined &&
+			(config.slackWebhookUrl || !existingVars[SLACK_ENV_KEYS.WEBHOOK_URL])
+		) {
+			existingVars[SLACK_ENV_KEYS.WEBHOOK_URL] = config.slackWebhookUrl;
+		}
+		if (config.discordNotificationsEnabled !== undefined) {
+			existingVars[DISCORD_ENV_KEYS.ENABLED] = config.discordNotificationsEnabled
+				? "true"
+				: "false";
+		}
+		if (
+			config.discordWebhookUrl !== undefined &&
+			(config.discordWebhookUrl || !existingVars[DISCORD_ENV_KEYS.WEBHOOK_URL])
+		) {
+			existingVars[DISCORD_ENV_KEYS.WEBHOOK_URL] = config.discordWebhookUrl;
+		}
+		if (config.googleChatNotificationsEnabled !== undefined) {
+			existingVars[GOOGLE_CHAT_ENV_KEYS.ENABLED] =
+				config.googleChatNotificationsEnabled ? "true" : "false";
+		}
+		if (
+			config.googleChatWebhookUrl !== undefined &&
+			(config.googleChatWebhookUrl ||
+				!existingVars[GOOGLE_CHAT_ENV_KEYS.WEBHOOK_URL])
+		) {
+			existingVars[GOOGLE_CHAT_ENV_KEYS.WEBHOOK_URL] =
+				config.googleChatWebhookUrl;
+		}
+		if (config.notifyWebhookEnabled !== undefined) {
+			existingVars[NOTIFY_WEBHOOK_ENV_KEYS.ENABLED] = config.notifyWebhookEnabled
+				? "true"
+				: "false";
+		}
+		if (
+			config.notifyWebhookUrl !== undefined &&
+			(config.notifyWebhookUrl ||
+				!existingVars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL])
+		) {
+			existingVars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL] = config.notifyWebhookUrl;
 		}
 		// Git/Worktree Settings
 		if (config.defaultBranch !== undefined) {
@@ -549,12 +620,25 @@ ${envLine(existingVars, CICD_ENV_KEYS.JENKINS_USER)}
 ${envLine(existingVars, CICD_ENV_KEYS.JENKINS_TOKEN)}
 
 # =============================================================================
-# MICROSOFT TEAMS NOTIFICATIONS (OPTIONAL)
-# Sends a message to a Teams channel when a task is done and a PR is created.
-# Create an Incoming Webhook in your Teams channel to get the URL.
+# CHANNEL NOTIFICATIONS (OPTIONAL)
+# Announce on your channels when a task is done and its PR is created.
+# Each channel needs a webhook URL (Incoming Webhook / channel webhook).
 # =============================================================================
+# Microsoft Teams
 ${existingVars[TEAMS_ENV_KEYS.ENABLED] ? `${TEAMS_ENV_KEYS.ENABLED}=${existingVars[TEAMS_ENV_KEYS.ENABLED]}` : `# ${TEAMS_ENV_KEYS.ENABLED}=false`}
 ${envLine(existingVars, TEAMS_ENV_KEYS.WEBHOOK_URL, "https://xxx.webhook.office.com/webhookb2/...")}
+# Slack
+${existingVars[SLACK_ENV_KEYS.ENABLED] ? `${SLACK_ENV_KEYS.ENABLED}=${existingVars[SLACK_ENV_KEYS.ENABLED]}` : `# ${SLACK_ENV_KEYS.ENABLED}=false`}
+${envLine(existingVars, SLACK_ENV_KEYS.WEBHOOK_URL, "https://hooks.slack.com/services/...")}
+# Discord
+${existingVars[DISCORD_ENV_KEYS.ENABLED] ? `${DISCORD_ENV_KEYS.ENABLED}=${existingVars[DISCORD_ENV_KEYS.ENABLED]}` : `# ${DISCORD_ENV_KEYS.ENABLED}=false`}
+${envLine(existingVars, DISCORD_ENV_KEYS.WEBHOOK_URL, "https://discord.com/api/webhooks/...")}
+# Google Chat
+${existingVars[GOOGLE_CHAT_ENV_KEYS.ENABLED] ? `${GOOGLE_CHAT_ENV_KEYS.ENABLED}=${existingVars[GOOGLE_CHAT_ENV_KEYS.ENABLED]}` : `# ${GOOGLE_CHAT_ENV_KEYS.ENABLED}=false`}
+${envLine(existingVars, GOOGLE_CHAT_ENV_KEYS.WEBHOOK_URL, "https://chat.googleapis.com/v1/spaces/...")}
+# Generic webhook (flat JSON POST)
+${existingVars[NOTIFY_WEBHOOK_ENV_KEYS.ENABLED] ? `${NOTIFY_WEBHOOK_ENV_KEYS.ENABLED}=${existingVars[NOTIFY_WEBHOOK_ENV_KEYS.ENABLED]}` : `# ${NOTIFY_WEBHOOK_ENV_KEYS.ENABLED}=false`}
+${envLine(existingVars, NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL, "https://example.com/webhook")}
 
 # =============================================================================
 # GIT/WORKTREE SETTINGS (OPTIONAL)
@@ -830,12 +914,36 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				config.cicdJenkinsToken = vars[CICD_ENV_KEYS.JENKINS_TOKEN];
 			}
 
-			// Microsoft Teams Notifications
+			// Channel Notifications (Teams / Slack / Discord / Google Chat / webhook)
 			if (vars[TEAMS_ENV_KEYS.ENABLED]?.toLowerCase() === "true") {
 				config.teamsNotificationsEnabled = true;
 			}
 			if (vars[TEAMS_ENV_KEYS.WEBHOOK_URL]) {
 				config.teamsWebhookUrl = vars[TEAMS_ENV_KEYS.WEBHOOK_URL];
+			}
+			if (vars[SLACK_ENV_KEYS.ENABLED]?.toLowerCase() === "true") {
+				config.slackNotificationsEnabled = true;
+			}
+			if (vars[SLACK_ENV_KEYS.WEBHOOK_URL]) {
+				config.slackWebhookUrl = vars[SLACK_ENV_KEYS.WEBHOOK_URL];
+			}
+			if (vars[DISCORD_ENV_KEYS.ENABLED]?.toLowerCase() === "true") {
+				config.discordNotificationsEnabled = true;
+			}
+			if (vars[DISCORD_ENV_KEYS.WEBHOOK_URL]) {
+				config.discordWebhookUrl = vars[DISCORD_ENV_KEYS.WEBHOOK_URL];
+			}
+			if (vars[GOOGLE_CHAT_ENV_KEYS.ENABLED]?.toLowerCase() === "true") {
+				config.googleChatNotificationsEnabled = true;
+			}
+			if (vars[GOOGLE_CHAT_ENV_KEYS.WEBHOOK_URL]) {
+				config.googleChatWebhookUrl = vars[GOOGLE_CHAT_ENV_KEYS.WEBHOOK_URL];
+			}
+			if (vars[NOTIFY_WEBHOOK_ENV_KEYS.ENABLED]?.toLowerCase() === "true") {
+				config.notifyWebhookEnabled = true;
+			}
+			if (vars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL]) {
+				config.notifyWebhookUrl = vars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL];
 			}
 
 			// Git/Worktree config

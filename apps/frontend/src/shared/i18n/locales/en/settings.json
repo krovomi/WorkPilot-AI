@@ -1814,23 +1814,40 @@
 		"required": "*",
 		"fillAllFields": "Please fill in all required fields (Instance URL, Email, API Token)"
 	},
-	"teams": {
-		"title": "Microsoft Teams",
-		"description": "Receive notifications in Teams when tasks are done and PRs are created",
-		"initGuardDescription": "Initialize WorkPilot AI for this project to configure Teams notifications",
-		"enableNotifications": "Enable Teams notifications",
-		"enableNotificationsHint": "Send a message to your Teams channel when a task completes and a PR is created",
-		"webhookUrl": "Incoming Webhook URL",
-		"webhookUrlHint": "Paste the Incoming Webhook URL from your Teams channel connector",
+	"channelNotifications": {
+		"navLabel": "Notifications (Teams, Slack…)",
+		"title": "Channel notifications",
+		"description": "Announce on your channels (Teams, Slack, Discord, Google Chat…) when a task is done and its PR is ready",
+		"initGuardDescription": "Initialize WorkPilot AI for this project to configure channel notifications",
 		"testWebhook": "Send test message",
 		"testSuccess": "Message sent!",
 		"testError": "Failed to reach webhook",
-		"testMessage": "WorkPilot AI — Test notification",
-		"testMessageBody": "This is a test message from WorkPilot AI. Your Teams notifications are configured correctly.",
 		"howToCreate": "How to create a webhook",
 		"triggers": "Notification triggers",
 		"triggerTaskDone": "When a Kanban task reaches 'Done' and a PR is created",
-		"triggerPrCreated": "When a PR is automatically created for human review"
+		"triggerPrCreated": "When a PR is automatically created for human review",
+		"channels": {
+			"teams": {
+				"name": "Microsoft Teams",
+				"hint": "Incoming Webhook of a Teams channel (connector or Workflows flow)"
+			},
+			"slack": {
+				"name": "Slack",
+				"hint": "Slack Incoming Webhook (\"Incoming Webhooks\" app)"
+			},
+			"discord": {
+				"name": "Discord",
+				"hint": "Discord channel webhook (Channel settings → Integrations)"
+			},
+			"googleChat": {
+				"name": "Google Chat",
+				"hint": "Google Chat space webhook (Space settings → Webhooks)"
+			},
+			"webhook": {
+				"name": "Generic webhook",
+				"hint": "Raw JSON POST to any HTTP endpoint (custom integrations)"
+			}
+		}
 	},
 	"cicd": {
 		"title": "CI/CD Pipeline",

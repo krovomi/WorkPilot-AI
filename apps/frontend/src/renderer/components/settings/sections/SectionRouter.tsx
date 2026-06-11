@@ -13,12 +13,12 @@ import { GeneralSettings } from "../../project-settings/GeneralSettings";
 import { SecuritySettings } from "../../project-settings/SecuritySettings";
 import { InitializationGuard } from "../common/InitializationGuard";
 import { AzureDevOpsIntegration } from "../integrations/AzureDevOpsIntegration";
+import { ChannelNotificationsIntegration } from "../integrations/ChannelNotificationsIntegration";
 import { CICDPipelineIntegration } from "../integrations/CICDPipelineIntegration";
 import { GitHubIntegration } from "../integrations/GitHubIntegration";
 import { GitLabIntegration } from "../integrations/GitLabIntegration";
 import { JiraIntegration } from "../integrations/JiraIntegration";
 import { LinearIntegration } from "../integrations/LinearIntegration";
-import { TeamsIntegration } from "../integrations/TeamsIntegration";
 import type { ProjectSettingsSection } from "../ProjectSettingsContent";
 import { SettingsSection } from "../SettingsSection";
 
@@ -264,15 +264,15 @@ export function SectionRouter({
 		case "teams":
 			return (
 				<SettingsSection
-					title={t("settings:teams.title")}
-					description={t("settings:teams.description")}
+					title={t("settings:channelNotifications.title")}
+					description={t("settings:channelNotifications.description")}
 				>
 					<InitializationGuard
 						initialized={!!project.autoBuildPath}
-						title={t("settings:teams.title")}
-						description={t("settings:teams.initGuardDescription")}
+						title={t("settings:channelNotifications.title")}
+						description={t("settings:channelNotifications.initGuardDescription")}
 					>
-						<TeamsIntegration
+						<ChannelNotificationsIntegration
 							envConfig={envConfig}
 							updateEnvConfig={updateEnvConfig}
 						/>

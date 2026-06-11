@@ -1903,6 +1903,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import event_hooks router: {e}")
 
+# --- Channel Notifications API (webhook test endpoint) ---
+try:
+    from services.notifications.api import router as notifications_router
+
+    app.include_router(notifications_router)
+except ImportError as e:
+    print(f"Warning: Could not import notifications router: {e}")
+
 if __name__ == "__main__":
     import uvicorn
 
