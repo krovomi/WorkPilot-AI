@@ -529,6 +529,13 @@ async function launchBackendIfNeeded() {
 			// pattern into extra positional args and making uvicorn exit code 2.
 			"--reload-dir",
 			backendDir,
+			// PythonEnvManager installs into backendDir/.venv, which is INSIDE
+			// the watched dir — exclude it or every pip install reload-storms
+			// the server. No wildcard => safe from the argv expansion issue
+			// above. Must be ABSOLUTE: uvicorn's FileFilter matches exclude
+			// dirs against the changed file's (absolute) parents.
+			"--reload-exclude",
+			resolve(backendDir, ".venv"),
 		],
 		{
 			cwd: backendDir,
