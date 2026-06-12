@@ -982,6 +982,25 @@
 			"profileCreatedAuthFailed": "Profile created but failed to prepare authentication: {{error}}",
 			"authPrepareFailed": "Failed to prepare authentication: {{error}}",
 			"authStartFailedMessage": "Failed to start authentication. Please try again."
+		},
+		"linear": {
+			"enableLinearSync": "Enable Linear Sync",
+			"enableLinearSyncDescription": "Create and update Linear issues automatically",
+			"apiKey": "API Key",
+			"apiKeyDescription": "Get your API key from",
+			"apiKeyLink": "Linear Settings",
+			"realtimeSync": "Real-time Sync",
+			"realtimeSyncDescription": "Automatically import new tasks created in Linear",
+			"realtimeSyncWarning": "When enabled, new Linear issues will be automatically imported into AutoBuild. Make sure to configure your team/project filters below to control which issues are imported.",
+			"importTasksTitle": "Import Existing Tasks",
+			"importTasksDescription": "Select which Linear issues to import into AutoBuild as tasks.",
+			"importTasksButton": "Import Tasks from Linear",
+			"teamId": "Team ID (Optional)",
+			"teamIdDescription": "The unique identifier of your Linear team",
+			"teamIdPlaceholder": "Auto-detected",
+			"projectId": "Project ID (Optional)",
+			"projectIdDescription": "The unique identifier of the Linear project to sync",
+			"projectIdPlaceholder": "Auto-created"
 		}
 	},
 	"accounts": {

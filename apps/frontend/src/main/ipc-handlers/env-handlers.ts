@@ -178,6 +178,9 @@ export function registerEnvHandlers(
 		if (config.autoBuildModel !== undefined) {
 			existingVars.AUTO_BUILD_MODEL = config.autoBuildModel;
 		}
+		if (config.linearEnabled !== undefined) {
+			existingVars.LINEAR_ENABLED = config.linearEnabled ? "true" : "false";
+		}
 		// Guard: don't overwrite existing non-empty values with empty strings
 		if (
 			config.linearApiKey !== undefined &&
@@ -564,6 +567,7 @@ ${existingVars.AUTO_BUILD_MODEL ? `AUTO_BUILD_MODEL=${existingVars.AUTO_BUILD_MO
 # =============================================================================
 # LINEAR INTEGRATION (OPTIONAL)
 # =============================================================================
+${existingVars.LINEAR_ENABLED ? `LINEAR_ENABLED=${existingVars.LINEAR_ENABLED}` : "# LINEAR_ENABLED=false"}
 ${existingVars.LINEAR_API_KEY ? `LINEAR_API_KEY=${existingVars.LINEAR_API_KEY}` : "# LINEAR_API_KEY="}
 ${existingVars.LINEAR_TEAM_ID ? `LINEAR_TEAM_ID=${existingVars.LINEAR_TEAM_ID}` : "# LINEAR_TEAM_ID="}
 ${existingVars.LINEAR_PROJECT_ID ? `LINEAR_PROJECT_ID=${existingVars.LINEAR_PROJECT_ID}` : "# LINEAR_PROJECT_ID="}
@@ -790,8 +794,13 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 			}
 
 			if (vars.LINEAR_API_KEY) {
-				config.linearEnabled = true;
 				config.linearApiKey = vars.LINEAR_API_KEY;
+			}
+			// Explicit LINEAR_ENABLED wins; fall back to API-key presence (legacy .env files)
+			if (vars.LINEAR_ENABLED !== undefined) {
+				config.linearEnabled = vars.LINEAR_ENABLED.toLowerCase() === "true";
+			} else if (vars.LINEAR_API_KEY) {
+				config.linearEnabled = true;
 			}
 			if (vars.LINEAR_TEAM_ID) {
 				config.linearTeamId = vars.LINEAR_TEAM_ID;
