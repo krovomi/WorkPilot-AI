@@ -1870,6 +1870,23 @@
 		"pollLabel": "Polling interval (seconds)",
 		"pollDescription": "How often the pipeline status is checked (minimum 15s, default 60s)"
 	},
+	"invitationsAdmin": {
+		"navLabel": "Invitations (team)",
+		"title": "Invitations",
+		"description": "Invite new members. Account creation is invitation-only.",
+		"email": "New user's email",
+		"role": "Role",
+		"roleMember": "Member",
+		"roleViewer": "Viewer",
+		"roleAdmin": "Administrator",
+		"create": "Invite",
+		"emailSent": "Invitation sent by email. You can also share the link:",
+		"emailNotSent": "Email not sent (SMTP not configured). Share this single-use link:",
+		"pending": "Pending invitations",
+		"none": "No pending invitations.",
+		"expires": "expires",
+		"revoke": "Revoke"
+	},
 	"jiraImport": {
 		"title": "Import Jira Issues",
 		"titleWithProject": "Import issues from {{project}}",

@@ -32,7 +32,19 @@ interface ServerSessionState {
 		password: string,
 	) => Promise<{ ok: boolean; error?: string }>;
 	loginEntra: (serverUrl: string) => Promise<{ ok: boolean; error?: string }>;
-	useLocalMode: () => Promise<void>;
+	lookupInvite: (
+		serverUrl: string,
+		token: string,
+	) => Promise<{ ok: boolean; email?: string; error?: string }>;
+	acceptInvite: (
+		serverUrl: string,
+		token: string,
+		displayName: string,
+		password: string,
+	) => Promise<{ ok: boolean; error?: string }>;
+	// Named switchTo* (not use*) so lint hook rules don't mistake the store
+	// action for a React hook at call sites.
+	switchToLocalMode: () => Promise<void>;
 	logout: () => Promise<void>;
 }
 
@@ -102,7 +114,30 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 			return { ok: false, error: result.error };
 		},
 
-		useLocalMode: async () => {
+		lookupInvite: async (serverUrl, token) => {
+			const result = await window.electronAPI.serverAuth.lookupInvite(
+				serverUrl,
+				token,
+			);
+			if (result.ok) return { ok: true, email: result.data.email };
+			return { ok: false, error: result.error };
+		},
+
+		acceptInvite: async (serverUrl, token, displayName, password) => {
+			const result = await window.electronAPI.serverAuth.acceptInvite(
+				serverUrl,
+				token,
+				displayName,
+				password,
+			);
+			if (result.ok) {
+				set({ isLoginScreenOpen: false });
+				return { ok: true };
+			}
+			return { ok: false, error: result.error };
+		},
+
+		switchToLocalMode: async () => {
 			const state = await window.electronAPI.serverAuth.setMode("local");
 			applyState(state);
 			set({ isLoginScreenOpen: false });

@@ -19,13 +19,16 @@ import {
 	Label,
 } from "@/components/ui";
 import { useServerSessionStore } from "../../stores/server-session-store";
+import { AcceptInviteForm } from "./AcceptInviteForm";
 
 const LAST_SERVER_URL_KEY = "workpilot-last-server-url";
 
 export function ServerLoginScreen() {
 	const { t } = useTranslation();
-	const { serverUrl, loginLocal, loginEntra, useLocalMode } =
+	const { serverUrl, loginLocal, loginEntra, switchToLocalMode } =
 		useServerSessionStore();
+
+	const [view, setView] = useState<"login" | "invite">("login");
 
 	const [url, setUrl] = useState(
 		serverUrl || localStorage.getItem(LAST_SERVER_URL_KEY) || "",
@@ -76,6 +79,10 @@ export function ServerLoginScreen() {
 			setBusy(null);
 		}
 	}, [url, loginEntra, rememberUrl]);
+
+	if (view === "invite") {
+		return <AcceptInviteForm onBack={() => setView("login")} />;
+	}
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
@@ -168,12 +175,24 @@ export function ServerLoginScreen() {
 							className="flex-1"
 							variant="outline"
 							disabled={busy !== null}
-							onClick={() => void useLocalMode()}
+							onClick={() => void switchToLocalMode()}
 						>
 							<Monitor className="mr-2 h-4 w-4" />
 							{t("serverLogin.localModeButton", "Mode local")}
 						</Button>
 					</div>
+
+					<button
+						type="button"
+						className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+						disabled={busy !== null}
+						onClick={() => {
+							setError(null);
+							setView("invite");
+						}}
+					>
+						{t("serverLogin.haveInvite", "J'ai une invitation")}
+					</button>
 				</CardContent>
 			</Card>
 		</div>

@@ -197,6 +197,149 @@ export async function getServerAuthConfig(
 	}
 }
 
+/**
+ * Authenticated request against the current server, attaching the access
+ * token. Used by admin-only invitation management.
+ */
+async function authedFetch<T>(
+	pathName: string,
+	method: string,
+	body?: unknown,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+	if (!serverUrl) return { ok: false, error: "No server URL configured" };
+	if (!accessToken) return { ok: false, error: "Not authenticated" };
+	try {
+		const res = await fetch(`${serverUrl}${pathName}`, {
+			method,
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${accessToken}`,
+			},
+			body: body === undefined ? undefined : JSON.stringify(body),
+		});
+		const text = await res.text();
+		if (!res.ok) {
+			try {
+				const parsed = JSON.parse(text) as { detail?: string };
+				return { ok: false, error: parsed.detail || `HTTP ${res.status}` };
+			} catch {
+				return { ok: false, error: text || `HTTP ${res.status}` };
+			}
+		}
+		return { ok: true, data: (text ? JSON.parse(text) : null) as T };
+	} catch (err) {
+		return {
+			ok: false,
+			error: err instanceof Error ? err.message : String(err),
+		};
+	}
+}
+
+export interface InviteLookup {
+	email: string;
+	role: string;
+}
+
+export interface InvitationPublic {
+	id: string;
+	email: string;
+	role: string;
+	project_id?: string | null;
+	project_role?: string | null;
+	expires_at: string;
+	created_at: string;
+}
+
+export interface CreateInvitationResult extends InvitationPublic {
+	invite_link: string;
+	email_sent: boolean;
+}
+
+/**
+ * Public invite lookup (no auth, no global state mutation): used by the
+ * accept-invitation screen to prefill the bound email. POST (not GET) so the
+ * token is never placed in a URL / proxy access log.
+ */
+export async function lookupInvite(
+	url: string,
+	token: string,
+): Promise<{ ok: true; data: InviteLookup } | { ok: false; error: string }> {
+	try {
+		const res = await fetch(
+			`${url.replace(/\/+$/, "")}/auth/invitations/lookup`,
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ token }),
+			},
+		);
+		const text = await res.text();
+		if (!res.ok) {
+			try {
+				const parsed = JSON.parse(text) as { detail?: string };
+				return { ok: false, error: parsed.detail || `HTTP ${res.status}` };
+			} catch {
+				return { ok: false, error: `HTTP ${res.status}` };
+			}
+		}
+		return { ok: true, data: JSON.parse(text) as InviteLookup };
+	} catch (err) {
+		return {
+			ok: false,
+			error: err instanceof Error ? err.message : String(err),
+		};
+	}
+}
+
+/**
+ * Accept an invitation: creates the account server-side and auto-logs in.
+ * The resulting token pair is stored in the main process (never the renderer).
+ */
+export async function acceptInvite(
+	token: string,
+	displayName: string,
+	password: string,
+): Promise<{ ok: true; user: ServerUser } | { ok: false; error: string }> {
+	const result = await serverFetch<TokenResponse>("/auth/invitations/accept", {
+		token,
+		display_name: displayName,
+		password,
+	});
+	if (!result.ok) return result;
+	applyTokens(result.data);
+	return { ok: true, user: result.data.user };
+}
+
+export async function createInvite(payload: {
+	email: string;
+	role?: string;
+	project_id?: string | null;
+	project_role?: string | null;
+}): Promise<
+	{ ok: true; data: CreateInvitationResult } | { ok: false; error: string }
+> {
+	return authedFetch<CreateInvitationResult>(
+		"/auth/invitations",
+		"POST",
+		payload,
+	);
+}
+
+export async function listInvites(): Promise<
+	{ ok: true; data: InvitationPublic[] } | { ok: false; error: string }
+> {
+	return authedFetch<InvitationPublic[]>("/auth/invitations", "GET");
+}
+
+export async function revokeInvite(
+	invitationId: string,
+): Promise<{ ok: true; data: { revoked: boolean } } | { ok: false; error: string }> {
+	return authedFetch<{ revoked: boolean }>(
+		`/auth/invitations/${encodeURIComponent(invitationId)}`,
+		"DELETE",
+	);
+}
+
 export async function loginLocal(
 	email: string,
 	password: string,

@@ -23,6 +23,8 @@ PUBLIC_PATHS = {
     "/auth/logout",
     "/auth/oidc/exchange",
     "/auth/config",
+    "/auth/invitations/lookup",
+    "/auth/invitations/accept",
     "/health",
     "/docs",
     "/openapi.json",
@@ -63,6 +65,13 @@ def mount_server_mode(app: FastAPI) -> bool:
     from server.routers.auth import router as auth_router
 
     app.include_router(auth_router)
+
+    try:
+        from server.routers.invitations import router as invitations_router
+
+        app.include_router(invitations_router)
+    except ImportError as e:
+        logger.warning("Server mode: invitations router unavailable: %s", e)
 
     try:
         from server.routers.projects import router as projects_router

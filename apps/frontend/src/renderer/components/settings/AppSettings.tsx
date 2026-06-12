@@ -22,6 +22,7 @@ import {
 	ShieldAlert,
 	Sparkles,
 	Terminal,
+	UserPlus,
 	Users,
 	Workflow,
 	Zap,
@@ -34,6 +35,8 @@ import { TerminalFontSettings } from "@/components/settings/terminal-font-settin
 import { ScrollArea } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/stores/project-store";
+import { useServerSessionStore } from "@/stores/server-session-store";
+import { InvitationsAdmin } from "../auth/InvitationsAdmin";
 import { Button } from "../ui/button";
 import {
 	FullScreenDialog,
@@ -121,6 +124,8 @@ export type AppSection =
 	| "guardrails"
 	| "anomaly-detection"
 	| "memory"
+	// Multi-utilisateurs (serveur, admin uniquement)
+	| "team-invitations"
 	// Système & Maintenance
 	| "updates"
 	| "notifications"
@@ -215,6 +220,12 @@ const createSettingsThemes = (t: {
 					"Notifications (Teams, Slack…)",
 				),
 				type: "project",
+			},
+			{
+				id: "team-invitations",
+				icon: UserPlus,
+				label: t("invitationsAdmin.navLabel", "Invitations (équipe)"),
+				type: "app",
 			},
 		],
 		description: "Comptes IA et intégrations externes",
@@ -341,6 +352,18 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 
 	// Create dynamic settings themes with translations
 	const SETTINGS_THEMES = createSettingsThemes(t);
+
+	// The team-invitations section is admin-only and only relevant in server
+	// mode; drop it from the nav otherwise.
+	const serverMode = useServerSessionStore((state) => state.mode);
+	const serverUserRole = useServerSessionStore((state) => state.user?.role);
+	const isServerAdmin = serverMode === "server" && serverUserRole === "admin";
+	if (!isServerAdmin) {
+		SETTINGS_THEMES.integrations.sections =
+			SETTINGS_THEMES.integrations.sections.filter(
+				(s) => s.id !== "team-invitations",
+			);
+	}
 
 	// Project state (déclaré avant tout usage)
 	const projects = useProjectStore((state) => state.projects);
@@ -565,6 +588,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return <SwarmModeSettings />;
 			case "continuous-ai":
 				return <ContinuousAISettings />;
+			case "team-invitations":
+				return isServerAdmin ? <InvitationsAdmin /> : null;
 			default:
 				return null;
 		}

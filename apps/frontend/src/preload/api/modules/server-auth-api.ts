@@ -31,6 +31,28 @@ export type ServerAuthResult =
 	| { ok: true; user: ServerUser }
 	| { ok: false; error: string };
 
+export interface InviteLookup {
+	email: string;
+	role: string;
+}
+
+export interface InvitationPublic {
+	id: string;
+	email: string;
+	role: string;
+	project_id?: string | null;
+	project_role?: string | null;
+	expires_at: string;
+	created_at: string;
+}
+
+export interface CreateInvitationResult extends InvitationPublic {
+	invite_link: string;
+	email_sent: boolean;
+}
+
+export type DataResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
 export interface ServerAuthAPI {
 	getState: () => Promise<ServerAuthState>;
 	getConfig: (
@@ -46,6 +68,26 @@ export interface ServerAuthAPI {
 		password: string,
 	) => Promise<ServerAuthResult>;
 	loginEntra: (serverUrl: string) => Promise<ServerAuthResult>;
+	lookupInvite: (
+		serverUrl: string,
+		token: string,
+	) => Promise<DataResult<InviteLookup>>;
+	acceptInvite: (
+		serverUrl: string,
+		token: string,
+		displayName: string,
+		password: string,
+	) => Promise<ServerAuthResult>;
+	createInvite: (payload: {
+		email: string;
+		role?: string;
+		project_id?: string | null;
+		project_role?: string | null;
+	}) => Promise<DataResult<CreateInvitationResult>>;
+	listInvites: () => Promise<DataResult<InvitationPublic[]>>;
+	revokeInvite: (
+		invitationId: string,
+	) => Promise<DataResult<{ revoked: boolean }>>;
 	logout: () => Promise<ServerAuthState>;
 	restore: () => Promise<ServerAuthState>;
 	onStateChanged: (callback: (state: ServerAuthState) => void) => () => void;
@@ -65,6 +107,32 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 		),
 	loginEntra: (serverUrl) =>
 		invokeIpc<ServerAuthResult>("server-auth:login-entra", serverUrl),
+	lookupInvite: (serverUrl, token) =>
+		invokeIpc<DataResult<InviteLookup>>(
+			"server-auth:lookup-invite",
+			serverUrl,
+			token,
+		),
+	acceptInvite: (serverUrl, token, displayName, password) =>
+		invokeIpc<ServerAuthResult>(
+			"server-auth:accept-invite",
+			serverUrl,
+			token,
+			displayName,
+			password,
+		),
+	createInvite: (payload) =>
+		invokeIpc<DataResult<CreateInvitationResult>>(
+			"server-auth:create-invite",
+			payload,
+		),
+	listInvites: () =>
+		invokeIpc<DataResult<InvitationPublic[]>>("server-auth:list-invites"),
+	revokeInvite: (invitationId) =>
+		invokeIpc<DataResult<{ revoked: boolean }>>(
+			"server-auth:revoke-invite",
+			invitationId,
+		),
 	logout: () => invokeIpc<ServerAuthState>("server-auth:logout"),
 	restore: () => invokeIpc<ServerAuthState>("server-auth:restore"),
 	onStateChanged: (callback) =>

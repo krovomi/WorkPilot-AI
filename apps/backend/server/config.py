@@ -72,9 +72,35 @@ class ServerSettings:
     # Maximum agent runs executing concurrently on this server.
     max_concurrent_runs: int
 
+    # Public base URL used to build invitation links (e.g.
+    # https://workpilot.example.com). Falls back to empty -> the API
+    # returns a relative-looking link the admin can complete manually.
+    public_base_url: str
+
+    # Self-service signup (invitation-only).
+    invitation_ttl_hours: int
+    password_min_length: int
+    # Optional Have I Been Pwned k-anonymity check on new passwords.
+    # Off by default so the server stays fully offline-capable.
+    password_hibp_check: bool
+
+    # SMTP for transactional email (invitation links). All empty => email
+    # disabled and the API returns the invite link for manual delivery.
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    smtp_from: str
+    smtp_use_tls: bool  # STARTTLS on a plaintext port (587)
+    smtp_use_ssl: bool  # implicit TLS (465)
+
     @property
     def entra_enabled(self) -> bool:
         return bool(self.entra_tenant_id and self.entra_client_id)
+
+    @property
+    def email_enabled(self) -> bool:
+        return bool(self.smtp_host and self.smtp_from)
 
     @classmethod
     def from_env(cls) -> ServerSettings:
@@ -109,6 +135,17 @@ class ServerSettings:
             secrets_master_key=os.environ.get("WORKPILOT_SECRETS_MASTER_KEY", ""),
             repos_root=repos_root,
             max_concurrent_runs=_env_int("WORKPILOT_MAX_CONCURRENT_RUNS", 3),
+            public_base_url=os.environ.get("WORKPILOT_PUBLIC_BASE_URL", "").rstrip("/"),
+            invitation_ttl_hours=_env_int("WORKPILOT_INVITATION_TTL_HOURS", 72),
+            password_min_length=_env_int("WORKPILOT_PASSWORD_MIN_LENGTH", 12),
+            password_hibp_check=_env_bool("WORKPILOT_PASSWORD_HIBP_CHECK", False),
+            smtp_host=os.environ.get("WORKPILOT_SMTP_HOST", ""),
+            smtp_port=_env_int("WORKPILOT_SMTP_PORT", 587),
+            smtp_user=os.environ.get("WORKPILOT_SMTP_USER", ""),
+            smtp_password=os.environ.get("WORKPILOT_SMTP_PASSWORD", ""),
+            smtp_from=os.environ.get("WORKPILOT_SMTP_FROM", ""),
+            smtp_use_tls=_env_bool("WORKPILOT_SMTP_USE_TLS", True),
+            smtp_use_ssl=_env_bool("WORKPILOT_SMTP_USE_SSL", False),
         )
 
 

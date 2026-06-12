@@ -12,12 +12,17 @@ import * as crypto from "node:crypto";
 import * as http from "node:http";
 import { type BrowserWindow, ipcMain, shell } from "electron";
 import {
+	acceptInvite,
+	createInvite,
 	getAuthState,
 	getServerAuthConfig,
+	listInvites,
 	loginLocal,
 	loginWithEntraIdToken,
 	logout,
+	lookupInvite,
 	restoreSession,
+	revokeInvite,
 	setMode,
 } from "../server-connection";
 
@@ -186,6 +191,53 @@ export function registerServerAuthHandlers(
 				};
 			}
 		},
+	);
+
+	// --- Invitation-only self-service signup ---
+
+	ipcMain.handle(
+		"server-auth:lookup-invite",
+		async (_e, serverUrl: string, token: string) =>
+			await lookupInvite(serverUrl, token),
+	);
+
+	ipcMain.handle(
+		"server-auth:accept-invite",
+		async (
+			_e,
+			serverUrl: string,
+			token: string,
+			displayName: string,
+			password: string,
+		) => {
+			setMode("server", serverUrl);
+			const result = await acceptInvite(token, displayName, password);
+			notifyRenderer();
+			return result;
+		},
+	);
+
+	ipcMain.handle(
+		"server-auth:create-invite",
+		async (
+			_e,
+			payload: {
+				email: string;
+				role?: string;
+				project_id?: string | null;
+				project_role?: string | null;
+			},
+		) => await createInvite(payload),
+	);
+
+	ipcMain.handle(
+		"server-auth:list-invites",
+		async () => await listInvites(),
+	);
+
+	ipcMain.handle(
+		"server-auth:revoke-invite",
+		async (_e, invitationId: string) => await revokeInvite(invitationId),
 	);
 
 	ipcMain.handle("server-auth:logout", async () => {

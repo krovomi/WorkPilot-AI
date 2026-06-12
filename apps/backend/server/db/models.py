@@ -247,6 +247,42 @@ class UserSecret(Base):
     )
 
 
+class Invitation(Base):
+    """A single-use, expiring invitation to create a local account.
+
+    Self-service signup is invitation-only: an admin issues an invitation
+    bound to a specific email; the invitee follows the link and sets a
+    password. The raw token is never stored — only its SHA-256 hash (same
+    discipline as :class:`AuthSession`). ``project_id``/``project_role``
+    optionally grant immediate membership on acceptance.
+    """
+
+    __tablename__ = "invitations"
+    __table_args__ = (Index("ix_invitations_email", "email"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    email: Mapped[str] = mapped_column(String(320))
+    role: Mapped[str] = mapped_column(String(20), default=GlobalRole.MEMBER.value)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    invited_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
+    )
+    project_role: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class AuditLog(Base):
     __tablename__ = "audit_log"
     __table_args__ = (Index("ix_audit_project_time", "project_id", "created_at"),)

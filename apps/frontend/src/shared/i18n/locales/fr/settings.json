@@ -1364,6 +1364,23 @@
 		"pollLabel": "Intervalle de vérification (secondes)",
 		"pollDescription": "Fréquence de vérification du statut du pipeline (minimum 15 s, défaut 60 s)"
 	},
+	"invitationsAdmin": {
+		"navLabel": "Invitations (équipe)",
+		"title": "Invitations",
+		"description": "Invitez de nouveaux membres. La création de compte se fait uniquement sur invitation.",
+		"email": "Email du nouvel utilisateur",
+		"role": "Rôle",
+		"roleMember": "Membre",
+		"roleViewer": "Lecteur",
+		"roleAdmin": "Administrateur",
+		"create": "Inviter",
+		"emailSent": "Invitation envoyée par email. Vous pouvez aussi partager le lien :",
+		"emailNotSent": "Email non envoyé (SMTP non configuré). Partagez ce lien à usage unique :",
+		"pending": "Invitations en attente",
+		"none": "Aucune invitation en attente.",
+		"expires": "expire le",
+		"revoke": "Révoquer"
+	},
 	"jiraImport": {
 		"cancel": "Annuler",
 		"configureButton": "Configurer Jira",

@@ -22,6 +22,7 @@ from server.auth.oidc import OidcError, provision_entra_user, validate_id_token
 from server.config import get_settings
 from server.db.engine import get_db
 from server.db.models import AuditLog, User
+from server.ratelimit import limiter
 from server.schemas import (
     ChangePasswordRequest,
     CreateUserRequest,
@@ -71,6 +72,7 @@ async def auth_config() -> dict:
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("10/minute")
 async def login(
     body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)
 ) -> TokenResponse:

@@ -23,7 +23,7 @@ async def _main() -> int:
     args = parser.parse_args()
 
     password = os.environ.get("WORKPILOT_ADMIN_PASSWORD") or getpass.getpass(
-        "Admin password (min 10 chars): "
+        "Admin password (min 12 chars): "
     )
 
     from server.auth.local import LocalAuthError, create_local_user

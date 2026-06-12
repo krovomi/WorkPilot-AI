@@ -6,10 +6,14 @@ through Entra ID. Registration is admin-only (no self-service signup).
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import urllib.error
+import urllib.request
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, VerifyMismatchError
+from server.config import get_settings
 from server.db.models import GlobalRole, IdentityProvider, User, UserIdentity
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +23,22 @@ logger = logging.getLogger(__name__)
 
 _hasher = PasswordHasher()  # argon2id with library defaults
 
-MIN_PASSWORD_LENGTH = 10
+# Absolute floor; the effective minimum is max(this, settings.password_min_length).
+MIN_PASSWORD_LENGTH = 12
+
+# A few obviously trivial passwords rejected regardless of length.
+_TRIVIAL_PASSWORDS = frozenset(
+    {
+        "password1234",
+        "motdepasse12",
+        "azertyuiop12",
+        "qwertyuiop12",
+        "123456789012",
+        "workpilot123",
+    }
+)
+
+_HIBP_TIMEOUT_SECONDS = 3
 
 
 class LocalAuthError(Exception):
@@ -37,10 +56,48 @@ def verify_password(password_hash: str, password: str) -> bool:
         return False
 
 
-def _validate_password(password: str) -> None:
-    if len(password) < MIN_PASSWORD_LENGTH:
+def _is_pwned(password: str) -> bool:
+    """Have I Been Pwned range query (k-anonymity).
+
+    Only the first 5 chars of the SHA-1 hash leave the process; the full
+    password is never sent. Fail-open on any network/error so that an
+    outage cannot lock out signups.
+    """
+    digest = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()  # noqa: S324
+    prefix, suffix = digest[:5], digest[5:]
+    try:
+        req = urllib.request.Request(
+            f"https://api.pwnedpasswords.com/range/{prefix}",
+            headers={"User-Agent": "WorkPilot-AI"},
+        )
+        with urllib.request.urlopen(req, timeout=_HIBP_TIMEOUT_SECONDS) as resp:
+            body = resp.read().decode("utf-8", "replace")
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        logger.warning("[Password] HIBP check skipped (%s)", exc)
+        return False
+    for line in body.splitlines():
+        hash_suffix, _, _count = line.partition(":")
+        if hash_suffix.strip().upper() == suffix:
+            return True
+    return False
+
+
+def _validate_password(password: str, email: str | None = None) -> None:
+    settings = get_settings()
+    min_length = max(MIN_PASSWORD_LENGTH, settings.password_min_length)
+    if len(password) < min_length:
+        raise LocalAuthError(f"Password must be at least {min_length} characters")
+    lowered = password.strip().lower()
+    if lowered in _TRIVIAL_PASSWORDS:
+        raise LocalAuthError("This password is too common")
+    if email:
+        email_lc = email.strip().lower()
+        local_part = email_lc.split("@", 1)[0]
+        if lowered == email_lc or (len(local_part) >= 4 and lowered == local_part):
+            raise LocalAuthError("Password must not match your email address")
+    if settings.password_hibp_check and _is_pwned(password):
         raise LocalAuthError(
-            f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+            "This password has appeared in a known data breach; choose another"
         )
 
 
@@ -52,10 +109,10 @@ async def create_local_user(
     role: str = GlobalRole.MEMBER.value,
 ) -> User:
     """Create a user with a local-password identity (admin action)."""
-    _validate_password(password)
     email = email.strip().lower()
     if not email or "@" not in email:
         raise LocalAuthError("Invalid email address")
+    _validate_password(password, email=email)
 
     existing = await db.scalar(select(User).where(User.email == email))
     if existing is not None:
@@ -111,7 +168,7 @@ async def authenticate_local(db: AsyncSession, email: str, password: str) -> Use
 async def change_password(
     db: AsyncSession, user: User, current_password: str, new_password: str
 ) -> None:
-    _validate_password(new_password)
+    _validate_password(new_password, email=user.email)
     identity = await db.scalar(
         select(UserIdentity).where(
             UserIdentity.user_id == user.id,

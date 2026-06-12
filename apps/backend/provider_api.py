@@ -42,9 +42,8 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
@@ -214,7 +213,10 @@ try:
 except Exception as e:  # noqa: BLE001 — never block local-mode boot on this
     logging.getLogger(__name__).warning("Could not initialize server mode: %s", e)
 
-limiter = Limiter(key_func=get_remote_address)
+# Single shared limiter instance (also imported by server.routers.* so all
+# rate-limit decorators share one backend).
+from server.ratelimit import limiter  # noqa: E402
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

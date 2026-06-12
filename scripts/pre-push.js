@@ -193,12 +193,15 @@ function venvBin(dir, name) {
 
 const backendVenv = path.join(ROOT, "apps", "backend");
 const rootVenv = ROOT;
+// install-backend.js creates the shared venv under .cache/.venv — without
+// this candidate the backend checks were silently skipped on dev machines.
+const cacheVenv = path.join(ROOT, ".cache");
 const frontendDir = path.join(ROOT, "apps", "frontend");
 
-const pytestPath = [backendVenv, rootVenv]
+const pytestPath = [backendVenv, rootVenv, cacheVenv]
 	.map((d) => venvBin(d, "pytest"))
 	.find((p) => fs.existsSync(p));
-const ruffPath = [backendVenv, rootVenv]
+const ruffPath = [backendVenv, rootVenv, cacheVenv]
 	.map((d) => venvBin(d, "ruff"))
 	.find((p) => fs.existsSync(p));
 
@@ -206,6 +209,15 @@ const jobs = [];
 
 if (ruffPath) {
 	jobs.push(runJob("backend:ruff", ruffPath, ["check", "apps/backend/"]));
+	// Mirrors the CI "ruff format check" step — a check-only `ruff check`
+	// does NOT catch formatting drift, which is exactly what broke CI.
+	jobs.push(
+		runJob("backend:ruff-format", ruffPath, [
+			"format",
+			"apps/backend/",
+			"--check",
+		]),
+	);
 } else {
 	console.warn(
 		"⚠  ruff not found in venv — skipping backend lint. Install with `pip install ruff`.",

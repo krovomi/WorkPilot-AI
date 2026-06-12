@@ -476,7 +476,9 @@ class StreamingWebSocketServer:
                 "Rejecting unauthenticated WS connection from %s",
                 getattr(websocket, "remote_address", "?"),
             )
-            await websocket.close(code=WS_CLOSE_UNAUTHORIZED, reason="authentication required")
+            await websocket.close(
+                code=WS_CLOSE_UNAUTHORIZED, reason="authentication required"
+            )
             return
 
         ctx["session_id"] = self._extract_session_id(path, websocket)

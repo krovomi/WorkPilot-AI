@@ -55,7 +55,54 @@ class CreateUserRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=10)
+    new_password: str = Field(min_length=12)
+
+
+# ---------------------------------------------------------------------------
+# Invitations (invitation-only self-service signup)
+# ---------------------------------------------------------------------------
+
+
+class CreateInvitationRequest(BaseModel):
+    email: EmailStr
+    role: str = "member"
+    project_id: str | None = None
+    project_role: str | None = None
+
+
+class InvitationPublic(BaseModel):
+    id: str
+    email: str
+    role: str
+    project_id: str | None = None
+    project_role: str | None = None
+    expires_at: datetime
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CreateInvitationResponse(InvitationPublic):
+    # The acceptance link (carries the one-time token). Returned once, to the
+    # admin, so it can be delivered manually if email is disabled or fails.
+    invite_link: str
+    email_sent: bool
+
+
+class InvitationLookupRequest(BaseModel):
+    # POST (not GET) so the token never lands in a URL / proxy access log.
+    token: str = Field(min_length=16)
+
+
+class InvitationLookupResponse(BaseModel):
+    email: str
+    role: str
+
+
+class AcceptInvitationRequest(BaseModel):
+    token: str = Field(min_length=16)
+    display_name: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=12)
 
 
 # ---------------------------------------------------------------------------
