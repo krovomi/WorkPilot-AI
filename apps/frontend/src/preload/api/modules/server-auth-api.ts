@@ -18,6 +18,9 @@ export interface ServerAuthState {
 	serverUrl: string | null;
 	user: ServerUser | null;
 	isAuthenticated: boolean;
+	// True once the user has made an explicit connection choice (server login
+	// or local mode). Drives the first-launch login gate.
+	configured: boolean;
 }
 
 export interface ServerAuthConfig {

@@ -39,4 +39,10 @@ if [ -n "$staged" ]; then
   done
 fi
 
+# Targeted tests on the staged files (pytest mapped by module name + vitest
+# related). Fast by design — the FULL suite runs at pre-push and in CI.
+# Bypass: PRE_COMMIT_SKIP_TESTS=1 git commit ...
+echo "[pre-commit] tests related to staged files..."
+node scripts/staged-tests.js || exit 1
+
 exit 0

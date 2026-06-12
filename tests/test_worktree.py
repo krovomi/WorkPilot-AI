@@ -407,6 +407,49 @@ class TestWorktreeAddRetry:
         assert info.branch == "workpilot/test-spec"
         assert (info.path / "README.md").exists()
 
+    def test_spawn_failure_exit_code_is_retried_with_slow_backoff(
+        self, temp_git_repo: Path, monkeypatch
+    ):
+        """STATUS_DLL_INIT_FAILED (0xC0000142) is retried even with stderr text.
+
+        On loaded GitHub Windows runners git can die before producing output
+        (exit 3221225794). The condition is runner-wide and persists longer
+        than a file lock, so the retry must (a) trigger on the exit code alone
+        and (b) use the slower backoff schedule.
+        """
+        import core.worktree as worktree_module
+
+        manager = WorktreeManager(temp_git_repo)
+        manager.setup()
+
+        real_run_git = manager._run_git
+        calls = {"add": 0}
+        sleeps: list[float] = []
+
+        def flaky_run_git(args, *a, **kw):
+            if len(args) >= 2 and args[0] == "worktree" and args[1] == "add":
+                calls["add"] += 1
+                if calls["add"] <= 2:
+                    # Spawn failure: non-empty stderr that does NOT match the
+                    # lock-message list — only the exit code marks it transient.
+                    return subprocess.CompletedProcess(
+                        args=args,
+                        returncode=3221225794,
+                        stdout="",
+                        stderr="(spawn diagnostics)",
+                    )
+            return real_run_git(args, *a, **kw)
+
+        monkeypatch.setattr(manager, "_run_git", flaky_run_git)
+        monkeypatch.setattr(worktree_module.time, "sleep", lambda s: sleeps.append(s))
+
+        info = manager.create_worktree("test-spec")
+
+        assert calls["add"] >= 3, "spawn failure should have been retried"
+        assert info.path.exists()
+        # Slow schedule: 2.0 * 2**(attempt-1), not the 0.5-based lock schedule.
+        assert sleeps[:2] == [2.0, 4.0]
+
     def test_create_worktree_reports_output_on_persistent_failure(
         self, temp_git_repo: Path, monkeypatch
     ):

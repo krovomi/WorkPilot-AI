@@ -20,6 +20,7 @@ interface ServerSessionState {
 	serverUrl: string | null;
 	user: ServerUser | null;
 	isAuthenticated: boolean;
+	configured: boolean;
 	isLoginScreenOpen: boolean;
 	initialized: boolean;
 
@@ -53,6 +54,7 @@ type AuthStatePayload = {
 	serverUrl: string | null;
 	user: ServerUser | null;
 	isAuthenticated: boolean;
+	configured: boolean;
 };
 
 export const useServerSessionStore = create<ServerSessionState>((set, get) => {
@@ -62,6 +64,7 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 			serverUrl: state.serverUrl,
 			user: state.user,
 			isAuthenticated: state.isAuthenticated,
+			configured: state.configured,
 		});
 	};
 
@@ -70,6 +73,7 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 		serverUrl: null,
 		user: null,
 		isAuthenticated: false,
+		configured: false,
 		isLoginScreenOpen: false,
 		initialized: false,
 
@@ -77,11 +81,18 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 			if (get().initialized) return;
 			set({ initialized: true });
 			try {
-				const state = await window.electronAPI.serverAuth.getState();
+				// Attempt to restore a persisted session first (auto-login from the
+				// encrypted refresh token), then decide whether to show the gate.
+				const state = await window.electronAPI.serverAuth.restore();
 				applyState(state);
 				window.electronAPI.serverAuth.onStateChanged(applyState);
-				// Server mode configured but session expired -> ask to log in again.
-				if (state.mode === "server" && !state.isAuthenticated) {
+				if (state.isAuthenticated) {
+					set({ isLoginScreenOpen: false });
+				} else if (state.mode === "server") {
+					// Server configured but session expired -> ask to log in again.
+					set({ isLoginScreenOpen: true });
+				} else if (!state.configured) {
+					// First launch, no choice made yet -> show the connection gate.
 					set({ isLoginScreenOpen: true });
 				}
 			} catch (err) {

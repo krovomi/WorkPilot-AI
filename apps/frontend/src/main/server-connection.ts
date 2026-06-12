@@ -29,6 +29,9 @@ export interface ServerAuthState {
 	serverUrl: string | null;
 	user: ServerUser | null;
 	isAuthenticated: boolean;
+	// True once the user has made an explicit connection choice (signed in to
+	// a server, or picked local mode). Drives the first-launch login gate.
+	configured: boolean;
 }
 
 interface TokenResponse {
@@ -50,6 +53,11 @@ let accessToken: string | null = null;
 let refreshToken: string | null = null;
 let currentUser: ServerUser | null = null;
 let refreshTimer: NodeJS.Timeout | null = null;
+// Whether a connection choice has ever been persisted (first-launch gate).
+let configured = false;
+// Shared in-flight restore so a concurrent main+renderer restore does not
+// refresh twice (refresh rotates the token — a double call would fail).
+let restoreInFlight: Promise<boolean> | null = null;
 
 function stateFilePath(): string {
 	return path.join(app.getPath("userData"), "server-connection.json");
@@ -65,6 +73,7 @@ function persist(): void {
 		}
 		const state: PersistedState = { mode, serverUrl, encryptedRefreshToken };
 		fs.writeFileSync(stateFilePath(), JSON.stringify(state), "utf-8");
+		configured = true;
 	} catch (err) {
 		console.error("[server-connection] Failed to persist state:", err);
 	}
@@ -76,6 +85,8 @@ export function loadPersistedState(): void {
 		const raw = JSON.parse(
 			fs.readFileSync(stateFilePath(), "utf-8"),
 		) as PersistedState;
+		// A persisted file means the user has already made a connection choice.
+		configured = true;
 		mode = raw.mode === "server" ? "server" : "local";
 		serverUrl = raw.serverUrl || null;
 		if (raw.encryptedRefreshToken && safeStorage.isEncryptionAvailable()) {
@@ -106,6 +117,7 @@ export function getAuthState(): ServerAuthState {
 		serverUrl,
 		user: currentUser,
 		isAuthenticated: !!accessToken,
+		configured,
 	};
 }
 
@@ -393,6 +405,13 @@ export async function logout(): Promise<void> {
  * Try to restore a session at startup from the persisted refresh token.
  */
 export async function restoreSession(): Promise<boolean> {
+	if (accessToken) return true; // already restored this run
 	if (!isServerMode() || !refreshToken) return false;
-	return refreshSession();
+	// Share a single in-flight refresh so a concurrent main + renderer restore
+	// does not rotate the refresh token twice (the second call would fail).
+	if (restoreInFlight) return restoreInFlight;
+	restoreInFlight = refreshSession().finally(() => {
+		restoreInFlight = null;
+	});
+	return restoreInFlight;
 }
