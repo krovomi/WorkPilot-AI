@@ -442,12 +442,24 @@ export function registerEnvHandlers(
 		if (config.graphitiEnabled !== undefined) {
 			existingVars.GRAPHITI_ENABLED = config.graphitiEnabled ? "true" : "false";
 		}
-		// Memory Provider Configuration (embeddings only - LLM uses Claude SDK)
+		// Memory Provider Configuration
 		if (config.graphitiProviderConfig) {
 			const pc = config.graphitiProviderConfig;
-			// Embedding provider only (LLM provider removed - Claude SDK handles RAG)
 			if (pc.embeddingProvider)
 				existingVars.GRAPHITI_EMBEDDER_PROVIDER = pc.embeddingProvider;
+			// graphiti-core needs an LLM to ingest episodes (entity extraction).
+			// Derive it from the embedding provider; for Ollama this keeps the
+			// whole memory stack local.
+			if (pc.embeddingProvider === "ollama" && pc.ollamaLlmModel) {
+				existingVars.GRAPHITI_LLM_PROVIDER = "ollama";
+				existingVars.OLLAMA_LLM_MODEL = pc.ollamaLlmModel;
+			} else if (pc.embeddingProvider === "openai" && pc.openaiApiKey) {
+				existingVars.GRAPHITI_LLM_PROVIDER = "openai";
+			} else if (pc.embeddingProvider === "google" && pc.googleApiKey) {
+				existingVars.GRAPHITI_LLM_PROVIDER = "google";
+			} else if (pc.embeddingProvider === "openrouter" && pc.openrouterApiKey) {
+				existingVars.GRAPHITI_LLM_PROVIDER = "openrouter";
+			}
 			// OpenAI Embeddings
 			if (pc.openaiApiKey) existingVars.OPENAI_API_KEY = pc.openaiApiKey;
 			if (pc.openaiEmbeddingModel)
@@ -700,6 +712,10 @@ ${existingVars.GRAPHITI_ENABLED ? `GRAPHITI_ENABLED=${existingVars.GRAPHITI_ENAB
 
 # Embedding Provider (for semantic search - optional, keyword search works without)
 ${existingVars.GRAPHITI_EMBEDDER_PROVIDER ? `GRAPHITI_EMBEDDER_PROVIDER=${existingVars.GRAPHITI_EMBEDDER_PROVIDER}` : "# GRAPHITI_EMBEDDER_PROVIDER=ollama"}
+
+# LLM used by graphiti-core to ingest episodes (entity extraction)
+${existingVars.GRAPHITI_LLM_PROVIDER ? `GRAPHITI_LLM_PROVIDER=${existingVars.GRAPHITI_LLM_PROVIDER}` : "# GRAPHITI_LLM_PROVIDER=ollama"}
+${existingVars.OLLAMA_LLM_MODEL ? `OLLAMA_LLM_MODEL=${existingVars.OLLAMA_LLM_MODEL}` : "# OLLAMA_LLM_MODEL=qwen3:4b"}
 
 # OpenAI Embeddings
 ${existingVars.OPENAI_API_KEY ? `OPENAI_API_KEY=${existingVars.OPENAI_API_KEY}` : "# OPENAI_API_KEY="}
@@ -1030,6 +1046,7 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 					ollamaEmbeddingDim: vars.OLLAMA_EMBEDDING_DIM
 						? Number.parseInt(vars.OLLAMA_EMBEDDING_DIM, 10)
 						: undefined,
+					ollamaLlmModel: vars.OLLAMA_LLM_MODEL,
 					// LadybugDB
 					database: vars.GRAPHITI_DATABASE,
 					dbPath: vars.GRAPHITI_DB_PATH,

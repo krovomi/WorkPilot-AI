@@ -38,6 +38,7 @@ import type {
 import type { AgentManager } from "../../agent";
 import { getAppLanguage } from "../../app-language";
 import { appLog } from "../../app-logger";
+import { learningLoopService } from "../../learning-loop-service";
 import {
 	type ClaudeProfileManager,
 	initializeClaudeProfileManager,
@@ -77,6 +78,50 @@ function requiresClaudeAuth(): boolean {
 		selectedProvider === "claude" ||
 		selectedProvider === "anthropic"
 	);
+}
+
+/**
+ * Feed the learning loop with a human review verdict, inferred from a kanban
+ * status transition. Fire-and-forget — never blocks the status change.
+ *
+ * - Approved: a reviewed task moves forward to done/pr_created.
+ * - Rejected: a task in human_review is sent back to an earlier column
+ *   (the reviewer wants rework).
+ */
+function recordReviewVerdictForLearning(
+	previousStatus: TaskStatus,
+	newStatus: TaskStatus,
+	project: Project,
+	task: Task,
+): void {
+	try {
+		const movingForwardToDone =
+			(newStatus === "done" || newStatus === "pr_created") &&
+			(previousStatus === "human_review" || previousStatus === "ai_review");
+
+		const sentBackFromReview =
+			previousStatus === "human_review" &&
+			(newStatus === "backlog" ||
+				newStatus === "queue" ||
+				newStatus === "in_progress");
+
+		if (movingForwardToDone) {
+			learningLoopService.recordTaskOutcome(
+				project.path,
+				task.specId,
+				"approved",
+			);
+		} else if (sentBackFromReview) {
+			learningLoopService.recordTaskOutcome(
+				project.path,
+				task.specId,
+				"rejected",
+				"Human reviewer sent the task back for rework.",
+			);
+		}
+	} catch (err) {
+		console.warn("[TASK_UPDATE_STATUS] Learning outcome recording failed:", err);
+	}
 }
 
 /**
@@ -1546,6 +1591,10 @@ print(json.dumps(result))
 						projectStore.invalidateTasksCache(project.id);
 					}
 				}
+
+				// Feed the learning loop with the human verdict on a reviewed task.
+				// `task.status` is still the pre-change status here.
+				recordReviewVerdictForLearning(task.status, status, project, task);
 
 				// Auto-stop task when status changes AWAY from 'in_progress' and process IS running
 				// This handles the case where user drags a running task back to Planning/backlog

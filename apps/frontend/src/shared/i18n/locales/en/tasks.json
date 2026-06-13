@@ -62,7 +62,8 @@
 		"tdd": "TDD",
 		"pipeline": "Pipeline",
 		"repairBuild": "Repair build",
-		"buildFailed": "Red build"
+		"buildFailed": "Red build",
+		"openInTracker": "Open in {{tracker}}"
 	},
 	"warnings": {
 		"stuck": {
@@ -203,6 +204,39 @@
 		"expandAll": "Expand all columns",
 		"azureDevOpsNotConnected": "Azure DevOps not connected — click to configure",
 		"jiraNotConnected": "Jira not connected — click to configure",
+		"filter": {
+			"button": "Filter",
+			"title": "Filters",
+			"clear": "Reset",
+			"clearSearch": "Clear search",
+			"searchPlaceholder": "Search tasks…",
+			"sourceLabel": "Source",
+			"categoryLabel": "Category",
+			"priorityLabel": "Priority",
+			"sources": {
+				"azure-devops": "Azure DevOps",
+				"jira": "Jira",
+				"linear": "Linear",
+				"github": "GitHub",
+				"gitlab": "GitLab",
+				"ideation": "Ideation",
+				"roadmap": "Roadmap",
+				"insights": "Insights",
+				"manual": "Manual"
+			}
+		},
+		"sort": {
+			"title": "Sort by",
+			"ascending": "Ascending",
+			"descending": "Descending",
+			"fields": {
+				"manual": "Manual order",
+				"priority": "Priority",
+				"created": "Created date",
+				"updated": "Last updated",
+				"title": "Title"
+			}
+		},
 		"quickCommand": {
 			"placeholder": "Quick command (e.g. /review, /help)",
 			"buttonLabel": "Run command",

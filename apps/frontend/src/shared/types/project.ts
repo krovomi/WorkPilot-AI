@@ -225,7 +225,9 @@ export type GraphitiLLMProvider =
 	| "openrouter";
 
 export interface GraphitiProviderConfig {
-	// Embedding Provider (LLM provider removed - Claude SDK handles RAG)
+	// Embedding Provider. A small LLM is still required for episode ingestion
+	// (entity extraction in graphiti-core); it is derived from the embedding
+	// provider, or runs locally via Ollama (ollamaLlmModel).
 	embeddingProvider: GraphitiEmbeddingProvider;
 	embeddingModel?: string; // Embedding model, uses provider default if not specified
 
@@ -256,6 +258,7 @@ export interface GraphitiProviderConfig {
 	ollamaBaseUrl?: string; // Default: http://localhost:11434
 	ollamaEmbeddingModel?: string;
 	ollamaEmbeddingDim?: number;
+	ollamaLlmModel?: string; // Local LLM used by graphiti-core for episode ingestion
 
 	// LadybugDB settings (embedded database - no Docker required)
 	database?: string; // Database name (default: auto_claude_memory)

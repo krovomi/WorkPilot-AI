@@ -29,6 +29,8 @@ import {
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
+import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
+import JiraLogo from "../assets/logos/jira.svg";
 import {
 	EXECUTION_PHASE_BADGE_COLORS,
 	EXECUTION_PHASE_LABELS,
@@ -206,6 +208,59 @@ const PipelineBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 				</Button>
 			)}
 		</div>
+	);
+};
+
+/**
+ * Tracker reference badge — shows the originating work-item number for tasks
+ * imported from Azure DevOps or Jira (the "US number" the user asked for).
+ * Clicking the badge opens the work item in the external tracker.
+ */
+const TrackerBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
+	const m = task.metadata;
+
+	let logo: string;
+	let alt: string;
+	let identifier: string;
+	let url: string | undefined;
+
+	if (m?.azureDevOpsIdentifier) {
+		logo = AzureDevOpsLogo;
+		alt = "Azure DevOps";
+		// Azure work-item ids are bare numbers — prefix with # for readability.
+		identifier = `#${m.azureDevOpsIdentifier}`;
+		url = m.azureDevOpsUrl;
+	} else if (m?.jiraIdentifier) {
+		logo = JiraLogo;
+		alt = "Jira";
+		// Jira keys already read like "PROJ-123".
+		identifier = m.jiraIdentifier;
+		url = m.jiraUrl;
+	} else {
+		return null;
+	}
+
+	const open = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		if (url) {
+			// biome-ignore lint/suspicious/noExplicitAny: electronAPI shape is dynamic
+			(globalThis as any).electronAPI?.openExternal?.(url);
+		}
+	};
+
+	return (
+		<Badge
+			variant="outline"
+			className={cn(
+				"text-[10px] px-1.5 py-0.5 flex w-fit items-center gap-1 bg-muted/40 text-muted-foreground border-border font-mono",
+				url && "cursor-pointer hover:bg-muted hover:text-foreground",
+			)}
+			onClick={url ? open : undefined}
+			title={t("labels.openInTracker", { tracker: alt })}
+		>
+			<img src={logo} alt={alt} className="h-3 w-3" />
+			{identifier}
+		</Badge>
 	);
 };
 
@@ -1203,9 +1258,12 @@ export const TaskCard = memo(function TaskCard({
 					)}
 
 					<div className={cn("flex-1 min-w-0", !isSelectable && "w-full")}>
+						{/* Tracker reference (Azure DevOps / Jira work-item number) */}
+						<TrackerBadge task={task} t={t} />
+
 						{/* Title - full width, no wrapper */}
 						<h3
-							className="font-semibold text-sm text-foreground line-clamp-2 leading-snug"
+							className="mt-1 font-semibold text-sm text-foreground line-clamp-2 leading-snug"
 							title={displayTitle}
 						>
 							{displayTitle}

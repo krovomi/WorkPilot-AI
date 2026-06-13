@@ -41,6 +41,7 @@ import {
 	updatePlanFile,
 } from "./ipc-handlers/task/plan-file-utils";
 import { parseEnvFile } from "./ipc-handlers/utils";
+import { learningLoopService } from "./learning-loop-service";
 import { projectStore } from "./project-store";
 
 const DEFAULT_POLL_SECONDS = 60;
@@ -359,6 +360,16 @@ class CiPipelineService {
 		} catch (err) {
 			console.warn("[CiPipeline] Could not write BUILD_FAILURE.md:", err);
 		}
+
+		// Feed the learning loop: a red build is a strong failure signal.
+		learningLoopService.recordTaskOutcome(
+			project.path,
+			task.specId,
+			"build_failed",
+			errors.length
+				? errors.join("\n").slice(0, 2000)
+				: `CI build ${status.buildNumber ?? ""} failed on ${status.branch ?? ""}`,
+		);
 
 		// If the agent is already repairing (or the user moved the task back to
 		// work), don't yank the task out of its column.
