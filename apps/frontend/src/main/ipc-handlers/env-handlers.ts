@@ -206,6 +206,9 @@ export function registerEnvHandlers(
 				: "false";
 		}
 		// GitHub Integration
+		if (config.githubEnabled !== undefined) {
+			existingVars.GITHUB_ENABLED = config.githubEnabled ? "true" : "false";
+		}
 		// Guard: don't overwrite existing non-empty values with empty strings
 		if (
 			config.githubToken !== undefined &&
@@ -576,6 +579,7 @@ ${existingVars.LINEAR_REALTIME_SYNC ? `LINEAR_REALTIME_SYNC=${existingVars.LINEA
 # =============================================================================
 # GITHUB INTEGRATION (OPTIONAL)
 # =============================================================================
+${existingVars.GITHUB_ENABLED ? `GITHUB_ENABLED=${existingVars.GITHUB_ENABLED}` : "# GITHUB_ENABLED=false"}
 ${existingVars.GITHUB_TOKEN ? `GITHUB_TOKEN=${existingVars.GITHUB_TOKEN}` : "# GITHUB_TOKEN="}
 ${existingVars.GITHUB_REPO ? `GITHUB_REPO=${existingVars.GITHUB_REPO}` : "# GITHUB_REPO=owner/repo"}
 ${existingVars.GITHUB_AUTO_SYNC ? `GITHUB_AUTO_SYNC=${existingVars.GITHUB_AUTO_SYNC}` : "# GITHUB_AUTO_SYNC=false"}
@@ -814,8 +818,13 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 
 			// GitHub config
 			if (vars.GITHUB_TOKEN) {
-				config.githubEnabled = true;
 				config.githubToken = vars.GITHUB_TOKEN;
+			}
+			// Explicit GITHUB_ENABLED wins; fall back to token presence (legacy .env files)
+			if (vars.GITHUB_ENABLED !== undefined) {
+				config.githubEnabled = vars.GITHUB_ENABLED.toLowerCase() === "true";
+			} else if (vars.GITHUB_TOKEN) {
+				config.githubEnabled = true;
 			}
 			if (vars.GITHUB_REPO) {
 				config.githubRepo = vars.GITHUB_REPO;
