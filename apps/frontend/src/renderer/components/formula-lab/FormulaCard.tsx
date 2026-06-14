@@ -44,10 +44,19 @@ export function FormulaCard({
 	const color = providerColor(formula.provider);
 
 	return (
-		<button
-			type="button"
+		// A div (not a button) so the inner "Apply" Button isn't a nested button —
+		// nested <button> is invalid HTML and triggers a hydration error.
+		<div
+			role="button"
+			tabIndex={0}
 			onClick={onSelect}
-			className={`group relative flex w-full flex-col gap-2 rounded-xl border p-3 text-left transition-all hover:shadow-md ${
+			onKeyDown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					onSelect?.();
+				}
+			}}
+			className={`group relative flex w-full cursor-pointer flex-col gap-2 rounded-xl border p-3 text-left transition-all hover:shadow-md ${
 				selected
 					? "border-primary ring-2 ring-primary/40"
 					: "border-border hover:border-primary/40"
@@ -118,6 +127,6 @@ export function FormulaCard({
 						: t("formulaLab:apply")}
 				</Button>
 			)}
-		</button>
+		</div>
 	);
 }
