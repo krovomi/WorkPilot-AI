@@ -2,6 +2,8 @@ import {
 	ChevronDown,
 	ChevronsUpDown,
 	ChevronUp,
+	Database,
+	Info,
 	Loader2,
 	RotateCw,
 	Search,
@@ -280,6 +282,26 @@ export function FormulaLab() {
 									className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gradient-to-r from-emerald-400 via-amber-300 to-sky-400 accent-primary"
 									aria-label={t("formulaLab:slider.preference")}
 								/>
+								{/* Cost provenance: states whether figures are calibrated on
+								    real project runs or fall back to heuristic volumes. */}
+								<p
+									className={`mt-2 flex items-center gap-1.5 text-[11px] ${
+										(matrix.history_tasks ?? 0) > 0
+											? "text-emerald-600 dark:text-emerald-400"
+											: "text-muted-foreground"
+									}`}
+								>
+									{(matrix.history_tasks ?? 0) > 0 ? (
+										<Database className="h-3 w-3 shrink-0" />
+									) : (
+										<Info className="h-3 w-3 shrink-0" />
+									)}
+									{(matrix.history_tasks ?? 0) > 0
+										? t("formulaLab:costBasis.calibrated", {
+												count: matrix.history_tasks,
+											})
+										: t("formulaLab:costBasis.heuristic")}
+								</p>
 								{refineError && (
 									<p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
 										{t("formulaLab:refine.error")}
@@ -446,7 +468,15 @@ export function FormulaLab() {
 														{formatTokens(totalTokens(f))}
 													</td>
 													<td className="p-2 text-right font-medium tabular-nums">
-														{formatCostBand(f)}
+														<span className="inline-flex items-center justify-end gap-1">
+															{f.cost_basis === "measured" && (
+																<span
+																	title={t("formulaLab:costBasis.measuredTooltip")}
+																	className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+																/>
+															)}
+															{formatCostBand(f)}
+														</span>
 													</td>
 													<td className="p-2">
 														<div className="flex items-center justify-center gap-1">

@@ -642,63 +642,91 @@ export function getModifiedFilesFromWorktree(
 }
 
 /**
- * Generate subtasks from modified files and feedback.
- * Groups related files together based on directory structure.
- *
- * @param modifiedFiles - Array of file paths that were modified
- * @param feedback - User feedback about what needs to be done
- * @returns Array of generated subtasks
+ * A subtask tracing a user "Request Changes" submission, persisted into the
+ * implementation plan. Carries `origin: "change_request"` so the Subtasks tab
+ * renders it with a distinct colour, and `requested_at` for the trace.
  */
-export function generateSubtasksFromModifiedFiles(
-	modifiedFiles: string[],
-	feedback: string,
-): Array<{
+export interface ChangeRequestSubtask {
 	id: string;
 	title: string;
 	description: string;
 	status: "pending";
 	files: string[];
-}> {
-	if (modifiedFiles.length === 0) {
-		return [];
-	}
+	origin: "change_request";
+	requested_at: string;
+}
 
-	// Group files by directory for better organization
-	const filesByDir = new Map<string, string[]>();
+/**
+ * Build a single "change request" subtask that records a modification the user
+ * asked for during human review.
+ *
+ * Unlike a file-derived breakdown, this ALWAYS returns one subtask — even when
+ * no files were modified yet — so every requested change leaves a visible trace
+ * in the Subtasks tab. The user's feedback becomes the subtask description and
+ * any modified files are attached as targets for the coder/QA loop.
+ *
+ * @param feedback - The user's "Request Changes" feedback text
+ * @param modifiedFiles - Files already changed in the worktree (optional)
+ * @returns A single change-request subtask
+ */
+export function buildChangeRequestSubtask(
+	feedback: string,
+	modifiedFiles: string[] = [],
+): ChangeRequestSubtask {
+	const trimmed = (feedback || "").trim();
+	const summary = trimmed
+		? trimmed.split("\n")[0].slice(0, 120)
+		: "Change requested by user";
+	const filesBlock =
+		modifiedFiles.length > 0
+			? `\n\nFiles touched so far:\n${modifiedFiles.map((f) => `- ${f}`).join("\n")}`
+			: "";
 
-	for (const file of modifiedFiles) {
-		const dir = path.dirname(file);
-		if (!filesByDir.has(dir)) {
-			filesByDir.set(dir, []);
+	return {
+		id: `change-request-${Date.now()}`,
+		title: summary,
+		description: `${trimmed || summary}${filesBlock}`,
+		status: "pending",
+		files: modifiedFiles,
+		origin: "change_request",
+		requested_at: new Date().toISOString(),
+	};
+}
+
+/**
+ * Append a change-request subtask to the implementation plan at `planPath`.
+ *
+ * Adds it to the "Implementation" phase (created if absent). Used to record the
+ * trace in BOTH the worktree plan (which the agent reads/updates) and the main
+ * project plan (which the Subtasks tab watches) — the worktree plan is only
+ * synced back to the main one after QA, so writing the main plan here is what
+ * makes the trace appear in the UI immediately.
+ *
+ * @returns true if the plan was updated, false if it could not be read/written.
+ */
+export function addChangeRequestSubtaskToPlan(
+	planPath: string,
+	subtask: ChangeRequestSubtask,
+): boolean {
+	try {
+		const plan = JSON.parse(readFileSync(planPath, "utf-8"));
+		if (!Array.isArray(plan.phases)) {
+			plan.phases = [];
 		}
-		filesByDir.get(dir)?.push(file);
+		let implPhase = plan.phases.find(
+			(p: Record<string, unknown>) => p.name === "Implementation",
+		);
+		if (!implPhase) {
+			implPhase = { name: "Implementation", subtasks: [] };
+			plan.phases.push(implPhase);
+		}
+		if (!Array.isArray(implPhase.subtasks)) {
+			implPhase.subtasks = [];
+		}
+		implPhase.subtasks.push(subtask);
+		writeFileSync(planPath, JSON.stringify(plan, null, 2), "utf-8");
+		return true;
+	} catch {
+		return false;
 	}
-
-	// Generate subtasks - one per directory group or one for all if only one dir
-	const subtasks: Array<{
-		id: string;
-		title: string;
-		description: string;
-		status: "pending";
-		files: string[];
-	}> = [];
-
-	let dirIndex = 0;
-	for (const [dir, files] of filesByDir.entries()) {
-		const dirName =
-			dir === "." ? "root" : dir.split("/").pop() || "files";
-		const fileCount = files.length;
-
-		subtasks.push({
-			id: `subtask-${Date.now()}-${dirIndex}`,
-			title: `Fix ${dirName} - ${fileCount} file${fileCount !== 1 ? "s" : ""}`,
-			description: `Address feedback in ${dirName}:\n\n${feedback}\n\nModified files in this directory:\n${files.map((f) => `- ${f}`).join("\n")}`,
-			status: "pending",
-			files,
-		});
-
-		dirIndex++;
-	}
-
-	return subtasks;
 }

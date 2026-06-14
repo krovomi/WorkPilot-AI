@@ -477,6 +477,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 					files: extractSubtaskFiles(subtask),
 					blockedReason: subtask.blocked_reason,
 					verification: subtask.verification as Subtask["verification"],
+					origin: subtask.origin as Subtask["origin"],
+					requestedAt: subtask.requested_at,
 				};
 			};
 

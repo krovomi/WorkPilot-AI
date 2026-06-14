@@ -89,6 +89,15 @@ export interface Subtask {
 		run?: string;
 		scenario?: string;
 	};
+	/**
+	 * Provenance marker. "change_request" = this subtask was created from a user
+	 * "Request Changes" submission during human review — i.e. a trace of a
+	 * modification the user explicitly asked for. The Subtasks tab renders these
+	 * with a distinct colour so they stand out from the originally-planned ones.
+	 */
+	origin?: "change_request";
+	/** ISO timestamp recorded when a change_request subtask was created. */
+	requestedAt?: string;
 }
 
 /**
@@ -467,6 +476,10 @@ export interface PlanSubtask {
 		run?: string;
 		scenario?: string;
 	};
+	/** Provenance marker (see {@link Subtask.origin}). */
+	origin?: "change_request";
+	/** ISO timestamp recorded when a change-request subtask was created. */
+	requested_at?: string;
 }
 
 // Workspace management types (for human review)
