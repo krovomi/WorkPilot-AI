@@ -239,6 +239,20 @@ export type TaskPriority = "low" | "medium" | "high" | "urgent";
 // Re-export ThinkingLevel (defined in settings.ts) for convenience
 export type { ThinkingLevel } from "./settings";
 export type ModelType = "haiku" | "sonnet" | "opus";
+
+/**
+ * The Provider × LLM × Effort "formula" a user selected in the Formula Lab,
+ * persisted on a task so the kanban card can show its cost/success badge.
+ */
+export interface AppliedFormula {
+	provider: string;
+	model: string;
+	effort: string; // ThinkingLevel: none | low | medium | high | ultrathink
+	expectedCostUsd: number;
+	successProbability: number; // 0-1
+	perTokenBilled: boolean;
+	appliedAt: string; // ISO timestamp
+}
 export type TaskCategory =
 	| "feature"
 	| "bug_fix"
@@ -337,6 +351,11 @@ export interface TaskMetadata {
 	phaseModels?: PhaseModelConfig; // Per-phase model configuration
 	phaseThinking?: PhaseThinkingConfig; // Per-phase thinking configuration
 	phaseProviders?: PhaseProviderConfig; // Per-phase LLM provider configuration
+
+	// Formula Lab — the Provider × LLM × Effort "formula" the user picked for
+	// this ticket before development. Drives the compact kanban badge and seeds
+	// the per-phase provider/model/thinking config above.
+	appliedFormula?: AppliedFormula;
 
 	// Git/Worktree configuration
 	baseBranch?: string; // Override base branch for this task's worktree

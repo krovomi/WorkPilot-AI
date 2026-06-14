@@ -29,8 +29,15 @@ from .cost_predictor import (
     extract_spec_footprint,
 )
 from .estimator import CostEstimate, PhaseEstimate, estimate_build_cost
+from .formula_matrix import Formula, FormulaMatrix, compute_formula_matrix
 from .live_tracker import CostEvent, LiveCostTracker, TrackerSnapshot
 from .reservation import BudgetReservation, ReservationManager
+from .success_model import (
+    EFFORT_LEVELS,
+    SuccessEstimate,
+    estimate_success_probability,
+    infer_model_tier,
+)
 
 __all__ = [
     # Catalog
@@ -60,4 +67,13 @@ __all__ = [
     "CostEstimate",
     "PhaseEstimate",
     "estimate_build_cost",
+    # Formula matrix (Provider × LLM × Effort)
+    "Formula",
+    "FormulaMatrix",
+    "compute_formula_matrix",
+    # Success model
+    "SuccessEstimate",
+    "estimate_success_probability",
+    "infer_model_tier",
+    "EFFORT_LEVELS",
 ]

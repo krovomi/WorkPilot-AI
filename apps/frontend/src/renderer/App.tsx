@@ -342,6 +342,7 @@ import { AzureDevOpsSetupModal } from "./components/AzureDevOpsSetupModal";
 import { CommandPalette } from "./components/CommandPalette";
 import { GitHubSetupModal } from "./components/GitHubSetupModal";
 import { GlobalDownloadIndicator } from "./components/GlobalDownloadIndicator";
+import { FormulaLab } from "./components/formula-lab/FormulaLab";
 import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay";
 import { NavigationConfirmDialog } from "./components/NavigationConfirmDialog";
 import { NoProjectPage } from "./components/NoProjectPage";
@@ -2018,6 +2019,10 @@ export function App() {
 						/>
 
 						<Toaster />
+
+						{/* Formula Lab — Provider × LLM × Effort comparator (kanban) */}
+						<FormulaLab />
+
 						{/* Global download progress indicator - shows overall progress of all downloads */}
 						<GlobalDownloadIndicator />
 

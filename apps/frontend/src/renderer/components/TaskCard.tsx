@@ -75,6 +75,7 @@ import { SyncFromBranchDialog } from "./task-detail/task-review/SyncFromBranchDi
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
+import { FormulaBadge } from "./formula-lab/FormulaBadge";
 import { Checkbox } from "./ui/checkbox";
 import {
 	DropdownMenu,
@@ -1317,6 +1318,10 @@ export const TaskCard = memo(function TaskCard({
 							<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
 								<Clock className="h-3 w-3" />
 								<span>{relativeTime}</span>
+								<FormulaBadge
+									task={task}
+									projectPath={currentProject?.path}
+								/>
 							</div>
 
 							<div className="flex items-center gap-1.5">

@@ -133,6 +133,10 @@ import {
 	type CostPredictorAPI,
 	createCostPredictorAPI,
 } from "./modules/cost-predictor-api";
+import {
+	createFormulaMatrixAPI,
+	type FormulaMatrixAPI,
+} from "./modules/formula-matrix-api";
 import { createDebugAPI, type DebugAPI } from "./modules/debug-api";
 import type { DecisionLoggerAPI } from "./modules/decision-logger-api";
 import { createDecisionLoggerAPI } from "./modules/decision-logger-api";
@@ -240,6 +244,7 @@ export interface ElectronAPI
 		TestGenerationAPI,
 		CostAPI,
 		CostPredictorAPI,
+		FormulaMatrixAPI,
 		AccessibilityAPI,
 		I18nAgentAPI,
 		DocDriftAPI,
@@ -370,6 +375,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createTestGenerationAPI(),
 		...createCostAPI(),
 		...createCostPredictorAPI(),
+		...createFormulaMatrixAPI(),
 		...createAccessibilityAPI(),
 		...createI18nAgentAPI(),
 		...createDocDriftAPI(),

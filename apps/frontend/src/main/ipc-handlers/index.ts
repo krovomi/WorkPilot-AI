@@ -51,6 +51,7 @@ import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 import { registerCostHandlers } from "./cost-handlers";
 import { registerCostPredictorHandlers } from "./cost-predictor-handlers";
+import { registerFormulaMatrixHandlers } from "./formula-matrix-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 import { registerDebugHandlers } from "./debug-handlers";
@@ -533,6 +534,9 @@ export function setupIpcHandlers(
 
 	// Cost Predictor handlers (ex-ante spec cost prediction)
 	registerCostPredictorHandlers();
+
+	// Formula Matrix handlers (Provider × LLM × Effort comparator — Formula Lab)
+	registerFormulaMatrixHandlers();
 
 	// Agent Debugger handlers (Feature 1)
 	registerAgentDebuggerHandlers();
