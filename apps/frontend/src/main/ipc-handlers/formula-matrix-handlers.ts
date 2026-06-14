@@ -30,6 +30,26 @@ interface FormulaMatrixResponse {
 	matrix: unknown;
 }
 
+interface FormulaRefineRequest {
+	description?: string;
+	candidates: Array<{
+		key: string;
+		provider: string;
+		model: string;
+		effort: string;
+		tier: string;
+		base_probability: number;
+	}>;
+}
+
+interface FormulaRefineResponse {
+	refined: Array<{
+		key: string;
+		success_probability: number;
+		reason: string;
+	}>;
+}
+
 export function registerFormulaMatrixHandlers(): void {
 	ipcMain.handle(
 		"formulaMatrix:run",
@@ -113,6 +133,85 @@ export function registerFormulaMatrixHandlers(): void {
 						);
 					}
 				});
+			});
+		},
+	);
+
+	// AI refine — one cheap LLM call to sharpen the top formulas' success.
+	ipcMain.handle(
+		"formulaMatrix:refine",
+		async (
+			_event,
+			req: FormulaRefineRequest,
+		): Promise<FormulaRefineResponse> => {
+			if (!req.candidates || req.candidates.length === 0) {
+				return { refined: [] };
+			}
+
+			const backendPath = app.isPackaged
+				? path.resolve(process.resourcesPath, "backend")
+				: path.resolve(app.getAppPath(), "..", "backend");
+			const runnerPath = path.resolve(
+				backendPath,
+				"runners",
+				"formula_refine_runner.py",
+			);
+
+			const pythonExe = pythonEnvManager.getPythonPath();
+			if (!pythonExe) throw new Error("Python environment not ready");
+
+			const payload = JSON.stringify({
+				description: req.description ?? "",
+				candidates: req.candidates,
+			});
+
+			return await new Promise<FormulaRefineResponse>((resolve, reject) => {
+				const child = spawn(pythonExe, [runnerPath], {
+					cwd: backendPath,
+					env: { ...process.env, PYTHONPATH: backendPath },
+				} as Parameters<typeof spawn>[2]);
+
+				let stdout = "";
+				let stderr = "";
+
+				child.stdout?.on("data", (c: Buffer) => {
+					stdout += c.toString();
+				});
+				child.stderr?.on("data", (c: Buffer) => {
+					stderr += c.toString();
+				});
+
+				child.on("error", (err) => reject(err));
+				child.on("close", (code) => {
+					const lines = stdout.trim().split("\n").filter(Boolean);
+					const lastLine = lines[lines.length - 1] ?? "";
+					try {
+						const parsed = JSON.parse(lastLine);
+						if (parsed.error) {
+							reject(new Error(parsed.error));
+							return;
+						}
+						if (code !== 0) {
+							reject(
+								new Error(
+									`formula_refine_runner exited with ${code}: ${stderr}`,
+								),
+							);
+							return;
+						}
+						resolve({ refined: parsed.refined ?? [] });
+					} catch (err) {
+						reject(
+							new Error(
+								`Failed to parse formula refine output: ${(err as Error).message} (stdout=${stdout.slice(0, 200)})`,
+							),
+						);
+					}
+				});
+
+				// Feed the candidate payload on stdin (avoids argv quoting limits).
+				child.stdin?.write(payload);
+				child.stdin?.end();
 			});
 		},
 	);

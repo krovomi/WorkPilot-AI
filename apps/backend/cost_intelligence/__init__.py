@@ -30,6 +30,7 @@ from .cost_predictor import (
 )
 from .estimator import CostEstimate, PhaseEstimate, estimate_build_cost
 from .formula_matrix import Formula, FormulaMatrix, compute_formula_matrix
+from .formula_refine import RefinedFormula, refine_formulas, refine_formulas_sync
 from .live_tracker import CostEvent, LiveCostTracker, TrackerSnapshot
 from .reservation import BudgetReservation, ReservationManager
 from .success_model import (
@@ -71,6 +72,10 @@ __all__ = [
     "Formula",
     "FormulaMatrix",
     "compute_formula_matrix",
+    # Formula AI refine
+    "RefinedFormula",
+    "refine_formulas",
+    "refine_formulas_sync",
     # Success model
     "SuccessEstimate",
     "estimate_success_probability",

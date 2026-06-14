@@ -27,6 +27,10 @@ export interface Formula {
 	value_score: number;
 	energy_kwh: number;
 	rationale: string[];
+	/** True once an AI refine pass has sharpened this formula's probability. */
+	ai_refined?: boolean;
+	/** One-line task-aware justification from the AI refine pass. */
+	refine_reason?: string;
 }
 
 export interface FormulaFootprint {
@@ -57,13 +61,40 @@ export interface FormulaMatrixRunOptions {
 	complexity?: number;
 }
 
+/** One candidate sent to the AI refine pass. */
+export interface FormulaRefineCandidate {
+	key: string;
+	provider: string;
+	model: string;
+	effort: string;
+	tier: string;
+	base_probability: number;
+}
+
+/** A task-aware success probability returned by the AI refine pass. */
+export interface RefinedFormula {
+	key: string;
+	success_probability: number;
+	reason: string;
+}
+
+export interface FormulaRefineOptions {
+	description?: string;
+	candidates: FormulaRefineCandidate[];
+}
+
 export interface FormulaMatrixAPI {
 	runFormulaMatrix: (
 		options: FormulaMatrixRunOptions,
 	) => Promise<{ matrix: FormulaMatrix }>;
+	refineFormulas: (
+		options: FormulaRefineOptions,
+	) => Promise<{ refined: RefinedFormula[] }>;
 }
 
 export const createFormulaMatrixAPI = (): FormulaMatrixAPI => ({
 	runFormulaMatrix: (options) =>
 		invokeIpc<{ matrix: FormulaMatrix }>("formulaMatrix:run", options),
+	refineFormulas: (options) =>
+		invokeIpc<{ refined: RefinedFormula[] }>("formulaMatrix:refine", options),
 });

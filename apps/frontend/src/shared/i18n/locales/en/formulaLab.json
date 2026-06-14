@@ -14,6 +14,13 @@
 		"confidence": "Confidence",
 		"preference": "Preference"
 	},
+	"refine": {
+		"cta": "Refine with AI",
+		"running": "Refining…",
+		"tooltip": "Run one cheap LLM pass to sharpen the success estimate of the top 3 formulas for this task",
+		"error": "AI refine unavailable — keeping heuristic estimates.",
+		"aiBadge": "AI-refined estimate"
+	},
 	"picks": {
 		"bestValue": "Best value",
 		"safest": "Safest",

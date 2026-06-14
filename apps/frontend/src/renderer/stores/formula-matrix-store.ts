@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
 	Formula,
 	FormulaMatrix,
+	RefinedFormula,
 } from "../../preload/api/modules/formula-matrix-api";
 import type {
 	AppliedFormula,
@@ -15,6 +16,16 @@ export type { Formula, FormulaMatrix } from "../../preload/api/modules/formula-m
 /** Stable identity for a formula (Provider × LLM × Effort). */
 export function formulaKey(f: Pick<Formula, "provider" | "model" | "effort">): string {
 	return `${f.provider}::${f.model}::${f.effort}`;
+}
+
+/**
+ * "Value" score (success per dollar), mirroring the backend default. Free /
+ * flat-rate models are scored on success alone (scaled) so they stay
+ * competitive without dominating purely by being free.
+ */
+function _defaultValueScore(success: number, cost: number): number {
+	if (cost <= 1e-4) return Math.round(success * 8 * 1e4) / 1e4;
+	return Math.round((success / cost) * 1e4) / 1e4;
 }
 
 /**
@@ -138,6 +149,10 @@ interface FormulaMatrixState {
 	weight: number;
 	selectedKey: string | null;
 	applying: boolean;
+	/** AI refine pass in flight. */
+	refining: boolean;
+	/** Error from the last refine attempt, if any. */
+	refineError: string | null;
 
 	openLab: (args: OpenLabArgs) => void;
 	closeLab: () => void;
@@ -145,6 +160,8 @@ interface FormulaMatrixState {
 	setSelectedKey: (key: string | null) => void;
 	fetchMatrix: () => Promise<void>;
 	applyFormula: (formula: Formula) => Promise<boolean>;
+	/** Run the hybrid AI pass on the current top-N ranked formulas. */
+	refineTopFormulas: (topN?: number) => Promise<void>;
 }
 
 /** Build the metadata patch that applies a formula uniformly across phases. */
@@ -190,6 +207,8 @@ export const useFormulaMatrixStore = create<FormulaMatrixState>((set, get) => ({
 	weight: 0.5,
 	selectedKey: null,
 	applying: false,
+	refining: false,
+	refineError: null,
 
 	openLab: (args) => {
 		set({
@@ -212,6 +231,8 @@ export const useFormulaMatrixStore = create<FormulaMatrixState>((set, get) => ({
 			matrix: null,
 			error: null,
 			selectedKey: null,
+			refining: false,
+			refineError: null,
 		}),
 
 	setWeight: (weight) => set({ weight: Math.max(0, Math.min(1, weight)) }),
@@ -251,6 +272,56 @@ export const useFormulaMatrixStore = create<FormulaMatrixState>((set, get) => ({
 			return ok;
 		} finally {
 			set({ applying: false });
+		}
+	},
+
+	refineTopFormulas: async (topN = 3) => {
+		const { matrix, weight, openArgs } = get();
+		if (!matrix || matrix.formulas.length === 0) return;
+
+		// Refine the user's current top-N (respecting the live preference).
+		const top = rankFormulas(matrix.formulas, weight).slice(0, topN);
+		const candidates = top.map((f) => ({
+			key: formulaKey(f),
+			provider: f.provider,
+			model: f.model,
+			effort: f.effort,
+			tier: f.tier,
+			base_probability: f.success_probability,
+		}));
+
+		set({ refining: true, refineError: null });
+		try {
+			const { refined } = (await globalThis.electronAPI.refineFormulas({
+				description: openArgs?.description,
+				candidates,
+			})) as { refined: RefinedFormula[] };
+			if (refined.length === 0) {
+				set({ refineError: "no_assessment" });
+				return;
+			}
+			const byKey = new Map(refined.map((r) => [r.key, r]));
+			const merged = matrix.formulas.map((f) => {
+				const r = byKey.get(formulaKey(f));
+				if (!r) return f;
+				return {
+					...f,
+					success_probability: r.success_probability,
+					value_score: _defaultValueScore(
+						r.success_probability,
+						f.expected_cost_usd,
+					),
+					ai_refined: true,
+					refine_reason: r.reason,
+				};
+			});
+			set({ matrix: { ...matrix, formulas: merged } });
+		} catch (err) {
+			set({
+				refineError: err instanceof Error ? err.message : String(err),
+			});
+		} finally {
+			set({ refining: false });
 		}
 	},
 }));

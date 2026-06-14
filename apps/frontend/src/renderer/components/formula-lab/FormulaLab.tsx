@@ -48,11 +48,14 @@ export function FormulaLab() {
 		weight,
 		selectedKey,
 		applying,
+		refining,
+		refineError,
 		setWeight,
 		setSelectedKey,
 		closeLab,
 		fetchMatrix,
 		applyFormula,
+		refineTopFormulas,
 	} = useFormulaMatrixStore();
 
 	const [providerFilter, setProviderFilter] = useState<string>("all");
@@ -154,14 +157,33 @@ export function FormulaLab() {
 				{matrix && !loading && !error && (
 					<ScrollArea className="flex-1 pr-3">
 						<div className="space-y-4">
-							{/* Preference slider */}
+							{/* Preference slider + AI refine */}
 							<div className="rounded-xl border bg-card/40 p-3">
-								<div className="mb-2 flex items-center justify-between text-xs font-medium">
-									<span>💸 {t("formulaLab:slider.cost")}</span>
-									<span className="text-muted-foreground">
-										{t("formulaLab:slider.preference")}
-									</span>
-									<span>{t("formulaLab:slider.confidence")} 🛡️</span>
+								<div className="mb-2 flex items-center gap-3">
+									<div className="flex flex-1 items-center justify-between text-xs font-medium">
+										<span>💸 {t("formulaLab:slider.cost")}</span>
+										<span className="text-muted-foreground">
+											{t("formulaLab:slider.preference")}
+										</span>
+										<span>{t("formulaLab:slider.confidence")} 🛡️</span>
+									</div>
+									<Button
+										size="sm"
+										variant="outline"
+										className="h-7 shrink-0 gap-1.5 text-xs"
+										disabled={refining}
+										onClick={() => refineTopFormulas(3)}
+										title={t("formulaLab:refine.tooltip")}
+									>
+										{refining ? (
+											<Loader2 className="h-3.5 w-3.5 animate-spin" />
+										) : (
+											<Sparkles className="h-3.5 w-3.5 text-primary" />
+										)}
+										{refining
+											? t("formulaLab:refine.running")
+											: t("formulaLab:refine.cta")}
+									</Button>
 								</div>
 								<input
 									type="range"
@@ -172,6 +194,11 @@ export function FormulaLab() {
 									className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gradient-to-r from-emerald-400 via-amber-300 to-sky-400 accent-primary"
 									aria-label={t("formulaLab:slider.preference")}
 								/>
+								{refineError && (
+									<p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+										{t("formulaLab:refine.error")}
+									</p>
+								)}
 							</div>
 
 							{/* Smart picks */}
@@ -336,12 +363,17 @@ export function FormulaLab() {
 														{formatCostBand(f)}
 													</td>
 													<td className="p-2">
-														<div className="flex justify-center">
+														<div className="flex items-center justify-center gap-1">
 															<SuccessRing
 																value={f.success_probability}
 																size={30}
 																stroke={3}
 															/>
+															{f.ai_refined && (
+																<span title={f.refine_reason}>
+																	<Sparkles className="h-3 w-3 text-primary" />
+																</span>
+															)}
 														</div>
 													</td>
 													<td className="p-2 text-right">

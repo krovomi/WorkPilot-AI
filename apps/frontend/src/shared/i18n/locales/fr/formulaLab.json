@@ -14,6 +14,13 @@
 		"confidence": "Confiance",
 		"preference": "Préférence"
 	},
+	"refine": {
+		"cta": "Affiner avec l'IA",
+		"running": "Affinage…",
+		"tooltip": "Lance un appel LLM économique pour affiner l'estimation de réussite des 3 meilleures formules pour cette tâche",
+		"error": "Affinage IA indisponible — estimations heuristiques conservées.",
+		"aiBadge": "Estimation affinée par l'IA"
+	},
 	"picks": {
 		"bestValue": "Meilleur rapport",
 		"safest": "Plus sûr",
