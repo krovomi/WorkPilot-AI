@@ -7,6 +7,11 @@ import {
 	buildChangeRequestSubtask,
 } from "../plan-file-utils";
 
+interface Phase {
+	name: string;
+	subtasks: Array<{ id: string; origin?: string }>;
+}
+
 describe("buildChangeRequestSubtask", () => {
 	it("always returns a single change-request subtask, even with no files", () => {
 		const subtask = buildChangeRequestSubtask("Please fix the VAT limit", []);
@@ -78,7 +83,7 @@ describe("addChangeRequestSubtaskToPlan", () => {
 
 		expect(ok).toBe(true);
 		const plan = JSON.parse(readFileSync(planPath, "utf-8"));
-		const impl = plan.phases.find((p: any) => p.name === "Implementation");
+		const impl = plan.phases.find((p: Phase) => p.name === "Implementation");
 		expect(impl.subtasks).toHaveLength(2);
 		expect(impl.subtasks[1].origin).toBe("change_request");
 		expect(impl.subtasks[1].id).toBe(subtask.id);
@@ -103,7 +108,7 @@ describe("addChangeRequestSubtaskToPlan", () => {
 		expect(plan.phases).toHaveLength(2);
 		// Original phase untouched
 		expect(plan.phases[0].subtasks[0].id).toBe("orig");
-		const impl = plan.phases.find((p: any) => p.name === "Implementation");
+		const impl = plan.phases.find((p: Phase) => p.name === "Implementation");
 		expect(impl.subtasks).toHaveLength(1);
 		expect(impl.subtasks[0].origin).toBe("change_request");
 	});

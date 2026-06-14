@@ -1197,8 +1197,13 @@ export function registerTaskExecutionHandlers(
 					);
 				}
 
-				// Reset existing subtasks to "pending" in the implementation plan
-				// so the full pipeline (planning → coding → QA) will re-process them
+				// Re-open the plan for another pass WITHOUT re-running work that
+				// already passed. A "Request Changes" is a follow-up: the agent should
+				// pick up the new change-request subtask (pending) and retry any
+				// genuinely failed ones, but COMPLETED subtasks stay completed —
+				// otherwise every modification re-executes the whole task and floods
+				// the logs with the other subtasks (matches the follow-up planner's
+				// "never change the status of completed subtasks" rule).
 				const resetPlanPath = path.join(
 					hasWorktree && worktreeSpecDir ? worktreeSpecDir : specDir,
 					AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
@@ -1210,15 +1215,15 @@ export function registerTaskExecutionHandlers(
 						for (const phase of resetPlan.phases) {
 							if (Array.isArray(phase.subtasks)) {
 								for (const subtask of phase.subtasks) {
-									// Only reset completed/failed subtasks back to pending
-									if (subtask.status === "completed" || subtask.status === "failed") {
+									// Retry failed subtasks; preserve completed ones.
+									if (subtask.status === "failed") {
 										subtask.status = "pending";
 									}
 								}
 							}
 						}
 					}
-					// Reset QA signoff so the full pipeline runs again
+					// Reset QA signoff so QA re-validates the task after the change.
 					if (resetPlan.qa_signoff) {
 						resetPlan.qa_signoff.status = "pending";
 					}
@@ -1226,7 +1231,9 @@ export function registerTaskExecutionHandlers(
 					resetPlan.planStatus = "in_progress";
 					resetPlan.updated_at = new Date().toISOString();
 					writeFileSync(resetPlanPath, JSON.stringify(resetPlan, null, 2), "utf-8");
-					appLog.info("[TASK_REVIEW] Reset subtasks to pending for full pipeline re-execution");
+					appLog.info(
+						"[TASK_REVIEW] Re-opened plan for change request (completed subtasks preserved)",
+					);
 				} catch (resetError) {
 					appLog.warn(
 						`[TASK_REVIEW] Could not reset subtasks in plan: ${resetError instanceof Error ? resetError.message : String(resetError)}`,

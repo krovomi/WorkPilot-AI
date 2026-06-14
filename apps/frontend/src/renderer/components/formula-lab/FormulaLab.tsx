@@ -319,8 +319,13 @@ export function FormulaLab() {
 										selected={selectedKey === formulaKey(picks.bestValue)}
 										applied={selectedKey === formulaKey(picks.bestValue)}
 										applying={applying}
-										onSelect={() => setSelectedKey(formulaKey(picks.bestValue!))}
-										onApply={() => handleApply(picks.bestValue!)}
+										onSelect={() =>
+											picks.bestValue &&
+											setSelectedKey(formulaKey(picks.bestValue))
+										}
+										onApply={() =>
+											picks.bestValue && handleApply(picks.bestValue)
+										}
 									/>
 								)}
 								{picks.safest && (
@@ -330,8 +335,8 @@ export function FormulaLab() {
 										accent="#0ea5e9"
 										selected={selectedKey === formulaKey(picks.safest)}
 										applying={applying}
-										onSelect={() => setSelectedKey(formulaKey(picks.safest!))}
-										onApply={() => handleApply(picks.safest!)}
+										onSelect={() => picks.safest && setSelectedKey(formulaKey(picks.safest))}
+										onApply={() => picks.safest && handleApply(picks.safest)}
 									/>
 								)}
 								{picks.cheapest && (
@@ -341,8 +346,8 @@ export function FormulaLab() {
 										accent="#f59e0b"
 										selected={selectedKey === formulaKey(picks.cheapest)}
 										applying={applying}
-										onSelect={() => setSelectedKey(formulaKey(picks.cheapest!))}
-										onApply={() => handleApply(picks.cheapest!)}
+										onSelect={() => picks.cheapest && setSelectedKey(formulaKey(picks.cheapest))}
+										onApply={() => picks.cheapest && handleApply(picks.cheapest)}
 									/>
 								)}
 								{picks.fastest && (
@@ -352,8 +357,8 @@ export function FormulaLab() {
 										accent="#8b5cf6"
 										selected={selectedKey === formulaKey(picks.fastest)}
 										applying={applying}
-										onSelect={() => setSelectedKey(formulaKey(picks.fastest!))}
-										onApply={() => handleApply(picks.fastest!)}
+										onSelect={() => picks.fastest && setSelectedKey(formulaKey(picks.fastest))}
+										onApply={() => picks.fastest && handleApply(picks.fastest)}
 									/>
 								)}
 							</div>
@@ -406,6 +411,7 @@ export function FormulaLab() {
 										</button>
 									))}
 								</div>
+								{/* biome-ignore lint/a11y/noLabelWithoutControl: Switch is a custom component */}
 								<label className="ml-auto flex items-center gap-1.5">
 									<Switch
 										checked={perTokenOnly}

@@ -683,6 +683,15 @@
 		"phaseEmpty": "Aucun log pour l'instant",
 		"hideOutput": "Masquer la sortie",
 		"showOutput": "Afficher la sortie",
+		"search": {
+			"placeholder": "Rechercher dans les logs…",
+			"ariaLabel": "Rechercher dans les logs",
+			"results_one": "{{count}} résultat",
+			"results_other": "{{count}} résultats",
+			"clear": "Effacer la recherche",
+			"noResults": "Aucun résultat",
+			"noResultsHint": "Aucune entrée de log ne correspond à « {{query}} »."
+		},
 		"thinking": {
 			"selectAria": "Niveau de réflexion pour cette phase",
 			"selectTooltip": "Changer le niveau de réflexion pour cette phase",

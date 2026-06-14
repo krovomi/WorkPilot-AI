@@ -683,6 +683,15 @@
 		"phaseEmpty": "No logs yet",
 		"hideOutput": "Hide output",
 		"showOutput": "Show output",
+		"search": {
+			"placeholder": "Search logs…",
+			"ariaLabel": "Search logs",
+			"results_one": "{{count}} result",
+			"results_other": "{{count}} results",
+			"clear": "Clear search",
+			"noResults": "No results",
+			"noResultsHint": "No log entry matches “{{query}}”."
+		},
 		"thinking": {
 			"selectAria": "Thinking effort for this phase",
 			"selectTooltip": "Change the thinking effort for this phase",
