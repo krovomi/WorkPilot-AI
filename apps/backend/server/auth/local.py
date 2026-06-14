@@ -63,7 +63,14 @@ def _is_pwned(password: str) -> bool:
     password is never sent. Fail-open on any network/error so that an
     outage cannot lock out signups.
     """
-    digest = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()  # noqa: S324
+    # SHA-1 is mandated by the HIBP range API and is not used as a security
+    # primitive here (real password storage uses argon2 via `_hasher`), so the
+    # weak-hash warning does not apply — flag it as non-security to both tools.
+    digest = (
+        hashlib.sha1(password.encode("utf-8"), usedforsecurity=False)
+        .hexdigest()
+        .upper()
+    )
     prefix, suffix = digest[:5], digest[5:]
     try:
         req = urllib.request.Request(
