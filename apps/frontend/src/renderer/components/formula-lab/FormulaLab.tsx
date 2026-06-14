@@ -19,7 +19,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "../ui/dialog";
-import { ScrollArea } from "../ui/scroll-area";
 import { Switch } from "../ui/switch";
 import { EfficiencyFrontier } from "./EfficiencyFrontier";
 import { FormulaCard } from "./FormulaCard";
@@ -34,7 +33,9 @@ import {
 } from "./formula-utils";
 import { SuccessRing } from "./SuccessRing";
 
-const MAX_ROWS = 48;
+// Generous cap: the full catalog is ~275 formulas, all renderable in the
+// scrollable table. The "+N more" hint only triggers for pathological sets.
+const MAX_ROWS = 500;
 
 export function FormulaLab() {
 	const { t } = useTranslation(["formulaLab", "common"]);
@@ -155,7 +156,7 @@ export function FormulaLab() {
 				)}
 
 				{matrix && !loading && !error && (
-					<ScrollArea className="flex-1 pr-3">
+					<div className="flex-1 min-h-0 overflow-y-auto pr-2">
 						<div className="space-y-4">
 							{/* Preference slider + AI refine */}
 							<div className="rounded-xl border bg-card/40 p-3">
@@ -303,7 +304,7 @@ export function FormulaLab() {
 							{/* Ranked table */}
 							<div className="overflow-hidden rounded-xl border">
 								<table className="w-full text-xs">
-									<thead className="bg-muted/50 text-left text-[11px] text-muted-foreground">
+									<thead className="sticky top-0 z-10 bg-muted text-left text-[11px] text-muted-foreground">
 										<tr>
 											<th className="p-2 font-medium">
 												{t("formulaLab:table.formula")}
@@ -404,7 +405,7 @@ export function FormulaLab() {
 								)}
 							</div>
 						</div>
-					</ScrollArea>
+					</div>
 				)}
 
 				{/* Footer: selected summary + apply */}
