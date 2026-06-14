@@ -32,8 +32,15 @@ import json
 import sys
 from pathlib import Path
 
-backend_path = Path(__file__).parent.parent
+backend_path = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_path))
+
+# cost_intelligence/__init__ pulls in budget_enforcer, which imports
+# `apps.backend.models_registry` — that needs the repo root on sys.path
+# (the Electron spawn only sets PYTHONPATH to apps/backend).
+_repo_root = backend_path.parent.parent
+if (_repo_root / "apps").is_dir():
+    sys.path.insert(0, str(_repo_root))
 
 from cost_intelligence import compute_formula_matrix  # noqa: E402
 
