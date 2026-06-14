@@ -1,4 +1,12 @@
-import { Loader2, RotateCw, Search, Sparkles } from "lucide-react";
+import {
+	ChevronDown,
+	ChevronsUpDown,
+	ChevronUp,
+	Loader2,
+	RotateCw,
+	Search,
+	Sparkles,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -37,6 +45,9 @@ import { SuccessRing } from "./SuccessRing";
 // scrollable table. The "+N more" hint only triggers for pathological sets.
 const MAX_ROWS = 500;
 
+/** Sortable table columns; `null` falls back to the preference ranking. */
+type SortKey = "formula" | "effort" | "tokens" | "cost" | "success" | null;
+
 export function FormulaLab() {
 	const { t } = useTranslation(["formulaLab", "common"]);
 	const { toast } = useToast();
@@ -65,6 +76,19 @@ export function FormulaLab() {
 	);
 	const [perTokenOnly, setPerTokenOnly] = useState(false);
 	const [search, setSearch] = useState("");
+	// Column sort. `null` keeps the preference-based ranking (the slider order).
+	const [sortKey, setSortKey] = useState<SortKey>(null);
+	const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+	const toggleSort = (key: NonNullable<SortKey>) => {
+		if (sortKey === key) {
+			setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+		} else {
+			setSortKey(key);
+			// Costs read best cheapest-first; success/tokens best highest-first.
+			setSortDir(key === "success" ? "desc" : "asc");
+		}
+	};
 
 	const allFormulas = matrix?.formulas ?? [];
 
@@ -89,15 +113,73 @@ export function FormulaLab() {
 		);
 	}, [allFormulas, providerFilter, effortFilter, perTokenOnly, search]);
 
-	const ranked = useMemo(
-		() => rankFormulas(filtered, weight),
-		[filtered, weight],
-	);
+	const ranked = useMemo(() => {
+		if (!sortKey) return rankFormulas(filtered, weight);
+		const dir = sortDir === "asc" ? 1 : -1;
+		const num = (f: Formula): number => {
+			switch (sortKey) {
+				case "effort":
+					return EFFORT_ORDER.indexOf(f.effort as (typeof EFFORT_ORDER)[number]);
+				case "tokens":
+					return totalTokens(f);
+				case "cost":
+					return f.expected_cost_usd;
+				case "success":
+					return f.success_probability;
+				default:
+					return 0;
+			}
+		};
+		return [...filtered].sort((a, b) => {
+			if (sortKey === "formula") {
+				return dir * `${a.provider} ${a.model}`.localeCompare(`${b.provider} ${b.model}`);
+			}
+			return dir * (num(a) - num(b));
+		});
+	}, [filtered, weight, sortKey, sortDir]);
 	const picks = useMemo(() => pickSmart(filtered), [filtered]);
 	const pareto = useMemo(() => paretoFront(filtered), [filtered]);
 
 	const selectedFormula =
 		ranked.find((f) => formulaKey(f) === selectedKey) ?? null;
+
+	const sortHeader = (
+		key: NonNullable<SortKey>,
+		labelKey: string,
+		align: "left" | "right" | "center" = "left",
+	) => {
+		const alignCls =
+			align === "right"
+				? "text-right"
+				: align === "center"
+					? "text-center"
+					: "";
+		const justifyCls =
+			align === "right"
+				? "justify-end"
+				: align === "center"
+					? "justify-center"
+					: "";
+		const Icon =
+			sortKey === key
+				? sortDir === "asc"
+					? ChevronUp
+					: ChevronDown
+				: ChevronsUpDown;
+		return (
+			<th
+				className={`cursor-pointer select-none p-2 font-medium hover:text-foreground ${alignCls}`}
+				onClick={() => toggleSort(key)}
+			>
+				<span className={`inline-flex items-center gap-1 ${justifyCls}`}>
+					{t(labelKey)}
+					<Icon
+						className={`h-3 w-3 ${sortKey === key ? "text-primary" : "opacity-40"}`}
+					/>
+				</span>
+			</th>
+		);
+	};
 
 	const toggleEffort = (effort: string) => {
 		setEffortFilter((prev) => {
@@ -319,21 +401,11 @@ export function FormulaLab() {
 								<table className="w-full text-xs">
 									<thead className="sticky top-0 z-10 bg-muted text-left text-[11px] text-muted-foreground">
 										<tr>
-											<th className="p-2 font-medium">
-												{t("formulaLab:table.formula")}
-											</th>
-											<th className="p-2 font-medium">
-												{t("formulaLab:table.effort")}
-											</th>
-											<th className="p-2 text-right font-medium">
-												{t("formulaLab:table.tokens")}
-											</th>
-											<th className="p-2 text-right font-medium">
-												{t("formulaLab:table.cost")}
-											</th>
-											<th className="p-2 text-center font-medium">
-												{t("formulaLab:table.success")}
-											</th>
+											{sortHeader("formula", "formulaLab:table.formula")}
+											{sortHeader("effort", "formulaLab:table.effort")}
+											{sortHeader("tokens", "formulaLab:table.tokens", "right")}
+											{sortHeader("cost", "formulaLab:table.cost", "right")}
+											{sortHeader("success", "formulaLab:table.success", "center")}
 											<th className="p-2" />
 										</tr>
 									</thead>
