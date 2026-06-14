@@ -1,4 +1,4 @@
-import { Loader2, RotateCw, Sparkles } from "lucide-react";
+import { Loader2, RotateCw, Search, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -64,6 +64,7 @@ export function FormulaLab() {
 		() => new Set(EFFORT_ORDER),
 	);
 	const [perTokenOnly, setPerTokenOnly] = useState(false);
+	const [search, setSearch] = useState("");
 
 	const allFormulas = matrix?.formulas ?? [];
 
@@ -75,16 +76,18 @@ export function FormulaLab() {
 		[allFormulas],
 	);
 
-	const filtered = useMemo(
-		() =>
-			allFormulas.filter(
-				(f) =>
-					(providerFilter === "all" || f.provider === providerFilter) &&
-					effortFilter.has(f.effort) &&
-					(!perTokenOnly || f.per_token_billed),
-			),
-		[allFormulas, providerFilter, effortFilter, perTokenOnly],
-	);
+	const filtered = useMemo(() => {
+		const q = search.trim().toLowerCase();
+		return allFormulas.filter(
+			(f) =>
+				(providerFilter === "all" || f.provider === providerFilter) &&
+				effortFilter.has(f.effort) &&
+				(!perTokenOnly || f.per_token_billed) &&
+				(!q ||
+					f.model.toLowerCase().includes(q) ||
+					f.provider.toLowerCase().includes(q)),
+		);
+	}, [allFormulas, providerFilter, effortFilter, perTokenOnly, search]);
 
 	const ranked = useMemo(
 		() => rankFormulas(filtered, weight),
@@ -261,6 +264,16 @@ export function FormulaLab() {
 
 							{/* Filters */}
 							<div className="flex flex-wrap items-center gap-2 text-xs">
+								<div className="relative">
+									<Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+									<input
+										type="search"
+										value={search}
+										onChange={(e) => setSearch(e.target.value)}
+										placeholder={t("formulaLab:filters.searchPlaceholder")}
+										className="h-8 w-44 rounded-md border border-border bg-card pl-7 pr-2 text-xs"
+									/>
+								</div>
 								<select
 									value={providerFilter}
 									onChange={(e) => setProviderFilter(e.target.value)}

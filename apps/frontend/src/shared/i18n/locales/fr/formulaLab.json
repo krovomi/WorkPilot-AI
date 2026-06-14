@@ -35,6 +35,7 @@
 	"filters": {
 		"allProviders": "Tous les fournisseurs",
 		"perTokenOnly": "Payés au token",
+		"searchPlaceholder": "Rechercher un LLM…",
 		"count": "{{count}} formules"
 	},
 	"table": {

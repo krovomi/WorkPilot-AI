@@ -35,6 +35,7 @@
 	"filters": {
 		"allProviders": "All providers",
 		"perTokenOnly": "Per-token only",
+		"searchPlaceholder": "Search LLM…",
 		"count": "{{count}} formulas"
 	},
 	"table": {

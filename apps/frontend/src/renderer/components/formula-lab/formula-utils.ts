@@ -2,15 +2,28 @@
 
 import type { Formula } from "../../stores/formula-matrix-store";
 
+/**
+ * USD → EUR conversion rate. The pricing catalog is denominated in USD (that is
+ * how every LLM provider bills), but the UI displays euros. Update this when the
+ * real rate drifts materially, or wire it to a live FX feed if precision matters.
+ */
+export const USD_TO_EUR = 0.92;
+
+/** Convert a USD amount to EUR using {@link USD_TO_EUR}. */
+export function toEur(usd: number): number {
+	return usd * USD_TO_EUR;
+}
+
+/** Format a USD cost as a EUR string (e.g. "€1.20", "€0", "~€0.0040"). */
 export function formatCost(usd: number): string {
-	if (usd <= 0) return "$0";
-	if (usd < 0.01) return `~$${usd.toFixed(4)}`;
-	if (usd < 1) return `$${usd.toFixed(2)}`;
-	return `$${usd.toFixed(2)}`;
+	const eur = toEur(usd);
+	if (eur <= 0) return "€0";
+	if (eur < 0.01) return `~€${eur.toFixed(4)}`;
+	return `€${eur.toFixed(2)}`;
 }
 
 export function formatCostBand(f: Formula): string {
-	if (f.expected_cost_usd <= 0) return "$0";
+	if (f.expected_cost_usd <= 0) return "€0";
 	return `${formatCost(f.low_cost_usd)}–${formatCost(f.high_cost_usd)}`;
 }
 
