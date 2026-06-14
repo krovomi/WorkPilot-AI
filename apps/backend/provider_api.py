@@ -1222,17 +1222,22 @@ async def _validate_key_http(provider: str, api_key: str, spec: dict[str, Any]) 
     auth_style = spec["auth_style"]
     ok_statuses = spec["ok_statuses"]
     headers: dict[str, str] = dict(spec.get("extra_headers", {}))
+    params: dict[str, str] = {}
 
     if auth_style == "bearer":
         headers["Authorization"] = f"Bearer {api_key}"
     elif auth_style == "x-api-key":
         headers["x-api-key"] = api_key
     elif auth_style == "query":
-        url = f"{url}?key={api_key}"
+        # Pass the key as a real query parameter so httpx percent-encodes it.
+        # Interpolating it into the URL string lets a crafted key inject extra
+        # query/fragment components (CodeQL py/partial-ssrf); the host stays the
+        # provider's hardcoded endpoint either way.
+        params["key"] = api_key
 
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-            resp = await client.get(url, headers=headers, timeout=10)
+            resp = await client.get(url, headers=headers, params=params, timeout=10)
         if resp.status_code not in ok_statuses:
             set_validated(provider, api_key, False)
             raise HTTPException(

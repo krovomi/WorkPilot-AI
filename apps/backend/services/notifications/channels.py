@@ -423,12 +423,32 @@ def validate_webhook_url(url: str) -> None:
             )
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject HTTP redirects on webhook delivery.
+
+    The upfront SSRF guard only validates the *initial* host. Following a 3xx
+    would let a malicious endpoint bounce the request to an internal address
+    (e.g. 169.254.169.254) that was never validated, so we refuse to redirect
+    at all (CodeQL py/full-ssrf).
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
+        raise urllib.error.HTTPError(
+            req.full_url, code, f"Redirects are not allowed ({msg})", headers, fp
+        )
+
+
+# Opener with redirects disabled; reused for every webhook POST.
+_NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirectHandler())
+
+
 def post_json(url: str, payload: dict) -> tuple[bool, int | None, str | None]:
     """POST a JSON payload. Returns (success, status_code, error).
 
     The destination is validated against SSRF (:func:`validate_webhook_url`)
     before any request is made, so a blocked URL never reaches the network and
-    leaks no reachability oracle beyond the rejection reason.
+    leaks no reachability oracle beyond the rejection reason. Redirects are
+    refused so a validated host cannot bounce the request to an internal one.
     """
     try:
         validate_webhook_url(url)
@@ -443,7 +463,7 @@ def post_json(url: str, payload: dict) -> tuple[bool, int | None, str | None]:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_SECONDS) as resp:
+        with _NO_REDIRECT_OPENER.open(req, timeout=_HTTP_TIMEOUT_SECONDS) as resp:
             ok = 200 <= resp.status < 300
             return ok, resp.status, None if ok else f"HTTP {resp.status}"
     except urllib.error.HTTPError as exc:
