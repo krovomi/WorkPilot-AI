@@ -96,8 +96,7 @@ import type { ImportableWorkItem } from "./azure-devops-import/ImportConfirmDial
 import { ImportConfirmDialog } from "./azure-devops-import/ImportConfirmDialog";
 import { BulkPRDialog } from "./BulkPRDialog";
 import { JiraSidePanel } from "./jira-import/JiraSidePanel";
-import { KanbanFilterBar } from "./kanban/KanbanFilterBar";
-import { QuickCommandBar } from "./kanban/QuickCommandBar";
+import { KanbanToolbar } from "./kanban/KanbanToolbar";
 import { PRFilesModal } from "./PRFilesModal";
 import { QueueSettingsModal } from "./QueueSettingsModal";
 import { SortableTaskCard } from "./SortableTaskCard";
@@ -2878,11 +2877,8 @@ export function KanbanBoard({
 							{t("tasks:kanban.expandAll")}
 						</Button>
 					)}
-					{/* Quick slash command bar — sends /<cmd> prompts to the SDK
-					    using .claude/commands/*.md from the active project. */}
-					<QuickCommandBar projectPath={project?.path} />
-					{/* Filter + sort controls for the board. */}
-					<KanbanFilterBar />
+					{/* Unified toolbar: search, filters, sort, and quick commands */}
+					<KanbanToolbar projectPath={project?.path} />
 				</div>
 				<div className="flex items-center gap-2">
 					{activeProjectId &&

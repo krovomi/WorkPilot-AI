@@ -1,7 +1,7 @@
 /**
  * Kanban filtering & sorting helpers.
  *
- * Shared between the filter store, the KanbanFilterBar UI and the KanbanBoard
+ * Shared between the filter store, the KanbanToolbar UI and the KanbanBoard
  * so the logic (which source a task belongs to, whether it matches the active
  * filters, how to order columns) lives in a single place.
  */

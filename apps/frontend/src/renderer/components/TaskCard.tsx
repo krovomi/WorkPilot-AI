@@ -70,6 +70,7 @@ import {
 	useTaskStore,
 } from "../stores/task-store";
 import { PhaseProgressIndicator } from "./PhaseProgressIndicator";
+import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
 import { SyncFromBranchDialog } from "./task-detail/task-review/SyncFromBranchDialog";
 import { Badge } from "./ui/badge";
@@ -1297,7 +1298,7 @@ export const TaskCard = memo(function TaskCard({
 							hasActiveExecution ||
 							isRunning ||
 							isStuck) && (
-							<div className="mt-3">
+							<div className="mt-3 space-y-2">
 								<PhaseProgressIndicator
 									phase={executionPhase}
 									subtasks={task.subtasks}
@@ -1310,6 +1311,8 @@ export const TaskCard = memo(function TaskCard({
 										task.subtasks.length > 0 ? handlePlanClick : undefined
 									}
 								/>
+								{/* Compaction affordance for long-running tasks (10+ phases) */}
+								<SessionCompactionBadge task={task} />
 							</div>
 						)}
 

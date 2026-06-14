@@ -63,7 +63,13 @@
 		"pipeline": "Pipeline",
 		"repairBuild": "Réparer le build",
 		"buildFailed": "Build rouge",
-		"openInTracker": "Ouvrir dans {{tracker}}"
+		"openInTracker": "Ouvrir dans {{tracker}}",
+		"currentPhase": "Phase actuelle",
+		"compactedPhases": "{{count}} phases",
+		"sessionCompactionHint": "{{count}} phases d'exécution — cliquez pour voir le résumé compacté",
+		"sessionCompaction": "Compaction de session",
+		"criticalPhases": "Étapes clés",
+		"lastError": "Dernière erreur"
 	},
 	"warnings": {
 		"stuck": {
