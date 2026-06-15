@@ -100,6 +100,8 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+	// Duplicate dialog: pre-filled copy of this task the user edits before creating.
+	const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
 	const [worktreeStatus, setWorktreeStatus] = useState<WorktreeStatus | null>(
 		null,
 	);
@@ -716,6 +718,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		isDeleting,
 		deleteError,
 		isEditDialogOpen,
+		isDuplicateDialogOpen,
 		worktreeStatus,
 		worktreeDiff,
 		isLoadingWorktree,
@@ -765,6 +768,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		setIsDeleting,
 		setDeleteError,
 		setIsEditDialogOpen,
+		setIsDuplicateDialogOpen,
 		setWorktreeStatus,
 		setWorktreeDiff,
 		setIsLoadingWorktree,

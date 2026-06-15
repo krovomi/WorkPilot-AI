@@ -5,6 +5,7 @@ import {
 	Bug,
 	CheckCircle2,
 	Clock,
+	Copy,
 	FileCode,
 	FileText,
 	FlaskConical,
@@ -116,6 +117,8 @@ interface TaskCardProps {
 	onToggleSelect?: () => void;
 	// Optional delete handler
 	onDelete?: () => void;
+	// Optional duplicate handler (clone the task into a fresh backlog ticket)
+	onDuplicate?: () => void;
 	// Optional PR files viewer handler
 	onViewPRFiles?: (prUrl: string, taskId: string) => void;
 	// Optional app preview handler for done, human_review, and ai_review tasks
@@ -880,6 +883,7 @@ function taskCardPropsAreEqual(
 		prevProps.onToggleSelect === nextProps.onToggleSelect &&
 		prevProps.onViewPRFiles === nextProps.onViewPRFiles &&
 		prevProps.onDelete === nextProps.onDelete &&
+		prevProps.onDuplicate === nextProps.onDuplicate &&
 		prevProps.onPreviewApp === nextProps.onPreviewApp
 	) {
 		return true;
@@ -951,6 +955,7 @@ export const TaskCard = memo(function TaskCard({
 	isSelected,
 	onToggleSelect,
 	onDelete,
+	onDuplicate,
 	onViewPRFiles,
 	onPreviewApp,
 }: TaskCardProps) {
@@ -1152,6 +1157,11 @@ export const TaskCard = memo(function TaskCard({
 		}
 	};
 
+	const handleDuplicate = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		onDuplicate?.();
+	};
+
 	const handleCardClick = (e: React.MouseEvent) => {
 		// Don't open task modal while sync dialog is open (prevents portal event leak)
 		if (showSyncDialog) return;
@@ -1347,8 +1357,11 @@ export const TaskCard = memo(function TaskCard({
 									t={t}
 								/>
 
-								{/* More options menu - includes pause/resume and status changes */}
-								{(statusMenuItems || isRunning || task.metadata?.paused?.enabled) && (
+								{/* More options menu - includes duplicate, pause/resume and status changes */}
+								{(statusMenuItems ||
+									isRunning ||
+									onDuplicate ||
+									task.metadata?.paused?.enabled) && (
 									<DropdownMenu>
 										<DropdownMenuTrigger asChild>
 											<Button
@@ -1365,6 +1378,21 @@ export const TaskCard = memo(function TaskCard({
 											align="end"
 											onClick={(e) => e.stopPropagation()}
 										>
+											{/* Duplicate - clone the task into a fresh backlog ticket */}
+											{onDuplicate && (
+												<>
+													<DropdownMenuItem
+														onClick={(e) => {
+															e.stopPropagation();
+															handleDuplicate(e as React.MouseEvent);
+														}}
+													>
+														<Copy className="mr-2 h-4 w-4" />
+														{t("actions.duplicate")}
+													</DropdownMenuItem>
+													<DropdownMenuSeparator />
+												</>
+											)}
 											{/* Pause/Resume - show when task is running or paused */}
 											{(isRunning || task.metadata?.paused?.enabled) && (
 												<>

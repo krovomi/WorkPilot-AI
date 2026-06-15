@@ -1,10 +1,11 @@
 ﻿import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	AlertTriangle,
 	CheckCircle2,
 	ChevronLeft,
 	ChevronRight,
+	Copy,
 	FlaskConical,
 	GitMerge,
 	GitPullRequest,
@@ -31,6 +32,8 @@ import {
 	getDisplayProgress,
 } from "../../lib/utils";
 import { isSubtaskDone } from "../../../shared/progress";
+import { needsExecutionFormula } from "../../../shared/utils/task-execution-config";
+import { useFormulaMatrixStore } from "../../stores/formula-matrix-store";
 import { useProjectStore } from "../../stores/project-store";
 import {
 	deleteTask,
@@ -79,6 +82,7 @@ import { TaskPauseControls } from "./TaskPauseControls";
 import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
+import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
 import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
 import { TaskReview } from "./TaskReview";
@@ -555,6 +559,7 @@ function TaskDetailModalContent({
 			// Ne pas naviguer quand une popin secondaire est ouverte.
 			if (
 				state.isEditDialogOpen ||
+				state.isDuplicateDialogOpen ||
 				state.showDeleteDialog ||
 				state.showSyncDialog
 			) {
@@ -579,6 +584,7 @@ function TaskDetailModalContent({
 		onNavigatePrevious,
 		onNavigateNext,
 		state.isEditDialogOpen,
+		state.isDuplicateDialogOpen,
 		state.showDeleteDialog,
 		state.showSyncDialog,
 	]);
@@ -964,6 +970,21 @@ function TaskDetailModalContent({
 											</TooltipContent>
 										</Tooltip>
 									)}
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<Button
+												variant="ghost"
+												size="icon"
+												className="hover:bg-primary/10 hover:text-primary transition-colors"
+												onClick={() => state.setIsDuplicateDialogOpen(true)}
+											>
+												<Copy className="h-4 w-4" />
+											</Button>
+										</TooltipTrigger>
+										<TooltipContent side="bottom">
+											{t("tasks:actions.duplicate")}
+										</TooltipContent>
+									</Tooltip>
 									<Button
 										variant="ghost"
 										size="icon"
@@ -1320,6 +1341,15 @@ function TaskDetailModalContent({
 				open={state.isEditDialogOpen}
 				onOpenChange={state.setIsEditDialogOpen}
 				onCloseTask={onCloseTask}
+			/>
+
+			{/* Duplicate Task Dialog — edit fields before creating the copy */}
+			<TaskEditDialog
+				mode="duplicate"
+				task={task}
+				open={state.isDuplicateDialogOpen}
+				onOpenChange={state.setIsDuplicateDialogOpen}
+				onCreated={() => state.setIsDuplicateDialogOpen(false)}
 			/>
 
 			{/* Delete Confirmation Dialog */}

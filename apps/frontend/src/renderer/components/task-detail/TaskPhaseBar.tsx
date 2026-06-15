@@ -1,34 +1,8 @@
-import type {
-	TaskLogEntry,
-	TaskLogPhase,
-	TaskLogs,
-} from "../../../shared/types";
+import type { TaskLogPhase, TaskLogs } from "../../../shared/types";
 import { cn } from "../../lib/utils";
 import { useTranslation } from "react-i18next";
 import { AnimatedEllipsis } from "../ui/AnimatedEllipsis";
-
-/**
- * Libellé de sous-étape porté par une entrée de log, ou `null`. On reconnaît :
- *   1. un tag `subphase` explicite ;
- *   2. l'en-tête « Starting phase N: NOM » émis par l'orchestrateur de
- *      planification (entrée de type `info`) → renvoyé sous la forme
- *      « phase N: NOM ».
- *
- * Les narrations libres de l'agent (entrées `text` du style « Phase 0: Deep
- * Codebase Investigation. Let me explore… ») sont volontairement ignorées : ce
- * ne sont pas des bornes de sous-étape fiables.
- */
-export function getSubStepLabel(
-	entry: Pick<TaskLogEntry, "type" | "content" | "subphase">,
-): string | null {
-	const sub = entry.subphase?.trim();
-	if (sub) return sub;
-	if (entry.type === "info" && entry.content) {
-		const match = entry.content.match(/^\s*Starting (phase\s+\d+\s*:\s*\S.*)$/i);
-		if (match) return match[1].trim();
-	}
-	return null;
-}
+import { getSubStepLabel } from "./task-log-substep";
 
 interface TaskPhaseBarProps {
 	phaseLogs: TaskLogs | null;

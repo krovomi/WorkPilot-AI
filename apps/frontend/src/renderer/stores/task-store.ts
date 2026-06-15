@@ -1017,6 +1017,33 @@ export async function createTask(
 }
 
 /**
+ * Duplicate an existing task into a fresh backlog task.
+ * Clones the spec (spec.md, requirements, metadata, attachments) without any
+ * plan/worktree/runtime artifacts. `newTitle` should already carry the
+ * localized "(copy)" suffix.
+ */
+export async function duplicateTask(
+	taskId: string,
+	newTitle?: string,
+): Promise<{ success: boolean; task?: Task; error?: string }> {
+	const store = useTaskStore.getState();
+
+	try {
+		const result = await globalThis.electronAPI.duplicateTask(taskId, newTitle);
+		if (result.success && result.data) {
+			store.addTask(result.data);
+			return { success: true, task: result.data };
+		}
+		store.setError(result.error || "Failed to duplicate task");
+		return { success: false, error: result.error };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Unknown error";
+		store.setError(message);
+		return { success: false, error: message };
+	}
+}
+
+/**
  * Start a task
  */
 export function startTask(

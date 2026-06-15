@@ -63,7 +63,8 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
-import { getSubStepLabel, TaskPhaseBar } from "./TaskPhaseBar";
+import { TaskPhaseBar } from "./TaskPhaseBar";
+import { buildPhaseSubSteps } from "./task-log-substep";
 
 interface TaskLogsProps {
 	task: Task;
@@ -818,57 +819,17 @@ function PhaseLogSection({
 
 	const hasEntries = displayedEntries.length > 0;
 
-	// La phase porte-t-elle des bornes de sous-étape structurées (tag `subphase`
-	// ou en-tête « Starting phase N: ») ? Si oui (nouveaux logs), on s'appuie
-	// uniquement dessus. Sinon (anciens logs de codage), on retombe sur le
-	// `subtask_id` des entrées, résolu vers le titre de la sous-tâche.
-	const hasStructuredSubsteps = useMemo(
-		() => (phaseLog?.entries || []).some((e) => getSubStepLabel(e) != null),
-		[phaseLog?.entries],
-	);
-
-	// Repli anciens logs (codage) : on ne marque que la PREMIÈRE entrée de chaque
-	// suite de sous-tâche (changement de `subtask_id`), pas chaque entrée — pour
-	// garder peu de bornes et éviter de coûteux relevés de position au défilement.
-	const codingSubtaskBoundaries = useMemo(() => {
-		const set = new Set<TaskLogEntry>();
-		if (hasStructuredSubsteps || phase !== "coding") return set;
-		let prev: string | null = null;
-		for (const e of phaseLog?.entries || []) {
-			const sid = e.subtask_id || null;
-			if (sid && sid !== prev) set.add(e);
-			if (sid) prev = sid;
-		}
-		return set;
-	}, [hasStructuredSubsteps, phase, phaseLog?.entries]);
-
-	// Repli anciens logs (validation) : chaque session QA est bornée par une
-	// entrée `phase_start` (« Starting QA validation… »). On les numérote en
-	// passes, faute de bornes structurées plus fines.
-	const validationPassLabels = useMemo(() => {
-		const map = new Map<TaskLogEntry, string>();
-		if (hasStructuredSubsteps || phase !== "validation") return map;
-		let pass = 0;
-		for (const e of phaseLog?.entries || []) {
-			if (e.type === "phase_start") {
-				pass += 1;
-				map.set(e, t("tasks:execution.labels.qaPass", "QA — passe {{n}}", { n: pass }));
-			}
-		}
-		return map;
-	}, [hasStructuredSubsteps, phase, phaseLog?.entries, t]);
-
-	// Étiquette de sous-étape à poser sur une entrée pour le suivi au défilement.
-	const resolveSubStep = useCallback(
-		(entry: TaskLogEntry): string | null => {
-			const label = getSubStepLabel(entry);
-			if (label) return label;
-			if (entry.subtask_id && codingSubtaskBoundaries.has(entry)) {
-				return subtaskTitles?.[entry.subtask_id] ?? entry.subtask_id;
-			}
-			return validationPassLabels.get(entry) ?? null;
-		},
-		[codingSubtaskBoundaries, validationPassLabels, subtaskTitles],
+	// Table « entrée → libellé de sous-étape » pour cette phase : bornes
+	// structurées (nouveaux logs) ou repli sur les anciens logs (sous-tâche pour
+	// le codage, session QA numérotée pour la validation). Cf. buildPhaseSubSteps.
+	const subStepLabels = useMemo(
+		() =>
+			buildPhaseSubSteps(phaseLog?.entries || [], phase, {
+				subtaskTitles,
+				formatQaPass: (n) =>
+					t("tasks:execution.labels.qaPass", "QA — vérification {{n}}", { n }),
+			}),
+		[phaseLog?.entries, phase, subtaskTitles, t],
 	);
 
 	const getStatusBadge = () => {
@@ -1120,7 +1081,7 @@ function PhaseLogSection({
 							// Les bornes de sous-étape (« Starting phase N: NOM ») sont
 							// marquées pour que TaskLogs puisse suivre la sous-étape courante
 							// au défilement.
-							const subStepLabel = resolveSubStep(entry);
+							const subStepLabel = subStepLabels.get(entry) ?? null;
 							if (subStepLabel) {
 								return (
 									<div key={key} data-substep={subStepLabel} data-substep-phase={phase}>

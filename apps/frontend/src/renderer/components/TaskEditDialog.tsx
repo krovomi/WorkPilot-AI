@@ -50,7 +50,7 @@ import type {
 } from "../../shared/types/settings";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
-import { persistUpdateTask } from "../stores/task-store";
+import { duplicateTask, persistUpdateTask } from "../stores/task-store";
 import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
 import type { FileReferenceData } from "./task-form/useImageUpload";
@@ -60,16 +60,25 @@ import { Button } from "./ui/button";
  * Props for the TaskEditDialog component
  */
 interface TaskEditDialogProps {
-	/** The task to edit */
+	/** The task to edit (in "duplicate" mode, the source task to clone) */
 	readonly task: Task;
 	/** Whether the dialog is open */
 	readonly open: boolean;
 	/** Callback when the dialog open state changes */
 	readonly onOpenChange: (open: boolean) => void;
-	/** Optional callback when task is successfully saved */
+	/** Optional callback when task is successfully saved (edit mode) */
 	readonly onSaved?: () => void;
 	/** Callback pour fermeture explicite de la tâche courante (remonte jusqu'à App.tsx) */
 	readonly onCloseTask?: () => void;
+	/**
+	 * Dialog behaviour:
+	 * - "edit" (default): update the existing task in place.
+	 * - "duplicate": pre-fill from the source task, let the user edit the
+	 *   fields, then create a brand-new backlog task on submit.
+	 */
+	readonly mode?: "edit" | "duplicate";
+	/** Optional callback when a duplicate is successfully created (duplicate mode) */
+	readonly onCreated?: (newTaskId: string) => void;
 }
 
 export function TaskEditDialog({
@@ -78,8 +87,15 @@ export function TaskEditDialog({
 	onOpenChange,
 	onSaved,
 	onCloseTask,
+	mode = "edit",
+	onCreated,
 }: TaskEditDialogProps) {
 	const { t } = useTranslation(["tasks", "common"]);
+	const isDuplicate = mode === "duplicate";
+	// In duplicate mode the title is pre-filled with a localized "(copy)" suffix.
+	const initialTitle = isDuplicate
+		? `${task.title} ${t("tasks:actions.duplicateSuffix")}`
+		: task.title;
 	// Get selected agent profile from settings for defaults
 	const { settings } = useSettingsStore();
 	const selectedProfile =
@@ -96,7 +112,7 @@ export function TaskEditDialog({
 	}, [projects, task.projectId]);
 
 	// Form state
-	const [title, setTitle] = useState(task.title);
+	const [title, setTitle] = useState(initialTitle);
 	const [description, setDescription] = useState(task.description);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -169,7 +185,7 @@ export function TaskEditDialog({
 	// Reset form when task changes or dialog opens
 	useEffect(() => {
 		if (open) {
-			setTitle(task.title);
+			setTitle(initialTitle);
 			setDescription(task.description);
 			setCategory(task.metadata?.category || "");
 			setPriority(task.metadata?.priority || "");
@@ -235,6 +251,7 @@ export function TaskEditDialog({
 	}, [
 		open,
 		task,
+		initialTitle,
 		settings.selectedAgentProfile,
 		selectedProfile.model,
 		selectedProfile.thinkingLevel,
@@ -296,37 +313,42 @@ export function TaskEditDialog({
 			return;
 		}
 
-		// Check if anything changed
 		const trimmedTitle = title.trim();
 		const trimmedDescription = description.trim();
-		const hasChanges =
-			trimmedTitle !== task.title ||
-			trimmedDescription !== task.description ||
-			category !== (task.metadata?.category || "") ||
-			priority !== (task.metadata?.priority || "") ||
-			complexity !== (task.metadata?.complexity || "") ||
-			impact !== (task.metadata?.impact || "") ||
-			model !== (task.metadata?.model || "") ||
-			thinkingLevel !== (task.metadata?.thinkingLevel || "") ||
-			requireReviewBeforeCoding !==
-				(task.metadata?.requireReviewBeforeCoding ?? false) ||
-			tddMode !== (task.metadata?.tddMode ?? false) ||
-			JSON.stringify(images) !==
-				JSON.stringify(task.metadata?.attachedImages || []) ||
-			JSON.stringify(phaseModels) !==
-				JSON.stringify(task.metadata?.phaseModels || DEFAULT_PHASE_MODELS) ||
-			JSON.stringify(phaseThinking) !==
-				JSON.stringify(task.metadata?.phaseThinking || DEFAULT_PHASE_THINKING);
 
-		if (!hasChanges) {
-			onOpenChange(false);
-			return;
+		// Edit mode short-circuits when nothing changed. Duplicate always creates.
+		if (!isDuplicate) {
+			const hasChanges =
+				trimmedTitle !== task.title ||
+				trimmedDescription !== task.description ||
+				category !== (task.metadata?.category || "") ||
+				priority !== (task.metadata?.priority || "") ||
+				complexity !== (task.metadata?.complexity || "") ||
+				impact !== (task.metadata?.impact || "") ||
+				model !== (task.metadata?.model || "") ||
+				thinkingLevel !== (task.metadata?.thinkingLevel || "") ||
+				requireReviewBeforeCoding !==
+					(task.metadata?.requireReviewBeforeCoding ?? false) ||
+				tddMode !== (task.metadata?.tddMode ?? false) ||
+				JSON.stringify(images) !==
+					JSON.stringify(task.metadata?.attachedImages || []) ||
+				JSON.stringify(phaseModels) !==
+					JSON.stringify(task.metadata?.phaseModels || DEFAULT_PHASE_MODELS) ||
+				JSON.stringify(phaseThinking) !==
+					JSON.stringify(
+						task.metadata?.phaseThinking || DEFAULT_PHASE_THINKING,
+					);
+
+			if (!hasChanges) {
+				onOpenChange(false);
+				return;
+			}
 		}
 
 		setIsSaving(true);
 		setError(null);
 
-		// Build metadata updates
+		// Build metadata updates (shared by edit + duplicate)
 		const metadataUpdates: Partial<typeof task.metadata> = {};
 		if (category) metadataUpdates.category = category;
 		if (priority) metadataUpdates.priority = priority;
@@ -346,6 +368,26 @@ export function TaskEditDialog({
 		// "inherit project default" (undefined) is preserved unless explicitly changed.
 		if (tddMode !== (task.metadata?.tddMode ?? false)) {
 			metadataUpdates.tddMode = tddMode;
+		}
+
+		if (isDuplicate) {
+			// Clone the source task (copies spec.md/requirements/metadata/attachments
+			// on disk, preserving images), then apply the edited fields to the
+			// freshly created backlog task.
+			const dup = await duplicateTask(task.id, trimmedTitle);
+			if (dup.success && dup.task) {
+				await persistUpdateTask(dup.task.id, {
+					title: trimmedTitle,
+					description: trimmedDescription,
+					metadata: metadataUpdates,
+				});
+				onOpenChange(false);
+				onCreated?.(dup.task.id);
+			} else {
+				setError(dup.error || t("tasks:duplicate.errors.createFailed"));
+			}
+			setIsSaving(false);
+			return;
 		}
 
 		const success = await persistUpdateTask(task.id, {
@@ -370,8 +412,12 @@ export function TaskEditDialog({
 		<TaskModalLayout
 			open={open}
 			onOpenChange={onOpenChange}
-			title={t("tasks:edit.title")}
-			description={t("tasks:edit.description")}
+			title={isDuplicate ? t("tasks:duplicate.title") : t("tasks:edit.title")}
+			description={
+				isDuplicate
+					? t("tasks:duplicate.description")
+					: t("tasks:edit.description")
+			}
 			disabled={isSaving}
 			onClose={onCloseTask}
 			footer={
@@ -387,8 +433,12 @@ export function TaskEditDialog({
 						{isSaving ? (
 							<>
 								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-								{t("common:buttons.saving")}
+								{isDuplicate
+									? t("common:buttons.creating")
+									: t("common:buttons.saving")}
 							</>
+						) : isDuplicate ? (
+							t("tasks:duplicate.createButton")
 						) : (
 							t("tasks:edit.saveChanges")
 						)}

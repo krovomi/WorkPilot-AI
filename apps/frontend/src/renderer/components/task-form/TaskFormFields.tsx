@@ -329,6 +329,29 @@ export function TaskFormFields({
 			/>
 
 			<div className="space-y-6">
+				{/* Title (Optional) — shown first so it reads top-to-bottom */}
+				<div className="space-y-2">
+					<Label
+						htmlFor={`${prefix}title`}
+						className="text-sm font-medium text-foreground"
+					>
+						{t("tasks:form.taskTitle")}{" "}
+						<span className="text-muted-foreground font-normal">
+							({t("common:labels.optional")})
+						</span>
+					</Label>
+					<Input
+						id={`${prefix}title`}
+						placeholder={t("tasks:form.titlePlaceholder")}
+						value={title}
+						onChange={(e) => onTitleChange(e.target.value)}
+						disabled={disabled}
+					/>
+					<p className="text-xs text-muted-foreground">
+						{t("tasks:form.titleHelpText")}
+					</p>
+				</div>
+
 				{/* Description (Primary - Required) */}
 				<div className="space-y-2">
 					<Label
@@ -540,29 +563,6 @@ export function TaskFormFields({
 						)}
 					</div>
 				)}
-
-				{/* Title (Optional) */}
-				<div className="space-y-2">
-					<Label
-						htmlFor={`${prefix}title`}
-						className="text-sm font-medium text-foreground"
-					>
-						{t("tasks:form.taskTitle")}{" "}
-						<span className="text-muted-foreground font-normal">
-							({t("common:labels.optional")})
-						</span>
-					</Label>
-					<Input
-						id={`${prefix}title`}
-						placeholder={t("tasks:form.titlePlaceholder")}
-						value={title}
-						onChange={(e) => onTitleChange(e.target.value)}
-						disabled={disabled}
-					/>
-					<p className="text-xs text-muted-foreground">
-						{t("tasks:form.titleHelpText")}
-					</p>
-				</div>
 
 				{/* Agent Profile Selection */}
 				<AgentProfileSelector

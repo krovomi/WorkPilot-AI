@@ -34,6 +34,10 @@ export interface TaskAPI {
 		description: string,
 		metadata?: TaskMetadata,
 	) => Promise<IPCResult<Task>>;
+	duplicateTask: (
+		taskId: string,
+		newTitle?: string,
+	) => Promise<IPCResult<Task>>;
 	deleteTask: (taskId: string) => Promise<IPCResult>;
 	updateTask: (
 		taskId: string,
@@ -283,6 +287,12 @@ export const createTaskAPI = (): TaskAPI => ({
 			description,
 			metadata,
 		),
+
+	duplicateTask: (
+		taskId: string,
+		newTitle?: string,
+	): Promise<IPCResult<Task>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_DUPLICATE, taskId, newTitle),
 
 	deleteTask: (taskId: string): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_DELETE, taskId),

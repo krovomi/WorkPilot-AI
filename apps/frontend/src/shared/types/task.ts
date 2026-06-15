@@ -311,6 +311,12 @@ export interface TaskMetadata {
 	// inlining des images en pièce jointe, etc.).
 	importSource?: "azure-devops" | "jira";
 
+	// Spec ID of the source task when this task was created via TASK_DUPLICATE.
+	// Duplicates otherwise carry `sourceType: "manual"`, so this is the only
+	// marker that lets the UI treat a clone like an import (e.g. propose the
+	// Provider × LLM × Effort prerequisite before it runs).
+	duplicatedFrom?: string;
+
 	// Classification
 	category?: TaskCategory;
 	complexity?: TaskComplexity;

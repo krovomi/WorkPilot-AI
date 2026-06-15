@@ -39,7 +39,9 @@
 		"taskActions": "Task actions",
 		"selectTask": "Select task: {{title}}",
 		"preview": "Preview",
-		"syncFromBranch": "Sync from branch"
+		"syncFromBranch": "Sync from branch",
+		"duplicate": "Duplicate",
+		"duplicateSuffix": "(copy)"
 	},
 	"confirmDelete": {
 		"title": "Delete Task",
@@ -188,6 +190,8 @@
 		"deleteError": "Failed to delete some tasks",
 		"restoreSuccess": "Task restored successfully",
 		"restoreError": "Failed to restore task",
+		"duplicateSuccess": "Task duplicated successfully",
+		"duplicateError": "Failed to duplicate task",
 		"undo": "Undo",
 		"clearSelection": "Clear Selection",
 		"mixedColumnWarning": "Different columns — move unavailable",
@@ -300,7 +304,7 @@
 			"entries": "entries",
 			"step": "Step {{current}}/{{total}}",
 			"stepScrollHint": "Click to jump to the start of this step",
-			"qaPass": "QA — pass {{n}}",
+			"qaPass": "QA — check {{n}}",
 			"thinking": "Processing in progress"
 		},
 		"shortPhases": {
@@ -479,6 +483,14 @@
 		"saveChanges": "Save Changes",
 		"errors": {
 			"updateFailed": "Failed to update task. Please try again."
+		}
+	},
+	"duplicate": {
+		"title": "Duplicate Task",
+		"description": "Adjust the fields before creating the copy. The new task is created in the backlog with its own spec (attachments are preserved).",
+		"createButton": "Create copy",
+		"errors": {
+			"createFailed": "Failed to duplicate task. Please try again."
 		}
 	},
 	"form": {

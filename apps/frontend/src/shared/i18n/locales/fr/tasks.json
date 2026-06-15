@@ -39,7 +39,9 @@
 		"taskActions": "Actions de la tâche",
 		"selectTask": "Sélectionner la tâche : {{title}}",
 		"preview": "Aperçu",
-		"syncFromBranch": "Synchroniser depuis une branche"
+		"syncFromBranch": "Synchroniser depuis une branche",
+		"duplicate": "Dupliquer",
+		"duplicateSuffix": "(copie)"
 	},
 	"confirmDelete": {
 		"title": "Supprimer la tâche",
@@ -188,6 +190,8 @@
 		"deleteError": "Échec de la suppression de certaines tâches",
 		"restoreSuccess": "Tâche restaurée avec succès",
 		"restoreError": "Échec de la restauration de la tâche",
+		"duplicateSuccess": "Tâche dupliquée avec succès",
+		"duplicateError": "Échec de la duplication de la tâche",
 		"undo": "Annuler",
 		"clearSelection": "Effacer la sélection",
 		"mixedColumnWarning": "Colonnes différentes — déplacement impossible",
@@ -300,7 +304,7 @@
 			"entries": "entrées",
 			"step": "Étape {{current}}/{{total}}",
 			"stepScrollHint": "Cliquer pour remonter au début de cette étape",
-			"qaPass": "QA — passe {{n}}",
+			"qaPass": "QA — vérification {{n}}",
 			"thinking": "Traitement en cours"
 		},
 		"shortPhases": {
@@ -479,6 +483,14 @@
 		"saveChanges": "Enregistrer les modifications",
 		"errors": {
 			"updateFailed": "Échec de la mise à jour de la tâche. Veuillez réessayer."
+		}
+	},
+	"duplicate": {
+		"title": "Dupliquer la tâche",
+		"description": "Ajustez les champs avant de créer la copie. La nouvelle tâche est créée dans le backlog avec sa propre spécification (les pièces jointes sont conservées).",
+		"createButton": "Créer la copie",
+		"errors": {
+			"createFailed": "Échec de la duplication de la tâche. Veuillez réessayer."
 		}
 	},
 	"form": {
