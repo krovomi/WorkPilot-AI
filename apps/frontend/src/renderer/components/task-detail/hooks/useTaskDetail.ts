@@ -331,12 +331,27 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 				);
 				if (result.success && result.data) {
 					setPhaseLogs(result.data);
-					// Auto-expand active phase
-					const activePhase = (
-						["planning", "coding", "validation"] as TaskLogPhase[]
-					).find((phase) => result.data?.phases[phase]?.status === "active");
+					const phaseKeys = [
+						"planning",
+						"coding",
+						"validation",
+					] as TaskLogPhase[];
+					const activePhase = phaseKeys.find(
+						(phase) => result.data?.phases[phase]?.status === "active",
+					);
 					if (activePhase) {
+						// Auto-expand active phase
 						setExpandedPhases(new Set([activePhase]));
+					} else {
+						// Tâche terminée (aucune phase active) : on déplie toutes les phases
+						// qui contiennent des entrées. Sinon tout reste replié à l'ouverture
+						// et les phases (codage/validation) semblent absentes.
+						const populated = phaseKeys.filter(
+							(phase) => (result.data?.phases[phase]?.entries?.length ?? 0) > 0,
+						);
+						if (populated.length > 0) {
+							setExpandedPhases(new Set(populated));
+						}
 					}
 				}
 			} catch (err) {

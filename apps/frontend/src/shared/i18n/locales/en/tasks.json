@@ -299,6 +299,8 @@
 			"entry": "entry",
 			"entries": "entries",
 			"step": "Step {{current}}/{{total}}",
+			"stepScrollHint": "Click to jump to the start of this step",
+			"qaPass": "QA — pass {{n}}",
 			"thinking": "Processing in progress"
 		},
 		"shortPhases": {

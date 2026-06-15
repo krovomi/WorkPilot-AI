@@ -63,6 +63,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
+import { getSubStepLabel, TaskPhaseBar } from "./TaskPhaseBar";
 
 interface TaskLogsProps {
 	task: Task;
@@ -75,6 +76,10 @@ interface TaskLogsProps {
 	onLogsScroll: (e: React.UIEvent<HTMLDivElement>) => void;
 	onTogglePhase: (phase: TaskLogPhase) => void;
 	onVisiblePhaseChange?: (phase: TaskLogPhase | null) => void;
+	/** Phase currently visible at the top of the viewport (scroll-driven). */
+	currentPhase?: TaskLogPhase | null;
+	/** Live activity label surfaced in the phase bar. */
+	currentActivity?: string | null;
 }
 
 const PHASE_ORDER: TaskLogPhase[] = ["planning", "coding", "validation"];
@@ -207,6 +212,8 @@ export function TaskLogs({
 	onLogsScroll,
 	onTogglePhase,
 	onVisiblePhaseChange,
+	currentPhase,
+	currentActivity,
 }: TaskLogsProps) {
 	const { t } = useTranslation(["tasks"]);
 	const { toast } = useToast();
@@ -232,6 +239,17 @@ export function TaskLogs({
 	}, [isSearching, phaseLogs, normalizedQuery]);
 
 	const hasAnyLogs = Boolean(phaseLogs || (task.logs && task.logs.length > 0));
+
+	// Table id → titre de sous-tâche, utilisée comme repli pour décrire la
+	// sous-étape de la phase de codage sur les anciens logs (qui portent un
+	// `subtask_id` sur leurs entrées mais aucune borne `subphase` structurée).
+	const subtaskTitles = useMemo(() => {
+		const map: Record<string, string> = {};
+		for (const st of task.subtasks ?? []) {
+			if (st.id) map[st.id] = st.title || st.id;
+		}
+		return map;
+	}, [task.subtasks]);
 
 	// Configured providers shown in each phase's provider dropdown. Loaded once
 	// (and refreshed when settings/profiles change) so adding an API key in
@@ -362,6 +380,11 @@ export function TaskLogs({
 	// frame des logs, afin de ne pas encombrer le viewport au repos.
 	const [isHoveringLogs, setIsHoveringLogs] = useState(false);
 
+	// Sous-étape courante affichée dans la barre de phase, suivie en fonction du
+	// défilement (dernière borne « phase N: NOM » passée sous le haut du
+	// viewport). Mise à jour par computeVisiblePhase.
+	const [visibleSubStep, setVisibleSubStep] = useState<string | null>(null);
+
 	const scrollToTop = useCallback(() => {
 		logsContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 	}, [logsContainerRef]);
@@ -371,6 +394,36 @@ export function TaskLogs({
 		if (!container) return;
 		container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
 	}, [logsContainerRef]);
+
+	// Remonte le conteneur de logs jusqu'au début de la section d'une phase.
+	// On mesure l'écart entre le haut de la section et le haut du conteneur, ce
+	// qui reste fiable quelles que soient les phases repliées au-dessus.
+	const scrollPhaseIntoView = useCallback(
+		(phase: TaskLogPhase) => {
+			const el = phaseRefs.current[phase];
+			const container = logsContainerRef.current;
+			if (!el || !container) return;
+			const delta =
+				el.getBoundingClientRect().top - container.getBoundingClientRect().top;
+			container.scrollTo({
+				top: Math.max(0, container.scrollTop + delta - 8),
+				behavior: "smooth",
+			});
+		},
+		[logsContainerRef],
+	);
+
+	// Au clic sur la barre de phase : on déploie la phase ciblée si besoin (pour
+	// révéler ses entrées) puis on remonte à son début. Le haut de l'en-tête de
+	// section ne bouge pas avec sa propre expansion, le défilement reste donc
+	// correct sans attendre la fin de l'animation.
+	const handleScrollToPhase = useCallback(
+		(phase: TaskLogPhase) => {
+			if (!expandedPhases.has(phase)) onTogglePhase(phase);
+			scrollPhaseIntoView(phase);
+		},
+		[expandedPhases, onTogglePhase, scrollPhaseIntoView],
+	);
 
 	// Raccourcis clavier quand le conteneur de logs a le focus :
 	// - Home → remonter tout en haut, End → descendre tout en bas.
@@ -402,7 +455,7 @@ export function TaskLogs({
 	// container and notify the parent so the sticky phase bar can follow.
 	const computeVisiblePhase = useCallback(() => {
 		const container = logsContainerRef.current;
-		if (!container || !onVisiblePhaseChange) return;
+		if (!container) return;
 
 		const containerTop = container.getBoundingClientRect().top;
 		let current: TaskLogPhase | null = null;
@@ -415,8 +468,36 @@ export function TaskLogs({
 				current = phase;
 			}
 		}
-		onVisiblePhaseChange(current);
-	}, [logsContainerRef, onVisiblePhaseChange]);
+		onVisiblePhaseChange?.(current);
+
+		// Sous-étape pilotée par le défilement : on suit la dernière borne de
+		// sous-étape passée sous le haut du viewport, restreinte à la phase
+		// affichée (planification : « phase N: NOM » ; codage : sous-tâche ;
+		// validation : passe QA). Les bornes proviennent des entrées marquées
+		// `data-substep` (cf. getSubStepLabel).
+		const activePhase =
+			PHASE_ORDER.find((p) => phaseLogs?.phases[p]?.status === "active") ?? null;
+		const displayPhase = current ?? activePhase;
+		let subStep: string | null = null;
+		if (displayPhase) {
+			const headers = Array.from(
+				container.querySelectorAll<HTMLElement>(
+					`[data-substep][data-substep-phase="${displayPhase}"]`,
+				),
+			);
+			for (const header of headers) {
+				if (header.getBoundingClientRect().top - containerTop <= 8) {
+					subStep = header.dataset.substep || null;
+				}
+			}
+			// Avant d'avoir défilé sous la première borne, on affiche tout de même
+			// la sous-étape initiale plutôt qu'un libellé vide.
+			if (!subStep && headers.length > 0) {
+				subStep = headers[0].dataset.substep || null;
+			}
+		}
+		setVisibleSubStep(subStep);
+	}, [logsContainerRef, onVisiblePhaseChange, phaseLogs]);
 
 	// Met à jour la visibilité des boutons flottants selon la position : on
 	// affiche « haut » dès qu'on s'éloigne du sommet et « bas » tant qu'on n'a
@@ -501,6 +582,17 @@ export function TaskLogs({
 				</div>
 			)}
 
+			{/* Barre de phase : nom de la phase, étape courante et sous-étape en
+			    temps réel. Placée sous la recherche ; un clic remonte au début des
+			    logs de la phase affichée. */}
+			<TaskPhaseBar
+				phaseLogs={phaseLogs}
+				currentPhase={currentPhase}
+				currentActivity={currentActivity}
+				subStep={visibleSubStep}
+				onStepClick={handleScrollToPhase}
+			/>
+
 			<div
 				ref={logsContainerRef}
 				className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent focus:outline-none"
@@ -534,6 +626,7 @@ export function TaskLogs({
 										onProviderChange={handleProviderChange}
 										isSavingPhase={savingPhase === phase}
 										searchQuery={normalizedQuery}
+										subtaskTitles={subtaskTitles}
 									/>
 								</div>
 							))}
@@ -651,6 +744,8 @@ interface PhaseLogSectionProps {
 	isSavingPhase?: boolean;
 	/** Active, already-lower-cased search query (empty = no filtering). */
 	searchQuery?: string;
+	/** Map id → titre de sous-tâche, pour le repli de sous-étape du codage. */
+	subtaskTitles?: Record<string, string>;
 }
 
 function PhaseLogSection({
@@ -666,6 +761,7 @@ function PhaseLogSection({
 	onProviderChange,
 	isSavingPhase,
 	searchQuery = "",
+	subtaskTitles,
 }: PhaseLogSectionProps) {
 	const { t } = useTranslation(["tasks"]);
 	const Icon = PHASE_ICONS[phase];
@@ -721,6 +817,59 @@ function PhaseLogSection({
 	}, [phaseLog?.entries, logOrder, isSearching, searchQuery]);
 
 	const hasEntries = displayedEntries.length > 0;
+
+	// La phase porte-t-elle des bornes de sous-étape structurées (tag `subphase`
+	// ou en-tête « Starting phase N: ») ? Si oui (nouveaux logs), on s'appuie
+	// uniquement dessus. Sinon (anciens logs de codage), on retombe sur le
+	// `subtask_id` des entrées, résolu vers le titre de la sous-tâche.
+	const hasStructuredSubsteps = useMemo(
+		() => (phaseLog?.entries || []).some((e) => getSubStepLabel(e) != null),
+		[phaseLog?.entries],
+	);
+
+	// Repli anciens logs (codage) : on ne marque que la PREMIÈRE entrée de chaque
+	// suite de sous-tâche (changement de `subtask_id`), pas chaque entrée — pour
+	// garder peu de bornes et éviter de coûteux relevés de position au défilement.
+	const codingSubtaskBoundaries = useMemo(() => {
+		const set = new Set<TaskLogEntry>();
+		if (hasStructuredSubsteps || phase !== "coding") return set;
+		let prev: string | null = null;
+		for (const e of phaseLog?.entries || []) {
+			const sid = e.subtask_id || null;
+			if (sid && sid !== prev) set.add(e);
+			if (sid) prev = sid;
+		}
+		return set;
+	}, [hasStructuredSubsteps, phase, phaseLog?.entries]);
+
+	// Repli anciens logs (validation) : chaque session QA est bornée par une
+	// entrée `phase_start` (« Starting QA validation… »). On les numérote en
+	// passes, faute de bornes structurées plus fines.
+	const validationPassLabels = useMemo(() => {
+		const map = new Map<TaskLogEntry, string>();
+		if (hasStructuredSubsteps || phase !== "validation") return map;
+		let pass = 0;
+		for (const e of phaseLog?.entries || []) {
+			if (e.type === "phase_start") {
+				pass += 1;
+				map.set(e, t("tasks:execution.labels.qaPass", "QA — passe {{n}}", { n: pass }));
+			}
+		}
+		return map;
+	}, [hasStructuredSubsteps, phase, phaseLog?.entries, t]);
+
+	// Étiquette de sous-étape à poser sur une entrée pour le suivi au défilement.
+	const resolveSubStep = useCallback(
+		(entry: TaskLogEntry): string | null => {
+			const label = getSubStepLabel(entry);
+			if (label) return label;
+			if (entry.subtask_id && codingSubtaskBoundaries.has(entry)) {
+				return subtaskTitles?.[entry.subtask_id] ?? entry.subtask_id;
+			}
+			return validationPassLabels.get(entry) ?? null;
+		},
+		[codingSubtaskBoundaries, validationPassLabels, subtaskTitles],
+	);
 
 	const getStatusBadge = () => {
 		switch (status) {
@@ -966,13 +1115,21 @@ function PhaseLogSection({
 							{t("tasks:logs.phaseEmpty")}
 						</p>
 					) : (
-						displayedEntries.map((entry) => (
-							<LogEntry
-								key={`${entry.timestamp}-${entry.type}-${entry.content.slice(0, 80)}`}
-								entry={entry}
-								query={searchQuery}
-							/>
-						))
+						displayedEntries.map((entry) => {
+							const key = `${entry.timestamp}-${entry.type}-${entry.content.slice(0, 80)}`;
+							// Les bornes de sous-étape (« Starting phase N: NOM ») sont
+							// marquées pour que TaskLogs puisse suivre la sous-étape courante
+							// au défilement.
+							const subStepLabel = resolveSubStep(entry);
+							if (subStepLabel) {
+								return (
+									<div key={key} data-substep={subStepLabel} data-substep-phase={phase}>
+										<LogEntry entry={entry} query={searchQuery} />
+									</div>
+								);
+							}
+							return <LogEntry key={key} entry={entry} query={searchQuery} />;
+						})
 					)}
 				</div>
 			</CollapsibleContent>

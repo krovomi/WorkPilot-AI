@@ -77,7 +77,6 @@ import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
 import { TaskRunControls } from "./TaskRunControls";
-import { TaskPhaseBar } from "./TaskPhaseBar";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
@@ -1153,15 +1152,6 @@ function TaskDetailModalContent({
 									<TaskSubtasks task={task} onUpdatePlan={handleUpdatePlan} />
 								</TabsContent>
 
-								{/* Phase bar - only visible on Logs tab */}
-								{state.activeTab === "logs" && (
-									<TaskPhaseBar
-										phaseLogs={state.phaseLogs}
-										currentPhase={state.currentLogPhase}
-										currentActivity={currentPhaseActivity}
-									/>
-								)}
-
 								{/* Logs Tab */}
 								<TabsContent
 									value="logs"
@@ -1178,6 +1168,8 @@ function TaskDetailModalContent({
 										onLogsScroll={state.handleLogsScroll}
 										onTogglePhase={state.togglePhase}
 										onVisiblePhaseChange={state.setCurrentLogPhase}
+										currentPhase={state.currentLogPhase}
+										currentActivity={currentPhaseActivity}
 									/>
 								</TabsContent>
 
