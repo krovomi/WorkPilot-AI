@@ -660,34 +660,30 @@ export interface ChangeRequestSubtask {
  * Build a single "change request" subtask that records a modification the user
  * asked for during human review.
  *
- * Unlike a file-derived breakdown, this ALWAYS returns one subtask — even when
- * no files were modified yet — so every requested change leaves a visible trace
- * in the Subtasks tab. The user's feedback becomes the subtask description and
- * any modified files are attached as targets for the coder/QA loop.
+ * Always returns one subtask so every requested change leaves a visible trace in
+ * the Subtasks tab. The user's feedback becomes the subtask description.
+ *
+ * `files` is deliberately left EMPTY: at creation the subtask has changed
+ * nothing. The files it actually touches are recorded by the backend as
+ * `files_changed` (ground truth, from the subtask's own commits) once the agent
+ * runs, and `extractSubtaskFiles` prefers that — so the file viewer shows
+ * exactly what THIS change modified instead of the whole branch diff.
  *
  * @param feedback - The user's "Request Changes" feedback text
- * @param modifiedFiles - Files already changed in the worktree (optional)
  * @returns A single change-request subtask
  */
-export function buildChangeRequestSubtask(
-	feedback: string,
-	modifiedFiles: string[] = [],
-): ChangeRequestSubtask {
+export function buildChangeRequestSubtask(feedback: string): ChangeRequestSubtask {
 	const trimmed = (feedback || "").trim();
 	const summary = trimmed
 		? trimmed.split("\n")[0].slice(0, 120)
 		: "Change requested by user";
-	const filesBlock =
-		modifiedFiles.length > 0
-			? `\n\nFiles touched so far:\n${modifiedFiles.map((f) => `- ${f}`).join("\n")}`
-			: "";
 
 	return {
 		id: `change-request-${Date.now()}`,
 		title: summary,
-		description: `${trimmed || summary}${filesBlock}`,
+		description: trimmed || summary,
 		status: "pending",
-		files: modifiedFiles,
+		files: [],
 		origin: "change_request",
 		requested_at: new Date().toISOString(),
 	};

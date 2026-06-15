@@ -13,15 +13,23 @@ interface Phase {
 }
 
 describe("buildChangeRequestSubtask", () => {
-	it("always returns a single change-request subtask, even with no files", () => {
-		const subtask = buildChangeRequestSubtask("Please fix the VAT limit", []);
+	it("always returns a single pending change-request subtask", () => {
+		const subtask = buildChangeRequestSubtask("Please fix the VAT limit");
 
 		expect(subtask.origin).toBe("change_request");
 		expect(subtask.status).toBe("pending");
-		expect(subtask.files).toEqual([]);
 		expect(subtask.id).toMatch(/^change-request-/);
 		// requested_at must be a valid ISO timestamp for the UI trace line.
 		expect(Number.isNaN(Date.parse(subtask.requested_at))).toBe(false);
+	});
+
+	it("leaves files empty so the viewer shows only files_changed (ground truth)", () => {
+		// The branch diff must NOT be attached — files the change actually touches
+		// are recorded by the backend after the agent runs.
+		const subtask = buildChangeRequestSubtask("Fix both files");
+
+		expect(subtask.files).toEqual([]);
+		expect(subtask.description).toBe("Fix both files");
 	});
 
 	it("uses the first feedback line as the title and keeps the full text in the description", () => {
@@ -37,15 +45,6 @@ describe("buildChangeRequestSubtask", () => {
 		const subtask = buildChangeRequestSubtask(longLine);
 
 		expect(subtask.title).toHaveLength(120);
-	});
-
-	it("attaches modified files as targets and lists them in the description", () => {
-		const files = ["src/a.cs", "src/b.cs"];
-		const subtask = buildChangeRequestSubtask("Fix both files", files);
-
-		expect(subtask.files).toEqual(files);
-		expect(subtask.description).toContain("src/a.cs");
-		expect(subtask.description).toContain("src/b.cs");
 	});
 
 	it("falls back to a default summary when feedback is empty", () => {

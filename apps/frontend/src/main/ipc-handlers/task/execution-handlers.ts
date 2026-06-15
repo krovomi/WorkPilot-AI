@@ -59,7 +59,6 @@ import {
 	getPlanPath,
 	persistPlanStatus,
 	updatePlanSubtasks,
-	getModifiedFilesFromWorktree,
 	buildChangeRequestSubtask,
 	addChangeRequestSubtaskToPlan,
 } from "./plan-file-utils";
@@ -1148,20 +1147,8 @@ export function registerTaskExecutionHandlers(
 				// when there is no worktree or no files have changed yet — so a request
 				// always leaves a trace.
 				try {
-					// Attach already-modified files when a worktree exists, as targets
-					// for the coder/QA loop.
-					const reviewBaseBranch =
-						task.metadata?.baseBranch ||
-						project.settings?.mainBranch ||
-						"main";
-					const modifiedFiles =
-						hasWorktree && worktreePath
-							? getModifiedFilesFromWorktree(worktreePath, reviewBaseBranch)
-							: [];
-
 					const changeRequestSubtask = buildChangeRequestSubtask(
 						feedback || "Needs fixes based on user feedback",
-						modifiedFiles,
 					);
 
 					// Write the trace to BOTH plans:
@@ -1170,6 +1157,8 @@ export function registerTaskExecutionHandlers(
 					//    worktree plan is only synced back to the main one after QA, so
 					//    without this second write the new subtask would not appear in
 					//    the UI until much later (the reported "no new coloured subtask").
+					// The subtask carries no files at creation — its real changes are
+					// captured in files_changed by the backend once the agent runs.
 					const worktreePlanPath = path.join(
 						hasWorktree && worktreeSpecDir ? worktreeSpecDir : specDir,
 						AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
@@ -1188,7 +1177,7 @@ export function registerTaskExecutionHandlers(
 					}
 
 					appLog.info(
-						`[TASK_REVIEW] Recorded change-request subtask (${changeRequestSubtask.id}, written=${wrote}) with ${modifiedFiles.length} file(s) attached`,
+						`[TASK_REVIEW] Recorded change-request subtask (${changeRequestSubtask.id}, written=${wrote})`,
 					);
 				} catch (subtaskError) {
 					// Don't fail the review - continue with QA process
@@ -1204,65 +1193,73 @@ export function registerTaskExecutionHandlers(
 				// otherwise every modification re-executes the whole task and floods
 				// the logs with the other subtasks (matches the follow-up planner's
 				// "never change the status of completed subtasks" rule).
-				const resetPlanPath = path.join(
-					hasWorktree && worktreeSpecDir ? worktreeSpecDir : specDir,
-					AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
-				);
-				try {
-					const resetPlanContent = readFileSync(resetPlanPath, "utf-8");
-					const resetPlan = JSON.parse(resetPlanContent);
-					if (resetPlan.phases) {
-						for (const phase of resetPlan.phases) {
-							if (Array.isArray(phase.subtasks)) {
-								for (const subtask of phase.subtasks) {
-									// Retry failed subtasks; preserve completed ones.
-									if (subtask.status === "failed") {
-										subtask.status = "pending";
+				//
+				// Reset BOTH plans: the MAIN plan is authoritative on restart (run.py
+				// is launched with the main project dir and copy_spec_to_worktree
+				// overwrites the worktree copy from it) AND it is the plan the UI
+				// watches — so it must carry the change-request + in-progress status.
+				const resetPlanPaths = [
+					path.join(specDir, AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN),
+					...(hasWorktree && worktreeSpecDir
+						? [path.join(worktreeSpecDir, AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN)]
+						: []),
+				];
+				for (const resetPlanPath of resetPlanPaths) {
+					if (!existsSync(resetPlanPath)) continue;
+					try {
+						const resetPlan = JSON.parse(readFileSync(resetPlanPath, "utf-8"));
+						if (resetPlan.phases) {
+							for (const phase of resetPlan.phases) {
+								if (Array.isArray(phase.subtasks)) {
+									for (const subtask of phase.subtasks) {
+										// Retry failed subtasks; preserve completed ones.
+										if (subtask.status === "failed") {
+											subtask.status = "pending";
+										}
 									}
 								}
 							}
 						}
+						// Reset QA signoff so QA re-validates the task after the change.
+						if (resetPlan.qa_signoff) {
+							resetPlan.qa_signoff.status = "pending";
+						}
+						resetPlan.status = "in_progress";
+						resetPlan.planStatus = "in_progress";
+						resetPlan.updated_at = new Date().toISOString();
+						writeFileSync(
+							resetPlanPath,
+							JSON.stringify(resetPlan, null, 2),
+							"utf-8",
+						);
+					} catch (resetError) {
+						appLog.warn(
+							`[TASK_REVIEW] Could not reset plan ${resetPlanPath}: ${resetError instanceof Error ? resetError.message : String(resetError)}`,
+						);
 					}
-					// Reset QA signoff so QA re-validates the task after the change.
-					if (resetPlan.qa_signoff) {
-						resetPlan.qa_signoff.status = "pending";
-					}
-					resetPlan.status = "in_progress";
-					resetPlan.planStatus = "in_progress";
-					resetPlan.updated_at = new Date().toISOString();
-					writeFileSync(resetPlanPath, JSON.stringify(resetPlan, null, 2), "utf-8");
-					appLog.info(
-						"[TASK_REVIEW] Re-opened plan for change request (completed subtasks preserved)",
-					);
-				} catch (resetError) {
-					appLog.warn(
-						`[TASK_REVIEW] Could not reset subtasks in plan: ${resetError instanceof Error ? resetError.message : String(resetError)}`,
-					);
 				}
+				appLog.info(
+					"[TASK_REVIEW] Re-opened plan(s) for change request (completed subtasks preserved)",
+				);
 
 				// Start full pipeline (planning → coding → QA) instead of QA-only
 				// This ensures changes requested by the user go through the complete workflow.
 				//
-				// When the task already lives in a worktree, run DIRECTLY inside it
-				// (useWorktree:false → run.py --direct) rather than asking run.py to set
-				// up worktree isolation again. The branch is already checked out in this
-				// worktree, so a fresh `git worktree add` fails with
-				//   fatal: '<branch>' is already used by worktree at '<path>' (git exit 128).
-				// Running direct also re-uses the worktree's own implementation_plan.json
-				// (the one we just reset + augmented with the change-request subtask) in
-				// place, and skips the remote fetch — so a "Request Changes" re-run works
-				// fully offline.
-				const runInExistingWorktree = hasWorktree && !!worktreePath;
-				const qaProjectPath = runInExistingWorktree
-					? worktreePath
-					: project.path;
+				// IMPORTANT: pass the MAIN project path (never the worktree path) as the
+				// project dir. The WorktreeManager then reuses the EXISTING worktree
+				// idempotently instead of trying to `git worktree add` a branch that is
+				// already checked out (which fails with "branch already used by worktree",
+				// git exit 128). Keeping worktree isolation (not --direct) also preserves
+				// the worktree→main progress sync (run.py sets source_spec_dir), so the
+				// kanban/modal percentage actually reaches 100% once the change-request
+				// completes — running --direct skips that sync and leaves the main plan
+				// (which the UI watches) stuck on the "pending" change-request subtask.
+				const qaProjectPath = project.path;
 				const baseBranch =
 					task.metadata?.baseBranch || project.settings?.mainBranch;
 				console.warn(
 					"[TASK_REVIEW] Starting full pipeline with projectPath:",
 					qaProjectPath,
-					"direct:",
-					runInExistingWorktree,
 				);
 				agentManager.startTaskExecution(
 					taskId,
@@ -1270,10 +1267,7 @@ export function registerTaskExecutionHandlers(
 					task.specId,
 					{
 						baseBranch,
-						// Inside an existing worktree we must NOT create another one.
-						useWorktree: runInExistingWorktree
-							? false
-							: task.metadata?.useWorktree,
+						useWorktree: task.metadata?.useWorktree,
 						useLocalBranch: task.metadata?.useLocalBranch,
 						enableStreaming: true,
 						streamingSessionId: taskId,
