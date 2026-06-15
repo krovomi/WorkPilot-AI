@@ -600,6 +600,21 @@
 		"savedDescription_other": "{{count}} answers added to the specification.",
 		"saveErrorTitle": "Failed to save clarifications"
 	},
+	"executionFormula": {
+		"bannerImported": "Imported task — pick the provider, model and effort before running it.",
+		"bannerDuplicated": "Duplicated task — pick the provider, model and effort before running it.",
+		"chooseButton": "Choose engine",
+		"dismiss": "Ignore",
+		"appliedLabel": "Engine:",
+		"editButton": "Change",
+		"gate": {
+			"title": "Choose the provider/LLM/effort first?",
+			"body": "This task was imported or duplicated and has no provider, model or effort chosen yet. Pick a formula in the Formula Lab, or start now with the current defaults.",
+			"choose": "Choose engine",
+			"startDefaults": "Start with defaults",
+			"cancel": "Cancel"
+		}
+	},
 	"reset": {
 		"button": "Reset task",
 		"confirmTitle": "Fully reset this task?",

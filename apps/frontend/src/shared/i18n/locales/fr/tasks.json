@@ -600,6 +600,21 @@
 		"savedDescription_other": "{{count}} réponses ajoutées à la spécification.",
 		"saveErrorTitle": "Échec de l'enregistrement des clarifications"
 	},
+	"executionFormula": {
+		"bannerImported": "Tâche importée — choisissez le provider, le modèle et l'effort avant de la lancer.",
+		"bannerDuplicated": "Tâche dupliquée — choisissez le provider, le modèle et l'effort avant de la lancer.",
+		"chooseButton": "Choisir le moteur",
+		"dismiss": "Ignorer",
+		"appliedLabel": "Moteur :",
+		"editButton": "Modifier",
+		"gate": {
+			"title": "Choisir le provider/LLM/effort d'abord ?",
+			"body": "Cette tâche a été importée ou dupliquée et aucun provider, modèle ou effort n'a encore été choisi. Sélectionnez une formule dans le Formula Lab, ou démarrez maintenant avec les défauts actuels.",
+			"choose": "Choisir le moteur",
+			"startDefaults": "Démarrer avec les défauts",
+			"cancel": "Annuler"
+		}
+	},
 	"reset": {
 		"button": "Réinitialiser la tâche",
 		"confirmTitle": "Réinitialiser complètement la tâche ?",
