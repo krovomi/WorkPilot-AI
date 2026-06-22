@@ -1367,7 +1367,11 @@ import sys
 from services.task_completion_service import create_task_completion_service
 
 # Read parameters as JSON from stdin (see note in execution-handlers.ts).
-params = json.load(sys.stdin)
+# Decode the raw stdin bytes as UTF-8 explicitly: on Windows, sys.stdin's
+# text wrapper defaults to the locale codepage (cp1252), which corrupts
+# accented characters in spec ids / titles (e.g. "à" -> "\\ufffd\\xa0") and
+# later trips the spec-name validation regex.
+params = json.loads(sys.stdin.buffer.read().decode("utf-8"))
 
 project_path = params["project_path"]
 spec_id = params["spec_id"]
@@ -1417,16 +1421,21 @@ print(json.dumps(result))
 						// Run from backendPath so Python resolves all internal imports
 						// (core.*, debug, services.*) correctly. Parameters are passed
 						// on stdin via `input` to avoid command-line length limits.
+						// `input` is an explicit UTF-8 Buffer (not a string) so accented
+						// characters survive the hand-off intact; PYTHONUTF8/IOENCODING
+						// keep Python's own stdio on UTF-8 regardless of the OS locale.
 						const result = execFileSync(pythonExecutable, [tmpScriptPath], {
 							cwd: backendPath,
 							encoding: "utf-8",
 							timeout: 60000, // 60 seconds timeout for PR creation
-							input: prParams,
+							input: Buffer.from(prParams, "utf-8"),
 							maxBuffer: 10 * 1024 * 1024, // PR output can be sizable
 							env: {
 								...process.env,
 								APP_LANGUAGE: getAppLanguage(),
 								PYTHONPATH: backendPath,
+								PYTHONUTF8: "1",
+								PYTHONIOENCODING: "utf-8",
 							},
 						});
 
