@@ -1,5 +1,12 @@
-import { ArrowLeft, ArrowRight, Check, Compass, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import {
+	ArrowLeft,
+	ArrowRight,
+	Check,
+	Compass,
+	SkipForward,
+	X,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/button";
@@ -32,15 +39,30 @@ export function GuidedTourOverlay() {
 	const navigateSettings = useGuidedTourStore((s) => s.navigateSettings);
 	const next = useGuidedTourStore((s) => s.next);
 	const back = useGuidedTourStore((s) => s.back);
+	const skipSection = useGuidedTourStore((s) => s.skipSection);
 	const stop = useGuidedTourStore((s) => s.stop);
 
 	const step = isActive ? steps[currentIndex] : undefined;
 
+	// Is there a later step belonging to a different section? (controls whether
+	// "Skip this section" jumps ahead or just ends the tour.)
+	const hasNextSection =
+		!!step &&
+		steps
+			.slice(currentIndex + 1)
+			.some(
+				(s) =>
+					s.section.kind !== step.section.kind ||
+					s.section.section !== step.section.section,
+			);
+
 	const [rect, setRect] = useState<TargetRect | null>(null);
-	const [resolving, setResolving] = useState(false);
 	const [notFound, setNotFound] = useState(false);
 	// Re-evaluated on a light interval so the gate reflects live typing.
 	const [gateOpen, setGateOpen] = useState(true);
+	// Direction of the last navigation, so an unreachable (hidden) optional step
+	// is skipped the same way the user was already going.
+	const directionRef = useRef<1 | -1>(1);
 
 	const isLast = currentIndex >= steps.length - 1;
 
@@ -54,53 +76,57 @@ export function GuidedTourOverlay() {
 		if (!current) return;
 		const controller = new AbortController();
 		let cancelled = false;
-		setResolving(true);
 		setNotFound(false);
 		setRect(null);
 
 		// Bring the right section on screen first.
-		console.info(
-			`[guided-tour] step ${currentIndex + 1}/${steps.length}: navigate`,
-			current.section,
-			"→ anchor",
-			current.anchor,
-		);
 		navigateSettings?.(current.section);
 
 		(async () => {
 			const selector = guideSelector(current.anchor);
-			// First attempt.
-			let el = await waitForElement(selector, 1200, controller.signal);
-			// Retry navigation once if the section/field hasn't mounted yet —
-			// switching sections in the already-open dialog can lose the first
-			// navigate if its listener wasn't mounted at dispatch time.
-			if (!el && !cancelled) {
-				console.info(
-					`[guided-tour] retry navigate for anchor: ${current.anchor}`,
-				);
-				navigateSettings?.(current.section);
-				el = await waitForElement(selector, 1800, controller.signal);
+			// Settings sections render `null` while their env config (re)loads and
+			// during StrictMode remounts, so the anchor flickers in and out of the
+			// DOM. Wait patiently and re-issue navigation periodically until the
+			// anchor appears in a non-null render window. The continuous rect-loop
+			// then keeps it locked even if it flickers again afterwards.
+			const deadline = performance.now() + 3000;
+			let el: HTMLElement | null = null;
+			let attempts = 0;
+			while (!cancelled && performance.now() < deadline) {
+				el = await waitForElement(selector, 600, controller.signal);
+				if (el || cancelled) break;
+				attempts += 1;
+				// Re-assert the target section every few misses.
+				if (attempts % 2 === 0) navigateSettings?.(current.section);
 			}
 			if (cancelled) return;
-			setResolving(false);
 			if (!el) {
-				console.warn(
-					`[guided-tour] anchor NOT found: ${current.anchor} — activeSection?`,
-					document.querySelector("[data-guide]")?.getAttribute("data-guide") ??
-						"(no data-guide in DOM)",
-				);
+				// The anchor never appeared — almost always a field hidden because
+				// its section toggle is off (e.g. navigating Back onto a conditional
+				// field). Skip it in the direction the user was going; toggle steps
+				// are always visible, so this lands on a real step (the toggle when
+				// going back, the next section when going forward).
+				const dir = directionRef.current;
+				const atBoundary =
+					(dir === -1 && currentIndex === 0) ||
+					(dir === 1 && currentIndex >= steps.length - 1);
+				if (!atBoundary) {
+					if (dir === -1) back();
+					else next();
+					return;
+				}
 				setNotFound(true);
 				return;
 			}
-			console.info(`[guided-tour] anchor resolved: ${current.anchor}`);
 			el.scrollIntoView({ block: "center", behavior: "smooth" });
 			window.setTimeout(() => {
 				if (cancelled) return;
-				const focusable = el.matches(
+				const live = document.querySelector<HTMLElement>(selector) ?? el;
+				const focusable = live?.matches(
 					"input, select, textarea, button, [role=switch]",
 				)
-					? el
-					: el.querySelector<HTMLElement>(
+					? live
+					: live?.querySelector<HTMLElement>(
 							"input, select, textarea, button, [role=switch]",
 						);
 				focusable?.focus({ preventScroll: true });
@@ -178,7 +204,15 @@ export function GuidedTourOverlay() {
 		return () => window.removeEventListener("keydown", onKey);
 	}, [isActive, stop]);
 
-	const handleNext = useCallback(() => next(), [next]);
+	const handleNext = useCallback(() => {
+		directionRef.current = 1;
+		next();
+	}, [next]);
+
+	const handleBack = useCallback(() => {
+		directionRef.current = -1;
+		back();
+	}, [back]);
 
 	if (!isActive || !step) return null;
 
@@ -259,10 +293,6 @@ export function GuidedTourOverlay() {
 						<p className="mt-1 text-sm text-muted-foreground">
 							{notFound ? t("fallback.openManually") : t(step.descKey)}
 						</p>
-						<p className="mt-1 font-mono text-[10px] text-muted-foreground/60">
-							{step.anchor}
-							{resolving ? " · …" : notFound ? " · introuvable" : " · ok"}
-						</p>
 					</div>
 					<button
 						type="button"
@@ -287,7 +317,12 @@ export function GuidedTourOverlay() {
 					</span>
 					<div className="flex items-center gap-2">
 						{currentIndex > 0 && (
-							<Button variant="ghost" size="sm" onClick={back} className="gap-1">
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={handleBack}
+								className="gap-1"
+							>
 								<ArrowLeft className="h-3.5 w-3.5" />
 								{t("actions.back")}
 							</Button>
@@ -317,6 +352,18 @@ export function GuidedTourOverlay() {
 						</Button>
 					</div>
 				</div>
+
+				{/* Skip the whole current section (e.g. "I have no Jira account"). */}
+				{hasNextSection && (
+					<button
+						type="button"
+						onClick={skipSection}
+						className="mt-2 flex w-full items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+					>
+						<SkipForward className="h-3 w-3" />
+						{t("actions.skipSection")}
+					</button>
+				)}
 			</div>
 		</div>
 	);

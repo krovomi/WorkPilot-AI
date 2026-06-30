@@ -40,7 +40,14 @@ interface GuidedTourState {
 	startTour: (steps: GuidedStep[]) => void;
 	next: () => void;
 	back: () => void;
+	/** Jump past every remaining step of the current section to the next one. */
+	skipSection: () => void;
 	stop: () => void;
+}
+
+/** Two deep-links point at the same settings section. */
+function sameSection(a: SetupDeepLink, b: SetupDeepLink): boolean {
+	return a.kind === b.kind && a.section === b.section;
 }
 
 export const useGuidedTourStore = create<GuidedTourState>((set, get) => ({
@@ -68,6 +75,22 @@ export const useGuidedTourStore = create<GuidedTourState>((set, get) => ({
 	back: () => {
 		const { currentIndex } = get();
 		if (currentIndex > 0) set({ currentIndex: currentIndex - 1 });
+	},
+
+	skipSection: () => {
+		const { currentIndex, steps } = get();
+		const current = steps[currentIndex];
+		if (!current) return;
+		// Find the first later step in a different section.
+		let i = currentIndex + 1;
+		while (i < steps.length && sameSection(steps[i].section, current.section)) {
+			i += 1;
+		}
+		if (i >= steps.length) {
+			set({ isActive: false, steps: [], currentIndex: 0 });
+			return;
+		}
+		set({ currentIndex: i });
 	},
 
 	stop: () => set({ isActive: false, steps: [], currentIndex: 0 }),
