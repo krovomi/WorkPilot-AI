@@ -557,17 +557,19 @@ export function App() {
 			setSettingsInitialSection(undefined);
 		}
 		setIsSettingsDialogOpen(true);
-		// Fire on the next tick so the dialog's listener is mounted when open flips.
-		requestAnimationFrame(() => {
+
+		// Switch the section even when the dialog is already open. One dispatch on
+		// the next frame is enough (the listener is mounted by then); dispatching
+		// repeatedly would remount the section and reset its loaded env config.
+		const detail =
+			deepLink.kind === "app"
+				? { section: deepLink.section }
+				: { projectSection: deepLink.section };
+		requestAnimationFrame(() =>
 			window.dispatchEvent(
-				new CustomEvent("app-settings:navigate", {
-					detail:
-						deepLink.kind === "app"
-							? { section: deepLink.section }
-							: { projectSection: deepLink.section },
-				}),
-			);
-		});
+				new CustomEvent("app-settings:navigate", { detail }),
+			),
+		);
 	}, []);
 
 	// Let the guided tour drive Settings navigation.

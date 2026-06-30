@@ -68,16 +68,26 @@ export function GuidedTourOverlay() {
 		navigateSettings?.(current.section);
 
 		(async () => {
-			const el = await waitForElement(
-				guideSelector(current.anchor),
-				2000,
-				controller.signal,
-			);
+			const selector = guideSelector(current.anchor);
+			// First attempt.
+			let el = await waitForElement(selector, 1200, controller.signal);
+			// Retry navigation once if the section/field hasn't mounted yet —
+			// switching sections in the already-open dialog can lose the first
+			// navigate if its listener wasn't mounted at dispatch time.
+			if (!el && !cancelled) {
+				console.info(
+					`[guided-tour] retry navigate for anchor: ${current.anchor}`,
+				);
+				navigateSettings?.(current.section);
+				el = await waitForElement(selector, 1800, controller.signal);
+			}
 			if (cancelled) return;
 			setResolving(false);
 			if (!el) {
 				console.warn(
-					`[guided-tour] anchor not found within 2s: ${current.anchor}`,
+					`[guided-tour] anchor NOT found: ${current.anchor} — activeSection?`,
+					document.querySelector("[data-guide]")?.getAttribute("data-guide") ??
+						"(no data-guide in DOM)",
 				);
 				setNotFound(true);
 				return;
@@ -104,9 +114,12 @@ export function GuidedTourOverlay() {
 	}, [isActive, currentIndex]);
 
 	// ── Keep the spotlight rect in sync via rAF; only update on real change ────
+	// Runs continuously (even after a transient miss) so the spotlight re-locks
+	// when the section re-renders — settings sections flicker null while their
+	// env config (re)loads, briefly removing then re-adding the anchor.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on step index intentionally
 	useEffect(() => {
-		if (!isActive || notFound) return;
+		if (!isActive) return;
 		const current = steps[currentIndex];
 		if (!current) return;
 		let rafId = 0;
@@ -114,6 +127,8 @@ export function GuidedTourOverlay() {
 		const loop = () => {
 			const el = document.querySelector<HTMLElement>(sel);
 			if (el) {
+				// Anchor present → ensure we're not stuck in the not-found state.
+				setNotFound((nf) => (nf ? false : nf));
 				const r = el.getBoundingClientRect();
 				// Only set state when the rect meaningfully changed — otherwise we
 				// re-render the whole app on every frame.
@@ -131,7 +146,7 @@ export function GuidedTourOverlay() {
 		};
 		rafId = requestAnimationFrame(loop);
 		return () => cancelAnimationFrame(rafId);
-	}, [isActive, currentIndex, notFound]);
+	}, [isActive, currentIndex]);
 
 	// ── Live "Next" gate ──────────────────────────────────────────────────────
 	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on step index intentionally
@@ -243,6 +258,10 @@ export function GuidedTourOverlay() {
 						<h3 className="font-medium text-foreground">{t(step.titleKey)}</h3>
 						<p className="mt-1 text-sm text-muted-foreground">
 							{notFound ? t("fallback.openManually") : t(step.descKey)}
+						</p>
+						<p className="mt-1 font-mono text-[10px] text-muted-foreground/60">
+							{step.anchor}
+							{resolving ? " · …" : notFound ? " · introuvable" : " · ok"}
 						</p>
 					</div>
 					<button

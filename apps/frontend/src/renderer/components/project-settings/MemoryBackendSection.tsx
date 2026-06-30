@@ -24,7 +24,6 @@ import {
 } from "../ui/select";
 import { Separator } from "../ui/separator";
 import { Switch } from "../ui/switch";
-import { GUIDE_ANCHORS } from "../guided-tour/anchors";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { InfrastructureStatus } from "./InfrastructureStatus";
 import { PasswordInput } from "./PasswordInput";
@@ -157,7 +156,6 @@ export function MemoryBackendSection({
 					</p>
 				</div>
 				<Switch
-					data-guide={GUIDE_ANCHORS.memory.enable}
 					checked={envConfig.graphitiEnabled}
 					onCheckedChange={(checked) => {
 						onUpdateConfig({ graphitiEnabled: checked });
@@ -250,9 +248,7 @@ export function MemoryBackendSection({
 								})
 							}
 						>
-							<SelectTrigger
-								data-guide={GUIDE_ANCHORS.memory.embeddingProvider}
-							>
+							<SelectTrigger>
 								<SelectValue placeholder="Select embedding provider" />
 							</SelectTrigger>
 							<SelectContent>
