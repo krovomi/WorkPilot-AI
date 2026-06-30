@@ -19,6 +19,7 @@ import type {
 	ProjectSettings,
 } from "../../../../shared/types";
 import { buildBranchOptions } from "../../../lib/branch-utils";
+import { GUIDE_ANCHORS } from "../../guided-tour/anchors";
 import { GitHubOAuthFlow } from "../../project-settings/GitHubOAuthFlow";
 import { PasswordInput } from "../../project-settings/PasswordInput";
 import { Button } from "../../ui/button";
@@ -287,6 +288,7 @@ export function GitHubIntegration({
 					</p>
 				</div>
 				<Switch
+					data-guide={GUIDE_ANCHORS.github.enable}
 					checked={envConfig.githubEnabled}
 					onCheckedChange={(checked) =>
 						updateEnvConfig({ githubEnabled: checked })
@@ -400,6 +402,7 @@ export function GitHubIntegration({
 									</a>
 								</p>
 								<PasswordInput
+									data-guide={GUIDE_ANCHORS.github.token}
 									value={envConfig.githubToken || ""}
 									onChange={(value) => updateEnvConfig({ githubToken: value })}
 									placeholder="ghp_xxxxxxxx or github_pat_xxxxxxxx"
@@ -702,6 +705,7 @@ function RepositoryInput({ value, onChange }: RepositoryInputProps) {
 				{t("projectSections.github.repositoryFormatExample")}
 			</p>
 			<Input
+				data-guide={GUIDE_ANCHORS.github.repo}
 				placeholder={t("projectSections.github.repositoryPlaceholder")}
 				value={value}
 				onChange={(e) => onChange(e.target.value)}

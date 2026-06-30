@@ -50,6 +50,7 @@ import enDialogs from "./locales/en/dialogs.json";
 import enDocumentation from "./locales/en/documentation.json";
 import enErrors from "./locales/en/errors.json";
 import enGitlab from "./locales/en/gitlab.json";
+import enGuidedTour from "./locales/en/guidedTour.json";
 import enIdeation from "./locales/en/ideation.json";
 import enInitDialog from "./locales/en/initDialog.json";
 import enInsights from "./locales/en/insights.json";
@@ -133,6 +134,7 @@ import frDialogs from "./locales/fr/dialogs.json";
 import frDocumentation from "./locales/fr/documentation.json";
 import frErrors from "./locales/fr/errors.json";
 import frGitlab from "./locales/fr/gitlab.json";
+import frGuidedTour from "./locales/fr/guidedTour.json";
 import frIdeation from "./locales/fr/ideation.json";
 import frInitDialog from "./locales/fr/initDialog.json";
 import frInsights from "./locales/fr/insights.json";
@@ -213,6 +215,7 @@ export const resources = {
 		documentation: enDocumentation,
 		errors: enErrors,
 		gitlab: enGitlab,
+		guidedTour: enGuidedTour,
 		initDialog: enInitDialog,
 		insights: enInsights,
 		learningLoop: enLearningLoop,
@@ -296,6 +299,7 @@ export const resources = {
 		documentation: frDocumentation,
 		errors: frErrors,
 		gitlab: frGitlab,
+		guidedTour: frGuidedTour,
 		initDialog: frInitDialog,
 		insights: frInsights,
 		learningLoop: frLearningLoop,
@@ -386,6 +390,7 @@ i18n.use(initReactI18next).init({
 		"documentation",
 		"errors",
 		"gitlab",
+		"guidedTour",
 		"initDialog",
 		"insights",
 		"learningLoop",

@@ -396,15 +396,26 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	};
 
 	// Listen for cross-component navigation requests (fired by descendants like
-	// project-settings/GeneralSettings to jump to the global "Agent" section).
+	// project-settings/GeneralSettings to jump to the global "Agent" section, and
+	// by the guided tour to switch sections while the dialog is already open).
 	useEffect(() => {
 		if (!open) return;
 		const handler = (event: Event) => {
-			const target = (event as CustomEvent<{ section?: AppSection }>).detail
-				?.section;
-			if (!target) return;
-			setActiveTopLevel("app");
-			setAppSection(target);
+			const detail = (
+				event as CustomEvent<{
+					section?: AppSection;
+					projectSection?: ProjectSettingsSection;
+				}>
+			).detail;
+			if (detail?.projectSection) {
+				setActiveTopLevel("project");
+				setProjectSection(detail.projectSection);
+				return;
+			}
+			if (detail?.section) {
+				setActiveTopLevel("app");
+				setAppSection(detail.section);
+			}
 		};
 		window.addEventListener("app-settings:navigate", handler);
 		return () => window.removeEventListener("app-settings:navigate", handler);

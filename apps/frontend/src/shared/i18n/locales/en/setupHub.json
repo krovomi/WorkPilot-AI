@@ -3,6 +3,7 @@
 	"description": "Configure your tools to unlock the most of WorkPilot AI's features.",
 	"navLabel": "Getting started",
 	"navDescription": "Guided setup center",
+	"guideMe": "Guide me step by step",
 	"progress": "{{completed}} of {{total}} configured",
 	"allDone": {
 		"title": "Everything is configured 🎉",

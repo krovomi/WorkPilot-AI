@@ -20,6 +20,7 @@ import type {
 	ProjectEnvConfig,
 	ProjectSettings,
 } from "../../../../shared/types";
+import { GUIDE_ANCHORS } from "../../guided-tour/anchors";
 import { PasswordInput } from "../../project-settings/PasswordInput";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
@@ -375,6 +376,7 @@ export function GitLabIntegration({
 					</p>
 				</div>
 				<Switch
+					data-guide={GUIDE_ANCHORS.gitlab.enable}
 					checked={envConfig.gitlabEnabled}
 					onCheckedChange={(checked) =>
 						updateEnvConfig({ gitlabEnabled: checked })
@@ -590,6 +592,7 @@ export function GitLabIntegration({
 									</a>
 								</p>
 								<PasswordInput
+									data-guide={GUIDE_ANCHORS.gitlab.token}
 									value={envConfig.gitlabToken || ""}
 									onChange={(value) => updateEnvConfig({ gitlabToken: value })}
 									placeholder="glpat-xxxxxxxxxxxxxxxxxxxx"
@@ -660,6 +663,7 @@ function InstanceUrlInput({ value, onChange }: InstanceUrlInputProps) {
 				{t("settings.instanceDescription")}
 			</p>
 			<Input
+				data-guide={GUIDE_ANCHORS.gitlab.instanceUrl}
 				placeholder="https://gitlab.com"
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
@@ -855,6 +859,7 @@ function ProjectInput({ value, onChange }: ProjectInputProps) {
 				{t("settings.projectFormatExample")}
 			</p>
 			<Input
+				data-guide={GUIDE_ANCHORS.gitlab.project}
 				placeholder="group/project"
 				value={value}
 				onChange={(e) => onChange(e.target.value)}

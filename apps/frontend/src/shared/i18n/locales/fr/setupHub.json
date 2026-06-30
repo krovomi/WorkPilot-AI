@@ -3,6 +3,7 @@
 	"description": "Configurez vos outils pour débloquer un maximum de fonctionnalités de WorkPilot AI.",
 	"navLabel": "Prise en main",
 	"navDescription": "Centre de configuration guidé",
+	"guideMe": "Me guider pas à pas",
 	"progress": "{{completed}} sur {{total}} configuré(s)",
 	"allDone": {
 		"title": "Tout est configuré 🎉",

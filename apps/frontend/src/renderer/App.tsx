@@ -48,6 +48,8 @@ import {
 import type { ProjectSettingsSection } from "./components/settings/ProjectSettingsContent";
 import { SetupHub } from "./components/setup-hub/SetupHub";
 import type { SetupDeepLink } from "./components/setup-hub/useSetupStatus";
+import { GuidedTourOverlay } from "./components/guided-tour/GuidedTourOverlay";
+import { useGuidedTourStore } from "./components/guided-tour/guided-tour-store";
 import { useSetupHubStore } from "./stores/setup-hub-store";
 import { ServerLoginScreen } from "./components/auth/ServerLoginScreen";
 import { TerminalGrid } from "./components/TerminalGrid";
@@ -541,6 +543,37 @@ export function App() {
 	const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
 	const isSetupHubOpen = useSetupHubStore((s) => s.isOpen);
 	const setSetupHubOpen = useSetupHubStore((s) => s.setSetupHubOpen);
+	const registerTourNavigate = useGuidedTourStore((s) => s.registerNavigate);
+
+	// Shared deep-link navigation used by the Setup Hub and the guided tour.
+	// Sets the initial section (for first open) AND dispatches the navigate event
+	// so sections also switch when the dialog is already open (the tour case).
+	const navigateToSettingsSection = useCallback((deepLink: SetupDeepLink) => {
+		if (deepLink.kind === "app") {
+			setSettingsInitialSection(deepLink.section);
+			setSettingsInitialProjectSection(undefined);
+		} else {
+			setSettingsInitialProjectSection(deepLink.section);
+			setSettingsInitialSection(undefined);
+		}
+		setIsSettingsDialogOpen(true);
+		// Fire on the next tick so the dialog's listener is mounted when open flips.
+		requestAnimationFrame(() => {
+			window.dispatchEvent(
+				new CustomEvent("app-settings:navigate", {
+					detail:
+						deepLink.kind === "app"
+							? { section: deepLink.section }
+							: { projectSection: deepLink.section },
+				}),
+			);
+		});
+	}, []);
+
+	// Let the guided tour drive Settings navigation.
+	useEffect(() => {
+		registerTourNavigate(navigateToSettingsSection);
+	}, [registerTourNavigate, navigateToSettingsSection]);
 	const [isVersionWarningModalOpen, setIsVersionWarningModalOpen] =
 		useState(false);
 	const [isRefreshingTasks, setIsRefreshingTasks] = useState(false);
@@ -2083,18 +2116,11 @@ export function App() {
 					<SetupHub
 						open={isSetupHubOpen}
 						onOpenChange={setSetupHubOpen}
-						onOpenSettingsSection={(deepLink: SetupDeepLink) => {
-							// Reuse the same deep-link path as CommandPalette / CompletionStep.
-							if (deepLink.kind === "app") {
-								setSettingsInitialSection(deepLink.section);
-								setSettingsInitialProjectSection(undefined);
-							} else {
-								setSettingsInitialProjectSection(deepLink.section);
-								setSettingsInitialSection(undefined);
-							}
-							setIsSettingsDialogOpen(true);
-						}}
+						onOpenSettingsSection={navigateToSettingsSection}
 					/>
+
+					{/* Guided tour overlay (spotlight + step-by-step coachmarks) */}
+					<GuidedTourOverlay />
 
 					{/* Version warning modal - shown once for reauthentication notice */}
 					<VersionWarningModal

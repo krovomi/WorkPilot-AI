@@ -1,6 +1,9 @@
-import { CheckCircle2, Compass, FolderGit2 } from "lucide-react";
+import { CheckCircle2, Compass, FolderGit2, Wand2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useProjectStore } from "../../stores/project-store";
+import { startGuidedTour } from "../guided-tour/guided-tour-store";
+import { buildTodoTour } from "../guided-tour/tour-steps";
+import { Button } from "../ui/button";
 import {
 	FullScreenDialog,
 	FullScreenDialogBody,
@@ -44,6 +47,12 @@ export function SetupHub({
 		onOpenSettingsSection(deepLink);
 	};
 
+	const handleGuideMe = () => {
+		// Close the hub, then walk the user through the remaining (todo) steps.
+		onOpenChange(false);
+		startGuidedTour(buildTodoTour(status));
+	};
+
 	return (
 		<FullScreenDialog open={open} onOpenChange={onOpenChange}>
 			<FullScreenDialogContent>
@@ -69,6 +78,15 @@ export function SetupHub({
 							</span>
 						</div>
 						<Progress value={status.percent} />
+
+						{status.percent < 100 && (
+							<div className="pt-1">
+								<Button size="sm" onClick={handleGuideMe} className="gap-2">
+									<Wand2 className="h-4 w-4" />
+									{t("guideMe")}
+								</Button>
+							</div>
+						)}
 					</div>
 				</FullScreenDialogHeader>
 
