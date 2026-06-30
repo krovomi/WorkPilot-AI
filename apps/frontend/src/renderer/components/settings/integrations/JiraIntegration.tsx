@@ -50,7 +50,6 @@ export function JiraIntegration({
 
 	// Guard: don't render until envConfig is loaded (matches AzureDevOpsIntegration pattern)
 	if (!envConfig) {
-		console.warn("[JiraIntegration] envConfig is null — not rendering");
 		return null;
 	}
 

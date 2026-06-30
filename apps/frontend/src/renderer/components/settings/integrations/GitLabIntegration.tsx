@@ -28,18 +28,8 @@ import { Label } from "../../ui/label";
 import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
 
-// Debug logging
-const DEBUG =
-	process.env.NODE_ENV === "development" || process.env.DEBUG === "true";
-function debugLog(message: string, data?: unknown) {
-	if (DEBUG) {
-		if (data !== undefined) {
-			console.warn(`[GitLabIntegration] ${message}`, data);
-		} else {
-			console.warn(`[GitLabIntegration] ${message}`);
-		}
-	}
-}
+// Debug logging — disabled (kept as a no-op so call sites stay valid).
+function debugLog(_message: string, _data?: unknown) {}
 
 interface GitLabProject {
 	pathWithNamespace: string;
