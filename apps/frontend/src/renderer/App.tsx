@@ -46,6 +46,9 @@ import {
 	AppSettingsDialog,
 } from "./components/settings/AppSettings";
 import type { ProjectSettingsSection } from "./components/settings/ProjectSettingsContent";
+import { SetupHub } from "./components/setup-hub/SetupHub";
+import type { SetupDeepLink } from "./components/setup-hub/useSetupStatus";
+import { useSetupHubStore } from "./stores/setup-hub-store";
 import { ServerLoginScreen } from "./components/auth/ServerLoginScreen";
 import { TerminalGrid } from "./components/TerminalGrid";
 import { Toaster } from "./components/ui/toaster";
@@ -536,6 +539,8 @@ export function App() {
 		null,
 	);
 	const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
+	const isSetupHubOpen = useSetupHubStore((s) => s.isOpen);
+	const setSetupHubOpen = useSetupHubStore((s) => s.setSetupHubOpen);
 	const [isVersionWarningModalOpen, setIsVersionWarningModalOpen] =
 		useState(false);
 	const [isRefreshingTasks, setIsRefreshingTasks] = useState(false);
@@ -2011,6 +2016,10 @@ export function App() {
 							}}
 							initialSection={settingsInitialSection}
 							initialProjectSection={settingsInitialProjectSection}
+							onOpenSetupHub={() => {
+								setIsSettingsDialogOpen(false);
+								setSetupHubOpen(true);
+							}}
 							onRerunWizard={() => {
 								// Reset the onboarding state to trigger wizard
 								useSettingsStore
@@ -2066,6 +2075,23 @@ export function App() {
 						}}
 						onOpenSettings={() => {
 							setIsOnboardingWizardOpen(false);
+							setIsSettingsDialogOpen(true);
+						}}
+					/>
+
+					{/* Setup Hub - guided "take me by the hand" configuration center */}
+					<SetupHub
+						open={isSetupHubOpen}
+						onOpenChange={setSetupHubOpen}
+						onOpenSettingsSection={(deepLink: SetupDeepLink) => {
+							// Reuse the same deep-link path as CommandPalette / CompletionStep.
+							if (deepLink.kind === "app") {
+								setSettingsInitialSection(deepLink.section);
+								setSettingsInitialProjectSection(undefined);
+							} else {
+								setSettingsInitialProjectSection(deepLink.section);
+								setSettingsInitialSection(undefined);
+							}
 							setIsSettingsDialogOpen(true);
 						}}
 					/>

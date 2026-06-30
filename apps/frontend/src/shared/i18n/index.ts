@@ -72,6 +72,7 @@ import enRoadmap from "./locales/en/roadmap.json";
 import enSelfHealing from "./locales/en/selfHealing.json";
 import enSessionHistory from "./locales/en/sessionHistory.json";
 import enSettings from "./locales/en/settings.json";
+import enSetupHub from "./locales/en/setupHub.json";
 import enStreaming from "./locales/en/streaming.json";
 import enSwarm from "./locales/en/swarm.json";
 import enTaskReview from "./locales/en/taskReview.json";
@@ -154,6 +155,7 @@ import frRoadmap from "./locales/fr/roadmap.json";
 import frSelfHealing from "./locales/fr/selfHealing.json";
 import frSessionHistory from "./locales/fr/sessionHistory.json";
 import frSettings from "./locales/fr/settings.json";
+import frSetupHub from "./locales/fr/setupHub.json";
 import frStreaming from "./locales/fr/streaming.json";
 import frSwarm from "./locales/fr/swarm.json";
 import frTaskReview from "./locales/fr/taskReview.json";
@@ -234,6 +236,7 @@ export const resources = {
 		refactoring: enRefactoring,
 		roadmap: enRoadmap,
 		settings: enSettings,
+		setupHub: enSetupHub,
 		streaming: enStreaming,
 		taskReview: enTaskReview,
 		tasks: enTasks,
@@ -316,6 +319,7 @@ export const resources = {
 		refactoring: frRefactoring,
 		roadmap: frRoadmap,
 		settings: frSettings,
+		setupHub: frSetupHub,
 		streaming: frStreaming,
 		taskReview: frTaskReview,
 		tasks: frTasks,
@@ -405,6 +409,7 @@ i18n.use(initReactI18next).init({
 		"refactoring",
 		"roadmap",
 		"settings",
+		"setupHub",
 		"streaming",
 		"taskReview",
 		"tasks",

@@ -7,6 +7,7 @@ import {
 	ChevronRight,
 	Cloud,
 	Code,
+	Compass,
 	Database,
 	FolderOpen,
 	Globe,
@@ -101,6 +102,8 @@ interface AppSettingsDialogProps {
 	readonly initialProjectSection?: ProjectSettingsSection;
 	readonly initialProjectId?: string;
 	readonly onRerunWizard?: () => void;
+	/** Closes settings and opens the guided Setup Hub ("Centre de configuration"). */
+	readonly onOpenSetupHub?: () => void;
 }
 
 // Types de sections thématiques
@@ -337,6 +340,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		initialProjectSection,
 		initialProjectId,
 		onRerunWizard,
+		onOpenSetupHub,
 	} = props;
 	const { t } = useTranslation(["settings", "swarm", "continuousAI"]);
 	const {
@@ -668,6 +672,38 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 											)}
 										/>
 									</button>
+
+									{/* Getting started — opens the guided Setup Hub. Sits at the
+									    very top so the configuration flow reads top-to-bottom. */}
+									{onOpenSetupHub && (
+										<button
+											type="button"
+											onClick={() => {
+												onOpenChange(false);
+												onOpenSetupHub();
+											}}
+											title={t("setupHub:navLabel")}
+											className={cn(
+												"w-full flex items-center rounded-lg transition-all",
+												"bg-primary/10 text-primary hover:bg-primary/20",
+												isNavigationCollapsed
+													? "justify-center p-2"
+													: "gap-3 p-3",
+											)}
+										>
+											<Compass className="h-5 w-5 shrink-0" />
+											{!isNavigationCollapsed && (
+												<div className="min-w-0 text-left">
+													<div className="font-medium text-sm">
+														{t("setupHub:navLabel")}
+													</div>
+													<div className="text-xs text-primary/70 truncate">
+														{t("setupHub:navDescription")}
+													</div>
+												</div>
+											)}
+										</button>
+									)}
 
 									{/* Thematic Navigation */}
 									{Object.entries(SETTINGS_THEMES)
