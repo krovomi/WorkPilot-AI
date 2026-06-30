@@ -37,6 +37,7 @@ import { ScrollArea } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/stores/project-store";
 import { useServerSessionStore } from "@/stores/server-session-store";
+import { useGuidedTourStore } from "../guided-tour/guided-tour-store";
 import { InvitationsAdmin } from "../auth/InvitationsAdmin";
 import { Button } from "../ui/button";
 import {
@@ -354,6 +355,11 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	} = useSettings();
 	const [version, setVersion] = useState<string>("");
 
+	// While the guided tour is running it drives this dialog; ignore stray close
+	// requests (the tour overlay portal counts as an "outside" interaction for
+	// the non-modal Radix dialog and would otherwise dismiss Settings).
+	const isTourActive = useGuidedTourStore((s) => s.isActive);
+
 	// Create dynamic settings themes with translations
 	const SETTINGS_THEMES = createSettingsThemes(t);
 
@@ -638,6 +644,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		<FullScreenDialog
 			open={dialogOpen}
 			onOpenChange={(newOpen) => {
+				// The tour owns the dialog lifecycle while running.
+				if (!newOpen && isTourActive) return;
 				if (!newOpen) {
 					revertTheme();
 				}

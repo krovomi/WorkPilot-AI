@@ -44,9 +44,14 @@ export function GuidedTourOverlay() {
 
 	const isLast = currentIndex >= steps.length - 1;
 
-	// ── Resolve + position the target whenever the step changes ───────────────
+	// ── Navigate + resolve + scroll/focus, exactly once per step ──────────────
+	// Keyed on currentIndex (a primitive) so it does NOT re-run on every render —
+	// re-running would re-fire navigateSettings() and cause a render loop.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on step index intentionally
 	useEffect(() => {
-		if (!step) return;
+		if (!isActive) return;
+		const current = steps[currentIndex];
+		if (!current) return;
 		const controller = new AbortController();
 		let cancelled = false;
 		setResolving(true);
@@ -54,74 +59,99 @@ export function GuidedTourOverlay() {
 		setRect(null);
 
 		// Bring the right section on screen first.
-		navigateSettings?.(step.section);
+		console.info(
+			`[guided-tour] step ${currentIndex + 1}/${steps.length}: navigate`,
+			current.section,
+			"→ anchor",
+			current.anchor,
+		);
+		navigateSettings?.(current.section);
 
 		(async () => {
 			const el = await waitForElement(
-				guideSelector(step.anchor),
-				1500,
+				guideSelector(current.anchor),
+				2000,
 				controller.signal,
 			);
 			if (cancelled) return;
 			setResolving(false);
 			if (!el) {
+				console.warn(
+					`[guided-tour] anchor not found within 2s: ${current.anchor}`,
+				);
 				setNotFound(true);
 				return;
 			}
+			console.info(`[guided-tour] anchor resolved: ${current.anchor}`);
 			el.scrollIntoView({ block: "center", behavior: "smooth" });
-			// Focus once it has settled into view.
 			window.setTimeout(() => {
 				if (cancelled) return;
-				const focusable =
-					el.matches("input, select, textarea, button, [role=switch]")
-						? el
-						: el.querySelector<HTMLElement>(
-								"input, select, textarea, button, [role=switch]",
-							);
+				const focusable = el.matches(
+					"input, select, textarea, button, [role=switch]",
+				)
+					? el
+					: el.querySelector<HTMLElement>(
+							"input, select, textarea, button, [role=switch]",
+						);
 				focusable?.focus({ preventScroll: true });
-			}, 250);
+			}, 300);
 		})();
 
 		return () => {
 			cancelled = true;
 			controller.abort();
 		};
-	}, [step, navigateSettings]);
+	}, [isActive, currentIndex]);
 
-	// ── Keep the spotlight rect in sync on scroll / resize ────────────────────
+	// ── Keep the spotlight rect in sync via rAF; only update on real change ────
+	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on step index intentionally
 	useEffect(() => {
-		if (!step || notFound) return;
-		const update = () => {
-			const el = document.querySelector<HTMLElement>(
-				guideSelector(step.anchor),
-			);
-			if (!el) return;
-			const r = el.getBoundingClientRect();
-			setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+		if (!isActive || notFound) return;
+		const current = steps[currentIndex];
+		if (!current) return;
+		let rafId = 0;
+		const sel = guideSelector(current.anchor);
+		const loop = () => {
+			const el = document.querySelector<HTMLElement>(sel);
+			if (el) {
+				const r = el.getBoundingClientRect();
+				// Only set state when the rect meaningfully changed — otherwise we
+				// re-render the whole app on every frame.
+				setRect((prev) =>
+					prev &&
+					Math.abs(prev.top - r.top) < 0.5 &&
+					Math.abs(prev.left - r.left) < 0.5 &&
+					Math.abs(prev.width - r.width) < 0.5 &&
+					Math.abs(prev.height - r.height) < 0.5
+						? prev
+						: { top: r.top, left: r.left, width: r.width, height: r.height },
+				);
+			}
+			rafId = requestAnimationFrame(loop);
 		};
-		update();
-		const id = window.setInterval(update, 200); // covers smooth-scroll settle
-		window.addEventListener("scroll", update, true);
-		window.addEventListener("resize", update);
-		return () => {
-			window.clearInterval(id);
-			window.removeEventListener("scroll", update, true);
-			window.removeEventListener("resize", update);
-		};
-	}, [step, notFound]);
+		rafId = requestAnimationFrame(loop);
+		return () => cancelAnimationFrame(rafId);
+	}, [isActive, currentIndex, notFound]);
 
 	// ── Live "Next" gate ──────────────────────────────────────────────────────
+	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on step index intentionally
 	useEffect(() => {
-		if (!step) return;
-		if (!step.condition) {
+		if (!isActive) return;
+		const current = steps[currentIndex];
+		if (!current) return;
+		if (!current.condition) {
 			setGateOpen(true);
 			return;
 		}
-		const evaluate = () => setGateOpen(Boolean(step.condition?.()));
+		const cond = current.condition;
+		const evaluate = () => setGateOpen((prev) => {
+			const v = Boolean(cond());
+			return prev === v ? prev : v;
+		});
 		evaluate();
-		const id = window.setInterval(evaluate, 300);
+		const id = window.setInterval(evaluate, 400);
 		return () => window.clearInterval(id);
-	}, [step]);
+	}, [isActive, currentIndex]);
 
 	// Esc closes the tour.
 	useEffect(() => {
@@ -153,16 +183,19 @@ export function GuidedTourOverlay() {
 			: null;
 
 	const overlay = (
-		<div className="fixed inset-0 z-[70]" aria-live="polite">
-			{/* Dimming panes around the spotlight (each captures pointer events). */}
+		// Root is non-interactive so the spotlight hole lets clicks reach the
+		// target. Only the dim panes and the bubble re-enable pointer events.
+		<div className="fixed inset-0 z-200 pointer-events-none" aria-live="polite">
+			{/* Dimming panes around the spotlight (each captures pointer events,
+			    blocking interaction everywhere EXCEPT the hole over the target). */}
 			{holes ? (
 				<>
 					<div
-						className="absolute left-0 right-0 top-0 bg-black/60"
+						className="absolute left-0 right-0 top-0 bg-black/60 pointer-events-auto"
 						style={{ height: holes.top }}
 					/>
 					<div
-						className="absolute left-0 bg-black/60"
+						className="absolute left-0 bg-black/60 pointer-events-auto"
 						style={{
 							top: holes.top,
 							width: holes.left,
@@ -170,7 +203,7 @@ export function GuidedTourOverlay() {
 						}}
 					/>
 					<div
-						className="absolute right-0 bg-black/60"
+						className="absolute right-0 bg-black/60 pointer-events-auto"
 						style={{
 							top: holes.top,
 							left: holes.left + holes.width,
@@ -178,7 +211,7 @@ export function GuidedTourOverlay() {
 						}}
 					/>
 					<div
-						className="absolute left-0 right-0 bg-black/60"
+						className="absolute left-0 right-0 bg-black/60 pointer-events-auto"
 						style={{ top: holes.top + holes.height, bottom: 0 }}
 					/>
 					{/* Highlight ring around the target (non-interactive). */}
@@ -194,12 +227,12 @@ export function GuidedTourOverlay() {
 				</>
 			) : (
 				// While resolving / not found, dim the whole screen.
-				<div className="absolute inset-0 bg-black/60" />
+				<div className="absolute inset-0 bg-black/60 pointer-events-auto" />
 			)}
 
 			{/* Instruction bubble: anchored under the target, or centered if unknown. */}
 			<div
-				className="absolute w-80 max-w-[90vw] rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-2xl z-[71]"
+				className="absolute w-80 max-w-[90vw] rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-2xl z-10 pointer-events-auto"
 				style={bubblePosition(holes)}
 			>
 				<div className="flex items-start gap-2">

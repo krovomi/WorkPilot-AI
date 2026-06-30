@@ -1,5 +1,6 @@
 import { CheckCircle2, Compass, FolderGit2, Wand2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toast } from "../../hooks/use-toast";
 import { useProjectStore } from "../../stores/project-store";
 import { startGuidedTour } from "../guided-tour/guided-tour-store";
 import { buildTodoTour } from "../guided-tour/tour-steps";
@@ -48,9 +49,15 @@ export function SetupHub({
 	};
 
 	const handleGuideMe = () => {
-		// Close the hub, then walk the user through the remaining (todo) steps.
+		const tour = buildTodoTour(status);
+		// Close the hub first, then start the tour on the next tick so the hub
+		// dialog has begun unmounting before the Settings dialog opens.
 		onOpenChange(false);
-		startGuidedTour(buildTodoTour(status));
+		if (tour.length === 0) {
+			toast({ description: t("nothingToGuide") });
+			return;
+		}
+		setTimeout(() => startGuidedTour(tour), 50);
 	};
 
 	return (

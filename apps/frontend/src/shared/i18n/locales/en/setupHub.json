@@ -4,6 +4,7 @@
 	"navLabel": "Getting started",
 	"navDescription": "Guided setup center",
 	"guideMe": "Guide me step by step",
+	"nothingToGuide": "Everything is already configured — nothing to guide. 🎉",
 	"progress": "{{completed}} of {{total}} configured",
 	"allDone": {
 		"title": "Everything is configured 🎉",

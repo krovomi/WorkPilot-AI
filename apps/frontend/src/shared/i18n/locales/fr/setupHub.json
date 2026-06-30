@@ -4,6 +4,7 @@
 	"navLabel": "Prise en main",
 	"navDescription": "Centre de configuration guidé",
 	"guideMe": "Me guider pas à pas",
+	"nothingToGuide": "Tout est déjà configuré — rien à guider. 🎉",
 	"progress": "{{completed}} sur {{total}} configuré(s)",
 	"allDone": {
 		"title": "Tout est configuré 🎉",
