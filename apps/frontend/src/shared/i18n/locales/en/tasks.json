@@ -833,6 +833,12 @@
 			"successTitle": "Phase restarted",
 			"successDesc": "The \"{{phase}}\" phase will restart.",
 			"errorTitle": "Re-run failed"
+		},
+		"hotSwap": {
+			"title": "Hot swap requested",
+			"desc": "The change will apply on the next turn, keeping the context.",
+			"pending": "Swapping…",
+			"pendingTip": "The LLM change will apply on the next turn."
 		}
 	},
 	"modal": {

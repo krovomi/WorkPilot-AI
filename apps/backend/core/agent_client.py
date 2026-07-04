@@ -39,7 +39,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from apps.backend.models_registry import get_pricing
+# Layout-agnostic import: the backend runs under two package layouts —
+# top-level (apps/backend on sys.path, e.g. `python -m cli.main`, run.py) and
+# repo-root (apps.backend.* on sys.path). Hard-coding `apps.backend.models_registry`
+# crashed the streaming-server spawn (index.ts launches `cli.main` with cwd on
+# sys.path but WITHOUT repo root), which killed live log streaming and forced the
+# slower file-watch fallback. Mirror the try/except used for core.* below.
+try:
+    from models_registry import get_pricing
+except ImportError:  # pragma: no cover - alternate package layout
+    from apps.backend.models_registry import get_pricing
 
 # Common token-optimization trunk shared by every generic (OpenAI-style)
 # multi-turn loop: head+tail tool-result truncation and over-budget history

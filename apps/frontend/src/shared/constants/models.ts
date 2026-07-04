@@ -55,12 +55,9 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 			tier: "standard",
 			supportsThinking: true,
 		},
-		{
-			value: "claude-haiku-4-6",
-			label: "Claude Haiku 4.6",
-			tier: "fast",
-			supportsThinking: false,
-		},
+		// NB: there is no "Claude Haiku 4.6" — Anthropic only shipped 4.6 for
+		// Sonnet/Opus. It was a phantom catalog entry the API rejected
+		// ("model may not exist"); the latest Haiku is 4.5 (below).
 		{
 			value: "claude-opus-4-5-20251101",
 			label: "Claude Opus 4.5",
@@ -671,7 +668,7 @@ export const MODEL_ID_MAP: Record<string, string> = {
 	"opus-4-7": "claude-opus-4-7",
 	opus: "claude-opus-4-6",
 	sonnet: "claude-sonnet-4-6",
-	haiku: "claude-haiku-4-6",
+	haiku: "claude-haiku-4-5", // no Haiku 4.6 exists — latest Haiku is 4.5
 	"opus-4-5": "claude-opus-4-5",
 	"sonnet-4-5": "claude-sonnet-4-5",
 	"haiku-4-5": "claude-haiku-4-5",
@@ -953,11 +950,11 @@ export const DEFAULT_FEATURE_MODELS: FeatureModelConfig = {
 	"natural-language-git": "claude-sonnet-4-6", // Natural language Git commands
 	githubIssues: "claude-opus-4-6", // Issue triage and analysis benefits from Opus
 	githubPrs: "claude-opus-4-6", // PR review benefits from thorough Opus analysis
-	utility: "claude-haiku-4-6", // Fast utility operations (commit messages, merge resolution)
+	utility: "claude-haiku-4-5", // Fast utility operations (commit messages, merge resolution)
 	promptOptimizer: "claude-sonnet-4-6", // Balanced prompt optimization
 	testGenerator: "claude-sonnet-4-6", // Balanced test generation for comprehensive coverage
 	codeReview: "claude-opus-4-6", // Code review benefits from thorough Opus analysis
-	voiceControl: "claude-haiku-4-6", // Fast voice control operations
+	voiceControl: "claude-haiku-4-5", // Fast voice control operations
 };
 
 // Default feature thinking configuration

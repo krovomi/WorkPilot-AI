@@ -22,7 +22,11 @@ from linear_updater import (
     linear_qa_rejected,
     linear_qa_started,
 )
-from phase_config import get_phase_model, get_phase_thinking_budget
+from phase_config import (
+    get_phase_model,
+    get_phase_provider,
+    get_phase_thinking_budget,
+)
 from phase_event import ExecutionPhase, emit_phase
 from progress import count_subtasks, is_build_complete
 from security.constants import PROJECT_DIR_ENV_VAR
@@ -505,9 +509,28 @@ async def run_qa_validation_loop(
                 print_to_console=False,
             )
 
+        # Hot LLM swap: apply any pending live provider/model/effort change for
+        # the QA phase before building the reviewer client, so the next QA pass
+        # ("next turn") uses it. No marker → no-op.
+        try:
+            from agents.hot_swap import (
+                apply_hot_swap_to_metadata,
+                consume_hot_swap_for_phase,
+                describe_hot_swap,
+            )
+
+            _hot_req = consume_hot_swap_for_phase(spec_dir, "qa")
+            if _hot_req is not None:
+                apply_hot_swap_to_metadata(spec_dir, _hot_req)
+                if task_logger:
+                    task_logger.log_info(describe_hot_swap(_hot_req))
+        except Exception:  # noqa: BLE001 - never break QA on a hot-swap hiccup
+            pass
+
         # Run QA reviewer with phase-specific model and thinking budget
         qa_model = get_phase_model(spec_dir, "qa", model)
         qa_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
+        qa_provider = get_phase_provider(spec_dir, phase="qa")
         debug(
             "qa_loop",
             "Creating client for QA reviewer session...",
@@ -521,6 +544,7 @@ async def run_qa_validation_loop(
                 model=qa_model,
                 agent_type="qa_reviewer",
                 max_thinking_tokens=qa_thinking_budget,
+                provider=qa_provider,
             )
         except Exception as e:
             debug_error("qa_loop", f"Failed to create QA reviewer client: {e}")

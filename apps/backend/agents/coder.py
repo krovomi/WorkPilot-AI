@@ -1044,6 +1044,27 @@ async def run_autonomous_agent(
         # Get the phase-specific model and thinking level (respects task_metadata.json configuration)
         # first_run means we're in planning phase, otherwise coding phase
         current_phase = "planning" if first_run else "coding"
+
+        # Hot LLM swap: apply any pending live provider/model/effort change for
+        # this phase BEFORE building the client, so the new turn uses it (the
+        # frontend also wrote it to task_metadata.json; consuming the marker makes
+        # the switch explicit + logged and covers the marker-only path). No marker
+        # → no-op.
+        try:
+            from agents.hot_swap import (
+                apply_hot_swap_to_metadata,
+                consume_hot_swap_for_phase,
+                describe_hot_swap,
+            )
+
+            _hot_req = consume_hot_swap_for_phase(spec_dir, current_phase)
+            if _hot_req is not None:
+                apply_hot_swap_to_metadata(spec_dir, _hot_req)
+                if task_logger:
+                    task_logger.log_info(describe_hot_swap(_hot_req))
+        except Exception:  # noqa: BLE001 - never break the loop on a hot-swap hiccup
+            pass
+
         phase_model = get_phase_model(spec_dir, current_phase, model)
         phase_thinking_budget = get_phase_thinking_budget(spec_dir, current_phase)
         agent_type = "planner" if first_run else "coder"
@@ -1405,6 +1426,19 @@ async def run_autonomous_agent(
                 phase=current_log_phase,
                 streaming_wrapper=streaming_wrapper,
             )
+
+            # Hot LLM swap requested mid-session: the session ended early so we can
+            # rebuild the client with the new provider/model. Re-loop WITHOUT
+            # advancing the subtask — the top of the loop consumes the marker and
+            # applies it, and the conversation log is replayed so the new model
+            # continues with the context the previous one accumulated.
+            if status == "hot_swap":
+                if task_logger:
+                    task_logger.log_info(
+                        "Bascule LLM à chaud — reprise avec le nouveau modèle "
+                        "(contexte rejoué)"
+                    )
+                continue
 
             # Emit agent response event
             if streaming_wrapper and response:
@@ -1805,6 +1839,33 @@ async def run_autonomous_agent(
                 current_retry_delay = min(
                     current_retry_delay * 2, MAX_RETRY_DELAY_SECONDS
                 )
+
+            elif error_info and error_info.get("type") == "model_unavailable":
+                # The selected model is invalid or the account can't access it
+                # (typically after a hot-swap to a catalog model that isn't
+                # actually available, e.g. claude-haiku-4-6). Retrying is futile
+                # and, worse, the phase would otherwise advance with nothing done.
+                # Halt and tell the user to pick a valid model for this phase.
+                _reset_concurrency_state()
+                _bad_model = get_phase_model(spec_dir, current_phase, model)
+                print_status(
+                    f"Modèle indisponible pour la phase « {current_phase} » : "
+                    f"{_bad_model}. Choisissez un autre modèle (dropdown de la "
+                    f"phase) puis relancez.",
+                    "error",
+                )
+                if task_logger:
+                    task_logger.log_error(
+                        f"Modèle indisponible : {_bad_model}. La phase est arrêtée "
+                        f"— sélectionnez un modèle valide et relancez l'étape.",
+                        current_log_phase,
+                    )
+                emit_phase(
+                    ExecutionPhase.FAILED,
+                    f"Selected model unavailable: {_bad_model}",
+                )
+                status_manager.update(state=BuildState.ERROR)
+                break
 
             elif error_info and (
                 error_info.get("type") == "prompt_too_long"

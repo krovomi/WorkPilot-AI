@@ -2290,6 +2290,79 @@ print(json.dumps(result))
 	);
 
 	/**
+	 * Live LLM hot-swap: change provider/model/effort for one phase WHILE the task
+	 * is running. Writes a single-shot HOT_SWAP.json marker in the spec dir(s); the
+	 * running agent applies it at the next safe boundary (next sub-task/QA pass, or
+	 * — for the single-session planner — by ending the current session early) and
+	 * replays the conversation log so the new model keeps the accumulated context.
+	 * The dropdown change is ALSO persisted to task_metadata.json by the caller, so
+	 * even if the marker is missed the next session picks the change up.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_HOT_SWAP,
+		async (
+			_,
+			taskId: string,
+			configPhase: "spec" | "planning" | "coding" | "qa",
+			change: { provider?: string; model?: string; effort?: string },
+		): Promise<IPCResult> => {
+			const VALID_PHASES = ["spec", "planning", "coding", "qa"];
+			if (!VALID_PHASES.includes(configPhase)) {
+				return { success: false, error: `Invalid phase: ${configPhase}` };
+			}
+			if (!change || (!change.provider && !change.model && !change.effort)) {
+				return { success: false, error: "No change provided" };
+			}
+			const { task, project } = findTaskAndProject(taskId);
+			if (!task || !project) {
+				return { success: false, error: "Task not found" };
+			}
+			try {
+				const specPaths = getSpecPaths(task, project);
+				const specDirs = [
+					specPaths.specDir,
+					specPaths.mainSpecDir,
+					specPaths.worktreeSpecDir,
+				].filter(
+					(d, i, arr): d is string =>
+						!!d && existsSync(d) && arr.indexOf(d) === i,
+				);
+				const payload = JSON.stringify({
+					phase: configPhase,
+					provider: change.provider ?? null,
+					model: change.model ?? null,
+					effort: change.effort ?? null,
+					requested_at: new Date().toISOString(),
+				});
+				let wrote = false;
+				for (const dir of specDirs) {
+					try {
+						atomicWriteFileSync(path.join(dir, "HOT_SWAP.json"), payload);
+						wrote = true;
+					} catch (err) {
+						appLog.warn(`[TASK_HOT_SWAP] Could not write marker in ${dir}:`, err);
+					}
+				}
+				if (!wrote) {
+					return { success: false, error: "Could not write hot-swap marker" };
+				}
+				appLog.info(
+					`[TASK_HOT_SWAP] task=${taskId} phase=${configPhase} ` +
+						`provider=${change.provider ?? "-"} model=${change.model ?? "-"} ` +
+						`effort=${change.effort ?? "-"} dirs=${specDirs.length}`,
+				);
+				return { success: true };
+			} catch (err) {
+				appLog.error(`[TASK_HOT_SWAP] Failed for task ${taskId}:`, err);
+				return {
+					success: false,
+					error: err instanceof Error ? err.message : "Hot-swap failed",
+				};
+			}
+		},
+	);
+
+	/**
 	 * Reset the target + downstream phase entries in every task_logs*.json file
 	 * (the shared feed and each per-LLM mirror) within one spec dir. Best-effort:
 	 * a re-run must never fail because a log file is missing or malformed.

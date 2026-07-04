@@ -44,6 +44,7 @@ import {
 	THINKING_LEVELS,
 } from "../../../shared/constants/models";
 import {
+	buildHotSwapRequest,
 	buildModelMetadataUpdate,
 	buildModelSelectOptions,
 	buildProviderMetadataUpdate,
@@ -435,6 +436,54 @@ export function TaskLogs({
 		[persistPhaseMetadata, task.metadata, settings, t],
 	);
 
+	// Live LLM hot-swap: when a phase's provider/model/effort is changed WHILE it
+	// is running, also drop a HOT_SWAP marker so the backend applies it at the next
+	// turn (replaying the context) instead of only at the next session. The phase
+	// dropdowns already persisted the change to metadata; this makes it "hot".
+	// A short-lived pending flag shows a badge until the swap is picked up.
+	const [hotSwapPending, setHotSwapPending] = useState<Set<TaskLogPhase>>(
+		() => new Set(),
+	);
+	const requestHotSwap = useCallback(
+		(
+			logPhase: TaskLogPhase,
+			phaseStatus: string | undefined,
+			change: { model?: string; provider?: string; effort?: string },
+		) => {
+			// Gate + config-phase mapping is a pure, unit-tested helper.
+			const req = buildHotSwapRequest(logPhase, phaseStatus, change);
+			if (!req) return;
+			void globalThis.electronAPI?.hotSwapPhase?.(
+				task.id,
+				req.configPhase,
+				req.change,
+			);
+			toast({
+				title: t("tasks:logs.hotSwap.title", "Bascule à chaud demandée"),
+				description: t(
+					"tasks:logs.hotSwap.desc",
+					"Le changement sera appliqué au prochain tour, en conservant le contexte.",
+				),
+			});
+			setHotSwapPending((prev) => {
+				const next = new Set(prev);
+				next.add(logPhase);
+				return next;
+			});
+			// Auto-clear the badge after ~a turn's worth of time (best-effort; the
+			// backend consumes the marker at its next boundary).
+			globalThis.setTimeout(() => {
+				setHotSwapPending((prev) => {
+					if (!prev.has(logPhase)) return prev;
+					const next = new Set(prev);
+					next.delete(logPhase);
+					return next;
+				});
+			}, 25000);
+		},
+		[task.id, toast, t],
+	);
+
 	// Re-run a phase on demand. Re-running an earlier phase discards the work of
 	// the later ones (planning ⊃ coding ⊃ validation), so those are gated behind
 	// a confirmation; Validation discards nothing and runs immediately.
@@ -778,6 +827,8 @@ export function TaskLogs({
 										onCompare={handleCompare}
 										onRerunPhase={handleRerunPhase}
 										isRerunning={rerunningPhase === phase}
+										onHotSwap={requestHotSwap}
+										isHotSwapPending={hotSwapPending.has(phase)}
 									/>
 								</div>
 							))}
@@ -949,6 +1000,15 @@ interface PhaseLogSectionProps {
 	onRerunPhase?: (phase: TaskLogPhase) => void;
 	/** True while this phase's re-run request is in flight. */
 	isRerunning?: boolean;
+	/** Request a live LLM swap. The parent gates on `phaseStatus` (only "active"
+	 * phases actually swap live). */
+	onHotSwap?: (
+		phase: TaskLogPhase,
+		phaseStatus: string | undefined,
+		change: { model?: string; provider?: string; effort?: string },
+	) => void;
+	/** True while a hot-swap for this phase is awaiting pickup by the backend. */
+	isHotSwapPending?: boolean;
 }
 
 function PhaseLogSection({
@@ -969,6 +1029,8 @@ function PhaseLogSection({
 	onCompare,
 	onRerunPhase,
 	isRerunning,
+	onHotSwap,
+	isHotSwapPending,
 }: PhaseLogSectionProps) {
 	const { t } = useTranslation(["tasks"]);
 	const { toast } = useToast();
@@ -1125,8 +1187,12 @@ function PhaseLogSection({
 	// Persist the chosen model; if it's a local model that isn't installed yet,
 	// start pulling it now (progress surfaces in the global download indicator)
 	// so it's ready by the time the phase runs — instead of silently 404-ing.
+	// When this phase is actively running, a dropdown change is a LIVE swap:
+	// besides persisting to metadata, drop a HOT_SWAP marker (applied next turn).
+	// The parent gates on `status` via buildHotSwapRequest.
 	const handleModelChange = (value: string) => {
 		onModelChange?.(phase, value);
+		onHotSwap?.(phase, status, { model: value });
 		if (!isLocalProvider) return;
 		const opt = modelOptions.find((o) => o.value === value);
 		if (!opt || opt.installed) return;
@@ -1280,7 +1346,10 @@ function PhaseLogSection({
 							{onProviderChange ? (
 								<Select
 									value={phaseConfig.provider}
-									onValueChange={(value) => onProviderChange(phase, value)}
+									onValueChange={(value) => {
+										onProviderChange(phase, value);
+										onHotSwap?.(phase, status, { provider: value });
+									}}
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
@@ -1384,9 +1453,10 @@ function PhaseLogSection({
 							{onThinkingChange ? (
 								<Select
 									value={phaseConfig.thinkingValue}
-									onValueChange={(value) =>
-										onThinkingChange(phase, value as ThinkingLevel)
-									}
+									onValueChange={(value) => {
+										onThinkingChange(phase, value as ThinkingLevel);
+										onHotSwap?.(phase, status, { effort: value });
+									}}
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
@@ -1466,6 +1536,19 @@ function PhaseLogSection({
 								{t("tasks:logs.rerun.button", "Refaire")}
 							</span>
 						</button>
+					)}
+					{isHotSwapPending && (
+						<Badge
+							variant="outline"
+							className="flex items-center gap-1 border-info/30 bg-info/10 text-[10px] text-info"
+							title={t(
+								"tasks:logs.hotSwap.pendingTip",
+								"Le changement de LLM sera appliqué au prochain tour.",
+							)}
+						>
+							<RotateCcw className="h-3 w-3 animate-spin" />
+							{t("tasks:logs.hotSwap.pending", "Bascule…")}
+						</Badge>
 					)}
 					{getStatusBadge()}
 				</div>

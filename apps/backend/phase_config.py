@@ -39,7 +39,10 @@ MODEL_ID_MAP: dict[str, str] = {
     "opus-4-5": "claude-opus-4-5",
     "sonnet-4-6": "claude-sonnet-4-6",
     "sonnet-4-5": "claude-sonnet-4-5",
-    "haiku-4-6": "claude-haiku-4-6",
+    # No Haiku 4.6 exists (Anthropic shipped 4.6 for Sonnet/Opus only); map any
+    # stale "haiku-4-6" alias to the valid latest Haiku so it never hits the API
+    # as an unknown model.
+    "haiku-4-6": "claude-haiku-4-5",
     "haiku-4-5": "claude-haiku-4-5",
 }
 

@@ -83,6 +83,11 @@ export interface TaskAPI {
 		taskId: string,
 		phase: "planning" | "coding" | "validation",
 	) => Promise<IPCResult>;
+	hotSwapPhase: (
+		taskId: string,
+		configPhase: "spec" | "planning" | "coding" | "qa",
+		change: { provider?: string; model?: string; effort?: string },
+	) => Promise<IPCResult>;
 	generateSpecInterview: (
 		taskId: string,
 	) => Promise<IPCResult<import("../../shared/types").SpecInterviewQuestion[]>>;
@@ -396,6 +401,13 @@ export const createTaskAPI = (): TaskAPI => ({
 		phase: "planning" | "coding" | "validation",
 	): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_RERUN_PHASE, taskId, phase),
+
+	hotSwapPhase: (
+		taskId: string,
+		configPhase: "spec" | "planning" | "coding" | "qa",
+		change: { provider?: string; model?: string; effort?: string },
+	): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_HOT_SWAP, taskId, configPhase, change),
 
 	generateSpecInterview: (
 		taskId: string,

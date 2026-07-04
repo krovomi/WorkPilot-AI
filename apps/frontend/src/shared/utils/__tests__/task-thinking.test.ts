@@ -11,6 +11,7 @@ import type {
 	PhaseThinkingConfig,
 } from "../../types/settings";
 import {
+	buildHotSwapRequest,
 	buildModelMetadataUpdate,
 	buildModelSelectOptions,
 	buildProviderMetadataUpdate,
@@ -44,6 +45,41 @@ describe("LOG_PHASE_TO_CONFIG_PHASE", () => {
 		expect(LOG_PHASE_TO_CONFIG_PHASE.planning).toBe("planning");
 		expect(LOG_PHASE_TO_CONFIG_PHASE.coding).toBe("coding");
 		expect(LOG_PHASE_TO_CONFIG_PHASE.validation).toBe("qa");
+	});
+});
+
+describe("buildHotSwapRequest", () => {
+	it("returns null when the phase is NOT actively running", () => {
+		expect(
+			buildHotSwapRequest("coding", "pending", { model: "claude-opus-4-8" }),
+		).toBeNull();
+		expect(
+			buildHotSwapRequest("coding", "completed", { model: "claude-opus-4-8" }),
+		).toBeNull();
+		expect(
+			buildHotSwapRequest("coding", undefined, { model: "claude-opus-4-8" }),
+		).toBeNull();
+	});
+
+	it("returns null for an empty change even when active", () => {
+		expect(buildHotSwapRequest("coding", "active", {})).toBeNull();
+	});
+
+	it("maps the log phase to the config phase and forwards the change when active", () => {
+		expect(
+			buildHotSwapRequest("planning", "active", { model: "claude-sonnet-4-5" }),
+		).toEqual({
+			configPhase: "planning",
+			change: { model: "claude-sonnet-4-5" },
+		});
+		// validation → qa
+		expect(
+			buildHotSwapRequest("validation", "active", { provider: "copilot" }),
+		).toEqual({ configPhase: "qa", change: { provider: "copilot" } });
+		// effort-only change
+		expect(
+			buildHotSwapRequest("coding", "active", { effort: "high" }),
+		).toEqual({ configPhase: "coding", change: { effort: "high" } });
 	});
 });
 

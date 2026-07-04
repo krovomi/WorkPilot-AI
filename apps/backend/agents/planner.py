@@ -202,6 +202,37 @@ async def run_followup_planner(
                     runtime, prompt, spec_dir, verbose, phase=LogPhase.PLANNING
                 )
 
+            # Hot LLM swap requested mid-session: rebuild the runtime with the new
+            # provider/model/effort for planning and retry. The conversation log is
+            # replayed by the session so context carries over. No marker → this
+            # branch is never taken.
+            if status == "hot_swap":
+                try:
+                    from agents.hot_swap import (
+                        apply_hot_swap_to_metadata,
+                        consume_hot_swap_for_phase,
+                        describe_hot_swap,
+                    )
+
+                    _req = consume_hot_swap_for_phase(spec_dir, "planning")
+                    if _req is not None:
+                        apply_hot_swap_to_metadata(spec_dir, _req)
+                        if task_logger:
+                            task_logger.log_info(describe_hot_swap(_req))
+                    runtime = create_agent_runtime(
+                        spec_dir=spec_dir,
+                        phase="planning",
+                        project_dir=project_dir,
+                        agent_type="planner",
+                        cli_provider=get_phase_provider(spec_dir, phase="planning"),
+                        cli_model=get_phase_model(spec_dir, "planning", model),
+                        cli_thinking=get_phase_thinking_budget(spec_dir, "planning"),
+                        config=None,
+                    )
+                    continue
+                except Exception:  # noqa: BLE001 - fall through to normal handling
+                    pass
+
             if status == "error" and isinstance(error_info, dict):
                 err_msg = error_info.get("message", "")
                 # Prompt-too-long is permanent — halt and let the UI surface

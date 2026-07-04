@@ -554,6 +554,29 @@ def _response_text_indicates_prompt_too_long(response_text: str) -> bool:
     return is_prompt_too_long_error(RuntimeError(stripped))
 
 
+def _response_text_indicates_model_unavailable(response_text: str) -> bool:
+    """Return True when the LLM's response text signals the selected model is
+    invalid or inaccessible.
+
+    The Claude CLI surfaces a bad model id — e.g. after a hot-swap to a model
+    the catalog offers but the account can't use ("There's an issue with the
+    selected model (claude-haiku-4-6). It may not exist or you may not have
+    access to it.") — as a normal short TextBlock instead of raising. The stream
+    then completes with status="continue", so the coder loops on a model it can
+    never run and eventually advances the phase with nothing done. Detect it
+    narrowly (short response, specific phrasing) and halt so the user can pick a
+    valid model.
+    """
+    if not response_text:
+        return False
+    stripped = response_text.strip().lower()
+    if len(stripped) > 200:
+        return False
+    return "issue with the selected model" in stripped or (
+        "selected model" in stripped and "may not exist" in stripped
+    )
+
+
 def is_prompt_too_long_error(error: Exception) -> bool:
     """
     Check if an error is a "prompt too long" error from any LLM provider.
@@ -1518,6 +1541,21 @@ async def run_agent_session(
                     pass
             return "complete", response_text, {}
 
+        # Invalid / inaccessible model surfaced as a short text response (not an
+        # exception) — reclassify as a halting error so the coder stops instead
+        # of looping on a model it can't use (and then advancing the phase).
+        if _response_text_indicates_model_unavailable(response_text):
+            debug_error(
+                "session",
+                "Reclassifying 'selected model unavailable' response as error",
+                response_preview=response_text[:160],
+            )
+            return (
+                "error",
+                response_text,
+                {"type": "model_unavailable", "message": response_text.strip()},
+            )
+
         # Provider may surface "Prompt is too long" as a normal short text
         # response instead of an exception (Claude Agent SDK does this when
         # the resume preamble blew the context window). Reclassify so the
@@ -1773,6 +1811,7 @@ async def _run_agent_client_session(
         debug_success("session", "Query sent successfully")
 
         response_text = ""
+        _hot_swap_pending = False  # set when a live provider/model swap is detected
         debug("session", "Starting to receive response stream...")
 
         async for agent_msg in client.receive_response():  # noqa: SIM113 — result msg needs post-loop handling
@@ -1943,7 +1982,36 @@ async def _run_agent_client_session(
                 subtask_id=log_subtask_id,
             )
 
+            # Hot LLM swap: if the user changed this phase's provider/model while
+            # the session is streaming, stop cleanly at this message boundary so
+            # the caller can rebuild the client with the new settings and replay
+            # the conversation log (context preserved). Guarded — when no marker
+            # exists this is a cheap file-stat and a no-op, so the normal path is
+            # unchanged. Applies to single-session phases (planning); multi-turn
+            # phases pick the swap up at their next iteration instead.
+            try:
+                from agents.hot_swap import (
+                    read_hot_swap_marker,
+                    should_break_for_hot_swap,
+                )
+
+                _hs = read_hot_swap_marker(spec_dir)
+                if should_break_for_hot_swap(_hs, phase.value, provider, log_model):
+                    debug(
+                        "session",
+                        "Hot-swap requested mid-session — ending for client rebuild",
+                    )
+                    _hot_swap_pending = True
+                    break
+            except Exception:  # noqa: BLE001 - never break the agent loop on this
+                pass
+
         print("\n" + "-" * 70 + "\n")
+
+        if _hot_swap_pending:
+            # Signal the caller to rebuild the client (new provider/model) and
+            # resume this phase with the context replayed.
+            return "hot_swap", response_text, {"hot_swap": True}
 
         # Persist SDK session_id on the AgentClient path too, mirroring the
         # raw SDK branch above. Without this the "Reprendre" button in the
@@ -2011,6 +2079,22 @@ async def _run_agent_client_session(
                 response_length=len(response_text),
             )
             return "complete", response_text, {}
+
+        # Invalid / inaccessible model (often after a hot-swap to a model the
+        # account can't use): the CLI returns it as a short text response, not an
+        # error, so without this the coder loops forever and then advances the
+        # phase with nothing done. Reclassify as a halting error.
+        if _response_text_indicates_model_unavailable(response_text):
+            debug_error(
+                "session",
+                "Reclassifying 'selected model unavailable' response as error (AgentClient)",
+                response_preview=response_text[:160],
+            )
+            return (
+                "error",
+                response_text,
+                {"type": "model_unavailable", "message": response_text.strip()},
+            )
 
         # Same reclassification as in the SDK-direct runner — providers can
         # surface "Prompt is too long" as a plain text response. See the

@@ -833,6 +833,12 @@
 			"successTitle": "Étape relancée",
 			"successDesc": "La phase « {{phase}} » va redémarrer.",
 			"errorTitle": "Échec de la relance"
+		},
+		"hotSwap": {
+			"title": "Bascule à chaud demandée",
+			"desc": "Le changement sera appliqué au prochain tour, en conservant le contexte.",
+			"pending": "Bascule…",
+			"pendingTip": "Le changement de LLM sera appliqué au prochain tour."
 		}
 	},
 	"modal": {

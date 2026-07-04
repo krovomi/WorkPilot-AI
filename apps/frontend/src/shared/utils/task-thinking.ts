@@ -35,6 +35,31 @@ export const LOG_PHASE_TO_CONFIG_PHASE: Record<
 	validation: "qa",
 };
 
+/** A live LLM change to apply to a running phase. */
+export interface HotSwapChange {
+	model?: string;
+	provider?: string;
+	effort?: string;
+}
+
+/**
+ * Decide whether a dropdown change should trigger a **live** hot-swap and, if so,
+ * build the request the IPC layer needs. Returns null when it must NOT hot-swap:
+ *  - the phase is not actively running (a change to an idle phase is just
+ *    persisted to metadata and applied when that phase next starts), or
+ *  - the change is empty.
+ * Pure so the gating (the risky part) is unit-tested without rendering.
+ */
+export function buildHotSwapRequest(
+	logPhase: TaskLogPhase,
+	phaseStatus: string | undefined,
+	change: HotSwapChange,
+): { configPhase: keyof PhaseThinkingConfig; change: HotSwapChange } | null {
+	if (phaseStatus !== "active") return null;
+	if (!change.model && !change.provider && !change.effort) return null;
+	return { configPhase: LOG_PHASE_TO_CONFIG_PHASE[logPhase], change };
+}
+
 /**
  * Défauts par phase résolus depuis les Settings (provider + modèles + thinking).
  * Sert à amorcer la configuration par phase d'une tâche : tant qu'une phase n'a
