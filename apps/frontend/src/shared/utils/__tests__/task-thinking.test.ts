@@ -37,8 +37,11 @@ const singleMeta: TaskMetadata = {
 };
 
 describe("LOG_PHASE_TO_CONFIG_PHASE", () => {
-	it("mappe planning→spec, coding→coding, validation→qa", () => {
-		expect(LOG_PHASE_TO_CONFIG_PHASE.planning).toBe("spec");
+	it("mappe planning→planning, coding→coding, validation→qa", () => {
+		// « Planification » (onglet Logs) = planificateur d'implémentation
+		// (config "planning"), pas la création de spec — sinon la sélection de
+		// modèle n'atteint jamais le planificateur backend.
+		expect(LOG_PHASE_TO_CONFIG_PHASE.planning).toBe("planning");
 		expect(LOG_PHASE_TO_CONFIG_PHASE.coding).toBe("coding");
 		expect(LOG_PHASE_TO_CONFIG_PHASE.validation).toBe("qa");
 	});
@@ -132,9 +135,9 @@ describe("buildThinkingMetadataUpdate", () => {
 		expect(update.phaseThinking?.coding).toBe("low");
 	});
 
-	it("mappe la phase de logs 'planning' vers la clé 'spec'", () => {
+	it("mappe la phase de logs 'planning' vers la clé 'planning'", () => {
 		const update = buildThinkingMetadataUpdate(perPhaseMeta, "planning", "none");
-		expect(update.phaseThinking?.spec).toBe("none");
+		expect(update.phaseThinking?.planning).toBe("none");
 	});
 
 	it("bascule une tâche mono-modèle en config par phase (amorcée des défauts)", () => {
@@ -266,15 +269,15 @@ describe("buildProviderMetadataUpdate", () => {
 		};
 		const update = buildProviderMetadataUpdate(
 			perPhaseMeta,
-			"planning", // phase de logs « planning » → clé de config « spec »
+			"planning", // phase de logs « planning » → clé de config « planning »
 			"ollama",
 			localDefaults,
 		);
-		expect(update.phaseProviders?.spec).toBe("ollama");
+		expect(update.phaseProviders?.planning).toBe("ollama");
 		// Seul le modèle de la phase ciblée est réinitialisé ; les autres restent.
 		expect(update.phaseModels).toEqual({
-			spec: "llama3.1",
-			planning: "opus",
+			spec: "opus",
+			planning: "llama3.1",
 			coding: "opus",
 			qa: "opus",
 		});

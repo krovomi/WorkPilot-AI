@@ -820,6 +820,19 @@
 			"close": "Close",
 			"swapAria": "Swap columns",
 			"selectAria": "Choose model to compare"
+		},
+		"rerun": {
+			"button": "Re-run",
+			"buttonAria": "Re-run this phase",
+			"buttonTooltip": "Re-run this phase (later phases will be re-done)",
+			"confirmTitle": "Re-run this phase?",
+			"confirmPlanning": "Re-running Planning regenerates the plan and discards the Coding and Validation already done. This cannot be undone.",
+			"confirmCoding": "Re-running Coding re-executes the implementation and discards the Validation already done. This cannot be undone.",
+			"confirmAction": "Re-run",
+			"cancel": "Cancel",
+			"successTitle": "Phase restarted",
+			"successDesc": "The \"{{phase}}\" phase will restart.",
+			"errorTitle": "Re-run failed"
 		}
 	},
 	"modal": {

@@ -16,6 +16,7 @@ import {
 	Info,
 	Loader2,
 	Pencil,
+	RotateCcw,
 	Search,
 	Server,
 	Terminal,
@@ -62,6 +63,16 @@ import { debugError } from "../../../shared/utils/debug-logger";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { useDownloadStore } from "../../stores/download-store";
 import { Badge } from "../ui/badge";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "../ui/alert-dialog";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -200,8 +211,17 @@ function getPhaseConfig(
 
 	const defaults: PhaseDefaults = resolvePhaseDefaults(settings, provider);
 
+	// Resolution mirrors the backend (phase_config.get_phase_model /
+	// get_phase_thinking): a per-phase override wins, then the task's single-model
+	// fields (metadata.model / metadata.thinkingLevel — set by a hot LLM switch,
+	// which clears the per-phase config and forces isAutoProfile:false), then the
+	// Settings default. Without the single-model fallback, a mid-run provider
+	// switch left the dropdowns showing the Settings default (e.g. "Sonnet 4.5 /
+	// None") instead of the model the task was actually switched to.
 	let modelValue =
-		metadata.phaseModels?.[configPhase] || defaults.phaseModels[configPhase];
+		metadata.phaseModels?.[configPhase] ||
+		metadata.model ||
+		defaults.phaseModels[configPhase];
 	// A local server runs ONE configured model for every phase (the backend
 	// forces OLLAMA_MODEL), so a stale per-phase value (e.g. an old
 	// "qwen2.5-coder") would mislabel the dropdown while runs are tagged with the
@@ -215,6 +235,7 @@ function getPhaseConfig(
 	}
 	const thinkingValue =
 		metadata.phaseThinking?.[configPhase] ||
+		metadata.thinkingLevel ||
 		defaults.phaseThinking[configPhase];
 
 	return {
@@ -412,6 +433,64 @@ export function TaskLogs({
 				),
 			),
 		[persistPhaseMetadata, task.metadata, settings, t],
+	);
+
+	// Re-run a phase on demand. Re-running an earlier phase discards the work of
+	// the later ones (planning ⊃ coding ⊃ validation), so those are gated behind
+	// a confirmation; Validation discards nothing and runs immediately.
+	const [rerunConfirm, setRerunConfirm] = useState<TaskLogPhase | null>(null);
+	const [rerunningPhase, setRerunningPhase] = useState<TaskLogPhase | null>(
+		null,
+	);
+
+	const doRerunPhase = useCallback(
+		async (logPhase: TaskLogPhase) => {
+			setRerunningPhase(logPhase);
+			try {
+				const res = await globalThis.electronAPI?.rerunPhase?.(
+					task.id,
+					logPhase,
+				);
+				if (res?.success) {
+					toast({
+						title: t("tasks:logs.rerun.successTitle", "Étape relancée"),
+						description: t(
+							"tasks:logs.rerun.successDesc",
+							"La phase « {{phase}} » va redémarrer.",
+							{ phase: t(`tasks:execution.phases.${logPhase}`) },
+						),
+					});
+				} else {
+					toast({
+						title: t("tasks:logs.rerun.errorTitle", "Échec de la relance"),
+						description: res?.error || "Unknown error",
+						variant: "destructive",
+					});
+				}
+			} catch (error) {
+				toast({
+					title: t("tasks:logs.rerun.errorTitle", "Échec de la relance"),
+					description: String(error),
+					variant: "destructive",
+				});
+			} finally {
+				setRerunningPhase(null);
+			}
+		},
+		[task.id, toast, t],
+	);
+
+	const handleRerunPhase = useCallback(
+		(logPhase: TaskLogPhase) => {
+			// Validation discards no downstream work → run directly.
+			if (logPhase === "validation") {
+				void doRerunPhase(logPhase);
+				return;
+			}
+			// Planning/Coding invalidate later phases → confirm first.
+			setRerunConfirm(logPhase);
+		},
+		[doRerunPhase],
 	);
 
 	// Refs to each rendered phase section so we can detect which phase is
@@ -697,6 +776,8 @@ export function TaskLogs({
 										searchQuery={normalizedQuery}
 										subtaskTitles={subtaskTitles}
 										onCompare={handleCompare}
+										onRerunPhase={handleRerunPhase}
+										isRerunning={rerunningPhase === phase}
 									/>
 								</div>
 							))}
@@ -789,6 +870,49 @@ export function TaskLogs({
 					</span>
 				</button>
 			</div>
+
+			{/* Confirmation avant de relancer une étape qui invalide l'aval
+			    (Planification efface Codage+Validation ; Codage efface Validation). */}
+			<AlertDialog
+				open={rerunConfirm !== null}
+				onOpenChange={(open) => {
+					if (!open) setRerunConfirm(null);
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle className="flex items-center gap-2">
+							<RotateCcw className="h-4 w-4" />
+							{t("tasks:logs.rerun.confirmTitle", "Relancer cette étape ?")}
+						</AlertDialogTitle>
+						<AlertDialogDescription>
+							{rerunConfirm === "planning"
+								? t(
+										"tasks:logs.rerun.confirmPlanning",
+										"Relancer la Planification régénère le plan et efface le Codage et la Validation déjà réalisés. Cette action est irréversible.",
+									)
+								: t(
+										"tasks:logs.rerun.confirmCoding",
+										"Relancer le Codage réexécute l'implémentation et efface la Validation déjà réalisée. Cette action est irréversible.",
+									)}
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>
+							{t("tasks:logs.rerun.cancel", "Annuler")}
+						</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={() => {
+								const target = rerunConfirm;
+								setRerunConfirm(null);
+								if (target) void doRerunPhase(target);
+							}}
+						>
+							{t("tasks:logs.rerun.confirmAction", "Relancer")}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }
@@ -821,6 +945,10 @@ interface PhaseLogSectionProps {
 	subtaskTitles?: Record<string, string>;
 	/** Open the side-by-side comparison for this phase (shown only when ≥2 models). */
 	onCompare?: (phase: TaskLogPhase) => void;
+	/** Re-run this phase on demand (rewinds the plan + restarts). */
+	onRerunPhase?: (phase: TaskLogPhase) => void;
+	/** True while this phase's re-run request is in flight. */
+	isRerunning?: boolean;
 }
 
 function PhaseLogSection({
@@ -839,6 +967,8 @@ function PhaseLogSection({
 	searchQuery = "",
 	subtaskTitles,
 	onCompare,
+	onRerunPhase,
+	isRerunning,
 }: PhaseLogSectionProps) {
 	const { t } = useTranslation(["tasks"]);
 	const { toast } = useToast();
@@ -922,19 +1052,28 @@ function PhaseLogSection({
 		// effectivePhaseLog is already the selected model's own file when one
 		// exists (so it's a single model). The canonical filter below is then a
 		// no-op, and only does real work on the shared-feed fallback.
-		let entries = effectivePhaseLog?.entries || [];
+		const allEntries = effectivePhaseLog?.entries || [];
+		let entries = allEntries;
 		const selProvider = phaseConfig?.provider;
 		const selModelKey = phaseConfig?.modelValue
 			? getCanonicalModelKey(phaseConfig.modelValue)
 			: undefined;
 		const hasAttribution = entries.some((e) => e.provider || e.model);
 		if (hasAttribution && selProvider && selModelKey) {
-			entries = entries.filter(
+			const matching = entries.filter(
 				(e) =>
 					e.provider === selProvider &&
 					e.model != null &&
 					getCanonicalModelKey(e.model) === selModelKey,
 			);
+			// Fall back to the full feed when the selected model matches NO entry.
+			// Otherwise a tag/selection mismatch — a mid-run model switch, or a
+			// backend that mislabels entries (e.g. tags them "opus-4-6" while the
+			// dropdown shows "sonnet-4-5") — would hide every real log and show a
+			// misleading "Aucun log pour l'instant" even though the phase ran.
+			// When the model DOES match some entries, keep the per-LLM filter so
+			// the compare/per-model view still works.
+			entries = matching.length > 0 ? matching : allEntries;
 		}
 		return isSearching
 			? entries.filter((e) => entryMatchesQuery(e, searchQuery))
@@ -1302,6 +1441,29 @@ function PhaseLogSection({
 							<Columns2 className="h-3 w-3" />
 							<span className="hidden sm:inline">
 								{t("tasks:logs.compare.button", "Comparer")}
+							</span>
+						</button>
+					)}
+					{/* Re-run this phase on demand (rewinds the plan + restarts). */}
+					{onRerunPhase && (
+						<button
+							type="button"
+							onClick={() => onRerunPhase(phase)}
+							disabled={isRerunning}
+							aria-label={t("tasks:logs.rerun.buttonAria", "Refaire cette étape")}
+							title={t(
+								"tasks:logs.rerun.buttonTooltip",
+								"Relancer cette étape (les étapes suivantes seront refaites)",
+							)}
+							className="flex shrink-0 items-center gap-1 rounded-md border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{isRerunning ? (
+								<Loader2 className="h-3 w-3 animate-spin" />
+							) : (
+								<RotateCcw className="h-3 w-3" />
+							)}
+							<span className="hidden sm:inline">
+								{t("tasks:logs.rerun.button", "Refaire")}
 							</span>
 						</button>
 					)}

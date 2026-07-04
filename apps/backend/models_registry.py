@@ -72,15 +72,6 @@ _ANTHROPIC_MODELS = [
     ),
     ModelEntry(
         "anthropic",
-        "claude-opus-4-6-v1",
-        "Claude Opus 4.6",
-        "flagship",
-        price_input=15.0,
-        price_output=75.0,
-        is_default=False,
-    ),
-    ModelEntry(
-        "anthropic",
         "claude-opus-4-6",
         "Claude Opus 4.6",
         "flagship",

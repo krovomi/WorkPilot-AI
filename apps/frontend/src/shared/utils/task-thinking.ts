@@ -16,14 +16,21 @@ import type {
 
 /**
  * Correspondance phase de logs → clé de configuration.
- * La phase de logs « planning » couvre la création de spec ; elle pilote donc
- * le thinking de la phase `spec`.
+ *
+ * La phase de logs « planning » affichée dans l'onglet Logs est le
+ * **planificateur d'implémentation** (backend `agent_type="planner"`, phase de
+ * config `"planning"`) — PAS la création de spec (qui a lieu à la création de la
+ * tâche, dans une autre UI). Elle doit donc piloter la config `planning`, sinon
+ * la sélection modèle/effort/fournisseur de « Planification » n'atteint jamais
+ * le planificateur (qui lit `phaseModels.planning`) : l'utilisateur choisissait
+ * p.ex. Sonnet 4.5 mais le backend gardait le modèle de `planning`. La phase de
+ * config `"spec"` se règle à la création de la tâche.
  */
 export const LOG_PHASE_TO_CONFIG_PHASE: Record<
 	TaskLogPhase,
 	keyof PhaseThinkingConfig
 > = {
-	planning: "spec",
+	planning: "planning",
 	coding: "coding",
 	validation: "qa",
 };

@@ -79,6 +79,10 @@ export interface TaskAPI {
 	) => Promise<IPCResult>;
 	resetTaskConversation: (taskId: string) => Promise<IPCResult>;
 	resetTask: (taskId: string) => Promise<IPCResult<Task>>;
+	rerunPhase: (
+		taskId: string,
+		phase: "planning" | "coding" | "validation",
+	) => Promise<IPCResult>;
 	generateSpecInterview: (
 		taskId: string,
 	) => Promise<IPCResult<import("../../shared/types").SpecInterviewQuestion[]>>;
@@ -386,6 +390,12 @@ export const createTaskAPI = (): TaskAPI => ({
 
 	resetTask: (taskId: string): Promise<IPCResult<Task>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_RESET, taskId),
+
+	rerunPhase: (
+		taskId: string,
+		phase: "planning" | "coding" | "validation",
+	): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_RERUN_PHASE, taskId, phase),
 
 	generateSpecInterview: (
 		taskId: string,

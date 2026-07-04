@@ -546,6 +546,17 @@ class ClaudeAgentClient(AgentClient):
             sdk_client: A configured ClaudeSDKClient instance.
         """
         self._client = sdk_client
+        # Expose the resolved model so the provider-agnostic session runner can
+        # attribute log entries to the RIGHT model (session.py reads
+        # `getattr(client, "model", "unknown")`). Without this the Claude client
+        # reported "unknown", which the label formatter turned into the stale
+        # default "Claude Opus 4.6" for every phase — mislabelling the feed and
+        # breaking the per-LLM log filter (entries tagged under the wrong model
+        # never matched the phase's selected model, so the view showed no logs).
+        # Mirrors the raw-SDK path (session.py: getattr(client.options, "model")).
+        self.model = (
+            getattr(getattr(sdk_client, "options", None), "model", None) or "unknown"
+        )
         # Captured during the last receive_response() iteration so callers
         # on the provider-agnostic path (session.py:_run_agent_client_session)
         # can persist session_id / usage just like the raw SDK path does.

@@ -820,6 +820,19 @@
 			"close": "Fermer",
 			"swapAria": "Inverser les colonnes",
 			"selectAria": "Choisir le modèle à comparer"
+		},
+		"rerun": {
+			"button": "Refaire",
+			"buttonAria": "Refaire cette étape",
+			"buttonTooltip": "Relancer cette étape (les étapes suivantes seront refaites)",
+			"confirmTitle": "Relancer cette étape ?",
+			"confirmPlanning": "Relancer la Planification régénère le plan et efface le Codage et la Validation déjà réalisés. Cette action est irréversible.",
+			"confirmCoding": "Relancer le Codage réexécute l'implémentation et efface la Validation déjà réalisée. Cette action est irréversible.",
+			"confirmAction": "Relancer",
+			"cancel": "Annuler",
+			"successTitle": "Étape relancée",
+			"successDesc": "La phase « {{phase}} » va redémarrer.",
+			"errorTitle": "Échec de la relance"
 		}
 	},
 	"modal": {

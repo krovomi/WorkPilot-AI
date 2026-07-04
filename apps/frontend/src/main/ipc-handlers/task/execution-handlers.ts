@@ -66,6 +66,11 @@ import {
 import { findTaskAndProject } from "./shared";
 import { extractPrCreationError } from "./pr-error-utils";
 import { stripHtml } from "../shared/sanitize";
+import {
+	buildPhaseRerunPlanUpdate,
+	downstreamLogPhases,
+	type RerunPhase,
+} from "./plan-rerun-utils";
 
 /**
  * Returns true if the currently active provider requires Claude OAuth authentication.
@@ -2022,6 +2027,15 @@ print(json.dumps(result))
 				//    resolves the chosen model (phase_config._resolve_single_model
 				//    reads metadata.model). isAutoProfile:false forces the single
 				//    model to win over any leftover phase-model config.
+				//
+				//    A hot switch moves the WHOLE task to the new provider, so the
+				//    per-phase config (phaseProviders/phaseModels) and the cached
+				//    formula MUST be realigned too. Leaving them stale was the
+				//    "logs switched providers but planning still ran on Ollama" bug:
+				//    `get_phase_provider`/`_resolve_auto_profile_model` honour the
+				//    per-phase keys first (phase_config.py), so a planning phase
+				//    still pointing at `ollama`/`llama3.1` kept running on Ollama
+				//    even though the global provider now said `anthropic`.
 				for (const dir of specDirs) {
 					const metadataPath = path.join(dir, "task_metadata.json");
 					try {
@@ -2029,9 +2043,34 @@ print(json.dumps(result))
 							? JSON.parse(safeReadFileSync(metadataPath) || "{}")
 							: {};
 						existing.provider = provider;
-						if (chosenModel) {
-							existing.model = chosenModel;
-							existing.isAutoProfile = false;
+						// Realign EVERY phase's provider to the new one. We point all
+						// four phases at `provider` rather than deleting the object so
+						// the frontend's per-phase dropdowns immediately reflect the
+						// switch (getPhaseModelInfo reads phaseProviders[phase] first).
+						if (
+							existing.phaseProviders &&
+							typeof existing.phaseProviders === "object"
+						) {
+							for (const phase of Object.keys(existing.phaseProviders)) {
+								existing.phaseProviders[phase] = provider;
+							}
+						}
+						// Drop per-phase models + the cached formula. Keeping the old
+						// provider's model ids here (e.g. "llama3.1:latest") would make
+						// the backend run the wrong model or silently fall back. With
+						// them gone, every phase resolves to `chosenModel` when one was
+						// picked (metadata.model, via _resolve_single_model), else to the
+						// NEW provider's default (_resolve_provider_default). The
+						// frontend dropdowns mirror this same order in getPhaseConfig.
+						delete existing.phaseModels;
+						delete existing.appliedFormula;
+						existing.model = chosenModel ?? undefined;
+						// Single-model switch: force the global model to win. With no
+						// explicit model, clear isAutoProfile too so the provider
+						// defaults (not a stale auto-profile spread) resolve each phase.
+						existing.isAutoProfile = false;
+						if (existing.model === undefined) {
+							delete existing.model;
 						}
 						if (chosenEffort) {
 							// Apply the chosen effort to the whole resumed run. The backend
@@ -2070,10 +2109,21 @@ print(json.dumps(result))
 					);
 				}
 
-				// Keep in-memory metadata + cache in sync for the UI.
+				// Keep in-memory metadata + cache in sync for the UI. Mirror the
+				// on-disk realignment so the per-phase dropdowns and the active
+				// provider/model update without a reload.
 				if (!task.metadata) task.metadata = {};
 				task.metadata.provider = provider;
-				if (chosenModel) task.metadata.model = chosenModel;
+				if (task.metadata.phaseProviders) {
+					const pp = task.metadata.phaseProviders;
+					for (const phase of Object.keys(pp) as (keyof typeof pp)[]) {
+						pp[phase] = provider;
+					}
+				}
+				task.metadata.phaseModels = undefined;
+				task.metadata.appliedFormula = undefined;
+				task.metadata.isAutoProfile = false;
+				task.metadata.model = chosenModel || undefined;
 				if (chosenEffort) {
 					task.metadata.thinkingLevel = chosenEffort as ThinkingLevel;
 					task.metadata.phaseThinking = undefined;
@@ -2111,6 +2161,179 @@ print(json.dumps(result))
 			);
 		},
 	);
+
+	/**
+	 * Re-run one execution phase on demand (planning / coding / validation).
+	 *
+	 * Phase entry is state-driven by implementation_plan.json (see
+	 * plan-rerun-utils.ts), so a re-run rewinds the plan to before the target
+	 * phase and restarts the task — the backend then re-enters at that phase.
+	 * Re-running an earlier phase cascade-invalidates the later ones (planning ⊃
+	 * coding ⊃ validation): their plan state AND their logs are cleared so the
+	 * feed reflects the fresh run. The worktree is recreated automatically by
+	 * startTaskExecution if it was cleaned up.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_RERUN_PHASE,
+		async (_, taskId: string, phase: RerunPhase): Promise<IPCResult> => {
+			const VALID_PHASES: RerunPhase[] = ["planning", "coding", "validation"];
+			if (!VALID_PHASES.includes(phase)) {
+				return { success: false, error: `Invalid phase: ${phase}` };
+			}
+
+			const { task, project } = findTaskAndProject(taskId);
+			if (!task || !project) {
+				return { success: false, error: "Task not found" };
+			}
+
+			try {
+				// 1. Stop any running subprocess FIRST so it can't overwrite the plan
+				//    reset we are about to write. Wait briefly for cleanup.
+				agentManager.killTask(taskId);
+				fileWatcher.unwatch(taskId);
+				await new Promise<void>((resolve) => setTimeout(resolve, 500));
+
+				const specPaths = getSpecPaths(task, project);
+				const specDirs = [
+					specPaths.specDir,
+					specPaths.mainSpecDir,
+					specPaths.worktreeSpecDir,
+				].filter(
+					(d, i, arr): d is string =>
+						!!d && existsSync(d) && arr.indexOf(d) === i,
+				);
+
+				// 2. Rewind the plan (every copy) to before `phase`.
+				const planPaths = getPlanPaths(specPaths, project);
+				let planWritten = false;
+				for (const planFile of planPaths.all) {
+					const content = safeReadFileSync(planFile);
+					if (!content) continue;
+					let plan: Record<string, unknown>;
+					try {
+						plan = JSON.parse(content);
+					} catch {
+						continue;
+					}
+					buildPhaseRerunPlanUpdate(plan, phase);
+					atomicWriteFileSync(planFile, JSON.stringify(plan, null, 2));
+					planWritten = true;
+				}
+				if (!planWritten) {
+					return {
+						success: false,
+						error:
+							"No implementation plan found to re-run. Start the task first.",
+					};
+				}
+
+				// 3. Clear the target + downstream phases' logs (shared feed AND the
+				//    per-LLM mirror files) so the view doesn't show stale entries.
+				const phasesToClear = downstreamLogPhases(phase);
+				for (const dir of specDirs) {
+					clearPhaseLogsInDir(dir, phasesToClear);
+				}
+
+				// 4. Delete runtime halt / pause markers that would otherwise block
+				//    or immediately re-park the restarted task.
+				const markerNames = [
+					"PROMPT_TOO_LONG_HALT",
+					"LOCAL_MODEL_NO_TOOLS_HALT",
+					"PAUSE",
+					"RESUME_WITH_PROVIDER",
+				];
+				for (const dir of specDirs) {
+					for (const name of markerNames) {
+						try {
+							unlinkSync(path.join(dir, name));
+						} catch {
+							// missing marker is the normal case
+						}
+					}
+				}
+
+				projectStore.invalidateTasksCache(project.id);
+				if (task.metadata?.paused) task.metadata.paused.enabled = false;
+
+				// 5. Restart from the reset phase. startTaskExecution recreates the
+				//    worktree if it was cleaned up.
+				const baseBranch =
+					task.metadata?.baseBranch || project.settings?.mainBranch;
+				await agentManager.startTaskExecution(
+					taskId,
+					project.path,
+					task.specId,
+					{
+						useWorktree: task.metadata?.useWorktree !== false,
+						baseBranch,
+					},
+					project.id,
+				);
+
+				appLog.info(
+					`[TASK_RERUN_PHASE] task=${taskId} phase=${phase} ` +
+						`cleared=[${phasesToClear.join(",")}] dirs=${specDirs.length}`,
+				);
+				return { success: true };
+			} catch (err) {
+				appLog.error(
+					`[TASK_RERUN_PHASE] Failed for task ${taskId} phase ${phase}:`,
+					err,
+				);
+				return {
+					success: false,
+					error:
+						err instanceof Error ? err.message : "Failed to re-run phase",
+				};
+			}
+		},
+	);
+
+	/**
+	 * Reset the target + downstream phase entries in every task_logs*.json file
+	 * (the shared feed and each per-LLM mirror) within one spec dir. Best-effort:
+	 * a re-run must never fail because a log file is missing or malformed.
+	 */
+	function clearPhaseLogsInDir(dir: string, phaseKeys: string[]): void {
+		let names: string[];
+		try {
+			names = readdirSync(dir);
+		} catch {
+			return;
+		}
+		for (const name of names) {
+			if (name !== "task_logs.json" && !/^task_logs\..+\.json$/.test(name)) {
+				continue;
+			}
+			const filePath = path.join(dir, name);
+			try {
+				const raw = safeReadFileSync(filePath);
+				if (!raw) continue;
+				const data = JSON.parse(raw) as {
+					phases?: Record<string, Record<string, unknown>>;
+				};
+				if (!data.phases) continue;
+				let changed = false;
+				for (const key of phaseKeys) {
+					if (data.phases[key]) {
+						data.phases[key] = {
+							phase: data.phases[key].phase ?? key,
+							status: "pending",
+							started_at: null,
+							completed_at: null,
+							entries: [],
+						};
+						changed = true;
+					}
+				}
+				if (changed) {
+					atomicWriteFileSync(filePath, JSON.stringify(data, null, 2));
+				}
+			} catch {
+				// Skip unreadable/malformed log files.
+			}
+		}
+	}
 
 	/**
 	 * Reset the persisted conversation log for a task.

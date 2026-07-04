@@ -136,8 +136,11 @@ def _get_model_info_for_provider(provider: str) -> dict[str, str]:
         except ImportError:
             pass
 
-        # Fallback to environment or defaults
-        model = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-6")
+        # Fallback to environment or defaults. Keep this on the current flagship
+        # so an unresolved model never mislabels the activity feed as a stale
+        # version (it used to hardcode "claude-opus-4-6", which surfaced as
+        # "Claude Opus 4.6" on every phase whose real model couldn't be read).
+        model = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
         return {"model": model, "model_label": _format_anthropic_model_label(model)}
 
     elif provider == "openai":

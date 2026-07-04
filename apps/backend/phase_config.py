@@ -19,11 +19,28 @@ except ImportError:
     # e.g. by tests that put apps/backend on sys.path directly.
     from models_registry import get_default  # type: ignore[no-redef]
 
-# Model shorthand to full model ID mapping
+# Model shorthand to full model ID mapping.
+#
+# Must stay in sync with the frontend MODEL_ID_MAP
+# (apps/frontend/src/shared/constants/models.ts): the phase dropdowns and
+# legacy agent profiles persist these numbered short aliases (e.g. "opus-4-8")
+# as the phase model, and the Anthropic API rejects them raw ("model ... may not
+# exist"). Without the numbered entries below, a task whose phaseModels held
+# "opus-4-8" failed planning with "issue with the selected model (opus-4-8)".
 MODEL_ID_MAP: dict[str, str] = {
+    # Bare family aliases (kept for backward compatibility with old profiles).
     "opus": "claude-opus-4-5-20251101",
     "sonnet": "claude-sonnet-4-5-20250929",
     "haiku": "claude-haiku-4-5-20251001",
+    # Numbered aliases → full Anthropic ids (mirror the frontend catalog).
+    "opus-4-8": "claude-opus-4-8",
+    "opus-4-7": "claude-opus-4-7",
+    "opus-4-6": "claude-opus-4-6",
+    "opus-4-5": "claude-opus-4-5",
+    "sonnet-4-6": "claude-sonnet-4-6",
+    "sonnet-4-5": "claude-sonnet-4-5",
+    "haiku-4-6": "claude-haiku-4-6",
+    "haiku-4-5": "claude-haiku-4-5",
 }
 
 # Thinking level to budget tokens mapping (None = no extended thinking)
