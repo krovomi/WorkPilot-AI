@@ -117,6 +117,17 @@ _ANTHROPIC_MODELS = [
         price_output=15.0,
         is_default=False,
     ),
+    # Standard — Claude Sonnet 5 (GA 2026), newest Sonnet.
+    ModelEntry(
+        "anthropic",
+        "claude-sonnet-5",
+        "Claude Sonnet 5",
+        "standard",
+        supports_thinking=True,
+        price_input=3.0,
+        price_output=15.0,
+        is_default=False,
+    ),
     ModelEntry(
         "anthropic",
         "claude-sonnet-4-6",

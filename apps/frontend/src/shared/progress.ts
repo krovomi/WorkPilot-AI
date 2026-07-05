@@ -23,6 +23,29 @@ export function isSubtaskDone(status: string): boolean {
 }
 
 /**
+ * True when the AI pipeline has finished ALL its work for this task, so the
+ * progress bar must read 100% regardless of the (possibly stale) in-memory
+ * subtask counts.
+ *
+ * This is why a finished task could show e.g. 50% even with every phase marked
+ * "Terminé": the header derives its percent from `task.subtasks`, which can lag
+ * behind the on-disk plan (especially after a mid-run LLM hot-swap re-syncs the
+ * plan). The task's terminal state is the reliable signal.
+ *
+ * `human_review` counts ONLY when the review is for a COMPLETED build
+ * (`reviewReason === "completed"`) — not a `plan_review` (coding hasn't started),
+ * `errors`, or `qa_rejected` hand-off where real work still remains.
+ */
+export function isTaskEffectivelyComplete(
+	status: string | undefined,
+	reviewReason?: string,
+): boolean {
+	if (status === "done" || status === "pr_created") return true;
+	if (status === "human_review" && reviewReason === "completed") return true;
+	return false;
+}
+
+/**
  * Calculate progress percentage from subtasks
  * @param subtasks Array of subtasks with status
  * @returns Progress percentage (0-100)

@@ -55,6 +55,7 @@ import type {
 	TaskCategory,
 	TaskStatus,
 } from "../../shared/types";
+import { isTaskEffectivelyComplete } from "../../shared/progress";
 import { setPendingTaskDetailTab } from "../lib/task-detail-nav";
 import { cn, extractTextFromHtml, sanitizeMarkdownForDisplay } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
@@ -1366,6 +1367,10 @@ export const TaskCard = memo(function TaskCard({
 									isStuck={isStuck}
 									isRunning={isRunning}
 									hasActiveExecution={hasActiveExecution}
+									isComplete={isTaskEffectivelyComplete(
+										task.status,
+										task.reviewReason,
+									)}
 									onPlanClick={
 										task.subtasks.length > 0 ? handlePlanClick : undefined
 									}

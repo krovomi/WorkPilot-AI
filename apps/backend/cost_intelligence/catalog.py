@@ -110,6 +110,12 @@ _DEFAULT_CATALOG: dict[str, dict[str, dict[str, float]]] = {
             "cache_read": 0.50,
             "thinking": 25.0,
         },
+        "claude-sonnet-5": {
+            "input": 3.0,
+            "output": 15.0,
+            "cache_write": 3.75,
+            "cache_read": 0.30,
+        },
         "claude-sonnet-4-6": {
             "input": 3.0,
             "output": 15.0,

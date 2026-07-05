@@ -27,6 +27,10 @@ interface PhaseProgressIndicatorProps {
 	 * Repli sur `isRunning` quand non fourni.
 	 */
 	hasActiveExecution?: boolean;
+	/** True when the task has finished its whole pipeline (terminal state) → the
+	 * bar reads 100% regardless of a lagging subtask count. See
+	 * isTaskEffectivelyComplete. */
+	isComplete?: boolean;
 	className?: string;
 	/** Called when the user clicks the completed Plan pill to view the implementation plan */
 	onPlanClick?: () => void;
@@ -76,6 +80,7 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 	isStuck = false,
 	isRunning = false,
 	hasActiveExecution,
+	isComplete,
 	className,
 	onPlanClick,
 }: PhaseProgressIndicatorProps) {
@@ -125,6 +130,7 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 		overallProgress,
 		isExecutionActive && !isStuck,
 		totalSubtasks > 0,
+		isComplete,
 	);
 
 	// Get log entry counts for activity indication

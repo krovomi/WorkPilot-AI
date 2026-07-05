@@ -9,6 +9,7 @@ import {
 	determineOverallStatus,
 	estimateRemainingTime,
 	formatProgressString,
+	isTaskEffectivelyComplete,
 } from "../progress";
 import type { Subtask, SubtaskStatus } from "../types";
 
@@ -22,6 +23,27 @@ function createSubtasks(statuses: SubtaskStatus[]): Subtask[] {
 		files: [],
 	}));
 }
+
+describe("isTaskEffectivelyComplete", () => {
+	it("is true for done / pr_created", () => {
+		expect(isTaskEffectivelyComplete("done")).toBe(true);
+		expect(isTaskEffectivelyComplete("pr_created")).toBe(true);
+	});
+	it("is true for human_review ONLY when the build completed", () => {
+		expect(isTaskEffectivelyComplete("human_review", "completed")).toBe(true);
+		// plan_review / errors / qa_rejected still have work → NOT complete
+		expect(isTaskEffectivelyComplete("human_review", "plan_review")).toBe(false);
+		expect(isTaskEffectivelyComplete("human_review", "errors")).toBe(false);
+		expect(isTaskEffectivelyComplete("human_review", "qa_rejected")).toBe(false);
+		expect(isTaskEffectivelyComplete("human_review", undefined)).toBe(false);
+	});
+	it("is false for active / non-terminal states", () => {
+		expect(isTaskEffectivelyComplete("in_progress")).toBe(false);
+		expect(isTaskEffectivelyComplete("backlog")).toBe(false);
+		expect(isTaskEffectivelyComplete("build_failed")).toBe(false);
+		expect(isTaskEffectivelyComplete(undefined)).toBe(false);
+	});
+});
 
 describe("calculateProgress", () => {
 	describe("with 0 subtasks", () => {

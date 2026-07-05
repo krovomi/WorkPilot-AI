@@ -31,7 +31,10 @@ import {
 	extractTextFromHtml,
 	getDisplayProgress,
 } from "../../lib/utils";
-import { isSubtaskDone } from "../../../shared/progress";
+import {
+	isSubtaskDone,
+	isTaskEffectivelyComplete,
+} from "../../../shared/progress";
 import { needsExecutionFormula } from "../../../shared/utils/task-execution-config";
 import { useFormulaMatrixStore } from "../../stores/formula-matrix-store";
 import { useProjectStore } from "../../stores/project-store";
@@ -545,6 +548,7 @@ function TaskDetailModalContent({
 		task.executionProgress?.overallProgress,
 		!!state.hasActiveExecution,
 		totalSubtasks > 0,
+		isTaskEffectivelyComplete(task.status, task.reviewReason),
 	);
 
 	// Activité en cours affichée dans la barre de phase : on privilégie le

@@ -50,6 +50,12 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 			supportsThinking: true,
 		},
 		{
+			value: "claude-sonnet-5",
+			label: "Claude Sonnet 5",
+			tier: "standard",
+			supportsThinking: true,
+		},
+		{
 			value: "claude-sonnet-4-6",
 			label: "Claude Sonnet 4.6",
 			tier: "standard",
@@ -71,7 +77,7 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 			supportsThinking: true,
 		},
 		{
-			value: "claude-haiku-4-5-20251001",
+			value: "claude-haiku-4-5",
 			label: "Claude Haiku 4.5",
 			tier: "fast",
 			supportsThinking: false,
@@ -565,7 +571,12 @@ export function getDefaultModelForProvider(provider: string): string {
 export function isAnthropicNativeVersionedModelId(model: string): boolean {
 	return (
 		/^claude-(opus|sonnet|haiku)-\d+-\d/.test(model) ||
-		/^claude-(fable|mythos)-\d/.test(model)
+		// Single-version-group families: the « Mythos-class » (claude-fable-5,
+		// claude-mythos-5) AND the 5-gen main line (claude-sonnet-5, and future
+		// claude-opus-5 / claude-haiku-5). The negative lookahead `(?![.\d])`
+		// keeps the dotted Copilot spelling (claude-sonnet-4.6) from matching —
+		// only the Anthropic-native bare form is native.
+		/^claude-(fable|mythos|opus|sonnet|haiku)-\d+(?![.\d])/.test(model)
 	);
 }
 

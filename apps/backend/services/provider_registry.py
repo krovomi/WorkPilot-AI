@@ -104,16 +104,16 @@ class ProviderRegistry:
                     "supportsThinking": True,
                 },
                 {
-                    "value": "claude-sonnet-4-6",
-                    "label": "Claude Sonnet 4.6",
+                    "value": "claude-sonnet-5",
+                    "label": "Claude Sonnet 5",
                     "tier": "standard",
                     "supportsThinking": True,
                 },
                 {
-                    "value": "claude-haiku-4-6",
-                    "label": "Claude Haiku 4.6",
-                    "tier": "fast",
-                    "supportsThinking": False,
+                    "value": "claude-sonnet-4-6",
+                    "label": "Claude Sonnet 4.6",
+                    "tier": "standard",
+                    "supportsThinking": True,
                 },
                 {
                     "value": "claude-opus-4-5-20251101",

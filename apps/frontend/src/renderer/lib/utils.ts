@@ -45,6 +45,9 @@ export function calculateProgress(subtasks: { status: string }[]): number {
  * @param hasActiveExecution Indique si une phase d'exécution est en cours
  * @param hasSubtasks `true` si la tâche a des sous-tâches (leur avancement fait
  *   alors foi) ; `false`/`undefined` → repli sur la progression de phase
+ * @param isComplete `true` si la tâche a terminé tout son pipeline (état terminal
+ *   fiable) → force 100%, même si le comptage des sous-tâches est en retard (ex.
+ *   après un changement de LLM en cours de route). Voir isTaskEffectivelyComplete.
  * @returns Pourcentage à afficher (0-100)
  */
 export function getDisplayProgress(
@@ -52,7 +55,11 @@ export function getDisplayProgress(
 	overallProgress: number | undefined,
 	hasActiveExecution: boolean,
 	hasSubtasks?: boolean,
+	isComplete?: boolean,
 ): number {
+	// A finished task is 100% by definition — the terminal state is authoritative
+	// over the (possibly stale) subtask ratio.
+	if (isComplete) return 100;
 	if (!hasActiveExecution) return subtaskProgress;
 	// Real work = completed subtasks. Don't let phase weighting overstate it.
 	if (hasSubtasks) return subtaskProgress;

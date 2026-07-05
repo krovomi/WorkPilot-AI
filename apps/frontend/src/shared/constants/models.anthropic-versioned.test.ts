@@ -32,6 +32,16 @@ describe("isAnthropicNativeVersionedModelId", () => {
 		expect(isAnthropicNativeVersionedModelId("claude-mythos-5")).toBe(true);
 	});
 
+	it("détecte la ligne principale 5-gen (claude-sonnet-5) sans casser Copilot", () => {
+		// Sonnet 5 a un seul groupe de version (comme fable/mythos) et doit être
+		// reconnu comme natif Anthropic…
+		expect(isAnthropicNativeVersionedModelId("claude-sonnet-5")).toBe(true);
+		expect(isAnthropicNativeVersionedModelId("claude-opus-5")).toBe(true);
+		expect(isAnthropicNativeVersionedModelId("claude-haiku-5")).toBe(true);
+		// …mais la forme pointée Copilot NE doit toujours PAS matcher.
+		expect(isAnthropicNativeVersionedModelId("claude-sonnet-5.0")).toBe(false);
+	});
+
 	it("ignore les modèles non-Claude", () => {
 		expect(isAnthropicNativeVersionedModelId("gpt-5.5")).toBe(false);
 		expect(isAnthropicNativeVersionedModelId("gemini-3.1-pro")).toBe(false);

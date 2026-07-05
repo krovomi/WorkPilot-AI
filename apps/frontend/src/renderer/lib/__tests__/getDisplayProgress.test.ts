@@ -37,4 +37,12 @@ describe("getDisplayProgress", () => {
 		// Pas encore de sous-tâches (création de spec) : la barre suit la phase.
 		expect(getDisplayProgress(0, 15, true, false)).toBe(15);
 	});
+
+	it("force 100% quand la tâche est terminée, même si les sous-tâches sont en retard", () => {
+		// Bug signalé : tâche terminée (human_review, toutes phases « Terminé »)
+		// mais le comptage des sous-tâches en mémoire est figé à 50% (surtout
+		// après un changement de LLM en cours). L'état terminal prime.
+		expect(getDisplayProgress(50, 74, false, true, true)).toBe(100);
+		expect(getDisplayProgress(0, 0, false, false, true)).toBe(100);
+	});
 });
