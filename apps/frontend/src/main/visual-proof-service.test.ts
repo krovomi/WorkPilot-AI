@@ -12,6 +12,7 @@ import type { VisualProofRun } from "../shared/types";
 import { visualProofNavigationService } from "./visual-proof-navigation-service";
 import {
 	analyzeDotNetProjects,
+	buildPrintWindowScript,
 	buildProofComment,
 	buildUiAutomationStepScript,
 	hasLegacyDotNetDesktopProject,
@@ -161,6 +162,51 @@ describe("buildProofComment", () => {
 		});
 		expect(comment).toContain("Status: **failed**");
 		expect(comment).toContain("Error: Server did not start");
+	});
+});
+
+describe("buildPrintWindowScript", () => {
+	it("captures only the app window via PrintWindow — never the screen", () => {
+		const script = buildPrintWindowScript("C:\\proofs\\desktop.png", 4321, [
+			"EBP.Invoicing",
+			"MeCa",
+		]);
+
+		// Targets the launched process' own window and renders it with PrintWindow
+		// (flag 2 = PW_RENDERFULLCONTENT), not any screen/desktop capture API.
+		expect(script).toContain("$targetPid = 4321");
+		expect(script).toContain("PrintWindow($h, $hdc, 2)");
+		expect(script).toContain("EnumWindows");
+		expect(script).not.toMatch(
+			/CopyFromScreen|BitBlt|GetDesktopWindow|VirtualScreen/,
+		);
+
+		// Feature/app names drive selection; WorkPilot/editor windows are excluded.
+		expect(script).toContain("@('ebp.invoicing','meca')");
+		expect(script).toContain("workpilot");
+		expect(script).toContain("vscode");
+
+		// Fails closed (no fallback grab) when no app window matches.
+		expect(script).toContain("NO_APP_WINDOW");
+		expect(script).toContain("'C:\\proofs\\desktop.png'");
+	});
+
+	it("sanitizes and single-quotes preferred names to prevent script injection", () => {
+		const script = buildPrintWindowScript("C:\\out.png", undefined, [
+			"a');Remove-Item 'x",
+		]);
+
+		// The dangerous quote/paren/semicolon are stripped, leaving an inert,
+		// single-quoted literal — the raw break-out payload never appears.
+		expect(script).toContain("@('aremove-item x')");
+		expect(script).not.toContain("a');Remove");
+		expect(script).toContain("$targetPid = 0");
+	});
+
+	it("emits empty defaults when no PID and no names are provided", () => {
+		const script = buildPrintWindowScript("C:\\out.png", undefined, []);
+		expect(script).toContain("$targetPid = 0");
+		expect(script).toContain("$preferred = @()");
 	});
 });
 

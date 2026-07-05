@@ -149,6 +149,12 @@ interface DesktopCaptureSelectionOptions {
 
 interface DesktopImageCaptureOptions extends DesktopCaptureSelectionOptions {
 	preferredNames?: readonly string[];
+	/**
+	 * PID of the launched desktop app. On Windows the capture targets this
+	 * process's own window via Win32 PrintWindow, so only the app frame is
+	 * grabbed — never the whole screen.
+	 */
+	pid?: number;
 }
 
 function createRunId(): string {
@@ -705,21 +711,202 @@ function describeApiSmoke(apiSmoke: VisualProofApiSmoke | undefined): string {
 	return ` API smoke: ${apiSmoke.passed}/${apiSmoke.attempted} endpoints passed.`;
 }
 
+/** Single-quote a value for safe embedding in a PowerShell script. */
+function powerShellSingleQuote(value: string): string {
+	return `'${value.replaceAll("'", "''")}'`;
+}
+
+/**
+ * Build the PowerShell script that captures a *single application window* to a
+ * PNG via the Win32 PrintWindow API.
+ *
+ * PrintWindow renders the target window's own bitmap into an off-screen device
+ * context, so it captures exactly that window — even when it is occluded,
+ * behind other windows or on another monitor — and it can **never** grab the
+ * desktop or other applications. The window is chosen by:
+ *   1. the launched app's PID (largest visible top-level window of that process);
+ *   2. otherwise a visible window whose title contains the feature/app name.
+ * WorkPilot/editor windows are excluded, and if nothing matches the script exits
+ * non-zero (fail closed) rather than capturing anything else.
+ *
+ * Exported for unit testing of the generated script.
+ */
+export function buildPrintWindowScript(
+	outputPath: string,
+	pid: number | undefined,
+	preferredNames: readonly string[] = [],
+): string {
+	const preferred = normalizePreferredWindowNames(preferredNames)
+		.map((name) => name.replaceAll(/[^a-z0-9 ._-]/g, "").trim())
+		.filter((name) => name.length > 0);
+	const preferredArray = preferred.length
+		? `@(${preferred.map(powerShellSingleQuote).join(",")})`
+		: "@()";
+	const targetPid = Number.isInteger(pid) && pid ? pid : 0;
+	const outPath = powerShellSingleQuote(outputPath);
+
+	// NOTE: keep the here-string terminators ("@ ... "@) at column 0 and avoid
+	// any ${...} sequence (would collide with this template literal).
+	return `$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing | Out-Null
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class WpCap {
+  public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr p);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+  [DllImport("user32.dll")] public static extern int GetWindowTextLength(IntPtr h);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+}
+"@ | Out-Null
+
+$targetPid = ${targetPid}
+$preferred = ${preferredArray}
+$excludeRe = 'workpilot|auto-claude|visual studio code|vscode|copilot|electron|program manager|task switching'
+$cands = New-Object System.Collections.ArrayList
+$cb = [WpCap+EnumProc]{
+  param($h, $l)
+  if (-not [WpCap]::IsWindowVisible($h)) { return $true }
+  $len = [WpCap]::GetWindowTextLength($h)
+  if ($len -le 0) { return $true }
+  $sb = New-Object System.Text.StringBuilder ($len + 1)
+  [void][WpCap]::GetWindowText($h, $sb, $sb.Capacity)
+  $title = $sb.ToString()
+  if ($title.ToLower() -match $excludeRe) { return $true }
+  $wpid = [uint32]0
+  [void][WpCap]::GetWindowThreadProcessId($h, [ref]$wpid)
+  $r = New-Object WpCap+RECT
+  [void][WpCap]::GetWindowRect($h, [ref]$r)
+  $w = $r.Right - $r.Left
+  $ht = $r.Bottom - $r.Top
+  if ($w -le 10 -or $ht -le 10) { return $true }
+  $proc = Get-Process -Id ([int]$wpid) -ErrorAction SilentlyContinue
+  $pname = ''
+  if ($proc) { $pname = $proc.ProcessName.ToLower() }
+  [void]$cands.Add([pscustomobject]@{ H = $h; WPid = $wpid; PName = $pname; Title = $title; Area = ([long]$w * [long]$ht) })
+  return $true
+}
+[void][WpCap]::EnumWindows($cb, [IntPtr]::Zero)
+
+# Selection, most reliable first: the launched PID's own window, then any window
+# whose owning *process name* matches the app (stable across localized titles and
+# PID hand-off), then a title match as a last resort. Largest window wins ties.
+$chosen = $null
+if ($targetPid -ne 0) {
+  $chosen = $cands | Where-Object { $_.WPid -eq $targetPid } | Sort-Object Area -Descending | Select-Object -First 1
+}
+if (-not $chosen -and $preferred.Count -gt 0) {
+  $chosen = $cands | Where-Object { $p = $_.PName; @($preferred | Where-Object { $p -and $p.Contains($_) }).Count -gt 0 } | Sort-Object Area -Descending | Select-Object -First 1
+}
+if (-not $chosen -and $preferred.Count -gt 0) {
+  $chosen = $cands | Where-Object { $t = $_.Title.ToLower(); @($preferred | Where-Object { $t.Contains($_) }).Count -gt 0 } | Sort-Object Area -Descending | Select-Object -First 1
+}
+if (-not $chosen) { [Console]::Error.WriteLine('NO_APP_WINDOW'); exit 3 }
+
+$h = $chosen.H
+if ([WpCap]::IsIconic($h)) { [void][WpCap]::ShowWindow($h, 9); Start-Sleep -Milliseconds 400 }
+$r = New-Object WpCap+RECT
+[void][WpCap]::GetWindowRect($h, [ref]$r)
+$w = $r.Right - $r.Left
+$ht = $r.Bottom - $r.Top
+if ($w -le 0 -or $ht -le 0) { [Console]::Error.WriteLine('BAD_RECT'); exit 4 }
+$bmp = New-Object System.Drawing.Bitmap $w, $ht
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$hdc = $g.GetHdc()
+$ok = [WpCap]::PrintWindow($h, $hdc, 2)
+$g.ReleaseHdc($hdc)
+$g.Dispose()
+$dir = Split-Path -Parent ${outPath}
+if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+$bmp.Save(${outPath}, [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp.Dispose()
+Write-Output ([string]::Format('{0} {1} {2}', $w, $ht, [int](-not $ok)))`;
+}
+
+/**
+ * Capture the launched app's own window on Windows via {@link buildPrintWindowScript}.
+ * Returns the captured window size. Throws when no application window can be
+ * found or the capture fails — callers must not fall back to a screen grab.
+ */
+async function captureAppWindowByPid(
+	outputPath: string,
+	pid: number | undefined,
+	preferredNames: readonly string[] = [],
+): Promise<{ width: number; height: number }> {
+	const script = buildPrintWindowScript(outputPath, pid, preferredNames);
+	let stdout: string;
+	try {
+		({ stdout } = await execFileAsync(
+			"powershell",
+			["-NoProfile", "-NonInteractive", "-Command", script],
+			{ windowsHide: true, timeout: 20000, maxBuffer: 256 * 1024 },
+		));
+	} catch (error) {
+		const names = normalizePreferredWindowNames(preferredNames);
+		throw new Error(
+			"Could not capture the application window" +
+				(names.length > 0 ? ` (${names.join(", ")})` : "") +
+				`: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+
+	const lastLine = stdout.trim().split(/\r?\n/).pop() ?? "";
+	const match = /(\d+)\s+(\d+)\s+([01])/.exec(lastLine);
+	if (match?.[3] === "1") {
+		logger.warn(
+			"[VisualProof] PrintWindow produced an empty frame — the target window is " +
+				"likely hardware-accelerated or runs elevated while WorkPilot does not. " +
+				"Relaunch WorkPilot as administrator to capture elevated apps.",
+		);
+	}
+	const width = match ? Number(match[1]) : DEFAULT_VIEWPORT.width;
+	const height = match ? Number(match[2]) : DEFAULT_VIEWPORT.height;
+	return {
+		width: width || DEFAULT_VIEWPORT.width,
+		height: height || DEFAULT_VIEWPORT.height,
+	};
+}
+
+/**
+ * Capture a single screenshot of the target application **window only** — never
+ * the full screen (the user may have private content in other windows/monitors).
+ *
+ * On Windows this uses Win32 PrintWindow against the app's own window handle
+ * (see {@link captureAppWindowByPid}); it fails closed instead of grabbing the
+ * desktop. Off Windows (dev on mono/wine) it falls back to Electron's
+ * desktopCapturer restricted to *window* sources — still never a screen source.
+ */
 async function captureDesktopImage(
 	outputPath: string,
 	options: DesktopImageCaptureOptions = {},
 ): Promise<{ width: number; height: number }> {
+	if (process.platform === "win32") {
+		return captureAppWindowByPid(
+			outputPath,
+			options.pid,
+			options.preferredNames,
+		);
+	}
+
 	const sources = await desktopCapturer.getSources({
-		types: options.requireWindowMatch ? ["window"] : ["window", "screen"],
+		types: ["window"],
 		thumbnailSize: DEFAULT_VIEWPORT,
 	});
 	if (sources.length === 0) {
-		throw new Error("No desktop or window source was available for capture");
+		throw new Error("No window source was available for capture");
 	}
 
 	const source = selectDesktopCaptureSource(sources, options.preferredNames, {
 		excludeSourceIds: options.excludeSourceIds,
-		requireWindowMatch: options.requireWindowMatch,
+		requireWindowMatch: true,
 	});
 	if (!source) {
 		const names = normalizePreferredWindowNames(options.preferredNames);
@@ -1203,6 +1390,8 @@ export async function resolveNavigationPlan(
 interface DesktopCaptureSequenceOptions {
 	excludeSourceIds: ReadonlySet<string>;
 	preferredNames: readonly string[];
+	/** PID of the launched app, so captures target only its own window. */
+	pid?: number;
 }
 
 /**
@@ -1229,6 +1418,7 @@ async function captureDesktopScreenshotSequence(
 			const size = await captureDesktopImage(screenshotPath, {
 				excludeSourceIds: options.excludeSourceIds,
 				preferredNames: options.preferredNames,
+				pid: options.pid,
 				requireWindowMatch: true,
 			});
 			screenshots.push(
@@ -1346,7 +1536,6 @@ async function runDesktopNavigationStep(
 }
 
 interface DesktopFeatureSequenceOptions extends DesktopCaptureSequenceOptions {
-	pid?: number;
 	steps: readonly VisualProofNavigationStep[];
 	/** Whether UI Automation can drive the app (false ⇒ UIPI blocks input → capture only). */
 	canDrive: boolean;
@@ -1388,6 +1577,7 @@ async function captureDesktopFeatureSequence(
 			const size = await captureDesktopImage(screenshotPath, {
 				excludeSourceIds: options.excludeSourceIds,
 				preferredNames: options.preferredNames,
+				pid: options.pid,
 				requireWindowMatch: true,
 			});
 			screenshots.push(
