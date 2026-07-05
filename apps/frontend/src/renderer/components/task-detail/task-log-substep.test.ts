@@ -72,6 +72,19 @@ describe("buildPhaseSubSteps", () => {
 		expect(labels.get(a)).toBe("st-9");
 	});
 
+	it("reformate la passe QA structurée « QA REVIEW — PASS n/max » (retire le max trompeur)", () => {
+		// Le backend émet le sous-tag « QA REVIEW — PASS 2/50 » ; le « /50 » est le
+		// max d'itérations, pas un objectif → on l'affiche comme « QA — vérification 2 ».
+		const a = entry({ phase: "validation", subphase: "QA REVIEW — PASS 2/50" });
+		const labels = buildPhaseSubSteps([a], "validation", { formatQaPass });
+		expect(labels.get(a)).toBe("QA — vérification 2");
+		// Nouveau format backend sans le max.
+		const b = entry({ phase: "validation", subphase: "QA REVIEW — PASS 3" });
+		expect(
+			buildPhaseSubSteps([b], "validation", { formatQaPass }).get(b),
+		).toBe("QA — vérification 3");
+	});
+
 	it("numérote les sessions QA des anciens logs de validation", () => {
 		const entries = [
 			entry({

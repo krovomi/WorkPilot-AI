@@ -304,7 +304,7 @@ describe("AgentTools - Agent Profile Resolution", () => {
 				{ type: "feature", feature: "utility" },
 				resolvedSettings,
 			);
-			expect(utilityAgent.model).toBe("claude-haiku-4-6");
+			expect(utilityAgent.model).toBe("claude-haiku-4-5");
 			expect(utilityAgent.thinking).toBe("low");
 		});
 

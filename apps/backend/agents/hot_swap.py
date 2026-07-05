@@ -114,9 +114,7 @@ def consume_hot_swap_marker(spec_dir: Path) -> HotSwapRequest | None:
     return req
 
 
-def consume_hot_swap_for_phase(
-    spec_dir: Path, phase: str
-) -> HotSwapRequest | None:
+def consume_hot_swap_for_phase(spec_dir: Path, phase: str) -> HotSwapRequest | None:
     """Return + delete the marker ONLY if it targets ``phase``; otherwise leave
     it in place (a marker for a different phase must survive until that phase
     runs). Prevents one phase from swallowing another phase's pending swap."""

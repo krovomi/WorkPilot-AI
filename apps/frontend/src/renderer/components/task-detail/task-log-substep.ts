@@ -54,8 +54,17 @@ export function buildPhaseSubSteps(
 	// 1. Bornes structurées (nouveaux logs).
 	let hasStructured = false;
 	for (const entry of entries) {
-		const label = getSubStepLabel(entry);
+		let label = getSubStepLabel(entry);
 		if (label) {
+			// La passe QA arrive du backend sous la forme « QA REVIEW — PASS 2/50 ».
+			// Le « /50 » est le MAXIMUM d'itérations (garde-fou), pas un objectif :
+			// affiché tel quel il se lit comme « 2 sur 50 faites » (~4%) alors que
+			// la QA s'arrête dès qu'elle approuve — d'où la confusion « 2/50 mais
+			// terminé ». On reformate en libellé clair et traduit (sans le max).
+			if (phase === "validation") {
+				const m = /pass\s+(\d+)/i.exec(label);
+				if (m) label = options.formatQaPass(Number(m[1]));
+			}
 			labels.set(entry, label);
 			hasStructured = true;
 		}

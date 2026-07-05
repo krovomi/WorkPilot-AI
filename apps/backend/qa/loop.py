@@ -502,9 +502,13 @@ async def run_qa_validation_loop(
         )
         # Sous-étape de la phase de validation, affichée dans la barre de phase
         # de l'UI (équivalent des « phase N: NOM » de la planification).
+        # On n'affiche PAS "/{MAX_QA_ITERATIONS}" : ce max est un garde-fou, pas
+        # un objectif — la QA s'arrête dès qu'elle approuve. Le montrer comme
+        # "PASS 2/50" se lisait à tort comme "2 sur 50 faites" (~4%) alors que la
+        # phase était terminée. Le frontend reformate en "QA — vérification N".
         if task_logger:
             task_logger.start_subphase(
-                f"QA REVIEW — PASS {qa_iteration}/{MAX_QA_ITERATIONS}",
+                f"QA REVIEW — PASS {qa_iteration}",
                 phase=LogPhase.VALIDATION,
                 print_to_console=False,
             )

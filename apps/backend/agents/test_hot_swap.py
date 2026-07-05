@@ -27,13 +27,17 @@ def test_should_break_for_hot_swap():
     # Marker for a DIFFERENT phase → no break (would otherwise loop forever).
     coding_marker = HotSwapRequest(phase="coding", model="claude-opus-4-8")
     assert (
-        should_break_for_hot_swap(coding_marker, "planning", "anthropic", "claude-sonnet-4-5")
+        should_break_for_hot_swap(
+            coding_marker, "planning", "anthropic", "claude-sonnet-4-5"
+        )
         is False
     )
     # Marker for THIS phase that changes the model → break.
     planning_marker = HotSwapRequest(phase="planning", model="claude-opus-4-8")
     assert (
-        should_break_for_hot_swap(planning_marker, "planning", "anthropic", "claude-sonnet-4-5")
+        should_break_for_hot_swap(
+            planning_marker, "planning", "anthropic", "claude-sonnet-4-5"
+        )
         is True
     )
     # validation log phase maps to qa config → a qa marker breaks it.
@@ -41,7 +45,10 @@ def test_should_break_for_hot_swap():
     assert should_break_for_hot_swap(qa_marker, "validation", "anthropic", "m") is True
     # Same model already active → no break.
     same = HotSwapRequest(phase="planning", model="claude-opus-4-8")
-    assert should_break_for_hot_swap(same, "planning", "anthropic", "claude-opus-4-8") is False
+    assert (
+        should_break_for_hot_swap(same, "planning", "anthropic", "claude-opus-4-8")
+        is False
+    )
 
 
 def test_consume_for_phase_only_matching(tmp_path):
@@ -57,7 +64,11 @@ def test_consume_for_phase_only_matching(tmp_path):
 
 def test_write_read_consume_roundtrip(tmp_path):
     assert write_hot_swap_marker(
-        tmp_path, "coding", provider="anthropic", model="claude-sonnet-4-5", effort="high"
+        tmp_path,
+        "coding",
+        provider="anthropic",
+        model="claude-sonnet-4-5",
+        effort="high",
     )
     req = read_hot_swap_marker(tmp_path)
     assert req == HotSwapRequest(
@@ -121,7 +132,9 @@ def test_hot_swap_differs():
     )
     # provider change alone
     assert (
-        hot_swap_differs(HotSwapRequest(phase="coding", provider="copilot"), "anthropic", "m")
+        hot_swap_differs(
+            HotSwapRequest(phase="coding", provider="copilot"), "anthropic", "m"
+        )
         is True
     )
     # effort change alone
