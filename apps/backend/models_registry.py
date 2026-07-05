@@ -100,7 +100,7 @@ _ANTHROPIC_MODELS = [
     ModelEntry(
         "anthropic",
         "claude-opus-4-20250514",
-        "Claude Opus 4 (May 2025)",
+        "Claude Opus 4",
         "flagship",
         price_input=15.0,
         price_output=75.0,
@@ -117,7 +117,7 @@ _ANTHROPIC_MODELS = [
         price_output=15.0,
         is_default=False,
     ),
-    # Standard — Claude Sonnet 5 (GA 2026), newest Sonnet.
+    # Standard — Claude Sonnet 5
     ModelEntry(
         "anthropic",
         "claude-sonnet-5",
@@ -149,7 +149,7 @@ _ANTHROPIC_MODELS = [
     ModelEntry(
         "anthropic",
         "claude-sonnet-4-20250514",
-        "Claude Sonnet 4 (May 2025)",
+        "Claude Sonnet 4",
         "standard",
         price_input=3.0,
         price_output=15.0,
