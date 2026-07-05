@@ -1435,8 +1435,7 @@ async def run_autonomous_agent(
             if status == "hot_swap":
                 if task_logger:
                     task_logger.log_info(
-                        "Bascule LLM à chaud — reprise avec le nouveau modèle "
-                        "(contexte rejoué)"
+                        "Hot LLM swap — resuming with the new model (context replayed)."
                     )
                 continue
 
@@ -1856,8 +1855,8 @@ async def run_autonomous_agent(
                 )
                 if task_logger:
                     task_logger.log_error(
-                        f"Modèle indisponible : {_bad_model}. La phase est arrêtée "
-                        f"— sélectionnez un modèle valide et relancez l'étape.",
+                        f"Unavailable model: {_bad_model}. Phase halted — pick a "
+                        f"valid model for this phase and re-run it.",
                         current_log_phase,
                     )
                 emit_phase(

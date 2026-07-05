@@ -381,6 +381,22 @@
 			"fixingQa": "Fixing QA issues…",
 			"runningQa": "Running QA review…",
 			"buildPaused": "Build paused — subtasks still pending"
+		},
+		"logMessages": {
+			"qaCoverageRejected": "QA pass #{{n}} rejected by the coverage gate; applying a fix, then re-reviewing (pass #{{next}}).",
+			"qaArchRejected": "QA pass #{{n}} rejected: {{count}} architecture violation(s); applying a fix, then re-reviewing (pass #{{next}}).",
+			"qaRejected": "QA pass #{{n}} rejected: {{count}} issue(s) found; applying a fix, then re-reviewing (pass #{{next}}).",
+			"qaApproved": "QA pass #{{n}} approved: all criteria met, architecture clean. Validation complete.",
+			"qaManualVerification": "QA pass #{{n}}: code validated by review; manual verification required. Validation complete.",
+			"qaManualVerificationSandbox": "QA pass #{{n}}: code validated by review; manual verification required (environment limitation: tests can't run here). Validation complete.",
+			"modelUnavailable": "Unavailable model: {{model}}. Phase halted — pick a valid model for this phase and re-run it.",
+			"hotSwapResumed": "Hot LLM swap — resuming with the new model (context replayed).",
+			"hotSwapLabel": "Hot swap",
+			"ctxSwitchLabel": "LLM context switch",
+			"ctxInitialLabel": "Initial LLM context",
+			"provider": "Provider",
+			"model": "Model",
+			"effort": "Effort"
 		}
 	},
 	"files": {

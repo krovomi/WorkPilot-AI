@@ -88,6 +88,7 @@ import {
 } from "../ui/select";
 import { TaskPhaseBar } from "./TaskPhaseBar";
 import { buildPhaseSubSteps } from "./task-log-substep";
+import { translateLogMessage } from "./translateLogMessage";
 
 interface TaskLogsProps {
 	task: Task;
@@ -1954,8 +1955,15 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 	const hasDetail = Boolean(entry.detail);
 
 	// Pre-built highlighted nodes for the searchable fields, reused across the
-	// per-type render branches below.
-	const content = <HighlightedText text={entry.content ?? ""} query={query} />;
+	// per-type render branches below. Known backend status lines (QA verdicts,
+	// hot-swap, context switch…) are emitted in stable English and localised here
+	// for display; anything else is shown as-is.
+	const content = (
+		<HighlightedText
+			text={translateLogMessage(t, entry.content)}
+			query={query}
+		/>
+	);
 	const detail = entry.detail ? (
 		<HighlightedText text={entry.detail} query={query} />
 	) : null;

@@ -229,12 +229,16 @@ def apply_hot_swap_to_metadata(spec_dir: Path, req: HotSwapRequest) -> None:
 
 
 def describe_hot_swap(req: HotSwapRequest) -> str:
-    """Human-readable one-liner for the activity feed."""
+    """Human-readable one-liner for the activity feed.
+
+    Emitted in stable English; the frontend (translateLogMessage) localises the
+    "Hot swap"/"Provider"/"Model"/"Effort" tokens for display.
+    """
     parts: list[str] = []
     if req.provider:
-        parts.append(f"Fournisseur → {req.provider}")
+        parts.append(f"Provider → {req.provider}")
     if req.model:
-        parts.append(f"Modèle → {req.model}")
+        parts.append(f"Model → {req.model}")
     if req.effort:
         parts.append(f"Effort → {req.effort}")
-    return f"🔄 Changement à chaud ({req.phase}) — " + " · ".join(parts)
+    return f"🔄 Hot swap ({req.phase}) — " + " · ".join(parts)

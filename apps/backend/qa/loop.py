@@ -738,6 +738,14 @@ async def run_qa_validation_loop(
                         arch_issues,
                         iteration_duration,
                     )
+                    if task_logger:
+                        task_logger.log_error(
+                            f"QA pass #{qa_iteration} rejected: "
+                            f"{len(arch_violations)} architecture violation(s); "
+                            f"applying a fix, then re-reviewing "
+                            f"(pass #{qa_iteration + 1}).",
+                            LogPhase.VALIDATION,
+                        )
 
                     # Fall through to the rejected handler below
                     # (which will run the fixer)
@@ -831,6 +839,15 @@ async def run_qa_validation_loop(
                             coverage_issues,
                             iteration_duration,
                         )
+                        # Trace explicite du verdict de CETTE passe, pour que
+                        # l'utilisateur comprenne pourquoi une nouvelle passe suit.
+                        if task_logger:
+                            task_logger.log_error(
+                                f"QA pass #{qa_iteration} rejected by the coverage "
+                                f"gate; applying a fix, then re-reviewing "
+                                f"(pass #{qa_iteration + 1}).",
+                                LogPhase.VALIDATION,
+                            )
                         # Fall through to the rejected handler below
 
                 except ImportError:
@@ -872,6 +889,11 @@ async def run_qa_validation_loop(
 
                 # End validation phase successfully
                 if task_logger:
+                    task_logger.log_success(
+                        f"QA pass #{qa_iteration} approved: all criteria met, "
+                        f"architecture clean. Validation complete.",
+                        LogPhase.VALIDATION,
+                    )
                     task_logger.end_phase(
                         LogPhase.VALIDATION,
                         success=True,
@@ -895,6 +917,17 @@ async def run_qa_validation_loop(
             )
             qa_status = get_qa_signoff_status(spec_dir) or {}
             notes = qa_status.get("next_steps", [])
+            if task_logger:
+                _reason = (
+                    " (environment limitation: tests can't run here)"
+                    if qa_status.get("sandbox_limitation")
+                    else ""
+                )
+                task_logger.log_info(
+                    f"QA pass #{qa_iteration}: code validated by review; manual "
+                    f"verification required{_reason}. Validation complete.",
+                    LogPhase.VALIDATION,
+                )
 
             emit_phase(ExecutionPhase.COMPLETE, "QA requires manual verification")
             task_event_emitter.emit(
@@ -951,6 +984,13 @@ async def run_qa_validation_loop(
                 issue_count=len(current_issues),
                 issues=current_issues[:3] if current_issues else [],  # Show first 3
             )
+            if task_logger:
+                task_logger.log_error(
+                    f"QA pass #{qa_iteration} rejected: {len(current_issues)} "
+                    f"issue(s) found; applying a fix, then re-reviewing "
+                    f"(pass #{qa_iteration + 1}).",
+                    LogPhase.VALIDATION,
+                )
             task_event_emitter.emit(
                 "QA_FAILED",
                 {

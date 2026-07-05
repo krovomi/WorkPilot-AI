@@ -381,6 +381,22 @@
 			"fixingQa": "Correction des problèmes QA…",
 			"runningQa": "Revue QA en cours…",
 			"buildPaused": "Build en pause — sous-tâches encore en attente"
+		},
+		"logMessages": {
+			"qaCoverageRejected": "Passe QA n°{{n}} rejetée par le contrôle de couverture ; un correctif va être appliqué, puis une nouvelle revue (passe n°{{next}}).",
+			"qaArchRejected": "Passe QA n°{{n}} rejetée : {{count}} violation(s) d'architecture ; un correctif va être appliqué, puis une nouvelle revue (passe n°{{next}}).",
+			"qaRejected": "Passe QA n°{{n}} rejetée : {{count}} problème(s) trouvé(s) ; un correctif va être appliqué, puis une nouvelle revue (passe n°{{next}}).",
+			"qaApproved": "Passe QA n°{{n}} approuvée : tous les critères validés, architecture conforme. Validation terminée.",
+			"qaManualVerification": "Passe QA n°{{n}} : code validé par la revue ; vérification manuelle requise. Validation terminée.",
+			"qaManualVerificationSandbox": "Passe QA n°{{n}} : code validé par la revue ; vérification manuelle requise (limite de l'environnement : tests non exécutables ici). Validation terminée.",
+			"modelUnavailable": "Modèle indisponible : {{model}}. Phase arrêtée — sélectionnez un modèle valide pour cette phase, puis relancez-la.",
+			"hotSwapResumed": "Bascule LLM à chaud — reprise avec le nouveau modèle (contexte rejoué).",
+			"hotSwapLabel": "Bascule à chaud",
+			"ctxSwitchLabel": "Changement de contexte LLM",
+			"ctxInitialLabel": "Contexte LLM initial",
+			"provider": "Fournisseur",
+			"model": "Modèle",
+			"effort": "Effort"
 		}
 	},
 	"files": {

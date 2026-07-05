@@ -1621,22 +1621,24 @@ def _log_llm_context_switch(
         ):
             return
 
+        # Emitted in stable English; the frontend (translateLogMessage) localises
+        # the "LLM context switch"/"Provider"/"Model"/"Effort" tokens for display.
         if previous is None:
             message = (
-                f"▶️ Contexte LLM initial — Fournisseur : {provider} "
-                f"· Modèle : {model} · Effort : {thinking}"
+                f"▶️ Initial LLM context — Provider: {provider} "
+                f"· Model: {model} · Effort: {thinking}"
             )
         else:
             # List only the fields that actually changed so the trace pinpoints
             # the switch (provider, model and/or thinking effort).
             changes: list[str] = []
             if prev_provider != provider:
-                changes.append(f"Fournisseur : {prev_provider} → {provider}")
+                changes.append(f"Provider: {prev_provider} → {provider}")
             if prev_model != model:
-                changes.append(f"Modèle : {prev_model} → {model}")
+                changes.append(f"Model: {prev_model} → {model}")
             if prev_thinking != thinking:
-                changes.append(f"Effort : {prev_thinking or '?'} → {thinking}")
-            message = "🔄 Changement de contexte LLM — " + " · ".join(changes)
+                changes.append(f"Effort: {prev_thinking or '?'} → {thinking}")
+            message = "🔄 LLM context switch — " + " · ".join(changes)
 
         logger.info("[llm-context] %s", message)
 
