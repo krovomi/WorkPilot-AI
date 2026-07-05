@@ -23,6 +23,7 @@ import {
 	resolveDesktopUiAutomation,
 	resolveNavigationPlan,
 	selectDesktopCaptureSource,
+	visualProofService,
 } from "./visual-proof-service";
 
 describe("parseGitHubPrUrl", () => {
@@ -160,6 +161,44 @@ describe("buildProofComment", () => {
 		});
 		expect(comment).toContain("Status: **failed**");
 		expect(comment).toContain("Error: Server did not start");
+	});
+});
+
+describe("visualProofService.publishToPr", () => {
+	const capturedRun: VisualProofRun = {
+		id: "visual-proof-1",
+		status: "passed",
+		taskId: "task-1",
+		specId: "spec-1",
+		// Captured before any PR existed: no prUrl, no per-screenshot URL.
+		screenshots: [
+			{
+				label: "Home",
+				relativePath: "specs/visual-proofs/spec-1/run/home.png",
+				absolutePath: "/abs/home.png",
+				width: 1440,
+				height: 1000,
+				capturedAt: new Date().toISOString(),
+			},
+		],
+		startedAt: new Date().toISOString(),
+	};
+
+	it("stamps the PR URL with no external calls for a non-GitHub PR and no worktree", async () => {
+		const azureUrl =
+			"https://dev.azure.com/org/proj/_git/repo/pullrequest/123";
+
+		const result = await visualProofService.publishToPr(capturedRun, azureUrl);
+
+		// The run is now linked to the PR...
+		expect(result.prUrl).toBe(azureUrl);
+		// ...but no GitHub comment is posted and no blob URL is attached
+		// (Azure DevOps isn't GitHub, and there is no branch without a worktree).
+		expect(result.commentUrl).toBeUndefined();
+		expect(result.screenshots[0].url).toBeUndefined();
+		// The input run is never mutated (screenshots are cloned).
+		expect(capturedRun.prUrl).toBeUndefined();
+		expect(capturedRun.screenshots[0].url).toBeUndefined();
 	});
 });
 

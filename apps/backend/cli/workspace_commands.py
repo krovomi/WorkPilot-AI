@@ -1347,6 +1347,49 @@ def handle_create_pr_command(
         return result
 
 
+def handle_find_pr_command(
+    project_dir: Path,
+    spec_name: str,
+    target_branch: str | None = None,
+) -> dict:
+    """Detect an existing open PR/MR for a spec's branch, read-only.
+
+    Wraps :meth:`WorktreeManager.find_existing_pr_url`, which is provider-aware
+    (GitHub via ``gh``, GitLab via ``glab``, Azure DevOps via REST) and never
+    raises. Nothing is pushed or created. Used by the visual-proof "sync to PR"
+    flow so captures taken before a PR exists can be published once a PR shows
+    up — regardless of how that PR was created.
+
+    Returns (and prints as JSON) ``{"success": bool, "pr_url": str | None}``.
+    A missing PR is a successful result with ``pr_url = None``; ``success`` is
+    ``False`` only when detection could not run (e.g. no worktree).
+    """
+    from core.worktree import WorktreeManager
+
+    worktree_path = get_existing_build_worktree(project_dir, spec_name)
+    if not worktree_path:
+        result = {
+            "success": False,
+            "pr_url": None,
+            "error": "No build found for this spec",
+        }
+        print(json.dumps(result))
+        return result
+
+    try:
+        manager = WorktreeManager(project_dir, base_branch=target_branch)
+        pr_url = manager.find_existing_pr_url(spec_name, target_branch)
+    except Exception as e:
+        debug_error(MODULE, f"Exception during PR detection: {e}")
+        result = {"success": False, "pr_url": None, "error": str(e)}
+        print(json.dumps(result))
+        return result
+
+    result = {"success": True, "pr_url": pr_url}
+    print(json.dumps(result))
+    return result
+
+
 def handle_analyze_impact_command(
     project_dir: Path,
     spec_name: str,

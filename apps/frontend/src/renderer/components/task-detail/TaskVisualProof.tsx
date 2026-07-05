@@ -2,12 +2,14 @@ import {
 	AlertCircle,
 	CheckCircle2,
 	ExternalLink,
+	GitPullRequest,
 	ImageIcon,
+	Link2Off,
 	Loader2,
 	RefreshCw,
 	Shield,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult, Task, VisualProofRun } from "../../../shared/types";
@@ -175,6 +177,45 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 	);
 	const commentUrl = proof?.commentUrl;
 	const capturedUrl = proof?.appUrl;
+	const prUrl = proof?.prUrl ?? task.prUrl ?? task.metadata?.prUrl;
+	const isLinkedToPr = Boolean(prUrl);
+
+	// Detect a PR that now exists on the branch — created any way — and publish
+	// the already-captured screenshots to it. Best-effort and silent: the tab
+	// works fine while unlinked, so a failed/absent PR probe never surfaces an
+	// error to the user.
+	const syncToPr = useCallback(async () => {
+		const api = globalThis.electronAPI;
+		if (typeof api?.syncVisualProof !== "function") return;
+		try {
+			const result = await api.syncVisualProof(task.id);
+			if (!result.success || !result.data?.prUrl) return;
+			if (!isMountedRef.current) return;
+			const { prUrl: linkedPrUrl, visualProof } = result.data;
+			if (visualProof) setProof(visualProof);
+			useTaskStore.getState().updateTask(task.id, {
+				metadata: {
+					...task.metadata,
+					prUrl: linkedPrUrl,
+					...(visualProof ? { visualProof } : {}),
+				},
+			});
+		} catch {
+			// Best-effort: leave the run unlinked; it can be synced on next open.
+		}
+	}, [task.id, task.metadata]);
+
+	// On tab open, if this task isn't linked to a PR yet, probe the branch once
+	// so captures taken before a PR existed get published as soon as one appears
+	// — regardless of how the PR was created. The ref keeps it to a single probe
+	// per task so metadata updates don't retrigger it.
+	const syncAttemptedForTaskRef = useRef<string | null>(null);
+	useEffect(() => {
+		if (isLinkedToPr) return;
+		if (syncAttemptedForTaskRef.current === task.id) return;
+		syncAttemptedForTaskRef.current = task.id;
+		void syncToPr();
+	}, [task.id, isLinkedToPr, syncToPr]);
 
 	const handleRunVisualProof = async () => {
 		setIsRunning(true);
@@ -189,6 +230,9 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 			useTaskStore.getState().updateTask(task.id, {
 				metadata: { ...task.metadata, visualProof: result.data },
 			});
+			// If the run wasn't tied to a PR, try to link + publish it right away
+			// (e.g. a PR was opened externally between builds).
+			if (!result.data.prUrl) void syncToPr();
 		} catch (err) {
 			if (isMountedRef.current) {
 				setError(
@@ -256,6 +300,17 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 										: t("tasks:visualProof.local")}
 								</Badge>
 							)}
+							{isLinkedToPr ? (
+								<Badge variant="info">
+									<GitPullRequest className="mr-1 h-3 w-3" />
+									{t("tasks:visualProof.linkedToPr")}
+								</Badge>
+							) : (
+								<Badge variant="outline">
+									<Link2Off className="mr-1 h-3 w-3" />
+									{t("tasks:visualProof.notLinkedToPr")}
+								</Badge>
+							)}
 						</div>
 						<p className="text-sm text-muted-foreground">
 							{proof.providerDetails || t("tasks:visualProof.defaultDetails")}
@@ -273,12 +328,12 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 								{t("tasks:visualProof.openComment")}
 							</Button>
 						)}
-						{proof.prUrl && (
+						{prUrl && (
 							<Button
 								type="button"
 								variant="outline"
 								size="sm"
-								onClick={() => globalThis.electronAPI.openExternal(proof.prUrl)}
+								onClick={() => globalThis.electronAPI.openExternal(prUrl)}
 							>
 								<ExternalLink className="mr-2 h-4 w-4" />
 								{t("tasks:visualProof.openPr")}
@@ -440,7 +495,11 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 				{proof.status === "passed" && (
 					<div className="flex items-center gap-2 text-sm text-success">
 						<CheckCircle2 className="h-4 w-4" />
-						<span>{t("tasks:visualProof.passedHint")}</span>
+						<span>
+							{isLinkedToPr
+								? t("tasks:visualProof.passedHint")
+								: t("tasks:visualProof.passedHintNoPr")}
+						</span>
 					</div>
 				)}
 				{imageLoadError && (

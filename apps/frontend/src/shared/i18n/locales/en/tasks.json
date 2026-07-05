@@ -420,7 +420,9 @@
 		"tab": "Visual proofs",
 		"title": "PR visual proof",
 		"emptyTitle": "No visual proof for this task",
-		"emptyDescription": "Run the emulator to generate screenshots and publish them in the PR.",
+		"emptyDescription": "Run the emulator to generate and store screenshots. They are published automatically as soon as a PR exists for this branch, no matter how it was created.",
+		"linkedToPr": "Linked to PR",
+		"notLinkedToPr": "Not linked to a PR yet",
 		"run": "Run visual proof",
 		"retry": "Retry",
 		"runFailed": "Failed to run visual proof",
@@ -440,6 +442,7 @@
 		"imageLoadFailed": "Unable to load the local screenshot",
 		"noScreenshots": "No screenshot was generated for this run.",
 		"passedHint": "These screenshots were added as proof in the PR.",
+		"passedHintNoPr": "These screenshots are stored locally and will be published to the PR as soon as one exists.",
 		"status": {
 			"pending": "pending",
 			"passed": "passed",

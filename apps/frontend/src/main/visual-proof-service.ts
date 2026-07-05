@@ -376,9 +376,10 @@ async function commitAndPushArtifacts(
 }
 
 async function postGitHubComment(
-	prUrl: string,
+	prUrl: string | undefined,
 	body: string,
 ): Promise<string | undefined> {
+	if (!prUrl) return undefined;
 	const pr = parseGitHubPrUrl(prUrl);
 	if (!pr) return undefined;
 
@@ -2288,10 +2289,10 @@ function createFailedProviderResult(
 
 function attachGitHubUrls(
 	screenshots: VisualProofScreenshot[],
-	prUrl: string,
+	prUrl: string | undefined,
 	branch: string | null,
 ): void {
-	if (!branch) return;
+	if (!branch || !prUrl) return;
 	const pr = parseGitHubPrUrl(prUrl);
 	if (!pr) return;
 	for (const screenshot of screenshots) {
@@ -2335,6 +2336,46 @@ export class VisualProofService extends EventEmitter {
 			this.emit("running-changed", options.taskId, false);
 		});
 		return promise;
+	}
+
+	/**
+	 * Link and publish an already-captured run to a PR that now exists.
+	 *
+	 * Used when a run was performed before any PR existed: the screenshots were
+	 * captured, committed/pushed to the branch and displayed locally, but no
+	 * GitHub blob URLs or PR comment were attached (there was nothing to attach
+	 * to). Once a PR is detected on the branch — regardless of how it was
+	 * created — this stamps the run with the PR URL, resolves GitHub blob URLs
+	 * for each screenshot and posts the proof comment. No emulator is launched.
+	 *
+	 * GitHub-only for the URL/comment step (mirrors {@link execute}); for other
+	 * providers (e.g. Azure DevOps) the run is simply stamped with `prUrl` so the
+	 * UI can surface the link, without inline images.
+	 */
+	async publishToPr(
+		run: VisualProofRun,
+		prUrl: string,
+		worktreePath?: string,
+	): Promise<VisualProofRun> {
+		const branch = worktreePath ? await getCurrentBranch(worktreePath) : null;
+		// Clone the screenshots so URL attachment doesn't mutate the caller's copy.
+		const screenshots = run.screenshots.map((screenshot) => ({ ...screenshot }));
+		attachGitHubUrls(screenshots, prUrl, branch);
+
+		const published: VisualProofRun = { ...run, prUrl, screenshots };
+		try {
+			const commentUrl = await postGitHubComment(
+				prUrl,
+				buildProofComment(published, branch ?? undefined),
+			);
+			return commentUrl ? { ...published, commentUrl } : published;
+		} catch (commentError) {
+			logger.warn(
+				"[VisualProof] Could not post PR comment while syncing:",
+				commentError,
+			);
+			return published;
+		}
 	}
 
 	private async execute(options: VisualProofRunOptions): Promise<VisualProofRun> {

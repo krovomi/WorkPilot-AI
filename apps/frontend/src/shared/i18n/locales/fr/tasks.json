@@ -420,7 +420,9 @@
 		"tab": "Preuves visuelles",
 		"title": "Preuve visuelle de la PR",
 		"emptyTitle": "Aucune preuve visuelle pour cette tâche",
-		"emptyDescription": "Lancez l'émulateur pour générer des captures et les publier dans la PR.",
+		"emptyDescription": "Lancez l'émulateur pour générer et stocker des captures. Elles seront publiées automatiquement dès qu'une PR existe pour cette branche, quelle que soit la façon dont elle est créée.",
+		"linkedToPr": "Liée à la PR",
+		"notLinkedToPr": "Pas encore liée à une PR",
 		"run": "Lancer la preuve visuelle",
 		"retry": "Relancer",
 		"runFailed": "Échec du lancement de la preuve visuelle",
@@ -440,6 +442,7 @@
 		"imageLoadFailed": "Impossible de charger la capture locale",
 		"noScreenshots": "Aucune capture n'a été générée pour ce run.",
 		"passedHint": "Ces captures ont été ajoutées comme preuve dans la PR.",
+		"passedHintNoPr": "Ces captures sont stockées localement et seront publiées dans la PR dès qu'elle existera.",
 		"status": {
 			"pending": "en attente",
 			"passed": "réussie",

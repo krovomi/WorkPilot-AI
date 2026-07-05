@@ -193,6 +193,15 @@ Environment Variables:
             "review modal."
         ),
     )
+    build_group.add_argument(
+        "--find-pr",
+        action="store_true",
+        help=(
+            "Detect an existing open PR/MR for this spec's branch WITHOUT "
+            "pushing or creating anything. Provider-aware (GitHub, GitLab, "
+            "Azure DevOps). Outputs JSON {success, pr_url} for the frontend."
+        ),
+    )
 
     # PR options
     parser.add_argument(
@@ -857,6 +866,21 @@ def _run_cli() -> None:
             target_branch=args.pr_target,
         )
         if not result.get("success", True):
+            sys.exit(1)
+        return
+
+    if args.find_pr:
+        from .workspace_commands import handle_find_pr_command
+
+        result = handle_find_pr_command(
+            project_dir=project_dir,
+            spec_name=spec_dir.name,
+            target_branch=args.pr_target,
+        )
+        # JSON output is already printed by handle_find_pr_command.
+        # A missing PR is not an error (exit 0) — the frontend distinguishes
+        # "no PR yet" from a real failure via the JSON payload.
+        if not result.get("success"):
             sys.exit(1)
         return
 

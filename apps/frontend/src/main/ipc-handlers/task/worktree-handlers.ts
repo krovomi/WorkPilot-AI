@@ -198,6 +198,10 @@ const PRINTABLE_CHARS_REGEX = /^[\x20-\x7E\u00A0-\uFFFF]*$/;
 // Timeout for PR creation operations (2 minutes for network operations)
 const PR_CREATION_TIMEOUT_MS = 120000;
 
+// Timeout for the read-only "does a PR already exist?" probe. Shorter than
+// creation: it is a single provider API/CLI query with no push.
+const PR_DETECTION_TIMEOUT_MS = 45000;
+
 /**
  * Read utility feature settings (for commit message, merge resolver) from settings file
  */
@@ -2128,6 +2132,124 @@ function updateVisualProofMetadata(
 	}
 
 	return result;
+}
+
+/**
+ * Persist a PR URL onto a task's metadata (spec dir + worktree), without
+ * touching its status. Used by the visual-proof sync flow, which links an
+ * already-completed task to a PR that appeared on the branch after the fact —
+ * unlike {@link updateTaskStatusAfterPRCreation}, it must not force "done".
+ */
+function persistTaskPrUrl(
+	specDir: string,
+	worktreePath: string | null,
+	autoBuildPath: string | undefined,
+	specId: string,
+	prUrl: string,
+): void {
+	updateTaskMetadataPrUrl(path.join(specDir, "task_metadata.json"), prUrl);
+	if (worktreePath) {
+		const worktreeMetadataPath = path.join(
+			worktreePath,
+			getSpecsDir(autoBuildPath),
+			specId,
+			"task_metadata.json",
+		);
+		updateTaskMetadataPrUrl(worktreeMetadataPath, prUrl);
+	}
+}
+
+/**
+ * Detect an existing open PR/MR for a task's branch, read-only.
+ *
+ * Runs `run.py --find-pr`, which wraps `WorktreeManager.find_existing_pr_url`
+ * (provider-aware: GitHub via gh, GitLab via glab, Azure DevOps via REST). This
+ * lets the visual-proof sync flow discover a PR *regardless of how it was
+ * created* (WorkPilot, gh, git, the Azure/GitHub web UI…). Never rejects:
+ * resolves to the PR URL, or `null` when there is no PR yet or detection fails.
+ */
+async function detectExistingPrUrl(
+	pythonEnvManager: PythonEnvManager,
+	project: { path: string; autoBuildPath?: string | null },
+	specId: string,
+	taskBaseBranch: string | undefined,
+): Promise<string | null> {
+	const pythonEnvError = await initializePythonEnvForPR(pythonEnvManager);
+	if (pythonEnvError) return null;
+
+	const sourcePath = getEffectiveSourcePath();
+	if (!sourcePath) return null;
+	const runScript = path.join(sourcePath, "run.py");
+
+	const args = [
+		runScript,
+		"--spec",
+		specId,
+		"--project-dir",
+		project.path,
+		"--find-pr",
+	];
+	if (taskBaseBranch && GIT_BRANCH_REGEX.test(taskBaseBranch)) {
+		args.push("--pr-target", taskBaseBranch);
+	}
+
+	const pythonPath = getConfiguredPythonPath();
+	const [pythonCommand, pythonBaseArgs] = parsePythonCommand(pythonPath);
+	const pythonEnv = pythonEnvManagerSingleton.getPythonEnv();
+	const profileEnv = getBestAvailableProfileEnv().env;
+	const projectEnv = loadProjectEnvForSubprocess(project);
+
+	return await new Promise<string | null>((resolve) => {
+		let settled = false;
+		const finish = (value: string | null) => {
+			if (settled) return;
+			settled = true;
+			resolve(value);
+		};
+
+		let child: ReturnType<typeof spawn>;
+		try {
+			child = spawn(pythonCommand, [...pythonBaseArgs, ...args], {
+				cwd: sourcePath,
+				env: {
+					...getIsolatedGitEnv(),
+					...pythonEnv,
+					...profileEnv,
+					...projectEnv,
+					GITHUB_CLI_PATH: getToolPath("gh"),
+					APP_LANGUAGE: getAppLanguage(),
+					PYTHONUNBUFFERED: "1",
+					PYTHONUTF8: "1",
+				},
+				stdio: ["ignore", "pipe", "pipe"],
+			});
+		} catch {
+			finish(null);
+			return;
+		}
+
+		const timeoutId = setTimeout(() => {
+			killProcessGracefully(child, {
+				debugPrefix: "[VISUAL_PROOF_SYNC]",
+				debug: false,
+			});
+			finish(null);
+		}, PR_DETECTION_TIMEOUT_MS);
+
+		let stdout = "";
+		child.stdout?.on("data", (data: Buffer) => {
+			stdout += data.toString("utf-8");
+		});
+		child.on("error", () => {
+			clearTimeout(timeoutId);
+			finish(null);
+		});
+		child.on("close", () => {
+			clearTimeout(timeoutId);
+			const parsed = parsePRJsonOutput(stdout);
+			finish(parsed?.prUrl ?? null);
+		});
+	});
 }
 
 /**
@@ -5018,7 +5140,13 @@ export function registerWorktreeHandlers(
 	);
 
 	/**
-	 * Run or retry automated visual proof for an existing PR.
+	 * Run or retry automated visual proof.
+	 *
+	 * A PR is no longer required: when the task has no PR URL yet, the run still
+	 * captures, stores and displays screenshots locally. GitHub blob URLs and the
+	 * PR comment are attached only when a PR URL is known — otherwise they are
+	 * added later by {@link IPC_CHANNELS.TASK_VISUAL_PROOF_SYNC} once a PR is
+	 * detected on the branch.
 	 */
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_VISUAL_PROOF_RUN,
@@ -5029,10 +5157,8 @@ export function registerWorktreeHandlers(
 					return { success: false, error: "Task not found" };
 				}
 
+				// May be undefined — a run without a PR is now supported.
 				const prUrl = task.prUrl ?? task.metadata?.prUrl;
-				if (!prUrl) {
-					return { success: false, error: "Task has no PR URL" };
-				}
 
 				const specDir = path.join(
 					project.path,
@@ -5075,6 +5201,98 @@ export function registerWorktreeHandlers(
 					success: false,
 					error:
 						error instanceof Error ? error.message : "Failed to run visual proof",
+				};
+			}
+		},
+	);
+
+	/**
+	 * Sync stored visual-proof captures to a PR once one exists.
+	 *
+	 * The renderer calls this when the Visual Proof tab opens and after each run:
+	 * if the task is not yet linked to a PR, we probe the branch for an existing
+	 * PR (created any way — WorkPilot, gh, git, the web UI). When one is found we
+	 * persist its URL onto the task and publish the already-captured screenshots
+	 * to it (GitHub blob URLs + proof comment). No emulator is launched and no PR
+	 * is ever created here.
+	 *
+	 * Returns `{ prUrl?, visualProof? }`: both absent means "no PR yet" (not an
+	 * error). The renderer merges the result into its task metadata.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_VISUAL_PROOF_SYNC,
+		async (
+			_,
+			taskId: string,
+		): Promise<
+			IPCResult<{ prUrl?: string; visualProof?: VisualProofRun }>
+		> => {
+			try {
+				const { task, project } = findTaskAndProject(taskId);
+				if (!task || !project) {
+					return { success: false, error: "Task not found" };
+				}
+
+				// Already linked to a PR: nothing to sync.
+				if (task.prUrl ?? task.metadata?.prUrl) {
+					return { success: true, data: {} };
+				}
+
+				const specDir = path.join(
+					project.path,
+					project.autoBuildPath || ".workpilot",
+					"specs",
+					task.specId,
+				);
+				const worktreePath = findTaskWorktree(project.path, task.specId);
+
+				const prUrl = await detectExistingPrUrl(
+					pythonEnvManager,
+					project,
+					task.specId,
+					getTaskBaseBranch(specDir),
+				);
+				if (!prUrl) {
+					// No PR on the branch yet — expected, not a failure.
+					return { success: true, data: {} };
+				}
+
+				// Link the task to the freshly-detected PR (without forcing "done").
+				persistTaskPrUrl(
+					specDir,
+					worktreePath,
+					project.autoBuildPath,
+					task.specId,
+					prUrl,
+				);
+
+				// Publish any already-captured run to the PR.
+				const existingProof = task.metadata?.visualProof;
+				let visualProof: VisualProofRun | undefined;
+				if (existingProof) {
+					visualProof = await visualProofService.publishToPr(
+						existingProof,
+						prUrl,
+						worktreePath ?? undefined,
+					);
+					updateVisualProofMetadata(
+						specDir,
+						worktreePath,
+						project.autoBuildPath,
+						task.specId,
+						visualProof,
+						(...args: unknown[]) => console.warn("[VISUAL_PROOF_SYNC]", ...args),
+					);
+				}
+
+				return { success: true, data: { prUrl, visualProof } };
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to sync visual proof",
 				};
 			}
 		},

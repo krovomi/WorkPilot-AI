@@ -824,7 +824,12 @@ export interface VisualProofRun {
 	status: VisualProofStatus;
 	taskId: string;
 	specId: string;
-	prUrl: string;
+	/**
+	 * URL of the PR the captures are published to. Optional: a run can be
+	 * performed before any PR exists (captures are stored + displayed locally),
+	 * then linked/published later once a PR is detected on the branch.
+	 */
+	prUrl?: string;
 	framework?: string;
 	provider?: VisualProofProviderId;
 	targetKind?: VisualProofTargetKind;
@@ -846,7 +851,12 @@ export interface VisualProofRunOptions {
 	taskId: string;
 	projectPath: string;
 	specId: string;
-	prUrl: string;
+	/**
+	 * Target PR URL. Optional: when omitted the run still captures, stores and
+	 * displays screenshots locally; GitHub blob URLs and the PR comment are only
+	 * attached once a PR URL is known (either passed here or synced in later).
+	 */
+	prUrl?: string;
 	worktreePath?: string;
 	autoBuildPath?: string;
 	provider?: VisualProofProviderId | "auto";

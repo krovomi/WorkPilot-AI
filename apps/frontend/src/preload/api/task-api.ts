@@ -211,6 +211,11 @@ export interface TaskAPI {
 		targetBranch?: string,
 	) => Promise<IPCResult<WorktreeAnalyzeImpactResult>>;
 	runVisualProof: (taskId: string) => Promise<IPCResult<VisualProofRun>>;
+	syncVisualProof: (
+		taskId: string,
+	) => Promise<
+		IPCResult<{ prUrl?: string; visualProof?: VisualProofRun }>
+	>;
 	getVisualProofStatus: (
 		taskId: string,
 	) => Promise<IPCResult<{ running: boolean }>>;
@@ -631,6 +636,11 @@ export const createTaskAPI = (): TaskAPI => ({
 
 	runVisualProof: (taskId: string): Promise<IPCResult<VisualProofRun>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_VISUAL_PROOF_RUN, taskId),
+
+	syncVisualProof: (
+		taskId: string,
+	): Promise<IPCResult<{ prUrl?: string; visualProof?: VisualProofRun }>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_VISUAL_PROOF_SYNC, taskId),
 
 	getVisualProofStatus: (
 		taskId: string,
