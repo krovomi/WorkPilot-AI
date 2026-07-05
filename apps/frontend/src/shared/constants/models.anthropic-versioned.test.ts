@@ -1,5 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { isAnthropicNativeVersionedModelId } from "./models";
+import {
+	isAnthropicNativeVersionedModelId,
+	sortClaudeCatalog,
+} from "./models";
+
+describe("sortClaudeCatalog", () => {
+	it("groupe par famille (Fable→Opus→Sonnet→Haiku) puis version décroissante", () => {
+		const input = [
+			"claude-sonnet-4-5",
+			"claude-opus-4-6",
+			"claude-haiku-4-5",
+			"claude-fable-5",
+			"claude-opus-4-8",
+			"claude-sonnet-5",
+			"claude-opus-4-20250514",
+			"claude-opus-4-7",
+			"claude-sonnet-4-6",
+			"claude-opus-4-5",
+		].map((value) => ({ value }));
+		expect(sortClaudeCatalog(input).map((m) => m.value)).toEqual([
+			"claude-fable-5",
+			"claude-opus-4-8",
+			"claude-opus-4-7",
+			"claude-opus-4-6",
+			"claude-opus-4-5",
+			"claude-opus-4-20250514", // Opus 4 (May 2025) : version 4.0, en dernier des Opus
+			"claude-sonnet-5",
+			"claude-sonnet-4-6",
+			"claude-sonnet-4-5",
+			"claude-haiku-4-5",
+		]);
+	});
+
+	it("relègue les entrées non-Claude en fin sans planter", () => {
+		const input = [{ value: "gpt-5.5" }, { value: "claude-opus-4-8" }].map(
+			(m) => m,
+		);
+		expect(sortClaudeCatalog(input).map((m) => m.value)).toEqual([
+			"claude-opus-4-8",
+			"gpt-5.5",
+		]);
+	});
+});
 
 describe("isAnthropicNativeVersionedModelId", () => {
 	it("préserve les modèles Claude en notation pointée (Copilot)", () => {

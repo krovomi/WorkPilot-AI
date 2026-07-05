@@ -765,6 +765,49 @@ export function dedupeModelCatalog<T extends { value: string }>(
 	return order.map((k) => best.get(k) as T);
 }
 
+// Ordre des familles Claude dans les dropdowns : Fable → Opus → Sonnet → Haiku.
+const _CLAUDE_FAMILY_RANK: Record<string, number> = {
+	fable: 0,
+	mythos: 1,
+	opus: 2,
+	sonnet: 3,
+	haiku: 4,
+};
+
+/**
+ * Clé de tri d'un id Claude : (rang de famille, version numérique).
+ * La version est `major.minor` (ex. `claude-opus-4-8` → 4.8, `claude-sonnet-5`
+ * → 5.0). Un éventuel snapshot daté final (8 chiffres) est ignoré — seul le
+ * `minor` à un chiffre compte (`claude-opus-4-20250514` → 4.0, pas 4.20250514).
+ */
+function claudeSortKey(value: string): { rank: number; version: number } {
+	const m = /^claude-(fable|mythos|opus|sonnet|haiku)-(\d+)(?:-(\d)(?!\d))?/.exec(
+		value,
+	);
+	if (!m) return { rank: 99, version: 0 };
+	const rank = _CLAUDE_FAMILY_RANK[m[1]] ?? 90;
+	const version = Number(m[2]) + (m[3] ? Number(m[3]) / 10 : 0);
+	return { rank, version };
+}
+
+/**
+ * Trie un catalogue de modèles **Claude** : par famille (Fable → Opus → Sonnet →
+ * Haiku), puis par **version décroissante** au sein de chaque famille (ex. Opus
+ * 4.8 avant 4.7). Les entrées non-Claude sont reléguées en fin, ordre relatif
+ * conservé. Ne change PAS le modèle par défaut (celui-ci vient de l'ordre statique
+ * de PROVIDER_MODELS_MAP, pas de cette liste d'affichage).
+ */
+export function sortClaudeCatalog<T extends { value: string }>(
+	models: readonly T[],
+): T[] {
+	return [...models].sort((a, b) => {
+		const ka = claudeSortKey(a.value);
+		const kb = claudeSortKey(b.value);
+		if (ka.rank !== kb.rank) return ka.rank - kb.rank;
+		return kb.version - ka.version; // version la plus haute d'abord
+	});
+}
+
 /**
  * Mappe une valeur de modèle persistée (potentiellement un alias court ou un
  * snapshot daté désormais masqué) vers la valeur réellement présente dans le

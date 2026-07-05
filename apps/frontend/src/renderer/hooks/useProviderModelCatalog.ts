@@ -25,6 +25,7 @@ import {
 	AVAILABLE_MODELS,
 	dedupeModelCatalog,
 	getModelsForProvider,
+	sortClaudeCatalog,
 } from "../../shared/constants";
 
 export type CatalogSource = "live" | "cache" | "static";
@@ -178,7 +179,13 @@ export function useProviderModelCatalog(
 	// entry, keeping the explicit versioned id so the dropdown never shows the
 	// same model twice for one provider.
 	const models = useMemo(() => {
-		const merged = dedupeModelCatalog(mergeCatalogs(liveModels, staticEntries));
+		let merged = dedupeModelCatalog(mergeCatalogs(liveModels, staticEntries));
+		// Claude catalog: present it grouped by family (Fable → Opus → Sonnet →
+		// Haiku), newest version first (Opus 4.8 before 4.7…), independent of the
+		// order the backend/static sources happened to use.
+		const isClaude =
+			!provider || provider === "anthropic" || provider === "claude";
+		if (isClaude) merged = sortClaudeCatalog(merged);
 		// For local providers the live list IS the set of installed models, so we
 		// can flag which dropdown entries are actually on disk vs. catalog-only
 		// suggestions (downloaded on demand). For cloud providers "live" means

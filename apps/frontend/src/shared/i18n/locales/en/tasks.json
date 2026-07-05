@@ -359,7 +359,7 @@
 			"entries": "entries",
 			"step": "Step {{current}}/{{total}}",
 			"stepScrollHint": "Click to jump to the start of this step",
-			"qaPass": "QA — check {{n}}",
+			"qaPass": "QA review — pass #{{n}}",
 			"thinking": "Processing in progress"
 		},
 		"shortPhases": {

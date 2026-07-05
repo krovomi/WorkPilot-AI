@@ -359,7 +359,7 @@
 			"entries": "entrées",
 			"step": "Étape {{current}}/{{total}}",
 			"stepScrollHint": "Cliquer pour remonter au début de cette étape",
-			"qaPass": "QA — vérification {{n}}",
+			"qaPass": "Revue QA — passe n°{{n}}",
 			"thinking": "Traitement en cours"
 		},
 		"shortPhases": {
