@@ -1579,6 +1579,11 @@ class WorktreeManager:
         if force:
             push_args.insert(1, "--force")
 
+        # Authenticate the push with the Azure DevOps PAT when applicable, so it
+        # doesn't fall back to the (often missing/read-only) credential manager
+        # and 403. No-op for GitHub/GitLab.
+        push_env = self._inject_azure_push_auth(get_isolated_git_env())
+
         def do_push() -> tuple[bool, PushBranchResult | None, str]:
             """Execute push operation for retry wrapper."""
             try:
@@ -1591,7 +1596,7 @@ class WorktreeManager:
                     encoding="utf-8",
                     errors="replace",
                     timeout=self.GIT_PUSH_TIMEOUT,
-                    env=get_isolated_git_env(),
+                    env=push_env,
                 )
 
                 if result.returncode == 0:
@@ -1626,10 +1631,18 @@ class WorktreeManager:
                 error=f"Push timed out after {max_retries} attempts.",
             )
 
+        error_msg = f"Failed to push branch: {last_error}"
+        # A 403 after we've injected the PAT means the token itself is rejected —
+        # almost always an insufficient scope. Point the user straight at it.
+        if last_error and "403" in last_error:
+            error_msg += (
+                " — HTTP 403 (accès refusé). Vérifiez que le PAT Azure DevOps a "
+                "le scope « Code (Read & Write) » et qu'il n'est pas expiré."
+            )
         return PushBranchResult(
             success=False,
             branch=info.branch,
-            error=f"Failed to push branch: {last_error}",
+            error=error_msg,
         )
 
     def _get_azure_devops_credentials(self) -> tuple[str, str] | None:
@@ -1697,6 +1710,48 @@ class WorktreeManager:
             logger.debug(f"Failed to get credentials from git credential manager: {e}")
 
         return None
+
+    def _inject_azure_push_auth(self, base_env: dict) -> dict:
+        """Return ``base_env`` augmented so ``git push`` authenticates to Azure
+        DevOps with the configured PAT.
+
+        Azure DevOps HTTPS push relies on git's ambient credential manager, which
+        on many setups is missing or holds a read-only credential — the push then
+        fails with **HTTP 403** even though the PAT used for the REST API is
+        valid. Here we inject ``http.extraheader: Authorization: Basic <b64>``
+        (empty user + PAT as password, the Azure-documented scheme) so the push
+        uses the same PAT as everything else.
+
+        The header is passed via ``GIT_CONFIG_*`` env vars (git 2.31+), not the
+        command line, so the PAT never appears in argv or in captured stderr.
+        No-op unless the remote is Azure DevOps and a PAT is resolvable.
+        """
+        try:
+            provider = detect_git_provider(self.project_dir)
+        except Exception:
+            provider = None
+        if provider != "azure_devops":
+            return base_env
+
+        creds = self._get_azure_devops_credentials()
+        if not creds:
+            return base_env
+        _username, pat = creds
+        if not pat:
+            return base_env
+
+        import base64
+
+        token = base64.b64encode(f":{pat}".encode()).decode("ascii")
+        env = dict(base_env)
+        try:
+            index = int(env.get("GIT_CONFIG_COUNT", "0"))
+        except ValueError:
+            index = 0
+        env[f"GIT_CONFIG_KEY_{index}"] = "http.extraheader"
+        env[f"GIT_CONFIG_VALUE_{index}"] = f"Authorization: Basic {token}"
+        env["GIT_CONFIG_COUNT"] = str(index + 1)
+        return env
 
     def create_azure_pull_request(
         self,
