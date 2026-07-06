@@ -1306,7 +1306,7 @@ export function registerTaskExecutionHandlers(
 			_,
 			taskId: string,
 			status: TaskStatus,
-			_options?: { forceCleanup?: boolean },
+			options?: { forceCleanup?: boolean; skipPrCreation?: boolean },
 		): Promise<
 			IPCResult & { worktreeExists?: boolean; worktreePath?: string }
 		> => {
@@ -1335,7 +1335,7 @@ export function registerTaskExecutionHandlers(
 				const worktreePath = findTaskWorktree(project.path, task.specId);
 				const hasWorktree = worktreePath !== null;
 
-				if (!existingPrUrl && hasWorktree) {
+				if (!existingPrUrl && hasWorktree && !options?.skipPrCreation) {
 					// Worktree exists - create PR for human validation
 					console.warn(
 						`[TASK_UPDATE_STATUS] Creating PR for task ${taskId} (status: done)`,
@@ -1525,9 +1525,15 @@ print(json.dumps(result))
 						};
 					}
 				} else if (!existingPrUrl) {
-					// No worktree and no existing PR - allow marking as done (limbo state recovery)
+					// Mark done without creating a PR. Either there is no worktree
+					// (limbo-state recovery) or the user explicitly chose to close
+					// without a PR (skipPrCreation) — e.g. the remote push is blocked
+					// (Azure 403) or the change will be handled outside WorkPilot. The
+					// worktree, if any, is left intact for reference.
 					console.warn(
-						`[TASK_UPDATE_STATUS] Allowing status 'done' for task ${taskId} (no worktree found - limbo state)`,
+						`[TASK_UPDATE_STATUS] Allowing status 'done' for task ${taskId} without PR creation (skipPrCreation=${Boolean(
+							options?.skipPrCreation,
+						)}, hasWorktree=${hasWorktree})`,
 					);
 				}
 			}

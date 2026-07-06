@@ -265,7 +265,9 @@ export function StagedInProjectMessage({
 		setError(null);
 
 		try {
-			await persistTaskStatus(task.id, "done");
+			// Keep the worktree but don't auto-create a PR: the changes are already
+			// staged in the main project, and closing must never push a branch.
+			await persistTaskStatus(task.id, "done", { skipPrCreation: true });
 			onClose?.();
 		} catch (err) {
 			console.error("Error marking task as done:", err);

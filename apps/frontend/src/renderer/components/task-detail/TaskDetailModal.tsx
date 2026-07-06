@@ -695,10 +695,17 @@ function TaskDetailModalContent({
 	// Approve & close from human review. Persists "done" (mapped to the Done
 	// column / "pr_created" when a PR exists), so it survives a rescan. The soft
 	// Definition-of-Done guard lives in CompletionDialog.
+	//
+	// skipPrCreation: closing is NOT PR creation — that is now a separate explicit
+	// action ("Créer la PR"). Without this, the backend auto-pushes a branch to
+	// create a PR on "done", which fails hard when the remote rejects the push
+	// (e.g. Azure 403), making "close without a PR" impossible.
 	const handleComplete = async () => {
 		state.setIsCompleting(true);
 		try {
-			const result = await persistTaskStatus(task.id, "done");
+			const result = await persistTaskStatus(task.id, "done", {
+				skipPrCreation: true,
+			});
 			if (result.success) {
 				onOpenChange(false);
 			} else {

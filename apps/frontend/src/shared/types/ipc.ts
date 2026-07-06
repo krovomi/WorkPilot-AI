@@ -290,7 +290,7 @@ export interface ElectronAPI {
 	updateTaskStatus: (
 		taskId: string,
 		status: TaskStatus,
-		options?: { forceCleanup?: boolean },
+		options?: { forceCleanup?: boolean; skipPrCreation?: boolean },
 	) => Promise<IPCResult & { worktreeExists?: boolean; worktreePath?: string }>;
 	recoverStuckTask: (
 		taskId: string,

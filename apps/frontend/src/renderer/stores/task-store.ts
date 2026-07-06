@@ -1106,7 +1106,7 @@ export interface PersistStatusResult {
 export async function persistTaskStatus(
 	taskId: string,
 	status: TaskStatus,
-	options?: { forceCleanup?: boolean },
+	options?: { forceCleanup?: boolean; skipPrCreation?: boolean },
 ): Promise<PersistStatusResult> {
 	const store = useTaskStore.getState();
 
