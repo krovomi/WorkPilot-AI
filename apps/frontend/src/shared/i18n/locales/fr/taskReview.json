@@ -12,7 +12,13 @@
 		"orGitActions": "ou opérations Git",
 		"confirm": "Clore la tâche",
 		"confirmAnyway": "Clore quand même",
-		"closing": "Clôture…"
+		"closing": "Clôture…",
+		"closeWithoutPr": "Clore sans PR",
+		"flow": {
+			"stepPr": "Créer la PR",
+			"stepClose": "Clôturer",
+			"createPrCta": "Créer la PR pour la revue"
+		}
 	},
 	"terminal": {
 		"openTerminal": "Ouvrir le terminal",

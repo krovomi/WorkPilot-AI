@@ -138,6 +138,11 @@ export function WorkspaceStatus({
 	const preferredIDE = settings.preferredIDE || "vscode";
 	const preferredTerminal = settings.preferredTerminal || "system";
 
+	// Drives the PR-first guided flow: the hero action is "Create PR" until a PR
+	// exists, then it flips to "Approve & close".
+	const hasExistingPr = Boolean(existingPrUrl);
+	const actionsBusy = isMerging || isDiscarding || isCreatingPR || isCompleting;
+
 	// Merge progress state
 	const [mergeProgress, setMergeProgress] = useState<MergeProgress | null>(
 		null,
@@ -714,31 +719,109 @@ export function WorkspaceStatus({
 
 			{/* Actions Footer */}
 			<div className="px-4 py-3 bg-muted/20 border-t border-border space-y-3">
-				{/* Approve & Close — the primary "this task is done" action. Distinct
-				    from the git tooling below (merge/PR/discard): closing marks the
-				    task done whether it was merged here or the PR is handled on the
-				    platform. */}
+				{/* PR-first guided flow. We nudge the user to open a PR before
+				    closing: a 2-step tracker + an adaptive hero. Until a PR exists
+				    the hero is "Create PR" and closing is demoted to a subtle link;
+				    once a PR exists the hero becomes "Approve & close". */}
 				{onRequestComplete && (
-					<>
-						<Button
-							variant="success"
-							onClick={onRequestComplete}
-							disabled={isMerging || isDiscarding || isCreatingPR || isCompleting}
-							className="w-full"
-						>
-							{isCompleting ? (
-								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-							) : (
-								<CheckCheck className="mr-2 h-4 w-4" />
-							)}
-							{t("taskReview:close.action")}
-						</Button>
+					<div className="space-y-3">
+						{/* Step tracker */}
+						<div className="flex items-center gap-2.5 rounded-lg border border-border bg-background/40 px-3 py-2">
+							<div className="flex items-center gap-2">
+								<span
+									className={cn(
+										"flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors",
+										hasExistingPr
+											? "bg-success text-success-foreground"
+											: "bg-info text-info-foreground ring-2 ring-info/25",
+									)}
+								>
+									{hasExistingPr ? <CheckCheck className="h-3.5 w-3.5" /> : "1"}
+								</span>
+								<span
+									className={cn(
+										"text-xs font-medium",
+										hasExistingPr ? "text-success" : "text-foreground",
+									)}
+								>
+									{t("taskReview:close.flow.stepPr")}
+								</span>
+							</div>
+							<span
+								className={cn(
+									"h-0.5 flex-1 rounded-full transition-colors",
+									hasExistingPr ? "bg-success/40" : "bg-border",
+								)}
+							/>
+							<div className="flex items-center gap-2">
+								<span
+									className={cn(
+										"flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors",
+										hasExistingPr
+											? "bg-success text-success-foreground ring-2 ring-success/25"
+											: "bg-muted text-muted-foreground",
+									)}
+								>
+									2
+								</span>
+								<span
+									className={cn(
+										"text-xs font-medium",
+										hasExistingPr ? "text-foreground" : "text-muted-foreground",
+									)}
+								>
+									{t("taskReview:close.flow.stepClose")}
+								</span>
+							</div>
+						</div>
+
+						{/* Adaptive hero: create the PR first, then close */}
+						{hasExistingPr ? (
+							<Button
+								variant="success"
+								onClick={onRequestComplete}
+								disabled={actionsBusy}
+								className="w-full shadow-sm"
+							>
+								{isCompleting ? (
+									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+								) : (
+									<CheckCheck className="mr-2 h-4 w-4" />
+								)}
+								{t("taskReview:close.action")}
+							</Button>
+						) : (
+							<div className="space-y-1.5">
+								<Button
+									variant="info"
+									onClick={() => onShowPRDialog?.(true)}
+									disabled={actionsBusy}
+									className="w-full shadow-sm"
+								>
+									{isCreatingPR ? (
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+									) : (
+										<GitPullRequest className="mr-2 h-4 w-4" />
+									)}
+									{t("taskReview:close.flow.createPrCta")}
+								</Button>
+								<button
+									type="button"
+									onClick={onRequestComplete}
+									disabled={actionsBusy}
+									className="mx-auto flex items-center gap-1 text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-warning hover:underline disabled:opacity-50"
+								>
+									{t("taskReview:close.closeWithoutPr")}
+								</button>
+							</div>
+						)}
+
 						<div className="flex items-center gap-2 text-[11px] text-muted-foreground">
 							<span className="h-px flex-1 bg-border" />
 							{t("taskReview:close.orGitActions")}
 							<span className="h-px flex-1 bg-border" />
 						</div>
-					</>
+					</div>
 				)}
 
 				{/* Stage Only Option - only show after conflicts have been checked (not for already_merged/superseded) */}
@@ -893,8 +976,14 @@ export function WorkspaceStatus({
 							</Tooltip>
 						)}
 
-					{/* Create / Update PR Button - hide for already_merged/superseded scenarios */}
-					{onShowPRDialog && !isAlreadyMerged && !isSuperseded && (
+					{/* Update PR button — creation is the hero above (PR-first flow), so
+					    here we only surface "Update PR" once a PR exists. When the close
+					    flow isn't wired (no onRequestComplete), keep the create/update
+					    button for backward compatibility. */}
+					{onShowPRDialog &&
+						(existingPrUrl || !onRequestComplete) &&
+						!isAlreadyMerged &&
+						!isSuperseded && (
 						<Button
 							variant="info"
 							onClick={() => onShowPRDialog(true)}

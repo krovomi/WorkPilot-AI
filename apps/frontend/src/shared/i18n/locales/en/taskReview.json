@@ -12,7 +12,13 @@
 		"orGitActions": "or Git actions",
 		"confirm": "Close task",
 		"confirmAnyway": "Close anyway",
-		"closing": "Closing…"
+		"closing": "Closing…",
+		"closeWithoutPr": "Close without a PR",
+		"flow": {
+			"stepPr": "Create PR",
+			"stepClose": "Close",
+			"createPrCta": "Create the PR for review"
+		}
 	},
 	"terminal": {
 		"openTerminal": "Open terminal",
