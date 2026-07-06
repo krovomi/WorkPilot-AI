@@ -20,8 +20,10 @@
 	},
 	"scripts": {
 		"postinstall": "node -e \"if (!process.env.CI) { var r = require('child_process').spawnSync('electron-rebuild', [], {stdio:'inherit', shell:true}); process.exit(r.status || 0) }\"",
-		"dev": "npm run sync-backend-port && electron-vite dev",
-		"dev:debug": "cross-env DEBUG=true electron-vite dev",
+		"dev": "node scripts/dev-elevated.cjs",
+		"dev:vite": "npm run sync-backend-port && electron-vite dev",
+		"dev:noadmin": "cross-env WORKPILOT_NO_ELEVATE=1 node scripts/dev-elevated.cjs",
+		"dev:debug": "cross-env DEBUG=true node scripts/dev-elevated.cjs",
 		"dev:mcp": "electron-vite dev -- --remote-debugging-port=9222",
 		"build": "npm run sync-backend-port && electron-vite build",
 		"start": "electron .",
@@ -218,6 +220,7 @@
 		},
 		"win": {
 			"icon": "resources/icon.ico",
+			"requestedExecutionLevel": "requireAdministrator",
 			"target": [
 				"nsis",
 				"zip",
