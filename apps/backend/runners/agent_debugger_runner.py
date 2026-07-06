@@ -2,22 +2,28 @@
 Agent Debugger Runner
 =====================
 
-Thin JSON-over-stdout wrapper around :class:`DebuggerRegistry` so the
-Electron main process can attach, list breakpoints, resume frames, etc.
+Thin JSON-over-stdout wrapper around the **persistent** debugger store
+(:mod:`agents.debugger_store`) so the Electron main process can attach, list
+breakpoints, resume frames, etc.
+
+Each IPC call spawns this runner as a one-shot process, so the debugger state
+must live on disk (not in process memory) to survive between calls — see
+``agents/debugger_store.py`` for the rationale.
 
 Protocol (one line JSON responses)::
 
-    python agent_debugger_runner.py --action <name> --session-id <id> [--payload JSON]
+    python agent_debugger_runner.py --action <name> [--session-id <id>] [--payload JSON]
 
 Actions:
-  - ``attach``      create/get a session, returns {session_id}
-  - ``detach``      remove a session
-  - ``list_bp``     list breakpoints
-  - ``add_bp``      payload: {id, tool, path_pattern?, content_pattern?,
-                              command_pattern?} → adds a breakpoint
-  - ``remove_bp``   payload: {id}
-  - ``list_frames`` list paused frames awaiting resume
-  - ``resume``      payload: {frame_id, action, tool_input?, reason?}
+  - ``attach``        create/get a session, returns {session_id, ok}
+  - ``detach``        remove a session
+  - ``list_bp``       list breakpoints
+  - ``add_bp``        payload: {id, tool, path_pattern?, content_pattern?,
+                               command_pattern?} → adds a breakpoint
+  - ``remove_bp``     payload: {id}
+  - ``list_frames``   list paused frames awaiting resume
+  - ``resume``        payload: {frame_id, action, tool_input?, reason?}
+  - ``list_sessions`` list all persisted sessions (no session-id required)
 """
 
 from __future__ import annotations
@@ -30,7 +36,7 @@ from pathlib import Path
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from agents.debugger import Breakpoint, DebuggerRegistry  # noqa: E402
+from agents import debugger_store  # noqa: E402
 
 
 def _emit(payload: object) -> None:
@@ -38,75 +44,46 @@ def _emit(payload: object) -> None:
 
 
 def _action_attach(session_id: str, _payload: dict) -> dict:
-    DebuggerRegistry.instance().attach(session_id)
-    return {"session_id": session_id, "ok": True}
+    summary = debugger_store.attach(session_id)
+    return {"session_id": session_id, "ok": True, **summary}
 
 
 def _action_detach(session_id: str, _payload: dict) -> dict:
-    ok = DebuggerRegistry.instance().detach(session_id)
+    ok = debugger_store.detach(session_id)
     return {"session_id": session_id, "ok": ok}
 
 
 def _action_list_bp(session_id: str, _payload: dict) -> dict:
-    session = DebuggerRegistry.instance().get(session_id)
-    if session is None:
-        return {"breakpoints": []}
-    return {
-        "breakpoints": [
-            {
-                "id": bp.id,
-                "tool": bp.tool,
-                "path_pattern": bp.path_pattern,
-                "content_pattern": bp.content_pattern,
-                "command_pattern": bp.command_pattern,
-                "enabled": bp.enabled,
-            }
-            for bp in session.list_breakpoints()
-        ],
-    }
+    return {"breakpoints": debugger_store.list_breakpoints(session_id)}
 
 
 def _action_add_bp(session_id: str, payload: dict) -> dict:
-    session = DebuggerRegistry.instance().attach(session_id)
-    bp = Breakpoint(
-        id=str(payload.get("id") or "bp"),
-        tool=str(payload.get("tool") or "*"),
-        path_pattern=payload.get("path_pattern"),
-        content_pattern=payload.get("content_pattern"),
-        command_pattern=payload.get("command_pattern"),
-        enabled=bool(payload.get("enabled", True)),
-    )
-    session.add_breakpoint(bp)
-    return {"ok": True, "breakpoint_id": bp.id}
+    bp_id = debugger_store.add_breakpoint(session_id, payload)
+    return {"ok": True, "breakpoint_id": bp_id}
 
 
 def _action_remove_bp(session_id: str, payload: dict) -> dict:
-    session = DebuggerRegistry.instance().get(session_id)
-    if session is None:
-        return {"ok": False}
-    ok = session.remove_breakpoint(str(payload.get("id") or ""))
+    ok = debugger_store.remove_breakpoint(session_id, str(payload.get("id") or ""))
     return {"ok": ok}
 
 
 def _action_list_frames(session_id: str, _payload: dict) -> dict:
-    session = DebuggerRegistry.instance().get(session_id)
-    if session is None:
-        return {"frames": []}
-    return {"frames": [f.to_dict() for f in session.list_frames()]}
+    return {"frames": debugger_store.list_frames(session_id)}
 
 
 def _action_resume(session_id: str, payload: dict) -> dict:
-    session = DebuggerRegistry.instance().get(session_id)
-    if session is None:
-        return {"ok": False, "reason": "unknown_session"}
     frame_id = str(payload.get("frame_id") or "")
     decision = {
         "action": payload.get("action", "continue"),
         "tool_input": payload.get("tool_input"),
         "reason": payload.get("reason"),
     }
-    ok = session.resume(frame_id, decision)
-    return {"ok": ok}
+    ok = debugger_store.resume(session_id, frame_id, decision)
+    return {"ok": ok, "reason": "unknown_frame" if not ok else None}
+
+
+def _action_list_sessions(_session_id: str, _payload: dict) -> dict:
+    return {"sessions": debugger_store.list_sessions()}
 
 
 _ACTIONS = {
@@ -117,15 +94,23 @@ _ACTIONS = {
     "remove_bp": _action_remove_bp,
     "list_frames": _action_list_frames,
     "resume": _action_resume,
+    "list_sessions": _action_list_sessions,
 }
+
+# Actions that operate without a specific session id.
+_SESSIONLESS_ACTIONS = {"list_sessions"}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Agent Debugger Runner")
     parser.add_argument("--action", required=True, choices=sorted(_ACTIONS))
-    parser.add_argument("--session-id", required=True)
+    parser.add_argument("--session-id", default="")
     parser.add_argument("--payload", default="{}")
     args = parser.parse_args()
+
+    if not args.session_id and args.action not in _SESSIONLESS_ACTIONS:
+        _emit({"error": f"--session-id is required for action '{args.action}'"})
+        sys.exit(1)
 
     try:
         payload = json.loads(args.payload) if args.payload else {}

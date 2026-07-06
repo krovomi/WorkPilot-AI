@@ -2,16 +2,19 @@ import { create } from "zustand";
 import type {
 	BreakpointSpec,
 	DebugFrameDTO,
+	DebugSessionSummary,
 	ResumeAction,
 } from "../../preload/api/modules/agent-debugger-api";
 
 interface AgentDebuggerState {
 	sessionId: string | null;
+	sessions: DebugSessionSummary[];
 	breakpoints: BreakpointSpec[];
 	frames: DebugFrameDTO[];
 	loading: boolean;
 	error: string | null;
 
+	listSessions: () => Promise<void>;
 	attach: (sessionId: string) => Promise<void>;
 	detach: () => Promise<void>;
 	refresh: () => Promise<void>;
@@ -26,10 +29,20 @@ interface AgentDebuggerState {
 
 export const useAgentDebuggerStore = create<AgentDebuggerState>((set, get) => ({
 	sessionId: null,
+	sessions: [],
 	breakpoints: [],
 	frames: [],
 	loading: false,
 	error: null,
+
+	listSessions: async () => {
+		try {
+			const { sessions } = await window.electronAPI.listDebugSessions();
+			set({ sessions });
+		} catch (e) {
+			set({ error: (e as Error).message });
+		}
+	},
 
 	attach: async (sessionId) => {
 		set({ loading: true, error: null });
@@ -49,6 +62,7 @@ export const useAgentDebuggerStore = create<AgentDebuggerState>((set, get) => ({
 		if (!sessionId) return;
 		await window.electronAPI.detachDebugger(sessionId);
 		set({ sessionId: null, breakpoints: [], frames: [] });
+		await get().listSessions();
 	},
 
 	refresh: async () => {

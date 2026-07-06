@@ -29,7 +29,15 @@ export interface DebugFrameDTO {
 
 export type ResumeAction = "continue" | "skip" | "modify";
 
+export interface DebugSessionSummary {
+	session_id: string;
+	breakpoints: number;
+	frames: number;
+	updated_at?: number;
+}
+
 export interface AgentDebuggerAPI {
+	listDebugSessions: () => Promise<{ sessions: DebugSessionSummary[] }>;
 	attachDebugger: (sessionId: string) => Promise<{ ok: boolean }>;
 	detachDebugger: (sessionId: string) => Promise<{ ok: boolean }>;
 	listBreakpoints: (
@@ -58,6 +66,7 @@ export interface AgentDebuggerAPI {
 }
 
 export const createAgentDebuggerAPI = (): AgentDebuggerAPI => ({
+	listDebugSessions: () => invokeIpc("agentDebugger:listSessions", {}),
 	attachDebugger: (sessionId) =>
 		invokeIpc("agentDebugger:attach", { sessionId }),
 	detachDebugger: (sessionId) =>

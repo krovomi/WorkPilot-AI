@@ -1,5 +1,14 @@
-import { Bug, Check, ChevronRight, Pause, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import {
+	Bug,
+	Check,
+	ChevronRight,
+	Pause,
+	Plus,
+	RefreshCw,
+	Trash2,
+	X,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgentDebuggerStore } from "../../stores/agent-debugger-store";
 import { Button } from "../ui/button";
@@ -19,10 +28,12 @@ export function AgentDebuggerPanel({ sessionId }: Props) {
 	const { t } = useTranslation(["agentDebugger", "common"]);
 	const {
 		sessionId: attachedSession,
+		sessions,
 		breakpoints,
 		frames,
 		loading,
 		error,
+		listSessions,
 		attach,
 		detach,
 		addBreakpoint,
@@ -31,10 +42,22 @@ export function AgentDebuggerPanel({ sessionId }: Props) {
 		refresh,
 	} = useAgentDebuggerStore();
 
+	const [manualId, setManualId] = useState(sessionId ?? "");
 	const [newId, setNewId] = useState("");
 	const [newTool, setNewTool] = useState("*");
 	const [newPath, setNewPath] = useState("");
 	const [newCommand, setNewCommand] = useState("");
+
+	// Load the list of persisted sessions so the user can attach to one even
+	// when no sessionId is passed in from the parent view.
+	useEffect(() => {
+		if (!attachedSession) void listSessions();
+	}, [attachedSession, listSessions]);
+
+	const handleAttach = (id: string) => {
+		const trimmed = id.trim();
+		if (trimmed) void attach(trimmed);
+	};
 
 	const handleAdd = async () => {
 		if (!newId.trim()) return;
@@ -74,20 +97,95 @@ export function AgentDebuggerPanel({ sessionId }: Props) {
 								{t("agentDebugger:detach", "Detach")}
 							</Button>
 						</>
-					) : (
-						<Button
-							size="sm"
-							disabled={!sessionId || loading}
-							onClick={() => sessionId && attach(sessionId)}
-						>
-							<Bug className="w-3 h-3 mr-1" />
-							{t("agentDebugger:attach", "Attach")}
-						</Button>
-					)}
+					) : null}
 				</div>
 			</div>
 
 			{error && <p className="text-sm text-destructive">{error}</p>}
+
+			{!attachedSession && (
+				<section className="border rounded-md p-3 bg-card space-y-3">
+					<div>
+						<h4 className="text-sm font-medium">
+							{t("agentDebugger:attachTitle", "Attach to a session")}
+						</h4>
+						<p className="text-xs text-muted-foreground mt-0.5">
+							{t(
+								"agentDebugger:attachHint",
+								"Enter an agent session id (e.g. a task id) to set breakpoints, or pick a saved one below.",
+							)}
+						</p>
+					</div>
+					<div className="flex items-end gap-2">
+						<div className="flex-1">
+							<Label className="text-xs">
+								{t("agentDebugger:sessionId", "Session id")}
+							</Label>
+							<Input
+								value={manualId}
+								onChange={(e) => setManualId(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") handleAttach(manualId);
+								}}
+								placeholder={t(
+									"agentDebugger:attachPlaceholder",
+									"e.g. task-1234",
+								)}
+							/>
+						</div>
+						<Button
+							size="sm"
+							disabled={!manualId.trim() || loading}
+							onClick={() => handleAttach(manualId)}
+						>
+							<Bug className="w-3 h-3 mr-1" />
+							{t("agentDebugger:attach", "Attach")}
+						</Button>
+					</div>
+
+					<div>
+						<div className="flex items-center justify-between mb-1">
+							<h5 className="text-xs font-medium text-muted-foreground">
+								{t("agentDebugger:existingSessions", "Saved sessions")} (
+								{sessions.length})
+							</h5>
+							<Button
+								size="icon"
+								variant="ghost"
+								onClick={() => void listSessions()}
+								title={t("common:refresh", "Refresh")}
+							>
+								<RefreshCw className="w-3 h-3" />
+							</Button>
+						</div>
+						{sessions.length === 0 ? (
+							<p className="text-xs text-muted-foreground">
+								{t("agentDebugger:noSessions", "No saved sessions yet.")}
+							</p>
+						) : (
+							<div className="space-y-1">
+								{sessions.map((s) => (
+									<button
+										type="button"
+										key={s.session_id}
+										onClick={() => handleAttach(s.session_id)}
+										className="w-full flex items-center justify-between text-sm border rounded p-2 bg-muted/20 hover:bg-muted/40 text-left"
+									>
+										<code className="font-mono truncate">{s.session_id}</code>
+										<span className="text-xs text-muted-foreground shrink-0 ml-2">
+											{t("agentDebugger:sessionMeta", {
+												bp: s.breakpoints,
+												frames: s.frames,
+												defaultValue: "{{bp}} breakpoints · {{frames}} paused",
+											})}
+										</span>
+									</button>
+								))}
+							</div>
+						)}
+					</div>
+				</section>
+			)}
 
 			{attachedSession && (
 				<>

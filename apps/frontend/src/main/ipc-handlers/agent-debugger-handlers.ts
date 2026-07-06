@@ -15,6 +15,7 @@
  *   agentDebugger:removeBreakpoint → { sessionId, id }
  *   agentDebugger:listFrames    → { sessionId } → { frames }
  *   agentDebugger:resume        → { sessionId, frameId, action, toolInput?, reason? }
+ *   agentDebugger:listSessions  → {} → { sessions }
  */
 
 import { spawn } from "node:child_process";
@@ -124,6 +125,9 @@ export function registerAgentDebuggerHandlers(): void {
 		"agentDebugger:listFrames",
 		async (_e, { sessionId }: { sessionId: string }) =>
 			runRunner({ action: "list_frames", sessionId }),
+	);
+	ipcMain.handle("agentDebugger:listSessions", async () =>
+		runRunner({ action: "list_sessions", sessionId: "" }),
 	);
 	ipcMain.handle(
 		"agentDebugger:resume",
