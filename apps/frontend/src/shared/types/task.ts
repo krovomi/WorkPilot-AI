@@ -393,6 +393,14 @@ export interface TaskMetadata {
 		model?: string;
 	};
 
+	// Abandon status — the task was set aside (e.g. the product owner no longer
+	// wants it developed). Reversible via "Reprendre" (clears `abandoned`). The
+	// task keeps its column/status but is greyed + badged in the Kanban and can
+	// be hidden via a board filter. Distinct from delete (permanent) and archive.
+	abandoned?: boolean; // True while the task is abandoned
+	abandonedAt?: string; // ISO date when the task was abandoned
+	abandonedReason?: string; // Optional free-text reason (e.g. "PO deprioritized")
+
 	// Archive status
 	archivedAt?: string; // ISO date when task was archived
 	archivedInVersion?: string; // Version in which task was archived (from changelog)

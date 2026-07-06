@@ -8,7 +8,9 @@ import type {
 	WorktreeDiff,
 	WorktreeStatus,
 } from "../../../shared/types";
+import { useState } from "react";
 import {
+	CompletionDialog,
 	ConflictDetailsDialog,
 	CreatePRDialog,
 	DiffViewDialog,
@@ -77,6 +79,9 @@ interface TaskReviewProps {
 		draft?: boolean;
 	}) => Promise<WorktreeCreatePRResult | null>;
 	readonly onRefreshDiff?: () => void;
+	/** Approve & close the task from human review (persists "done"). */
+	readonly onComplete: () => void;
+	readonly isCompleting: boolean;
 }
 
 /**
@@ -125,7 +130,13 @@ export function TaskReview({
 	onShowPRDialog,
 	onCreatePR,
 	onRefreshDiff,
+	onComplete,
+	isCompleting,
 }: TaskReviewProps) {
+	// Local: the "Close task" Definition-of-Done confirmation. Kept here so both
+	// the workspace view and the no-workspace view can trigger the same dialog.
+	const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+
 	// Extract nested ternary into a clear variable
 	const workspaceStatusComponent = (() => {
 		if (isLoadingWorktree) {
@@ -171,11 +182,20 @@ export function TaskReview({
 					onStageOnlyChange={onStageOnlyChange}
 					onMerge={onMerge}
 					onShowPRDialog={onShowPRDialog}
+					isCompleting={isCompleting}
+					onRequestComplete={() => setShowCompletionDialog(true)}
 				/>
 			);
 		}
 
-		return <NoWorkspaceMessage task={task} onClose={onClose} />;
+		return (
+			<NoWorkspaceMessage
+				task={task}
+				onClose={onClose}
+				isCompleting={isCompleting}
+				onRequestComplete={() => setShowCompletionDialog(true)}
+			/>
+		);
 	})();
 
 	return (
@@ -252,6 +272,18 @@ export function TaskReview({
 				worktreeStatus={worktreeStatus}
 				onOpenChange={onShowPRDialog}
 				onCreatePR={onCreatePR}
+			/>
+
+			{/* Approve & Close — soft Definition-of-Done confirmation */}
+			<CompletionDialog
+				open={showCompletionDialog}
+				task={task}
+				isCompleting={isCompleting}
+				onOpenChange={setShowCompletionDialog}
+				onConfirm={() => {
+					setShowCompletionDialog(false);
+					onComplete();
+				}}
 			/>
 		</div>
 	);

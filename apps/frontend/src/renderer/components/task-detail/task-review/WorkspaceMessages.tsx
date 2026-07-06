@@ -36,15 +36,28 @@ export function LoadingMessage({
 interface NoWorkspaceMessageProps {
 	readonly task?: Task;
 	readonly onClose?: () => void;
+	/** When provided, the "close" action goes through the DoD confirmation. */
+	readonly isCompleting?: boolean;
+	readonly onRequestComplete?: () => void;
 }
 
 /**
  * Displays message when no workspace is found for the task
  * Falls back to showing PR stats if a PR exists
  */
-export function NoWorkspaceMessage({ task, onClose }: NoWorkspaceMessageProps) {
+export function NoWorkspaceMessage({
+	task,
+	onClose,
+	isCompleting,
+	onRequestComplete,
+}: NoWorkspaceMessageProps) {
 	const [isMarkingDone, setIsMarkingDone] = useState(false);
 	const [isProceeding, setIsProceeding] = useState(false);
+
+	// Prefer the guarded Definition-of-Done flow when the parent wired it;
+	// otherwise fall back to the direct mark-as-done (backward compatible).
+	const closeAction = onRequestComplete ?? (() => void handleMarkDone());
+	const closeBusy = Boolean(isCompleting) || isMarkingDone;
 
 	const prUrl = task?.metadata?.prUrl;
 	const { prData, isLoading: isLoadingPR } = usePullRequestStats(
@@ -90,13 +103,13 @@ export function NoWorkspaceMessage({ task, onClose }: NoWorkspaceMessageProps) {
 				<PullRequestStats prData={prData} />
 				{task?.status === "human_review" && (
 					<Button
-						onClick={handleMarkDone}
-						disabled={isMarkingDone}
+						onClick={closeAction}
+						disabled={closeBusy}
 						size="sm"
 						variant="default"
 						className="w-full"
 					>
-						{isMarkingDone ? (
+						{closeBusy ? (
 							<>
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
 								Updating...
@@ -162,13 +175,13 @@ export function NoWorkspaceMessage({ task, onClose }: NoWorkspaceMessageProps) {
 			) : (
 				task?.status === "human_review" && (
 					<Button
-						onClick={handleMarkDone}
-						disabled={isMarkingDone}
+						onClick={closeAction}
+						disabled={closeBusy}
 						size="sm"
 						variant="default"
 						className="w-full"
 					>
-						{isMarkingDone ? (
+						{closeBusy ? (
 							<>
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
 								Updating...

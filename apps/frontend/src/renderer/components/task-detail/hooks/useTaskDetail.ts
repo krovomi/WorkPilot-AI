@@ -154,6 +154,9 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const [showConflictDialog, setShowConflictDialog] = useState(false);
 	const [showPRDialog, setShowPRDialog] = useState(false);
 	const [isCreatingPR, setIsCreatingPR] = useState(false);
+	const [isCompleting, setIsCompleting] = useState(false);
+	const [showAbandonDialog, setShowAbandonDialog] = useState(false);
+	const [isAbandoning, setIsAbandoning] = useState(false);
 	const [showSyncDialog, setShowSyncDialog] = useState(false);
 
 	const selectedProject = useProjectStore((state) =>
@@ -845,6 +848,9 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		showConflictDialog,
 		showPRDialog,
 		isCreatingPR,
+		isCompleting,
+		showAbandonDialog,
+		isAbandoning,
 		showSyncDialog,
 		isLoadingPlan,
 
@@ -882,6 +888,9 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		setShowConflictDialog,
 		setShowPRDialog,
 		setIsCreatingPR,
+		setIsCompleting,
+		setShowAbandonDialog,
+		setIsAbandoning,
 		setShowSyncDialog,
 
 		// Handlers

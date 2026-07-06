@@ -69,6 +69,10 @@ interface WorkspaceStatusProps {
 	readonly onStageOnlyChange: (value: boolean) => void;
 	readonly onMerge: () => void;
 	readonly onShowPRDialog?: (show: boolean) => void;
+	/** Whether the approve-&-close action is in flight. */
+	readonly isCompleting?: boolean;
+	/** Open the Definition-of-Done confirmation to close the task. */
+	readonly onRequestComplete?: () => void;
 }
 
 /**
@@ -126,6 +130,8 @@ export function WorkspaceStatus({
 	onStageOnlyChange,
 	onMerge,
 	onShowPRDialog,
+	isCompleting,
+	onRequestComplete,
 }: WorkspaceStatusProps) {
 	const { t } = useTranslation(["taskReview", "common", "tasks"]);
 	const { settings } = useSettingsStore();
@@ -708,6 +714,33 @@ export function WorkspaceStatus({
 
 			{/* Actions Footer */}
 			<div className="px-4 py-3 bg-muted/20 border-t border-border space-y-3">
+				{/* Approve & Close — the primary "this task is done" action. Distinct
+				    from the git tooling below (merge/PR/discard): closing marks the
+				    task done whether it was merged here or the PR is handled on the
+				    platform. */}
+				{onRequestComplete && (
+					<>
+						<Button
+							variant="success"
+							onClick={onRequestComplete}
+							disabled={isMerging || isDiscarding || isCreatingPR || isCompleting}
+							className="w-full"
+						>
+							{isCompleting ? (
+								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+							) : (
+								<CheckCheck className="mr-2 h-4 w-4" />
+							)}
+							{t("taskReview:close.action")}
+						</Button>
+						<div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+							<span className="h-px flex-1 bg-border" />
+							{t("taskReview:close.orGitActions")}
+							<span className="h-px flex-1 bg-border" />
+						</div>
+					</>
+				)}
+
 				{/* Stage Only Option - only show after conflicts have been checked (not for already_merged/superseded) */}
 				{mergePreview && !isAlreadyMerged && !isSuperseded && (
 					// biome-ignore lint/a11y/noLabelWithoutControl: label association is implicit

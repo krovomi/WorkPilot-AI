@@ -1,4 +1,19 @@
 {
+	"close": {
+		"title": "Clore la tâche",
+		"description": "Marquer cette tâche comme terminée et la déplacer dans « Terminé ». À utiliser quand la revue humaine est validée.",
+		"checklistTitle": "Définition du Fini",
+		"prPresent": "PR créée",
+		"prMissing": "Aucune PR liée",
+		"proofPresent": "Preuve visuelle capturée",
+		"proofMissing": "Aucune preuve visuelle",
+		"softWarning": "Certains éléments manquent, mais vous pouvez tout de même clore la tâche (par ex. PR fusionnée directement sur la plateforme, ou changement non visuel).",
+		"action": "Valider et clore la tâche",
+		"orGitActions": "ou opérations Git",
+		"confirm": "Clore la tâche",
+		"confirmAnyway": "Clore quand même",
+		"closing": "Clôture…"
+	},
 	"terminal": {
 		"openTerminal": "Ouvrir le terminal",
 		"openInbuilt": "Ouvrir dans le terminal intégré",

@@ -16,6 +16,10 @@ import type {
 } from "../../shared/types";
 import { isSubtaskDone } from "../../shared/progress";
 import { debugLog, debugWarn } from "../../shared/utils/debug-logger";
+import {
+	buildAbandonMetadata,
+	buildResumeMetadata,
+} from "../../shared/utils/task-lifecycle";
 import { extractSubtaskFiles } from "../../shared/utils/subtask-files";
 import { isMeaningfulFeatureTitle } from "../../shared/utils/task-title";
 
@@ -1262,6 +1266,82 @@ export async function deleteTask(
 		};
 	} catch (error) {
 		console.error("Error deleting task:", error);
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Unknown error",
+		};
+	}
+}
+
+/**
+ * Abandon a task: the product owner no longer wants it developed. Persists an
+ * `abandoned` flag to task_metadata.json (via TASK_UPDATE, which merges), stops
+ * any in-flight run, and greys the card in place. Fully reversible — see
+ * {@link resumeAbandonedTask}. Nothing is deleted.
+ */
+export async function abandonTask(
+	taskId: string,
+	reason?: string,
+): Promise<{ success: boolean; error?: string }> {
+	const store = useTaskStore.getState();
+	const task = store.tasks.find((t) => t.id === taskId || t.specId === taskId);
+
+	// Stop the pipeline first so an abandoned task doesn't keep burning tokens.
+	if (
+		task &&
+		(task.status === "in_progress" ||
+			task.status === "queue" ||
+			task.status === "ai_review")
+	) {
+		stopTask(taskId);
+	}
+
+	try {
+		const patch = buildAbandonMetadata(reason);
+		const result = await globalThis.electronAPI.updateTask(taskId, {
+			metadata: patch,
+		});
+		if (!result.success) {
+			return {
+				success: false,
+				error: result.error || "Failed to abandon task",
+			};
+		}
+		store.updateTask(taskId, {
+			metadata: { ...(task?.metadata ?? {}), ...patch },
+		});
+		return { success: true };
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Unknown error",
+		};
+	}
+}
+
+/** Reactivate an abandoned task, clearing the `abandoned` flag. */
+export async function resumeAbandonedTask(
+	taskId: string,
+): Promise<{ success: boolean; error?: string }> {
+	const store = useTaskStore.getState();
+	const task = store.tasks.find((t) => t.id === taskId || t.specId === taskId);
+
+	try {
+		const patch = buildResumeMetadata();
+		const result = await globalThis.electronAPI.updateTask(taskId, {
+			metadata: patch,
+		});
+		if (!result.success) {
+			return {
+				success: false,
+				error: result.error || "Failed to resume task",
+			};
+		}
+		store.updateTask(taskId, {
+			metadata: { ...(task?.metadata ?? {}), ...patch },
+		});
+		return { success: true };
+	} catch (error) {
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : "Unknown error",

@@ -5,6 +5,7 @@
  * including workspace status, merge previews, dialogs, and feedback forms.
  */
 
+export { CompletionDialog } from "./CompletionDialog";
 export { ConflictDetailsDialog } from "./ConflictDetailsDialog";
 export { CreatePRDialog } from "./CreatePRDialog";
 export { DiffViewDialog } from "./DiffViewDialog";

@@ -1,4 +1,19 @@
 {
+	"close": {
+		"title": "Close task",
+		"description": "Mark this task as done and move it to \"Done\". Use this once the human review is approved.",
+		"checklistTitle": "Definition of Done",
+		"prPresent": "PR created",
+		"prMissing": "No PR linked",
+		"proofPresent": "Visual proof captured",
+		"proofMissing": "No visual proof",
+		"softWarning": "Some items are missing, but you can still close the task (e.g. the PR was merged directly on the platform, or this is a non-UI change).",
+		"action": "Approve & close task",
+		"orGitActions": "or Git actions",
+		"confirm": "Close task",
+		"confirmAnyway": "Close anyway",
+		"closing": "Closing…"
+	},
 	"terminal": {
 		"openTerminal": "Open terminal",
 		"openInbuilt": "Open in Inbuilt Terminal",

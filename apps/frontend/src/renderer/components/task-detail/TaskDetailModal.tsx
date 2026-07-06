@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
 	AlertTriangle,
+	Ban,
 	CheckCircle2,
 	ChevronLeft,
 	ChevronRight,
@@ -14,6 +15,7 @@ import {
 	Play,
 	RotateCcw,
 	Trash2,
+	Undo2,
 	X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -39,10 +41,12 @@ import { needsExecutionFormula } from "../../../shared/utils/task-execution-conf
 import { useFormulaMatrixStore } from "../../stores/formula-matrix-store";
 import { useProjectStore } from "../../stores/project-store";
 import {
+	abandonTask,
 	deleteTask,
 	persistTaskStatus,
 	persistUpdateTask,
 	recoverStuckTask,
+	resumeAbandonedTask,
 	startTask,
 	stopTask,
 	submitReview,
@@ -77,6 +81,8 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "../ui/tooltip";
+import { isTaskAbandoned } from "../../../shared/utils/task-lifecycle";
+import { AbandonDialog } from "./AbandonDialog";
 import { useTaskDetail } from "./hooks/useTaskDetail";
 import { PlanConflictBadge } from "./PlanConflictBadge";
 import { TaskStatusMoveBadge } from "./TaskStatusMoveBadge";
@@ -686,6 +692,70 @@ function TaskDetailModalContent({
 		state.setIsDiscarding(false);
 	};
 
+	// Approve & close from human review. Persists "done" (mapped to the Done
+	// column / "pr_created" when a PR exists), so it survives a rescan. The soft
+	// Definition-of-Done guard lives in CompletionDialog.
+	const handleComplete = async () => {
+		state.setIsCompleting(true);
+		try {
+			const result = await persistTaskStatus(task.id, "done");
+			if (result.success) {
+				onOpenChange(false);
+			} else {
+				toast({
+					title: t("tasks:review.closeFailedTitle"),
+					description: result.error || t("tasks:review.closeFailedDescription"),
+					variant: "destructive",
+					duration: 5000,
+				});
+			}
+		} finally {
+			state.setIsCompleting(false);
+		}
+	};
+
+	const handleAbandon = async (reason?: string) => {
+		state.setIsAbandoning(true);
+		try {
+			const result = await abandonTask(task.id, reason);
+			if (result.success) {
+				state.setShowAbandonDialog(false);
+				toast({
+					title: t("tasks:abandon.abandonedTitle"),
+					description: t("tasks:abandon.abandonedDescription"),
+					duration: 4000,
+				});
+			} else {
+				toast({
+					title: t("tasks:abandon.failedTitle"),
+					description: result.error || t("tasks:abandon.failedDescription"),
+					variant: "destructive",
+					duration: 5000,
+				});
+			}
+		} finally {
+			state.setIsAbandoning(false);
+		}
+	};
+
+	const handleResume = async () => {
+		state.setIsAbandoning(true);
+		try {
+			const result = await resumeAbandonedTask(task.id);
+			if (!result.success) {
+				toast({
+					title: t("tasks:abandon.resumeFailedTitle"),
+					description:
+						result.error || t("tasks:abandon.resumeFailedDescription"),
+					variant: "destructive",
+					duration: 5000,
+				});
+			}
+		} finally {
+			state.setIsAbandoning(false);
+		}
+	};
+
 	const handleCreatePR = async (options: WorktreeCreatePROptions) => {
 		state.setIsCreatingPR(true);
 		try {
@@ -1214,6 +1284,8 @@ function TaskDetailModalContent({
 														onShowPRDialog={state.setShowPRDialog}
 														onCreatePR={handleCreatePR}
 														onRefreshDiff={state.refreshWorktreeDiff}
+														isCompleting={state.isCompleting}
+														onComplete={handleComplete}
 													/>
 												</>
 											)}
@@ -1314,6 +1386,36 @@ function TaskDetailModalContent({
 									<Trash2 className="mr-2 h-4 w-4" />
 									{t("tasks:modal.actions.deleteTask")}
 								</Button>
+								{/* Abandon / Resume — set the task aside (reversibly) when the
+								    product owner no longer wants it developed. Not for "done". */}
+								{task.status !== "done" &&
+									(isTaskAbandoned(task) ? (
+										<Button
+											variant="ghost"
+											size="sm"
+											className="text-info hover:text-info hover:bg-info/10"
+											onClick={handleResume}
+											disabled={state.isAbandoning}
+										>
+											{state.isAbandoning ? (
+												<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+											) : (
+												<Undo2 className="mr-2 h-4 w-4" />
+											)}
+											{t("tasks:abandon.resume")}
+										</Button>
+									) : (
+										<Button
+											variant="ghost"
+											size="sm"
+											className="text-muted-foreground hover:text-warning hover:bg-warning/10"
+											onClick={() => state.setShowAbandonDialog(true)}
+											disabled={state.isAbandoning}
+										>
+											<Ban className="mr-2 h-4 w-4" />
+											{t("tasks:abandon.abandon")}
+										</Button>
+									))}
 								<div className="flex-1" />
 								{renderPrimaryAction()}
 								<Button variant="outline" onClick={handleClose}>
@@ -1407,6 +1509,15 @@ function TaskDetailModalContent({
 				open={state.isDuplicateDialogOpen}
 				onOpenChange={state.setIsDuplicateDialogOpen}
 				onCreated={() => state.setIsDuplicateDialogOpen(false)}
+			/>
+
+			{/* Abandon Confirmation Dialog (optional reason) */}
+			<AbandonDialog
+				open={state.showAbandonDialog}
+				task={task}
+				isAbandoning={state.isAbandoning}
+				onOpenChange={state.setShowAbandonDialog}
+				onAbandon={handleAbandon}
 			/>
 
 			{/* Delete Confirmation Dialog */}

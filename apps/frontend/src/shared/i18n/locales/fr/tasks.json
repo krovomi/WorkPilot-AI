@@ -142,6 +142,12 @@
 		"error": "Erreur"
 	},
 	"kanban": {
+		"abandoned": {
+			"chip": "{{count}} abandonnée",
+			"chip_other": "{{count}} abandonnées",
+			"hideChip": "Masquer les tâches abandonnées",
+			"showChip": "Afficher les tâches abandonnées"
+		},
 		"emptyBacklog": "Aucune tâche planifiée",
 		"emptyBacklogHint": "Ajoutez une tâche pour commencer",
 		"emptyQueue": "La file d'attente est vide",
@@ -549,7 +555,26 @@
 		"submitting": "Envoi en cours..."
 	},
 	"review": {
-		"mergeTooltip": "Fusionne les changements de la branche d'arbre de travail de la tâche vers votre branche de base. L'IA résoudra les conflits éventuels. Vous pourrez ensuite choisir de conserver ou de supprimer l'arbre de travail."
+		"mergeTooltip": "Fusionne les changements de la branche d'arbre de travail de la tâche vers votre branche de base. L'IA résoudra les conflits éventuels. Vous pourrez ensuite choisir de conserver ou de supprimer l'arbre de travail.",
+		"closeFailedTitle": "Impossible de clore la tâche",
+		"closeFailedDescription": "La clôture de la tâche a échoué. Veuillez réessayer."
+	},
+	"abandon": {
+		"abandon": "Abandonner",
+		"resume": "Reprendre",
+		"badge": "Abandonnée",
+		"dialogTitle": "Abandonner la tâche",
+		"dialogPrefix": "Voulez-vous abandonner",
+		"dialogSuffix": " ? Le développement s'arrête et la tâche est mise de côté.",
+		"dialogReversible": "Rien n'est supprimé : la tâche est grisée sur le tableau et vous pourrez la reprendre à tout moment.",
+		"reasonPlaceholder": "Raison (facultatif) — ex. : le product owner ne veut plus la développer",
+		"abandoning": "Abandon…",
+		"abandonedTitle": "Tâche abandonnée",
+		"abandonedDescription": "La tâche a été mise de côté. Vous pouvez la reprendre depuis le tableau ou cette fenêtre.",
+		"failedTitle": "Échec de l'abandon",
+		"failedDescription": "Impossible d'abandonner la tâche. Veuillez réessayer.",
+		"resumeFailedTitle": "Échec de la reprise",
+		"resumeFailedDescription": "Impossible de reprendre la tâche. Veuillez réessayer."
 	},
 	"edit": {
 		"title": "Modifier la tâche",

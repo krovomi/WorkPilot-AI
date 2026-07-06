@@ -1254,7 +1254,8 @@ export function KanbanBoard({
 	const { announcement, announce } = useKanbanAccessibility();
 	const [activeTask, setActiveTask] = useState<Task | null>(null);
 	const [overColumnId, setOverColumnId] = useState<string | null>(null);
-	const { showArchived, toggleShowArchived } = useViewState();
+	const { showArchived, toggleShowArchived, hideAbandoned, toggleHideAbandoned } =
+		useViewState();
 
 	// --- Accessibility helpers (screen-reader drag-and-drop announcements) ---
 	const getColumnLabel = useCallback(
@@ -1497,13 +1498,26 @@ export function KanbanBoard({
 
 	// Filter tasks based on archive status
 	const filteredTasks = useMemo(() => {
-		// Archive gate first, then the user-selected search/source/category/priority
-		// filters from the filter bar.
-		const base = showArchived
+		// Archive gate first, then (optionally) the abandoned gate, then the
+		// user-selected search/source/category/priority filters from the filter bar.
+		// Abandoned tasks are shown greyed by default; hideAbandoned removes them.
+		let base = showArchived
 			? tasks
 			: tasks.filter((t) => !t.metadata?.archivedAt);
+		if (hideAbandoned) {
+			base = base.filter((t) => t.metadata?.abandoned !== true);
+		}
 		return base.filter((t) => taskMatchesFilters(t, kanbanFilters));
-	}, [tasks, showArchived, kanbanFilters]);
+	}, [tasks, showArchived, hideAbandoned, kanbanFilters]);
+
+	// Count of abandoned tasks currently on the board (drives the filter toggle).
+	const abandonedCount = useMemo(
+		() =>
+			tasks.filter(
+				(t) => t.metadata?.abandoned === true && !t.metadata?.archivedAt,
+			).length,
+		[tasks],
+	);
 
 	// Calculate archived count for Done column button
 	const archivedCount = useMemo(
@@ -3420,6 +3434,29 @@ export function KanbanBoard({
 								</ScrollArea>
 							</PopoverContent>
 						</Popover>
+					)}
+					{/* Abandoned filter: shown greyed on the board by default; this chip
+					    toggles hiding them. Only appears when there are abandoned tasks. */}
+					{abandonedCount > 0 && (
+						<button
+							type="button"
+							onClick={toggleHideAbandoned}
+							aria-pressed={hideAbandoned}
+							className={cn(
+								"flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
+								hideAbandoned
+									? "border-warning/50 bg-warning/20 text-warning hover:bg-warning/25"
+									: "border-border/60 bg-muted/30 text-muted-foreground hover:bg-muted/50",
+							)}
+							title={
+								hideAbandoned
+									? t("kanban.abandoned.showChip")
+									: t("kanban.abandoned.hideChip")
+							}
+						>
+							<Ban className="h-3.5 w-3.5" />
+							{t("kanban.abandoned.chip", { count: abandonedCount })}
+						</button>
 					)}
 					{/* Cost forecast: sum of applied Formula Lab estimates */}
 					{costForecast.totalUsd > 0 && (

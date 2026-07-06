@@ -9,11 +9,15 @@ import {
 
 interface ViewState {
 	showArchived: boolean;
+	/** Hide abandoned tasks from the board (they are shown greyed by default). */
+	hideAbandoned: boolean;
 }
 
 interface ViewStateContextValue extends ViewState {
 	setShowArchived: (show: boolean) => void;
 	toggleShowArchived: () => void;
+	setHideAbandoned: (hide: boolean) => void;
+	toggleHideAbandoned: () => void;
 }
 
 const ViewStateContext = createContext<ViewStateContextValue | null>(null);
@@ -31,6 +35,7 @@ interface ViewStateProviderProps {
  */
 export function ViewStateProvider({ children }: ViewStateProviderProps) {
 	const [showArchived, setShowArchivedState] = useState(false);
+	const [hideAbandoned, setHideAbandonedState] = useState(false);
 
 	const setShowArchived = useCallback((show: boolean) => {
 		setShowArchivedState(show);
@@ -40,13 +45,31 @@ export function ViewStateProvider({ children }: ViewStateProviderProps) {
 		setShowArchivedState((prev) => !prev);
 	}, []);
 
+	const setHideAbandoned = useCallback((hide: boolean) => {
+		setHideAbandonedState(hide);
+	}, []);
+
+	const toggleHideAbandoned = useCallback(() => {
+		setHideAbandonedState((prev) => !prev);
+	}, []);
+
 	const value = useMemo<ViewStateContextValue>(
 		() => ({
 			showArchived,
 			setShowArchived,
 			toggleShowArchived,
+			hideAbandoned,
+			setHideAbandoned,
+			toggleHideAbandoned,
 		}),
-		[showArchived, setShowArchived, toggleShowArchived],
+		[
+			showArchived,
+			setShowArchived,
+			toggleShowArchived,
+			hideAbandoned,
+			setHideAbandoned,
+			toggleHideAbandoned,
+		],
 	);
 
 	return (

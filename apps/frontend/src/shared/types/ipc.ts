@@ -268,7 +268,11 @@ export interface ElectronAPI {
 	deleteTask: (taskId: string) => Promise<IPCResult>;
 	updateTask: (
 		taskId: string,
-		updates: { title?: string; description?: string },
+		updates: {
+			title?: string;
+			description?: string;
+			metadata?: Partial<TaskMetadata>;
+		},
 	) => Promise<IPCResult<Task>>;
 	startTask: (taskId: string, options?: TaskStartOptions) => void;
 

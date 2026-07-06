@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import {
 	AlertTriangle,
 	Archive,
+	Ban,
 	Bug,
 	CheckCircle2,
 	Clock,
@@ -22,6 +23,7 @@ import {
 	Shield,
 	Square,
 	Target,
+	Undo2,
 	Wrench,
 	X,
 	XCircle,
@@ -56,6 +58,7 @@ import type {
 	TaskStatus,
 } from "../../shared/types";
 import { isTaskEffectivelyComplete } from "../../shared/progress";
+import { isTaskAbandoned } from "../../shared/utils/task-lifecycle";
 import { setPendingTaskDetailTab } from "../lib/task-detail-nav";
 import { cn, extractTextFromHtml, sanitizeMarkdownForDisplay } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
@@ -66,6 +69,7 @@ import {
 	isIncompleteHumanReview,
 	pauseTask,
 	recoverStuckTask,
+	resumeAbandonedTask,
 	resumeTask,
 	startTask,
 	stopTask,
@@ -1242,6 +1246,7 @@ export const TaskCard = memo(function TaskCard({
 			: null;
 
 	const isArchived = !!task.metadata?.archivedAt;
+	const isAbandoned = isTaskAbandoned(task);
 
 	// Check if task was imported from Azure DevOps
 	const isFromAzureDevOps = !!(
@@ -1268,6 +1273,7 @@ export const TaskCard = memo(function TaskCard({
 					"ring-2 ring-primary border-primary task-running-pulse",
 				isStuck && "ring-2 ring-warning border-warning task-stuck-pulse",
 				isArchived && "opacity-60 hover:opacity-80",
+				isAbandoned && "opacity-55 grayscale hover:opacity-80",
 				isSelectable &&
 					isSelected &&
 					"ring-2 ring-ring border-ring bg-accent/10",
@@ -1287,6 +1293,30 @@ export const TaskCard = memo(function TaskCard({
 			}}
 		>
 			<CardContent className="p-3">
+				{/* Abandoned banner — reversible "set aside" state. Kept ungreyed
+				    (relative + not affected by the card's grayscale) so "Reprendre"
+				    stays actionable. */}
+				{isAbandoned && (
+					<div className="relative z-10 mb-2 flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
+						<Ban className="h-3.5 w-3.5 shrink-0 text-warning" />
+						<span className="text-[11px] font-medium text-warning">
+							{t("tasks:abandon.badge")}
+						</span>
+						<button
+							type="button"
+							className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-info hover:bg-info/10"
+							onClick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								void resumeAbandonedTask(task.id);
+							}}
+							title={t("tasks:abandon.resume")}
+						>
+							<Undo2 className="h-3 w-3" />
+							{t("tasks:abandon.resume")}
+						</button>
+					</div>
+				)}
 				{/* Delete button - positioned at the top right, outside the content flow */}
 				{onDelete && (
 					<Button

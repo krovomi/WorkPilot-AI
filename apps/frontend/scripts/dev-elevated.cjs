@@ -1,22 +1,29 @@
 #!/usr/bin/env node
 /**
- * Dev launcher that runs WorkPilot's Electron dev stack **elevated (admin)** on
- * Windows.
+ * Cross-platform dev launcher (`pnpm run dev`).
  *
- * Why: the visual-proof capture (Win32 PrintWindow) and UI Automation can only
- * drive/screenshot a desktop app that runs at the same integrity level. The EBP
- * heavy client requires administrator, so WorkPilot must be elevated too —
- * otherwise captures come back blank and navigation is blocked (Windows UIPI).
+ * On **Windows** it runs WorkPilot's Electron dev stack **elevated (admin)**;
+ * on **macOS/Linux** it is a transparent passthrough to the normal dev stack.
  *
- * How: we elevate the whole `electron-vite dev` process (via `dev:vite`), NOT
- * just the Electron child. electron-vite calls `ps.on('close', process.exit)`,
- * so if Electron alone were relaunched elevated and the original exited, the
- * Vite renderer dev server would be torn down and the elevated window would load
- * a dead URL. Elevating electron-vite itself keeps the dev server + Electron in
- * one elevated process — HMR intact, no race.
+ * Why elevate on Windows: the visual-proof capture (Win32 PrintWindow) and UI
+ * Automation can only drive/screenshot a desktop app running at the same
+ * integrity level. The EBP heavy client requires administrator, so WorkPilot
+ * must be elevated too — otherwise captures come back blank and navigation is
+ * blocked (Windows UIPI).
+ *
+ * Why NOT elevate on macOS/Linux: there is no such elevated-app scenario there
+ * (EBP is Windows-only), and running a GUI/Electron app as root is harmful and a
+ * security risk. So on those OSes we just run the dev stack as-is.
+ *
+ * How (Windows): we elevate the whole `electron-vite dev` process (via
+ * `dev:vite`), NOT just the Electron child. electron-vite calls
+ * `ps.on('close', process.exit)`, so if Electron alone were relaunched elevated
+ * and the original exited, the Vite renderer dev server would be torn down and
+ * the elevated window would load a dead URL. Elevating electron-vite itself
+ * keeps the dev server + Electron in one elevated process — HMR intact, no race.
  *
  * Behaviour:
- *   - non-Windows, already elevated, or WORKPILOT_NO_ELEVATE set → run the dev
+ *   - macOS/Linux, already elevated, or WORKPILOT_NO_ELEVATE set → run the dev
  *     stack in THIS process (logs stay inline);
  *   - Windows + not elevated → relaunch `dev:vite` in a new elevated console via
  *     UAC (a separate window; that's an unavoidable Windows limitation when
@@ -50,7 +57,7 @@ function shouldForwardEnv(key) {
 /**
  * Are we already running elevated on Windows? Uses the classic `net session`
  * probe: it only succeeds for administrators (non-admins get "Access is
- * denied"). Fast and dependency-free.
+ * denied"). Fast and dependency-free. Windows-only — never called elsewhere.
  */
 function isWindowsElevated() {
 	try {
@@ -61,14 +68,17 @@ function isWindowsElevated() {
 	}
 }
 
-/** Run the real dev stack (`dev:vite`) in this process, inheriting stdio. */
+/**
+ * Run the real dev stack (`dev:vite`) in this process, inheriting stdio.
+ * `shell: true` makes the bare `npm` resolve cross-OS (npm.cmd on Windows via
+ * PATHEXT, npm on POSIX).
+ */
 function runDevInProcess() {
 	if (dryRun) {
 		console.log("[dev:dryrun] would run in-process: npm run dev:vite");
 		process.exit(0);
 	}
-	const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-	const result = spawnSync(npm, ["run", "dev:vite"], {
+	const result = spawnSync("npm", ["run", "dev:vite"], {
 		stdio: "inherit",
 		shell: true,
 	});
@@ -95,10 +105,13 @@ function relaunchElevated() {
 	// `dev:vite` (not `dev`) so the elevated console never re-enters this
 	// launcher — no recursion, no reliance on the elevation probe there. `npm`
 	// is bundled with Node, so it's always on PATH in the fresh elevated console.
-	const innerCmd = `${setPrefix}npm run dev:vite`;
+	//
+	// The `cd /d` is REQUIRED: `Start-Process -Verb RunAs` ignores
+	// `-WorkingDirectory`, so an elevated process starts in C:\Windows\System32.
+	// Without this cd, npm would look for package.json there and fail (ENOENT).
+	const innerCmd = `cd /d "${process.cwd()}" && ${setPrefix}npm run dev:vite`;
 	const psCommand =
 		"Start-Process -FilePath 'cmd.exe' -Verb RunAs -Wait " +
-		`-WorkingDirectory ${psQuote(process.cwd())} ` +
 		`-ArgumentList '/k', ${psQuote(innerCmd)}`;
 
 	if (dryRun) {
@@ -128,6 +141,8 @@ function relaunchElevated() {
 	}
 }
 
+// macOS/Linux never elevate (short-circuits before the Windows-only probe).
+// On Windows we elevate only when not already admin and not opted out.
 if (process.platform !== "win32" || optedOut || isWindowsElevated()) {
 	runDevInProcess();
 } else {
