@@ -50,7 +50,10 @@ import {
 	buildArchitectureSpec,
 	sanitizeEdges,
 } from "../../lib/architecture-spec";
-import { useProjectStore } from "../../stores/project-store";
+import {
+	addProject as registerProject,
+	useProjectStore,
+} from "../../stores/project-store";
 import { createTask, startTask } from "../../stores/task-store";
 import type { DiagramType } from "../../stores/visual-to-code-store";
 import { useVisualToCodeStore } from "../../stores/visual-to-code-store";
@@ -71,6 +74,9 @@ export type { DiagramType } from "../../stores/visual-to-code-store";
 export const CanvasPanel: React.FC = () => {
 	const { t, i18n } = useTranslation("visualProgramming");
 	const lang: Lang = i18n.language?.toLowerCase().startsWith("fr") ? "fr" : "en";
+	const activeProject = useProjectStore(
+		(s) => s.projects.find((p) => p.id === s.activeProjectId) ?? null,
+	);
 	const {
 		canvasNodes: storedNodes,
 		canvasEdges: storedEdges,
@@ -331,8 +337,56 @@ export const CanvasPanel: React.FC = () => {
 
 	// ── Scaffold on demand ──────────────────────────────────────────────
 	// Hand the drawn architecture to WorkPilot's agentic build pipeline: the
-	// diagram becomes a task spec, the coder agents scaffold the real project.
+	// diagram becomes a task spec, the coder agents scaffold the real project —
+	// either in the active project or a fresh greenfield repo.
 	const [isScaffolding, setIsScaffolding] = useState(false);
+	const [showScaffoldDialog, setShowScaffoldDialog] = useState(false);
+	const [scaffoldMode, setScaffoldMode] = useState<"active" | "new">("active");
+	const [newProjectName, setNewProjectName] = useState("");
+	const [newProjectLocation, setNewProjectLocation] = useState("");
+	const [initGit, setInitGit] = useState(true);
+
+	const slugify = (s: string) =>
+		s
+			.toLowerCase()
+			.normalize("NFD")
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 40) || "mon-projet";
+
+	// Create the task from the diagram and kick off the agentic build.
+	const runScaffold = async (projectId: string) => {
+		const cleanEdges = sanitizeEdges(nodes, edges);
+		const { title, description } = buildArchitectureSpec(
+			nodes,
+			cleanEdges,
+			diagramType,
+			lang,
+		);
+		const task = await createTask(projectId, title, description);
+		if (!task) {
+			toast({
+				title: t("scaffoldError", "Échec de la création de la tâche"),
+				variant: "destructive",
+			});
+			return;
+		}
+		// On demand: start the build immediately and jump to the Kanban.
+		startTask(task.id);
+		globalThis.dispatchEvent(
+			new CustomEvent("workpilot:navigate-view", {
+				detail: { view: "kanban" },
+			}),
+		);
+		toast({
+			title: t("scaffoldStarted", "Génération lancée"),
+			description: t(
+				"scaffoldStartedDesc",
+				"Suivez la progression dans le Kanban.",
+			),
+		});
+	};
+
 	const handleScaffold = async () => {
 		if (nodes.length === 0) {
 			toast({
@@ -345,50 +399,83 @@ export const CanvasPanel: React.FC = () => {
 			});
 			return;
 		}
-		const activeProjectId = useProjectStore.getState().activeProjectId;
-		if (!activeProjectId) {
-			toast({
-				title: t("noActiveProject", "Aucun projet actif"),
-				description: t(
-					"noActiveProjectDesc",
-					"Ouvrez ou sélectionnez un projet cible avant de scaffolder.",
-				),
-				variant: "destructive",
-			});
-			return;
+		// Prefill the new-project form; default to the active project when one is
+		// open, else force greenfield.
+		const stacks = [
+			...new Set(
+				nodes
+					.map((n) => (n.data as { framework?: string })?.framework)
+					.filter((f): f is string => !!f),
+			),
+		];
+		setNewProjectName(slugify(stacks.join("-") || diagramType));
+		if (!newProjectLocation) {
+			try {
+				const loc = await globalThis.electronAPI?.getDefaultProjectLocation?.();
+				if (loc) setNewProjectLocation(loc);
+			} catch {
+				/* ignore */
+			}
 		}
+		setScaffoldMode(activeProject ? "active" : "new");
+		setShowScaffoldDialog(true);
+	};
+
+	const handleBrowseLocation = async () => {
+		const dir = await globalThis.electronAPI?.selectDirectory?.();
+		if (dir) setNewProjectLocation(dir);
+	};
+
+	const confirmScaffold = async () => {
+		setShowScaffoldDialog(false);
 		setIsScaffolding(true);
 		try {
-			const cleanEdges = sanitizeEdges(nodes, edges);
-			const { title, description } = buildArchitectureSpec(
-				nodes,
-				cleanEdges,
-				diagramType,
-				lang,
-			);
-			const task = await createTask(activeProjectId, title, description);
-			if (task) {
-				// On demand: kick off the agentic build immediately and take the
-				// user to the Kanban to watch it scaffold the project.
-				startTask(task.id);
-				globalThis.dispatchEvent(
-					new CustomEvent("workpilot:navigate-view", {
-						detail: { view: "kanban" },
-					}),
-				);
-				toast({
-					title: t("scaffoldStarted", "Génération lancée"),
-					description: t(
-						"scaffoldStartedDesc",
-						"Suivez la progression dans le Kanban.",
-					),
-				});
+			let projectId: string | null = null;
+			if (scaffoldMode === "active") {
+				projectId = activeProject?.id ?? null;
 			} else {
+				if (!newProjectName.trim() || !newProjectLocation.trim()) {
+					toast({
+						title: t("newProjectIncomplete", "Projet incomplet"),
+						description: t(
+							"newProjectIncompleteDesc",
+							"Renseignez un nom et un emplacement.",
+						),
+						variant: "destructive",
+					});
+					return;
+				}
+				const created = await globalThis.electronAPI?.createProjectFolder?.(
+					newProjectLocation.trim(),
+					newProjectName.trim(),
+					initGit,
+				);
+				if (!created?.success || !created.data) {
+					toast({
+						title: t("newProjectError", "Échec de la création du projet"),
+						description: created?.error,
+						variant: "destructive",
+					});
+					return;
+				}
+				const registered = await registerProject(created.data.path);
+				if (!registered) {
+					toast({
+						title: t("newProjectError", "Échec de la création du projet"),
+						variant: "destructive",
+					});
+					return;
+				}
+				projectId = registered.project.id;
+			}
+			if (!projectId) {
 				toast({
-					title: t("scaffoldError", "Échec de la création de la tâche"),
+					title: t("noActiveProject", "Aucun projet actif"),
 					variant: "destructive",
 				});
+				return;
 			}
+			await runScaffold(projectId);
 		} finally {
 			setIsScaffolding(false);
 		}
@@ -1109,6 +1196,132 @@ export const CanvasPanel: React.FC = () => {
 							{t("save", "Sauvegarder dans le dossier sélectionné")}
 						</Button>
 						<Button variant="ghost" onClick={cancelSaveAs}>
+							{t("cancel", "Annuler")}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Scaffold target dialog — active project vs. new greenfield repo */}
+			<Dialog open={showScaffoldDialog} onOpenChange={setShowScaffoldDialog}>
+				<DialogContent>
+					<DialogTitle>
+						{t("scaffoldTargetTitle", "Où générer le projet ?")}
+					</DialogTitle>
+					<DialogDescription>
+						{t(
+							"scaffoldTargetDesc",
+							"L'architecture est transformée en tâche puis construite par le pipeline agentique.",
+						)}
+					</DialogDescription>
+					<div className="mt-4 flex flex-col gap-2">
+						<button
+							type="button"
+							onClick={() => activeProject && setScaffoldMode("active")}
+							disabled={!activeProject}
+							className={`text-left rounded-md border p-3 text-sm transition-colors disabled:opacity-50 ${
+								scaffoldMode === "active"
+									? "border-emerald-500 bg-emerald-500/10"
+									: "hover:bg-accent/50"
+							}`}
+						>
+							<div className="font-medium">
+								{t("scaffoldInActive", "Projet actif")}
+							</div>
+							<div className="text-xs text-muted-foreground">
+								{activeProject
+									? activeProject.name
+									: t("noActiveProject", "Aucun projet actif")}
+							</div>
+						</button>
+						<button
+							type="button"
+							onClick={() => setScaffoldMode("new")}
+							className={`text-left rounded-md border p-3 text-sm transition-colors ${
+								scaffoldMode === "new"
+									? "border-emerald-500 bg-emerald-500/10"
+									: "hover:bg-accent/50"
+							}`}
+						>
+							<div className="font-medium">
+								{t("scaffoldInNew", "Nouveau projet (repo greenfield)")}
+							</div>
+							<div className="text-xs text-muted-foreground">
+								{t(
+									"scaffoldInNewDesc",
+									"Crée un dossier + dépôt Git, puis génère dedans.",
+								)}
+							</div>
+						</button>
+					</div>
+
+					{scaffoldMode === "new" && (
+						<div className="mt-3 flex flex-col gap-3">
+							<div>
+								<label
+									htmlFor="scaffold-proj-name"
+									className="block text-xs font-bold mb-1"
+								>
+									{t("projectName", "Nom du projet")}
+								</label>
+								<input
+									id="scaffold-proj-name"
+									type="text"
+									value={newProjectName}
+									onChange={(e) => setNewProjectName(e.target.value)}
+									className="w-full p-2 border rounded text-sm"
+									placeholder="mon-projet"
+								/>
+							</div>
+							<div>
+								<label
+									htmlFor="scaffold-proj-loc"
+									className="block text-xs font-bold mb-1"
+								>
+									{t("projectLocation", "Emplacement")}
+								</label>
+								<div className="flex gap-2">
+									<input
+										id="scaffold-proj-loc"
+										type="text"
+										value={newProjectLocation}
+										onChange={(e) => setNewProjectLocation(e.target.value)}
+										className="w-full p-2 border rounded text-sm"
+										placeholder="C:\\ ou /"
+									/>
+									<Button variant="secondary" onClick={handleBrowseLocation}>
+										{t("browse", "Parcourir")}
+									</Button>
+								</div>
+							</div>
+							{/* biome-ignore lint/a11y/noLabelWithoutControl: input is nested inside */}
+							<label className="flex items-center gap-2 text-sm">
+								<input
+									type="checkbox"
+									checked={initGit}
+									onChange={(e) => setInitGit(e.target.checked)}
+								/>
+								{t("initGit", "Initialiser un dépôt Git")}
+							</label>
+						</div>
+					)}
+
+					<DialogFooter className="mt-4">
+						<Button
+							variant="outline"
+							onClick={confirmScaffold}
+							disabled={
+								scaffoldMode === "active"
+									? !activeProject
+									: !newProjectName.trim() || !newProjectLocation.trim()
+							}
+						>
+							{t("scaffold", "Générer le projet")}
+						</Button>
+						<Button
+							variant="ghost"
+							onClick={() => setShowScaffoldDialog(false)}
+						>
 							{t("cancel", "Annuler")}
 						</Button>
 					</DialogFooter>
