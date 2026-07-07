@@ -25,7 +25,7 @@ export const useVisualToCodeStore = create<VisualToCodeState>()(
 			setActiveMode: (mode) => set({ activeMode: mode }),
 			canvasNodes: [],
 			canvasEdges: [],
-			canvasDiagramType: "flowchart",
+			canvasDiagramType: "architecture",
 			setCanvasNodes: (nodes) => set({ canvasNodes: nodes }),
 			setCanvasEdges: (edges) => set({ canvasEdges: edges }),
 			setCanvasDiagramType: (type) => set({ canvasDiagramType: type }),
