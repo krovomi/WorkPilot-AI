@@ -104,7 +104,11 @@ class ReplayRecorder:
         session.status = status
 
         # Record session end step
-        _end_label = "Session Completed" if status == "completed" else f"Session Ended ({status})"
+        _end_label = (
+            "Session Completed"
+            if status == "completed"
+            else f"Session Ended ({status})"
+        )
         self._add_step(
             session_id,
             ReplayStepType.SESSION_END,
