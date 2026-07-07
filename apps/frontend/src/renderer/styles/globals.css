@@ -1074,6 +1074,18 @@ body {
   box-shadow: var(--shadow-md);
 }
 
+/* Auto-generated tasks from the visual canvas — distinct violet tint so they
+   read as machine-generated. Placed after .card-surface to win on source order. */
+.visual-canvas-task {
+  background-color: rgba(139, 92, 246, 0.08);
+  border-left: 4px solid rgba(139, 92, 246, 0.75);
+}
+
+.dark .visual-canvas-task {
+  background-color: rgba(139, 92, 246, 0.16);
+  border-left-color: rgba(167, 139, 250, 0.85);
+}
+
 /* Interactive card hover state */
 .card-interactive {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);

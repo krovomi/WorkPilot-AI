@@ -53,7 +53,7 @@ import {
 	addProject as registerProject,
 	useProjectStore,
 } from "../../stores/project-store";
-import { createTask, startTask } from "../../stores/task-store";
+import { createTask } from "../../stores/task-store";
 import type { DiagramType } from "../../stores/visual-to-code-store";
 import { useVisualToCodeStore } from "../../stores/visual-to-code-store";
 import { FileTree } from "../FileTree";
@@ -361,7 +361,10 @@ export const CanvasPanel: React.FC = () => {
 			.replace(/^-+|-+$/g, "")
 			.slice(0, 40) || "mon-projet";
 
-	// Create the task from the diagram and kick off the agentic build.
+	// Create the task from the diagram and hand it to the Kanban. The task is
+	// tagged `visual-canvas` (distinct card colour) and left in "Planification"
+	// (backlog) — the user reviews the generated spec and launches the build
+	// from the Kanban when ready (no auto-start).
 	const runScaffold = async (projectId: string) => {
 		const cleanEdges = sanitizeEdges(nodes, edges);
 		const { title, description } = buildArchitectureSpec(
@@ -370,7 +373,9 @@ export const CanvasPanel: React.FC = () => {
 			diagramType,
 			lang,
 		);
-		const task = await createTask(projectId, title, description);
+		const task = await createTask(projectId, title, description, {
+			sourceType: "visual-canvas",
+		});
 		if (!task) {
 			toast({
 				title: t("scaffoldError", "Échec de la création de la tâche"),
@@ -378,18 +383,16 @@ export const CanvasPanel: React.FC = () => {
 			});
 			return;
 		}
-		// On demand: start the build immediately and jump to the Kanban.
-		startTask(task.id);
 		globalThis.dispatchEvent(
 			new CustomEvent("workpilot:navigate-view", {
 				detail: { view: "kanban" },
 			}),
 		);
 		toast({
-			title: t("scaffoldStarted", "Génération lancée"),
+			title: t("scaffoldQueued", "Tâche créée en Planification"),
 			description: t(
-				"scaffoldStartedDesc",
-				"Suivez la progression dans le Kanban.",
+				"scaffoldQueuedDesc",
+				"Ouvrez le Kanban et lancez-la quand vous voulez.",
 			),
 		});
 	};

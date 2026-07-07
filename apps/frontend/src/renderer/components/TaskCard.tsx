@@ -1278,6 +1278,7 @@ export const TaskCard = memo(function TaskCard({
 					isSelected &&
 					"ring-2 ring-ring border-ring bg-accent/10",
 				isFromAzureDevOps && "azure-devops-task",
+				task.metadata?.sourceType === "visual-canvas" && "visual-canvas-task",
 				isSpotlit && "ring-2 task-spotlight", // violet spotlight on jump-to
 			)}
 			onClick={handleCardClick}
