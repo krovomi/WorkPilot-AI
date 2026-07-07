@@ -840,21 +840,55 @@ Return ONLY the JSON, no additional text."""
         # Parse the JSON response
         return self._parse_design_analysis(raw_analysis)
 
-    async def _call_vision_ai(self, image_data: str, prompt: str) -> str:
-        """Call Vision AI (Claude or OpenAI) for image analysis."""
+    def _resolve_active_provider(self) -> str:
+        """Resolve the user's selected provider (empty string if unknown)."""
         try:
-            # Try Claude Vision first
-            anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+            from core.client import _get_active_provider
+
+            return (_get_active_provider() or "").lower().strip()
+        except Exception:  # noqa: BLE001
+            return ""
+
+    async def _call_vision_ai(self, image_data: str, prompt: str) -> str:
+        """Analyze the design image with the active provider's vision model.
+
+        Honors the user's selected provider when it is vision-capable (Claude,
+        OpenAI/Copilot, Google Gemini), then falls back to any available
+        vision-capable key. Provider-agnostic — not hard-wired to Claude.
+        """
+        provider = self._resolve_active_provider()
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+        google_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+
+        # provider alias -> (api key, vision handler)
+        handlers = {
+            "claude": (anthropic_key, self._call_claude_vision),
+            "anthropic": (anthropic_key, self._call_claude_vision),
+            "openai": (openai_key, self._call_openai_vision),
+            "copilot": (openai_key, self._call_openai_vision),
+            "google": (google_key, self._call_gemini_vision),
+            "gemini": (google_key, self._call_gemini_vision),
+        }
+
+        try:
+            # 1) Honor the selected provider when it's vision-capable + keyed.
+            selected = handlers.get(provider)
+            if selected and selected[0]:
+                return await selected[1](selected[0], image_data, prompt)
+
+            # 2) Fall back to any available vision-capable provider.
             if anthropic_key:
                 return await self._call_claude_vision(anthropic_key, image_data, prompt)
-
-            # Fall back to OpenAI GPT-4o
-            openai_key = os.getenv("OPENAI_API_KEY")
             if openai_key:
                 return await self._call_openai_vision(openai_key, image_data, prompt)
+            if google_key:
+                return await self._call_gemini_vision(google_key, image_data, prompt)
 
-            # Fall back to mock analysis for development/testing
-            logger.warning("No Vision AI API key found. Using mock analysis.")
+            logger.warning(
+                "No vision-capable provider configured (provider=%s). Using mock analysis.",
+                provider or "unknown",
+            )
             return self._mock_vision_analysis()
 
         except Exception as e:
@@ -942,6 +976,47 @@ Return ONLY the JSON, no additional text."""
             response.raise_for_status()
             data = response.json()
             return data["choices"][0]["message"]["content"]
+
+    async def _call_gemini_vision(
+        self, api_key: str, image_data: str, prompt: str
+    ) -> str:
+        """Call Google Gemini Vision for image analysis."""
+        import httpx
+
+        # Extract base64 + media type from a data URI (or assume PNG).
+        if image_data.startswith("data:"):
+            parts = image_data.split(",", 1)
+            media_type = parts[0].split(":")[1].split(";")[0]
+            b64_data = parts[1]
+        else:
+            media_type = "image/png"
+            b64_data = image_data
+
+        model = os.getenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", "gemini-1.5-flash")
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                headers={"Content-Type": CONTENT_TYPE_JSON},
+                params={"key": api_key},
+                json={
+                    "contents": [
+                        {
+                            "parts": [
+                                {"text": prompt},
+                                {
+                                    "inline_data": {
+                                        "mime_type": media_type,
+                                        "data": b64_data,
+                                    }
+                                },
+                            ]
+                        }
+                    ]
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
 
     def _mock_vision_analysis(self) -> str:
         """Return a mock analysis for development/testing when no API key is available."""
@@ -1274,7 +1349,23 @@ Return ONLY the JSON array."""
         return "\n".join(lines)
 
     async def _call_code_generation_ai(self, prompt: str) -> str:
-        """Call the code generation AI model."""
+        """Generate code via the user's active provider (any LLM).
+
+        Routes through the shared provider-agnostic one-shot trunk so the
+        selected provider (Claude, OpenAI, Copilot, Gemini, Ollama, …) is used;
+        falls back to a direct API call only if the trunk can't resolve.
+        """
+        try:
+            from core.oneshot import oneshot_completion
+
+            text = await oneshot_completion(prompt, project_dir=str(self.project_path))
+            if text and text.strip():
+                return text
+            logger.warning("One-shot code-gen returned empty; using direct-API fallback.")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"One-shot code-gen failed ({e}); using direct-API fallback.")
+
+        # Legacy direct-API fallback (Anthropic → OpenAI → mock).
         try:
             import httpx
 

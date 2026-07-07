@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { app } from "electron";
 import { pythonEnvManager } from "./python-env-manager";
+import { credentialManager } from "./services/credential-manager";
 import { getEffectiveSourcePath } from "./updater/path-resolver";
 
 /**
@@ -103,6 +104,15 @@ export class DesignToCodeService {
 				if (settings.globalAnthropicApiKey)
 					env.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
 			}
+		} catch {
+			/* ignore */
+		}
+		// Provider-agnostic: inject the selected provider + its credentials
+		// (SELECTED_LLM_PROVIDER, OPENAI_API_KEY, GOOGLE_API_KEY, …) so vision and
+		// code-gen route to whatever LLM the user picked — not just Claude. Wins
+		// over the legacy Claude tokens above.
+		try {
+			Object.assign(env, credentialManager.getEnvironmentVariables());
 		} catch {
 			/* ignore */
 		}
