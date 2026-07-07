@@ -11,10 +11,8 @@ import {
 	ArrowLeftRight,
 	Blocks,
 	FileJson,
+	FilePlus2,
 	FolderOpen,
-	GitBranch,
-	Layers,
-	LayoutTemplate,
 	Loader2,
 	PanelLeftClose,
 	Plus,
@@ -100,7 +98,7 @@ export const CanvasPanel: React.FC = () => {
 					{
 						id: "1",
 						position: { x: 250, y: 5 },
-						data: { label: t("newFlowchart") },
+						data: { label: t("newDiagram", "Nouveau diagramme") },
 						type: "editable",
 					},
 				],
@@ -714,11 +712,6 @@ export const CanvasPanel: React.FC = () => {
 		null,
 	);
 
-	const requestDiagramChange = (type: DiagramType) => {
-		setNextDiagramType(type);
-		setShowSaveAsDialog(true);
-	};
-
 	const handleNewDiagram = (type: DiagramType) => {
 		if (!isJsonSaved) {
 			setNextDiagramType(type);
@@ -743,12 +736,8 @@ export const CanvasPanel: React.FC = () => {
 		setIsJsonSaved(false);
 	};
 
-	const getNodeLabel = (type: DiagramType) => {
-		if (type === "flowchart") return t("newFlowchart");
-		if (type === "architecture") return t("newArchitectureDiagram");
-		if (type === "mockup") return t("newMockup");
-		return "";
-	};
+	const getNodeLabel = (_type: DiagramType) =>
+		t("newDiagram", "Nouveau diagramme");
 
 	const getDiagramPrefix = (type: string) => {
 		if (type === "architecture") return "architectural";
@@ -879,51 +868,23 @@ export const CanvasPanel: React.FC = () => {
 		// biome-ignore lint/correctness/useExhaustiveDependencies: only refresh on open
 	}, [showSaveAsDialog]);
 
-	const DIAGRAM_OPTIONS: {
-		type: DiagramType;
-		icon: React.ReactNode;
-		label: string;
-	}[] = [
-		{
-			type: "flowchart",
-			icon: <GitBranch className="h-3.5 w-3.5" />,
-			label: t("newFlowchart"),
-		},
-		{
-			type: "architecture",
-			icon: <Layers className="h-3.5 w-3.5" />,
-			label: t("newArchitectureDiagram"),
-		},
-		{
-			type: "mockup",
-			icon: <LayoutTemplate className="h-3.5 w-3.5" />,
-			label: t("newMockup"),
-		},
-	];
-
 	return (
 		<div className="flex flex-col h-full flex-1 relative">
 			{/* Toolbar */}
 			<div className="flex items-center gap-1 px-2 py-1.5 border-b bg-background shrink-0">
-				{/* Group 1 — Diagram type selector */}
-				<div className="flex items-center gap-0.5 p-0.5 bg-muted rounded-md">
-					{DIAGRAM_OPTIONS.map(({ type, icon, label }) => (
-						<button
-							key={type}
-							type="button"
-							onClick={() => requestDiagramChange(type)}
-							title={label}
-							className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all ${
-								diagramType === type
-									? "bg-background text-foreground shadow-sm"
-									: "text-muted-foreground hover:text-foreground"
-							}`}
-						>
-							{icon}
-							<span className="hidden lg:inline">{label}</span>
-						</button>
-					))}
-				</div>
+				{/* Group 1 — New diagram */}
+				<Button
+					size="sm"
+					variant="ghost"
+					onClick={() => handleNewDiagram("architecture")}
+					className="gap-1.5 h-7 px-2 text-xs"
+					title={t("newDiagram", "Nouveau diagramme")}
+				>
+					<FilePlus2 className="h-3.5 w-3.5" />
+					<span className="hidden md:inline">
+						{t("newDiagram", "Nouveau diagramme")}
+					</span>
+				</Button>
 
 				<div className="h-5 w-px bg-border mx-0.5" />
 

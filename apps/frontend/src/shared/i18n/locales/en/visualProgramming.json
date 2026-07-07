@@ -1,6 +1,7 @@
 {
 	"title": "Visual Programming Interface",
 	"description": "No-code/Low-code interface for non-developers. Build flowcharts, architecture diagrams, and mockups to generate code automatically. Also supports reverse: visualize code as diagrams.",
+	"newDiagram": "New diagram",
 	"newFlowchart": "New Flowchart",
 	"newArchitectureDiagram": "New Architecture Diagram",
 	"newMockup": "New Mockup",

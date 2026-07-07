@@ -6,6 +6,7 @@ vi.mock("react-i18next", () => ({
 	useTranslation: () => ({
 		t: (key: string, fallback?: string) => {
 			const translations: Record<string, string> = {
+				newDiagram: "New diagram",
 				newFlowchart: "New Flowchart",
 				newArchitectureDiagram: "New Architecture Diagram",
 				newMockup: "New Mockup",
@@ -94,11 +95,13 @@ describe("CanvasPanel", () => {
 		(globalThis as any).platform = { isWindows: false };
 	});
 
-	it("renders diagram type buttons", () => {
+	it("renders a single 'New diagram' button (consolidated types)", () => {
 		render(<CanvasPanel />);
-		expect(screen.getByText("New Flowchart")).toBeInTheDocument();
-		expect(screen.getByText("New Architecture Diagram")).toBeInTheDocument();
-		expect(screen.getByText("New Mockup")).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "New diagram" }),
+		).toBeInTheDocument();
+		// The old flowchart/mockup presets are gone.
+		expect(screen.queryByText("New Mockup")).not.toBeInTheDocument();
 	});
 
 	it("renders action buttons", () => {
@@ -139,7 +142,7 @@ describe("CanvasPanel", () => {
 		).toBeInTheDocument();
 	});
 
-	it("opens the Save-As dialog on diagram change without an update loop", async () => {
+	it("opens the Save-As dialog without an update loop", async () => {
 		// Force the millisecond timestamp to advance on every read. The old
 		// filename effect (deps included the unstable getDefaultFileName) re-ran
 		// on every render and wrote a new value each time → "Maximum update depth
@@ -158,7 +161,7 @@ describe("CanvasPanel", () => {
 		);
 		try {
 			render(<CanvasPanel />);
-			fireEvent.click(screen.getByText("New Architecture Diagram"));
+			fireEvent.click(screen.getByRole("button", { name: "Save as…" }));
 			expect(await screen.findByText("Export file name")).toBeInTheDocument();
 		} finally {
 			vi.unstubAllGlobals();

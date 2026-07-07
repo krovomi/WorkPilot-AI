@@ -1,6 +1,7 @@
 {
 	"title": "Programmation visuelle",
 	"description": "Interface no-code/low-code pour non-développeurs. Créez des organigrammes, des diagrammes d'architecture et des maquettes pour générer du code automatiquement. Supporte aussi l'inverse : visualiser le code sous forme de diagrammes.",
+	"newDiagram": "Nouveau diagramme",
 	"newFlowchart": "Nouvel organigramme",
 	"newArchitectureDiagram": "Nouveau diagramme d'architecture",
 	"newMockup": "Nouvelle maquette",
