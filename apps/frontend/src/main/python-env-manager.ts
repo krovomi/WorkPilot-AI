@@ -191,38 +191,66 @@ export class PythonEnvManager extends EventEmitter {
 		const venvPython = this.getVenvPythonPath();
 		if (!venvPython || !existsSync(venvPython)) return false;
 
-		try {
-			// Check all dependencies - if any fail, we need to reinstall
-			// This prevents issues where partial installs leave some packages missing
-			// See: https://github.com/AndyMik90/Auto-Claude/issues/359
-			//
-			// Dependencies checked:
-			// - claude_agent_sdk: Core agent SDK (required)
-			// - dotenv: Environment variable loading (required)
-			// - google.generativeai: Google AI/Gemini support (required for full functionality)
-			// - real_ladybug + graphiti_core: Graphiti memory system (Python 3.12+ only)
-			const checkScript = `
-import sys
-import claude_agent_sdk
-import dotenv
-import google.generativeai
-# Graphiti dependencies only available on Python 3.12+
-if sys.version_info >= (3, 12):
-    import real_ladybug
-    import graphiti_core
-`;
-			execSync(
-				`"${venvPython}" -c "${checkScript.replace(/\n/g, "; ").replace(/; ; /g, "; ")}"`,
-				{
-					stdio: "pipe",
-					timeout: 15000,
-					encoding: "utf-8",
-				},
-			);
-			return true;
-		} catch {
-			return false;
-		}
+		// Check all dependencies - if any fail, we need to reinstall
+		// This prevents issues where partial installs leave some packages missing
+		// See: https://github.com/AndyMik90/Auto-Claude/issues/359
+		//
+		// Dependencies checked:
+		// - claude_agent_sdk: Core agent SDK (required)
+		// - dotenv: Environment variable loading (required)
+		// - google.generativeai: Google AI/Gemini support (required for full functionality)
+		// - real_ladybug + graphiti_core: Graphiti memory system (Python 3.12+ only)
+		//
+		// IMPORTANT: we use importlib.util.find_spec (presence check) instead of
+		// actually `import`-ing the modules. Importing google.generativeai +
+		// graphiti_core cold on Windows costs ~28s, which blew past the old 15s
+		// timeout — so a cold `pnpm run dev` wrongly concluded deps were missing
+		// and re-ran a full `pip install` on EVERY startup, freezing the main
+		// process. find_spec resolves the module locations without executing their
+		// (very heavy) top-level init, so this check is ~0.1s. It runs via a real
+		// child process (not execSync) so it never blocks the main event loop.
+		const checkScript = [
+			"import importlib.util as u, sys",
+			"mods = ['claude_agent_sdk', 'dotenv', 'google.generativeai']",
+			"if sys.version_info >= (3, 12):",
+			"    mods += ['real_ladybug', 'graphiti_core']",
+			"def present(m):",
+			"    try:",
+			"        return u.find_spec(m) is not None",
+			"    except Exception:",
+			"        return False",
+			"sys.exit(0 if all(present(m) for m in mods) else 1)",
+		].join("\n");
+
+		return await new Promise<boolean>((resolvePromise) => {
+			try {
+				// Pass the script over stdin ("-") rather than -c: avoids fragile
+				// cross-platform quoting of a multi-line script on Windows.
+				const proc = spawn(venvPython, ["-"], {
+					stdio: ["pipe", "ignore", "ignore"],
+				});
+				const timer = setTimeout(() => {
+					try {
+						proc.kill();
+					} catch {
+						/* noop */
+					}
+					resolvePromise(false);
+				}, 15000);
+				proc.on("error", () => {
+					clearTimeout(timer);
+					resolvePromise(false);
+				});
+				proc.on("close", (code) => {
+					clearTimeout(timer);
+					resolvePromise(code === 0);
+				});
+				proc.stdin.write(checkScript);
+				proc.stdin.end();
+			} catch {
+				resolvePromise(false);
+			}
+		});
 	}
 
 	/**

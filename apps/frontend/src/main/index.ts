@@ -646,17 +646,26 @@ async function ensureStreamingServerLaunched() {
 	}
 }
 
-// Initialisation explicite du PythonEnvManager avec le chemin du backend (corrigé)
+// Initialisation du PythonEnvManager en arrière-plan (NON bloquant).
+//
+// Auparavant en top-level `await`, ce qui suspendait TOUTE l'évaluation du
+// module principal — donc avant même app.whenReady() et l'affichage de la
+// fenêtre — pendant la vérification de l'environnement Python (jusqu'à ~28s à
+// froid après un `pnpm run build`). On lance l'init sans l'attendre : la
+// fenêtre s'affiche immédiatement, et tout ce qui dépend de Python
+// (backend FastAPI, serveur de streaming) attend déjà l'event "ready"
+// (cf. ensureBackendLaunched / ensureStreamingServerLaunched), donc rien ne
+// requiert que l'init soit terminée de façon synchrone ici.
 const backendSourcePath = resolve(__dirname, "../../../backend");
-try {
-	const status = await pythonEnvManager.initialize(backendSourcePath);
-	console.warn("[main] PythonEnvManager status:", status);
-} catch (err) {
-	console.error(
-		"[main] Erreur lors de l'initialisation du PythonEnvManager:",
-		err,
+pythonEnvManager
+	.initialize(backendSourcePath)
+	.then((status) => console.warn("[main] PythonEnvManager status:", status))
+	.catch((err) =>
+		console.error(
+			"[main] Erreur lors de l'initialisation du PythonEnvManager:",
+			err,
+		),
 	);
-}
 
 // Clear cache on Windows to prevent permission errors from stale cache
 async function clearWindowsCache() {
