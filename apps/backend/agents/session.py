@@ -1594,7 +1594,7 @@ async def run_agent_session(
                 pass
             if _rr and _rs_id:
                 try:
-                    _rr.end_session(_rs_id)
+                    _rr.end_session(_rs_id, status="failed")
                 except Exception:
                     pass
             return "error", response_text, error_info
@@ -1717,7 +1717,7 @@ async def run_agent_session(
         }
         if _rr and _rs_id:
             try:
-                _rr.end_session(_rs_id)
+                _rr.end_session(_rs_id, status="failed")
             except Exception:
                 pass
         return "error", sanitized_error, error_info

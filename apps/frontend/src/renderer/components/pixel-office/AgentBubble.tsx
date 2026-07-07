@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { stripAnsiCodes } from "../../../shared/utils/ansi-sanitizer";
+import { flattenTaskLogsToLines } from "../../../shared/utils/task-logs";
 import type { PixelAgent } from "../../stores/pixel-office-store";
 import { useTaskStore } from "../../stores/task-store";
 import type { Terminal } from "../../stores/terminal-store";
@@ -224,15 +225,41 @@ function logLineColor(line: string): string {
 }
 
 function LogStream({ taskId }: { readonly taskId: string }) {
-	const logs = useTaskStore(
-		(s) => s.tasks.find((t) => t.id === taskId)?.logs ?? [],
-	);
+	const task = useTaskStore((s) => s.tasks.find((t) => t.id === taskId));
+	const liveLogs = task?.logs ?? [];
+	const specId = task?.specId;
+	const projectId = task?.projectId;
 	const [open, setOpen] = useState(true);
 	const [copied, setCopied] = useState(false);
+	const [persistedLines, setPersistedLines] = useState<string[]>([]);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const atBottomRef = useRef(true);
 
-	const visibleLines = logs
+	// A finished task streams no live logs into `task.logs` (that array is only
+	// filled while the pipeline runs). Fall back to the persisted phase logs
+	// (task_logs.json) — the same source the Kanban's Logs tab reads — so the
+	// bubble isn't stuck on "En attente de logs…" for a completed task.
+	const hasLiveLogs = liveLogs.length > 0;
+	useEffect(() => {
+		if (hasLiveLogs || !projectId || !specId) return;
+		let cancelled = false;
+		window.electronAPI
+			.getTaskLogs(projectId, specId)
+			.then((res) => {
+				if (!cancelled && res.success && res.data) {
+					setPersistedLines(flattenTaskLogsToLines(res.data));
+				}
+			})
+			.catch(() => {
+				/* best-effort: bubble simply shows no logs */
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [hasLiveLogs, projectId, specId]);
+
+	const sourceLines = hasLiveLogs ? liveLogs : persistedLines;
+	const visibleLines = sourceLines
 		.slice(-LOG_KEEP)
 		.map((l) => stripAnsiCodes(l).trim())
 		.filter((l) => l.length > 0);

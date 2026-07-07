@@ -194,6 +194,20 @@ def record_session_usage(
     except Exception as exc:
         logger.warning("[usage_tracker] dashboard_snapshot write failed: %s", exc)
 
+    # 4 — carbon-ledger.json (for CarbonProfiler runner)
+    try:
+        _append_carbon_ledger(
+            project_dir,
+            provider,
+            model,
+            input_tokens,
+            output_tokens,
+            cache_creation_input_tokens,
+            cache_read_input_tokens,
+        )
+    except Exception as exc:
+        logger.warning("[usage_tracker] carbon-ledger write failed: %s", exc)
+
 
 # ---------------------------------------------------------------------------
 # Destination 1: cost_data.json
@@ -425,6 +439,167 @@ def _update_dashboard_snapshot(
         snap["last_updated"] = datetime.now(timezone.utc).isoformat()
 
         _atomic_write(snap_path, json.dumps(snap, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Destination 4: carbon-ledger.json  (consumed by carbon_profiler_runner.py)
+# ---------------------------------------------------------------------------
+
+# Providers whose inference runs on local/consumer hardware rather than a
+# hyperscale data centre. Used to pick the ComputeSource in the ledger so the
+# EnergyTracker applies the right grid-intensity multiplier.
+_LOCAL_PROVIDERS = {"ollama", "local", "lmstudio", "llamacpp", "llama.cpp"}
+
+
+def _classify_carbon_source(provider: str) -> str:
+    """Map a provider name to a ledger ``source`` value."""
+    return "llm_local" if (provider or "").lower() in _LOCAL_PROVIDERS else "llm_cloud"
+
+
+def _resolve_carbon_ledger_root(project_dir: Path) -> Path:
+    """Return the main project root that owns the carbon ledger.
+
+    Builds run inside worktrees (``<root>/.workpilot/worktrees/tasks/<spec>``)
+    so ``project_dir`` is the worktree, not the repo the CarbonProfiler scans.
+    Walk back to the directory that owns the first ``.workpilot`` in the chain
+    so every worktree feeds a single ledger at the real project root.
+    """
+    parts = project_dir.parts
+    for i, part in enumerate(parts):
+        if part == ".workpilot" and i + 1 < len(parts) and parts[i + 1] == "worktrees":
+            return Path(*parts[:i]) if i else project_dir
+    return project_dir
+
+
+def _carbon_record(
+    provider: str,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_creation_input_tokens: int,
+    cache_read_input_tokens: int,
+    timestamp: str,
+) -> dict:
+    """Build one carbon-ledger entry in the shape the runner ingests.
+
+    All input-side tokens (fresh + cache creation + cache read) are counted as
+    ``tokens_in`` because they are all processed by the model — cache reads are
+    cheaper to bill but still consume compute.
+    """
+    return {
+        "source": _classify_carbon_source(provider),
+        "provider": provider,
+        "model": model,
+        "tokens_in": int(input_tokens)
+        + int(cache_creation_input_tokens)
+        + int(cache_read_input_tokens),
+        "tokens_out": int(output_tokens),
+        "timestamp": timestamp,
+    }
+
+
+def _append_carbon_ledger(
+    project_dir: Path,
+    provider: str,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_creation_input_tokens: int = 0,
+    cache_read_input_tokens: int = 0,
+) -> None:
+    """Append one usage record to ``<root>/.workpilot/carbon-ledger.json``.
+
+    The ledger is a flat JSON array (see carbon_profiler_runner.py).
+    """
+    root = _resolve_carbon_ledger_root(project_dir)
+    ledger_path = root / ".workpilot" / "carbon-ledger.json"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with _get_file_lock(ledger_path):
+        if ledger_path.exists():
+            try:
+                ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+                if not isinstance(ledger, list):
+                    ledger = []
+            except Exception:
+                ledger = []
+        else:
+            ledger = []
+
+        ledger.append(
+            _carbon_record(
+                provider,
+                model,
+                input_tokens,
+                output_tokens,
+                cache_creation_input_tokens,
+                cache_read_input_tokens,
+                datetime.now(timezone.utc).isoformat(),
+            )
+        )
+        _atomic_write(ledger_path, json.dumps(ledger, indent=2))
+
+
+def backfill_carbon_ledger_from_cost_data(project_dir: Path) -> int:
+    """Rebuild ``carbon-ledger.json`` from every ``cost_data.json`` in the project.
+
+    Seeds the ledger for projects whose builds ran before the carbon producer
+    existed. Scans the project root plus all worktrees, de-duplicates records,
+    and overwrites the ledger. Idempotent: cost_data.json is the superset of all
+    tracked usage, so re-running always reproduces the full, correct ledger.
+
+    Returns the number of records written.
+    """
+    root = _resolve_carbon_ledger_root(project_dir)
+    workpilot = root / ".workpilot"
+
+    cost_files: list[Path] = []
+    root_cost = workpilot / "cost_data.json"
+    if root_cost.exists():
+        cost_files.append(root_cost)
+    cost_files.extend(sorted(workpilot.glob("worktrees/**/cost_data.json")))
+
+    records: list[dict] = []
+    seen: set[tuple] = set()
+    for cost_file in cost_files:
+        try:
+            data = json.loads(cost_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for usage in data.get("usages", []):
+            provider = usage.get("provider", "")
+            input_tokens = int(usage.get("input_tokens", 0))
+            output_tokens = int(usage.get("output_tokens", 0))
+            cache_creation = int(usage.get("cache_creation_input_tokens", 0))
+            cache_read = int(usage.get("cache_read_input_tokens", 0))
+            timestamp = usage.get("timestamp", "")
+            key = (
+                timestamp,
+                usage.get("task_id"),
+                usage.get("phase"),
+                input_tokens,
+                output_tokens,
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            records.append(
+                _carbon_record(
+                    provider,
+                    usage.get("model", ""),
+                    input_tokens,
+                    output_tokens,
+                    cache_creation,
+                    cache_read,
+                    timestamp,
+                )
+            )
+
+    ledger_path = workpilot / "carbon-ledger.json"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with _get_file_lock(ledger_path):
+        _atomic_write(ledger_path, json.dumps(records, indent=2))
+    return len(records)
 
 
 # ---------------------------------------------------------------------------

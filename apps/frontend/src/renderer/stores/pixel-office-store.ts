@@ -1,9 +1,14 @@
 import { create } from "zustand";
+import {
+	calculateProgress,
+	isTaskEffectivelyComplete,
+} from "../../shared/progress";
 import type {
 	SubtaskNode,
 	SubtaskState as SwarmSubtaskState,
 } from "../../shared/types/swarm";
 import type { ExecutionPhase, Task } from "../../shared/types/task";
+import { getDisplayProgress } from "../lib/utils";
 import type { Terminal } from "./terminal-store";
 
 // ── Types ────────────────────────────────────────────────────
@@ -250,9 +255,26 @@ function buildTaskAgent(
 	const name = shortTitle(task.title);
 	const activity = mapTaskToActivity(task);
 	const isPending = activity === "pending";
+	// Mirror the Kanban's percent (getDisplayProgress) instead of the raw
+	// phase-weighted overallProgress: a finished task in human_review persists
+	// overallProgress=50, so the bubble would show 50% while the board shows
+	// 100%. Deriving it from completed subtasks + the terminal-state check keeps
+	// both views in sync.
+	const executionPhase = task.executionProgress?.phase;
+	const hasActiveExecution =
+		!!executionPhase &&
+		executionPhase !== "idle" &&
+		executionPhase !== "complete" &&
+		executionPhase !== "failed";
 	const progress = {
-		phase: task.executionProgress?.phase,
-		progress: task.executionProgress?.overallProgress,
+		phase: executionPhase,
+		progress: getDisplayProgress(
+			calculateProgress(task.subtasks),
+			task.executionProgress?.overallProgress,
+			hasActiveExecution,
+			task.subtasks.length > 0,
+			isTaskEffectivelyComplete(task.status, task.reviewReason),
+		),
 		currentSubtask: task.executionProgress?.currentSubtask,
 	};
 

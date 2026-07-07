@@ -482,7 +482,7 @@ async def run_qa_fixer_session(
             task_logger.log_error(f"QA fixer error: {e}", LogPhase.VALIDATION)
         if _rr and _rs_id:
             try:
-                _rr.end_session(_rs_id)
+                _rr.end_session(_rs_id, status="failed")
             except Exception:
                 pass
         return "error", str(e)
@@ -730,7 +730,7 @@ async def _run_qa_fixer_agent_client_session(
             task_logger.log_error(f"QA fixer error: {e}", LogPhase.VALIDATION)
         if _rr and _rs_id:
             try:
-                _rr.end_session(_rs_id)
+                _rr.end_session(_rs_id, status="failed")
             except Exception:
                 pass
         return "error", str(e)

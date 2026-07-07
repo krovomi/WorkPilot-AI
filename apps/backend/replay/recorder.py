@@ -85,22 +85,32 @@ class ReplayRecorder:
         logger.info(f"Replay recording started: {session_id}")
         return session
 
-    def end_session(self, session_id: str) -> ReplaySession | None:
-        """End recording and persist the session."""
+    def end_session(
+        self, session_id: str, status: str = "completed"
+    ) -> ReplaySession | None:
+        """End recording and persist the session.
+
+        Args:
+            session_id: The session to finalize.
+            status: Final status — "completed" (default) for a clean end, or
+                "failed" when the agent turn ended through an error/exception
+                path. Surfaced by the Session History UI (red vs. green).
+        """
         session = self._active_sessions.get(session_id)
         if not session:
             return None
 
         session.end_time = time.time()
-        session.status = "completed"
+        session.status = status
 
         # Record session end step
+        _end_label = "Session Completed" if status == "completed" else f"Session Ended ({status})"
         self._add_step(
             session_id,
             ReplayStepType.SESSION_END,
             {
-                "label": "Session Completed",
-                "description": f"Completed in {session.duration_seconds:.1f}s — "
+                "label": _end_label,
+                "description": f"Ended ({status}) in {session.duration_seconds:.1f}s — "
                 f"{session.total_tokens} tokens, {session.total_tool_calls} tool calls",
             },
         )

@@ -612,7 +612,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
             task_logger.log_error(f"QA session error: {e}", LogPhase.VALIDATION)
         if _rr and _rs_id:
             try:
-                _rr.end_session(_rs_id)
+                _rr.end_session(_rs_id, status="failed")
             except Exception:
                 pass
         return "error", str(e)
@@ -861,7 +861,7 @@ async def _run_qa_agent_client_session(
             task_logger.log_error(f"QA session error: {e}", LogPhase.VALIDATION)
         if _rr and _rs_id:
             try:
-                _rr.end_session(_rs_id)
+                _rr.end_session(_rs_id, status="failed")
             except Exception:
                 pass
         return "error", str(e)

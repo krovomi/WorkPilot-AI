@@ -341,6 +341,7 @@ class ReplaySession:
             "provider": self.provider,
             "model_label": self.model_label,
             "task_description": self.task_description,
+            "project_path": self.project_path,
             "start_time": self.start_time,
             "end_time": self.end_time,
             "duration_seconds": self.duration_seconds,

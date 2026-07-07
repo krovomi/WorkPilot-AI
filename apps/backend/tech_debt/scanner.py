@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
@@ -53,6 +54,13 @@ SKIP_DIRS = {
     ".cache",
     "target",
     "out",
+    # .NET / MSBuild generated output — otherwise a brownfield C# repo
+    # yields hundreds of thousands of false-positive debt items.
+    "obj",
+    "bin",
+    "packages",
+    ".vs",
+    "TestResults",
 }
 
 TODO_PATTERN = re.compile(
@@ -109,14 +117,14 @@ class DebtReport:
 
 
 def _iter_source_files(root: Path) -> Iterable[Path]:
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in SCAN_EXTS:
-            continue
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+    # os.walk lets us prune skipped directories *in place* so we never descend
+    # into .git / node_modules / build output — much faster than rglob("*"),
+    # which walks the entire tree (including huge dirs) before filtering.
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        for name in filenames:
+            if Path(name).suffix.lower() in SCAN_EXTS:
+                yield Path(dirpath) / name
 
 
 def _make_id(kind: str, file_path: str, line: int, msg: str) -> str:
@@ -413,8 +421,15 @@ def scan_project(
     project_path: str | Path,
     kinds: list[DebtKind] | None = None,
     persist: bool = True,
+    max_items: int | None = 1000,
 ) -> DebtReport:
-    """Run all enabled scanners and produce a report with ROI scores."""
+    """Run all enabled scanners and produce a report with ROI scores.
+
+    ``max_items`` bounds how many individual items are shipped/persisted
+    (highest ROI first). The summary always reflects the *full* totals, so a
+    huge brownfield repo reports its real debt without producing a multi-GB
+    payload that would overflow the IPC bridge.
+    """
     import time
 
     root = Path(project_path).resolve()
@@ -445,6 +460,8 @@ def scan_project(
 
     items.sort(key=lambda i: i.roi, reverse=True)
 
+    # Summary is computed over *all* detected items so totals stay truthful,
+    # even though we only ship the top `max_items` below.
     summary = {
         "total": len(items),
         "by_kind": {
@@ -454,6 +471,9 @@ def scan_project(
         "total_effort": round(sum(i.effort for i in items), 2),
         "avg_roi": round(sum(i.roi for i in items) / len(items), 3) if items else 0.0,
     }
+
+    if max_items is not None and len(items) > max_items:
+        items = items[:max_items]
 
     now = time.time()
     trend_file = root / ".workpilot" / "tech_debt" / "trend.json"

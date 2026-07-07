@@ -54,6 +54,18 @@ def _isoformat(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
 
+def _parse_timestamp(value: Any) -> float | None:
+    """Parse a ledger timestamp (ISO-8601 string or epoch seconds) to epoch."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
 def _record_to_dict(record: Any) -> dict[str, Any]:
     return {
         "source": record.source.value,
@@ -72,12 +84,12 @@ def _ingest_ledger(tracker: EnergyTracker, ledger: list[dict[str, Any]]) -> None
     for entry in ledger:
         source = entry.get("source", "llm_cloud")
         if source == "ci_cd":
-            tracker.record_ci_run(
+            record = tracker.record_ci_run(
                 duration_s=float(entry.get("duration_s", 0)),
                 runner_type=entry.get("runner_type", "standard"),
             )
         else:
-            tracker.record_llm_call(
+            record = tracker.record_llm_call(
                 provider=entry.get("provider", ""),
                 model=entry.get("model", ""),
                 tokens_in=int(entry.get("tokens_in", 0)),
@@ -87,6 +99,11 @@ def _ingest_ledger(tracker: EnergyTracker, ledger: list[dict[str, Any]]) -> None
                 if source in {s.value for s in ComputeSource}
                 else ComputeSource.LLM_CLOUD,
             )
+        # Preserve the original event time so the report's period reflects when
+        # the work happened, not when the scan ran.
+        ts = _parse_timestamp(entry.get("timestamp"))
+        if ts is not None:
+            record.timestamp = ts
 
 
 def _empty_result(reason: str) -> dict[str, Any]:
@@ -146,12 +163,27 @@ def main() -> None:
         default="global_avg",
         help="Grid region for carbon intensity (us-east, eu-west, ...)",
     )
+    parser.add_argument(
+        "--backfill",
+        action="store_true",
+        help="Rebuild carbon-ledger.json from existing cost_data.json before scanning.",
+    )
     args = parser.parse_args()
 
     project_path = Path(args.project_path)
     if not project_path.exists():
         _emit("CARBON_ERROR", f"Project path does not exist: {project_path}")
         sys.exit(1)
+
+    if args.backfill:
+        try:
+            from core.usage_tracker import backfill_carbon_ledger_from_cost_data
+
+            count = backfill_carbon_ledger_from_cost_data(project_path)
+            _emit_event("backfill", {"records": count})
+        except Exception as exc:  # noqa: BLE001
+            _emit("CARBON_ERROR", f"Backfill failed: {exc}")
+            sys.exit(1)
 
     try:
         result = run_scan(project_path, args.region)
