@@ -16,6 +16,7 @@ import {
 	Layers,
 	LayoutTemplate,
 	Loader2,
+	PanelLeftClose,
 	Plus,
 	Rocket,
 	Save,
@@ -74,9 +75,15 @@ export type { DiagramType } from "../../stores/visual-to-code-store";
 export const CanvasPanel: React.FC = () => {
 	const { t, i18n } = useTranslation("visualProgramming");
 	const lang: Lang = i18n.language?.toLowerCase().startsWith("fr") ? "fr" : "en";
-	const activeProject = useProjectStore(
-		(s) => s.projects.find((p) => p.id === s.activeProjectId) ?? null,
-	);
+	// Captured imperatively when the scaffold dialog opens — NOT a reactive
+	// store subscription. Subscribing here would re-render the canvas on every
+	// project-store change (e.g. task-progress updates while the panel stays
+	// mounted), which can thrash Radix Presence refs into a "Maximum update
+	// depth exceeded" loop.
+	const [activeProject, setActiveProject] = useState<{
+		id: string;
+		name: string;
+	} | null>(null);
 	const {
 		canvasNodes: storedNodes,
 		canvasEdges: storedEdges,
@@ -113,6 +120,8 @@ export const CanvasPanel: React.FC = () => {
 	const reactFlowRef = useRef<any>(null);
 	const [isJsonSaved, setIsJsonSaved] = useState(true);
 	const [showPalette, setShowPalette] = useState(true);
+	// MiniMap is collapsed to a small thumbnail and expands on hover.
+	const [miniMapExpanded, setMiniMapExpanded] = useState(false);
 	const [selectedFolder, setSelectedFolder] = useState<string>("");
 	const [showSaveAsDialog, setShowSaveAsDialog] = useState(false);
 	const [saveAsFileName, setSaveAsFileName] = useState("");
@@ -417,7 +426,13 @@ export const CanvasPanel: React.FC = () => {
 				/* ignore */
 			}
 		}
-		setScaffoldMode(activeProject ? "active" : "new");
+		// Snapshot the active project once, imperatively.
+		const projState = useProjectStore.getState();
+		const proj =
+			projState.projects.find((p) => p.id === projState.activeProjectId) ?? null;
+		const projInfo = proj ? { id: proj.id, name: proj.name } : null;
+		setActiveProject(projInfo);
+		setScaffoldMode(projInfo ? "active" : "new");
 		setShowScaffoldDialog(true);
 	};
 
@@ -432,7 +447,8 @@ export const CanvasPanel: React.FC = () => {
 		try {
 			let projectId: string | null = null;
 			if (scaffoldMode === "active") {
-				projectId = activeProject?.id ?? null;
+				projectId =
+					useProjectStore.getState().activeProjectId ?? activeProject?.id ?? null;
 			} else {
 				if (!newProjectName.trim() || !newProjectLocation.trim()) {
 					toast({
@@ -852,11 +868,16 @@ export const CanvasPanel: React.FC = () => {
 	}, [getFallbackExplorerRoot]);
 
 	React.useEffect(() => {
+		// Refresh the suggested filename ONLY when the dialog opens. Depending on
+		// getDefaultFileName (a new function every render, returning a millisecond
+		// timestamp) re-ran this on every render and wrote a new value each time —
+		// an infinite setState loop that surfaced as "Maximum update depth
+		// exceeded" through the Radix Dialog's Presence refs.
 		if (showSaveAsDialog) {
 			setSaveAsFileName(getDefaultFileName());
 		}
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [showSaveAsDialog, getDefaultFileName]);
+		// biome-ignore lint/correctness/useExhaustiveDependencies: only refresh on open
+	}, [showSaveAsDialog]);
 
 	const DIAGRAM_OPTIONS: {
 		type: DiagramType;
@@ -1044,7 +1065,15 @@ export const CanvasPanel: React.FC = () => {
 
 			<div className="flex flex-1 min-h-0">
 				{showPalette && (
-					<div className="shrink-0 border-r bg-background overflow-y-auto p-2">
+					<div className="relative shrink-0 border-r bg-background overflow-y-auto p-2">
+						<button
+							type="button"
+							onClick={() => setShowPalette(false)}
+							title={t("hidePalette", "Masquer la palette")}
+							className="absolute top-2 right-2 z-10 p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+						>
+							<PanelLeftClose className="h-4 w-4" />
+						</button>
 						<VisualProgrammingPalette />
 					</div>
 				)}
@@ -1067,18 +1096,34 @@ export const CanvasPanel: React.FC = () => {
 						onDragOver={handleDragOver}
 					>
 						<Controls />
-						<MiniMap
+						{/* Collapsed to a small thumbnail; expands on hover. Pannable/
+						    zoomable so clicking-dragging it navigates the diagram. */}
+						<div
+							onMouseEnter={() => setMiniMapExpanded(true)}
+							onMouseLeave={() => setMiniMapExpanded(false)}
 							style={{
 								position: "absolute",
-								left: 40,
-								width: 180,
-								height: 120,
+								right: 12,
+								bottom: 12,
 								zIndex: 11,
-								background: "rgba(255,255,255,0.9)",
-								borderRadius: 8,
-								boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
 							}}
-						/>
+						>
+							<MiniMap
+								pannable
+								zoomable
+								style={{
+									position: "relative",
+									margin: 0,
+									width: miniMapExpanded ? 200 : 52,
+									height: miniMapExpanded ? 140 : 40,
+									opacity: miniMapExpanded ? 1 : 0.55,
+									transition: "width 0.2s, height 0.2s, opacity 0.2s",
+									background: "rgba(255,255,255,0.92)",
+									borderRadius: 8,
+									boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
+								}}
+							/>
+						</div>
 						<Background />
 					</ReactFlow>
 				</div>

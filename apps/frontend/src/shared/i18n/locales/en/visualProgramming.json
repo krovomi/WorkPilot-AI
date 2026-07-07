@@ -13,6 +13,7 @@
 	"newBlock": "New block",
 	"palette": "Palette",
 	"togglePalette": "Show/hide the block palette",
+	"hidePalette": "Hide the palette",
 	"scaffold": "Generate project",
 	"scaffolding": "Generating…",
 	"scaffoldTooltip": "Generate the full production-ready project via the agentic pipeline, then open the Kanban",

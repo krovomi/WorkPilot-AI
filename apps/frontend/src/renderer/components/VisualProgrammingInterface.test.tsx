@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom";
 
@@ -127,5 +127,54 @@ describe("CanvasPanel", () => {
 		expect(
 			screen.getByRole("button", { name: "Code preview" }),
 		).not.toBeDisabled();
+	});
+
+	it("opens the scaffold-target dialog without an infinite update loop", async () => {
+		render(<CanvasPanel />);
+		fireEvent.click(screen.getByRole("button", { name: "Generate project" }));
+		// A Radix Presence ref loop would throw "Maximum update depth exceeded"
+		// here; otherwise the dialog title renders.
+		expect(
+			await screen.findByText("Où générer le projet ?"),
+		).toBeInTheDocument();
+	});
+
+	it("opens the Save-As dialog on diagram change without an update loop", async () => {
+		// Force the millisecond timestamp to advance on every read. The old
+		// filename effect (deps included the unstable getDefaultFileName) re-ran
+		// on every render and wrote a new value each time → "Maximum update depth
+		// exceeded". The fix runs it only when the dialog opens.
+		let tick = 0;
+		const RealDate = Date;
+		// biome-ignore lint/suspicious/noExplicitAny: minimal Date stub for the test
+		vi.stubGlobal(
+			"Date",
+			class extends RealDate {
+				getMilliseconds() {
+					return tick++ % 1000;
+				}
+				// biome-ignore lint/suspicious/noExplicitAny: constructor passthrough
+			} as any,
+		);
+		try {
+			render(<CanvasPanel />);
+			fireEvent.click(screen.getByText("New Architecture Diagram"));
+			expect(await screen.findByText("Export file name")).toBeInTheDocument();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("opens the scaffold dialog with an active project seeded (no loop)", async () => {
+		const { useProjectStore } = await import("../stores/project-store");
+		useProjectStore.setState({
+			// biome-ignore lint/suspicious/noExplicitAny: minimal test project
+			projects: [{ id: "p1", name: "My Project" } as any],
+			activeProjectId: "p1",
+		});
+		render(<CanvasPanel />);
+		fireEvent.click(screen.getByRole("button", { name: "Generate project" }));
+		expect(await screen.findByText("My Project")).toBeInTheDocument();
+		useProjectStore.setState({ projects: [], activeProjectId: null });
 	});
 });
