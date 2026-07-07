@@ -583,6 +583,17 @@ export function App() {
 	// Task completion toast notifications (human_review, done, pr_created, error)
 	useTaskNotifications({ onNavigate: (view) => setActiveView(view) });
 
+	// Programmatic main-view navigation (e.g. the visual canvas jumps to the
+	// Kanban after queuing a scaffold task).
+	useEffect(() => {
+		const handler = (e: Event) => {
+			const view = (e as CustomEvent<{ view?: SidebarView }>).detail?.view;
+			if (view) setActiveView(view);
+		};
+		window.addEventListener("workpilot:navigate-view", handler);
+		return () => window.removeEventListener("workpilot:navigate-view", handler);
+	}, []);
+
 	// Command Palette & Keyboard Shortcuts state (Features 9.4 & 9.5)
 	const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 	const [isShortcutsOverlayOpen, setIsShortcutsOverlayOpen] = useState(false);

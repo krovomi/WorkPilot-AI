@@ -3,6 +3,12 @@
 	"description": "Run N contestants in parallel with different provider/model combinations. An impartial judge picks the winner.",
 	"projectPath": "Project path",
 	"specId": "Spec id",
+	"selectSpec": "Select a spec",
+	"hint": {
+		"selectProject": "Select a project first.",
+		"selectSpec": "Choose a spec to launch.",
+		"addContestant": "Add at least one contestant."
+	},
 	"contestants": "Contestants",
 	"contestantsCount": "{{count}} contestants",
 	"addContestant": "Add contestant",

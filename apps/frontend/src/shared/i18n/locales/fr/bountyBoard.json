@@ -3,6 +3,12 @@
 	"description": "Lancez N participants en parallèle avec des combinaisons provider/modèle différentes. Un juge impartial choisit le gagnant.",
 	"projectPath": "Chemin du projet",
 	"specId": "Identifiant de spec",
+	"selectSpec": "Sélectionnez une spec",
+	"hint": {
+		"selectProject": "Sélectionnez d'abord un projet.",
+		"selectSpec": "Choisissez une spec à lancer.",
+		"addContestant": "Ajoutez au moins un participant."
+	},
 	"contestants": "Participants",
 	"contestantsCount": "{{count}} participants",
 	"addContestant": "Ajouter un participant",

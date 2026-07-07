@@ -17,6 +17,7 @@ import {
 	LayoutTemplate,
 	Loader2,
 	Plus,
+	Rocket,
 	Save,
 	Sparkles,
 } from "lucide-react";
@@ -40,6 +41,17 @@ import type {
 } from "@preload/api/modules/visual-programming-api";
 import { saveAs } from "file-saver";
 import { toast } from "@/hooks/use-toast";
+import {
+	canConnect,
+	connectionLabel,
+	type Lang,
+} from "../../lib/architecture-connections";
+import {
+	buildArchitectureSpec,
+	sanitizeEdges,
+} from "../../lib/architecture-spec";
+import { useProjectStore } from "../../stores/project-store";
+import { createTask, startTask } from "../../stores/task-store";
 import type { DiagramType } from "../../stores/visual-to-code-store";
 import { useVisualToCodeStore } from "../../stores/visual-to-code-store";
 import { FileTree } from "../FileTree";
@@ -57,7 +69,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "../ui/select";
 export type { DiagramType } from "../../stores/visual-to-code-store";
 
 export const CanvasPanel: React.FC = () => {
-	const { t } = useTranslation("visualProgramming");
+	const { t, i18n } = useTranslation("visualProgramming");
+	const lang: Lang = i18n.language?.toLowerCase().startsWith("fr") ? "fr" : "en";
 	const {
 		canvasNodes: storedNodes,
 		canvasEdges: storedEdges,
@@ -105,6 +118,15 @@ export const CanvasPanel: React.FC = () => {
 			{ value: "Angular", labelKey: "Angular" },
 			{ value: "Vue", labelKey: "Vue" },
 			{ value: "Svelte", labelKey: "Svelte" },
+		],
+		desktop: [
+			{ value: "WPF", labelKey: "WPF" },
+			{ value: "WinForms", labelKey: "WinForms" },
+			{ value: "WinUI", labelKey: "WinUI" },
+			{ value: "DotNetMaui", labelKey: "DotNetMaui" },
+			{ value: "Avalonia", labelKey: "Avalonia" },
+			{ value: "Electron", labelKey: "Electron" },
+			{ value: "Qt", labelKey: "Qt" },
 		],
 		backend: [
 			{ value: "NodeJs", labelKey: "NodeJs" },
@@ -275,11 +297,105 @@ export const CanvasPanel: React.FC = () => {
 		});
 	};
 
-	const onConnect = (params: Edge | Connection) =>
-		setEdges((eds) => addEdge(params, eds));
+	const onConnect = (params: Edge | Connection) => {
+		const src = nodes.find((n) => n.id === params.source);
+		const tgt = nodes.find((n) => n.id === params.target);
+		const srcType = src?.data?.type as string | undefined;
+		const tgtType = tgt?.data?.type as string | undefined;
+		// Only allow logical software-architecture edges (e.g. reject Worker →
+		// Database). Untyped/custom nodes stay permissive.
+		if (!canConnect(srcType, tgtType)) {
+			toast({
+				title: t("invalidConnection", "Connexion non valide"),
+				description: `${t(
+					"invalidConnectionDesc",
+					"Cet enchaînement n'est pas une suite logique d'architecture.",
+				)} (${src?.data?.label ?? params.source} → ${tgt?.data?.label ?? params.target})`,
+				variant: "destructive",
+			});
+			return;
+		}
+		// Attach a spoken relationship label so the diagram reads as an
+		// architecture (and the generated spec is precise).
+		const label = connectionLabel(srcType, tgtType, lang);
+		setEdges((eds) => addEdge({ ...params, data: { label } }, eds));
+		setIsJsonSaved(false);
+	};
+
+	// Collision-free node ids. The previous `(nodes.length + 1)` scheme reused
+	// ids after a delete (e.g. delete "1" then add → "2" again), which left
+	// edges pointing at the wrong / a now-missing node (the dangling `edge-1-6`).
+	const genNodeId = () =>
+		globalThis.crypto?.randomUUID?.() ??
+		`n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+	// ── Scaffold on demand ──────────────────────────────────────────────
+	// Hand the drawn architecture to WorkPilot's agentic build pipeline: the
+	// diagram becomes a task spec, the coder agents scaffold the real project.
+	const [isScaffolding, setIsScaffolding] = useState(false);
+	const handleScaffold = async () => {
+		if (nodes.length === 0) {
+			toast({
+				title: t("emptyDiagram", "Diagramme vide"),
+				description: t(
+					"addBlocksFirst",
+					"Ajoutez des blocs avant de scaffolder l'architecture.",
+				),
+				variant: "destructive",
+			});
+			return;
+		}
+		const activeProjectId = useProjectStore.getState().activeProjectId;
+		if (!activeProjectId) {
+			toast({
+				title: t("noActiveProject", "Aucun projet actif"),
+				description: t(
+					"noActiveProjectDesc",
+					"Ouvrez ou sélectionnez un projet cible avant de scaffolder.",
+				),
+				variant: "destructive",
+			});
+			return;
+		}
+		setIsScaffolding(true);
+		try {
+			const cleanEdges = sanitizeEdges(nodes, edges);
+			const { title, description } = buildArchitectureSpec(
+				nodes,
+				cleanEdges,
+				diagramType,
+				lang,
+			);
+			const task = await createTask(activeProjectId, title, description);
+			if (task) {
+				// On demand: kick off the agentic build immediately and take the
+				// user to the Kanban to watch it scaffold the project.
+				startTask(task.id);
+				globalThis.dispatchEvent(
+					new CustomEvent("workpilot:navigate-view", {
+						detail: { view: "kanban" },
+					}),
+				);
+				toast({
+					title: t("scaffoldStarted", "Génération lancée"),
+					description: t(
+						"scaffoldStartedDesc",
+						"Suivez la progression dans le Kanban.",
+					),
+				});
+			} else {
+				toast({
+					title: t("scaffoldError", "Échec de la création de la tâche"),
+					variant: "destructive",
+				});
+			}
+		} finally {
+			setIsScaffolding(false);
+		}
+	};
 
 	const handleAddNode = () => {
-		const newId = (nodes.length + 1).toString();
+		const newId = genNodeId();
 		setNodes((nds) => [
 			...nds,
 			{
@@ -390,19 +506,29 @@ export const CanvasPanel: React.FC = () => {
 		const type = event.dataTransfer.getData("application/block-type");
 		if (!type) return;
 		const reactFlowInstance = reactFlowRef.current;
-		const bounds = event.currentTarget.getBoundingClientRect();
-		const mouseX = event.clientX - bounds.left;
-		const mouseY = event.clientY - bounds.top;
-		let position = { x: mouseX, y: mouseY };
-		if (reactFlowInstance?.project) {
-			position = reactFlowInstance.project({ x: mouseX, y: mouseY });
+		// screenToFlowPosition maps the cursor's screen coords into the canvas'
+		// coordinate space, accounting for the current pan/zoom, so the block
+		// lands exactly under the drop point. Fall back to pane-relative coords
+		// if the instance isn't ready yet.
+		let position: { x: number; y: number };
+		if (reactFlowInstance?.screenToFlowPosition) {
+			position = reactFlowInstance.screenToFlowPosition({
+				x: event.clientX,
+				y: event.clientY,
+			});
+		} else {
+			const bounds = event.currentTarget.getBoundingClientRect();
+			position = {
+				x: event.clientX - bounds.left,
+				y: event.clientY - bounds.top,
+			};
 		}
 		if (FRAMEWORKS[type]) {
-			const newId = (nodes.length + 1).toString();
+			const newId = genNodeId();
 			setPendingNode({ id: newId, type, position });
 			setShowFrameworkModal(true);
 		} else {
-			const newId = (nodes.length + 1).toString();
+			const newId = genNodeId();
 			setNodes((nds) => [
 				...nds,
 				{
@@ -740,16 +866,38 @@ export const CanvasPanel: React.FC = () => {
 
 				<div className="h-5 w-px bg-border mx-0.5" />
 
-				{/* Group 3 — AI: primary action */}
+				{/* Group 3 — AI: primary action (full agentic scaffold) */}
 				<Button
 					size="sm"
+					onClick={handleScaffold}
+					disabled={isScaffolding || nodes.length === 0}
+					title={t(
+						"scaffoldTooltip",
+						"Scaffolder le projet complet (production-ready) via le pipeline agentique, dans le projet actif",
+					)}
+					className="gap-1.5 h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+				>
+					{isScaffolding ? (
+						<Loader2 className="h-3.5 w-3.5 animate-spin" />
+					) : (
+						<Rocket className="h-3.5 w-3.5" />
+					)}
+					{isScaffolding
+						? t("scaffolding", "Création…")
+						: t("scaffold", "Scaffolder")}
+				</Button>
+
+				{/* Secondary — one-shot code preview */}
+				<Button
+					size="sm"
+					variant="outline"
 					onClick={handleGenerateCode}
 					disabled={isAiRunning || nodes.length === 0}
 					title={t(
 						"generateCodeTooltip",
-						"Générer du code à partir du diagramme courant",
+						"Aperçu rapide : génère une ébauche de code en un appel (non écrite dans le projet)",
 					)}
-					className="gap-1.5 h-7 px-3 text-xs bg-violet-600 hover:bg-violet-700 text-white"
+					className="gap-1.5 h-7 px-3 text-xs"
 				>
 					{isAiRunning ? (
 						<Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -758,7 +906,7 @@ export const CanvasPanel: React.FC = () => {
 					)}
 					{isAiRunning
 						? aiStatus || t("generating", "Génération…")
-						: t("generateCode", "Générer le code")}
+						: t("codePreview", "Aperçu du code")}
 				</Button>
 
 				{/* Spacer */}
@@ -815,7 +963,9 @@ export const CanvasPanel: React.FC = () => {
 				)}
 				<div className="flex-1 min-h-0 bg-muted/30 text-muted-foreground overflow-hidden relative">
 					<ReactFlow
-						ref={reactFlowRef}
+						onInit={(instance) => {
+							reactFlowRef.current = instance;
+						}}
 						key={diagramType}
 						nodes={nodes}
 						edges={edges}

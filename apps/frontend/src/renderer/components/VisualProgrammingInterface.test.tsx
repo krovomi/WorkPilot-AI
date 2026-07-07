@@ -12,6 +12,8 @@ vi.mock("react-i18next", () => ({
 				addBlock: "Add block",
 				reverse: "Reverse: Code → Visual",
 				generateCode: "Generate code",
+				scaffold: "Generate project",
+				codePreview: "Code preview",
 				export: "Export JSON",
 				saveAs: "Save as\u2026",
 				load: "Load",
@@ -103,7 +105,9 @@ describe("CanvasPanel", () => {
 		render(<CanvasPanel />);
 		expect(screen.getByText("Add block")).toBeInTheDocument();
 		expect(screen.getByText("Reverse: Code \u2192 Visual")).toBeInTheDocument();
-		expect(screen.getByText("Generate code")).toBeInTheDocument();
+		// Primary action: full agentic scaffold; secondary: one-shot code preview
+		expect(screen.getByText("Generate project")).toBeInTheDocument();
+		expect(screen.getByText("Code preview")).toBeInTheDocument();
 		expect(screen.getByText("Export JSON")).toBeInTheDocument();
 		expect(screen.getByText("Save as\u2026")).toBeInTheDocument();
 		expect(screen.getByText("Load")).toBeInTheDocument();
@@ -114,10 +118,14 @@ describe("CanvasPanel", () => {
 		expect(screen.getByTestId("reactflow-canvas")).toBeInTheDocument();
 	});
 
-	it("Generate code button is enabled when diagram has nodes", () => {
+	it("Generate-project and Code-preview buttons are enabled when diagram has nodes", () => {
 		render(<CanvasPanel />);
-		// Initial state has 1 node (the default New Flowchart node), so button is enabled
-		const button = screen.getByRole("button", { name: "Generate code" });
-		expect(button).not.toBeDisabled();
+		// Initial state has 1 node (the default New Flowchart node), so both are enabled
+		expect(
+			screen.getByRole("button", { name: "Generate project" }),
+		).not.toBeDisabled();
+		expect(
+			screen.getByRole("button", { name: "Code preview" }),
+		).not.toBeDisabled();
 	});
 });

@@ -88,6 +88,11 @@ export class DesignToCodeService {
 		env.PYTHONPATH = env.PYTHONPATH
 			? `${sourcePath}${path.delimiter}${env.PYTHONPATH}`
 			: sourcePath;
+		// Force UTF-8 stdio so status/result lines aren't mojibaked on Windows
+		// (Python defaults to cp1252 there, mangling "…" and accents).
+		env.PYTHONIOENCODING = "utf-8";
+		env.PYTHONUTF8 = "1";
+		env.PYTHONUNBUFFERED = "1";
 		try {
 			const settingsPath = path.join(app.getPath("userData"), "settings.json");
 			if (existsSync(settingsPath)) {

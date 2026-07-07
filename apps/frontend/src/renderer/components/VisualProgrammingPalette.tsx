@@ -6,7 +6,10 @@ import { useTranslation } from "react-i18next";
 const BLOCK_CATEGORIES = [
 	{
 		labelKey: "categoryFrontend",
-		blocks: [{ type: "frontend", labelKey: "frontend", icon: "🖥️" }],
+		blocks: [
+			{ type: "frontend", labelKey: "frontend", icon: "🖥️" },
+			{ type: "desktop", labelKey: "desktop", icon: "💻" },
+		],
 	},
 	{
 		labelKey: "categoryBackend",

@@ -1,8 +1,9 @@
 import { Plus, Swords, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PROVIDER_MODELS_MAP } from "@shared/constants/models";
 import { useBountyBoardStore } from "../../stores/bounty-board-store";
+import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -45,9 +46,37 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 		loadArchives,
 	} = useBountyBoardStore();
 
+	const tasks = useTaskStore((s) => s.tasks);
+	const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+
 	const [projectInput] = useState(projectPath ?? "");
 	const [specInput, setSpecInput] = useState(specId ?? "");
 	const [verdictOpen, setVerdictOpen] = useState(false);
+
+	// Specs the user can pick from, derived from the loaded tasks (no extra IPC).
+	const availableSpecs = useMemo(() => {
+		const seen = new Map<string, string>();
+		for (const task of tasks) {
+			if (task.specId && !seen.has(task.specId)) {
+				seen.set(task.specId, task.title || task.specId);
+			}
+		}
+		return Array.from(seen, ([id, title]) => ({ id, title }));
+	}, [tasks]);
+
+	// Prefer the explicit prop, then the currently-selected task's spec, then
+	// the first available spec — so the field is rarely empty on open.
+	const preferredSpecId = useMemo(() => {
+		if (specId) return specId;
+		const selected = tasks.find((t) => t.id === selectedTaskId)?.specId;
+		return selected || availableSpecs[0]?.id || "";
+	}, [specId, tasks, selectedTaskId, availableSpecs]);
+
+	useEffect(() => {
+		if (!specInput && preferredSpecId) {
+			setSpecInput(preferredSpecId);
+		}
+	}, [preferredSpecId, specInput]);
 
 	useEffect(() => {
 		if (projectInput && specInput) {
@@ -61,11 +90,23 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 		}
 	}, [current]);
 
-	const canStart =
+	const canStart = Boolean(
 		!loading &&
-		projectInput.trim() &&
-		specInput.trim() &&
-		contestants.length > 0;
+			projectInput.trim() &&
+			specInput.trim() &&
+			contestants.length > 0,
+	);
+
+	// Explain why the launch button is disabled instead of leaving it inert.
+	const disabledReason = loading
+		? null
+		: !projectInput.trim()
+			? t("bountyBoard:hint.selectProject", "Select a project first.")
+			: !specInput.trim()
+				? t("bountyBoard:hint.selectSpec", "Choose a spec to launch.")
+				: contestants.length === 0
+					? t("bountyBoard:hint.addContestant", "Add at least one contestant.")
+					: null;
 
 	const handleStart = () => {
 		if (!canStart) return;
@@ -105,11 +146,28 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 					<Label className="text-xs">
 						{t("bountyBoard:specId", "Spec id")}
 					</Label>
-					<Input
-						value={specInput}
-						onChange={(e) => setSpecInput(e.target.value)}
-						placeholder="001-my-feature"
-					/>
+					{availableSpecs.length > 0 ? (
+						<Select value={specInput} onValueChange={setSpecInput}>
+							<SelectTrigger>
+								<SelectValue
+									placeholder={t("bountyBoard:selectSpec", "Select a spec")}
+								/>
+							</SelectTrigger>
+							<SelectContent>
+								{availableSpecs.map((s) => (
+									<SelectItem key={s.id} value={s.id}>
+										{s.title}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					) : (
+						<Input
+							value={specInput}
+							onChange={(e) => setSpecInput(e.target.value)}
+							placeholder="001-my-feature"
+						/>
+					)}
 				</div>
 			</section>
 
@@ -213,13 +271,18 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 				</div>
 			</section>
 
-			<div className="flex gap-2">
+			<div className="flex items-center gap-3">
 				<Button onClick={handleStart} disabled={!canStart}>
 					<Swords className="w-4 h-4 mr-1" />
 					{loading
 						? t("bountyBoard:running", "Running…")
 						: t("bountyBoard:start", "Start bounty")}
 				</Button>
+				{disabledReason && (
+					<span className="text-xs text-muted-foreground">
+						{disabledReason}
+					</span>
+				)}
 			</div>
 
 			{error && <p className="text-sm text-destructive">{error}</p>}
