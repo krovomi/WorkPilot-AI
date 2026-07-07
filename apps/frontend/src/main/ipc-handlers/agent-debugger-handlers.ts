@@ -126,6 +126,11 @@ export function registerAgentDebuggerHandlers(): void {
 		async (_e, { sessionId }: { sessionId: string }) =>
 			runRunner({ action: "list_frames", sessionId }),
 	);
+	ipcMain.handle(
+		"agentDebugger:getState",
+		async (_e, { sessionId }: { sessionId: string }) =>
+			runRunner({ action: "get_state", sessionId }),
+	);
 	ipcMain.handle("agentDebugger:listSessions", async () =>
 		runRunner({ action: "list_sessions", sessionId: "" }),
 	);

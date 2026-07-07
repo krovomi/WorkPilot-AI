@@ -1,55 +1,55 @@
-﻿import type React from "react";
+import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-// CatÃ©gories et templates enrichis
+// Catégories et templates enrichis
 const BLOCK_CATEGORIES = [
 	{
 		labelKey: "categoryFrontend",
-		blocks: [{ type: "frontend", labelKey: "frontend", icon: "ðŸ–¥ï¸" }],
+		blocks: [{ type: "frontend", labelKey: "frontend", icon: "🖥️" }],
 	},
 	{
 		labelKey: "categoryBackend",
 		blocks: [
-			{ type: "backend", labelKey: "backend", icon: "ðŸ—„ï¸" },
-			{ type: "worker", labelKey: "worker", icon: "âš™ï¸" },
-			{ type: "microservice", labelKey: "microservice", icon: "ðŸ”Œ" },
-			{ type: "gateway", labelKey: "gateway", icon: "ðŸ›¡ï¸" },
+			{ type: "backend", labelKey: "backend", icon: "🗄️" },
+			{ type: "worker", labelKey: "worker", icon: "⚙️" },
+			{ type: "microservice", labelKey: "microservice", icon: "🔌" },
+			{ type: "gateway", labelKey: "gateway", icon: "🛡️" },
 		],
 	},
 	{
 		labelKey: "categoryData",
 		blocks: [
-			{ type: "database", labelKey: "database", icon: "ðŸ—ƒï¸" },
-			{ type: "cache", labelKey: "cache", icon: "ðŸ§ " },
-			{ type: "search", labelKey: "search", icon: "ðŸ”" },
-			{ type: "queue", labelKey: "queue", icon: "ðŸ“¬" },
-			{ type: "storage", labelKey: "storage", icon: "ðŸ’¾" },
+			{ type: "database", labelKey: "database", icon: "🗃️" },
+			{ type: "cache", labelKey: "cache", icon: "🧠" },
+			{ type: "search", labelKey: "search", icon: "🔍" },
+			{ type: "queue", labelKey: "queue", icon: "📬" },
+			{ type: "storage", labelKey: "storage", icon: "💾" },
 		],
 	},
 	{
 		labelKey: "categoryInfra",
 		blocks: [
-			{ type: "messagebroker", labelKey: "messageBroker", icon: "ðŸ“¨" },
-			{ type: "cdn", labelKey: "cdn", icon: "ðŸŒ" },
-			{ type: "monitoring", labelKey: "monitoring", icon: "ðŸ“ˆ" },
-			{ type: "analytics", labelKey: "analytics", icon: "ðŸ“Š" },
+			{ type: "messagebroker", labelKey: "messageBroker", icon: "📨" },
+			{ type: "cdn", labelKey: "cdn", icon: "🌐" },
+			{ type: "monitoring", labelKey: "monitoring", icon: "📈" },
+			{ type: "analytics", labelKey: "analytics", icon: "📊" },
 		],
 	},
 	{
 		labelKey: "categorySecurity",
-		blocks: [{ type: "auth", labelKey: "auth", icon: "ðŸ”’" }],
+		blocks: [{ type: "auth", labelKey: "auth", icon: "🔒" }],
 	},
 	{
 		labelKey: "categoryIntegration",
 		blocks: [
-			{ type: "thirdparty", labelKey: "thirdPartyApi", icon: "ðŸ”—" },
-			{ type: "notification", labelKey: "notification", icon: "ðŸ””" },
+			{ type: "thirdparty", labelKey: "thirdPartyApi", icon: "🔗" },
+			{ type: "notification", labelKey: "notification", icon: "🔔" },
 		],
 	},
 	{
 		labelKey: "categoryCustom",
-		blocks: [{ type: "custom", labelKey: "customBlock", icon: "âœ¨" }],
+		blocks: [{ type: "custom", labelKey: "customBlock", icon: "✨" }],
 	},
 ];
 
@@ -57,7 +57,7 @@ export const VisualProgrammingPalette: React.FC<{ compact?: boolean }> = ({
 	compact = false,
 }) => {
 	const { t } = useTranslation("visualProgramming");
-	// Accordion state: ouvert/fermÃ© par catÃ©gorie
+	// Accordion state: ouvert/fermé par catégorie
 	const [openGroups, setOpenGroups] = useState(() =>
 		Object.fromEntries(BLOCK_CATEGORIES.map((cat) => [cat.labelKey, true])),
 	);
@@ -78,7 +78,7 @@ export const VisualProgrammingPalette: React.FC<{ compact?: boolean }> = ({
 					pointerEvents: "auto",
 					filter: "none",
 					background: "transparent",
-				}} // icÃ´ne nette, pas de blur
+				}} // icône nette, pas de blur
 				title={t("showPalette", "Afficher la palette")}
 			>
 				<span
@@ -89,7 +89,7 @@ export const VisualProgrammingPalette: React.FC<{ compact?: boolean }> = ({
 						textShadow: "0 1px 4px rgba(0,0,0,0.10)",
 					}}
 				>
-					ðŸ§©
+					🧩
 				</span>
 			</div>
 		);
@@ -125,7 +125,7 @@ export const VisualProgrammingPalette: React.FC<{ compact?: boolean }> = ({
 						aria-expanded={openGroups[cat.labelKey]}
 					>
 						<span style={{ marginRight: 6 }}>
-							{openGroups[cat.labelKey] ? "â–¼" : "â–¶"}
+							{openGroups[cat.labelKey] ? "▼" : "▶"}
 						</span>
 						{t(cat.labelKey)}
 					</button>

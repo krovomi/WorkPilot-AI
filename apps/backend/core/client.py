@@ -313,6 +313,15 @@ def _make_stop_hook(spec_dir: Path):
             logger.info("[hook:Stop] spec=%s session=%s", spec_dir.name, session_id)
         except Exception:
             logger.debug("[hook:Stop] logging failed", exc_info=True)
+        # Mark any live debugger session for this spec as no longer running so
+        # the UI stops showing it as attachable. Cheap + fail-safe.
+        try:
+            from agents import debugger_store
+
+            if debugger_store.session_exists(spec_dir.name):
+                debugger_store.deactivate(spec_dir.name)
+        except Exception:
+            logger.debug("[hook:Stop] debugger deactivate failed", exc_info=True)
         return {}
 
     return _hook
@@ -1180,6 +1189,45 @@ def create_client(
 
     print()
 
+    # Agent Debugger (opt-in) — install a PreToolUse hook that pauses on the
+    # user's breakpoints and waits for a resume decision issued from the UI.
+    #
+    # Zero impact on normal runs: the hook is installed ONLY when this run opts
+    # in, which happens when either (a) AUTO_CLAUDE_AGENT_DEBUGGER is truthy, or
+    # (b) the user has already attached a debugger session for this spec in the
+    # UI (a row exists in the file-backed store keyed by the spec name). Both
+    # checks are cheap and off the tool-call hot path — session_exists() is a
+    # single stat when the store file is absent. Wiring failures must never
+    # abort session startup, hence the broad guard.
+    _debugger_hooks: list = []
+    try:
+        from agents import debugger_store
+        from agents.debugger import make_persistent_debugger_hook
+
+        _dbg_session_id = spec_dir.name if spec_dir else project_dir.name
+        _dbg_forced = os.environ.get("AUTO_CLAUDE_AGENT_DEBUGGER", "").lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        if _dbg_forced or debugger_store.session_exists(_dbg_session_id):
+            debugger_store.register_active(
+                _dbg_session_id,
+                {
+                    "project": str(project_dir.resolve()),
+                    "spec": _dbg_session_id,
+                    "agent_type": agent_type,
+                    "pid": os.getpid(),
+                },
+            )
+            _debugger_hooks.append(
+                HookMatcher(hooks=[make_persistent_debugger_hook(_dbg_session_id)])
+            )
+            print(f"   - Agent Debugger: attached to session '{_dbg_session_id}'")
+    except Exception:
+        logger.debug("Agent debugger wiring skipped", exc_info=True)
+
     # Build options dict, conditionally including output_format
     options_kwargs: dict[str, Any] = {
         "model": model,
@@ -1201,6 +1249,8 @@ def create_client(
                     matcher="Edit",
                     hooks=[_make_guardrails_hook(project_dir)],
                 ),
+                # Debugger breakpoints (any tool). Empty unless this run opted in.
+                *_debugger_hooks,
             ],
             "PreCompact": [HookMatcher(hooks=[_make_pre_compact_hook(spec_dir)])],
             "Stop": [HookMatcher(hooks=[_make_stop_hook(spec_dir)])],

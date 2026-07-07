@@ -186,7 +186,7 @@ export function PipelineGenerator(): React.ReactElement {
 								)}
 								{result.stack.has_docker && (
 									<div className="text-blue-400">
-										ðŸ³ {t("pipelineGenerator:stackInfo.dockerDetected")}
+										🐳 {t("pipelineGenerator:stackInfo.dockerDetected")}
 									</div>
 								)}
 							</div>

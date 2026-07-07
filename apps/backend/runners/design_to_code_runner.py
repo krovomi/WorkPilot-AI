@@ -233,22 +233,61 @@ class DesignToCodeRunner:
         print("=" * 60)
 
     def _serialize_result(self, result) -> dict:
-        """Serialize the pipeline result for JSON output."""
+        """Serialize the full pipeline result for the renderer.
+
+        The frontend (DesignToCodeResult) needs the *content* of every generated
+        file plus the design spec, tests and tokens — not just counts — so this
+        mirrors the frontend interface field-for-field.
+        """
+        design_spec = None
+        if result.design_spec:
+            design_spec = {
+                "components": [
+                    {
+                        "name": c.name,
+                        "type": c.type,
+                        "description": c.description,
+                        "children": [
+                            {"name": ch.name, "type": ch.type} for ch in c.children
+                        ],
+                    }
+                    for c in result.design_spec.components
+                ],
+                "color_palette": result.design_spec.color_palette,
+                "typography": result.design_spec.typography,
+            }
+
         return {
             "success": result.success,
             "phase": result.phase.value,
-            "files_generated": len(result.generated_files),
-            "visual_tests_generated": len(result.visual_tests),
-            "design_tokens_used": len(result.design_tokens_used),
-            "components_identified": len(result.design_spec.components)
-            if result.design_spec
-            else 0,
-            "duration_seconds": result.duration_seconds,
-            "errors": result.errors,
+            "design_spec": design_spec,
             "generated_files": [
-                {"path": f.path, "language": f.language, "description": f.description}
+                {
+                    "path": f.path,
+                    "content": f.content,
+                    "language": f.language,
+                    "description": f.description,
+                }
                 for f in result.generated_files
             ],
+            "visual_tests": [
+                {
+                    "name": t.name,
+                    "test_code": t.test_code,
+                    "threshold": t.threshold,
+                    "description": t.description,
+                }
+                for t in result.visual_tests
+            ],
+            "design_tokens_used": [
+                {"name": tok.name, "value": tok.value, "category": tok.category}
+                for tok in result.design_tokens_used
+            ],
+            "figma_sync_status": result.figma_sync_status,
+            "errors": result.errors,
+            "warnings": result.warnings,
+            "duration_seconds": result.duration_seconds,
+            "tokens_used": result.tokens_used,
         }
 
 
@@ -308,10 +347,25 @@ async def main():
         output_dir=args.output_dir,
     )
 
-    result = await runner.run()
+    try:
+        result = await runner.run()
+    except Exception as exc:  # noqa: BLE001 — surface any failure to the UI
+        # Structured error line parsed by the Electron design-to-code service.
+        print(f"__DESIGN_TO_CODE_ERROR__:{exc}", flush=True)
+        sys.exit(1)
+
+    # Early-return failures (e.g. no resolvable image) come back as a minimal
+    # dict; normalize so the renderer always receives the full result shape.
+    if not result.get("success") and "generated_files" not in result:
+        message = result.get("error", "Design-to-code pipeline failed")
+        print(f"__DESIGN_TO_CODE_ERROR__:{message}", flush=True)
+        sys.exit(1)
 
     if args.json:
         print(json.dumps(result, indent=2))
+
+    # Structured result line parsed by the Electron design-to-code service.
+    print(f"__DESIGN_TO_CODE_RESULT__:{json.dumps(result)}", flush=True)
 
     sys.exit(0 if result.get("success") else 1)
 

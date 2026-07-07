@@ -54,10 +54,10 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 // Category icons
 const CATEGORY_ICONS: Record<string, string> = {
-	bugs: "ðŸ›",
-	security: "ðŸ”’",
-	maintainability: "ðŸ”§",
-	complexity: "ðŸ“Š",
+	bugs: "🐛",
+	security: "🔒",
+	maintainability: "🔧",
+	complexity: "📊",
 };
 
 export function QualityScorePanel({
@@ -187,7 +187,7 @@ export function QualityScorePanel({
 									{Object.entries(issuesByCategory).map(
 										([category, issues]) => {
 											const isOpen = expandedCategories.has(category);
-											const icon = CATEGORY_ICONS[category] || "ðŸ“„";
+											const icon = CATEGORY_ICONS[category] || "📄";
 
 											return (
 												<div key={category} className="border rounded-lg p-3">
@@ -246,7 +246,7 @@ export function QualityScorePanel({
 																				</div>
 																				{issue.suggestion && (
 																					<div className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
-																						<span>ðŸ’¡</span>
+																						<span>💡</span>
 																						<span>{issue.suggestion}</span>
 																					</div>
 																				)}
@@ -275,7 +275,7 @@ export function QualityScorePanel({
 				{/* No Issues */}
 				{score.total_issues === 0 && (
 					<div className="text-center py-4 text-muted-foreground">
-						<div className="text-4xl mb-2">ðŸŽ‰</div>
+						<div className="text-4xl mb-2">🎉</div>
 						<div className="text-sm">{t("noIssues")}</div>
 					</div>
 				)}

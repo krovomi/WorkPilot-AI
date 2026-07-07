@@ -9,6 +9,7 @@
 
 import {
 	ArrowLeftRight,
+	Blocks,
 	FileJson,
 	FolderOpen,
 	GitBranch,
@@ -42,6 +43,7 @@ import { toast } from "@/hooks/use-toast";
 import type { DiagramType } from "../../stores/visual-to-code-store";
 import { useVisualToCodeStore } from "../../stores/visual-to-code-store";
 import { FileTree } from "../FileTree";
+import { VisualProgrammingPalette } from "../VisualProgrammingPalette";
 import { edgeTypes, nodeTypes } from "../reactflowTypes";
 import {
 	Dialog,
@@ -91,6 +93,7 @@ export const CanvasPanel: React.FC = () => {
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 	const reactFlowRef = useRef<any>(null);
 	const [isJsonSaved, setIsJsonSaved] = useState(true);
+	const [showPalette, setShowPalette] = useState(true);
 	const [selectedFolder, setSelectedFolder] = useState<string>("");
 	const [showSaveAsDialog, setShowSaveAsDialog] = useState(false);
 	const [saveAsFileName, setSaveAsFileName] = useState("");
@@ -693,6 +696,16 @@ export const CanvasPanel: React.FC = () => {
 				{/* Group 2 — Canvas editing */}
 				<Button
 					size="sm"
+					variant={showPalette ? "secondary" : "ghost"}
+					onClick={() => setShowPalette((v) => !v)}
+					className="gap-1.5 h-7 px-2 text-xs"
+					title={t("togglePalette", "Afficher/masquer la palette de blocs")}
+				>
+					<Blocks className="h-3.5 w-3.5" />
+					<span className="hidden md:inline">{t("palette", "Palette")}</span>
+				</Button>
+				<Button
+					size="sm"
 					variant="ghost"
 					onClick={handleAddNode}
 					className="gap-1.5 h-7 px-2 text-xs"
@@ -794,7 +807,12 @@ export const CanvasPanel: React.FC = () => {
 				</Button>
 			</div>
 
-			<div className="flex flex-col flex-1 min-h-0">
+			<div className="flex flex-1 min-h-0">
+				{showPalette && (
+					<div className="shrink-0 border-r bg-background overflow-y-auto p-2">
+						<VisualProgrammingPalette />
+					</div>
+				)}
 				<div className="flex-1 min-h-0 bg-muted/30 text-muted-foreground overflow-hidden relative">
 					<ReactFlow
 						ref={reactFlowRef}

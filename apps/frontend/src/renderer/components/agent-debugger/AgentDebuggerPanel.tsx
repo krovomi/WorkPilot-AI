@@ -54,6 +54,19 @@ export function AgentDebuggerPanel({ sessionId }: Props) {
 		if (!attachedSession) void listSessions();
 	}, [attachedSession, listSessions]);
 
+	// Poll while the panel is open so paused frames (produced by a live agent
+	// run in another process) show up without a manual refresh, and so live
+	// runs appear in the picker as they start. Gentle intervals — each tick
+	// spawns a one-shot runner process.
+	useEffect(() => {
+		if (attachedSession) {
+			const id = setInterval(() => void refresh(), 2000);
+			return () => clearInterval(id);
+		}
+		const id = setInterval(() => void listSessions(), 4000);
+		return () => clearInterval(id);
+	}, [attachedSession, refresh, listSessions]);
+
 	const handleAttach = (id: string) => {
 		const trimmed = id.trim();
 		if (trimmed) void attach(trimmed);
@@ -164,23 +177,47 @@ export function AgentDebuggerPanel({ sessionId }: Props) {
 							</p>
 						) : (
 							<div className="space-y-1">
-								{sessions.map((s) => (
-									<button
-										type="button"
-										key={s.session_id}
-										onClick={() => handleAttach(s.session_id)}
-										className="w-full flex items-center justify-between text-sm border rounded p-2 bg-muted/20 hover:bg-muted/40 text-left"
-									>
-										<code className="font-mono truncate">{s.session_id}</code>
-										<span className="text-xs text-muted-foreground shrink-0 ml-2">
-											{t("agentDebugger:sessionMeta", {
-												bp: s.breakpoints,
-												frames: s.frames,
-												defaultValue: "{{bp}} breakpoints · {{frames}} paused",
-											})}
-										</span>
-									</button>
-								))}
+								{[...sessions]
+									.sort(
+										(a, b) => Number(b.active ?? false) - Number(a.active ?? false),
+									)
+									.map((s) => (
+										<button
+											type="button"
+											key={s.session_id}
+											onClick={() => handleAttach(s.session_id)}
+											className="w-full flex items-center justify-between gap-2 text-sm border rounded p-2 bg-muted/20 hover:bg-muted/40 text-left"
+										>
+											<div className="min-w-0">
+												<div className="flex items-center gap-1.5">
+													{s.active && (
+														<span
+															className="w-2 h-2 rounded-full bg-green-500 shrink-0"
+															title={t("agentDebugger:live", "Live run")}
+														/>
+													)}
+													<code className="font-mono truncate">
+														{s.session_id}
+													</code>
+												</div>
+												{s.meta?.agent_type && (
+													<span className="text-[11px] text-muted-foreground">
+														{s.active
+															? t("agentDebugger:live", "Live run")
+															: t("agentDebugger:lastRun", "Last run")}{" "}
+														· {s.meta.agent_type}
+													</span>
+												)}
+											</div>
+											<span className="text-xs text-muted-foreground shrink-0">
+												{t("agentDebugger:sessionMeta", {
+													bp: s.breakpoints,
+													frames: s.frames,
+													defaultValue: "{{bp}} breakpoints · {{frames}} paused",
+												})}
+											</span>
+										</button>
+									))}
 							</div>
 						)}
 					</div>

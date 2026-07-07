@@ -191,7 +191,7 @@ export function CodeQualityDetails({ idea }: CodeQualityDetailsProps) {
 								key={prereq}
 								className="text-sm text-muted-foreground flex items-start gap-2"
 							>
-								<span className="text-muted-foreground">â€¢</span>
+								<span className="text-muted-foreground">•</span>
 								{prereq}
 							</li>
 						))}

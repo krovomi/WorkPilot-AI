@@ -12,6 +12,7 @@
 	"addBlock": "Add block",
 	"newBlock": "New block",
 	"palette": "Palette",
+	"togglePalette": "Show/hide the block palette",
 	"frontend": "FrontEnd",
 	"backend": "BackEnd",
 	"database": "Database",

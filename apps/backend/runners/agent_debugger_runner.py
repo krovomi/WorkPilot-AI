@@ -71,6 +71,15 @@ def _action_list_frames(session_id: str, _payload: dict) -> dict:
     return {"frames": debugger_store.list_frames(session_id)}
 
 
+def _action_get_state(session_id: str, _payload: dict) -> dict:
+    """Breakpoints + pending frames in one shot (used by the UI poll loop to
+    avoid spawning two runner processes per refresh)."""
+    return {
+        "breakpoints": debugger_store.list_breakpoints(session_id),
+        "frames": debugger_store.list_frames(session_id),
+    }
+
+
 def _action_resume(session_id: str, payload: dict) -> dict:
     frame_id = str(payload.get("frame_id") or "")
     decision = {
@@ -93,6 +102,7 @@ _ACTIONS = {
     "add_bp": _action_add_bp,
     "remove_bp": _action_remove_bp,
     "list_frames": _action_list_frames,
+    "get_state": _action_get_state,
     "resume": _action_resume,
     "list_sessions": _action_list_sessions,
 }

@@ -642,7 +642,7 @@ export function App() {
 			setHasRestoredView(true);
 			isRestoringView.current = true;
 			setActiveView(settings.activeView);
-			// RÃ©initialiser le flag aprÃ¨s un court dÃ©lai pour permettre les futures sauvegardes
+			// Réinitialiser le flag après un court délai pour permettre les futures sauvegardes
 			setTimeout(() => {
 				isRestoringView.current = false;
 			}, 100);
@@ -676,7 +676,7 @@ export function App() {
 		(p) => p.id === (activeProjectId || selectedProjectId),
 	);
 
-	// State global pour provider LLM actif et modÃ¨les associÃ©s
+	// State global pour provider LLM actif et modèles associés
 	const [_providers, setProviders] = useState<string[]>([]);
 	const [selectedProvider, setSelectedProvider] = useState<string>("");
 	const [_providerModels, setProviderModels] = useState<string[]>([]);
@@ -1291,7 +1291,7 @@ export function App() {
 
 	const handleProjectAdded = async (project: Project, needsInit: boolean) => {
 		openProjectTab(project.id);
-		// Si le projet a dÃ©jÃ  une description et un provider, il est dÃ©jÃ  initialisÃ©
+		// Si le projet a déjà une description et un provider, il est déjà initialisé
 		const alreadyInitialized = !!(
 			project.settings?.description && project.settings?.provider
 		);
@@ -1468,7 +1468,7 @@ export function App() {
 		}
 	};
 
-	// RÃ©cupÃ¨re la liste des providers au chargement
+	// Récupère la liste des providers au chargement
 	useEffect(() => {
 		const controller = new AbortController();
 		const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
@@ -1493,7 +1493,7 @@ export function App() {
 							: String(p),
 				);
 				setProviders(providerNames);
-				// SÃ©lectionne automatiquement 'claude' si prÃ©sent
+				// Sélectionne automatiquement 'claude' si présent
 				if (!selectedProvider && providerNames.includes("claude")) {
 					setSelectedProvider("claude");
 				} else if (!selectedProvider && providerNames.length > 0) {
@@ -1515,7 +1515,7 @@ export function App() {
 		return () => controller.abort();
 	}, [selectedProvider]);
 
-	// RÃ©cupÃ¨re les modÃ¨les du provider sÃ©lectionnÃ©
+	// Récupère les modèles du provider sélectionné
 	useEffect(() => {
 		if (!selectedProvider) {
 			setProviderModels([]);
@@ -1557,7 +1557,7 @@ export function App() {
 				}
 				setProviderModels([]);
 				setProviderModelsError(
-					`Erreur lors de la rÃ©cupÃ©ration des modÃ¨les pour le provider Â«${selectedProvider}Â».`,
+					`Erreur lors de la récupération des modèles pour le provider «${selectedProvider}».`,
 				);
 			});
 		return () => controller.abort();
@@ -1609,10 +1609,10 @@ export function App() {
 
 							{/* Main content */}
 							<div className="flex flex-1 flex-col overflow-hidden">
-								{/* Ligne sticky avec ProviderSelector et bouton "Claude Code" placÃ©e juste sous les tabs projets */}
+								{/* Ligne sticky avec ProviderSelector et bouton "Claude Code" placée juste sous les tabs projets */}
 								<div className="flex items-center justify-between gap-3 px-2.5 py-2 border-b border-border bg-background sticky top-0 z-30">
 									<div className="flex items-center flex-1 min-w-0">
-										{/* Espace rÃ©servÃ© pour alignement, ou autre contenu si besoin */}
+										{/* Espace réservé pour alignement, ou autre contenu si besoin */}
 									</div>
 									<div className="shrink-0">
 										<ProviderSelector
@@ -2130,7 +2130,7 @@ export function App() {
 						onClose={handleVersionWarningClose}
 					/>
 
-					{/* Modals spÃ©cifiques Ã  GitHub et Azure DevOps */}
+					{/* Modals spécifiques à GitHub et Azure DevOps */}
 					{gitHubSetupProject && (
 						<GitHubSetupModal
 							open={showGitHubSetup}

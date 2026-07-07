@@ -68,11 +68,17 @@ export const useAgentDebuggerStore = create<AgentDebuggerState>((set, get) => ({
 	refresh: async () => {
 		const { sessionId } = get();
 		if (!sessionId) return;
-		const [bp, fr] = await Promise.all([
-			window.electronAPI.listBreakpoints(sessionId),
-			window.electronAPI.listDebugFrames(sessionId),
-		]);
-		set({ breakpoints: bp.breakpoints, frames: fr.frames });
+		// One runner process instead of two (breakpoints + frames in one shot),
+		// which matters because refresh() is polled while attached. Guarded so a
+		// transient runner failure during polling doesn't spam unhandled
+		// rejections.
+		try {
+			const { breakpoints, frames } =
+				await window.electronAPI.getDebugState(sessionId);
+			set({ breakpoints, frames });
+		} catch (e) {
+			set({ error: (e as Error).message });
+		}
 	},
 
 	addBreakpoint: async (bp) => {

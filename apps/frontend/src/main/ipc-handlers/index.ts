@@ -125,6 +125,7 @@ import { registerTaskHandlers } from "./task-handlers";
 import { registerTeamSyncHandlers } from "./team-sync-handlers";
 import { registerTerminalWorktreeIpcHandlers } from "./terminal";
 import { registerTerminalHandlers } from "./terminal-handlers";
+import { registerDesignToCodeHandlers } from "./design-to-code-handlers";
 import { setupTestGenerationHandlers } from "./test-generation-handlers";
 import { registerTimeTravelHandlers } from "./time-travel-handlers";
 import {
@@ -461,6 +462,9 @@ export function setupIpcHandlers(
 	// Visual Programming handlers (diagram → code, code → diagram)
 	registerVisualProgrammingHandlers(getMainWindow);
 	setupVisualProgrammingEventForwarding(getMainWindow);
+
+	// Design-to-Code handlers (design image → generated code)
+	registerDesignToCodeHandlers();
 
 	// Code Playground handlers (AI sandbox code generation)
 	registerCodePlaygroundHandlers();

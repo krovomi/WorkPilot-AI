@@ -17,10 +17,10 @@ const DIAGRAM_LABELS: Record<DiagramType, string> = {
 };
 
 const DIAGRAM_ICONS: Record<DiagramType, string> = {
-	module_dependencies: "ðŸ”—",
-	component_hierarchy: "ðŸŒ³",
-	data_flow: "ðŸŒŠ",
-	database_schema: "ðŸ—„ï¸",
+	module_dependencies: "🔗",
+	component_hierarchy: "🌳",
+	data_flow: "🌊",
+	database_schema: "🗄️",
 };
 
 export function ArchitectureVisualizer(): React.ReactElement {
@@ -199,7 +199,7 @@ export function ArchitectureVisualizer(): React.ReactElement {
 								</span>
 								<h2 className="text-lg font-medium">{selectedDiagram.title}</h2>
 								<span className="text-xs text-[var(--text-secondary)] ml-2">
-									{selectedDiagram.nodes?.length ?? 0} nodes â€¢{" "}
+									{selectedDiagram.nodes?.length ?? 0} nodes •{" "}
 									{selectedDiagram.edges?.length ?? 0} edges
 								</span>
 							</div>
@@ -236,7 +236,7 @@ export function ArchitectureVisualizer(): React.ReactElement {
 					{phase === "idle" && !result && (
 						<div className="flex-1 flex items-center justify-center text-center p-8">
 							<div>
-								<div className="text-5xl mb-4">ðŸ—ï¸</div>
+								<div className="text-5xl mb-4">🏗️</div>
 								<h3 className="text-lg font-medium mb-2">
 									Architecture Visualizer
 								</h3>

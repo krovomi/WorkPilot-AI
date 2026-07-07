@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { Handle, type NodeProps, Position } from "reactflow";
 
-// Utilise les couleurs du thÃ¨me utilisateur via CSS vars (dÃ©finies dans globals.css)
-// Fallback sur des couleurs par dÃ©faut si non dÃ©finies
+// Utilise les couleurs du thème utilisateur via CSS vars (définies dans globals.css)
+// Fallback sur des couleurs par défaut si non définies
 const getUserNodeColors = () => ({
 	nodeBg: "var(--card, #f3f4f6)",
 	nodeBorder: "var(--primary, #a5b4fc)",
@@ -22,7 +22,7 @@ export const EditableNode: React.FC<NodeProps> = ({
 }) => {
 	const [editing, setEditing] = useState(false);
 	const [label, setLabel] = useState(data.label || "");
-	// Prend les couleurs du thÃ¨me utilisateur
+	// Prend les couleurs du thème utilisateur
 	const theme = getUserNodeColors();
 
 	const handleDoubleClick = () => setEditing(true);

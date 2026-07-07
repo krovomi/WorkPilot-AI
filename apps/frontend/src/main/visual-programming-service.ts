@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
+import { pythonEnvManager } from "./python-env-manager";
 import { getEffectiveSourcePath } from "./updater/path-resolver";
 
 export interface GeneratedFile {
@@ -126,6 +127,11 @@ export class VisualProgrammingService extends EventEmitter {
 		this.emit("status", `Starting ${request.action}…`);
 
 		const env = this.buildEnv();
+		// Ensure the backend package root is importable (core.*, services.*),
+		// matching how the other Python runners are spawned.
+		env.PYTHONPATH = env.PYTHONPATH
+			? `${sourcePath}${path.delimiter}${env.PYTHONPATH}`
+			: sourcePath;
 		await this.executeProcess(args, env, sourcePath);
 	}
 
@@ -149,12 +155,24 @@ export class VisualProgrammingService extends EventEmitter {
 		return env;
 	}
 
+	private resolvePythonExecutable(): string {
+		// Prefer the managed virtualenv Python — it has the backend dependencies
+		// (claude-agent-sdk, etc.) installed. Bare "python" from PATH usually does
+		// not, which makes the runner fail on `import core.simple_client`.
+		const managed = pythonEnvManager.getPythonPath();
+		if (managed && existsSync(managed)) {
+			return managed;
+		}
+		return this.pythonPath;
+	}
+
 	private async executeProcess(
 		args: string[],
 		env: Record<string, string>,
 		cwd: string,
 	): Promise<void> {
-		const proc = spawn(this.pythonPath, args, {
+		const pythonExe = this.resolvePythonExecutable();
+		const proc = spawn(pythonExe, args, {
 			cwd,
 			env,
 			stdio: ["pipe", "pipe", "pipe"],

@@ -154,7 +154,7 @@ export function FileTreeItem({
 			"flex items-center gap-2 bg-card border border-primary rounded-md px-3 py-2 shadow-lg text-sm";
 
 		const iconSpan = document.createElement("span");
-		iconSpan.textContent = node.isDirectory ? "ðŸ“" : "ðŸ“„";
+		iconSpan.textContent = node.isDirectory ? "📁" : "📄";
 
 		const nameSpan = document.createElement("span");
 		nameSpan.textContent = node.name;
@@ -184,11 +184,11 @@ export function FileTreeItem({
 	const _handleSelectFolder = (e: React.MouseEvent) => {
 		e.stopPropagation();
 		if (node.isDirectory) {
-			onSelectFolder?.(node.path); // Appelle onSelectFolder avec le chemin du dossier si dÃ©fini
+			onSelectFolder?.(node.path); // Appelle onSelectFolder avec le chemin du dossier si défini
 		}
 	};
 
-	// Ajoute un effet visuel sur le dossier sÃ©lectionnÃ©
+	// Ajoute un effet visuel sur le dossier sélectionné
 	const isSelected = selectedFolder === node.path;
 
 	// Determine which icon to show in the expand/collapse button
@@ -234,7 +234,7 @@ export function FileTreeItem({
 				node.isDirectory &&
 					"focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
 				isDragging && "opacity-50 bg-accent ring-2 ring-primary",
-				isSelected && "bg-primary text-white", // Highlight si sÃ©lectionnÃ©
+				isSelected && "bg-primary text-white", // Highlight si sélectionné
 			)}
 			style={{ paddingLeft: `${depth * 12 + 8}px` }}
 			onClick={handleClick}

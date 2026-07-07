@@ -180,6 +180,8 @@ import type { TeamSyncAPI } from "./modules/team-sync-api";
 import { createTeamSyncAPI } from "./modules/team-sync-api";
 import type { TestGenerationAPI } from "./modules/test-generation-api";
 import { createTestGenerationAPI } from "./modules/test-generation-api";
+import type { DesignToCodeAPI } from "./modules/design-to-code-api";
+import { createDesignToCodeAPI } from "./modules/design-to-code-api";
 import type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 import { createVisualProgrammingAPI } from "./modules/visual-programming-api";
 import {
@@ -271,7 +273,8 @@ export interface ElectronAPI
 		TeamBotAPI,
 		EnvSnapshotAPI,
 		OfflineModeAPI,
-		VisualProgrammingAPI {
+		VisualProgrammingAPI,
+		DesignToCodeAPI {
 	github: GitHubAPI;
 	/** Multi-user server mode: connection + login (local / Entra ID) */
 	serverAuth: ServerAuthAPI;
@@ -403,6 +406,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
+		...createDesignToCodeAPI(),
 		github: createGitHubAPI(),
 		serverAuth: createServerAuthAPI(), // Multi-user server mode
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
@@ -515,6 +519,8 @@ export type { SmartEstimationAPI } from "./modules/smart-estimation-api";
 export { createSmartEstimationAPI } from "./modules/smart-estimation-api";
 export type { TestGenerationAPI } from "./modules/test-generation-api";
 export { createTestGenerationAPI } from "./modules/test-generation-api";
+export type { DesignToCodeAPI } from "./modules/design-to-code-api";
+export { createDesignToCodeAPI } from "./modules/design-to-code-api";
 export type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 export { createVisualProgrammingAPI } from "./modules/visual-programming-api";
 export type { VoiceControlAPI } from "./modules/voice-control-api";

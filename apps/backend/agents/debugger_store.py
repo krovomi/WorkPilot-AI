@@ -96,6 +96,8 @@ def _summary(session_id: str, session: dict[str, Any]) -> dict[str, Any]:
         "breakpoints": len(breakpoints),
         "frames": len(frames),
         "updated_at": session.get("updated_at"),
+        "active": bool(session.get("active")),
+        "meta": session.get("meta") or {},
     }
 
 
@@ -214,3 +216,110 @@ def list_sessions() -> list[dict[str, Any]]:
         for sid, session in state["sessions"].items()
         if isinstance(session, dict)
     ]
+
+
+# ---------------------------------------------------------------------------
+# Live-run integration — used by the agent process (make_persistent_debugger_hook)
+# to publish paused frames cross-process and by create_client to advertise a
+# session as "live" so the UI can attach to it.
+# ---------------------------------------------------------------------------
+
+
+def add_frame(session_id: str, frame: dict[str, Any]) -> str:
+    """Append a *pending* frame (a paused tool call) and return its id.
+
+    Called from the live agent process when a breakpoint fires. Auto-attaches
+    the session so a race with detach never drops the frame.
+    """
+    state = _load()
+    session = _session(state, session_id)
+    now = time.time()
+    if session is None:
+        session = {"created_at": now, "updated_at": now, "breakpoints": [], "frames": []}
+        state["sessions"][session_id] = session
+    stored = dict(frame)
+    stored["frame_id"] = str(stored.get("frame_id") or uuid.uuid4())
+    stored.setdefault("session_id", session_id)
+    stored.setdefault("captured_at", now)
+    stored.pop("resume_decision", None)  # a fresh frame is always pending
+    session.setdefault("frames", []).append(stored)
+    session["updated_at"] = now
+    _save(state)
+    return stored["frame_id"]
+
+
+def get_frame(session_id: str, frame_id: str) -> dict[str, Any] | None:
+    session = _session(_load(), session_id)
+    if session is None:
+        return None
+    return next(
+        (f for f in session.get("frames") or [] if f.get("frame_id") == frame_id),
+        None,
+    )
+
+
+def remove_frame(session_id: str, frame_id: str) -> bool:
+    state = _load()
+    session = _session(state, session_id)
+    if session is None:
+        return False
+    before = session.get("frames") or []
+    after = [f for f in before if f.get("frame_id") != frame_id]
+    if len(after) == len(before):
+        return False
+    session["frames"] = after
+    session["updated_at"] = time.time()
+    _save(state)
+    return True
+
+
+def session_exists(session_id: str) -> bool:
+    """Cheap check (single ``stat`` when the file is absent) used by
+    ``create_client`` to decide whether to install the debugger hook."""
+    try:
+        state_path().stat()
+    except OSError:
+        return False
+    return session_id in _load().get("sessions", {})
+
+
+def session_is_armed(session_id: str) -> bool:
+    """True when the session has at least one enabled breakpoint.
+
+    Fast-paths on file absence so the live hook pays a single ``stat`` per tool
+    call on runs where the debugger has never been used.
+    """
+    try:
+        state_path().stat()
+    except OSError:
+        return False
+    session = _session(_load(), session_id)
+    if session is None:
+        return False
+    return any(b.get("enabled", True) for b in session.get("breakpoints") or [])
+
+
+def register_active(session_id: str, meta: dict[str, Any] | None = None) -> None:
+    """Advertise a session as a live agent run so the UI can attach to it."""
+    state = _load()
+    session = _session(state, session_id)
+    now = time.time()
+    if session is None:
+        session = {"created_at": now, "breakpoints": [], "frames": []}
+        state["sessions"][session_id] = session
+    session["active"] = True
+    session["updated_at"] = now
+    session["meta"] = {**(session.get("meta") or {}), **(meta or {}), "heartbeat": now}
+    _save(state)
+
+
+def deactivate(session_id: str) -> bool:
+    """Mark a live session as no longer running (called from the Stop hook)."""
+    state = _load()
+    session = _session(state, session_id)
+    if session is None:
+        return False
+    session["active"] = False
+    session["updated_at"] = time.time()
+    _save(state)
+    return True
