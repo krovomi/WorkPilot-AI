@@ -3,6 +3,22 @@
 	"title": "Train de Release",
 	"services": "services",
 	"status": "Statut",
+	"noVersionChanges": "Aucun changement de version",
+	"statuses": {
+		"planning": "Planification",
+		"staging": "Pré-production",
+		"gate_check": "Vérification des portes",
+		"releasing": "Publication",
+		"released": "Publiée",
+		"rolled_back": "Annulée",
+		"failed": "Échec"
+	},
+	"bumpTypes": {
+		"major": "Majeure",
+		"minor": "Mineure",
+		"patch": "Correctif",
+		"none": "Aucun"
+	},
 	"shipIt": "Lancer 🚀",
 	"gates": "Portes",
 	"plannedActions": "Actions Planifiées",

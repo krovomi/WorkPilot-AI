@@ -160,7 +160,9 @@ def add_breakpoint(session_id: str, bp: dict[str, Any]) -> str:
         session = _session(state, session_id)
         assert session is not None  # noqa: S101 — just created above
     normalized = _normalize_breakpoint(bp)
-    breakpoints = [b for b in session.get("breakpoints") or [] if b.get("id") != normalized["id"]]
+    breakpoints = [
+        b for b in session.get("breakpoints") or [] if b.get("id") != normalized["id"]
+    ]
     breakpoints.append(normalized)
     session["breakpoints"] = breakpoints
     session["updated_at"] = time.time()
@@ -235,7 +237,12 @@ def add_frame(session_id: str, frame: dict[str, Any]) -> str:
     session = _session(state, session_id)
     now = time.time()
     if session is None:
-        session = {"created_at": now, "updated_at": now, "breakpoints": [], "frames": []}
+        session = {
+            "created_at": now,
+            "updated_at": now,
+            "breakpoints": [],
+            "frames": [],
+        }
         state["sessions"][session_id] = session
     stored = dict(frame)
     stored["frame_id"] = str(stored.get("frame_id") or uuid.uuid4())

@@ -4,7 +4,8 @@
 	"empty": "Aucun élément de dette ne correspond aux filtres.",
 	"noTrend": "Pas encore d'historique — lancez un scan pour commencer le suivi.",
 	"lastScanned": "Dernier scan : {{when}}",
-	"specCreated": "Spec créé : {{path}}",
+	"taskCreated": "Tâche créée : {{title}}",
+	"openInKanban": "Ouvrir dans le Kanban",
 	"trendAria": "Total d'éléments de dette au fil du temps",
 	"trendFrom": "début : {{count}}",
 	"trendTo": "maintenant : {{count}} ({{delta}})",
@@ -16,7 +17,8 @@
 	},
 	"actions": {
 		"scan": "Lancer un scan",
-		"createSpec": "Créer un spec"
+		"createTask": "Créer une tâche",
+		"creatingTask": "Création…"
 	},
 	"sections": {
 		"trend": "Évolution de la dette",

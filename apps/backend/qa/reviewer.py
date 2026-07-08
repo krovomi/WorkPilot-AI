@@ -410,6 +410,28 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                         cost_usd=msg.total_cost_usd,
                         duration_ms=msg.duration_ms,
                     )
+                    # Feed usage into the replay recorder (Session History cards).
+                    if _rr and _rs_id:
+                        try:
+                            _usage = getattr(msg, "usage", None)
+                            _in_tok = (
+                                _usage.get("input_tokens", 0)
+                                if isinstance(_usage, dict)
+                                else 0
+                            )
+                            _out_tok = (
+                                _usage.get("output_tokens", 0)
+                                if isinstance(_usage, dict)
+                                else 0
+                            )
+                            _rr.record_usage(
+                                _rs_id,
+                                input_tokens=_in_tok,
+                                output_tokens=_out_tok,
+                                cost_usd=msg.total_cost_usd or 0.0,
+                            )
+                        except Exception:
+                            pass
                 continue
 
             if msg_type == "AssistantMessage" and hasattr(msg, "content"):

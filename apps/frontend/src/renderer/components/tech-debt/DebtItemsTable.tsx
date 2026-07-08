@@ -1,14 +1,15 @@
-import { Wand2 } from "lucide-react";
+import { ListPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { DebtItem } from "../../../preload/api/modules/tech-debt-api";
 import { Button } from "../ui/button";
 
 interface Props {
 	readonly items: DebtItem[];
-	readonly onGenerateSpec: (itemId: string) => void;
+	readonly onCreateTask: (item: DebtItem) => void;
+	readonly creatingItemId?: string | null;
 }
 
-export function DebtItemsTable({ items, onGenerateSpec }: Props) {
+export function DebtItemsTable({ items, onCreateTask, creatingItemId }: Props) {
 	const { t } = useTranslation(["techDebt", "common"]);
 	if (!items.length) {
 		return (
@@ -60,10 +61,13 @@ export function DebtItemsTable({ items, onGenerateSpec }: Props) {
 								<Button
 									size="sm"
 									variant="outline"
-									onClick={() => onGenerateSpec(item.id)}
+									disabled={creatingItemId === item.id}
+									onClick={() => onCreateTask(item)}
 								>
-									<Wand2 className="h-3 w-3 mr-1" />
-									{t("techDebt:actions.createSpec")}
+									<ListPlus className="h-3 w-3 mr-1" />
+									{creatingItemId === item.id
+										? t("techDebt:actions.creatingTask")
+										: t("techDebt:actions.createTask")}
 								</Button>
 							</td>
 						</tr>

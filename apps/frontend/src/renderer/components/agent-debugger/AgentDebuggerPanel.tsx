@@ -4,7 +4,6 @@ import {
 	ChevronRight,
 	Pause,
 	Plus,
-	RefreshCw,
 	Trash2,
 	X,
 } from "lucide-react";
@@ -125,7 +124,7 @@ export function AgentDebuggerPanel({ sessionId }: Props) {
 						<p className="text-xs text-muted-foreground mt-0.5">
 							{t(
 								"agentDebugger:attachHint",
-								"Enter an agent session id (e.g. a task id) to set breakpoints, or pick a saved one below.",
+								"Pick an agent session from the list to set breakpoints.",
 							)}
 						</p>
 					</div>
@@ -134,17 +133,29 @@ export function AgentDebuggerPanel({ sessionId }: Props) {
 							<Label className="text-xs">
 								{t("agentDebugger:sessionId", "Session id")}
 							</Label>
-							<Input
+							<select
+								className={`${SELECT_CLASS} w-full`}
 								value={manualId}
 								onChange={(e) => setManualId(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") handleAttach(manualId);
-								}}
-								placeholder={t(
-									"agentDebugger:attachPlaceholder",
-									"e.g. task-1234",
-								)}
-							/>
+							>
+								<option value="">
+									{sessions.length === 0
+										? t("agentDebugger:noSessions", "No saved sessions yet.")
+										: t("agentDebugger:selectSession", "Select a session…")}
+								</option>
+								{[...sessions]
+									.sort(
+										(a, b) =>
+											Number(b.active ?? false) - Number(a.active ?? false),
+									)
+									.map((s) => (
+										<option key={s.session_id} value={s.session_id}>
+											{s.active ? "● " : ""}
+											{s.session_id}
+											{s.meta?.agent_type ? ` · ${s.meta.agent_type}` : ""}
+										</option>
+									))}
+							</select>
 						</div>
 						<Button
 							size="sm"
@@ -156,71 +167,6 @@ export function AgentDebuggerPanel({ sessionId }: Props) {
 						</Button>
 					</div>
 
-					<div>
-						<div className="flex items-center justify-between mb-1">
-							<h5 className="text-xs font-medium text-muted-foreground">
-								{t("agentDebugger:existingSessions", "Saved sessions")} (
-								{sessions.length})
-							</h5>
-							<Button
-								size="icon"
-								variant="ghost"
-								onClick={() => void listSessions()}
-								title={t("common:refresh", "Refresh")}
-							>
-								<RefreshCw className="w-3 h-3" />
-							</Button>
-						</div>
-						{sessions.length === 0 ? (
-							<p className="text-xs text-muted-foreground">
-								{t("agentDebugger:noSessions", "No saved sessions yet.")}
-							</p>
-						) : (
-							<div className="space-y-1">
-								{[...sessions]
-									.sort(
-										(a, b) => Number(b.active ?? false) - Number(a.active ?? false),
-									)
-									.map((s) => (
-										<button
-											type="button"
-											key={s.session_id}
-											onClick={() => handleAttach(s.session_id)}
-											className="w-full flex items-center justify-between gap-2 text-sm border rounded p-2 bg-muted/20 hover:bg-muted/40 text-left"
-										>
-											<div className="min-w-0">
-												<div className="flex items-center gap-1.5">
-													{s.active && (
-														<span
-															className="w-2 h-2 rounded-full bg-green-500 shrink-0"
-															title={t("agentDebugger:live", "Live run")}
-														/>
-													)}
-													<code className="font-mono truncate">
-														{s.session_id}
-													</code>
-												</div>
-												{s.meta?.agent_type && (
-													<span className="text-[11px] text-muted-foreground">
-														{s.active
-															? t("agentDebugger:live", "Live run")
-															: t("agentDebugger:lastRun", "Last run")}{" "}
-														· {s.meta.agent_type}
-													</span>
-												)}
-											</div>
-											<span className="text-xs text-muted-foreground shrink-0">
-												{t("agentDebugger:sessionMeta", {
-													bp: s.breakpoints,
-													frames: s.frames,
-													defaultValue: "{{bp}} breakpoints · {{frames}} paused",
-												})}
-											</span>
-										</button>
-									))}
-							</div>
-						)}
-					</div>
 				</section>
 			)}
 

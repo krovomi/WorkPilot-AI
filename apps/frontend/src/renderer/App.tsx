@@ -587,8 +587,19 @@ export function App() {
 	// Kanban after queuing a scaffold task).
 	useEffect(() => {
 		const handler = (e: Event) => {
-			const view = (e as CustomEvent<{ view?: SidebarView }>).detail?.view;
+			const detail = (
+				e as CustomEvent<{ view?: SidebarView; taskId?: string }>
+			).detail;
+			const view = detail?.view;
 			if (view) setActiveView(view);
+			// Optionally open a specific task once we land on the Kanban (e.g. the
+			// Tech Debt dashboard jumps straight to the task it just created).
+			if (detail?.taskId) {
+				const task = useTaskStore
+					.getState()
+					.tasks.find((tsk) => tsk.id === detail.taskId);
+				if (task) setSelectedTask(task);
+			}
 		};
 		window.addEventListener("workpilot:navigate-view", handler);
 		return () => window.removeEventListener("workpilot:navigate-view", handler);

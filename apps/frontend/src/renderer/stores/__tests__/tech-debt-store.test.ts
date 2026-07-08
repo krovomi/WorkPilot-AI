@@ -9,6 +9,7 @@ import type { DebtReport } from "../../../preload/api/modules/tech-debt-api";
 const mockScan = vi.fn();
 const mockList = vi.fn();
 const mockSpec = vi.fn();
+const mockCreateTask = vi.fn();
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -17,6 +18,7 @@ beforeEach(() => {
 			scanTechDebt: mockScan,
 			listDebtItems: mockList,
 			generateDebtSpec: mockSpec,
+			createTask: mockCreateTask,
 		},
 		writable: true,
 		configurable: true,
@@ -108,5 +110,41 @@ describe("tech-debt-store", () => {
 			llmHint: undefined,
 		});
 		expect(dir).toBe("/p/.workpilot/specs/001-x");
+	});
+
+	it("createTaskFromItem creates a Kanban task from a debt item", async () => {
+		const createdTask = {
+			id: "task-42",
+			title: "Tech debt : m",
+			projectId: "proj-1",
+		};
+		mockCreateTask.mockResolvedValueOnce({ success: true, data: createdTask });
+
+		const item = {
+			id: "x",
+			kind: "duplication" as const,
+			file_path: "a.cs",
+			line: 3,
+			message: "m",
+			cost: 10,
+			effort: 2,
+			roi: 5,
+			tags: [],
+			context: "",
+		};
+
+		const { result } = renderHook(() => useTechDebtStore());
+		let task: unknown = null;
+		await act(async () => {
+			task = await result.current.createTaskFromItem("proj-1", item, "en");
+		});
+
+		expect(mockCreateTask).toHaveBeenCalledWith(
+			"proj-1",
+			expect.stringContaining("Tech debt"),
+			expect.stringContaining("Location: `a.cs:3`"),
+			{ sourceType: "tech-debt" },
+		);
+		expect((task as { id: string }).id).toBe("task-42");
 	});
 });

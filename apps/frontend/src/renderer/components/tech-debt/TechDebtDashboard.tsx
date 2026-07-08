@@ -1,6 +1,9 @@
-import { FileWarning, Gauge, RefreshCw, Wand2 } from "lucide-react";
+import { ArrowRight, FileWarning, Gauge, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { DebtItem } from "../../../preload/api/modules/tech-debt-api";
+import type { Lang } from "../../lib/debt-task-spec";
+import { useProjectStore } from "../../stores/project-store";
 import { useTechDebtStore } from "../../stores/tech-debt-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -14,7 +17,10 @@ interface Props {
 }
 
 export function TechDebtDashboard({ projectPath }: Props) {
-	const { t } = useTranslation(["techDebt", "common"]);
+	const { t, i18n } = useTranslation(["techDebt", "common"]);
+	const lang: Lang = i18n.language?.toLowerCase().startsWith("fr")
+		? "fr"
+		: "en";
 	const {
 		items,
 		trend,
@@ -25,17 +31,25 @@ export function TechDebtDashboard({ projectPath }: Props) {
 		lastScannedAt,
 		setFilter,
 		scan,
-		generateSpec,
+		refresh,
+		createTaskFromItem,
 	} = useTechDebtStore();
 
 	const [projectInput, setProjectInput] = useState(projectPath ?? "");
-	const [specCreated, setSpecCreated] = useState<string | null>(null);
+	const [creatingItemId, setCreatingItemId] = useState<string | null>(null);
+	const [createdTask, setCreatedTask] = useState<{
+		id: string;
+		title: string;
+	} | null>(null);
 
+	// On arrival, load any previously persisted debt items (fast, read-only).
+	// A full scan is expensive and is only triggered when the user clicks the
+	// button — auto-scanning here would keep the button disabled the whole time.
 	useEffect(() => {
 		if (projectPath && !items.length && !scanning) {
-			void scan(projectPath);
+			void refresh(projectPath);
 		}
-	}, [projectPath, items.length, scanning, scan]);
+	}, [projectPath, items.length, scanning, refresh]);
 
 	const filteredItems = useMemo(() => {
 		return items.filter((item) => {
@@ -63,10 +77,36 @@ export function TechDebtDashboard({ projectPath }: Props) {
 		if (canScan) void scan(projectInput.trim());
 	};
 
-	const handleGenerateSpec = async (itemId: string) => {
-		if (!projectInput.trim()) return;
-		const dir = await generateSpec(projectInput.trim(), itemId);
-		if (dir) setSpecCreated(dir);
+	// Resolve the target project id: the dashboard is fed a raw path, but tasks
+	// are keyed by project id. Match the registered project by path, and fall
+	// back to the active project.
+	const resolveProjectId = (): string | null => {
+		const projState = useProjectStore.getState();
+		const target = projectInput.trim();
+		const byPath = projState.projects.find((p) => p.path === target);
+		return byPath?.id ?? projState.activeProjectId ?? null;
+	};
+
+	const handleCreateTask = async (item: DebtItem) => {
+		if (!projectInput.trim() || creatingItemId) return;
+		const projectId = resolveProjectId();
+		if (!projectId) return;
+		setCreatingItemId(item.id);
+		try {
+			const task = await createTaskFromItem(projectId, item, lang);
+			if (task) setCreatedTask({ id: task.id, title: task.title });
+		} finally {
+			setCreatingItemId(null);
+		}
+	};
+
+	const openCreatedTaskInKanban = () => {
+		if (!createdTask) return;
+		globalThis.dispatchEvent(
+			new CustomEvent("workpilot:navigate-view", {
+				detail: { view: "kanban", taskId: createdTask.id },
+			}),
+		);
 	};
 
 	return (
@@ -180,15 +220,27 @@ export function TechDebtDashboard({ projectPath }: Props) {
 				</div>
 				<DebtItemsTable
 					items={topItems}
-					onGenerateSpec={handleGenerateSpec}
+					onCreateTask={handleCreateTask}
+					creatingItemId={creatingItemId}
 				/>
 			</section>
 
-			{specCreated && (
-				<div className="p-3 rounded-md border bg-muted/40 text-sm flex items-center gap-2">
-					<Wand2 className="h-4 w-4" />
-					{t("techDebt:specCreated", { path: specCreated })}
-				</div>
+			{createdTask && (
+				<button
+					type="button"
+					onClick={openCreatedTaskInKanban}
+					className="w-full text-left p-3 rounded-md border bg-muted/40 hover:bg-muted/70 transition-colors text-sm flex items-center justify-between gap-2 group"
+				>
+					<span className="flex items-center gap-2 min-w-0">
+						<ArrowRight className="h-4 w-4 shrink-0" />
+						<span className="truncate">
+							{t("techDebt:taskCreated", { title: createdTask.title })}
+						</span>
+					</span>
+					<span className="shrink-0 text-xs font-medium text-primary group-hover:underline">
+						{t("techDebt:openInKanban")}
+					</span>
+				</button>
 			)}
 		</div>
 	);

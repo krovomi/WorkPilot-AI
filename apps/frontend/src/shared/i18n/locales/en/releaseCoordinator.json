@@ -3,6 +3,22 @@
 	"title": "Release Train",
 	"services": "services",
 	"status": "Status",
+	"noVersionChanges": "No version changes",
+	"statuses": {
+		"planning": "Planning",
+		"staging": "Staging",
+		"gate_check": "Gate check",
+		"releasing": "Releasing",
+		"released": "Released",
+		"rolled_back": "Rolled back",
+		"failed": "Failed"
+	},
+	"bumpTypes": {
+		"major": "Major",
+		"minor": "Minor",
+		"patch": "Patch",
+		"none": "None"
+	},
 	"shipIt": "Ship It 🚀",
 	"gates": "Gates",
 	"plannedActions": "Planned Actions",

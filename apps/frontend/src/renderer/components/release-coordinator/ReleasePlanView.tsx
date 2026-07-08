@@ -112,12 +112,15 @@ function PlanBody({
 	readonly plan: ReleaseTrainPlan;
 	readonly t: (key: string, opts?: Record<string, unknown>) => string;
 }): React.ReactElement {
+	const hasVersionChanges = plan.services.some((s) => s.bumpType !== "none");
+	const statusLabel = t(`statuses.${plan.status}`, { defaultValue: plan.status });
+
 	return (
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
 				<p className="text-sm text-(--text-secondary)">
-					{plan.services.length} {t("services")} · {t("status")}: {plan.status}
+					{plan.services.length} {t("services")} · {t("status")}: {statusLabel}
 				</p>
 			</div>
 
@@ -157,7 +160,9 @@ function PlanBody({
 								</span>
 							</div>
 							<div className="flex items-center gap-2 text-xs text-(--text-secondary)">
-								<span className="uppercase">{svc.bumpType}</span>
+								<span className="uppercase">
+									{t(`bumpTypes.${svc.bumpType}`, { defaultValue: svc.bumpType })}
+								</span>
 								<span>·</span>
 								<span>
 									{svc.changelogEntries.length} {t("changelogEntries")}
@@ -168,11 +173,9 @@ function PlanBody({
 				})}
 			</div>
 
-			{plan.summary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
-					{plan.summary}
-				</p>
-			)}
+			<p className="text-sm text-(--text-secondary) italic mt-2">
+				{hasVersionChanges ? plan.summary : t("noVersionChanges")}
+			</p>
 		</div>
 	);
 }

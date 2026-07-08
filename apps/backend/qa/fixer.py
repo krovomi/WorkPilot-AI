@@ -281,6 +281,32 @@ async def run_qa_fixer_session(
                 msg_type=msg_type,
             )
 
+            # Capture SDK usage (tokens/cost) for the Session History cards.
+            if msg_type == "ResultMessage":
+                if _rr and _rs_id:
+                    try:
+                        _usage = getattr(msg, "usage", None)
+                        _in_tok = (
+                            _usage.get("input_tokens", 0)
+                            if isinstance(_usage, dict)
+                            else 0
+                        )
+                        _out_tok = (
+                            _usage.get("output_tokens", 0)
+                            if isinstance(_usage, dict)
+                            else 0
+                        )
+                        _cost = getattr(msg, "total_cost_usd", None) or 0.0
+                        _rr.record_usage(
+                            _rs_id,
+                            input_tokens=_in_tok,
+                            output_tokens=_out_tok,
+                            cost_usd=_cost,
+                        )
+                    except Exception:
+                        pass
+                continue
+
             if msg_type == "AssistantMessage" and hasattr(msg, "content"):
                 for block in msg.content:
                     block_type = type(block).__name__

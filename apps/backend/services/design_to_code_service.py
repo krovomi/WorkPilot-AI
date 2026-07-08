@@ -1361,9 +1361,13 @@ Return ONLY the JSON array."""
             text = await oneshot_completion(prompt, project_dir=str(self.project_path))
             if text and text.strip():
                 return text
-            logger.warning("One-shot code-gen returned empty; using direct-API fallback.")
+            logger.warning(
+                "One-shot code-gen returned empty; using direct-API fallback."
+            )
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"One-shot code-gen failed ({e}); using direct-API fallback.")
+            logger.warning(
+                f"One-shot code-gen failed ({e}); using direct-API fallback."
+            )
 
         # Legacy direct-API fallback (Anthropic → OpenAI → mock).
         try:

@@ -4,7 +4,8 @@
 	"empty": "No debt items match the current filters.",
 	"noTrend": "No trend data yet — run a scan to start tracking.",
 	"lastScanned": "Last scanned: {{when}}",
-	"specCreated": "Spec created at: {{path}}",
+	"taskCreated": "Task created: {{title}}",
+	"openInKanban": "Open in Kanban",
 	"trendAria": "Total debt items over time",
 	"trendFrom": "start: {{count}}",
 	"trendTo": "now: {{count}} ({{delta}})",
@@ -16,7 +17,8 @@
 	},
 	"actions": {
 		"scan": "Scan now",
-		"createSpec": "Create spec"
+		"createTask": "Create task",
+		"creatingTask": "Creating…"
 	},
 	"sections": {
 		"trend": "Debt trend",

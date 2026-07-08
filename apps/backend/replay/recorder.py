@@ -171,6 +171,27 @@ class ReplayRecorder:
             },
         )
 
+    def record_usage(
+        self,
+        session_id: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        cost_usd: float = 0.0,
+    ) -> None:
+        """Accumulate token/cost usage onto a session's running totals.
+
+        Unlike record_response (one call per streamed text block), usage is
+        authoritative and arrives once per turn on the SDK ResultMessage, so it
+        is added straight to the totals rather than creating a timeline step.
+        These totals back the Session History "Tokens" / cost cards via
+        to_summary().
+        """
+        session = self._active_sessions.get(session_id)
+        if not session:
+            return
+        session.total_tokens += (input_tokens or 0) + (output_tokens or 0)
+        session.total_cost_usd += cost_usd or 0.0
+
     def record_tool_call(
         self,
         session_id: str,

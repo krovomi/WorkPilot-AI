@@ -8,6 +8,9 @@ import type {
 	DebtSummary,
 	DebtTrendPoint,
 } from "../../preload/api/modules/tech-debt-api";
+import type { Task } from "../../shared/types";
+import { buildDebtTaskSpec, type Lang } from "../lib/debt-task-spec";
+import { createTask } from "./task-store";
 
 export interface TechDebtFilters {
 	minScore: number;
@@ -35,6 +38,11 @@ interface TechDebtState {
 		itemId: string,
 		llmHint?: string,
 	) => Promise<string | null>;
+	createTaskFromItem: (
+		projectId: string,
+		item: DebtItem,
+		lang: Lang,
+	) => Promise<Task | null>;
 	clear: () => void;
 }
 
@@ -108,6 +116,26 @@ export const useTechDebtStore = create<TechDebtState>((set, get) => ({
 				llmHint,
 			});
 			return result.spec_dir;
+		} catch (e) {
+			set({ error: String(e) });
+			return null;
+		}
+	},
+
+	// Turn a debt item into a real Kanban task (backlog). Unlike generateSpec
+	// (which wrote an orphan spec folder with no card), this creates a task the
+	// user can see, open and launch from the board.
+	createTaskFromItem: async (projectId, item, lang) => {
+		const { title, description } = buildDebtTaskSpec(item, lang);
+		try {
+			const task = await createTask(projectId, title, description, {
+				sourceType: "tech-debt",
+			});
+			if (!task) {
+				set({ error: "Failed to create task from debt item" });
+				return null;
+			}
+			return task;
 		} catch (e) {
 			set({ error: String(e) });
 			return null;

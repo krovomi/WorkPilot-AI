@@ -1525,6 +1525,27 @@ async def run_agent_session(
             except Exception as _ute:
                 logger.debug("[usage_tracker] SDK usage recording failed: %s", _ute)
 
+        # Mirror the SDK usage into the replay recorder so the Session History
+        # cards show real tokens/cost (independent of the usage_tracker above).
+        if _sdk_result_msg is not None and _rr and _rs_id:
+            try:
+                _usage = getattr(_sdk_result_msg, "usage", None)
+                _in_tok = (
+                    _usage.get("input_tokens", 0) if isinstance(_usage, dict) else 0
+                )
+                _out_tok = (
+                    _usage.get("output_tokens", 0) if isinstance(_usage, dict) else 0
+                )
+                _cost = getattr(_sdk_result_msg, "total_cost_usd", None) or 0.0
+                _rr.record_usage(
+                    _rs_id,
+                    input_tokens=_in_tok,
+                    output_tokens=_out_tok,
+                    cost_usd=_cost,
+                )
+            except Exception:
+                pass
+
         # Check if build is complete
         if is_build_complete(spec_dir):
             debug_success(

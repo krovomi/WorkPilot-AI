@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -73,6 +74,64 @@ def _read_pyproject(path: Path) -> dict[str, Any] | None:
     return {"name": name, "version": version, "dependencies": []}
 
 
+def _read_csproj(path: Path) -> dict[str, Any] | None:
+    """Read a .NET project file (SDK-style or legacy .csproj)."""
+    try:
+        content = path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return None
+
+    def _tag(tag: str) -> str:
+        match = re.search(rf"<{tag}>\s*([^<]+?)\s*</{tag}>", content, re.IGNORECASE)
+        return match.group(1).strip() if match else ""
+
+    # Version precedence: <Version> > <VersionPrefix> > <AssemblyVersion>.
+    version = _tag("Version") or _tag("VersionPrefix") or _tag("AssemblyVersion")
+    # AssemblyVersion is 4-part (a.b.c.d); SemVer.parse keeps the first three.
+    name = _tag("AssemblyName") or path.stem
+
+    # Referenced projects → dependency names (by referenced .csproj stem).
+    dependencies = [
+        Path(ref.replace("\\", "/")).stem
+        for ref in re.findall(
+            r'<ProjectReference\s+Include\s*=\s*"([^"]+)"', content, re.IGNORECASE
+        )
+    ]
+    return {
+        "name": name,
+        "version": version or "0.0.0",
+        "dependencies": dependencies,
+    }
+
+
+def _read_cargo_toml(path: Path) -> dict[str, Any] | None:
+    """Read a Rust Cargo.toml (only the [package] table)."""
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    name = ""
+    version = "0.0.0"
+    in_package = False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("["):
+            in_package = stripped == "[package]"
+            continue
+        if not in_package or "=" not in stripped:
+            continue
+        key, _, raw = stripped.partition("=")
+        value = raw.split("#", 1)[0].strip().strip('"').strip("'")
+        if key.strip() == "name":
+            name = value
+        elif key.strip() == "version":
+            version = value
+    if not name:
+        return None
+    return {"name": name, "version": version, "dependencies": []}
+
+
 def _discover_services(project_path: Path) -> list[tuple[Path, dict[str, Any]]]:
     services: list[tuple[Path, dict[str, Any]]] = []
     seen_names: set[str] = set()
@@ -95,6 +154,22 @@ def _discover_services(project_path: Path) -> list[tuple[Path, dict[str, Any]]]:
         info = _read_pyproject(pyproj)
         if info and info["name"] not in seen_names:
             services.append((pyproj.parent, info))
+            seen_names.add(info["name"])
+
+    for csproj in project_path.glob("**/*.csproj"):
+        if any(part in {"bin", "obj", ".git"} for part in csproj.parts):
+            continue
+        info = _read_csproj(csproj)
+        if info and info["name"] not in seen_names:
+            services.append((csproj.parent, info))
+            seen_names.add(info["name"])
+
+    for cargo in project_path.glob("**/Cargo.toml"):
+        if any(part in {"target", ".git"} for part in cargo.parts):
+            continue
+        info = _read_cargo_toml(cargo)
+        if info and info["name"] not in seen_names:
+            services.append((cargo.parent, info))
             seen_names.add(info["name"])
 
     return services

@@ -289,7 +289,8 @@ export interface TaskMetadata {
 		| "linear"
 		| "github"
 		| "gitlab"
-		| "visual-canvas";
+		| "visual-canvas"
+		| "tech-debt";
 	ideationType?: string; // e.g., 'code_improvements', 'security_hardening'
 	ideaId?: string; // Reference to the original idea if converted
 	featureId?: string; // Reference to roadmap feature if from roadmap
