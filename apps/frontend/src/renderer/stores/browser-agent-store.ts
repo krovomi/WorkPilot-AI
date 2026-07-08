@@ -107,11 +107,11 @@ export const useBrowserAgentStore = create<BrowserAgentState>((set, get) => ({
 	setBrowserScreenshot: (screenshot) => set({ browserScreenshot: screenshot }),
 	setDashboardData: (data) =>
 		set({
-			stats: data.stats,
-			screenshots: data.screenshots,
-			baselines: data.baselines,
-			comparisons: data.comparisons,
-			recentTestRun: data.recentTestRun,
+			stats: data?.stats ?? { ...defaultStats },
+			screenshots: data?.screenshots ?? [],
+			baselines: data?.baselines ?? [],
+			comparisons: data?.comparisons ?? [],
+			recentTestRun: data?.recentTestRun ?? null,
 		}),
 
 	// Async: Fetch dashboard data

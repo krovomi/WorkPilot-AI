@@ -11,6 +11,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { parsePythonCommand } from "../python-detector";
+import {
+	getConfiguredPythonPath,
+	pythonEnvManager,
+} from "../python-env-manager";
 
 // ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -31,7 +36,10 @@ export function registerBrowserAgentHandlers(
 				const result = await runBrowserAgentCommand(projectPath, [
 					"dashboard",
 				]);
-				return { success: true, data: JSON.parse(result) };
+				// The runner already emits { success, data }, so return it
+				// as-is rather than re-wrapping (which would nest data.data).
+				const parsed = JSON.parse(result);
+				return { success: parsed.success, data: parsed.data };
 			} catch (_error) {
 				return { success: true, data: getEmptyDashboard() };
 			}
@@ -254,13 +262,30 @@ function runBrowserAgentCommand(
 			"runners",
 			"browser_agent_runner.py",
 		);
+		// Use the app's configured Python (the project venv, which is where
+		// backend deps like playwright are installed) instead of a bare
+		// "python" that would resolve to whatever is first on the runtime PATH.
+		const pythonPath = getConfiguredPythonPath();
+		const [cmd, pythonBaseArgs] = parsePythonCommand(pythonPath);
+		// getPythonEnv() already sets PYTHONIOENCODING=utf-8 + PYTHONPATH so the
+		// venv's site-packages resolve and emoji don't crash on a cp1252 pipe.
+		const env = pythonEnvManager.getPythonEnv();
+
 		const proc = spawn(
-			"python",
-			[runnerPath, "--project", projectPath, "--json", ...args],
+			cmd,
+			[
+				...pythonBaseArgs,
+				runnerPath,
+				"--project",
+				projectPath,
+				"--json",
+				...args,
+			],
 			{
 				cwd: projectPath,
 				stdio: ["ignore", "pipe", "pipe"],
 				timeout,
+				env,
 			},
 		);
 
@@ -277,6 +302,11 @@ function runBrowserAgentCommand(
 
 		proc.on("close", (code: number | null) => {
 			if (code === 0) {
+				resolve(stdout);
+			} else if (stdout.trim()) {
+				// The runner emits structured errors ({ success:false, error })
+				// on stdout before exiting non-zero. Surface that so callers
+				// see the real message instead of an empty "exited with code 1".
 				resolve(stdout);
 			} else {
 				reject(

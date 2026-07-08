@@ -232,20 +232,27 @@ def main():
             else:
                 print(f"Error: {result.get('error', 'Unknown error')}", file=sys.stderr)
 
+    # Human-friendly, emoji-decorated status lines must never be emitted in
+    # --json mode: they pollute the JSON stdout the caller parses, and on a
+    # Windows cp1252 pipe the emoji raise UnicodeEncodeError (runner exits 1).
+    def log(msg: str):
+        if not args.json:
+            print(msg)
+
     try:
         if args.command == "screenshot":
-            print(f"📸 Capturing screenshot of {args.url}...")
+            log(f"📸 Capturing screenshot of {args.url}...")
             result = asyncio.run(
                 runner.run_screenshot(args.url, args.name, args.full_page)
             )
             if result["success"]:
-                print(f"✅ Screenshot saved: {result['data']['path']}")
+                log(f"✅ Screenshot saved: {result['data']['path']}")
             output(result)
 
         elif args.command == "compare":
-            print(f"🔍 Comparing '{args.name}' against baseline...")
+            log(f"🔍 Comparing '{args.name}' against baseline...")
             result = asyncio.run(runner.run_compare(args.name, args.url))
-            if result["success"]:
+            if result["success"] and not args.json:
                 data = result["data"]
                 emoji = "✅" if data["passed"] else "❌"
                 print(
@@ -263,11 +270,11 @@ def main():
                     args.name, getattr(args, "screenshot", None)
                 )
                 if result["success"]:
-                    print(f"✅ Baseline set for '{args.name}'")
+                    log(f"✅ Baseline set for '{args.name}'")
                 output(result)
             elif args.baseline_action == "list":
                 result = runner.run_list_baselines()
-                if result["success"]:
+                if result["success"] and not args.json:
                     baselines = result["data"]
                     if baselines:
                         print(f"📋 {len(baselines)} baseline(s):")
@@ -281,17 +288,17 @@ def main():
             elif args.baseline_action == "delete":
                 result = runner.run_delete_baseline(args.name)
                 if result["success"] and result["data"]["deleted"]:
-                    print(f"🗑️ Baseline '{args.name}' deleted.")
+                    log(f"🗑️ Baseline '{args.name}' deleted.")
                 else:
-                    print(f"No baseline found for '{args.name}'.")
+                    log(f"No baseline found for '{args.name}'.")
                 output(result)
             else:
                 baseline_parser.print_help()
 
         elif args.command == "tests":
-            print("🧪 Running E2E tests...")
+            log("🧪 Running E2E tests...")
             result = runner.run_tests(getattr(args, "files", None))
-            if result["success"]:
+            if result["success"] and not args.json:
                 data = result["data"]
                 print(
                     f"Results: {data['passed']} passed, {data['failed']} failed, {data['skipped']} skipped"

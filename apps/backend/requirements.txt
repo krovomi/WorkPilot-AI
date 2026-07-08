@@ -73,5 +73,10 @@ msrest>=0.7.1           # Required by azure-devops SDK
 # Anthropic SDK for Claude API integration
 anthropic>=0.113.0
 
+# Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
+# After install, the Chromium binary must be fetched once:
+#   playwright install chromium
+playwright>=1.40.0
+
 # Ajout d'une note pour l'installation automatique de uvicorn si absent
 # Pour garantir l'automatisation, il est recommandé d'ajouter uvicorn dans requirements.txt racine ou de documenter l'installation automatique.
