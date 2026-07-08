@@ -143,7 +143,12 @@ describe("tech-debt-store", () => {
 			"proj-1",
 			expect.stringContaining("Tech debt"),
 			expect.stringContaining("Location: `a.cs:3`"),
-			{ sourceType: "tech-debt" },
+			expect.objectContaining({
+				sourceType: "tech-debt",
+				acceptanceCriteria: expect.arrayContaining([
+					expect.stringContaining("next tech debt scan"),
+				]),
+			}),
 		);
 		expect((task as { id: string }).id).toBe("task-42");
 	});

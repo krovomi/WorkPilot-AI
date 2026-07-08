@@ -126,10 +126,14 @@ export const useTechDebtStore = create<TechDebtState>((set, get) => ({
 	// (which wrote an orphan spec folder with no card), this creates a task the
 	// user can see, open and launch from the board.
 	createTaskFromItem: async (projectId, item, lang) => {
-		const { title, description } = buildDebtTaskSpec(item, lang);
+		const { title, description, acceptanceCriteria } = buildDebtTaskSpec(
+			item,
+			lang,
+		);
 		try {
 			const task = await createTask(projectId, title, description, {
 				sourceType: "tech-debt",
+				acceptanceCriteria,
 			});
 			if (!task) {
 				set({ error: "Failed to create task from debt item" });

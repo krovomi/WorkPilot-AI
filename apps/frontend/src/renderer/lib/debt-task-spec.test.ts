@@ -35,12 +35,25 @@ describe("buildDebtTaskSpec", () => {
 		expect(title.length).toBeLessThan(100);
 	});
 
-	it("embeds the location, ROI and acceptance criteria in the description", () => {
+	it("embeds the location, ROI and objective in the description", () => {
 		const { description } = buildDebtTaskSpec(makeItem(), "en");
 		expect(description).toContain("`src/foo.cs:13`");
 		expect(description).toContain("ROI: **2640**");
-		expect(description).toContain("Acceptance criteria");
-		expect(description).toContain("no longer appears in the next tech debt scan");
+		expect(description).toContain("Objective");
+		expect(description).toContain("Resolve the tech debt detected");
+	});
+
+	it("returns acceptance criteria separately (not in the body)", () => {
+		const { description, acceptanceCriteria } = buildDebtTaskSpec(
+			makeItem(),
+			"en",
+		);
+		expect(acceptanceCriteria).toHaveLength(3);
+		expect(acceptanceCriteria[0]).toContain(
+			"no longer appears in the next tech debt scan",
+		);
+		// The body must not carry an AC section (the scanner strips it anyway).
+		expect(description).not.toContain("Acceptance criteria");
 	});
 
 	it("includes a context block only when context is present", () => {

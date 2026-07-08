@@ -46,10 +46,17 @@ function buildTitle(item: DebtItem, lang: Lang): string {
 export interface DebtTaskSpec {
 	title: string;
 	description: string;
+	/**
+	 * Surfaced through `metadata.acceptanceCriteria` so they land in the task's
+	 * dedicated AC panel — the scanner strips any "Acceptance criteria" section
+	 * out of the description body, so keeping them there too would drop them.
+	 */
+	acceptanceCriteria: string[];
 }
 
 /**
- * Build the `{ title, description }` handed to `createTask` for a debt item.
+ * Build the `{ title, description, acceptanceCriteria }` handed to `createTask`
+ * for a debt item.
  */
 export function buildDebtTaskSpec(item: DebtItem, lang: Lang): DebtTaskSpec {
 	const title = buildTitle(item, lang);
@@ -105,19 +112,20 @@ export function buildDebtTaskSpec(item: DebtItem, lang: Lang): DebtTaskSpec {
 		lang === "fr"
 			? `Résoudre la dette technique détectée dans \`${location}\`.`
 			: `Resolve the tech debt detected in \`${location}\`.`,
-		"",
-		lang === "fr" ? "### Critères d'acceptation" : "### Acceptance criteria",
-		"",
-		lang === "fr"
-			? "- [ ] L'élément n'apparaît plus au prochain scan de dette technique."
-			: "- [ ] The item no longer appears in the next tech debt scan.",
-		lang === "fr"
-			? "- [ ] Les tests existants passent toujours."
-			: "- [ ] Existing tests still pass.",
-		lang === "fr"
-			? "- [ ] De nouveaux tests couvrent le code refactoré si le comportement change."
-			: "- [ ] New tests cover the refactored path when behaviour changes.",
 	);
 
-	return { title, description: lines.join("\n") };
+	const acceptanceCriteria =
+		lang === "fr"
+			? [
+					"L'élément n'apparaît plus au prochain scan de dette technique.",
+					"Les tests existants passent toujours.",
+					"De nouveaux tests couvrent le code refactoré si le comportement change.",
+				]
+			: [
+					"The item no longer appears in the next tech debt scan.",
+					"Existing tests still pass.",
+					"New tests cover the refactored path when behaviour changes.",
+				];
+
+	return { title, description: lines.join("\n"), acceptanceCriteria };
 }

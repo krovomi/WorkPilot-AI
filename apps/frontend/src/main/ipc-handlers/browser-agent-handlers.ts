@@ -8,8 +8,13 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { type BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+
+// ESM-compatible __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Register all browser agent IPC handlers.
@@ -247,7 +252,6 @@ function runBrowserAgentCommand(
 	return new Promise((resolve, reject) => {
 		const runnerPath = path.join(
 			__dirname,
-			"..",
 			"..",
 			"..",
 			"..",
