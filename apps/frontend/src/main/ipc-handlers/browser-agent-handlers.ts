@@ -30,7 +30,6 @@ export function registerBrowserAgentHandlers(
 			try {
 				const result = await runBrowserAgentCommand(projectPath, [
 					"dashboard",
-					"--json",
 				]);
 				return { success: true, data: JSON.parse(result) };
 			} catch (_error) {
@@ -59,7 +58,6 @@ export function registerBrowserAgentHandlers(
 					url,
 					"--name",
 					name,
-					"--json",
 				]);
 				const data = JSON.parse(result);
 
@@ -104,7 +102,6 @@ export function registerBrowserAgentHandlers(
 					url,
 					"--name",
 					"navigation_preview",
-					"--json",
 				]);
 				return JSON.parse(result);
 			} catch (error) {
@@ -119,7 +116,7 @@ export function registerBrowserAgentHandlers(
 		IPC_CHANNELS.BROWSER_AGENT_SET_BASELINE,
 		async (_, projectPath: string, name: string, screenshotPath?: string) => {
 			try {
-				const args = ["baseline", "set", "--name", name, "--json"];
+				const args = ["baseline", "set", "--name", name];
 				if (screenshotPath) {
 					args.push("--screenshot", screenshotPath);
 				}
@@ -138,7 +135,6 @@ export function registerBrowserAgentHandlers(
 				const result = await runBrowserAgentCommand(projectPath, [
 					"baseline",
 					"list",
-					"--json",
 				]);
 				return JSON.parse(result);
 			} catch (_error) {
@@ -156,7 +152,6 @@ export function registerBrowserAgentHandlers(
 					"delete",
 					"--name",
 					name,
-					"--json",
 				]);
 				return JSON.parse(result);
 			} catch (error) {
@@ -179,7 +174,7 @@ export function registerBrowserAgentHandlers(
 					});
 				}
 
-				const args = ["compare", "--name", name, "--json"];
+				const args = ["compare", "--name", name];
 				if (url) {
 					args.push("--url", url);
 				}
@@ -207,7 +202,7 @@ export function registerBrowserAgentHandlers(
 
 				const result = await runBrowserAgentCommand(
 					projectPath,
-					["tests", "--json"],
+					["tests"],
 					300000,
 				);
 				const data = JSON.parse(result);

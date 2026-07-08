@@ -570,9 +570,17 @@ class TestContextCacheIntegrator:
         unique_project = temp_project / f"test_integrator_{unique_suffix}"
         unique_project.mkdir(exist_ok=True)
         
-        # Copy the git repository to the unique directory
+        # Copy the git repository to the unique directory.
+        # Ignore transient *.lock files (e.g. .git/objects/maintenance.lock):
+        # git's background maintenance can create and delete them mid-copy,
+        # which makes copytree raise a "No such file or directory" race error.
         import shutil
-        shutil.copytree(temp_project / ".git", unique_project / ".git", dirs_exist_ok=True)
+        shutil.copytree(
+            temp_project / ".git",
+            unique_project / ".git",
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("*.lock"),
+        )
         for file_path in temp_project.glob("*"):
             if file_path.is_file() or file_path.is_dir() and file_path.name != ".git":
                 if file_path.is_dir():
