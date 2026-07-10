@@ -339,10 +339,10 @@ class TestTestGeneratorAgent:
             }
         ''').strip()
 
-        async def fake_call(_prompt):
+        async def fake_call(_prompt, _project_path=None):
             return fake_response
 
-        with patch.object(agent, "_call_claude", side_effect=fake_call):
+        with patch.object(agent, "_call_llm", side_effect=fake_call):
             result = agent.generate_unit_tests(sample_source, str(test_path))
             result_no_existing = agent.generate_unit_tests(sample_source)
 

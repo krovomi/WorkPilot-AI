@@ -24,6 +24,11 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+_TEST_GEN_SYSTEM_PROMPT = (
+    "You are a senior test engineer. Follow the user's instructions exactly and "
+    "return only the requested raw JSON object — no markdown fences, no prose."
+)
+
 
 # ── Data models ─────────────────────────────────────────────────────
 
@@ -536,12 +541,12 @@ class TestGeneratorAgent:
             f"Detected {framework_info['language']} project with {framework_info['test_framework']}",
             flush=True,
         )
-        print("Asking Claude to analyse coverage gaps...", flush=True)
+        print("Asking the model to analyse coverage gaps...", flush=True)
 
         prompt = self._analyze_coverage_prompt(
             source, file_path, framework_info, existing
         )
-        response = await self._call_claude(prompt)
+        response = await self._call_llm(prompt, project_path)
         return self._parse_gaps(response, file_path, existing)
 
     async def _generate_unit_async(
@@ -566,12 +571,12 @@ class TestGeneratorAgent:
             f"Detected {framework_info['language']} + {framework_info['test_framework']}",
             flush=True,
         )
-        print("Asking Claude to generate unit tests...", flush=True)
+        print("Asking the model to generate unit tests...", flush=True)
 
         prompt = self._generate_unit_prompt(
             source, file_path, framework_info, existing, max_tests_per_function
         )
-        response = await self._call_claude(prompt)
+        response = await self._call_llm(prompt, project_path)
         return self._parse_generation_result(
             response, file_path, "unit", framework_info
         )
@@ -598,10 +603,10 @@ class TestGeneratorAgent:
             f"Detected {framework_info['language']} + {framework_info['test_framework']}",
             flush=True,
         )
-        print("Asking Claude to generate E2E tests...", flush=True)
+        print("Asking the model to generate E2E tests...", flush=True)
 
         prompt = self._generate_e2e_prompt(user_story, target_module, framework_info)
-        response = await self._call_claude(prompt)
+        response = await self._call_llm(prompt, project_path)
         return self._parse_generation_result(
             response, target_module, "e2e", framework_info
         )
@@ -642,55 +647,47 @@ class TestGeneratorAgent:
             f"Generating TDD tests for {language} ({framework})",
             flush=True,
         )
-        print("Asking Claude to generate failing tests (TDD red phase)...", flush=True)
+        print(
+            "Asking the model to generate failing tests (TDD red phase)...",
+            flush=True,
+        )
 
         prompt = self._generate_tdd_prompt(spec, framework_info)
-        response = await self._call_claude(prompt)
+        response = await self._call_llm(prompt, project_path)
         spec_name = spec.get("name", "feature")
         slug = re.sub(r"[^a-z0-9_]", "_", spec_name.lower())
         return self._parse_generation_result(
             response, f"tdd_{slug}", "unit", framework_info, spec_name
         )
 
-    # ── Claude call ──────────────────────────────────────────────────
+    # ── LLM call (provider-agnostic) ─────────────────────────────────
 
-    async def _call_claude(self, prompt: str) -> str:
-        """Call Claude via the Agent SDK and return the text response."""
-        from core.auth import ensure_claude_code_oauth_token
-        from core.model_config import get_utility_model_config
-        from core.simple_client import create_simple_client
+    async def _call_llm(self, prompt: str, project_path: str | None = None) -> str:
+        """Run a one-shot completion against the user's active LLM provider.
 
-        try:
-            ensure_claude_code_oauth_token()
-            model, thinking_budget = get_utility_model_config(
-                default_model="claude-sonnet-4-6"
+        Routes through ``core.oneshot.oneshot_completion`` so test generation
+        honours the provider selected in WorkPilot (Claude / Copilot / OpenAI /
+        Windsurf / Google / local) instead of hardcoding the Claude Agent SDK —
+        the previous ``create_simple_client`` path silently did nothing for
+        anyone not authenticated with Claude. ``project_path`` lets exotic
+        providers resolve their routing from the project's ``.env``.
+
+        Raises on failure (including an empty response) so the runner surfaces a
+        clear error rather than the UI hanging on "Asking the model…".
+        """
+        from core.oneshot import oneshot_completion
+
+        text = await oneshot_completion(
+            prompt,
+            system_prompt=_TEST_GEN_SYSTEM_PROMPT,
+            project_dir=project_path,
+        )
+        if not text or not text.strip():
+            raise RuntimeError(
+                "The LLM returned an empty response. Check that your AI provider "
+                "is selected and authenticated in Settings."
             )
-
-            client = create_simple_client(
-                agent_type="batch_analysis",
-                model=model,
-                max_thinking_tokens=thinking_budget,
-            )
-        except ValueError as exc:
-            logger.warning("Claude authentication not available: %s", exc)
-            return f"error: {exc}"
-
-        response_text = ""
-        try:
-            async with client:
-                await client.query(prompt)
-                async for msg in client.receive_response():
-                    if type(msg).__name__ == "AssistantMessage" and hasattr(
-                        msg, "content"
-                    ):
-                        for block in msg.content:
-                            if hasattr(block, "text"):
-                                response_text += block.text
-        except Exception as exc:
-            logger.error("Claude call failed: %s", exc)
-            raise
-
-        return response_text
+        return text
 
     # ── Prompts ──────────────────────────────────────────────────────
 
