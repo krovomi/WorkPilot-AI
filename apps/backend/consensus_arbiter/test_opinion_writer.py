@@ -88,7 +88,10 @@ def test_build_security_opinions_maps_severity_and_file() -> None:
     ]
     opinions = build_security_opinions(issues)
 
-    assert [o["affected_files"] for o in opinions] == [["api/handler.py"], ["ui/view.tsx"]]
+    assert [o["affected_files"] for o in opinions] == [
+        ["api/handler.py"],
+        ["ui/view.tsx"],
+    ]
     assert opinions[0]["domain"] == "security"
     assert opinions[0]["confidence"] == 0.95  # critical
     assert opinions[0]["recommendation"] == "Use parameterized queries"
@@ -199,9 +202,7 @@ def test_record_helpers_write_to_root_from_worktree(tmp_path: Path) -> None:
 
 def _load_runner():
     runner_path = (
-        Path(__file__).resolve().parents[1]
-        / "runners"
-        / "consensus_arbiter_runner.py"
+        Path(__file__).resolve().parents[1] / "runners" / "consensus_arbiter_runner.py"
     )
     spec = importlib.util.spec_from_file_location("_ca_runner_test", runner_path)
     assert spec and spec.loader

@@ -120,6 +120,8 @@
 		"badgeLive": "LIVE",
 		"waiting": "Waiting for the model…",
 		"writtenTo": "Written to",
+		"copyPath": "Copy path",
+		"copied": "Copied",
 		"cancel": "Cancel generation",
 		"assertions": "assertions",
 		"viewCode": "View code"

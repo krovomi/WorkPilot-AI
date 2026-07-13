@@ -45,7 +45,16 @@ def _decode_json_string_prefix(raw: str, start: int) -> tuple[str, bool]:
     lone ``\\`` or a partial ``\\uXXXX``) is held back so a half-arrived chunk
     never yields a broken character — the next chunk completes it.
     """
-    esc = {'"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
+    esc = {
+        '"': '"',
+        "\\": "\\",
+        "/": "/",
+        "b": "\b",
+        "f": "\f",
+        "n": "\n",
+        "r": "\r",
+        "t": "\t",
+    }
     out: list[str] = []
     i, n = start, len(raw)
     while i < n:
@@ -663,9 +672,7 @@ class TestGeneratorAgent:
     ) -> TestGenerationResult:
         """Generate E2E tests from a user story."""
         return asyncio.run(
-            self._generate_e2e_async(
-                user_story, target_module, project_path, on_event
-            )
+            self._generate_e2e_async(user_story, target_module, project_path, on_event)
         )
 
     def generate_tdd_tests(
@@ -1143,10 +1150,12 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
     ) -> list[CoverageGap]:
         data = self._extract_json(response)
 
-        # If we got empty data due to rate limit, create basic gaps from source analysis
-        if not data.get("gaps") and (
-            "limit" in response.lower() or "error" in response.lower()
-        ):
+        # An empty dict means the response wasn't parseable JSON at all (not a
+        # valid object reporting zero gaps). Only then do we fall back to a
+        # best-effort AST scan so the user still gets a gap list. We no longer
+        # trigger this on the words "limit"/"error" appearing in the text — a
+        # false positive that discarded perfectly valid model output.
+        if not data:
             try:
                 # Fallback: analyze source with CodeAnalyzer to create basic gaps
                 source = self._read_file(file_path)
@@ -1198,6 +1207,10 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
                     suggested_test_count=g.get("suggested_test_count", 1),
                 )
             )
+        # Surface the most important gaps first regardless of the order the model
+        # emitted them (stable within a priority band).
+        _rank = {"high": 0, "medium": 1, "low": 2}
+        gaps.sort(key=lambda g: _rank.get(g.priority, 1))
         return gaps
 
     def _extract_tested_functions(self, test_content: str) -> set[str]:
@@ -1253,189 +1266,55 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
         file_path: str,
         test_type: str,
         framework_info: dict[str, str],
-        spec_name: str | None = None,
+        spec_name: str | None = None,  # noqa: ARG002 — kept for call-site compatibility
     ) -> TestGenerationResult:
         data = self._extract_json(response)
 
         test_file_content = data.get("test_file_content", "")
         if not test_file_content:
-            # Check if response itself contains test code (rate limit case)
-            if "limit" in response.lower() or "error" in response.lower():
-                # Generate a basic stub test file for testing purposes
-                stem = Path(file_path).stem
-                language = framework_info.get("language", "python")
+            # No JSON envelope with a content field. Some providers reply with the
+            # raw test file (no wrapper) — surface it verbatim so the user still
+            # sees real generated code instead of an empty box or a fake stub.
+            # Genuine provider failures never reach here: ``_call_llm`` raises on
+            # an empty response, so ``response`` always carries something usable.
+            # (``oneshot_completion`` already trims surrounding whitespace.)
+            test_file_content = response
 
-                if language == "python":
-                    # Try to analyze source to generate more realistic test count
-                    source = self._read_file(file_path)
-                    functions_count = 0
-                    if source:
-                        analyzer = CodeAnalyzer()
-                        functions = analyzer.analyze_source(source, file_path)
-                        functions_count = len(
-                            [f for f in functions if not f.is_private]
-                        )
-
-                    # For TDD tests, generate more specific test names
-                    if (
-                        test_type == "unit"
-                        and file_path.startswith("tdd_")
-                        and spec_name
-                    ):
-                        feature_name = spec_name
-                        test_file_content = f'''"""Auto-generated TDD tests for {feature_name}."""
-
-import pytest
-
-_PLACEHOLDER_REASON = (
-    "Test generator fell back to placeholders — no LLM response available. "
-    "Replace these with real assertions once the feature is implemented."
-)
-
-
-def test_{feature_name}_happy_path():
-    pytest.skip(_PLACEHOLDER_REASON)
-
-
-def test_{feature_name}_error_handling():
-    pytest.skip(_PLACEHOLDER_REASON)
-
-
-def test_{feature_name}_edge_cases():
-    pytest.skip(_PLACEHOLDER_REASON)
-'''
-                        tests_generated = 3
-                        functions_analyzed = functions_count
-                    else:
-                        test_file_content = f'''"""Auto-generated tests for {stem}."""
-
-import pytest
-
-
-def test_placeholder():
-    """Placeholder: the LLM was unavailable when this file was generated.
-
-    We ``skip`` instead of asserting True so the gap shows up in CI reports
-    rather than silently inflating the pass rate.
-    """
-    pytest.skip("Test generator fell back to placeholder — no LLM response available.")
-'''
-                        tests_generated = max(1, functions_count)  # At least 1 test
-                        functions_analyzed = functions_count
-                else:
-                    test_file_content = f"// Auto-generated E2E tests for {stem}\n// Tests would be generated here when API is available\n"
-                    tests_generated = 1
-                    functions_analyzed = 0
-            else:
-                # Last resort: the whole response might be the test file
-                test_file_content = response
-                tests_generated = 1
-                functions_analyzed = 0
-        else:
-            tests_generated = data.get("tests_generated", 0)
-            functions_analyzed = data.get("functions_analyzed", 0)
-
-        # Update tests_generated for fallback scenarios
-        generated_tests = []  # Initialize here to avoid "used before defined" error
-        if (
-            "limit" in response.lower() or "error" in response.lower()
-        ) and not data.get("tests_generated"):
-            if test_type == "unit" and file_path.startswith("tdd_"):
-                tests_generated = 3  # TDD expects at least 3 tests
-            elif test_type == "e2e":
-                tests_generated = 1  # E2E expects at least 1 test
-            else:
-                tests_generated = 0  # Will be set after generated_tests is created
+        tests_generated = data.get("tests_generated", 0)
+        functions_analyzed = data.get("functions_analyzed", 0)
 
         test_file_path = data.get(
             "test_file_path",
             self._compute_test_file_path(file_path, framework_info),
         )
 
-        # Ensure E2E tests have 'e2e' in the path
+        # Ensure E2E tests land under an e2e/ path even if the model omitted it.
         if test_type == "e2e" and "e2e" not in test_file_path:
             stem = Path(file_path).stem.lower()
             language = framework_info.get("language", "unknown")
             ext = "py" if language == "python" else "js"
             test_file_path = f"e2e/test_{stem}.{ext}"
 
-        # Generate basic generated_tests list for fallback
-        if not data.get("generated_tests") and (
-            "limit" in response.lower() or "error" in response.lower()
-        ):
-            source = self._read_file(file_path)
-            if source:
-                analyzer = CodeAnalyzer()
-                functions = analyzer.analyze_source(source, file_path)
-                public_functions = [f for f in functions if not f.is_private]
+        language = framework_info.get("language", "")
+        generated_tests = [
+            GeneratedTest(
+                test_name=t.get("test_name", ""),
+                # Slice each test's source out of the full file so the UI can
+                # show real code instead of an empty box. Best-effort: falls
+                # back to "" when the block can't be located.
+                test_code=_slice_test_block(
+                    test_file_content, t.get("test_name", ""), language
+                ),
+                target_function=file_path,
+                test_type=test_type,
+                description=t.get("description", ""),
+            )
+            for t in data.get("generated_tests", [])
+        ]
 
-                # For TDD tests, generate more tests to meet test expectations
-                if test_type == "unit" and file_path.startswith("tdd_"):
-                    test_count = 3  # TDD tests expect at least 3
-                elif test_type == "e2e":
-                    test_count = 1  # E2E tests expect at least 1
-                else:
-                    test_count = min(3, len(public_functions))  # Regular unit tests
-
-                generated_tests = [
-                    GeneratedTest(
-                        test_name=f"test_{func.name}_placeholder"
-                        if source
-                        else f"test_placeholder_{i}",
-                        test_code="# Placeholder test code",
-                        target_function=func.name if source else file_path,
-                        test_type=test_type,
-                        description=f"Placeholder test for {func.name if source else 'feature'}",
-                    )
-                    for i, func in enumerate(public_functions[:test_count])
-                ]
-            else:
-                # No source available, create basic placeholders
-                if test_type == "unit" and file_path.startswith("tdd_"):
-                    test_count = 3
-                else:
-                    test_count = 1
-
-                generated_tests = [
-                    GeneratedTest(
-                        test_name=f"test_placeholder_{i}",
-                        test_code="# Placeholder test code",
-                        target_function=file_path,
-                        test_type=test_type,
-                        description=f"Placeholder test {i}",
-                    )
-                    for i in range(test_count)
-                ]
-        else:
-            language = framework_info.get("language", "")
-            generated_tests = [
-                GeneratedTest(
-                    test_name=t.get("test_name", ""),
-                    # Slice each test's source out of the full file so the UI can
-                    # show real code instead of an empty box. Best-effort: falls
-                    # back to "" when the block can't be located.
-                    test_code=_slice_test_block(
-                        test_file_content, t.get("test_name", ""), language
-                    ),
-                    target_function=file_path,
-                    test_type=test_type,
-                    description=t.get("description", ""),
-                )
-                for t in data.get("generated_tests", [])
-            ]
-
-        # Update tests_generated if it was set to 0 earlier
-        if (
-            "limit" in response.lower() or "error" in response.lower()
-        ) and not data.get("tests_generated"):
-            if test_type == "unit" and file_path.startswith("tdd_"):
-                tests_generated = 3  # Already set
-            elif test_type == "e2e":
-                tests_generated = 1  # Already set
-            else:
-                tests_generated = len(
-                    generated_tests
-                )  # Set based on actual generated tests
+        # Infer the count when the model returned tests but no (or a zero) total.
+        if not tests_generated and generated_tests:
+            tests_generated = len(generated_tests)
 
         return TestGenerationResult(
             source_file=file_path,
@@ -1447,61 +1326,59 @@ def test_placeholder():
         )
 
     def _extract_json(self, text: str) -> dict[str, Any]:
-        """Extract JSON from a Claude response, handling markdown fences and rate limits."""
+        """Extract the JSON object from an LLM response.
+
+        Handles markdown code fences and locates the outermost ``{...}`` when the
+        model wraps the object in prose. Returns an empty result structure only
+        when *no* JSON can be parsed, so callers degrade gracefully.
+
+        Note: we deliberately do **not** scan the text for words like "error",
+        "limit" or "reset" to guess at a rate limit. Legitimate test code
+        routinely contains those words (a feature named "limitation…", an
+        error-handling test), and doing so silently discarded real generations —
+        surfacing the "// Tests would be generated here" stub instead of the code
+        the model actually produced. Genuine provider failures surface as
+        exceptions from ``_call_llm`` (an empty response raises ``RuntimeError``),
+        not as parseable JSON, so this parser never needs to second-guess them.
+        """
         if not text:
             logger.error("Empty response received")
             return {}
 
-        # Check for rate limit or error messages
-        if (
-            "limit" in text.lower()
-            or "error" in text.lower()
-            or "reset" in text.lower()
-        ):
-            logger.error("Rate limit or error message received: %.100s", text)
-            # Return empty result structure for tests to continue
-            return {
-                "functions_analyzed": 0,
-                "gaps": [],
-                "tests_generated": 0,
-                "generated_tests": [],
-            }
+        candidate = text
 
         # Strip markdown code fences
-        if "```json" in text:
-            start = text.find("```json") + 7
-            end = text.find("```", start)
+        if "```json" in candidate:
+            start = candidate.find("```json") + 7
+            end = candidate.find("```", start)
             if end > start:
-                text = text[start:end].strip()
-        elif "```" in text:
-            start = text.find("```") + 3
-            end = text.find("```", start)
+                candidate = candidate[start:end].strip()
+        elif "```" in candidate:
+            start = candidate.find("```") + 3
+            end = candidate.find("```", start)
             if end > start:
-                text = text[start:end].strip()
+                candidate = candidate[start:end].strip()
 
         # Direct parse
         try:
-            return json.loads(text)
+            return json.loads(candidate)
         except json.JSONDecodeError:
             pass
 
         # Find first { ... last }
-        start = text.find("{")
-        end = text.rfind("}") + 1
+        start = candidate.find("{")
+        end = candidate.rfind("}") + 1
         if start >= 0 and end > start:
             try:
-                return json.loads(text[start:end])
+                return json.loads(candidate[start:end])
             except json.JSONDecodeError:
                 pass
 
         logger.error("Failed to parse JSON from response: %.200s", text)
-        # Return empty result structure for tests to continue
-        return {
-            "functions_analyzed": 0,
-            "gaps": [],
-            "tests_generated": 0,
-            "generated_tests": [],
-        }
+        # Empty dict signals "nothing parseable" — distinct from a valid object
+        # that legitimately reports no gaps / no tests. Callers use ``.get()`` with
+        # defaults, and ``_parse_gaps`` treats it as the cue to fall back to AST.
+        return {}
 
     def _compute_test_file_path(
         self, source_path: str, framework_info: dict[str, str]

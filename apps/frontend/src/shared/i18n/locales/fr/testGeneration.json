@@ -120,6 +120,8 @@
 		"badgeLive": "EN DIRECT",
 		"waiting": "En attente du modèle…",
 		"writtenTo": "Écrit dans",
+		"copyPath": "Copier le chemin",
+		"copied": "Copié",
 		"cancel": "Annuler la génération",
 		"assertions": "assertions",
 		"viewCode": "Voir le code"

@@ -1,5 +1,7 @@
 import {
+	AlertTriangle,
 	Check,
+	Copy,
 	FileCode2,
 	FileText,
 	Loader2,
@@ -122,6 +124,7 @@ export function LiveGenerationSurface() {
 
 	const isGenerating = phase === "generating";
 	const isComplete = phase === "complete";
+	const isError = phase === "error";
 
 	const prefersReduced = useMemo(
 		() =>
@@ -159,10 +162,22 @@ export function LiveGenerationSurface() {
 	const lineCount = revealed ? lines.length : 0;
 	const testsCount = liveMeta.tests ?? result?.tests_generated;
 	const framework = liveMeta.framework ?? "—";
+	// Absolute path the runner resolved and wrote to — this is where the user
+	// can open the generated file on disk.
 	const filePath = result?.test_file_path ?? liveMeta.path;
 	const fileName = filePath ? filePath.split(/[\\/]/).pop() : undefined;
 
-	const showStages = liveStages.length > 0;
+	const [pathCopied, setPathCopied] = useState(false);
+	const handleCopyPath = () => {
+		if (!filePath) return;
+		try {
+			navigator.clipboard.writeText(filePath);
+			setPathCopied(true);
+			setTimeout(() => setPathCopied(false), 2000);
+		} catch {
+			// best-effort — clipboard may be unavailable
+		}
+	};
 
 	return (
 		<div className="flex flex-col gap-3 rounded-xl border bg-card/60 p-3">
@@ -171,19 +186,23 @@ export function LiveGenerationSurface() {
 				{STAGE_ORDER.map((id) => {
 					const stage = liveStages.find((s) => s.id === id);
 					const Icon = STAGE_ICONS[id];
-					const isActive = stage?.status === "active";
+					const active = stage?.status === "active";
 					const isDone = stage?.status === "done";
+					const isFailed = isError && active; // the stage we stalled on
+					const isActive = active && !isError;
 					const seen = Boolean(stage);
 					return (
 						<div
 							key={id}
 							className={[
 								"relative flex flex-col gap-1.5 rounded-lg border p-2.5 transition-all duration-300",
-								isActive
-									? "border-primary/50 bg-primary/5 ring-1 ring-primary/25"
-									: isDone
-										? "border-emerald-600/30 bg-emerald-500/5"
-										: "border-border bg-muted/30",
+								isFailed
+									? "border-red-500/50 bg-red-500/5"
+									: isActive
+										? "border-primary/50 bg-primary/5 ring-1 ring-primary/25"
+										: isDone
+											? "border-emerald-600/30 bg-emerald-500/5"
+											: "border-border bg-muted/30",
 								seen ? "opacity-100" : "opacity-50",
 							].join(" ")}
 						>
@@ -191,14 +210,18 @@ export function LiveGenerationSurface() {
 								<span
 									className={[
 										"grid h-5 w-5 place-items-center rounded",
-										isDone
-											? "text-emerald-400"
-											: isActive
-												? "text-primary"
-												: "text-muted-foreground",
+										isFailed
+											? "text-red-400"
+											: isDone
+												? "text-emerald-400"
+												: isActive
+													? "text-primary"
+													: "text-muted-foreground",
 									].join(" ")}
 								>
-									{isDone ? (
+									{isFailed ? (
+										<AlertTriangle className="h-3.5 w-3.5" />
+									) : isDone ? (
 										<Check className="h-3.5 w-3.5" />
 									) : isActive ? (
 										<Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -296,7 +319,7 @@ export function LiveGenerationSurface() {
 				</Stat>
 			</div>
 
-			{/* ── footer: cancel while running, written-to when done ── */}
+			{/* ── footer: cancel while running, written-to (full path) when done ── */}
 			{isGenerating ? (
 				<button
 					type="button"
@@ -308,13 +331,30 @@ export function LiveGenerationSurface() {
 				</button>
 			) : (
 				isComplete &&
-				fileName && (
-					<div className="flex items-center gap-2 px-1 text-sm text-muted-foreground">
-						<Check className="h-4 w-4 flex-none text-emerald-400" />
-						<span>
-							{t("live.writtenTo")}{" "}
-							<code className="font-mono text-xs text-primary">{fileName}</code>
-						</span>
+				filePath && (
+					<div className="flex flex-col gap-1.5 rounded-lg border border-emerald-600/30 bg-emerald-500/5 px-3 py-2.5">
+						<div className="flex items-center gap-2 text-sm text-foreground">
+							<Check className="h-4 w-4 flex-none text-emerald-400" />
+							<span className="font-medium">{t("live.writtenTo")}</span>
+						</div>
+						<div className="flex items-center gap-2 pl-6">
+							<code className="min-w-0 flex-1 select-all break-all font-mono text-xs text-primary">
+								{filePath}
+							</code>
+							<button
+								type="button"
+								onClick={handleCopyPath}
+								title={t("live.copyPath")}
+								className="flex flex-none items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+							>
+								{pathCopied ? (
+									<Check className="h-3 w-3 text-emerald-400" />
+								) : (
+									<Copy className="h-3 w-3" />
+								)}
+								{pathCopied ? t("live.copied") : t("live.copyPath")}
+							</button>
+						</div>
 					</div>
 				)
 			)}

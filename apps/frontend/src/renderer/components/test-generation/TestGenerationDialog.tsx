@@ -121,30 +121,46 @@ export function TestGenerationDialog({
 
 	const handleAnalyzeCoverage = useCallback(async () => {
 		if (!selectedFile) return;
-		await analyzeCoverage(selectedFile, existingTestPath || undefined);
+		try {
+			await analyzeCoverage(selectedFile, existingTestPath || undefined);
+		} catch {
+			// Error is surfaced via the store's error state (rendered in the UI).
+		}
 	}, [selectedFile, existingTestPath, analyzeCoverage]);
 
 	const handleGenerateUnitTests = useCallback(async () => {
 		if (!selectedFile) return;
-		await generateUnitTests(
-			selectedFile,
-			existingTestPath || undefined,
-			coverageTarget,
-		);
+		try {
+			await generateUnitTests(
+				selectedFile,
+				existingTestPath || undefined,
+				coverageTarget,
+			);
+		} catch {
+			// Error is surfaced via the store's error state (rendered in the UI).
+		}
 	}, [selectedFile, existingTestPath, coverageTarget, generateUnitTests]);
 
 	const handleGenerateE2ETests = useCallback(async () => {
 		if (!userStory.trim() || !targetModule.trim()) return;
-		await generateE2ETests(userStory, targetModule);
+		try {
+			await generateE2ETests(userStory, targetModule);
+		} catch {
+			// Error is surfaced via the store's error state (rendered in the UI).
+		}
 	}, [userStory, targetModule, generateE2ETests]);
 
 	const handleGenerateTDDTests = useCallback(async () => {
 		if (!tddDescription.trim()) return;
-		await generateTDDTests({
-			description: tddDescription,
-			language: tddLanguage,
-			snippet_type: tddSnippetType,
-		});
+		try {
+			await generateTDDTests({
+				description: tddDescription,
+				language: tddLanguage,
+				snippet_type: tddSnippetType,
+			});
+		} catch {
+			// Error is surfaced via the store's error state (rendered in the UI).
+		}
 	}, [tddDescription, tddLanguage, tddSnippetType, generateTDDTests]);
 
 	const handleCopyToClipboard = useCallback((content: string) => {
@@ -698,11 +714,14 @@ export function TestGenerationDialog({
 					</TabsContent>
 				</Tabs>
 
-				{isLiveRun && (phase === "generating" || phase === "complete") && (
-					<div className="mt-4">
-						<LiveGenerationSurface />
-					</div>
-				)}
+				{isLiveRun &&
+					(phase === "generating" ||
+						phase === "complete" ||
+						phase === "error") && (
+						<div className="mt-4">
+							<LiveGenerationSurface />
+						</div>
+					)}
 
 				<DialogFooter>
 					<Button variant="outline" onClick={closeDialog}>
