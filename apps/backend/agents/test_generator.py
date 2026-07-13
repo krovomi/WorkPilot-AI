@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,147 @@ _TEST_GEN_SYSTEM_PROMPT = (
     "You are a senior test engineer. Follow the user's instructions exactly and "
     "return only the requested raw JSON object — no markdown fences, no prose."
 )
+
+# An event emitted during a streaming generation run. ``type`` is either
+# ``"stage"`` (pipeline step: detect / read / generate / write / done, with an
+# optional human ``detail``) or ``"code"`` (a chunk of *clean*, un-escaped test
+# file content for live display).
+GenEvent = dict[str, Any]
+
+
+def _decode_json_string_prefix(raw: str, start: int) -> tuple[str, bool]:
+    """Decode a JSON string body beginning at ``start`` (just past the opening quote).
+
+    Returns ``(decoded_so_far, closed)`` where ``closed`` becomes True once the
+    terminating unescaped quote is reached. A trailing *incomplete* escape (a
+    lone ``\\`` or a partial ``\\uXXXX``) is held back so a half-arrived chunk
+    never yields a broken character — the next chunk completes it.
+    """
+    esc = {'"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
+    out: list[str] = []
+    i, n = start, len(raw)
+    while i < n:
+        c = raw[i]
+        if c == "\\":
+            if i + 1 >= n:
+                break  # incomplete escape — wait for more
+            nxt = raw[i + 1]
+            if nxt == "u":
+                if i + 6 > n:
+                    break  # incomplete \uXXXX — wait for more
+                try:
+                    out.append(chr(int(raw[i + 2 : i + 6], 16)))
+                except ValueError:
+                    out.append(raw[i : i + 6])
+                i += 6
+                continue
+            out.append(esc.get(nxt, nxt))
+            i += 2
+            continue
+        if c == '"':
+            return "".join(out), True
+        out.append(c)
+        i += 1
+    return "".join(out), False
+
+
+class StreamingJsonFieldExtractor:
+    """Incrementally decode one string field of a JSON object as it streams in.
+
+    The test-generation prompts ask the model for a JSON object whose
+    ``test_file_content`` holds the whole test file as an *escaped* string.
+    Forwarding the raw JSON to the UI would surface ugly ``\\n`` escapes, so this
+    scanner locates the field and un-escapes it on the fly, returning only the
+    newly-decoded characters on each :meth:`feed` — a clean, live "typing" stream
+    no matter how the provider chunks its output.
+
+    Fail-safe: if the field never appears (malformed output) it simply yields
+    nothing and the caller falls back to the fully-parsed final result.
+    """
+
+    def __init__(self, field_name: str = "test_file_content") -> None:
+        self._needle = f'"{field_name}"'
+        self._raw = ""
+        self._content_start = -1  # index just past the opening quote, once found
+        self._emitted = 0  # count of decoded chars already returned
+        self._closed = False
+
+    def feed(self, chunk: str) -> str:
+        """Append ``chunk`` and return any newly-decoded field characters."""
+        if self._closed or not chunk:
+            return ""
+        self._raw += chunk
+        if self._content_start < 0:
+            self._locate_start()
+            if self._content_start < 0:
+                return ""
+        decoded, closed = _decode_json_string_prefix(self._raw, self._content_start)
+        self._closed = closed
+        if len(decoded) <= self._emitted:
+            return ""
+        new = decoded[self._emitted :]
+        self._emitted = len(decoded)
+        return new
+
+    def _locate_start(self) -> None:
+        key = self._raw.find(self._needle)
+        if key < 0:
+            return
+        i, n = key + len(self._needle), len(self._raw)
+        while i < n and self._raw[i] in " \t\r\n":
+            i += 1
+        if i >= n or self._raw[i] != ":":
+            return
+        i += 1
+        while i < n and self._raw[i] in " \t\r\n":
+            i += 1
+        if i >= n or self._raw[i] != '"':
+            return  # value isn't a string, or the opening quote hasn't arrived
+        self._content_start = i + 1
+
+
+def _slice_test_block(content: str, test_name: str, language: str) -> str:
+    """Best-effort: extract the source block of a single test from a test file.
+
+    Used to fill each ``GeneratedTest.test_code`` (previously always empty, which
+    rendered as blank boxes in the UI). Brace languages use brace matching;
+    Python uses indentation. Returns ``""`` when the test can't be located so the
+    caller degrades gracefully rather than showing garbage.
+    """
+    if not content or not test_name:
+        return ""
+    idx = content.find(test_name)
+    if idx < 0:
+        return ""
+    line_start = content.rfind("\n", 0, idx) + 1
+
+    if language == "python":
+        lines = content[line_start:].split("\n")
+        first = lines[0]
+        indent = len(first) - len(first.lstrip())
+        kept = [first]
+        for ln in lines[1:]:
+            if ln.strip() == "":
+                kept.append(ln)
+                continue
+            if (len(ln) - len(ln.lstrip())) <= indent:
+                break
+            kept.append(ln)
+        return "\n".join(kept).rstrip() + "\n"
+
+    brace = content.find("{", idx)
+    if brace < 0:
+        return ""
+    depth = 0
+    for i in range(brace, len(content)):
+        ch = content[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return content[line_start : i + 1].rstrip() + "\n"
+    return ""
 
 
 # ── Data models ─────────────────────────────────────────────────────
@@ -494,11 +636,21 @@ class TestGeneratorAgent:
         existing_test_path: str | None = None,
         max_tests_per_function: int = 3,
         project_path: str | None = None,
+        on_event: Callable[[GenEvent], None] | None = None,
     ) -> TestGenerationResult:
-        """Generate a complete unit test file for *file_path*."""
+        """Generate a complete unit test file for *file_path*.
+
+        ``on_event`` — optional callback for live progress: pipeline ``stage``
+        events and ``code`` chunks as the model streams the test file (see
+        :data:`GenEvent`).
+        """
         return asyncio.run(
             self._generate_unit_async(
-                file_path, existing_test_path, max_tests_per_function, project_path
+                file_path,
+                existing_test_path,
+                max_tests_per_function,
+                project_path,
+                on_event,
             )
         )
 
@@ -507,21 +659,53 @@ class TestGeneratorAgent:
         user_story: str,
         target_module: str,
         project_path: str | None = None,
+        on_event: Callable[[GenEvent], None] | None = None,
     ) -> TestGenerationResult:
         """Generate E2E tests from a user story."""
         return asyncio.run(
-            self._generate_e2e_async(user_story, target_module, project_path)
+            self._generate_e2e_async(
+                user_story, target_module, project_path, on_event
+            )
         )
 
     def generate_tdd_tests(
         self,
         spec: dict[str, Any],
         project_path: str | None = None,
+        on_event: Callable[[GenEvent], None] | None = None,
     ) -> TestGenerationResult:
         """Generate failing tests (TDD red phase) based on a spec."""
-        return asyncio.run(self._generate_tdd_async(spec, project_path))
+        return asyncio.run(self._generate_tdd_async(spec, project_path, on_event))
 
     # ── Async implementations ────────────────────────────────────────
+
+    @staticmethod
+    def _emit(on_event: Callable[[GenEvent], None] | None, event: GenEvent) -> None:
+        """Fire a progress event, swallowing any consumer error."""
+        if on_event is None:
+            return
+        try:
+            on_event(event)
+        except Exception:  # noqa: BLE001 — progress reporting must never break generation
+            logger.debug("test-gen on_event callback raised", exc_info=True)
+
+    async def _generate_with_events(
+        self,
+        prompt: str,
+        project_path: str | None,
+        on_event: Callable[[GenEvent], None] | None,
+    ) -> str:
+        """Run the LLM call, emitting clean ``code`` chunks as the file streams in."""
+        on_delta: Callable[[str], None] | None = None
+        if on_event is not None:
+            extractor = StreamingJsonFieldExtractor("test_file_content")
+
+            def on_delta(raw: str) -> None:  # noqa: F811 — deliberate conditional binding
+                clean = extractor.feed(raw)
+                if clean:
+                    self._emit(on_event, {"type": "code", "delta": clean})
+
+        return await self._call_llm(prompt, project_path, on_delta=on_delta)
 
     async def _analyze_coverage_async(
         self, file_path: str, existing_test_path: str | None, project_path: str | None
@@ -555,8 +739,23 @@ class TestGeneratorAgent:
         existing_test_path: str | None,
         max_tests_per_function: int,
         project_path: str | None,
+        on_event: Callable[[GenEvent], None] | None = None,
     ) -> TestGenerationResult:
+        self._emit(on_event, {"type": "stage", "stage": "detect"})
         framework_info = self._project_analyzer.detect(file_path, project_path)
+        self._emit(
+            on_event,
+            {
+                "type": "stage",
+                "stage": "detect",
+                "status": "done",
+                "detail": f"{framework_info['language']} · {framework_info['test_framework']}",
+                "language": framework_info["language"],
+                "framework": framework_info["test_framework"],
+            },
+        )
+
+        self._emit(on_event, {"type": "stage", "stage": "read"})
         source = self._read_file(file_path)
         if not source:
             raise FileNotFoundError(f"Cannot read source file: {file_path}")
@@ -566,6 +765,15 @@ class TestGeneratorAgent:
             if existing_test_path and os.path.exists(existing_test_path)
             else ""
         )
+        self._emit(
+            on_event,
+            {
+                "type": "stage",
+                "stage": "read",
+                "status": "done",
+                "detail": f"{len(source.splitlines())} lignes",
+            },
+        )
 
         print(
             f"Detected {framework_info['language']} + {framework_info['test_framework']}",
@@ -573,17 +781,23 @@ class TestGeneratorAgent:
         )
         print("Asking the model to generate unit tests...", flush=True)
 
+        self._emit(on_event, {"type": "stage", "stage": "generate"})
         prompt = self._generate_unit_prompt(
             source, file_path, framework_info, existing, max_tests_per_function
         )
-        response = await self._call_llm(prompt, project_path)
+        response = await self._generate_with_events(prompt, project_path, on_event)
         return self._parse_generation_result(
             response, file_path, "unit", framework_info
         )
 
     async def _generate_e2e_async(
-        self, user_story: str, target_module: str, project_path: str | None
+        self,
+        user_story: str,
+        target_module: str,
+        project_path: str | None,
+        on_event: Callable[[GenEvent], None] | None = None,
     ) -> TestGenerationResult:
+        self._emit(on_event, {"type": "stage", "stage": "detect"})
         # Try to detect framework from target module; fall back to project_path
         if os.path.exists(target_module):
             framework_info = self._project_analyzer.detect(target_module, project_path)
@@ -598,6 +812,17 @@ class TestGeneratorAgent:
                 "project_root": "",
                 "details": "",
             }
+        self._emit(
+            on_event,
+            {
+                "type": "stage",
+                "stage": "detect",
+                "status": "done",
+                "detail": f"{framework_info['language']} · {framework_info['test_framework']}",
+                "language": framework_info["language"],
+                "framework": framework_info["test_framework"],
+            },
+        )
 
         print(
             f"Detected {framework_info['language']} + {framework_info['test_framework']}",
@@ -605,15 +830,20 @@ class TestGeneratorAgent:
         )
         print("Asking the model to generate E2E tests...", flush=True)
 
+        self._emit(on_event, {"type": "stage", "stage": "generate"})
         prompt = self._generate_e2e_prompt(user_story, target_module, framework_info)
-        response = await self._call_llm(prompt, project_path)
+        response = await self._generate_with_events(prompt, project_path, on_event)
         return self._parse_generation_result(
             response, target_module, "e2e", framework_info
         )
 
     async def _generate_tdd_async(
-        self, spec: dict[str, Any], project_path: str | None
+        self,
+        spec: dict[str, Any],
+        project_path: str | None,
+        on_event: Callable[[GenEvent], None] | None = None,
     ) -> TestGenerationResult:
+        self._emit(on_event, {"type": "stage", "stage": "detect"})
         language = spec.get("language", "python")
 
         # Detect framework from project if possible
@@ -642,6 +872,17 @@ class TestGeneratorAgent:
             "project_root": project_path or "",
             "details": "",
         }
+        self._emit(
+            on_event,
+            {
+                "type": "stage",
+                "stage": "detect",
+                "status": "done",
+                "detail": f"{language} · {framework}",
+                "language": language,
+                "framework": framework,
+            },
+        )
 
         print(
             f"Generating TDD tests for {language} ({framework})",
@@ -652,8 +893,9 @@ class TestGeneratorAgent:
             flush=True,
         )
 
+        self._emit(on_event, {"type": "stage", "stage": "generate"})
         prompt = self._generate_tdd_prompt(spec, framework_info)
-        response = await self._call_llm(prompt, project_path)
+        response = await self._generate_with_events(prompt, project_path, on_event)
         spec_name = spec.get("name", "feature")
         slug = re.sub(r"[^a-z0-9_]", "_", spec_name.lower())
         return self._parse_generation_result(
@@ -662,7 +904,12 @@ class TestGeneratorAgent:
 
     # ── LLM call (provider-agnostic) ─────────────────────────────────
 
-    async def _call_llm(self, prompt: str, project_path: str | None = None) -> str:
+    async def _call_llm(
+        self,
+        prompt: str,
+        project_path: str | None = None,
+        on_delta: Callable[[str], None] | None = None,
+    ) -> str:
         """Run a one-shot completion against the user's active LLM provider.
 
         Routes through ``core.oneshot.oneshot_completion`` so test generation
@@ -672,15 +919,23 @@ class TestGeneratorAgent:
         anyone not authenticated with Claude. ``project_path`` lets exotic
         providers resolve their routing from the project's ``.env``.
 
+        ``on_delta`` — optional streaming callback forwarded to
+        ``oneshot_completion``. Passed only when set so the argument surface stays
+        identical to the un-instrumented call for tests that patch this path.
+
         Raises on failure (including an empty response) so the runner surfaces a
         clear error rather than the UI hanging on "Asking the model…".
         """
         from core.oneshot import oneshot_completion
 
+        kwargs: dict[str, Any] = {}
+        if on_delta is not None:
+            kwargs["on_delta"] = on_delta
         text = await oneshot_completion(
             prompt,
             system_prompt=_TEST_GEN_SYSTEM_PROMPT,
             project_dir=project_path,
+            **kwargs,
         )
         if not text or not text.strip():
             raise RuntimeError(
@@ -1152,10 +1407,16 @@ def test_placeholder():
                     for i in range(test_count)
                 ]
         else:
+            language = framework_info.get("language", "")
             generated_tests = [
                 GeneratedTest(
                     test_name=t.get("test_name", ""),
-                    test_code="",
+                    # Slice each test's source out of the full file so the UI can
+                    # show real code instead of an empty box. Best-effort: falls
+                    # back to "" when the block can't be located.
+                    test_code=_slice_test_block(
+                        test_file_content, t.get("test_name", ""), language
+                    ),
                     target_function=file_path,
                     test_type=test_type,
                     description=t.get("description", ""),
