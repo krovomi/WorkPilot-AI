@@ -239,8 +239,7 @@ _LANGUAGE_REPORT_HINTS: list[tuple[str, tuple[str, ...], str]] = [
     (
         "JavaScript / TypeScript",
         ("package.json",),
-        "jest --reporters=default --reporters=jest-junit "
-        "(or vitest --reporter=junit)",
+        "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)",
     ),
     (
         "Python",
