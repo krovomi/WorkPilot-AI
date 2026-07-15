@@ -1,13 +1,19 @@
 import { readdirSync, statSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
-import type { FileNode, IPCResult } from "../../shared/types";
+import type { FileNode, FileSearchResult, IPCResult } from "../../shared/types";
 
 // Maximum file size to read (1MB)
 const MAX_FILE_SIZE = 1024 * 1024;
+
+// Bounds for the recursive autocomplete search — keep it snappy and never let
+// a pathological tree (deep nesting, huge repos) block the main process.
+const MAX_SEARCH_RESULTS = 50;
+const MAX_SEARCH_ENTRIES = 20000;
+const MAX_SEARCH_DEPTH = 12;
 
 /**
  * Validates and normalizes a file path for safe reading.
@@ -119,6 +125,76 @@ const IGNORED_DIRS = new Set([
 	".gradle",
 	".maven",
 ]);
+
+/**
+ * Recursively walk `rootPath` collecting files or directories whose
+ * project-relative POSIX path matches every whitespace-separated token in
+ * `query` (case-insensitive substring). Powers the file-path autocomplete in
+ * the agent inputs. Async (uses fs/promises) so it never blocks the main
+ * process, and bounded on depth, visited entries, and results.
+ */
+async function searchProjectPaths(
+	rootPath: string,
+	query: string,
+	mode: "file" | "directory",
+): Promise<FileSearchResult[]> {
+	const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+	const results: FileSearchResult[] = [];
+	let visited = 0;
+
+	async function walk(
+		absDir: string,
+		relDir: string,
+		depth: number,
+	): Promise<void> {
+		if (results.length >= MAX_SEARCH_RESULTS || depth > MAX_SEARCH_DEPTH) {
+			return;
+		}
+		let entries: import("node:fs").Dirent[];
+		try {
+			entries = await readdir(absDir, { withFileTypes: true });
+		} catch {
+			return; // unreadable dir — skip silently
+		}
+
+		for (const entry of entries) {
+			if (results.length >= MAX_SEARCH_RESULTS) return;
+			if (visited++ > MAX_SEARCH_ENTRIES) return;
+
+			const isDirectory = entry.isDirectory();
+			// Skip noisy build/vendor dirs and hidden entries entirely.
+			if (isDirectory && (IGNORED_DIRS.has(entry.name) || entry.name.startsWith("."))) {
+				continue;
+			}
+			if (!isDirectory && entry.name.startsWith(".")) continue;
+
+			const relPath = relDir ? `${relDir}/${entry.name}` : entry.name;
+			const typeMatches = mode === "directory" ? isDirectory : !isDirectory;
+			if (typeMatches) {
+				const haystack = relPath.toLowerCase();
+				if (tokens.every((tok) => haystack.includes(tok))) {
+					results.push({ relativePath: relPath, name: entry.name, isDirectory });
+				}
+			}
+
+			if (isDirectory) {
+				await walk(path.join(absDir, entry.name), relPath, depth + 1);
+			}
+		}
+	}
+
+	await walk(rootPath, "", 0);
+
+	// Rank shorter (closer-to-root, tighter) matches first, then alphabetically.
+	results.sort(
+		(a, b) =>
+			a.relativePath.length - b.relativePath.length ||
+			a.relativePath.localeCompare(b.relativePath, undefined, {
+				sensitivity: "base",
+			}),
+	);
+	return results.slice(0, MAX_SEARCH_RESULTS);
+}
 
 /**
  * Register all file-related IPC handlers
@@ -250,5 +326,34 @@ export function registerFileHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.FILE_EXPLORER_GET_USER_HOME,
 		async (): Promise<string> => os.homedir(),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.FILE_EXPLORER_SEARCH,
+		async (
+			_,
+			rootPath: string,
+			query: string,
+			mode: "file" | "directory",
+		): Promise<IPCResult<FileSearchResult[]>> => {
+			try {
+				const validation = validatePath(rootPath);
+				if (!validation.valid) {
+					return { success: false, error: validation.error };
+				}
+				const results = await searchProjectPaths(
+					validation.path,
+					typeof query === "string" ? query : "",
+					mode === "directory" ? "directory" : "file",
+				);
+				return { success: true, data: results };
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error ? error.message : "Failed to search files",
+				};
+			}
+		},
 	);
 }
