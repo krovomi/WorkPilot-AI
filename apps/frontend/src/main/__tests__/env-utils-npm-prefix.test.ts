@@ -14,7 +14,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const execFileSyncMock = vi.fn(() => "");
+const execFileSyncMock = vi.fn((..._args: unknown[]) => "");
 
 vi.mock("node:child_process", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("node:child_process")>();
