@@ -1,6 +1,6 @@
 {
 	"name": "workpilot-ai-ui",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"type": "module",
 	"description": "Desktop UI for WorkPilot AI autonomous coding framework",
 	"homepage": "https://github.com/krovomi/WorkPilotAI",
