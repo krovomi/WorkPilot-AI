@@ -4,6 +4,9 @@ Permet l'enregistrement, la récupération et la validation des paramètres prov
 """
 import json
 import logging
+import os
+import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -70,30 +73,109 @@ class ProviderConfig:
         # or in the saved provider config file
         return cls(provider=provider, model=model)
 
+# CONFIG_FILE holds API keys in clear text and every mutation is a
+# read-modify-write of the WHOLE file. Two things follow:
+#   * the write must be atomic — a crash or a full disk mid-`json.dump` used to
+#     truncate the file and take every provider's key with it;
+#   * concurrent writers must be serialised — these functions are reached from
+#     FastAPI endpoints, and uvicorn runs sync endpoints on a thread pool, so
+#     two requests could interleave their read-modify-write and silently drop
+#     one of the two updates.
+_CONFIG_LOCK = threading.Lock()
+
+
+def _write_all_provider_configs(all_configs: dict[str, Any]) -> None:
+    """Atomically replace CONFIG_FILE, owner-readable only.
+
+    The temp file is created in the same directory so `os.replace` stays on one
+    filesystem (and is therefore atomic). Permissions are tightened *before* the
+    rename so the secrets are never briefly world-readable. On Windows `chmod`
+    only toggles the read-only bit, but the file lives under the user profile,
+    whose ACL already restricts it to the owner.
+    """
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=str(CONFIG_FILE.parent), prefix=".llm_providers-", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(all_configs, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, CONFIG_FILE)
+    except BaseException:
+        # Never leave a stray temp file holding a copy of the API keys.
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
 def save_provider_config(name: str, config: dict[str, Any]) -> None:
     """Enregistre la configuration d'un provider (clé API, endpoint, etc.)."""
-    all_configs = load_all_provider_configs()
-    all_configs[name] = config
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(all_configs, f, indent=2)
+    with _CONFIG_LOCK:
+        all_configs = load_all_provider_configs()
+        all_configs[name] = config
+        _write_all_provider_configs(all_configs)
 
 def load_provider_config(name: str) -> dict[str, Any] | None:
     """Charge la configuration d'un provider donné."""
     all_configs = load_all_provider_configs()
     return all_configs.get(name)
 
+def _ensure_owner_only(path: Path) -> None:
+    """Tighten an existing config file to 0600 if it is more permissive.
+
+    Installs created before atomic writes landed have a world-readable 0644
+    file full of API keys sitting in the home directory. They would only be
+    repaired on the next write, which may never happen — so repair on read too.
+    No-op on Windows, where the mode bits do not carry group/other permissions.
+    """
+    if os.name == "nt":
+        return
+    try:
+        current = os.stat(path).st_mode & 0o777
+        if current & 0o077:
+            os.chmod(path, 0o600)
+            logger.info("Tightened permissions on %s to 0600", path)
+    except OSError:
+        logger.debug("Could not adjust permissions on %s", path, exc_info=True)
+
+
 def load_all_provider_configs() -> dict[str, Any]:
-    if CONFIG_FILE.exists():
+    if not CONFIG_FILE.exists():
+        return {}
+    _ensure_owner_only(CONFIG_FILE)
+    try:
         with open(CONFIG_FILE, encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+            data = json.load(f)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        # A corrupt file used to raise out of every endpoint that touches
+        # provider config, leaving the app permanently stuck. Move it aside so
+        # the user can still recover their keys by hand, and start clean.
+        backup = CONFIG_FILE.with_suffix(CONFIG_FILE.suffix + ".corrupt")
+        try:
+            os.replace(CONFIG_FILE, backup)
+            logger.error(
+                "Provider config file was unreadable; moved to %s and starting "
+                "from an empty configuration.", backup
+            )
+        except OSError:
+            logger.exception("Provider config file is unreadable and could not be moved aside")
+        return {}
+    if not isinstance(data, dict):
+        logger.error("Provider config file does not contain a JSON object; ignoring it.")
+        return {}
+    return data
 
 def delete_provider_config(name: str) -> None:
-    all_configs = load_all_provider_configs()
-    if name in all_configs:
-        del all_configs[name]
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(all_configs, f, indent=2)
+    with _CONFIG_LOCK:
+        all_configs = load_all_provider_configs()
+        if name in all_configs:
+            del all_configs[name]
+            _write_all_provider_configs(all_configs)
 
 def list_provider_configs() -> list[str]:
     return [k for k in load_all_provider_configs() if not k.startswith("__")]
@@ -104,10 +186,10 @@ _ACTIVE_PROVIDER_KEY = "__active_provider__"
 
 def set_active_provider(name: str) -> None:
     """Persist the currently selected provider in the config file."""
-    all_configs = load_all_provider_configs()
-    all_configs[_ACTIVE_PROVIDER_KEY] = name
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(all_configs, f, indent=2)
+    with _CONFIG_LOCK:
+        all_configs = load_all_provider_configs()
+        all_configs[_ACTIVE_PROVIDER_KEY] = name
+        _write_all_provider_configs(all_configs)
 
 
 def get_active_provider() -> str | None:

@@ -1816,7 +1816,21 @@ function getEffectiveBaseBranch(
 		return projectMainBranch;
 	}
 
-	// 3. Ask the remote what its default branch is. This is the source of
+	// 3-5. Ask git itself. Works from any git directory, worktrees included.
+	return detectGitDefaultBranch(projectPath);
+}
+
+/**
+ * Detect a repository's default branch from git alone, for callers that have a
+ * git directory but no project/spec context (e.g. a worktree path).
+ *
+ * Never assume a hardcoded branch name: WorkPilot's own repo uses `develop`,
+ * but most projects use `main` or `master`, and some use `trunk`/`production`.
+ * Running `git checkout <wrong-branch> --` either fails outright or, worse,
+ * restores files from an unrelated branch that happens to exist.
+ */
+function detectGitDefaultBranch(cwd: string): string {
+	// 1. Ask the remote what its default branch is. This is the source of
 	// truth for repos that don't use 'main' or 'master' (e.g. 'develop',
 	// 'trunk', 'production'). Without this the count of files / commits in
 	// the "Build ready for review" panel comes back as 0 against a branch
@@ -1826,7 +1840,7 @@ function getEffectiveBaseBranch(
 			getToolPath("git"),
 			["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
 			{
-				cwd: projectPath,
+				cwd,
 				encoding: "utf-8",
 				stdio: ["pipe", "pipe", "pipe"],
 			},
@@ -1843,12 +1857,12 @@ function getEffectiveBaseBranch(
 		// to the per-branch heuristic below.
 	}
 
-	// 4. Try to detect the usual default branches. 'develop' is included so
+	// 2. Try to detect the usual default branches. 'develop' is included so
 	// GitFlow repos without an explicit project mainBranch still resolve.
 	for (const branch of ["main", "master", "develop"]) {
 		try {
 			execFileSync(getToolPath("git"), ["rev-parse", "--verify", branch], {
-				cwd: projectPath,
+				cwd,
 				encoding: "utf-8",
 				stdio: ["pipe", "pipe", "pipe"],
 			});
@@ -1858,7 +1872,7 @@ function getEffectiveBaseBranch(
 		}
 	}
 
-	// 5. Last-resort fallback.
+	// 3. Last-resort fallback.
 	return "main";
 }
 
@@ -4511,6 +4525,10 @@ export function registerWorktreeHandlers(
 			const deleted: string[] = [];
 			const failed: string[] = [];
 			const resolvedWorktree = path.resolve(worktreePath);
+			// Discarding means "restore this file to the base branch's version".
+			// Which branch that is depends on the project — never assume one.
+			const baseBranch = detectGitDefaultBranch(resolvedWorktree);
+			const gitPath = getToolPath("git");
 
 			// Load existing discard list
 			const discardListPath = path.join(
@@ -4539,9 +4557,15 @@ export function registerWorktreeHandlers(
 						continue;
 					}
 
-					// Discard changes: sync file state with develop branch
-					const statusResult = await execAsync(
-						`git status --porcelain -- "${relativePath}"`,
+					// Discard changes: sync file state with the base branch.
+					// execFileAsync (argv array), NOT a shell template string:
+					// `relativePath` is a filename from the repo, and the
+					// containment check above says nothing about shell
+					// metacharacters. A file named `a" & calc & ".txt` in a
+					// cloned repo would otherwise run as a command here.
+					const statusResult = await execFileAsync(
+						gitPath,
+						["status", "--porcelain", "--", relativePath],
 						{ cwd: resolvedWorktree },
 					);
 					const statusOutput = statusResult.stdout.trim();
@@ -4560,14 +4584,16 @@ export function registerWorktreeHandlers(
 							}
 						}
 					} else if (statusOutput) {
-						// File is tracked: reset to develop's version using git reset
-						await execAsync(
-							`git reset develop -- "${relativePath}"`,
+						// File is tracked: reset to the base branch's version
+						await execFileAsync(
+							gitPath,
+							["reset", baseBranch, "--", relativePath],
 							{ cwd: resolvedWorktree },
 						);
-						// Then checkout the file from develop to match exactly
-						await execAsync(
-							`git checkout develop -- "${relativePath}"`,
+						// Then checkout the file from the base branch to match exactly
+						await execFileAsync(
+							gitPath,
+							["checkout", baseBranch, "--", relativePath],
 							{ cwd: resolvedWorktree },
 						);
 					}
