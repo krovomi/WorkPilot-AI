@@ -4,10 +4,10 @@
 
 ![WorkPilot AI Kanban Board](.github/assets/WorkPilot-AI-Kanban.png)
 
-[![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./agpl-3.0.txt)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/KCXaPBr4Dj)
 [![YouTube](https://img.shields.io/badge/YouTube-Subscribe-FF0000?style=flat-square&logo=youtube&logoColor=white)](https://www.youtube.com/@AndreMikalsen)
-[![CI](https://img.shields.io/github/actions/workflow/status/tleub-ebp/WorkPilot-AI/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/tleub-ebp/WorkPilot-AI/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/krovomi/WorkPilot-AI/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/krovomi/WorkPilot-AI/actions)
 
 ---
 
@@ -16,37 +16,37 @@
 ### Stable Release
 
 <!-- STABLE_VERSION_BADGE -->
-[![Stable](https://img.shields.io/badge/stable-1.0.0-blue?style=flat-square)](https://github.com/tleub-ebp/WorkPilot-AI/releases/tag/v1.0.0)
+[![Stable](https://img.shields.io/badge/stable-1.0.0-blue?style=flat-square)](https://github.com/krovomi/WorkPilot-AI/releases/tag/v1.0.0)
 <!-- STABLE_VERSION_BADGE_END -->
 
 <!-- STABLE_DOWNLOADS -->
 | Platform | Download |
 |----------|----------|
-| **Windows** | [WorkPilot-AI-1.0.0-win32-x64.exe](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-win32-x64.exe) |
-| **macOS (Apple Silicon)** | [WorkPilot-AI-1.0.0-darwin-arm64.dmg](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-darwin-arm64.dmg) |
-| **macOS (Intel)** | [WorkPilot-AI-1.0.0-darwin-x64.dmg](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-darwin-x64.dmg) |
-| **Linux** | [WorkPilot-AI-1.0.0-linux-x86_64.AppImage](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-linux-x86_64.AppImage) |
-| **Linux (Debian)** | [WorkPilot-AI-1.0.0-linux-amd64.deb](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-linux-amd64.deb) |
-| **Linux (Flatpak)** | [WorkPilot-AI-1.0.0-linux-x86_64.flatpak](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-linux-x86_64.flatpak) |
+| **Windows** | [WorkPilot-AI-1.0.0-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-win32-x64.exe) |
+| **macOS (Apple Silicon)** | [WorkPilot-AI-1.0.0-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-darwin-arm64.dmg) |
+| **macOS (Intel)** | [WorkPilot-AI-1.0.0-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-darwin-x64.dmg) |
+| **Linux** | [WorkPilot-AI-1.0.0-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-linux-x86_64.AppImage) |
+| **Linux (Debian)** | [WorkPilot-AI-1.0.0-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-linux-amd64.deb) |
+| **Linux (Flatpak)** | [WorkPilot-AI-1.0.0-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-linux-x86_64.flatpak) |
 <!-- STABLE_DOWNLOADS_END -->
 
 ### Beta Release
 
-> Beta releases may contain bugs and breaking changes. [View all releases](https://github.com/tleub-ebp/WorkPilot-AI/releases)
+> Beta releases may contain bugs and breaking changes. [View all releases](https://github.com/krovomi/WorkPilot-AI/releases)
 
 <!-- BETA_VERSION_BADGE -->
-[![Beta](https://img.shields.io/badge/beta-1.0.0--alpha-orange?style=flat-square)](https://github.com/tleub-ebp/WorkPilot-AI/releases/tag/v1.0.0-alpha.1)
+[![Beta](https://img.shields.io/badge/beta-1.0.0--alpha-orange?style=flat-square)](https://github.com/krovomi/WorkPilot-AI/releases/tag/v1.0.0-alpha.1)
 <!-- BETA_VERSION_BADGE_END -->
 
 <!-- BETA_DOWNLOADS -->
 | Platform | Download |
 |----------|----------|
-| **Windows** | [WorkPilot-AI-1.0.0-alpha.1-win32-x64.exe](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-win32-x64.exe) |
-| **macOS (Apple Silicon)** | [WorkPilot-AI-1.0.0-alpha.1-darwin-arm64.dmg](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-darwin-arm64.dmg) |
-| **macOS (Intel)** | [WorkPilot-AI-1.0.0-alpha.1-darwin-x64.dmg](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-darwin-x64.dmg) |
-| **Linux** | [WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.AppImage](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.AppImage) |
-| **Linux (Debian)** | [WorkPilot-AI-1.0.0-alpha.1-linux-amd64.deb](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-linux-amd64.deb) |
-| **Linux (Flatpak)** | [WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.flatpak](https://github.com/tleub-ebp/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.flatpak) |
+| **Windows** | [WorkPilot-AI-1.0.0-alpha.1-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-win32-x64.exe) |
+| **macOS (Apple Silicon)** | [WorkPilot-AI-1.0.0-alpha.1-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-darwin-arm64.dmg) |
+| **macOS (Intel)** | [WorkPilot-AI-1.0.0-alpha.1-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-darwin-x64.dmg) |
+| **Linux** | [WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.AppImage) |
+| **Linux (Debian)** | [WorkPilot-AI-1.0.0-alpha.1-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-linux-amd64.deb) |
+| **Linux (Flatpak)** | [WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.flatpak) |
 <!-- BETA_DOWNLOADS_END -->
 
 > All releases include SHA256 checksums and VirusTotal scan results for security verification.
@@ -68,7 +68,7 @@ pnpm install
 pnpm run dev
 ```
 
-See the [Setup Guide](docs/SETUP.md) for detailed instructions.
+See [Installation et Configuration](#installation-et-configuration) below for detailed instructions.
 
 ---
 
@@ -201,7 +201,7 @@ See the [Setup Guide](docs/SETUP.md) for detailed instructions.
 
 | Feature | Description |
 |---------|-------------|
-| **7+ Color Themes** | Default, Dusk, Lime, Ocean, Retro, Neo — each with light and dark variants |
+| **7 Color Themes** | Default, Dusk, Lime, Ocean, Retro, Neo, Forest — each with light and dark variants |
 | **Custom Theme Editor** | Color picker with live preview, export, and import |
 | **Bilingual UI** | Full French and English interface |
 | **Command Palette** | Keyboard-driven access to all features with fuzzy search |
@@ -277,13 +277,14 @@ apps/backend/
 │   ├── worktree.py      # Isolation des espaces de travail Git
 │   └── platform.py      # Abstraction cross-plateforme
 ├── agents/              # Logique d'exécution des agents
-│   ├── planner/         # Agent de planification
-│   ├── coder/           # Agent de développement
-│   └── session/         # Gestion des sessions
+│   ├── planner.py       # Agent de planification
+│   ├── coder.py         # Agent de développement
+│   └── session.py       # Gestion des sessions
 ├── qa/                  # Pipeline de validation QA
-│   ├── reviewer/        # Validation des critères
-│   ├── fixer/           # Résolution automatique
-│   └── loop/            # Boucle de validation
+│   ├── reviewer.py      # Validation des critères
+│   ├── fixer.py         # Résolution automatique
+│   └── loop.py          # Boucle de validation
+├── runners/             # Points d'entrée (spec_runner, github, azure_devops)
 ├── spec/                # Création et gestion des specs
 ├── skills/              # Système de compétences AI optimisé
 ├── cli/                 # Interface ligne de commande
@@ -304,7 +305,7 @@ apps/backend/
 └── prompts/             # Prompts des agents (60+ agents spécialisés)
 ```
 
-> Le backend s'est étoffé en **90+ modules spécialisés** (accessibilité, dérive d'architecture, gouvernance de licences, orchestration multi-repo, etc.). Voir [apps/backend/README.md](apps/backend/README.md) et la [table des modules du wiki](https://github.com/tleub-ebp/WorkPilot-AI/wiki) pour l'inventaire complet auto-généré.
+> Le backend s'est étoffé en **90+ modules spécialisés** (accessibilité, dérive d'architecture, gouvernance de licences, orchestration multi-repo, etc.). Voir [apps/backend/README.md](apps/backend/README.md) et la [table des modules du wiki](https://github.com/krovomi/WorkPilot-AI/wiki) pour l'inventaire complet auto-généré.
 
 #### Frontend Electron (`apps/frontend/`)
 ```
@@ -314,22 +315,21 @@ apps/frontend/src/
 │   ├── claude-profile/  # Gestion multi-profils
 │   ├── terminal/        # Daemon PTY et cycle de vie
 │   ├── platform/        # Abstraction cross-plateforme
-│   ├── ipc-handlers/    # 40+ modules de gestion IPC
-│   └── services/        # Récupération de session SDK
+│   ├── ipc-handlers/    # 100+ modules de gestion IPC
+│   ├── services/        # Récupération de session SDK, credentials
+│   └── utils/           # Chemins, isolation git, nettoyage worktree
+├── preload/             # Pont contextIsolation (API exposée au renderer)
 ├── renderer/            # Interface React
-│   ├── features/        # Modules fonctionnels auto-contenus
-│   │   ├── tasks/       # Gestion des tâches, kanban
-│   │   ├── terminals/   # Émulation de terminal
-│   │   ├── projects/    # Gestion de projet, explorateur
-│   │   ├── settings/    # Paramètres application/projet
-│   │   ├── roadmap/     # Génération de roadmap
-│   │   ├── insights/    # Analyse de code
-│   │   └── agents/      # Gestion profils Claude
-│   ├── shared/          # Ressources partagées
-│   └── hooks/           # Hooks au niveau application
+│   ├── components/      # Kanban, terminaux, settings, task detail…
+│   ├── stores/          # État Zustand par domaine
+│   ├── contexts/        # Providers React (thème, i18n)
+│   ├── hooks/           # Hooks au niveau application
+│   ├── lib/             # Utilitaires de présentation
+│   └── locales/         # Traductions FR / EN
 └── shared/              # Partagé main/renderer
     ├── types/           # Définitions TypeScript
     ├── constants/       # Constantes application
+    ├── i18n/            # Configuration i18n
     └── utils/           # Utilitaires partagés
 ```
 
@@ -345,11 +345,11 @@ apps/frontend/src/
 7. **Phase de Fusion** → Fusion sémantique vers la branche principale
 
 #### Gestion d'État
-- **État Projet** → `project-store.ts`
-- **État Tâche/Spec** → `task-store.ts`
-- **État Terminal** → `terminal-store.ts`
-- **État Agent** → `agent-state.ts`
-- **État Paramètres** → `settings-store.ts`
+- **État Projet** → [`main/project-store.ts`](apps/frontend/src/main/project-store.ts)
+- **État Tâche/Spec** → [`renderer/stores/task-store.ts`](apps/frontend/src/renderer/stores/task-store.ts)
+- **État Terminal** → [`renderer/stores/terminal-store.ts`](apps/frontend/src/renderer/stores/terminal-store.ts)
+- **État Agent** → [`main/agent/agent-state.ts`](apps/frontend/src/main/agent/agent-state.ts)
+- **État Paramètres** → [`renderer/stores/settings-store.ts`](apps/frontend/src/renderer/stores/settings-store.ts)
 
 ### Sécurité et Isolation
 
@@ -391,17 +391,18 @@ apps/frontend/src/
 - **Réseau** : Connexion internet stable
 
 #### Dépendances Logicielles
-- **Node.js v24.12.0 LTS** (Requis)
+- **Node.js ≥ 20** (la CI construit sur Node 22)
+- **pnpm ≥ 8** (le dépôt est épinglé sur pnpm 10 via `packageManager`)
 - **Python 3.12+** (Pour le backend)
 - **Git** (Dépôt initialisé obligatoire)
-- **Claude Code CLI** : `pnpm install -g @anthropic-ai/claude-code`
+- **Claude Code CLI** : `pnpm add -g @anthropic-ai/claude-code`
 
 ### Méthodes d'Installation
 
 #### Option 1 : Application Bureau (Recommandé)
 
 1. **Téléchargement**
-   - Visitez [GitHub Releases](https://github.com/tleub-ebp/WorkPilot-AI/releases)
+   - Visitez [GitHub Releases](https://github.com/krovomi/WorkPilot-AI/releases)
    - Téléchargez la version stable pour votre plateforme
 
 2. **Installation**
@@ -418,8 +419,8 @@ apps/frontend/src/
 
 1. **Clonage du Dépôt**
    ```bash
-   git clone https://github.com/tleub-ebp/WorkPilot-AI.git
-   cd Auto-Claude_EBP
+   git clone https://github.com/krovomi/WorkPilot-AI.git
+   cd WorkPilot-AI
    ```
 
 2. **Installation Automatique**
@@ -494,20 +495,20 @@ WorkPilot AI détecte automatiquement :
 
 #### Tests de Connexion
 ```bash
-# Test du provider AI
-pnpm test:provider
-
-# Test du backend
-pnpm test:backend
-
-# Test complet de l'application
+# Tests du frontend (vitest)
 pnpm test
+
+# Tests du backend (pytest)
+pnpm run test:backend
+
+# Suite complète (pré-push)
+pnpm run test:all
 ```
 
 #### Vérification de l'Environnement
 ```bash
 # Version Node.js
-node --version  # v24.12.0
+node --version  # >= v20
 
 # Version Python
 python --version  # 3.12+
@@ -521,7 +522,7 @@ claude --version
 #### Problèmes d'Installation
 - **Node.js non trouvé** : Réinstallez depuis https://nodejs.org avec "Add to PATH"
 - **Modules natifs** : `pnpm run rebuild` dans `apps/frontend`
-- **Python manquant** : Installez Python 3.10+ et ajoutez au PATH
+- **Python manquant** : Installez Python 3.12+ et ajoutez au PATH
 
 #### Problèmes d'Authentification
 - **Token Claude expiré** : `claude` puis `/login`
@@ -542,9 +543,12 @@ WorkPilot-AI/
 ├── apps/
 │   ├── backend/     # Python agents, specs, QA pipeline, integrations
 │   └── frontend/    # Electron desktop application (React + TypeScript)
+├── src/             # Shared Python connectors (provider config, LLM discovery)
+├── config/          # Provider registry and shared configuration
 ├── docs/            # Documentation and guides
-├── tests/           # Test suite
-└── scripts/         # Build and release utilities
+├── shared_docs/     # Long-form reference docs (configuration, architecture)
+├── tests/           # Python test suite
+└── scripts/         # Build, release, and maintenance utilities
 ```
 
 ---
@@ -555,10 +559,10 @@ For headless operation, CI/CD integration, or terminal-only workflows:
 
 ```bash
 cd apps/backend
-python spec_runner.py --interactive   # Create a spec interactively
-python run.py --spec 001              # Run autonomous build
-python run.py --spec 001 --review     # Review
-python run.py --spec 001 --merge      # Merge
+python runners/spec_runner.py --interactive   # Create a spec interactively
+python run.py --spec 001                      # Run autonomous build
+python run.py --spec 001 --review             # Review
+python run.py --spec 001 --merge              # Merge
 ```
 
 See [docs/CLI-USAGE.md](docs/CLI-USAGE.md) for the full CLI reference.
@@ -581,25 +585,28 @@ All releases include SHA256 checksums and VirusTotal scans.
 
 | Document | Description |
 |----------|-------------|
-| [Setup Guide](docs/SETUP.md) | Installation, requirements, scripts, dev environment |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and fixes |
-| [Providers Guide](docs/PROVIDERS.md) | Multi-provider LLM setup |
+| [Installation et Configuration](#installation-et-configuration) | Requirements, install methods, provider setup |
+| [Dépannage Courant](#dépannage-courant) | Common issues and fixes |
+| [Configuration Reference](shared_docs/CONFIGURATION.md) | Provider registry, credential resolution, env vars |
 | [CLI Usage](docs/CLI-USAGE.md) | Headless / CI usage |
-| [Contributing](CONTRIBUTING.md) | Code style, testing, PR process |
+| [Contributing](docs/CONTRIBUTING.md) | Code style, testing, PR process |
 | [Linux Guide](docs/linux.md) | Flatpak, AppImage builds |
+| [Windows Development](docs/windows-development.md) | Windows-specific encoding and tooling notes |
+| [Release Process](docs/RELEASE.md) | How releases are cut and published |
+| [Security Policy](docs/SECURITY.md) | Supported versions, reporting a vulnerability |
 
 ---
 
 ## Contributing
 
-We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, testing requirements, and PR process.
+We welcome contributions! Please read [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup, code style, testing requirements, and PR process.
 
 ---
 
 ## Community
 
-- **Issues** — [Report bugs or request features](https://github.com/tleub-ebp/WorkPilot-AI/issues)
-- **Discussions** — [Ask questions](https://github.com/tleub-ebp/WorkPilot-AI/discussions)
+- **Issues** — [Report bugs or request features](https://github.com/krovomi/WorkPilot-AI/issues)
+- **Discussions** — [Ask questions](https://github.com/krovomi/WorkPilot-AI/discussions)
 
 ---
 
@@ -613,6 +620,6 @@ WorkPilot AI is free to use. If you modify and distribute it, or run it as a ser
 
 ## Star History
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/tleub-ebp/WorkPilot-AI?style=social)](https://github.com/tleub-ebp/WorkPilot-AI/stargazers)
+[![GitHub Repo stars](https://img.shields.io/github/stars/krovomi/WorkPilot-AI?style=social)](https://github.com/krovomi/WorkPilot-AI/stargazers)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=tleub-ebp/WorkPilot-AI&type=Date)](https://star-history.com/#tleub-ebp/WorkPilot-AI&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=krovomi/WorkPilot-AI&type=Date)](https://star-history.com/#krovomi/WorkPilot-AI&Date)

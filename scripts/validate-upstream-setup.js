@@ -93,8 +93,8 @@ class Validator {
 				"Please configure origin remote",
 			);
 
-			if (hasOrigin && remotes.includes("github.com/tleub-ebp/WorkPilot-AI")) {
-				this.check("origin points to fork (tleub-ebp)", true);
+			if (hasOrigin && remotes.includes("github.com/krovomi/WorkPilot-AI")) {
+				this.check("origin points to fork (krovomi)", true);
 			} else if (hasOrigin) {
 				this.log("  ⚠ origin points to different URL", "warning");
 			}

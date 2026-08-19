@@ -87,7 +87,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 
 **No time estimates** — Never provide duration predictions. Use priority-based ordering instead.
 
-**PR target** — Always target the `develop` branch for PRs to tleub-ebp/WorkPilot-AI, NOT `main`.
+**PR target** — Always target the `develop` branch for PRs to krovomi/WorkPilot-AI, NOT `main`.
 
 ## Project Structure
 

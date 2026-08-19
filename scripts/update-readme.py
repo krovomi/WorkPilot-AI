@@ -32,7 +32,7 @@ STABLE_BADGE_START = "<!-- STABLE_VERSION_BADGE -->"
 STABLE_BADGE_END = "<!-- STABLE_VERSION_BADGE_END -->"
 STABLE_DL_START = "<!-- STABLE_DOWNLOADS -->"
 STABLE_DL_END = "<!-- STABLE_DOWNLOADS_END -->"
-REPO_URL = "https://github.com/tleub-ebp/WorkPilot-AI"
+REPO_URL = "https://github.com/krovomi/WorkPilot-AI"
 
 DOWNLOAD_TEMPLATE = """\
 | Platform | Download |

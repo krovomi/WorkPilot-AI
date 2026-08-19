@@ -39,7 +39,7 @@
 	"packageManager": "pnpm@10.27.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/tleub-ebp/WorkPilot-AI.git"
+		"url": "https://github.com/krovomi/WorkPilot-AI.git"
 	},
 	"keywords": [
 		"ai",
