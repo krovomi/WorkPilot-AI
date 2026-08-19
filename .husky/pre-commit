@@ -1,5 +1,4 @@
 #!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
 
 # Pre-commit gate — mirrors .github/workflows/lint.yml so lint failures
 # surface HERE instead of in CI.
