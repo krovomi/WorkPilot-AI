@@ -1,4 +1,4 @@
-﻿import { Circle, Code2, FileCode, TrendingUp } from "lucide-react";
+import { Circle, Code2, FileCode, TrendingUp } from "lucide-react";
 import { IDEATION_EFFORT_COLORS } from "../../../../shared/constants";
 import type { CodeImprovementIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";

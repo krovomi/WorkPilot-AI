@@ -1,4 +1,4 @@
-﻿# Intent Recognition & Smart Routing
+# Intent Recognition & Smart Routing
 
 > Advanced intent recognition using LLM to understand the true intent behind task descriptions, with learning capabilities and proactive recommendations.
 

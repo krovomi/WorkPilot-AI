@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests pour le service de complétion de tâches
 """
 

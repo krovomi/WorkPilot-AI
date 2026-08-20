@@ -1,4 +1,4 @@
-﻿import {
+import {
 	AlertCircle,
 	CheckCircle2,
 	Clock,

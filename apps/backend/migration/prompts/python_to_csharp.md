@@ -1,4 +1,4 @@
-﻿# Python to C# Transformation Prompt
+# Python to C# Transformation Prompt
 
 You are an expert C# developer specializing in Python to C# migrations.
 

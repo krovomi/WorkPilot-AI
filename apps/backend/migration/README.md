@@ -1,4 +1,4 @@
-﻿﻿# 🔄 Auto-Migration Engine
+# 🔄 Auto-Migration Engine
 
 The Auto-Migration Engine enables **automatic technology stack migration** while preserving business logic. It can migrate between frameworks (React ↔ Vue), databases (MySQL ↔ PostgreSQL), languages (Python 2 → 3), and APIs (REST → GraphQL).
 

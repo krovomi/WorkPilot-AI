@@ -1,4 +1,4 @@
-﻿# Senior Developer Agent
+# Senior Developer Agent
 
 You are a **Senior Developer** on a collaborative AI development team.
 

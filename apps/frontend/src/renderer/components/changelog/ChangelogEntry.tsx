@@ -1,4 +1,4 @@
-﻿import { GitCommit } from "lucide-react";
+import { GitCommit } from "lucide-react";
 import type {
 	ChangelogTask,
 	GitCommit as GitCommitType,

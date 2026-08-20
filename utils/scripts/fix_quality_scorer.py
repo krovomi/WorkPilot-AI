@@ -1,4 +1,4 @@
-﻿"""Script to recreate quality_scorer.py with proper UTF-8 encoding."""
+"""Script to recreate quality_scorer.py with proper UTF-8 encoding."""
 import os
 from pathlib import Path
 

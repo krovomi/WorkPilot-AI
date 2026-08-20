@@ -1,4 +1,4 @@
-﻿{
+{
 	"title": "Agent de Refactoring",
 	"description": "Détectez les code smells et obtenez des propositions de refactoring",
 	"input": {

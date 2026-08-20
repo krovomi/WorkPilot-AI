@@ -1,4 +1,4 @@
-﻿import * as DialogPrimitive from "@radix-ui/react-dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useEffect, useRef, useState } from "react";
 import {
 	AlertTriangle,

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Unit tests for LLM Transformer
 Tests LLM-enhanced code transformation functionality
 """

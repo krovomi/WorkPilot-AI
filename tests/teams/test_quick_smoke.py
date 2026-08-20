@@ -1,4 +1,4 @@
-﻿"""
+"""
 Quick smoke test for Claude Teams
 ==================================
 

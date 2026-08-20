@@ -1,4 +1,4 @@
-﻿import { MessageCircle, Sparkles, Tag, User } from "lucide-react";
+import { MessageCircle, Sparkles, Tag, User } from "lucide-react";
 import {
 	GITHUB_ISSUE_STATE_COLORS,
 	GITHUB_ISSUE_STATE_LABELS,

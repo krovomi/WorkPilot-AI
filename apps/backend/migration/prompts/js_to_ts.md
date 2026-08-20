@@ -1,4 +1,4 @@
-﻿# JavaScript to TypeScript Migration Prompt
+# JavaScript to TypeScript Migration Prompt
 
 You are an expert TypeScript developer specializing in JavaScript to TypeScript migrations.
 

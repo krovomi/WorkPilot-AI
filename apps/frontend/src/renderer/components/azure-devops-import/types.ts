@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Azure DevOps Integration Types
  */
 

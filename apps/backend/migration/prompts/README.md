@@ -1,4 +1,4 @@
-﻿# 📝 Migration Prompts Guide
+# 📝 Migration Prompts Guide
 
 This directory contains specialized LLM prompts for guiding Claude through complex code transformations.
 

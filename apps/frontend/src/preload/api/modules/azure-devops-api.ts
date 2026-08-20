@@ -1,4 +1,4 @@
-﻿import { IPC_CHANNELS } from "../../../shared/constants";
+import { IPC_CHANNELS } from "../../../shared/constants";
 import type {
 	AzureDevOpsImportResult,
 	AzureDevOpsProject,

@@ -1,4 +1,4 @@
-﻿"""Tests for Quality Badge and Integration modules"""
+"""Tests for Quality Badge and Integration modules"""
 
 import re
 import sys

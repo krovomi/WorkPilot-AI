@@ -1,4 +1,4 @@
-﻿import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { type MouseEvent, memo, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ExecutionPhase, Subtask, TaskLogs } from "../../shared/types";

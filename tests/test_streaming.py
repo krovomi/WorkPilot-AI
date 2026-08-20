@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for Streaming Development Mode
 """
 

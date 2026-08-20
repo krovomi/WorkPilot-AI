@@ -1,4 +1,4 @@
-﻿// React
+// React
 
 // Types
 import type { GitStatus, Project } from "@shared/types";
