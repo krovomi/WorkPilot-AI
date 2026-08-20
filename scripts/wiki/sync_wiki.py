@@ -48,12 +48,23 @@ def detect_wiki_url(repo: Path) -> str:
     return f"{origin}.wiki.git"
 
 
+class WikiUnavailableError(RuntimeError):
+    """The wiki git repository does not exist yet."""
+
+
 def clone_or_pull_wiki(wiki_url: str, workdir: Path) -> Path:
     wiki_dir = workdir / "wiki"
     if wiki_dir.is_dir():
         run(["git", "-C", str(wiki_dir), "pull", "--ff-only"])
-    else:
+        return wiki_dir
+    try:
         run(["git", "clone", wiki_url, str(wiki_dir)])
+    except subprocess.CalledProcessError as exc:
+        # GitHub only materialises `<repo>.wiki.git` once the wiki has its first
+        # page — enabling the wiki in the repository settings is not enough, and
+        # a fork never inherits its parent's wiki. Until someone creates that
+        # page the clone fails with "Repository not found".
+        raise WikiUnavailableError(wiki_url) from exc
     return wiki_dir
 
 
@@ -158,7 +169,19 @@ def main() -> int:
     args.workdir.mkdir(parents=True, exist_ok=True)
 
     wiki_url = detect_wiki_url(repo)
-    wiki = clone_or_pull_wiki(wiki_url, args.workdir.resolve())
+    try:
+        wiki = clone_or_pull_wiki(wiki_url, args.workdir.resolve())
+    except WikiUnavailableError:
+        # Skip rather than fail the workflow: having no wiki is a legitimate
+        # state, and a documentation sync job should never turn a green build
+        # red because of it.
+        print(
+            "::warning::Wiki repository is not available — skipping wiki sync.\n"
+            "Create the first wiki page in the GitHub UI to initialise it "
+            "(enabling the wiki in Settings is not enough, and forks do not "
+            "inherit the parent's wiki)."
+        )
+        return 0
     configure_git(wiki)
 
     commit_msgs: list[str] = []
