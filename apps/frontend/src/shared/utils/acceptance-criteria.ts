@@ -77,10 +77,11 @@ export function stripAcceptanceCriteriaSection(html: string): string {
 	HEADING_BLOCK.lastIndex = 0;
 	let match: RegExpExecArray | null = HEADING_BLOCK.exec(html);
 	while (match !== null) {
-		const innerText = match[1]
-			.replace(/<[^>]+>/g, "")
-			.replace(/\s+/g, " ")
-			.trim();
+		const innerHtml = match[1];
+		const innerText = new DOMParser()
+			.parseFromString(innerHtml, "text/html")
+			.body.textContent?.replace(/\s+/g, " ")
+			.trim() ?? "";
 		if (AC_HEADING_LABELS.some((re) => re.test(innerText))) {
 			return html.slice(0, match.index).trimEnd();
 		}
