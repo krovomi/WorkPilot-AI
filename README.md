@@ -594,6 +594,18 @@ All releases include SHA256 checksums and VirusTotal scans.
 
 We welcome contributions! Please read [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup, code style, testing requirements, and PR process.
 
+### Syncing with Upstream
+
+WorkPilot AI tracks the upstream [Auto-Claude](https://github.com/AndyMik90/Auto-Claude) project. To pull upstream changes into your fork:
+
+```bash
+pnpm merge-upstream                 # merge upstream/develop and push
+pnpm merge-upstream -- --skip-push  # review before publishing
+pnpm run validate:upstream          # check the sync tooling is wired up
+```
+
+Platform wrappers are in `utils/system/`, and `.github/workflows/sync-upstream.yml` runs the same merge on a schedule. See [Keeping Your Fork Updated](docs/CONTRIBUTING.md#keeping-your-fork-updated) for details.
+
 ---
 
 ## Community

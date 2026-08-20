@@ -58,14 +58,20 @@ class Validator {
 
 		// 1. Check files exist
 		this.log("📋 Checking required files...", "info");
+		// The platform wrappers moved out of the repo root into utils/system/
+		// (commit 665abc0a) and this list was never updated, so it reported
+		// three files as missing that are present.
+		//
+		// MERGE_UPSTREAM.md, GIT_SETUP.md and QUICK_REFERENCE.md are gone from
+		// this list: they exist nowhere in the repository's history — they were
+		// planned and never written, so the validator failed on them forever.
+		// docs/CONTRIBUTING.md is what actually documents the sync workflow.
 		const requiredFiles = [
-			"merge-upstream.ps1",
-			"merge-upstream.bat",
-			"merge-upstream.sh",
+			"utils/system/merge-upstream.ps1",
+			"utils/system/merge-upstream.bat",
+			"utils/system/merge-upstream.sh",
 			"scripts/merge-upstream.js",
-			"MERGE_UPSTREAM.md",
-			"GIT_SETUP.md",
-			"QUICK_REFERENCE.md",
+			"docs/CONTRIBUTING.md",
 			".github/workflows/sync-upstream.yml",
 		];
 
@@ -110,21 +116,31 @@ class Validator {
 
 		// 3. Check scripts are executable
 		this.log("🔐 Checking script permissions...", "info");
-		const executableScripts = [
-			"merge-upstream.sh",
-			"scripts/merge-upstream.js",
-		];
+		// Only the shell wrapper is executed directly (`./merge-upstream.sh`).
+		// scripts/merge-upstream.js is always run through node, via the
+		// `merge-upstream` package script, so its exec bit is irrelevant — and
+		// unsettable on Windows checkouts, where core.filemode is false.
+		const executableScripts = ["utils/system/merge-upstream.sh"];
 
 		executableScripts.forEach((script) => {
 			const fullPath = path.join(ROOT_DIR, script);
 			if (fs.existsSync(fullPath)) {
 				try {
-					const stats = fs.statSync(fullPath);
-					const isExecutable = (stats.mode & 0o111) !== 0;
+					// Ask git, not the filesystem. Windows checkouts have
+					// core.filemode=false and report no exec bit for anything, so
+					// a statSync check could never pass there. What actually
+					// matters is the mode git records (100755 vs 100644), because
+					// that is what everyone else gets on clone.
+					const mode = execSync(`git ls-files -s -- "${script}"`, {
+						cwd: ROOT_DIR,
+						encoding: "utf-8",
+					})
+						.trim()
+						.split(/\s+/)[0];
 					this.check(
 						`${script} is executable`,
-						isExecutable,
-						`Run: chmod +x ${script}`,
+						mode === "100755",
+						`Run: git update-index --chmod=+x ${script}`,
 					);
 				} catch (error) {
 					this.log(
