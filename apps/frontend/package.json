@@ -190,6 +190,10 @@
 				"to": "icon.ico"
 			},
 			{
+				"from": "resources/icon.png",
+				"to": "icon.png"
+			},
+			{
 				"from": "../backend",
 				"to": "backend",
 				"filter": [

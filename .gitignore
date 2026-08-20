@@ -181,7 +181,9 @@ playwright/.cache/
 apps/frontend/electron.vite.config.*.mjs
 
 # Development
-/docs
+# NOTE: /docs is deliberately NOT ignored. It was, which meant every new file
+# under docs/ was silently dropped from `git add` while the 10 already-tracked
+# ones kept working — a trap, especially now that the README links into docs/.
 dev/
 _bmad/
 _bmad-output/
