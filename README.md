@@ -16,18 +16,18 @@
 ### Stable Release
 
 <!-- STABLE_VERSION_BADGE -->
-[![Stable](https://img.shields.io/badge/stable-1.0.0-blue?style=flat-square)](https://github.com/krovomi/WorkPilot-AI/releases/tag/v1.0.0)
+[![Stable](https://img.shields.io/badge/stable-1.1.0-blue?style=flat-square)](https://github.com/krovomi/WorkPilot-AI/releases/tag/v1.1.0)
 <!-- STABLE_VERSION_BADGE_END -->
 
 <!-- STABLE_DOWNLOADS -->
 | Platform | Download |
 |----------|----------|
-| **Windows** | [WorkPilot-AI-1.0.0-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-win32-x64.exe) |
-| **macOS (Apple Silicon)** | [WorkPilot-AI-1.0.0-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-darwin-arm64.dmg) |
-| **macOS (Intel)** | [WorkPilot-AI-1.0.0-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-darwin-x64.dmg) |
-| **Linux** | [WorkPilot-AI-1.0.0-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-linux-x86_64.AppImage) |
-| **Linux (Debian)** | [WorkPilot-AI-1.0.0-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-linux-amd64.deb) |
-| **Linux (Flatpak)** | [WorkPilot-AI-1.0.0-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0/WorkPilot-AI-1.0.0-linux-x86_64.flatpak) |
+| **Windows** | [WorkPilot-AI-1.1.0-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.1.0/WorkPilot-AI-1.1.0-win32-x64.exe) |
+| **macOS (Apple Silicon)** | [WorkPilot-AI-1.1.0-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.1.0/WorkPilot-AI-1.1.0-darwin-arm64.dmg) |
+| **macOS (Intel)** | [WorkPilot-AI-1.1.0-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.1.0/WorkPilot-AI-1.1.0-darwin-x64.dmg) |
+| **Linux** | [WorkPilot-AI-1.1.0-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.1.0/WorkPilot-AI-1.1.0-linux-x86_64.AppImage) |
+| **Linux (Debian)** | [WorkPilot-AI-1.1.0-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.1.0/WorkPilot-AI-1.1.0-linux-amd64.deb) |
+| **Linux (Flatpak)** | [WorkPilot-AI-1.1.0-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.1.0/WorkPilot-AI-1.1.0-linux-x86_64.flatpak) |
 <!-- STABLE_DOWNLOADS_END -->
 
 ### Beta Release
@@ -35,18 +35,11 @@
 > Beta releases may contain bugs and breaking changes. [View all releases](https://github.com/krovomi/WorkPilot-AI/releases)
 
 <!-- BETA_VERSION_BADGE -->
-[![Beta](https://img.shields.io/badge/beta-1.0.0--alpha-orange?style=flat-square)](https://github.com/krovomi/WorkPilot-AI/releases/tag/v1.0.0-alpha.1)
+[![Beta](https://img.shields.io/badge/beta-none%20published-lightgrey?style=flat-square)](https://github.com/krovomi/WorkPilot-AI/releases)
 <!-- BETA_VERSION_BADGE_END -->
 
 <!-- BETA_DOWNLOADS -->
-| Platform | Download |
-|----------|----------|
-| **Windows** | [WorkPilot-AI-1.0.0-alpha.1-win32-x64.exe](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-win32-x64.exe) |
-| **macOS (Apple Silicon)** | [WorkPilot-AI-1.0.0-alpha.1-darwin-arm64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-darwin-arm64.dmg) |
-| **macOS (Intel)** | [WorkPilot-AI-1.0.0-alpha.1-darwin-x64.dmg](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-darwin-x64.dmg) |
-| **Linux** | [WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.AppImage](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.AppImage) |
-| **Linux (Debian)** | [WorkPilot-AI-1.0.0-alpha.1-linux-amd64.deb](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-linux-amd64.deb) |
-| **Linux (Flatpak)** | [WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.flatpak](https://github.com/krovomi/WorkPilot-AI/releases/download/v1.0.0-alpha.1/WorkPilot-AI-1.0.0-alpha.1-linux-x86_64.flatpak) |
+_No beta build is currently published. The table above is the latest stable release._
 <!-- BETA_DOWNLOADS_END -->
 
 > All releases include SHA256 checksums and VirusTotal scan results for security verification.
