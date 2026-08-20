@@ -42,6 +42,13 @@ _CRITICAL_PINS: tuple[tuple[str, str, str], ...] = (
         "0.100.0",
         "0.100+ required for Pydantic v2 integration.",
     ),
+    (
+        "aiohttp",
+        "3.10.0",
+        "Imported unconditionally by core/agent_client.py (Copilot / GitHub "
+        "Models) and the Graphiti validators; dropping it makes those paths "
+        "raise ModuleNotFoundError at runtime.",
+    ),
 )
 
 
@@ -74,9 +81,7 @@ def _version_tuple(version: str) -> tuple[int, ...]:
 
 
 @pytest.mark.parametrize(("package", "minimum", "rationale"), _CRITICAL_PINS)
-def test_minimum_version_is_pinned(
-    package: str, minimum: str, rationale: str
-) -> None:
+def test_minimum_version_is_pinned(package: str, minimum: str, rationale: str) -> None:
     """Fail if ``requirements.txt`` loosens below the documented floor.
 
     The rationale is surfaced in the failure message so the maintainer
