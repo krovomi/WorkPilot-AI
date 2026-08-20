@@ -143,12 +143,17 @@ def _is_target_connection(conn, port: int) -> bool:
 
 
 def _process_single_process(proc, port: int) -> bool:
-    """Process a single process and return True if it was killed."""
+    """Process a single process and return True if it was killed.
+
+    Only processes actually LISTENing on ``port`` are candidates. The
+    connection loop used to end in a bare ``continue``, so every process on
+    the machine fell through to the kill decision below — and
+    ``_should_kill_process``'s "orphaned" rule (any python process older than
+    5 minutes when port == 8765) then terminated unrelated interpreters.
+    """
     try:
-        connections = proc.connections()
-        for conn in connections:
-            if not _is_target_connection(conn, port):
-                continue
+        if not any(_is_target_connection(conn, port) for conn in proc.connections()):
+            return False
 
         pid = proc.info["pid"]
         name = proc.info["name"]

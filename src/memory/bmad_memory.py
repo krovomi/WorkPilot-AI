@@ -501,7 +501,7 @@ def create_performance_memory(scenario: str, optimization: str,
                            bmm_workflow: str, quality_score: float) -> PerformanceMemory:
     """Crée une mémoire de performance"""
     pattern_id = hashlib.md5(
-        f"{scenario}{optimization}{datetime.now().isoformat()}".encode()
+        f"{scenario}{optimization}{datetime.now().isoformat()}".encode(), usedforsecurity=False
     ).hexdigest()
     
     return PerformanceMemory(

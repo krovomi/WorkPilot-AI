@@ -187,4 +187,10 @@ async def change_password(
     if not verify_password(identity.password_hash, current_password):
         raise LocalAuthError("Current password is incorrect")
     identity.password_hash = hash_password(new_password)
+    # A password change must invalidate everything minted under the old one:
+    # otherwise a refresh token stolen before the change keeps working for
+    # its full TTL, which defeats the point of changing the password.
+    from server.auth.jwt_tokens import revoke_all_sessions
+
+    await revoke_all_sessions(db, user.id, commit=False)
     await db.commit()

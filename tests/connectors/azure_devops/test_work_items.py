@@ -433,6 +433,30 @@ class TestListBacklogItems:
         # Default types should not appear
         assert "[System.WorkItemType] = 'Task'" not in query
 
+    def test_escapes_quotes_in_project_and_type_names(
+        self,
+        work_items_client,
+        mock_wit_client,
+        sample_wiql_result_empty,
+    ):
+        """Names are WIQL string literals: an apostrophe must be doubled.
+
+        Without escaping, a legitimate project name like "Tom's Project"
+        produces a syntax error, and a caller-supplied name can close the
+        literal and append arbitrary WIQL clauses.
+        """
+        mock_wit_client.query_by_wiql.return_value = sample_wiql_result_empty
+
+        work_items_client.list_backlog_items(
+            "Tom's Project", item_types=["Bug' OR '1'='1"]
+        )
+
+        query = mock_wit_client.query_by_wiql.call_args.kwargs["wiql"].query
+        assert "[System.TeamProject] = 'Tom''s Project'" in query
+        assert "[System.WorkItemType] = 'Bug'' OR ''1''=''1'" in query
+        # The injected clause must not survive as live WIQL.
+        assert "OR '1'='1'" not in query
+
     def test_excludes_closed_done_removed_states(
         self,
         work_items_client,
