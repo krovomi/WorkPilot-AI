@@ -20,9 +20,9 @@
 	"devDependencies": {
 		"@types/react": "^19.2.7",
 		"@types/react-dom": "^19.2.3",
-		"@vitejs/plugin-react": "^5.2.0",
+		"@vitejs/plugin-react": "^6.1.0",
 		"autoprefixer": "^10.4.22",
-		"postcss": "^8.5.13",
+		"postcss": "^8.5.26",
 		"tailwindcss": "^4.1.17",
 		"@tailwindcss/postcss": "^4.1.17",
 		"typescript": "^5.9.3",
