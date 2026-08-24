@@ -632,6 +632,42 @@ python --version  # 3.12+
 claude --version
 ```
 
+### Hooks Git
+
+Les hooks sont volontairement **rapides**. La CI (`ci.yml`, `lint.yml`) rejoue la suite complète sur Linux, Windows et macOS à chaque push sur `main`/`develop` : la redoubler en local coûte plusieurs minutes à chaque commit sans rien garantir de plus.
+
+| Étage | Ce qui tourne | Budget |
+|-------|---------------|--------|
+| `pre-commit` | ruff + biome **sur les fichiers stagés uniquement**, puis les tests liés à ces fichiers | quelques secondes |
+| `pre-push` | ruff check, ruff format --check, biome lint | < 30 s |
+| CI | pytest, typecheck, vitest, build — sur 3 OS | — |
+
+Le typecheck est **incrémental** (`incremental` + `tsBuildInfoFile` dans `apps/frontend/tsconfig.json`) : la première passe reste longue, les suivantes tombent à quelques secondes.
+
+#### Jouer la suite complète en local
+
+```bash
+PRE_PUSH_FULL=1 git push        # ajoute pytest, typecheck et vitest au pre-push
+pnpm run test:all               # ou directement, sans pousser
+```
+
+#### Contourner (dépannage)
+
+| Besoin | Commande |
+|--------|----------|
+| Sauter tous les hooks d'un commit | `git commit --no-verify` |
+| Sauter le pre-push | `git push --no-verify` |
+| Garder le lint, sauter les tests au commit | `PRE_COMMIT_SKIP_TESTS=1 git commit …` |
+| Laisser plus de temps à un check lent | `PRE_PUSH_TIMEOUT_MS=900000 git push` (15 min) |
+| Refuser le push si un check expire | `PRE_PUSH_STRICT=1 git push` |
+
+Chaque job du pre-push a un **timeout** (5 min par défaut) : un check qui part en vrille est tué au lieu de bloquer le push indéfiniment, et un point d'avancement s'affiche toutes les 20 s. Un timeout avertit sans bloquer — la CI reste le garde-fou.
+
+> ⚠️ **Gardez ruff aligné sur la CI** (`ruff==0.15.7`, voir `.github/workflows/lint.yml`). Une version plus récente reformate le code Python contenu dans les blocs ```` ```python ```` des fichiers `.md`, ce qui produit des dizaines de fichiers modifiés sans rapport avec votre travail :
+> ```bash
+> pip install "ruff==0.15.7"
+> ```
+
 ### Dépannage Courant
 
 #### Problèmes d'Installation
