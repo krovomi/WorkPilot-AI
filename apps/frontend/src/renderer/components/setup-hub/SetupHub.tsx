@@ -1,7 +1,6 @@
 import { CheckCircle2, Compass, FolderGit2, Wand2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "../../hooks/use-toast";
-import { useProjectStore } from "../../stores/project-store";
 import { startGuidedTour } from "../guided-tour/guided-tour-store";
 import { buildTodoTour } from "../guided-tour/tour-steps";
 import { Button } from "../ui/button";
@@ -40,7 +39,9 @@ export function SetupHub({
 }: SetupHubProps) {
 	const { t } = useTranslation("setupHub");
 	const status = useSetupStatus();
-	const hasProject = useProjectStore((s) => Boolean(s.selectedProjectId));
+	// Single source of truth for "is a project selected" — also drives what
+	// buildTodoTour() below is allowed to include.
+	const hasProject = status.hasProject;
 
 	const handleConfigure = (deepLink: SetupDeepLink) => {
 		// Close the hub first so the Settings dialog takes focus cleanly.
@@ -100,7 +101,11 @@ export function SetupHub({
 				<FullScreenDialogBody>
 					<ScrollArea className="h-full">
 						<div className="mx-auto w-full max-w-3xl space-y-8 p-6">
-							{status.percent === 100 && (
+							{/* Only celebrate once integrations were actually counted — with
+							    no project yet, percent hits 100% from AI providers alone,
+							    which would misleadingly claim "all done" while a whole
+							    category is still waiting on a project to exist. */}
+							{status.percent === 100 && status.hasProject && (
 								<div className="flex items-start gap-4 rounded-xl border border-success/30 bg-success/10 p-5">
 									<CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-success" />
 									<div>

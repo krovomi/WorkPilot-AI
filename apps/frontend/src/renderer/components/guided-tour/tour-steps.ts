@@ -206,6 +206,13 @@ export function buildTodoTour(status: SetupStatus): GuidedStep[] {
 	const emit = (category: SetupCategory) => {
 		for (const item of category.items) {
 			if (item.state === "done") continue;
+			// Without a resolved project, Settings shows its own "no project"
+			// empty state instead of the integration forms, so these anchors
+			// never mount. Including them here would produce steps whose target
+			// can never be found; the overlay silently auto-skips those after a
+			// timeout, which looks like the tour racing through screens on its
+			// own — exactly what this guards against.
+			if (item.deepLink.kind === "project" && !status.hasProject) continue;
 			const journey =
 				item.id === "providers"
 					? PROVIDERS_JOURNEY
