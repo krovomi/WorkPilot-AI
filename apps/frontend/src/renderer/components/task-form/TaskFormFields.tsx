@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TaskFormFields - Shared form fields component for task create/edit
  *
  * Bundles the common form fields used in both TaskCreationWizard and TaskEditDialog:

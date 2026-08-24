@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Quick test to verify quality_scorer.py is properly encoded"""
 
 import sys

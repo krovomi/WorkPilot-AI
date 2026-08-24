@@ -1,4 +1,4 @@
-﻿"""
+"""
 Quick test to validate self_healing CLI works
 """
 import subprocess

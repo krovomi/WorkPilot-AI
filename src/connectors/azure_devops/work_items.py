@@ -37,6 +37,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_BACKLOG_TYPES = ["Bug", "User Story", "Task"]
 
 
+
+def _wiql_literal(value: str) -> str:
+    """Quote a value for use as a WIQL string literal.
+
+    WIQL escapes a single quote by doubling it. Without this, a project or
+    work-item-type name containing an apostrophe ("Tom's Project") breaks the
+    query, and a caller-supplied name can inject arbitrary WIQL clauses.
+    """
+    return "'" + str(value).replace("'", "''") + "'"
+
+
 class AzureWorkItemsClient:
     """Client for Azure DevOps work item tracking operations.
 
@@ -289,10 +300,10 @@ class AzureWorkItemsClient:
         # so that process-specific/custom types (e.g. EBP's "RSD") are
         # returned and stay findable. Callers can still pass ``item_types``
         # to narrow the result set.
-        where_clauses = [f"[System.TeamProject] = '{project}'"]
+        where_clauses = [f"[System.TeamProject] = {_wiql_literal(project)}"]
         if item_types:
             type_conditions = " OR ".join(
-                f"[System.WorkItemType] = '{wt}'" for wt in item_types
+                f"[System.WorkItemType] = {_wiql_literal(wt)}" for wt in item_types
             )
             where_clauses.append(f"({type_conditions})")
         where_clauses += [

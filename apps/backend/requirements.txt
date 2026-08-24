@@ -18,11 +18,11 @@ secretstorage>=3.5.0; sys_platform == "linux"
 
 # Memory Integration - LadybugDB (embedded graph database)
 # Requires Python 3.12+ (no Docker required); wheels available for 3.14 since 0.15.x
-real_ladybug>=0.14.1; python_version >= "3.12"
+real_ladybug>=0.15.3; python_version >= "3.12"
 graphiti-core>=0.5.0; python_version >= "3.12"
 # pandas is required by real_ladybug for get_as_df() method
 # pandas 2.2.0+ required for pre-built wheels on Python 3.12
-pandas>=3.0.3; python_version >= "3.12"
+pandas>=3.0.5; python_version >= "3.12"
 
 # Windows-specific dependency for LadybugDB/Graphiti
 # pywin32 provides Windows system bindings required by real_ladybug
@@ -50,7 +50,7 @@ bandit>=1.9.4
 # pip-audit for dependency vulnerability scanning (optional but recommended)
 # Install separately: pip install pip-audit
 
-fastapi>=0.100.0
+fastapi>=0.141.1
 uvicorn[standard]>=0.50.2
 slowapi>=0.1.10
 
@@ -61,9 +61,14 @@ aiosqlite>=0.20.0        # SQLite async driver (dev/tests fallback)
 argon2-cffi>=25.1.0      # Password hashing for local accounts
 PyJWT[crypto]>=2.13.0     # JWT access/refresh tokens + Entra ID JWKS validation
 cryptography>=49.0.0     # Fernet encryption for per-user integration secrets
-email-validator>=2.0.0   # pydantic EmailStr support (auth schemas)
+email-validator>=2.3.0   # pydantic EmailStr support (auth schemas)
 requests>=2.34.2
 httpx[http2]>=0.27.0
+# Imported unconditionally by the Copilot / GitHub Models agent client
+# (core/agent_client.py) and by the Graphiti validators + team sync. It was
+# never declared, so those code paths raised ModuleNotFoundError at runtime on
+# any environment that did not happen to pull aiohttp in transitively.
+aiohttp>=3.10.0
 h2>=4.3.0  # HTTP/2 support for Windsurf gRPC proxy
 sqlalchemy>=2.0.0
 psutil>=5.9.0
@@ -76,7 +81,7 @@ anthropic>=0.113.0
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:
 #   playwright install chromium
-playwright>=1.40.0
+playwright>=1.62.0
 
 # Ajout d'une note pour l'installation automatique de uvicorn si absent
 # Pour garantir l'automatisation, il est recommandé d'ajouter uvicorn dans requirements.txt racine ou de documenter l'installation automatique.

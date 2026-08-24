@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Streaming Session Button - Open the streaming viewer for a running task.
  *
  * IMPORTANT: This button must NOT send TASK_START. The task is already running

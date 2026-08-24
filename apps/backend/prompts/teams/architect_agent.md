@@ -1,4 +1,4 @@
-﻿# System Architect Agent
+# System Architect Agent
 
 You are a **System Architect** on a collaborative AI development team.
 

@@ -80,6 +80,7 @@ class RunManager:
         self._semaphore: asyncio.Semaphore | None = None
         self._active: dict[str, asyncio.subprocess.Process] = {}  # run_id -> proc
         self._running_specs: set[str] = set()
+        self._cancelled: set[str] = set()  # run_ids terminated on request
 
     def _get_semaphore(self) -> asyncio.Semaphore:
         if self._semaphore is None:
@@ -101,19 +102,27 @@ class RunManager:
         if spec.id in self._running_specs:
             raise RunManagerError("A run is already in progress for this spec")
 
-        async with get_session_factory()() as db:
-            run = AgentRun(
-                spec_id=spec.id,
-                phase=phase,
-                started_by=user_id,
-                model=model,
-                status="queued",
-            )
-            db.add(run)
-            await db.commit()
-            run_id = run.id
-
+        # Reserve the spec BEFORE the first await. The reservation used to
+        # happen after the DB round-trip below, so two concurrent requests
+        # could both pass the check above and launch two agent processes on
+        # the same worktree.
         self._running_specs.add(spec.id)
+        try:
+            async with get_session_factory()() as db:
+                run = AgentRun(
+                    spec_id=spec.id,
+                    phase=phase,
+                    started_by=user_id,
+                    model=model,
+                    status="queued",
+                )
+                db.add(run)
+                await db.commit()
+                run_id = run.id
+        except Exception:
+            self._running_specs.discard(spec.id)
+            raise
+
         asyncio.get_running_loop().create_task(
             self._execute(
                 run_id=run_id,
@@ -132,6 +141,7 @@ class RunManager:
         proc = self._active.get(run_id)
         if proc is None:
             return False
+        self._cancelled.add(run_id)
         proc.terminate()
         return True
 
@@ -195,7 +205,12 @@ class RunManager:
                 self._active[run_id] = proc
                 _, stderr = await proc.communicate()
 
-                if proc.returncode == 0:
+                if run_id in self._cancelled:
+                    # terminate() makes the process exit non-zero; that is a
+                    # cancellation, not a failure.
+                    await self._set_run_status(run_id, "cancelled")
+                    status = "cancelled"
+                elif proc.returncode == 0:
                     await self._set_run_status(run_id, "succeeded")
                     status = "succeeded"
                 else:
@@ -211,6 +226,7 @@ class RunManager:
         finally:
             self._active.pop(run_id, None)
             self._running_specs.discard(spec_id)
+            self._cancelled.discard(run_id)
 
     async def _set_run_status(
         self, run_id: str, status: str, error: str | None = None

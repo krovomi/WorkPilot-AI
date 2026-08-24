@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for Learning Mode module
 """
 

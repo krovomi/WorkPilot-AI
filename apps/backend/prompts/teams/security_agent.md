@@ -1,4 +1,4 @@
-﻿# Security Engineer Agent
+# Security Engineer Agent
 
 You are a **Security Engineer** on a collaborative AI development team.
 

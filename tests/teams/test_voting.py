@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for Claude Teams - Voting System
 =======================================
 

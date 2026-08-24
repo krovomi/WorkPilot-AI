@@ -3,10 +3,10 @@
 	"version": "1.1.0",
 	"type": "module",
 	"description": "Desktop UI for WorkPilot AI autonomous coding framework",
-	"homepage": "https://github.com/krovomi/WorkPilotAI",
+	"homepage": "https://github.com/krovomi/WorkPilot-AI",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/krovomi/WorkPilotAI.git"
+		"url": "https://github.com/krovomi/WorkPilot-AI.git"
 	},
 	"main": "./out/main/index.js",
 	"author": {
@@ -98,7 +98,7 @@
 		"chokidar": "^5.0.0",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
-		"dompurify": "^3.4.0",
+		"dompurify": "^3.4.6",
 		"dotenv": "^17.2.3",
 		"electron-log": "^5.4.3",
 		"electron-updater": "^6.6.2",
@@ -145,18 +145,18 @@
 		"@vitejs/plugin-react": "^5.2.0",
 		"autoprefixer": "^10.4.22",
 		"cross-env": "^10.1.0",
-		"electron": "41.2.0",
-		"electron-builder": "^26.8.2",
+		"electron": "41.10.6",
+		"electron-builder": "^26.15.3",
 		"electron-vite": "^5.0.0",
 		"husky": "^9.1.7",
 		"jsdom": "^29.0.2",
 		"lint-staged": "^16.2.7",
 		"node-pty": "1.1.0",
-		"postcss": "^8.5.10",
+		"postcss": "^8.5.18",
 		"tailwindcss": "^4.2.2",
 		"typescript": "^5.9.3",
 		"unzipper": "^0.10.14",
-		"vite": "^8.0.8",
+		"vite": "^8.0.16",
 		"vitest": "^4.1.4"
 	},
 	"build": {
@@ -167,7 +167,7 @@
 		"publish": [
 			{
 				"provider": "github",
-				"owner": "tleub-ebp",
+				"owner": "krovomi",
 				"repo": "WorkPilot-AI"
 			}
 		],
@@ -188,6 +188,10 @@
 			{
 				"from": "resources/icon.ico",
 				"to": "icon.ico"
+			},
+			{
+				"from": "resources/icon.png",
+				"to": "icon.png"
 			},
 			{
 				"from": "../backend",

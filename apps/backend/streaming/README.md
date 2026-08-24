@@ -1,4 +1,4 @@
-﻿# Streaming Development Mode
+# Streaming Development Mode
 
 ## Overview
 

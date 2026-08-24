@@ -218,7 +218,7 @@ def _category_for(name: str) -> str:
 
 
 def _source_link(rel_path: str) -> str:
-    return f"https://github.com/tleub-ebp/WorkPilot-AI/blob/develop/{rel_path}"
+    return f"https://github.com/krovomi/WorkPilot-AI/blob/develop/{rel_path}"
 
 
 def _placeholder(reason: str, lang: str) -> str:

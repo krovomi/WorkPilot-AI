@@ -1,4 +1,4 @@
-﻿import { useSortable } from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AlertTriangle, FolderSearch, Settings2 } from "lucide-react";
 import { useRef, useState } from "react";

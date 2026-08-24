@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Fix the encoding issue in quality_scorer.py"""
 
 from pathlib import Path

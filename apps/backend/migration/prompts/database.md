@@ -1,4 +1,4 @@
-﻿# MySQL to PostgreSQL Migration Prompt
+# MySQL to PostgreSQL Migration Prompt
 
 You are an expert database administrator specializing in database migrations.
 

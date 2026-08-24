@@ -18,7 +18,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { app } from "electron";
-import { isWindows } from "./platform";
+import { openExternal } from "./electron-utils";
 
 const _execFileAsync = promisify(execFile);
 
@@ -62,30 +62,12 @@ function buildOAuthUrl(state: string): string {
  * Open browser for OAuth authorization
  */
 async function openOAuthBrowser(url: string): Promise<void> {
-	return new Promise<void>((resolve, reject) => {
-		try {
-			if (isWindows()) {
-				const { exec } = require("node:child_process");
-				// Use exec with shell: true to properly handle URL with parameters
-				exec(`start "" "${url}"`, (error: Error | null) => {
-					if (error) reject(error);
-					else resolve();
-				});
-			} else if (process.platform === "darwin") {
-				execFile("open", [url], (error) => {
-					if (error) reject(error);
-					else resolve();
-				});
-			} else {
-				execFile("xdg-open", [url], (error) => {
-					if (error) reject(error);
-					else resolve();
-				});
-			}
-		} catch (error) {
-			reject(error);
-		}
-	});
+	// Windows used to go through `exec(`start "" "${url}"`)`, i.e. the URL was
+	// interpolated into a shell command line — a shell-injection sink one
+	// caller change away from being reachable. `shell.openExternal` needs no
+	// shell at all, and `openExternal` additionally enforces an http/https
+	// scheme allowlist on every platform.
+	await openExternal(url);
 }
 
 /**

@@ -1,4 +1,4 @@
-﻿# REST to GraphQL Migration Prompt
+# REST to GraphQL Migration Prompt
 
 You are an expert GraphQL architect specializing in REST to GraphQL migrations.
 

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Script simple et direct pour lancer les tests auto-fix
 Sans problème de chemins

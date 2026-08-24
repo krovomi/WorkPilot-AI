@@ -1,4 +1,4 @@
-﻿﻿#!/bin/bash
+#!/bin/bash
 
 #
 # Merge upstream changes from WorkPilot AI into your fork

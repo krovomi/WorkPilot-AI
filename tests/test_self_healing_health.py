@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for Self-Healing Codebase - Health Checker
 =================================================
 """

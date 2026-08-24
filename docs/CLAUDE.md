@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, and validates software for you. It's a monorepo with a Python backend (CLI + agent logic) and an Electron/React frontend (desktop UI).
 
-> **Deep-dive reference:** [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md) | [Architecture Deep Dives](shared_docs/README.md) | **Frontend contributing:** [apps/frontend/CONTRIBUTING.md](apps/frontend/CONTRIBUTING.md)
+> **Deep-dive reference:** [Architecture deep dives](../shared_docs/README.md) | [Configuration reference](../shared_docs/CONFIGURATION.md) | **Frontend contributing:** [apps/frontend/CONTRIBUTING.md](../apps/frontend/CONTRIBUTING.md)
 
 ## Table of Contents
 
@@ -87,11 +87,11 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 
 **No time estimates** — Never provide duration predictions. Use priority-based ordering instead.
 
-**PR target** — Always target the `develop` branch for PRs to tleub-ebp/WorkPilot-AI, NOT `main`.
+**PR target** — Always target the `develop` branch for PRs to krovomi/WorkPilot-AI, NOT `main`.
 
 ## Project Structure
 
-WorkPilot_AI/
+WorkPilot-AI/
 ├── apps/
 │   ├── backend/                      # Python backend/CLI — ALL agent logic
 │   │   ├── core/                     # client.py, auth.py, worktree.py, platform/, workflow_logger.py
@@ -102,7 +102,7 @@ WorkPilot_AI/
 │   │   ├── skills/                   # AI skills system with optimization
 │   │   ├── cli/                      # CLI commands (spec, build, workspace, QA)
 │   │   ├── context/                  # Task context building, semantic search
-│   │   ├── runners/                  # 33 standalone runners (spec, roadmap, insights, github, self-healing, etc.)
+│   │   ├── runners/                  # 66 standalone runners (spec, roadmap, insights, github, self-healing, etc.)
 │   │   ├── services/                 # Background services, recovery orchestration
 │   │   ├── integrations/             # graphiti/, linear, github, windsurf_proxy
 │   │   ├── project/                  # Project analysis, security profiles
@@ -115,13 +115,13 @@ WorkPilot_AI/
 │           │   ├── claude-profile/   # Multi-profile credentials, token refresh, usage
 │           │   ├── terminal/         # PTY daemon, lifecycle, Claude integration
 │           │   ├── platform/         # Cross-platform abstraction
-│           │   ├── ipc-handlers/     # 68 handler modules by domain
+│           │   ├── ipc-handlers/     # 106 handler modules by domain
 │           │   ├── services/         # SDK session recovery, profile service
 │           │   └── changelog/        # Changelog generation and formatting
 │           ├── preload/              # Electron preload scripts (electronAPI bridge)
 │           ├── renderer/             # React UI
 │           │   ├── components/       # UI components (onboarding, settings, task, terminal, github, etc.)
-│           │   ├── stores/           # 60+ Zustand state stores
+│           │   ├── stores/           # 96 Zustand state stores
 │           │   ├── contexts/         # React contexts (ViewStateContext)
 │           │   ├── hooks/            # Custom hooks (useIpc, useTerminal, etc.)
 │           │   ├── styles/           # CSS / Tailwind styles
@@ -135,7 +135,8 @@ WorkPilot_AI/
 ├── src/                              # Shared connectors and utilities
 │   └── connectors/
 │       └── grepai/                   # grepai semantic search integration
-├── guides/                           # Documentation
+├── docs/                             # Documentation (this file, CLI usage, release, security)
+├── shared_docs/                      # Long-form reference (configuration, architecture)
 ├── tests/                            # Backend test suite
 └── scripts/                          # Build and utility scripts
 
@@ -144,7 +145,7 @@ WorkPilot_AI/
 ### Setup
 
 **Prerequisites:**
-- Python 3.8+ with `uv` package manager
+- Python 3.12+ with `uv` package manager
 - Node.js 20+ with `pnpm 8+` package manager
 - Git
 
@@ -160,8 +161,8 @@ cd apps/frontend && pnpm install
 ### Backend
 ```bash
 cd apps/backend
-python spec_runner.py --interactive            # Create spec interactively
-python spec_runner.py --task "description"      # Create from task
+python runners/spec_runner.py --interactive     # Create spec interactively
+python runners/spec_runner.py --task "..."      # Create from task
 python run.py --spec 001                        # Run autonomous build
 python run.py --spec 001 --qa                   # Run QA validation
 python run.py --spec 001 --merge                # Merge completed build
@@ -171,24 +172,24 @@ python run.py --list                            # List all specs
 ### Frontend
 ```bash
 cd apps/frontend
-npm run dev              # Dev mode (Electron + Vite HMR)
-npm run build            # Production build
-npm run test             # Vitest unit tests
-npm run test:watch       # Vitest watch mode
-npm run lint             # Biome check
-npm run lint:fix         # Biome auto-fix
-npm run typecheck        # TypeScript strict check
-npm run package          # Package for distribution
+pnpm run dev             # Dev mode (Electron + Vite HMR)
+pnpm run build           # Production build
+pnpm run test            # Vitest unit tests
+pnpm run test:watch      # Vitest watch mode
+pnpm run lint            # Biome check
+pnpm run lint:fix        # Biome auto-fix
+pnpm run typecheck       # TypeScript strict check
+pnpm run package         # Package for distribution
 ```
 
 ### Testing
 
 | Stack | Command | Tool |
 |-------|---------|------|
-| Backend | `apps/backend/.venv/bin/pytest tests/ -v` | pytest |
-| Frontend unit | `cd apps/frontend && npm test` | Vitest |
-| Frontend E2E | `cd apps/frontend && npm run test:e2e` | Playwright |
-| All backend | `npm run test:backend` (from root) | pytest |
+| Backend | `pytest tests/ -v` (venv: `.venv/bin` on Unix, `.venv/Scripts` on Windows) | pytest |
+| Frontend unit | `cd apps/frontend && pnpm test` | Vitest |
+| Frontend E2E | `cd apps/frontend && pnpm run test:e2e` | Playwright |
+| All backend | `pnpm run test:backend` (from root) | pytest |
 
 ### Releases
 ```bash
@@ -196,7 +197,7 @@ node scripts/bump-version.js patch|minor|major  # Bump version
 git push && gh pr create --base main             # PR to main triggers release
 ```
 
-See [RELEASE.md](RELEASE.md) for full release process.
+See [RELEASE.md](RELEASE.md) for the full release process.
 
 ## Backend Development
 
@@ -231,7 +232,7 @@ Working examples: `agents/planner.py`, `agents/coder.py`, `qa/reviewer.py`, `qa/
 
 ### Agent Prompts (`apps/backend/prompts/`)
 
-37 root-level prompts + 22 GitHub-specific prompts in `prompts/github/`.
+38 root-level prompts + 22 GitHub-specific prompts in `prompts/github/`.
 
 | Category | Prompts |
 |----------|---------|
@@ -251,7 +252,7 @@ Each spec in `.workpilot/specs/XXX-name/` contains: `spec.md`, `requirements.jso
 
 ### Memory System (Graphiti)
 
-Graph-based semantic memory in `integrations/graphiti/`. Configured through the Electron app's onboarding/settings UI (CLI users can alternatively set `GRAPHITI_ENABLED=true` in `.env-files/.env`). See [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md#memory-system) for details.
+Graph-based semantic memory in `integrations/graphiti/`. Configured through the Electron app's onboarding/settings UI (CLI users can alternatively set `GRAPHITI_ENABLED=true` in `.env-files/.env`). See [shared_docs/CONFIGURATION.md](../shared_docs/CONFIGURATION.md) for details.
 
 ### Skills System
 
@@ -313,23 +314,27 @@ active = workflow_logger.get_active_traces()
 
 ### Tech Stack
 
-React 19, TypeScript (strict), Electron 40, Zustand 5, Tailwind CSS v4, Radix UI, xterm.js 6, Vite 7, Vitest 4, Biome 2, Motion (Framer Motion)
+React 19, TypeScript 5.9 (strict), Electron 41, Zustand 5, Tailwind CSS v4, Radix UI, xterm.js 6, Vite 8, Vitest 4, Biome 2, Motion (Framer Motion)
 
 ### Path Aliases (tsconfig.json)
 
-| Alias | Maps to |
-|-------|---------|
-| `@/*` | `src/renderer/*` |
-| `@shared/*` | `src/shared/*` |
-| `@preload/*` | `src/preload/*` |
-| `@features/*` | `src/renderer/features/*` |
-| `@components/*` | `src/renderer/shared/components/*` |
-| `@hooks/*` | `src/renderer/shared/hooks/*` |
-| `@lib/*` | `src/renderer/lib/*` |
+| Alias | Maps to | Usable |
+|-------|---------|--------|
+| `@/*` | `src/renderer/*` | yes |
+| `@shared/*` | `src/shared/*` | yes |
+| `@preload/*` | `src/preload/*` | yes |
+| `@lib/*` | `src/renderer/lib/*` | yes |
+| `@features/*` | `src/renderer/features/*` | **no — target does not exist** |
+| `@components/*` | `src/renderer/shared/components/*` | **no — target does not exist** |
+| `@hooks/*` | `src/renderer/shared/hooks/*` | **no — target does not exist** |
+
+The last three are declared in `tsconfig.json` but point at directories that
+were never created, and no file imports through them. Components live in
+`src/renderer/components/`, hooks in `src/renderer/hooks/`.
 
 ### State Management (Zustand)
 
-60+ stores in `src/renderer/stores/`. Key stores:
+96 stores in `src/renderer/stores/`. Key stores:
 
 - `project-store.ts` — Active project, project list
 - `task-store.ts` — Tasks/specs management
@@ -351,7 +356,7 @@ Main process also has stores: `src/main/project-store.ts`, `src/main/terminal-se
 ### Styling
 
 - **Tailwind CSS v4** with `@tailwindcss/postcss` plugin
-- **7 color themes** (Default, Dusk, Lime, Ocean, Retro, Neo + more) defined in `src/shared/constants/themes.ts`
+- **7 color themes** (Default, Dusk, Lime, Ocean, Retro, Neo, Forest) defined in `src/shared/constants/themes.ts`
 - Each theme has light/dark mode variants via CSS custom properties
 - Utility: `clsx` + `tailwind-merge` via `cn()` helper
 - Component variants: `class-variance-authority` (CVA)
@@ -390,20 +395,20 @@ Full PTY-based terminal integration:
 ## Code Quality
 
 ### Frontend
-- **Linting:** Biome (`npm run lint` / `npm run lint:fix`)
-- **Type checking:** `npm run typecheck` (strict mode)
+- **Linting:** Biome (`pnpm run lint` / `pnpm run lint:fix`)
+- **Type checking:** `pnpm run typecheck` (strict mode)
 - **Pre-commit:** Husky + lint-staged runs Biome on staged `.ts/.tsx/.js/.jsx/.json`
 - **Testing:** Vitest + React Testing Library + jsdom
 
 ### Backend
 - **Linting:** Ruff
-- **Testing:** pytest (`apps/backend/.venv/bin/pytest tests/ -v`)
+- **Testing:** pytest (`pytest tests/ -v` (venv: `.venv/bin` on Unix, `.venv/Scripts` on Windows))
 
 ## i18n Guidelines
 
 All frontend UI text uses `react-i18next`. Translation files: `apps/frontend/src/shared/i18n/locales/{en,fr}/*.json`
 
-55 namespace files per language. Core namespaces: `common`, `navigation`, `settings`, `dialogs`, `tasks`, `errors`, `onboarding`, `welcome`, `analytics`, `appEmulator`, `arena`, `browserAgent`, `dashboard`, `github`, `gitlab`, `ideation`, `insights`, `kanban`, `learningLoop`, `llm`, `multiRepo`, `pairProgramming`, `pixelOffice`, `roadmap`, `selfHealing`, `streaming`, `terminal`, `testGeneration`, `voiceControl`, and more.
+90 namespace files per language. Core namespaces: `common`, `navigation`, `settings`, `dialogs`, `tasks`, `errors`, `onboarding`, `welcome`, `analytics`, `appEmulator`, `arena`, `browserAgent`, `dashboard`, `github`, `gitlab`, `ideation`, `insights`, `kanban`, `learningLoop`, `llm`, `multiRepo`, `pairProgramming`, `pixelOffice`, `roadmap`, `selfHealing`, `streaming`, `terminal`, `testGeneration`, `voiceControl`, and more.
 
 ```tsx
 import { useTranslation } from 'react-i18next';
@@ -431,17 +436,17 @@ Supports Windows, macOS, Linux. CI tests all three.
 | `findExecutable(name)` | Cross-platform executable lookup |
 | `requiresShell(command)` | `.cmd/.bat` shell detection (Win) |
 
-Never hardcode paths. Use `findExecutable()` and `joinPaths()`. See [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md#cross-platform-development) for extended guide.
+Never hardcode paths. Use `findExecutable()` and `joinPaths()`. See [docs/windows-development.md](windows-development.md) for the Windows-specific notes.
 
 ## E2E Testing (Electron MCP)
 
 QA agents can interact with the running Electron app via Chrome DevTools Protocol:
 
-1. Start app: `npm run dev:debug` (debug mode for AI self-validation via Electron MCP)
+1. Start app: `pnpm run dev:debug` (debug mode for AI self-validation via Electron MCP)
 2. Set `ELECTRON_MCP_ENABLED=true` in `.env-files/.env`
 3. Run QA: `python run.py --spec 001 --qa`
 
-Tools: `take_screenshot`, `click_by_text`, `fill_input`, `get_page_structure`, `send_keyboard_shortcut`, `eval`. See [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md#end-to-end-testing) for full capabilities.
+Tools: `take_screenshot`, `click_by_text`, `fill_input`, `get_page_structure`, `send_keyboard_shortcut`, `eval`. 
 
 ## Chrome DevTools MCP
 
@@ -462,8 +467,8 @@ Browser automation via [chrome-devtools-mcp](https://github.com/ChromeDevTools/c
 cd apps/backend && python run.py --spec 001
 
 # Desktop app
-npm start          # Production build + run
-npm run dev        # Development mode with HMR
+pnpm start         # Production build + run
+pnpm run dev       # Development mode with HMR
 
 # Project data: .workpilot/specs/ (gitignored)
 ```
@@ -499,7 +504,7 @@ results = client.search("user authentication flow", top_k=5)
 **Files:**
 - `src/connectors/grepai/client.py` - Python client
 - `src/connectors/grepai/grepai/` - Embedded grepai tool
-- `docs/grepai_integration.md` - Integration guide
+- `src/connectors/grepai/README.md` - Integration guide
 
 ## Troubleshooting
 
@@ -547,6 +552,5 @@ export GRAPHITI_ENABLED=true
 ### Getting Help
 
 - Check `logs/workflow.log` for detailed execution traces
-- Run `python apps/backend/.venv/bin/pytest tests/ -v` for test failures
-- See [guides/](guides/) for detailed setup instructions
-- Check [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md) for system design
+- Run `pytest tests/ -v` from the backend venv for test failures
+- Check [shared_docs/README.md](../shared_docs/README.md) for system design

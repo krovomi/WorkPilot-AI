@@ -1,2 +1,2 @@
-﻿"""Empty __init__.py for teams test package."""
+"""Empty __init__.py for teams test package."""
 

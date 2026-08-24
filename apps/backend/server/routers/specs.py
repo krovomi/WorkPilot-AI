@@ -237,6 +237,12 @@ async def cancel_run(
 
     spec = await _get_spec_or_404(db, project_id, spec_id)
     ensure_can_act_on_spec(spec, user, None)
+    # The run id is a free-form path param: without this check a member of
+    # any project could terminate a run belonging to a project they cannot
+    # see, just by guessing/leaking its id.
+    run = await db.get(AgentRun, run_id)
+    if run is None or run.spec_id != spec_id:
+        raise HTTPException(status_code=404, detail="Run not found for this spec")
     cancelled = await get_run_manager().cancel_run(run_id)
     if cancelled:
         db.add(

@@ -1,4 +1,4 @@
-﻿# Security Module - Feature 8: Security-First Features
+# Security Module - Feature 8: Security-First Features
 
 ## ⚠️ IMPORTANT: This Feature is INCLUDED and NON-OPTIONAL
 

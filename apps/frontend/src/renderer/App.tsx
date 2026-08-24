@@ -1,4 +1,4 @@
-﻿import {
+import {
 	closestCenter,
 	DndContext,
 	type DragEndEvent,
@@ -2073,6 +2073,15 @@ export function App() {
 							}}
 							initialSection={settingsInitialSection}
 							initialProjectSection={settingsInitialProjectSection}
+							// Without this, the dialog falls back to the project store's
+							// `selectedProjectId`, which can be stale/unset even though a
+							// project tab is active (see project-store's loadProjects()).
+							// That produced "Projet non trouvé" whenever Settings — or the
+							// guided tour driving it — opened a project-scoped section, and
+							// since the tour's anchors never mount without a resolved
+							// project, it also auto-skipped every project step with no
+							// element to wait for.
+							initialProjectId={(activeProjectId || selectedProjectId) ?? undefined}
 							onOpenSetupHub={() => {
 								setIsSettingsDialogOpen(false);
 								setSetupHubOpen(true);

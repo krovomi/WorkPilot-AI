@@ -1,4 +1,4 @@
-﻿# Intent-Specific Prompt Templates
+# Intent-Specific Prompt Templates
 
 This directory contains optimized prompt templates for different intent categories.
 

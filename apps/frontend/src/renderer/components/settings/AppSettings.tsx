@@ -620,13 +620,10 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		if (activeTopLevel === "app") {
 			return renderAppSection();
 		}
-		if (!selectedProject) {
-			return (
-				<div style={{ color: "red", padding: "1em" }}>
-					Projet non trouvé: {selectedProjectId}
-				</div>
-			);
-		}
+		// ProjectSettingsContent already renders a proper, translated empty
+		// state when `project` is undefined (first run before any project is
+		// selected, or a stale selection) — no need to special-case it here
+		// with a raw debug message.
 		return (
 			<ProjectSettingsContent
 				project={selectedProject}

@@ -1,4 +1,4 @@
-﻿# React to Vue Component Transformation Prompt
+# React to Vue Component Transformation Prompt
 
 You are an expert JavaScript/TypeScript developer specializing in framework migrations.
 

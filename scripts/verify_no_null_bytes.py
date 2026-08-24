@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Vérifier l'absence de null bytes dans quality_scorer.py"""
 
 from pathlib import Path

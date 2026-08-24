@@ -1,4 +1,4 @@
-﻿# Learning Mode Module
+# Learning Mode Module
 
 > Module pédagogique pour explications en temps réel et onboarding automatisé
 

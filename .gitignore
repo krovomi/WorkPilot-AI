@@ -174,9 +174,16 @@ playwright/.cache/
 *.bak
 *.tmp
 *.temp
+# src/main/__tests__/ipc-handlers.test.ts writes fixtures to ../../tmp,
+# which resolves to the repo root.
+/tmp/
+# electron-vite writes a timestamped config bundle next to the config file.
+apps/frontend/electron.vite.config.*.mjs
 
 # Development
-/docs
+# NOTE: /docs is deliberately NOT ignored. It was, which meant every new file
+# under docs/ was silently dropped from `git add` while the 10 already-tracked
+# ones kept working — a trap, especially now that the README links into docs/.
 dev/
 _bmad/
 _bmad-output/

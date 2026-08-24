@@ -1,4 +1,4 @@
-﻿# 🧬 Self-Healing Codebase
+# 🧬 Self-Healing Codebase
 
 > **Feature #11 from Roadmap - Tier 3** - Autonomous code health monitoring and self-repair
 

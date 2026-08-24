@@ -1,3 +1,75 @@
+// Entities we decode when reading text out of tracker HTML. `amp` lives in
+// the same table as the rest because decoding happens in ONE pass (see
+// `decodeHtmlEntities`) — a chained decode would turn "&amp;lt;" into "<".
+const NAMED_ENTITIES: Readonly<Record<string, string>> = {
+	amp: "&",
+	nbsp: " ",
+	lt: "<",
+	gt: ">",
+	quot: '"',
+	apos: "'",
+	// Accented / typographic characters AzDO emits in French headings.
+	agrave: "à",
+	ccedil: "ç",
+	eacute: "é",
+	egrave: "è",
+	ecirc: "ê",
+	icirc: "î",
+	iuml: "ï",
+	ocirc: "ô",
+	ugrave: "ù",
+	lsquo: "‘",
+	rsquo: "’",
+	ldquo: "“",
+	rdquo: "”",
+	ndash: "–",
+	mdash: "—",
+	hellip: "…",
+};
+
+const HTML_ENTITY = /&(?:#x([0-9a-f]+)|#(\d+)|([a-z][a-z0-9]*));/gi;
+
+function codePointOr(cp: number, fallback: string): string {
+	// Reject out-of-range values instead of letting fromCodePoint throw.
+	return Number.isInteger(cp) && cp >= 0 && cp <= 0x10ffff
+		? String.fromCodePoint(cp)
+		: fallback;
+}
+
+/**
+ * Decode the HTML entities that show up in tracker rich text.
+ *
+ * Single pass on purpose: decoding named and numeric entities in separate
+ * passes lets the output of one become the input of the next, so "&amp;lt;"
+ * would wrongly collapse to "<". Unknown entities are left verbatim.
+ */
+export function decodeHtmlEntities(input: string): string {
+	return input.replace(HTML_ENTITY, (whole, hex, dec, name) => {
+		if (hex !== undefined) return codePointOr(Number.parseInt(hex, 16), whole);
+		if (dec !== undefined) return codePointOr(Number(dec), whole);
+		const decoded = NAMED_ENTITIES[String(name).toLowerCase()];
+		return decoded === undefined ? whole : decoded;
+	});
+}
+
+/**
+ * Strip HTML tags until the result stops changing.
+ *
+ * A single `replace(/<[^>]+>/g, "")` pass is incomplete: on "<<a>script>" it
+ * removes the inner "<a>" and *creates* "<script>" out of the leftovers.
+ * Iterating to a fixed point is what makes the removal total — this is the
+ * defect CodeQL reports as `js/incomplete-multi-character-sanitization`.
+ */
+export function stripHtmlTags(input: string): string {
+	let previous: string;
+	let current = input;
+	do {
+		previous = current;
+		current = current.replace(/<[^>]+>/g, "");
+	} while (current !== previous);
+	return current;
+}
+
 /**
  * Parse acceptance criteria coming from external trackers into the
  * `string[]` shape stored in `TaskMetadata.acceptanceCriteria`.
@@ -10,18 +82,13 @@
 export function parseAcceptanceCriteriaText(raw: string | undefined): string[] {
 	if (!raw) return [];
 
-	let text = raw
-		.replace(/<\s*br\s*\/?>/gi, "\n")
-		.replace(/<\/(?:li|p|div|h[1-6]|tr)>/gi, "\n")
-		.replace(/<[^>]+>/g, "");
-
-	text = text
-		.replaceAll("&nbsp;", " ")
-		.replaceAll("&lt;", "<")
-		.replaceAll("&gt;", ">")
-		.replaceAll("&quot;", '"')
-		.replaceAll("&#39;", "'")
-		.replaceAll("&amp;", "&");
+	const text = decodeHtmlEntities(
+		stripHtmlTags(
+			raw
+				.replace(/<\s*br\s*\/?>/gi, "\n")
+				.replace(/<\/(?:li|p|div|h[1-6]|tr)>/gi, "\n"),
+		),
+	);
 
 	return text
 		.split(/\r?\n/)
@@ -77,8 +144,12 @@ export function stripAcceptanceCriteriaSection(html: string): string {
 	HEADING_BLOCK.lastIndex = 0;
 	let match: RegExpExecArray | null = HEADING_BLOCK.exec(html);
 	while (match !== null) {
-		const innerText = match[1]
-			.replace(/<[^>]+>/g, "")
+		// No DOMParser here: this module is imported by the Electron MAIN
+		// process (project-store.ts, azure-devops-handlers.ts), which is plain
+		// Node — `DOMParser` is undefined there and the call throws at runtime.
+		// The jsdom test env and `"lib": ["DOM"]` both hide that, so it has to
+		// stay DOM-free by construction.
+		const innerText = decodeHtmlEntities(stripHtmlTags(match[1]))
 			.replace(/\s+/g, " ")
 			.trim();
 		if (AC_HEADING_LABELS.some((re) => re.test(innerText))) {

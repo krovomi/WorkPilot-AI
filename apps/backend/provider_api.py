@@ -40,7 +40,7 @@ from typing import Annotated, Any
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import Body, FastAPI, HTTPException, Query, Request
+from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -78,6 +78,38 @@ API_MODELS_ENDPOINT = "/v1/models"
 DEFAULT_HTTP_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
 logger = logging.getLogger(__name__)
+
+
+def _server_mode_active() -> bool:
+    """True when multi-user server mode is running (auth middleware installed)."""
+    try:
+        from server.config import get_settings
+
+        return get_settings().server_mode
+    except Exception:  # noqa: BLE001 — no server config at all == local mode
+        return False
+
+
+def deny_in_server_mode() -> None:
+    """FastAPI dependency: disable the single-user provider-credential surface.
+
+    These endpoints read and write ``~/.work_pilot_ai_llm_providers.json`` — a
+    single process-wide credential store with no tenant scoping, and ``GET``
+    returns ``api_key`` in clear text. That is right for the local desktop app
+    (one user, own machine) and wrong for a shared deployment, where the auth
+    middleware only proves *some* valid bearer token: every member could read
+    and overwrite the deployment's LLM credentials. In server mode the LLM keys
+    live in the server process environment instead (see
+    ``server/services/secrets.py``), so this whole surface is simply off.
+    """
+    if _server_mode_active():
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Provider credentials are managed server-side in server mode; "
+                "this endpoint is disabled."
+            ),
+        )
 
 
 def _safe_error_message(e: Exception) -> str:
@@ -206,11 +238,31 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # --- Multi-user server mode (no-op unless WORKPILOT_SERVER_MODE is enabled) ---
+# SECURITY: this must FAIL CLOSED. `mount_server_mode` is what installs the
+# bearer-token middleware, and it can legitimately raise — e.g. `get_settings()`
+# refuses to build a config when WORKPILOT_SERVER_MODE=1 but WORKPILOT_JWT_SECRET
+# is missing/too short. Swallowing that would boot a *public* server with every
+# multi-user router mounted and no authentication at all, while the operator
+# believes server mode is active. So: only tolerate failures when server mode was
+# not requested in the first place.
+_SERVER_MODE_REQUESTED = os.environ.get(
+    "WORKPILOT_SERVER_MODE", ""
+).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 try:
     from server.integration import mount_server_mode
 
     mount_server_mode(app)
-except Exception as e:  # noqa: BLE001 — never block local-mode boot on this
+except Exception as e:
+    if _SERVER_MODE_REQUESTED:
+        raise RuntimeError(
+            "WORKPILOT_SERVER_MODE is enabled but server mode failed to initialize; "
+            "refusing to start an unauthenticated server."
+        ) from e
     logging.getLogger(__name__).warning("Could not initialize server mode: %s", e)
 
 # Single shared limiter instance (also imported by server.routers.* so all
@@ -233,10 +285,28 @@ _ALLOWED_ORIGINS = [
     "file://",  # Electron file:// protocol
 ]
 
+# There used to be an `allow_origin_regex` of
+# ``^https?://(localhost|127\.0\.0\.1)(:\d+)?$`` here. Combined with
+# ``allow_credentials=True`` that trusted *any* page served from *any* local
+# port — so any other local dev server, or a page a user happened to open from
+# a local static server, could make credentialed calls to this API. The
+# explicit list above already covers the ports WorkPilot itself uses; anything
+# else must be opted into deliberately.
+_EXTRA_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("WORKPILOT_EXTRA_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if _EXTRA_ORIGINS:
+    _ALLOWED_ORIGINS.extend(_EXTRA_ORIGINS)
+    logger.warning(
+        "Extra CORS origins enabled via WORKPILOT_EXTRA_CORS_ORIGINS: %s",
+        ", ".join(_EXTRA_ORIGINS),
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=[
@@ -574,7 +644,7 @@ def get_providers():
     return {"providers": providers, "status": status}
 
 
-@app.get("/providers/configs")
+@app.get("/providers/configs", dependencies=[Depends(deny_in_server_mode)])
 def get_provider_configs():
     return {"configs": list_provider_configs()}
 
@@ -582,6 +652,7 @@ def get_provider_configs():
 @app.get(
     "/providers/config/{provider}",
     responses={404: {"description": PROVIDER_CONFIG_NOT_FOUND}},
+    dependencies=[Depends(deny_in_server_mode)],
 )
 def get_provider_config(provider: str):
     config = load_provider_config(provider) or get_env_provider_config(provider)
@@ -590,13 +661,13 @@ def get_provider_config(provider: str):
     return config
 
 
-@app.post("/providers/config/{provider}")
+@app.post("/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)])
 def set_provider_config(provider: str, config: dict[str, Any]):
     save_provider_config(provider, config)
     return {"status": "ok"}
 
 
-@app.delete("/providers/config/{provider}")
+@app.delete("/providers/config/{provider}", dependencies=[Depends(deny_in_server_mode)])
 def delete_provider_config_api(provider: str):
     delete_provider_config(provider)
     return {"status": "deleted"}

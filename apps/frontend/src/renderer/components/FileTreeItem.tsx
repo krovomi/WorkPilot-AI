@@ -1,4 +1,4 @@
-﻿import {
+import {
 	ChevronDown,
 	ChevronRight,
 	File,

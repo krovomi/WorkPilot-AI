@@ -1,4 +1,4 @@
-﻿# JavaScript/TypeScript to C# (.NET) Transformation Prompt
+# JavaScript/TypeScript to C# (.NET) Transformation Prompt
 
 You are an expert C# developer specializing in JavaScript to C# migrations for .NET applications.
 
