@@ -37,9 +37,15 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "ResolvedPhase",
     "ExecutionProfile",
+    "MissingImpl",
     "resolve_profile",
+    "validate_impls",
     "DETERMINISTIC_PACKS",
+    "BUILTIN_PACKS",
 ]
+
+# Phases implemented by WorkPilot's own Python, not by a skill pack.
+BUILTIN_PACKS = frozenset({"workpilot"})
 
 # Packs whose phases run without an API call. Pruning them by effort saves
 # nothing, so they run at every level.
@@ -173,3 +179,52 @@ def resolve_profile(
         profile.run.append(_degrade(phase, supports_subagents))
 
     return profile
+
+
+@dataclass(frozen=True)
+class MissingImpl:
+    """A phase whose implementation is not installed."""
+
+    phase_id: str
+    impl: str
+    pack: str
+    reason: str
+
+
+def validate_impls(
+    workflow: Workflow, available: dict[str, set[str]]
+) -> list[MissingImpl]:
+    """Report phases whose implementation cannot be found.
+
+    ``available`` maps pack name to the skill names it provides.
+
+    Reported, never fatal. Several packs are vendored on demand, so a fresh
+    clone legitimately has phases it cannot run yet; the answer is to tell the
+    user which bootstrap they are missing, not to refuse to build. Discovering
+    it mid-run, on the other hand, wastes a whole build.
+    """
+    missing: list[MissingImpl] = []
+    for phase in workflow.phases:
+        if phase.pack in BUILTIN_PACKS:
+            continue
+        skills = available.get(phase.pack)
+        if skills is None:
+            missing.append(
+                MissingImpl(
+                    phase.id,
+                    phase.impl,
+                    phase.pack,
+                    f"pack {phase.pack!r} is not installed "
+                    f"(pnpm run skills:bootstrap --pack {phase.pack})",
+                )
+            )
+        elif phase.skill not in skills:
+            missing.append(
+                MissingImpl(
+                    phase.id,
+                    phase.impl,
+                    phase.pack,
+                    f"pack {phase.pack!r} provides no skill named {phase.skill!r}",
+                )
+            )
+    return missing

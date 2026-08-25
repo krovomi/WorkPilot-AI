@@ -239,11 +239,17 @@ def plan_build(
 
 def _lockfile(
     source_root: Path,
+    out_root: Path,
     resolution: Resolution,
     plan: BuildPlan,
     harness_names: list[str],
 ) -> str:
     digests = {s.name: content_hash(s) for s in resolution.selected}
+    # scripts/skills_sync.py records the upstream tree SHA it last observed on
+    # each pack. The build owns the rest of this file, so it has to carry that
+    # field forward -- dropping it would make every sync run report "moved"
+    # and the signal would stop meaning anything.
+    previous_packs = _previous_pack_entries(out_root)
     doc = {
         "lockfileVersion": LOCK_VERSION,
         "note": (
@@ -257,6 +263,11 @@ def _lockfile(
                 "version": pack.version,
                 "source": pack.source,
                 "path": pack.path.relative_to(source_root).as_posix(),
+                **(
+                    {"upstreamTreeSha": sha}
+                    if (sha := previous_packs.get(name, {}).get("upstreamTreeSha"))
+                    else {}
+                ),
             }
             for name, pack in sorted(resolution.packs.items())
         },
@@ -284,6 +295,17 @@ def _lockfile(
         "emitted": sorted(p.as_posix() for p in plan.all_paths()),
     }
     return json.dumps(doc, indent="\t", ensure_ascii=False) + "\n"
+
+
+def _previous_pack_entries(out_root: Path) -> dict[str, dict]:
+    """Pack entries from the existing lockfile, for fields the build does not own."""
+    lock = out_root / LOCKFILE_RELPATH
+    if not lock.is_file():
+        return {}
+    try:
+        return json.loads(lock.read_text(encoding="utf-8")).get("packs") or {}
+    except json.JSONDecodeError:
+        return {}
 
 
 def _previously_emitted(out_root: Path) -> set[Path]:
@@ -320,7 +342,7 @@ def apply_build(
 
     # The lockfile is part of the output, and its `emitted` list must describe
     # the build that produced it — so compute it before deciding what to remove.
-    lock_text = _lockfile(source_root, resolution, plan, harness_names)
+    lock_text = _lockfile(source_root, out_root, resolution, plan, harness_names)
     wanted_files = dict(plan.files)
     wanted_files[LOCKFILE_RELPATH] = lock_text
 

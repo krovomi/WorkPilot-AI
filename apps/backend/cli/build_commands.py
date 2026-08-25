@@ -74,6 +74,24 @@ def _resolve_workflow_profile(spec_dir: Path):
             workflow, effort, provider=_get_active_provider(spec_dir)
         )
         print("\n" + profile.describe())
+
+        # Naming an uninstalled implementation up front beats discovering it
+        # halfway through a build.
+        try:
+            from skills_registry.packs import load_packs
+
+            from workflows import validate_impls
+
+            available = {
+                p.name: {s.name for s in p.skills()}
+                for p in load_packs(repo_root / "skills")
+            }
+            for miss in validate_impls(workflow, available):
+                if profile.will_run(miss.phase_id):
+                    print(f"  ⚠ {miss.phase_id}: {miss.reason}")
+        except Exception as exc:  # noqa: BLE001 - advisory only
+            print(f"  (could not check phase implementations: {exc})")
+
         return profile
     except Exception as exc:  # noqa: BLE001 - never block a build
         print(f"⚠ Workflow engine disabled for this run: {exc}")

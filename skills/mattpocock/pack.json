@@ -1,0 +1,12 @@
+{
+	"name": "mattpocock",
+	"version": "0.0.0",
+	"description": "À la carte engineering skills: grill-me, to-spec, to-tickets, diagnosing-bugs, handoff, code-review.",
+	"targets": {},
+	"source": "mattpocock/skills",
+	"maintainer": "upstream (vendored on demand)",
+	"bootstrap": {
+		"command": ["npx", "--yes", "skills@latest", "add", "mattpocock/skills", "--dir", "skills/mattpocock"],
+		"produces": "skills/mattpocock/.vendored"
+	}
+}

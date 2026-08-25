@@ -1,0 +1,81 @@
+name: Skills Sync
+
+# Watches the upstream skill packs and opens a PR when one moves.
+#
+# Modelled on sync-upstream.yml, with one deliberate difference: this never
+# merges. A skill is an instruction an agent will follow on real code, so a
+# change to one gets read by a person before it ships.
+#
+# The non-regression rule lives here: a breaking upstream change becomes a NEW
+# variant, and the pinned one is left exactly as it was. A project that targets
+# an older toolchain keeps resolving to the skills written for it.
+
+on:
+  schedule:
+    # Monday 08:00 UTC, an hour before sync-upstream so the two do not collide.
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+    inputs:
+      pack:
+        description: 'Only check this pack (blank = all)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: skills-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Check upstream skill packs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: pip install "PyYAML>=6.0"
+
+      - name: Compare upstream tree SHAs
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ONLY_PACK: ${{ inputs.pack }}
+        run: python3 scripts/skills_sync.py --report "$GITHUB_STEP_SUMMARY"
+
+      - name: Open a pull request
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Passed through the environment rather than interpolated into the
+          # script: a summary containing a quote or a newline would otherwise
+          # break out of the shell command.
+          SUMMARY: ${{ steps.check.outputs.summary }}
+        run: |
+          set -euo pipefail
+          branch="skills-sync/$(date +%Y-%m-%d)"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add skills-lock.json skills/
+          printf 'chore(skills): sync upstream packs\n\n%s\n' "$SUMMARY" > /tmp/msg
+          git commit -F /tmp/msg
+          git push -u origin "$branch"
+          {
+            printf 'Opened by the weekly skills sync.\n\n%s\n\n' "$SUMMARY"
+            printf 'Breaking changes create a new variant; pinned variants are untouched.\n'
+            printf 'Review the instruction changes, not just the diff stat: these are\n'
+            printf 'prompts agents will follow on real code.\n'
+          } > /tmp/body
+          gh pr create --base develop \
+            --title "chore(skills): sync upstream packs" \
+            --body-file /tmp/body

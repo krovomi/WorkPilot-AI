@@ -37,6 +37,8 @@ from skills_registry.packs import PackError, load_packs  # noqa: E402
 from skills_registry.project import load_project_config  # noqa: E402
 from skills_registry.resolver import resolve  # noqa: E402
 
+from workflows import WorkflowError  # noqa: E402
+
 SKILLS_ROOT = REPO_ROOT / "skills"
 
 
@@ -134,6 +136,27 @@ def cmd_list(args: argparse.Namespace) -> int:
         print(f"\nnot emitted ({len(resolution.rejected)}):")
         for rej in sorted(resolution.rejected, key=lambda r: (r.gate, r.name)):
             print(f"  [{rej.gate:9}] {rej.name:34} {rej.reason}")
+    return 0
+
+
+def cmd_workflow(args: argparse.Namespace) -> int:
+    """Show how a workflow resolves here, and which phases cannot run yet."""
+    from workflows import load_workflow, resolve_profile, validate_impls
+
+    project_dir = Path(args.project_dir).resolve()
+    path = REPO_ROOT / "workflows" / args.workflow / "workflow.yaml"
+    workflow = load_workflow(path)
+
+    profile = resolve_profile(workflow, args.effort, provider=args.provider)
+    print(profile.describe())
+
+    packs, _ = _load(project_dir)
+    available = {p.name: {s.name for s in p.skills()} for p in packs}
+    missing = validate_impls(workflow, available)
+    if missing:
+        print(f"\n{len(missing)} phase(s) cannot run yet:")
+        for m in missing:
+            print(f"  {m.phase_id:<14} {m.impl:<45} {m.reason}")
     return 0
 
 
@@ -248,6 +271,14 @@ def main(argv: list[str] | None = None) -> int:
     p_boot.add_argument("--dry-run", action="store_true", help="print, do not execute")
     p_boot.set_defaults(func=cmd_bootstrap)
 
+    p_wf = sub.add_parser("workflow", help="show how a workflow resolves here")
+    p_wf.add_argument("workflow", nargs="?", default="feature-build")
+    p_wf.add_argument(
+        "--effort", default="medium", help="none|low|medium|high|ultrathink"
+    )
+    p_wf.add_argument("--provider", help="resolve dispatch against this provider")
+    p_wf.set_defaults(func=cmd_workflow)
+
     p_why = sub.add_parser("why", help="explain one skill's fate")
     p_why.add_argument("skill")
     p_why.set_defaults(func=cmd_why)
@@ -255,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except (PackError, ValueError, FileNotFoundError) as exc:
+    except (PackError, ValueError, FileNotFoundError, WorkflowError) as exc:
         print(f"skills-cli: {exc}", file=sys.stderr)
         return 2
 

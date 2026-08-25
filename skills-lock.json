@@ -9,7 +9,8 @@
 		"bmad": {
 			"version": "6.0.0",
 			"source": "bmad-code-org/BMAD-METHOD",
-			"path": "skills/bmad"
+			"path": "skills/bmad",
+			"upstreamTreeSha": "a515e4e7f82e5ad697cf9c8411a1a7146f5d5a1c"
 		},
 		"comms": {
 			"version": "1.0.0",
@@ -20,6 +21,30 @@
 			"version": "1.0.0",
 			"source": "local",
 			"path": "skills/dotnet"
+		},
+		"impeccable": {
+			"version": "0.0.0",
+			"source": "pbakaus/impeccable",
+			"path": "skills/impeccable",
+			"upstreamTreeSha": "e5721fadc3ef0f9b2386b6f4330ba8490dd451bc"
+		},
+		"mattpocock": {
+			"version": "0.0.0",
+			"source": "mattpocock/skills",
+			"path": "skills/mattpocock",
+			"upstreamTreeSha": "adb0fb8583c232cf40ce43f7283d21f364a6ac4d"
+		},
+		"superpowers": {
+			"version": "0.0.0",
+			"source": "obra/superpowers",
+			"path": "skills/superpowers",
+			"upstreamTreeSha": "21219529a4e224bcb27baf8816b039c8bf7c6673"
+		},
+		"task-observer": {
+			"version": "0.0.0",
+			"source": "rebelytics/one-skill-to-rule-them-all",
+			"path": "skills/task-observer",
+			"upstreamTreeSha": "09c63d51c3e61e91abfbf0d6d05cf99b2d9974ee"
 		},
 		"tooling": {
 			"version": "1.0.0",

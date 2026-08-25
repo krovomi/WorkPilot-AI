@@ -196,6 +196,17 @@ apps/frontend/electron.vite.config.*.mjs
 # ones kept working — a trap, especially now that the README links into docs/.
 dev/
 _bmad/
+# Skill packs vendored on demand by `pnpm run skills:bootstrap`. Only the
+# pack.json manifest is committed -- the content is third-party, has its own
+# release cadence, and is pinned by tree SHA in skills-lock.json instead.
+skills/superpowers/*
+!skills/superpowers/pack.json
+skills/mattpocock/*
+!skills/mattpocock/pack.json
+skills/impeccable/*
+!skills/impeccable/pack.json
+skills/task-observer/*
+!skills/task-observer/pack.json
 _bmad-output/
 .claude/
 /.github/agents

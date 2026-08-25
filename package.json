@@ -35,7 +35,8 @@
 		"skills:check": "python3 scripts/skills_cli.py build --check",
 		"skills:list": "python3 scripts/skills_cli.py list",
 		"skills:why": "python3 scripts/skills_cli.py why",
-		"skills:bootstrap": "python3 scripts/skills_cli.py bootstrap"
+		"skills:bootstrap": "python3 scripts/skills_cli.py bootstrap",
+		"skills:workflow": "python3 scripts/skills_cli.py workflow"
 	},
 	"engines": {
 		"node": ">=20.0.0",

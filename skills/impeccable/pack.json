@@ -1,0 +1,13 @@
+{
+	"name": "impeccable",
+	"version": "0.0.0",
+	"description": "Frontend design guidance: 23 commands plus 59 deterministic detector rules that run locally with no API call.",
+	"targets": {},
+	"source": "pbakaus/impeccable",
+	"maintainer": "upstream (vendored on demand)",
+	"bootstrap": {
+		"command": ["npx", "--yes", "impeccable", "install", "--agent", "agnostic"],
+		"produces": "skills/impeccable/.vendored",
+		"note": "Its `npx impeccable detect --json` is a deterministic gate: no tokens, so the workflow runs it at every effort level and the learning loop can use its verdict as an external verification signal."
+	}
+}
