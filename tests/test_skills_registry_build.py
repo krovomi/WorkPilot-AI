@@ -389,3 +389,118 @@ def test_detection_never_removes_the_default_outputs():
     defaults = {n for n, h in load_harnesses(REPO_ROOT).items() if h.default}
     resolved = set(module._resolve_harnesses("auto", [], REPO_ROOT))
     assert defaults <= resolved
+
+
+# ── one source, N outputs ─────────────────────────────────────────────────────
+
+
+def _emitted_names(out: Path, harness) -> tuple[set[str], set[str]]:
+    """(skills, agents) a harness's output actually offers.
+
+    A TOML-command harness has one flat directory, so the two cannot be told
+    apart from the filesystem — the caller compares their union there.
+    """
+    skills: set[str] = set()
+    agents: set[str] = set()
+    if harness.skills_path:
+        base = out / harness.skills_path
+        skills = (
+            {p.parent.name for p in base.glob("*/SKILL.md")} if base.is_dir() else set()
+        )
+    if harness.agents_path:
+        base = out / harness.agents_path
+        agents = {p.stem for p in base.glob("*.md")} if base.is_dir() else set()
+    if harness.format == "toml-command" and harness.commands_path:
+        base = out / harness.commands_path
+        skills |= {p.stem for p in base.glob("*.toml")} if base.is_dir() else set()
+    return skills, agents
+
+
+def test_every_harness_describes_the_same_set_of_skills(source, tmp_path):
+    """One authored skill becomes N files — never N different sets.
+
+    A mirror that drifts is worse than a missing one: the developer on Cursor
+    and the developer on Gemini disagree about what the project can do, and
+    neither has any reason to suspect it.
+
+    Agents are held to the weaker promise their targets allow: they appear
+    wherever the harness can carry them. Gemini has no subagents, so a persona
+    is degraded to a slash command in the same flat directory as the skills —
+    which is why that harness is compared on the union.
+
+    Run against the repo's real capability matrix rather than the miniature
+    one: the property is about the harnesses actually shipped, and a fixture
+    listing two of them could not catch a third drifting.
+    """
+    import shutil
+
+    from skills_registry.harnesses import load_harnesses
+
+    shutil.copy(
+        REPO_ROOT / "capabilities" / "harnesses.yaml",
+        source / "capabilities" / "harnesses.yaml",
+    )
+    matrix = load_harnesses(REPO_ROOT)
+    harnesses = ["agnostic", "claude-code", "copilot", "cursor", "gemini", "codex"]
+    out = tmp_path / "out"
+    build(source, out, harnesses=harnesses)
+
+    expected_skills = {"hello"}
+    expected_agents = {"greeter"}
+
+    for name in harnesses:
+        harness = matrix[name]
+        skills, agents = _emitted_names(out, harness)
+        if harness.format == "toml-command":
+            assert skills == expected_skills | expected_agents, name
+            continue
+        assert skills == expected_skills, f"{name} offers skills {sorted(skills)}"
+        if harness.agents_path:
+            assert agents == expected_agents, f"{name} offers agents {sorted(agents)}"
+
+
+def test_a_harness_that_cannot_carry_agents_drops_them_rather_than_faking_them(
+    source, tmp_path
+):
+    """Cursor is `modes-only`: there is nowhere honest to put a persona.
+
+    Emitting it into `.cursor/skills/` would present an agent as a skill, and
+    the user would invoke a delegation target as instructions.
+    """
+    import shutil
+
+    shutil.copy(
+        REPO_ROOT / "capabilities" / "harnesses.yaml",
+        source / "capabilities" / "harnesses.yaml",
+    )
+    out = tmp_path / "out"
+    build(source, out, harnesses=["cursor"])
+    assert (out / ".cursor" / "skills" / "hello" / "SKILL.md").is_file()
+    assert not (out / ".cursor" / "skills" / "greeter").exists()
+
+
+def test_the_committed_outputs_of_this_repo_agree():
+    """The same assertion, against what is actually checked in."""
+    agnostic = {
+        p.parent.name for p in (REPO_ROOT / ".agents" / "skills").glob("*/SKILL.md")
+    }
+    gemini = {p.stem for p in (REPO_ROOT / ".gemini" / "commands").glob("*.toml")}
+    assert agnostic, ".agents/skills/ is empty"
+    assert gemini == agnostic, f"gemini mirror has drifted: {agnostic ^ gemini}"
+
+
+def test_the_plugin_marketplace_lists_what_was_emitted():
+    import json
+
+    manifest = json.loads(
+        (REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8")
+    )
+    # Plugin names are namespaced so they do not collide with anyone else's in
+    # a shared marketplace; the pack name is what the lockfile records.
+    listed = {p["name"].removeprefix("workpilot-") for p in manifest.get("plugins", [])}
+    lock = json.loads((REPO_ROOT / "skills-lock.json").read_text(encoding="utf-8"))
+    packs_with_skills = {entry["pack"] for entry in (lock.get("skills") or {}).values()}
+    assert listed >= packs_with_skills, (
+        f"marketplace omits pack(s) that emitted skills: "
+        f"{sorted(packs_with_skills - listed)}"
+    )
