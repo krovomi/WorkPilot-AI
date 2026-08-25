@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, HTTPException, Query
+from skills_registry.frontmatter import parse_frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -67,28 +68,15 @@ def _safe_project_dir(raw: str) -> Path:
     return p
 
 
-def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
-    """Very small YAML-ish frontmatter parser.
+def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
+    """Parse a SKILL.md / command frontmatter block.
 
-    The .claude/commands/*.md files in this repo use a simple
-    `key: value` frontmatter block delimited by `---`. A full YAML
-    parser would be overkill (and would pull in a runtime dep we don't
-    need); we just split the leading block and read `key: value` lines.
+    Delegates to the shared parser so every reader in the repo agrees on what
+    a frontmatter block means. The previous local implementation stripped
+    quotes off the whole value, which truncated any description ending in a
+    quoted phrase -- 32 of the BMAD skills lost their closing quote that way.
     """
-    if not text.startswith("---"):
-        return {}, text
-    end = text.find("\n---", 3)
-    if end == -1:
-        return {}, text
-    header = text[3:end].strip("\n")
-    body = text[end + 4 :].lstrip("\n")
-    meta: dict[str, str] = {}
-    for line in header.splitlines():
-        if ":" not in line:
-            continue
-        k, _, v = line.partition(":")
-        meta[k.strip()] = v.strip().strip('"').strip("'")
-    return meta, body
+    return parse_frontmatter(text)
 
 
 def _scan_commands_dir(dir_path: Path, source: str) -> list[dict[str, Any]]:
