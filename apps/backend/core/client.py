@@ -1291,27 +1291,22 @@ def create_client(
     if output_format:
         options_kwargs["output_format"] = output_format
 
-    # Merge phase-appropriate default subagents with any caller-supplied ones.
-    # Caller wins on key collision so a specific run can override defaults.
-    # The set is chosen by agent_type so the planner doesn't waste context on
-    # QA subagents and vice versa.
+    # Compose the subagent roster: phase defaults, specialised by the detected
+    # language stack, with caller-supplied agents winning on key collision.
+    # The phase split means the planner does not carry QA subagents into its
+    # context, and vice versa; the language layer means a Rust card and a .NET
+    # card no longer get the same generic `test-runner` prompt.
     # See: code.claude.com/docs/en/agent-sdk/subagents
     try:
-        if agent_type in ("qa_reviewer", "qa_fixer", "qa"):
-            from agents.qa_subagents import (
-                merge_with_user_agents as _merge_phase_agents,
-            )
-        elif agent_type in ("planner", "architect"):
-            from agents.planner_subagents import (
-                merge_with_user_agents as _merge_phase_agents,
-            )
-        else:
-            from agents.kanban_subagents import (
-                merge_with_user_agents as _merge_phase_agents,
-            )
+        from agents.subagents import resolve as _resolve_subagents
 
-        _merged_agents = _merge_phase_agents(agents)
-    except Exception:
+        _merged_agents = _resolve_subagents(
+            agent_type, project_dir=project_dir, user_agents=agents
+        )
+    except Exception as exc:
+        # Roster composition must never break client creation; falling back to
+        # exactly what the caller passed preserves the previous behaviour.
+        logger.debug("subagent resolution failed, using caller agents: %s", exc)
         _merged_agents = agents
     if _merged_agents:
         options_kwargs["agents"] = _merged_agents
