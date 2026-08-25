@@ -20,6 +20,18 @@
 #   hooks             path to its hook config, or null
 #   mcp               path to its MCP config, or null
 #   default           whether `skills-cli build` emits it without being asked
+#   tools             canonical tool name -> what this harness calls it
+#
+# The canonical vocabulary is Claude Code's (Read, Write, Edit, Bash, Grep,
+# Glob), because that is what the subagent registry in
+# apps/backend/agents/subagents/ is written in. Emitting an agent definition
+# into another harness means translating those names, or the harness ignores
+# the whole list and hands the agent every tool it has.
+#
+# The maps below are deliberately partial. A canonical name with no entry is
+# emitted unchanged and reported by the build, which is the honest failure:
+# guessing at a name produces a definition that looks right and grants nothing.
+# Adding one is a line of YAML, not a code change.
 
 agnostic:
   skills_path: .agents/skills
@@ -35,6 +47,7 @@ agnostic:
     Read natively by Copilot, Codex, Cursor, Amp and Gemini CLI, and as a
     fallback by OpenCode. Also the source the WorkPilot backend serves to the
     Kanban command palette.
+  tools: {}   # canonical vocabulary; nothing to translate
 
 claude-code:
   skills_path: .claude/skills
@@ -49,6 +62,7 @@ claude-code:
   note: >-
     Disabled by default in this repo because `.claude/` is gitignored, so the
     output would not survive a clone. Enable per-project via skills.toml.
+  tools: {}   # the canonical vocabulary is this harness's own
 
 copilot:
   skills_path: .github/skills
@@ -60,6 +74,15 @@ copilot:
   hooks: .github/hooks
   mcp: .github/mcp.json
   default: false
+  tools:
+    # The vocabulary .github/chatmodes/kanban-expert.chatmode.md already uses
+    # in this repo, which is where these come from rather than from guessing.
+    Read: view
+    Write: create
+    Edit: edit
+    Grep: grep
+    Glob: glob
+    Bash: runCommands
 
 codex:
   skills_path: .agents/skills
@@ -71,7 +94,12 @@ codex:
   hooks: .codex/hooks.json
   mcp: .codex/config.toml
   default: false
-  note: Reads the agnostic skills path directly; only its agents differ.
+  note: >-
+    Reads the agnostic skills path directly; only its agents differ. Its tool
+    vocabulary is not mapped because it is not verified — the canonical names
+    pass through, which is what it would receive anyway. A guess here would
+    produce definitions that look translated and grant nothing.
+  tools: {}
 
 cursor:
   skills_path: .cursor/skills

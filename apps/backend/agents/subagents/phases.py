@@ -7,11 +7,23 @@ definitions and did nothing else; the prompts below are theirs, verbatim.
 
 Selection by phase is deliberate — the planner should not carry QA subagents
 into its context, and vice versa.
+
+Declared as `AgentSpec`, converted on demand
+--------------------------------------------
+The rosters used to be built as `AgentDefinition`s directly, which tied them to
+the Claude SDK being importable and made them unreadable to anything else. They
+are plain data now, and `phase_defaults()` converts them at the point of use.
+
+That is what lets `skills-cli build` emit the same roster into `.github/agents/`
+and `.codex/agents/`: one source, N outputs, the same rule the skills follow.
+A developer driving Copilot directly gets the specialists the pipeline uses
+instead of a different set nobody maintains.
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -26,7 +38,40 @@ except ImportError:  # pragma: no cover
     AgentDefinition = None  # type: ignore[assignment,misc]
     _SDK_AVAILABLE = False
 
-__all__ = ["sdk_available", "phase_defaults", "PHASE_ALIASES"]
+__all__ = [
+    "AgentSpec",
+    "sdk_available",
+    "phase_defaults",
+    "phase_specs",
+    "all_specs",
+    "PHASE_ALIASES",
+]
+
+
+@dataclass(frozen=True)
+class AgentSpec:
+    """One subagent, as data.
+
+    Field names match `AgentDefinition`'s on purpose: converting is a splat,
+    and a reader comparing the two does not have to translate.
+    """
+
+    description: str
+    prompt: str
+    tools: list[str] = field(default_factory=list)
+    model: str | None = None
+
+    def to_definition(self) -> Any:
+        """The SDK object. Caller must have checked `sdk_available()`."""
+        kwargs: dict[str, Any] = {
+            "description": self.description,
+            "prompt": self.prompt,
+            "tools": list(self.tools),
+        }
+        if self.model:
+            kwargs["model"] = self.model
+        return AgentDefinition(**kwargs)
+
 
 # agent_type -> phase. Everything unlisted falls through to "kanban", which is
 # the roster for an ordinary board card.
@@ -43,9 +88,9 @@ def sdk_available() -> bool:
     return _SDK_AVAILABLE and AgentDefinition is not None
 
 
-def _kanban() -> dict[str, Any]:
+def _kanban() -> dict[str, AgentSpec]:
     return {
-        "code-reviewer": AgentDefinition(
+        "code-reviewer": AgentSpec(
             description=(
                 "Read-only code quality and security reviewer. Use for diff "
                 "reviews, PR audits, or any 'check this code before I commit' "
@@ -65,7 +110,7 @@ def _kanban() -> dict[str, Any]:
             tools=["Read", "Grep", "Glob"],
             model="sonnet",
         ),
-        "test-runner": AgentDefinition(
+        "test-runner": AgentSpec(
             description=(
                 "Runs the project's test suite and reports failures with "
                 "actionable detail. Use when a card asks for test execution "
@@ -83,7 +128,7 @@ def _kanban() -> dict[str, Any]:
             ),
             tools=["Bash", "Read", "Grep", "Glob"],
         ),
-        "spec-explorer": AgentDefinition(
+        "spec-explorer": AgentSpec(
             description=(
                 "Surveys a spec/ directory (or any documentation tree) and "
                 "returns a concise structural summary. Use when the parent "
@@ -102,9 +147,9 @@ def _kanban() -> dict[str, Any]:
     }
 
 
-def _planner() -> dict[str, Any]:
+def _planner() -> dict[str, AgentSpec]:
     return {
-        "architecture-analyst": AgentDefinition(
+        "architecture-analyst": AgentSpec(
             description=(
                 "Read-only architecture analyst. Use when the planner needs "
                 "to understand existing module boundaries, dependency graphs, "
@@ -123,7 +168,7 @@ def _planner() -> dict[str, Any]:
             tools=["Read", "Grep", "Glob"],
             model="sonnet",
         ),
-        "dependency-tracer": AgentDefinition(
+        "dependency-tracer": AgentSpec(
             description=(
                 "Traces how a function, class or file is used across the "
                 "codebase. Use when the planner needs blast-radius "
@@ -144,9 +189,9 @@ def _planner() -> dict[str, Any]:
     }
 
 
-def _qa() -> dict[str, Any]:
+def _qa() -> dict[str, AgentSpec]:
     return {
-        "qa-acceptance-checker": AgentDefinition(
+        "qa-acceptance-checker": AgentSpec(
             description=(
                 "Read-only acceptance criteria auditor. Use during qa_reviewer "
                 "to verify each acceptance bullet against the diff without "
@@ -164,7 +209,7 @@ def _qa() -> dict[str, Any]:
             tools=["Read", "Grep", "Glob"],
             model="sonnet",
         ),
-        "qa-test-evidence": AgentDefinition(
+        "qa-test-evidence": AgentSpec(
             description=(
                 "Runs the project's test suite and returns a condensed pass/fail "
                 "report. Use during qa_reviewer to gather evidence without "
@@ -186,9 +231,26 @@ def _qa() -> dict[str, Any]:
 _BUILDERS = {"kanban": _kanban, "planner": _planner, "qa": _qa}
 
 
+def phase_specs(agent_type: str) -> dict[str, AgentSpec]:
+    """The generic roster for ``agent_type``, as data.
+
+    Available with or without the SDK, which is what the build needs: emitting
+    `.github/agents/` must not depend on a Python package the harness in
+    question has nothing to do with.
+    """
+    phase = PHASE_ALIASES.get(agent_type, "kanban")
+    return _BUILDERS[phase]()
+
+
+def all_specs() -> dict[str, dict[str, AgentSpec]]:
+    """Every phase roster, keyed by phase. For the build, not for a run."""
+    return {phase: builder() for phase, builder in _BUILDERS.items()}
+
+
 def phase_defaults(agent_type: str) -> dict[str, Any]:
     """The generic roster for ``agent_type``. Empty when the SDK is absent."""
     if not sdk_available():
         return {}
-    phase = PHASE_ALIASES.get(agent_type, "kanban")
-    return _BUILDERS[phase]()
+    return {
+        name: spec.to_definition() for name, spec in phase_specs(agent_type).items()
+    }

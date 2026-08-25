@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,11 +28,14 @@ from typing import Any
 
 import yaml
 
+from .agents import collect_registry_agents, emit_for_harness
 from .harnesses import load_harnesses
 from .packs import SkillSource
 from .resolver import Resolution
 
 __all__ = ["BuildPlan", "BuildResult", "plan_build", "apply_build", "LOCKFILE_RELPATH"]
+
+logger = logging.getLogger(__name__)
 
 LOCKFILE_RELPATH = Path("skills-lock.json")
 LOCK_VERSION = 1
@@ -50,6 +54,8 @@ class BuildPlan:
     """Text files, relative to the repo root."""
     copies: dict[Path, Path] = field(default_factory=dict)
     """Bundled resources: destination (relative) -> absolute source."""
+    warnings: list[str] = field(default_factory=list)
+    """Advisory, never fatal — things the build did that someone should see."""
 
     def all_paths(self) -> set[Path]:
         return set(self.files) | set(self.copies)
@@ -233,6 +239,23 @@ def plan_build(
                         _emit_gemini_command(src, src.body)
                     )
 
+    # The Python subagent registry, emitted per harness from the same source.
+    # Packs contribute their own `agents/` above; this is the roster the
+    # pipeline itself runs, which until now existed only in Python.
+    registry_agents = collect_registry_agents()
+    for harness in enabled:
+        emission = emit_for_harness(harness, registry_agents)
+        for rel, body in emission.files.items():
+            path = Path(rel)
+            if path in plan.files:
+                # A pack authored an agent of the same name. The pack wins:
+                # it is version-controlled content someone wrote deliberately,
+                # whereas the registry entry is a default.
+                logger.debug("pack agent shadows registry agent at %s", rel)
+                continue
+            plan.files[path] = body
+        plan.warnings.extend(emission.warnings())
+
     plan.files[Path(".claude-plugin") / "marketplace.json"] = _marketplace(resolution)
     return plan
 
@@ -308,6 +331,29 @@ def _previous_pack_entries(out_root: Path) -> dict[str, dict]:
         return {}
 
 
+def _owned_by(rel: Path, roots: set[str]) -> bool:
+    """Whether ``rel`` belongs to one of the harness directories being built.
+
+    The lockfile is always owned — it is rewritten every run. Anything under a
+    directory no enabled harness claims is left alone, because this run has no
+    opinion about it.
+    """
+    if rel == LOCKFILE_RELPATH:
+        return True
+    posix = rel.as_posix()
+    return any(posix == root or posix.startswith(f"{root}/") for root in roots)
+
+
+def _harness_roots(harnesses) -> set[str]:
+    """Every output directory the given harnesses write into."""
+    roots = {".claude-plugin"}
+    for harness in harnesses:
+        for path in (harness.skills_path, harness.agents_path, harness.commands_path):
+            if path:
+                roots.add(path.rstrip("/"))
+    return roots
+
+
 def _previously_emitted(out_root: Path) -> set[Path]:
     lock = out_root / LOCKFILE_RELPATH
     if not lock.is_file():
@@ -339,6 +385,10 @@ def apply_build(
     """
     source_root = source_root or out_root
     result = BuildResult()
+    matrix = load_harnesses(source_root)
+    enabled_paths = _harness_roots(
+        [matrix[h] for h in harness_names if h in matrix] or list(matrix.values())
+    )
 
     # The lockfile is part of the output, and its `emitted` list must describe
     # the build that produced it — so compute it before deciding what to remove.
@@ -346,7 +396,16 @@ def apply_build(
     wanted_files = dict(plan.files)
     wanted_files[LOCKFILE_RELPATH] = lock_text
 
-    stale = _previously_emitted(out_root) - plan.all_paths()
+    # What the build owns and this run did not produce. Scoped to the
+    # harnesses being built: `--harness=copilot` must not delete the agnostic
+    # output, which is the one the backend serves. Before this, a single-
+    # harness build wiped every other harness's files and reported it as
+    # ordinary cleanup.
+    stale = {
+        rel
+        for rel in _previously_emitted(out_root) - plan.all_paths()
+        if _owned_by(rel, enabled_paths)
+    }
 
     for rel, content in sorted(wanted_files.items()):
         dest = out_root / rel

@@ -51,7 +51,8 @@ docs/ shared_docs/     documentation
 | `.agents/skills/<nom>/SKILL.md` | **source lue en production** par la barre de commandes du Kanban, quel que soit le LLM |
 | `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | miroirs par harness |
 | `.gemini/commands/*.toml` | miroir Gemini CLI |
-| `apps/backend/agents/*_subagents.py` | sous-agents SDK, choisis par phase dans `core/client.py` |
+| `apps/backend/agents/subagents/` | **la** source des sous-agents : défauts de phase, overlays langage, spécialistes de PR |
+| `.agents/agents/`, `.github/agents/`, `.codex/agents/` | sorties générées depuis ce registre, noms d'outils traduits par harness |
 
 Le frontmatter d'un skill se lit **toujours** via `skills_registry.frontmatter.parse_frontmatter`.
 Les champs propres à WorkPilot vivent sous `metadata.workpilot` (pack, version, targets,

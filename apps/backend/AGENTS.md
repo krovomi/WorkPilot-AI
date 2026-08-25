@@ -50,6 +50,8 @@ propre dict `agents` : **il gagne sur les défauts**.
 | `skills/skill_manager.py` | chargement progressif des skills Python (`angular/`, `migration/`) |
 | `skills_registry/acquire.py` | `skills-cli add/update/remove` — plan puis apply, testable hors ligne |
 | `skills_registry/upstream.py` | provenance par tree SHA, partagée avec `scripts/skills_sync.py` |
+| `skills_registry/agents.py` | émet le registre de sous-agents vers chaque harness, noms d'outils traduits |
+| `skills_registry/classify.py` | classe une release upstream : non-cassante / potentielle / cassante |
 
 ## Apprentissage et autonomie
 

@@ -11,7 +11,7 @@ that has to be right anyway.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -39,6 +39,29 @@ class Harness:
     mcp: str | None
     default: bool
     note: str = ""
+    tools: dict[str, str] = field(default_factory=dict)
+    """Canonical tool name -> this harness's name for it. Partial by design."""
+
+    def translate_tools(self, tools: list[str]) -> tuple[list[str], list[str]]:
+        """Rename tools for this harness.
+
+        Returns ``(translated, untranslated)``. An unmapped name passes through
+        unchanged and is reported rather than dropped: a definition missing a
+        tool is a subagent that silently cannot do its job, whereas one naming
+        a tool the harness does not know is visibly wrong the first time it
+        runs. Both are bad; only the second is findable.
+        """
+        if not self.tools:
+            return list(tools), []
+        renamed: list[str] = []
+        unknown: list[str] = []
+        for tool in tools:
+            if tool in self.tools:
+                renamed.append(self.tools[tool])
+            else:
+                renamed.append(tool)
+                unknown.append(tool)
+        return renamed, unknown
 
 
 def load_harnesses(repo_root: Path) -> dict[str, Harness]:
@@ -61,6 +84,7 @@ def load_harnesses(repo_root: Path) -> dict[str, Harness]:
             mcp=cfg.get("mcp"),
             default=bool(cfg.get("default", False)),
             note=str(cfg.get("note", "") or ""),
+            tools={str(k): str(v) for k, v in (cfg.get("tools") or {}).items()},
         )
     return out
 

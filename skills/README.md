@@ -90,6 +90,27 @@ canonical output: the WorkPilot backend serves it to the Kanban palette regardle
 which LLM drives the task, and Copilot, Codex, Cursor, Amp and Gemini read it natively.
 The rest are mirrors for tools that only look in their own directory.
 
+It also carries the **tool-name map**. The subagent registry is written in
+Claude Code's vocabulary (`Read`, `Bash`, `Grep`, `Glob`) because that is what
+the SDK takes; Copilot calls those `view` and `runCommands`. A tool list a
+harness cannot match is a tool list it *ignores*, so an untranslated read-only
+reviewer silently receives every tool there is. The maps are partial on
+purpose: an unmapped name is emitted unchanged and reported by the build, which
+beats guessing at one.
+
+## Agents
+
+`apps/backend/agents/subagents/` is the source for the specialists the pipeline
+runs, and `skills-cli build` emits them into every harness that has subagents —
+`.agents/agents/`, `.claude/agents/`, `.github/agents/`, `.codex/agents/`. Same
+rule as the skills: one source, N outputs, `skills:check` fails on drift. Packs
+may also ship their own under `skills/<pack>/agents/`; a pack agent wins over a
+registry one of the same name, because it is content someone wrote deliberately.
+
+A harness with no `agents_path` gets nothing rather than a persona filed as a
+skill — Cursor is `modes-only`, and presenting a delegation target as
+instructions the user should follow is worse than omitting it.
+
 The same matrix answers "which harnesses is this checkout using?" — a harness is present
 when a path only it reads exists (`.claude/settings.local.json`, `.cursor/hooks.json`,
 `.gemini/commands/`). A shared path proves nothing: six of these tools read

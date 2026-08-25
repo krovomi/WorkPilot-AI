@@ -135,6 +135,8 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f"  removed  {rel}")
     if not result.changed:
         print("  (already up to date)")
+    for warning in plan.warnings:
+        print(f"  ⚠ {warning}")
     if resolution.rejected:
         print(
             f"\n  {len(resolution.rejected)} not emitted — `skills:list` explains why"

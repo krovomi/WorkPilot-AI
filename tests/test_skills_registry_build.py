@@ -445,14 +445,22 @@ def test_every_harness_describes_the_same_set_of_skills(source, tmp_path):
     out = tmp_path / "out"
     build(source, out, harnesses=harnesses)
 
+    from skills_registry.agents import collect_registry_agents
+
     expected_skills = {"hello"}
-    expected_agents = {"greeter"}
+    # A harness that can hold agents gets the pack's own plus the Python
+    # registry's — one source, N outputs, applied to agents as well as skills.
+    expected_agents = {"greeter"} | {a.name for a in collect_registry_agents()}
 
     for name in harnesses:
         harness = matrix[name]
         skills, agents = _emitted_names(out, harness)
         if harness.format == "toml-command":
-            assert skills == expected_skills | expected_agents, name
+            # Gemini has no subagents, so a pack persona degrades to a command
+            # in the same flat directory. The registry roster does not: those
+            # are delegation targets, and a harness that cannot delegate has no
+            # honest place for them.
+            assert skills == expected_skills | {"greeter"}, name
             continue
         assert skills == expected_skills, f"{name} offers skills {sorted(skills)}"
         if harness.agents_path:
@@ -504,3 +512,62 @@ def test_the_plugin_marketplace_lists_what_was_emitted():
         f"marketplace omits pack(s) that emitted skills: "
         f"{sorted(packs_with_skills - listed)}"
     )
+
+
+def test_building_one_harness_does_not_delete_another(source, tmp_path):
+    """`--harness=copilot` must leave `.agents/skills/` alone.
+
+    The build owns its `emitted` list and prunes what a run no longer produces,
+    which is right — but scoped to the harnesses that run produced. Without the
+    scoping, asking for one mirror wiped the canonical output the backend
+    serves, and reported it as ordinary cleanup.
+    """
+    import shutil
+
+    shutil.copy(
+        REPO_ROOT / "capabilities" / "harnesses.yaml",
+        source / "capabilities" / "harnesses.yaml",
+    )
+    out = tmp_path / "out"
+    build(source, out, harnesses=["agnostic"])
+    assert (out / ".agents/skills/hello/SKILL.md").is_file()
+
+    result = build(source, out, harnesses=["copilot"])
+    assert (out / ".github/skills/hello/SKILL.md").is_file()
+    assert (out / ".agents/skills/hello/SKILL.md").is_file(), (
+        "a copilot-only build removed the agnostic output"
+    )
+    assert not [r for r in result.removed if ".agents" in str(r)]
+
+
+def test_a_skill_that_stops_resolving_is_still_pruned_within_its_harness(
+    source, tmp_path
+):
+    """Scoping the pruning must not turn it off."""
+    import shutil
+
+    shutil.copy(
+        REPO_ROOT / "capabilities" / "harnesses.yaml",
+        source / "capabilities" / "harnesses.yaml",
+    )
+    out = tmp_path / "out"
+    build(source, out, harnesses=["agnostic"])
+    assert (out / ".agents/skills/hello/SKILL.md").is_file()
+
+    shutil.rmtree(source / "skills" / "demo" / "hello")
+    build(source, out, harnesses=["agnostic"])
+    assert not (out / ".agents/skills/hello/SKILL.md").exists()
+
+
+def test_the_registry_agents_are_part_of_the_build(source, tmp_path):
+    import shutil
+
+    shutil.copy(
+        REPO_ROOT / "capabilities" / "harnesses.yaml",
+        source / "capabilities" / "harnesses.yaml",
+    )
+    out = tmp_path / "out"
+    build(source, out, harnesses=["agnostic"])
+    emitted = {p.stem for p in (out / ".agents" / "agents").glob("*.md")}
+    assert "test-runner" in emitted, "the Python roster did not reach the output"
+    assert "greeter" in emitted, "the pack's own agent was dropped"
