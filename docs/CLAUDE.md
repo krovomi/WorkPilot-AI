@@ -256,33 +256,41 @@ Graph-based semantic memory in `integrations/graphiti/`. Configured through the 
 
 ### Skills System
 
-Advanced AI skills system in `apps/backend/skills/` with token optimization and dynamic context management:
+Skills are markdown files with YAML frontmatter, following the [Agent Skills](https://agentskills.io)
+open standard so the same file works across Claude Code, Copilot, Codex, Cursor and Gemini.
 
-**Key Features:**
-- **Token Optimization:** Compress metadata, limit descriptions to 512 chars, cache operations
-- **Context Management:** Aggressive compaction at 70% limit, checkpoint system
-- **Performance:** Default max_workers=3, timeout=25s, subagent delegation
-- **Dynamic Registration:** Runtime skill validation and registration
+**Where they live:**
 
-**Usage Example:**
+| Path | Role |
+|---|---|
+| `.agents/skills/<name>/SKILL.md` | The source read in production. Provider- and IDE-agnostic. |
+| `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | Per-harness mirrors |
+| `.gemini/commands/*.toml` | Gemini CLI mirror |
+
+`apps/backend/slash_commands/api.py` scans `.agents/skills/` and serves the result to the
+Kanban Quick-Command bar (`GET /api/slash-commands`), then resolves a command's body
+server-side so any provider can execute it.
+
+**Reading frontmatter:** always through `skills_registry.frontmatter.parse_frontmatter`.
+It parses with PyYAML and degrades to a line parser for hand-edited blocks. Do not write
+another one — the repo used to carry four, with divergent semantics, and three of them
+truncated any description ending in a quoted phrase.
+
+WorkPilot-specific fields live under `metadata.workpilot` (pack, version, targets,
+requires, min_effort, provenance) — a free-form space the Agent Skills spec reserves for
+tooling and that Claude Code ignores.
+
+**Python-side skills:** `apps/backend/skills/` holds two executable skills (`angular/`,
+`migration/`) loaded by `skill_manager.py` with progressive disclosure — metadata first,
+instructions on trigger, scripts on demand:
+
 ```python
-from apps.backend.skills.skill_manager import skill_manager
+from skills.skill_manager import SkillManager
 
-# Execute optimized skill
-result = await skill_manager.execute_skill(
-    skill_name="framework-migration",
-    action="analyze",
-    context={"framework": "react", "project_path": "/path/to/project"}
-)
+manager = SkillManager("apps/backend/skills")
+skill = manager.load_skill("framework-migration")
+result = skill.execute_script("analyze_stack.py", {"project-root": "/path/to/project"})
 ```
-
-**Files:**
-- `skill_manager.py` - Main skill orchestration
-- `context_optimizer.py` - Context compaction and checkpoints
-- `token_optimizer.py` - Token counting and compression
-- `dynamic_skill_manager.py` - Runtime skill registration
-
-See `apps/backend/skills/CLAUDE.md` for detailed guidelines.
 
 ### Workflow Logger
 

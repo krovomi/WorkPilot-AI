@@ -70,7 +70,17 @@ lerna-debug.log*
 # ===========================
 # WorkPilot AI Generated
 # ===========================
-.workpilot/
+# Note the trailing /* rather than /: git cannot re-include a file whose
+# parent directory is excluded, so ignoring the directory itself would make the
+# negations below dead letters (which is why the .md files here were previously
+# kept alive by `git add -f`). These four are inputs, not runtime state -- CI
+# must resolve the same skills a developer does, and it cannot do that if the
+# config is not committed.
+.workpilot/*
+!.workpilot/architecture.md
+!.workpilot/conventions.md
+!.workpilot/patterns.md
+!.workpilot/skills.toml
 .planning/
 .planning-archive/
 .auto-build-security.json
@@ -193,7 +203,6 @@ _bmad-output/
 # WorkPilot AI generated files
 .security-key
 logs/security/
-Agents.md
 nul
 
 # ===========================
