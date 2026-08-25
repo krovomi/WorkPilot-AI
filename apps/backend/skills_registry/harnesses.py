@@ -1,4 +1,13 @@
-"""Reading capabilities/harnesses.yaml."""
+"""Reading capabilities/harnesses.yaml, and spotting which harnesses are in use.
+
+The matrix is the single source of truth for where each tool looks. That makes
+detection a consequence of it rather than a second body of knowledge: a harness
+is present when the paths it is declared to read are on disk. `src/hybrid/
+ide_detector.py` used to answer a similar question from 421 lines of regexes
+over process names and environment variables, maintained apart from the matrix
+and already drifted from it — this is the same answer derived from the file
+that has to be right anyway.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +16,12 @@ from pathlib import Path
 
 import yaml
 
-__all__ = ["Harness", "load_harnesses", "HARNESSES_RELPATH"]
+__all__ = [
+    "Harness",
+    "load_harnesses",
+    "detect_harnesses",
+    "HARNESSES_RELPATH",
+]
 
 HARNESSES_RELPATH = Path("capabilities") / "harnesses.yaml"
 
@@ -49,3 +63,40 @@ def load_harnesses(repo_root: Path) -> dict[str, Harness]:
             note=str(cfg.get("note", "") or ""),
         )
     return out
+
+
+def detect_harnesses(project_dir: Path, matrix: dict[str, Harness]) -> list[str]:
+    """Which harnesses this project shows signs of, by name.
+
+    Evidence is a harness-specific directory or config file that exists: its
+    hooks config, its MCP config, its commands directory, or a skills path it
+    does not share with anyone else. Shared paths prove nothing — `.agents/
+    skills/` is read by six of these tools, so its presence is not evidence for
+    any one of them, and treating it as such would report every harness on
+    every repo.
+
+    Returns names in matrix order. An empty list means no evidence, which is
+    the honest answer and is why callers fall back to the declared defaults
+    rather than to a guess.
+    """
+    shared = _shared_paths(matrix)
+    found: list[str] = []
+    for name, harness in matrix.items():
+        candidates = [harness.hooks, harness.mcp, harness.commands_path]
+        if harness.skills_path and harness.skills_path not in shared:
+            candidates.append(harness.skills_path)
+        if harness.agents_path and harness.agents_path not in shared:
+            candidates.append(harness.agents_path)
+        if any(rel and (project_dir / rel).exists() for rel in candidates):
+            found.append(name)
+    return found
+
+
+def _shared_paths(matrix: dict[str, Harness]) -> set[str]:
+    """Paths more than one harness reads, which therefore identify none."""
+    seen: dict[str, int] = {}
+    for harness in matrix.values():
+        for rel in (harness.skills_path, harness.agents_path):
+            if rel:
+                seen[rel] = seen.get(rel, 0) + 1
+    return {rel for rel, count in seen.items() if count > 1}

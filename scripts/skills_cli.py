@@ -42,7 +42,10 @@ from skills_registry.build import (  # noqa: E402
     apply_build,
     plan_build,
 )
-from skills_registry.harnesses import load_harnesses  # noqa: E402
+from skills_registry.harnesses import (  # noqa: E402
+    detect_harnesses,
+    load_harnesses,
+)
 from skills_registry.packs import PackError, load_packs  # noqa: E402
 from skills_registry.project import load_project_config  # noqa: E402
 from skills_registry.resolver import resolve  # noqa: E402
@@ -58,13 +61,27 @@ from workflows import WorkflowError  # noqa: E402
 SKILLS_ROOT = REPO_ROOT / "skills"
 
 
-def _resolve_harnesses(explicit: str | None, config_harnesses: list[str]) -> list[str]:
+def _resolve_harnesses(
+    explicit: str | None, config_harnesses: list[str], project_dir: Path
+) -> list[str]:
+    """Which harness outputs to write, in order of who asked.
+
+    `--harness=auto` writes the mirrors this checkout shows evidence of, on top
+    of the defaults. The defaults are always included: `.agents/skills/` is what
+    the WorkPilot backend serves to the Kanban palette whatever the developer's
+    editor happens to be, so detection can add mirrors and never remove them.
+    """
     matrix = load_harnesses(REPO_ROOT)
-    if explicit:
+    defaults = [name for name, h in matrix.items() if h.default]
+
+    if explicit and explicit != "auto":
         return [h.strip() for h in explicit.split(",") if h.strip()]
+    if explicit == "auto":
+        detected = detect_harnesses(project_dir, matrix)
+        return list(dict.fromkeys(defaults + detected))
     if config_harnesses:
         return config_harnesses
-    return [name for name, h in matrix.items() if h.default]
+    return defaults
 
 
 def _load(project_dir: Path):
@@ -76,7 +93,7 @@ def _load(project_dir: Path):
 def cmd_build(args: argparse.Namespace) -> int:
     project_dir = Path(args.project_dir).resolve()
     packs, config = _load(project_dir)
-    harness_names = _resolve_harnesses(args.harness, config.harnesses)
+    harness_names = _resolve_harnesses(args.harness, config.harnesses, project_dir)
     resolution = resolve(packs, config)
     plan = plan_build(REPO_ROOT, resolution, harness_names)
     # Outputs land in the consuming project; packs are read from this repo.
@@ -454,7 +471,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_build.add_argument(
         "--harness",
-        help="comma-separated harness names (default: those marked default)",
+        help=(
+            "comma-separated harness names, or 'auto' to add the ones this "
+            "checkout shows evidence of (default: those marked default)"
+        ),
     )
     p_build.set_defaults(func=cmd_build)
 

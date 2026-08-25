@@ -306,3 +306,86 @@ class TestRealBmadPack:
             meta, _ = parse_frontmatter(f.read_text(encoding="utf-8"))
             runtime = (workpilot_meta(meta).get("requires") or {}).get("runtime", "")
             assert runtime.startswith("_bmad/"), f"{f.parent.name}: {runtime!r}"
+
+
+# ── harness detection ─────────────────────────────────────────────────────────
+#
+# Replaces `src/hybrid/ide_detector.py`, which answered a similar question from
+# 421 lines of regexes over process names and environment variables, maintained
+# apart from the capability matrix and already drifted from it. Deriving the
+# answer from the matrix means there is one place to be right.
+
+
+def test_a_bare_project_shows_no_harness_evidence(tmp_path: Path):
+    """No evidence is the honest answer; the caller falls back to defaults."""
+    from skills_registry.harnesses import detect_harnesses, load_harnesses
+
+    assert detect_harnesses(tmp_path, load_harnesses(REPO_ROOT)) == []
+
+
+def test_a_shared_skills_path_is_not_evidence_for_anyone(tmp_path: Path):
+    """`.agents/skills/` is read by six of these tools.
+
+    Counting it would report every harness on every repo, which is the same as
+    reporting none while looking authoritative.
+    """
+    from skills_registry.harnesses import detect_harnesses, load_harnesses
+
+    (tmp_path / ".agents" / "skills").mkdir(parents=True)
+    assert detect_harnesses(tmp_path, load_harnesses(REPO_ROOT)) == []
+
+
+@pytest.mark.parametrize(
+    "marker,expected",
+    [
+        (".claude/settings.local.json", "claude-code"),
+        (".github/hooks", "copilot"),
+        (".cursor/hooks.json", "cursor"),
+        (".gemini/commands", "gemini"),
+        (".codex/hooks.json", "codex"),
+    ],
+)
+def test_a_harness_specific_path_identifies_its_harness(
+    tmp_path: Path, marker: str, expected: str
+):
+    from skills_registry.harnesses import detect_harnesses, load_harnesses
+
+    path = tmp_path / marker
+    if path.suffix:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+    else:
+        path.mkdir(parents=True)
+    assert expected in detect_harnesses(tmp_path, load_harnesses(REPO_ROOT))
+
+
+def test_detection_reports_every_harness_in_use(tmp_path: Path):
+    from skills_registry.harnesses import detect_harnesses, load_harnesses
+
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "settings.local.json").write_text("{}", encoding="utf-8")
+    (tmp_path / ".gemini" / "commands").mkdir(parents=True)
+    found = detect_harnesses(tmp_path, load_harnesses(REPO_ROOT))
+    assert set(found) == {"claude-code", "gemini"}
+
+
+def test_detection_never_removes_the_default_outputs():
+    """`--harness=auto` adds mirrors; it must not drop the canonical output.
+
+    `.agents/skills/` is what the backend serves to the Kanban palette whatever
+    editor the developer happens to run, so a build that omitted it because
+    nobody had `.agents/` open would break the product.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "skills_cli", REPO_ROOT / "scripts" / "skills_cli.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    from skills_registry.harnesses import load_harnesses
+
+    defaults = {n for n, h in load_harnesses(REPO_ROOT).items() if h.default}
+    resolved = set(module._resolve_harnesses("auto", [], REPO_ROOT))
+    assert defaults <= resolved

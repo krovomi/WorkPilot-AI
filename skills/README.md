@@ -90,6 +90,18 @@ canonical output: the WorkPilot backend serves it to the Kanban palette regardle
 which LLM drives the task, and Copilot, Codex, Cursor, Amp and Gemini read it natively.
 The rest are mirrors for tools that only look in their own directory.
 
+The same matrix answers "which harnesses is this checkout using?" — a harness is present
+when a path only it reads exists (`.claude/settings.local.json`, `.cursor/hooks.json`,
+`.gemini/commands/`). A shared path proves nothing: six of these tools read
+`.agents/skills/`.
+
+```bash
+python3 scripts/skills_cli.py build --harness=auto   # defaults + whatever is in use
+```
+
+`auto` only ever *adds* mirrors. The defaults are always written, because the backend
+serves them whichever editor the developer happens to have open.
+
 ## Vendored and optional packs
 
 An upstream pack commits its `pack.json` and nothing else. The content is fetched by
