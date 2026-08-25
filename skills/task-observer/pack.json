@@ -6,7 +6,6 @@
 	"source": "rebelytics/one-skill-to-rule-them-all",
 	"maintainer": "upstream (vendored on demand)",
 	"bootstrap": {
-		"command": ["npx", "--yes", "skills@latest", "add", "rebelytics/one-skill-to-rule-them-all", "--dir", "skills/task-observer"],
-		"produces": "skills/task-observer/.vendored"
+		"command": ["npx", "--yes", "skills@latest", "add", "rebelytics/one-skill-to-rule-them-all", "--dir", "skills/task-observer"]
 	}
 }

@@ -36,6 +36,9 @@
 		"skills:list": "python3 scripts/skills_cli.py list",
 		"skills:why": "python3 scripts/skills_cli.py why",
 		"skills:bootstrap": "python3 scripts/skills_cli.py bootstrap",
+		"skills:add": "python3 scripts/skills_cli.py add",
+		"skills:update": "python3 scripts/skills_cli.py update",
+		"skills:remove": "python3 scripts/skills_cli.py remove",
 		"skills:workflow": "python3 scripts/skills_cli.py workflow"
 	},
 	"engines": {

@@ -4,6 +4,8 @@
     pnpm run skills:build          # write every enabled harness output
     pnpm run skills:check          # fail if the outputs are stale (CI gate)
     pnpm run skills:list           # what this project resolves to, and why not
+    pnpm run skills:update         # check vendored packs against upstream
+    python scripts/skills_cli.py add obra/superpowers
     python scripts/skills_cli.py why <skill>
 
 One authored skill in `skills/` becomes N files: `.agents/skills/` (the source
@@ -28,6 +30,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
+from skills_registry.acquire import (  # noqa: E402
+    AcquireError,
+    apply_add,
+    apply_remove,
+    bootstrap_satisfied,
+    plan_add,
+    plan_remove,
+)
 from skills_registry.build import (  # noqa: E402
     apply_build,
     plan_build,
@@ -36,6 +46,12 @@ from skills_registry.harnesses import load_harnesses  # noqa: E402
 from skills_registry.packs import PackError, load_packs  # noqa: E402
 from skills_registry.project import load_project_config  # noqa: E402
 from skills_registry.resolver import resolve  # noqa: E402
+from skills_registry.upstream import (  # noqa: E402
+    LOCKFILE_NAME,
+    fetch_tree_sha,
+    record_shas,
+    recorded_shas,
+)
 
 from workflows import WorkflowError  # noqa: E402
 
@@ -186,10 +202,11 @@ def cmd_bootstrap(args: argparse.Namespace) -> int:
         return 0
 
     failed = False
+    fetched: list[str] = []
     for pack in wanted:
         command = [str(c) for c in pack.bootstrap["command"]]
-        produces = pack.bootstrap.get("produces")
-        if produces and (project_dir / produces).exists() and not args.force:
+        produces = pack.bootstrap.get("produces") or "its skills"
+        if bootstrap_satisfied(project_dir, pack) and not args.force:
             print(
                 f"{pack.name}: {produces} already present — skipping (--force to redo)"
             )
@@ -202,20 +219,191 @@ def cmd_bootstrap(args: argparse.Namespace) -> int:
             continue
         try:
             subprocess.run(command, cwd=project_dir, check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
             print(f"{pack.name}: bootstrap failed — {exc}", file=sys.stderr)
             failed = True
             continue
-        if produces and not (project_dir / produces).exists():
+        if not bootstrap_satisfied(project_dir, pack):
             print(
                 f"{pack.name}: installer finished but {produces} is still missing",
                 file=sys.stderr,
             )
             failed = True
+            continue
+        fetched.append(pack.name)
+
+    # Record what upstream looked like at the moment we vendored it. Without
+    # this the first sync run reports every pack as moved, and a report that is
+    # always positive is a report nobody reads.
+    _record_provenance(fetched)
 
     if not failed and not args.dry_run:
         print("\nRun `pnpm run skills:build` to emit the skills this unlocked.")
     return 1 if failed else 0
+
+
+def _record_provenance(pack_names: list[str]) -> None:
+    """Stamp the current upstream tree SHA for packs we just fetched."""
+    if not pack_names:
+        return
+    by_name = {p.name: p for p in load_packs(SKILLS_ROOT)}
+    observed: dict[str, str] = {}
+    for name in pack_names:
+        pack = by_name.get(name)
+        if not pack or pack.source == "local":
+            continue
+        if sha := fetch_tree_sha(pack.source):
+            observed[name] = sha
+    if observed:
+        record_shas(REPO_ROOT / LOCKFILE_NAME, observed)
+        print(f"  provenance recorded for {', '.join(sorted(observed))}")
+
+
+def cmd_add(args: argparse.Namespace) -> int:
+    """Vendor a pack from upstream and record where it came from.
+
+    Two steps that stay separate on purpose: this writes the manifest, the
+    ignore block and the pin, and `bootstrap` does the fetch. So `add` works
+    offline, and the fetch a fresh clone performs is the same code path as the
+    one here — there is no second way to vendor a pack that could drift.
+    """
+    project_dir = Path(args.project_dir).resolve()
+    plan = plan_add(
+        REPO_ROOT,
+        args.source,
+        name=args.name,
+        description=args.description or "",
+        pin=("" if args.no_pin else args.pin),
+    )
+
+    print("skills-cli add:")
+    print(plan.describe())
+    if args.dry_run:
+        print("\n  (dry run — nothing written)")
+        return 0
+
+    apply_add(REPO_ROOT, plan, project_dir=project_dir)
+    print(f"\nwrote skills/{plan.pack}/pack.json")
+
+    if args.no_fetch:
+        print(f"Run `pnpm run skills:bootstrap --pack {plan.pack}` to fetch it.")
+        return 0
+
+    fetch_args = argparse.Namespace(
+        project_dir=str(project_dir),
+        pack=plan.pack,
+        force=False,
+        dry_run=False,
+    )
+    return cmd_bootstrap(fetch_args)
+
+
+def cmd_update(args: argparse.Namespace) -> int:
+    """Check vendored packs against upstream, and re-fetch the ones that moved.
+
+    Comparison is by tree SHA, so a week in which upstream did not move costs
+    one API call per pack and prints "unchanged". `--check` stops after the
+    report, which is what CI wants; without it the moved packs are re-fetched
+    and their provenance re-stamped.
+
+    A breaking upstream change is not resolved here. `.github/workflows/
+    skills-sync.yml` classifies the diff and opens a pull request that adds a
+    *variant*, leaving the pinned one resolving exactly as before. Overwriting
+    a pack in place is how a project that pinned `dotnet = "^2"` silently ends
+    up on v3.
+    """
+    project_dir = Path(args.project_dir).resolve()
+    packs = [p for p in load_packs(SKILLS_ROOT) if p.source != "local"]
+    if args.pack:
+        packs = [p for p in packs if p.name in args.pack]
+        unknown = set(args.pack) - {p.name for p in packs}
+        if unknown:
+            print(
+                f"skills-cli: no vendored pack named {', '.join(sorted(unknown))}",
+                file=sys.stderr,
+            )
+            return 1
+    if not packs:
+        print("skills-cli: no vendored packs to update.")
+        return 0
+
+    known = recorded_shas(REPO_ROOT / LOCKFILE_NAME)
+    moved: list[str] = []
+    unreachable = 0
+
+    for pack in packs:
+        current = fetch_tree_sha(pack.source)
+        if current is None:
+            print(f"  ?  {pack.name:<16} could not reach {pack.source}")
+            unreachable += 1
+            continue
+        if current == known.get(pack.name, ""):
+            print(f"  =  {pack.name:<16} unchanged ({current[:12]})")
+            continue
+        was = known.get(pack.name, "")[:12] or "not recorded"
+        print(f"  ↑  {pack.name:<16} {was} → {current[:12]}  ({pack.source})")
+        moved.append(pack.name)
+
+    if not moved:
+        print(
+            "\nEverything is at the upstream we recorded."
+            + (f" ({unreachable} unreachable)" if unreachable else "")
+        )
+        return 1 if (args.check and unreachable) else 0
+
+    if args.check:
+        print(f"\n{len(moved)} pack(s) moved upstream. Run `pnpm run skills:update`.")
+        return 1
+
+    print()
+    fetch_args = argparse.Namespace(
+        project_dir=str(project_dir), pack="", force=True, dry_run=False
+    )
+    failed = 0
+    for name in moved:
+        fetch_args.pack = name
+        failed |= cmd_bootstrap(fetch_args)
+    return failed
+
+
+def cmd_remove(args: argparse.Namespace) -> int:
+    """Drop a pack, its ignore block, its pin and its lockfile entry.
+
+    Deletes a directory, so it says what it is about to lose first. A vendored
+    pack is one `add` away from coming back; a locally authored one is not, and
+    that difference decides whether `--yes` is required.
+    """
+    project_dir = Path(args.project_dir).resolve()
+    plan = plan_remove(REPO_ROOT, args.pack)
+
+    print(f"skills-cli remove: {plan.pack}  (source: {plan.source})")
+    print(f"  deletes  {plan.pack_dir.relative_to(REPO_ROOT)}/")
+    if plan.authored_files:
+        print(
+            f"  ⚠ {plan.authored_files} file(s) here are authored, not fetched — "
+            f"deleting them loses work that no `add` brings back"
+        )
+    elif plan.vendored:
+        print("  vendored content only — `skills-cli add` restores it")
+    print(
+        "  also removes its .gitignore block, its skills.toml pin "
+        f"and its {LOCKFILE_NAME} entry"
+    )
+
+    if args.dry_run:
+        print("\n  (dry run — nothing deleted)")
+        return 0
+    if not plan.recoverable and not args.yes:
+        print(
+            "\nRefusing to delete unrecoverable content without --yes.",
+            file=sys.stderr,
+        )
+        return 1
+
+    apply_remove(REPO_ROOT, plan, project_dir=project_dir)
+    print(f"\nremoved skills/{plan.pack}")
+    print("Run `pnpm run skills:build` to drop what it emitted.")
+    return 0
 
 
 def cmd_why(args: argparse.Namespace) -> int:
@@ -283,10 +471,49 @@ def main(argv: list[str] | None = None) -> int:
     p_why.add_argument("skill")
     p_why.set_defaults(func=cmd_why)
 
+    p_add = sub.add_parser("add", help="vendor a pack from upstream")
+    p_add.add_argument("source", help="owner/repo, owner/repo@ref, or a git URL")
+    p_add.add_argument("--name", help="pack name (default: the repo name)")
+    p_add.add_argument("--description", help="what this pack is for")
+    p_add.add_argument(
+        "--pin",
+        default="latest",
+        help="version range for skills.toml (default: latest)",
+    )
+    p_add.add_argument(
+        "--no-pin", action="store_true", help="do not record a pin in skills.toml"
+    )
+    p_add.add_argument(
+        "--no-fetch", action="store_true", help="write the manifest, fetch later"
+    )
+    p_add.add_argument("--dry-run", action="store_true", help="print, write nothing")
+    p_add.set_defaults(func=cmd_add)
+
+    p_up = sub.add_parser("update", help="compare vendored packs with upstream")
+    p_up.add_argument("pack", nargs="*", help="limit to these packs")
+    p_up.add_argument(
+        "--check", action="store_true", help="report drift and exit 1, fetch nothing"
+    )
+    p_up.set_defaults(func=cmd_update)
+
+    p_rm = sub.add_parser("remove", help="drop a pack and everything pointing at it")
+    p_rm.add_argument("pack")
+    p_rm.add_argument(
+        "--yes", action="store_true", help="confirm deleting authored content"
+    )
+    p_rm.add_argument("--dry-run", action="store_true", help="print, delete nothing")
+    p_rm.set_defaults(func=cmd_remove)
+
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except (PackError, ValueError, FileNotFoundError, WorkflowError) as exc:
+    except (
+        AcquireError,
+        PackError,
+        ValueError,
+        FileNotFoundError,
+        WorkflowError,
+    ) as exc:
         print(f"skills-cli: {exc}", file=sys.stderr)
         return 2
 

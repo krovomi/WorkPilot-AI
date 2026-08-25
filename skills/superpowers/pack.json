@@ -7,7 +7,6 @@
 	"maintainer": "upstream (vendored on demand)",
 	"bootstrap": {
 		"command": ["npx", "--yes", "skills@latest", "add", "obra/superpowers", "--dir", "skills/superpowers"],
-		"produces": "skills/superpowers/.vendored",
 		"note": "Fetched on demand rather than committed: it is third-party content with its own release cadence, and the sync workflow tracks its tree SHA in skills-lock.json. Nothing lands in the repo until someone runs skills:bootstrap."
 	}
 }
