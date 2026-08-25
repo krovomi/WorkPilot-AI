@@ -234,3 +234,9 @@ tmp/ipc-handlers-test/userData/store/projects.json
 # Generated security-scan reports (bandit) — must never be committed.
 bandit-report.json
 apps/backend/bandit-report.json
+
+# Per-agent experience ledgers, written by the `observe` phase on every build.
+# The proposals themselves (skills/_proposed/*.md) ARE committed — they are the
+# reviewable diff — and each one embeds the signals and build ids that earned
+# it, so the evidence is in the pull request without the raw tally churning.
+skills/_proposed/_ledgers/

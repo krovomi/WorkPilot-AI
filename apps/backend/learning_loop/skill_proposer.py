@@ -119,7 +119,18 @@ class Evidence:
 
     @property
     def verified_count(self) -> int:
-        return len(self.signals)
+        """How many separate times something external agreed.
+
+        Counted in **builds**, not signals. One run that passed its tests and
+        its QA is two witnesses to a single event, not two events — and the
+        gate is asking whether the lesson held up more than once, which one run
+        cannot answer however many verifiers it satisfied.
+
+        Falls back to the signal count when no build recorded itself, so a
+        caller that has corroboration but no build id is not silently stuck at
+        zero.
+        """
+        return len(set(self.build_ids)) if self.build_ids else len(self.signals)
 
     def add(self, signal: ExternalSignal, build_id: str = "") -> None:
         self.signals.append(signal)
@@ -169,7 +180,7 @@ def evaluate(
         return (
             False,
             RejectionReason.UNVERIFIED,
-            f"{evidence.verified_count} externally verified outcome(s), "
+            f"corroborated on {evidence.verified_count} build(s), "
             f"needs {MIN_VERIFIED_OUTCOMES}. The pattern's own confidence "
             f"({pattern.confidence:.2f}) does not count: it is the agent's "
             f"assessment of the agent.",

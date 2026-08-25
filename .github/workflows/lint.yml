@@ -106,10 +106,15 @@ jobs:
           python-version: '3.12'
 
       - name: Install PyYAML
-        run: pip install "PyYAML>=6.0"
+        run: pip install "PyYAML>=6.0" pytest
 
       - name: Check materialised skills are up to date
         run: python3 scripts/skills_cli.py build --check
+
+      # The gate the learning loop has to pass. Offline: the replay uses a
+      # recorded grader, so this costs no API call and cannot flake on one.
+      - name: Skills evaluation harness
+        run: python3 -m pytest tests/skills_eval/ -q -p no:cacheprovider
 
   # --------------------------------------------------------------------------
   # Gate Job - Single check for branch protection

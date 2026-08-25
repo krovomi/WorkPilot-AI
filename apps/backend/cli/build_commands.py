@@ -98,6 +98,61 @@ def _resolve_workflow_profile(spec_dir: Path):
         return None
 
 
+def _run_observe_phase(
+    spec_dir: Path, *, profile, qa_approved: bool, ran_qa: bool
+) -> None:
+    """Turn what this build externally verified into learning-loop candidates.
+
+    Gated on the profile only for the phase's presence; the phase is declared
+    `always: true`, so in practice it runs whenever the engine is on. Every
+    failure is swallowed: a build that produced working code must not be
+    reported as failed because the bookkeeping afterwards did not work.
+    """
+    if profile is not None and not profile.will_run("observe"):
+        return
+    if profile is None:
+        return
+    try:
+        from learning_loop.observe import BuildOutcome, run_observe
+        from learning_loop.pattern_storage import PatternStorage
+
+        repo_root = Path(__file__).resolve().parents[3]
+        outcome = BuildOutcome(
+            spec_id=spec_dir.name,
+            # QA that did not run is unknown, not passed. Recording a skipped
+            # gate as a clean one manufactures corroboration out of a budget
+            # decision, which is the one thing the external-signal rule exists
+            # to prevent.
+            qa_approved=qa_approved if ran_qa else None,
+            tests_passed=_tests_went_green(spec_dir),
+            workflow=profile.workflow,
+        )
+        patterns = PatternStorage(spec_dir.parent.parent).load_patterns()
+        report = run_observe(repo_root, outcome, patterns)
+        if summary := report.describe():
+            print("\n" + summary)
+    except Exception as exc:  # noqa: BLE001 - observation never fails a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Observe phase skipped: {exc}")
+
+
+def _tests_went_green(spec_dir: Path) -> bool | None:
+    """Whether the QA report recorded a passing test run, or None if unknown."""
+    report = spec_dir / "qa_report.md"
+    if not report.is_file():
+        return None
+    try:
+        text = report.read_text(encoding="utf-8", errors="replace").lower()
+    except OSError:
+        return None
+    if "tests: pass" in text or "all tests passed" in text:
+        return True
+    if "tests: fail" in text or "test failures" in text:
+        return False
+    return None
+
+
 def handle_build_command(
     project_dir: Path,
     spec_dir: Path,
@@ -414,6 +469,14 @@ def handle_build_command(
                     )
                 except Exception:
                     pass  # Best-effort
+
+        # The `observe` phase. Marked `always: true` in the workflow, so it
+        # runs at every effort level — it costs no API call, it only reads what
+        # the verifiers already said. Placed after QA so the QA verdict is one
+        # of the signals it can record.
+        _run_observe_phase(
+            spec_dir, profile=_profile, qa_approved=qa_approved, ran_qa=qa_should_run
+        )
 
         # Post-build finalization (only for isolated sequential mode)
         # This happens AFTER QA validation so the worktree still exists
