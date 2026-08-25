@@ -220,8 +220,8 @@ class IDEDetector:
         # Patterns spécifiques à chaque IDE
         structure_patterns = {
             '.windsurf/workflows/': 'windsurf',
-            '.claude-skills/': 'claude-code',
-            'claude-skills/': 'claude-code',
+            '.claude/skills/': 'claude-code',
+            '.agents/skills/': 'agnostic',
             'node_modules/.bin/claude': 'claude-code',
             '.github/copilot/': 'github-copilot'
         }

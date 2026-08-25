@@ -99,7 +99,7 @@ WorkPilot-AI/
 │   │   ├── agents/                   # planner, coder, session management
 │   │   ├── qa/                       # reviewer, fixer, loop, criteria
 │   │   ├── spec/                     # Spec creation pipeline
-│   │   ├── skills/                   # AI skills system with optimization
+│   │   ├── skills/                   # Executable Python skills (angular, migration)
 │   │   ├── cli/                      # CLI commands (spec, build, workspace, QA)
 │   │   ├── context/                  # Task context building, semantic search
 │   │   ├── runners/                  # 66 standalone runners (spec, roadmap, insights, github, self-healing, etc.)
@@ -553,7 +553,6 @@ export GRAPHITI_ENABLED=true
 ```
 
 **Performance Issues:**
-- Check skill optimization: `python apps/backend/skills/performance_test.py`
 - Monitor workflow logs: `tail -f logs/workflow.log`
 - Reduce concurrent agents in settings
 
