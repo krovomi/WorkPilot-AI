@@ -93,6 +93,11 @@ class ExecutionProfile:
             f"Workflow '{self.workflow}' at effort '{self.effort}'"
             + (f" on {self.provider}" if self.provider else "")
         ]
+        # Width from the actual ids: a fixed pad silently breaks the columns
+        # the first time someone adds a phase with a longer name.
+        ids = [r.id for r in self.run] + [p.id for p, _ in self.skipped]
+        width = max((len(i) for i in ids), default=0)
+
         for resolved in self.run:
             suffix = ""
             if resolved.degraded_from:
@@ -100,14 +105,16 @@ class ExecutionProfile:
             elif resolved.dispatch != "inline":
                 suffix = f"  [{resolved.dispatch}]"
             marker = "!" if resolved.phase.hard_gate else " "
-            lines.append(f"  {marker} {resolved.id:<14} {resolved.phase.impl}{suffix}")
+            lines.append(
+                f"  {marker} {resolved.id:<{width}} {resolved.phase.impl}{suffix}"
+            )
         for phase, why in self.skipped:
             detail = (
                 f"needs effort ≥ {phase.min_effort}"
                 if why == _SKIP_EFFORT
                 else "no matching files changed"
             )
-            lines.append(f"  - {phase.id:<14} skipped ({detail})")
+            lines.append(f"  - {phase.id:<{width}} skipped ({detail})")
         return "\n".join(lines)
 
 

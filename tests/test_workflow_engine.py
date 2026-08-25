@@ -115,6 +115,45 @@ class TestEffortPruning:
         top = resolve_profile(workflow, "ultrathink", changed_files=[])
         assert set(low.phase_ids) < set(top.phase_ids)
 
+    def test_each_level_buys_something_the_one_below_did_not(self, workflow):
+        """The dial has to be monotone *and* strict.
+
+        A top level identical to the one below it is worse than not offering
+        it: the user pays for ultrathink, sees the same plan, and has no way to
+        tell that the setting did nothing.
+        """
+        profiles = [
+            (level, set(resolve_profile(workflow, level, changed_files=[]).phase_ids))
+            for level in EFFORT_ORDER
+        ]
+        for (lower, below), (higher, above) in zip(profiles, profiles[1:]):
+            assert below < above, (
+                f"effort {higher!r} runs the same phases as {lower!r} — "
+                f"the setting buys nothing"
+            )
+
+    def test_the_cheapest_level_runs_only_what_cannot_be_skipped(self, workflow):
+        """Coding, the hard gate, and the near-free observation. Nothing else."""
+        profile = resolve_profile(workflow, "none", changed_files=[])
+        assert set(profile.phase_ids) == {"coding", "verify", "observe"}
+
+    def test_ultrathink_buys_the_second_opinion(self, workflow):
+        """What the top level is for: a reading that did not write the code.
+
+        Both passes run in a fresh context, so neither inherits the reasoning
+        it is supposed to attack.
+        """
+        profile = resolve_profile(workflow, "ultrathink", changed_files=[])
+        assert profile.will_run("adversarial-review")
+        assert profile.will_run("spec-conformance")
+        for phase_id in ("adversarial-review", "spec-conformance"):
+            resolved = next(r for r in profile.run if r.id == phase_id)
+            assert resolved.dispatch == "fresh-context"
+
+        below = resolve_profile(workflow, "high", changed_files=[])
+        assert not below.will_run("adversarial-review")
+        assert not below.will_run("spec-conformance")
+
     def test_expensive_phases_only_appear_where_they_earn_it(self, workflow):
         assert not resolve_profile(workflow, "low", changed_files=[]).will_run(
             "brainstorm"

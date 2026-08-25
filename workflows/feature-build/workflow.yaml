@@ -55,6 +55,30 @@ phases:
     min_effort: low
     description: The existing QA reviewer/fixer loop.
 
+  - id: adversarial-review
+    impl: bmad/bmad-review-adversarial-general
+    min_effort: ultrathink
+    dispatch: fresh-context
+    description: >-
+      A reader whose job is to find what is wrong, not to agree. Only at the
+      top effort level: it is a second full pass over the same code, and the
+      point of paying for ultrathink is buying the pass that disagrees with the
+      first one. Runs in a fresh context so it inherits none of the reasoning
+      it is supposed to attack.
+
+  - id: spec-conformance
+    impl: bmad/bmad-bmm-check-implementation-readiness
+    min_effort: ultrathink
+    dispatch: fresh-context
+    description: >-
+      The second of the two ultrathink readings, and a different question from
+      the one above: not "is this good code" but "is this the thing that was
+      asked for". Green tests are evidence about the tests that exist, not
+      about the acceptance criteria nobody wrote a test for. The
+      `qa-acceptance-checker` subagent does this inside the QA loop; this is
+      the same audit run against the finished branch with nothing else in
+      context.
+
   - id: verify
     impl: superpowers/verification-before-completion
     hard_gate: tests-pass
