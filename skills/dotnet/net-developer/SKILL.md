@@ -1,6 +1,7 @@
 ---
 name: net-developer
 description: Développement .NET moderne (C# 14, ASP.NET Core 10, EF Core 10, Blazor, Azure). À utiliser pour créer, structurer, tester et déployer des applications .NET — APIs REST, microservices, Clean Architecture, DDD, CQRS. Voir aussi le skill net-advanced pour Akka.NET/Aspire/benchmarks/TestContainers.
+paths: "**/*.cs,**/*.csproj,**/*.sln,**/Directory.Build.props"
 ---
 
 # Développeur .NET

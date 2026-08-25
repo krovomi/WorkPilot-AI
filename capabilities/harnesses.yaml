@@ -1,0 +1,110 @@
+# What each coding harness can read, and where it looks.
+#
+# One authored skill in `skills/` is materialised into every enabled harness.
+# The paths below are not guesses: they are the locations these tools document,
+# and they match what multi-harness packs (superpowers, impeccable) write when
+# they install.
+#
+# `agnostic` is the canonical output. It is the one the WorkPilot backend reads
+# (apps/backend/slash_commands/api.py) regardless of which LLM drives the task,
+# and the one the widest set of third-party tools reads natively. The others
+# are mirrors for harnesses that only look in their own directory.
+#
+# Fields:
+#   skills_path       where SKILL.md directories go (null = harness has no skills)
+#   agents_path       where subagent definitions go (null = no subagent support)
+#   commands_path     flat command files, for harnesses that use them
+#   format            skill-dir | toml-command
+#   instruction_file  the file this harness reads for repo-wide rules
+#   subagents         native | modes-only | none
+#   hooks             path to its hook config, or null
+#   mcp               path to its MCP config, or null
+#   default           whether `skills-cli build` emits it without being asked
+
+agnostic:
+  skills_path: .agents/skills
+  agents_path: .agents/agents
+  commands_path: null
+  format: skill-dir
+  instruction_file: AGENTS.md
+  subagents: native
+  hooks: null
+  mcp: null
+  default: true
+  note: >-
+    Read natively by Copilot, Codex, Cursor, Amp and Gemini CLI, and as a
+    fallback by OpenCode. Also the source the WorkPilot backend serves to the
+    Kanban command palette.
+
+claude-code:
+  skills_path: .claude/skills
+  agents_path: .claude/agents
+  commands_path: .claude/commands
+  format: skill-dir
+  instruction_file: CLAUDE.md
+  subagents: native
+  hooks: .claude/settings.local.json
+  mcp: .mcp.json
+  default: false
+  note: >-
+    Disabled by default in this repo because `.claude/` is gitignored, so the
+    output would not survive a clone. Enable per-project via skills.toml.
+
+copilot:
+  skills_path: .github/skills
+  agents_path: .github/agents
+  commands_path: .github/prompts
+  format: skill-dir
+  instruction_file: AGENTS.md
+  subagents: native
+  hooks: .github/hooks
+  mcp: .github/mcp.json
+  default: false
+
+codex:
+  skills_path: .agents/skills
+  agents_path: .codex/agents
+  commands_path: null
+  format: skill-dir
+  instruction_file: AGENTS.md
+  subagents: native
+  hooks: .codex/hooks.json
+  mcp: .codex/config.toml
+  default: false
+  note: Reads the agnostic skills path directly; only its agents differ.
+
+cursor:
+  skills_path: .cursor/skills
+  agents_path: null
+  commands_path: null
+  format: skill-dir
+  instruction_file: AGENTS.md
+  subagents: modes-only
+  hooks: .cursor/hooks.json
+  mcp: .cursor/mcp.json
+  default: false
+
+gemini:
+  skills_path: .agents/skills
+  agents_path: null
+  commands_path: .gemini/commands
+  format: toml-command
+  instruction_file: AGENTS.md
+  subagents: none
+  hooks: null
+  mcp: null
+  default: true
+  note: >-
+    Gemini CLI reads the agnostic skills path, but its slash commands are TOML
+    files. Those are generated here, never hand-edited.
+
+opencode:
+  skills_path: .agents/skills
+  agents_path: null
+  commands_path: null
+  format: skill-dir
+  instruction_file: AGENTS.md
+  subagents: none
+  hooks: null
+  mcp: null
+  default: false

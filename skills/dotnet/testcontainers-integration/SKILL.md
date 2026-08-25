@@ -1,6 +1,7 @@
 ---
 name: testcontainers-integration
 description: Tests d'intégration .NET sur conteneurs Docker réels avec Testcontainers — PostgreSQL, Redis, RabbitMQ, services cloud-native. À utiliser pour tester du code contre de vraies dépendances dans des environnements jetables et isolés, en local comme en CI.
+paths: "**/*.cs,**/*.csproj,**/*.sln,**/Directory.Build.props"
 ---
 
 # Testcontainers — Tests d'Intégration Distribués

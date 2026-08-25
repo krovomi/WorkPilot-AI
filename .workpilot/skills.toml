@@ -1,0 +1,27 @@
+# Which skills this repository itself gets, and from where.
+#
+# `skills-cli` reads this to resolve `skills/` into `.agents/skills/` and the
+# harness mirrors. Run `pnpm run skills:build` after editing, and commit the
+# result -- CI runs `pnpm run skills:check` and fails on drift.
+#
+#   pnpm run skills:list      what resolves here, and why the rest does not
+
+[targets]
+# Toolchain versions this repo is on. Anything omitted is detected from the
+# files on disk (package.json engines, .nvmrc, pyproject, go.mod, Cargo.toml).
+# Declared explicitly here because detection only looks at the repo root, and
+# the Python side of this monorepo lives under apps/backend.
+node = "20.0.0"
+python = "3.13"
+
+[packs]
+# Pin a pack to a semver range to stay on it while newer ones ship.
+# Unpinned packs always resolve to whatever is in `skills/`.
+comms = "^1"
+tooling = "^1"
+# The `dotnet` pack is authored here for consumer projects; this repo is
+# Python + TypeScript, so its skills correctly resolve away. Nothing to pin.
+
+# Harnesses to materialise. Omit to use the defaults from
+# capabilities/harnesses.yaml (agnostic + gemini).
+# harnesses = ["agnostic", "gemini", "copilot"]

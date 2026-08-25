@@ -1,6 +1,7 @@
 ---
 name: akka-net-patterns
 description: Systèmes distribués Akka.NET — acteurs, supervision, clustering, persistence (event sourcing) et Akka.Streams. À utiliser pour concevoir des applications .NET scalables et résilientes à base d'acteurs, du clustering ou du stream processing avec back-pressure.
+paths: "**/*.cs,**/*.csproj,**/*.sln,**/Directory.Build.props"
 ---
 
 # Akka.NET — Systèmes Distribués Résilients

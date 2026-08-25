@@ -1,6 +1,7 @@
 ---
 name: net-advanced
 description: Expertise .NET 10 avancée — systèmes distribués, performance et cloud-native. Routeur vers les skills spécialisés Akka.NET, Aspire, BenchmarkDotNet et TestContainers, plus les patterns C# 14 transverses. À utiliser pour des choix d'architecture distribuée, d'optimisation mémoire ou de stratégie de test d'intégration.
+paths: "**/*.cs,**/*.csproj,**/*.sln,**/Directory.Build.props"
 ---
 
 # .NET 10 — Expertise Avancée

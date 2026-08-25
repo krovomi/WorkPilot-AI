@@ -1,6 +1,7 @@
 ---
 name: benchmark-dotnet
 description: Mesure et optimisation de performance .NET avec BenchmarkDotNet — micro-benchmarks, profiling mémoire/allocations, détection de régression et gates CI/CD. À utiliser pour écrire des benchmarks fiables, interpréter les résultats ou comparer des implémentations.
+paths: "**/*.cs,**/*.csproj,**/*.sln,**/Directory.Build.props"
 ---
 
 # BenchmarkDotNet — Performance & Optimisation

@@ -1,6 +1,7 @@
 ---
 name: aspire-orchestration
 description: Orchestration cloud-native .NET Aspire — applications distribuées, microservices, conteneurs, service discovery et observabilité (OpenTelemetry, health checks). À utiliser pour composer un AppHost Aspire, câbler des dépendances (Postgres/Redis/RabbitMQ) ou instrumenter des services distribués.
+paths: "**/*.cs,**/*.csproj,**/*.sln,**/Directory.Build.props"
 ---
 
 # .NET Aspire — Orchestration Cloud-Native
