@@ -49,6 +49,37 @@ from .input_handlers import (
 )
 
 
+def _resolve_workflow_profile(spec_dir: Path):
+    """Resolve the declarative workflow for this build, or None when disabled.
+
+    Gated on WORKPILOT_WORKFLOW_ENGINE=1. Every failure degrades to None, which
+    is exactly the previous behaviour: the workflow shapes the run, it must
+    never be able to stop one.
+    """
+    import os
+
+    if os.environ.get("WORKPILOT_WORKFLOW_ENGINE") != "1":
+        return None
+    try:
+        from core.client import _get_active_provider
+        from phase_config import get_phase_thinking
+
+        from workflows import load_workflow, resolve_profile
+
+        repo_root = Path(__file__).resolve().parents[3]
+        workflow_path = repo_root / "workflows" / "feature-build" / "workflow.yaml"
+        workflow = load_workflow(workflow_path)
+        effort = get_phase_thinking(spec_dir, "coding")
+        profile = resolve_profile(
+            workflow, effort, provider=_get_active_provider(spec_dir)
+        )
+        print("\n" + profile.describe())
+        return profile
+    except Exception as exc:  # noqa: BLE001 - never block a build
+        print(f"⚠ Workflow engine disabled for this run: {exc}")
+        return None
+
+
 def handle_build_command(
     project_dir: Path,
     spec_dir: Path,
@@ -105,6 +136,13 @@ def handle_build_command(
     planning_model = get_phase_model(spec_dir, "planning", model)
     coding_model = get_phase_model(spec_dir, "coding", model)
     qa_model = get_phase_model(spec_dir, "qa", model)
+
+    # Resolve the declarative workflow, when it is switched on. It decides
+    # which phases this effort level and provider actually buy; the hard-coded
+    # sequence below stays the execution path. Opt-in until the golden profiles
+    # have run against real builds — this function is the entry point of every
+    # build in the product.
+    _profile = _resolve_workflow_profile(spec_dir)
 
     print_banner()
     print(f"\nProject directory: {project_dir}")
@@ -287,6 +325,15 @@ def handle_build_command(
         # QA must sign off before the build is considered complete
         qa_approved = True  # Default to approved if QA is skipped
         qa_should_run = not skip_qa and should_run_qa(spec_dir)
+        if _profile is not None and qa_should_run and not _profile.will_run("qa"):
+            # The workflow says this effort level does not buy a QA pass.
+            # `skip_qa` and should_run_qa() still win when either says no —
+            # the profile can remove a phase, never add one back.
+            print(
+                f"\n⏭  QA skipped — workflow '{_profile.workflow}' does not run it "
+                f"at effort '{_profile.effort}'."
+            )
+            qa_should_run = False
         if qa_should_run:
             print("\n" + "=" * 70)
             print("  SUBTASKS COMPLETE - STARTING QA VALIDATION")
