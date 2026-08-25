@@ -93,8 +93,15 @@ def _specialise_test_runner(base: Any, overlays: list[LanguageOverlay]) -> Any:
             tools=base.tools,
             model=getattr(base, "model", None) or "inherit",
         )
-    except Exception as exc:  # pragma: no cover - never break the roster
-        logger.debug("could not specialise test-runner: %s", exc)
+    except Exception as exc:  # never break the roster
+        # Warning, not debug: the run continues with a generic test-runner,
+        # which still works but has to rediscover the framework every time.
+        # A silent downgrade is how you end up wondering why the roster stopped
+        # helping.
+        logger.warning(
+            "could not specialise test-runner, falling back to the generic prompt: %s",
+            exc,
+        )
         return base
 
 

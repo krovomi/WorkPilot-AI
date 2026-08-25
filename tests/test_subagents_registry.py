@@ -225,3 +225,85 @@ class TestDotnetDetection:
         assert "dotnet" in {
             o.language for o in overlays_for(detect_languages(tmp_path))
         }
+
+
+class TestPRReviewRoster:
+    """The sixth roster, moved out of the runner that used to declare it.
+
+    `parallel_orchestrator_reviewer.py` built these inline — the fourth place
+    in the repo where subagents were defined, and the only one the registry
+    could not see.
+    """
+
+    @staticmethod
+    def _build():
+        from agents.subagents.pr_review import pr_review_agents
+
+        return pr_review_agents(
+            lambda name: f"PROMPT BODY for {name}",
+            lambda prompt, fallback: f"[wd] {prompt or fallback}",
+        )
+
+    def test_every_specialist_is_present(self):
+        from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
+
+        assert {s.name for s in PR_REVIEW_SPECIALISTS} == {
+            "security-reviewer",
+            "quality-reviewer",
+            "logic-reviewer",
+            "codebase-fit-reviewer",
+            "ai-triage-reviewer",
+            "finding-validator",
+        }
+
+    def test_the_roster_matches_the_specs(self):
+        from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
+
+        roster = self._build()
+        assert set(roster) == {s.name for s in PR_REVIEW_SPECIALISTS}
+
+    def test_reviewers_cannot_write(self):
+        """A reviewer that can edit the code it reviews stops being one."""
+        for name, agent in self._build().items():
+            assert set(agent.tools) == {"Read", "Grep", "Glob"}, name
+
+    def test_every_prompt_carries_the_working_directory(self):
+        """A subagent does not inherit the parent's cwd, so it must be told."""
+        for name, agent in self._build().items():
+            assert agent.prompt.startswith("[wd] "), name
+
+    def test_a_missing_prompt_file_falls_back_rather_than_crashing(self):
+        from agents.subagents.pr_review import pr_review_agents
+
+        roster = pr_review_agents(
+            lambda _name: None, lambda prompt, fallback: prompt or fallback
+        )
+        assert roster["security-reviewer"].prompt == (
+            "You are a security expert. Find vulnerabilities."
+        )
+
+    def test_the_runner_builds_the_same_roster(self):
+        """The move must be behaviour-preserving: same names, same tools."""
+        from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
+
+        source = (
+            REPO_ROOT
+            / "apps/backend/runners/github/services/parallel_orchestrator_reviewer.py"
+        ).read_text(encoding="utf-8")
+        assert "pr_review_agents(" in source
+        assert "AgentDefinition(" not in source, (
+            "a definition is being declared inline again"
+        )
+        for spec in PR_REVIEW_SPECIALISTS:
+            assert spec.prompt_file, spec.name
+
+    def test_every_prompt_file_the_specs_name_exists(self):
+        prompts = REPO_ROOT / "apps/backend/prompts/github"
+        from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
+
+        missing = [
+            s.prompt_file
+            for s in PR_REVIEW_SPECIALISTS
+            if not (prompts / s.prompt_file).is_file()
+        ]
+        assert not missing, f"specs name prompt files that do not exist: {missing}"
