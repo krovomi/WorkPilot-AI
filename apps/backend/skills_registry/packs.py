@@ -80,6 +80,12 @@ class Pack:
     maintainer: str = ""
     source: str = "local"
     """Where the pack came from: ``local`` or an upstream ``owner/repo``."""
+    bootstrap: dict[str, Any] = field(default_factory=dict)
+    """How to materialise this pack's runtime, when it needs one.
+
+    ``{"command": [...], "produces": "<relative path>"}``. Declared by the pack
+    rather than hardcoded in the CLI, so a second vendored runtime does not
+    mean a second special case."""
 
     def skills(self) -> list[SkillSource]:
         return _discover(self)
@@ -122,6 +128,7 @@ def load_pack(pack_dir: Path) -> Pack:
         path=pack_dir,
         maintainer=str(raw.get("maintainer", "")),
         source=str(raw.get("source", "local")),
+        bootstrap=raw.get("bootstrap") or {},
     )
 
 

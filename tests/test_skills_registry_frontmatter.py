@@ -110,9 +110,16 @@ class TestAgainstRealSkillFiles:
 
     @staticmethod
     def _skill_files() -> list[Path]:
+        """Authored sources plus generated output — both must parse.
+
+        `skills/` is the source of truth; `.agents/skills/` is what the backend
+        actually serves, so a parser regression that only shows up after the
+        build would still break the command palette.
+        """
         return sorted(
-            list((REPO_ROOT / ".agents" / "skills").glob("*/SKILL.md"))
-            + list((REPO_ROOT / "claude-skills").rglob("SKILL.md"))
+            list((REPO_ROOT / "skills").glob("*/*/SKILL.md"))
+            + list((REPO_ROOT / "skills").glob("*/agents/*.md"))
+            + list((REPO_ROOT / ".agents" / "skills").glob("*/SKILL.md"))
             + list((REPO_ROOT / "apps" / "backend" / "skills").glob("*/SKILL.md"))
         )
 

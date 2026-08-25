@@ -5,6 +5,12 @@
 	},
 	"plugins": [
 		{
+			"name": "workpilot-bmad",
+			"source": "./skills/bmad",
+			"version": "6.0.0",
+			"description": "BMAD Method v6 — product artefacts (PRD, architecture, epics, stories, sprint), the builder module, the creative-intelligence suite and the test architect."
+		},
+		{
 			"name": "workpilot-comms",
 			"source": "./skills/comms",
 			"version": "1.0.0",

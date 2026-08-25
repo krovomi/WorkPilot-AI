@@ -222,9 +222,16 @@ def plan_build(
                         _emit_gemini_command(src, src.body)
                     )
             else:
-                if not harness.agents_path:
-                    continue
-                plan.files[Path(harness.agents_path) / f"{src.name}.md"] = document
+                if harness.agents_path:
+                    plan.files[Path(harness.agents_path) / f"{src.name}.md"] = document
+                elif harness.format == "toml-command" and harness.commands_path:
+                    # This harness has no subagents, so the persona cannot be
+                    # dispatched to. Exposing it as a slash command is the
+                    # honest degradation: the user invokes it themselves
+                    # instead of the parent delegating to it.
+                    plan.files[Path(harness.commands_path) / f"{src.name}.toml"] = (
+                        _emit_gemini_command(src, src.body)
+                    )
 
     plan.files[Path(".claude-plugin") / "marketplace.json"] = _marketplace(resolution)
     return plan
