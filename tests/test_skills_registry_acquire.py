@@ -415,3 +415,30 @@ def test_real_repo_manifests_all_declare_a_reachable_source():
             f"{pack.name}: source {pack.source!r} is not owner/repo"
         )
         assert pack.bootstrap.get("command"), f"{pack.name}: vendored but no bootstrap"
+
+
+# ── optional packs ────────────────────────────────────────────────────────────
+
+
+def test_a_pack_can_declare_itself_opt_in(repo: Path):
+    """A heavier alternative to something already here is declared, not installed."""
+    write_pack(
+        repo,
+        "claude-mem",
+        source="thedotmack/claude-mem",
+        bootstrap={"command": ["npx", "skills"], "optional": True},
+    )
+    pack = load_pack(repo / "skills" / "claude-mem")
+    assert pack.bootstrap.get("optional") is True
+
+
+def test_the_repo_declares_claude_mem_as_optional():
+    """6d: the pattern was adopted, the daemon was not.
+
+    It stays in the catalogue for anyone running Claude Code without the
+    WorkPilot backend, but a bare `skills:bootstrap` must not stand up a fourth
+    memory with its own worker and its own two stores.
+    """
+    pack = load_pack(REPO_ROOT / "skills" / "claude-mem")
+    assert pack.bootstrap.get("optional") is True
+    assert "mem-search" in pack.bootstrap.get("note", "")

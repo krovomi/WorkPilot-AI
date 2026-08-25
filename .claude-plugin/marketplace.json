@@ -11,6 +11,12 @@
 			"description": "BMAD Method v6 — product artefacts (PRD, architecture, epics, stories, sprint), the builder module, the creative-intelligence suite and the test architect."
 		},
 		{
+			"name": "workpilot-claude-mem",
+			"source": "./skills/claude-mem",
+			"version": "0.0.0",
+			"description": "Persistent session memory (SQLite + Chroma + a Bun worker). Optional: WorkPilot's own three memories plus the mem-search skill cover the same ground without a fourth store."
+		},
+		{
 			"name": "workpilot-comms",
 			"source": "./skills/comms",
 			"version": "1.0.0",

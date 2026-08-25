@@ -9,6 +9,9 @@ pnpm run skills:list       # what this project resolves to, and why the rest doe
 pnpm run skills:build      # regenerate every enabled harness output
 pnpm run skills:check      # fail on drift (the CI gate)
 pnpm run skills:bootstrap  # install runtimes that gated skills are waiting on
+pnpm run skills:update     # compare vendored packs with upstream, re-fetch what moved
+pnpm run skills:add        # vendor a new pack:  pnpm run skills:add obra/superpowers
+pnpm run skills:remove     # drop one, with its pin, ignore block and lock entry
 python3 scripts/skills_cli.py why <skill>
 ```
 
@@ -28,6 +31,8 @@ skills/
 | `tooling` | toolchain-agnostic: building MCP servers, driving web apps under test |
 | `comms` | business communication and brand guidelines |
 | `bmad` | BMAD Method v6, vendored and pinned — needs `skills:bootstrap` |
+| `superpowers`, `mattpocock`, `impeccable`, `task-observer` | upstream packs, fetched on demand; only their `pack.json` is committed |
+| `claude-mem` | declared **optional** — see below |
 
 ## Authoring a skill
 
@@ -84,3 +89,31 @@ on invocation.
 canonical output: the WorkPilot backend serves it to the Kanban palette regardless of
 which LLM drives the task, and Copilot, Codex, Cursor, Amp and Gemini read it natively.
 The rest are mirrors for tools that only look in their own directory.
+
+## Vendored and optional packs
+
+An upstream pack commits its `pack.json` and nothing else. The content is fetched by
+`skills:bootstrap`, pinned by tree SHA in `skills-lock.json`, and checked weekly by
+`.github/workflows/skills-sync.yml` — which opens a pull request when upstream moves and
+never merges one. A breaking change arrives as a *new variant*; the pinned one keeps
+resolving exactly as it did.
+
+A pack whose `bootstrap` carries `"optional": true` is declared but not installed by
+default. `claude-mem` is the case this exists for: WorkPilot already keeps three
+memories (`task_logger` captures, graphiti holds the graph, `learning_loop` distils), and
+it would add a fourth with its own Bun worker, SQLite file and Chroma store. What it gets
+right is its three-layer retrieval, which is a query shape rather than a dependency — the
+`mem-search` skill in the `tooling` pack implements it over the stores already here.
+Anyone who wants the real thing:
+
+```bash
+pnpm run skills:bootstrap --pack claude-mem
+```
+
+## `mem-search`
+
+`skills/tooling/mem-search/` reads WorkPilot's memory in three layers, each paid for only
+when the previous one justified it: a compact index (~100 tokens whatever the archive
+holds), then a couple of lines per id, then one full record on request. The backend is
+`apps/backend/mem_search/`; the budget and the laziness are pinned down by
+`tests/test_mem_search.py`.

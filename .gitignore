@@ -240,3 +240,6 @@ apps/backend/bandit-report.json
 # reviewable diff — and each one embeds the signals and build ids that earned
 # it, so the evidence is in the pull request without the raw tally churning.
 skills/_proposed/_ledgers/
+# skills-cli: vendored on demand (claude-mem)
+skills/claude-mem/*
+!skills/claude-mem/pack.json

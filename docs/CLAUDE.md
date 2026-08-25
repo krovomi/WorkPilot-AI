@@ -18,6 +18,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Spec Directory Structure](#spec-directory-structure)
   - [Memory System (Graphiti)](#memory-system-graphiti)
   - [Skills System](#skills-system)
+  - [Memory Search (mem-search)](#memory-search-mem-search)
   - [Workflow Logger](#workflow-logger)
 - [Frontend Development](#frontend-development)
   - [Tech Stack](#tech-stack)
@@ -267,6 +268,12 @@ open standard so the same file works across Claude Code, Copilot, Codex, Cursor 
 | `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | Per-harness mirrors |
 | `.gemini/commands/*.toml` | Gemini CLI mirror |
 
+Those are **generated**. `skills/` is the source, and `scripts/skills_cli.py` is the only
+thing that writes the outputs — `pnpm run skills:check` fails CI on drift. Packs are
+added, updated and dropped through the same CLI (`skills:add`, `skills:update`,
+`skills:remove`), which keeps `skills-lock.json`, `.workpilot/skills.toml` and the
+`.gitignore` entries in step. See [skills/README.md](../skills/README.md).
+
 `apps/backend/slash_commands/api.py` scans `.agents/skills/` and serves the result to the
 Kanban Quick-Command bar (`GET /api/slash-commands`), then resolves a command's body
 server-side so any provider can execute it.
@@ -291,6 +298,30 @@ manager = SkillManager("apps/backend/skills")
 skill = manager.load_skill("framework-migration")
 result = skill.execute_script("analyze_stack.py", {"project-root": "/path/to/project"})
 ```
+
+### Memory Search (`mem-search`)
+
+Three-layer progressive retrieval over the memories that already exist — `task_logger`
+traces and `learning_loop` patterns — so an agent can ask "have we hit this before?"
+without paying for every candidate to discard most of them.
+
+```python
+from mem_search import search_for
+
+memory = search_for(project_dir)
+index = memory.index("flaky timeout in the integration suite")  # ~100 tokens, always
+memory.timeline(index.ids()[:3])                                # a couple of lines each
+memory.detail("task:042-add-widget")                            # the full record, by id
+```
+
+The index is held to a token budget by dropping entries and reporting the count, never
+by truncating what it kept, and building it never reads a record body — a source that
+loaded everything in order to list it would have moved the cost, not removed it.
+
+The agent-facing side is `skills/tooling/mem-search/`. `claude-mem` is declared as an
+**optional** pack (`pnpm run skills:bootstrap --pack claude-mem`) rather than installed:
+its retrieval pattern is what was worth adopting, and taking the tool itself would add a
+fourth memory with its own worker and two more stores.
 
 ### Workflow Logger
 

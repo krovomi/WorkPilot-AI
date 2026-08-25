@@ -12,6 +12,11 @@
 			"path": "skills/bmad",
 			"upstreamTreeSha": "a515e4e7f82e5ad697cf9c8411a1a7146f5d5a1c"
 		},
+		"claude-mem": {
+			"version": "0.0.0",
+			"source": "thedotmack/claude-mem",
+			"path": "skills/claude-mem"
+		},
 		"comms": {
 			"version": "1.0.0",
 			"source": "local",
@@ -75,6 +80,14 @@
 			"packVersion": "1.0.0",
 			"source": "skills/tooling/mcp-builder/SKILL.md",
 			"contentSha256": "c29575ad8c526d3d49ff3065d705a4251840e97492c3260453ddd411bf1c11fa",
+			"targets": {}
+		},
+		"mem-search": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/mem-search/SKILL.md",
+			"contentSha256": "c3ac1b28906d63849cb56be3eaedc231642287913ec4cdcc6349b6016cf0318c",
 			"targets": {}
 		},
 		"webapp-testing": {
@@ -703,12 +716,15 @@
 		".agents/skills/business-comms/SKILL.md",
 		".agents/skills/business-comms/examples/project-reports.md",
 		".agents/skills/mcp-builder/SKILL.md",
+		".agents/skills/mem-search/SKILL.md",
+		".agents/skills/mem-search/scripts/mem_search.py",
 		".agents/skills/webapp-testing/SKILL.md",
 		".agents/skills/webapp-testing/scripts/with_server.py",
 		".claude-plugin/marketplace.json",
 		".gemini/commands/brand-guidelines.toml",
 		".gemini/commands/business-comms.toml",
 		".gemini/commands/mcp-builder.toml",
+		".gemini/commands/mem-search.toml",
 		".gemini/commands/webapp-testing.toml"
 	]
 }

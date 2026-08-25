@@ -197,6 +197,17 @@ def cmd_bootstrap(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 1
+    elif not getattr(args, "all", False):
+        # A pack marked optional is one the repo declares but does not want by
+        # default — a heavier alternative to something already here. Naming it
+        # explicitly is the opt-in; a bare `bootstrap` must not install it.
+        skipped = [p.name for p in wanted if p.bootstrap.get("optional")]
+        wanted = [p for p in wanted if not p.bootstrap.get("optional")]
+        if skipped:
+            print(
+                f"skipping optional pack(s): {', '.join(sorted(skipped))} "
+                f"(--pack <name> or --all to install)"
+            )
     if not wanted:
         print("skills-cli: no pack needs bootstrapping.")
         return 0
@@ -294,6 +305,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         pack=plan.pack,
         force=False,
         dry_run=False,
+        all=False,
     )
     return cmd_bootstrap(fetch_args)
 
@@ -357,7 +369,7 @@ def cmd_update(args: argparse.Namespace) -> int:
 
     print()
     fetch_args = argparse.Namespace(
-        project_dir=str(project_dir), pack="", force=True, dry_run=False
+        project_dir=str(project_dir), pack="", force=True, dry_run=False, all=False
     )
     failed = 0
     for name in moved:
@@ -455,6 +467,9 @@ def main(argv: list[str] | None = None) -> int:
         "bootstrap", help="install the runtimes that gated skills are waiting on"
     )
     p_boot.add_argument("--pack", help="bootstrap only this pack")
+    p_boot.add_argument(
+        "--all", action="store_true", help="include packs marked optional"
+    )
     p_boot.add_argument("--force", action="store_true", help="re-run even if present")
     p_boot.add_argument("--dry-run", action="store_true", help="print, do not execute")
     p_boot.set_defaults(func=cmd_bootstrap)
