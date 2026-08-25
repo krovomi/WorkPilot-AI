@@ -98,6 +98,23 @@ reviewer silently receives every tool there is. The maps are partial on
 purpose: an unmapped name is emitted unchanged and reported by the build, which
 beats guessing at one.
 
+## Deterministic gates
+
+A pack may declare a check that costs no tokens:
+
+```json
+"gate": { "command": ["npx", "--yes", "impeccable", "detect", "--json"], "clean_when": "exit_zero" }
+```
+
+`workflows/gates.py` runs it whenever a resolved profile keeps its phase — at
+every effort level, because there is no level at which skipping a local check
+saves anything. The verdict is *external*, which is what lets the learning loop
+count it as corroboration where the agent's own assessment does not.
+
+A gate that could not run is recorded as **unknown**, never as clean. Declaring
+the command in `pack.json` rather than in the engine means a second
+deterministic pack is a manifest, not a branch.
+
 ## Agents
 
 `apps/backend/agents/subagents/` is the source for the specialists the pipeline

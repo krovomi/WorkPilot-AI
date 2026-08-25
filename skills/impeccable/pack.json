@@ -6,7 +6,25 @@
 	"source": "pbakaus/impeccable",
 	"maintainer": "upstream (vendored on demand)",
 	"bootstrap": {
-		"command": ["npx", "--yes", "impeccable", "install", "--agent", "agnostic"],
+		"command": [
+			"npx",
+			"--yes",
+			"impeccable",
+			"install",
+			"--agent",
+			"agnostic"
+		],
 		"note": "Its `npx impeccable detect --json` is a deterministic gate: no tokens, so the workflow runs it at every effort level and the learning loop can use its verdict as an external verification signal."
+	},
+	"gate": {
+		"command": [
+			"npx",
+			"--yes",
+			"impeccable",
+			"detect",
+			"--json"
+		],
+		"clean_when": "exit_zero",
+		"note": "Deterministic: 59 rules evaluated locally, no API call, so pruning it by effort would save nothing and it runs at every level. Its verdict is an external verification signal the learning loop can use — the agent's opinion of its own frontend work is not."
 	}
 }

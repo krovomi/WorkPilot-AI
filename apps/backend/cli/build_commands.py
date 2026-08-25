@@ -49,8 +49,40 @@ from .input_handlers import (
 )
 
 
-def _resolve_workflow_profile(spec_dir: Path):
+def _changed_files(worktree_manager, spec_name: str) -> list[str] | None:
+    """Paths this task has touched, or None when it cannot be determined.
+
+    None is not the same as an empty list, and the engine treats it that way:
+    an unknown change set runs the conditional phases, because one extra pass
+    is cheaper than skipping a design review on a change that did touch the UI.
+    """
+    if worktree_manager is None:
+        return None
+    try:
+        return [path for _status, path in worktree_manager.get_changed_files(spec_name)]
+    except Exception as exc:  # noqa: BLE001 - advisory input, never fatal
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Could not list changed files: {exc}")
+        return None
+
+
+def _resolve_workflow_profile(
+    spec_dir: Path,
+    changed_files: list[str] | None = None,
+    *,
+    announce: bool = True,
+):
     """Resolve the declarative workflow for this build, or None when disabled.
+
+    Called twice, for two different questions. Up front with no change set, to
+    show the user what their effort level bought before anything runs — at that
+    point nothing has been written, so a conditional phase can only be
+    forecast, and the engine's "unknown means run it" rule makes that forecast
+    the inclusive one. Then again after the coding phase with the real change
+    set, to decide which conditional gates actually apply. The second call does
+    not announce: the plan was already printed, and reprinting it would read as
+    a second build starting.
 
     Gated on WORKPILOT_WORKFLOW_ENGINE=1. Every failure degrades to None, which
     is exactly the previous behaviour: the workflow shapes the run, it must
@@ -71,8 +103,13 @@ def _resolve_workflow_profile(spec_dir: Path):
         workflow = load_workflow(workflow_path)
         effort = get_phase_thinking(spec_dir, "coding")
         profile = resolve_profile(
-            workflow, effort, provider=_get_active_provider(spec_dir)
+            workflow,
+            effort,
+            provider=_get_active_provider(spec_dir),
+            changed_files=changed_files,
         )
+        if not announce:
+            return profile
         print("\n" + profile.describe())
 
         # Naming an uninstalled implementation up front beats discovering it
@@ -94,12 +131,45 @@ def _resolve_workflow_profile(spec_dir: Path):
 
         return profile
     except Exception as exc:  # noqa: BLE001 - never block a build
-        print(f"⚠ Workflow engine disabled for this run: {exc}")
+        if announce:
+            print(f"⚠ Workflow engine disabled for this run: {exc}")
+        return None
+
+
+def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
+    """Execute the no-token checks the resolved profile keeps.
+
+    Returns the run, or None when the engine is off. Never raises: a gate is a
+    signal, and a build that produced working code must not fail because a
+    linter could not start.
+    """
+    if profile is None:
+        return None
+    try:
+        from skills_registry.packs import load_packs
+
+        from workflows import run_deterministic_gates
+
+        repo_root = Path(__file__).resolve().parents[3]
+        packs = {p.name: p for p in load_packs(repo_root / "skills")}
+        run = run_deterministic_gates(profile, working_dir, packs)
+        if summary := run.describe():
+            print("\n" + summary)
+        return run
+    except Exception as exc:  # noqa: BLE001 - gates never fail a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Deterministic gates skipped: {exc}")
         return None
 
 
 def _run_observe_phase(
-    spec_dir: Path, *, profile, qa_approved: bool, ran_qa: bool
+    spec_dir: Path,
+    *,
+    profile,
+    qa_approved: bool,
+    ran_qa: bool,
+    detector_clean: bool | None = None,
 ) -> None:
     """Turn what this build externally verified into learning-loop candidates.
 
@@ -125,6 +195,10 @@ def _run_observe_phase(
             # to prevent.
             qa_approved=qa_approved if ran_qa else None,
             tests_passed=_tests_went_green(spec_dir),
+            # None when no gate ran or one could not be evaluated. Recording a
+            # gate that did not execute as clean would manufacture exactly the
+            # corroboration the promotion rules refuse to invent.
+            detector_clean=detector_clean,
             workflow=profile.workflow,
         )
         patterns = PatternStorage(spec_dir.parent.parent).load_patterns()
@@ -470,12 +544,30 @@ def handle_build_command(
                 except Exception:
                     pass  # Best-effort
 
+        # Deterministic gates. The workflow declares them; this is where the
+        # engine actually runs one. No API call, so they are not pruned by
+        # effort — and their verdict is an *external* signal, which is what
+        # makes it usable as corroboration by the learning loop below.
+        gate_run = _run_deterministic_gates(
+            _resolve_workflow_profile(
+                spec_dir,
+                _changed_files(worktree_manager, spec_dir.name),
+                announce=False,
+            ),
+            working_dir,
+            spec_dir,
+        )
+
         # The `observe` phase. Marked `always: true` in the workflow, so it
         # runs at every effort level — it costs no API call, it only reads what
         # the verifiers already said. Placed after QA so the QA verdict is one
         # of the signals it can record.
         _run_observe_phase(
-            spec_dir, profile=_profile, qa_approved=qa_approved, ran_qa=qa_should_run
+            spec_dir,
+            profile=_profile,
+            qa_approved=qa_approved,
+            ran_qa=qa_should_run,
+            detector_clean=gate_run.all_clean if gate_run else None,
         )
 
         # Post-build finalization (only for isolated sequential mode)

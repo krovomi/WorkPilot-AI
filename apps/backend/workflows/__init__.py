@@ -12,11 +12,14 @@ from .engine import (
     resolve_profile,
     validate_impls,
 )
+from .gates import GateRun, GateVerdict, run_deterministic_gates
 from .spec import EFFORT_ORDER, Phase, Workflow, WorkflowError, load_workflow
 
 __all__ = [
     "EFFORT_ORDER",
     "ExecutionProfile",
+    "GateRun",
+    "GateVerdict",
     "MissingImpl",
     "Phase",
     "ResolvedPhase",
@@ -24,5 +27,6 @@ __all__ = [
     "WorkflowError",
     "load_workflow",
     "resolve_profile",
+    "run_deterministic_gates",
     "validate_impls",
 ]

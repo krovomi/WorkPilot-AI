@@ -114,6 +114,12 @@ class Pack:
     mean a second special case."""
     variants: tuple[PackVariant, ...] = ()
     """Older cuts, newest first. Empty for a pack that has never forked."""
+    gate: dict[str, Any] = field(default_factory=dict)
+    """A deterministic check this pack provides, if any.
+
+    ``{"command": [...], "clean_when": "exit_zero"}``. Declared here rather
+    than hardcoded in the engine so a second deterministic pack is not a second
+    special case — the same reasoning as ``bootstrap``."""
 
     def skills(self) -> list[SkillSource]:
         return _discover(self)
@@ -188,6 +194,7 @@ def load_pack(pack_dir: Path) -> Pack:
         source=str(raw.get("source", "local")),
         bootstrap=raw.get("bootstrap") or {},
         variants=_load_variants(raw, manifest),
+        gate=raw.get("gate") or {},
     )
 
 
