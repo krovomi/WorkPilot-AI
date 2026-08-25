@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -36,7 +36,14 @@ from .frontmatter import parse_frontmatter, workpilot_meta
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["Pack", "SkillSource", "PackError", "load_packs", "load_pack"]
+__all__ = [
+    "Pack",
+    "PackVariant",
+    "SkillSource",
+    "PackError",
+    "load_packs",
+    "load_pack",
+]
 
 SkillKind = Literal["skill", "agent"]
 
@@ -69,6 +76,25 @@ class SkillSource:
 
 
 @dataclass(frozen=True)
+class PackVariant:
+    """An earlier cut of a pack, kept for the toolchains it was written for.
+
+    A pack forks when upstream ships something the older toolchain cannot use.
+    The answer is never to rewrite the pinned one in place — a project on .NET 8
+    would silently start getting .NET 10 guidance — so the new work becomes the
+    root pack and the old one moves into a subdirectory with the targets it
+    serves. Both stay resolvable; which one a project gets is decided by what
+    that project is actually on.
+    """
+
+    version: str
+    dir: str
+    """Subdirectory of the pack, holding that variant's skills."""
+    targets: dict[str, str] = field(default_factory=dict)
+    note: str = ""
+
+
+@dataclass(frozen=True)
 class Pack:
     """A versioned bundle of skills and agents."""
 
@@ -86,9 +112,41 @@ class Pack:
     ``{"command": [...], "produces": "<relative path>"}``. Declared by the pack
     rather than hardcoded in the CLI, so a second vendored runtime does not
     mean a second special case."""
+    variants: tuple[PackVariant, ...] = ()
+    """Older cuts, newest first. Empty for a pack that has never forked."""
 
     def skills(self) -> list[SkillSource]:
         return _discover(self)
+
+    def variant_dirs(self) -> set[str]:
+        """Subdirectories that belong to a variant, not to this pack's skills."""
+        return {v.dir for v in self.variants}
+
+    def resolve_variant(self, project_targets: dict[str, str]) -> Pack | None:
+        """The cut of this pack a project on ``project_targets`` should get.
+
+        Returns ``self`` when the root pack applies, a variant rendered as a
+        Pack when an older one does, or None when nothing here fits — which the
+        caller reports rather than papering over, because silently handing a
+        project the wrong variant is the failure this mechanism exists to stop.
+
+        The root is tried first and variants in declared order, so the newest
+        applicable cut wins. Variants are declared newest-first for that reason.
+        """
+        from .targets import targets_match
+
+        if targets_match(self.targets, project_targets)[0]:
+            return self
+        for variant in self.variants:
+            if targets_match(variant.targets, project_targets)[0]:
+                return replace(
+                    self,
+                    version=variant.version,
+                    targets=dict(variant.targets),
+                    path=self.path / variant.dir,
+                    variants=(),
+                )
+        return None
 
 
 _REQUIRED_FIELDS = ("name", "version")
@@ -129,7 +187,38 @@ def load_pack(pack_dir: Path) -> Pack:
         maintainer=str(raw.get("maintainer", "")),
         source=str(raw.get("source", "local")),
         bootstrap=raw.get("bootstrap") or {},
+        variants=_load_variants(raw, manifest),
     )
+
+
+def _load_variants(raw: dict[str, Any], manifest: Path) -> tuple[PackVariant, ...]:
+    declared = raw.get("variants") or []
+    if not isinstance(declared, list):
+        raise PackError(f"{manifest}: 'variants' must be a list")
+    out: list[PackVariant] = []
+    seen: set[str] = set()
+    for entry in declared:
+        if not isinstance(entry, dict):
+            raise PackError(f"{manifest}: each variant must be an object")
+        missing = [f for f in ("version", "dir") if not entry.get(f)]
+        if missing:
+            raise PackError(f"{manifest}: variant is missing {', '.join(missing)}")
+        directory = str(entry["dir"])
+        if directory in seen:
+            raise PackError(f"{manifest}: two variants both use dir {directory!r}")
+        seen.add(directory)
+        variant_targets = entry.get("targets") or {}
+        if not isinstance(variant_targets, dict):
+            raise PackError(f"{manifest}: variant 'targets' must be an object")
+        out.append(
+            PackVariant(
+                version=str(entry["version"]),
+                dir=directory,
+                targets={str(k): str(v) for k, v in variant_targets.items()},
+                note=str(entry.get("note", "")),
+            )
+        )
+    return tuple(out)
 
 
 def load_packs(skills_root: Path) -> list[Pack]:
@@ -187,8 +276,9 @@ def _read_source(
 def _discover(pack: Pack) -> list[SkillSource]:
     found: list[SkillSource] = []
 
+    skip = {"agents"} | pack.variant_dirs()
     for skill_dir in sorted(pack.path.iterdir()):
-        if not skill_dir.is_dir() or skill_dir.name in ("agents",):
+        if not skill_dir.is_dir() or skill_dir.name in skip:
             continue
         skill_file = skill_dir / "SKILL.md"
         if skill_file.is_file():

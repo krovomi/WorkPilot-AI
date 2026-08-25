@@ -15,7 +15,8 @@
 		"claude-mem": {
 			"version": "0.0.0",
 			"source": "thedotmack/claude-mem",
-			"path": "skills/claude-mem"
+			"path": "skills/claude-mem",
+			"upstreamTreeSha": "98687a056891fdace7868d042c4fca2be7de37c4"
 		},
 		"comms": {
 			"version": "1.0.0",

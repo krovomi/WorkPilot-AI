@@ -314,6 +314,10 @@ def cmd_add(args: argparse.Namespace) -> int:
     print(f"\nwrote skills/{plan.pack}/pack.json")
 
     if args.no_fetch:
+        # Record where upstream is now even though nothing was fetched.
+        # Without a baseline the next sync reports the pack as "moved" when it
+        # has not, and a report that is always positive stops being read.
+        _record_provenance([plan.pack])
         print(f"Run `pnpm run skills:bootstrap --pack {plan.pack}` to fetch it.")
         return 0
 

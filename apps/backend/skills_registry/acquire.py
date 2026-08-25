@@ -34,7 +34,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .packs import Pack, load_pack
+from .packs import Pack, PackVariant, load_pack
 from .upstream import LOCKFILE_NAME, SourceSpec, forget_pack, parse_source
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ __all__ = [
     "plan_remove",
     "apply_remove",
     "bootstrap_satisfied",
+    "fork_variant",
     "vendored_skill_count",
     "GITIGNORE_MARKER",
 ]
@@ -423,3 +424,70 @@ def unpin_pack(project_dir: Path, pack: str) -> bool:
     if dropped:
         path.write_text("\n".join(kept) + "\n", encoding="utf-8")
     return dropped
+
+
+# ── forking a pack on a breaking upstream release ─────────────────────────────
+
+
+def fork_variant(
+    repo_root: Path,
+    pack_name: str,
+    *,
+    new_version: str,
+    note: str = "",
+) -> PackVariant:
+    """Preserve the current cut as a variant before taking a breaking release.
+
+    This is the non-regression promise, as a function. The pinned cut keeps its
+    version, its targets and its directory; the root pack moves on. A project
+    that resolved to the old one goes on resolving to it, because the resolver
+    picks a variant by the toolchain the project is actually on rather than by
+    whatever landed most recently.
+
+    Only the manifest is written. The skills themselves are not copied: a
+    vendored pack's content is re-fetched from a pinned upstream ref, and a
+    locally authored one is moved by whoever is doing the fork, who is the only
+    party that knows which files belong to which cut.
+    """
+    pack_dir = repo_root / "skills" / pack_name
+    manifest_path = pack_dir / "pack.json"
+    if not manifest_path.is_file():
+        raise AcquireError(f"no pack named {pack_name!r} to fork")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    current_version = str(manifest.get("version", "0.0.0"))
+    if current_version == new_version:
+        raise AcquireError(
+            f"{pack_name}: refusing to fork {current_version} into itself — "
+            f"the new cut needs a version of its own"
+        )
+
+    directory = f"v{current_version.split('.')[0]}"
+    existing = manifest.get("variants") or []
+    if any(v.get("dir") == directory for v in existing):
+        raise AcquireError(
+            f"{pack_name}: a variant already occupies {directory!r}. Two "
+            f"breaking releases inside one major need the second named by hand."
+        )
+
+    variant = {
+        "version": current_version,
+        "dir": directory,
+        "targets": dict(manifest.get("targets") or {}),
+    }
+    if note:
+        variant["note"] = note
+
+    # Newest first: the resolver takes the first variant whose targets match,
+    # so ordering is what makes "the newest applicable cut" true.
+    manifest["variants"] = [variant, *existing]
+    manifest["version"] = new_version
+    manifest_path.write_text(
+        json.dumps(manifest, indent="\t", ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return PackVariant(
+        version=variant["version"],
+        dir=directory,
+        targets=variant["targets"],
+        note=note,
+    )

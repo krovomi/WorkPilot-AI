@@ -5,6 +5,14 @@ Three gates, in order. A skill has to clear all three:
 1. **Pack pin** — if ``skills.toml`` pins ``dotnet = "^1"``, a pack at 2.0.0 is
    out. This is the axis that lets a project stay on an older pack while the
    learning loop ships newer ones.
+
+   Before the pin is checked, the pack's *variant* is chosen. A pack that has
+   forked keeps its older cuts in subdirectories with the targets they were
+   written for, so a project on .NET 8 resolves to the .NET 8 variant rather
+   than to nothing. Which cut applies is decided by the project's toolchain;
+   the pin is then evaluated against that cut's version, because pinning
+   ``^2`` means "the 2.x line", not "the 2.x line of whatever the root happens
+   to be today".
 2. **Toolchain targets** — the skill's content has to apply to what the project
    is on. This is the axis that keeps .NET 10 guidance away from a .NET
    Framework 4.8 codebase.
@@ -106,7 +114,25 @@ def resolve(
     """
     result = Resolution()
 
-    for pack in packs:
+    for declared in packs:
+        pack = (
+            declared.resolve_variant(config.targets) if declared.variants else declared
+        )
+        if pack is None:
+            for src in declared.skills():
+                result.rejected.append(
+                    Rejection(
+                        src.name,
+                        src.kind,
+                        declared.name,
+                        "targets",
+                        f"no variant of {declared.name} targets this toolchain "
+                        f"({_describe(declared.targets)}; "
+                        f"variants: {', '.join(v.dir for v in declared.variants)})",
+                    )
+                )
+            continue
+
         pin = config.packs.get(pack.name)
         if pin and not satisfies(pack.version, pin):
             for src in pack.skills():
@@ -143,3 +169,7 @@ def resolve(
 
     result.selected.sort(key=lambda s: (s.kind, s.name))
     return result
+
+
+def _describe(targets: dict[str, str]) -> str:
+    return ", ".join(f"{k} {v}" for k, v in sorted(targets.items())) or "no targets"
