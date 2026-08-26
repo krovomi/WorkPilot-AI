@@ -205,7 +205,8 @@ def workflow_profile(
         sd = _resolve_spec_dir(spec_dir, project_dir, spec_id)
         path = _workflow_path(workflow)
     except ValueError as exc:
-        return {"success": False, "error": str(exc)}
+        logger.warning("invalid workflow profile request parameters: %s", exc)
+        return {"success": False, "error": "Invalid request parameters."}
 
     try:
         from phase_config import get_phase_provider, get_phase_thinking
