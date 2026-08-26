@@ -14,6 +14,7 @@ import asyncio
 import logging
 from pathlib import Path
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
@@ -30,12 +31,7 @@ router = APIRouter(prefix="/api/virtual-reviewer", tags=["virtual-reviewer"])
 
 
 def _validate_dir(raw: str, label: str) -> Path:
-    if not raw or raw.strip().startswith("-"):
-        raise ValueError(f"{label} must be a non-empty path not starting with '-'")
-    p = Path(raw).expanduser().resolve()
-    if not p.exists() or not p.is_dir():
-        raise ValueError(f"{label} does not exist or is not a directory: {p}")
-    return p
+    return validated_dir(raw, label)
 
 
 @router.get("/summary")
@@ -47,7 +43,7 @@ def summary(
         sd = _validate_dir(spec_dir, "spec_dir")
         pd = _validate_dir(project_dir, "project_dir")
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "summary")}
     summary = compute_review_summary(sd, pd)
     return {
         "success": True,
@@ -74,7 +70,7 @@ def run(req: RunRequest):
         sd = _validate_dir(req.spec_dir, "spec_dir")
         pd = _validate_dir(req.project_dir, "project_dir")
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "run")}
 
     if not virtual_reviewer_enabled():
         return {
@@ -98,4 +94,4 @@ def run(req: RunRequest):
         }
     except Exception as e:  # noqa: BLE001
         logger.exception("run_virtual_review failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "run")}

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 
+from core.api_safety import safe_error
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -85,7 +86,11 @@ def run(req: RunRequest) -> dict:
     try:
         result = runner.run(req.snippet, language, stdin=req.stdin)
     except PlaygroundTimeout as exc:
-        return {"success": False, "error": str(exc), "timed_out": True}
+        return {
+            "success": False,
+            "error": safe_error(exc, logger, "run"),
+            "timed_out": True,
+        }
     except Exception:
         # Defensive — runner errors should not 500 the whole API.
         logger.exception("Code playground run failed")

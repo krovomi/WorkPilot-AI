@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -35,14 +36,7 @@ router = APIRouter(prefix="/api/license-governance", tags=["license-governance"]
 
 
 def _validate_project_path(raw: str) -> Path:
-    if not raw or not isinstance(raw, str):
-        raise ValueError("project_path must be a non-empty string")
-    if raw.strip().startswith("-"):
-        raise ValueError("project_path must not start with '-'")
-    resolved = Path(raw).expanduser().resolve()
-    if not resolved.exists() or not resolved.is_dir():
-        raise ValueError(f"project_path is not a valid directory: {resolved}")
-    return resolved
+    return validated_dir(raw, "project_path")
 
 
 _POLICY_PRESETS = {
@@ -85,7 +79,7 @@ def scan(req: ScanRequest):
     try:
         path = _validate_project_path(req.project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "scan")}
 
     if req.policy not in _POLICY_PRESETS:
         return {
@@ -108,7 +102,7 @@ def scan(req: ScanRequest):
         return {"success": True, "report": report.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("license scan failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "resolver")}
 
 
 @router.post("/classify")
@@ -124,7 +118,7 @@ def classify(req: ClassifyRequest):
         }
     except Exception as e:  # noqa: BLE001
         logger.exception("classify failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "classify")}
 
 
 class AttributionRequest(BaseModel):
@@ -147,7 +141,7 @@ def attribution(req: AttributionRequest):
     try:
         path = _validate_project_path(req.project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "attribution")}
 
     overrides = {o.name: o.license for o in (req.license_overrides or [])}
 
@@ -174,4 +168,4 @@ def attribution(req: AttributionRequest):
         return result
     except Exception as e:  # noqa: BLE001
         logger.exception("attribution generation failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "resolver")}

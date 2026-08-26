@@ -136,7 +136,11 @@ def classify_license(raw: str | None) -> LicenseCategory:
         LicenseCategory.COMMERCIAL: 5,
         LicenseCategory.UNKNOWN: 6,
     }
-    parts = re.split(r"\s+(?:or|/)\s+", text)
+    # `\s+(?:or|/)\s+` backtracks polynomially on a long run of whitespace
+    # (CodeQL py/polynomial-redos). Collapsing whitespace first makes each
+    # separator a single space, so the split pattern no longer has two
+    # variable-length whitespace groups to trade characters between.
+    parts = re.split(r" (?:or|/) ", " ".join(text.split()))
     best: LicenseCategory | None = None
     for part in parts:
         cleaned = part.strip().strip("()")

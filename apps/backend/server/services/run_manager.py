@@ -157,7 +157,12 @@ class RunManager:
                 try:
                     value = await get_user_secret(db, user_id, kind)
                 except Exception as e:  # vault misconfig must not block runs
-                    logger.warning("Could not read secret %s: %s", kind, e)
+                    # Type only, never the message: this is the failure path of
+                    # a secret read, and the backend that raised it is free to
+                    # quote the value it was handling.
+                    logger.warning(
+                        "Could not read secret %s: %s", kind, type(e).__name__
+                    )
                     continue
                 if value:
                     env[env_name] = value

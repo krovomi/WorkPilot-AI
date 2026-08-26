@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter, Query
 
 from .prompt_preview import build_prompt_preview
@@ -22,12 +23,7 @@ router = APIRouter(prefix="/api/prompt-preview", tags=["prompt-preview"])
 
 
 def _validate_dir(raw: str, label: str) -> Path:
-    if not raw or raw.strip().startswith("-"):
-        raise ValueError(f"{label} must be a non-empty path not starting with '-'")
-    p = Path(raw).expanduser().resolve()
-    if not p.exists() or not p.is_dir():
-        raise ValueError(f"{label} does not exist or is not a directory: {p}")
-    return p
+    return validated_dir(raw, label)
 
 
 @router.get("/")
@@ -41,11 +37,11 @@ def preview(
         pdir = _validate_dir(project_dir, "project_dir")
         sdir = _validate_dir(spec_dir, "spec_dir")
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "preview")}
 
     try:
         snapshot = build_prompt_preview(pdir, sdir, agent_type=agent_type)
         return {"success": True, "preview": snapshot.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("build_prompt_preview failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "preview")}

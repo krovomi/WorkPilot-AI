@@ -9,13 +9,17 @@ webhook providers).
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Annotated, Any
 
+from core.api_safety import safe_error
 from fastapi import APIRouter, Body
 
 from .channels import build_text_payload, post_json, validate_webhook_url
 from .models import NotificationChannel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -37,7 +41,10 @@ def test_notification_webhook(body: Annotated[dict[str, Any], Body(...)]):
     try:
         validate_webhook_url(url)
     except ValueError as exc:
-        return {"success": False, "error": str(exc)}
+        return {
+            "success": False,
+            "error": safe_error(exc, logger, "test_notification_webhook"),
+        }
 
     lang = os.environ.get("APP_LANGUAGE", "en")
     message = _TEST_MESSAGES.get(lang, _TEST_MESSAGES["en"])

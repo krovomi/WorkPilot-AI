@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 
+from core.api_safety import safe_error
 from fastapi import APIRouter, Path
 from pydantic import BaseModel, Field
 
@@ -34,7 +35,7 @@ def list_domains():
         return {"success": True, "domains": DomainAgentFactory().list_domains()}
     except Exception as e:  # noqa: BLE001
         logger.exception("list_domains failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "list_domains")}
 
 
 @router.get("/profile/{domain}")
@@ -43,10 +44,10 @@ def profile(domain: str = Path(..., min_length=1, max_length=64)):
         p = DomainAgentFactory().get_profile(domain)
         return {"success": True, "profile": p.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "profile")}
     except Exception as e:  # noqa: BLE001
         logger.exception("profile failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "profile")}
 
 
 @router.post("/build")
@@ -55,7 +56,7 @@ def build(req: BuildRequest):
         bundle = DomainAgentFactory().build(req.domain, req.role)
         return {"success": True, "bundle": bundle.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "build")}
     except Exception as e:  # noqa: BLE001
         logger.exception("build failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "build")}

@@ -30,6 +30,7 @@ import logging
 import os
 from pathlib import Path
 
+from core.api_safety import validated_dir
 from fastapi import APIRouter, Query
 
 logger = logging.getLogger(__name__)
@@ -72,36 +73,36 @@ class _BadRequest(ValueError):
 def _validate_dir(raw: str, label: str) -> Path:
     """Normalise a caller-supplied directory path.
 
-    CodeQL flags the `Path(raw)` below as `py/path-injection`, and an autofix
-    has already once "resolved" it by confining the result to this repository
-    (PR #20). **Do not reinstate that.** WorkPilot builds other people's
-    projects: the directory is outside this repository by definition, and
-    confining it turns the endpoint into one that answers only for people
-    building WorkPilot itself — ten red tests and an empty task panel for
-    everyone else.
+    Delegates to `core.api_safety.validated_dir`, which is where the
+    normalisation, the length cap and the `..` refusal now live for every
+    endpoint in this backend. Kept as a local function only to translate its
+    `ValueError` into a `_BadRequest` carrying a `_REASONS` key.
 
-    What is guarded instead — `spec_id` as a bare name, containment of the
-    derived spec directory under the given project directory, and `workflow`
-    confined to `workflows/` — is in `_resolve_spec_dir` and `_workflow_path`,
-    where the traversal risk actually lives. `TestItAnswersForRealProjects`
-    fails if this is undone.
+    **The project directory is not confined to this repository, and must not
+    be.** An autofix once "resolved" `py/path-injection` that way (PR #20):
+    WorkPilot builds other people's projects, so the directory is outside
+    this repository by definition, and confining it made the endpoint answer
+    only for people building WorkPilot itself — ten red tests and an empty
+    task panel for everyone else. `TestItAnswersForRealProjects` fails if it
+    comes back.
 
-    The `..` rejection below is not part of that guard set: `resolve()` on the
-    next line normalises `..` away regardless, so refusing it changes nothing
-    a caller can observe. It is here because it is *also* what CodeQL accepts
-    as a barrier for this query — a comparison against a constant, matched by
-    `ConstCompareAsSanitizerGuard` — which is what lets this endpoint keep
-    taking an absolute path **and** keep a clean scan, rather than trading one
-    for the other. Removing it brings `py/path-injection` straight back.
+    What guards traversal is elsewhere and is kept: `spec_id` must be a bare
+    name, the derived spec directory must sit under the given project
+    directory, and `workflow` is confined to `workflows/` — see
+    `_resolve_spec_dir` and `_workflow_path`.
     """
-    if not raw or raw.strip().startswith("-"):
-        raise _BadRequest("empty", f"{label} is empty or starts with '-'")
-    if ".." in Path(raw).expanduser().parts:
-        raise _BadRequest("traversal", f"{label} contains '..': {raw}")
-    p = Path(raw).expanduser().resolve()
-    if not p.exists() or not p.is_dir():
-        raise _BadRequest("missing", f"{label} is not a directory: {p}")
-    return p
+    try:
+        return validated_dir(raw, label)
+    except ValueError as exc:
+        # `validated_dir` names the rule that was broken; map it onto the
+        # reason table so the caller still gets a literal from `_REASONS`
+        # rather than a message built from their own input.
+        text = str(exc)
+        if "'..'" in text:
+            raise _BadRequest("traversal", text) from None
+        if "does not exist" in text:
+            raise _BadRequest("missing", text) from None
+        raise _BadRequest("empty", text) from None
 
 
 def _resolve_spec_dir(

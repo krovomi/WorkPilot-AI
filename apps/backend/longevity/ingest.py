@@ -16,7 +16,9 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree as ET  # noqa: S405 - ParseError type only
+
+from defusedxml.ElementTree import parse as defused_parse
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,7 @@ def parse_coverage_xml(path: str | Path) -> float:
         raise CoverageParseError(f"coverage.xml not found: {p}")
 
     try:
-        tree = ET.parse(p)
+        tree = defused_parse(p)
     except ET.ParseError as e:
         raise CoverageParseError(f"invalid XML in {p}: {e}") from e
 

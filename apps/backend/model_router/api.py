@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 
+from core.api_safety import safe_error
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -71,7 +72,7 @@ def route(req: RouteRequest):
         raise
     except Exception as e:  # noqa: BLE001 — surface as 500 with safe message
         logger.exception("ModelRouter.route failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "route")}
 
 
 @router.post("/compare")
@@ -90,4 +91,4 @@ def compare(req: RouteRequest):
         }
     except Exception as e:  # noqa: BLE001
         logger.exception("ModelRouter.compare failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "compare")}

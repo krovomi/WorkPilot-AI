@@ -82,6 +82,12 @@ psutil>=5.9.0
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK
 
+# Hardened XML parsing. WorkPilot reads coverage.xml and JUnit XML out of
+# whichever repository it is building, so those files are attacker-controlled
+# in exactly the way stdlib xml.etree is not built for (entity expansion —
+# CodeQL py/xml-bomb).
+defusedxml>=0.7.1
+
 # Anthropic SDK for Claude API integration
 anthropic>=0.113.0
 

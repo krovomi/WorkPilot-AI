@@ -16,6 +16,7 @@ from typing import Any
 from architecture.config import infer_architecture_config, load_architecture_config
 from architecture.models import ArchitectureReport
 from architecture.rules_engine import ArchitectureRulesEngine
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -31,16 +32,7 @@ class ProjectPathRequest(BaseModel):
 
 
 def _validate_project_path(raw: str) -> Path:
-    if not raw or not isinstance(raw, str):
-        raise ValueError("project_path must be a non-empty string")
-    if raw.strip().startswith("-"):
-        raise ValueError("project_path must not start with '-'")
-    resolved = Path(raw).expanduser().resolve()
-    if not resolved.exists():
-        raise ValueError(f"project_path does not exist: {resolved}")
-    if not resolved.is_dir():
-        raise ValueError(f"project_path is not a directory: {resolved}")
-    return resolved
+    return validated_dir(raw, "project_path")
 
 
 def _run_validation(project_dir: Path) -> tuple[ArchitectureReport, str]:
@@ -74,13 +66,13 @@ def scan(req: ProjectPathRequest) -> dict[str, Any]:
     try:
         path = _validate_project_path(req.project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "scan")}
     try:
         report, source = _run_validation(path)
         return {"success": True, "config_source": source, "report": report.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("Architecture scan failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "scan")}
 
 
 @router.post("/save-baseline")
@@ -89,7 +81,7 @@ def save_baseline(req: ProjectPathRequest) -> dict[str, Any]:
     try:
         path = _validate_project_path(req.project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "save_baseline")}
     try:
         report, source = _run_validation(path)
         baseline_path = DriftDetector(project_dir=path).save_baseline(report)
@@ -101,7 +93,7 @@ def save_baseline(req: ProjectPathRequest) -> dict[str, Any]:
         }
     except Exception as e:  # noqa: BLE001
         logger.exception("Save baseline failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "save_baseline")}
 
 
 @router.post("/compare")
@@ -110,7 +102,7 @@ def compare(req: ProjectPathRequest) -> dict[str, Any]:
     try:
         path = _validate_project_path(req.project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "compare")}
     try:
         report, source = _run_validation(path)
         drift = DriftDetector(project_dir=path).compare(report)
@@ -121,4 +113,4 @@ def compare(req: ProjectPathRequest) -> dict[str, Any]:
         }
     except Exception as e:  # noqa: BLE001
         logger.exception("Drift compare failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "compare")}

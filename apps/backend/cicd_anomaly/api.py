@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 
+from core.api_safety import safe_error
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -47,7 +48,7 @@ def scan(req: ScanRequest):
         }
     except Exception as e:  # noqa: BLE001
         logger.exception("scan failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "scan")}
 
 
 @router.post("/analyse")
@@ -57,4 +58,4 @@ def analyse(req: AnalyseRequest):
         return {"success": True, "report": report.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("analyse failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "analyse")}
