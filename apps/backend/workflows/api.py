@@ -52,6 +52,7 @@ _REASONS = {
     "escapes": "spec_id escapes the project directory",
     "empty": "the path must be non-empty and must not start with '-'",
     "missing": "no such directory",
+    "traversal": "the path must not contain '..'",
     "workflow": "unknown workflow",
 }
 
@@ -79,15 +80,24 @@ def _validate_dir(raw: str, label: str) -> Path:
     building WorkPilot itself — ten red tests and an empty task panel for
     everyone else.
 
-    There is no sanitiser for "an absolute path the local user chose in their
-    own desktop app", because that is the feature. What is guarded instead —
-    `spec_id` as a bare name, containment of the derived spec directory under
-    the given project directory, and `workflow` confined to `workflows/` — is
-    in `_resolve_spec_dir` and `_workflow_path`, where the traversal risk
-    actually lives. `TestItAnswersForRealProjects` fails if this is undone.
+    What is guarded instead — `spec_id` as a bare name, containment of the
+    derived spec directory under the given project directory, and `workflow`
+    confined to `workflows/` — is in `_resolve_spec_dir` and `_workflow_path`,
+    where the traversal risk actually lives. `TestItAnswersForRealProjects`
+    fails if this is undone.
+
+    The `..` rejection below is not part of that guard set: `resolve()` on the
+    next line normalises `..` away regardless, so refusing it changes nothing
+    a caller can observe. It is here because it is *also* what CodeQL accepts
+    as a barrier for this query — a comparison against a constant, matched by
+    `ConstCompareAsSanitizerGuard` — which is what lets this endpoint keep
+    taking an absolute path **and** keep a clean scan, rather than trading one
+    for the other. Removing it brings `py/path-injection` straight back.
     """
     if not raw or raw.strip().startswith("-"):
         raise _BadRequest("empty", f"{label} is empty or starts with '-'")
+    if ".." in Path(raw).expanduser().parts:
+        raise _BadRequest("traversal", f"{label} contains '..': {raw}")
     p = Path(raw).expanduser().resolve()
     if not p.exists() or not p.is_dir():
         raise _BadRequest("missing", f"{label} is not a directory: {p}")

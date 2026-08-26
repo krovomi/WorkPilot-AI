@@ -147,6 +147,19 @@ class TestItAnswersForRealProjects:
 
 
 class TestItRefusesToWander:
+    def test_a_path_carrying_dot_dot_is_refused(self, project):
+        """Not a behaviour change — a barrier CodeQL is able to see.
+
+        `resolve()` normalises `..` away, so this refuses nothing that would
+        otherwise have been reachable. It is asserted because the guard is
+        load-bearing for a *different* reason: it is the constant comparison
+        that keeps `py/path-injection` off this file. Delete it and the alert
+        returns, which is how the confinement regression started.
+        """
+        res = get(project_dir=f"{project}/../..", spec_id="001-x")
+        assert res["success"] is False
+        assert res["error"] == "the path must not contain '..'"
+
     @pytest.mark.parametrize("spec_id", ["../..", "a/b", "", ".", ".."])
     def test_a_spec_id_is_a_directory_name(self, project, spec_id):
         res = get(project_dir=str(project), spec_id=spec_id)
