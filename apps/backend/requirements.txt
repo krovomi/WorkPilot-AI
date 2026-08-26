@@ -40,7 +40,7 @@ pywin32>=312; sys_platform == "win32"
 google-generativeai>=0.8.0
 
 # Pydantic for structured output schemas
-pydantic>=2.0.0
+pydantic>=2.13.4
 
 # Rich for beautiful CLI formatting (intent recognition)
 rich>=15.0.0
