@@ -43,14 +43,7 @@ _DEFAULT_WORKFLOW = "feature-build"
 def _validate_dir(raw: str, label: str, base: Path | None = None) -> Path:
     if not raw or raw.strip().startswith("-"):
         raise ValueError(f"{label} must be a non-empty path not starting with '-'")
-
-    candidate = Path(raw).expanduser()
-    if candidate.is_absolute():
-        raise ValueError(f"{label} must be a relative path")
-    if ".." in candidate.parts:
-        raise ValueError(f"{label} must not contain parent-directory traversal")
-
-    p = candidate.resolve()
+    p = Path(raw).expanduser().resolve()
     if base is not None:
         b = base.expanduser().resolve()
         try:
@@ -70,14 +63,35 @@ def _resolve_spec_dir(
     The renderer knows a task by its project and its spec id, not by an
     absolute path — so accepting the pair keeps the `.workpilot/specs/` layout
     written down once, here, instead of once here and once in TypeScript.
+
+    Why the project directory is **not** confined to this repository
+    ---------------------------------------------------------------
+    Because WorkPilot builds other people's projects. `project_dir` is the
+    checkout the user opened in the desktop app; it is outside this repository
+    by definition, and requiring otherwise means the endpoint only answers for
+    people building WorkPilot itself. That confinement was added to silence a
+    `py/path-injection` alert and it silenced the feature with it.
+
+    What actually guards the traversal, and is kept:
+
+    * ``spec_id`` must be a bare directory name — no separator, no ``..``;
+    * the derived spec directory must sit **under the project directory the
+      caller gave**, so the pair form cannot address anything else;
+    * ``workflow`` is resolved under ``workflows/`` in this repo (see
+      `_workflow_path`), because that one *is* ours.
+
+    The remaining input is an absolute path the local user chose in their own
+    desktop app, read by a backend running as that same user. There is no
+    privilege boundary there to cross — and `progress_indicator/api.py`, which
+    takes the same input in the same way, is the existing convention.
     """
     if spec_dir:
-        return _validate_dir(spec_dir, "spec_dir", base=_REPO_ROOT)
+        return _validate_dir(spec_dir, "spec_dir")
     if not (project_dir and spec_id):
         raise ValueError("pass spec_dir, or both project_dir and spec_id")
     if "/" in spec_id or "\\" in spec_id or spec_id in ("", ".", ".."):
         raise ValueError(f"spec_id is not a directory name: {spec_id!r}")
-    root = _validate_dir(project_dir, "project_dir", base=_REPO_ROOT)
+    root = _validate_dir(project_dir, "project_dir")
     candidate = (root / ".workpilot" / "specs" / spec_id).resolve()
     if not str(candidate).startswith(str(root) + os.sep):
         raise ValueError("spec_id escapes the project directory")
@@ -219,7 +233,7 @@ def workflow_profile(
         path = _workflow_path(workflow)
     except ValueError as exc:
         logger.warning("invalid workflow profile request parameters: %s", exc)
-        return {"success": False, "error": "Invalid request parameters."}
+        return {"success": False, "error": str(exc)}
 
     try:
         from phase_config import get_phase_provider, get_phase_thinking

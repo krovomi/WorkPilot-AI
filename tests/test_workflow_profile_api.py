@@ -119,6 +119,30 @@ class TestItDoesNotTouchAnything:
         assert marker.exists()
 
 
+class TestItAnswersForRealProjects:
+    """The regression that shipped and had to be undone.
+
+    A `py/path-injection` autofix confined `project_dir` to the WorkPilot
+    repository. It silenced the alert and the feature with it: WorkPilot builds
+    *other people's* projects, so the project directory is outside this
+    repository by definition. Ten tests failed and the endpoint answered
+    nothing for any real user.
+    """
+
+    def test_a_project_outside_this_repository_is_answered(self, project):
+        # `project` is a tmp_path fixture — exactly the shape of a real user's
+        # checkout, and nowhere near this repo.
+        assert str(project).startswith("/tmp") or str(project).startswith("/var")
+        res = ask(project, effort="high")
+        assert res["success"] is True
+        assert res["profile"]["runCount"] > 0
+
+    def test_the_same_holds_for_an_explicit_spec_dir(self, project):
+        spec = project / ".workpilot" / "specs" / "001-x"
+        res = get(spec_dir=str(spec), effort="high")
+        assert res["success"] is True
+
+
 class TestItRefusesToWander:
     @pytest.mark.parametrize("spec_id", ["../..", "a/b", "", ".", ".."])
     def test_a_spec_id_is_a_directory_name(self, project, spec_id):
