@@ -4,22 +4,26 @@
 is the other direction: it changes what is *in* `skills/`, which is the only
 other way the emitted set can move.
 
-Why we do not simply use `npx skills` for all of it
----------------------------------------------------
-`vercel-labs/skills` resolves a source well — an ``owner/repo``, a URL, the
-skills.sh registry — and vendors into `.agents/skills/`, the convention this
-repo already follows. So it is the fetcher, and there is no reason to write a
-second one.
+Why the fetch is a git clone, not `npx skills add`
+--------------------------------------------------
+The plan chose `vercel-labs/skills` as the acquisition backend. Running it
+showed why that cannot work here, and it is not a missing flag:
 
-Its *update* path is a different matter. Project-level skills are not written
-into its lock (`~/.agents/.skill-lock.json`), so `npx skills check` and
-`npx skills update` skip them silently, and `install`/`sync` are still
-`experimental_`-prefixed. Beyond that, targeting on two axes — toolchain
-version *and* pack semver — is outside its model entirely: it has no notion
-that this project wants `net-developer@2.x` because it is on .NET 8.
+* it writes into **every harness directory it knows** — `.claude/`, `.agents/`,
+  `.windsurf/`, `.kilocode/` and dozens more — which is exactly what
+  `skills-cli build` owns. Two writers of the same directories means whichever
+  ran last wins, and `skills:check` reports drift nobody introduced;
+* it writes **its own `skills-lock.json` at the repo root**. That is our file,
+  and the provenance record the whole registry is built on.
 
-So the split is: it fetches, `skills-lock.json` remains the authority on what
-we are pinned to, and this module writes the provenance after the fetch.
+Its update path was already out: project-level skills are not in its lock, so
+`npx skills check`/`update` skip them silently, and targeting on two axes —
+toolchain version *and* pack semver — is outside its model entirely.
+
+So `scripts/vendor_pack.py` clones, which is what both tools do underneath,
+and `skills-lock.json` remains the authority. `npx skills add <repo> --list` is
+still the right tool for *discovery*: it enumerates what a repository offers
+without installing anything.
 
 Everything here is a plan-then-apply pair, so the CLI can print what a command
 would do before it does it, and so it can be tested without a network.
@@ -121,22 +125,23 @@ class RemovePlan:
         return self.vendored and self.authored_files == 0
 
 
-def _npx_fetch_command(source: SourceSpec, pack: str) -> list[str]:
+def _vendor_command(source: SourceSpec, pack: str) -> list[str]:
     """The command that vendors a pack, recorded in its manifest.
 
     Stored rather than hardcoded in the CLI so a fresh clone reproduces the
     exact fetch with `pnpm run skills:bootstrap`, and so a pack that needs a
     different installer (BMAD does) is not a special case in the code.
     """
-    return [
-        "npx",
-        "--yes",
-        "skills@latest",
-        "add",
-        source.raw,
-        "--dir",
+    command = [
+        "python3",
+        "scripts/vendor_pack.py",
+        source.slug or source.raw,
+        "--into",
         f"skills/{pack}",
     ]
+    if source.ref and source.ref != "HEAD":
+        command += ["--ref", source.ref]
+    return command
 
 
 def plan_add(
@@ -178,7 +183,7 @@ def plan_add(
         "source": source.slug or source.raw,
         "maintainer": "upstream (vendored on demand)",
         "bootstrap": {
-            "command": _npx_fetch_command(source, pack),
+            "command": _vendor_command(source, pack),
             "note": (
                 "Fetched on demand rather than committed: third-party content "
                 "with its own release cadence, tracked by tree SHA in "

@@ -128,12 +128,13 @@ def test_add_writes_manifest_ignore_block_and_pin(repo: Path):
 
     manifest = json.loads((repo / "skills" / "superpowers" / "pack.json").read_text())
     assert manifest["source"] == "obra/superpowers"
-    assert manifest["bootstrap"]["command"][:4] == [
-        "npx",
-        "--yes",
-        "skills@latest",
-        "add",
+    # A git clone, not `npx skills add`: that tool writes into every harness
+    # directory it knows and overwrites skills-lock.json at the repo root.
+    assert manifest["bootstrap"]["command"][:2] == [
+        "python3",
+        "scripts/vendor_pack.py",
     ]
+    assert "--into" in manifest["bootstrap"]["command"]
 
     ignore = (repo / ".gitignore").read_text()
     assert "skills/superpowers/*" in ignore
@@ -148,7 +149,8 @@ def test_add_records_the_ref_when_one_is_pinned(repo: Path):
     plan = plan_add(repo, "obra/superpowers@v3.0.0")
     apply_add(repo, plan, project_dir=repo)
     manifest = json.loads((repo / "skills" / "superpowers" / "pack.json").read_text())
-    assert "obra/superpowers@v3.0.0" in manifest["bootstrap"]["command"]
+    command = manifest["bootstrap"]["command"]
+    assert "--ref" in command and "v3.0.0" in command
     assert manifest["source"] == "obra/superpowers"
 
 

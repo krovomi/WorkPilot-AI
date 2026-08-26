@@ -2,9 +2,17 @@
 
 Three gates, in order. A skill has to clear all three:
 
-1. **Pack pin** — if ``skills.toml`` pins ``dotnet = "^1"``, a pack at 2.0.0 is
-   out. This is the axis that lets a project stay on an older pack while the
-   learning loop ships newer ones.
+1. **Pack selection and pin** — ``skills.toml``'s ``[packs]`` table is a
+   *want-list*: a pack it does not name is not resolved at all, and a pack it
+   pins to ``^1`` is out at 2.0.0. The pin is the axis that lets a project stay
+   on an older pack while newer ones ship.
+
+   Opt-in rather than opt-out, and the reason is mechanical. `skills/` holds
+   packs vendored on demand whose content is gitignored: with opt-out, the
+   emitted set would depend on whether the developer had run
+   `skills:bootstrap`, so `skills:check` would pass on a fresh clone and fail
+   for anyone who had. The build output has to be a function of what is
+   committed, and the want-list is the committed part.
 
    Before the pin is checked, the pack's *variant* is chosen. A pack that has
    forked keeps its older cuts in subdirectories with the targets they were
@@ -133,8 +141,22 @@ def resolve(
                 )
             continue
 
+        if config.packs and pack.name not in config.packs:
+            for src in pack.skills():
+                result.rejected.append(
+                    Rejection(
+                        src.name,
+                        src.kind,
+                        pack.name,
+                        "pack-pin",
+                        f"pack {pack.name} is not listed in this project's "
+                        f"[packs] — add it to .workpilot/skills.toml to use it",
+                    )
+                )
+            continue
+
         pin = config.packs.get(pack.name)
-        if pin and not satisfies(pack.version, pin):
+        if pin and pin != "latest" and not satisfies(pack.version, pin):
             for src in pack.skills():
                 result.rejected.append(
                     Rejection(

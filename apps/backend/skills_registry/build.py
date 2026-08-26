@@ -305,16 +305,12 @@ def _lockfile(
             }
             for src in sorted(resolution.selected, key=lambda s: s.name)
         },
-        "rejected": [
-            {
-                "name": r.name,
-                "kind": r.kind,
-                "pack": r.pack,
-                "gate": r.gate,
-                "reason": r.reason,
-            }
-            for r in sorted(resolution.rejected, key=lambda r: (r.name, r.gate))
-        ],
+        # Rejections are deliberately NOT recorded. They depend on what is on
+        # disk right now — a vendored pack contributes rejections only after
+        # `skills:bootstrap`, so writing them here would make a committed file
+        # a function of transient local state and `skills:check` would fail for
+        # whoever had bootstrapped. `skills:list` reports them live, which is
+        # where a diagnostic belongs.
         "emitted": sorted(p.as_posix() for p in plan.all_paths()),
     }
     return json.dumps(doc, indent="\t", ensure_ascii=False) + "\n"

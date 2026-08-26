@@ -19,6 +19,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Memory System (Graphiti)](#memory-system-graphiti)
   - [Skills System](#skills-system)
   - [Memory Search (mem-search)](#memory-search-mem-search)
+  - [Declarative Workflows](#declarative-workflows)
   - [Workflow Logger](#workflow-logger)
 - [Frontend Development](#frontend-development)
   - [Tech Stack](#tech-stack)
@@ -322,6 +323,43 @@ The agent-facing side is `skills/tooling/mem-search/`. `claude-mem` is declared 
 **optional** pack (`pnpm run skills:bootstrap --pack claude-mem`) rather than installed:
 its retrieval pattern is what was worth adopting, and taking the tool itself would add a
 fourth memory with its own worker and two more stores.
+
+### Declarative Workflows
+
+`workflows/<name>/workflow.yaml` describes a build as phases; `workflows/engine.py`
+resolves it against the effort level the user picked, the provider's capabilities
+and the files the task touched. The resolved profile is printed before the build
+starts, so the user sees what their effort setting bought.
+
+```bash
+pnpm run skills:workflow -- --effort high      # what would run, and what is pruned
+pnpm run skills:workflow -- --effort low --provider mistral
+```
+
+**Opt-in.** The engine is gated on `WORKPILOT_WORKFLOW_ENGINE=1` in
+`.env-files/.env`; unset, `handle_build_command` behaves exactly as it did
+before. It is off by default because most phases are still executed by the
+hard-coded sequence — see the table below for what the engine actually drives
+today.
+
+| Phase | Who runs it |
+|---|---|
+| `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
+| `observe` | the engine (`learning_loop/observe.py`) |
+| `qa` | the hard-coded loop, which the profile can switch off |
+| everything else | the hard-coded sequence in `run_autonomous_agent` |
+
+Two rules the resolver enforces and that are easy to break:
+
+- **A `hard_gate` is never pruned by effort**, at any level. Note this protects
+  the phase from pruning; it does not by itself make anything verify the gate.
+- **A deterministic phase is never pruned either.** It costs no API call, so
+  there is no effort level at which skipping it saves anything — and its verdict
+  is an *external* signal the learning loop may count as corroboration.
+
+A phase asking for `subagent-per-task` on a provider with no subagents degrades
+to sequential execution with a context reset, recorded on the resolved phase
+rather than silently pretended.
 
 ### Workflow Logger
 

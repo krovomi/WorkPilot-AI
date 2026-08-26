@@ -17,7 +17,10 @@ on:
       - '.claude-plugin/**'
       - 'skills-lock.json'
       - 'scripts/skills_cli.py'
+      - 'scripts/skills_sync.py'
       - '.workpilot/skills.toml'
+      - '.codex/**'
+      - '.github/agents/**'
   pull_request:
     branches: [main, develop]
     paths:
@@ -34,7 +37,10 @@ on:
       - '.claude-plugin/**'
       - 'skills-lock.json'
       - 'scripts/skills_cli.py'
+      - 'scripts/skills_sync.py'
       - '.workpilot/skills.toml'
+      - '.codex/**'
+      - '.github/agents/**'
 
 permissions:
   contents: read
@@ -67,6 +73,16 @@ jobs:
 
       - name: Run ruff format check
         run: ruff format apps/backend/ --check --diff
+
+      # `scripts/` as a whole is not linted here: three unrelated merge scripts
+      # carry pre-existing violations, and fixing them belongs to whoever owns
+      # them. These two are the registry's own, and they write the generated
+      # output the `skills` job then verifies — so they get the same guarantee
+      # as the code they generate from.
+      - name: Run ruff on the skills scripts
+        run: |
+          ruff check scripts/skills_cli.py scripts/skills_sync.py --output-format=github
+          ruff format scripts/skills_cli.py scripts/skills_sync.py --check --diff
 
   # TypeScript/JavaScript linting (Biome) - 15-25x faster than ESLint
   typescript:

@@ -255,3 +255,67 @@ class TestAgainstTheRealPacks:
         assert "dotnet-framework-48-expert" in names
         assert "net-developer" not in names
         assert "akka-net-patterns" not in names
+
+
+class TestPackWantList:
+    """`[packs]` is opt-in, and the reason is `skills:check` stability.
+
+    `skills/` holds packs vendored on demand whose content is gitignored. Under
+    the old opt-out rule the emitted set depended on whether the developer had
+    run `skills:bootstrap`: the check passed on a fresh clone and failed for
+    anyone who had, which is the worst kind of red — it accuses the person who
+    did the extra setup.
+    """
+
+    def test_an_unlisted_pack_is_not_resolved(self, skills_root, tmp_path):
+        r = resolve(
+            load_packs(skills_root), cfg(tmp_path, {"dotnet": "10.0"}, {"other": "^1"})
+        )
+        assert r.selected == []
+        assert r.rejections_for("modern-api")[0].gate == "pack-pin"
+        assert "not listed" in r.rejections_for("modern-api")[0].reason
+
+    def test_a_listed_pack_resolves(self, skills_root, tmp_path):
+        r = resolve(
+            load_packs(skills_root),
+            cfg(tmp_path, {"dotnet": "10.0"}, {"demo": "latest"}),
+        )
+        assert {s.name for s in r.selected} == {"modern-api", "modern-orm", "anywhere"}
+
+    def test_latest_accepts_any_version(self, skills_root, tmp_path):
+        """ "latest" means "whatever is in skills/", not a version to satisfy."""
+        r = resolve(
+            load_packs(skills_root),
+            cfg(tmp_path, {"dotnet": "10.0"}, {"demo": "latest"}),
+        )
+        assert r.selected
+
+    def test_a_listed_pack_still_honours_its_pin(self, skills_root, tmp_path):
+        r = resolve(
+            load_packs(skills_root), cfg(tmp_path, {"dotnet": "10.0"}, {"demo": "^1"})
+        )
+        assert r.selected == [], "a 2.0.0 pack satisfied a ^1 pin"
+
+    def test_an_empty_want_list_resolves_everything(self, skills_root, tmp_path):
+        """A project with no `[packs]` table has expressed no preference.
+
+        Refusing everything there would mean a fresh `.workpilot/skills.toml`
+        silently produces an empty palette, which reads as the tool being broken.
+        """
+        r = resolve(load_packs(skills_root), cfg(tmp_path, {"dotnet": "10.0"}, {}))
+        assert r.selected
+
+    def test_the_emitted_set_does_not_depend_on_what_is_vendored(self, tmp_path):
+        """The property the want-list exists to guarantee."""
+        root = tmp_path / "skills"
+        wanted = write_pack(root, "wanted", "1.0.0", {})
+        write_skill(wanted, "mine")
+        vendored = write_pack(root, "vendored", "0.0.0", {})
+
+        config = cfg(tmp_path, {}, {"wanted": "latest"})
+        before = {s.name for s in resolve(load_packs(root), config).selected}
+
+        write_skill(vendored, "theirs")  # someone ran skills:bootstrap
+        after = {s.name for s in resolve(load_packs(root), config).selected}
+
+        assert before == after == {"mine"}

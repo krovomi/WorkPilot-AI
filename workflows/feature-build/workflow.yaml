@@ -36,7 +36,7 @@ phases:
       on providers that cannot run subagents.
 
   - id: design-check
-    impl: impeccable/critique
+    impl: impeccable/impeccable
     when: touches("**/*.tsx,**/*.jsx,**/*.css,**/*.scss,**/*.vue")
     description: >-
       Frontend only. impeccable's 59 detector rules run locally with no API
@@ -87,7 +87,7 @@ phases:
       decision, and "it looked right" is not evidence.
 
   - id: observe
-    impl: task-observer/observe
+    impl: task-observer/task-observer
     always: true
     description: >-
       Watches for corrections the user made, work no skill covered, and its own

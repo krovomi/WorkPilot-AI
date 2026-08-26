@@ -15,12 +15,21 @@ node = "20.0.0"
 python = "3.13"
 
 [packs]
-# Pin a pack to a semver range to stay on it while newer ones ship.
-# Unpinned packs always resolve to whatever is in `skills/`.
+# A want-list, not a filter: a pack that is NOT listed here is not resolved at
+# all. Opt-in rather than opt-out, because `skills/` holds packs vendored on
+# demand whose content is gitignored — with opt-out the emitted set would
+# depend on whether you had run `skills:bootstrap`, and `skills:check` would
+# pass on a fresh clone and fail for anyone who had.
+#
+# The value is a semver range, or "latest" to take whatever is in `skills/`.
 comms = "^1"
 tooling = "^1"
-# The `dotnet` pack is authored here for consumer projects; this repo is
-# Python + TypeScript, so its skills correctly resolve away. Nothing to pin.
+# Not listed, therefore not emitted here:
+#   dotnet       authored for consumer projects; this repo is Python + TS
+#   bmad         76 wrappers, needs `skills:bootstrap` and a _bmad/ runtime
+#   superpowers, mattpocock, impeccable, task-observer, claude-mem
+#                upstream packs, available to any project that lists them
+# Add one and run `pnpm run skills:build` to pull it into this repo's palette.
 
 # Harnesses to materialise. Omit to use the defaults from
 # capabilities/harnesses.yaml (agnostic + gemini).

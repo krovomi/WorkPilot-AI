@@ -6,6 +6,13 @@
 	"source": "mattpocock/skills",
 	"maintainer": "upstream (vendored on demand)",
 	"bootstrap": {
-		"command": ["npx", "--yes", "skills@latest", "add", "mattpocock/skills", "--dir", "skills/mattpocock"]
+		"command": [
+			"python3",
+			"scripts/vendor_pack.py",
+			"mattpocock/skills",
+			"--into",
+			"skills/mattpocock"
+		],
+		"note": "Vendored by git clone, not by `npx skills add`: that tool writes into every harness directory it knows and writes its own skills-lock.json at the repo root — both are artifacts `skills-cli build` already owns. Verified, not assumed. `npx skills add <repo> --list` remains the way to see what a repository offers."
 	}
 }
