@@ -460,6 +460,33 @@ def cmd_why(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_hermes_ingest(args: argparse.Namespace) -> int:
+    """File skills hermes-agent authored as candidates for review.
+
+    Hermes has its own learning loop and writes skills from its own experience,
+    on surfaces WorkPilot never sees — Telegram, Discord, a cron job on a VPS.
+    What it lacks is the corroboration WorkPilot has. This composes the two the
+    only way that is honest: hermes proposes, the review queue decides, and a
+    person reads one diff.
+
+    Nothing under skills/<pack>/ is modified, and nothing under ~/.hermes is
+    written.
+    """
+    from learning_loop.hermes_ingest import ingest_hermes_skills
+
+    report = ingest_hermes_skills(
+        REPO_ROOT,
+        home=Path(args.home).expanduser() if args.home else None,
+        write=not args.dry_run,
+        limit=args.limit,
+    )
+    summary = report.describe()
+    print(summary or "hermes: nothing to do")
+    if args.dry_run and report.written:
+        print(f"  (dry run — {len(report.written)} file(s) not written)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="skills-cli", description=__doc__)
     parser.add_argument(
@@ -536,6 +563,22 @@ def main(argv: list[str] | None = None) -> int:
         "--check", action="store_true", help="report drift and exit 1, fetch nothing"
     )
     p_up.set_defaults(func=cmd_update)
+
+    p_hermes = sub.add_parser(
+        "hermes-ingest",
+        help="file skills hermes-agent authored as candidates for review",
+    )
+    p_hermes.add_argument(
+        "--home", help="hermes home to read (default: $HERMES_HOME or ~/.hermes)"
+    )
+    p_hermes.add_argument(
+        "--limit",
+        type=int,
+        default=25,
+        help="candidates per run (default: 25) — a review queue, not a dump",
+    )
+    p_hermes.add_argument("--dry-run", action="store_true", help="print, write nothing")
+    p_hermes.set_defaults(func=cmd_hermes_ingest)
 
     p_rm = sub.add_parser("remove", help="drop a pack and everything pointing at it")
     p_rm.add_argument("pack")

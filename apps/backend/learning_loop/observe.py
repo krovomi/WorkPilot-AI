@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .hermes_ingest import HermesIngestReport, ingest_hermes_skills
 from .replay import ReplayResult, load_episodes
 from .skill_proposer import (
     Evidence,
@@ -53,6 +54,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "BuildOutcome",
+    "HermesIngestReport",
     "ObserveReport",
     "signals_from_outcome",
     "run_observe",
@@ -91,10 +93,14 @@ class ObserveReport:
     proposals_written: list[Path] = field(default_factory=list)
     rejected: list[tuple[str, RejectionReason]] = field(default_factory=list)
     replay: ReplayResult | None = None
+    hermes: HermesIngestReport | None = None
+    """What hermes-agent had authored since the last look, if it is installed."""
 
     def describe(self) -> str:
+        hermes_summary = self.hermes.describe() if self.hermes else ""
         if not self.signals and not self.outcomes_recorded:
-            return "observe: nothing externally verified to learn from"
+            head = "observe: nothing externally verified to learn from"
+            return f"{head}\n{hermes_summary}" if hermes_summary else head
         parts = [
             f"observe: {len(self.signals)} external signal(s)"
             + (f" — {', '.join(s.value for s in self.signals)}" if self.signals else "")
@@ -107,6 +113,8 @@ class ObserveReport:
             parts.append(f"  held back {pattern_id} ({reason.value})")
         if self.replay and self.replay.ran:
             parts.append(f"  replay    {len(self.replay.regressions)} regression(s)")
+        if hermes_summary:
+            parts.append(hermes_summary)
         return "\n".join(parts)
 
 
@@ -166,6 +174,14 @@ def run_observe(
     """
     report = ObserveReport(spec_id=outcome.spec_id)
     try:
+        # Hermes-authored skills, if hermes is installed on this machine. Read
+        # before the early return below, because it does not depend on what
+        # *this* build verified: hermes learned it somewhere WorkPilot was not
+        # watching, and a build with no external signals of its own is not a
+        # reason to ignore that. It arrives as a candidate with no
+        # corroboration and is promoted by nothing — see hermes_ingest.
+        report.hermes = ingest_hermes_skills(repo_root, write=write)
+
         report.signals = signals_from_outcome(outcome)
         report.replay = replay
 

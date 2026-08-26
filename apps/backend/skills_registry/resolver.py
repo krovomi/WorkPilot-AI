@@ -58,7 +58,7 @@ class Rejection:
     kind: str
     pack: str
     gate: str
-    """``pack-pin`` | ``targets`` | ``requires``"""
+    """``pack-pin`` | ``targets`` | ``requires`` | ``name-collision``"""
     reason: str
 
 
@@ -117,21 +117,53 @@ def check_requires(requires: dict[str, Any], project_dir: Path) -> tuple[bool, s
     return True, ""
 
 
+def _pack_order(packs: list[Pack], config: ProjectConfig) -> list[Pack]:
+    """Packs in the order that decides who wins a name collision.
+
+    A project's ``[packs]`` list is written by hand, so its order is a
+    statement of preference: a project that lists ``superpowers`` before
+    ``hermes`` has said which one it wants when both offer
+    ``test-driven-development``. Packs it does not list keep their incoming
+    order, which is alphabetical, so the outcome is deterministic either way
+    and never depends on filesystem iteration.
+    """
+    if not config.packs:
+        return list(packs)
+    preference = {name: i for i, name in enumerate(config.packs)}
+    return sorted(
+        packs, key=lambda p: (preference.get(p.name, len(preference)), p.name)
+    )
+
+
 def resolve(
     packs: list[Pack],
     config: ProjectConfig,
     *,
     ignore_requires: bool = False,
 ) -> Resolution:
-    """Run the three gates over every skill in ``packs``.
+    """Run the gates over every skill in ``packs``.
 
-    ``ignore_requires`` skips gate 3. It exists for ``skills-cli list``, which
-    should be able to show what a project *would* get once its runtimes are
-    bootstrapped — not for the build, which must only emit what works.
+    ``ignore_requires`` skips the requires gate. It exists for ``skills-cli
+    list``, which should be able to show what a project *would* get once its
+    runtimes are bootstrapped — not for the build, which must only emit what
+    works.
+
+    The last gate is **name collision**, and it exists because the build keys
+    its output on the skill name: `.agents/skills/<name>/SKILL.md`. Two packs
+    providing the same name therefore used to produce one file whose content
+    depended on which pack was iterated last — alphabetical order, silently.
+    That was survivable while the tracked upstreams happened not to overlap;
+    it stops being survivable the moment a fifth pack is added, since several
+    of them are adaptations of each other and share skill names on purpose.
+
+    The loser is rejected with a reason naming the winner, so `skills-cli why`
+    can answer "where did my skill go" instead of the answer being "nowhere,
+    and nobody noticed".
     """
     result = Resolution()
+    claimed: dict[tuple[str, str], str] = {}
 
-    for declared in packs:
+    for declared in _pack_order(packs, config):
         pack = (
             declared.resolve_variant(config.targets) if declared.variants else declared
         )
@@ -195,6 +227,23 @@ def resolve(
                         Rejection(src.name, src.kind, pack.name, "requires", reason)
                     )
                     continue
+
+            owner = claimed.get((src.kind, src.name))
+            if owner is not None:
+                result.rejected.append(
+                    Rejection(
+                        src.name,
+                        src.kind,
+                        pack.name,
+                        "name-collision",
+                        f"pack {owner!r} already provides a {src.kind} named "
+                        f"{src.name!r}, and the build emits one file per name. "
+                        f"List the pack you want first in [packs], or stop "
+                        f"vendoring the duplicate.",
+                    )
+                )
+                continue
+            claimed[(src.kind, src.name)] = pack.name
 
             result.selected.append(src)
 
