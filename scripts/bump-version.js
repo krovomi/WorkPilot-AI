@@ -133,6 +133,22 @@ function checkGitStatus() {
 }
 
 // Update package.json version
+/**
+ * Re-serialize a package.json using the indentation the file already had.
+ *
+ * Hardcoding two spaces here rewrote every line of both manifests on every
+ * release: this repo indents JSON with tabs, so a two-line version bump landed
+ * as a 530-line diff that also silently reverted the convention. A release
+ * commit nobody can read is a release commit nobody checks.
+ */
+function serialize(json, original) {
+	const match = original.match(/^\{\r?\n([ \t]+)/);
+	const indent = match ? match[1] : "\t";
+	const newline = original.includes("\r\n") ? "\r\n" : "\n";
+	const body = JSON.stringify(json, null, indent);
+	return `${newline === "\r\n" ? body.replace(/\n/g, "\r\n") : body}${newline}`;
+}
+
 function updatePackageJson(newVersion) {
 	const frontendPath = path.join(
 		__dirname,
@@ -148,16 +164,18 @@ function updatePackageJson(newVersion) {
 	}
 
 	// Update frontend package.json
-	const frontendJson = JSON.parse(fs.readFileSync(frontendPath, "utf8"));
+	const frontendRaw = fs.readFileSync(frontendPath, "utf8");
+	const frontendJson = JSON.parse(frontendRaw);
 	const oldVersion = frontendJson.version;
 	frontendJson.version = newVersion;
-	fs.writeFileSync(frontendPath, `${JSON.stringify(frontendJson, null, 2)}\n`);
+	fs.writeFileSync(frontendPath, serialize(frontendJson, frontendRaw));
 
 	// Update root package.json if it exists
 	if (fs.existsSync(rootPath)) {
-		const rootJson = JSON.parse(fs.readFileSync(rootPath, "utf8"));
+		const rootRaw = fs.readFileSync(rootPath, "utf8");
+		const rootJson = JSON.parse(rootRaw);
 		rootJson.version = newVersion;
-		fs.writeFileSync(rootPath, `${JSON.stringify(rootJson, null, 2)}\n`);
+		fs.writeFileSync(rootPath, serialize(rootJson, rootRaw));
 	}
 
 	return { oldVersion, packagePath: frontendPath };
