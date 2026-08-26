@@ -1,0 +1,140 @@
+"""Tests for the resolved-profile endpoint the Kanban reads.
+
+Chantier 4 asks for the user to see what an effort level buys *before* the
+build runs. Three properties this endpoint has to hold to be worth showing:
+
+* dropped phases are returned in their declared position, with their reason —
+  a list of survivors cannot answer "what would one level more give me";
+* resolving is **side-effect free**, because the UI may poll it and the other
+  provider-resolution path eats the single-shot "resume with X" marker;
+* a caller cannot walk out of the project or the workflows folder.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from workflows.api import router  # noqa: E402
+
+_app = FastAPI()
+_app.include_router(router)
+_client = TestClient(_app)
+
+
+@pytest.fixture
+def project(tmp_path: Path) -> Path:
+    (tmp_path / ".workpilot" / "specs" / "001-x").mkdir(parents=True)
+    return tmp_path
+
+
+def get(**params):
+    """Call the endpoint the way the renderer does — over HTTP.
+
+    Through the app rather than the function, so query parsing, the
+    `includeLevels` alias and the optional-parameter defaults are exercised
+    instead of being bypassed by a direct Python call.
+    """
+    clean = {k: v for k, v in params.items() if v is not None}
+    return _client.get("/api/workflow-profile/", params=clean).json()
+
+
+def ask(project: Path, **kwargs):
+    return get(project_dir=str(project), spec_id="001-x", **kwargs)
+
+
+class TestResolution:
+    def test_it_returns_the_shipped_pipeline(self, project):
+        res = ask(project, effort="high")
+        assert res["success"] is True
+        ids = [p["id"] for p in res["profile"]["phases"]]
+        assert ids[0] == "brainstorm"
+        assert ids[-1] == "observe"
+
+    def test_dropped_phases_stay_in_place_with_a_reason(self, project):
+        res = ask(project, effort="low")
+        by_id = {p["id"]: p for p in res["profile"]["phases"]}
+        assert by_id["brainstorm"]["runs"] is False
+        assert by_id["brainstorm"]["skipReason"] == "effort"
+        assert by_id["brainstorm"]["minEffort"] == "high"
+        # …and the position is preserved, not filtered out.
+        assert [p["id"] for p in res["profile"]["phases"]][0] == "brainstorm"
+
+    def test_the_hard_gate_runs_at_the_cheapest_level(self, project):
+        res = ask(project, effort="low")
+        verify = next(p for p in res["profile"]["phases"] if p["id"] == "verify")
+        assert verify["runs"] is True
+        assert verify["hardGate"] == "tests-pass"
+
+    def test_a_degradation_is_reported_not_hidden(self, project, monkeypatch):
+        import types
+
+        import skills_registry.providers as providers
+
+        monkeypatch.setattr(
+            providers,
+            "get_provider_capabilities",
+            lambda name: types.SimpleNamespace(supports_subagents=False),
+        )
+        res = ask(project, effort="high", provider="mistral")
+        coding = next(p for p in res["profile"]["phases"] if p["id"] == "coding")
+        assert coding["dispatch"] == "sequential-reset"
+        assert coding["degradedFrom"] == "subagent-per-task"
+        assert coding["degradedReason"]
+
+    def test_each_level_is_priced(self, project):
+        res = ask(project, effort="medium")
+        counts = {lvl["effort"]: lvl["count"] for lvl in res["profile"]["levels"]}
+        assert counts["low"] < counts["medium"] < counts["high"] < counts["ultrathink"]
+
+    def test_levels_can_be_left_out(self, project):
+        res = ask(project, effort="medium", includeLevels="false")
+        assert "levels" not in res["profile"]
+
+    def test_the_deterministic_phase_is_flagged(self, project):
+        res = ask(project, effort="low")
+        design = next(p for p in res["profile"]["phases"] if p["id"] == "design-check")
+        assert design["deterministic"] is True
+        assert design["runs"] is True
+
+
+class TestItDoesNotTouchAnything:
+    def test_resolving_leaves_the_resume_marker_alone(self, project, monkeypatch):
+        """The UI may poll this. It must not eat a single-shot choice."""
+        from core.client import RESUME_WITH_PROVIDER_FILE
+
+        monkeypatch.delenv("AUTO_CLAUDE_PROVIDER", raising=False)
+        spec = project / ".workpilot" / "specs" / "001-x"
+        marker = spec / RESUME_WITH_PROVIDER_FILE
+        marker.write_text("copilot", encoding="utf-8")
+
+        assert ask(project)["success"] is True
+        assert marker.exists()
+
+
+class TestItRefusesToWander:
+    @pytest.mark.parametrize("spec_id", ["../..", "a/b", "", ".", ".."])
+    def test_a_spec_id_is_a_directory_name(self, project, spec_id):
+        res = get(project_dir=str(project), spec_id=spec_id)
+        assert res["success"] is False
+
+    def test_a_workflow_name_cannot_escape_the_folder(self, project):
+        res = ask(project, workflow="../../etc")
+        assert res["success"] is False
+        assert "unknown workflow" in res["error"]
+
+    def test_a_missing_spec_is_an_error_not_a_guess(self, tmp_path):
+        res = get(project_dir=str(tmp_path), spec_id="404-nope")
+        assert res["success"] is False
+
+    def test_neither_form_of_address_is_an_error(self, tmp_path):
+        res = get()
+        assert res["success"] is False
+        assert "spec_dir" in res["error"]

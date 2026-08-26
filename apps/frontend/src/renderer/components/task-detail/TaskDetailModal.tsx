@@ -93,6 +93,7 @@ import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
+import { WorkflowProfileCard } from "./WorkflowProfileCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
 import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
 import { TaskReview } from "./TaskReview";
@@ -1244,6 +1245,14 @@ function TaskDetailModalContent({
 
 											{/* Provider × LLM × Effort prerequisite for imported/duplicated tasks */}
 											<ExecutionFormulaBanner task={task} />
+
+											{/* What the chosen effort level actually runs, before it runs */}
+											<WorkflowProfileCard
+												task={task}
+												projectPath={
+													taskProject?.path ?? activeProject?.path
+												}
+											/>
 
 											{/* Metadata */}
 											<TaskMetadataComponent task={task} />

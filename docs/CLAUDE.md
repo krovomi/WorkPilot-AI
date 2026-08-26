@@ -386,6 +386,20 @@ phase dispatched that way does not rehydrate the transcript a pending
 writer's reasoning is not a second opinion. The marker is restored afterwards,
 so the coder loop's own resume survives a review pass between two iterations.
 
+#### The resolved profile in the UI
+
+The same profile the CLI banner prints is served to the Kanban at
+`GET /api/workflow-profile/?project_dir=…&spec_id=…` and rendered in the task
+detail modal (`WorkflowProfileCard`). Dropped phases are returned **in their
+declared position with their reason**, plus a per-level phase count: a list of
+survivors cannot answer "what would one level more give me", which is the
+question someone is actually asking in front of an effort selector.
+
+The endpoint resolves the provider through `get_phase_provider`, never
+`_get_active_provider` — the latter consumes the single-shot
+RESUME_WITH_PROVIDER marker, and an endpoint the UI may poll must not eat a
+choice the next build was meant to honour.
+
 ### Workflow Logger
 
 Centralized logging system for tracking all AI agents, skills, hooks and workflows:

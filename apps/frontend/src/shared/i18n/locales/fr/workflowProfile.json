@@ -1,0 +1,52 @@
+{
+	"title": "Profil d'exécution",
+	"subtitle": "Ce que ce niveau d'effort exécute, avant qu'il ne s'exécute",
+	"loading": "Résolution du workflow…",
+	"error": "Workflow non résolu : {{error}}",
+	"disabled": {
+		"title": "Le moteur de workflow est éteint",
+		"body": "WORKPILOT_WORKFLOW_ENGINE vaut 0 : l'ancien pipeline s'exécute et ce profil n'est qu'un aperçu."
+	},
+	"summary": {
+		"phases": "{{count}} phases sur {{total}}",
+		"effort": "Effort",
+		"provider": "Provider",
+		"providerUnset": "non défini"
+	},
+	"phase": {
+		"runs": "exécutée",
+		"skipped": "sautée",
+		"skippedByEffort": "demande un effort ≥ {{minEffort}}",
+		"skippedUntouched": "aucun fichier concerné modifié",
+		"hardGate": "Jamais sautée — {{gate}}",
+		"always": "Toujours exécutée",
+		"deterministic": "Aucun appel API",
+		"humanGate": "S'arrête pour approbation",
+		"conditional": "Seulement si {{globs}} change",
+		"dispatch": {
+			"inline": "en ligne",
+			"fresh-context": "contexte neuf",
+			"subagent-per-task": "un sous-agent par tâche",
+			"sequential-reset": "séquentiel, contexte réinitialisé"
+		},
+		"degraded": "Demandait {{from}} ; {{reason}}"
+	},
+	"levels": {
+		"title": "Ce que chaque niveau achète",
+		"current": "actuel",
+		"adds": "+{{count}} phase",
+		"adds_other": "+{{count}} phases",
+		"removes": "−{{count}} phase",
+		"removes_other": "−{{count}} phases",
+		"same": "mêmes phases",
+		"preview": "Aperçu",
+		"backToTask": "Revenir au niveau de la tâche"
+	},
+	"missing": {
+		"title": "Non installé",
+		"body": "{{count}} phase désigne une implémentation absente de ce clone. Elle sera signalée et sautée, jamais devinée.",
+		"body_other": "{{count}} phases désignent des implémentations absentes de ce clone. Elles seront signalées et sautées, jamais devinées."
+	},
+	"expand": "Afficher le pipeline",
+	"collapse": "Masquer le pipeline"
+}
