@@ -13,6 +13,7 @@ from .engine import (
     validate_impls,
 )
 from .gates import GateRun, GateVerdict, run_deterministic_gates
+from .hard_gates import HardGateReport, HardGateResult, evaluate_hard_gates
 from .spec import EFFORT_ORDER, Phase, Workflow, WorkflowError, load_workflow
 
 __all__ = [
@@ -20,11 +21,14 @@ __all__ = [
     "ExecutionProfile",
     "GateRun",
     "GateVerdict",
+    "HardGateReport",
+    "HardGateResult",
     "MissingImpl",
     "Phase",
     "ResolvedPhase",
     "Workflow",
     "WorkflowError",
+    "evaluate_hard_gates",
     "load_workflow",
     "resolve_profile",
     "run_deterministic_gates",

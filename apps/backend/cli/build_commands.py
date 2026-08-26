@@ -170,6 +170,7 @@ def _run_observe_phase(
     qa_approved: bool,
     ran_qa: bool,
     detector_clean: bool | None = None,
+    tests_passed: bool | None = None,
 ) -> None:
     """Turn what this build externally verified into learning-loop candidates.
 
@@ -194,7 +195,7 @@ def _run_observe_phase(
             # decision, which is the one thing the external-signal rule exists
             # to prevent.
             qa_approved=qa_approved if ran_qa else None,
-            tests_passed=_tests_went_green(spec_dir),
+            tests_passed=tests_passed,
             # None when no gate ran or one could not be evaluated. Recording a
             # gate that did not execute as clean would manufacture exactly the
             # corroboration the promotion rules refuse to invent.
@@ -209,6 +210,30 @@ def _run_observe_phase(
         from debug import debug_warning
 
         debug_warning("run.py", f"Observe phase skipped: {exc}")
+
+
+def _report_hard_gates(profile, spec_dir: Path, tests_passed: bool | None) -> None:
+    """Say whether the workflow's non-negotiable gates actually held.
+
+    Reports; does not abort. The build has already produced a worktree and a
+    diff, and throwing that away over a gate the user can see for themselves
+    would be worse than telling them plainly. What matters is that "not
+    negotiable" stops being a claim nobody checks.
+    """
+    if profile is None:
+        return
+    try:
+        from workflows import evaluate_hard_gates
+
+        report = evaluate_hard_gates(profile, spec_dir, tests_passed=tests_passed)
+        if summary := report.describe():
+            print("\n" + summary)
+        if report.blocking:
+            print("  → the branch is not ready to merge on this evidence.")
+    except Exception as exc:  # noqa: BLE001 - a gate reports, never fails a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Hard gate check skipped: {exc}")
 
 
 def _tests_went_green(spec_dir: Path) -> bool | None:
@@ -558,6 +583,14 @@ def handle_build_command(
             spec_dir,
         )
 
+        # Hard gates. `verify` declares `hard_gate: tests-pass`, which until
+        # now only kept the phase out of the effort pruner — nothing checked
+        # whether the tests actually passed, so a build could conclude green
+        # with a red suite. Evaluated here, from the same test evidence the
+        # observe phase records, so the two cannot disagree.
+        _tests_green = _tests_went_green(spec_dir)
+        _report_hard_gates(_profile, spec_dir, _tests_green)
+
         # The `observe` phase. Marked `always: true` in the workflow, so it
         # runs at every effort level — it costs no API call, it only reads what
         # the verifiers already said. Placed after QA so the QA verdict is one
@@ -568,6 +601,7 @@ def handle_build_command(
             qa_approved=qa_approved,
             ran_qa=qa_should_run,
             detector_clean=gate_run.all_clean if gate_run else None,
+            tests_passed=_tests_green,
         )
 
         # Post-build finalization (only for isolated sequential mode)

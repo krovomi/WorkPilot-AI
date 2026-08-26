@@ -345,14 +345,19 @@ today.
 | Phase | Who runs it |
 |---|---|
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
+| the `tests-pass` hard gate | the engine (`workflows/hard_gates.py`) |
 | `observe` | the engine (`learning_loop/observe.py`) |
 | `qa` | the hard-coded loop, which the profile can switch off |
 | everything else | the hard-coded sequence in `run_autonomous_agent` |
 
 Two rules the resolver enforces and that are easy to break:
 
-- **A `hard_gate` is never pruned by effort**, at any level. Note this protects
-  the phase from pruning; it does not by itself make anything verify the gate.
+- **A `hard_gate` is never pruned by effort**, and it is evaluated after the
+  build: `verify` declares `tests-pass`, and `workflows/hard_gates.py` reports
+  whether it held. A gate that failed is reported as failed; one with no
+  evidence to judge is reported as unknown and does not block, because
+  refusing on an absent signal would make every project without a QA report
+  unbuildable.
 - **A deterministic phase is never pruned either.** It costs no API call, so
   there is no effort level at which skipping it saves anything — and its verdict
   is an *external* signal the learning loop may count as corroboration.
