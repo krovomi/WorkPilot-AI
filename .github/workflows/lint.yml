@@ -121,8 +121,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install PyYAML
-        run: pip install "PyYAML>=6.0" pytest
+      # pytest-asyncio is not optional even though the eval suite is entirely
+      # synchronous: tests/conftest.py declares `pytest_plugins =
+      # ("pytest_asyncio",)`, so every pytest run in this repo loads it and
+      # fails at collection without it.
+      - name: Install the skills toolchain
+        run: pip install "PyYAML>=6.0" pytest pytest-asyncio
 
       - name: Check materialised skills are up to date
         run: python3 scripts/skills_cli.py build --check
