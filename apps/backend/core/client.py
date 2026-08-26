@@ -1300,8 +1300,15 @@ def create_client(
     try:
         from agents.subagents import resolve as _resolve_subagents
 
+        # The provider matters: `resolve` returns no roster at all for one
+        # that cannot run subagents, rather than handing the SDK a list it
+        # will ignore. Omitting it here was why that degradation, though
+        # implemented and tested, never fired in a real run.
         _merged_agents = _resolve_subagents(
-            agent_type, project_dir=project_dir, user_agents=agents
+            agent_type,
+            project_dir=project_dir,
+            user_agents=agents,
+            provider=_get_active_provider(spec_dir),
         )
     except Exception as exc:
         # Roster composition must never break client creation; falling back to

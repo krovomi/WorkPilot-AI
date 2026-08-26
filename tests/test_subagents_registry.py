@@ -307,3 +307,28 @@ class TestPRReviewRoster:
             if not (prompts / s.prompt_file).is_file()
         ]
         assert not missing, f"specs name prompt files that do not exist: {missing}"
+
+
+class TestProviderDegradationReachesTheClient:
+    """The degradation has to fire where clients are actually built.
+
+    `resolve()` returns no roster for a provider that cannot run subagents, and
+    that was tested from the start. What was not tested is that `create_client`
+    *asks*: it called `resolve()` without a provider, so the degradation was
+    implemented, covered, and never once exercised in a real run. A capability
+    matrix nobody consults is documentation, not behaviour.
+    """
+
+    def test_create_client_passes_the_active_provider(self):
+        source = (REPO_ROOT / "apps/backend/core/client.py").read_text(encoding="utf-8")
+        call = source[source.index("_resolve_subagents(") :][:400]
+        assert "provider=" in call, (
+            "create_client resolves subagents without a provider — "
+            "providers with no subagent support will silently get a roster"
+        )
+
+    def test_a_provider_without_subagents_still_yields_none(self, tmp_path):
+        """Guards the other half: `resolve` must keep honouring the argument."""
+        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+        assert resolve("coder", project_dir=tmp_path, provider="mistral") is None
+        assert resolve("coder", project_dir=tmp_path, provider="claude") is not None
