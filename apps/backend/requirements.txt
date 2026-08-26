@@ -6,7 +6,7 @@ claude-agent-sdk>=0.2.110
 python-dotenv>=1.2.2
 
 # WebSocket support for streaming development mode
-websockets>=16.0
+websockets>=17.0.1
 
 # TOML parsing fallback for Python < 3.11
 tomli>=2.0.0; python_version < "3.11"
@@ -40,7 +40,7 @@ pywin32>=312; sys_platform == "win32"
 google-generativeai>=0.8.0
 
 # Pydantic for structured output schemas
-pydantic>=2.0.0
+pydantic>=2.13.4
 
 # Rich for beautiful CLI formatting (intent recognition)
 rich>=15.0.0
@@ -63,21 +63,21 @@ slowapi>=0.1.10
 
 # Multi-user server mode (central deployment)
 alembic>=1.18.5          # DB schema migrations
-asyncpg>=0.29.0          # PostgreSQL async driver (server mode)
+asyncpg>=0.31.0          # PostgreSQL async driver (server mode)
 aiosqlite>=0.20.0        # SQLite async driver (dev/tests fallback)
 argon2-cffi>=25.1.0      # Password hashing for local accounts
 PyJWT[crypto]>=2.13.0     # JWT access/refresh tokens + Entra ID JWKS validation
 cryptography>=49.0.0     # Fernet encryption for per-user integration secrets
 email-validator>=2.3.0   # pydantic EmailStr support (auth schemas)
 requests>=2.34.2
-httpx[http2]>=0.27.0
+httpx[http2]>=0.28.1
 # Imported unconditionally by the Copilot / GitHub Models agent client
 # (core/agent_client.py) and by the Graphiti validators + team sync. It was
 # never declared, so those code paths raised ModuleNotFoundError at runtime on
 # any environment that did not happen to pull aiohttp in transitively.
 aiohttp>=3.10.0
 h2>=4.3.0  # HTTP/2 support for Windsurf gRPC proxy
-sqlalchemy>=2.0.0
+sqlalchemy>=2.0.52
 psutil>=5.9.0
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK
