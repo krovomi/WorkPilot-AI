@@ -40,10 +40,16 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_WORKFLOW = "feature-build"
 
 
-def _validate_dir(raw: str, label: str) -> Path:
+def _validate_dir(raw: str, label: str, base: Path | None = None) -> Path:
     if not raw or raw.strip().startswith("-"):
         raise ValueError(f"{label} must be a non-empty path not starting with '-'")
     p = Path(raw).expanduser().resolve()
+    if base is not None:
+        b = base.expanduser().resolve()
+        try:
+            p.relative_to(b)
+        except ValueError:
+            raise ValueError(f"{label} must be within {b}") from None
     if not p.exists() or not p.is_dir():
         raise ValueError(f"{label} does not exist or is not a directory: {p}")
     return p
@@ -59,12 +65,12 @@ def _resolve_spec_dir(
     written down once, here, instead of once here and once in TypeScript.
     """
     if spec_dir:
-        return _validate_dir(spec_dir, "spec_dir")
+        return _validate_dir(spec_dir, "spec_dir", base=_REPO_ROOT)
     if not (project_dir and spec_id):
         raise ValueError("pass spec_dir, or both project_dir and spec_id")
     if "/" in spec_id or "\\" in spec_id or spec_id in ("", ".", ".."):
         raise ValueError(f"spec_id is not a directory name: {spec_id!r}")
-    root = _validate_dir(project_dir, "project_dir")
+    root = _validate_dir(project_dir, "project_dir", base=_REPO_ROOT)
     candidate = (root / ".workpilot" / "specs" / spec_id).resolve()
     if not str(candidate).startswith(str(root) + os.sep):
         raise ValueError("spec_id escapes the project directory")
