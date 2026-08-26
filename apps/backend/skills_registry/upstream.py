@@ -27,6 +27,7 @@ import logging
 import re
 import subprocess
 from pathlib import Path
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -92,9 +93,14 @@ def parse_source(raw: str) -> SourceSpec:
     if _GH_SLUG.match(spec):
         return SourceSpec(raw, spec, ref)
 
-    if spec.startswith(("http://", "https://", "git@", "ssh://")) and (
-        "github.com" in spec
-    ):
+    is_github_source = False
+    if spec.startswith(("http://", "https://", "ssh://")):
+        parsed = urlparse(spec)
+        is_github_source = parsed.hostname == "github.com"
+    elif spec.startswith("git@"):
+        is_github_source = spec.startswith("git@github.com:")
+
+    if is_github_source:
         if match := _URL_TAIL.search(spec):
             return SourceSpec(raw, f"{match.group(1)}/{match.group(2)}", ref)
 
