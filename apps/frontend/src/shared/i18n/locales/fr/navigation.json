@@ -193,7 +193,7 @@
 		"current": "Actuelle",
 		"latest": "Dernière",
 		"lastChecked": "Dernière vérification",
-		"notInstalledDescription": "Codex CLI n'est pas installé. Cliquez sur « Installer » pour l'installer via pnpm en arrière-plan :",
+		"notInstalledDescription": "Codex CLI n'est pas installé. Cliquez sur « Installer » pour l'installer en arrière-plan :",
 		"installing": "Installation en cours, merci de patienter...",
 		"viewDocs": "Voir la documentation Codex CLI"
 	}

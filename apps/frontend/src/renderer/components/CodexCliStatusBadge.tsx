@@ -282,11 +282,14 @@ export function CodexCliStatusBadge({
 							<p>
 								{t(
 									"navigation:codex.notInstalledDescription",
-									"Codex CLI is not installed. Click \"Install\" to install it via pnpm in the background:",
+									"Codex CLI is not installed. Click \"Install\" to install it in the background:",
 								)}
 							</p>
+							{/* The package manager is chosen at install time — pnpm when it
+							    has a global bin directory, npm otherwise — so naming one
+							    here would be wrong half the time. */}
 							<p className="mt-1 font-mono bg-muted px-1 rounded break-all">
-								pnpm install -g @openai/codex@latest
+								install -g @openai/codex@latest
 							</p>
 						</div>
 					)}
