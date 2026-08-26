@@ -69,6 +69,23 @@ class _BadRequest(ValueError):
 
 
 def _validate_dir(raw: str, label: str) -> Path:
+    """Normalise a caller-supplied directory path.
+
+    CodeQL flags the `Path(raw)` below as `py/path-injection`, and an autofix
+    has already once "resolved" it by confining the result to this repository
+    (PR #20). **Do not reinstate that.** WorkPilot builds other people's
+    projects: the directory is outside this repository by definition, and
+    confining it turns the endpoint into one that answers only for people
+    building WorkPilot itself — ten red tests and an empty task panel for
+    everyone else.
+
+    There is no sanitiser for "an absolute path the local user chose in their
+    own desktop app", because that is the feature. What is guarded instead —
+    `spec_id` as a bare name, containment of the derived spec directory under
+    the given project directory, and `workflow` confined to `workflows/` — is
+    in `_resolve_spec_dir` and `_workflow_path`, where the traversal risk
+    actually lives. `TestItAnswersForRealProjects` fails if this is undone.
+    """
     if not raw or raw.strip().startswith("-"):
         raise _BadRequest("empty", f"{label} is empty or starts with '-'")
     p = Path(raw).expanduser().resolve()
