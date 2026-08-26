@@ -126,6 +126,40 @@ gemini:
     Gemini CLI reads the agnostic skills path, but its slash commands are TOML
     files. Those are generated here, never hand-edited.
 
+hermes:
+  skills_path: .agents/skills
+  agents_path: null
+  commands_path: null
+  format: skill-dir
+  instruction_file: AGENTS.md
+  subagents: native
+  hooks: null
+  mcp: null
+  default: false
+  note: >-
+    Nous Research's hermes-agent. Listed here because it is supported, and
+    emitting nothing because it already reads what this repo already builds:
+    hermes scans `<project>/.hermes/skills/` and `<project>/.agents/skills/`
+    at the git root, and injects AGENTS.md — the agnostic output and the
+    portable instruction file, both committed. Adding a `.hermes/skills/`
+    mirror would duplicate 390-odd files to say the same thing twice and
+    would put `skills:check` in the position of policing two copies.
+
+    What it does need is a trust decision, and that is deliberate on their
+    side: project skills are load-on-demand procedures an agent will follow,
+    so auto-sourcing them from any cloned repo is a prompt-injection vector.
+    Hermes therefore loads none until the repo is listed in
+    `skills.trusted_project_dirs` in `~/.hermes/config.yaml` — one
+    `hermes skills trust` in the checkout. It is a per-machine decision by a
+    person, so nothing here can or should make it.
+
+    Not in providers.yaml: hermes is an agent runtime, not an LLM provider.
+    It has its own loop, its own tools and its own model routing, and listing
+    it as a provider would claim WorkPilot can drive a task on it. It cannot,
+    and a second entry in the wrong matrix is exactly the sort of half-truth
+    that file was created to end.
+  tools: {}   # reads the agnostic output; nothing to translate
+
 opencode:
   skills_path: .agents/skills
   agents_path: null

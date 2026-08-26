@@ -269,6 +269,13 @@ open standard so the same file works across Claude Code, Copilot, Codex, Cursor 
 | `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | Per-harness mirrors |
 | `.gemini/commands/*.toml` | Gemini CLI mirror |
 
+A skill name is the output key — `.agents/skills/<name>/` — so two packs providing the
+same name is a **collision**, not a merge. The resolver rejects the loser at the
+`name-collision` gate with a reason naming the winner (`skills-cli why <skill>` prints
+it), and the project decides: the pack listed first in `[packs]` wins. Several tracked
+upstreams are adaptations of each other and share names on purpose, so leaving this to
+iteration order meant the emitted content depended on alphabetical luck.
+
 Those are **generated**. `skills/` is the source, and `scripts/skills_cli.py` is the only
 thing that writes the outputs — `pnpm run skills:check` fails CI on drift. Packs are
 added, updated and dropped through the same CLI (`skills:add`, `skills:update`,
@@ -299,6 +306,59 @@ manager = SkillManager("apps/backend/skills")
 skill = manager.load_skill("framework-migration")
 result = skill.execute_script("analyze_stack.py", {"project-root": "/path/to/project"})
 ```
+
+### hermes-agent
+
+[hermes-agent](https://github.com/NousResearch/hermes-agent) (Nous Research, MIT) is
+supported, and the integration is deliberately small — because most of it already
+existed.
+
+**As a harness, nothing is emitted.** Hermes scans `<project>/.hermes/skills/` *and*
+`<project>/.agents/skills/` at the git root, and injects `AGENTS.md`. Both are already
+built and committed here, so `capabilities/harnesses.yaml` points its entry at the
+agnostic path. A `.hermes/` mirror would duplicate ~390 files to say the same thing
+twice and put `skills:check` in charge of policing two copies.
+
+What it does need is one command in the checkout:
+
+```bash
+hermes skills trust
+```
+
+That is hermes's own trust gate, and it is right: project skills are load-on-demand
+procedures an agent will follow, so auto-sourcing them from any cloned repo is a
+prompt-injection vector. It is a per-machine decision by a person; nothing in this repo
+makes it.
+
+**Not in `providers.yaml`.** Hermes is an agent runtime, not an LLM provider — its own
+loop, tools and model routing. Listing it there would claim WorkPilot can drive a task
+on it.
+
+**As a pack, `skills/hermes` is opt-in and scoped.** hermes-agent is a product that
+ships skills, not a skill collection: hundreds of them, covering smart-home and
+social-media alongside software development. `skills:bootstrap --pack hermes` takes
+three categories and excludes the skills another tracked pack already provides —
+`test-driven-development` is upstream's own adaptation of `obra/superpowers`. What is
+left is what it genuinely adds: `systematic-debugging`, `spike`, the two runtime
+debuggers, `merge-reconciler`, `sdlc-review`, and the procedures for driving Claude
+Code, Codex and OpenCode.
+
+**As a proposer, its learning loop feeds ours.** Hermes writes skills from its own
+experience, on surfaces WorkPilot never sees — Telegram, Discord, a cron job on a VPS.
+Two closed loops writing skills is one too many, so there is no second loop here:
+`learning_loop/hermes_ingest.py` files each authored skill as a *candidate* under
+`skills/_proposed/`, and the `observe` phase runs it when hermes is installed.
+
+```bash
+python3 scripts/skills_cli.py hermes-ingest --dry-run
+```
+
+A candidate carries **no external verification signal**, and that is not a gap to close
+later. Hermes's approval gate is a person saying yes to a text; it is not an observation
+of a build that used the skill. Counting it as corroboration would manufacture exactly
+the evidence `skill_proposer.evaluate` refuses to invent. Hermes proposes from breadth,
+WorkPilot decides from evidence, and a person reads one diff. Nothing under
+`skills/<pack>/` is modified, and nothing under `~/.hermes` is ever written.
 
 ### Memory Search (`mem-search`)
 

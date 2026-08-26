@@ -1,0 +1,39 @@
+{
+	"name": "hermes",
+	"version": "0.0.0",
+	"description": "Nous Research's hermes-agent: debugging and investigation procedures (systematic-debugging, spike, python-debugpy, node-inspect-debugger), merge reconciliation, and procedures for driving other coding agents.",
+	"targets": {},
+	"source": "NousResearch/hermes-agent",
+	"maintainer": "upstream (vendored on demand)",
+	"bootstrap": {
+		"command": [
+			"python3",
+			"scripts/vendor_pack.py",
+			"NousResearch/hermes-agent",
+			"--into",
+			"skills/hermes",
+			"--subdir",
+			"skills/software-development",
+			"--subdir",
+			"skills/autonomous-ai-agents",
+			"--subdir",
+			"skills/devops",
+			"--exclude",
+			"test-driven-development",
+			"--exclude",
+			"plan",
+			"--exclude",
+			"requesting-code-review",
+			"--exclude",
+			"hermes-agent-skill-authoring",
+			"--exclude",
+			"inspecting-hermes-desktop-dom",
+			"--exclude",
+			"hermes-agent",
+			"--exclude",
+			"dogfood"
+		],
+		"optional": true,
+		"note": "Scoped on purpose, and the scope is the whole point. hermes-agent is a product that ships skills, not a skill collection: it carries hundreds across `skills/`, `optional-skills/`, its fixtures and its documentation site, covering smart-home, social-media and email alongside software development. Vendoring the repository would put home-automation procedures in a build pipeline's command palette. Three categories are taken; the rest is left upstream.\n\nThe `--exclude` list is the other half. `test-driven-development` is upstream's own adaptation of obra/superpowers — the pack this repo already tracks — and `plan` and `requesting-code-review` restate what superpowers and mattpocock already provide. The build emits one file per skill name, so vendoring a duplicate would make the emitted content depend on pack iteration order; the resolver now reports that as a `name-collision` rejection, and not vendoring the duplicate is the honest fix rather than relying on the gate to catch it. `hermes-agent-skill-authoring`, `inspecting-hermes-desktop-dom`, `hermes-agent` and `dogfood` are about operating hermes itself and have no meaning in a WorkPilot build.\n\nWhat is left is what hermes genuinely adds: `systematic-debugging` and `spike` (investigation procedures no tracked pack covers), the two runtime debuggers, `merge-reconciler`, `sdlc-review`, and the procedures for driving Claude Code, Codex and OpenCode — which matter here precisely because WorkPilot is multi-harness.\n\nMIT licensed. Vendored by git clone like the other upstream packs — see scripts/vendor_pack.py for why `npx skills add` cannot be the fetcher."
+	}
+}

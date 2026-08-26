@@ -32,7 +32,7 @@ skills/
 | `comms` | business communication and brand guidelines |
 | `bmad` | BMAD Method v6, vendored and pinned — needs `skills:bootstrap` |
 | `superpowers`, `mattpocock`, `impeccable`, `task-observer` | upstream packs, fetched on demand; only their `pack.json` is committed |
-| `claude-mem` | declared **optional** — see below |
+| `claude-mem`, `hermes` | declared **optional** — see below |
 
 ## Authoring a skill
 
@@ -159,6 +159,28 @@ Anyone who wants the real thing:
 ```bash
 pnpm run skills:bootstrap --pack claude-mem
 ```
+
+`hermes` is optional for a different reason, and its bootstrap is **scoped**.
+[hermes-agent](https://github.com/NousResearch/hermes-agent) is a product that ships
+skills rather than a skill collection: hundreds of them, covering smart-home,
+social-media and email alongside software development. Vendoring the repository would
+put home-automation procedures in a build pipeline's command palette, so the manifest
+names three categories with `--subdir` and drops, with `--exclude`, the skills another
+tracked pack already provides — `test-driven-development` there is upstream's own
+adaptation of `obra/superpowers`, which this repo already tracks.
+
+That second list is not belt-and-braces. The build emits one file per skill *name*, so a
+duplicate is a collision the resolver rejects at the `name-collision` gate; not vendoring
+the duplicate is the honest fix, rather than relying on a gate to clean up after a choice
+that was avoidable.
+
+```bash
+pnpm run skills:bootstrap --pack hermes
+```
+
+Hermes also *writes* skills, from its own experience, on surfaces WorkPilot never sees.
+Those arrive as candidates under `skills/_proposed/` and are promoted by nothing — see
+the hermes-agent section in [docs/CLAUDE.md](../docs/CLAUDE.md).
 
 ## `mem-search`
 
