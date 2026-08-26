@@ -43,7 +43,14 @@ _DEFAULT_WORKFLOW = "feature-build"
 def _validate_dir(raw: str, label: str, base: Path | None = None) -> Path:
     if not raw or raw.strip().startswith("-"):
         raise ValueError(f"{label} must be a non-empty path not starting with '-'")
-    p = Path(raw).expanduser().resolve()
+
+    candidate = Path(raw).expanduser()
+    if candidate.is_absolute():
+        raise ValueError(f"{label} must be a relative path")
+    if ".." in candidate.parts:
+        raise ValueError(f"{label} must not contain parent-directory traversal")
+
+    p = candidate.resolve()
     if base is not None:
         b = base.expanduser().resolve()
         try:
