@@ -100,7 +100,7 @@ def _resolve_workflow_profile(
     if _flag in ("0", "false", "off", "no"):
         return None
     try:
-        from core.client import _get_active_provider
+        from core.client import peek_active_provider
         from phase_config import get_phase_thinking
 
         from workflows import load_workflow, resolve_profile
@@ -112,7 +112,13 @@ def _resolve_workflow_profile(
         profile = resolve_profile(
             workflow,
             effort,
-            provider=_get_active_provider(spec_dir),
+            # Peeked, not consumed. `_get_active_provider` deletes the
+            # RESUME_WITH_PROVIDER marker on read — it is single-shot by
+            # design — so resolving the profile with it would eat the user's
+            # "resume with X" choice before the session meant to honour it
+            # ever started. The engine decides here; it does not start
+            # anything.
+            provider=peek_active_provider(spec_dir),
             changed_files=changed_files,
         )
         if not announce:

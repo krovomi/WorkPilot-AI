@@ -1451,13 +1451,22 @@ def create_client(
 RESUME_WITH_PROVIDER_FILE = "RESUME_WITH_PROVIDER"
 
 
-def _consume_resume_with_provider_marker(spec_dir: Path) -> str | None:
-    """Read and remove the RESUME_WITH_PROVIDER marker, returning the provider
-    name the user picked (or None if no marker exists).
+def _consume_resume_with_provider_marker(
+    spec_dir: Path, *, consume: bool = True
+) -> str | None:
+    """Read the RESUME_WITH_PROVIDER marker, returning the provider the user
+    picked (or None if no marker exists).
 
     The file can be either plain text containing the provider id
     (``copilot``) or JSON ``{"provider": "copilot"}``. Anything else is
     treated as no override and the file is left in place for inspection.
+
+    ``consume=False`` leaves the marker on disk. It exists because the marker
+    is single-shot and destructive to read: anything that only wants to *know*
+    which provider a run will use — the workflow resolver deciding whether to
+    degrade a dispatch, an endpoint showing the user their resolved profile —
+    would otherwise eat the user's "resume with X" choice before the session
+    that was supposed to honour it ever started.
 
     Failures here must NEVER prevent session startup — log and return None.
     """
@@ -1467,7 +1476,8 @@ def _consume_resume_with_provider_marker(spec_dir: Path) -> str | None:
     try:
         raw = marker.read_text(encoding="utf-8").strip()
         if not raw:
-            marker.unlink(missing_ok=True)
+            if consume:
+                marker.unlink(missing_ok=True)
             return None
         # Try JSON first, fall back to plain text.
         provider: str | None
@@ -1482,14 +1492,25 @@ def _consume_resume_with_provider_marker(spec_dir: Path) -> str | None:
             )
         except Exception:
             provider = raw
-        marker.unlink(missing_ok=True)  # single-shot
+        if consume:
+            marker.unlink(missing_ok=True)  # single-shot
         return provider or None
     except Exception as e:
         logger.warning("[_get_active_provider] could not read %s: %s", marker, e)
         return None
 
 
-def _get_active_provider(spec_dir: Path | None = None) -> str:
+def peek_active_provider(spec_dir: Path | None = None) -> str:
+    """Which provider a run would use, without consuming anything.
+
+    Same resolution as `_get_active_provider`, minus the single-shot side
+    effect on the RESUME_WITH_PROVIDER marker. Callers that are *deciding*
+    rather than *starting* must use this one.
+    """
+    return _get_active_provider(spec_dir, consume=False)
+
+
+def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) -> str:
     """
     Determine the active AI provider from IPC selection, environment or project settings.
 
@@ -1529,7 +1550,7 @@ def _get_active_provider(spec_dir: Path | None = None) -> str:
     # modal (Niveau 3b). Consumed once and removed so subsequent sessions
     # for the same spec don't keep overriding.
     if spec_dir:
-        override = _consume_resume_with_provider_marker(Path(spec_dir))
+        override = _consume_resume_with_provider_marker(Path(spec_dir), consume=consume)
         if override:
             mapped_override = provider_mapping.get(override.lower(), override.lower())
             logger.info(

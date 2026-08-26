@@ -98,3 +98,47 @@ class TestTestEvidence:
         spec = self._spec(tmp_path)
         (spec / "qa_report.md").write_text("the run was inconclusive", encoding="utf-8")
         assert _tests_went_green(spec) is None
+
+
+class TestResolvingDoesNotConsumeTheResumeChoice:
+    """The defect switching the engine on by default would have exposed.
+
+    `RESUME_WITH_PROVIDER` is written by the frontend's "resume with X" modal
+    and is single-shot: `_get_active_provider` deletes it on read. Resolving
+    the workflow profile calls that resolution at the *start* of the build, so
+    with the engine on, the marker was eaten before `create_agent_client` ever
+    looked for it — the user picked Copilot and got whatever the default was.
+    """
+
+    def _marker(self, spec: Path) -> Path:
+        from core.client import RESUME_WITH_PROVIDER_FILE
+
+        return spec / RESUME_WITH_PROVIDER_FILE
+
+    def test_peeking_leaves_the_marker_for_the_session_that_needs_it(
+        self, tmp_path, monkeypatch
+    ):
+        from core.client import _get_active_provider, peek_active_provider
+
+        monkeypatch.delenv("AUTO_CLAUDE_PROVIDER", raising=False)
+        spec = tmp_path / "001-x"
+        spec.mkdir()
+        self._marker(spec).write_text('{"provider": "copilot"}', encoding="utf-8")
+
+        assert peek_active_provider(spec) == "copilot"
+        assert self._marker(spec).exists(), "peeking must not consume"
+        # Still there for the run that was supposed to honour it.
+        assert _get_active_provider(spec) == "copilot"
+        assert not self._marker(spec).exists(), "starting a session consumes it"
+
+    def test_resolving_a_profile_does_not_eat_it(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("WORKPILOT_WORKFLOW_ENGINE", raising=False)
+        monkeypatch.delenv("AUTO_CLAUDE_PROVIDER", raising=False)
+        spec = tmp_path / "001-x"
+        spec.mkdir()
+        self._marker(spec).write_text("copilot", encoding="utf-8")
+
+        profile = _resolve_workflow_profile(spec, announce=False)
+        assert profile is not None
+        assert profile.provider == "copilot"
+        assert self._marker(spec).exists()
