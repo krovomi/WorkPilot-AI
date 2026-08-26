@@ -40,18 +40,40 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_WORKFLOW = "feature-build"
 
 
-def _validate_dir(raw: str, label: str, base: Path | None = None) -> Path:
+# What a caller is told when their request is rejected.
+#
+# The response never echoes an exception message. Those carry resolved
+# filesystem paths, and a path is exactly the kind of detail an error is not
+# supposed to hand back — CodeQL flags it, and it is right to. The detail still
+# reaches the log, where the person debugging can see it and a caller cannot.
+_REASONS = {
+    "addressing": "pass spec_dir, or both project_dir and spec_id",
+    "spec_id": "spec_id must be a plain directory name",
+    "escapes": "spec_id escapes the project directory",
+    "empty": "the path must be non-empty and must not start with '-'",
+    "missing": "no such directory",
+    "workflow": "unknown workflow",
+}
+
+
+class _BadRequest(ValueError):
+    """A rejected request, named by a reason the caller may be told.
+
+    The reason is a key into `_REASONS`, not free text, so what reaches the
+    response is always a literal written here.
+    """
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        self.reason = reason
+        super().__init__(detail or reason)
+
+
+def _validate_dir(raw: str, label: str) -> Path:
     if not raw or raw.strip().startswith("-"):
-        raise ValueError(f"{label} must be a non-empty path not starting with '-'")
+        raise _BadRequest("empty", f"{label} is empty or starts with '-'")
     p = Path(raw).expanduser().resolve()
-    if base is not None:
-        b = base.expanduser().resolve()
-        try:
-            p.relative_to(b)
-        except ValueError:
-            raise ValueError(f"{label} must be within {b}") from None
     if not p.exists() or not p.is_dir():
-        raise ValueError(f"{label} does not exist or is not a directory: {p}")
+        raise _BadRequest("missing", f"{label} is not a directory: {p}")
     return p
 
 
@@ -88,22 +110,26 @@ def _resolve_spec_dir(
     if spec_dir:
         return _validate_dir(spec_dir, "spec_dir")
     if not (project_dir and spec_id):
-        raise ValueError("pass spec_dir, or both project_dir and spec_id")
+        raise _BadRequest("addressing")
     if "/" in spec_id or "\\" in spec_id or spec_id in ("", ".", ".."):
-        raise ValueError(f"spec_id is not a directory name: {spec_id!r}")
+        raise _BadRequest("spec_id", f"spec_id is not a directory name: {spec_id!r}")
     root = _validate_dir(project_dir, "project_dir")
     candidate = (root / ".workpilot" / "specs" / spec_id).resolve()
-    if not str(candidate).startswith(str(root) + os.sep):
-        raise ValueError("spec_id escapes the project directory")
+    if not candidate.is_relative_to(root):
+        raise _BadRequest("escapes")
     return _validate_dir(str(candidate), "spec_dir")
 
 
 def _workflow_path(name: str) -> Path:
-    """Resolve a workflow by name, refusing anything that escapes the folder."""
-    candidate = (_REPO_ROOT / "workflows" / name / "workflow.yaml").resolve()
+    """Resolve a workflow by name, refusing anything that escapes the folder.
+
+    This root *is* ours — `workflows/` in this repository — so unlike the
+    project directory it is confined, and that confinement is the point.
+    """
     root = (_REPO_ROOT / "workflows").resolve()
-    if not str(candidate).startswith(str(root) + os.sep):
-        raise ValueError(f"unknown workflow: {name}")
+    candidate = (root / name / "workflow.yaml").resolve()
+    if not candidate.is_relative_to(root):
+        raise _BadRequest("workflow", f"unknown workflow: {name}")
     return candidate
 
 
@@ -231,9 +257,15 @@ def workflow_profile(
     try:
         sd = _resolve_spec_dir(spec_dir, project_dir, spec_id)
         path = _workflow_path(workflow)
-    except ValueError as exc:
-        logger.warning("invalid workflow profile request parameters: %s", exc)
-        return {"success": False, "error": str(exc)}
+    except _BadRequest as exc:
+        # The detail goes to the log; the caller gets the literal reason. An
+        # exception message here would carry a resolved filesystem path.
+        logger.warning("invalid workflow profile request: %s", exc)
+        return {
+            "success": False,
+            "error": _REASONS.get(exc.reason, _REASONS["addressing"]),
+            "reason": exc.reason,
+        }
 
     try:
         from phase_config import get_phase_provider, get_phase_thinking

@@ -130,9 +130,12 @@ class TestItAnswersForRealProjects:
     """
 
     def test_a_project_outside_this_repository_is_answered(self, project):
-        # `project` is a tmp_path fixture — exactly the shape of a real user's
-        # checkout, and nowhere near this repo.
-        assert str(project).startswith("/tmp") or str(project).startswith("/var")
+        # `project` is a tmp_path fixture — the shape of a real user's checkout.
+        # Assert the property under test, not the runner's temp layout: macOS
+        # resolves tmp_path under /private/var and Windows under C:\, so a
+        # prefix check on "/tmp" tests the platform, not the containment.
+        assert not project.resolve().is_relative_to(REPO_ROOT.resolve())
+
         res = ask(project, effort="high")
         assert res["success"] is True
         assert res["profile"]["runCount"] > 0
@@ -152,7 +155,7 @@ class TestItRefusesToWander:
     def test_a_workflow_name_cannot_escape_the_folder(self, project):
         res = ask(project, workflow="../../etc")
         assert res["success"] is False
-        assert "unknown workflow" in res["error"]
+        assert res["reason"] == "workflow"
 
     def test_a_missing_spec_is_an_error_not_a_guess(self, tmp_path):
         res = get(project_dir=str(tmp_path), spec_id="404-nope")
@@ -161,4 +164,19 @@ class TestItRefusesToWander:
     def test_neither_form_of_address_is_an_error(self, tmp_path):
         res = get()
         assert res["success"] is False
+        assert res["reason"] == "addressing"
         assert "spec_dir" in res["error"]
+
+    def test_the_error_never_echoes_a_resolved_path(self, project):
+        """What a caller is told is a literal written in the module.
+
+        An exception message here carries the resolved filesystem path it
+        failed on, which is exactly the detail an error must not hand back.
+        The log keeps it; the response does not.
+        """
+        missing = project / "nope"
+        res = get(spec_dir=str(missing))
+        assert res["success"] is False
+        assert res["reason"] == "missing"
+        assert str(missing) not in res["error"]
+        assert "nope" not in res["error"]

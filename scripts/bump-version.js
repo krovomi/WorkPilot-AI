@@ -134,6 +134,23 @@ function checkGitStatus() {
 
 // Update package.json version
 /**
+ * Read a file, or return null when it is not there.
+ *
+ * The point is to have one answer instead of two: `existsSync` followed by a
+ * read asks the filesystem twice and believes the first reply, which is a race
+ * by construction. Anything other than "no such file" is still an error worth
+ * failing on.
+ */
+function readIfPresent(filePath) {
+	try {
+		return fs.readFileSync(filePath, "utf8");
+	} catch (err) {
+		if (err.code === "ENOENT") return null;
+		throw err;
+	}
+}
+
+/**
  * Re-serialize a package.json using the indentation the file already had.
  *
  * Hardcoding two spaces here rewrote every line of both manifests on every
@@ -159,20 +176,24 @@ function updatePackageJson(newVersion) {
 	);
 	const rootPath = path.join(__dirname, "..", "package.json");
 
-	if (!fs.existsSync(frontendPath)) {
+	// Update frontend package.json. One answer, not two: the read either
+	// produces the file or reports that it is missing.
+	const frontendRaw = readIfPresent(frontendPath);
+	if (frontendRaw === null) {
 		error(`package.json not found at ${frontendPath}`);
 	}
-
-	// Update frontend package.json
-	const frontendRaw = fs.readFileSync(frontendPath, "utf8");
 	const frontendJson = JSON.parse(frontendRaw);
 	const oldVersion = frontendJson.version;
 	frontendJson.version = newVersion;
 	fs.writeFileSync(frontendPath, serialize(frontendJson, frontendRaw));
 
-	// Update root package.json if it exists
-	if (fs.existsSync(rootPath)) {
-		const rootRaw = fs.readFileSync(rootPath, "utf8");
+	// Update root package.json if it exists.
+	//
+	// Read first and treat "not there" as an outcome of the read, rather than
+	// asking existsSync and then reading: between the two answers the file can
+	// change, so the check guarantees nothing about what the read will find.
+	const rootRaw = readIfPresent(rootPath);
+	if (rootRaw !== null) {
 		const rootJson = JSON.parse(rootRaw);
 		rootJson.version = newVersion;
 		fs.writeFileSync(rootPath, serialize(rootJson, rootRaw));
