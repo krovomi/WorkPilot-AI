@@ -127,6 +127,28 @@ _DEFAULT_AGENT = "analyzer"
 # Where a phase's output lands, relative to the spec directory.
 OUTPUT_DIRNAME = "workflow"
 
+# The closing instructions every skill phase gets, held here rather than inline
+# in the list that builds the prompt: adjacent string literals inside a list
+# concatenate silently, so a wrapped paragraph and a forgotten comma look
+# exactly alike to a reader and to CodeQL. Naming them removes the ambiguity
+# and keeps the prompt body a list of one element per line.
+_REPORTING = (
+    "End your turn with a written result: what you did, what you found, and"
+    " whether the phase's objective was met. If the procedure asks you to"
+    " produce a document, write the file and say where it is."
+)
+
+# The hard gate reads this line out of the phase's report. Stating the exact
+# wording is what makes `verify` able to supply the evidence for the gate it
+# declares, instead of the gate only ever reading a report written by another
+# phase.
+_TEST_VERDICT = (
+    "If your procedure ran the test suite, state the outcome on a line of its"
+    " own, exactly `Tests: pass` or `Tests: fail`. That line is read by the"
+    " workflow's hard gate; without it the gate records the result as unknown,"
+    " which is neither a pass nor a failure."
+)
+
 
 def subagents_allowed(dispatch: str) -> bool:
     """Whether a phase running under ``dispatch`` may use the subagent roster.
@@ -312,14 +334,9 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
         "",
         "## Reporting",
         "",
-        "End your turn with a written result: what you did, what you found, and "
-        "whether the phase's objective was met. If the procedure asks you to "
-        "produce a document, write the file and say where it is.",
+        _REPORTING,
         "",
-        "If your procedure ran the test suite, state the outcome on a line of "
-        "its own, exactly `Tests: pass` or `Tests: fail`. That line is read by "
-        "the workflow's hard gate; without it the gate records the result as "
-        "unknown, which is neither a pass nor a failure.",
+        _TEST_VERDICT,
     ]
     return "\n".join(lines)
 
