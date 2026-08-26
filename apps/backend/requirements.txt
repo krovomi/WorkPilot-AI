@@ -70,14 +70,14 @@ PyJWT[crypto]>=2.13.0     # JWT access/refresh tokens + Entra ID JWKS validation
 cryptography>=49.0.0     # Fernet encryption for per-user integration secrets
 email-validator>=2.3.0   # pydantic EmailStr support (auth schemas)
 requests>=2.34.2
-httpx[http2]>=0.27.0
+httpx[http2]>=0.28.1
 # Imported unconditionally by the Copilot / GitHub Models agent client
 # (core/agent_client.py) and by the Graphiti validators + team sync. It was
 # never declared, so those code paths raised ModuleNotFoundError at runtime on
 # any environment that did not happen to pull aiohttp in transitively.
 aiohttp>=3.10.0
 h2>=4.3.0  # HTTP/2 support for Windsurf gRPC proxy
-sqlalchemy>=2.0.0
+sqlalchemy>=2.0.52
 psutil>=5.9.0
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK
