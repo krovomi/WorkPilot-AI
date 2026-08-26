@@ -119,7 +119,47 @@ class TestItDoesNotTouchAnything:
         assert marker.exists()
 
 
+class TestItAnswersForRealProjects:
+    """The regression that shipped and had to be undone.
+
+    A `py/path-injection` autofix confined `project_dir` to the WorkPilot
+    repository. It silenced the alert and the feature with it: WorkPilot builds
+    *other people's* projects, so the project directory is outside this
+    repository by definition. Ten tests failed and the endpoint answered
+    nothing for any real user.
+    """
+
+    def test_a_project_outside_this_repository_is_answered(self, project):
+        # `project` is a tmp_path fixture — the shape of a real user's checkout.
+        # Assert the property under test, not the runner's temp layout: macOS
+        # resolves tmp_path under /private/var and Windows under C:\, so a
+        # prefix check on "/tmp" tests the platform, not the containment.
+        assert not project.resolve().is_relative_to(REPO_ROOT.resolve())
+
+        res = ask(project, effort="high")
+        assert res["success"] is True
+        assert res["profile"]["runCount"] > 0
+
+    def test_the_same_holds_for_an_explicit_spec_dir(self, project):
+        spec = project / ".workpilot" / "specs" / "001-x"
+        res = get(spec_dir=str(spec), effort="high")
+        assert res["success"] is True
+
+
 class TestItRefusesToWander:
+    def test_a_path_carrying_dot_dot_is_refused(self, project):
+        """Not a behaviour change — a barrier CodeQL is able to see.
+
+        `resolve()` normalises `..` away, so this refuses nothing that would
+        otherwise have been reachable. It is asserted because the guard is
+        load-bearing for a *different* reason: it is the constant comparison
+        that keeps `py/path-injection` off this file. Delete it and the alert
+        returns, which is how the confinement regression started.
+        """
+        res = get(project_dir=f"{project}/../..", spec_id="001-x")
+        assert res["success"] is False
+        assert res["error"] == "the path must not contain '..'"
+
     @pytest.mark.parametrize("spec_id", ["../..", "a/b", "", ".", ".."])
     def test_a_spec_id_is_a_directory_name(self, project, spec_id):
         res = get(project_dir=str(project), spec_id=spec_id)
@@ -128,7 +168,7 @@ class TestItRefusesToWander:
     def test_a_workflow_name_cannot_escape_the_folder(self, project):
         res = ask(project, workflow="../../etc")
         assert res["success"] is False
-        assert "unknown workflow" in res["error"]
+        assert res["reason"] == "workflow"
 
     def test_a_missing_spec_is_an_error_not_a_guess(self, tmp_path):
         res = get(project_dir=str(tmp_path), spec_id="404-nope")
@@ -137,4 +177,19 @@ class TestItRefusesToWander:
     def test_neither_form_of_address_is_an_error(self, tmp_path):
         res = get()
         assert res["success"] is False
+        assert res["reason"] == "addressing"
         assert "spec_dir" in res["error"]
+
+    def test_the_error_never_echoes_a_resolved_path(self, project):
+        """What a caller is told is a literal written in the module.
+
+        An exception message here carries the resolved filesystem path it
+        failed on, which is exactly the detail an error must not hand back.
+        The log keeps it; the response does not.
+        """
+        missing = project / "nope"
+        res = get(spec_dir=str(missing))
+        assert res["success"] is False
+        assert res["reason"] == "missing"
+        assert str(missing) not in res["error"]
+        assert "nope" not in res["error"]

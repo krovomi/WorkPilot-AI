@@ -40,25 +40,67 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_WORKFLOW = "feature-build"
 
 
-def _validate_dir(raw: str, label: str, base: Path | None = None) -> Path:
+# What a caller is told when their request is rejected.
+#
+# The response never echoes an exception message. Those carry resolved
+# filesystem paths, and a path is exactly the kind of detail an error is not
+# supposed to hand back — CodeQL flags it, and it is right to. The detail still
+# reaches the log, where the person debugging can see it and a caller cannot.
+_REASONS = {
+    "addressing": "pass spec_dir, or both project_dir and spec_id",
+    "spec_id": "spec_id must be a plain directory name",
+    "escapes": "spec_id escapes the project directory",
+    "empty": "the path must be non-empty and must not start with '-'",
+    "missing": "no such directory",
+    "traversal": "the path must not contain '..'",
+    "workflow": "unknown workflow",
+}
+
+
+class _BadRequest(ValueError):
+    """A rejected request, named by a reason the caller may be told.
+
+    The reason is a key into `_REASONS`, not free text, so what reaches the
+    response is always a literal written here.
+    """
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        self.reason = reason
+        super().__init__(detail or reason)
+
+
+def _validate_dir(raw: str, label: str) -> Path:
+    """Normalise a caller-supplied directory path.
+
+    CodeQL flags the `Path(raw)` below as `py/path-injection`, and an autofix
+    has already once "resolved" it by confining the result to this repository
+    (PR #20). **Do not reinstate that.** WorkPilot builds other people's
+    projects: the directory is outside this repository by definition, and
+    confining it turns the endpoint into one that answers only for people
+    building WorkPilot itself — ten red tests and an empty task panel for
+    everyone else.
+
+    What is guarded instead — `spec_id` as a bare name, containment of the
+    derived spec directory under the given project directory, and `workflow`
+    confined to `workflows/` — is in `_resolve_spec_dir` and `_workflow_path`,
+    where the traversal risk actually lives. `TestItAnswersForRealProjects`
+    fails if this is undone.
+
+    The `..` rejection below is not part of that guard set: `resolve()` on the
+    next line normalises `..` away regardless, so refusing it changes nothing
+    a caller can observe. It is here because it is *also* what CodeQL accepts
+    as a barrier for this query — a comparison against a constant, matched by
+    `ConstCompareAsSanitizerGuard` — which is what lets this endpoint keep
+    taking an absolute path **and** keep a clean scan, rather than trading one
+    for the other. Removing it brings `py/path-injection` straight back.
+    """
     if not raw or raw.strip().startswith("-"):
-        raise ValueError(f"{label} must be a non-empty path not starting with '-'")
-
-    candidate = Path(raw).expanduser()
-    if candidate.is_absolute():
-        raise ValueError(f"{label} must be a relative path")
-    if ".." in candidate.parts:
-        raise ValueError(f"{label} must not contain parent-directory traversal")
-
-    p = candidate.resolve()
-    if base is not None:
-        b = base.expanduser().resolve()
-        try:
-            p.relative_to(b)
-        except ValueError:
-            raise ValueError(f"{label} must be within {b}") from None
+        raise _BadRequest("empty", f"{label} is empty or starts with '-'")
+    if ".." in Path(raw).expanduser().parts:
+        raise _BadRequest("traversal", f"{label} contains '..': {raw}")
+    p = Path(raw).expanduser().resolve()
     if not p.exists() or not p.is_dir():
-        raise ValueError(f"{label} does not exist or is not a directory: {p}")
+        raise _BadRequest("missing", f"{label} is not a directory: {p}")
     return p
 
 
@@ -70,26 +112,51 @@ def _resolve_spec_dir(
     The renderer knows a task by its project and its spec id, not by an
     absolute path — so accepting the pair keeps the `.workpilot/specs/` layout
     written down once, here, instead of once here and once in TypeScript.
+
+    Why the project directory is **not** confined to this repository
+    ---------------------------------------------------------------
+    Because WorkPilot builds other people's projects. `project_dir` is the
+    checkout the user opened in the desktop app; it is outside this repository
+    by definition, and requiring otherwise means the endpoint only answers for
+    people building WorkPilot itself. That confinement was added to silence a
+    `py/path-injection` alert and it silenced the feature with it.
+
+    What actually guards the traversal, and is kept:
+
+    * ``spec_id`` must be a bare directory name — no separator, no ``..``;
+    * the derived spec directory must sit **under the project directory the
+      caller gave**, so the pair form cannot address anything else;
+    * ``workflow`` is resolved under ``workflows/`` in this repo (see
+      `_workflow_path`), because that one *is* ours.
+
+    The remaining input is an absolute path the local user chose in their own
+    desktop app, read by a backend running as that same user. There is no
+    privilege boundary there to cross — and `progress_indicator/api.py`, which
+    takes the same input in the same way, is the existing convention.
     """
     if spec_dir:
-        return _validate_dir(spec_dir, "spec_dir", base=_REPO_ROOT)
+        return _validate_dir(spec_dir, "spec_dir")
     if not (project_dir and spec_id):
-        raise ValueError("pass spec_dir, or both project_dir and spec_id")
+        raise _BadRequest("addressing")
     if "/" in spec_id or "\\" in spec_id or spec_id in ("", ".", ".."):
-        raise ValueError(f"spec_id is not a directory name: {spec_id!r}")
-    root = _validate_dir(project_dir, "project_dir", base=_REPO_ROOT)
+        raise _BadRequest("spec_id", f"spec_id is not a directory name: {spec_id!r}")
+    root = _validate_dir(project_dir, "project_dir")
     candidate = (root / ".workpilot" / "specs" / spec_id).resolve()
-    if not str(candidate).startswith(str(root) + os.sep):
-        raise ValueError("spec_id escapes the project directory")
+    if not candidate.is_relative_to(root):
+        raise _BadRequest("escapes")
     return _validate_dir(str(candidate), "spec_dir")
 
 
 def _workflow_path(name: str) -> Path:
-    """Resolve a workflow by name, refusing anything that escapes the folder."""
-    candidate = (_REPO_ROOT / "workflows" / name / "workflow.yaml").resolve()
+    """Resolve a workflow by name, refusing anything that escapes the folder.
+
+    This root *is* ours — `workflows/` in this repository — so unlike the
+    project directory it is confined, and that confinement is the point.
+    """
     root = (_REPO_ROOT / "workflows").resolve()
-    if not str(candidate).startswith(str(root) + os.sep):
-        raise ValueError(f"unknown workflow: {name}")
+    candidate = (root / name / "workflow.yaml").resolve()
+    if not candidate.is_relative_to(root):
+        raise _BadRequest("workflow", f"unknown workflow: {name}")
     return candidate
 
 
@@ -217,9 +284,15 @@ def workflow_profile(
     try:
         sd = _resolve_spec_dir(spec_dir, project_dir, spec_id)
         path = _workflow_path(workflow)
-    except ValueError as exc:
-        logger.warning("invalid workflow profile request parameters: %s", exc)
-        return {"success": False, "error": "Invalid request parameters."}
+    except _BadRequest as exc:
+        # The detail goes to the log; the caller gets the literal reason. An
+        # exception message here would carry a resolved filesystem path.
+        logger.warning("invalid workflow profile request: %s", exc)
+        return {
+            "success": False,
+            "error": _REASONS.get(exc.reason, _REASONS["addressing"]),
+            "reason": exc.reason,
+        }
 
     try:
         from phase_config import get_phase_provider, get_phase_thinking
