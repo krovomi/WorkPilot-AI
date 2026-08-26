@@ -20,6 +20,10 @@ Phase fields
 ``dispatch``    ``subagent-per-task`` | ``fresh-context`` | ``inline``
 ``when``        ``touches("<globs>")`` — run only when matching files changed
 ``gate``        ``human`` — stop for approval before continuing
+``agent``       the AGENT_CONFIGS entry a skill phase runs under, when the
+                default for its id is not the right one. Data rather than a
+                branch in the runner, for the same reason ``gate`` and
+                ``bootstrap`` are declared by their pack.
 """
 
 from __future__ import annotations
@@ -73,6 +77,7 @@ class Phase:
     dispatch: str = "inline"
     when_globs: tuple[str, ...] = ()
     gate: str | None = None
+    agent: str | None = None
     description: str = ""
 
     @property
@@ -149,6 +154,7 @@ def _parse_phase(raw: Any, index: int) -> Phase:
         dispatch=dispatch,
         when_globs=_parse_when(raw.get("when"), str(phase_id)),
         gate=gate,
+        agent=(str(raw["agent"]) if raw.get("agent") else None),
         description=str(raw.get("description", "")),
     )
 

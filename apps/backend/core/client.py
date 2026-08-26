@@ -664,6 +664,15 @@ def _inject_domain_addendum(
     return f"{base_prompt}\n\n# Domain-Specific Guidance\n\n{addendum}"
 
 
+class _NoSubagents(Exception):
+    """Internal signal: this call must not compose a subagent roster.
+
+    Raised and caught inside `create_client` only, so the suppression path and
+    the failure path share one exit and cannot drift apart. It is a control
+    signal, never surfaced to a caller.
+    """
+
+
 def create_client(
     project_dir: Path,
     spec_dir: Path,
@@ -673,6 +682,7 @@ def create_client(
     output_format: dict | None = None,
     agents: dict | None = None,
     resume: str | None = None,
+    use_subagents: bool = True,
 ) -> ClaudeSDKClient:
     """
     Create a Claude Agent SDK client with multi-layered security.
@@ -697,6 +707,10 @@ def create_client(
         output_format: Optional structured output format for validated JSON responses.
                       Use {"type": "json_schema", "schema": Model.model_json_schema()}
                       See: https://platform.claude.com/docs/en/agent-sdk/structured-outputs
+        use_subagents: Whether this call may compose a subagent roster at all.
+                      False is the workflow engine's `sequential-reset`: same
+                      isolation, no parallel dispatch. Defaults to True, which
+                      is the behaviour every existing caller already had.
         agents: Optional dict of subagent definitions for SDK parallel execution.
                Format: {"agent-name": {"description": "...", "prompt": "...",
                         "tools": [...], "model": "inherit"}}
@@ -1297,7 +1311,17 @@ def create_client(
     # context, and vice versa; the language layer means a Rust card and a .NET
     # card no longer get the same generic `test-runner` prompt.
     # See: code.claude.com/docs/en/agent-sdk/subagents
+    #
+    # `use_subagents=False` is the workflow engine's `sequential-reset`: the
+    # resolved phase asked for dispatch the run cannot have, so the roster is
+    # suppressed at the source instead of being handed over to be ignored. It
+    # is a separate question from the provider check inside `resolve()` — that
+    # one is about capability, this one about what the phase was allowed.
+    # Default True, so every existing caller keeps the behaviour it had.
+    _merged_agents = None
     try:
+        if not use_subagents:
+            raise _NoSubagents
         from agents.subagents import resolve as _resolve_subagents
 
         # The provider matters: `resolve` returns no roster at all for one
@@ -1309,6 +1333,12 @@ def create_client(
             project_dir=project_dir,
             user_agents=agents,
             provider=_get_active_provider(spec_dir),
+        )
+    except _NoSubagents:
+        logger.debug(
+            "subagent roster suppressed for agent_type=%s: the workflow phase "
+            "runs without dispatch",
+            agent_type,
         )
     except Exception as exc:
         # Roster composition must never break client creation; falling back to
@@ -1761,6 +1791,7 @@ def create_agent_client(
     provider: str | None = None,
     resume: str | None = None,
     system_prompt: str | None = None,
+    use_subagents: bool = True,
 ) -> "AgentClient":  # noqa: F821
     """
     Create a provider-agnostic agent client for Kanban task execution.
@@ -1781,6 +1812,9 @@ def create_agent_client(
                For Copilot: converted to SubagentDefinition for parallel API calls
         provider: Provider override ("claude" or "copilot").
                  If None, auto-detected from env/project settings.
+        use_subagents: Whether this call may compose a subagent roster at all.
+                 False suppresses it entirely — the workflow engine's
+                 `sequential-reset` dispatch. Defaults to True.
         system_prompt: Optional system-prompt override. When provided, it
                  replaces the default coding base prompt for the
                  copilot/openai/windsurf clients (used by utilities that need
@@ -1849,7 +1883,7 @@ def create_agent_client(
 
         # Convert agents dict to SubagentDefinition if provided
         copilot_agents: dict[str, SubagentDefinition] | None = None
-        if agents:
+        if agents and use_subagents:
             copilot_agents = {}
             for name, defn in agents.items():
                 # Handle both AgentDefinition (Claude SDK) and dict formats
@@ -1892,6 +1926,7 @@ def create_agent_client(
             output_format=output_format,
             agents=agents,
             resume=resume,
+            use_subagents=use_subagents,
         )
         return ClaudeAgentClient(sdk_client)
 

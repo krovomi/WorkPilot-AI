@@ -84,13 +84,20 @@ def _resolve_workflow_profile(
     not announce: the plan was already printed, and reprinting it would read as
     a second build starting.
 
-    Gated on WORKPILOT_WORKFLOW_ENGINE=1. Every failure degrades to None, which
-    is exactly the previous behaviour: the workflow shapes the run, it must
-    never be able to stop one.
+    On by default; set WORKPILOT_WORKFLOW_ENGINE=0 to run the pre-engine
+    pipeline. The flag flipped once the engine executed the phases it declares
+    rather than only pruning them: while eight of eleven phases were played by
+    a hard-coded sequence the engine did not drive, switching it on bought the
+    printed profile and little else, and the honest default for that is off.
+    Now the declared workflow is the pipeline, so the honest default is on.
+
+    Every failure still degrades to None, which is exactly the previous
+    behaviour: the workflow shapes the run, it must never be able to stop one.
     """
     import os
 
-    if os.environ.get("WORKPILOT_WORKFLOW_ENGINE") != "1":
+    _flag = os.environ.get("WORKPILOT_WORKFLOW_ENGINE", "1").strip().lower()
+    if _flag in ("0", "false", "off", "no"):
         return None
     try:
         from core.client import _get_active_provider
@@ -160,6 +167,64 @@ def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
         from debug import debug_warning
 
         debug_warning("run.py", f"Deterministic gates skipped: {exc}")
+        return None
+
+
+def _phase_context(
+    profile,
+    project_dir: Path,
+    spec_dir: Path,
+    model: str,
+    verbose: bool,
+    changed_files: list[str] | None,
+):
+    """Assemble what a skill phase needs, or None when the engine is off."""
+    if profile is None:
+        return None
+    try:
+        from workflows import PhaseContext
+
+        return PhaseContext(
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            model=model,
+            repo_root=Path(__file__).resolve().parents[3],
+            effort=profile.effort,
+            verbose=verbose,
+            changed_files=changed_files,
+        )
+    except Exception as exc:  # noqa: BLE001 - never block a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Workflow phase context unavailable: {exc}")
+        return None
+
+
+def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None):
+    """Execute the skill-backed phases in one window of the declared order.
+
+    This is what "the workflow is the pipeline" finally means: `brainstorm`,
+    `spec`, `review`, `adversarial-review`, `spec-conformance` and `verify`
+    were declared in `workflow.yaml` from the start and executed by nothing.
+    The window is expressed by phase id, so inserting a phase into the YAML
+    between two existing ones is picked up here with no change to this file.
+
+    Never raises, and never aborts the build: a review pass that could not
+    start is reported, and the code it was going to read still exists.
+    """
+    if profile is None or ctx is None:
+        return None
+    try:
+        from workflows import run_skill_phases
+
+        run = asyncio.run(run_skill_phases(profile, ctx, after=after, before=before))
+        if summary := run.describe():
+            print("\n" + summary)
+        return run
+    except Exception as exc:  # noqa: BLE001 - phases report, they do not fail builds
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Workflow phases skipped: {exc}")
         return None
 
 
@@ -236,19 +301,43 @@ def _report_hard_gates(profile, spec_dir: Path, tests_passed: bool | None) -> No
         debug_warning("run.py", f"Hard gate check skipped: {exc}")
 
 
-def _tests_went_green(spec_dir: Path) -> bool | None:
-    """Whether the QA report recorded a passing test run, or None if unknown."""
-    report = spec_dir / "qa_report.md"
-    if not report.is_file():
+def _verdict_in(path: Path) -> bool | None:
+    """Read a test verdict out of one report, or None when it says nothing."""
+    if not path.is_file():
         return None
     try:
-        text = report.read_text(encoding="utf-8", errors="replace").lower()
+        text = path.read_text(encoding="utf-8", errors="replace").lower()
     except OSError:
         return None
     if "tests: pass" in text or "all tests passed" in text:
         return True
     if "tests: fail" in text or "test failures" in text:
         return False
+    return None
+
+
+def _tests_went_green(spec_dir: Path) -> bool | None:
+    """Whether a test run was recorded as passing, or None if nobody said.
+
+    Two readers, in order of authority. The QA loop's report comes first: it is
+    written by a phase whose whole job is to check the work. The `verify`
+    phase's own report is the fallback, and it matters because `verify` is the
+    phase that declares `hard_gate: tests-pass` — until it was executed, the
+    gate could only ever read a report written by a *different* phase, and on a
+    build with QA pruned there was no report at all.
+
+    A failure anywhere wins over a pass elsewhere: two readers disagreeing
+    means something is wrong, and the safe reading of "wrong" is not "green".
+    None when neither said anything, which is unknown and stays unknown.
+    """
+    verdicts = [
+        _verdict_in(spec_dir / "qa_report.md"),
+        _verdict_in(spec_dir / "workflow" / "verify.md"),
+    ]
+    if False in verdicts:
+        return False
+    if True in verdicts:
+        return True
     return None
 
 
@@ -454,6 +543,15 @@ def handle_build_command(
     try:
         debug("run.py", "Starting agent execution")
 
+        # Phases the workflow declares before `planning`. At low and medium
+        # effort the profile has already dropped them, so this is a no-op there
+        # — which is the point: what the effort level buys is now the phases
+        # that actually run, not a line in a printed plan.
+        _pre_ctx = _phase_context(
+            _profile, working_dir, spec_dir, model, verbose, changed_files=None
+        )
+        _run_workflow_phases(_profile, _pre_ctx, after=None, before="planning")
+
         asyncio.run(
             run_autonomous_agent(
                 project_dir=working_dir,  # Use worktree if isolated
@@ -463,6 +561,11 @@ def handle_build_command(
                 verbose=verbose,
                 source_spec_dir=source_spec_dir,  # For syncing progress back to main project
                 streaming_session_id=streaming_session_id,
+                # B.6: the two phases this call owns — `planning` and `coding` —
+                # stop being an opaque internal sequence. The profile decides
+                # whether planning is bought at this effort and whether coding
+                # may dispatch to subagents.
+                profile=_profile,
             )
         )
         debug_success("run.py", "Agent execution completed")
@@ -492,6 +595,33 @@ def handle_build_command(
                     )
             except Exception as exc:  # noqa: BLE001 - non-fatal
                 debug_warning("run.py", f"Encoding repair skipped: {exc}")
+
+        # Second resolution of the profile, with the change set this build
+        # actually produced. The first one was a forecast printed before
+        # anything was written; this one decides the conditional phases.
+        # `announce=False` — reprinting the plan here would read as a second
+        # build starting.
+        _changed = _changed_files(worktree_manager, spec_dir.name)
+        _post_profile = (
+            _resolve_workflow_profile(spec_dir, _changed, announce=False)
+            if _profile is not None
+            else None
+        )
+        _post_ctx = _phase_context(
+            _post_profile, working_dir, spec_dir, model, verbose, _changed
+        )
+
+        # `design-check`. The workflow declares it immediately after `coding`
+        # and before `review`, and that is now where it runs — a frontend
+        # finding is worth more to the reviewer than to the archive. No API
+        # call, so it is not pruned by effort, and its verdict is an *external*
+        # signal, which is what makes it usable as corroboration by the
+        # learning loop below.
+        gate_run = _run_deterministic_gates(_post_profile, working_dir, spec_dir)
+
+        # `review` — declared between `coding` and `qa`, dispatched in a fresh
+        # context so the reader inherits none of the writer's reasoning.
+        _run_workflow_phases(_post_profile, _post_ctx, after="coding", before="qa")
 
         # Run QA validation BEFORE finalization (while worktree still exists)
         # QA must sign off before the build is considered complete
@@ -569,19 +699,13 @@ def handle_build_command(
                 except Exception:
                     pass  # Best-effort
 
-        # Deterministic gates. The workflow declares them; this is where the
-        # engine actually runs one. No API call, so they are not pruned by
-        # effort — and their verdict is an *external* signal, which is what
-        # makes it usable as corroboration by the learning loop below.
-        gate_run = _run_deterministic_gates(
-            _resolve_workflow_profile(
-                spec_dir,
-                _changed_files(worktree_manager, spec_dir.name),
-                announce=False,
-            ),
-            working_dir,
-            spec_dir,
-        )
+        # Everything the workflow declares after `qa`: the two ultrathink
+        # readings and `verify`. They run here rather than earlier because
+        # each is a question about the finished branch — `adversarial-review`
+        # attacks the code, `spec-conformance` asks whether it is the thing
+        # that was asked for, and `verify` checks the work before the build
+        # claims to be done.
+        _run_workflow_phases(_post_profile, _post_ctx, after="qa", before=None)
 
         # Hard gates. `verify` declares `hard_gate: tests-pass`, which until
         # now only kept the phase out of the effort pruner — nothing checked
@@ -589,7 +713,7 @@ def handle_build_command(
         # with a red suite. Evaluated here, from the same test evidence the
         # observe phase records, so the two cannot disagree.
         _tests_green = _tests_went_green(spec_dir)
-        _report_hard_gates(_profile, spec_dir, _tests_green)
+        _report_hard_gates(_post_profile or _profile, spec_dir, _tests_green)
 
         # The `observe` phase. Marked `always: true` in the workflow, so it
         # runs at every effort level — it costs no API call, it only reads what
@@ -597,7 +721,7 @@ def handle_build_command(
         # of the signals it can record.
         _run_observe_phase(
             spec_dir,
-            profile=_profile,
+            profile=_post_profile or _profile,
             qa_approved=qa_approved,
             ran_qa=qa_should_run,
             detector_clean=gate_run.all_clean if gate_run else None,
@@ -626,6 +750,7 @@ def handle_build_command(
             model=model,
             max_iterations=max_iterations,
             verbose=verbose,
+            profile=_profile,
         )
     except Exception as e:
         import traceback
@@ -643,6 +768,7 @@ def _handle_build_interrupt(
     model: str,
     max_iterations: int | None,
     verbose: bool,
+    profile=None,
 ) -> None:
     """
     Handle keyboard interrupt during build.
@@ -655,6 +781,11 @@ def _handle_build_interrupt(
         model: Model being used
         max_iterations: Maximum iterations
         verbose: Verbose mode flag
+        profile: The resolved workflow profile, carried through so a build the
+            user paused and resumed keeps the dispatch and effort decisions it
+            started with. Resuming into a differently-shaped pipeline than the
+            one that was announced is the kind of surprise this whole refactor
+            exists to remove.
     """
     from agent import run_autonomous_agent
 
@@ -762,6 +893,7 @@ def _handle_build_interrupt(
                     max_iterations=max_iterations,
                     verbose=verbose,
                     streaming_session_id=streaming_session_id,  # noqa: F821
+                    profile=profile,
                 )
             )
             # Build completed or was interrupted again - exit

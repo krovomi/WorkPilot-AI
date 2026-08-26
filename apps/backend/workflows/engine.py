@@ -75,10 +75,26 @@ class ExecutionProfile:
     provider: str | None
     run: list[ResolvedPhase] = field(default_factory=list)
     skipped: list[tuple[Phase, str]] = field(default_factory=list)
+    declared: tuple[str, ...] = ()
+    """Every phase id the workflow declares, in file order.
+
+    Kept because `run` and `skipped` each preserve their own order but lose the
+    interleaving between them, and two callers need the declared sequence: the
+    runner, which selects phases by the window between two ids and must not
+    move that window when a boundary phase is pruned, and the UI, which shows
+    the pipeline with the dropped phases still in place.
+    """
 
     @property
     def phase_ids(self) -> list[str]:
         return [r.id for r in self.run]
+
+    def declared_index(self, phase_id: str) -> int | None:
+        """Position of a phase in the workflow file, run or not."""
+        try:
+            return self.declared.index(phase_id)
+        except ValueError:
+            return None
 
     def will_run(self, phase_id: str) -> bool:
         return any(r.id == phase_id for r in self.run)
@@ -167,7 +183,12 @@ def resolve_profile(
         except Exception as exc:  # capability lookup must not block a build
             logger.debug("provider capability lookup failed: %s", exc)
 
-    profile = ExecutionProfile(workflow=workflow.name, effort=effort, provider=provider)
+    profile = ExecutionProfile(
+        workflow=workflow.name,
+        effort=effort,
+        provider=provider,
+        declared=tuple(p.id for p in workflow.phases),
+    )
 
     for phase in workflow.phases:
         deterministic = phase.pack in DETERMINISTIC_PACKS

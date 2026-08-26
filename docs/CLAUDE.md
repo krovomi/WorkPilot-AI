@@ -336,19 +336,33 @@ pnpm run skills:workflow -- --effort high      # what would run, and what is pru
 pnpm run skills:workflow -- --effort low --provider mistral
 ```
 
-**Opt-in.** The engine is gated on `WORKPILOT_WORKFLOW_ENGINE=1` in
-`.env-files/.env`; unset, `handle_build_command` behaves exactly as it did
-before. It is off by default because most phases are still executed by the
-hard-coded sequence — see the table below for what the engine actually drives
-today.
+**On by default.** Set `WORKPILOT_WORKFLOW_ENGINE=0` in `.env-files/.env` to
+run the pre-engine pipeline. The default flipped once the engine executed the
+phases it declares rather than only pruning them: while eight of eleven were
+played by a hard-coded sequence, switching it on bought the printed profile and
+little else.
 
 | Phase | Who runs it |
 |---|---|
+| `brainstorm`, `spec`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
+| `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
 | the `tests-pass` hard gate | the engine (`workflows/hard_gates.py`) |
+| `qa` | `qa_loop`, which the profile can switch off |
 | `observe` | the engine (`learning_loop/observe.py`) |
-| `qa` | the hard-coded loop, which the profile can switch off |
-| everything else | the hard-coded sequence in `run_autonomous_agent` |
+
+A skill phase runs where the workflow file declares it. The window is looked up
+by phase id in the **declared** order, so inserting a phase into
+`workflow.yaml` between two existing ones needs no Python change — and pruning
+a phase that bounds a window does not hand its work to the neighbouring one.
+
+`impl:` reaches the two built-in phases as well. `coding` declares
+`superpowers/test-driven-development`: the skill is the *methodology*, the
+coder loop is the *executor*, and the engine names the skill file in the
+prompt rather than pasting ten kilobytes of it into every subtask session.
+Builtins are recognised by **phase id**, never by their impl string — keying on
+the impl would mean swapping the methodology in YAML silently demotes `coding`
+to a one-shot session and loses the coder loop.
 
 Two rules the resolver enforces and that are easy to break:
 
@@ -364,7 +378,13 @@ Two rules the resolver enforces and that are easy to break:
 
 A phase asking for `subagent-per-task` on a provider with no subagents degrades
 to sequential execution with a context reset, recorded on the resolved phase
-rather than silently pretended.
+rather than silently pretended — and the degradation is now *read at
+execution*: `create_client(use_subagents=False)` suppresses the roster instead
+of handing one to a provider that will drop it. `fresh-context` is read too: a
+phase dispatched that way does not rehydrate the transcript a pending
+`AUTO_CLAUDE_RESUME_SESSION_ID` points at, because a reviewer carrying the
+writer's reasoning is not a second opinion. The marker is restored afterwards,
+so the coder loop's own resume survives a review pass between two iterations.
 
 ### Workflow Logger
 

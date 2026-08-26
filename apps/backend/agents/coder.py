@@ -575,6 +575,7 @@ async def run_autonomous_agent(
     verbose: bool = False,
     source_spec_dir: Path | None = None,
     streaming_session_id: str | None = None,
+    profile: object | None = None,
 ) -> None:
     """
     Run the autonomous agent loop with automatic memory management.
@@ -590,6 +591,16 @@ async def run_autonomous_agent(
         verbose: Whether to show detailed output
         source_spec_dir: Original spec directory in main project (for syncing from worktree)
         streaming_session_id: Optional streaming session ID for live coding
+        profile: The resolved workflow ExecutionProfile, when the engine is on.
+
+            `planning` and `coding` are the two phases this function runs as one
+            internal sequence, and until now it ran them the same way at every
+            effort level and on every provider — whatever `workflow.yaml` said.
+            The profile is what makes the declared workflow reach them: it
+            decides whether planning is bought at this effort, and whether the
+            coding phase is allowed to dispatch to subagents or must work
+            through its subtasks sequentially. None keeps the previous
+            behaviour exactly, which is what the engine being off has to mean.
     """
     # Log agent start
     agent_trace_id = workflow_logger.log_agent_start(
@@ -784,6 +795,35 @@ async def run_autonomous_agent(
 
     # Check if this is a fresh start or continuation
     first_run = is_first_run(spec_dir)
+
+    # The declarative workflow's verdict on the two phases this loop owns.
+    # Resolved once: the loop runs many iterations and the profile does not
+    # change between them, and re-reading it per iteration would make the
+    # engine part of the hot path for no gain.
+    _workflow_repo_root = Path(__file__).resolve().parents[3]
+    try:
+        from workflows.runner import builtin_plan, effort_preamble
+
+        workflow_plan = builtin_plan(profile)
+    except Exception as exc:  # noqa: BLE001 - the engine never blocks a build
+        logger.debug("workflow plan unavailable, using defaults: %s", exc)
+        workflow_plan = None
+        effort_preamble = None  # noqa: F811
+
+    if workflow_plan is not None and profile is not None:
+        print_status(workflow_plan.describe(), "info")
+        if not workflow_plan.planning_runs and first_run:
+            # The profile pruned a phase this build cannot do without: there is
+            # no implementation plan, and coding has nothing to work through
+            # without one. Running it anyway is the only correct outcome — but
+            # the profile printed before the build said it would be skipped, so
+            # saying nothing here would make the plan the user was shown a lie.
+            print_status(
+                "Planning was pruned by the effort profile, but this spec has no "
+                "implementation plan yet — running it anyway. Effort decides how "
+                "much work happens, never whether the build can start.",
+                "warning",
+            )
 
     # Track which phase we're in for logging
     current_log_phase = LogPhase.CODING
@@ -1080,6 +1120,13 @@ async def run_autonomous_agent(
             if _metadata and _metadata.get("phaseProviders")
             else None
         )
+        # `dispatch` finally reaches execution. The coding phase declares
+        # `subagent-per-task`; on a provider with no subagents the engine
+        # degraded it to `sequential-reset`, and until now that degradation was
+        # resolved, logged, and then ignored at the point it mattered. False
+        # here suppresses the roster instead of handing over a list that will
+        # be dropped — same isolation, no pretend dispatch.
+        _use_subagents = workflow_plan.use_subagents if workflow_plan else True
         client = create_agent_client(
             project_dir=project_dir,
             spec_dir=spec_dir,
@@ -1087,12 +1134,22 @@ async def run_autonomous_agent(
             agent_type=agent_type,
             max_thinking_tokens=phase_thinking_budget,
             provider=phase_provider,
+            use_subagents=_use_subagents,
         )
 
         # Generate appropriate prompt
         if first_run:
             # Create client for planning phase
             prompt = generate_planner_prompt(spec_dir, project_dir)
+            # Chantier 4's portable answer to effort sensitivity: the engine
+            # states the level rather than the prompt template branching on a
+            # variable only some harnesses expose.
+            if workflow_plan is not None and effort_preamble is not None:
+                prompt = (
+                    effort_preamble(workflow_plan, "planning", _workflow_repo_root)
+                    + "\n\n"
+                    + prompt
+                )
             if planning_retry_context:
                 prompt += "\n\n" + planning_retry_context
 
@@ -1337,6 +1394,12 @@ async def run_autonomous_agent(
                 attempt_count=attempt_count,
                 recovery_hints=recovery_hints,
             )
+            if workflow_plan is not None and effort_preamble is not None:
+                prompt = (
+                    effort_preamble(workflow_plan, "coding", _workflow_repo_root)
+                    + "\n\n"
+                    + prompt
+                )
 
             # Load and append relevant file context — only when the
             # (provider, effort) pair benefits from inlining. Claude agents
