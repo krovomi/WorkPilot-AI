@@ -89,10 +89,19 @@ def check_requires(requires: dict[str, Any], project_dir: Path) -> tuple[bool, s
 
     An unknown key is a hard failure rather than a silent pass: a typo in
     ``requires`` must not quietly turn the gate off.
+
+    ``runtime`` is confined to the project directory. The value comes from a
+    ``SKILL.md``, and since packs are vendored from upstream that is
+    third-party content: without the check, `runtime: "../../.ssh/id_rsa"`
+    would turn this gate into a filesystem probe, reporting through the
+    command palette whether a file exists anywhere the backend can reach.
     """
     for key, value in requires.items():
         if key == "runtime":
-            if not (project_dir / str(value)).exists():
+            target = _within(project_dir, str(value))
+            if target is None:
+                return False, f"runtime escapes the project directory: {value}"
+            if not target.exists():
                 return False, f"runtime not present: {value}"
         elif key == "command":
             # A list means alternatives: `python3` on Unix, `python` on
@@ -191,6 +200,24 @@ def resolve(
 
     result.selected.sort(key=lambda s: (s.kind, s.name))
     return result
+
+
+def _within(root: Path, relative: str) -> Path | None:
+    """Resolve ``relative`` under ``root``, or None if it escapes.
+
+    Absolute paths escape by definition and are rejected too — a `requires`
+    entry describes something inside the project, so an absolute one is
+    either a mistake or an attempt.
+    """
+    candidate = Path(relative)
+    if candidate.is_absolute():
+        return None
+    try:
+        resolved = (root / candidate).resolve()
+        resolved.relative_to(root.resolve())
+    except (ValueError, OSError):
+        return None
+    return resolved
 
 
 def _describe(targets: dict[str, str]) -> str:

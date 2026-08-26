@@ -114,3 +114,58 @@ def test_this_repos_committed_palette_is_all_runnable():
         p.parent.name for p in (REPO_ROOT / ".agents" / "skills").glob("*/SKILL.md")
     }
     assert listed == on_disk, f"committed but unusable here: {sorted(on_disk - listed)}"
+
+
+# ── the gate must not become a filesystem probe ───────────────────────────────
+#
+# `requires.runtime` comes from a SKILL.md, and packs are vendored from
+# upstream — third-party content. The palette answers over HTTP with a
+# caller-supplied `project_dir`, so an unconfined path here would let a
+# malicious skill report whether any file the backend can reach exists.
+
+
+@pytest.mark.parametrize(
+    "escape",
+    [
+        "../../../etc/passwd",
+        "../outside.txt",
+        "/etc/passwd",
+        "sub/../../escape.txt",
+    ],
+)
+def test_a_runtime_path_that_escapes_the_project_is_refused(tmp_path: Path, escape):
+    from skills_registry.resolver import check_requires
+
+    ok, reason = check_requires({"runtime": escape}, tmp_path)
+    assert not ok
+    assert "escapes the project directory" in reason
+
+
+def test_an_escaping_runtime_is_refused_even_when_the_target_exists(tmp_path: Path):
+    """The check is about the path, not about whether the probe would succeed."""
+    from skills_registry.resolver import check_requires
+
+    project = tmp_path / "project"
+    project.mkdir()
+    secret = tmp_path / "secret.txt"
+    secret.write_text("s", encoding="utf-8")
+
+    ok, reason = check_requires({"runtime": "../secret.txt"}, project)
+    assert not ok
+    assert "escapes" in reason
+
+
+def test_a_legitimate_nested_runtime_still_resolves(tmp_path: Path):
+    from skills_registry.resolver import check_requires
+
+    runtime = tmp_path / "_bmad" / "core" / "tasks"
+    runtime.mkdir(parents=True)
+    (runtime / "workflow.xml").write_text("<w/>", encoding="utf-8")
+
+    ok, _ = check_requires({"runtime": "_bmad/core/tasks/workflow.xml"}, tmp_path)
+    assert ok
+
+
+def test_an_escaping_runtime_hides_the_command_from_the_palette(tmp_path: Path):
+    write_skill(tmp_path, "probe", requires={"runtime": "../../../etc/passwd"})
+    assert names(tmp_path) == set()
