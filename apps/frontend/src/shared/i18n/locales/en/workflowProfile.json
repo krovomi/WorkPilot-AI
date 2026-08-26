@@ -1,0 +1,52 @@
+{
+	"title": "Execution profile",
+	"subtitle": "What this effort level runs, before it runs it",
+	"loading": "Resolving the workflow…",
+	"error": "Could not resolve the workflow: {{error}}",
+	"disabled": {
+		"title": "The workflow engine is off",
+		"body": "WORKPILOT_WORKFLOW_ENGINE is set to 0, so the pre-engine pipeline runs and this profile is a preview only."
+	},
+	"summary": {
+		"phases": "{{count}} of {{total}} phases",
+		"effort": "Effort",
+		"provider": "Provider",
+		"providerUnset": "not set"
+	},
+	"phase": {
+		"runs": "runs",
+		"skipped": "skipped",
+		"skippedByEffort": "needs effort {{minEffort}} or above",
+		"skippedUntouched": "no matching files changed",
+		"hardGate": "Never skipped — {{gate}}",
+		"always": "Always runs",
+		"deterministic": "No API call",
+		"humanGate": "Stops for approval",
+		"conditional": "Only when {{globs}} change",
+		"dispatch": {
+			"inline": "inline",
+			"fresh-context": "fresh context",
+			"subagent-per-task": "subagent per task",
+			"sequential-reset": "sequential, context reset"
+		},
+		"degraded": "Asked for {{from}}; {{reason}}"
+	},
+	"levels": {
+		"title": "What each level buys",
+		"current": "current",
+		"adds": "+{{count}} phase",
+		"adds_other": "+{{count}} phases",
+		"removes": "−{{count}} phase",
+		"removes_other": "−{{count}} phases",
+		"same": "same phases",
+		"preview": "Preview",
+		"backToTask": "Back to this task's level"
+	},
+	"missing": {
+		"title": "Not installed",
+		"body": "{{count}} phase names an implementation this checkout does not have. It will be reported and skipped, not guessed at.",
+		"body_other": "{{count}} phases name implementations this checkout does not have. They will be reported and skipped, not guessed at."
+	},
+	"expand": "Show the pipeline",
+	"collapse": "Hide the pipeline"
+}

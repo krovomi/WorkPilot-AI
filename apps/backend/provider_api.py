@@ -1921,6 +1921,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import qa_promotion router: {e}")
 
+# --- Workflow Profile API (what the chosen effort level actually buys) ---
+try:
+    from workflows.api import router as workflow_profile_router
+
+    app.include_router(workflow_profile_router)
+except ImportError as e:
+    print(f"Warning: Could not import workflow_profile router: {e}")
+
 # --- Slash Commands API (Kanban Quick-Command bar: list + run .claude/commands) ---
 try:
     from slash_commands.api import router as slash_commands_router
