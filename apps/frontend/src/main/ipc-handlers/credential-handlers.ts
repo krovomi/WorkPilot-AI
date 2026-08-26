@@ -222,25 +222,79 @@ function runShellCommand(
 }
 
 /**
- * Update @openai/codex via pnpm global install.
- * Using pnpm as the primary package manager for consistency.
+ * Whether pnpm can perform a global install here.
+ *
+ * `pnpm install -g` needs a global bin directory, which only exists after
+ * `pnpm setup` has run and exported PNPM_HOME. A desktop-launched Electron
+ * process does not inherit the user's shell profile, so PNPM_HOME is usually
+ * absent even when the terminal has it — which is why this failed with
+ * ERR_PNPM_NO_GLOBAL_BIN_DIR while the same command worked by hand.
+ *
+ * Asking pnpm rather than guessing: it reports the resolved directory, and an
+ * unconfigured install answers with an error instead of a path.
+ */
+async function pnpmCanInstallGlobally(): Promise<boolean> {
+	if (process.env.PNPM_HOME) {
+		return true;
+	}
+	try {
+		const probe = await runShellCommand("pnpm", ["config", "get", "global-bin-dir"]);
+		const value = probe.stdout.trim();
+		return Boolean(value) && value !== "undefined" && value !== "null";
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Install or update @openai/codex globally.
+ *
+ * pnpm when it is set up, npm otherwise. npm needs no equivalent of
+ * `pnpm setup`: its global prefix always resolves, which makes it the right
+ * fallback rather than telling the user to go and configure a package manager
+ * they may not have chosen. The UI text and the preload docs already said
+ * `npm install -g`, so this also ends a disagreement between the code and
+ * everything documenting it.
  */
 async function runCodexUpdate(): Promise<{
 	code: number;
 	stdout: string;
 	stderr: string;
 }> {
-	const results: string[] = [];
+	const usePnpm = await pnpmCanInstallGlobally();
+	const manager = usePnpm ? "pnpm" : "npm";
 
-	// Always run pnpm install -g @latest to force latest version
-	const pnpmResult = await runShellCommand("pnpm", [
-		"install",
-		"-g",
-		"@openai/codex@latest",
-	]);
-	results.push(`[pnpm] ${pnpmResult.stdout.trim()}`);
-
-	return { code: 0, stdout: results.join("\n"), stderr: "" };
+	try {
+		const result = await runShellCommand(manager, [
+			"install",
+			"-g",
+			"@openai/codex@latest",
+		]);
+		return {
+			code: 0,
+			stdout: `[${manager}] ${result.stdout.trim()}`,
+			stderr: "",
+		};
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		// A pnpm that looked usable but was not — retrying with npm beats
+		// surfacing a package-manager setup error to someone who just wanted
+		// the Codex CLI.
+		if (manager === "pnpm") {
+			console.warn(`[Codex CLI] pnpm install failed, retrying with npm: ${message}`);
+			const fallback = await runShellCommand("npm", [
+				"install",
+				"-g",
+				"@openai/codex@latest",
+			]);
+			return {
+				code: 0,
+				stdout: `[npm] ${fallback.stdout.trim()}`,
+				stderr: "",
+			};
+		}
+		throw error;
+	}
 }
 
 /**
