@@ -226,4 +226,4 @@ def workflow_profile(
         return {"success": True, "profile": payload}
     except Exception as exc:  # noqa: BLE001
         logger.exception("workflow profile resolution failed")
-        return {"success": False, "error": str(exc)}
+        return {"success": False, "error": "An internal error has occurred."}
