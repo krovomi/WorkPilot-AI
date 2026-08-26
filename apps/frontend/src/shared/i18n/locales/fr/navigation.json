@@ -4,13 +4,13 @@
 		"tools": "Outils"
 	},
 	"groups": {
-		"workspace": "🎯 Espace de travail",
-		"agents": "🤖 Agents",
-		"development": "📁 Développement",
-		"explore": "✨ Explorer",
-		"gitIntegrations": "🌐 Git & Intégrations",
-		"planning": "📊 Planification",
-		"toolbox": "🧰 Boîte à outils",
+		"workspace": "Espace de travail",
+		"agents": "Agents",
+		"development": "Développement",
+		"explore": "Explorer",
+		"gitIntegrations": "Git & Intégrations",
+		"planning": "Planification",
+		"toolbox": "Boîte à outils",
 		"favorites": "Favoris"
 	},
 	"favorites": {
