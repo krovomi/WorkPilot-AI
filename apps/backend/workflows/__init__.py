@@ -14,10 +14,22 @@ from .engine import (
 )
 from .gates import GateRun, GateVerdict, run_deterministic_gates
 from .hard_gates import HardGateReport, HardGateResult, evaluate_hard_gates
+from .runner import (
+    BuiltinPlan,
+    PhaseContext,
+    PhaseOutcome,
+    PhaseRun,
+    builtin_plan,
+    effort_preamble,
+    phases_between,
+    run_skill_phase,
+    run_skill_phases,
+)
 from .spec import EFFORT_ORDER, Phase, Workflow, WorkflowError, load_workflow
 
 __all__ = [
     "EFFORT_ORDER",
+    "BuiltinPlan",
     "ExecutionProfile",
     "GateRun",
     "GateVerdict",
@@ -25,12 +37,20 @@ __all__ = [
     "HardGateResult",
     "MissingImpl",
     "Phase",
+    "PhaseContext",
+    "PhaseOutcome",
+    "PhaseRun",
     "ResolvedPhase",
     "Workflow",
     "WorkflowError",
+    "builtin_plan",
+    "effort_preamble",
     "evaluate_hard_gates",
     "load_workflow",
+    "phases_between",
     "resolve_profile",
     "run_deterministic_gates",
+    "run_skill_phase",
+    "run_skill_phases",
     "validate_impls",
 ]
