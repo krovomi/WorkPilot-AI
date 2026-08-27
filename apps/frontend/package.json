@@ -34,7 +34,7 @@
 		"python:download:all": "node scripts/download-python.cjs --all",
 		"python:verify": "node scripts/verify-python-bundling.cjs",
 		"package": "node scripts/package-simple.cjs",
-		"package:mac": "node scripts/package-simple.cjs --mac --arm64",
+		"package:mac": "node scripts/package-simple.cjs --mac",
 		"package:win": "node scripts/package-simple.cjs --win",
 		"package:linux": "node scripts/package-simple.cjs --linux",
 		"package:flatpak": "node scripts/package-simple.cjs --linux flatpak",
