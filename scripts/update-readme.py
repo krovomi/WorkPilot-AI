@@ -11,8 +11,12 @@ Examples:
 """
 
 import argparse
+import json
+import os
 import re
 import sys
+import urllib.error
+import urllib.request
 
 # Semver pattern: X.Y.Z or X.Y.Z-prerelease.N
 SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z]+\.\d+)?$")
@@ -33,17 +37,91 @@ STABLE_BADGE_END = "<!-- STABLE_VERSION_BADGE_END -->"
 STABLE_DL_START = "<!-- STABLE_DOWNLOADS -->"
 STABLE_DL_END = "<!-- STABLE_DOWNLOADS_END -->"
 REPO_URL = "https://github.com/krovomi/WorkPilot-AI"
+REPO_SLUG = os.environ.get("GITHUB_REPOSITORY", "krovomi/WorkPilot-AI")
 
-DOWNLOAD_TEMPLATE = """\
-| Platform | Download |
-|----------|----------|
-| **Windows** | [WorkPilot-AI-{v}-win32-x64.exe]({repo}/releases/download/v{v}/WorkPilot-AI-{v}-win32-x64.exe) |
-| **macOS (Apple Silicon)** | [WorkPilot-AI-{v}-darwin-arm64.dmg]({repo}/releases/download/v{v}/WorkPilot-AI-{v}-darwin-arm64.dmg) |
-| **macOS (Intel)** | [WorkPilot-AI-{v}-darwin-x64.dmg]({repo}/releases/download/v{v}/WorkPilot-AI-{v}-darwin-x64.dmg) |
-| **Linux** | [WorkPilot-AI-{v}-linux-x86_64.AppImage]({repo}/releases/download/v{v}/WorkPilot-AI-{v}-linux-x86_64.AppImage) |
-| **Linux (Debian)** | [WorkPilot-AI-{v}-linux-amd64.deb]({repo}/releases/download/v{v}/WorkPilot-AI-{v}-linux-amd64.deb) |
-| **Linux (Flatpak)** | [WorkPilot-AI-{v}-linux-x86_64.flatpak]({repo}/releases/download/v{v}/WorkPilot-AI-{v}-linux-x86_64.flatpak) |
-"""
+# The platforms a release is expected to carry, and how to recognise each one
+# among the release assets. Order is the order of the table.
+#
+# A row is written only when its asset is really attached to the release. The
+# table used to be a fixed six-line template with the version substituted into
+# it, which meant the README advertised every platform whether or not it had
+# been built: v1.2.0 shipped without a macOS Intel build — the job packaged
+# arm64 by mistake — and the README linked to a `darwin-x64.dmg` that returned
+# a 404 for a whole release cycle.
+PLATFORM_ASSETS = [
+    ("Windows", "-win32-x64.exe"),
+    ("macOS (Apple Silicon)", "-darwin-arm64.dmg"),
+    ("macOS (Intel)", "-darwin-x64.dmg"),
+    ("Linux", "-linux-x86_64.AppImage"),
+    ("Linux (Debian)", "-linux-amd64.deb"),
+    ("Linux (Flatpak)", "-linux-x86_64.flatpak"),
+]
+
+_TABLE_HEADER = "| Platform | Download |\n|----------|----------|\n"
+
+
+def fetch_release_assets(version: str) -> list[str] | None:
+    """Names of the assets attached to `v{version}`, or None if unknown.
+
+    None means "could not ask" — no network, no token, release not published
+    yet — and the caller falls back to listing every platform. It never means
+    "the release has no assets": that case returns an empty list, and the
+    caller writes a table with no rows rather than six dead links.
+    """
+    url = f"https://api.github.com/repos/{REPO_SLUG}/releases/tags/v{version}"
+    request = urllib.request.Request(
+        url, headers={"Accept": "application/vnd.github+json"}
+    )
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.load(response)
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+        print(f"Could not read the assets of v{version}: {exc}")
+        return None
+    return [asset.get("name", "") for asset in payload.get("assets", [])]
+
+
+def build_download_table(version: str, assets: list[str] | None) -> str:
+    """The download table, listing only what the release actually carries."""
+    if assets is None:
+        print("Listing every platform: the release assets could not be read.")
+        wanted = [(label, suffix) for label, suffix in PLATFORM_ASSETS]
+    else:
+        present = set(assets)
+        wanted = [
+            (label, suffix)
+            for label, suffix in PLATFORM_ASSETS
+            if f"WorkPilot-AI-{version}{suffix}" in present
+        ]
+        missing = [
+            label
+            for label, suffix in PLATFORM_ASSETS
+            if f"WorkPilot-AI-{version}{suffix}" not in present
+        ]
+        if missing:
+            # A warning, not a failure: a release that is short one platform is
+            # still worth publishing, and a README that stays silent about the
+            # gap is worse than one that simply does not offer the download.
+            print(
+                f"::warning::v{version} has no build for: {', '.join(missing)}. "
+                "Those rows are left out of the README."
+            )
+
+    if not wanted:
+        return (
+            "_No binaries are attached to this release yet. "
+            f"See [the release page]({REPO_URL}/releases/tag/v{version})._\n"
+        )
+
+    rows = "".join(
+        f"| **{label}** | [WorkPilot-AI-{version}{suffix}]"
+        f"({REPO_URL}/releases/download/v{version}/WorkPilot-AI-{version}{suffix}) |\n"
+        for label, suffix in wanted
+    )
+    return _TABLE_HEADER + rows
 
 
 def validate_version(version: str) -> bool:
@@ -89,32 +167,39 @@ def section_has_links(text: str, start_marker: str, end_marker: str) -> bool:
 
 
 def _update_or_generate_downloads(content, start, end, version, semver):
-    """Update existing download links or generate them if the section is empty."""
-    if section_has_links(content, start, end):
-        return update_section(content, start, end, [
-            (rf"WorkPilot-AI-{semver}", f"WorkPilot-AI-{version}"),
-            (rf"download/v{semver}/", f"download/v{version}/"),
-        ])
-    return replace_section_content(content, start, end, DOWNLOAD_TEMPLATE.format(v=version, repo=REPO_URL))
+    """Rewrite the download table from the assets the release actually has.
+
+    Deliberately a regeneration and not a version substitution. Substituting
+    carried every row forward untouched, so one release built without a
+    platform left a dead link in the README for every release after it.
+    """
+    table = build_download_table(version, fetch_release_assets(version))
+    return replace_section_content(content, start, end, table)
 
 
 def _update_beta(content, version, version_badge, semver, semver_badge):
     """Update beta sections of README."""
     print(f"Updating BETA section to {version} (badge: {version_badge})")
 
-    badge_line = f'[![Beta](https://img.shields.io/badge/beta-{version_badge}-orange?style=flat-square)]({REPO_URL}/releases/tag/v{version})\n'
+    badge_line = f"[![Beta](https://img.shields.io/badge/beta-{version_badge}-orange?style=flat-square)]({REPO_URL}/releases/tag/v{version})\n"
     if section_has_links(content, BETA_BADGE_START, BETA_BADGE_END):
         content = re.sub(
             rf"beta-{semver_badge}-orange", f"beta-{version_badge}-orange", content
         )
         content = update_section(
-            content, BETA_BADGE_START, BETA_BADGE_END,
+            content,
+            BETA_BADGE_START,
+            BETA_BADGE_END,
             [(rf"tag/v{semver}\)", f"tag/v{version})")],
         )
     else:
-        content = replace_section_content(content, BETA_BADGE_START, BETA_BADGE_END, badge_line)
+        content = replace_section_content(
+            content, BETA_BADGE_START, BETA_BADGE_END, badge_line
+        )
 
-    content = _update_or_generate_downloads(content, BETA_DL_START, BETA_DL_END, version, semver)
+    content = _update_or_generate_downloads(
+        content, BETA_DL_START, BETA_DL_END, version, semver
+    )
     return content
 
 
@@ -123,17 +208,26 @@ def _update_stable(content, version, version_badge, semver, semver_badge):
     print(f"Updating STABLE section to {version} (badge: {version_badge})")
 
     # Stable version badge
-    stable_badge = f'[![Stable](https://img.shields.io/badge/stable-{version_badge}-blue?style=flat-square)]({REPO_URL}/releases/tag/v{version})\n'
+    stable_badge = f"[![Stable](https://img.shields.io/badge/stable-{version_badge}-blue?style=flat-square)]({REPO_URL}/releases/tag/v{version})\n"
     if section_has_links(content, STABLE_BADGE_START, STABLE_BADGE_END):
-        content = update_section(content, STABLE_BADGE_START, STABLE_BADGE_END, [
-            (rf"stable-{semver_badge}-blue", f"stable-{version_badge}-blue"),
-            (rf"tag/v{semver}\)", f"tag/v{version})"),
-        ])
+        content = update_section(
+            content,
+            STABLE_BADGE_START,
+            STABLE_BADGE_END,
+            [
+                (rf"stable-{semver_badge}-blue", f"stable-{version_badge}-blue"),
+                (rf"tag/v{semver}\)", f"tag/v{version})"),
+            ],
+        )
     else:
-        content = replace_section_content(content, STABLE_BADGE_START, STABLE_BADGE_END, stable_badge)
+        content = replace_section_content(
+            content, STABLE_BADGE_START, STABLE_BADGE_END, stable_badge
+        )
 
     # Download links
-    content = _update_or_generate_downloads(content, STABLE_DL_START, STABLE_DL_END, version, semver)
+    content = _update_or_generate_downloads(
+        content, STABLE_DL_START, STABLE_DL_END, version, semver
+    )
 
     # Remove "no stable release yet" notice
     content = re.sub(r"> No stable release yet\.[^\n]*\n\n?", "", content)
@@ -154,9 +248,13 @@ def update_readme(version: str, is_prerelease: bool) -> bool:
         original_content = f.read()
 
     if is_prerelease:
-        content = _update_beta(original_content, version, version_badge, SEMVER_RE, SEMVER_BADGE_RE)
+        content = _update_beta(
+            original_content, version, version_badge, SEMVER_RE, SEMVER_BADGE_RE
+        )
     else:
-        content = _update_stable(original_content, version, version_badge, SEMVER_RE, SEMVER_BADGE_RE)
+        content = _update_stable(
+            original_content, version, version_badge, SEMVER_RE, SEMVER_BADGE_RE
+        )
 
     if content == original_content:
         print("No changes needed")
