@@ -369,6 +369,48 @@ def build_text_payload(channel: NotificationChannel, message: str) -> dict:
 # ── Delivery ────────────────────────────────────────────────────────────────
 
 
+# Why a webhook URL was refused, in words a caller may read.
+#
+# The response never carries an exception message. CodeQL calls that
+# stack-trace exposure and it is right: the text of a parse error, a resolver
+# failure or an OSError is exactly the sort of internal detail an error is not
+# supposed to hand back. The key is what travels; the literal is looked up here.
+#
+# Same shape as `_REASONS` in `workflows/api.py`, which is the one error
+# surface in this backend the scanner has never flagged.
+WEBHOOK_REJECTIONS = {
+    "empty": "Webhook URL cannot be empty",
+    "unparseable": "Invalid webhook URL",
+    "scheme": "Only HTTP and HTTPS webhook URLs are allowed",
+    "no_host": "Webhook URL has no host",
+    "unresolvable": "Unable to resolve the webhook host",
+    "no_address": "No addresses resolved for the webhook host",
+    "bad_address": "Webhook host resolved to an unreadable address",
+    "private": "Webhook host resolves to a private or non-routable address",
+    "unreachable": "Webhook host could not be reached",
+    "blocked": "Webhook URL rejected by the SSRF policy",
+}
+
+
+class WebhookRejected(ValueError):
+    """A refused webhook URL, named by a key into `WEBHOOK_REJECTIONS`.
+
+    `reason` is set by this module and never derived from a caught exception,
+    so a caller can be told which rule was broken without any internal text
+    travelling with it. `detail` is for the log only.
+    """
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        self.reason = reason
+        super().__init__(detail or WEBHOOK_REJECTIONS.get(reason, reason))
+
+
+def rejection_text(exc: BaseException) -> str:
+    """The caller-facing literal for a rejection, never the exception text."""
+    reason = getattr(exc, "reason", "")
+    return WEBHOOK_REJECTIONS.get(reason, WEBHOOK_REJECTIONS["blocked"])
+
+
 def validate_webhook_url(url: str) -> None:
     """SSRF guard for outbound webhook delivery.
 
@@ -383,28 +425,28 @@ def validate_webhook_url(url: str) -> None:
             resolves to a non-routable address.
     """
     if not url:
-        raise ValueError("Webhook URL cannot be empty")
+        raise WebhookRejected("empty")
     try:
         parsed = urlparse(url)
     except Exception as exc:  # noqa: BLE001 — any parse error is a rejection
         # The parser's own message adds nothing a caller can act on, and it
         # reaches the HTTP response through `post_json`.
         logger.warning("[Notifications] unparseable webhook URL: %s", exc)
-        raise ValueError("Invalid webhook URL") from None
+        raise WebhookRejected("unparseable") from None
     if parsed.scheme not in ("https", "http"):
-        raise ValueError("Only HTTP and HTTPS webhook URLs are allowed")
+        raise WebhookRejected("scheme")
     hostname = parsed.hostname
     if not hostname:
-        raise ValueError("Webhook URL has no host")
+        raise WebhookRejected("no_host")
 
     try:
         infos = socket.getaddrinfo(
             hostname, None, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM
         )
     except socket.gaierror:
-        raise ValueError(f"Unable to resolve webhook host: {hostname}")
+        raise WebhookRejected("unresolvable", f"cannot resolve {hostname}") from None
     if not infos:
-        raise ValueError(f"No addresses resolved for webhook host: {hostname}")
+        raise WebhookRejected("no_address", f"no address for {hostname}")
 
     for info in infos:
         family, _, _, _, sockaddr = info
@@ -414,7 +456,7 @@ def validate_webhook_url(url: str) -> None:
             ip_obj = ipaddress.ip_address(raw)
         except ValueError as exc:
             logger.warning("[Notifications] unparseable resolved address: %s", exc)
-            raise ValueError("Webhook host resolved to an unreadable address") from None
+            raise WebhookRejected("bad_address") from None
         if (
             ip_obj.is_private
             or ip_obj.is_loopback
@@ -423,10 +465,7 @@ def validate_webhook_url(url: str) -> None:
             or ip_obj.is_reserved
             or ip_obj.is_unspecified
         ):
-            raise ValueError(
-                f"Webhook host {hostname} resolves to a non-routable / private "
-                f"address ({ip_str}) and is not allowed"
-            )
+            raise WebhookRejected("private", f"{hostname} resolves to {ip_str}")
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -461,8 +500,12 @@ def post_json(url: str, payload: dict) -> tuple[bool, int | None, str | None]:
         parsed = urlparse(url)
         safe_url = parsed._replace().geturl()
     except ValueError as exc:
+        # The literal from the table, not `str(exc)`. This arm is also
+        # defence in depth: `api.test_notification_webhook` validates the URL
+        # itself first and returns the specific reason there, so nothing
+        # diagnostic is lost by keeping this one keyed.
         logger.warning("[Notifications] blocked webhook URL: %s", exc)
-        return False, None, str(exc)
+        return False, None, rejection_text(exc)
     try:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
