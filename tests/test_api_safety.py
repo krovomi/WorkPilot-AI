@@ -92,14 +92,13 @@ class TestValidatedDir:
             validated_dir(raw, "project_dir")
 
     def test_a_path_carrying_dot_dot_is_refused(self, tmp_path):
-        """Not a behaviour change — a barrier CodeQL is able to see.
+        """An explicit refusal, not a behaviour change.
 
-        `resolve()` normalises `..` away, so this refuses nothing that would
-        otherwise have been reachable. It is asserted because the guard is
-        load-bearing for a different reason: `ConstCompareAsSanitizerGuard`
-        is what keeps `py/path-injection` off every module that calls this,
-        and `is_relative_to` — which the allowlist below uses — CodeQL does
-        not recognise at all.
+        `resolve()` normalises `..` away a line later, so this rejects
+        nothing that would otherwise have been reachable. It is asserted
+        because the *explicitness* is the point: a traversal attempt is
+        refused by name, before any filesystem call, rather than inferred
+        from a containment failure further down.
         """
         with pytest.raises(ValueError, match=r"\.\."):
             validated_dir(f"{tmp_path}/../..", "project_dir")

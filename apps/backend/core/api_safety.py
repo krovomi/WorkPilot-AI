@@ -36,24 +36,34 @@ abuses. When `allowed_roots` is given it additionally requires the result to
 sit under one of them — that is real containment and the strongest guard
 here.
 
-Two details that look redundant and are not:
-
-* The `".." in parts` check is kept even though `resolve()` normalises `..`
-  away on the next line, so it refuses nothing that would otherwise have got
-  through. It is there because CodeQL's `ConstCompareAsSanitizerGuard`
-  recognises a comparison against a constant as a barrier, and `is_relative_to`
-  — which is what the containment check uses — it does not recognise at all.
-  Without it, a module with a *correct* allowlist still reports
-  `py/path-injection`.
-* The value is bound to `candidate` and reused. Rebuilding `Path(raw)` a
-  second time creates a fresh tainted node that the guard above does not
-  cover, which is exactly how the alert survived a first attempt at this.
+The `".." in parts` check refuses nothing that `resolve()` would not have
+normalised away a line later. It is kept because rejecting a traversal
+attempt explicitly, before any filesystem call, is easier to read and to test
+than inferring it from a containment failure further down — not for any
+effect on static analysis. An earlier version of this docstring claimed it
+acted as a CodeQL barrier (`ConstCompareAsSanitizerGuard`); that was wrong,
+and a full scan says so. Do not restore that claim.
 
 Not every path can be confined. A project directory is whatever checkout the
 user opened in their own desktop app; confining it to this repository once
 made `workflows/api.py` answer only for people building WorkPilot itself.
 Pass `allowed_roots` when a real root exists, and leave it out when it does
-not — the barrier above still applies.
+not.
+
+On the `py/path-injection` alert this function carries
+--------------------------------------------------------
+It is expected, and it is a false positive that belongs here rather than in
+twenty-one modules. When `allowed_roots` is None the argument really is an
+unconstrained caller-supplied path, and CodeQL is right that no sanitiser
+stands between it and the filesystem — because that is the feature. WorkPilot
+builds other people's projects; the directory is outside this repository by
+definition, and the backend reading it runs as the same local user who chose
+it in their own desktop app. There is no privilege boundary to cross.
+
+The point of centralising here is that this judgement is now made **once**, in
+a place a reviewer can read, instead of being repeated as twenty-one separate
+dismissals. Dismiss the alert on this function with that reason; do not
+"fix" it by confining the path.
 """
 
 from __future__ import annotations
@@ -130,8 +140,6 @@ def validated_dir(
     if len(raw) > MAX_PATH_LEN:
         raise ValueError(f"{label} is longer than {MAX_PATH_LEN} characters")
 
-    # Bound once and reused below: see the module docstring on why rebuilding
-    # this expression defeats the guard on the next line.
     candidate = Path(raw).expanduser()
     if ".." in candidate.parts:
         raise ValueError(f"{label} must not contain '..'")

@@ -148,13 +148,17 @@ class TestItAnswersForRealProjects:
 
 class TestItRefusesToWander:
     def test_a_path_carrying_dot_dot_is_refused(self, project):
-        """Not a behaviour change — a barrier CodeQL is able to see.
+        """An explicit refusal, not a behaviour change.
 
-        `resolve()` normalises `..` away, so this refuses nothing that would
-        otherwise have been reachable. It is asserted because the guard is
-        load-bearing for a *different* reason: it is the constant comparison
-        that keeps `py/path-injection` off this file. Delete it and the alert
-        returns, which is how the confinement regression started.
+        `resolve()` normalises `..` away, so this rejects nothing that would
+        otherwise have been reachable. What is asserted is that the endpoint
+        says so by name, with a reason from `_REASONS` rather than a message
+        built from the caller's own input.
+
+        An earlier version of this docstring claimed the check kept
+        `py/path-injection` off the file. It does not — a full scan still
+        reports it, because an unconstrained project path is the feature. See
+        `core.api_safety` for where that judgement is now recorded.
         """
         res = get(project_dir=f"{project}/../..", spec_id="001-x")
         assert res["success"] is False
