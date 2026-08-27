@@ -164,9 +164,9 @@ class TestWorktreeCreation:
 
         assert info.path.exists()
         # No `git fetch ...` should have been issued in local-branch (offline) mode.
-        assert not any(
-            call and call[0] == "fetch" for call in git_calls
-        ), f"expected no fetch, got: {git_calls}"
+        assert not any(call and call[0] == "fetch" for call in git_calls), (
+            f"expected no fetch, got: {git_calls}"
+        )
 
     def test_create_worktree_fetches_when_not_local_branch(
         self, temp_git_repo: Path, monkeypatch
@@ -491,8 +491,19 @@ class TestWorktreeAddRetry:
 
         assert calls["add"] >= 3, "spawn failure should have been retried"
         assert info.path.exists()
+
+        # `worktree_module.time` *is* the global time module, so the patch above
+        # is process-wide: `sleeps` collects every sleep any library performs
+        # during create_worktree, not just the retry backoff. On a loaded runner
+        # a stray sub-millisecond sleep lands between the two we care about and
+        # the assertion fails for a reason unrelated to the retry logic.
+        #
+        # Neither schedule in worktree.py sleeps under half a second — the slow
+        # one is 2.0 * 2**(attempt-1), the lock one 0.5 * 2**(attempt-1) — so
+        # filtering below that keeps exactly the backoff and drops the noise.
+        backoff = [s for s in sleeps if s >= 0.5]
         # Slow schedule: 2.0 * 2**(attempt-1), not the 0.5-based lock schedule.
-        assert sleeps[:2] == [2.0, 4.0]
+        assert backoff[:2] == [2.0, 4.0], f"unexpected backoff: {sleeps}"
 
     def test_create_worktree_reports_output_on_persistent_failure(
         self, temp_git_repo: Path, monkeypatch
