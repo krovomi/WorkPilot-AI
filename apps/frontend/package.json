@@ -157,7 +157,7 @@
 		"typescript": "^5.9.3",
 		"unzipper": "^0.10.14",
 		"vite": "^8.0.16",
-		"vitest": "^4.1.4"
+		"vitest": "^4.1.11"
 	},
 	"build": {
 		"appId": "com.workpilotai.app",
