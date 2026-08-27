@@ -71,7 +71,10 @@ def score(req: ScoreRequest):
             report = score_codebase(path)
         return {"success": True, "report": report.to_dict()}
     except CoverageParseError as e:
-        return {"success": False, "error": f"coverage_xml: {e}"}
+        # CoverageParseError now carries only fixed text (see ingest.py), but
+        # go through safe_error anyway so a future message cannot leak here.
+        logger.warning("coverage_xml rejected: %s", e)
+        return {"success": False, "error": safe_error(e, logger, "coverage_xml")}
     except Exception as e:  # noqa: BLE001
         logger.exception("LongevityScorer.score_codebase failed")
         return {"success": False, "error": safe_error(e, logger, "score")}

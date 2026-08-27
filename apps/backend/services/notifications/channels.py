@@ -21,6 +21,8 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
+from core.api_safety import safe_error
+
 from .models import ChannelResult, NotificationChannel, PRReadyNotification
 
 logger = logging.getLogger(__name__)
@@ -473,7 +475,11 @@ def post_json(url: str, payload: dict) -> tuple[bool, int | None, str | None]:
     except urllib.error.URLError as exc:
         return False, None, f"URL error: {exc.reason}"
     except Exception as exc:  # noqa: BLE001 — notifications must never crash callers
-        return False, None, str(exc)
+        # The HTTPError/URLError arms above return the caller's own URL and
+        # status back to them, which is useful and safe. This one is anything
+        # else, and `str(exc)` on an arbitrary failure is how a resolved path
+        # or a driver message reaches the API response.
+        return False, None, safe_error(exc, logger, "post_json")
 
 
 def send_to_channel(
