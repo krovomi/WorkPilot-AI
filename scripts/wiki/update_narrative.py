@@ -27,6 +27,7 @@ Expects CLAUDE_CODE_OAUTH_TOKEN in the environment, and the `claude` CLI on PATH
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import shutil
@@ -39,8 +40,12 @@ MARKER = re.compile(
     re.DOTALL,
 )
 
-NARRATIVE_MODEL = "claude-sonnet-4-6"
-TRANSLATE_MODEL = "claude-haiku-4-5-20251001"
+# Sonnet 5 rather than Sonnet 4.6: newer *and* cheaper — $2/$10 per MTok
+# against $3/$15. There is no trade-off to weigh here.
+NARRATIVE_MODEL = "claude-sonnet-5"
+# Translation is mechanical, so the cheapest model is the right one: $1/$5.
+# The bare id is the whole id — a date suffix is not a valid model string.
+TRANSLATE_MODEL = "claude-haiku-4-5"
 
 SOURCE_FILES = [
     "README.md",
@@ -95,12 +100,63 @@ def _is_stub(content: str) -> bool:
     return len(body) < 500
 
 
-def refresh_narrative(claude: str, repo: Path, wiki: Path, dry_run: bool = False) -> int:
+# Where the digest of the last narrative run is kept, inside the wiki repo.
+# A dotfile: GitHub renders wiki pages from *.md and ignores this one.
+SOURCES_DIGEST_FILE = ".narrative-sources"
+
+
+def _sources_digest(sources: str) -> str:
+    return hashlib.sha256(sources.encode("utf-8")).hexdigest()
+
+
+def _narrative_is_current(wiki: Path, digest: str) -> bool:
+    """Were the narrative blocks last written from exactly these sources?"""
+    stored = wiki / SOURCES_DIGEST_FILE
+    try:
+        return stored.read_text(encoding="utf-8").strip() == digest
+    except OSError:
+        return False
+
+
+def _block_is_empty(text: str) -> bool:
+    """True when the page has the markers but nothing between them."""
+    match = MARKER.search(text)
+    return match is not None and not match.group(2).strip()
+
+
+def refresh_narrative(
+    claude: str,
+    repo: Path,
+    wiki: Path,
+    dry_run: bool = False,
+    force: bool = False,
+) -> int:
+    """Rewrite the narrative blocks, skipping what the sources did not change.
+
+    Every page is rewritten from the same three source documents, so when none
+    of them has changed the model is being paid to produce the prose it
+    produced last time. At roughly 20k tokens of sources per page across
+    fourteen pages, that is ~290k input tokens — about a dollar — for output
+    nobody asked to differ.
+
+    A page is still rewritten when its block is empty: a page added since the
+    last run has to be filled even though the sources are untouched.
+    """
     sources = _load_sources(repo)
+    digest = _sources_digest(sources)
+    sources_unchanged = not force and _narrative_is_current(wiki, digest)
+    if sources_unchanged:
+        print(
+            "Sources unchanged since the last narrative run — rewriting only "
+            "pages whose block is still empty. Pass --force to rewrite all."
+        )
     changed = 0
     for md in sorted(wiki.glob("*.md")):
         text = md.read_text(encoding="utf-8")
         if "<!-- AUTOGEN:NARRATIVE:START -->" not in text:
+            continue
+
+        if sources_unchanged and not _block_is_empty(text):
             continue
 
         lang = _lang_of(md)
@@ -121,6 +177,11 @@ def refresh_narrative(claude: str, repo: Path, wiki: Path, dry_run: bool = False
             md.write_text(new_text, encoding="utf-8")
         if new_text != text:
             print(f"[{'DRY' if dry_run else 'OK'}] narrative: {md.name}")
+
+    if not dry_run:
+        # Written only after the whole pass: a run that raised part-way must
+        # not convince the next one that everything is up to date.
+        (wiki / SOURCES_DIGEST_FILE).write_text(digest + "\n", encoding="utf-8")
     return changed
 
 
@@ -129,7 +190,11 @@ def translate_fr(claude: str, repo: Path, wiki: Path, dry_run: bool = False) -> 
     _ = repo
     changed = 0
     for en in sorted(wiki.glob("*.md")):
-        if en.name.endswith(".fr.md") or en.name in {"_Sidebar.md", "_Footer.md", "Home.md"}:
+        if en.name.endswith(".fr.md") or en.name in {
+            "_Sidebar.md",
+            "_Footer.md",
+            "Home.md",
+        }:
             continue
         fr_path = wiki / en.name.replace(".md", ".fr.md")
 
@@ -197,7 +262,9 @@ SOURCE DOCUMENTS:
 Respond with the markdown body only, no preamble, no code fence."""
 
 
-def _build_translate_prompt(source_content: str, existing_target: str, target_lang: str) -> str:
+def _build_translate_prompt(
+    source_content: str, existing_target: str, target_lang: str
+) -> str:
     source_lang_name = "French" if target_lang == "en" else "English"
     target_lang_name = "English" if target_lang == "en" else "French"
     hint = ""
@@ -207,7 +274,9 @@ def _build_translate_prompt(source_content: str, existing_target: str, target_la
             f"than writing from scratch):\n{existing_target}"
         )
     example = (
-        "'Paramètres' → 'Settings'" if target_lang == "en" else "'Settings' → 'Paramètres'"
+        "'Paramètres' → 'Settings'"
+        if target_lang == "en"
+        else "'Settings' → 'Paramètres'"
     )
     return f"""Translate the following {source_lang_name} markdown page to {target_lang_name}.
 
@@ -251,6 +320,13 @@ def main() -> int:
         p.add_argument("--repo", type=Path, default=Path.cwd())
         p.add_argument("--wiki", type=Path, required=True)
         p.add_argument("--dry-run", action="store_true")
+        if name == "refresh-narrative":
+            p.add_argument(
+                "--force",
+                action="store_true",
+                help="Rewrite every narrative block even when the source "
+                "documents have not changed since the last run.",
+            )
 
     args = parser.parse_args()
     claude = "" if args.dry_run else _ensure_cli()
@@ -259,7 +335,7 @@ def main() -> int:
     wiki = args.wiki.resolve()
 
     if args.command == "refresh-narrative":
-        n = refresh_narrative(claude, repo, wiki, args.dry_run)
+        n = refresh_narrative(claude, repo, wiki, args.dry_run, args.force)
     elif args.command == "translate-fr":
         n = translate_fr(claude, repo, wiki, args.dry_run)
     else:
