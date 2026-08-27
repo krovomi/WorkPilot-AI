@@ -82,6 +82,8 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Pause & Resume** | Suspend a running task and resume later with full context preserved, optionally on a different provider |
 | **Per-Phase Re-run** | Redo any phase (planning, coding, validation) on demand without restarting the whole task |
 | **PR-First Review Flow** | Guided human-review with a DoD checklist, "approve & close", and reversible task abandon |
+| **Declarative Workflows** | A build is described as phases in `workflows/<name>/workflow.yaml`; the engine resolves them against your effort level, the provider's capabilities, and the files the task touches. On by default |
+| **Resolved Profile Preview** | See which phases your effort setting bought — and what the next level up would add — in the task detail modal, *before* the build starts |
 
 ### Multi-Agent Orchestration
 
@@ -175,7 +177,9 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | Feature | Description |
 |---------|-------------|
 | **Memory System (Graphiti)** | Graph-based semantic memory — agents retain insights across sessions |
-| **Skills System** | Token-optimized dynamic skill execution with checkpoint-based context management |
+| **Skills System** | Provider-agnostic [Agent Skills](https://agentskills.io) packs under `.agents/skills/`, served to the Kanban command bar and mirrored per harness (Claude Code, Copilot, Codex, Cursor, Gemini) |
+| **Memory Search** | Three-layer progressive retrieval over past builds — an index costs ~100 tokens, timelines and full records are fetched only on demand |
+| **hermes-agent** | [hermes-agent](https://github.com/NousResearch/hermes-agent) skills are read from the same `.agents/skills/`; skills it authors arrive as *candidates* for review, never auto-adopted |
 | **Context Management** | Intelligent context building with file relevance ranking and dependency graph analysis |
 | **Session History** | Browse and replay past agent sessions with full statistics |
 
@@ -189,6 +193,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Carbon Profiler** | Estimates the energy (kWh) and carbon footprint of your agent runs |
 | **Rate Limit Monitor** | Real-time usage tracking with proactive warnings and auto-switching triggers |
 | **Workflow Logger** | Structured execution logs with trace IDs for all agents, skills, and hooks |
+| **Learning Loop** | Extracts patterns from completed builds and A/B-replays promoted changes, so a suggestion is backed by an observed run rather than a guess |
 
 ### Customization
 
