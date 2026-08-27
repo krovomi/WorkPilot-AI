@@ -13,10 +13,14 @@ import logging
 import os
 from typing import Annotated, Any
 
-from core.api_safety import safe_error
 from fastapi import APIRouter, Body
 
-from .channels import build_text_payload, post_json, validate_webhook_url
+from .channels import (
+    build_text_payload,
+    post_json,
+    rejection_text,
+    validate_webhook_url,
+)
 from .models import NotificationChannel
 
 logger = logging.getLogger(__name__)
@@ -41,10 +45,12 @@ def test_notification_webhook(body: Annotated[dict[str, Any], Body(...)]):
     try:
         validate_webhook_url(url)
     except ValueError as exc:
-        return {
-            "success": False,
-            "error": safe_error(exc, logger, "test_notification_webhook"),
-        }
+        # `rejection_text` rather than `safe_error`: both keep the exception
+        # text out of the response, but this one names the rule that was
+        # broken instead of flattening every rejection to "Invalid input".
+        # Someone pasting a webhook URL needs to know *which* check refused it.
+        logger.warning("[Notifications] webhook test rejected: %s", exc)
+        return {"success": False, "error": rejection_text(exc)}
 
     lang = os.environ.get("APP_LANGUAGE", "en")
     message = _TEST_MESSAGES.get(lang, _TEST_MESSAGES["en"])
