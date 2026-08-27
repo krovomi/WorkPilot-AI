@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter, Query
 
 from .builder import build_timeline
@@ -15,12 +16,7 @@ router = APIRouter(prefix="/api/timeline", tags=["timeline"])
 
 
 def _validate_dir(raw: str) -> Path:
-    if not raw or raw.strip().startswith("-"):
-        raise ValueError("project_dir must be a non-empty path not starting with '-'")
-    p = Path(raw).expanduser().resolve()
-    if not p.exists() or not p.is_dir():
-        raise ValueError(f"project_dir does not exist or is not a directory: {p}")
-    return p
+    return validated_dir(raw, "project_dir")
 
 
 @router.get("/{correlation_id}")
@@ -35,7 +31,7 @@ def timeline(
     try:
         pdir = _validate_dir(project_dir)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "timeline")}
 
     try:
         snap = build_timeline(
@@ -48,4 +44,4 @@ def timeline(
         return {"success": True, "timeline": snap.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("build_timeline failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "timeline")}

@@ -167,7 +167,11 @@ class TestMakeRegistryResolver:
     def test_routes_npm_to_npm_resolver(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
             "license_governance.resolvers._http_get_json",
-            lambda url: {"license": "MIT"} if "registry.npmjs.org" in url else None,
+            lambda url: (
+                {"license": "MIT"}
+                if url.startswith("https://registry.npmjs.org/")
+                else None
+            ),
         )
         resolve = make_registry_resolver()
         assert resolve(_dep("react", "npm")) == "MIT"
@@ -178,7 +182,9 @@ class TestMakeRegistryResolver:
         monkeypatch.setattr(
             "license_governance.resolvers._http_get_json",
             lambda url: (
-                {"info": {"license": "Apache-2.0"}} if "pypi.org" in url else None
+                {"info": {"license": "Apache-2.0"}}
+                if url.startswith("https://pypi.org/")
+                else None
             ),
         )
         resolve = make_registry_resolver()

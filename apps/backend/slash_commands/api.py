@@ -39,6 +39,7 @@ import sys
 from pathlib import Path
 from typing import Annotated, Any
 
+from core.api_safety import validated_dir
 from fastapi import APIRouter, Body, HTTPException, Query
 from skills_registry.frontmatter import parse_frontmatter, workpilot_meta
 from skills_registry.resolver import check_requires
@@ -61,12 +62,12 @@ def _safe_project_dir(raw: str) -> Path:
     setups where projects live anywhere. The .claude/commands listing itself
     is read-only, so the worst a bad path can do is return [].
     """
-    if not raw or len(raw) > 4096:
-        raise HTTPException(status_code=400, detail="project_dir is required")
-    p = Path(raw).expanduser().resolve()
-    if not p.exists() or not p.is_dir():
-        raise HTTPException(status_code=400, detail=f"project_dir not found: {raw}")
-    return p
+    try:
+        return validated_dir(raw, "project_dir")
+    except ValueError as exc:
+        # `validated_dir` is written not to put a resolved server path in its
+        # message, so this one is safe to pass on as-is.
+        raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
 def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:

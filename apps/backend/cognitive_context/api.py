@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -42,12 +43,7 @@ class OptimizeRequest(BaseModel):
 def _validate_optional_dir(raw: str | None) -> Path | None:
     if not raw:
         return None
-    if raw.strip().startswith("-"):
-        raise ValueError("project_dir must not start with '-'")
-    resolved = Path(raw).expanduser().resolve()
-    if not resolved.exists() or not resolved.is_dir():
-        raise ValueError(f"project_dir is not a valid directory: {resolved}")
-    return resolved
+    return validated_dir(raw, "project_dir")
 
 
 @router.post("/optimize")
@@ -55,7 +51,7 @@ def optimize(req: OptimizeRequest):
     try:
         project_dir = _validate_optional_dir(req.project_dir)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "optimize")}
 
     try:
         engine = CognitiveContextOptimizer(project_dir=project_dir)
@@ -68,7 +64,7 @@ def optimize(req: OptimizeRequest):
         )
         return {"success": True, "context": result.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "optimize")}
     except Exception as e:  # noqa: BLE001
         logger.exception("optimize failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "optimize")}

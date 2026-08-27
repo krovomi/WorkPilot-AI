@@ -157,7 +157,19 @@ class RunManager:
                 try:
                     value = await get_user_secret(db, user_id, kind)
                 except Exception as e:  # vault misconfig must not block runs
-                    logger.warning("Could not read secret %s: %s", kind, e)
+                    # Type only, never the message: this is the failure path of
+                    # a secret read, and the backend that raised it is free to
+                    # quote the value it was handling.
+                    #
+                    # `kind` stays, and keeps a `py/clear-text-logging` alert
+                    # on this line. It is a key of USER_SECRET_ENV — the
+                    # literal string "jira_token", never a token — and CodeQL
+                    # is matching the name, not a value. Dropping it would
+                    # leave an operator with "a secret failed to load" and no
+                    # way to tell which integration to go and fix.
+                    logger.warning(
+                        "Could not read secret %s: %s", kind, type(e).__name__
+                    )
                     continue
                 if value:
                     env[env_name] = value

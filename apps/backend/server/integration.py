@@ -84,7 +84,14 @@ def mount_server_mode(app: FastAPI) -> bool:
         try:
             claims = decode_access_token(auth[len("Bearer ") :].strip())
         except TokenError as e:
-            return JSONResponse(status_code=401, content={"detail": str(e)})
+            # One answer for every way a token can be bad. `TokenError` says
+            # which — expired, malformed, wrong signature — and that is a
+            # distinction worth denying an unauthenticated caller, who can
+            # otherwise probe it. The reason goes to the log instead.
+            logger.warning("Server mode: rejected bearer token: %s", e)
+            return JSONResponse(
+                status_code=401, content={"detail": "Invalid or expired token"}
+            )
 
         # Make the principal available to legacy endpoints that want
         # attribution without depending on server.auth.deps.

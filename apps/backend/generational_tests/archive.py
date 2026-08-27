@@ -32,12 +32,14 @@ import json
 import logging
 import re
 import time
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa: S405 - element/ParseError types only
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+from defusedxml.ElementTree import fromstring as defused_fromstring
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +177,7 @@ def parse_junit_xml(xml_text: str | bytes | Path) -> list[TestOutcome]:
         xml_text = xml_text.read_bytes()
 
     try:
-        root = ET.fromstring(xml_text)  # noqa: S314 - JUnit XML is trusted local
+        root = defused_fromstring(xml_text)
     except ET.ParseError as e:
         raise ValueError(f"Invalid JUnit XML: {e}") from e
 

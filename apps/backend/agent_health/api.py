@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import threading
 
+from core.api_safety import safe_error
 from fastapi import APIRouter, HTTPException, Path
 from pydantic import BaseModel, Field
 
@@ -71,10 +72,12 @@ def record(req: RecordRunRequest):
         )
         return {"success": True}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(
+            status_code=400, detail=safe_error(e, logger, "record")
+        ) from e
     except Exception as e:  # noqa: BLE001
         logger.exception("record failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "record")}
 
 
 @router.post("/record-batch")
@@ -93,10 +96,12 @@ def record_batch(req: RecordBatchRequest):
         _get_monitor().record_many(runs)
         return {"success": True, "recorded": len(runs)}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(
+            status_code=400, detail=safe_error(e, logger, "record_batch")
+        ) from e
     except Exception as e:  # noqa: BLE001
         logger.exception("record-batch failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "record_batch")}
 
 
 @router.get("/score/{agent_name}")
@@ -112,7 +117,7 @@ def score(agent_name: str = Path(..., min_length=1, max_length=128)):
         return {"success": True, "score": result.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("score failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "score")}
 
 
 @router.get("/scores")
@@ -126,7 +131,7 @@ def scores():
         }
     except Exception as e:  # noqa: BLE001
         logger.exception("scores failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "scores")}
 
 
 @router.post("/reset")
@@ -136,4 +141,4 @@ def reset(req: ResetRequest):
         return {"success": True}
     except Exception as e:  # noqa: BLE001
         logger.exception("reset failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "reset")}
