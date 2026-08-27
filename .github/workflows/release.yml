@@ -470,6 +470,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Needed to dispatch the wiki refresh below — a `release: published`
+      # event raised by GITHUB_TOKEN does not trigger other workflows.
+      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -657,6 +660,25 @@ jobs:
           prerelease: ${{ contains(steps.changelog.outputs.version, 'beta') || contains(steps.changelog.outputs.version, 'alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # wiki-narrative.yml listens on `release: published`, but this release
+      # was published by GITHUB_TOKEN — and events raised by that token do not
+      # trigger other workflows. Same rule that keeps a tag push from starting
+      # this very workflow, and the reason the wiki did not refresh for v1.2.0.
+      #
+      # A PAT would fix both; dispatching explicitly fixes this one without
+      # requiring a secret the repository may not have.
+      - name: Refresh the wiki
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run != true) }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh workflow run wiki-narrative.yml \
+                 --repo "$GITHUB_REPOSITORY" --ref main -f mode=full; then
+            echo "::warning::Could not dispatch the wiki refresh. Run it by hand:"
+            echo "::warning::  gh workflow run wiki-narrative.yml --ref main -f mode=full"
+          fi
 
   # Update README with new version after successful release
   update-readme:
