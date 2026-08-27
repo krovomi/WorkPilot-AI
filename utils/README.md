@@ -28,9 +28,6 @@ Contient les fichiers de configuration temporaires et les ressources partagées 
 ### `/system`
 Contient les scripts système pour la gestion du projet :
 
-- `merge-upstream.bat` - Script de fusion pour Windows (batch)
-- `merge-upstream.ps1` - Script de fusion pour Windows (PowerShell)
-- `merge-upstream.sh` - Script de fusion pour Unix/Linux
 
 ## Utilisation
 

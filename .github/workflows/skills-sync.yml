@@ -2,7 +2,8 @@ name: Skills Sync
 
 # Watches the upstream skill packs and opens a PR when one moves.
 #
-# Modelled on sync-upstream.yml, with one deliberate difference: this never
+# Modelled on the upstream-sync workflow this repository used to carry, with
+# one deliberate difference: this never
 # merges. A skill is an instruction an agent will follow on real code, so a
 # change to one gets read by a person before it ships.
 #
@@ -12,7 +13,7 @@ name: Skills Sync
 
 on:
   schedule:
-    # Monday 08:00 UTC, an hour before sync-upstream so the two do not collide.
+    # Monday 08:00 UTC.
     - cron: '0 8 * * 1'
   workflow_dispatch:
     inputs:
