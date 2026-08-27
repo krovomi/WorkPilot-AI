@@ -828,7 +828,13 @@ def _validate_url_ssrf(provider: str, url: str) -> str:
             else:
                 ip_obj = ipaddress.IPv4Address(ip_str)
         except ipaddress.AddressValueError as exc:
-            raise ValueError(f"Invalid resolved address {ip_str!r}: {exc}")
+            # The parser's own message adds nothing a caller can act on. Every
+            # caller already funnels this through `_safe_error_message`, so it
+            # does not reach a response today — but the twin of this validator
+            # in `services/notifications/channels.py` did leak, and matching
+            # them removes the chance of the next caller forgetting.
+            logger.warning("[SSRF] unreadable resolved address: %s", exc)
+            raise ValueError("Resolved address could not be read") from None
 
         # Reject ANY private/loopback/link-local/multicast/reserved address
         # — covers the explicit PRIVATE_IP_RANGES list AND the broader
