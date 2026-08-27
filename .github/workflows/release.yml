@@ -642,6 +642,49 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> $GITHUB_OUTPUT
 
+      # Whether the binaries about to be published are signed. Notarisation
+      # and Windows signing already skip themselves when their secrets are
+      # absent, which is right — a release should not fail for want of a
+      # certificate. But it made the outcome silent: v1.2.0 and v1.2.1 both
+      # shipped unsigned, and the only way to find out was to download one and
+      # watch Gatekeeper refuse it.
+      - name: Note whether the build is signed
+        id: signing
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run != true) }}
+        env:
+          MAC_CERT: ${{ secrets.MAC_CERTIFICATE }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          missing=""
+          [ -z "$MAC_CERT" ] && missing="${missing} macOS-signing"
+          [ -z "$APPLE_ID" ] && missing="${missing} macOS-notarization"
+          [ -z "$AZURE_CLIENT_ID" ] && missing="${missing} Windows-signing"
+
+          if [ -z "$missing" ]; then
+            echo "unsigned_note=" >> "$GITHUB_OUTPUT"
+            echo "Binaries are signed."
+            exit 0
+          fi
+
+          echo "::warning::Publishing unsigned binaries — not configured:${missing}"
+          {
+            echo 'unsigned_note<<UNSIGNED_EOF'
+            echo '> ### ⚠️ These binaries are not code-signed'
+            echo '>'
+            echo '> The signing credentials are not configured for this repository, so'
+            echo '> your operating system will not recognise the publisher:'
+            echo '>'
+            echo '> - **macOS** — Gatekeeper will refuse to open the app. Right-click the'
+            echo '>   app and choose *Open*, or run'
+            echo '>   `xattr -dr com.apple.quarantine /Applications/WorkPilot\ AI.app`.'
+            echo '> - **Windows** — SmartScreen shows “Windows protected your PC”. Choose'
+            echo '>   *More info* → *Run anyway*.'
+            echo '>'
+            echo '> Verify what you downloaded against `checksums.sha256` in this release.'
+            echo 'UNSIGNED_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create Release
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run != true) }}
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
@@ -649,6 +692,8 @@ jobs:
           tag_name: v${{ steps.changelog.outputs.version }}
           body: |
             ${{ steps.changelog.outputs.body }}
+
+            ${{ steps.signing.outputs.unsigned_note }}
 
             ---
 
