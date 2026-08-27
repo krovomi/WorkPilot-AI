@@ -1,6 +1,6 @@
 {
 	"name": "workpilot-ai-ui",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"type": "module",
 	"description": "Desktop UI for WorkPilot AI autonomous coding framework",
 	"homepage": "https://github.com/krovomi/WorkPilot-AI",
@@ -34,7 +34,7 @@
 		"python:download:all": "node scripts/download-python.cjs --all",
 		"python:verify": "node scripts/verify-python-bundling.cjs",
 		"package": "node scripts/package-simple.cjs",
-		"package:mac": "node scripts/package-simple.cjs --mac --arm64",
+		"package:mac": "node scripts/package-simple.cjs --mac",
 		"package:win": "node scripts/package-simple.cjs --win",
 		"package:linux": "node scripts/package-simple.cjs --linux",
 		"package:flatpak": "node scripts/package-simple.cjs --linux flatpak",
@@ -87,7 +87,7 @@
 		"@tailwindcss/typography": "^0.5.19",
 		"@tanstack/react-virtual": "^3.13.23",
 		"@types/dompurify": "^3.0.5",
-		"@uiw/codemirror-theme-vscode": "^4.25.10",
+		"@uiw/codemirror-theme-vscode": "^4.25.11",
 		"@uiw/react-codemirror": "^4.25.10",
 		"@xterm/addon-fit": "^0.11.0",
 		"@xterm/addon-serialize": "^0.14.0",
@@ -104,7 +104,7 @@
 		"electron-updater": "^6.6.2",
 		"file-saver": "^2.0.5",
 		"i18next": "^25.7.3",
-		"lucide-react": "^1.8.0",
+		"lucide-react": "^1.33.0",
 		"minimatch": "^10.2.3",
 		"motion": "^12.23.26",
 		"proper-lockfile": "^4.1.2",
@@ -120,7 +120,7 @@
 		"semver": "^7.7.3",
 		"tailwind-merge": "^3.4.0",
 		"uuid": "^14.0.0",
-		"xstate": "^5.26.0",
+		"xstate": "^5.32.5",
 		"zod": "^4.2.1",
 		"zustand": "^5.0.9"
 	},
@@ -143,7 +143,7 @@
 		"@types/semver": "^7.7.1",
 		"@types/uuid": "^11.0.0",
 		"@vitejs/plugin-react": "^5.2.0",
-		"autoprefixer": "^10.4.22",
+		"autoprefixer": "^10.5.4",
 		"cross-env": "^10.1.0",
 		"electron": "41.10.6",
 		"electron-builder": "^26.15.3",
@@ -157,7 +157,7 @@
 		"typescript": "^5.9.3",
 		"unzipper": "^0.10.14",
 		"vite": "^8.0.16",
-		"vitest": "^4.1.4"
+		"vitest": "^4.1.11"
 	},
 	"build": {
 		"appId": "com.workpilotai.app",

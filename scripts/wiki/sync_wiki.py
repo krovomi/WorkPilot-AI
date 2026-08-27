@@ -31,7 +31,9 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).resolve().parent
 
 
-def run(cmd: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess:
+def run(
+    cmd: list[str], cwd: Path | None = None, check: bool = True
+) -> subprocess.CompletedProcess:
     print(f"$ {' '.join(cmd)}")
     return subprocess.run(cmd, cwd=cwd, check=check, text=True)
 
@@ -85,6 +87,48 @@ def has_changes(wiki: Path) -> bool:
     return bool(result.stdout.strip())
 
 
+class WikiPushDenied(RuntimeError):
+    """The remote refused the push because the token may not write the wiki.
+
+    A GitHub wiki is a separate git repository, and `GITHUB_TOKEN` has no
+    write access to it — it can clone, generate and commit, then fail on the
+    final push with a 403. There is no API detour for this one: pushing to
+    `<repo>.wiki.git` needs a token that carries the permission.
+    """
+
+
+def _push_was_denied(stderr: str) -> bool:
+    lowered = stderr.lower()
+    return "403" in lowered or "permission to" in lowered and "denied" in lowered
+
+
+def _explain_denied_push() -> None:
+    configured = bool(os.environ.get("WIKI_PUSH_TOKEN"))
+    level = "error" if configured else "warning"
+    print(f"::{level}::The wiki push was refused (HTTP 403).")
+    if configured:
+        print(
+            "::error::WIKI_PUSH_TOKEN is set, so this is not the usual cause. "
+            "Check that it is a classic PAT with the `repo` scope, that it has "
+            "not expired, and that its owner can write this wiki."
+        )
+        return
+    print(
+        "::warning::GITHUB_TOKEN cannot write to a GitHub wiki — the wiki is a "
+        "separate repository and the token has no permission on it. The clone, "
+        "the generation and the commit all succeeded; only the push failed."
+    )
+    print(
+        "::warning::To enable the sync, add a repository secret named "
+        "WIKI_PUSH_TOKEN holding a PAT with the `repo` scope. The workflows "
+        "already prefer it over GITHUB_TOKEN when it exists."
+    )
+    print(
+        "::warning::Until then the wiki is simply not refreshed. Nothing else "
+        "in this run is affected."
+    )
+
+
 def commit_and_push(wiki: Path, message: str) -> None:
     run(["git", "-C", str(wiki), "add", "-A"])
     run(["git", "-C", str(wiki), "commit", "-m", message])
@@ -99,8 +143,19 @@ def commit_and_push(wiki: Path, message: str) -> None:
             return
         stderr = result.stderr or ""
         print(stderr, end="")
-        if "rejected" not in stderr and "fetch first" not in stderr and "non-fast-forward" not in stderr:
-            raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, stderr)
+        if _push_was_denied(stderr):
+            # Not worth a traceback: it is a missing secret, not a broken
+            # sync, and a stack trace buries the one line that says so.
+            _explain_denied_push()
+            raise WikiPushDenied(stderr.strip() or "wiki push denied")
+        if (
+            "rejected" not in stderr
+            and "fetch first" not in stderr
+            and "non-fast-forward" not in stderr
+        ):
+            raise subprocess.CalledProcessError(
+                result.returncode, result.args, result.stdout, stderr
+            )
         print(f"[retry {attempt + 1}/3] remote moved — pulling with rebase")
         run(["git", "-C", str(wiki), "pull", "--rebase"])
     raise RuntimeError("wiki push rejected 3 times in a row")
@@ -111,8 +166,10 @@ def step_inventories(repo: Path, wiki: Path) -> None:
         [
             sys.executable,
             str(SCRIPTS_DIR / "generate_inventories.py"),
-            "--repo", str(repo),
-            "--wiki", str(wiki),
+            "--repo",
+            str(repo),
+            "--wiki",
+            str(wiki),
         ]
     )
 
@@ -123,8 +180,10 @@ def step_narrative(repo: Path, wiki: Path) -> None:
             sys.executable,
             str(SCRIPTS_DIR / "update_narrative.py"),
             "refresh-narrative",
-            "--repo", str(repo),
-            "--wiki", str(wiki),
+            "--repo",
+            str(repo),
+            "--wiki",
+            str(wiki),
         ]
     )
 
@@ -135,8 +194,10 @@ def step_translate(repo: Path, wiki: Path) -> None:
             sys.executable,
             str(SCRIPTS_DIR / "update_narrative.py"),
             "translate-fr",
-            "--repo", str(repo),
-            "--wiki", str(wiki),
+            "--repo",
+            str(repo),
+            "--wiki",
+            str(wiki),
         ]
     )
 
@@ -147,8 +208,10 @@ def step_translate_en(repo: Path, wiki: Path) -> None:
             sys.executable,
             str(SCRIPTS_DIR / "update_narrative.py"),
             "translate-en",
-            "--repo", str(repo),
-            "--wiki", str(wiki),
+            "--repo",
+            str(repo),
+            "--wiki",
+            str(wiki),
         ]
     )
 
@@ -157,11 +220,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--mode",
-        choices=["inventories", "narrative", "translate", "translate-en", "full", "bootstrap"],
+        choices=[
+            "inventories",
+            "narrative",
+            "translate",
+            "translate-en",
+            "full",
+            "bootstrap",
+        ],
         required=True,
     )
     parser.add_argument("--repo", type=Path, default=Path.cwd())
-    parser.add_argument("--workdir", type=Path, default=Path("/tmp/workpilot-wiki-sync"))
+    parser.add_argument(
+        "--workdir", type=Path, default=Path("/tmp/workpilot-wiki-sync")
+    )
     parser.add_argument("--no-push", action="store_true")
     args = parser.parse_args()
 
@@ -208,7 +280,16 @@ def main() -> int:
         print(f"--no-push set, skipping commit/push. Would commit:\n{message}")
         return 0
 
-    commit_and_push(wiki, message)
+    try:
+        commit_and_push(wiki, message)
+    except WikiPushDenied:
+        # Fail only when the sync was actually configured. Without
+        # WIKI_PUSH_TOKEN the push cannot succeed by construction, and a job
+        # that goes red on every push to develop for a feature nobody enabled
+        # teaches people to ignore red jobs. The warning above says what to do.
+        if os.environ.get("WIKI_PUSH_TOKEN"):
+            return 1
+        return 0
     return 0
 
 

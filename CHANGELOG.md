@@ -11,6 +11,57 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## 1.2.1 - La build macOS Intel, et la chaîne de release qui la publie
+
+La 1.2.0 annonçait six plateformes et n'en livrait que cinq. Cette version
+existe d'abord pour livrer la sixième, et pour que le cas ne puisse pas se
+reproduire silencieusement.
+
+### 🐛 Corrections
+
+- **La build macOS Intel manquait purement et simplement.** `package:mac` codait
+  `--arm64` en dur, alors que les quatre appels du dépôt passent déjà une
+  architecture explicite : le job « Intel » lançait
+  `electron-builder --mac --arm64 --x64` et packageait de l'arm64 sur un runner
+  `macos-15-intel`. Les deux jobs macOS produisaient le même binaire. Les
+  utilisateurs de Mac Intel n'avaient rien à télécharger, et le lien du README
+  renvoyait un 404.
+- **Le README annonçait des plateformes non construites.** Le tableau de
+  téléchargement était un modèle figé de six lignes dans lequel on substituait
+  le numéro de version — jamais régénéré, donc une ligne périmée survivait de
+  release en release. Il est désormais construit depuis les assets réellement
+  attachés à la release : une plateforme absente est omise **et** signalée en
+  `::warning::`, et une release sans aucun asset rend une phrase plutôt que six
+  liens morts.
+- **Le wiki ne se rafraîchissait jamais.** `wiki-narrative.yml` écoute
+  `release: published`, mais un événement émis par `GITHUB_TOKEN` ne déclenche
+  aucun workflow — la même règle qui empêchait déjà un tag de lancer sa release.
+  `create-release` le dispatche maintenant explicitement.
+- Un push wiki refusé faute de token rend un message actionnable au lieu d'une
+  traceback, et n'échoue le job que si le sync était réellement configuré.
+
+### 🔒 Sécurité
+
+- **`py/stack-trace-exposure` sur le test de webhook** (alerte 74), restée
+  ouverte après une première correction incomplète. La réponse ne dérive plus
+  d'une exception : chaque motif de rejet est lu dans une table de littéraux,
+  sur le modèle de `workflows/api.py`. L'appelant y gagne au passage un
+  diagnostic précis — URL vide, schéma refusé, hôte irrésolvable, plage privée —
+  là où tout était aplati en « Invalid input ».
+
+### 🛠️ Coûts et dépendances
+
+- **Le rafraîchissement narratif du wiki ne se repaie plus lui-même.** Une
+  empreinte des documents sources garde la passe : une release qui ne touche ni
+  `README.md`, ni `docs/CLAUDE.md`, ni `docs/CLI-USAGE.md` ne régénère plus une
+  prose identique. Le modèle passe de `claude-sonnet-4-6` à `claude-sonnet-5`,
+  plus récent **et** moins cher. Sur dix releases dont deux touchent la
+  documentation, le coût passe d'environ 10,60 $ à 1,41 $.
+- Dix montées de dépendances (claude-agent-sdk, alembic, h2, aiosqlite, psutil,
+  vitest, autoprefixer, xstate, lucide-react, @uiw/codemirror-theme-vscode).
+
+---
+
 ## 1.2.0 - Workflows déclaratifs, skills agnostiques et durcissement
 
 Le moteur de workflow décide désormais réellement ce qui tourne, les skills
