@@ -7,7 +7,7 @@ Thank you for your interest in contributing to WorkPilot AI! This document provi
 | What you want to do | Where to start |
 |----------------------|----------------|
 | Bug fixes & small improvements | Open a PR directly |
-| New features / architecture changes | Start a [GitHub Discussion](https://github.com/AndyMik90/Auto-Claude/discussions) or ask in [Discord](https://discord.com/channels/1448614759996854284/1451298184612548779) first |
+| New features / architecture changes | Start a [GitHub Discussion](https://github.com/krovomi/WorkPilot-AI/discussions) or ask in [Discord](https://discord.com/channels/1448614759996854284/1451298184612548779) first |
 | Questions & setup help | [Discord #setup-help](https://discord.com/channels/1448614759996854284/1451298184612548779) |
 
 ## AI-Assisted Contributions
@@ -153,8 +153,8 @@ The fastest way to get started:
 
 ```bash
 # Clone the repository
-git clone https://github.com/AndyMik90/Auto-Claude.git
-cd Auto-Claude
+git clone https://github.com/krovomi/WorkPilot-AI.git
+cd WorkPilot-AI
 
 # Install all dependencies (cross-platform)
 npm run install:all
@@ -219,7 +219,7 @@ WorkPilot AI automatically downloads prebuilt binaries for Windows. If prebuilts
 
 </details>
 
-> **Note:** For regular usage, we recommend downloading the pre-built releases from [GitHub Releases](https://github.com/AndyMik90/Auto-Claude/releases). Running from source is primarily for contributors and those testing unreleased features.
+> **Note:** For regular usage, we recommend downloading the pre-built releases from [GitHub Releases](https://github.com/krovomi/WorkPilot-AI/releases). Running from source is primarily for contributors and those testing unreleased features.
 
 ## Pre-commit Hooks
 
@@ -382,7 +382,7 @@ with open(path, "rb") as f:  # Correct
     data = f.read()
 ```
 
-Our pre-commit hooks automatically check for missing encoding parameters. See [PR #782](https://github.com/AndyMik90/Auto-Claude/pull/782) for the comprehensive encoding fix and [guides/windows-development.md](guides/windows-development.md) for Windows-specific development guidance.
+Our pre-commit hooks automatically check for missing encoding parameters. See [docs/windows-development.md](windows-development.md) for the encoding rules and Windows-specific development guidance.
 
 ## Testing
 
@@ -496,58 +496,24 @@ When contributing to WorkPilot AI, you'll typically fork the repository first. P
 # 1. Fork on GitHub (click the Fork button on the repo page)
 
 # 2. Clone YOUR fork (not the original repo)
-git clone https://github.com/YOUR-USERNAME/Auto-Claude.git
-cd Auto-Claude
+git clone https://github.com/YOUR-USERNAME/WorkPilot-AI.git
+cd WorkPilot-AI
 
 # 3. Verify your remotes point to YOUR fork
 git remote -v
 # Should show:
-# origin  https://github.com/YOUR-USERNAME/Auto-Claude.git (fetch)
-# origin  https://github.com/YOUR-USERNAME/Auto-Claude.git (push)
+# origin  https://github.com/YOUR-USERNAME/WorkPilot-AI.git (fetch)
+# origin  https://github.com/YOUR-USERNAME/WorkPilot-AI.git (push)
 
 # 4. Add upstream remote to sync with the original repo
-git remote add upstream https://github.com/AndyMik90/Auto-Claude.git
+git remote add upstream https://github.com/krovomi/WorkPilot-AI.git
 ```
 
 #### Keeping Your Fork Updated
 
-You can sync with upstream using automated scripts or manual commands.
-
-**Option 1: Automated Scripts (Recommended)**
-
-The cross-platform entry point is the package script — it works the same on
-Windows, macOS and Linux:
-
-```bash
-pnpm merge-upstream
-
-# Review the merge before publishing it
-pnpm merge-upstream -- --skip-push
-
-# Sync a branch other than develop
-pnpm merge-upstream -- --branch main
-```
-
-Platform wrappers live in `utils/system/` if you prefer them:
-
-```powershell
-# Windows PowerShell
-.\utils\system\merge-upstream.ps1
-.\utils\system\merge-upstream.ps1 -SkipPush
-```
-
-```bash
-# Windows CMD
-utils\system\merge-upstream.bat
-
-# macOS / Linux
-./utils/system/merge-upstream.sh
-```
-
-Run `pnpm run validate:upstream` to check that the sync tooling is wired up
-correctly.
-
-**Option 2: Manual Git Commands**
+Sync your fork with this repository using plain git — the wrapper scripts that
+used to live in `utils/system/` were removed with the upstream tracking they
+belonged to, and they pointed at a repository this project no longer follows.
 
 ```bash
 # Fetch latest changes from upstream
