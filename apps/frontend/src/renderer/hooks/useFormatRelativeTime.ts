@@ -1,4 +1,4 @@
-﻿import { useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 /**
  * Hook to format a date as a relative time string with i18n support

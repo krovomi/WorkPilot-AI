@@ -1,4 +1,4 @@
-﻿# Scripts Utilitaires
+# Scripts Utilitaires
 
 Ce dossier contient les scripts de diagnostic et d'utilitaires du projet.
 

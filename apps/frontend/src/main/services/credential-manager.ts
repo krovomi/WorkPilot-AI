@@ -49,6 +49,28 @@ export interface UsageData {
 }
 
 /**
+ * Is this API key one of the fake/placeholder keys a past version of the app
+ * generated (via the since-removed `ensureTestProfiles`), rather than a real
+ * credential the user entered?
+ *
+ * Deliberately matches on the *markers* of those generated keys and NOT on
+ * length. A `key.length < 20` heuristic used to stand in for this, but WorkPilot
+ * supports any OpenAI-compatible endpoint, and local runtimes (Ollama, LM
+ * Studio, LiteLLM, vLLM) are routinely configured with short throwaway keys
+ * like `ollama` or `sk-local`. Treating those as fake deleted real user
+ * profiles on startup and made valid local setups look unauthenticated.
+ */
+export function isPlaceholderApiKey(apiKey: string | undefined | null): boolean {
+	const key = (apiKey || "").trim();
+	if (!key) return true;
+	return (
+		key.includes("placeholder") ||
+		key.startsWith("test-") ||
+		key.startsWith("sk-ant-test")
+	);
+}
+
+/**
  * Credential Manager - Gestion centralisée des credentials et usage
  */
 export class CredentialManager extends EventEmitter {
@@ -76,22 +98,27 @@ export class CredentialManager extends EventEmitter {
 	private async cleanupTestProfiles(): Promise<void> {
 		try {
 			const profilesFile = await loadProfilesFile();
-			const before = profilesFile.profiles.length;
-			profilesFile.profiles = profilesFile.profiles.filter((p) => {
-				const key = p.apiKey || "";
-				const isFake =
-					key.includes("placeholder") ||
-					key.startsWith("test-") ||
-					(key.startsWith("sk-ant-test") && key.length < 20) ||
-					key.length < 20;
-				if (isFake) {
-					// noop
-				}
-				return !isFake;
-			});
-			if (profilesFile.profiles.length < before) {
-				await saveProfilesFile(profilesFile);
+			const removed = profilesFile.profiles
+				.filter((p) => isPlaceholderApiKey(p.apiKey))
+				.map((p) => p.name || p.id);
+			if (removed.length === 0) return;
+
+			profilesFile.profiles = profilesFile.profiles.filter(
+				(p) => !isPlaceholderApiKey(p.apiKey),
+			);
+			// Dropping the active profile would leave a dangling pointer.
+			if (
+				profilesFile.activeProfileId &&
+				!profilesFile.profiles.some((p) => p.id === profilesFile.activeProfileId)
+			) {
+				profilesFile.activeProfileId = profilesFile.profiles[0]?.id ?? null;
 			}
+			// This deletes user-visible configuration — say so rather than
+			// silently rewriting profiles.json behind the user's back.
+			console.warn(
+				`[CredentialManager] Removed ${removed.length} placeholder profile(s): ${removed.join(", ")}`,
+			);
+			await saveProfilesFile(profilesFile);
 		} catch {
 			// Non-critical — skip cleanup
 		}
@@ -482,12 +509,7 @@ export class CredentialManager extends EventEmitter {
 				const apiProfile = profilesFile.profiles.find((p) => {
 					return detectProvider(p.baseUrl) === provider;
 				});
-				if (
-					apiProfile?.apiKey &&
-					!apiProfile.apiKey.includes("placeholder") &&
-					!apiProfile.apiKey.startsWith("test-") &&
-					apiProfile.apiKey.length >= 20
-				) {
+				if (apiProfile?.apiKey && !isPlaceholderApiKey(apiProfile.apiKey)) {
 					apiKey = apiProfile.apiKey;
 					baseUrl = apiProfile.baseUrl;
 					profileName = apiProfile.name;
@@ -986,9 +1008,7 @@ export class CredentialManager extends EventEmitter {
 				});
 				if (
 					anthropicProfile?.apiKey &&
-					!anthropicProfile.apiKey.includes("placeholder") &&
-					!anthropicProfile.apiKey.startsWith("test-") &&
-					anthropicProfile.apiKey.length >= 20
+					!isPlaceholderApiKey(anthropicProfile.apiKey)
 				) {
 					return {
 						isAuthenticated: true,
@@ -1133,9 +1153,7 @@ export class CredentialManager extends EventEmitter {
 				});
 				if (
 					openaiProfile?.apiKey &&
-					!openaiProfile.apiKey.includes("placeholder") &&
-					!openaiProfile.apiKey.startsWith("test-") &&
-					openaiProfile.apiKey.length >= 20
+					!isPlaceholderApiKey(openaiProfile.apiKey)
 				) {
 					return {
 						isAuthenticated: true,

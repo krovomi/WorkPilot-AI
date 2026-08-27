@@ -1,4 +1,4 @@
-﻿# Python 2 to Python 3 Migration Prompt
+# Python 2 to Python 3 Migration Prompt
 
 You are an expert Python developer specializing in Python 2 to 3 migrations.
 

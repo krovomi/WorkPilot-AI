@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -19,6 +20,8 @@ from server.config import get_settings
 from server.db.models import AuthSession, User
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 
 class TokenError(Exception):
@@ -99,6 +102,31 @@ async def issue_token_pair(
     )
 
 
+async def revoke_all_sessions(
+    db: AsyncSession, user_id: str, *, commit: bool = True
+) -> int:
+    """Revoke every live refresh session of a user. Returns how many.
+
+    Used both for password changes (a credential change must invalidate
+    everything issued under the old one) and for refresh-token reuse
+    detection below.
+    """
+    sessions = list(
+        await db.scalars(
+            select(AuthSession).where(
+                AuthSession.user_id == user_id,
+                AuthSession.revoked_at.is_(None),
+            )
+        )
+    )
+    now = _utcnow()
+    for session in sessions:
+        session.revoked_at = now
+    if commit:
+        await db.commit()
+    return len(sessions)
+
+
 async def rotate_refresh_token(
     db: AsyncSession,
     refresh_token: str,
@@ -114,6 +142,16 @@ async def rotate_refresh_token(
     if session is None:
         raise TokenError("Unknown refresh token")
     if session.revoked_at is not None:
+        # Reuse of an already-rotated token: either the legitimate client
+        # replayed it, or it leaked and someone is replaying it after the
+        # real client already refreshed. We cannot tell the two apart, so
+        # kill the whole family and force a fresh login.
+        revoked = await revoke_all_sessions(db, session.user_id)
+        logger.warning(
+            "Refresh-token reuse detected for user %s; revoked %d session(s)",
+            session.user_id,
+            revoked,
+        )
         raise TokenError("Refresh token was revoked")
     expires_at = session.expires_at
     if expires_at.tzinfo is None:  # SQLite returns naive datetimes

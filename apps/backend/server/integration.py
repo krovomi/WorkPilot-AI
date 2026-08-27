@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from importlib import import_module
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -62,38 +63,12 @@ def mount_server_mode(app: FastAPI) -> bool:
         return False
 
     from server.auth.jwt_tokens import TokenError, decode_access_token
-    from server.routers.auth import router as auth_router
 
-    app.include_router(auth_router)
-
-    try:
-        from server.routers.invitations import router as invitations_router
-
-        app.include_router(invitations_router)
-    except ImportError as e:
-        logger.warning("Server mode: invitations router unavailable: %s", e)
-
-    try:
-        from server.routers.projects import router as projects_router
-
-        app.include_router(projects_router)
-    except ImportError as e:
-        logger.warning("Server mode: projects router unavailable: %s", e)
-
-    try:
-        from server.routers.specs import router as specs_router
-
-        app.include_router(specs_router)
-    except ImportError as e:
-        logger.warning("Server mode: specs router unavailable: %s", e)
-
-    try:
-        from server.routers.users import router as users_router
-
-        app.include_router(users_router)
-    except ImportError as e:
-        logger.warning("Server mode: users router unavailable: %s", e)
-
+    # SECURITY: the auth middleware is registered BEFORE any router is mounted.
+    # Starlette applies middleware to the whole app regardless of registration
+    # order, but doing it first means that if a router import blows up below,
+    # we can never end up with protected routes mounted and no gate in front of
+    # them. Callers additionally treat any exception from this function as fatal.
     @app.middleware("http")
     async def _auth_middleware(request: Request, call_next):
         await _ensure_db_ready()
@@ -109,7 +84,14 @@ def mount_server_mode(app: FastAPI) -> bool:
         try:
             claims = decode_access_token(auth[len("Bearer ") :].strip())
         except TokenError as e:
-            return JSONResponse(status_code=401, content={"detail": str(e)})
+            # One answer for every way a token can be bad. `TokenError` says
+            # which — expired, malformed, wrong signature — and that is a
+            # distinction worth denying an unauthenticated caller, who can
+            # otherwise probe it. The reason goes to the log instead.
+            logger.warning("Server mode: rejected bearer token: %s", e)
+            return JSONResponse(
+                status_code=401, content={"detail": "Invalid or expired token"}
+            )
 
         # Make the principal available to legacy endpoints that want
         # attribution without depending on server.auth.deps.
@@ -117,6 +99,23 @@ def mount_server_mode(app: FastAPI) -> bool:
         request.state.user_email = claims.get("email", "")
         request.state.user_role = claims.get("role", "member")
         return await call_next(request)
+
+    from server.routers.auth import router as auth_router
+
+    app.include_router(auth_router)
+
+    for module_path, label in (
+        ("server.routers.invitations", "invitations"),
+        ("server.routers.projects", "projects"),
+        ("server.routers.specs", "specs"),
+        ("server.routers.users", "users"),
+    ):
+        try:
+            module = import_module(module_path)
+        except ImportError as e:
+            logger.warning("Server mode: %s router unavailable: %s", label, e)
+            continue
+        app.include_router(module.router)
 
     logger.info("WorkPilot server mode ACTIVE (multi-user, auth required)")
     return True

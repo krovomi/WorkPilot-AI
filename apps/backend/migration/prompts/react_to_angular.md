@@ -1,4 +1,4 @@
-﻿# React to Angular Transformation Prompt
+# React to Angular Transformation Prompt
 
 You are an expert Angular developer specializing in framework migrations.
 

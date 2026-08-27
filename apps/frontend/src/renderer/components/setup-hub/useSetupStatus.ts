@@ -2,6 +2,7 @@ import type { ProjectEnvConfig } from "@shared/types/project";
 import { useEffect, useMemo, useState } from "react";
 import { getStaticProviders } from "../../../shared/utils/providers";
 import { useProjectEnvStore } from "../../stores/project-env-store";
+import { useProjectStore } from "../../stores/project-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import type { AppSection, ProjectSettingsSection } from "../settings/AppSettings";
 
@@ -50,6 +51,14 @@ export interface SetupStatus {
 	total: number;
 	/** 0-100, rounded. 100 when there is nothing left to configure. */
 	percent: number;
+	/**
+	 * Whether a project is currently selected/active. Project-scoped
+	 * integration items (GitHub, Jira, …) can't be configured — or even shown —
+	 * without one, so callers keep them out of the progress tally and out of
+	 * the guided tour (see `buildTodoTour`) instead of counting them as
+	 * outstanding "todo" work on a fresh install.
+	 */
+	hasProject: boolean;
 }
 
 /** Treat a credential string as present only when it has non-whitespace content. */
@@ -83,6 +92,12 @@ function integrationItem(
 export function computeSetupCategories(
 	providerStatus: Record<string, boolean>,
 	env: ProjectEnvConfig | null,
+	/**
+	 * Defaults to `true` so existing callers that only ever pass a project's
+	 * `env` (implying a project is selected) keep their current behaviour.
+	 * Pass `false` explicitly when no project is selected/active yet.
+	 */
+	hasProject = true,
 ): SetupStatus {
 	// ── AI providers: a single aggregated row that mirrors the accounts screen.
 	const providerNames = Object.keys(providerStatus);
@@ -158,12 +173,20 @@ export function computeSetupCategories(
 		(a, b) => a.priority - b.priority,
 	);
 
-	const allItems = categories.flatMap((c) => c.items);
-	const total = allItems.length;
-	const completed = allItems.filter((i) => i.state === "done").length;
+	// `categories` keeps every item regardless of `hasProject` — the Setup Hub
+	// still needs the "integrations" category present to render its own
+	// "select/create a project first" empty state. But without a project,
+	// none of those items are actually actionable, so they shouldn't count
+	// against progress (that would permanently show a fresh install as "80%
+	// left to configure") or be handed to the guided tour.
+	const countableItems = hasProject
+		? categories.flatMap((c) => c.items)
+		: aiCategory.items;
+	const total = countableItems.length;
+	const completed = countableItems.filter((i) => i.state === "done").length;
 	const percent = total === 0 ? 100 : Math.round((completed / total) * 100);
 
-	return { categories, completed, total, percent };
+	return { categories, completed, total, percent, hasProject };
 }
 
 /** True when at least one notification channel is enabled with its webhook set. */
@@ -187,6 +210,13 @@ export function useSetupStatus(): SetupStatus {
 	const settings = useSettingsStore((s) => s.settings);
 	const profiles = useSettingsStore((s) => s.profiles);
 	const envConfig = useProjectEnvStore((s) => s.envConfig);
+	// `activeProjectId` is the currently open/focused tab; `selectedProjectId`
+	// can lag behind it right after startup (see project-store's
+	// `loadProjects`). Fall back the same way the rest of the app does so this
+	// doesn't flap to "no project" while a project is clearly open.
+	const hasProject = useProjectStore((s) =>
+		Boolean(s.activeProjectId || s.selectedProjectId),
+	);
 
 	const [providerStatus, setProviderStatus] = useState<Record<string, boolean>>(
 		{},
@@ -207,7 +237,7 @@ export function useSetupStatus(): SetupStatus {
 	}, [profiles, settings]);
 
 	return useMemo(
-		() => computeSetupCategories(providerStatus, envConfig),
-		[providerStatus, envConfig],
+		() => computeSetupCategories(providerStatus, envConfig, hasProject),
+		[providerStatus, envConfig, hasProject],
 	);
 }

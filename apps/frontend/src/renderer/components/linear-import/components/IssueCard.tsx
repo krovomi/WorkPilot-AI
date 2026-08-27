@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Individual issue card component
  */
 

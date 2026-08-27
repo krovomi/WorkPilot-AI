@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Test fonctionnel complet de l'auto-fix loop
 Simule un cycle complet sans appeler Claude

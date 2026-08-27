@@ -26,7 +26,29 @@ sys.path.insert(0, str(_pydantic_models_path))
 
 from typing import Literal
 
+import pytest
 from pydantic import BaseModel, Field
+
+_TRUTHY = {"1", "true", "yes", "on"}
+
+#: Opt-in switch for the live-API test below.
+#:
+#: This test drives the real Claude API through the bundled CLI, so it must
+#: never gate the ordinary suite. It used to run whenever
+#: ``CLAUDE_CODE_OAUTH_TOKEN`` merely *happened* to be set — and
+#: ``core.auth.ensure_claude_code_oauth_token()`` injects exactly that variable
+#: into ``os.environ`` during a full-suite run. So it fired incidentally, with
+#: three different bad outcomes: reported "passed" without testing anything
+#: when the variable was absent (it returned early), failed with a 401 when the
+#: stored access token had expired, and hung indefinitely — the SDK retries up
+#: to 10 times with backoff — when the token was valid but the API was slow.
+#: That last one wedged the pre-push gate. Presence of a credential is not
+#: consent to spend it: require an explicit intent instead.
+RUN_LIVE_API_TESTS = (
+    os.environ.get("WORKPILOT_RUN_LIVE_API_TESTS", "").strip().lower() in _TRUTHY
+)
+
+pytestmark = pytest.mark.integration
 
 
 # Simple test model
@@ -38,13 +60,17 @@ class SimpleReviewResponse(BaseModel):
     score: int = Field(ge=0, le=100, description="Score from 0-100")
 
 
+@pytest.mark.skipif(
+    not RUN_LIVE_API_TESTS,
+    reason="Live Claude API test. Set WORKPILOT_RUN_LIVE_API_TESTS=1 to run it.",
+)
 async def test_structured_output():
     """Test the SDK's structured output functionality."""
 
-    # OAuth token must be set in environment (CLAUDE_CODE_OAUTH_TOKEN)
+    # Skip, never pass silently: a green tick here used to mean "we never
+    # checked", which is worse than a visible skip.
     if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
-        print("ERROR: CLAUDE_CODE_OAUTH_TOKEN environment variable not set")
-        return
+        pytest.skip("CLAUDE_CODE_OAUTH_TOKEN is not set")
 
     from claude_agent_sdk import ClaudeAgentOptions, query
 

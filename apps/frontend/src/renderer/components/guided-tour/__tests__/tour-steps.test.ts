@@ -92,4 +92,22 @@ describe("buildTodoTour", () => {
 		expect(projectKey?.optional).toBe(true);
 		expect(projectKey?.condition).toBeUndefined();
 	});
+
+	it("skips every project-scoped journey when there is no project yet, even though the items are 'todo'", () => {
+		// Fresh install: no provider configured, no project, nothing done.
+		const status = computeSetupCategories({}, null, false);
+		const anchors = anchorsOf(status);
+
+		expect(anchors).not.toContain(GUIDE_ANCHORS.github.enable);
+		expect(anchors).not.toContain(GUIDE_ANCHORS.jira.enable);
+		expect(anchors).not.toContain(GUIDE_ANCHORS.gitlab.enable);
+		// The app-level AI-providers step has no project dependency, so it's
+		// still offered.
+		expect(anchors).toContain(GUIDE_ANCHORS.providers.configure);
+	});
+
+	it("produces an empty tour when there is no project and providers are already configured", () => {
+		const status = computeSetupCategories({ anthropic: true }, null, false);
+		expect(buildTodoTour(status)).toHaveLength(0);
+	});
 });

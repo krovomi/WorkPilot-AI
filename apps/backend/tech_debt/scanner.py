@@ -129,7 +129,7 @@ def _iter_source_files(root: Path) -> Iterable[Path]:
 
 def _make_id(kind: str, file_path: str, line: int, msg: str) -> str:
     key = f"{kind}|{file_path}|{line}|{msg}".encode()
-    return hashlib.sha1(key).hexdigest()[:12]  # nosec: B324 - SHA1 used for ID generation, not security
+    return hashlib.sha1(key, usedforsecurity=False).hexdigest()[:12]  # nosec: B324 - SHA1 used for ID generation, not security
 
 
 def score_roi(cost: float, effort: float) -> float:
@@ -313,7 +313,9 @@ def _scan_duplication(root: Path, block_size: int = 6) -> list[DebtItem]:
             ]
             if len(block_lines) < block_size - 1:
                 continue
-            key = hashlib.sha1("\n".join(block_lines).encode("utf-8")).hexdigest()  # nosec: B324 - SHA1 used for deduplication, not security
+            key = hashlib.sha1(
+                "\n".join(block_lines).encode("utf-8"), usedforsecurity=False
+            ).hexdigest()  # nosec: B324 - SHA1 used for deduplication, not security
             blocks.setdefault(key, []).append((rel, i + 1))
 
     items: list[DebtItem] = []

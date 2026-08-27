@@ -48,7 +48,7 @@ python scripts/wiki/generate_inventories.py \
     --repo . --wiki /tmp/wp-wiki --dry-run
 
 # Full refresh against a local wiki clone — uses your local `claude` CLI login
-git clone https://github.com/tleub-ebp/WorkPilot-AI.wiki.git /tmp/wp-wiki
+git clone https://github.com/krovomi/WorkPilot-AI.wiki.git /tmp/wp-wiki
 python scripts/wiki/sync_wiki.py --mode full --workdir /tmp/wp-work --no-push
 ```
 

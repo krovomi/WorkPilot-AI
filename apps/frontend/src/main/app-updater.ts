@@ -29,7 +29,7 @@ import { isMacOS } from "./platform";
 import { compareVersions } from "./updater/version-manager";
 
 // GitHub repo info for API calls
-const GITHUB_OWNER = "tleub-ebp";
+const GITHUB_OWNER = "krovomi";
 const GITHUB_REPO = "WorkPilot-AI";
 
 // Debug mode - DEBUG_UPDATER=true or development mode

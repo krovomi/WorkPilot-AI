@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
@@ -24,14 +25,7 @@ router = APIRouter(prefix="/api/generational-tests", tags=["generational-tests"]
 
 
 def _validate_project_path(raw: str) -> Path:
-    if not raw or not isinstance(raw, str):
-        raise ValueError("project_path must be a non-empty string")
-    if raw.strip().startswith("-"):
-        raise ValueError("project_path must not start with '-'")
-    resolved = Path(raw).expanduser().resolve()
-    if not resolved.exists() or not resolved.is_dir():
-        raise ValueError(f"project_path is not a valid directory: {resolved}")
-    return resolved
+    return validated_dir(raw, "project_path")
 
 
 class CaptureRequest(BaseModel):
@@ -55,13 +49,13 @@ def list_generations(project_path: str = Query(...)):
     try:
         path = _validate_project_path(project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "list_generations")}
     try:
         archive = GenerationalArchive(project_dir=path)
         return {"success": True, "generations": archive.list_generations()}
     except Exception as e:  # noqa: BLE001
         logger.exception("list_generations failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "list_generations")}
 
 
 @router.post("/capture")
@@ -69,7 +63,7 @@ def capture(req: CaptureRequest):
     try:
         path = _validate_project_path(req.project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "capture")}
     try:
         archive = GenerationalArchive(project_dir=path)
         gen = archive.capture(req.label, junit_xml=req.junit_xml)
@@ -80,10 +74,10 @@ def capture(req: CaptureRequest):
             "passing_count": len(gen.passing_ids),
         }
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "capture")}
     except Exception as e:  # noqa: BLE001
         logger.exception("capture failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "capture")}
 
 
 @router.post("/compare")
@@ -91,7 +85,7 @@ def compare(req: CompareRequest):
     try:
         path = _validate_project_path(req.project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "compare")}
     try:
         archive = GenerationalArchive(project_dir=path)
         report = archive.compare(
@@ -99,10 +93,10 @@ def compare(req: CompareRequest):
         )
         return {"success": True, "report": report.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "compare")}
     except Exception as e:  # noqa: BLE001
         logger.exception("compare failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "compare")}
 
 
 @router.delete("/{label}")
@@ -110,13 +104,13 @@ def delete(label: str, project_path: str = Query(...)):
     try:
         path = _validate_project_path(project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "delete")}
     try:
         archive = GenerationalArchive(project_dir=path)
         deleted = archive.delete(label)
         return {"success": True, "deleted": deleted}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "delete")}
     except Exception as e:  # noqa: BLE001
         logger.exception("delete failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "delete")}

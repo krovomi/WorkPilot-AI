@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -42,17 +43,7 @@ class ScoreRequest(BaseModel):
 
 
 def _validate_project_path(raw: str) -> Path:
-    """Same defensive validation we apply to other path-taking endpoints."""
-    if not raw or not isinstance(raw, str):
-        raise ValueError("project_path must be a non-empty string")
-    if raw.strip().startswith("-"):
-        raise ValueError("project_path must not start with '-'")
-    resolved = Path(raw).expanduser().resolve()
-    if not resolved.exists():
-        raise ValueError(f"project_path does not exist: {resolved}")
-    if not resolved.is_dir():
-        raise ValueError(f"project_path is not a directory: {resolved}")
-    return resolved
+    return validated_dir(raw, "project_path")
 
 
 @router.post("/score")
@@ -66,7 +57,7 @@ def score(req: ScoreRequest):
     try:
         path = _validate_project_path(req.project_path)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "score")}
 
     has_signals = req.coverage_xml is not None or req.auto_load_sentinel
     try:
@@ -80,7 +71,10 @@ def score(req: ScoreRequest):
             report = score_codebase(path)
         return {"success": True, "report": report.to_dict()}
     except CoverageParseError as e:
-        return {"success": False, "error": f"coverage_xml: {e}"}
+        # CoverageParseError now carries only fixed text (see ingest.py), but
+        # go through safe_error anyway so a future message cannot leak here.
+        logger.warning("coverage_xml rejected: %s", e)
+        return {"success": False, "error": safe_error(e, logger, "coverage_xml")}
     except Exception as e:  # noqa: BLE001
         logger.exception("LongevityScorer.score_codebase failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "score")}

@@ -400,3 +400,91 @@ export async function runVirtualReview(
 		signal,
 	);
 }
+
+// ---------------------------------------------------------------------------
+// Workflow profile — what the chosen effort level actually buys
+//
+// Chantier 4 asks for the resolved pipeline to be visible *before* a build
+// runs, so the user sees what an effort level bought or cost rather than
+// inferring it from a log afterwards. Until now it was printed to a terminal
+// the Kanban user never opens.
+
+export interface WorkflowPhasePayload {
+	id: string;
+	impl: string;
+	pack: string;
+	skill: string;
+	description: string;
+	minEffort: string;
+	hardGate: string | null;
+	always: boolean;
+	gate: string | null;
+	conditional: boolean;
+	whenGlobs: string[];
+	/** False for a phase this effort level or change set dropped. */
+	runs: boolean;
+	dispatch: string;
+	/** Set when the provider could not give the dispatch the phase asked for. */
+	degradedFrom: string | null;
+	degradedReason: string;
+	/** "effort" | "untouched" — why it was dropped, when it was. */
+	skipReason: string | null;
+	deterministic: boolean;
+}
+
+export interface WorkflowLevelPayload {
+	effort: string;
+	phaseIds: string[];
+	count: number;
+}
+
+export interface WorkflowProfilePayload {
+	workflow: string;
+	description: string;
+	effort: string;
+	provider: string | null;
+	/** False when WORKPILOT_WORKFLOW_ENGINE is switched off. */
+	enabled: boolean;
+	phases: WorkflowPhasePayload[];
+	runCount: number;
+	missing: Array<{
+		phaseId: string;
+		impl: string;
+		pack: string;
+		reason: string;
+	}>;
+	levels?: WorkflowLevelPayload[];
+}
+
+export interface WorkflowProfileQuery {
+	/** Absolute spec directory, when the caller has one. */
+	specDir?: string;
+	/** Otherwise the pair that names it — the server owns the layout. */
+	projectDir?: string;
+	specId?: string;
+	/** Preview another level without changing the task's configuration. */
+	effort?: string;
+	provider?: string;
+	workflow?: string;
+	includeLevels?: boolean;
+}
+
+export async function fetchWorkflowProfile(
+	query: WorkflowProfileQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ profile: WorkflowProfilePayload }>> {
+	const params: Record<string, string> = {};
+	if (query.specDir) params.spec_dir = query.specDir;
+	if (query.projectDir) params.project_dir = query.projectDir;
+	if (query.specId) params.spec_id = query.specId;
+	if (query.effort) params.effort = query.effort;
+	if (query.provider) params.provider = query.provider;
+	if (query.workflow) params.workflow = query.workflow;
+	if (query.includeLevels === false) params.includeLevels = "false";
+
+	return _get<{ profile: WorkflowProfilePayload }>(
+		"/api/workflow-profile/",
+		params,
+		signal,
+	);
+}

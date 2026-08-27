@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """
 Quality CLI - Script standalone pour tester le Quality Scorer
 =============================================================

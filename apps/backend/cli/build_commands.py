@@ -49,6 +49,304 @@ from .input_handlers import (
 )
 
 
+def _changed_files(worktree_manager, spec_name: str) -> list[str] | None:
+    """Paths this task has touched, or None when it cannot be determined.
+
+    None is not the same as an empty list, and the engine treats it that way:
+    an unknown change set runs the conditional phases, because one extra pass
+    is cheaper than skipping a design review on a change that did touch the UI.
+    """
+    if worktree_manager is None:
+        return None
+    try:
+        return [path for _status, path in worktree_manager.get_changed_files(spec_name)]
+    except Exception as exc:  # noqa: BLE001 - advisory input, never fatal
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Could not list changed files: {exc}")
+        return None
+
+
+def _resolve_workflow_profile(
+    spec_dir: Path,
+    changed_files: list[str] | None = None,
+    *,
+    announce: bool = True,
+):
+    """Resolve the declarative workflow for this build, or None when disabled.
+
+    Called twice, for two different questions. Up front with no change set, to
+    show the user what their effort level bought before anything runs — at that
+    point nothing has been written, so a conditional phase can only be
+    forecast, and the engine's "unknown means run it" rule makes that forecast
+    the inclusive one. Then again after the coding phase with the real change
+    set, to decide which conditional gates actually apply. The second call does
+    not announce: the plan was already printed, and reprinting it would read as
+    a second build starting.
+
+    On by default; set WORKPILOT_WORKFLOW_ENGINE=0 to run the pre-engine
+    pipeline. The flag flipped once the engine executed the phases it declares
+    rather than only pruning them: while eight of eleven phases were played by
+    a hard-coded sequence the engine did not drive, switching it on bought the
+    printed profile and little else, and the honest default for that is off.
+    Now the declared workflow is the pipeline, so the honest default is on.
+
+    Every failure still degrades to None, which is exactly the previous
+    behaviour: the workflow shapes the run, it must never be able to stop one.
+    """
+    import os
+
+    _flag = os.environ.get("WORKPILOT_WORKFLOW_ENGINE", "1").strip().lower()
+    if _flag in ("0", "false", "off", "no"):
+        return None
+    try:
+        from core.client import peek_active_provider
+        from phase_config import get_phase_thinking
+
+        from workflows import load_workflow, resolve_profile
+
+        repo_root = Path(__file__).resolve().parents[3]
+        workflow_path = repo_root / "workflows" / "feature-build" / "workflow.yaml"
+        workflow = load_workflow(workflow_path)
+        effort = get_phase_thinking(spec_dir, "coding")
+        profile = resolve_profile(
+            workflow,
+            effort,
+            # Peeked, not consumed. `_get_active_provider` deletes the
+            # RESUME_WITH_PROVIDER marker on read — it is single-shot by
+            # design — so resolving the profile with it would eat the user's
+            # "resume with X" choice before the session meant to honour it
+            # ever started. The engine decides here; it does not start
+            # anything.
+            provider=peek_active_provider(spec_dir),
+            changed_files=changed_files,
+        )
+        if not announce:
+            return profile
+        print("\n" + profile.describe())
+
+        # Naming an uninstalled implementation up front beats discovering it
+        # halfway through a build.
+        try:
+            from skills_registry.packs import load_packs
+
+            from workflows import validate_impls
+
+            available = {
+                p.name: {s.name for s in p.skills()}
+                for p in load_packs(repo_root / "skills")
+            }
+            for miss in validate_impls(workflow, available):
+                if profile.will_run(miss.phase_id):
+                    print(f"  ⚠ {miss.phase_id}: {miss.reason}")
+        except Exception as exc:  # noqa: BLE001 - advisory only
+            print(f"  (could not check phase implementations: {exc})")
+
+        return profile
+    except Exception as exc:  # noqa: BLE001 - never block a build
+        if announce:
+            print(f"⚠ Workflow engine disabled for this run: {exc}")
+        return None
+
+
+def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
+    """Execute the no-token checks the resolved profile keeps.
+
+    Returns the run, or None when the engine is off. Never raises: a gate is a
+    signal, and a build that produced working code must not fail because a
+    linter could not start.
+    """
+    if profile is None:
+        return None
+    try:
+        from skills_registry.packs import load_packs
+
+        from workflows import run_deterministic_gates
+
+        repo_root = Path(__file__).resolve().parents[3]
+        packs = {p.name: p for p in load_packs(repo_root / "skills")}
+        run = run_deterministic_gates(profile, working_dir, packs)
+        if summary := run.describe():
+            print("\n" + summary)
+        return run
+    except Exception as exc:  # noqa: BLE001 - gates never fail a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Deterministic gates skipped: {exc}")
+        return None
+
+
+def _phase_context(
+    profile,
+    project_dir: Path,
+    spec_dir: Path,
+    model: str,
+    verbose: bool,
+    changed_files: list[str] | None,
+):
+    """Assemble what a skill phase needs, or None when the engine is off."""
+    if profile is None:
+        return None
+    try:
+        from workflows import PhaseContext
+
+        return PhaseContext(
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            model=model,
+            repo_root=Path(__file__).resolve().parents[3],
+            effort=profile.effort,
+            verbose=verbose,
+            changed_files=changed_files,
+        )
+    except Exception as exc:  # noqa: BLE001 - never block a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Workflow phase context unavailable: {exc}")
+        return None
+
+
+def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None):
+    """Execute the skill-backed phases in one window of the declared order.
+
+    This is what "the workflow is the pipeline" finally means: `brainstorm`,
+    `spec`, `review`, `adversarial-review`, `spec-conformance` and `verify`
+    were declared in `workflow.yaml` from the start and executed by nothing.
+    The window is expressed by phase id, so inserting a phase into the YAML
+    between two existing ones is picked up here with no change to this file.
+
+    Never raises, and never aborts the build: a review pass that could not
+    start is reported, and the code it was going to read still exists.
+    """
+    if profile is None or ctx is None:
+        return None
+    try:
+        from workflows import run_skill_phases
+
+        run = asyncio.run(run_skill_phases(profile, ctx, after=after, before=before))
+        if summary := run.describe():
+            print("\n" + summary)
+        return run
+    except Exception as exc:  # noqa: BLE001 - phases report, they do not fail builds
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Workflow phases skipped: {exc}")
+        return None
+
+
+def _run_observe_phase(
+    spec_dir: Path,
+    *,
+    profile,
+    qa_approved: bool,
+    ran_qa: bool,
+    detector_clean: bool | None = None,
+    tests_passed: bool | None = None,
+) -> None:
+    """Turn what this build externally verified into learning-loop candidates.
+
+    Gated on the profile only for the phase's presence; the phase is declared
+    `always: true`, so in practice it runs whenever the engine is on. Every
+    failure is swallowed: a build that produced working code must not be
+    reported as failed because the bookkeeping afterwards did not work.
+    """
+    if profile is not None and not profile.will_run("observe"):
+        return
+    if profile is None:
+        return
+    try:
+        from learning_loop.observe import BuildOutcome, run_observe
+        from learning_loop.pattern_storage import PatternStorage
+
+        repo_root = Path(__file__).resolve().parents[3]
+        outcome = BuildOutcome(
+            spec_id=spec_dir.name,
+            # QA that did not run is unknown, not passed. Recording a skipped
+            # gate as a clean one manufactures corroboration out of a budget
+            # decision, which is the one thing the external-signal rule exists
+            # to prevent.
+            qa_approved=qa_approved if ran_qa else None,
+            tests_passed=tests_passed,
+            # None when no gate ran or one could not be evaluated. Recording a
+            # gate that did not execute as clean would manufacture exactly the
+            # corroboration the promotion rules refuse to invent.
+            detector_clean=detector_clean,
+            workflow=profile.workflow,
+        )
+        patterns = PatternStorage(spec_dir.parent.parent).load_patterns()
+        report = run_observe(repo_root, outcome, patterns)
+        if summary := report.describe():
+            print("\n" + summary)
+    except Exception as exc:  # noqa: BLE001 - observation never fails a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Observe phase skipped: {exc}")
+
+
+def _report_hard_gates(profile, spec_dir: Path, tests_passed: bool | None) -> None:
+    """Say whether the workflow's non-negotiable gates actually held.
+
+    Reports; does not abort. The build has already produced a worktree and a
+    diff, and throwing that away over a gate the user can see for themselves
+    would be worse than telling them plainly. What matters is that "not
+    negotiable" stops being a claim nobody checks.
+    """
+    if profile is None:
+        return
+    try:
+        from workflows import evaluate_hard_gates
+
+        report = evaluate_hard_gates(profile, spec_dir, tests_passed=tests_passed)
+        if summary := report.describe():
+            print("\n" + summary)
+        if report.blocking:
+            print("  → the branch is not ready to merge on this evidence.")
+    except Exception as exc:  # noqa: BLE001 - a gate reports, never fails a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Hard gate check skipped: {exc}")
+
+
+def _verdict_in(path: Path) -> bool | None:
+    """Read a test verdict out of one report, or None when it says nothing."""
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace").lower()
+    except OSError:
+        return None
+    if "tests: pass" in text or "all tests passed" in text:
+        return True
+    if "tests: fail" in text or "test failures" in text:
+        return False
+    return None
+
+
+def _tests_went_green(spec_dir: Path) -> bool | None:
+    """Whether a test run was recorded as passing, or None if nobody said.
+
+    Two readers, in order of authority. The QA loop's report comes first: it is
+    written by a phase whose whole job is to check the work. The `verify`
+    phase's own report is the fallback, and it matters because `verify` is the
+    phase that declares `hard_gate: tests-pass` — until it was executed, the
+    gate could only ever read a report written by a *different* phase, and on a
+    build with QA pruned there was no report at all.
+
+    A failure anywhere wins over a pass elsewhere: two readers disagreeing
+    means something is wrong, and the safe reading of "wrong" is not "green".
+    None when neither said anything, which is unknown and stays unknown.
+    """
+    verdicts = [
+        _verdict_in(spec_dir / "qa_report.md"),
+        _verdict_in(spec_dir / "workflow" / "verify.md"),
+    ]
+    if False in verdicts:
+        return False
+    if True in verdicts:
+        return True
+    return None
+
+
 def handle_build_command(
     project_dir: Path,
     spec_dir: Path,
@@ -105,6 +403,13 @@ def handle_build_command(
     planning_model = get_phase_model(spec_dir, "planning", model)
     coding_model = get_phase_model(spec_dir, "coding", model)
     qa_model = get_phase_model(spec_dir, "qa", model)
+
+    # Resolve the declarative workflow, when it is switched on. It decides
+    # which phases this effort level and provider actually buy; the hard-coded
+    # sequence below stays the execution path. Opt-in until the golden profiles
+    # have run against real builds — this function is the entry point of every
+    # build in the product.
+    _profile = _resolve_workflow_profile(spec_dir)
 
     print_banner()
     print(f"\nProject directory: {project_dir}")
@@ -244,6 +549,15 @@ def handle_build_command(
     try:
         debug("run.py", "Starting agent execution")
 
+        # Phases the workflow declares before `planning`. At low and medium
+        # effort the profile has already dropped them, so this is a no-op there
+        # — which is the point: what the effort level buys is now the phases
+        # that actually run, not a line in a printed plan.
+        _pre_ctx = _phase_context(
+            _profile, working_dir, spec_dir, model, verbose, changed_files=None
+        )
+        _run_workflow_phases(_profile, _pre_ctx, after=None, before="planning")
+
         asyncio.run(
             run_autonomous_agent(
                 project_dir=working_dir,  # Use worktree if isolated
@@ -253,6 +567,11 @@ def handle_build_command(
                 verbose=verbose,
                 source_spec_dir=source_spec_dir,  # For syncing progress back to main project
                 streaming_session_id=streaming_session_id,
+                # B.6: the two phases this call owns — `planning` and `coding` —
+                # stop being an opaque internal sequence. The profile decides
+                # whether planning is bought at this effort and whether coding
+                # may dispatch to subagents.
+                profile=_profile,
             )
         )
         debug_success("run.py", "Agent execution completed")
@@ -283,10 +602,46 @@ def handle_build_command(
             except Exception as exc:  # noqa: BLE001 - non-fatal
                 debug_warning("run.py", f"Encoding repair skipped: {exc}")
 
+        # Second resolution of the profile, with the change set this build
+        # actually produced. The first one was a forecast printed before
+        # anything was written; this one decides the conditional phases.
+        # `announce=False` — reprinting the plan here would read as a second
+        # build starting.
+        _changed = _changed_files(worktree_manager, spec_dir.name)
+        _post_profile = (
+            _resolve_workflow_profile(spec_dir, _changed, announce=False)
+            if _profile is not None
+            else None
+        )
+        _post_ctx = _phase_context(
+            _post_profile, working_dir, spec_dir, model, verbose, _changed
+        )
+
+        # `design-check`. The workflow declares it immediately after `coding`
+        # and before `review`, and that is now where it runs — a frontend
+        # finding is worth more to the reviewer than to the archive. No API
+        # call, so it is not pruned by effort, and its verdict is an *external*
+        # signal, which is what makes it usable as corroboration by the
+        # learning loop below.
+        gate_run = _run_deterministic_gates(_post_profile, working_dir, spec_dir)
+
+        # `review` — declared between `coding` and `qa`, dispatched in a fresh
+        # context so the reader inherits none of the writer's reasoning.
+        _run_workflow_phases(_post_profile, _post_ctx, after="coding", before="qa")
+
         # Run QA validation BEFORE finalization (while worktree still exists)
         # QA must sign off before the build is considered complete
         qa_approved = True  # Default to approved if QA is skipped
         qa_should_run = not skip_qa and should_run_qa(spec_dir)
+        if _profile is not None and qa_should_run and not _profile.will_run("qa"):
+            # The workflow says this effort level does not buy a QA pass.
+            # `skip_qa` and should_run_qa() still win when either says no —
+            # the profile can remove a phase, never add one back.
+            print(
+                f"\n⏭  QA skipped — workflow '{_profile.workflow}' does not run it "
+                f"at effort '{_profile.effort}'."
+            )
+            qa_should_run = False
         if qa_should_run:
             print("\n" + "=" * 70)
             print("  SUBTASKS COMPLETE - STARTING QA VALIDATION")
@@ -350,6 +705,35 @@ def handle_build_command(
                 except Exception:
                     pass  # Best-effort
 
+        # Everything the workflow declares after `qa`: the two ultrathink
+        # readings and `verify`. They run here rather than earlier because
+        # each is a question about the finished branch — `adversarial-review`
+        # attacks the code, `spec-conformance` asks whether it is the thing
+        # that was asked for, and `verify` checks the work before the build
+        # claims to be done.
+        _run_workflow_phases(_post_profile, _post_ctx, after="qa", before=None)
+
+        # Hard gates. `verify` declares `hard_gate: tests-pass`, which until
+        # now only kept the phase out of the effort pruner — nothing checked
+        # whether the tests actually passed, so a build could conclude green
+        # with a red suite. Evaluated here, from the same test evidence the
+        # observe phase records, so the two cannot disagree.
+        _tests_green = _tests_went_green(spec_dir)
+        _report_hard_gates(_post_profile or _profile, spec_dir, _tests_green)
+
+        # The `observe` phase. Marked `always: true` in the workflow, so it
+        # runs at every effort level — it costs no API call, it only reads what
+        # the verifiers already said. Placed after QA so the QA verdict is one
+        # of the signals it can record.
+        _run_observe_phase(
+            spec_dir,
+            profile=_post_profile or _profile,
+            qa_approved=qa_approved,
+            ran_qa=qa_should_run,
+            detector_clean=gate_run.all_clean if gate_run else None,
+            tests_passed=_tests_green,
+        )
+
         # Post-build finalization (only for isolated sequential mode)
         # This happens AFTER QA validation so the worktree still exists
         if worktree_manager:
@@ -372,6 +756,7 @@ def handle_build_command(
             model=model,
             max_iterations=max_iterations,
             verbose=verbose,
+            profile=_profile,
         )
     except Exception as e:
         import traceback
@@ -389,6 +774,7 @@ def _handle_build_interrupt(
     model: str,
     max_iterations: int | None,
     verbose: bool,
+    profile=None,
 ) -> None:
     """
     Handle keyboard interrupt during build.
@@ -401,6 +787,11 @@ def _handle_build_interrupt(
         model: Model being used
         max_iterations: Maximum iterations
         verbose: Verbose mode flag
+        profile: The resolved workflow profile, carried through so a build the
+            user paused and resumed keeps the dispatch and effort decisions it
+            started with. Resuming into a differently-shaped pipeline than the
+            one that was announced is the kind of surprise this whole refactor
+            exists to remove.
     """
     from agent import run_autonomous_agent
 
@@ -508,6 +899,7 @@ def _handle_build_interrupt(
                     max_iterations=max_iterations,
                     verbose=verbose,
                     streaming_session_id=streaming_session_id,  # noqa: F821
+                    profile=profile,
                 )
             )
             # Build completed or was interrupted again - exit

@@ -4,13 +4,13 @@
 		"tools": "Tools"
 	},
 	"groups": {
-		"workspace": " Workspace",
-		"agents": " Agents",
-		"development": " Development",
-		"explore": " Explore",
-		"gitIntegrations": " Git & Integrations",
-		"planning": " Planning",
-		"toolbox": " Toolbox",
+		"workspace": "Workspace",
+		"agents": "Agents",
+		"development": "Development",
+		"explore": "Explore",
+		"gitIntegrations": "Git & Integrations",
+		"planning": "Planning",
+		"toolbox": "Toolbox",
 		"favorites": "Favorites"
 	},
 	"favorites": {
@@ -193,7 +193,7 @@
 		"current": "Current",
 		"latest": "Latest",
 		"lastChecked": "Last checked",
-		"notInstalledDescription": "Codex CLI is not installed. Click \"Install\" to install it via pnpm in the background:",
+		"notInstalledDescription": "Codex CLI is not installed. Click \"Install\" to install it in the background:",
 		"installing": "Installing, please wait...",
 		"viewDocs": "View Codex CLI documentation"
 	}

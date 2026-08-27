@@ -1,4 +1,4 @@
-﻿import {
+import {
 	AlertCircle,
 	AlertTriangle,
 	ExternalLink,

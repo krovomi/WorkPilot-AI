@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Script complet de tests - Auto-Fix Loops Feature
 Lance les tests dans le bon ordre avec les bonnes dépendances

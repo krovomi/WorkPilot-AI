@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -24,12 +25,7 @@ router = APIRouter(prefix="/api/i18n-scaler", tags=["i18n-scaler"])
 
 
 def _validate_dir(raw: str) -> Path:
-    if not raw or raw.strip().startswith("-"):
-        raise ValueError("path must not be empty or start with '-'")
-    p = Path(raw).expanduser().resolve()
-    if not p.is_dir():
-        raise ValueError(f"not a directory: {p}")
-    return p
+    return validated_dir(raw, "path")
 
 
 def _resolve_strategy(raw: str | None) -> PlaceholderStrategy:
@@ -76,7 +72,7 @@ def diff(req: DiffRequest):
         return {"success": True, "diff": d.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("diff failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "diff")}
 
 
 @router.post("/skeleton")
@@ -84,7 +80,7 @@ def skeleton(req: SkeletonRequest):
     try:
         strategy = _resolve_strategy(req.placeholder_strategy)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "skeleton")}
     try:
         scaler = I18nAutoScaler(placeholder_strategy=strategy)
         out = scaler.generate_skeleton(
@@ -95,7 +91,7 @@ def skeleton(req: SkeletonRequest):
         return {"success": True, "skeleton": out}
     except Exception as e:  # noqa: BLE001
         logger.exception("skeleton failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "skeleton")}
 
 
 @router.post("/report-from-dir")
@@ -104,7 +100,7 @@ def report_from_dir(req: ReportFromDirRequest):
         path = _validate_dir(req.locales_dir)
         strategy = _resolve_strategy(req.placeholder_strategy)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
     try:
         scaler = I18nAutoScaler(placeholder_strategy=strategy)
         locales = scaler.discover_locale_dir(path)
@@ -117,4 +113,4 @@ def report_from_dir(req: ReportFromDirRequest):
         return {"success": True, "report": report.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("report-from-dir failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "report_from_dir")}

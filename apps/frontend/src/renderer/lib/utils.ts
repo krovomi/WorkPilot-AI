@@ -92,24 +92,40 @@ export function formatRelativeTime(date: Date): string {
  * @param html The HTML content
  * @returns Plain text extracted from HTML
  */
+/**
+ * Memo for extractTextFromHtml. The Kanban search filter calls it once per task
+ * on every keystroke, and task descriptions do not change while the user types.
+ * Bounded so a long session cannot grow it without limit.
+ */
+const HTML_TEXT_CACHE_LIMIT = 500;
+const htmlTextCache = new Map<string, string>();
+
 export function extractTextFromHtml(html: string): string {
 	if (!html) return "";
 
-	// Create a temporary DOM element to parse HTML safely
-	const tempDiv = document.createElement("div");
-	tempDiv.innerHTML = html;
+	const cached = htmlTextCache.get(html);
+	if (cached !== undefined) return cached;
 
-	// Get text content (automatically strips tags and decodes entities)
-	let text = tempDiv.textContent || tempDiv.innerText || "";
-
-	// Clean up whitespace
-	text = text
-		// Collapse multiple newlines and spaces
-		.replace(/\s+/g, " ")
-		// Remove leading/trailing whitespace
+	// DOMParser, NOT `div.innerHTML = html`. Assigning innerHTML builds nodes in
+	// the live document: `<img src=x onerror=...>` starts a real network fetch
+	// even on a detached element. Task titles and descriptions come from Jira,
+	// Linear and GitHub, so they are third-party content. A DOMParser document
+	// is inert — no resource loading, no handlers — and we only read text.
+	const text = new DOMParser()
+		.parseFromString(html, "text/html")
+		.body // textContent strips tags and decodes entities
+		.textContent // Collapse runs of whitespace, then trim
+		?.replace(/\s+/g, " ")
 		.trim();
 
-	return text;
+	const result = text || "";
+	if (htmlTextCache.size >= HTML_TEXT_CACHE_LIMIT) {
+		// Cheap FIFO eviction — drop the oldest entry.
+		const oldest = htmlTextCache.keys().next().value;
+		if (oldest !== undefined) htmlTextCache.delete(oldest);
+	}
+	htmlTextCache.set(html, result);
+	return result;
 }
 
 /**

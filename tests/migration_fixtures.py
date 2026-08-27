@@ -1,4 +1,4 @@
-﻿"""
+"""
 Test fixtures for migration testing
 Sample projects for testing transformations
 """

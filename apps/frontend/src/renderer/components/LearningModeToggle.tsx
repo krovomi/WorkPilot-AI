@@ -1,4 +1,4 @@
-﻿import { GraduationCap, Settings } from "lucide-react";
+import { GraduationCap, Settings } from "lucide-react";
 import { useState } from "react";
 import type { ExplanationLevel, LearningModeConfig } from "../../shared/types";
 import { cn } from "../lib/utils";

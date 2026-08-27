@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -28,12 +29,7 @@ class PreviewRequest(BaseModel):
 
 
 def _validate_spec_dir(raw: str) -> Path:
-    if not raw or raw.strip().startswith("-"):
-        raise ValueError("spec_dir must be a non-empty path not starting with '-'")
-    p = Path(raw).expanduser().resolve()
-    if not p.exists() or not p.is_dir():
-        raise ValueError(f"spec_dir does not exist or is not a directory: {p}")
-    return p
+    return validated_dir(raw, "spec_dir")
 
 
 @router.post("/preview")
@@ -42,14 +38,14 @@ def preview(req: PreviewRequest):
     try:
         spec_dir = _validate_spec_dir(req.spec_dir)
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "preview")}
 
     try:
         estimate = estimate_build_cost(spec_dir)
         return {"success": True, "estimate": estimate.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("estimate_build_cost failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "preview")}
 
 
 class FormulaMatrixRequest(BaseModel):
@@ -79,9 +75,13 @@ def formula_matrix(req: FormulaMatrixRequest):
         matrix = compute_formula_matrix(
             ticket_id=req.ticket_id,
             description=req.description,
-            spec_dir=Path(req.spec_dir).expanduser() if req.spec_dir else None,
+            # Through the validator, not Path(...) directly: this endpoint
+            # had its own _validate_spec_dir and went round it.
+            spec_dir=validated_dir(req.spec_dir, "spec_dir") if req.spec_dir else None,
             project_root=(
-                Path(req.project_root).expanduser() if req.project_root else None
+                validated_dir(req.project_root, "project_root")
+                if req.project_root
+                else None
             ),
             providers=req.providers,
             complexity_score=req.complexity_score,
@@ -90,4 +90,4 @@ def formula_matrix(req: FormulaMatrixRequest):
         return {"success": True, "matrix": matrix.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("compute_formula_matrix failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "formula_matrix")}

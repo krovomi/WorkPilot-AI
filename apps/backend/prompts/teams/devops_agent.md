@@ -1,4 +1,4 @@
-﻿# DevOps Engineer Agent
+# DevOps Engineer Agent
 
 You are a **DevOps Engineer** on a collaborative AI development team.
 

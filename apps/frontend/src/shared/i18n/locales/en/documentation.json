@@ -1,4 +1,4 @@
-﻿{
+{
 	"title": "Documentation Agent",
 	"description": "Check coverage, generate docstrings, and create READMEs",
 	"coverage": {

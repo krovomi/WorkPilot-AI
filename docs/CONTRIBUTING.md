@@ -515,20 +515,37 @@ You can sync with upstream using automated scripts or manual commands.
 
 **Option 1: Automated Scripts (Recommended)**
 
+The cross-platform entry point is the package script — it works the same on
+Windows, macOS and Linux:
+
+```bash
+pnpm merge-upstream
+
+# Review the merge before publishing it
+pnpm merge-upstream -- --skip-push
+
+# Sync a branch other than develop
+pnpm merge-upstream -- --branch main
+```
+
+Platform wrappers live in `utils/system/` if you prefer them:
+
 ```powershell
 # Windows PowerShell
-.\merge-upstream.ps1
-
-# Optional: Skip push to review changes first
-.\merge-upstream.ps1 -SkipPush
+.\utils\system\merge-upstream.ps1
+.\utils\system\merge-upstream.ps1 -SkipPush
 ```
 
 ```bash
 # Windows CMD
-merge-upstream.bat
+utils\system\merge-upstream.bat
+
+# macOS / Linux
+./utils/system/merge-upstream.sh
 ```
 
-See [MERGE_UPSTREAM.md](MERGE_UPSTREAM.md) for detailed documentation and troubleshooting.
+Run `pnpm run validate:upstream` to check that the sync tooling is wired up
+correctly.
 
 **Option 2: Manual Git Commands**
 

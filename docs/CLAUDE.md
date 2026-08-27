@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, and validates software for you. It's a monorepo with a Python backend (CLI + agent logic) and an Electron/React frontend (desktop UI).
 
-> **Deep-dive reference:** [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md) | [Architecture Deep Dives](shared_docs/README.md) | **Frontend contributing:** [apps/frontend/CONTRIBUTING.md](apps/frontend/CONTRIBUTING.md)
+> **Deep-dive reference:** [Architecture deep dives](../shared_docs/README.md) | [Configuration reference](../shared_docs/CONFIGURATION.md) | **Frontend contributing:** [apps/frontend/CONTRIBUTING.md](../apps/frontend/CONTRIBUTING.md)
 
 ## Table of Contents
 
@@ -18,6 +18,8 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Spec Directory Structure](#spec-directory-structure)
   - [Memory System (Graphiti)](#memory-system-graphiti)
   - [Skills System](#skills-system)
+  - [Memory Search (mem-search)](#memory-search-mem-search)
+  - [Declarative Workflows](#declarative-workflows)
   - [Workflow Logger](#workflow-logger)
 - [Frontend Development](#frontend-development)
   - [Tech Stack](#tech-stack)
@@ -87,11 +89,11 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 
 **No time estimates** — Never provide duration predictions. Use priority-based ordering instead.
 
-**PR target** — Always target the `develop` branch for PRs to tleub-ebp/WorkPilot-AI, NOT `main`.
+**PR target** — Always target the `develop` branch for PRs to krovomi/WorkPilot-AI, NOT `main`.
 
 ## Project Structure
 
-WorkPilot_AI/
+WorkPilot-AI/
 ├── apps/
 │   ├── backend/                      # Python backend/CLI — ALL agent logic
 │   │   ├── core/                     # client.py, auth.py, worktree.py, platform/, workflow_logger.py
@@ -99,10 +101,10 @@ WorkPilot_AI/
 │   │   ├── agents/                   # planner, coder, session management
 │   │   ├── qa/                       # reviewer, fixer, loop, criteria
 │   │   ├── spec/                     # Spec creation pipeline
-│   │   ├── skills/                   # AI skills system with optimization
+│   │   ├── skills/                   # Executable Python skills (angular, migration)
 │   │   ├── cli/                      # CLI commands (spec, build, workspace, QA)
 │   │   ├── context/                  # Task context building, semantic search
-│   │   ├── runners/                  # 33 standalone runners (spec, roadmap, insights, github, self-healing, etc.)
+│   │   ├── runners/                  # 66 standalone runners (spec, roadmap, insights, github, self-healing, etc.)
 │   │   ├── services/                 # Background services, recovery orchestration
 │   │   ├── integrations/             # graphiti/, linear, github, windsurf_proxy
 │   │   ├── project/                  # Project analysis, security profiles
@@ -115,13 +117,13 @@ WorkPilot_AI/
 │           │   ├── claude-profile/   # Multi-profile credentials, token refresh, usage
 │           │   ├── terminal/         # PTY daemon, lifecycle, Claude integration
 │           │   ├── platform/         # Cross-platform abstraction
-│           │   ├── ipc-handlers/     # 68 handler modules by domain
+│           │   ├── ipc-handlers/     # 106 handler modules by domain
 │           │   ├── services/         # SDK session recovery, profile service
 │           │   └── changelog/        # Changelog generation and formatting
 │           ├── preload/              # Electron preload scripts (electronAPI bridge)
 │           ├── renderer/             # React UI
 │           │   ├── components/       # UI components (onboarding, settings, task, terminal, github, etc.)
-│           │   ├── stores/           # 60+ Zustand state stores
+│           │   ├── stores/           # 96 Zustand state stores
 │           │   ├── contexts/         # React contexts (ViewStateContext)
 │           │   ├── hooks/            # Custom hooks (useIpc, useTerminal, etc.)
 │           │   ├── styles/           # CSS / Tailwind styles
@@ -135,7 +137,8 @@ WorkPilot_AI/
 ├── src/                              # Shared connectors and utilities
 │   └── connectors/
 │       └── grepai/                   # grepai semantic search integration
-├── guides/                           # Documentation
+├── docs/                             # Documentation (this file, CLI usage, release, security)
+├── shared_docs/                      # Long-form reference (configuration, architecture)
 ├── tests/                            # Backend test suite
 └── scripts/                          # Build and utility scripts
 
@@ -144,7 +147,7 @@ WorkPilot_AI/
 ### Setup
 
 **Prerequisites:**
-- Python 3.8+ with `uv` package manager
+- Python 3.12+ with `uv` package manager
 - Node.js 20+ with `pnpm 8+` package manager
 - Git
 
@@ -160,8 +163,8 @@ cd apps/frontend && pnpm install
 ### Backend
 ```bash
 cd apps/backend
-python spec_runner.py --interactive            # Create spec interactively
-python spec_runner.py --task "description"      # Create from task
+python runners/spec_runner.py --interactive     # Create spec interactively
+python runners/spec_runner.py --task "..."      # Create from task
 python run.py --spec 001                        # Run autonomous build
 python run.py --spec 001 --qa                   # Run QA validation
 python run.py --spec 001 --merge                # Merge completed build
@@ -171,24 +174,24 @@ python run.py --list                            # List all specs
 ### Frontend
 ```bash
 cd apps/frontend
-npm run dev              # Dev mode (Electron + Vite HMR)
-npm run build            # Production build
-npm run test             # Vitest unit tests
-npm run test:watch       # Vitest watch mode
-npm run lint             # Biome check
-npm run lint:fix         # Biome auto-fix
-npm run typecheck        # TypeScript strict check
-npm run package          # Package for distribution
+pnpm run dev             # Dev mode (Electron + Vite HMR)
+pnpm run build           # Production build
+pnpm run test            # Vitest unit tests
+pnpm run test:watch      # Vitest watch mode
+pnpm run lint            # Biome check
+pnpm run lint:fix        # Biome auto-fix
+pnpm run typecheck       # TypeScript strict check
+pnpm run package         # Package for distribution
 ```
 
 ### Testing
 
 | Stack | Command | Tool |
 |-------|---------|------|
-| Backend | `apps/backend/.venv/bin/pytest tests/ -v` | pytest |
-| Frontend unit | `cd apps/frontend && npm test` | Vitest |
-| Frontend E2E | `cd apps/frontend && npm run test:e2e` | Playwright |
-| All backend | `npm run test:backend` (from root) | pytest |
+| Backend | `pytest tests/ -v` (venv: `.venv/bin` on Unix, `.venv/Scripts` on Windows) | pytest |
+| Frontend unit | `cd apps/frontend && pnpm test` | Vitest |
+| Frontend E2E | `cd apps/frontend && pnpm run test:e2e` | Playwright |
+| All backend | `pnpm run test:backend` (from root) | pytest |
 
 ### Releases
 ```bash
@@ -196,7 +199,7 @@ node scripts/bump-version.js patch|minor|major  # Bump version
 git push && gh pr create --base main             # PR to main triggers release
 ```
 
-See [RELEASE.md](RELEASE.md) for full release process.
+See [RELEASE.md](RELEASE.md) for the full release process.
 
 ## Backend Development
 
@@ -231,7 +234,7 @@ Working examples: `agents/planner.py`, `agents/coder.py`, `qa/reviewer.py`, `qa/
 
 ### Agent Prompts (`apps/backend/prompts/`)
 
-37 root-level prompts + 22 GitHub-specific prompts in `prompts/github/`.
+38 root-level prompts + 22 GitHub-specific prompts in `prompts/github/`.
 
 | Category | Prompts |
 |----------|---------|
@@ -251,37 +254,211 @@ Each spec in `.workpilot/specs/XXX-name/` contains: `spec.md`, `requirements.jso
 
 ### Memory System (Graphiti)
 
-Graph-based semantic memory in `integrations/graphiti/`. Configured through the Electron app's onboarding/settings UI (CLI users can alternatively set `GRAPHITI_ENABLED=true` in `.env-files/.env`). See [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md#memory-system) for details.
+Graph-based semantic memory in `integrations/graphiti/`. Configured through the Electron app's onboarding/settings UI (CLI users can alternatively set `GRAPHITI_ENABLED=true` in `.env-files/.env`). See [shared_docs/CONFIGURATION.md](../shared_docs/CONFIGURATION.md) for details.
 
 ### Skills System
 
-Advanced AI skills system in `apps/backend/skills/` with token optimization and dynamic context management:
+Skills are markdown files with YAML frontmatter, following the [Agent Skills](https://agentskills.io)
+open standard so the same file works across Claude Code, Copilot, Codex, Cursor and Gemini.
 
-**Key Features:**
-- **Token Optimization:** Compress metadata, limit descriptions to 512 chars, cache operations
-- **Context Management:** Aggressive compaction at 70% limit, checkpoint system
-- **Performance:** Default max_workers=3, timeout=25s, subagent delegation
-- **Dynamic Registration:** Runtime skill validation and registration
+**Where they live:**
 
-**Usage Example:**
+| Path | Role |
+|---|---|
+| `.agents/skills/<name>/SKILL.md` | The source read in production. Provider- and IDE-agnostic. |
+| `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | Per-harness mirrors |
+| `.gemini/commands/*.toml` | Gemini CLI mirror |
+
+A skill name is the output key — `.agents/skills/<name>/` — so two packs providing the
+same name is a **collision**, not a merge. The resolver rejects the loser at the
+`name-collision` gate with a reason naming the winner (`skills-cli why <skill>` prints
+it), and the project decides: the pack listed first in `[packs]` wins. Several tracked
+upstreams are adaptations of each other and share names on purpose, so leaving this to
+iteration order meant the emitted content depended on alphabetical luck.
+
+Those are **generated**. `skills/` is the source, and `scripts/skills_cli.py` is the only
+thing that writes the outputs — `pnpm run skills:check` fails CI on drift. Packs are
+added, updated and dropped through the same CLI (`skills:add`, `skills:update`,
+`skills:remove`), which keeps `skills-lock.json`, `.workpilot/skills.toml` and the
+`.gitignore` entries in step. See [skills/README.md](../skills/README.md).
+
+`apps/backend/slash_commands/api.py` scans `.agents/skills/` and serves the result to the
+Kanban Quick-Command bar (`GET /api/slash-commands`), then resolves a command's body
+server-side so any provider can execute it.
+
+**Reading frontmatter:** always through `skills_registry.frontmatter.parse_frontmatter`.
+It parses with PyYAML and degrades to a line parser for hand-edited blocks. Do not write
+another one — the repo used to carry four, with divergent semantics, and three of them
+truncated any description ending in a quoted phrase.
+
+WorkPilot-specific fields live under `metadata.workpilot` (pack, version, targets,
+requires, min_effort, provenance) — a free-form space the Agent Skills spec reserves for
+tooling and that Claude Code ignores.
+
+**Python-side skills:** `apps/backend/skills/` holds two executable skills (`angular/`,
+`migration/`) loaded by `skill_manager.py` with progressive disclosure — metadata first,
+instructions on trigger, scripts on demand:
+
 ```python
-from apps.backend.skills.skill_manager import skill_manager
+from skills.skill_manager import SkillManager
 
-# Execute optimized skill
-result = await skill_manager.execute_skill(
-    skill_name="framework-migration",
-    action="analyze",
-    context={"framework": "react", "project_path": "/path/to/project"}
-)
+manager = SkillManager("apps/backend/skills")
+skill = manager.load_skill("framework-migration")
+result = skill.execute_script("analyze_stack.py", {"project-root": "/path/to/project"})
 ```
 
-**Files:**
-- `skill_manager.py` - Main skill orchestration
-- `context_optimizer.py` - Context compaction and checkpoints
-- `token_optimizer.py` - Token counting and compression
-- `dynamic_skill_manager.py` - Runtime skill registration
+### hermes-agent
 
-See `apps/backend/skills/CLAUDE.md` for detailed guidelines.
+[hermes-agent](https://github.com/NousResearch/hermes-agent) (Nous Research, MIT) is
+supported, and the integration is deliberately small — because most of it already
+existed.
+
+**As a harness, nothing is emitted.** Hermes scans `<project>/.hermes/skills/` *and*
+`<project>/.agents/skills/` at the git root, and injects `AGENTS.md`. Both are already
+built and committed here, so `capabilities/harnesses.yaml` points its entry at the
+agnostic path. A `.hermes/` mirror would duplicate ~390 files to say the same thing
+twice and put `skills:check` in charge of policing two copies.
+
+What it does need is one command in the checkout:
+
+```bash
+hermes skills trust
+```
+
+That is hermes's own trust gate, and it is right: project skills are load-on-demand
+procedures an agent will follow, so auto-sourcing them from any cloned repo is a
+prompt-injection vector. It is a per-machine decision by a person; nothing in this repo
+makes it.
+
+**Not in `providers.yaml`.** Hermes is an agent runtime, not an LLM provider — its own
+loop, tools and model routing. Listing it there would claim WorkPilot can drive a task
+on it.
+
+**As a pack, `skills/hermes` is opt-in and scoped.** hermes-agent is a product that
+ships skills, not a skill collection: hundreds of them, covering smart-home and
+social-media alongside software development. `skills:bootstrap --pack hermes` takes
+three categories and excludes the skills another tracked pack already provides —
+`test-driven-development` is upstream's own adaptation of `obra/superpowers`. What is
+left is what it genuinely adds: `systematic-debugging`, `spike`, the two runtime
+debuggers, `merge-reconciler`, `sdlc-review`, and the procedures for driving Claude
+Code, Codex and OpenCode.
+
+**As a proposer, its learning loop feeds ours.** Hermes writes skills from its own
+experience, on surfaces WorkPilot never sees — Telegram, Discord, a cron job on a VPS.
+Two closed loops writing skills is one too many, so there is no second loop here:
+`learning_loop/hermes_ingest.py` files each authored skill as a *candidate* under
+`skills/_proposed/`, and the `observe` phase runs it when hermes is installed.
+
+```bash
+python3 scripts/skills_cli.py hermes-ingest --dry-run
+```
+
+A candidate carries **no external verification signal**, and that is not a gap to close
+later. Hermes's approval gate is a person saying yes to a text; it is not an observation
+of a build that used the skill. Counting it as corroboration would manufacture exactly
+the evidence `skill_proposer.evaluate` refuses to invent. Hermes proposes from breadth,
+WorkPilot decides from evidence, and a person reads one diff. Nothing under
+`skills/<pack>/` is modified, and nothing under `~/.hermes` is ever written.
+
+### Memory Search (`mem-search`)
+
+Three-layer progressive retrieval over the memories that already exist — `task_logger`
+traces and `learning_loop` patterns — so an agent can ask "have we hit this before?"
+without paying for every candidate to discard most of them.
+
+```python
+from mem_search import search_for
+
+memory = search_for(project_dir)
+index = memory.index("flaky timeout in the integration suite")  # ~100 tokens, always
+memory.timeline(index.ids()[:3])                                # a couple of lines each
+memory.detail("task:042-add-widget")                            # the full record, by id
+```
+
+The index is held to a token budget by dropping entries and reporting the count, never
+by truncating what it kept, and building it never reads a record body — a source that
+loaded everything in order to list it would have moved the cost, not removed it.
+
+The agent-facing side is `skills/tooling/mem-search/`. `claude-mem` is declared as an
+**optional** pack (`pnpm run skills:bootstrap --pack claude-mem`) rather than installed:
+its retrieval pattern is what was worth adopting, and taking the tool itself would add a
+fourth memory with its own worker and two more stores.
+
+### Declarative Workflows
+
+`workflows/<name>/workflow.yaml` describes a build as phases; `workflows/engine.py`
+resolves it against the effort level the user picked, the provider's capabilities
+and the files the task touched. The resolved profile is printed before the build
+starts, so the user sees what their effort setting bought.
+
+```bash
+pnpm run skills:workflow -- --effort high      # what would run, and what is pruned
+pnpm run skills:workflow -- --effort low --provider mistral
+```
+
+**On by default.** Set `WORKPILOT_WORKFLOW_ENGINE=0` in `.env-files/.env` to
+run the pre-engine pipeline. The default flipped once the engine executed the
+phases it declares rather than only pruning them: while eight of eleven were
+played by a hard-coded sequence, switching it on bought the printed profile and
+little else.
+
+| Phase | Who runs it |
+|---|---|
+| `brainstorm`, `spec`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
+| `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
+| `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
+| the `tests-pass` hard gate | the engine (`workflows/hard_gates.py`) |
+| `qa` | `qa_loop`, which the profile can switch off |
+| `observe` | the engine (`learning_loop/observe.py`) |
+
+A skill phase runs where the workflow file declares it. The window is looked up
+by phase id in the **declared** order, so inserting a phase into
+`workflow.yaml` between two existing ones needs no Python change — and pruning
+a phase that bounds a window does not hand its work to the neighbouring one.
+
+`impl:` reaches the two built-in phases as well. `coding` declares
+`superpowers/test-driven-development`: the skill is the *methodology*, the
+coder loop is the *executor*, and the engine names the skill file in the
+prompt rather than pasting ten kilobytes of it into every subtask session.
+Builtins are recognised by **phase id**, never by their impl string — keying on
+the impl would mean swapping the methodology in YAML silently demotes `coding`
+to a one-shot session and loses the coder loop.
+
+Two rules the resolver enforces and that are easy to break:
+
+- **A `hard_gate` is never pruned by effort**, and it is evaluated after the
+  build: `verify` declares `tests-pass`, and `workflows/hard_gates.py` reports
+  whether it held. A gate that failed is reported as failed; one with no
+  evidence to judge is reported as unknown and does not block, because
+  refusing on an absent signal would make every project without a QA report
+  unbuildable.
+- **A deterministic phase is never pruned either.** It costs no API call, so
+  there is no effort level at which skipping it saves anything — and its verdict
+  is an *external* signal the learning loop may count as corroboration.
+
+A phase asking for `subagent-per-task` on a provider with no subagents degrades
+to sequential execution with a context reset, recorded on the resolved phase
+rather than silently pretended — and the degradation is now *read at
+execution*: `create_client(use_subagents=False)` suppresses the roster instead
+of handing one to a provider that will drop it. `fresh-context` is read too: a
+phase dispatched that way does not rehydrate the transcript a pending
+`AUTO_CLAUDE_RESUME_SESSION_ID` points at, because a reviewer carrying the
+writer's reasoning is not a second opinion. The marker is restored afterwards,
+so the coder loop's own resume survives a review pass between two iterations.
+
+#### The resolved profile in the UI
+
+The same profile the CLI banner prints is served to the Kanban at
+`GET /api/workflow-profile/?project_dir=…&spec_id=…` and rendered in the task
+detail modal (`WorkflowProfileCard`). Dropped phases are returned **in their
+declared position with their reason**, plus a per-level phase count: a list of
+survivors cannot answer "what would one level more give me", which is the
+question someone is actually asking in front of an effort selector.
+
+The endpoint resolves the provider through `get_phase_provider`, never
+`_get_active_provider` — the latter consumes the single-shot
+RESUME_WITH_PROVIDER marker, and an endpoint the UI may poll must not eat a
+choice the next build was meant to honour.
 
 ### Workflow Logger
 
@@ -313,23 +490,27 @@ active = workflow_logger.get_active_traces()
 
 ### Tech Stack
 
-React 19, TypeScript (strict), Electron 40, Zustand 5, Tailwind CSS v4, Radix UI, xterm.js 6, Vite 7, Vitest 4, Biome 2, Motion (Framer Motion)
+React 19, TypeScript 5.9 (strict), Electron 41, Zustand 5, Tailwind CSS v4, Radix UI, xterm.js 6, Vite 8, Vitest 4, Biome 2, Motion (Framer Motion)
 
 ### Path Aliases (tsconfig.json)
 
-| Alias | Maps to |
-|-------|---------|
-| `@/*` | `src/renderer/*` |
-| `@shared/*` | `src/shared/*` |
-| `@preload/*` | `src/preload/*` |
-| `@features/*` | `src/renderer/features/*` |
-| `@components/*` | `src/renderer/shared/components/*` |
-| `@hooks/*` | `src/renderer/shared/hooks/*` |
-| `@lib/*` | `src/renderer/lib/*` |
+| Alias | Maps to | Usable |
+|-------|---------|--------|
+| `@/*` | `src/renderer/*` | yes |
+| `@shared/*` | `src/shared/*` | yes |
+| `@preload/*` | `src/preload/*` | yes |
+| `@lib/*` | `src/renderer/lib/*` | yes |
+| `@features/*` | `src/renderer/features/*` | **no — target does not exist** |
+| `@components/*` | `src/renderer/shared/components/*` | **no — target does not exist** |
+| `@hooks/*` | `src/renderer/shared/hooks/*` | **no — target does not exist** |
+
+The last three are declared in `tsconfig.json` but point at directories that
+were never created, and no file imports through them. Components live in
+`src/renderer/components/`, hooks in `src/renderer/hooks/`.
 
 ### State Management (Zustand)
 
-60+ stores in `src/renderer/stores/`. Key stores:
+96 stores in `src/renderer/stores/`. Key stores:
 
 - `project-store.ts` — Active project, project list
 - `task-store.ts` — Tasks/specs management
@@ -351,7 +532,7 @@ Main process also has stores: `src/main/project-store.ts`, `src/main/terminal-se
 ### Styling
 
 - **Tailwind CSS v4** with `@tailwindcss/postcss` plugin
-- **7 color themes** (Default, Dusk, Lime, Ocean, Retro, Neo + more) defined in `src/shared/constants/themes.ts`
+- **7 color themes** (Default, Dusk, Lime, Ocean, Retro, Neo, Forest) defined in `src/shared/constants/themes.ts`
 - Each theme has light/dark mode variants via CSS custom properties
 - Utility: `clsx` + `tailwind-merge` via `cn()` helper
 - Component variants: `class-variance-authority` (CVA)
@@ -390,20 +571,20 @@ Full PTY-based terminal integration:
 ## Code Quality
 
 ### Frontend
-- **Linting:** Biome (`npm run lint` / `npm run lint:fix`)
-- **Type checking:** `npm run typecheck` (strict mode)
+- **Linting:** Biome (`pnpm run lint` / `pnpm run lint:fix`)
+- **Type checking:** `pnpm run typecheck` (strict mode)
 - **Pre-commit:** Husky + lint-staged runs Biome on staged `.ts/.tsx/.js/.jsx/.json`
 - **Testing:** Vitest + React Testing Library + jsdom
 
 ### Backend
 - **Linting:** Ruff
-- **Testing:** pytest (`apps/backend/.venv/bin/pytest tests/ -v`)
+- **Testing:** pytest (`pytest tests/ -v` (venv: `.venv/bin` on Unix, `.venv/Scripts` on Windows))
 
 ## i18n Guidelines
 
 All frontend UI text uses `react-i18next`. Translation files: `apps/frontend/src/shared/i18n/locales/{en,fr}/*.json`
 
-55 namespace files per language. Core namespaces: `common`, `navigation`, `settings`, `dialogs`, `tasks`, `errors`, `onboarding`, `welcome`, `analytics`, `appEmulator`, `arena`, `browserAgent`, `dashboard`, `github`, `gitlab`, `ideation`, `insights`, `kanban`, `learningLoop`, `llm`, `multiRepo`, `pairProgramming`, `pixelOffice`, `roadmap`, `selfHealing`, `streaming`, `terminal`, `testGeneration`, `voiceControl`, and more.
+90 namespace files per language. Core namespaces: `common`, `navigation`, `settings`, `dialogs`, `tasks`, `errors`, `onboarding`, `welcome`, `analytics`, `appEmulator`, `arena`, `browserAgent`, `dashboard`, `github`, `gitlab`, `ideation`, `insights`, `kanban`, `learningLoop`, `llm`, `multiRepo`, `pairProgramming`, `pixelOffice`, `roadmap`, `selfHealing`, `streaming`, `terminal`, `testGeneration`, `voiceControl`, and more.
 
 ```tsx
 import { useTranslation } from 'react-i18next';
@@ -431,17 +612,17 @@ Supports Windows, macOS, Linux. CI tests all three.
 | `findExecutable(name)` | Cross-platform executable lookup |
 | `requiresShell(command)` | `.cmd/.bat` shell detection (Win) |
 
-Never hardcode paths. Use `findExecutable()` and `joinPaths()`. See [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md#cross-platform-development) for extended guide.
+Never hardcode paths. Use `findExecutable()` and `joinPaths()`. See [docs/windows-development.md](windows-development.md) for the Windows-specific notes.
 
 ## E2E Testing (Electron MCP)
 
 QA agents can interact with the running Electron app via Chrome DevTools Protocol:
 
-1. Start app: `npm run dev:debug` (debug mode for AI self-validation via Electron MCP)
+1. Start app: `pnpm run dev:debug` (debug mode for AI self-validation via Electron MCP)
 2. Set `ELECTRON_MCP_ENABLED=true` in `.env-files/.env`
 3. Run QA: `python run.py --spec 001 --qa`
 
-Tools: `take_screenshot`, `click_by_text`, `fill_input`, `get_page_structure`, `send_keyboard_shortcut`, `eval`. See [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md#end-to-end-testing) for full capabilities.
+Tools: `take_screenshot`, `click_by_text`, `fill_input`, `get_page_structure`, `send_keyboard_shortcut`, `eval`. 
 
 ## Chrome DevTools MCP
 
@@ -462,8 +643,8 @@ Browser automation via [chrome-devtools-mcp](https://github.com/ChromeDevTools/c
 cd apps/backend && python run.py --spec 001
 
 # Desktop app
-npm start          # Production build + run
-npm run dev        # Development mode with HMR
+pnpm start         # Production build + run
+pnpm run dev       # Development mode with HMR
 
 # Project data: .workpilot/specs/ (gitignored)
 ```
@@ -499,7 +680,7 @@ results = client.search("user authentication flow", top_k=5)
 **Files:**
 - `src/connectors/grepai/client.py` - Python client
 - `src/connectors/grepai/grepai/` - Embedded grepai tool
-- `docs/grepai_integration.md` - Integration guide
+- `src/connectors/grepai/README.md` - Integration guide
 
 ## Troubleshooting
 
@@ -540,13 +721,11 @@ export GRAPHITI_ENABLED=true
 ```
 
 **Performance Issues:**
-- Check skill optimization: `python apps/backend/skills/performance_test.py`
 - Monitor workflow logs: `tail -f logs/workflow.log`
 - Reduce concurrent agents in settings
 
 ### Getting Help
 
 - Check `logs/workflow.log` for detailed execution traces
-- Run `python apps/backend/.venv/bin/pytest tests/ -v` for test failures
-- See [guides/](guides/) for detailed setup instructions
-- Check [ARCHITECTURE.md](shared_docs/ARCHITECTURE.md) for system design
+- Run `pytest tests/ -v` from the backend venv for test failures
+- Check [shared_docs/README.md](../shared_docs/README.md) for system design

@@ -18,7 +18,7 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { AUTO_BUILD_PATHS, getSpecsDir } from "../../../shared/constants";
 import type { Project, Task, TaskStatus } from "../../../shared/types";
@@ -606,8 +606,11 @@ export function getModifiedFilesFromWorktree(
 	try {
 		// Get diff between main branch and current branch
 		// Shows files that are: modified (M), added (A), or deleted (D)
-		const output = execSync(
-			`git diff --name-status ${mainBranch}...HEAD`,
+		// execFileSync (no shell): `mainBranch` is caller-supplied and a branch
+		// name may legally contain characters the shell would interpret.
+		const output = execFileSync(
+			"git",
+			["diff", "--name-status", `${mainBranch}...HEAD`],
 			{
 				cwd: worktreePath,
 				encoding: "utf-8",

@@ -1,4 +1,4 @@
-﻿import { AlertCircle, CheckCircle2, FileCode, Users } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileCode, Users } from "lucide-react";
 import {
 	DOCUMENTATION_CATEGORY_LABELS,
 	IDEATION_EFFORT_COLORS,

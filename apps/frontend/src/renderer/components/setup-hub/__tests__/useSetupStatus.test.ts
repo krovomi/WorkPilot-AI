@@ -162,4 +162,39 @@ describe("computeSetupCategories", () => {
 		expect(find(result, "ai", "providers").state).toBe("done");
 		expect(find(result, "integrations", "github").state).toBe("todo");
 	});
+
+	describe("hasProject: false (no project selected yet)", () => {
+		it("excludes integrations from the progress tally", () => {
+			const result = computeSetupCategories({}, null, false);
+			// Only the AI-providers item is actionable without a project.
+			expect(result.total).toBe(1);
+			expect(result.completed).toBe(0);
+			expect(result.hasProject).toBe(false);
+		});
+
+		it("still returns the integrations category (Setup Hub needs it to render its own empty state), just uncounted", () => {
+			const result = computeSetupCategories({}, null, false);
+			expect(
+				result.categories.find((c) => c.id === "integrations")?.items.length,
+			).toBe(8);
+		});
+
+		it("percent reflects only AI providers, not the untouchable integrations", () => {
+			const noProviderYet = computeSetupCategories({ anthropic: false }, null, false);
+			expect(noProviderYet.percent).toBe(0);
+
+			const providerConfigured = computeSetupCategories(
+				{ anthropic: true },
+				null,
+				false,
+			);
+			expect(providerConfigured.percent).toBe(100);
+		});
+	});
+
+	it("defaults hasProject to true, preserving prior behaviour for callers that don't pass it", () => {
+		const result = computeSetupCategories({ anthropic: true }, env());
+		expect(result.hasProject).toBe(true);
+		expect(result.total).toBe(9);
+	});
 });

@@ -22,6 +22,7 @@ import asyncio
 import json
 import logging
 
+from core.api_safety import safe_error
 from fastapi import APIRouter, Path, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -102,7 +103,7 @@ def create_room(req: CreateRoomRequest):
         room = get_manager().create_room(req.room_id)
         return {"success": True, "room": room.snapshot().to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "create_room")}
 
 
 @router.get("/rooms")
@@ -139,7 +140,7 @@ def join(room_id: str, req: JoinRequest):
         op = room.join(req.user_id, req.display_name, role=role)
         return {"success": True, "op": op.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "join")}
 
 
 @router.post("/rooms/{room_id}/leave")
@@ -169,7 +170,7 @@ def edit(room_id: str, req: EditRequest):
         )
         return {"success": True, "op": op.to_dict()}
     except (KeyError, ValueError) as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "edit")}
 
 
 @router.post("/rooms/{room_id}/cursor")
@@ -179,7 +180,7 @@ def cursor(room_id: str, req: CursorRequest):
         op = room.submit_cursor(req.actor, req.file_path, req.line, req.column)
         return {"success": True, "op": op.to_dict()}
     except (KeyError, ValueError) as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "cursor")}
 
 
 @router.post("/rooms/{room_id}/chat")
@@ -189,7 +190,7 @@ def chat(room_id: str, req: ChatRequest):
         op = room.submit_chat(req.actor, req.text)
         return {"success": True, "op": op.to_dict()}
     except (KeyError, ValueError) as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "chat")}
 
 
 @router.post("/rooms/{room_id}/suggestion")
@@ -201,7 +202,7 @@ def suggestion(room_id: str, req: SuggestionRequest):
         )
         return {"success": True, "op": op.to_dict()}
     except (KeyError, ValueError) as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "suggestion")}
 
 
 # ----------------------------------------------------------------------

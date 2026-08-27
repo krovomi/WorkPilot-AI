@@ -1,6 +1,6 @@
 {
 	"name": "workpilot-ai",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "Autonomous multi-agent coding framework",
 	"license": "AGPL-3.0",
 	"author": "WorkPilot AI Team",
@@ -30,7 +30,16 @@
 		"validate:upstream": "node scripts/validate-upstream-setup.js",
 		"validate:npm-scripts": "node scripts/validate-npm-scripts.js",
 		"generate:provider-types": "node scripts/generate-provider-types.js",
-		"validate:provider-types": "node scripts/generate-provider-types.js --check"
+		"validate:provider-types": "node scripts/generate-provider-types.js --check",
+		"skills:build": "python3 scripts/skills_cli.py build",
+		"skills:check": "python3 scripts/skills_cli.py build --check",
+		"skills:list": "python3 scripts/skills_cli.py list",
+		"skills:why": "python3 scripts/skills_cli.py why",
+		"skills:bootstrap": "python3 scripts/skills_cli.py bootstrap",
+		"skills:add": "python3 scripts/skills_cli.py add",
+		"skills:update": "python3 scripts/skills_cli.py update",
+		"skills:remove": "python3 scripts/skills_cli.py remove",
+		"skills:workflow": "python3 scripts/skills_cli.py workflow"
 	},
 	"engines": {
 		"node": ">=20.0.0",
@@ -39,7 +48,7 @@
 	"packageManager": "pnpm@10.27.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/tleub-ebp/WorkPilot-AI.git"
+		"url": "https://github.com/krovomi/WorkPilot-AI.git"
 	},
 	"keywords": [
 		"ai",
@@ -54,27 +63,9 @@
 	},
 	"dependencies": {
 		"@lydell/node-pty": "1.1.0",
-		"@lydell/node-pty-darwin-arm64": "1.2.0-beta.10",
+		"@lydell/node-pty-darwin-arm64": "1.2.0-beta.15",
 		"lucide-react": "^1.8.0",
 		"unzipper": "^0.10.11",
-		"tar": "^7.5.13"
-	},
-	"pnpm": {
-		"overrides": {
-			"electron-builder-squirrel-windows": "^26.8.2",
-			"dmg-builder": "^26.8.2",
-			"@electron/rebuild": "4.0.3",
-			"vite": ">= 8.0.8",
-			"esbuild": ">= 0.25.0",
-			"lodash": ">= 4.18.0",
-			"@xmldom/xmldom": "^0.8.12",
-			"brace-expansion": ">= 2.0.3",
-			"picomatch": ">= 4.0.4",
-			"yaml": ">= 2.8.3",
-			"tar": ">= 7.5.11",
-			"ajv": "^6.14.0",
-			"@modelcontextprotocol/sdk>ajv": "^8.17.1",
-			"rollup": ">= 4.59.0"
-		}
+		"tar": "^7.5.19"
 	}
 }

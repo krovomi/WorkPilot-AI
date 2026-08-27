@@ -1,4 +1,4 @@
-﻿"""
+"""
 Syntax checker for auto-fix loop files
 """
 import sys

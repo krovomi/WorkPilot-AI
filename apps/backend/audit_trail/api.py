@@ -20,6 +20,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+from core.api_safety import safe_error, validated_dir
 from fastapi import APIRouter, Query
 from fastapi import Path as PathParam
 from fastapi.responses import PlainTextResponse
@@ -55,15 +56,20 @@ def _allowed_storage_roots() -> list[Path]:
 
 
 def _validate_dir(raw: str) -> Path:
-    if not raw or raw.strip().startswith("-"):
-        raise ValueError("storage_dir must not be empty or start with '-'")
-    p = Path(raw).expanduser().resolve()
-    allowed = _allowed_storage_roots()
-    if not any(p == root or p.is_relative_to(root) for root in allowed):
-        raise ValueError(
-            "storage_dir is not under any allowed root "
-            "(set AUDIT_TRAIL_ALLOWED_ROOTS to extend the allowlist)"
-        )
+    """The allowlist stays — it is the real containment on this endpoint.
+
+    `validated_dir` adds the normalisation and the `..` refusal that CodeQL
+    recognises as a barrier; `is_relative_to`, which the allowlist uses, it
+    does not recognise at all, so the module reported `py/path-injection`
+    despite being correctly confined. `must_exist=False` because the
+    directory is created below rather than required up front.
+    """
+    p = validated_dir(
+        raw,
+        "storage_dir",
+        allowed_roots=_allowed_storage_roots(),
+        must_exist=False,
+    )
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -115,10 +121,10 @@ def append(req: AppendRequest):
         )
         return {"success": True, "event": evt.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "append")}
     except Exception as e:  # noqa: BLE001
         logger.exception("append failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "append")}
 
 
 @router.post("/append-decision")
@@ -140,10 +146,10 @@ def append_decision(req: AppendDecisionRequest):
         )
         return {"success": True, "event": evt.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "append_decision")}
     except Exception as e:  # noqa: BLE001
         logger.exception("append_decision failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "append_decision")}
 
 
 @router.get("/events")
@@ -163,7 +169,7 @@ def events(
             try:
                 AuditEventKind(kind)
             except ValueError as e:
-                return {"success": False, "error": str(e)}
+                return {"success": False, "error": safe_error(e, logger, "events")}
         results = trail.filter(actor=actor, kind=kind, since=since, until=until)
         return {
             "success": True,
@@ -171,10 +177,10 @@ def events(
             "count": len(results),
         }
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "events")}
     except Exception as e:  # noqa: BLE001
         logger.exception("events failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "events")}
 
 
 @router.get("/replay/{correlation_id}")
@@ -188,10 +194,10 @@ def replay(
         bundle = trail.replay(correlation_id)
         return {"success": True, "bundle": bundle.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "replay")}
     except Exception as e:  # noqa: BLE001
         logger.exception("replay failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "replay")}
 
 
 @router.get("/verify")
@@ -201,10 +207,10 @@ def verify(storage_dir: str = Query(...), trail_name: str = Query("default")):
         report = trail.verify()
         return {"success": True, "integrity": report.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "verify")}
     except Exception as e:  # noqa: BLE001
         logger.exception("verify failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "verify")}
 
 
 @router.get("/trails")
@@ -213,10 +219,10 @@ def list_trails(storage_dir: str = Query(...)):
         path = _validate_dir(storage_dir)
         return {"success": True, "trails": AuditTrail.list_trails(path)}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "list_trails")}
     except Exception as e:  # noqa: BLE001
         logger.exception("list_trails failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "list_trails")}
 
 
 @router.get("/export/soc2")
@@ -241,10 +247,10 @@ def export_soc2(
             },
         )
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "export_soc2")}
     except Exception as e:  # noqa: BLE001
         logger.exception("export_soc2 failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "export_soc2")}
 
 
 @router.get("/export/gdpr")
@@ -263,7 +269,7 @@ def export_gdpr(
         bundle = build_dsar_bundle(trail, actor=actor, correlation_id=correlation_id)
         return {"success": True, "bundle": bundle.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "export_gdpr")}
     except Exception as e:  # noqa: BLE001
         logger.exception("export_gdpr failed")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": safe_error(e, logger, "export_gdpr")}

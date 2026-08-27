@@ -1,4 +1,4 @@
-﻿// React
+// React
 
 // Types
 import type { GitStatus, Project } from "@shared/types";
@@ -2321,7 +2321,7 @@ export function Sidebar({
 									size="icon"
 									onClick={() =>
 										globalThis.open(
-											"https://github.com/tleub-ebp/WorkPilot-AI/issues",
+											"https://github.com/krovomi/WorkPilot-AI/issues",
 											"_blank",
 										)
 									}

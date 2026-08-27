@@ -2,13 +2,27 @@
 /**
  * Pre-push gate: replicates the essential CI checks locally before pushing.
  *
- * Runs backend (ruff + pytest) and frontend (biome + tsc + vitest) jobs in
- * parallel and aggregates results. Mirrors .github/workflows/ci.yml and
- * lint.yml so failures surface here instead of in CI.
+ * MODE RAPIDE PAR DÉFAUT (objectif : < 30 s).
+ *   Joue seulement le lint : ruff check, ruff format --check, biome.
+ *   pytest / tsc / vitest sont délégués à la CI, qui les rejoue de toute façon
+ *   en parallèle sans bloquer personne. Les jouer ici aussi, c'est payer deux
+ *   fois la même garantie et rendre chaque push pénible.
+ *
+ * MODE COMPLET (opt-in) : PRE_PUSH_FULL=1 git push
+ *   Ajoute pytest (ciblé sur le diff), tsc et vitest — utile avant une release
+ *   ou quand on veut la certitude avant d'attendre la CI.
  *
  * Skip rules:
  *   - PRE_PUSH_SKIP=1 or `git push --no-verify` bypass entirely.
  *   - If only docs/CI-config files changed vs the upstream branch, skip tests.
+ *
+ * Anti-blocage (ces règles existent parce qu'un push qui « pend » sans aucune
+ * sortie est pire qu'un push refusé) :
+ *   - Chaque job a un TIMEOUT (PRE_PUSH_TIMEOUT_MS, 5 min par défaut). Passé ce
+ *     délai le process est tué au lieu de bloquer le push indéfiniment.
+ *   - Un battement de cœur affiche les jobs encore en cours toutes les 20 s.
+ *   - Un job en timeout AVERTIT sans bloquer (la CI reste le garde-fou).
+ *     PRE_PUSH_STRICT=1 rend les timeouts bloquants.
  *
  * Run manually: `node scripts/pre-push.js`
  */
@@ -28,6 +42,14 @@ if (process.env.PRE_PUSH_SKIP === "1") {
 	console.log("⏭  PRE_PUSH_SKIP=1 set — skipping pre-push checks.");
 	process.exit(0);
 }
+
+// Un job qui dépasse ce délai est tué : sans ça, un `tsc --noEmit` lent (cas
+// classique sous Windows quand l'antivirus scanne node_modules) fait pendre le
+// push indéfiniment, sans la moindre sortie à l'écran.
+const JOB_TIMEOUT_MS = Number(process.env.PRE_PUSH_TIMEOUT_MS || 300000);
+// Par défaut un timeout n'est PAS bloquant : on n'a pas pu vérifier, la CI le
+// fera. PRE_PUSH_STRICT=1 pour refuser le push dans ce cas.
+const STRICT_TIMEOUTS = process.env.PRE_PUSH_STRICT === "1";
 
 // ---------------------------------------------------------------------------
 // Diff-based skip: if only docs/yaml outside CI paths changed, no need to run.
@@ -94,9 +116,31 @@ if (changed !== null && changed.length > 0) {
 // Job runner — captures output and reports at the end so parallel jobs don't
 // interleave their logs.
 // ---------------------------------------------------------------------------
+// Jobs actuellement en cours — sert au battement de cœur, pour qu'un check long
+// ressemble à « ça travaille » et non à « c'est planté ».
+const running = new Map(); // name -> startedAt
+
+/** Tue un process et toute sa descendance (indispensable sous Windows). */
+function killTree(child) {
+	if (IS_WINDOWS) {
+		try {
+			execSync(`taskkill /pid ${child.pid} /T /F`, { stdio: "ignore" });
+			return;
+		} catch {
+			/* le process s'est peut-être déjà terminé — on retombe sur kill() */
+		}
+	}
+	try {
+		child.kill("SIGKILL");
+	} catch {
+		/* ignore */
+	}
+}
+
 function runJob(name, cmd, args, opts = {}) {
 	return new Promise((resolve) => {
 		const start = Date.now();
+		running.set(name, start);
 		// opts.env (if provided) is merged on top of process.env + FORCE_COLOR
 		// so callers can add per-job env vars (e.g. VITEST_SINGLE_FORK).
 		const child = spawn(cmd, args, {
@@ -107,6 +151,26 @@ function runJob(name, cmd, args, opts = {}) {
 
 		let stdout = "";
 		let stderr = "";
+		let timedOut = false;
+		let settled = false;
+
+		const timeoutMs = opts.timeoutMs || JOB_TIMEOUT_MS;
+		const timer = setTimeout(() => {
+			timedOut = true;
+			console.log(
+				`⏱  ${name} dépasse ${Math.round(timeoutMs / 1000)}s — process tué.`,
+			);
+			killTree(child);
+		}, timeoutMs);
+
+		const finish = (result) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			running.delete(name);
+			resolve(result);
+		};
+
 		child.stdout.on("data", (d) => {
 			stdout += d.toString();
 		});
@@ -114,24 +178,40 @@ function runJob(name, cmd, args, opts = {}) {
 			stderr += d.toString();
 		});
 		child.on("close", (code) => {
-			resolve({
+			finish({
 				name,
-				code,
+				code: timedOut ? 1 : code,
+				timedOut,
 				durationMs: Date.now() - start,
 				stdout,
 				stderr,
 			});
 		});
 		child.on("error", (err) => {
-			resolve({
+			finish({
 				name,
 				code: 1,
+				timedOut,
 				durationMs: Date.now() - start,
 				stdout: "",
 				stderr: `Failed to spawn: ${err.message}`,
 			});
 		});
 	});
+}
+
+/** Affiche périodiquement ce qui tourne encore, pour ne jamais paraître figé. */
+function startHeartbeat() {
+	const interval = setInterval(() => {
+		if (running.size === 0) return;
+		const now = Date.now();
+		const list = [...running.entries()]
+			.map(([n, t]) => `${n} (${Math.round((now - t) / 1000)}s)`)
+			.join(", ");
+		console.log(`   … en cours : ${list}`);
+	}, 20000);
+	interval.unref?.();
+	return () => clearInterval(interval);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,51 +237,89 @@ if (ruffPath) {
 			"--check",
 		]),
 	);
+	// The two scripts that write the generated skill output. CI lints them for
+	// the same reason: they produce files the `skills` job then verifies.
+	jobs.push(
+		runJob("skills:ruff", ruffPath, [
+			"check",
+			"scripts/skills_cli.py",
+			"scripts/skills_sync.py",
+		]),
+	);
 } else {
 	console.warn(
 		"⚠  ruff not found in venv — skipping backend lint. Install with `pip install ruff`.",
 	);
 }
 
-if (pytestPath) {
-	// Default: only run tests related to changed backend paths. Set
-	// PRE_PUSH_FULL=1 to run the full suite (matches CI exactly).
-	const full = process.env.PRE_PUSH_FULL === "1";
-	const pytestTargets = full ? ["tests/"] : selectPytestTargets(ROOT, changed);
-	if (pytestTargets.length === 0) {
-		console.log("⏭  No backend code changed — skipping pytest.");
+// `.agents/skills/`, `.agents/agents/` and the harness mirrors are build
+// output. Cheap, deterministic and offline, so it belongs in the default pass
+// rather than being discovered on CI after the push. Python is required
+// anyway for the ruff jobs above.
+const pythonPath = findVenvBin(ROOT, "python") || "python3";
+jobs.push(
+	runJob("skills:check", pythonPath, ["scripts/skills_cli.py", "build", "--check"]),
+);
+
+// --- Checks lourds : opt-in seulement -------------------------------------
+// pytest / tsc / vitest coûtent plusieurs minutes et sont DÉJÀ rejoués par la
+// CI, en parallèle, sans bloquer personne. Les rejouer à chaque push, c'est
+// payer deux fois pour la même garantie — et c'est ce qui rendait le push
+// insupportable. Ils restent disponibles à la demande :
+//     PRE_PUSH_FULL=1 git push
+const FULL = process.env.PRE_PUSH_FULL === "1";
+
+if (FULL) {
+	if (pytestPath) {
+		const pytestTargets = selectPytestTargets(ROOT, changed);
+		if (pytestTargets.length === 0) {
+			console.log("⏭  No backend code changed — skipping pytest.");
+		} else {
+			jobs.push(
+				runJob("backend:pytest", pytestPath, [
+					...pytestTargets,
+					"--tb=short",
+					"-x",
+					"-q",
+				]),
+			);
+		}
 	} else {
-		jobs.push(
-			runJob("backend:pytest", pytestPath, [
-				...pytestTargets,
-				"--tb=short",
-				"-x",
-				"-q",
-			]),
+		console.warn(
+			'⚠  pytest not found in venv — skipping backend tests. Run "pnpm run install:backend".',
 		);
 	}
-} else {
-	console.warn(
-		'⚠  pytest not found in venv — skipping backend tests. Run "pnpm run install:backend".',
+}
+
+// Frontend: biome lint toujours (quelques secondes). Le typecheck rejoint les
+// checks lourds — il est incrémental (voir tsconfig.json), donc rapide en
+// local, mais la première passe après un `pnpm install` reste longue.
+const pnpmCmd = IS_WINDOWS ? "pnpm.cmd" : "pnpm";
+jobs.push(runJob("frontend:lint", pnpmCmd, ["run", "lint"], { cwd: frontendDir }));
+if (FULL) {
+	jobs.push(
+		runJob("frontend:typecheck", pnpmCmd, ["run", "typecheck"], {
+			cwd: frontendDir,
+		}),
 	);
 }
 
-// Frontend: biome check + typecheck. (vitest is run sequentially AFTER the
-// parallel batch — see below — to avoid CPU contention with backend:pytest
-// that was starving vitest worker forks and producing spurious
-// "Vitest failed to access its internal state" / worker-timeout errors.)
-const pnpmCmd = IS_WINDOWS ? "pnpm.cmd" : "pnpm";
-jobs.push(
-	runJob("frontend:lint", pnpmCmd, ["run", "lint"], { cwd: frontendDir }),
-	runJob("frontend:typecheck", pnpmCmd, ["run", "typecheck"], {
-		cwd: frontendDir,
-	}),
-);
-
 console.log(
-	`🚦 Running ${jobs.length} pre-push checks in parallel (vitest deferred)...\n`,
+	FULL
+		? `🚦 Running ${jobs.length} pre-push checks (mode COMPLET, vitest deferred)...`
+		: `🚦 Running ${jobs.length} pre-push checks (mode rapide)...`,
 );
+console.log(
+	`   timeout par job : ${Math.round(JOB_TIMEOUT_MS / 1000)}s · bypass : git push --no-verify`,
+);
+if (!FULL) {
+	console.log(
+		"   tests + typecheck : délégués à la CI · en local : PRE_PUSH_FULL=1 git push",
+	);
+}
+console.log("");
 const startedAt = Date.now();
+const stopHeartbeat = startHeartbeat();
 
 Promise.all(jobs).then(async (parallelResults) => {
 	// Run vitest only after the parallel batch settles, so it doesn't fight
@@ -215,39 +333,73 @@ Promise.all(jobs).then(async (parallelResults) => {
 	const VITEST_FLAKE_SIGNATURE =
 		/Vitest failed to access its internal state|\[vitest-pool-runner\]: Timeout waiting for worker|\[vitest-pool\]: Failed to start forks worker/;
 
-	let vitestResult = await runJob("frontend:test", pnpmCmd, ["run", "test"], {
-		cwd: frontendDir,
-		env: vitestEnv,
-	});
-
-	if (
-		vitestResult.code !== 0 &&
-		VITEST_FLAKE_SIGNATURE.test(vitestResult.stdout + vitestResult.stderr)
-	) {
-		console.log(
-			"\n⚠  frontend:test failed with vitest worker-flake signature — retrying once.\n",
-		);
+	// Mode rapide : pas de vitest ici, la CI s'en charge.
+	let vitestResult = null;
+	if (FULL) {
 		vitestResult = await runJob("frontend:test", pnpmCmd, ["run", "test"], {
 			cwd: frontendDir,
 			env: vitestEnv,
 		});
-		vitestResult.name = "frontend:test (retry)";
+
+		if (
+			vitestResult.code !== 0 &&
+			VITEST_FLAKE_SIGNATURE.test(vitestResult.stdout + vitestResult.stderr)
+		) {
+			console.log(
+				"\n⚠  frontend:test failed with vitest worker-flake signature — retrying once.\n",
+			);
+			vitestResult = await runJob("frontend:test", pnpmCmd, ["run", "test"], {
+				cwd: frontendDir,
+				env: vitestEnv,
+			});
+			vitestResult.name = "frontend:test (retry)";
+		}
 	}
 
-	const results = [...parallelResults, vitestResult];
+	const results = vitestResult
+		? [...parallelResults, vitestResult]
+		: [...parallelResults];
+	stopHeartbeat();
 
 	const totalSec = ((Date.now() - startedAt) / 1000).toFixed(1);
-	const failed = results.filter((r) => r.code !== 0);
+	// Un timeout n'est pas un échec de test : on n'a pas pu vérifier. Bloquant
+	// seulement en mode strict.
+	const timedOut = results.filter((r) => r.timedOut);
+	const failed = results.filter((r) => r.code !== 0 && !r.timedOut);
 
 	for (const r of results) {
 		const sec = (r.durationMs / 1000).toFixed(1);
-		const status = r.code === 0 ? "✅" : "❌";
-		console.log(`${status} ${r.name} (${sec}s)`);
+		const status = r.timedOut ? "⏱ " : r.code === 0 ? "✅" : "❌";
+		console.log(`${status} ${r.name} (${sec}s)${r.timedOut ? " — timeout" : ""}`);
 	}
 	console.log(`\n⏱  Total: ${totalSec}s\n`);
 
+	if (timedOut.length > 0) {
+		console.log(
+			`⚠  ${timedOut.length} check(s) en timeout : ${timedOut
+				.map((r) => r.name)
+				.join(", ")}\n` +
+				"   Non vérifié localement — la CI le fera. Pour laisser plus de temps :\n" +
+				"   PRE_PUSH_TIMEOUT_MS=900000 git push   (15 min)\n" +
+				"   Pour refuser le push dans ce cas : PRE_PUSH_STRICT=1 git push\n",
+		);
+		if (STRICT_TIMEOUTS) {
+			console.log("❌ PRE_PUSH_STRICT=1 — push refusé à cause du timeout.");
+			process.exit(1);
+		}
+	}
+
 	if (failed.length === 0) {
-		console.log("✅ All pre-push checks passed.");
+		console.log(
+			timedOut.length > 0
+				? "✅ Aucun échec réel — push autorisé."
+				: "✅ All pre-push checks passed.",
+		);
+		if (!FULL) {
+			console.log(
+				"   (mode rapide : pytest/tsc/vitest tournent en CI — PRE_PUSH_FULL=1 pour les jouer ici)",
+			);
+		}
 		process.exit(0);
 	}
 

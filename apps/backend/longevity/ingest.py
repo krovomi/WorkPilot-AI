@@ -16,7 +16,10 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree as ET  # noqa: S405 - ParseError type only
+
+from core.api_safety import validated_dir
+from defusedxml.ElementTree import parse as defused_parse
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +47,20 @@ def parse_coverage_xml(path: str | Path) -> float:
     [0, 1] is clamped (defensive — coverage tools occasionally emit -nan
     or > 1 for empty modules).
     """
-    p = Path(path)
-    if not p.exists():
-        raise CoverageParseError(f"coverage.xml not found: {p}")
+    # The path comes from the request body. Normalise it the same way every
+    # other caller-supplied path in this backend is normalised, and keep the
+    # resolved value out of the messages below — they reach an HTTP caller.
+    try:
+        p = validated_dir(str(path), "coverage_xml", must_exist=False)
+    except ValueError as e:
+        raise CoverageParseError(str(e)) from None
+    if not p.is_file():
+        raise CoverageParseError("coverage.xml not found")
 
     try:
-        tree = ET.parse(p)
+        tree = defused_parse(p)
     except ET.ParseError as e:
-        raise CoverageParseError(f"invalid XML in {p}: {e}") from e
+        raise CoverageParseError("invalid XML in coverage.xml") from e
 
     root = tree.getroot()
     rate = root.get(_COBERTURA_LINE_RATE_ATTR)

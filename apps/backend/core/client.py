@@ -144,6 +144,7 @@ from agents.tools_pkg import (
     get_required_mcp_servers,
     is_tools_available,
 )
+from skills_registry.providers import get_provider_capabilities
 
 # Make claude_agent_sdk optional for testing purposes
 try:
@@ -663,6 +664,15 @@ def _inject_domain_addendum(
     return f"{base_prompt}\n\n# Domain-Specific Guidance\n\n{addendum}"
 
 
+class _NoSubagents(Exception):
+    """Internal signal: this call must not compose a subagent roster.
+
+    Raised and caught inside `create_client` only, so the suppression path and
+    the failure path share one exit and cannot drift apart. It is a control
+    signal, never surfaced to a caller.
+    """
+
+
 def create_client(
     project_dir: Path,
     spec_dir: Path,
@@ -672,6 +682,7 @@ def create_client(
     output_format: dict | None = None,
     agents: dict | None = None,
     resume: str | None = None,
+    use_subagents: bool = True,
 ) -> ClaudeSDKClient:
     """
     Create a Claude Agent SDK client with multi-layered security.
@@ -696,6 +707,10 @@ def create_client(
         output_format: Optional structured output format for validated JSON responses.
                       Use {"type": "json_schema", "schema": Model.model_json_schema()}
                       See: https://platform.claude.com/docs/en/agent-sdk/structured-outputs
+        use_subagents: Whether this call may compose a subagent roster at all.
+                      False is the workflow engine's `sequential-reset`: same
+                      isolation, no parallel dispatch. Defaults to True, which
+                      is the behaviour every existing caller already had.
         agents: Optional dict of subagent definitions for SDK parallel execution.
                Format: {"agent-name": {"description": "...", "prompt": "...",
                         "tools": [...], "model": "inherit"}}
@@ -1290,27 +1305,45 @@ def create_client(
     if output_format:
         options_kwargs["output_format"] = output_format
 
-    # Merge phase-appropriate default subagents with any caller-supplied ones.
-    # Caller wins on key collision so a specific run can override defaults.
-    # The set is chosen by agent_type so the planner doesn't waste context on
-    # QA subagents and vice versa.
+    # Compose the subagent roster: phase defaults, specialised by the detected
+    # language stack, with caller-supplied agents winning on key collision.
+    # The phase split means the planner does not carry QA subagents into its
+    # context, and vice versa; the language layer means a Rust card and a .NET
+    # card no longer get the same generic `test-runner` prompt.
     # See: code.claude.com/docs/en/agent-sdk/subagents
+    #
+    # `use_subagents=False` is the workflow engine's `sequential-reset`: the
+    # resolved phase asked for dispatch the run cannot have, so the roster is
+    # suppressed at the source instead of being handed over to be ignored. It
+    # is a separate question from the provider check inside `resolve()` — that
+    # one is about capability, this one about what the phase was allowed.
+    # Default True, so every existing caller keeps the behaviour it had.
+    _merged_agents = None
     try:
-        if agent_type in ("qa_reviewer", "qa_fixer", "qa"):
-            from agents.qa_subagents import (
-                merge_with_user_agents as _merge_phase_agents,
-            )
-        elif agent_type in ("planner", "architect"):
-            from agents.planner_subagents import (
-                merge_with_user_agents as _merge_phase_agents,
-            )
-        else:
-            from agents.kanban_subagents import (
-                merge_with_user_agents as _merge_phase_agents,
-            )
+        if not use_subagents:
+            raise _NoSubagents
+        from agents.subagents import resolve as _resolve_subagents
 
-        _merged_agents = _merge_phase_agents(agents)
-    except Exception:
+        # The provider matters: `resolve` returns no roster at all for one
+        # that cannot run subagents, rather than handing the SDK a list it
+        # will ignore. Omitting it here was why that degradation, though
+        # implemented and tested, never fired in a real run.
+        _merged_agents = _resolve_subagents(
+            agent_type,
+            project_dir=project_dir,
+            user_agents=agents,
+            provider=_get_active_provider(spec_dir),
+        )
+    except _NoSubagents:
+        logger.debug(
+            "subagent roster suppressed for agent_type=%s: the workflow phase "
+            "runs without dispatch",
+            agent_type,
+        )
+    except Exception as exc:
+        # Roster composition must never break client creation; falling back to
+        # exactly what the caller passed preserves the previous behaviour.
+        logger.debug("subagent resolution failed, using caller agents: %s", exc)
         _merged_agents = agents
     if _merged_agents:
         options_kwargs["agents"] = _merged_agents
@@ -1418,13 +1451,22 @@ def create_client(
 RESUME_WITH_PROVIDER_FILE = "RESUME_WITH_PROVIDER"
 
 
-def _consume_resume_with_provider_marker(spec_dir: Path) -> str | None:
-    """Read and remove the RESUME_WITH_PROVIDER marker, returning the provider
-    name the user picked (or None if no marker exists).
+def _consume_resume_with_provider_marker(
+    spec_dir: Path, *, consume: bool = True
+) -> str | None:
+    """Read the RESUME_WITH_PROVIDER marker, returning the provider the user
+    picked (or None if no marker exists).
 
     The file can be either plain text containing the provider id
     (``copilot``) or JSON ``{"provider": "copilot"}``. Anything else is
     treated as no override and the file is left in place for inspection.
+
+    ``consume=False`` leaves the marker on disk. It exists because the marker
+    is single-shot and destructive to read: anything that only wants to *know*
+    which provider a run will use — the workflow resolver deciding whether to
+    degrade a dispatch, an endpoint showing the user their resolved profile —
+    would otherwise eat the user's "resume with X" choice before the session
+    that was supposed to honour it ever started.
 
     Failures here must NEVER prevent session startup — log and return None.
     """
@@ -1434,7 +1476,8 @@ def _consume_resume_with_provider_marker(spec_dir: Path) -> str | None:
     try:
         raw = marker.read_text(encoding="utf-8").strip()
         if not raw:
-            marker.unlink(missing_ok=True)
+            if consume:
+                marker.unlink(missing_ok=True)
             return None
         # Try JSON first, fall back to plain text.
         provider: str | None
@@ -1449,14 +1492,25 @@ def _consume_resume_with_provider_marker(spec_dir: Path) -> str | None:
             )
         except Exception:
             provider = raw
-        marker.unlink(missing_ok=True)  # single-shot
+        if consume:
+            marker.unlink(missing_ok=True)  # single-shot
         return provider or None
     except Exception as e:
         logger.warning("[_get_active_provider] could not read %s: %s", marker, e)
         return None
 
 
-def _get_active_provider(spec_dir: Path | None = None) -> str:
+def peek_active_provider(spec_dir: Path | None = None) -> str:
+    """Which provider a run would use, without consuming anything.
+
+    Same resolution as `_get_active_provider`, minus the single-shot side
+    effect on the RESUME_WITH_PROVIDER marker. Callers that are *deciding*
+    rather than *starting* must use this one.
+    """
+    return _get_active_provider(spec_dir, consume=False)
+
+
+def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) -> str:
     """
     Determine the active AI provider from IPC selection, environment or project settings.
 
@@ -1496,7 +1550,7 @@ def _get_active_provider(spec_dir: Path | None = None) -> str:
     # modal (Niveau 3b). Consumed once and removed so subsequent sessions
     # for the same spec don't keep overriding.
     if spec_dir:
-        override = _consume_resume_with_provider_marker(Path(spec_dir))
+        override = _consume_resume_with_provider_marker(Path(spec_dir), consume=consume)
         if override:
             mapped_override = provider_mapping.get(override.lower(), override.lower())
             logger.info(
@@ -1633,6 +1687,32 @@ def _get_active_provider(spec_dir: Path | None = None) -> str:
 LLM_CONTEXT_STATE_FILE = ".llm_context.json"
 
 
+def _log_provider_degradation(spec_dir: Path, requested: str, actual: str) -> None:
+    """Tell the user, in the task feed, that their provider choice was not honoured.
+
+    Selecting Mistral and getting Claude is the kind of thing that has to be
+    visible: it changes cost, latency and behaviour, and it silently invalidates
+    any conclusion drawn from "I tested this on Mistral". A warning in the
+    backend log is not visible.
+
+    Like _log_llm_context_switch, this must never break client creation, so
+    every step is guarded.
+    """
+    message = (
+        f"⚠️ Provider degraded — {requested} has no agentic adapter in WorkPilot; "
+        f"this run executes on {actual}. Subagents are disabled."
+    )
+    logger.warning("[provider-degradation] %s", message)
+    try:
+        from task_logger import get_task_logger
+
+        tl = get_task_logger()
+        if tl is not None and Path(tl.spec_dir) == Path(spec_dir):
+            tl.log_info(message)
+    except Exception as exc:  # pragma: no cover - tracing must not break a run
+        logger.debug("could not surface provider degradation in the feed: %s", exc)
+
+
 def _log_llm_context_switch(
     spec_dir: Path, provider: str, model: str, thinking: str
 ) -> None:
@@ -1732,6 +1812,7 @@ def create_agent_client(
     provider: str | None = None,
     resume: str | None = None,
     system_prompt: str | None = None,
+    use_subagents: bool = True,
 ) -> "AgentClient":  # noqa: F821
     """
     Create a provider-agnostic agent client for Kanban task execution.
@@ -1752,6 +1833,9 @@ def create_agent_client(
                For Copilot: converted to SubagentDefinition for parallel API calls
         provider: Provider override ("claude" or "copilot").
                  If None, auto-detected from env/project settings.
+        use_subagents: Whether this call may compose a subagent roster at all.
+                 False suppresses it entirely — the workflow engine's
+                 `sequential-reset` dispatch. Defaults to True.
         system_prompt: Optional system-prompt override. When provided, it
                  replaces the default coding base prompt for the
                  copilot/openai/windsurf clients (used by utilities that need
@@ -1820,7 +1904,7 @@ def create_agent_client(
 
         # Convert agents dict to SubagentDefinition if provided
         copilot_agents: dict[str, SubagentDefinition] | None = None
-        if agents:
+        if agents and use_subagents:
             copilot_agents = {}
             for name, defn in agents.items():
                 # Handle both AgentDefinition (Claude SDK) and dict formats
@@ -1863,6 +1947,7 @@ def create_agent_client(
             output_format=output_format,
             agents=agents,
             resume=resume,
+            use_subagents=use_subagents,
         )
         return ClaudeAgentClient(sdk_client)
 
@@ -2014,10 +2099,22 @@ def create_agent_client(
         )
 
     else:
-        # For other providers (mistral, deepseek, grok, meta, …), fall back to
-        # Claude SDK with provider selection.
+        # No agentic adapter for this provider (mistral, deepseek, grok, meta,
+        # aws, cursor, custom). The task still runs — on the Claude SDK — but
+        # that is a real limitation, not a detail, so say so where the user can
+        # see it instead of in a log line nobody reads. capabilities/providers.yaml
+        # is the record of which providers are in this state.
+        #
+        # `create_client` takes no provider argument: the previous comment here
+        # claimed "with provider selection", which was never true.
+        caps = get_provider_capabilities(provider)
+        target = caps.degrades_to or "claude"
+        _log_provider_degradation(spec_dir, provider, target)
         logger.warning(
-            f"Provider '{provider}' not directly supported, falling back to Claude SDK with provider selection"
+            "Provider %r has no agentic adapter; running on the %s SDK instead. "
+            "Subagents are disabled for this run.",
+            provider,
+            target,
         )
         sdk_client = create_client(
             project_dir=project_dir,
@@ -2026,6 +2123,10 @@ def create_agent_client(
             agent_type=agent_type,
             max_thinking_tokens=max_thinking_tokens,
             output_format=output_format,
-            agents=agents,
+            # Deliberately dropped: this provider does not run subagents, and
+            # passing a dict nobody reads makes the roster look active when it
+            # is not.
+            agents=None,
+            resume=resume,
         )
         return ClaudeAgentClient(sdk_client)

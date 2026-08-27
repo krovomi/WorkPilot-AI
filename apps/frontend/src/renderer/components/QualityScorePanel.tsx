@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Quality Score Panel Component
  * Displays detailed quality analysis with issues breakdown
  */

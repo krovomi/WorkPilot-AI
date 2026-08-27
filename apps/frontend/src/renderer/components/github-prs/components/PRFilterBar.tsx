@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Filter bar for GitHub PRs list
  * Grid layout: Contributors (3) | Status (3) | Search (8)
  * Multi-select dropdowns with visible chip selections

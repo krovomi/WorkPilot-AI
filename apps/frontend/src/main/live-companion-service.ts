@@ -1,4 +1,4 @@
-import { type ChildProcess, execSync, spawn } from "node:child_process";
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -343,7 +343,11 @@ export class LiveCompanionService extends EventEmitter {
 		let diff = "";
 		if (changeType === "modified") {
 			try {
-				diff = execSync(`git diff -- "${filePath}"`, {
+				// execFileSync (argv array), not a shell string: `filePath` comes
+				// from the file watcher, so it is whatever the repo contains. A
+				// tracked file named `a" & calc & ".ts` would otherwise break out
+				// of the quotes and run as a command.
+				diff = execFileSync("git", ["diff", "--", filePath], {
 					cwd: projectDir,
 					encoding: "utf-8",
 					timeout: 5000,

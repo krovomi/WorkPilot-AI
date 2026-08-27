@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Migration Service - Handles auto-migration operations
  */
 

@@ -367,7 +367,11 @@ function setupExternalLinkHandler(mainWindow: BrowserWindow): void {
 					return { action: "deny" };
 				}
 
-				// Open the URL externally and allow the action
+				// Hand the URL to the OS browser and DENY the in-app window.
+				// Returning "allow" here would do both: open the user's browser
+				// *and* let Electron create a second BrowserWindow rendering the
+				// remote page inside the app — every external link opening twice,
+				// with untrusted content hosted in our own process.
 				shell.openExternal(details.url).catch((error) => {
 					console.warn(
 						"[main] Failed to open external URL:",
@@ -375,13 +379,52 @@ function setupExternalLinkHandler(mainWindow: BrowserWindow): void {
 						error,
 					);
 				});
-				return { action: "allow" };
+				return { action: "deny" };
 			} catch {
 				console.warn("[main] Blocked invalid URL:", details.url);
 				return { action: "deny" };
 			}
 		},
 	);
+
+	// Top-level navigation guard. `setWindowOpenHandler` only covers
+	// window.open()/target=_blank; a plain link, a form post or a
+	// `location.href =` navigates the main window in place. Letting that
+	// reach a remote origin would hand the preload bridge — and with it every
+	// IPC handler — to a third-party page. In-app navigation (the dev server
+	// in dev, file:// in production) is allowed; anything else is bounced to
+	// the OS browser.
+	mainWindow?.webContents.on("will-navigate", (event, targetUrl) => {
+		let target: URL;
+		try {
+			target = new URL(targetUrl);
+		} catch {
+			event.preventDefault();
+			console.warn("[main] Blocked navigation to invalid URL:", targetUrl);
+			return;
+		}
+
+		try {
+			const current = new URL(mainWindow?.webContents.getURL() || "");
+			// file:// URLs all share the opaque "null" origin, so compare
+			// protocols for the packaged app and origins for the dev server.
+			const sameApp =
+				target.protocol === "file:" && current.protocol === "file:"
+					? true
+					: target.origin === current.origin;
+			if (sameApp) return;
+		} catch {
+			// No parseable current URL — treat the navigation as external.
+		}
+
+		event.preventDefault();
+		console.warn("[main] Blocked in-app navigation to:", targetUrl);
+		if (ALLOWED_URL_SCHEMES.has(target.protocol)) {
+			shell.openExternal(targetUrl).catch(() => {
+				/* nothing more we can do */
+			});
+		}
+	});
 }
 
 function createWindow(): void {
@@ -508,6 +551,30 @@ async function launchBackendIfNeeded() {
 		);
 	}
 	const providerApiModule = "provider_api:app";
+	// `--reload` belongs to development only. In a packaged app the backend
+	// source never changes, and the watcher costs a second supervisor process
+	// plus roughly double the memory — while a stray write under backendDir
+	// (a log, a cache) can restart the API under the user's feet mid-task.
+	const reloadArgs = is.dev
+		? [
+				"--reload",
+				// Watch only backend source; the shared virtualenv lives at the repo
+				// root, so scoping the watcher to backendDir keeps pip installs (from
+				// the PythonEnvManager) from triggering an endless reload storm.
+				// NOTE: do not add glob --reload-exclude patterns (e.g. ".venv/*"):
+				// the bundled Windows python.exe expands wildcard argv, turning the
+				// pattern into extra positional args and making uvicorn exit code 2.
+				"--reload-dir",
+				backendDir,
+				// PythonEnvManager installs into backendDir/.venv, which is INSIDE
+				// the watched dir — exclude it or every pip install reload-storms
+				// the server. No wildcard => safe from the argv expansion issue
+				// above. Must be ABSOLUTE: uvicorn's FileFilter matches exclude
+				// dirs against the changed file's (absolute) parents.
+				"--reload-exclude",
+				resolve(backendDir, ".venv"),
+			]
+		: [];
 	backendProcess = spawn(
 		pythonPath,
 		[
@@ -518,22 +585,7 @@ async function launchBackendIfNeeded() {
 			"127.0.0.1",
 			"--port",
 			"9000",
-			"--reload",
-			// Watch only backend source; the shared virtualenv lives at the repo
-			// root, so scoping the watcher to backendDir keeps pip installs (from
-			// the PythonEnvManager) from triggering an endless reload storm.
-			// NOTE: do not add glob --reload-exclude patterns (e.g. ".venv/*"):
-			// the bundled Windows python.exe expands wildcard argv, turning the
-			// pattern into extra positional args and making uvicorn exit code 2.
-			"--reload-dir",
-			backendDir,
-			// PythonEnvManager installs into backendDir/.venv, which is INSIDE
-			// the watched dir — exclude it or every pip install reload-storms
-			// the server. No wildcard => safe from the argv expansion issue
-			// above. Must be ABSOLUTE: uvicorn's FileFilter matches exclude
-			// dirs against the changed file's (absolute) parents.
-			"--reload-exclude",
-			resolve(backendDir, ".venv"),
+			...reloadArgs,
 		],
 		{
 			cwd: backendDir,

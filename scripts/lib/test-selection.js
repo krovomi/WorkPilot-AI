@@ -38,6 +38,15 @@ function findVenvBin(root, name) {
 }
 
 /**
+ * Does pytest collect this file? Mirrors `python_files` in pytest.ini
+ * (`test_*.py *_test.py`).
+ */
+function isPytestFile(file) {
+	const base = path.basename(file);
+	return base.endsWith(".py") && (base.startsWith("test_") || base.endsWith("_test.py"));
+}
+
+/**
  * Pick a pytest target list based on changed files.
  *
  * - Backend test file changed → run that file directly.
@@ -54,8 +63,14 @@ function selectPytestTargets(root, changedFiles, options = {}) {
 	const backendSrc = changedFiles.filter(
 		(f) => f.startsWith("apps/backend/") && f.endsWith(".py"),
 	);
+	// Only files pytest would actually collect. `tests/` also holds standalone
+	// scripts (check_syntax.py, run_all_tests.py, validation_script.py, …) that
+	// call sys.exit() at import time. A normal `pytest tests/` run never touches
+	// them because they do not match python_files, but naming them explicitly on
+	// the command line makes pytest import them anyway — and the SystemExit
+	// surfaces as a collection INTERNALERROR that aborts the whole run.
 	const testChanges = changedFiles.filter(
-		(f) => f.startsWith("tests/") && f.endsWith(".py"),
+		(f) => f.startsWith("tests/") && isPytestFile(f),
 	);
 	if (backendSrc.length === 0 && testChanges.length === 0) return [];
 
@@ -67,11 +82,7 @@ function selectPytestTargets(root, changedFiles, options = {}) {
 		for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
 			const full = path.join(dir, e.name);
 			if (e.isDirectory()) walk(full);
-			else if (
-				e.isFile() &&
-				e.name.startsWith("test_") &&
-				e.name.endsWith(".py")
-			) {
+			else if (e.isFile() && isPytestFile(e.name)) {
 				allTests.push(full);
 			}
 		}

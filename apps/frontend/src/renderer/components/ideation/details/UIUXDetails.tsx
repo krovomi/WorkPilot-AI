@@ -1,4 +1,4 @@
-﻿import { AlertCircle, CheckCircle2, FileCode, Users } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileCode, Users } from "lucide-react";
 import { UIUX_CATEGORY_LABELS } from "../../../../shared/constants";
 import type { UIUXImprovementIdea } from "../../../../shared/types";
 import { Badge } from "../../ui/badge";
