@@ -387,7 +387,10 @@ def validate_webhook_url(url: str) -> None:
     try:
         parsed = urlparse(url)
     except Exception as exc:  # noqa: BLE001 — any parse error is a rejection
-        raise ValueError(f"Invalid webhook URL: {exc}")
+        # The parser's own message adds nothing a caller can act on, and it
+        # reaches the HTTP response through `post_json`.
+        logger.warning("[Notifications] unparseable webhook URL: %s", exc)
+        raise ValueError("Invalid webhook URL") from None
     if parsed.scheme not in ("https", "http"):
         raise ValueError("Only HTTP and HTTPS webhook URLs are allowed")
     hostname = parsed.hostname
@@ -410,7 +413,8 @@ def validate_webhook_url(url: str) -> None:
             raw = ip_str.split("%", 1)[0] if family == socket.AF_INET6 else ip_str
             ip_obj = ipaddress.ip_address(raw)
         except ValueError as exc:
-            raise ValueError(f"Invalid resolved address {ip_str!r}: {exc}")
+            logger.warning("[Notifications] unparseable resolved address: %s", exc)
+            raise ValueError("Webhook host resolved to an unreadable address") from None
         if (
             ip_obj.is_private
             or ip_obj.is_loopback
@@ -471,9 +475,16 @@ def post_json(url: str, payload: dict) -> tuple[bool, int | None, str | None]:
             ok = 200 <= resp.status < 300
             return ok, resp.status, None if ok else f"HTTP {resp.status}"
     except urllib.error.HTTPError as exc:
-        return False, exc.code, f"HTTP {exc.code}: {exc.reason}"
+        # The code, not `exc.reason`: the reason is server-supplied text that
+        # lands verbatim in the API response, and the code is what a person
+        # testing a webhook actually reads.
+        logger.warning("[Notifications] webhook returned %s: %s", exc.code, exc.reason)
+        return False, exc.code, f"HTTP {exc.code}"
     except urllib.error.URLError as exc:
-        return False, None, f"URL error: {exc.reason}"
+        # `exc.reason` is usually an OSError, whose text carries resolver and
+        # socket detail.
+        logger.warning("[Notifications] webhook unreachable: %s", exc.reason)
+        return False, None, "Webhook host could not be reached"
     except Exception as exc:  # noqa: BLE001 — notifications must never crash callers
         # The HTTPError/URLError arms above return the caller's own URL and
         # status back to them, which is useful and safe. This one is anything
