@@ -721,6 +721,11 @@ jobs:
           fi
 
       - name: Update README.md
+        env:
+          # The script reads the release's real assets to decide which rows
+          # the download table gets. Unauthenticated it would still work, but
+          # against the shared api.github.com rate limit.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           IS_PRERELEASE="${{ steps.version.outputs.is_prerelease }}"
