@@ -46,8 +46,8 @@ importers:
         specifier: 1.2.0-beta.15
         version: 1.2.0-beta.15
       lucide-react:
-        specifier: ^1.8.0
-        version: 1.8.0(react@19.2.4)
+        specifier: ^1.33.0
+        version: 1.33.0(react@19.2.4)
       tar:
         specifier: '>= 7.5.19'
         version: 7.5.22
@@ -199,8 +199,8 @@ importers:
         specifier: ^25.7.3
         version: 25.8.4(typescript@5.9.3)
       lucide-react:
-        specifier: ^1.8.0
-        version: 1.8.0(react@19.2.4)
+        specifier: ^1.33.0
+        version: 1.33.0(react@19.2.4)
       minimatch:
         specifier: ^10.2.3
         version: 10.2.3
@@ -3763,8 +3763,8 @@ packages:
     resolution: {integrity: sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==}
     engines: {node: '>=10'}
 
-  lucide-react@1.8.0:
-    resolution: {integrity: sha512-WuvlsjngSk7TnTBJ1hsCy3ql9V9VOdcPkd3PKcSmM34vJD8KG6molxz7m7zbYFgICwsanQWmJ13JlYs4Zp7Arw==}
+  lucide-react@1.33.0:
+    resolution: {integrity: sha512-MTRwMy0ZlL8Ur/vOAiJ9XGHE+kFPC7brq6MxAm0GiGXEBj0qy0jA/pG4N675oSzciO/UCdX8T+5yUQdmDeTLxg==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -9014,7 +9014,7 @@ snapshots:
     dependencies:
       yallist: 4.0.0
 
-  lucide-react@1.8.0(react@19.2.4):
+  lucide-react@1.33.0(react@19.2.4):
     dependencies:
       react: 19.2.4
 
