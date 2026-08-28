@@ -1801,6 +1801,64 @@ def _log_llm_context_switch(
         logger.debug("Could not record LLM context switch: %s", e)
 
 
+class _Unset:
+    """Distinguishes "the caller said nothing" from "the caller said None".
+
+    `max_thinking_tokens=None` is a real instruction — disable extended
+    thinking — so it cannot double as "resolve it for me".
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "<unset>"
+
+
+_UNSET = _Unset()
+
+# agent_type -> the phase whose effort setting governs it. `phase_config`
+# speaks four phases, so anything outside the build pipeline maps onto the
+# nearest one; "coding" is the general case for an agent doing substantive
+# work on a codebase.
+_EFFORT_PHASE: dict[str, str] = {
+    "planner": "planning",
+    "architect": "planning",
+    "impact_analyzer": "planning",
+    "qa": "qa",
+    "qa_reviewer": "qa",
+    "qa_fixer": "qa",
+    "spec_writer": "spec",
+    "spec_gatherer": "spec",
+}
+_DEFAULT_EFFORT_PHASE = "coding"
+
+# Single-purpose calls that stay on the provider default. Spending an
+# ultrathink budget on a one-line commit message is not what the user asked
+# for when they raised the effort on their build — the same reasoning that
+# gives these agent_types an empty subagent roster.
+_NO_EFFORT = frozenset({"commit_message", "pr_template_filler", "spec_compaction"})
+
+
+def _effort_for(spec_dir: Path | None, agent_type: str) -> int | None:
+    """The thinking budget this agent should run with, or None.
+
+    Never raises and never blocks a run: an unresolvable effort is the
+    provider default, which is exactly the behaviour every one of these call
+    sites had before.
+    """
+    if agent_type in _NO_EFFORT or spec_dir is None:
+        return None
+    try:
+        from phase_config import get_phase_thinking_budget
+
+        phase = _EFFORT_PHASE.get(agent_type, _DEFAULT_EFFORT_PHASE)
+        budget = get_phase_thinking_budget(Path(spec_dir), phase)
+        return budget if isinstance(budget, int) else None
+    except Exception as exc:  # noqa: BLE001 - effort is an optimisation
+        logger.debug("could not resolve effort for %s: %s", agent_type, exc)
+        return None
+
+
 # The tier aliases the SDK understands. On Anthropic they are a deliberate
 # cost choice — run the cheap read-only specialists on Sonnet even when the
 # parent is on Opus. Anywhere else they are just an unknown model id.
@@ -1826,7 +1884,7 @@ def create_agent_client(
     spec_dir: Path,
     model: str,
     agent_type: str = "coder",
-    max_thinking_tokens: int | None = None,
+    max_thinking_tokens: int | None | _Unset = _UNSET,
     output_format: dict | None = None,
     agents: dict | None = None,
     provider: str | None = None,
@@ -1846,7 +1904,9 @@ def create_agent_client(
         spec_dir: Directory containing the spec (for settings file)
         model: Model identifier (e.g., "claude-sonnet-4-5-20250929" or "gpt-4o")
         agent_type: Agent type from AGENT_CONFIGS
-        max_thinking_tokens: Token budget for extended thinking
+        max_thinking_tokens: Token budget for extended thinking. Omit it to
+            use the effort level the user chose for this phase; pass None to
+            disable extended thinking regardless of that setting.
         output_format: Optional structured output format
         agents: Optional dict of subagent definitions.
                For Claude: passed as claude_agent_sdk.AgentDefinition objects
@@ -1879,6 +1939,14 @@ def create_agent_client(
         project_dir = Path(project_dir)
     if isinstance(spec_dir, str):
         spec_dir = Path(spec_dir)
+
+    # The user's effort setting, unless this caller stated its own. Omitting
+    # the argument used to mean "no extended thinking at all", so fifteen call
+    # sites across PR review, triage, arena, the spec pipeline and the slash
+    # commands silently ignored the effort selector: a user on ultrathink got
+    # a reviewer with no thinking budget and no way to tell.
+    if max_thinking_tokens is _UNSET:
+        max_thinking_tokens = _effort_for(spec_dir, agent_type)
 
     # Resolve provider
     if provider is None:
