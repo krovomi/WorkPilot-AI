@@ -31,19 +31,6 @@ except ImportError:
         return "medium"
 
 
-def _effort_tokens(spec_dir) -> int | None:
-    """The user's effort budget as a token count, or None.
-
-    Guarded because the ImportError fallback above returns the string
-    "medium", which `max_thinking_tokens` cannot use.
-    """
-    try:
-        budget = get_phase_thinking_budget(spec_dir, "coding")
-    except Exception:  # noqa: BLE001 - effort is an optimisation, not a gate
-        return None
-    return budget if isinstance(budget, int) else None
-
-
 try:
     from debug import debug, debug_error, debug_section, debug_success
 except ImportError:
@@ -205,15 +192,15 @@ NEW_CODE: Refactored code snippet
 
             # `agent_type` was left to its default, so a refactoring session
             # was given the coder roster and the coder tool permissions by
-            # accident rather than by choice; the effort selector never
-            # reached it either.
+            # accident rather than by choice. The effort budget is resolved by
+            # `create_agent_client` now, from the same setting as every other
+            # coding session.
             _rf_dir = Path.cwd()
             client = create_agent_client(
                 project_dir=_rf_dir,
                 spec_dir=_rf_dir,
                 model=self.model,
                 agent_type="coder",
-                max_thinking_tokens=_effort_tokens(_rf_dir),
             )
             if not client:
                 return self._create_simple_action(file_path, issues)
