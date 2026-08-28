@@ -270,6 +270,7 @@ def _run_observe_phase(
     ran_qa: bool,
     detector_clean: bool | None = None,
     tests_passed: bool | None = None,
+    changed_files: list[str] | None = None,
 ) -> None:
     """Turn what this build externally verified into learning-loop candidates.
 
@@ -310,10 +311,51 @@ def _run_observe_phase(
         report = run_observe(repo_root, outcome, patterns)
         if summary := report.describe():
             print("\n" + summary)
+
+        # The deterministic half of the loop: what the code this build touched
+        # says about the project's own conventions. Costs no API call, so it
+        # runs at every effort level, and it is graded by the same external
+        # signals as everything else above.
+        _run_convention_pass(spec_dir, outcome, changed_files)
     except Exception as exc:  # noqa: BLE001 - observation never fails a build
         from debug import debug_warning
 
         debug_warning("run.py", f"Observe phase skipped: {exc}")
+
+
+def _run_convention_pass(
+    spec_dir: Path, outcome, changed_files: list[str] | None
+) -> None:
+    """Learn the project's naming and layout rules from what the build wrote.
+
+    Ported from `core/learning_loop.py`, which had this and could not run it.
+    The difference that matters is the promotion rule: that version proposed a
+    convention on a confidence score it computed about itself, this one waits
+    for the same external corroboration the skill proposer requires.
+    """
+    try:
+        from learning_loop.conventions import run_convention_pass
+        from learning_loop.observe import signals_from_outcome
+
+        if not changed_files:
+            # None means the change set could not be determined, [] means the
+            # build touched nothing. Neither is evidence about conventions.
+            return
+
+        recorded, proposals = run_convention_pass(
+            _project_dir(spec_dir),
+            changed_files,
+            signals_from_outcome(outcome),
+            outcome.spec_id,
+        )
+        if recorded:
+            print(f"  conventions: {recorded} observation(s) recorded")
+        for path in proposals:
+            print(f"  proposed  conventions/_proposed/{path.name}")
+    except Exception as exc:  # noqa: BLE001 - observation never fails a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Convention pass skipped: {exc}")
 
 
 def _report_hard_gates(profile, spec_dir: Path, tests_passed: bool | None) -> None:
@@ -765,6 +807,10 @@ def handle_build_command(
             ran_qa=qa_should_run,
             detector_clean=gate_run.all_clean if gate_run else None,
             tests_passed=_tests_green,
+            # The real git diff, already computed above for the conditional
+            # phases. Reused rather than re-derived from the plan: the plan
+            # says what was intended, the diff says what happened.
+            changed_files=_changed,
         )
 
         # Post-build finalization (only for isolated sequential mode)
