@@ -234,6 +234,34 @@ def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None)
         return None
 
 
+def _project_dir(spec_dir: Path) -> Path:
+    """The project root, from a spec directory.
+
+    `spec_dir` is `<project>/.workpilot/specs/<spec-id>`, so the root is three
+    levels up. Worth a named helper: the call below used to climb only two,
+    and `PatternStorage` appends `.workpilot` itself — so the observe phase
+    read `<project>/.workpilot/.workpilot/learning_loop/patterns.json`, found
+    nothing every time, and recorded no outcome for any build.
+    """
+    return spec_dir.parent.parent.parent
+
+
+def _primary_language(spec_dir: Path) -> str:
+    """The project's dominant language, or "" when it cannot be determined.
+
+    Reuses the stack detection the subagent registry already performs, rather
+    than adding another detector. Empty on any failure: an unkeyed ledger is a
+    coarser lesson, a raised exception is a failed build.
+    """
+    try:
+        from agents.subagents import detect_languages
+
+        languages = detect_languages(_project_dir(spec_dir))
+        return languages[0] if languages else ""
+    except Exception:  # noqa: BLE001 - observation must not break a build
+        return ""
+
+
 def _run_observe_phase(
     spec_dir: Path,
     *,
@@ -272,8 +300,13 @@ def _run_observe_phase(
             # corroboration the promotion rules refuse to invent.
             detector_clean=detector_clean,
             workflow=profile.workflow,
+            # Left empty until now, which quietly defeated the point of
+            # keying ledgers by language: every project's lessons landed in
+            # the same bucket, so a Rust build corroborated a pattern mined
+            # from a TypeScript one.
+            language=_primary_language(spec_dir),
         )
-        patterns = PatternStorage(spec_dir.parent.parent).load_patterns()
+        patterns = PatternStorage(_project_dir(spec_dir)).load_patterns()
         report = run_observe(repo_root, outcome, patterns)
         if summary := report.describe():
             print("\n" + summary)

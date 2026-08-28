@@ -1,15 +1,46 @@
 """
 LLM-Enhanced Transformer
-Uses Claude to improve code transformation quality with context-aware refactoring
+Uses the configured provider to improve code transformation quality with
+context-aware refactoring.
+
+This module used to build `anthropic.Anthropic()` directly, which is the one
+thing the repo's rules forbid outright. That path skipped the security hooks,
+the tool permissions, the per-phase model and effort resolution, and every
+provider that is not Anthropic — a user running on Copilot or a local model
+got a hard dependency on ANTHROPIC_API_KEY and silence without it. It also
+pinned a model id by hand, so it kept calling a 2024 Sonnet long after the
+rest of the product had moved on.
 """
 
 import asyncio
-import os
 from pathlib import Path
 
-import anthropic
-
 from .models import TransformationResult
+
+
+def _parse_json(text: str):
+    """Parse a JSON body out of a model reply, or return None.
+
+    An agent client returns prose, not a JSON-mode payload, so the reply may
+    be fenced or prefaced. Tries the whole string first, then the outermost
+    braces or brackets.
+    """
+    import json
+
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
+
+    for opener, closer in (("{", "}"), ("[", "]")):
+        start = text.find(opener)
+        end = text.rfind(closer)
+        if start != -1 and end > start:
+            try:
+                return json.loads(text[start : end + 1])
+            except ValueError:
+                continue
+    return None
 
 
 class LLMTransformer:
@@ -17,10 +48,44 @@ class LLMTransformer:
 
     def __init__(self, project_dir: str, api_key: str | None = None):
         self.project_dir = Path(project_dir)
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        self.client = (
-            anthropic.Anthropic(api_key=self.api_key) if self.api_key else None
+        # Accepted and ignored: credentials are resolved by `core.client`,
+        # which knows about OAuth profiles, per-provider keys and account
+        # swapping. Kept in the signature so existing callers still construct.
+        self.api_key = api_key
+
+    async def _query(self, prompt: str) -> str:
+        """Run one completion through the sanctioned client factory.
+
+        Returns "" when the provider produced no text, which the caller treats
+        as "leave the rule-based transformation alone" — the same fallback the
+        missing-API-key branch used to provide.
+        """
+        from core.client import create_agent_client
+        from phase_config import get_phase_model, get_phase_thinking_budget
+
+        # Resolved, not hard-coded. The old code pinned
+        # "claude-3-5-sonnet-20241022" in three places, so a user who had
+        # chosen a different model or effort level got neither, and a user on
+        # a non-Anthropic provider got an error.
+        spec_dir = self.project_dir
+        client = create_agent_client(
+            project_dir=self.project_dir,
+            spec_dir=spec_dir,
+            model=get_phase_model(spec_dir, "coding"),
+            agent_type="migration",
+            max_thinking_tokens=get_phase_thinking_budget(spec_dir, "coding"),
         )
+
+        text = ""
+        async with client:
+            await client.query(prompt)
+            async for msg in client.receive_response():
+                if type(msg).__name__ != "AssistantMessage":
+                    continue
+                for block in getattr(msg, "content", []) or []:
+                    if type(block).__name__ == "TextBlock":
+                        text += getattr(block, "text", "")
+        return text.strip()
 
     async def enhance_transformation(
         self,
@@ -41,9 +106,6 @@ class LLMTransformer:
         Returns:
             Enhanced TransformationResult with improved code quality
         """
-        if not self.client:
-            return result
-
         try:
             # Load the prompt template
             prompt = self._build_prompt(
@@ -54,20 +116,9 @@ class LLMTransformer:
                 prompt_template,
             )
 
-            # Call Claude
-            response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=8000,
-                temperature=0.1,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
-            )
-
-            enhanced_code = response.content[0].text
+            enhanced_code = await self._query(prompt)
+            if not enhanced_code:
+                return result
 
             # Update the result
             result.after = enhanced_code
@@ -183,9 +234,6 @@ Ensure the transformation:
         Returns:
             True if validation passes
         """
-        if not self.client:
-            return False
-
         try:
             prompt = f"""Review this code transformation and determine if it's correct.
 
@@ -214,17 +262,14 @@ Respond with JSON:
 }}
 """
 
-            response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=2000,
-                temperature=0,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            raw = await self._query(prompt)
+            if not raw:
+                return False
 
-            # Parse response
-            import json
-
-            validation = json.loads(response.content[0].text)
+            validation = _parse_json(raw)
+            if validation is None:
+                result.errors.append("Validation response was not valid JSON")
+                return False
 
             result.validation_passed = validation.get("valid", False)
             result.confidence = validation.get("confidence", result.confidence)
@@ -247,9 +292,6 @@ Respond with JSON:
         Returns:
             List of suggestions with line numbers and descriptions
         """
-        if not self.client:
-            return []
-
         try:
             prompt = f"""Analyze this code transformation and identify parts that need manual review.
 
@@ -279,17 +321,12 @@ Return JSON array:
 ]
 """
 
-            response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=2000,
-                temperature=0,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            raw = await self._query(prompt)
+            if not raw:
+                return []
 
-            import json
-
-            suggestions = json.loads(response.content[0].text)
-            return suggestions
+            suggestions = _parse_json(raw)
+            return suggestions if isinstance(suggestions, list) else []
 
         except Exception as e:
             return [

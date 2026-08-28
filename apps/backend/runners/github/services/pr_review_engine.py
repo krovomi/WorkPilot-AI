@@ -60,6 +60,21 @@ class ProgressCallback:
     extra: dict[str, Any] | None = None
 
 
+def _learning_context(project_dir) -> str:
+    """Review lessons the learning loop has recorded for this project.
+
+    Empty when nothing is recorded. Never raises — a review that runs without
+    its history is worse, a review that crashes is useless.
+    """
+    try:
+        from learning_loop.prompt_injection import context_for_agent
+
+        context = context_for_agent(project_dir, "pr_reviewer")
+        return f"\n\n---\n\n{context}\n" if context.strip() else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 class PRReviewEngine:
     """Handles multi-pass PR review workflow."""
 
@@ -239,6 +254,11 @@ class PRReviewEngine:
             if self.project_dir.name == "backend"
             else self.project_dir
         )
+
+        # What earlier reviews on this project established. Without it the
+        # reviewer re-raises findings the team already decided about, which is
+        # the single most common complaint about automated review.
+        full_prompt += _learning_context(project_root)
 
         # Resolve model shorthand (e.g., "sonnet") to full model ID for API compatibility
         model = resolve_model_id(self.config.model or "sonnet")

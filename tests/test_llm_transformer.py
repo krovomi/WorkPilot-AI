@@ -73,11 +73,17 @@ class TestLLMTransformer:
         assert transformer.api_key == os.getenv("ANTHROPIC_API_KEY")
     
     def test_initialization_with_api_key(self, temp_project):
-        """Test initialization with explicit API key."""
+        """The key is retained, and no provider client is built from it.
+
+        This module used to construct `anthropic.Anthropic()` here, which meant
+        the whole migration feature only worked for one provider and skipped
+        the security hooks. Credentials are `core.client`'s job now, so there
+        is deliberately no client object to assert on.
+        """
         transformer = LLMTransformer(temp_project, api_key="test-key")
-        
+
         assert transformer.api_key == "test-key"
-        assert transformer.client is not None
+        assert not hasattr(transformer, "client")
     
     def test_build_prompt(self, temp_project, sample_transformation):
         """Test prompt building."""
@@ -201,12 +207,21 @@ class TestLLMTransformer:
                 assert 'line_number' in suggestion or 'description' in suggestion
     
     @pytest.mark.asyncio
-    async def test_enhance_without_api_key(self, temp_project, sample_transformation):
-        """Test enhancement fails gracefully without API key."""
-        # Create transformer without API key
+    async def test_enhance_when_the_model_returns_nothing(
+        self, temp_project, sample_transformation
+    ):
+        """An empty completion leaves the rule-based transformation alone.
+
+        Replaces the old "no API key" case: there is no key to withhold now,
+        so the equivalent degradation is a provider that answers with nothing.
+        """
         transformer = LLMTransformer(temp_project, api_key=None)
-        transformer.client = None
-        
+
+        async def no_answer(_prompt):
+            return ""
+
+        transformer._query = no_answer
+
         enhanced = await transformer.enhance_transformation(
             sample_transformation,
             "react",

@@ -140,6 +140,7 @@ async def run_pair_programming_session(
         from core.agent_client import ContentBlockType
         from core.client import create_agent_client
         from core.workflow_logger import workflow_logger
+        from phase_config import get_phase_model, get_phase_thinking_budget
     except ImportError as e:
         emit_error(f"Failed to import backend modules: {e}")
         return
@@ -189,11 +190,17 @@ Begin now. Be systematic and thorough."""
     emit_status("active", f"Starting AI implementation: {ai_scope}")
 
     try:
+        # Resolved from the user's settings like every other coding session.
+        # `model=None` sent whatever the provider defaulted to, and no thinking
+        # budget meant the effort selector did not reach pair programming at
+        # all — the one mode where the user is watching the agent work.
+        _pp_spec_dir = Path(project_dir)
         client = create_agent_client(
             project_dir=project_dir,
-            spec_dir=None,
-            model=None,
+            spec_dir=_pp_spec_dir,
+            model=get_phase_model(_pp_spec_dir, "coding"),
             agent_type="coder",
+            max_thinking_tokens=get_phase_thinking_budget(_pp_spec_dir, "coding"),
         )
 
         accumulated_response = []

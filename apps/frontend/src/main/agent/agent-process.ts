@@ -43,6 +43,7 @@ import { readSettingsFile } from "../settings-utils";
 import type { AgentEvents } from "./agent-events";
 import type { AgentState } from "./agent-state";
 import { getOAuthModeClearVars } from "./env-utils";
+import { forwardTaskEventToHooks } from "./hook-bridge";
 import { parseTaskEvent } from "./task-event-parser";
 import type { ExecutionProgressData, ProcessType } from "./types";
 
@@ -1054,6 +1055,10 @@ export class AgentProcessManager {
 					taskEvent,
 				);
 				this.emitter.emit("task-event", taskId, taskEvent, projectId);
+				// Same event, second consumer: the hooks bus, which can turn it
+				// into a spec, an agent run or a pipeline. Fire-and-forget —
+				// see hook-bridge.ts.
+				forwardTaskEventToHooks(taskEvent, projectId);
 			}
 
 			const phaseUpdate = this.events.parseExecutionPhase(

@@ -63,6 +63,7 @@ __all__ = [
     "MIN_VERIFIED_OUTCOMES",
     "evaluate",
     "write_proposal",
+    "record_signal_for_build",
     "proposal_dir",
 ]
 
@@ -263,6 +264,75 @@ Builds: {", ".join(proposal.evidence.build_ids) or "not recorded"}
 def ledger_path(repo_root: Path, key: LedgerKey) -> Path:
     """Where one agent's experience for one context is accumulated."""
     return proposal_dir(repo_root) / "_ledgers" / f"{key.slug()}.json"
+
+
+def record_signal_for_build(
+    repo_root: Path,
+    build_id: str,
+    signal: ExternalSignal,
+) -> int:
+    """Attach a late-arriving signal to every ledger entry ``build_id`` fed.
+
+    Some external verdicts are not knowable when the build ends. The strongest
+    of them — a human merged the pull request — arrives hours or days later,
+    which is why `BuildOutcome.pr_merged` existed as a field that nothing ever
+    set: the observe phase runs at the wrong moment to know the answer.
+
+    Rather than re-deriving which patterns were active, this reuses what the
+    ledger already recorded. `record_outcome` writes the build id alongside
+    every pattern it credits, so the entries to update are exactly the ones
+    listing this build.
+
+    Returns the number of ledger entries updated. Best-effort throughout: a
+    bookkeeping failure here must not propagate into whatever triggered it.
+    """
+    updated = 0
+    try:
+        ledger_dir = proposal_dir(repo_root) / "_ledgers"
+        if not ledger_dir.is_dir():
+            return 0
+        for path in sorted(ledger_dir.glob("*.json")):
+            try:
+                data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            dirty = False
+            for pattern_id, entry in data.items():
+                if pattern_id == "_key" or not isinstance(entry, dict):
+                    continue
+                if build_id not in entry.get("builds", []):
+                    continue
+                # One signal per build, not one per call. A webhook that
+                # redelivers, or a PR merged and re-merged after a revert,
+                # must not inflate the corroboration count — that would let
+                # retry noise promote a pattern the rules meant to hold back.
+                if _already_signalled(entry, signal, build_id):
+                    continue
+                entry.setdefault("signals", []).append(signal.value)
+                entry.setdefault("late", []).append(
+                    {"signal": signal.value, "build": build_id}
+                )
+                dirty = True
+                updated += 1
+            if dirty:
+                path.write_text(
+                    json.dumps(data, indent="\t", ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+    except Exception as exc:  # pragma: no cover - bookkeeping only
+        logger.debug("could not record late signal: %s", exc)
+    return updated
+
+
+def _already_signalled(
+    entry: dict[str, Any], signal: ExternalSignal, build_id: str
+) -> bool:
+    """Whether this exact late signal was already credited for this build."""
+    return any(
+        rec.get("signal") == signal.value and rec.get("build") == build_id
+        for rec in entry.get("late", [])
+        if isinstance(rec, dict)
+    )
 
 
 def record_outcome(
