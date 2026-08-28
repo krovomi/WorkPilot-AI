@@ -50,6 +50,15 @@ except (ImportError, ValueError, SystemError):
 
 # Define a local ProgressCallback to avoid circular import
 @dataclass
+class ProgressCallback:
+    """Callback for progress updates - local definition to avoid circular import."""
+
+    phase: str
+    progress: int
+    message: str
+    pr_number: int | None = None
+    extra: dict[str, Any] | None = None
+
 
 def _learning_context(project_dir) -> str:
     """Review lessons the learning loop has recorded for this project.
@@ -64,16 +73,6 @@ def _learning_context(project_dir) -> str:
         return f"\n\n---\n\n{context}\n" if context.strip() else ""
     except Exception:  # noqa: BLE001
         return ""
-
-
-class ProgressCallback:
-    """Callback for progress updates - local definition to avoid circular import."""
-
-    phase: str
-    progress: int
-    message: str
-    pr_number: int | None = None
-    extra: dict[str, Any] | None = None
 
 
 class PRReviewEngine:
