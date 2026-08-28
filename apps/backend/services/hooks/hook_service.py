@@ -33,6 +33,7 @@ from .models import (
     HookStatus,
     Trigger,
     TriggerCondition,
+    TriggerType,
 )
 from .templates import get_hook_templates, get_template_by_id
 
@@ -427,6 +428,39 @@ def _interpolate_argv(argv: list[str], data: dict[str, Any]) -> list[str]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _credit_merge_to_learning_loop(event: HookEvent) -> None:
+    """Record `pr_merged` against the build the merged branch came from.
+
+    `ExternalSignal.PR_MERGED` was declared, handled by `signals_from_outcome`,
+    and never once written, because nothing knew when a merge happened. The
+    hooks bus does — so the signal is taken here, from whichever producer
+    reports it.
+
+    Needs a spec id to attribute the merge to; an event without one is a merge
+    of work the pipeline did not produce, and there is nothing to credit.
+    Everything is swallowed: hook dispatch must not fail over bookkeeping.
+    """
+    try:
+        if event.type is not TriggerType.PR_MERGED:
+            return
+        data = event.data or {}
+        spec_id = str(data.get("spec_id") or data.get("specId") or "").strip()
+        if not spec_id:
+            return
+        from learning_loop.observe import record_merge_outcome
+
+        repo_root = Path(__file__).resolve().parents[3]
+        credited = record_merge_outcome(repo_root, spec_id)
+        if credited:
+            logger.info(
+                "learning loop: merge of %s credited to %d ledger entrie(s)",
+                spec_id,
+                credited,
+            )
+    except Exception as exc:  # noqa: BLE001 - never break hook dispatch
+        logger.debug("could not credit merge to learning loop: %s", exc)
+
+
 class HookService:
     """Core service for managing event-driven hooks."""
 
@@ -503,6 +537,15 @@ class HookService:
             logger.error("[HookService] Failed to save executions: %s", e)
 
     # ── CRUD ──────────────────────────────────────────────────────────────
+
+    def active_hooks(self) -> list[Hook]:
+        """Active hooks as model objects, not dicts.
+
+        `list_hooks` serialises, which is right for the API and wrong for the
+        scheduler: it needs `Trigger.type` and `Trigger.cron_expression` as
+        typed values, and re-parsing dicts it just serialised would be silly.
+        """
+        return [h for h in self._hooks.values() if h.status == HookStatus.ACTIVE]
 
     def list_hooks(self, project_id: str | None = None) -> list[dict]:
         """List all hooks, optionally filtered by project."""
@@ -602,6 +645,12 @@ class HookService:
 
     async def emit_event(self, event: HookEvent) -> list[dict]:
         """Emit an event and execute matching hooks."""
+        # A merge is the strongest external signal the learning loop can get,
+        # and the observe phase runs too early to see it. Credited here rather
+        # than in one merge path, so every source of the verdict counts: the
+        # local `--merge`, a GitHub webhook, or continuous_ai closing a PR.
+        _credit_merge_to_learning_loop(event)
+
         results = []
         matching_hooks = [
             h

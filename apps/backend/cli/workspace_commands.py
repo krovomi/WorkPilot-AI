@@ -371,6 +371,27 @@ except ImportError:
 MODULE = "cli.workspace_commands"
 
 
+def _record_merge_for_learning(spec_name: str) -> None:
+    """Tell the learning loop that a human accepted this build.
+
+    The observe phase runs when the build ends, at which point nothing has been
+    merged — so `ExternalSignal.PR_MERGED` was declared and handled but never
+    once recorded. This is the moment it becomes knowable.
+
+    Swallows everything: a merge that worked must not be reported as failed
+    because the bookkeeping afterwards did not.
+    """
+    try:
+        from learning_loop.observe import record_merge_outcome
+
+        repo_root = Path(__file__).resolve().parents[3]
+        credited = record_merge_outcome(repo_root, spec_name)
+        if credited:
+            print(f"  learning: merge credited to {credited} ledger entrie(s)")
+    except Exception:  # noqa: BLE001 - never fail a merge over bookkeeping
+        pass
+
+
 def handle_merge_command(
     project_dir: Path,
     spec_name: str,
@@ -398,6 +419,9 @@ def handle_merge_command(
             _ut_record_merge(project_dir, automatic=False)
         except Exception:
             pass
+
+    if success:
+        _record_merge_for_learning(spec_name)
 
     # Generate commit message suggestion if staging succeeded (no_commit mode)
     if success and no_commit:

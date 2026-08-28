@@ -1801,6 +1801,26 @@ def _log_llm_context_switch(
         logger.debug("Could not record LLM context switch: %s", e)
 
 
+# The tier aliases the SDK understands. On Anthropic they are a deliberate
+# cost choice — run the cheap read-only specialists on Sonnet even when the
+# parent is on Opus. Anywhere else they are just an unknown model id.
+_ANTHROPIC_TIER_ALIASES = frozenset({"sonnet", "opus", "haiku"})
+
+
+def _portable_subagent_model(model: str | None) -> str:
+    """Translate a roster's model hint for a non-Anthropic provider.
+
+    The registry in `agents/subagents/` is provider-agnostic by design, but its
+    specs name a tier the way the Claude SDK does. Handing "sonnet" to Copilot
+    costs a `400 model_not_supported` round-trip per subagent before the
+    fallback rescues it, so the alias is resolved to "inherit" here: the
+    specialist runs on whatever model the user actually chose.
+    """
+    if not model:
+        return "inherit"
+    return "inherit" if model.lower() in _ANTHROPIC_TIER_ALIASES else model
+
+
 def create_agent_client(
     project_dir: Path,
     spec_dir: Path,
@@ -1913,9 +1933,15 @@ def create_agent_client(
                         description=getattr(defn, "description", ""),
                         prompt=getattr(defn, "prompt", ""),
                         tools=getattr(defn, "tools", []),
-                        model=getattr(defn, "model", "inherit"),
+                        model=_portable_subagent_model(
+                            getattr(defn, "model", "inherit")
+                        ),
                     )
                 elif isinstance(defn, dict):
+                    defn = dict(defn)
+                    defn["model"] = _portable_subagent_model(
+                        defn.get("model", "inherit")
+                    )
                     copilot_agents[name] = SubagentDefinition(**defn)
 
         # Get allowed tools for the agent type
