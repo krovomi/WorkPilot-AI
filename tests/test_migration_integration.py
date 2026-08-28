@@ -648,19 +648,27 @@ function Component{i}() {{
             validation_passed=False,
         )
 
-        # Enhance with LLM (if API key available)
+        # The transformer no longer holds a provider client to gate on — the
+        # sanctioned factory resolves credentials at call time. Stubbing the
+        # one completion keeps this a test of the enhancement contract rather
+        # than of whoever happens to be authenticated on this machine.
         llm_transformer = LLMTransformer(temp_project)
-        if llm_transformer.client:
-            enhanced = await llm_transformer.enhance_transformation(
-                base_result,
-                "react",
-                "vue",
-                "react_to_vue.md",
-            )
 
-            assert enhanced.confidence >= base_result.confidence
-            assert hasattr(enhanced, 'llm_enhanced') and enhanced.llm_enhanced
-            assert len(enhanced.after) > 0
+        async def enhanced_answer(_prompt):
+            return "<template><div>Enhanced transformation</div></template>"
+
+        llm_transformer._query = enhanced_answer
+
+        enhanced = await llm_transformer.enhance_transformation(
+            base_result,
+            "react",
+            "vue",
+            "react_to_vue.md",
+        )
+
+        assert enhanced.confidence >= base_result.confidence
+        assert hasattr(enhanced, 'llm_enhanced') and enhanced.llm_enhanced
+        assert len(enhanced.after) > 0
 
     def test_migration_with_auto_fix(self, temp_project):
         """Test migration with auto-fix loop integration."""

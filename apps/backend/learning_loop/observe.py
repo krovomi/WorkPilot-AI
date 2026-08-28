@@ -47,6 +47,7 @@ from .skill_proposer import (
     evaluate,
     ledger_path,
     record_outcome,
+    record_signal_for_build,
     write_proposal,
 )
 
@@ -58,6 +59,7 @@ __all__ = [
     "ObserveReport",
     "signals_from_outcome",
     "run_observe",
+    "record_merge_outcome",
     "GOLDEN_RELPATH",
 ]
 
@@ -148,7 +150,14 @@ def _agents_for(pattern: Any) -> list[str]:
         "coding": ["code-reviewer", "test-runner"],
         "qa_review": ["qa-acceptance-checker", "test-runner"],
         "qa_fixing": ["test-runner"],
-        "planning": ["spec-explorer"],
+        "planning": ["spec-explorer", "dependency-tracer"],
+        # The rosters the registry grew for the features outside the build.
+        # Without these rows a lesson mined from a review or an ideation run
+        # was attributed to nobody and silently dropped — the same reason the
+        # four rows above exist.
+        "review": ["security-auditor", "regression-hunter"],
+        "research": ["codebase-surveyor", "evidence-collector"],
+        "spec": ["prior-art-finder", "constraint-collector"],
     }
     return phase_agents.get(getattr(pattern, "agent_phase", ""), [])
 
@@ -232,6 +241,27 @@ def run_observe(
     except Exception as exc:  # noqa: BLE001 - observation must not break a build
         logger.warning("observe phase failed, build unaffected: %s", exc)
     return report
+
+
+def record_merge_outcome(repo_root: Path, spec_id: str) -> int:
+    """Credit a build with the one verdict the observe phase cannot see.
+
+    `run_observe` fires when the build ends, and at that moment nobody has
+    merged anything — which is why `ExternalSignal.PR_MERGED` was declared,
+    handled by `signals_from_outcome`, and never once recorded.
+
+    A merge is the most expensive signal in the set and the hardest to fake: a
+    person read the diff and accepted it. Counting it requires no new
+    machinery, only calling this when the merge actually happens.
+
+    Returns the number of ledger entries credited — 0 when the build taught
+    nothing, which is the ordinary case and not an error.
+    """
+    try:
+        return record_signal_for_build(repo_root, spec_id, ExternalSignal.PR_MERGED)
+    except Exception as exc:  # noqa: BLE001 - never propagate into a merge
+        logger.warning("could not record merge outcome for %s: %s", spec_id, exc)
+        return 0
 
 
 def _evidence_for(

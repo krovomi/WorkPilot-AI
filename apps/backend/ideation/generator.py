@@ -49,6 +49,22 @@ IDEATION_TYPE_PROMPTS = {
 }
 
 
+def _learning_context(project_dir) -> str:
+    """Lessons the learning loop has recorded for research-type agents.
+
+    Empty string when there is nothing recorded, which is the ordinary case on
+    a fresh project. Never raises: a missing lesson is a worse prompt, an
+    exception is a failed run.
+    """
+    try:
+        from learning_loop.prompt_injection import context_for_agent
+
+        context = context_for_agent(project_dir, "ideation")
+        return f"\n\n---\n\n{context}\n" if context.strip() else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 class IdeationGenerator:
     """Generates ideas using AI agents."""
 
@@ -89,6 +105,11 @@ class IdeationGenerator:
 
         if additional_context:
             prompt += f"\n{additional_context}\n"
+
+        # What previous runs established. Without this an ideation pass
+        # rediscovers the same findings every time it runs, and the user reads
+        # the same suggestion they already rejected last month.
+        prompt += _learning_context(self.project_dir)
 
         client = create_agent_client(
             project_dir=self.project_dir,

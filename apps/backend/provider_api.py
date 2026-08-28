@@ -228,11 +228,28 @@ async def lifespan(app: FastAPI):
             f"Could not initialize analytics database: {e}"
         )
 
+    # The loop that makes scheduled hooks fire. Until it existed, a hook could
+    # carry a cron expression that nothing ever evaluated — see
+    # services/hooks/scheduler.py.
+    try:
+        from services.hooks.scheduler import start_hook_scheduler
+
+        start_hook_scheduler()
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Could not start hook scheduler: {e}")
+
     logging.getLogger(__name__).debug(
         "Backend started without WebSocket (disabled for stability)"
     )
 
     yield
+
+    try:
+        from services.hooks.scheduler import stop_hook_scheduler
+
+        await stop_hook_scheduler()
+    except Exception as e:
+        logging.getLogger(__name__).debug(f"Hook scheduler shutdown: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
