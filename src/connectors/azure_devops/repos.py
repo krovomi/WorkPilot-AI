@@ -399,15 +399,11 @@ class AzureReposClient:
 
         pr_reviewers = None
         if reviewers:
-            pr_reviewers = [
-                IdentityRefWithVote(unique_name=name) for name in reviewers
-            ]
+            pr_reviewers = [IdentityRefWithVote(unique_name=name) for name in reviewers]
 
         pr_work_items = None
         if work_item_ids:
-            pr_work_items = [
-                ResourceRef(id=str(wid)) for wid in work_item_ids
-            ]
+            pr_work_items = [ResourceRef(id=str(wid)) for wid in work_item_ids]
 
         pr_to_create = GitPullRequest(
             source_ref_name=source_branch,
@@ -435,8 +431,7 @@ class AzureReposClient:
                     repository_id=repository_id, project=project
                 ) from exc
             raise APIError(
-                f"Failed to create pull request in repository "
-                f"'{repository_id}': {exc}"
+                f"Failed to create pull request in repository '{repository_id}': {exc}"
             ) from exc
 
         pull_request = PullRequest.from_api_response(api_pr)
@@ -541,26 +536,26 @@ class AzureReposClient:
                 project=project,
                 pull_request_id=pull_request_id,
             )
-            
+
             # Get the iteration changes to see file differences
             api_iterations = git_client.get_pull_request_iterations(
                 repository_id=repository_id,
                 project=project,
                 pull_request_id=pull_request_id,
             )
-            
+
             # Get the latest iteration's changes
             latest_iteration = api_iterations[-1] if api_iterations else None
             if not latest_iteration:
                 return []
-                
+
             api_changes = git_client.get_pull_request_iteration_changes(
                 repository_id=repository_id,
                 project=project,
                 pull_request_id=pull_request_id,
                 iteration_id=latest_iteration.id,
             )
-            
+
         except AzureDevOpsError:
             raise
         except Exception as exc:
@@ -616,15 +611,15 @@ class AzureReposClient:
 
         # Get PR details
         pr = self.get_pull_request(project, repository_id, pull_request_id)
-        
+
         # Get file changes
         files = self.get_pull_request_files(project, repository_id, pull_request_id)
-        
+
         # Calculate statistics
         additions = sum(file.additions for file in files)
         deletions = sum(file.deletions for file in files)
         changes = sum(file.changes for file in files)
-        
+
         return {
             "id": pr.pull_request_id,
             "title": pr.title,
@@ -632,9 +627,7 @@ class AzureReposClient:
             "status": pr.status,
             "sourceRefName": pr.source_branch,
             "targetRefName": pr.target_branch,
-            "createdBy": {
-                "displayName": pr.created_by
-            } if pr.created_by else None,
+            "createdBy": {"displayName": pr.created_by} if pr.created_by else None,
             "creationDate": pr.creation_date.isoformat() if pr.creation_date else None,
             "isDraft": pr.is_draft,
             "mergeStatus": pr.merge_status,
@@ -650,8 +643,8 @@ class AzureReposClient:
                     "additions": file.additions,
                     "deletions": file.deletions,
                     "changes": file.changes,
-                    "oldPath": file.old_path
+                    "oldPath": file.old_path,
                 }
                 for file in files
-            ]
+            ],
         }

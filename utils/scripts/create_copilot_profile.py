@@ -10,42 +10,48 @@ from urllib.parse import urlparse
 
 def create_copilot_profile():
     """Create a Copilot profile in the profiles file"""
-    
+
     # Find the profiles file location
     home_dir = Path.home()
     profiles_dir = home_dir / ".claude-ebp" / "profiles"
     profiles_file = profiles_dir / "profiles.json"
-    
+
     if not profiles_file.exists():
         print(f"❌ Profiles file not found at {profiles_file}")
         return False
-    
+
     # Read existing profiles
     try:
-        with open(profiles_file, encoding='utf-8') as f:
+        with open(profiles_file, encoding="utf-8") as f:
             profiles_data = json.load(f)
     except Exception as e:
         print(f"❌ Error reading profiles file: {e}")
         return False
-    
+
     # Check if Copilot profile already exists
     existing_copilot = None
-    for profile in profiles_data.get('profiles', []):
-        host = (urlparse(profile.get('baseUrl', '')).hostname or '').lower()
-        if 'copilot' in profile.get('name', '').lower() or host == 'github.com' or host.endswith('.github.com'):
+    for profile in profiles_data.get("profiles", []):
+        host = (urlparse(profile.get("baseUrl", "")).hostname or "").lower()
+        if (
+            "copilot" in profile.get("name", "").lower()
+            or host == "github.com"
+            or host.endswith(".github.com")
+        ):
             existing_copilot = profile
             break
-    
+
     if existing_copilot:
-        print(f"✅ Copilot profile already exists: {existing_copilot.get('name', 'Unknown')}")
+        print(
+            f"✅ Copilot profile already exists: {existing_copilot.get('name', 'Unknown')}"
+        )
         print(f"   ID: {existing_copilot.get('id', 'Unknown')}")
         print(f"   Base URL: {existing_copilot.get('baseUrl', 'Unknown')}")
         return True
-    
+
     # Create new Copilot profile
     import uuid
     from datetime import datetime
-    
+
     copilot_profile = {
         "id": str(uuid.uuid4()),
         "name": "GitHub Copilot",
@@ -53,30 +59,31 @@ def create_copilot_profile():
         "apiKey": "copilot-cli-key",  # Placeholder key
         "models": ["gpt-4o", "claude-3.5-sonnet"],
         "createdAt": datetime.now().isoformat(),
-        "updatedAt": datetime.now().isoformat()
+        "updatedAt": datetime.now().isoformat(),
     }
-    
+
     # Add to profiles
-    if 'profiles' not in profiles_data:
-        profiles_data['profiles'] = []
-    
-    profiles_data['profiles'].append(copilot_profile)
-    
+    if "profiles" not in profiles_data:
+        profiles_data["profiles"] = []
+
+    profiles_data["profiles"].append(copilot_profile)
+
     # Save back to file
     try:
-        with open(profiles_file, 'w', encoding='utf-8') as f:
+        with open(profiles_file, "w", encoding="utf-8") as f:
             json.dump(profiles_data, f, indent=2, ensure_ascii=False)
-        
+
         print("✅ Created Copilot profile:")
         print(f"   ID: {copilot_profile['id']}")
         print(f"   Name: {copilot_profile['name']}")
         print(f"   Base URL: {copilot_profile['baseUrl']}")
         print(f"   File: {profiles_file}")
         return True
-        
+
     except Exception as e:
         print(f"❌ Error saving profiles file: {e}")
         return False
+
 
 if __name__ == "__main__":
     print("🔧 Creating Copilot API profile...")

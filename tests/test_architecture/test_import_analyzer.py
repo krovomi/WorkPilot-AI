@@ -137,8 +137,7 @@ class TestJSTSImportParsing:
     def test_parse_require(self, tmp_project):
         """Should parse require() calls."""
         (tmp_project / "app.js").write_text(
-            "const fs = require('fs');\n"
-            "const helper = require('./helpers/utils');\n",
+            "const fs = require('fs');\nconst helper = require('./helpers/utils');\n",
             encoding="utf-8",
         )
         analyzer = ImportAnalyzer(tmp_project, _make_config())
@@ -177,8 +176,7 @@ class TestJSTSImportParsing:
     def test_skips_comments(self, tmp_project):
         """Should skip commented import lines."""
         (tmp_project / "app.ts").write_text(
-            "// import { old } from 'deprecated';\n"
-            "import { current } from 'active';\n",
+            "// import { old } from 'deprecated';\nimport { current } from 'active';\n",
             encoding="utf-8",
         )
         analyzer = ImportAnalyzer(tmp_project, _make_config())
@@ -341,7 +339,10 @@ class TestForbiddenImports:
 
         assert len(violations) == 1
         assert violations[0].type == "forbidden_import"
-        assert "prisma" in violations[0].import_target.lower() or "prisma" in violations[0].description.lower()
+        assert (
+            "prisma" in violations[0].import_target.lower()
+            or "prisma" in violations[0].description.lower()
+        )
 
     def test_no_false_positive_for_allowed_imports(self, tmp_project):
         """Should not flag imports that don't match the forbidden pattern."""

@@ -71,9 +71,7 @@ _UNDETECTED_ATTACKS: list[str] = [
 
 
 @pytest.mark.parametrize("payload", _DETECTED_ATTACKS)
-def test_known_attacks_are_flagged(
-    scanner: InjectionScanner, payload: str
-) -> None:
+def test_known_attacks_are_flagged(scanner: InjectionScanner, payload: str) -> None:
     result = scanner.scan(payload, source="tool_output")
     assert result.threat_level != ThreatLevel.CLEAN, (
         f"{payload!r} was not flagged; findings={result.findings}"
@@ -85,9 +83,7 @@ def test_known_attacks_are_flagged(
     strict=False,
 )
 @pytest.mark.parametrize("payload", _UNDETECTED_ATTACKS)
-def test_currently_undetected_attacks(
-    scanner: InjectionScanner, payload: str
-) -> None:
+def test_currently_undetected_attacks(scanner: InjectionScanner, payload: str) -> None:
     """Gap tracker: when the scanner grows to catch these the xfail
     will flip to xpassed and demand the marker be removed."""
     result = scanner.scan(payload, source="tool_output")
@@ -111,13 +107,10 @@ _BENIGN: list[str] = [
 
 
 @pytest.mark.parametrize("payload", _BENIGN)
-def test_benign_input_stays_clean(
-    scanner: InjectionScanner, payload: str
-) -> None:
+def test_benign_input_stays_clean(scanner: InjectionScanner, payload: str) -> None:
     result = scanner.scan(payload, source="tool_output")
     assert result.threat_level == ThreatLevel.CLEAN, (
-        f"false positive on benign input: {payload!r} "
-        f"findings={result.findings}"
+        f"false positive on benign input: {payload!r} findings={result.findings}"
     )
 
 

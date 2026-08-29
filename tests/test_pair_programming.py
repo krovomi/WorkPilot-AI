@@ -39,10 +39,12 @@ from apps.backend.agents.pair_programming import (
 # UserComment
 # -----------------------------------------------------------------------
 
+
 class TestUserComment:
     def test_create_comment(self):
         comment = UserComment(
-            comment_id="c1", step_index=0,
+            comment_id="c1",
+            step_index=0,
             content="Use bcrypt instead of md5",
         )
         assert comment.content == "Use bcrypt instead of md5"
@@ -59,12 +61,16 @@ class TestUserComment:
 # CodeSuggestion
 # -----------------------------------------------------------------------
 
+
 class TestCodeSuggestion:
     def test_create_suggestion(self):
         sug = CodeSuggestion(
-            suggestion_id="s1", file_path="f.py",
-            line_start=10, line_end=15,
-            original_code="old", suggested_code="new",
+            suggestion_id="s1",
+            file_path="f.py",
+            line_start=10,
+            line_end=15,
+            original_code="old",
+            suggested_code="new",
             explanation="Better approach",
         )
         assert sug.status == SuggestionStatus.PENDING
@@ -80,11 +86,14 @@ class TestCodeSuggestion:
 # PlanStep
 # -----------------------------------------------------------------------
 
+
 class TestPlanStep:
     def test_create_step(self):
         step = PlanStep(
-            index=0, step_type=StepType.CODE,
-            title="Implement login", file_path="src/login.py",
+            index=0,
+            step_type=StepType.CODE,
+            title="Implement login",
+            file_path="src/login.py",
         )
         assert step.step_type == StepType.CODE
         assert step.status == StepStatus.PROPOSED
@@ -98,10 +107,15 @@ class TestPlanStep:
 
     def test_step_from_dict(self):
         d = {
-            "index": 0, "step_type": "code", "title": "T",
-            "description": "D", "file_path": "f.py",
-            "code_preview": "", "status": "approved",
-            "user_comments": [], "suggestions": [],
+            "index": 0,
+            "step_type": "code",
+            "title": "T",
+            "description": "D",
+            "file_path": "f.py",
+            "code_preview": "",
+            "status": "approved",
+            "user_comments": [],
+            "suggestions": [],
             "metadata": {},
         }
         step = PlanStep.from_dict(d)
@@ -112,6 +126,7 @@ class TestPlanStep:
 # -----------------------------------------------------------------------
 # PairProgrammingPlan
 # -----------------------------------------------------------------------
+
 
 class TestPairProgrammingPlan:
     def test_create_plan(self):
@@ -129,7 +144,12 @@ class TestPairProgrammingPlan:
         plan = PairProgrammingPlan(
             task="T",
             steps=[
-                PlanStep(index=0, step_type=StepType.CODE, title="S1", status=StepStatus.COMPLETED),
+                PlanStep(
+                    index=0,
+                    step_type=StepType.CODE,
+                    title="S1",
+                    status=StepStatus.COMPLETED,
+                ),
                 PlanStep(index=1, step_type=StepType.CODE, title="S2"),
             ],
         )
@@ -147,10 +167,12 @@ class TestPairProgrammingPlan:
 # PairProgrammingSession — plan management
 # -----------------------------------------------------------------------
 
+
 class TestSessionPlanManagement:
     def setup_method(self):
         self.session = PairProgrammingSession(
-            project_id="p1", task="Add login page",
+            project_id="p1",
+            task="Add login page",
         )
 
     def test_propose_plan_default(self):
@@ -159,10 +181,16 @@ class TestSessionPlanManagement:
         assert plan.total_steps >= 2
 
     def test_propose_plan_custom_steps(self):
-        plan = self.session.propose_plan(steps=[
-            {"step_type": "code", "title": "Write component", "file_path": "src/Login.tsx"},
-            {"step_type": "test", "title": "Write tests"},
-        ])
+        plan = self.session.propose_plan(
+            steps=[
+                {
+                    "step_type": "code",
+                    "title": "Write component",
+                    "file_path": "src/Login.tsx",
+                },
+                {"step_type": "test", "title": "Write tests"},
+            ]
+        )
         assert plan.total_steps == 2
         assert plan.steps[0].step_type == StepType.CODE
 
@@ -177,20 +205,26 @@ class TestSessionPlanManagement:
         assert result is False
 
     def test_modify_plan_add_steps(self):
-        self.session.propose_plan(steps=[
-            {"step_type": "code", "title": "Step 1"},
-        ])
-        modified = self.session.modify_plan(add_steps=[
-            {"step_type": "test", "title": "Step 2"},
-        ])
+        self.session.propose_plan(
+            steps=[
+                {"step_type": "code", "title": "Step 1"},
+            ]
+        )
+        modified = self.session.modify_plan(
+            add_steps=[
+                {"step_type": "test", "title": "Step 2"},
+            ]
+        )
         assert modified.total_steps == 2
 
     def test_modify_plan_remove_steps(self):
-        self.session.propose_plan(steps=[
-            {"step_type": "code", "title": "Step A"},
-            {"step_type": "test", "title": "Step B"},
-            {"step_type": "review", "title": "Step C"},
-        ])
+        self.session.propose_plan(
+            steps=[
+                {"step_type": "code", "title": "Step A"},
+                {"step_type": "test", "title": "Step B"},
+                {"step_type": "review", "title": "Step C"},
+            ]
+        )
         modified = self.session.modify_plan(remove_indices=[1])
         assert modified.total_steps == 2
 
@@ -199,14 +233,17 @@ class TestSessionPlanManagement:
 # PairProgrammingSession — step execution
 # -----------------------------------------------------------------------
 
+
 class TestSessionStepExecution:
     def setup_method(self):
         self.session = PairProgrammingSession(project_id="p1", task="T")
-        self.session.propose_plan(steps=[
-            {"step_type": "plan", "title": "Analyze"},
-            {"step_type": "code", "title": "Implement"},
-            {"step_type": "test", "title": "Test"},
-        ])
+        self.session.propose_plan(
+            steps=[
+                {"step_type": "plan", "title": "Analyze"},
+                {"step_type": "code", "title": "Implement"},
+                {"step_type": "test", "title": "Test"},
+            ]
+        )
 
     def test_preview_step(self):
         step = self.session.preview_step(0)
@@ -244,12 +281,15 @@ class TestSessionStepExecution:
 # PairProgrammingSession — user interaction
 # -----------------------------------------------------------------------
 
+
 class TestSessionUserInteraction:
     def setup_method(self):
         self.session = PairProgrammingSession(project_id="p1", task="T")
-        self.session.propose_plan(steps=[
-            {"step_type": "code", "title": "Implement"},
-        ])
+        self.session.propose_plan(
+            steps=[
+                {"step_type": "code", "title": "Implement"},
+            ]
+        )
 
     def test_add_user_comment(self):
         comment = self.session.add_user_comment(0, "Use async/await")
@@ -285,16 +325,25 @@ class TestSessionUserInteraction:
 # PairProgrammingSession — suggestions
 # -----------------------------------------------------------------------
 
+
 class TestSessionSuggestions:
     def setup_method(self):
         self.session = PairProgrammingSession(project_id="p1", task="T")
-        self.session.propose_plan(steps=[
-            {"step_type": "code", "title": "Implement"},
-        ])
+        self.session.propose_plan(
+            steps=[
+                {"step_type": "code", "title": "Implement"},
+            ]
+        )
 
     def test_add_suggestion(self):
         sug = self.session.add_suggestion(
-            0, "f.py", 10, 15, "old_code", "new_code", "Better approach",
+            0,
+            "f.py",
+            10,
+            15,
+            "old_code",
+            "new_code",
+            "Better approach",
         )
         assert sug is not None
         assert sug.status == SuggestionStatus.PENDING
@@ -318,13 +367,16 @@ class TestSessionSuggestions:
 # PairProgrammingSession — progress & lifecycle
 # -----------------------------------------------------------------------
 
+
 class TestSessionProgress:
     def setup_method(self):
         self.session = PairProgrammingSession(project_id="p1", task="T")
-        self.session.propose_plan(steps=[
-            {"step_type": "code", "title": "S1"},
-            {"step_type": "test", "title": "S2"},
-        ])
+        self.session.propose_plan(
+            steps=[
+                {"step_type": "code", "title": "S1"},
+                {"step_type": "test", "title": "S2"},
+            ]
+        )
 
     def test_get_progress(self):
         progress = self.session.get_progress()
@@ -354,6 +406,7 @@ class TestSessionProgress:
 # -----------------------------------------------------------------------
 # PairProgrammingSession — serialization
 # -----------------------------------------------------------------------
+
 
 class TestSessionSerialization:
     def test_to_dict(self):

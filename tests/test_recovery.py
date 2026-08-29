@@ -320,9 +320,7 @@ def test_mark_subtask_stuck_no_plan_file(test_env):
     # Should be a no-op for the plan, and still record the stuck entry.
     manager.mark_subtask_stuck("subtask-x", "no plan present")
 
-    assert any(
-        s["subtask_id"] == "subtask-x" for s in manager.get_stuck_subtasks()
-    )
+    assert any(s["subtask_id"] == "subtask-x" for s in manager.get_stuck_subtasks())
 
 
 def test_recovery_hints(test_env):

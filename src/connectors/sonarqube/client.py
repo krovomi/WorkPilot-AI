@@ -128,9 +128,11 @@ class SonarQubeClient:
 
         self._session = requests.Session()
         self._session.auth = (self._token, "")
-        self._session.headers.update({
-            "Accept": "application/json",
-        })
+        self._session.headers.update(
+            {
+                "Accept": "application/json",
+            }
+        )
 
         try:
             response = self._session.get(
@@ -150,9 +152,7 @@ class SonarQubeClient:
                 f"Cannot connect to SonarQube at '{self.base_url}': {exc}"
             ) from exc
         except requests.exceptions.RequestException as exc:
-            raise SonarQubeAPIError(
-                f"Failed to connect to SonarQube: {exc}"
-            ) from exc
+            raise SonarQubeAPIError(f"Failed to connect to SonarQube: {exc}") from exc
 
         self._connected = True
         logger.info("Successfully connected to SonarQube.")
@@ -207,9 +207,7 @@ class SonarQubeClient:
                 timeout=timeout,
             )
         except requests.exceptions.RequestException as exc:
-            raise SonarQubeAPIError(
-                f"Request to {endpoint} failed: {exc}"
-            ) from exc
+            raise SonarQubeAPIError(f"Request to {endpoint} failed: {exc}") from exc
 
         if response.status_code == 401 or response.status_code == 403:
             raise SonarQubeAuthenticationError(
@@ -224,9 +222,7 @@ class SonarQubeClient:
             )
             if project_key:
                 raise SonarQubeProjectNotFoundError(project_key)
-            raise SonarQubeAPIError(
-                f"Resource not found: {endpoint}", status_code=404
-            )
+            raise SonarQubeAPIError(f"Resource not found: {endpoint}", status_code=404)
 
         if response.status_code >= 400:
             error_body = ""

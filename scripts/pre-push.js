@@ -227,13 +227,18 @@ const ruffPath = findVenvBin(ROOT, "ruff");
 const jobs = [];
 
 if (ruffPath) {
-	jobs.push(runJob("backend:ruff", ruffPath, ["check", "apps/backend/"]));
+	// Same set as the CI job. `tests/`, `src/` and `utils/` were checked by
+	// neither, which is how they reached 11 lint errors and 169 unformatted
+	// files while apps/backend/ stayed clean.
+	const PYTHON_LINT_PATHS = ["apps/backend/", "tests/", "src/", "utils/"];
+
+	jobs.push(runJob("backend:ruff", ruffPath, ["check", ...PYTHON_LINT_PATHS]));
 	// Mirrors the CI "ruff format check" step — a check-only `ruff check`
 	// does NOT catch formatting drift, which is exactly what broke CI.
 	jobs.push(
 		runJob("backend:ruff-format", ruffPath, [
 			"format",
-			"apps/backend/",
+			...PYTHON_LINT_PATHS,
 			"--check",
 		]),
 	);

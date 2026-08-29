@@ -164,7 +164,11 @@ class TestVisualTestGenerator:
 
         assert len(tests) >= 1
         code_lower = tests[0].test_code.lower()
-        assert "1280" in tests[0].test_code or "desktop" in code_lower or "viewport" in code_lower
+        assert (
+            "1280" in tests[0].test_code
+            or "desktop" in code_lower
+            or "viewport" in code_lower
+        )
 
 
 class TestDesignSpec:
@@ -276,6 +280,7 @@ class TestDesignToCodeService:
         with patch.dict("os.environ", {}, clear=True):
             # Remove any API keys
             import os
+
             for key in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]:
                 os.environ.pop(key, None)
 
@@ -299,6 +304,7 @@ class TestDesignToCodeService:
 
         with patch.dict("os.environ", {}, clear=True):
             import os
+
             for key in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]:
                 os.environ.pop(key, None)
 
@@ -315,6 +321,7 @@ class TestDesignToCodeService:
         """Should generate visual tests when enabled."""
         with patch.dict("os.environ", {}, clear=True):
             import os
+
             for key in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]:
                 os.environ.pop(key, None)
 
@@ -332,6 +339,7 @@ class TestDesignToCodeService:
         """Should skip visual tests when disabled."""
         with patch.dict("os.environ", {}, clear=True):
             import os
+
             for key in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]:
                 os.environ.pop(key, None)
 
@@ -349,6 +357,7 @@ class TestDesignToCodeService:
         """Should generate Vue code when vue framework is specified."""
         with patch.dict("os.environ", {}, clear=True):
             import os
+
             for key in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]:
                 os.environ.pop(key, None)
 
@@ -365,6 +374,7 @@ class TestDesignToCodeService:
         """Should record pipeline execution duration."""
         with patch.dict("os.environ", {}, clear=True):
             import os
+
             for key in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]:
                 os.environ.pop(key, None)
 
@@ -386,10 +396,11 @@ class TestFigmaConnector:
         import os
         import sys
         from pathlib import Path
+
         project_root = Path(__file__).parent.parent.parent
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))
-        
+
         from src.connectors.figma_connector import FigmaConnector
 
         result = FigmaConnector.parse_figma_url(
@@ -406,10 +417,11 @@ class TestFigmaConnector:
         import os
         import sys
         from pathlib import Path
+
         project_root = Path(__file__).parent.parent.parent
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))
-        
+
         from src.connectors.figma_connector import FigmaConnector
 
         result = FigmaConnector.parse_figma_url(
@@ -426,10 +438,11 @@ class TestFigmaConnector:
         import os
         import sys
         from pathlib import Path
+
         project_root = Path(__file__).parent.parent.parent
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))
-        
+
         from src.connectors.figma_connector import FigmaConnector
 
         result = FigmaConnector.parse_figma_url("https://google.com")
@@ -442,14 +455,16 @@ class TestFigmaConnector:
         import os
         import sys
         from pathlib import Path
+
         project_root = Path(__file__).parent.parent.parent
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))
-        
+
         from src.connectors.figma_connector import FigmaConnector
 
         with patch.dict("os.environ", {}, clear=True):
             import os
+
             os.environ.pop("FIGMA_ACCESS_TOKEN", None)
             connector = FigmaConnector(access_token="")
             assert connector.is_configured() is False
@@ -461,10 +476,11 @@ class TestFigmaConnector:
         import os
         import sys
         from pathlib import Path
+
         project_root = Path(__file__).parent.parent.parent
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))
-        
+
         from src.connectors.figma_connector import FigmaConnector
 
         connector = FigmaConnector(access_token="test-token-123")
@@ -477,10 +493,11 @@ class TestFigmaConnector:
         import os
         import sys
         from pathlib import Path
+
         project_root = Path(__file__).parent.parent.parent
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))
-        
+
         from src.connectors.figma_connector import FigmaConnector
 
         assert FigmaConnector._to_token_name("Color/Primary/500") == "color-primary-500"

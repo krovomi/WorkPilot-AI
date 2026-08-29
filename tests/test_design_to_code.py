@@ -41,17 +41,22 @@ from design_to_code.visual_diff import (
 # =========================================================================
 
 
-def _make_grid(width: int, height: int, color: tuple[int, int, int] = (255, 255, 255)) -> PixelGrid:
+def _make_grid(
+    width: int, height: int, color: tuple[int, int, int] = (255, 255, 255)
+) -> PixelGrid:
     """Create a solid-color pixel grid."""
     return [[color for _ in range(width)] for _ in range(height)]
 
 
 def _make_grid_with_region(
-    width: int, height: int,
+    width: int,
+    height: int,
     base: tuple[int, int, int] = (255, 255, 255),
     region_color: tuple[int, int, int] = (0, 0, 0),
-    region_x: int = 0, region_y: int = 0,
-    region_w: int = 10, region_h: int = 10,
+    region_x: int = 0,
+    region_y: int = 0,
+    region_w: int = 10,
+    region_h: int = 10,
 ) -> PixelGrid:
     """Create a grid with a colored region."""
     grid = _make_grid(width, height, base)
@@ -92,7 +97,9 @@ class TestVisualDiffEngine:
     def test_partial_diff(self):
         engine = VisualDiffEngine(VisualDiffConfig(tolerance_per_pixel=0))
         design = _make_grid(100, 100, (255, 255, 255))
-        rendered = _make_grid_with_region(100, 100, region_color=(0, 0, 0), region_w=10, region_h=10)
+        rendered = _make_grid_with_region(
+            100, 100, region_color=(0, 0, 0), region_w=10, region_h=10
+        )
         result = engine.compare(design, rendered, 100, 100)
         assert 0.0 < result.overall_similarity < 1.0
         assert result.diff_pixel_count == 100  # 10x10 region
@@ -155,10 +162,20 @@ class TestSemanticDiffAnalyzer:
     def test_perfect_match(self):
         analyzer = SemanticDiffAnalyzer()
         design = [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Submit", region="content"),
+            ComponentSpec(
+                id="btn1",
+                component_type=ComponentType.BUTTON,
+                text="Submit",
+                region="content",
+            ),
         ]
         code = [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Submit", region="content"),
+            ComponentSpec(
+                id="btn1",
+                component_type=ComponentType.BUTTON,
+                text="Submit",
+                region="content",
+            ),
         ]
         result = analyzer.compare(design, code)
         assert result.matched == 1
@@ -167,11 +184,15 @@ class TestSemanticDiffAnalyzer:
     def test_missing_component(self):
         analyzer = SemanticDiffAnalyzer()
         design = [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Submit"),
+            ComponentSpec(
+                id="btn1", component_type=ComponentType.BUTTON, text="Submit"
+            ),
             ComponentSpec(id="icon1", component_type=ComponentType.ICON, text="search"),
         ]
         code = [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Submit"),
+            ComponentSpec(
+                id="btn1", component_type=ComponentType.BUTTON, text="Submit"
+            ),
         ]
         result = analyzer.compare(design, code)
         assert result.missing == 1
@@ -180,11 +201,17 @@ class TestSemanticDiffAnalyzer:
     def test_extra_component(self):
         analyzer = SemanticDiffAnalyzer()
         design = [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Submit"),
+            ComponentSpec(
+                id="btn1", component_type=ComponentType.BUTTON, text="Submit"
+            ),
         ]
         code = [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Submit"),
-            ComponentSpec(id="extra1", component_type=ComponentType.TEXT, text="Debug info"),
+            ComponentSpec(
+                id="btn1", component_type=ComponentType.BUTTON, text="Submit"
+            ),
+            ComponentSpec(
+                id="extra1", component_type=ComponentType.TEXT, text="Debug info"
+            ),
         ]
         result = analyzer.compare(design, code)
         assert result.extra == 1
@@ -192,7 +219,9 @@ class TestSemanticDiffAnalyzer:
     def test_content_mismatch(self):
         analyzer = SemanticDiffAnalyzer()
         design = [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Submit"),
+            ComponentSpec(
+                id="btn1", component_type=ComponentType.BUTTON, text="Submit"
+            ),
         ]
         code = [
             ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Send"),
@@ -205,13 +234,17 @@ class TestSemanticDiffAnalyzer:
         analyzer = SemanticDiffAnalyzer()
         design = [
             ComponentSpec(
-                id="btn1", component_type=ComponentType.BUTTON, text="OK",
+                id="btn1",
+                component_type=ComponentType.BUTTON,
+                text="OK",
                 styles={"background": "blue", "color": "white"},
             ),
         ]
         code = [
             ComponentSpec(
-                id="btn1", component_type=ComponentType.BUTTON, text="OK",
+                id="btn1",
+                component_type=ComponentType.BUTTON,
+                text="OK",
                 styles={"background": "red", "color": "white"},
             ),
         ]
@@ -221,10 +254,14 @@ class TestSemanticDiffAnalyzer:
     def test_position_off(self):
         analyzer = SemanticDiffAnalyzer(position_tolerance=5.0)
         design = [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="OK", x=100, y=200),
+            ComponentSpec(
+                id="btn1", component_type=ComponentType.BUTTON, text="OK", x=100, y=200
+            ),
         ]
         code = [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="OK", x=150, y=200),
+            ComponentSpec(
+                id="btn1", component_type=ComponentType.BUTTON, text="OK", x=150, y=200
+            ),
         ]
         result = analyzer.compare(design, code)
         assert any(d.action == DiffAction.POSITION_OFF for d in result.diffs)
@@ -232,7 +269,12 @@ class TestSemanticDiffAnalyzer:
     def test_correction_hints(self):
         analyzer = SemanticDiffAnalyzer()
         design = [
-            ComponentSpec(id="icon1", component_type=ComponentType.ICON, text="search", region="header"),
+            ComponentSpec(
+                id="icon1",
+                component_type=ComponentType.ICON,
+                text="search",
+                region="header",
+            ),
         ]
         code: list[ComponentSpec] = []
         result = analyzer.compare(design, code)
@@ -241,9 +283,12 @@ class TestSemanticDiffAnalyzer:
 
     def test_empty_design(self):
         analyzer = SemanticDiffAnalyzer()
-        result = analyzer.compare([], [
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON),
-        ])
+        result = analyzer.compare(
+            [],
+            [
+                ComponentSpec(id="btn1", component_type=ComponentType.BUTTON),
+            ],
+        )
         assert result.extra == 1
         assert result.total_components == 0
 
@@ -263,16 +308,56 @@ class TestSemanticDiffAnalyzer:
     def test_multiple_components(self):
         analyzer = SemanticDiffAnalyzer()
         design = [
-            ComponentSpec(id="h1", component_type=ComponentType.HEADER, text="Title", region="header"),
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Save", region="content"),
-            ComponentSpec(id="input1", component_type=ComponentType.INPUT, text="", region="content"),
-            ComponentSpec(id="footer1", component_type=ComponentType.FOOTER, text="© 2025", region="footer"),
+            ComponentSpec(
+                id="h1",
+                component_type=ComponentType.HEADER,
+                text="Title",
+                region="header",
+            ),
+            ComponentSpec(
+                id="btn1",
+                component_type=ComponentType.BUTTON,
+                text="Save",
+                region="content",
+            ),
+            ComponentSpec(
+                id="input1",
+                component_type=ComponentType.INPUT,
+                text="",
+                region="content",
+            ),
+            ComponentSpec(
+                id="footer1",
+                component_type=ComponentType.FOOTER,
+                text="© 2025",
+                region="footer",
+            ),
         ]
         code = [
-            ComponentSpec(id="h1", component_type=ComponentType.HEADER, text="Title", region="header"),
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Save", region="content"),
-            ComponentSpec(id="input1", component_type=ComponentType.INPUT, text="", region="content"),
-            ComponentSpec(id="footer1", component_type=ComponentType.FOOTER, text="© 2025", region="footer"),
+            ComponentSpec(
+                id="h1",
+                component_type=ComponentType.HEADER,
+                text="Title",
+                region="header",
+            ),
+            ComponentSpec(
+                id="btn1",
+                component_type=ComponentType.BUTTON,
+                text="Save",
+                region="content",
+            ),
+            ComponentSpec(
+                id="input1",
+                component_type=ComponentType.INPUT,
+                text="",
+                region="content",
+            ),
+            ComponentSpec(
+                id="footer1",
+                component_type=ComponentType.FOOTER,
+                text="© 2025",
+                region="footer",
+            ),
         ]
         result = analyzer.compare(design, code)
         assert result.fidelity_score == 1.0
@@ -290,7 +375,8 @@ class TestRenderLoop:
         return RenderResult(
             pixels=_make_grid(100, 100, (255, 255, 255)),
             components=[],
-            width=100, height=100,
+            width=100,
+            height=100,
             code=code,
         )
 
@@ -304,7 +390,8 @@ class TestRenderLoop:
         iterations = loop.run(
             design_pixels=design,
             design_components=[],
-            design_width=100, design_height=100,
+            design_width=100,
+            design_height=100,
             render_fn=self._mock_render,
             correct_fn=self._mock_correct,
             initial_code="<div>Hello</div>",
@@ -321,23 +408,32 @@ class TestRenderLoop:
             if call_count[0] == 1:
                 return RenderResult(
                     pixels=_make_grid(100, 100, (0, 0, 0)),
-                    components=[], width=100, height=100, code=code,
+                    components=[],
+                    width=100,
+                    height=100,
+                    code=code,
                 )
             return RenderResult(
                 pixels=_make_grid(100, 100, (255, 255, 255)),
-                components=[], width=100, height=100, code=code,
+                components=[],
+                width=100,
+                height=100,
+                code=code,
             )
 
-        loop = RenderLoop(RenderLoopConfig(
-            max_iterations=5,
-            target_similarity=0.95,
-            visual_diff_config=VisualDiffConfig(tolerance_per_pixel=0),
-        ))
+        loop = RenderLoop(
+            RenderLoopConfig(
+                max_iterations=5,
+                target_similarity=0.95,
+                visual_diff_config=VisualDiffConfig(tolerance_per_pixel=0),
+            )
+        )
         design = _make_grid(100, 100, (255, 255, 255))
         iterations = loop.run(
             design_pixels=design,
             design_components=[],
-            design_width=100, design_height=100,
+            design_width=100,
+            design_height=100,
             render_fn=render_fn,
             correct_fn=self._mock_correct,
             initial_code="<div>Hello</div>",
@@ -350,18 +446,24 @@ class TestRenderLoop:
         def bad_render(code: str) -> RenderResult:
             return RenderResult(
                 pixels=_make_grid(100, 100, (0, 0, 0)),
-                components=[], width=100, height=100, code=code,
+                components=[],
+                width=100,
+                height=100,
+                code=code,
             )
 
-        loop = RenderLoop(RenderLoopConfig(
-            max_iterations=3,
-            visual_diff_config=VisualDiffConfig(tolerance_per_pixel=0),
-        ))
+        loop = RenderLoop(
+            RenderLoopConfig(
+                max_iterations=3,
+                visual_diff_config=VisualDiffConfig(tolerance_per_pixel=0),
+            )
+        )
         design = _make_grid(100, 100, (255, 255, 255))
         iterations = loop.run(
             design_pixels=design,
             design_components=[],
-            design_width=100, design_height=100,
+            design_width=100,
+            design_height=100,
             render_fn=bad_render,
             correct_fn=self._mock_correct,
         )
@@ -373,7 +475,10 @@ class TestRenderLoop:
         design = _make_grid(100, 100, (255, 255, 255))
         rendered = RenderResult(
             pixels=_make_grid(100, 100, (255, 255, 255)),
-            components=[], width=100, height=100, code="<div/>",
+            components=[],
+            width=100,
+            height=100,
+            code="<div/>",
         )
         iteration = loop.run_single(design, rendered, 100, 100)
         assert iteration.passed
@@ -387,24 +492,31 @@ class TestRenderLoop:
         rendered = RenderResult(
             pixels=_make_grid(100, 100),
             components=[
-                ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="OK"),
+                ComponentSpec(
+                    id="btn1", component_type=ComponentType.BUTTON, text="OK"
+                ),
             ],
-            width=100, height=100, code="<button>OK</button>",
+            width=100,
+            height=100,
+            code="<button>OK</button>",
         )
         iteration = loop.run_single(design_pixels, rendered, 100, 100, design_comps)
         assert iteration.semantic_diff is not None
         assert iteration.semantic_diff.fidelity_score == 1.0
 
     def test_time_budget(self):
-        loop = RenderLoop(RenderLoopConfig(
-            max_iterations=100,
-            visual_budget_seconds=0.0,  # Immediately exhausted
-        ))
+        loop = RenderLoop(
+            RenderLoopConfig(
+                max_iterations=100,
+                visual_budget_seconds=0.0,  # Immediately exhausted
+            )
+        )
         design = _make_grid(100, 100)
         iterations = loop.run(
             design_pixels=design,
             design_components=[],
-            design_width=100, design_height=100,
+            design_width=100,
+            design_height=100,
             render_fn=self._mock_render,
             correct_fn=self._mock_correct,
         )
@@ -426,8 +538,18 @@ class TestDesignToCodeIntegration:
     def test_full_visual_and_semantic_loop(self):
         design_pixels = _make_grid(200, 200, (240, 240, 240))
         design_comps = [
-            ComponentSpec(id="h1", component_type=ComponentType.HEADER, text="Welcome", region="header"),
-            ComponentSpec(id="btn1", component_type=ComponentType.BUTTON, text="Start", region="content"),
+            ComponentSpec(
+                id="h1",
+                component_type=ComponentType.HEADER,
+                text="Welcome",
+                region="header",
+            ),
+            ComponentSpec(
+                id="btn1",
+                component_type=ComponentType.BUTTON,
+                text="Start",
+                region="content",
+            ),
         ]
 
         call_count = [0]
@@ -439,30 +561,42 @@ class TestDesignToCodeIntegration:
                 return RenderResult(
                     pixels=_make_grid(200, 200, (200, 200, 200)),
                     components=[
-                        ComponentSpec(id="h1", component_type=ComponentType.HEADER, text="Welcome", region="header"),
+                        ComponentSpec(
+                            id="h1",
+                            component_type=ComponentType.HEADER,
+                            text="Welcome",
+                            region="header",
+                        ),
                     ],
-                    width=200, height=200, code=code,
+                    width=200,
+                    height=200,
+                    code=code,
                 )
             # Second render: perfect match
             return RenderResult(
                 pixels=_make_grid(200, 200, (240, 240, 240)),
                 components=design_comps,
-                width=200, height=200, code=code,
+                width=200,
+                height=200,
+                code=code,
             )
 
         def correct_fn(code: str, suggestions: list[str]) -> str:
             return code + "\n// fixed"
 
-        loop = RenderLoop(RenderLoopConfig(
-            max_iterations=5,
-            target_similarity=0.95,
-            enable_semantic_diff=True,
-        ))
+        loop = RenderLoop(
+            RenderLoopConfig(
+                max_iterations=5,
+                target_similarity=0.95,
+                enable_semantic_diff=True,
+            )
+        )
 
         iterations = loop.run(
             design_pixels=design_pixels,
             design_components=design_comps,
-            design_width=200, design_height=200,
+            design_width=200,
+            design_height=200,
             render_fn=render_fn,
             correct_fn=correct_fn,
             initial_code="<div>Hello</div>",

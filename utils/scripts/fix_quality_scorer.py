@@ -1,8 +1,11 @@
 """Script to recreate quality_scorer.py with proper UTF-8 encoding."""
+
 import os
 from pathlib import Path
 
-target_file = Path(__file__).parent / "apps" / "backend" / "review" / "quality_scorer.py"
+target_file = (
+    Path(__file__).parent / "apps" / "backend" / "review" / "quality_scorer.py"
+)
 
 content = '''"""
 AI Code Review - Quality Scorer
@@ -244,7 +247,7 @@ if target_file.exists():
     os.remove(target_file)
 
 # Write with explicit UTF-8 encoding
-with open(target_file, 'w', encoding='utf-8', newline='\n') as f:
+with open(target_file, "w", encoding="utf-8", newline="\n") as f:
     f.write(content)
 
 print(f"File recreated successfully at {target_file}")

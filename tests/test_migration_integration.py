@@ -29,7 +29,7 @@ from apps.backend.migration.validator import MigrationValidator
 from tests.migration_fixtures import TEST_FIXTURES
 
 
-def _make_stack_info(framework, language, version='unknown'):
+def _make_stack_info(framework, language, version="unknown"):
     """Helper to create a StackInfo with the actual fields."""
     return StackInfo(
         framework=framework,
@@ -38,11 +38,14 @@ def _make_stack_info(framework, language, version='unknown'):
     )
 
 
-def _make_migration_context(project_dir, source_framework='react', target_framework='vue'):
+def _make_migration_context(
+    project_dir, source_framework="react", target_framework="vue"
+):
     """Helper to create a minimal MigrationContext for components that require one."""
     import uuid
-    source = _make_stack_info(source_framework, 'javascript')
-    target = _make_stack_info(target_framework, 'javascript')
+
+    source = _make_stack_info(source_framework, "javascript")
+    target = _make_stack_info(target_framework, "javascript")
     return MigrationContext(
         migration_id=str(uuid.uuid4()),
         source_stack=source,
@@ -70,47 +73,47 @@ class TestFullMigrationPipeline:
         src_dir.mkdir()
 
         comp_file = src_dir / "Counter.jsx"
-        comp_file.write_text(TEST_FIXTURES['react_component']['content'])
+        comp_file.write_text(TEST_FIXTURES["react_component"]["content"])
 
         # Also create package.json so the analyzer can detect react
-        (project_path / "package.json").write_text(json.dumps({
-            "dependencies": {"react": "^18.0.0"}
-        }))
+        (project_path / "package.json").write_text(
+            json.dumps({"dependencies": {"react": "^18.0.0"}})
+        )
 
         # 2. Analyze the project
         analyzer = StackAnalyzer(temp_project)
         stack_info = analyzer.detect_stack()
 
-        assert stack_info.framework == 'react'
-        assert stack_info.language == 'javascript'
+        assert stack_info.framework == "react"
+        assert stack_info.language == "javascript"
 
         # 3. Create migration plan using the actual API:
         #    MigrationPlanner(source_stack, target_stack) then .create_plan()
         source_stack = stack_info
-        target_stack = _make_stack_info('vue', stack_info.language)
+        target_stack = _make_stack_info("vue", stack_info.language)
         planner = MigrationPlanner(source_stack, target_stack)
         plan = planner.create_plan()
 
-        assert plan.source_stack.framework == 'react'
-        assert plan.target_stack.framework == 'vue'
+        assert plan.source_stack.framework == "react"
+        assert plan.target_stack.framework == "vue"
         assert len(plan.phases) > 0
 
         # 4. Transform code
-        transformer_engine = TransformationEngine(temp_project, 'react', 'vue')
+        transformer_engine = TransformationEngine(temp_project, "react", "vue")
         results = transformer_engine.transform_code()
 
         assert len(results) > 0
         assert all(r.confidence > 0.7 for r in results)
 
         # 5. Generate report via MigrationReporter(context)
-        context = _make_migration_context(temp_project, 'react', 'vue')
+        context = _make_migration_context(temp_project, "react", "vue")
         context.plan = plan
         context.transformations = results
         reporter = MigrationReporter(context)
         report = reporter.generate_report()
 
-        assert 'react' in report.lower()
-        assert 'vue' in report.lower()
+        assert "react" in report.lower()
+        assert "vue" in report.lower()
 
     def test_react_to_angular_complete_migration(self, temp_project):
         """Test complete React to Angular migration pipeline."""
@@ -118,37 +121,37 @@ class TestFullMigrationPipeline:
 
         # Create test component + package.json
         comp_file = project_path / "UserCard.jsx"
-        comp_file.write_text(TEST_FIXTURES['react_component']['content'])
-        (project_path / "package.json").write_text(json.dumps({
-            "dependencies": {"react": "^18.0.0"}
-        }))
+        comp_file.write_text(TEST_FIXTURES["react_component"]["content"])
+        (project_path / "package.json").write_text(
+            json.dumps({"dependencies": {"react": "^18.0.0"}})
+        )
 
         # Analyze
         analyzer = StackAnalyzer(temp_project)
         stack_info = analyzer.detect_stack()
-        assert stack_info.framework == 'react'
+        assert stack_info.framework == "react"
 
         # Plan
         source_stack = stack_info
-        target_stack = _make_stack_info('angular', stack_info.language)
+        target_stack = _make_stack_info("angular", stack_info.language)
         planner = MigrationPlanner(source_stack, target_stack)
         plan = planner.create_plan()
         assert len(plan.phases) > 0
 
         # Transform
-        transformer = TransformationEngine(temp_project, 'react', 'angular')
+        transformer = TransformationEngine(temp_project, "react", "angular")
         results = transformer.transform_code()
 
         assert len(results) > 0
-        assert all(r.transformation_type == 'react_to_angular' for r in results)
+        assert all(r.transformation_type == "react_to_angular" for r in results)
 
         # Report
-        context = _make_migration_context(temp_project, 'react', 'angular')
+        context = _make_migration_context(temp_project, "react", "angular")
         context.plan = plan
         context.transformations = results
         reporter = MigrationReporter(context)
         report = reporter.generate_report()
-        assert 'angular' in report.lower()
+        assert "angular" in report.lower()
 
     def test_mysql_to_postgresql_complete_migration(self, temp_project):
         """Test complete MySQL to PostgreSQL migration pipeline."""
@@ -156,26 +159,26 @@ class TestFullMigrationPipeline:
 
         # Create schema file
         schema_file = project_path / "schema.sql"
-        schema_file.write_text(TEST_FIXTURES['mysql_schema']['content'])
+        schema_file.write_text(TEST_FIXTURES["mysql_schema"]["content"])
 
         # Analyze
         analyzer = StackAnalyzer(temp_project)
         stack_info = analyzer.detect_stack()
 
         # Plan
-        source_stack = _make_stack_info('mysql', stack_info.language)
-        target_stack = _make_stack_info('postgresql', stack_info.language)
+        source_stack = _make_stack_info("mysql", stack_info.language)
+        target_stack = _make_stack_info("postgresql", stack_info.language)
         planner = MigrationPlanner(source_stack, target_stack)
         plan = planner.create_plan()
-        assert plan.target_stack.framework == 'postgresql'
+        assert plan.target_stack.framework == "postgresql"
 
         # Transform
-        transformer = TransformationEngine(temp_project, 'mysql', 'postgresql')
+        transformer = TransformationEngine(temp_project, "mysql", "postgresql")
         results = transformer.transform_code()
 
         assert len(results) > 0
         # Should have SQL conversions
-        sql_results = [r for r in results if r.transformation_type == 'sql_conversion']
+        sql_results = [r for r in results if r.transformation_type == "sql_conversion"]
         assert len(sql_results) > 0
 
     def test_python2_to_python3_complete_migration(self, temp_project):
@@ -184,25 +187,25 @@ class TestFullMigrationPipeline:
 
         # Create Python 2 file
         py_file = project_path / "legacy.py"
-        py_file.write_text(TEST_FIXTURES['python2_code']['content'])
+        py_file.write_text(TEST_FIXTURES["python2_code"]["content"])
 
         # Analyze
         analyzer = StackAnalyzer(temp_project)
         stack_info = analyzer.detect_stack()
 
         # Plan
-        source_stack = _make_stack_info('python2', 'python')
-        target_stack = _make_stack_info('python3', 'python')
+        source_stack = _make_stack_info("python2", "python")
+        target_stack = _make_stack_info("python3", "python")
         planner = MigrationPlanner(source_stack, target_stack)
         plan = planner.create_plan()
-        assert plan.target_stack.framework == 'python3'
+        assert plan.target_stack.framework == "python3"
 
         # Transform
-        transformer = TransformationEngine(temp_project, 'python2', 'python3')
+        transformer = TransformationEngine(temp_project, "python2", "python3")
         results = transformer.transform_code()
 
         assert len(results) > 0
-        assert all(r.transformation_type == 'python2_to_3' for r in results)
+        assert all(r.transformation_type == "python2_to_3" for r in results)
 
 
 class TestOrchestratorIntegration:
@@ -218,18 +221,18 @@ class TestOrchestratorIntegration:
         """Test orchestrator analysis phase."""
         project_path = Path(temp_project)
         comp_file = project_path / "App.jsx"
-        comp_file.write_text(TEST_FIXTURES['react_component']['content'])
-        (project_path / "package.json").write_text(json.dumps({
-            "dependencies": {"react": "^18.0.0"}
-        }))
+        comp_file.write_text(TEST_FIXTURES["react_component"]["content"])
+        (project_path / "package.json").write_text(
+            json.dumps({"dependencies": {"react": "^18.0.0"}})
+        )
 
         orchestrator = MigrationOrchestrator(temp_project, enable_llm=False)
 
         # start_migration returns a MigrationContext and sets up the plan
-        context = orchestrator.start_migration('vue', 'javascript')
+        context = orchestrator.start_migration("vue", "javascript")
 
         assert context is not None
-        assert context.source_stack.framework == 'react'
+        assert context.source_stack.framework == "react"
         assert context.plan is not None
         assert len(context.plan.phases) > 0
 
@@ -245,18 +248,18 @@ function Button({ label }) {
   return <button onClick={() => setClicked(true)}>{label}</button>
 }
 """)
-        (project_path / "package.json").write_text(json.dumps({
-            "dependencies": {"react": "^18.0.0"}
-        }))
+        (project_path / "package.json").write_text(
+            json.dumps({"dependencies": {"react": "^18.0.0"}})
+        )
 
         orchestrator = MigrationOrchestrator(temp_project, enable_llm=False)
 
         # Must start migration first, then transform
-        orchestrator.start_migration('vue', 'javascript')
+        orchestrator.start_migration("vue", "javascript")
         results = orchestrator.transform_phase()
 
         assert results is not None
-        assert 'status' in results
+        assert "status" in results
 
     def test_orchestrator_validation_phase(self, temp_project):
         """Test orchestrator validation phase."""
@@ -286,14 +289,14 @@ class TestTransformerEngineIntegration:
 
         # Create React file
         comp = project_path / "App.jsx"
-        comp.write_text(TEST_FIXTURES['react_component']['content'])
+        comp.write_text(TEST_FIXTURES["react_component"]["content"])
 
-        engine = TransformationEngine(temp_project, 'react', 'vue')
+        engine = TransformationEngine(temp_project, "react", "vue")
         results = engine.transform_code()
 
         # Should detect JSX file automatically
         assert len(results) > 0
-        assert all(r.transformation_type == 'jsx_to_vue_sfc' for r in results)
+        assert all(r.transformation_type == "jsx_to_vue_sfc" for r in results)
 
     def test_engine_handles_multiple_file_types(self, temp_project):
         """Test engine handles multiple file types in same project."""
@@ -301,17 +304,17 @@ class TestTransformerEngineIntegration:
 
         # Create multiple file types
         jsx_file = project_path / "Component.jsx"
-        jsx_file.write_text(TEST_FIXTURES['react_component']['content'])
+        jsx_file.write_text(TEST_FIXTURES["react_component"]["content"])
 
         sql_file = project_path / "schema.sql"
-        sql_file.write_text(TEST_FIXTURES['mysql_schema']['content'])
+        sql_file.write_text(TEST_FIXTURES["mysql_schema"]["content"])
 
         # Transform React to Vue
-        react_engine = TransformationEngine(temp_project, 'react', 'vue')
+        react_engine = TransformationEngine(temp_project, "react", "vue")
         react_results = react_engine.transform_code()
 
         # Transform MySQL to PostgreSQL
-        db_engine = TransformationEngine(temp_project, 'mysql', 'postgresql')
+        db_engine = TransformationEngine(temp_project, "mysql", "postgresql")
         db_results = db_engine.transform_code()
 
         assert len(react_results) > 0
@@ -325,14 +328,16 @@ class TestTransformerEngineIntegration:
         src_file = project_path / "simple.js"
         src_file.write_text("const x = 5")
 
-        engine = TransformationEngine(temp_project, 'javascript', 'typescript')
-        results = engine.transform_code(['simple.js'])
+        engine = TransformationEngine(temp_project, "javascript", "typescript")
+        # The call performs the transformation; its return value is not
+        # what this test asserts on — `apply_transformations` below is.
+        engine.transform_code(["simple.js"])
 
         # Apply transformations
         summary = engine.apply_transformations(dry_run=False)
 
-        assert summary['applied'] >= 0
-        assert not summary['dry_run']
+        assert summary["applied"] >= 0
+        assert not summary["dry_run"]
 
 
 class TestReporterIntegration:
@@ -350,14 +355,14 @@ class TestReporterIntegration:
 
         # Create stack info using the actual StackInfo fields (no framework_version)
         source_stack = StackInfo(
-            framework='react',
-            language='javascript',
-            version='18.0',
+            framework="react",
+            language="javascript",
+            version="18.0",
         )
         target_stack = StackInfo(
-            framework='vue',
-            language='javascript',
-            version='3.0',
+            framework="vue",
+            language="javascript",
+            version="3.0",
         )
 
         # Create plan with actual MigrationPlan fields
@@ -380,23 +385,23 @@ class TestReporterIntegration:
         reporter = MigrationReporter(context)
         report = reporter.generate_report()
 
-        assert '# Migration Report' in report or 'Migration' in report
-        assert 'react' in report.lower()
-        assert 'vue' in report.lower()
+        assert "# Migration Report" in report or "Migration" in report
+        assert "react" in report.lower()
+        assert "vue" in report.lower()
 
     def test_reporter_generates_html(self, temp_project):
         """Test reporter generates HTML output."""
         import uuid
 
         source_stack = StackInfo(
-            framework='react',
-            language='javascript',
-            version='18.0',
+            framework="react",
+            language="javascript",
+            version="18.0",
         )
         target_stack = StackInfo(
-            framework='vue',
-            language='javascript',
-            version='3.0',
+            framework="vue",
+            language="javascript",
+            version="3.0",
         )
 
         plan = MigrationPlan(
@@ -417,7 +422,7 @@ class TestReporterIntegration:
         reporter = MigrationReporter(context)
         html = reporter.generate_html_report()
 
-        assert '<html' in html.lower() or '<div' in html.lower()
+        assert "<html" in html.lower() or "<div" in html.lower()
 
 
 class TestRollbackIntegration:
@@ -431,15 +436,26 @@ class TestRollbackIntegration:
 
             # Initialize git repo
             import subprocess
-            subprocess.run(['git', 'init'], cwd=tmpdir, capture_output=True)
-            subprocess.run(['git', 'config', 'user.email', 'test@test.com'], cwd=tmpdir, capture_output=True)
-            subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=tmpdir, capture_output=True)
+
+            subprocess.run(["git", "init"], cwd=tmpdir, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@test.com"],
+                cwd=tmpdir,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=tmpdir,
+                capture_output=True,
+            )
 
             # Create initial commit
-            test_file = project_path / 'test.txt'
-            test_file.write_text('initial')
-            subprocess.run(['git', 'add', '.'], cwd=tmpdir, capture_output=True)
-            subprocess.run(['git', 'commit', '-m', 'initial'], cwd=tmpdir, capture_output=True)
+            test_file = project_path / "test.txt"
+            test_file.write_text("initial")
+            subprocess.run(["git", "add", "."], cwd=tmpdir, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "initial"], cwd=tmpdir, capture_output=True
+            )
 
             yield tmpdir
 
@@ -452,13 +468,12 @@ class TestRollbackIntegration:
         # Create checkpoint — returns RollbackCheckpoint, not a plain string
         # The actual parameter is phase_id (not phase_name)
         checkpoint = rollback_manager.create_checkpoint(
-            phase_id='test_phase',
-            description='Test checkpoint'
+            phase_id="test_phase", description="Test checkpoint"
         )
 
         assert checkpoint is not None
         # RollbackCheckpoint has phase_id and checkpoint_id attributes
-        assert hasattr(checkpoint, 'phase_id') or hasattr(checkpoint, 'checkpoint_id')
+        assert hasattr(checkpoint, "phase_id") or hasattr(checkpoint, "checkpoint_id")
 
 
 class TestValidatorIntegration:
@@ -475,7 +490,7 @@ class TestValidatorIntegration:
         project_path = Path(temp_project)
 
         # Create mock test file
-        test_file = project_path / 'test.js'
+        test_file = project_path / "test.js"
         test_file.write_text('console.log("test")')
 
         # MigrationValidator.validate() takes no keyword arguments
@@ -495,27 +510,33 @@ class TestComplexMigrationScenarios:
             project_path = Path(tmpdir)
 
             # Create realistic structure
-            src_dir = project_path / 'src'
+            src_dir = project_path / "src"
             src_dir.mkdir()
 
-            components_dir = src_dir / 'components'
+            components_dir = src_dir / "components"
             components_dir.mkdir()
 
-            services_dir = src_dir / 'services'
+            services_dir = src_dir / "services"
             services_dir.mkdir()
 
             # Create multiple components
-            (components_dir / 'Button.jsx').write_text(TEST_FIXTURES['react_component']['content'][:100])
-            (components_dir / 'Header.jsx').write_text("import React from 'react'\nfunction Header() { return <h1>Header</h1> }")
+            (components_dir / "Button.jsx").write_text(
+                TEST_FIXTURES["react_component"]["content"][:100]
+            )
+            (components_dir / "Header.jsx").write_text(
+                "import React from 'react'\nfunction Header() { return <h1>Header</h1> }"
+            )
 
             # Create service files
-            (services_dir / 'api.js').write_text(TEST_FIXTURES['javascript_code']['content'][:100])
+            (services_dir / "api.js").write_text(
+                TEST_FIXTURES["javascript_code"]["content"][:100]
+            )
 
             yield tmpdir
 
     def test_migrate_multiple_components(self, temp_project):
         """Test migrating entire component directory."""
-        engine = TransformationEngine(temp_project, 'react', 'vue')
+        engine = TransformationEngine(temp_project, "react", "vue")
         results = engine.transform_code()
 
         # Should find and transform multiple files
@@ -526,21 +547,25 @@ class TestComplexMigrationScenarios:
         project_path = Path(temp_project)
 
         # Add SQL file
-        (project_path / 'schema.sql').write_text(TEST_FIXTURES['mysql_schema']['content'][:100])
+        (project_path / "schema.sql").write_text(
+            TEST_FIXTURES["mysql_schema"]["content"][:100]
+        )
 
         # Add Python file
-        (project_path / 'utils.py').write_text(TEST_FIXTURES['python2_code']['content'][:100])
+        (project_path / "utils.py").write_text(
+            TEST_FIXTURES["python2_code"]["content"][:100]
+        )
 
         # React migration
-        react_engine = TransformationEngine(temp_project, 'react', 'vue')
+        react_engine = TransformationEngine(temp_project, "react", "vue")
         react_results = react_engine.transform_code()
 
         # Database migration
-        db_engine = TransformationEngine(temp_project, 'mysql', 'postgresql')
+        db_engine = TransformationEngine(temp_project, "mysql", "postgresql")
         db_results = db_engine.transform_code()
 
         # Python migration
-        py_engine = TransformationEngine(temp_project, 'python2', 'python3')
+        py_engine = TransformationEngine(temp_project, "python2", "python3")
         py_results = py_engine.transform_code()
 
         # Should have transformations for all types
@@ -559,7 +584,7 @@ class TestErrorHandlingIntegration:
 
     def test_handles_invalid_project_path(self):
         """Test handling of invalid project path."""
-        engine = TransformationEngine('/nonexistent/path', 'react', 'vue')
+        engine = TransformationEngine("/nonexistent/path", "react", "vue")
         results = engine.transform_code()
 
         # Should handle gracefully
@@ -567,8 +592,8 @@ class TestErrorHandlingIntegration:
 
     def test_handles_missing_files(self, temp_project):
         """Test handling when expected files are missing."""
-        engine = TransformationEngine(temp_project, 'react', 'vue')
-        results = engine.transform_code(['nonexistent.jsx'])
+        engine = TransformationEngine(temp_project, "react", "vue")
+        results = engine.transform_code(["nonexistent.jsx"])
 
         # Should not crash
         assert isinstance(results, list)
@@ -578,10 +603,10 @@ class TestErrorHandlingIntegration:
         project_path = Path(temp_project)
 
         # Create malformed file
-        bad_file = project_path / 'bad.jsx'
-        bad_file.write_text('function Test() { {{{{{ invalid syntax')
+        bad_file = project_path / "bad.jsx"
+        bad_file.write_text("function Test() { {{{{{ invalid syntax")
 
-        engine = TransformationEngine(temp_project, 'react', 'vue')
+        engine = TransformationEngine(temp_project, "react", "vue")
         results = engine.transform_code()
 
         # Should handle gracefully
@@ -599,7 +624,7 @@ class TestPerformanceIntegration:
 
             # Create multiple component files
             for i in range(5):
-                comp_file = project_path / f'Component{i}.jsx'
+                comp_file = project_path / f"Component{i}.jsx"
                 comp_file.write_text(f"""
 import React, {{ useState }} from 'react'
 
@@ -615,7 +640,7 @@ function Component{i}() {{
         """Test migration completes in reasonable time."""
         import time
 
-        engine = TransformationEngine(temp_project, 'react', 'vue')
+        engine = TransformationEngine(temp_project, "react", "vue")
 
         start = time.time()
         results = engine.transform_code()
@@ -635,13 +660,15 @@ function Component{i}() {{
 
         # Create test file
         test_file = project_path / "test.jsx"
-        test_file.write_text(TEST_FIXTURES.get('react_component', {}).get('content', ''))
+        test_file.write_text(
+            TEST_FIXTURES.get("react_component", {}).get("content", "")
+        )
 
         # Create base transformation
         base_result = TransformationResult(
             file_path="test.jsx",
             transformation_type="jsx_to_vue",
-            before=TEST_FIXTURES.get('react_component', {}).get('content', ''),
+            before=TEST_FIXTURES.get("react_component", {}).get("content", ""),
             after="<template><div>Basic transformation</div></template>",
             changes_count=10,
             confidence=0.7,
@@ -667,7 +694,7 @@ function Component{i}() {{
         )
 
         assert enhanced.confidence >= base_result.confidence
-        assert hasattr(enhanced, 'llm_enhanced') and enhanced.llm_enhanced
+        assert hasattr(enhanced, "llm_enhanced") and enhanced.llm_enhanced
         assert len(enhanced.after) > 0
 
     def test_migration_with_auto_fix(self, temp_project):
@@ -690,7 +717,7 @@ def test_component():
 
         # Create source file
         src_file = project_path / "component.jsx"
-        src_file.write_text(TEST_FIXTURES.get('react_component', {}).get('content', ''))
+        src_file.write_text(TEST_FIXTURES.get("react_component", {}).get("content", ""))
 
         # Run migration
         orchestrator = MigrationOrchestrator(temp_project, enable_llm=False)
@@ -723,12 +750,9 @@ export default function Counter() {
 
         # Create package.json to identify as React project
         package_json = project_path / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test-project",
-            "dependencies": {
-                "react": "^18.0.0"
-            }
-        }))
+        package_json.write_text(
+            json.dumps({"name": "test-project", "dependencies": {"react": "^18.0.0"}})
+        )
 
         # Run migration with LLM enabled
         orchestrator = MigrationOrchestrator(temp_project, enable_llm=True)
@@ -760,7 +784,7 @@ export default function Component{i}() {{
 """)
 
         # Run transformation
-        transformer = TransformationEngine(temp_project, 'react', 'vue')
+        transformer = TransformationEngine(temp_project, "react", "vue")
         results = transformer.transform_code()
 
         # Should transform all files

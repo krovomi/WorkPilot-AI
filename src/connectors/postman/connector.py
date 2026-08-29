@@ -136,9 +136,7 @@ class PostmanConnector:
 
         data = self._client.get("/collections", params=params)
         collections_data = data.get("collections", [])
-        collections = [
-            PostmanCollection.from_api_response(c) for c in collections_data
-        ]
+        collections = [PostmanCollection.from_api_response(c) for c in collections_data]
 
         logger.info("Found %d collections.", len(collections))
         return collections
@@ -211,9 +209,7 @@ class PostmanConnector:
         for item in items:
             if "item" in item:
                 # This is a folder — recurse
-                self._extract_requests(
-                    item["item"], result, folder_id=item.get("id")
-                )
+                self._extract_requests(item["item"], result, folder_id=item.get("id"))
             elif "request" in item:
                 req = PostmanRequest.from_api_response(item)
                 req.folder_id = folder_id
@@ -244,16 +240,18 @@ class PostmanConnector:
 
         specs = []
         for req in requests_list:
-            specs.append({
-                "name": req.name,
-                "method": req.method,
-                "url": req.url,
-                "description": req.description,
-                "headers": req.headers,
-                "body": req.body,
-                "source": "postman",
-                "source_id": req.request_id,
-            })
+            specs.append(
+                {
+                    "name": req.name,
+                    "method": req.method,
+                    "url": req.url,
+                    "description": req.description,
+                    "headers": req.headers,
+                    "body": req.body,
+                    "source": "postman",
+                    "source_id": req.request_id,
+                }
+            )
 
         logger.info("Imported %d endpoint specs.", len(specs))
         return specs
@@ -494,12 +492,14 @@ class PostmanConnector:
         for req in requests_list:
             # Validate URL
             has_url = bool(req.url and req.url.strip())
-            results.append(PostmanTestResult(
-                request_name=req.name,
-                test_name="Has valid URL",
-                passed=has_url,
-                error_message="" if has_url else "Request URL is empty",
-            ))
+            results.append(
+                PostmanTestResult(
+                    request_name=req.name,
+                    test_name="Has valid URL",
+                    passed=has_url,
+                    error_message="" if has_url else "Request URL is empty",
+                )
+            )
             if has_url:
                 passed += 1
             else:
@@ -508,12 +508,14 @@ class PostmanConnector:
             # Validate method
             valid_methods = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
             has_method = req.method.upper() in valid_methods
-            results.append(PostmanTestResult(
-                request_name=req.name,
-                test_name="Has valid HTTP method",
-                passed=has_method,
-                error_message="" if has_method else f"Invalid method: {req.method}",
-            ))
+            results.append(
+                PostmanTestResult(
+                    request_name=req.name,
+                    test_name="Has valid HTTP method",
+                    passed=has_method,
+                    error_message="" if has_method else f"Invalid method: {req.method}",
+                )
+            )
             if has_method:
                 passed += 1
             else:

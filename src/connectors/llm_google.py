@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from .llm_base import BaseLLMProvider
 
@@ -7,16 +7,19 @@ class GoogleLLMProvider(BaseLLMProvider):
     def __init__(self, api_key: str, model: str = "gemini-2.0-flash"):
         self.api_key = api_key
         self.model = model
-        self._client: Optional[Any] = None
+        self._client: Any | None = None
 
     def connect(self) -> None:
         try:
             import warnings
+
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", FutureWarning)
                 import google.generativeai as genai
         except ImportError:
-            raise ImportError("google-generativeai package is required. Install with: pip install google-generativeai")
+            raise ImportError(
+                "google-generativeai package is required. Install with: pip install google-generativeai"
+            )
         genai.configure(api_key=self.api_key)
         self._genai = genai
         self._model = genai.GenerativeModel(self.model)

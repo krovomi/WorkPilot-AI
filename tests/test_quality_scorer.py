@@ -75,9 +75,7 @@ except:
 
         # Doit détecter le bare except
         bare_except_issues = [
-            i
-            for i in scorer.issues
-            if "bare except" in i.title.lower()
+            i for i in scorer.issues if "bare except" in i.title.lower()
         ]
         assert len(bare_except_issues) > 0
 
@@ -109,10 +107,10 @@ def complex_function(x):
 
     def test_detect_security_issues(self, scorer, temp_project):
         """Test détection de problèmes de sécurité."""
-        code = '''
+        code = """
 password = "hardcoded_secret"
 eval(user_input)
-'''
+"""
         test_file = temp_project / "insecure.py"
         test_file.write_text(code)
 
@@ -137,4 +135,3 @@ eval(user_input)
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

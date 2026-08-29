@@ -64,8 +64,10 @@ class TestPricingCatalog:
     def test_calculate_cost(self):
         catalog = PricingCatalog()
         cost = catalog.calculate_cost(
-            "anthropic", "claude-sonnet-4-6",
-            input_tokens=1_000_000, output_tokens=500_000,
+            "anthropic",
+            "claude-sonnet-4-6",
+            input_tokens=1_000_000,
+            output_tokens=500_000,
         )
         # 1M * 3.0/1M + 500K * 15.0/1M = 3.0 + 7.5 = 10.5
         assert abs(cost - 10.5) < 0.01
@@ -78,24 +80,29 @@ class TestPricingCatalog:
     def test_ollama_is_free(self):
         catalog = PricingCatalog()
         cost = catalog.calculate_cost(
-            "ollama", "llama-3.3-70b",
-            input_tokens=1_000_000, output_tokens=1_000_000,
+            "ollama",
+            "llama-3.3-70b",
+            input_tokens=1_000_000,
+            output_tokens=1_000_000,
         )
         assert cost == 0.0
 
     def test_add_custom_pricing(self):
         catalog = PricingCatalog()
-        custom = ModelPricing(provider="custom", model="my-model", input=1.0, output=2.0)
+        custom = ModelPricing(
+            provider="custom", model="my-model", input=1.0, output=2.0
+        )
         catalog.add_pricing(custom)
         assert catalog.get_pricing("custom", "my-model") is not None
 
     def test_load_from_file(self, tmp_path):
         pricing_file = tmp_path / "pricing.json"
-        pricing_file.write_text(json.dumps({
-            "test_provider": {
-                "test-model": {"input": 5.0, "output": 10.0}
-            }
-        }), encoding="utf-8")
+        pricing_file.write_text(
+            json.dumps(
+                {"test_provider": {"test-model": {"input": 5.0, "output": 10.0}}}
+            ),
+            encoding="utf-8",
+        )
         catalog = PricingCatalog(catalog_path=pricing_file)
         pricing = catalog.get_pricing("test_provider", "test-model")
         assert pricing is not None
@@ -103,9 +110,12 @@ class TestPricingCatalog:
 
     def test_model_pricing_cost_for_tokens(self):
         pricing = ModelPricing(
-            provider="test", model="test",
-            input=3.0, output=15.0,
-            cache_write=3.75, cache_read=0.30,
+            provider="test",
+            model="test",
+            input=3.0,
+            output=15.0,
+            cache_write=3.75,
+            cache_read=0.30,
             thinking=75.0,
         )
         cost = pricing.cost_for_tokens(
@@ -134,11 +144,16 @@ class TestLiveCostTracker:
     def test_record_and_get_snapshot(self):
         catalog = PricingCatalog()
         tracker = LiveCostTracker(catalog=catalog)
-        tracker.record(CostEvent(
-            provider="anthropic", model="claude-sonnet-4-6",
-            input_tokens=1000, output_tokens=500,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="anthropic",
+                model="claude-sonnet-4-6",
+                input_tokens=1000,
+                output_tokens=500,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         snap = tracker.get_snapshot("spec", "s1")
         assert snap.total_input_tokens == 1000
         assert snap.total_output_tokens == 500
@@ -148,33 +163,48 @@ class TestLiveCostTracker:
     def test_multiple_events_accumulate(self):
         tracker = LiveCostTracker()
         for _ in range(3):
-            tracker.record(CostEvent(
-                provider="openai", model="gpt-4o",
-                input_tokens=1000, output_tokens=500,
-                scope="project", scope_id="p1",
-            ))
+            tracker.record(
+                CostEvent(
+                    provider="openai",
+                    model="gpt-4o",
+                    input_tokens=1000,
+                    output_tokens=500,
+                    scope="project",
+                    scope_id="p1",
+                )
+            )
         snap = tracker.get_snapshot("project", "p1")
         assert snap.total_input_tokens == 3000
         assert snap.event_count == 3
 
     def test_retry_events_skipped(self):
         tracker = LiveCostTracker()
-        tracker.record(CostEvent(
-            provider="anthropic", model="claude-sonnet-4-6",
-            input_tokens=1000, output_tokens=500,
-            scope="spec", scope_id="s1",
-            is_retry=True,
-        ))
+        tracker.record(
+            CostEvent(
+                provider="anthropic",
+                model="claude-sonnet-4-6",
+                input_tokens=1000,
+                output_tokens=500,
+                scope="spec",
+                scope_id="s1",
+                is_retry=True,
+            )
+        )
         snap = tracker.get_snapshot("spec", "s1")
         assert snap.event_count == 0
 
     def test_get_total_cost(self):
         tracker = LiveCostTracker()
-        tracker.record(CostEvent(
-            provider="openai", model="gpt-4o",
-            input_tokens=1_000_000, output_tokens=0,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="openai",
+                model="gpt-4o",
+                input_tokens=1_000_000,
+                output_tokens=0,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         cost = tracker.get_total_cost("spec", "s1")
         assert cost > 0
 
@@ -185,14 +215,24 @@ class TestLiveCostTracker:
 
     def test_get_events_filtered(self):
         tracker = LiveCostTracker()
-        tracker.record(CostEvent(
-            provider="anthropic", model="m1",
-            input_tokens=100, scope="spec", scope_id="s1",
-        ))
-        tracker.record(CostEvent(
-            provider="openai", model="m2",
-            input_tokens=200, scope="project", scope_id="p1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="anthropic",
+                model="m1",
+                input_tokens=100,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
+        tracker.record(
+            CostEvent(
+                provider="openai",
+                model="m2",
+                input_tokens=200,
+                scope="project",
+                scope_id="p1",
+            )
+        )
         spec_events = tracker.get_events(scope="spec")
         assert len(spec_events) == 1
         all_events = tracker.get_events()
@@ -200,44 +240,68 @@ class TestLiveCostTracker:
 
     def test_reset_specific_scope(self):
         tracker = LiveCostTracker()
-        tracker.record(CostEvent(
-            provider="a", model="m", input_tokens=100,
-            scope="spec", scope_id="s1",
-        ))
-        tracker.record(CostEvent(
-            provider="a", model="m", input_tokens=200,
-            scope="spec", scope_id="s2",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="a",
+                model="m",
+                input_tokens=100,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
+        tracker.record(
+            CostEvent(
+                provider="a",
+                model="m",
+                input_tokens=200,
+                scope="spec",
+                scope_id="s2",
+            )
+        )
         tracker.reset(scope="spec", scope_id="s1")
         assert tracker.get_snapshot("spec", "s1").event_count == 0
         assert tracker.get_snapshot("spec", "s2").event_count == 1
 
     def test_reset_all(self):
         tracker = LiveCostTracker()
-        tracker.record(CostEvent(
-            provider="a", model="m", input_tokens=100,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="a",
+                model="m",
+                input_tokens=100,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         tracker.reset()
         assert len(tracker.get_all_snapshots()) == 0
 
     def test_sqlite_persistence(self, tmp_path):
         db_path = tmp_path / "costs.db"
         tracker = LiveCostTracker(db_path=db_path)
-        tracker.record(CostEvent(
-            provider="anthropic", model="claude-sonnet-4-6",
-            input_tokens=1000, output_tokens=500,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="anthropic",
+                model="claude-sonnet-4-6",
+                input_tokens=1000,
+                output_tokens=500,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         assert db_path.exists()
 
     def test_explicit_cost_used(self):
         tracker = LiveCostTracker()
-        tracker.record(CostEvent(
-            provider="custom", model="custom-model",
-            cost_usd=5.0,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="custom",
+                model="custom-model",
+                cost_usd=5.0,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         assert tracker.get_total_cost("spec", "s1") == 5.0
 
 
@@ -261,50 +325,75 @@ class TestBudgetEnforcer:
     def test_under_budget(self):
         tracker, enforcer = self._make_enforcer()
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=1.0,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=1.0,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         assert status.alert_level == AlertLevel.NONE
 
     def test_50_percent_alert(self):
         tracker, enforcer = self._make_enforcer()
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=5.5,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=5.5,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         assert status.alert_level == AlertLevel.INFO_50
 
     def test_75_percent_alert(self):
         tracker, enforcer = self._make_enforcer()
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=7.8,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=7.8,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         assert status.alert_level == AlertLevel.WARNING_75
 
     def test_90_percent_alert(self):
         tracker, enforcer = self._make_enforcer()
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=9.2,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=9.2,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         assert status.alert_level == AlertLevel.CRITICAL_90
 
     def test_hard_stop(self):
         tracker, enforcer = self._make_enforcer()
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=10.5,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=10.5,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         assert status.alert_level == AlertLevel.HARD_STOP
         assert status.is_stopped
@@ -312,10 +401,15 @@ class TestBudgetEnforcer:
     def test_auto_degradation(self):
         tracker, enforcer = self._make_enforcer()
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=7.8,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=7.8,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         # At 78%, should degrade to FAST tier
         assert status.current_tier.rank < DegradationTier.FLAGSHIP.rank
@@ -323,10 +417,15 @@ class TestBudgetEnforcer:
     def test_degradation_only_degrades(self):
         tracker, enforcer = self._make_enforcer()
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=9.5,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=9.5,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         tier_after_90 = status.current_tier
         # Cost stays at 95% — should not upgrade back
@@ -335,11 +434,18 @@ class TestBudgetEnforcer:
 
     def test_circuit_breaker_open(self):
         tracker, enforcer = self._make_enforcer()
-        enforcer.set_budget("spec", "s1", hard_stop=10.0, circuit_breaker_multiplier=2.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=25.0,
-            scope="spec", scope_id="s1",
-        ))
+        enforcer.set_budget(
+            "spec", "s1", hard_stop=10.0, circuit_breaker_multiplier=2.0
+        )
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=25.0,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         assert status.circuit_breaker == CircuitBreakerState.OPEN
         assert status.is_stopped
@@ -350,20 +456,30 @@ class TestBudgetEnforcer:
             "spec", "s1", hard_stop=10.0, circuit_breaker_multiplier=2.0
         )
         enforcer.mark_progress("spec", "s1")  # Mark progress right now
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=25.0,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=25.0,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         assert status.circuit_breaker == CircuitBreakerState.HALF_OPEN
 
     def test_percentage_used(self):
         tracker, enforcer = self._make_enforcer()
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=3.0,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=3.0,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         status = enforcer.check("spec", "s1")
         assert abs(status.percentage_used - 30.0) < 0.1
         assert abs(status.remaining_usd - 7.0) < 0.01
@@ -373,10 +489,15 @@ class TestBudgetEnforcer:
         alerts: list[BudgetStatus] = []
         enforcer.on_alert(lambda s: alerts.append(s))
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        tracker.record(CostEvent(
-            provider="x", model="m", cost_usd=5.5,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="x",
+                model="m",
+                cost_usd=5.5,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         enforcer.check("spec", "s1")
         assert len(alerts) == 1
         assert alerts[0].alert_level == AlertLevel.INFO_50
@@ -384,7 +505,9 @@ class TestBudgetEnforcer:
     def test_get_recommended_model(self):
         tracker, enforcer = self._make_enforcer()
         enforcer.set_budget("spec", "s1", hard_stop=10.0)
-        model = enforcer.get_recommended_model("spec", "s1", preferred_provider="anthropic")
+        model = enforcer.get_recommended_model(
+            "spec", "s1", preferred_provider="anthropic"
+        )
         assert model is not None
         assert model["provider"] == "anthropic"
 
@@ -507,11 +630,16 @@ class TestCostIntelligenceIntegration:
 
         # Record cost events
         for _ in range(5):
-            tracker.record(CostEvent(
-                provider="anthropic", model="claude-sonnet-4-6",
-                input_tokens=500_000, output_tokens=100_000,
-                scope="spec", scope_id="s1",
-            ))
+            tracker.record(
+                CostEvent(
+                    provider="anthropic",
+                    model="claude-sonnet-4-6",
+                    input_tokens=500_000,
+                    output_tokens=100_000,
+                    scope="spec",
+                    scope_id="s1",
+                )
+            )
 
         status = enforcer.check("spec", "s1")
         # Should be near or above budget with degradation
@@ -525,11 +653,16 @@ class TestCostIntelligenceIntegration:
 
         res = mgr.reserve("p1", "s1", estimated_usd=10.0)
         # Simulate spec running
-        tracker.record(CostEvent(
-            provider="anthropic", model="claude-sonnet-4-6",
-            input_tokens=1_000_000, output_tokens=200_000,
-            scope="spec", scope_id="s1",
-        ))
+        tracker.record(
+            CostEvent(
+                provider="anthropic",
+                model="claude-sonnet-4-6",
+                input_tokens=1_000_000,
+                output_tokens=200_000,
+                scope="spec",
+                scope_id="s1",
+            )
+        )
         actual = tracker.get_total_cost("spec", "s1")
         mgr.release(res.id, actual_cost=actual)
         assert mgr.available_budget("p1") > 0

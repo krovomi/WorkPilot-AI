@@ -336,9 +336,7 @@ class TestClaudeAgentClient:
     @pytest.mark.asyncio
     async def test_receive_response_wraps_result_message(self):
         """ResultMessage yields RESULT content block."""
-        raw_msg = ResultMessage(
-            subtype=None, structured_output={"score": 9}
-        )
+        raw_msg = ResultMessage(subtype=None, structured_output={"score": 9})
 
         sdk_mock = MagicMock()
 
@@ -443,9 +441,9 @@ class TestCopilotAgentClient:
         mock_session.post = MagicMock(return_value=mock_response)
 
         client._http_client = mock_session
-        
+
         # Mock the token method to bypass authentication
-        with patch.object(client, '_get_copilot_token', return_value="mock_token"):
+        with patch.object(client, "_get_copilot_token", return_value="mock_token"):
             messages = []
             async for msg in client.receive_response():
                 messages.append(msg)
@@ -476,7 +474,7 @@ class TestCopilotAgentClient:
         client._http_client = mock_session
 
         # Mock the token method to bypass authentication
-        with patch.object(client, '_get_copilot_token', return_value="mock_token"):
+        with patch.object(client, "_get_copilot_token", return_value="mock_token"):
             messages = []
             async for msg in client.receive_response():
                 messages.append(msg)
@@ -503,9 +501,7 @@ class TestCopilotAgentClient:
             resp = MagicMock()
             resp.status = 429
             resp.headers = {"Retry-After": "1"}
-            resp.text = AsyncMock(
-                return_value='{"error":{"message":"rate-limited"}}'
-            )
+            resp.text = AsyncMock(return_value='{"error":{"message":"rate-limited"}}')
             resp.__aenter__ = AsyncMock(return_value=resp)
             resp.__aexit__ = AsyncMock(return_value=None)
             return resp
@@ -530,11 +526,11 @@ class TestCopilotAgentClient:
         mock_session.post = MagicMock(side_effect=lambda *a, **k: next(responses))
         client._http_client = mock_session
 
-        with patch.object(
-            client, "_get_copilot_token", return_value="mock_token"
-        ), patch.object(
-            agent_client_module, "_COPILOT_RATE_LIMIT_BACKOFF", 0.0
-        ), patch("asyncio.sleep", new=AsyncMock()):
+        with (
+            patch.object(client, "_get_copilot_token", return_value="mock_token"),
+            patch.object(agent_client_module, "_COPILOT_RATE_LIMIT_BACKOFF", 0.0),
+            patch("asyncio.sleep", new=AsyncMock()),
+        ):
             messages = []
             async for msg in client.receive_response():
                 messages.append(msg)
@@ -569,13 +565,12 @@ class TestCopilotAgentClient:
         mock_session.post = MagicMock(side_effect=lambda *a, **k: make_429())
         client._http_client = mock_session
 
-        with patch.object(
-            client, "_get_copilot_token", return_value="mock_token"
-        ), patch.object(
-            agent_client_module, "_COPILOT_RATE_LIMIT_MAX_RETRIES", 2
-        ), patch.object(
-            agent_client_module, "_COPILOT_RATE_LIMIT_BACKOFF", 0.0
-        ), patch("asyncio.sleep", new=AsyncMock()) as mock_sleep:
+        with (
+            patch.object(client, "_get_copilot_token", return_value="mock_token"),
+            patch.object(agent_client_module, "_COPILOT_RATE_LIMIT_MAX_RETRIES", 2),
+            patch.object(agent_client_module, "_COPILOT_RATE_LIMIT_BACKOFF", 0.0),
+            patch("asyncio.sleep", new=AsyncMock()) as mock_sleep,
+        ):
             messages = []
             async for msg in client.receive_response():
                 messages.append(msg)
@@ -601,9 +596,7 @@ class TestCopilotAgentClient:
 
         # Already-dotted / non-Claude ids are left untouched.
         assert (
-            CopilotAgentClient(
-                model="claude-opus-4.8", github_token="ghp_test"
-            ).model
+            CopilotAgentClient(model="claude-opus-4.8", github_token="ghp_test").model
             == "claude-opus-4.8"
         )
         assert (
@@ -711,7 +704,7 @@ class TestCopilotAgentClient:
         client._http_client = mock_session
 
         # Mock the token method to bypass authentication
-        with patch.object(client, '_get_copilot_token', return_value="mock_token"):
+        with patch.object(client, "_get_copilot_token", return_value="mock_token"):
             messages = []
             async for msg in client.receive_response():
                 messages.append(msg)
@@ -724,7 +717,7 @@ class TestCopilotAgentClient:
         assert tool_blocks[0].tool_name == "Read"
         assert tool_blocks[0].tool_id == "call_1"
         assert tool_blocks[0].tool_input == {"file_path": "/foo.py"}
-        
+
         # Check tool result message
         result_blocks = [
             b for b in messages[1].content if b.type == ContentBlockType.TOOL_RESULT
@@ -753,9 +746,7 @@ class TestCopilotAgentClient:
             [
                 make_response({"choices": []}),
                 make_response({"choices": []}),
-                make_response(
-                    {"choices": [{"message": {"content": "Recovered!"}}]}
-                ),
+                make_response({"choices": [{"message": {"content": "Recovered!"}}]}),
             ]
         )
 
@@ -763,13 +754,15 @@ class TestCopilotAgentClient:
         mock_session.post = MagicMock(side_effect=lambda *a, **k: next(responses))
         client._http_client = mock_session
 
-        with patch.object(client, "_get_copilot_token", return_value="mock_token"), \
+        with (
+            patch.object(client, "_get_copilot_token", return_value="mock_token"),
             patch.object(
                 agent_client_module,
                 "_COPILOT_EMPTY_RESPONSE_BACKOFF",
                 0.0,
-            ), \
-            patch("asyncio.sleep", new=AsyncMock()):
+            ),
+            patch("asyncio.sleep", new=AsyncMock()),
+        ):
             messages = []
             async for msg in client.receive_response():
                 messages.append(msg)
@@ -805,18 +798,20 @@ class TestCopilotAgentClient:
         mock_session.post = MagicMock(side_effect=lambda *a, **k: make_empty())
         client._http_client = mock_session
 
-        with patch.object(client, "_get_copilot_token", return_value="mock_token"), \
+        with (
+            patch.object(client, "_get_copilot_token", return_value="mock_token"),
             patch.object(
                 agent_client_module,
                 "_COPILOT_MAX_CONSECUTIVE_EMPTY_RESPONSES",
                 2,
-            ), \
+            ),
             patch.object(
                 agent_client_module,
                 "_COPILOT_EMPTY_RESPONSE_BACKOFF",
                 0.0,
-            ), \
-            patch("asyncio.sleep", new=AsyncMock()):
+            ),
+            patch("asyncio.sleep", new=AsyncMock()),
+        ):
             messages = []
             async for msg in client.receive_response():
                 messages.append(msg)
@@ -851,9 +846,7 @@ class TestCopilotAgentClient:
             resp = MagicMock()
             resp.status = 200
             resp.json = AsyncMock(
-                return_value={
-                    "choices": [{"message": {"content": content_text}}]
-                }
+                return_value={"choices": [{"message": {"content": content_text}}]}
             )
             resp.__aenter__ = AsyncMock(return_value=resp)
             resp.__aexit__ = AsyncMock(return_value=None)
@@ -871,7 +864,7 @@ class TestCopilotAgentClient:
         client._http_client = mock_session
 
         # Mock the token method to bypass authentication
-        with patch.object(client, '_get_copilot_token', return_value="mock_token"):
+        with patch.object(client, "_get_copilot_token", return_value="mock_token"):
             results = await client.run_subagents(agents, "Review this PR")
 
         assert len(results) == 2

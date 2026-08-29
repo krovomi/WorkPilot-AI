@@ -22,10 +22,7 @@ from architecture.models import (
 def _make_graph(edges: list[tuple[str, str]]) -> ImportGraph:
     """Helper to create an ImportGraph from (source, target) tuples."""
     return ImportGraph(
-        edges=[
-            ImportEdge(source_file=src, target_module=tgt)
-            for src, tgt in edges
-        ],
+        edges=[ImportEdge(source_file=src, target_module=tgt) for src, tgt in edges],
         files_analyzed=len(set(src for src, _ in edges)),
     )
 
@@ -46,10 +43,12 @@ class TestCycleDetection:
 
     def test_detects_simple_cycle(self):
         """Should detect A -> B -> A cycle."""
-        graph = _make_graph([
-            ("a.py", "b.py"),
-            ("b.py", "a.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("a.py", "b.py"),
+                ("b.py", "a.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config())
         cycles = detector.detect_cycles()
 
@@ -63,11 +62,13 @@ class TestCycleDetection:
 
     def test_detects_three_node_cycle(self):
         """Should detect A -> B -> C -> A cycle."""
-        graph = _make_graph([
-            ("a.py", "b.py"),
-            ("b.py", "c.py"),
-            ("c.py", "a.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("a.py", "b.py"),
+                ("b.py", "c.py"),
+                ("c.py", "a.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config())
         cycles = detector.detect_cycles()
 
@@ -82,11 +83,13 @@ class TestCycleDetection:
 
     def test_no_cycle_in_dag(self):
         """Should not detect cycles in a DAG."""
-        graph = _make_graph([
-            ("a.py", "b.py"),
-            ("b.py", "c.py"),
-            ("a.py", "c.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("a.py", "b.py"),
+                ("b.py", "c.py"),
+                ("a.py", "c.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config())
         cycles = detector.detect_cycles()
 
@@ -94,11 +97,13 @@ class TestCycleDetection:
 
     def test_no_cycle_in_linear_chain(self):
         """Should not detect cycles in a linear chain."""
-        graph = _make_graph([
-            ("a.py", "b.py"),
-            ("b.py", "c.py"),
-            ("c.py", "d.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("a.py", "b.py"),
+                ("b.py", "c.py"),
+                ("c.py", "d.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config())
         cycles = detector.detect_cycles()
 
@@ -114,9 +119,11 @@ class TestCycleDetection:
 
     def test_self_import_not_counted_as_cycle(self):
         """Self-imports should not be counted as cycles."""
-        graph = _make_graph([
-            ("a.py", "a.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("a.py", "a.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config())
         cycles = detector.detect_cycles()
 
@@ -125,10 +132,12 @@ class TestCycleDetection:
 
     def test_deduplicates_cycles(self):
         """Should not report the same cycle with different starting nodes."""
-        graph = _make_graph([
-            ("a.py", "b.py"),
-            ("b.py", "a.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("a.py", "b.py"),
+                ("b.py", "a.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config())
         cycles = detector.detect_cycles()
 
@@ -141,10 +150,12 @@ class TestCycleViolations:
 
     def test_returns_violations_for_cycles(self):
         """Should return ArchitectureViolation objects for detected cycles."""
-        graph = _make_graph([
-            ("a.py", "b.py"),
-            ("b.py", "a.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("a.py", "b.py"),
+                ("b.py", "a.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config())
         violations = detector.get_cycle_violations()
 
@@ -156,10 +167,12 @@ class TestCycleViolations:
 
     def test_skips_when_disabled(self):
         """Should return empty list when circular dependency check is disabled."""
-        graph = _make_graph([
-            ("a.py", "b.py"),
-            ("b.py", "a.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("a.py", "b.py"),
+                ("b.py", "a.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config(no_circular=False))
         violations = detector.get_cycle_violations()
 
@@ -167,10 +180,12 @@ class TestCycleViolations:
 
     def test_inferred_config_produces_warnings(self):
         """Inferred configs should produce warnings."""
-        graph = _make_graph([
-            ("a.py", "b.py"),
-            ("b.py", "a.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("a.py", "b.py"),
+                ("b.py", "a.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config(inferred=True))
         violations = detector.get_cycle_violations()
 
@@ -183,9 +198,11 @@ class TestBoundedContextViolations:
 
     def test_detects_cross_context_import(self):
         """Should detect imports crossing bounded context boundaries."""
-        graph = _make_graph([
-            ("auth/login.py", "billing/invoice.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("auth/login.py", "billing/invoice.py"),
+            ]
+        )
         config = _make_config(
             bounded_contexts=[
                 BoundedContextConfig(
@@ -211,9 +228,11 @@ class TestBoundedContextViolations:
 
     def test_allows_shared_imports(self):
         """Should allow imports from 'shared' context."""
-        graph = _make_graph([
-            ("auth/login.py", "shared/utils.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("auth/login.py", "shared/utils.py"),
+            ]
+        )
         config = _make_config(
             bounded_contexts=[
                 BoundedContextConfig(
@@ -236,9 +255,11 @@ class TestBoundedContextViolations:
 
     def test_allows_same_context_imports(self):
         """Should allow imports within the same context."""
-        graph = _make_graph([
-            ("auth/login.py", "auth/utils.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("auth/login.py", "auth/utils.py"),
+            ]
+        )
         config = _make_config(
             bounded_contexts=[
                 BoundedContextConfig(
@@ -256,9 +277,11 @@ class TestBoundedContextViolations:
 
     def test_no_violations_without_contexts(self):
         """Should return empty list when no bounded contexts configured."""
-        graph = _make_graph([
-            ("auth/login.py", "billing/invoice.py"),
-        ])
+        graph = _make_graph(
+            [
+                ("auth/login.py", "billing/invoice.py"),
+            ]
+        )
         detector = CircularDependencyDetector(graph, _make_config())
         violations = detector.check_bounded_context_violations()
 

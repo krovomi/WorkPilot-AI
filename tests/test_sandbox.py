@@ -32,6 +32,7 @@ from apps.backend.security.sandbox import (
 # ResourceLimits tests
 # ---------------------------------------------------------------------------
 
+
 class TestResourceLimits:
     def test_defaults(self):
         limits = ResourceLimits()
@@ -53,6 +54,7 @@ class TestResourceLimits:
 # ---------------------------------------------------------------------------
 # PathRule tests
 # ---------------------------------------------------------------------------
+
 
 class TestPathRule:
     def test_exact_match(self):
@@ -76,6 +78,7 @@ class TestPathRule:
 # SecurityViolation tests
 # ---------------------------------------------------------------------------
 
+
 class TestSecurityViolation:
     def test_create_violation(self):
         v = SecurityViolation(
@@ -92,7 +95,9 @@ class TestSecurityViolation:
             violation_id="vio-1",
             violation_type="resource_exceeded",
             description="RAM exceeded",
-            resource="memory_mb", value=3000, limit=2048,
+            resource="memory_mb",
+            value=3000,
+            limit=2048,
         )
         d = v.to_dict()
         assert d["violation_type"] == "resource_exceeded"
@@ -102,10 +107,12 @@ class TestSecurityViolation:
 # Snapshot tests
 # ---------------------------------------------------------------------------
 
+
 class TestSnapshot:
     def test_create_snapshot(self):
         snap = Snapshot(
-            snapshot_id="snap-1", sandbox_id="sbx-1",
+            snapshot_id="snap-1",
+            sandbox_id="sbx-1",
             files=[FileSnapshot(path="a.py", content_hash="abc", exists=True)],
         )
         assert snap.file_count == 1
@@ -121,10 +128,13 @@ class TestSnapshot:
 # SandboxConfig tests
 # ---------------------------------------------------------------------------
 
+
 class TestSandboxConfig:
     def test_create_config(self):
         config = SandboxConfig(
-            sandbox_id="sbx-1", task_id="task-1", agent_type="coder",
+            sandbox_id="sbx-1",
+            task_id="task-1",
+            agent_type="coder",
         )
         assert config.status == SandboxStatus.CREATED
         assert config.mode == SandboxMode.NORMAL
@@ -132,7 +142,9 @@ class TestSandboxConfig:
 
     def test_dry_run_mode(self):
         config = SandboxConfig(
-            sandbox_id="sbx-1", task_id="task-1", agent_type="coder",
+            sandbox_id="sbx-1",
+            task_id="task-1",
+            agent_type="coder",
             mode="dry_run",
         )
         assert config.is_dry_run
@@ -151,7 +163,9 @@ class TestSandboxConfig:
 
     def test_check_path_access_blocked(self):
         config = SandboxConfig(
-            sandbox_id="sbx-1", task_id="t-1", agent_type="coder",
+            sandbox_id="sbx-1",
+            task_id="t-1",
+            agent_type="coder",
             blocked_paths=[".env"],
         )
         config.add_allowed_path("src/")
@@ -159,7 +173,9 @@ class TestSandboxConfig:
 
     def test_to_dict(self):
         config = SandboxConfig(
-            sandbox_id="sbx-1", task_id="t-1", agent_type="coder",
+            sandbox_id="sbx-1",
+            task_id="t-1",
+            agent_type="coder",
         )
         d = config.to_dict()
         assert d["sandbox_id"] == "sbx-1"
@@ -169,6 +185,7 @@ class TestSandboxConfig:
 # ---------------------------------------------------------------------------
 # SandboxManager — Lifecycle
 # ---------------------------------------------------------------------------
+
 
 class TestManagerLifecycle:
     def test_create_sandbox(self):
@@ -181,7 +198,9 @@ class TestManagerLifecycle:
     def test_create_sandbox_with_options(self):
         manager = SandboxManager()
         sandbox = manager.create_sandbox(
-            "task-1", "coder", mode="dry_run",
+            "task-1",
+            "coder",
+            mode="dry_run",
             resource_limits={"memory_mb": 512},
             allowed_paths=["src/"],
             blocked_paths=["dist/"],
@@ -214,6 +233,7 @@ class TestManagerLifecycle:
 # SandboxManager — Path validation
 # ---------------------------------------------------------------------------
 
+
 class TestManagerPathValidation:
     def test_validate_allowed_path(self):
         manager = SandboxManager()
@@ -223,7 +243,9 @@ class TestManagerPathValidation:
     def test_validate_blocked_path(self):
         manager = SandboxManager()
         sandbox = manager.create_sandbox("t-1", "coder", allowed_paths=["src/"])
-        assert not manager.validate_path_access(sandbox.sandbox_id, "tests/secret.py", "write")
+        assert not manager.validate_path_access(
+            sandbox.sandbox_id, "tests/secret.py", "write"
+        )
 
     def test_validate_default_blocked_paths(self):
         manager = SandboxManager()
@@ -243,7 +265,9 @@ class TestManagerPathValidation:
         manager = SandboxManager()
         sandbox = manager.create_sandbox("t-1", "coder")
         # No allowed_paths = permissive (but blocked paths still apply)
-        assert manager.validate_path_access(sandbox.sandbox_id, "random/file.py", "write")
+        assert manager.validate_path_access(
+            sandbox.sandbox_id, "random/file.py", "write"
+        )
 
     def test_nonexistent_sandbox_denied(self):
         manager = SandboxManager()
@@ -253,6 +277,7 @@ class TestManagerPathValidation:
 # ---------------------------------------------------------------------------
 # SandboxManager — Command validation
 # ---------------------------------------------------------------------------
+
 
 class TestManagerCommandValidation:
     def test_allowed_command(self):
@@ -275,37 +300,45 @@ class TestManagerCommandValidation:
 # SandboxManager — Resource limits
 # ---------------------------------------------------------------------------
 
+
 class TestManagerResourceLimits:
     def test_within_limits(self):
         manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder",
-                                          resource_limits={"memory_mb": 1024})
+        sandbox = manager.create_sandbox(
+            "t-1", "coder", resource_limits={"memory_mb": 1024}
+        )
         assert manager.check_resource_limit(sandbox.sandbox_id, "memory_mb", 512)
 
     def test_exceeded_limits(self):
         manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder",
-                                          resource_limits={"memory_mb": 1024})
+        sandbox = manager.create_sandbox(
+            "t-1", "coder", resource_limits={"memory_mb": 1024}
+        )
         assert not manager.check_resource_limit(sandbox.sandbox_id, "memory_mb", 2048)
 
     def test_violation_on_exceed(self):
         manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder",
-                                          resource_limits={"max_files_written": 5})
+        sandbox = manager.create_sandbox(
+            "t-1", "coder", resource_limits={"max_files_written": 5}
+        )
         manager.check_resource_limit(sandbox.sandbox_id, "max_files_written", 10)
         violations = manager.get_violations(sandbox.sandbox_id)
-        assert any(v.violation_type == ViolationType.RESOURCE_EXCEEDED for v in violations)
+        assert any(
+            v.violation_type == ViolationType.RESOURCE_EXCEEDED for v in violations
+        )
 
 
 # ---------------------------------------------------------------------------
 # SandboxManager — Snapshots
 # ---------------------------------------------------------------------------
 
+
 class TestManagerSnapshots:
     def test_create_snapshot_nonexistent_paths(self):
         manager = SandboxManager(project_root=tempfile.gettempdir())
-        sandbox = manager.create_sandbox("t-1", "coder",
-                                          allowed_paths=["nonexistent_dir/"])
+        sandbox = manager.create_sandbox(
+            "t-1", "coder", allowed_paths=["nonexistent_dir/"]
+        )
         snap_id = manager.create_snapshot(sandbox.sandbox_id)
         assert snap_id is not None
         snapshots = manager.get_snapshots(sandbox.sandbox_id)
@@ -355,12 +388,15 @@ class TestManagerSnapshots:
 # SandboxManager — Execution
 # ---------------------------------------------------------------------------
 
+
 class TestManagerExecution:
     def test_execute_success(self):
         manager = SandboxManager()
         sandbox = manager.create_sandbox("t-1", "coder")
         result = manager.execute_in_sandbox(
-            sandbox.sandbox_id, lambda: "hello", auto_snapshot=False,
+            sandbox.sandbox_id,
+            lambda: "hello",
+            auto_snapshot=False,
         )
         assert result.success
         assert result.output == "hello"
@@ -373,8 +409,7 @@ class TestManagerExecution:
                 f.write("original")
 
             manager = SandboxManager(project_root=tmpdir)
-            sandbox = manager.create_sandbox("t-1", "coder",
-                                              allowed_paths=["test.txt"])
+            sandbox = manager.create_sandbox("t-1", "coder", allowed_paths=["test.txt"])
 
             def failing_func():
                 with open(test_file, "w") as f:
@@ -400,8 +435,10 @@ class TestManagerExecution:
         manager = SandboxManager()
         sandbox = manager.create_sandbox("t-1", "coder")
         result = manager.execute_in_sandbox(
-            sandbox.sandbox_id, lambda x, y: x + y,
-            args=(3, 4), auto_snapshot=False,
+            sandbox.sandbox_id,
+            lambda x, y: x + y,
+            args=(3, 4),
+            auto_snapshot=False,
         )
         assert result.success
         assert result.output == 7
@@ -410,7 +447,9 @@ class TestManagerExecution:
         manager = SandboxManager()
         sandbox = manager.create_sandbox("t-1", "coder")
         result = manager.execute_in_sandbox(
-            sandbox.sandbox_id, lambda: "done", auto_snapshot=False,
+            sandbox.sandbox_id,
+            lambda: "done",
+            auto_snapshot=False,
         )
         assert result.duration_s >= 0
 
@@ -418,7 +457,9 @@ class TestManagerExecution:
         manager = SandboxManager()
         sandbox = manager.create_sandbox("t-1", "coder")
         result = manager.execute_in_sandbox(
-            sandbox.sandbox_id, lambda: 42, auto_snapshot=False,
+            sandbox.sandbox_id,
+            lambda: 42,
+            auto_snapshot=False,
         )
         assert sandbox.execution_result is result
 
@@ -427,13 +468,16 @@ class TestManagerExecution:
 # SandboxManager — Dry-run mode
 # ---------------------------------------------------------------------------
 
+
 class TestManagerDryRun:
     def test_dry_run_produces_plan(self):
         manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder", mode="dry_run",
-                                          allowed_paths=["src/"])
+        sandbox = manager.create_sandbox(
+            "t-1", "coder", mode="dry_run", allowed_paths=["src/"]
+        )
         result = manager.execute_in_sandbox(
-            sandbox.sandbox_id, lambda: "should not run",
+            sandbox.sandbox_id,
+            lambda: "should not run",
         )
         assert result.success
         assert len(result.dry_run_plan) > 0
@@ -444,7 +488,8 @@ class TestManagerDryRun:
         sandbox = manager.create_sandbox("t-1", "coder", mode="dry_run")
         side_effect_marker = []
         result = manager.execute_in_sandbox(
-            sandbox.sandbox_id, lambda: side_effect_marker.append("executed"),
+            sandbox.sandbox_id,
+            lambda: side_effect_marker.append("executed"),
         )
         assert result.success
         assert len(side_effect_marker) == 0  # Function was NOT called
@@ -453,7 +498,8 @@ class TestManagerDryRun:
         manager = SandboxManager()
         sandbox = manager.create_sandbox("task-42", "qa", mode="dry_run")
         result = manager.execute_in_sandbox(
-            sandbox.sandbox_id, lambda: None,
+            sandbox.sandbox_id,
+            lambda: None,
         )
         plan_text = "\n".join(result.dry_run_plan)
         assert "task-42" in plan_text
@@ -463,6 +509,7 @@ class TestManagerDryRun:
 # ---------------------------------------------------------------------------
 # SandboxManager — Stats
 # ---------------------------------------------------------------------------
+
 
 class TestManagerStats:
     def test_get_stats_empty(self):

@@ -39,6 +39,7 @@ from apps.backend.scheduling.cost_estimator import (
 # TokenUsage
 # -----------------------------------------------------------------------
 
+
 class TestTokenUsage:
     def test_create_token_usage(self):
         usage = TokenUsage(
@@ -57,8 +58,13 @@ class TestTokenUsage:
 
     def test_token_usage_to_dict(self):
         usage = TokenUsage(
-            project_id="p1", provider="openai", model="gpt-4o",
-            input_tokens=100, output_tokens=50, cost=0.001, task_id="t1",
+            project_id="p1",
+            provider="openai",
+            model="gpt-4o",
+            input_tokens=100,
+            output_tokens=50,
+            cost=0.001,
+            task_id="t1",
         )
         d = usage.to_dict()
         assert d["project_id"] == "p1"
@@ -68,8 +74,12 @@ class TestTokenUsage:
 
     def test_token_usage_default_timestamp(self):
         usage = TokenUsage(
-            project_id="p1", provider="a", model="m",
-            input_tokens=0, output_tokens=0, cost=0,
+            project_id="p1",
+            provider="a",
+            model="m",
+            input_tokens=0,
+            output_tokens=0,
+            cost=0,
         )
         assert isinstance(usage.timestamp, datetime)
         assert usage.timestamp.tzinfo is not None
@@ -78,6 +88,7 @@ class TestTokenUsage:
 # -----------------------------------------------------------------------
 # BudgetAlert
 # -----------------------------------------------------------------------
+
 
 class TestBudgetAlert:
     def test_create_budget_alert(self):
@@ -94,9 +105,12 @@ class TestBudgetAlert:
 
     def test_budget_alert_to_dict(self):
         alert = BudgetAlert(
-            project_id="p1", level=AlertLevel.EXCEEDED,
-            message="Over budget", current_spend=55.0,
-            budget_limit=50.0, percentage=1.1,
+            project_id="p1",
+            level=AlertLevel.EXCEEDED,
+            message="Over budget",
+            current_spend=55.0,
+            budget_limit=50.0,
+            percentage=1.1,
         )
         d = alert.to_dict()
         assert d["level"] == "exceeded"
@@ -107,20 +121,26 @@ class TestBudgetAlert:
 # CostEstimate
 # -----------------------------------------------------------------------
 
+
 class TestCostEstimate:
     def test_create_cost_estimate(self):
         est = CostEstimate(
-            provider="anthropic", model="claude-sonnet-4-20250514",
-            estimated_input_tokens=2000, estimated_output_tokens=1000,
-            estimated_cost=0.021, confidence="high",
+            provider="anthropic",
+            model="claude-sonnet-4-20250514",
+            estimated_input_tokens=2000,
+            estimated_output_tokens=1000,
+            estimated_cost=0.021,
+            confidence="high",
         )
         assert est.estimated_cost == 0.021
         assert est.confidence == "high"
 
     def test_cost_estimate_to_dict(self):
         est = CostEstimate(
-            provider="openai", model="gpt-4o",
-            estimated_input_tokens=1000, estimated_output_tokens=500,
+            provider="openai",
+            model="gpt-4o",
+            estimated_input_tokens=1000,
+            estimated_output_tokens=500,
             estimated_cost=0.01,
         )
         d = est.to_dict()
@@ -131,6 +151,7 @@ class TestCostEstimate:
 # -----------------------------------------------------------------------
 # ProjectBudget
 # -----------------------------------------------------------------------
+
 
 class TestProjectBudget:
     def test_create_project_budget(self):
@@ -144,6 +165,7 @@ class TestProjectBudget:
 # -----------------------------------------------------------------------
 # CostEstimator — Pricing
 # -----------------------------------------------------------------------
+
 
 class TestCostEstimatorPricing:
     def test_get_known_token_price(self):
@@ -174,8 +196,10 @@ class TestCostEstimatorPricing:
     def test_calculate_cost_anthropic(self):
         estimator = CostEstimator()
         cost = estimator.calculate_cost(
-            "anthropic", "claude-sonnet-4-20250514",
-            input_tokens=1_000_000, output_tokens=1_000_000,
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            input_tokens=1_000_000,
+            output_tokens=1_000_000,
         )
         assert cost == 18.0  # 3.0 + 15.0
 
@@ -189,12 +213,17 @@ class TestCostEstimatorPricing:
 # CostEstimator — Usage tracking
 # -----------------------------------------------------------------------
 
+
 class TestCostEstimatorUsage:
     def test_record_usage(self):
         estimator = CostEstimator()
         usage = estimator.record_usage(
-            "proj-1", "anthropic", "claude-sonnet-4-20250514",
-            input_tokens=1000, output_tokens=500, task_id="t1",
+            "proj-1",
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            input_tokens=1000,
+            output_tokens=500,
+            task_id="t1",
         )
         assert usage.cost > 0
         assert usage.project_id == "proj-1"
@@ -216,8 +245,12 @@ class TestCostEstimatorUsage:
 
     def test_get_usages_filter_by_task(self):
         estimator = CostEstimator()
-        estimator.record_usage("p1", "anthropic", "claude-sonnet-4-20250514", 100, 50, task_id="t1")
-        estimator.record_usage("p1", "anthropic", "claude-sonnet-4-20250514", 200, 100, task_id="t2")
+        estimator.record_usage(
+            "p1", "anthropic", "claude-sonnet-4-20250514", 100, 50, task_id="t1"
+        )
+        estimator.record_usage(
+            "p1", "anthropic", "claude-sonnet-4-20250514", 200, 100, task_id="t2"
+        )
         usages = estimator.get_usages(task_id="t1")
         assert len(usages) == 1
 
@@ -240,6 +273,7 @@ class TestCostEstimatorUsage:
 # -----------------------------------------------------------------------
 # CostEstimator — Budget management
 # -----------------------------------------------------------------------
+
 
 class TestCostEstimatorBudget:
     def test_set_budget(self):
@@ -270,7 +304,9 @@ class TestCostEstimatorBudget:
     def test_budget_exceeded_alert(self):
         estimator = CostEstimator()
         estimator.set_budget("p1", 0.0001)  # Very low budget
-        estimator.record_usage("p1", "anthropic", "claude-sonnet-4-20250514", 10000, 5000)
+        estimator.record_usage(
+            "p1", "anthropic", "claude-sonnet-4-20250514", 10000, 5000
+        )
         alerts = estimator.get_alerts(project_id="p1", level=AlertLevel.EXCEEDED)
         assert len(alerts) >= 1
 
@@ -294,24 +330,35 @@ class TestCostEstimatorBudget:
 # CostEstimator — Cost estimation (pre-execution)
 # -----------------------------------------------------------------------
 
+
 class TestCostEstimatorEstimation:
     def test_estimate_task_cost(self):
         estimator = CostEstimator()
-        est = estimator.estimate_task_cost("anthropic", "claude-sonnet-4-20250514", "coding")
+        est = estimator.estimate_task_cost(
+            "anthropic", "claude-sonnet-4-20250514", "coding"
+        )
         assert est.estimated_cost > 0
         assert est.estimated_input_tokens > 0
         assert est.estimated_output_tokens > 0
 
     def test_estimate_with_complexity_multiplier(self):
         estimator = CostEstimator()
-        est1 = estimator.estimate_task_cost("anthropic", "claude-sonnet-4-20250514", "coding", 1.0)
-        est2 = estimator.estimate_task_cost("anthropic", "claude-sonnet-4-20250514", "coding", 2.0)
+        est1 = estimator.estimate_task_cost(
+            "anthropic", "claude-sonnet-4-20250514", "coding", 1.0
+        )
+        est2 = estimator.estimate_task_cost(
+            "anthropic", "claude-sonnet-4-20250514", "coding", 2.0
+        )
         assert est2.estimated_cost > est1.estimated_cost
 
     def test_estimate_unknown_task_type_uses_general(self):
         estimator = CostEstimator()
-        est = estimator.estimate_task_cost("anthropic", "claude-sonnet-4-20250514", "unknown_type")
-        general_est = estimator.estimate_task_cost("anthropic", "claude-sonnet-4-20250514", "general")
+        est = estimator.estimate_task_cost(
+            "anthropic", "claude-sonnet-4-20250514", "unknown_type"
+        )
+        general_est = estimator.estimate_task_cost(
+            "anthropic", "claude-sonnet-4-20250514", "general"
+        )
         assert est.estimated_cost == general_est.estimated_cost
 
     def test_estimate_local_model_is_free(self):
@@ -321,8 +368,12 @@ class TestCostEstimatorEstimation:
 
     def test_estimate_confidence_varies(self):
         estimator = CostEstimator()
-        est_low = estimator.estimate_task_cost("anthropic", "claude-sonnet-4-20250514", "coding", 3.0)
-        est_high = estimator.estimate_task_cost("anthropic", "claude-sonnet-4-20250514", "coding", 1.5)
+        est_low = estimator.estimate_task_cost(
+            "anthropic", "claude-sonnet-4-20250514", "coding", 3.0
+        )
+        est_high = estimator.estimate_task_cost(
+            "anthropic", "claude-sonnet-4-20250514", "coding", 1.5
+        )
         assert est_low.confidence == "low"
         assert est_high.confidence == "high"
 
@@ -331,10 +382,13 @@ class TestCostEstimatorEstimation:
 # CostEstimator — Reporting
 # -----------------------------------------------------------------------
 
+
 class TestCostEstimatorReporting:
     def test_get_project_report(self):
         estimator = CostEstimator()
-        estimator.record_usage("p1", "anthropic", "claude-sonnet-4-20250514", 1000, 500, task_id="t1")
+        estimator.record_usage(
+            "p1", "anthropic", "claude-sonnet-4-20250514", 1000, 500, task_id="t1"
+        )
         estimator.record_usage("p1", "openai", "gpt-4o", 500, 200, task_id="t2")
         report = estimator.get_project_report("p1")
         assert report["project_id"] == "p1"
@@ -377,6 +431,7 @@ class TestCostEstimatorReporting:
 # CostEstimator — Suggestions
 # -----------------------------------------------------------------------
 
+
 class TestCostEstimatorSuggestions:
     def test_suggest_cheapest_model(self):
         estimator = CostEstimator()
@@ -403,6 +458,7 @@ class TestCostEstimatorSuggestions:
 # -----------------------------------------------------------------------
 # Provider pricing data validation
 # -----------------------------------------------------------------------
+
 
 class TestProviderPricing:
     def test_pricing_structure(self):

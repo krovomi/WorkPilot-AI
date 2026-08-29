@@ -49,6 +49,7 @@ def _is_safe_report_url(url: str) -> bool:
         return False
     return True
 
+
 # GitHub CLI permission scope required for Copilot usage metrics
 ADMIN_ORG_PERMISSION = "admin:org"
 
@@ -56,7 +57,7 @@ ADMIN_ORG_PERMISSION = "admin:org"
 class CopilotUsageConnector:
     """
     Connecteur pour récupérer les métriques d'utilisation GitHub Copilot.
-    
+
     Ce connecteur utilise l'API REST GitHub pour récupérer les données d'utilisation
     Copilot au niveau de l'organisation ou de l'entreprise.
     """
@@ -64,7 +65,7 @@ class CopilotUsageConnector:
     def __init__(self, gh_token: str | None = None):
         """
         Initialise le connecteur Copilot.
-        
+
         Args:
             gh_token: Token GitHub d'authentification (optionnel, utilise gh CLI si non fourni)
         """
@@ -78,29 +79,27 @@ class CopilotUsageConnector:
         resolved = shutil.which("gh")
         return resolved or "gh"
 
-    def _run_gh_command(self, args: list[str], timeout: int = 15) -> subprocess.CompletedProcess:
+    def _run_gh_command(
+        self, args: list[str], timeout: int = 15
+    ) -> subprocess.CompletedProcess:
         """
         Exécute une commande gh CLI avec authentification.
-        
+
         Args:
             args: Arguments de la commande gh
             timeout: Timeout en secondes
-            
+
         Returns:
             Résultat de la commande subprocess
-            
+
         Raises:
             RuntimeError: Si la commande échoue
         """
         cmd = [self.gh_executable] + args
-        
+
         try:
             result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                check=True
+                cmd, capture_output=True, text=True, timeout=timeout, check=True
             )
             return result
         except subprocess.CalledProcessError as e:
@@ -115,17 +114,19 @@ class CopilotUsageConnector:
             logger.error(error_msg)
             raise RuntimeError(error_msg) from None
         except FileNotFoundError as e:
-            error_msg = "GitHub CLI (gh) not found. Install from https://cli.github.com/"
+            error_msg = (
+                "GitHub CLI (gh) not found. Install from https://cli.github.com/"
+            )
             logger.error(error_msg)
             raise RuntimeError(error_msg)
 
     def _get_authenticated_user(self) -> str:
         """
         Récupère le nom d'utilisateur GitHub authentifié.
-        
+
         Returns:
             Nom d'utilisateur GitHub
-            
+
         Raises:
             RuntimeError: Si non authentifié
         """
@@ -140,10 +141,10 @@ class CopilotUsageConnector:
     def get_copilot_enterprise_usage(self) -> dict[str, Any]:
         """
         Récupère les métriques d'utilisation Copilot au niveau de l'entreprise.
-        
+
         Returns:
             Dictionnaire contenant les métriques d'utilisation
-            
+
         Raises:
             RuntimeError: Si la récupération échoue
         """
@@ -153,53 +154,67 @@ class CopilotUsageConnector:
             logger.info(f"Authenticated as GitHub user: {username}")
 
             # Récupérer les entreprises de l'utilisateur
-            enterprises_result = self._run_gh_command([
-                "api",
-                "user/enterprises",
-                "--jq", ".[].slug"
-            ])
-            
+            enterprises_result = self._run_gh_command(
+                ["api", "user/enterprises", "--jq", ".[].slug"]
+            )
+
             if enterprises_result.returncode != 0:
                 raise RuntimeError("Failed to fetch user enterprises")
-                
-            enterprises = [line.strip() for line in enterprises_result.stdout.strip().split('\n') if line.strip()]
-            
+
+            enterprises = [
+                line.strip()
+                for line in enterprises_result.stdout.strip().split("\n")
+                if line.strip()
+            ]
+
             if not enterprises:
                 raise RuntimeError("No enterprises found for user")
-            
+
             # Pour chaque entreprise, essayer de récupérer les métriques du jour précédent
             from datetime import date, timedelta
+
             yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-            
+
             for enterprise in enterprises:
                 try:
                     # Utiliser le bon endpoint pour les métriques d'entreprise
-                    usage_result = self._run_gh_command([
-                        "api",
-                        f"/enterprises/{enterprise}/copilot/metrics/reports/enterprise-1-day",
-                        "--method", "GET",
-                        "-f", f"day={yesterday}"
-                    ])
-                    
+                    usage_result = self._run_gh_command(
+                        [
+                            "api",
+                            f"/enterprises/{enterprise}/copilot/metrics/reports/enterprise-1-day",
+                            "--method",
+                            "GET",
+                            "-f",
+                            f"day={yesterday}",
+                        ]
+                    )
+
                     if usage_result.returncode == 0 and usage_result.stdout.strip():
                         usage_data = json.loads(usage_result.stdout)
-                        
+
                         # Les données retournées contiennent des liens de téléchargement
-                        if "download_links" in usage_data and usage_data["download_links"]:
+                        if (
+                            "download_links" in usage_data
+                            and usage_data["download_links"]
+                        ):
                             # Télécharger le premier rapport
                             report_url = usage_data["download_links"][0]
                             report_data = self._download_report(report_url)
-                            return self._format_usage_data(report_data, "enterprise", enterprise)
+                            return self._format_usage_data(
+                                report_data, "enterprise", enterprise
+                            )
                         else:
-                            logger.warning(f"No download links found for enterprise {enterprise}")
+                            logger.warning(
+                                f"No download links found for enterprise {enterprise}"
+                            )
                             continue
-                        
+
                 except RuntimeError as e:
                     logger.debug(f"No Copilot data for enterprise {enterprise}: {e}")
                     continue
-            
+
             raise RuntimeError("No Copilot usage data found for any enterprise")
-            
+
         except RuntimeError as e:
             logger.warning(f"Failed to get enterprise usage: {e}")
             # Fallback sur les métriques d'organisation
@@ -208,13 +223,13 @@ class CopilotUsageConnector:
     def _download_report(self, report_url: str) -> dict[str, Any]:
         """
         Télécharge et analyse un rapport Copilot depuis une URL signée.
-        
+
         Args:
             report_url: URL signée pour télécharger le rapport
-            
+
         Returns:
             Données du rapport analysées
-            
+
         Raises:
             RuntimeError: Si le téléchargement échoue
         """
@@ -226,13 +241,14 @@ class CopilotUsageConnector:
 
         try:
             import requests
+
             # allow_redirects=False so a 30x to an internal host can't bypass
             # the validation we just did above.
             response = requests.get(report_url, timeout=30, allow_redirects=False)
             response.raise_for_status()
 
             # Le rapport est généralement un fichier JSON
-            if report_url.endswith('.json'):
+            if report_url.endswith(".json"):
                 return response.json()
             else:
                 # Pour les autres formats, essayer de parser comme JSON
@@ -242,45 +258,55 @@ class CopilotUsageConnector:
             logger.error(f"Failed to download report from {report_url}: {e}")
             raise RuntimeError(f"Failed to download report: {e}")
 
-    def _fetch_single_organization_usage(self, org: str, yesterday: str) -> dict[str, Any] | None:
+    def _fetch_single_organization_usage(
+        self, org: str, yesterday: str
+    ) -> dict[str, Any] | None:
         """
         Fetch usage data for a single organization.
-        
+
         Args:
             org: Organization name
             yesterday: Date string for yesterday in YYYY-MM-DD format
-            
+
         Returns:
             Formatted usage data if successful, None otherwise
         """
-        usage_result = self._run_gh_command([
-            "api",
-            f"/orgs/{org}/copilot/metrics/reports/organization-1-day",
-            "--method", "GET",
-            "-f", f"day={yesterday}"
-        ])
-        
+        usage_result = self._run_gh_command(
+            [
+                "api",
+                f"/orgs/{org}/copilot/metrics/reports/organization-1-day",
+                "--method",
+                "GET",
+                "-f",
+                f"day={yesterday}",
+            ]
+        )
+
         if usage_result.returncode == 0 and usage_result.stdout.strip():
             usage_data = json.loads(usage_result.stdout)
-            
+
             if "download_links" in usage_data and usage_data["download_links"]:
                 report_url = usage_data["download_links"][0]
                 report_data = self._download_report(report_url)
-                formatted_data = self._format_usage_data(report_data, "organization", org)
-                logger.info(f"Successfully retrieved Copilot usage for organization: {org}")
+                formatted_data = self._format_usage_data(
+                    report_data, "organization", org
+                )
+                logger.info(
+                    f"Successfully retrieved Copilot usage for organization: {org}"
+                )
                 return formatted_data
             else:
                 logger.warning(f"No download links found for organization {org}")
-        
+
         return None
 
     def _categorize_organization_error(self, error: RuntimeError) -> str:
         """
         Categorize an organization fetch error.
-        
+
         Args:
             error: The RuntimeError to categorize
-            
+
         Returns:
             Error category: "permission", "not_found", or "other"
         """
@@ -294,34 +320,37 @@ class CopilotUsageConnector:
     def get_copilot_organization_usage(self) -> dict[str, Any]:
         """
         Récupère les métriques d'utilisation Copilot au niveau de l'organisation.
-        
+
         Returns:
             Dictionnaire contenant les métriques d'utilisation
-            
+
         Raises:
             RuntimeError: Si la récupération échoue
         """
         try:
-            orgs_result = self._run_gh_command([
-                "api",
-                "user/orgs",
-                "--jq", ".[].login"
-            ])
-            
+            orgs_result = self._run_gh_command(
+                ["api", "user/orgs", "--jq", ".[].login"]
+            )
+
             if orgs_result.returncode != 0:
                 raise RuntimeError("Failed to fetch user organizations")
-                
-            organizations = [line.strip() for line in orgs_result.stdout.strip().split('\n') if line.strip()]
-            
+
+            organizations = [
+                line.strip()
+                for line in orgs_result.stdout.strip().split("\n")
+                if line.strip()
+            ]
+
             if not organizations:
                 raise RuntimeError("No organizations found for user")
-            
+
             from datetime import date, timedelta
+
             yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-            
+
             permission_errors = []
             not_found_errors = []
-            
+
             for org in organizations:
                 try:
                     usage_data = self._fetch_single_organization_usage(org, yesterday)
@@ -336,21 +365,23 @@ class CopilotUsageConnector:
                     else:
                         logger.debug(f"No Copilot data for organization {org}: {e}")
                     continue
-            
+
             self._raise_organization_errors(permission_errors, not_found_errors)
-            
+
         except RuntimeError as e:
             logger.error(f"Failed to get organization usage: {e}")
             raise
 
-    def _raise_organization_errors(self, permission_errors: list[str], not_found_errors: list[str]) -> None:
+    def _raise_organization_errors(
+        self, permission_errors: list[str], not_found_errors: list[str]
+    ) -> None:
         """
         Raise appropriate error based on collected organization errors.
-        
+
         Args:
             permission_errors: List of permission-related error messages
             not_found_errors: List of not-found error messages
-            
+
         Raises:
             RuntimeError: With appropriate error message
         """
@@ -470,23 +501,26 @@ class CopilotUsageConnector:
             return self.get_copilot_organization_usage()
         except RuntimeError as e:
             organization_error = e
-        
+
         # Si tout échoue, vérifier si c'est un problème de permissions
         all_errors = [str(enterprise_error or ""), str(organization_error or "")]
         combined_error_msg = " ".join(all_errors).lower()
-        
-        if ("insufficient permissions" in combined_error_msg or ADMIN_ORG_PERMISSION in combined_error_msg):
+
+        if (
+            "insufficient permissions" in combined_error_msg
+            or ADMIN_ORG_PERMISSION in combined_error_msg
+        ):
             return {
                 "error": "INSUFFICIENT_PERMISSIONS",
                 "message": "Permissions insuffisantes pour accéder aux métriques Copilot. Cette fonctionnalité nécessite des permissions d'administrateur d'organisation ou d'entreprise.",
                 "suggestions": [
                     f"Exécutez: gh auth refresh -h github.com -s {ADMIN_ORG_PERMISSION}",
                     "Assurez-vous d'être administrateur de l'organisation Copilot",
-                    "Contactez votre administrateur GitHub pour obtenir les permissions nécessaires"
+                    "Contactez votre administrateur GitHub pour obtenir les permissions nécessaires",
                 ],
                 "provider": "copilot",
                 "available": False,
-                "permission_required": ADMIN_ORG_PERMISSION
+                "permission_required": ADMIN_ORG_PERMISSION,
             }
         else:
             logger.error(
@@ -500,21 +534,23 @@ class CopilotUsageConnector:
                     "Verify GitHub CLI authentication: gh auth status",
                     "Ensure Copilot is enabled for your organization",
                     "Check you have 'View Enterprise Copilot Metrics' permission",
-                    "For enterprise metrics: ensure you're an enterprise owner or billing manager"
+                    "For enterprise metrics: ensure you're an enterprise owner or billing manager",
                 ],
                 "provider": "copilot",
-                "available": False
+                "available": False,
             }
 
-    def _format_usage_data(self, raw_data: dict[str, Any], level: str, org_name: str = None) -> dict[str, Any]:
+    def _format_usage_data(
+        self, raw_data: dict[str, Any], level: str, org_name: str = None
+    ) -> dict[str, Any]:
         """
         Formate les données brutes d'utilisation en un format standardisé.
-        
+
         Args:
             raw_data: Données brutes de l'API GitHub
             level: Niveau des données ("enterprise" ou "organization")
             org_name: Nom de l'organisation (si applicable)
-            
+
         Returns:
             Données formatées
         """
@@ -523,7 +559,7 @@ class CopilotUsageConnector:
         total_acceptances = 0
         total_lines_suggested = 0
         total_lines_accepted = 0
-        
+
         # Les données peuvent venir dans différents formats selon l'endpoint
         if "usage" in raw_data:
             usage_metrics = raw_data["usage"]
@@ -531,7 +567,7 @@ class CopilotUsageConnector:
             usage_metrics = raw_data["data"]
         else:
             usage_metrics = raw_data
-        
+
         # Agréger les métriques
         if isinstance(usage_metrics, list):
             for metric in usage_metrics:
@@ -545,11 +581,19 @@ class CopilotUsageConnector:
             total_acceptances = usage_metrics.get("total_acceptances", 0)
             total_lines_suggested = usage_metrics.get("total_lines_suggested", 0)
             total_lines_accepted = usage_metrics.get("total_lines_accepted", 0)
-        
+
         # Calculer les taux d'acceptation
-        acceptance_rate = (total_acceptances / total_suggestions * 100) if total_suggestions > 0 else 0
-        line_acceptance_rate = (total_lines_accepted / total_lines_suggested * 100) if total_lines_suggested > 0 else 0
-        
+        acceptance_rate = (
+            (total_acceptances / total_suggestions * 100)
+            if total_suggestions > 0
+            else 0
+        )
+        line_acceptance_rate = (
+            (total_lines_accepted / total_lines_suggested * 100)
+            if total_lines_suggested > 0
+            else 0
+        )
+
         return {
             "provider": "copilot",
             "level": level,
@@ -562,14 +606,14 @@ class CopilotUsageConnector:
             "line_acceptance_rate_percent": round(line_acceptance_rate, 2),
             "total_tokens": total_suggestions + total_acceptances,  # Approximation
             "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "raw_data": raw_data  # Conserver les données brutes pour le débogage
+            "raw_data": raw_data,  # Conserver les données brutes pour le débogage
         }
 
 
 def get_copilot_usage_metrics() -> dict[str, Any]:
     """
     Point d'entrée principal pour récupérer les métriques d'utilisation Copilot.
-    
+
     Returns:
         Métriques d'utilisation Copilot formatées
     """
@@ -582,5 +626,5 @@ def get_copilot_usage_metrics() -> dict[str, Any]:
             "error": "COPILOT_USAGE_RETRIEVAL_FAILED",
             "message": "Unable to retrieve Copilot usage metrics at this time.",
             "provider": "copilot",
-            "available": False
+            "available": False,
         }

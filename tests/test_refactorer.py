@@ -45,6 +45,7 @@ from apps.backend.agents.refactorer import (
 # CodeSmell
 # -----------------------------------------------------------------------
 
+
 class TestCodeSmell:
     def test_create_code_smell(self):
         smell = CodeSmell(
@@ -77,6 +78,7 @@ class TestCodeSmell:
 # RefactoringProposal
 # -----------------------------------------------------------------------
 
+
 class TestRefactoringProposal:
     def test_create_proposal(self):
         proposal = RefactoringProposal(
@@ -102,6 +104,7 @@ class TestRefactoringProposal:
 # -----------------------------------------------------------------------
 # RefactoringResult
 # -----------------------------------------------------------------------
+
 
 class TestRefactoringResult:
     def test_create_result(self):
@@ -129,6 +132,7 @@ class TestRefactoringResult:
 # -----------------------------------------------------------------------
 # SmellDetector — long method
 # -----------------------------------------------------------------------
+
 
 class TestSmellDetectorLongMethod:
     def test_detects_long_method(self):
@@ -159,9 +163,12 @@ class TestSmellDetectorLongMethod:
 # SmellDetector — god class
 # -----------------------------------------------------------------------
 
+
 class TestSmellDetectorGodClass:
     def test_detects_god_class(self):
-        methods = "\n".join(f"    def method_{i}(self):\n        pass\n" for i in range(20))
+        methods = "\n".join(
+            f"    def method_{i}(self):\n        pass\n" for i in range(20)
+        )
         source = f"class BigClass:\n{methods}"
         detector = SmellDetector(thresholds={"max_class_methods": 15})
         smells = detector.detect_from_source(source, "f.py")
@@ -180,25 +187,31 @@ class TestSmellDetectorGodClass:
 # SmellDetector — parameters
 # -----------------------------------------------------------------------
 
+
 class TestSmellDetectorParameters:
     def test_detects_long_param_list(self):
         source = "def func(a, b, c, d, e, f, g):\n    pass\n"
         detector = SmellDetector(thresholds={"max_parameters": 5})
         smells = detector.detect_from_source(source, "f.py")
-        param_smells = [s for s in smells if s.smell_type == SmellType.LONG_PARAMETER_LIST]
+        param_smells = [
+            s for s in smells if s.smell_type == SmellType.LONG_PARAMETER_LIST
+        ]
         assert len(param_smells) >= 1
 
     def test_no_smell_few_params(self):
         source = "def func(a, b):\n    pass\n"
         detector = SmellDetector()
         smells = detector.detect_from_source(source, "f.py")
-        param_smells = [s for s in smells if s.smell_type == SmellType.LONG_PARAMETER_LIST]
+        param_smells = [
+            s for s in smells if s.smell_type == SmellType.LONG_PARAMETER_LIST
+        ]
         assert len(param_smells) == 0
 
 
 # -----------------------------------------------------------------------
 # SmellDetector — nesting
 # -----------------------------------------------------------------------
+
 
 class TestSmellDetectorNesting:
     def test_detects_deep_nesting(self):
@@ -228,6 +241,7 @@ class TestSmellDetectorNesting:
 # SmellDetector — missing docstring
 # -----------------------------------------------------------------------
 
+
 class TestSmellDetectorDocstring:
     def test_detects_missing_docstring(self):
         source = "def public_func():\n    pass\n"
@@ -240,13 +254,19 @@ class TestSmellDetectorDocstring:
         source = 'def documented():\n    """This is documented."""\n    pass\n'
         detector = SmellDetector()
         smells = detector.detect_from_source(source, "f.py")
-        doc_smells = [s for s in smells if s.smell_type == SmellType.MISSING_DOCSTRING and s.symbol_name == "documented"]
+        doc_smells = [
+            s
+            for s in smells
+            if s.smell_type == SmellType.MISSING_DOCSTRING
+            and s.symbol_name == "documented"
+        ]
         assert len(doc_smells) == 0
 
 
 # -----------------------------------------------------------------------
 # SmellDetector — large file
 # -----------------------------------------------------------------------
+
 
 class TestSmellDetectorLargeFile:
     def test_detects_large_file(self):
@@ -268,25 +288,35 @@ class TestSmellDetectorLargeFile:
 # SmellDetector — unused imports
 # -----------------------------------------------------------------------
 
+
 class TestSmellDetectorUnusedImports:
     def test_detects_unused_import(self):
         source = "import os\nimport sys\nprint(sys.argv)\n"
         detector = SmellDetector()
         smells = detector.detect_from_source(source, "f.py")
-        unused = [s for s in smells if s.smell_type == SmellType.UNUSED_IMPORT and s.symbol_name == "os"]
+        unused = [
+            s
+            for s in smells
+            if s.smell_type == SmellType.UNUSED_IMPORT and s.symbol_name == "os"
+        ]
         assert len(unused) >= 1
 
     def test_no_unused_import(self):
         source = "import os\nprint(os.getcwd())\n"
         detector = SmellDetector()
         smells = detector.detect_from_source(source, "f.py")
-        unused = [s for s in smells if s.smell_type == SmellType.UNUSED_IMPORT and s.symbol_name == "os"]
+        unused = [
+            s
+            for s in smells
+            if s.smell_type == SmellType.UNUSED_IMPORT and s.symbol_name == "os"
+        ]
         assert len(unused) == 0
 
 
 # -----------------------------------------------------------------------
 # SmellDetector — duplicates
 # -----------------------------------------------------------------------
+
 
 class TestSmellDetectorDuplicates:
     def test_detects_duplicate_block(self):
@@ -309,6 +339,7 @@ class TestSmellDetectorDuplicates:
 # SmellDetector — magic numbers
 # -----------------------------------------------------------------------
 
+
 class TestSmellDetectorMagicNumbers:
     def test_detects_magic_number(self):
         source = "def func():\n    timeout = 42\n    return timeout\n"
@@ -328,6 +359,7 @@ class TestSmellDetectorMagicNumbers:
 # -----------------------------------------------------------------------
 # RefactoringAgent — detect smells
 # -----------------------------------------------------------------------
+
 
 class TestRefactoringAgentDetection:
     def test_detect_smells_from_source(self):
@@ -351,6 +383,7 @@ class TestRefactoringAgentDetection:
 # RefactoringAgent — proposals
 # -----------------------------------------------------------------------
 
+
 class TestRefactoringAgentProposals:
     def test_propose_from_smells(self):
         source = "def long_func():\n" + "    x = 1\n" * 40
@@ -362,7 +395,9 @@ class TestRefactoringAgentProposals:
         source = "def long_func():\n" + "    x = 1\n" * 40
         agent = RefactoringAgent(thresholds={"max_method_lines": 30})
         proposals = agent.propose_refactoring(source=source)
-        extract_method = [p for p in proposals if p.pattern == RefactoringPattern.EXTRACT_METHOD]
+        extract_method = [
+            p for p in proposals if p.pattern == RefactoringPattern.EXTRACT_METHOD
+        ]
         assert len(extract_method) >= 1
 
     def test_proposal_for_god_class(self):
@@ -370,7 +405,9 @@ class TestRefactoringAgentProposals:
         source = f"class Big:\n{methods}"
         agent = RefactoringAgent(thresholds={"max_class_methods": 15})
         proposals = agent.propose_refactoring(source=source)
-        extract_class = [p for p in proposals if p.pattern == RefactoringPattern.EXTRACT_CLASS]
+        extract_class = [
+            p for p in proposals if p.pattern == RefactoringPattern.EXTRACT_CLASS
+        ]
         assert len(extract_class) >= 1
 
     def test_proposal_has_description(self):
@@ -381,7 +418,9 @@ class TestRefactoringAgentProposals:
 
     def test_no_proposals_clean_code(self):
         source = '"""Module."""\ndef clean():\n    """Docstring."""\n    return 1\n'
-        agent = RefactoringAgent(thresholds={"max_method_lines": 100, "max_file_lines": 1000})
+        agent = RefactoringAgent(
+            thresholds={"max_method_lines": 100, "max_file_lines": 1000}
+        )
         proposals = agent.propose_refactoring(source=source)
         # May have some info-level suggestions like magic numbers but no major refactoring
         major = [p for p in proposals if p.risk_level in ("medium", "high")]
@@ -391,6 +430,7 @@ class TestRefactoringAgentProposals:
 # -----------------------------------------------------------------------
 # RefactoringAgent — execution
 # -----------------------------------------------------------------------
+
 
 class TestRefactoringAgentExecution:
     def test_execute_refactoring(self):
@@ -420,6 +460,7 @@ class TestRefactoringAgentExecution:
 # -----------------------------------------------------------------------
 # RefactoringAgent — stats
 # -----------------------------------------------------------------------
+
 
 class TestRefactoringAgentStats:
     def test_stats_empty(self):

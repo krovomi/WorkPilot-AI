@@ -32,9 +32,12 @@ from apps.backend.ui.theme_manager import (
 # ThemeColors tests
 # ---------------------------------------------------------------------------
 
+
 class TestThemeColors:
     def test_create(self):
-        colors = ThemeColors(bg="#FFFFFF", accent="#3B82F6", darkBg="#0F172A", darkAccent="#60A5FA")
+        colors = ThemeColors(
+            bg="#FFFFFF", accent="#3B82F6", darkBg="#0F172A", darkAccent="#60A5FA"
+        )
         assert colors.bg == "#FFFFFF"
         assert colors.darkBg == "#0F172A"
 
@@ -46,13 +49,20 @@ class TestThemeColors:
         assert "darkBg" in d
 
     def test_from_dict(self):
-        data = {"bg": "#1a1a2e", "accent": "#e94560", "darkBg": "#0f0f1a", "darkAccent": "#ff6b6b"}
+        data = {
+            "bg": "#1a1a2e",
+            "accent": "#e94560",
+            "darkBg": "#0f0f1a",
+            "darkAccent": "#ff6b6b",
+        }
         colors = ThemeColors.from_dict(data)
         assert colors.bg == "#1a1a2e"
         assert colors.accent == "#e94560"
 
     def test_validate_valid(self):
-        colors = ThemeColors(bg="#FFFFFF", accent="#3B82F6", darkBg="#0F172A", darkAccent="#60A5FA")
+        colors = ThemeColors(
+            bg="#FFFFFF", accent="#3B82F6", darkBg="#0F172A", darkAccent="#60A5FA"
+        )
         errors = colors.validate()
         assert len(errors) == 0
 
@@ -62,6 +72,7 @@ class TestThemeColors:
 # ---------------------------------------------------------------------------
 # CustomTheme tests
 # ---------------------------------------------------------------------------
+
 
 class TestCustomTheme:
     def test_create(self):
@@ -89,7 +100,12 @@ class TestCustomTheme:
             "name": "Imported",
             "description": "Test",
             "source": "imported",
-            "colors": {"bg": "#FFFFFF", "accent": "#3B82F6", "darkBg": "#0F172A", "darkAccent": "#60A5FA"},
+            "colors": {
+                "bg": "#FFFFFF",
+                "accent": "#3B82F6",
+                "darkBg": "#0F172A",
+                "darkAccent": "#60A5FA",
+            },
         }
         theme = CustomTheme.from_dict(data)
         assert theme.name == "Imported"
@@ -99,6 +115,7 @@ class TestCustomTheme:
 # ---------------------------------------------------------------------------
 # Mode management tests
 # ---------------------------------------------------------------------------
+
 
 class TestModeManagement:
     def test_get_mode_default(self):
@@ -125,6 +142,7 @@ class TestModeManagement:
 # Built-in themes tests
 # ---------------------------------------------------------------------------
 
+
 class TestBuiltinThemes:
     def test_list_builtin(self):
         manager = ThemeManager()
@@ -150,12 +168,18 @@ class TestBuiltinThemes:
 # Custom themes CRUD tests
 # ---------------------------------------------------------------------------
 
+
 class TestCustomThemesCRUD:
     def test_create_custom(self):
         manager = ThemeManager()
         theme = manager.create_custom_theme(
             "My Theme",
-            colors={"bg": "#1a1a2e", "accent": "#e94560", "darkBg": "#0f0f1a", "darkAccent": "#ff6b6b"},
+            colors={
+                "bg": "#1a1a2e",
+                "accent": "#e94560",
+                "darkBg": "#0f0f1a",
+                "darkAccent": "#ff6b6b",
+            },
             description="My custom theme",
             author="Alice",
         )
@@ -167,7 +191,13 @@ class TestCustomThemesCRUD:
     def test_get_custom(self):
         manager = ThemeManager()
         created = manager.create_custom_theme(
-            "Test", colors={"bg": "#fff", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"}
+            "Test",
+            colors={
+                "bg": "#fff",
+                "accent": "#000",
+                "darkBg": "#111",
+                "darkAccent": "#eee",
+            },
         )
         retrieved = manager.get_custom_theme(created.theme_id)
         assert retrieved is not None
@@ -176,9 +206,17 @@ class TestCustomThemesCRUD:
     def test_update_custom(self):
         manager = ThemeManager()
         theme = manager.create_custom_theme(
-            "Old Name", colors={"bg": "#fff", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"}
+            "Old Name",
+            colors={
+                "bg": "#fff",
+                "accent": "#000",
+                "darkBg": "#111",
+                "darkAccent": "#eee",
+            },
         )
-        updated = manager.update_custom_theme(theme.theme_id, name="New Name", description="Updated")
+        updated = manager.update_custom_theme(
+            theme.theme_id, name="New Name", description="Updated"
+        )
         assert updated is not None
         assert updated.name == "New Name"
         assert updated.description == "Updated"
@@ -186,15 +224,37 @@ class TestCustomThemesCRUD:
     def test_delete_custom(self):
         manager = ThemeManager()
         theme = manager.create_custom_theme(
-            "To Delete", colors={"bg": "#fff", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"}
+            "To Delete",
+            colors={
+                "bg": "#fff",
+                "accent": "#000",
+                "darkBg": "#111",
+                "darkAccent": "#eee",
+            },
         )
         assert manager.delete_custom_theme(theme.theme_id) is True
         assert manager.get_custom_theme(theme.theme_id) is None
 
     def test_list_custom(self):
         manager = ThemeManager()
-        manager.create_custom_theme("A", colors={"bg": "#fff", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"})
-        manager.create_custom_theme("B", colors={"bg": "#fff", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"})
+        manager.create_custom_theme(
+            "A",
+            colors={
+                "bg": "#fff",
+                "accent": "#000",
+                "darkBg": "#111",
+                "darkAccent": "#eee",
+            },
+        )
+        manager.create_custom_theme(
+            "B",
+            colors={
+                "bg": "#fff",
+                "accent": "#000",
+                "darkBg": "#111",
+                "darkAccent": "#eee",
+            },
+        )
         assert len(manager.list_custom_themes()) == 2
 
     def test_validation_error(self):
@@ -202,13 +262,19 @@ class TestCustomThemesCRUD:
         with pytest.raises(ValueError, match="Invalid"):
             manager.create_custom_theme(
                 "Bad Theme",
-                colors={"bg": "not-a-color", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"},
+                colors={
+                    "bg": "not-a-color",
+                    "accent": "#000",
+                    "darkBg": "#111",
+                    "darkAccent": "#eee",
+                },
             )
 
 
 # ---------------------------------------------------------------------------
 # Per-project themes tests
 # ---------------------------------------------------------------------------
+
 
 class TestProjectThemes:
     def test_set_project_theme(self):
@@ -248,12 +314,18 @@ class TestProjectThemes:
 # Import / Export tests
 # ---------------------------------------------------------------------------
 
+
 class TestImportExport:
     def test_export_custom(self):
         manager = ThemeManager()
         theme = manager.create_custom_theme(
             "Export Me",
-            colors={"bg": "#1a1a2e", "accent": "#e94560", "darkBg": "#0f0f1a", "darkAccent": "#ff6b6b"},
+            colors={
+                "bg": "#1a1a2e",
+                "accent": "#e94560",
+                "darkBg": "#0f0f1a",
+                "darkAccent": "#ff6b6b",
+            },
         )
         exported = manager.export_theme(theme.theme_id)
         assert exported is not None
@@ -274,8 +346,10 @@ class TestImportExport:
             "name": "Imported Theme",
             "description": "From another instance",
             "colors": {
-                "bg": "#1a1a2e", "accent": "#e94560",
-                "darkBg": "#0f0f1a", "darkAccent": "#ff6b6b",
+                "bg": "#1a1a2e",
+                "accent": "#e94560",
+                "darkBg": "#0f0f1a",
+                "darkAccent": "#ff6b6b",
             },
             "author": "Bob",
         }
@@ -293,7 +367,12 @@ class TestImportExport:
         manager = ThemeManager()
         theme_data = {
             "name": "Bad Import",
-            "colors": {"bg": "xyz", "accent": "abc", "darkBg": "def", "darkAccent": "ghi"},
+            "colors": {
+                "bg": "xyz",
+                "accent": "abc",
+                "darkBg": "def",
+                "darkAccent": "ghi",
+            },
         }
         with pytest.raises(ValueError, match="Invalid"):
             manager.import_theme(json.dumps(theme_data))
@@ -302,6 +381,7 @@ class TestImportExport:
 # ---------------------------------------------------------------------------
 # CSS generation tests
 # ---------------------------------------------------------------------------
+
 
 class TestCSSGeneration:
     def test_light_mode(self):
@@ -328,10 +408,19 @@ class TestCSSGeneration:
 # All themes tests
 # ---------------------------------------------------------------------------
 
+
 class TestAllThemes:
     def test_list_all(self):
         manager = ThemeManager()
-        manager.create_custom_theme("Custom", colors={"bg": "#fff", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"})
+        manager.create_custom_theme(
+            "Custom",
+            colors={
+                "bg": "#fff",
+                "accent": "#000",
+                "darkBg": "#111",
+                "darkAccent": "#eee",
+            },
+        )
         all_themes = manager.list_all_themes()
         assert len(all_themes) == 8  # 7 builtin + 1 custom
 
@@ -342,7 +431,15 @@ class TestAllThemes:
 
     def test_sources(self):
         manager = ThemeManager()
-        manager.create_custom_theme("Custom", colors={"bg": "#fff", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"})
+        manager.create_custom_theme(
+            "Custom",
+            colors={
+                "bg": "#fff",
+                "accent": "#000",
+                "darkBg": "#111",
+                "darkAccent": "#eee",
+            },
+        )
         all_themes = manager.list_all_themes()
         sources = {t.get("source") for t in all_themes}
         assert "builtin" in sources
@@ -353,10 +450,19 @@ class TestAllThemes:
 # Stats tests
 # ---------------------------------------------------------------------------
 
+
 class TestStats:
     def test_stats_basic(self):
         manager = ThemeManager()
-        manager.create_custom_theme("A", colors={"bg": "#fff", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"})
+        manager.create_custom_theme(
+            "A",
+            colors={
+                "bg": "#fff",
+                "accent": "#000",
+                "darkBg": "#111",
+                "darkAccent": "#eee",
+            },
+        )
         manager.set_project_theme("proj-1", "ocean")
         stats = manager.get_stats()
         assert stats["builtin_themes"] == 7
@@ -375,10 +481,19 @@ class TestStats:
 # Edge cases tests
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
     def test_delete_theme_removes_bindings(self):
         manager = ThemeManager()
-        theme = manager.create_custom_theme("Temp", colors={"bg": "#fff", "accent": "#000", "darkBg": "#111", "darkAccent": "#eee"})
+        theme = manager.create_custom_theme(
+            "Temp",
+            colors={
+                "bg": "#fff",
+                "accent": "#000",
+                "darkBg": "#111",
+                "darkAccent": "#eee",
+            },
+        )
         manager.set_project_theme("proj-1", theme.theme_id)
         assert manager.get_project_theme("proj-1") is not None
         manager.delete_custom_theme(theme.theme_id)

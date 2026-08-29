@@ -259,4 +259,7 @@ class TestInferArchitectureConfig:
 
         assert len(result.rules.forbidden_patterns) > 0
         db_pattern = result.rules.forbidden_patterns[0]
-        assert "database" in db_pattern.import_pattern or "prisma" in db_pattern.import_pattern
+        assert (
+            "database" in db_pattern.import_pattern
+            or "prisma" in db_pattern.import_pattern
+        )

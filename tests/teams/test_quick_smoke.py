@@ -15,9 +15,9 @@ sys.path.insert(0, str(backend_path))
 # Mock dependencies
 from unittest.mock import MagicMock
 
-sys.modules['claude_agent_sdk'] = MagicMock()
-sys.modules['core.client'] = MagicMock()
-sys.modules['debug'] = MagicMock()
+sys.modules["claude_agent_sdk"] = MagicMock()
+sys.modules["core.client"] = MagicMock()
+sys.modules["debug"] = MagicMock()
 
 print("🔍 Testing Claude Teams components...\n")
 
@@ -56,12 +56,12 @@ from teams.voting import Vote, VoteChoice, VotingResult, VotingSystem
 
 with TemporaryDirectory() as tmpdir:
     voting = VotingSystem(Path(tmpdir))
-    
+
     votes = [
         Vote("architect", VoteChoice.APPROVE, "Good", weight=5, can_veto=True),
         Vote("security", VoteChoice.VETO, "Risk!", weight=5, can_veto=True),
     ]
-    
+
     result = voting.conduct_vote(votes, DebateStrategy.WEIGHTED_VOTE, "test")
     assert result.decision == "rejected"
     assert len(result.vetoes) == 1
@@ -75,17 +75,17 @@ from teams.communication import CommunicationBus, MessageType
 with TemporaryDirectory() as tmpdir:
     bus = CommunicationBus(Path(tmpdir))
     thread = bus.create_thread("Test topic")
-    
+
     assert thread.thread_id == "thread_1"
-    
+
     bus.post_message(
         thread.thread_id,
         "architect",
         "System Architect",
         MessageType.PROPOSAL,
-        "Use REST API"
+        "Use REST API",
     )
-    
+
     assert len(thread.messages) == 1
     assert thread.messages[0].content == "Use REST API"
 
@@ -115,4 +115,3 @@ print("  1. Integrate with SpecOrchestrator")
 print("  2. Add CLI flags (--enable-teams)")
 print("  3. Test with real Claude API")
 print("  4. Build UI components")
-

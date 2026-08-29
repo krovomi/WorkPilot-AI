@@ -326,7 +326,9 @@ class NotificationsConnector:
             event_type=event_type,
             title=f"QA {status.capitalize()}",
             message=f"QA {status} for task `{task_id}` with score *{score:.0f}/100*.",
-            priority=NotificationPriority.NORMAL if passed else NotificationPriority.HIGH,
+            priority=NotificationPriority.NORMAL
+            if passed
+            else NotificationPriority.HIGH,
             project_id=project_id,
             task_id=task_id,
             metadata={"score": score, "passed": passed},
@@ -396,7 +398,11 @@ class NotificationsConnector:
         Returns:
             Delivery results.
         """
-        priority = NotificationPriority.URGENT if severity in ("high", "critical") else NotificationPriority.HIGH
+        priority = (
+            NotificationPriority.URGENT
+            if severity in ("high", "critical")
+            else NotificationPriority.HIGH
+        )
         event = NotificationEvent(
             event_type=EventType.SECURITY_ALERT,
             title="Security Alert",
@@ -477,14 +483,16 @@ class NotificationsConnector:
         elif command.command == "budget":
             return self._cmd_budget(command.args)
         else:
-            return {"text": f"Command `{command.command}` is recognized but not yet implemented."}
+            return {
+                "text": f"Command `{command.command}` is recognized but not yet implemented."
+            }
 
     def _cmd_help(self) -> dict[str, Any]:
         """Return help text for available commands."""
         return {
             "text": (
                 "*WorkPilot AI — Available Commands:*\n"
-                "• `/workpilot create-task \"description\"` — Create a new task\n"
+                '• `/workpilot create-task "description"` — Create a new task\n'
                 "• `/workpilot status` — Show project status\n"
                 "• `/workpilot list-tasks` — List current tasks\n"
                 "• `/workpilot budget [project_id]` — Show budget status\n"
@@ -507,7 +515,7 @@ class NotificationsConnector:
         """Handle the create-task command."""
         task_desc = args.strip().strip('"').strip("'")
         if not task_desc:
-            return {"text": "Usage: `/workpilot create-task \"task description\"`"}
+            return {"text": 'Usage: `/workpilot create-task "task description"`'}
         return {
             "text": f"Task creation requested: *{task_desc}*\n_Task will be created in WorkPilot AI._",
             "task_description": task_desc,
@@ -571,7 +579,9 @@ class NotificationsConnector:
         by_event_type: dict[str, int] = {}
         for r in self._delivery_log:
             by_channel[r.channel.value] = by_channel.get(r.channel.value, 0) + 1
-            by_event_type[r.event_type.value] = by_event_type.get(r.event_type.value, 0) + 1
+            by_event_type[r.event_type.value] = (
+                by_event_type.get(r.event_type.value, 0) + 1
+            )
 
         return {
             "enabled_channels": [c.value for c in self._enabled_channels],

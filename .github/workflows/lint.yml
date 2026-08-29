@@ -6,6 +6,8 @@ on:
     paths:
       - 'apps/**'
       - 'tests/**'
+      - 'src/**'
+      - 'utils/**'
       - '.github/workflows/lint.yml'
       - '.github/actions/**'
       - 'apps/frontend/biome.jsonc'
@@ -26,6 +28,8 @@ on:
     paths:
       - 'apps/**'
       - 'tests/**'
+      - 'src/**'
+      - 'utils/**'
       - '.github/workflows/lint.yml'
       - '.github/actions/**'
       - 'apps/frontend/biome.jsonc'
@@ -68,11 +72,17 @@ jobs:
       - name: Install ruff
         run: pip install ruff==0.15.7
 
+      # `tests/`, `src/` and `utils/` were outside the gate until now, which is
+      # why they had drifted to 11 lint errors and 169 unformatted files while
+      # apps/backend/ stayed clean: nothing was checking them. `tests/` is the
+      # second-largest body of Python here and the one every contributor
+      # touches, so leaving it ungated meant the suite that guards the product
+      # was the least guarded thing in the repo.
       - name: Run ruff check
-        run: ruff check apps/backend/ --output-format=github
+        run: ruff check apps/backend/ tests/ src/ utils/ --output-format=github
 
       - name: Run ruff format check
-        run: ruff format apps/backend/ --check --diff
+        run: ruff format apps/backend/ tests/ src/ utils/ --check --diff
 
       # `scripts/` as a whole is not linted here: three unrelated merge scripts
       # carry pre-existing violations, and fixing them belongs to whoever owns

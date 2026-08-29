@@ -20,36 +20,46 @@ import pytest
 def import_module_direct(module_name, file_path):
     """Import a module directly from file path, bypassing package __init__.py"""
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
+
 # Import modules directly to avoid circular import issues in __init__.py
 # First import exceptions and models, then connector (which depends on them)
 project_root = Path(__file__).parent.parent.parent.parent
 
 # Import exceptions first
-exceptions_module = import_module_direct("jira_exceptions", project_root / "src" / "connectors" / "jira" / "exceptions.py")
-models_module = import_module_direct("jira_models", project_root / "src" / "connectors" / "jira" / "models.py")
-client_module = import_module_direct("jira_client", project_root / "src" / "connectors" / "jira" / "client.py")
+exceptions_module = import_module_direct(
+    "jira_exceptions", project_root / "src" / "connectors" / "jira" / "exceptions.py"
+)
+models_module = import_module_direct(
+    "jira_models", project_root / "src" / "connectors" / "jira" / "models.py"
+)
+client_module = import_module_direct(
+    "jira_client", project_root / "src" / "connectors" / "jira" / "client.py"
+)
 
 # Make modules available in sys.modules so connector can import them
 # Create a proper package structure
-jira_package = type('Package', (), {
-    'exceptions': exceptions_module,
-    'models': models_module,
-    'client': client_module
-})()
+jira_package = type(
+    "Package",
+    (),
+    {"exceptions": exceptions_module, "models": models_module, "client": client_module},
+)()
 sys.modules["src.connectors.jira.exceptions"] = exceptions_module
 sys.modules["src.connectors.jira.models"] = models_module
 sys.modules["src.connectors.jira.client"] = client_module
 sys.modules["src.connectors.jira"] = jira_package
-sys.modules["src.connectors"] = type('Package', (), {'jira': jira_package})()
+sys.modules["src.connectors"] = type("Package", (), {"jira": jira_package})()
 
 # Now import connector
-connector_module = import_module_direct("jira_connector", project_root / "src" / "connectors" / "jira" / "connector.py")
+connector_module = import_module_direct(
+    "jira_connector", project_root / "src" / "connectors" / "jira" / "connector.py"
+)
 
 JiraConnector = connector_module.JiraConnector
 JiraComment = models_module.JiraComment
@@ -219,7 +229,10 @@ class TestGetIssue:
             "fields": {
                 "summary": "Implement feature X",
                 "description": "Some description",
-                "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
+                "status": {
+                    "name": "In Progress",
+                    "statusCategory": {"key": "indeterminate"},
+                },
                 "priority": {"name": "Medium"},
                 "issuetype": {"name": "Story"},
                 "labels": [],
@@ -315,12 +328,20 @@ class TestTransitions:
                 {
                     "id": "11",
                     "name": "Start Progress",
-                    "to": {"name": "In Progress", "id": "3", "statusCategory": {"key": "indeterminate"}},
+                    "to": {
+                        "name": "In Progress",
+                        "id": "3",
+                        "statusCategory": {"key": "indeterminate"},
+                    },
                 },
                 {
                     "id": "21",
                     "name": "Done",
-                    "to": {"name": "Done", "id": "5", "statusCategory": {"key": "done"}},
+                    "to": {
+                        "name": "Done",
+                        "id": "5",
+                        "statusCategory": {"key": "done"},
+                    },
                 },
             ]
         }
@@ -361,7 +382,11 @@ class TestTransitions:
                 {
                     "id": "21",
                     "name": "Done",
-                    "to": {"name": "Done", "id": "5", "statusCategory": {"key": "done"}},
+                    "to": {
+                        "name": "Done",
+                        "id": "5",
+                        "statusCategory": {"key": "done"},
+                    },
                 },
             ]
         }
@@ -379,7 +404,11 @@ class TestTransitions:
                 {
                     "id": "11",
                     "name": "Start",
-                    "to": {"name": "In Progress", "id": "3", "statusCategory": {"key": "indeterminate"}},
+                    "to": {
+                        "name": "In Progress",
+                        "id": "3",
+                        "statusCategory": {"key": "indeterminate"},
+                    },
                 },
             ]
         }
@@ -497,12 +526,14 @@ class TestJiraModels:
 
     def test_jira_user_from_api(self):
         """JiraUser.from_api_response maps fields correctly."""
-        user = JiraUser.from_api_response({
-            "accountId": "abc123",
-            "displayName": "John Doe",
-            "emailAddress": "john@example.com",
-            "active": True,
-        })
+        user = JiraUser.from_api_response(
+            {
+                "accountId": "abc123",
+                "displayName": "John Doe",
+                "emailAddress": "john@example.com",
+                "active": True,
+            }
+        )
         assert user.account_id == "abc123"
         assert user.display_name == "John Doe"
         assert user.email == "john@example.com"
@@ -513,79 +544,93 @@ class TestJiraModels:
 
     def test_jira_status_from_api(self):
         """JiraStatus.from_api_response maps fields correctly."""
-        status = JiraStatus.from_api_response({
-            "name": "In Progress",
-            "id": "3",
-            "statusCategory": {"key": "indeterminate"},
-        })
+        status = JiraStatus.from_api_response(
+            {
+                "name": "In Progress",
+                "id": "3",
+                "statusCategory": {"key": "indeterminate"},
+            }
+        )
         assert status.name == "In Progress"
         assert status.category == "indeterminate"
 
     def test_jira_issue_with_adf_description(self):
         """JiraIssue parses ADF description into plain text."""
-        issue = JiraIssue.from_api_response({
-            "key": "PROJ-1",
-            "id": "10001",
-            "fields": {
-                "summary": "Test",
-                "description": {
-                    "type": "doc",
-                    "content": [
-                        {
-                            "type": "paragraph",
-                            "content": [
-                                {"type": "text", "text": "Hello world"},
-                            ],
-                        }
-                    ],
+        issue = JiraIssue.from_api_response(
+            {
+                "key": "PROJ-1",
+                "id": "10001",
+                "fields": {
+                    "summary": "Test",
+                    "description": {
+                        "type": "doc",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [
+                                    {"type": "text", "text": "Hello world"},
+                                ],
+                            }
+                        ],
+                    },
+                    "status": {"name": "To Do"},
+                    "priority": {"name": "Medium"},
+                    "issuetype": {"name": "Task"},
+                    "project": {"key": "PROJ"},
                 },
-                "status": {"name": "To Do"},
-                "priority": {"name": "Medium"},
-                "issuetype": {"name": "Task"},
-                "project": {"key": "PROJ"},
-            },
-        })
+            }
+        )
         assert "Hello world" in issue.description
 
     def test_jira_issue_with_string_description(self):
         """JiraIssue handles plain string description."""
-        issue = JiraIssue.from_api_response({
-            "key": "PROJ-2",
-            "id": "10002",
-            "fields": {
-                "summary": "Test",
-                "description": "Plain text description",
-                "status": {"name": "To Do"},
-                "issuetype": {"name": "Task"},
-                "project": {"key": "PROJ"},
-            },
-        })
+        issue = JiraIssue.from_api_response(
+            {
+                "key": "PROJ-2",
+                "id": "10002",
+                "fields": {
+                    "summary": "Test",
+                    "description": "Plain text description",
+                    "status": {"name": "To Do"},
+                    "issuetype": {"name": "Task"},
+                    "project": {"key": "PROJ"},
+                },
+            }
+        )
         assert issue.description == "Plain text description"
 
     def test_jira_issue_parses_dates(self):
         """JiraIssue parses created/updated dates."""
-        issue = JiraIssue.from_api_response({
-            "key": "PROJ-3",
-            "id": "10003",
-            "fields": {
-                "summary": "Test",
-                "created": "2026-01-15T10:30:00.000+0000",
-                "updated": "2026-02-01T14:00:00.000+0000",
-                "status": {"name": "Done"},
-                "issuetype": {"name": "Task"},
-                "project": {"key": "PROJ"},
-            },
-        })
+        issue = JiraIssue.from_api_response(
+            {
+                "key": "PROJ-3",
+                "id": "10003",
+                "fields": {
+                    "summary": "Test",
+                    "created": "2026-01-15T10:30:00.000+0000",
+                    "updated": "2026-02-01T14:00:00.000+0000",
+                    "status": {"name": "Done"},
+                    "issuetype": {"name": "Task"},
+                    "project": {"key": "PROJ"},
+                },
+            }
+        )
         assert issue.created is not None
         assert issue.updated is not None
 
     def test_jira_transition_from_api(self):
         """JiraTransition.from_api_response maps fields correctly."""
-        transition = JiraTransition.from_api_response({
-            "id": "11",
-            "name": "Start Progress",
-            "to": {"name": "In Progress", "id": "3", "statusCategory": {"key": "indeterminate"}},
-        })
+        transition = JiraTransition.from_api_response(
+            {
+                "id": "11",
+                "name": "Start Progress",
+                "to": {
+                    "name": "In Progress",
+                    "id": "3",
+                    "statusCategory": {"key": "indeterminate"},
+                },
+            }
+        )
         assert transition.transition_id == "11"
         assert transition.name == "Start Progress"
         assert transition.to_status.name == "In Progress"
@@ -633,7 +678,9 @@ class TestExtractAdfText:
                             "content": [
                                 {
                                     "type": "paragraph",
-                                    "content": [{"type": "text", "text": "Criterion A"}],
+                                    "content": [
+                                        {"type": "text", "text": "Criterion A"}
+                                    ],
                                 }
                             ],
                         },
@@ -642,7 +689,9 @@ class TestExtractAdfText:
                             "content": [
                                 {
                                     "type": "paragraph",
-                                    "content": [{"type": "text", "text": "Criterion B"}],
+                                    "content": [
+                                        {"type": "text", "text": "Criterion B"}
+                                    ],
                                 }
                             ],
                         },

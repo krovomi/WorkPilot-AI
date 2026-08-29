@@ -32,6 +32,7 @@ sys.path.insert(0, project_root_str)
 try:
     from azure.devops.connection import Connection
     from msrest.authentication import BasicAuthentication
+
     AZURE_DEVOPS_AVAILABLE = True
 except ImportError:
     Connection = None  # type: ignore[assignment,misc]

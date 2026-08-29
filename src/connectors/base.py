@@ -190,8 +190,10 @@ class BaseIntegratedConnector(BaseConnector, BaseWorkItemTracker):
 
 class GrepaiConnector:
     """Connector pour effectuer des recherches avancées via Grepai."""
+
     def __init__(self, base_url="http://localhost:9000"):
         from src.connectors.grepai.client import GrepaiClient
+
         self.client = GrepaiClient(base_url=base_url)
 
     def search_code(self, query, top_k=5):
@@ -201,6 +203,6 @@ class GrepaiConnector:
     def enrich_item(self, item: Any) -> Any:
         """Enrichit un item (repository, fichier, etc.) via Grepai."""
         result = self.search_code(f"item:{str(item)}")
-        if result and 'error' not in result:
-            item['grepai'] = result
+        if result and "error" not in result:
+            item["grepai"] = result
         return item

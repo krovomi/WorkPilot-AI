@@ -67,14 +67,11 @@ def mock_spec_dir(tmp_path):
     """Create a mock spec directory."""
     spec_dir = tmp_path / ".workpilot" / "specs" / "001-test-spec"
     spec_dir.mkdir(parents=True)
-    
+
     # Create implementation_plan.json
-    plan = {
-        "spec_name": "test-spec",
-        "subtasks": []
-    }
+    plan = {"spec_name": "test-spec", "subtasks": []}
     (spec_dir / "implementation_plan.json").write_text(json.dumps(plan))
-    
+
     return spec_dir
 
 
@@ -120,16 +117,14 @@ class TestAutoFixLoop:
         assert loop.attempts == []
 
     @pytest.mark.asyncio
-    async def test_run_tests_success(
-        self, mock_project_dir, mock_spec_dir
-    ):
+    async def test_run_tests_success(self, mock_project_dir, mock_spec_dir):
         """Test successful test execution."""
         # Create a simple mock for test_info directly
         mock_test_info = MagicMock()
         mock_test_info.has_tests = True
         mock_test_info.test_command = "pytest"
         mock_test_info.frameworks = [MagicMock(name="pytest")]
-        
+
         # Create AutoFixLoop and manually set test_info
         loop = AutoFixLoop(mock_project_dir, mock_spec_dir, "test-model")
         loop.test_info = mock_test_info
@@ -154,16 +149,14 @@ class TestAutoFixLoop:
             assert result.failed_count == 0
 
     @pytest.mark.asyncio
-    async def test_run_tests_failure(
-        self, mock_project_dir, mock_spec_dir
-    ):
+    async def test_run_tests_failure(self, mock_project_dir, mock_spec_dir):
         """Test failed test execution."""
         # Create a simple mock for test_info directly
         mock_test_info = MagicMock()
         mock_test_info.has_tests = True
         mock_test_info.test_command = "pytest"
         mock_test_info.frameworks = [MagicMock(name="pytest")]
-        
+
         # Create AutoFixLoop and manually set test_info
         loop = AutoFixLoop(mock_project_dir, mock_spec_dir, "test-model")
         loop.test_info = mock_test_info
@@ -188,16 +181,14 @@ class TestAutoFixLoop:
             assert result.failed_count > 0
 
     @pytest.mark.asyncio
-    async def test_run_tests_timeout(
-        self, mock_project_dir, mock_spec_dir
-    ):
+    async def test_run_tests_timeout(self, mock_project_dir, mock_spec_dir):
         """Test test execution timeout."""
         # Create a simple mock for test_info directly
         mock_test_info = MagicMock()
         mock_test_info.has_tests = True
         mock_test_info.test_command = "pytest"
         mock_test_info.frameworks = [MagicMock(name="pytest")]
-        
+
         # Create AutoFixLoop and manually set test_info
         loop = AutoFixLoop(mock_project_dir, mock_spec_dir, "test-model")
         loop.test_info = mock_test_info
@@ -234,7 +225,7 @@ class TestAutoFixLoop:
         # Test with format that has failed tests to avoid pytest regex matching
         output = "Tests: 2 failed, 5 passed, 7 total"
         total, failed = loop._parse_test_counts(output)
-        
+
         # Debug: let's see what we actually get
         print(f"Output: {output}")
         print(f"Parsed: total={total}, failed={failed}")
@@ -280,16 +271,14 @@ class TestAutoFixLoop:
         assert pattern == "import_error"
 
     @pytest.mark.asyncio
-    async def test_create_fix_request(
-        self, mock_project_dir, mock_spec_dir
-    ):
+    async def test_create_fix_request(self, mock_project_dir, mock_spec_dir):
         """Test fix request creation."""
         # Create a simple mock for test_info directly
         mock_test_info = MagicMock()
         mock_test_info.has_tests = True
         mock_test_info.test_command = "pytest"
         mock_test_info.frameworks = [MagicMock(name="pytest")]
-        
+
         # Create AutoFixLoop and manually set test_info
         loop = AutoFixLoop(mock_project_dir, mock_spec_dir, "test-model")
         loop.test_info = mock_test_info
@@ -305,11 +294,11 @@ class TestAutoFixLoop:
         )
 
         loop._create_fix_request(test_result, "assertion_failure", "memory context")
-        
+
         # Check that the file was created
         fix_request_file = mock_spec_dir / "QA_FIX_REQUEST.md"
         assert fix_request_file.exists()
-        
+
         # Check file content
         content = fix_request_file.read_text()
         assert "Auto-Fix Request" in content
@@ -333,7 +322,7 @@ class TestAutoFixLoop:
         mock_test_info.has_tests = True
         mock_test_info.test_command = "pytest"
         mock_test_info.frameworks = [MagicMock(name="pytest")]
-        
+
         # Create AutoFixLoop and manually set test_info
         loop = AutoFixLoop(mock_project_dir, mock_spec_dir, "test-model")
         loop.test_info = mock_test_info
@@ -371,7 +360,7 @@ class TestAutoFixLoop:
         mock_test_info.has_tests = True
         mock_test_info.test_command = "pytest"
         mock_test_info.frameworks = [MagicMock(name="pytest")]
-        
+
         # Create AutoFixLoop and manually set test_info
         loop = AutoFixLoop(mock_project_dir, mock_spec_dir, "test-model")
         loop.test_info = mock_test_info
@@ -420,16 +409,14 @@ class TestAutoFixLoop:
         assert loop.attempts[1].test_result.passed is True
 
     @pytest.mark.asyncio
-    async def test_run_until_green_max_attempts(
-        self, mock_project_dir, mock_spec_dir
-    ):
+    async def test_run_until_green_max_attempts(self, mock_project_dir, mock_spec_dir):
         """Test max attempts reached."""
         # Create a simple mock for test_info directly
         mock_test_info = MagicMock()
         mock_test_info.has_tests = True
         mock_test_info.test_command = "pytest"
         mock_test_info.frameworks = [MagicMock(name="pytest")]
-        
+
         # Create AutoFixLoop and manually set test_info
         loop = AutoFixLoop(mock_project_dir, mock_spec_dir, "test-model")
         loop.test_info = mock_test_info
@@ -459,7 +446,9 @@ class TestAutoFixLoop:
                                     success = await loop.run_until_green(max_attempts=3)
 
         assert success is False
-        assert len(loop.attempts) == 2  # The logic stops after 2 attempts when tests keep failing
+        assert (
+            len(loop.attempts) == 2
+        )  # The logic stops after 2 attempts when tests keep failing
 
 
 class TestAutoFixMetrics:
@@ -622,15 +611,15 @@ class TestAutoFixPublicAPI:
     """Tests for public API functions."""
 
     @pytest.mark.asyncio
-    async def test_run_auto_fix_loop(
-        self, mock_project_dir, mock_spec_dir
-    ):
+    async def test_run_auto_fix_loop(self, mock_project_dir, mock_spec_dir):
         """Test run_auto_fix_loop public function."""
         # Mock the entire run_auto_fix_loop function to return True
-        with patch("apps.backend.qa.auto_fix_loop.run_auto_fix_loop", return_value=True):
+        with patch(
+            "apps.backend.qa.auto_fix_loop.run_auto_fix_loop", return_value=True
+        ):
             # Import the function to test the mock
             from apps.backend.qa.auto_fix_loop import run_auto_fix_loop
-            
+
             success = await run_auto_fix_loop(
                 mock_project_dir,
                 mock_spec_dir,

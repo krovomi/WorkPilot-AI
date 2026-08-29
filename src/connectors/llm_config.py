@@ -2,6 +2,7 @@
 Gestion sécurisée de la configuration des providers LLM (clés API, endpoints, etc.).
 Permet l'enregistrement, la récupération et la validation des paramètres providers.
 """
+
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ from apps.backend.core.auth import get_auth_token
 
 logger = logging.getLogger(__name__)
 
+
 def _mask_secret(value: str) -> str:
     """Renvoie un placeholder pour une clé API dans les logs.
 
@@ -24,54 +26,74 @@ def _mask_secret(value: str) -> str:
         return "***"
     return f"<redacted, {len(value)} chars>"
 
+
 CONFIG_FILE = Path.home() / ".work_pilot_ai_llm_providers.json"
+
 
 class ProviderConfig:
     """Configuration class for LLM providers."""
-    
-    def __init__(self, provider: str, model: str, api_key: str | None = None, base_url: str | None = None, **kwargs):
+
+    def __init__(
+        self,
+        provider: str,
+        model: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        **kwargs,
+    ):
         self.provider = provider
         self.model = model
         self.api_key = api_key
         self.base_url = base_url
-        self.is_claude_sdk = provider in ['anthropic-sdk', 'claude']
+        self.is_claude_sdk = provider in ["anthropic-sdk", "claude"]
         for key, value in kwargs.items():
             setattr(self, key, value)
-    
+
     @classmethod
-    def load_provider_config(cls, phase: str, spec_dir: str, cli_provider: str | None = None, cli_model: str | None = None):
+    def load_provider_config(
+        cls,
+        phase: str,
+        spec_dir: str,
+        cli_provider: str | None = None,
+        cli_model: str | None = None,
+    ):
         """Load provider configuration from various sources.
-        
+
         Priority:
         1. CLI provider + config file entry (if provider has saved config)
         2. CLI provider + auth token (for anthropic/claude providers)
         3. CLI provider + cli_model (for other providers like openai, ollama)
         4. Default: anthropic provider with system auth token
         """
-        provider = cli_provider or 'anthropic'
-        model = cli_model or 'claude-3-sonnet-20240229'
-        
+        provider = cli_provider or "anthropic"
+        model = cli_model or "claude-3-sonnet-20240229"
+
         # Try to load saved provider config from ~/.work_pilot_ai_llm_providers.json
         config_data = load_provider_config(provider)
         if config_data:
             return cls(
                 provider=provider,
-                model=cli_model or config_data.get('model', model),
-                api_key=config_data.get('api_key'),
-                base_url=config_data.get('base_url'),
-                **{k: v for k, v in config_data.items() if k not in ['provider', 'model', 'api_key', 'base_url']}
+                model=cli_model or config_data.get("model", model),
+                api_key=config_data.get("api_key"),
+                base_url=config_data.get("base_url"),
+                **{
+                    k: v
+                    for k, v in config_data.items()
+                    if k not in ["provider", "model", "api_key", "base_url"]
+                },
             )
-        
+
         # No saved config — try system auth token for Anthropic/Claude providers
-        if provider in ('anthropic', 'claude'):
+        if provider in ("anthropic", "claude"):
             token = get_auth_token()
             if token and token.startswith("sk-"):
                 return cls(provider=provider, model=model, api_key=token)
-        
+
         # For other providers (openai, ollama, google, etc.), return config
         # with the model from task_metadata.json — API keys should be in env vars
         # or in the saved provider config file
         return cls(provider=provider, model=model)
+
 
 # CONFIG_FILE holds API keys in clear text and every mutation is a
 # read-modify-write of the WHOLE file. Two things follow:
@@ -120,10 +142,12 @@ def save_provider_config(name: str, config: dict[str, Any]) -> None:
         all_configs[name] = config
         _write_all_provider_configs(all_configs)
 
+
 def load_provider_config(name: str) -> dict[str, Any] | None:
     """Charge la configuration d'un provider donné."""
     all_configs = load_all_provider_configs()
     return all_configs.get(name)
+
 
 def _ensure_owner_only(path: Path) -> None:
     """Tighten an existing config file to 0600 if it is more permissive.
@@ -160,15 +184,21 @@ def load_all_provider_configs() -> dict[str, Any]:
             os.replace(CONFIG_FILE, backup)
             logger.error(
                 "Provider config file was unreadable; moved to %s and starting "
-                "from an empty configuration.", backup
+                "from an empty configuration.",
+                backup,
             )
         except OSError:
-            logger.exception("Provider config file is unreadable and could not be moved aside")
+            logger.exception(
+                "Provider config file is unreadable and could not be moved aside"
+            )
         return {}
     if not isinstance(data, dict):
-        logger.error("Provider config file does not contain a JSON object; ignoring it.")
+        logger.error(
+            "Provider config file does not contain a JSON object; ignoring it."
+        )
         return {}
     return data
+
 
 def delete_provider_config(name: str) -> None:
     with _CONFIG_LOCK:
@@ -176,6 +206,7 @@ def delete_provider_config(name: str) -> None:
         if name in all_configs:
             del all_configs[name]
             _write_all_provider_configs(all_configs)
+
 
 def list_provider_configs() -> list[str]:
     return [k for k in load_all_provider_configs() if not k.startswith("__")]
@@ -196,12 +227,14 @@ def get_active_provider() -> str | None:
     """Return the name of the provider previously selected, or None."""
     return load_all_provider_configs().get(_ACTIVE_PROVIDER_KEY)
 
+
 def get_claude_token_from_system() -> str | None:
     """Récupère le token Claude Code depuis le keychain/credential manager (via core.auth)."""
     token = get_auth_token()
     if token and token.startswith("sk-"):
         return token
     return None
+
 
 def force_claude_provider_config():
     """Crée ou met à jour la config provider 'claude' à partir du token système."""
@@ -211,4 +244,6 @@ def force_claude_provider_config():
         save_provider_config("claude", config)
         logger.info("force_claude_provider_config - config sauvegardée.")
     else:
-        logger.warning("force_claude_provider_config - aucun token Claude valide trouvé.")
+        logger.warning(
+            "force_claude_provider_config - aucun token Claude valide trouvé."
+        )

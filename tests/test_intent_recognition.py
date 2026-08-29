@@ -320,9 +320,7 @@ class TestIntentRecommender:
         assert "regression" in recs.suggested_tests
 
         # Should have regression test recommendation
-        test_rec = next(
-            (r for r in recs.recommendations if r.type == "tool"), None
-        )
+        test_rec = next((r for r in recs.recommendations if r.type == "tool"), None)
         assert test_rec is not None
         assert "regression" in test_rec.description.lower()
 
@@ -371,9 +369,7 @@ class TestIntentRecommender:
         recs = recommender.generate_recommendations(analysis)
 
         # Should have low confidence warning
-        warning = next(
-            (r for r in recs.recommendations if r.type == "warning"), None
-        )
+        warning = next((r for r in recs.recommendations if r.type == "warning"), None)
         assert warning is not None
         assert "confidence" in warning.title.lower()
 
@@ -408,4 +404,3 @@ class TestIntentRecommender:
 
         assert recs.estimated_complexity == "high"
         assert recs.estimated_duration_hours[1] >= 20.0
-

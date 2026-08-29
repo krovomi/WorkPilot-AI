@@ -198,8 +198,16 @@ class TestLocalModelManager:
         """Should parse Ollama model list."""
         mock_fetch.return_value = {
             "models": [
-                {"name": "llama3:8b", "size": 5_000_000_000, "modified_at": "2026-01-01"},
-                {"name": "mistral:7b", "size": 4_000_000_000, "modified_at": "2026-01-01"},
+                {
+                    "name": "llama3:8b",
+                    "size": 5_000_000_000,
+                    "modified_at": "2026-01-01",
+                },
+                {
+                    "name": "mistral:7b",
+                    "size": 4_000_000_000,
+                    "modified_at": "2026-01-01",
+                },
             ]
         }
         models = self.manager._list_ollama_models()
@@ -352,7 +360,9 @@ class TestLocalModelManager:
             self.manager._system_resources = fake_resources
             return fake_resources
 
-        with patch.object(self.manager, "get_system_resources", side_effect=mock_get_resources):
+        with patch.object(
+            self.manager, "get_system_resources", side_effect=mock_get_resources
+        ):
             alerts = self.manager.check_resource_alerts(ram_threshold=0.9)
             assert len(alerts) >= 1
             assert alerts[0].alert_type == "ram"
@@ -367,7 +377,11 @@ class TestLocalModelManager:
             available_vram_gb=0.5,
             gpu_detected=True,
         )
-        with patch.object(self.manager, "get_system_resources", return_value=self.manager._system_resources):
+        with patch.object(
+            self.manager,
+            "get_system_resources",
+            return_value=self.manager._system_resources,
+        ):
             alerts = self.manager.check_resource_alerts(vram_threshold=0.9)
             vram_alerts = [a for a in alerts if a.alert_type == "vram"]
             assert len(vram_alerts) == 1
@@ -378,7 +392,11 @@ class TestLocalModelManager:
             total_ram_gb=32.0,
             available_ram_gb=20.0,
         )
-        with patch.object(self.manager, "get_system_resources", return_value=self.manager._system_resources):
+        with patch.object(
+            self.manager,
+            "get_system_resources",
+            return_value=self.manager._system_resources,
+        ):
             alerts = self.manager.check_resource_alerts()
             assert len(alerts) == 0
 

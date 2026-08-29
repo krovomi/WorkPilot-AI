@@ -111,9 +111,7 @@ def test_gate_disabled_when_threshold_zero(monkeypatch):
 
 
 def test_evaluate_pass_full_coverage():
-    report = evaluate_coverage(
-        {"unit": 100, "integration": 100, "e2e": 100}, 100
-    )
+    report = evaluate_coverage({"unit": 100, "integration": 100, "e2e": 100}, 100)
     assert report["passed"] is True
     assert report["enabled"] is True
     assert report["failures"] == []
@@ -134,9 +132,7 @@ def test_evaluate_fail_missing_required():
 
 def test_evaluate_e2e_is_best_effort_only():
     # e2e below threshold must NOT block (warning only)
-    report = evaluate_coverage(
-        {"unit": 100, "integration": 100, "e2e": 10}, 100
-    )
+    report = evaluate_coverage({"unit": 100, "integration": 100, "e2e": 10}, 100)
     assert report["passed"] is True
     assert report["warnings"]
     assert any("e2e" in w for w in report["warnings"])
@@ -247,9 +243,7 @@ def test_mark_signoff_rejected_overrides_approved(tmp_path):
     signoff = updated["qa_signoff"]
     assert signoff["status"] == "rejected"
     assert signoff["ready_for_qa_revalidation"] is False
-    assert any(
-        i.get("type") == "coverage_gap" for i in signoff["issues_found"]
-    )
+    assert any(i.get("type") == "coverage_gap" for i in signoff["issues_found"])
 
 
 def test_mark_signoff_rejected_is_idempotent(tmp_path):
@@ -261,9 +255,7 @@ def test_mark_signoff_rejected_is_idempotent(tmp_path):
         (tmp_path / "implementation_plan.json").read_text(encoding="utf-8")
     )
     gaps = [
-        i
-        for i in plan["qa_signoff"]["issues_found"]
-        if i.get("type") == "coverage_gap"
+        i for i in plan["qa_signoff"]["issues_found"] if i.get("type") == "coverage_gap"
     ]
     # No duplicate accumulation across repeated calls.
     assert len(gaps) == 1

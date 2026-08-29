@@ -25,6 +25,7 @@ def test_api_providers():
     assert isinstance(data["providers"], list)
     assert isinstance(data["status"], dict)
 
+
 def test_api_select_provider():
     r = requests.post(
         "http://localhost:9000/providers/select?provider=openai", timeout=5
