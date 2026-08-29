@@ -7,6 +7,10 @@
 	"baseline_signals": [],
 	"context": {
 		"why_this_is_here": "The archived baseline failed this one. It is in the corpus so a candidate that fixes it is measured as an improvement rather than assumed to be one.",
-		"observable": "CI run history, 3 failures in 15 runs"
+		"observable": "CI run history, 3 failures in 15 runs",
+		"requires": [
+			"flaky"
+		],
+		"discriminator_note": "Failed. The generic prompt never names flakiness, so one green run reads as proof. A candidate that names it is a measured improvement."
 	}
 }
