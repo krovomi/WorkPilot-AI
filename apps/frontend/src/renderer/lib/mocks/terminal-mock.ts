@@ -82,10 +82,6 @@ export const terminalMock = {
 		},
 	}),
 
-	saveTerminalBuffer: async () => {
-		/* noop */
-	},
-
 	checkTerminalPtyAlive: async () => ({
 		success: true,
 		data: { alive: false },
