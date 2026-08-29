@@ -522,7 +522,7 @@ export const ProviderManager: React.FC<{ selected: string }> = ({
 									disabled={isSavingConfig}
 								>
 									{isSavingConfig
-										? t("common:saving", "Enregistrement...")
+										? t("common:buttons.saving", "Enregistrement...")
 										: t("common:save", "Enregistrer")}
 								</button>
 								<button
@@ -532,7 +532,7 @@ export const ProviderManager: React.FC<{ selected: string }> = ({
 									disabled={isDeletingConfig}
 								>
 									{isDeletingConfig
-										? t("common:deleting", "Suppression...")
+										? t("common:buttons.deleting", "Suppression...")
 										: t("common:delete", "Supprimer")}
 								</button>
 								<button
@@ -581,8 +581,8 @@ export const ProviderManager: React.FC<{ selected: string }> = ({
 							disabled={isGenerating || !prompt.trim()}
 						>
 							{isGenerating
-								? t("common:generating", "Génération...")
-								: t("common:generate", "Générer")}
+								? t("common:buttons.generating", "Génération...")
+								: t("common:buttons.generate", "Générer")}
 						</button>
 						{generation && (
 							<pre style={{ background: "#f5f5f5", padding: 8 }}>

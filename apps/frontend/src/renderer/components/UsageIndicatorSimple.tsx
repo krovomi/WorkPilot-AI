@@ -350,7 +350,7 @@ export function UsageIndicatorSimple() {
 							<div className="space-y-2">
 								<div className="flex items-center justify-between">
 									<span className="text-[10px] text-muted-foreground">
-										{t("common:usage.session")}
+										{t("common:usage.sessionDefault")}
 									</span>
 									<span
 										className={`text-xs font-semibold ${sessionColorClass}`}
@@ -380,7 +380,7 @@ export function UsageIndicatorSimple() {
 								</div>
 								{sessionResetTime && (
 									<p className="text-[9px] text-muted-foreground">
-										{t("common:usage.resetsIn", { time: sessionResetTime })}
+										{sessionResetTime}
 									</p>
 								)}
 							</div>
@@ -389,7 +389,7 @@ export function UsageIndicatorSimple() {
 							<div className="space-y-2">
 								<div className="flex items-center justify-between">
 									<span className="text-[10px] text-muted-foreground">
-										{t("common:usage.weekly")}
+										{t("common:usage.weeklyDefault")}
 									</span>
 									<span className={`text-xs font-semibold ${weeklyUnavailable ? "text-muted-foreground" : weeklyColorClass}`}>
 										{weeklyUnavailable ? "N/A" : `${Math.round(weeklyPercent)}%`}
@@ -419,7 +419,7 @@ export function UsageIndicatorSimple() {
 								)}
 								{weeklyResetTime && !weeklyUnavailable && (
 									<p className="text-[9px] text-muted-foreground">
-										{t("common:usage.resetsIn", { time: weeklyResetTime })}
+										{weeklyResetTime}
 									</p>
 								)}
 							</div>

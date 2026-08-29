@@ -644,7 +644,12 @@
 			"tokenSaveFailed": "Échec de l'enregistrement du jeton",
 			"tokenSaved": "Jeton enregistré",
 			"tokenSavedDescription": "Votre jeton a été enregistré avec succès.",
-			"tryAgain": "Veuillez réessayer."
+			"tryAgain": "Veuillez réessayer.",
+			"authFailed": "Échec de l'authentification",
+			"checkFilePermissions": "Vérifiez les permissions du fichier et réessayez.",
+			"checkPath": "Vérifiez que le chemin existe et réessayez.",
+			"pathNotFound": "Chemin introuvable",
+			"permissionDenied": "Permission refusée"
 		}
 	},
 	"actions": {
@@ -1051,7 +1056,8 @@
 		"successTitle": "Import réussi !",
 		"title": "Importer les éléments Azure DevOps",
 		"titleWithRepository": "Importer les éléments de {{repository}}",
-		"toggleSelection": "Basculer la sélection pour l'élément de travail {{id}}"
+		"toggleSelection": "Basculer la sélection pour l'élément de travail {{id}}",
+		"importError": "Échec de l'import Azure DevOps"
 	},
 	"collaboration": {
 		"description": "Paramètres de collaboration multi-utilisateurs",
@@ -1351,7 +1357,10 @@
 			"defaultBranch": {
 				"label": "Branche par défaut",
 				"description": "Branche de base pour la création des arbres de travail des tâches",
-				"selectedBranchHelp": "Toutes les nouvelles tâches seront créées à partir de {{branch}}"
+				"selectedBranchHelp": "Toutes les nouvelles tâches seront créées à partir de {{branch}}",
+				"autoDetect": "Détection automatique",
+				"searchPlaceholder": "Rechercher une branche…",
+				"noBranchesFound": "Aucune branche trouvée"
 			}
 		},
 		"linear": {
@@ -2339,6 +2348,30 @@
 			"approved": "Approuvée",
 			"rejected": "Rejetée",
 			"changes_requested": "Modifications demandées"
+		}
+	},
+	"guardrails": {
+		"title": "Garde-fous des agents",
+		"description": "Règles que les agents doivent respecter avant Write / Edit / Bash. Stockées dans .workpilot/guardrails.json.",
+		"selectProject": "Sélectionnez un projet pour gérer ses garde-fous.",
+		"activeCount": "{{count}} règle(s) active(s)",
+		"addRule": "Ajouter une règle",
+		"empty": "Aucune règle pour l'instant. Ajoutez-en une pour commencer à appliquer des politiques.",
+		"ruleId": "identifiant de règle",
+		"description_placeholder": "Que fait respecter cette règle ?",
+		"tool": "Outil(s)",
+		"pathPrefix": "Préfixe de chemin",
+		"pathRegex": "Regex de chemin",
+		"contentRegex": "Regex de contenu",
+		"maxLines": "Lignes de contenu maximum",
+		"commandPattern": "Motif de commande Bash",
+		"tester": "Tester un appel d'outil",
+		"runTest": "Lancer le test",
+		"actions": {
+			"allow": "Autoriser",
+			"warn": "Avertir",
+			"deny": "Refuser",
+			"require_approval": "Demander une approbation"
 		}
 	}
 }

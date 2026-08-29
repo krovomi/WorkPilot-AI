@@ -688,7 +688,9 @@
 			"cancel": "Cancel",
 			"delete": "Delete",
 			"deleting": "Deleting..."
-		}
+		},
+		"title": "API Profiles",
+		"description": "Configure Anthropic-compatible API endpoints"
 	},
 	"modelSelect": {
 		"placeholder": "Select a model or type manually",
@@ -1113,6 +1115,16 @@
 			"projectId": "Project ID (Optional)",
 			"projectIdDescription": "The unique identifier of the Linear project to sync",
 			"projectIdPlaceholder": "Auto-created"
+		},
+		"github": {
+			"defaultBranch": {
+				"label": "Default branch",
+				"description": "The branch pull requests target by default.",
+				"autoDetect": "Auto-detect",
+				"searchPlaceholder": "Search branches…",
+				"noBranchesFound": "No branches found",
+				"selectedBranchHelp": "Pull requests will target {{branch}}."
+			}
 		}
 	},
 	"accounts": {
@@ -1797,7 +1809,8 @@
 		"importConfirmDescription": "The following items will be imported into the {{column}} column.",
 		"importConfirmButton": "Import {{count}} item(s)",
 		"selectedItems": "{{count}} item(s) selected",
-		"toggleSelection": "Toggle selection for work item {{id}}"
+		"toggleSelection": "Toggle selection for work item {{id}}",
+		"importError": "Azure DevOps import failed"
 	},
 	"azureDevOps": {
 		"enableSyncLabel": "Enable Azure DevOps Sync",
@@ -2412,6 +2425,30 @@
 			"authFailed": "Authentication failed",
 			"logoutFailed": "Sign-out failed",
 			"unknownError": "An unknown error occurred."
+		}
+	},
+	"guardrails": {
+		"title": "Agent Guardrails",
+		"description": "Rules agents must respect before Write / Edit / Bash. Stored in .workpilot/guardrails.json.",
+		"selectProject": "Select a project to manage its guardrails.",
+		"activeCount": "{{count}} active rule(s)",
+		"addRule": "Add rule",
+		"empty": "No rules yet. Add one to start enforcing policies.",
+		"ruleId": "rule id",
+		"description_placeholder": "What does this rule enforce?",
+		"tool": "Tool(s)",
+		"pathPrefix": "Path prefix",
+		"pathRegex": "Path regex",
+		"contentRegex": "Content regex",
+		"maxLines": "Max content lines",
+		"commandPattern": "Bash command pattern",
+		"tester": "Test a tool call",
+		"runTest": "Run test",
+		"actions": {
+			"allow": "Allow",
+			"warn": "Warn",
+			"deny": "Deny",
+			"require_approval": "Require approval"
 		}
 	}
 }

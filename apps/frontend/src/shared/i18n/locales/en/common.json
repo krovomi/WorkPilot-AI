@@ -100,7 +100,12 @@
 		"test": "Test",
 		"testing": "Testing...",
 		"generate": "Generate",
-		"generating": "Generating..."
+		"generating": "Generating...",
+		"browse": "Browse",
+		"reset": "Reset",
+		"continueAnyway": "Continue anyway",
+		"showMore": "Show more",
+		"showLess": "Show less"
 	},
 	"actions": {
 		"save": "Save",

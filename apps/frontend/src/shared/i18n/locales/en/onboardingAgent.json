@@ -12,5 +12,13 @@
 	"errors": {
 		"noProject": "Select a project to generate its onboarding guide.",
 		"failed": "Generation failed: {{error}}"
+	},
+	"packageTitle": "Onboarding Tour",
+	"packageIntro": "Generate an interactive tour with quiz, first tasks, and glossary for this project.",
+	"tabs": {
+		"tour": "Tour",
+		"quiz": "Quiz",
+		"firstTasks": "First tasks",
+		"glossary": "Glossary"
 	}
 }

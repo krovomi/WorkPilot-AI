@@ -34,7 +34,7 @@ export function ProfileRenderer({
 						<span className="text-sm font-medium truncate">{account.name}</span>
 						{isActive && (
 							<span className="text-xs bg-primary-foreground/20 px-1.5 py-0.5 rounded-full">
-								{t("common:usage.active")}
+								{t("common:usage.activeAccount")}
 							</span>
 						)}
 					</div>

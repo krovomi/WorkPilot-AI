@@ -182,7 +182,8 @@
 		"toggle": {
 			"label": "Envoyer des rapports d'erreurs anonymes",
 			"description": "Aidez-nous à identifier et corriger les problèmes"
-		}
+		},
+		"saveFailed": "Échec de l'enregistrement des paramètres de confidentialité. Veuillez réessayer."
 	},
 	"cli": {
 		"title": "CLI IA",

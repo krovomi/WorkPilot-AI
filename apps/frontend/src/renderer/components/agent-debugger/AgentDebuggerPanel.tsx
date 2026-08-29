@@ -222,7 +222,7 @@ export function AgentDebuggerPanel({ sessionId }: Props) {
 							</div>
 							<Button size="sm" onClick={handleAdd} disabled={!newId.trim()}>
 								<Plus className="w-3 h-3 mr-1" />
-								{t("common:add", "Add")}
+								{t("common:buttons.add", "Add")}
 							</Button>
 						</div>
 						<div className="space-y-1">

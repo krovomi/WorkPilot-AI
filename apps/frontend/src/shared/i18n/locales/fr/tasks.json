@@ -366,6 +366,16 @@
 			"saved": "Paramètres de la file d'attente enregistrés",
 			"saveFailed": "Échec de l'enregistrement des paramètres",
 			"retry": "Veuillez réessayer"
+		},
+		"autoSwap": {
+			"title": "Profil basculé",
+			"description": "Bascule de {{from}} vers {{to}} ({{reason}})",
+			"batchTitle": "{{count}} bascules de profil",
+			"batchDescription": "Tâches redistribuées vers : {{profiles}}"
+		},
+		"blocked": {
+			"title": "File bloquée",
+			"description": "Tous les profils sont saturés. Les tâches reprendront dès qu'un profil se libère."
 		}
 	},
 	"execution": {
@@ -888,7 +898,9 @@
 			"installed": "✓ installé",
 			"downloadable": "à télécharger",
 			"downloadStartedTitle": "Téléchargement du modèle",
-			"downloadStartedDesc": "{{model}} se télécharge en arrière-plan."
+			"downloadStartedDesc": "{{model}} se télécharge en arrière-plan.",
+			"smallWarn": "⚠ petit — déconseillé planif",
+			"smallWarnTip": "Petit modèle ({{n}}B) — déconseillé pour la planification (préférez ≥24B ou Claude) ; limité sur les tâches complexes."
 		},
 		"modelGroup": {
 			"toggleAria": "Afficher ou masquer les logs du modèle {{model}}",
@@ -1063,5 +1075,17 @@
 			"conflictsDependencyExists": "Déjà un prérequis",
 			"conflictsDependencyCycle": "Impossible : créerait un cycle"
 		}
+	},
+	"untitled": "Tâche sans titre",
+	"plan": {
+		"changesSaved": "Plan enregistré",
+		"saveError": "Impossible d'enregistrer le plan"
+	},
+	"decisionLogger": {
+		"title": "Journal des décisions",
+		"loading": "Chargement du journal des décisions…",
+		"empty": "Aucune décision enregistrée pour l'instant",
+		"emptyHint": "Les décisions apparaissent ici pendant que l'agent tourne.",
+		"noMatch": "Aucune entrée ne correspond au filtre actuel."
 	}
 }

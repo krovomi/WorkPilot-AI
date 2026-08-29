@@ -142,8 +142,8 @@ export function PluginCard({
 					className="mt-1 text-[10px] text-primary hover:underline text-left"
 				>
 					{showFullDesc
-						? t("common:actions.showLess")
-						: t("common:actions.showMore")}
+						? t("common:buttons.showLess")
+						: t("common:buttons.showMore")}
 				</button>
 			)}
 

@@ -366,6 +366,16 @@
 			"saved": "Queue settings saved",
 			"saveFailed": "Failed to save queue settings",
 			"retry": "Please try again"
+		},
+		"autoSwap": {
+			"title": "Profile Swapped",
+			"description": "Switched from {{from}} to {{to}} ({{reason}})",
+			"batchTitle": "{{count}} Profile Swaps",
+			"batchDescription": "Tasks redistributed to: {{profiles}}"
+		},
+		"blocked": {
+			"title": "Queue Blocked",
+			"description": "All profiles are at capacity. Tasks will resume when a profile becomes available."
 		}
 	},
 	"execution": {
@@ -888,7 +898,9 @@
 			"installed": "✓ installed",
 			"downloadable": "to download",
 			"downloadStartedTitle": "Downloading model",
-			"downloadStartedDesc": "{{model}} is downloading in the background."
+			"downloadStartedDesc": "{{model}} is downloading in the background.",
+			"smallWarn": "⚠ small — not advised for planning",
+			"smallWarnTip": "Small model ({{n}}B) — not advised for planning (prefer ≥24B or Claude); limited on complex tasks."
 		},
 		"modelGroup": {
 			"toggleAria": "Show or hide logs from model {{model}}",
@@ -1063,5 +1075,17 @@
 			"conflictsDependencyExists": "Already a prerequisite",
 			"conflictsDependencyCycle": "Not possible: would create a cycle"
 		}
+	},
+	"untitled": "Untitled task",
+	"plan": {
+		"changesSaved": "Plan saved",
+		"saveError": "Could not save the plan"
+	},
+	"decisionLogger": {
+		"title": "Decision Timeline",
+		"loading": "Loading decision log…",
+		"empty": "No decisions recorded yet",
+		"emptyHint": "Decisions appear here while the agent is running.",
+		"noMatch": "No entries match the current filter."
 	}
 }

@@ -182,7 +182,8 @@
 		"toggle": {
 			"label": "Send anonymous error reports",
 			"description": "Help us identify and fix issues"
-		}
+		},
+		"saveFailed": "Failed to save privacy settings. Please try again."
 	},
 	"cli": {
 		"title": "AI CLI",

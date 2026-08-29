@@ -80,7 +80,7 @@ export function RepoSelector() {
 						onClick={handleBrowse}
 						className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
 					>
-						{t("common:browse")}
+						{t("common:buttons.browse")}
 					</button>
 					<button
 						type="button"

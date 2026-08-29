@@ -2034,7 +2034,7 @@ export function App() {
 											</>
 										) : (
 											<div className="flex items-center justify-center h-full text-muted">
-												{t("common:noProjectSelected")}
+												{t("common:common.noProjectSelected")}
 											</div>
 										)}
 									</Suspense>
