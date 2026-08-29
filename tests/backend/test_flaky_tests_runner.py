@@ -53,8 +53,10 @@ TRX_XML = """<?xml version="1.0" encoding="UTF-8"?>
 
 def _parse(xml: str) -> list:
     root = ET.fromstring(xml)
-    return ftr._parse_trx_root(root, "r", 0.0) if _is_trx(root) else ftr._parse_junit_root(
-        root, "r", 0.0
+    return (
+        ftr._parse_trx_root(root, "r", 0.0)
+        if _is_trx(root)
+        else ftr._parse_junit_root(root, "r", 0.0)
     )
 
 

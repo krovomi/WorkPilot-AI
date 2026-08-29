@@ -45,19 +45,25 @@ from apps.backend.agents.documenter import (
 # SymbolDoc
 # -----------------------------------------------------------------------
 
+
 class TestSymbolDoc:
     def test_create_symbol_doc(self):
         sym = SymbolDoc(
-            name="my_func", symbol_type="function",
-            file_path="f.py", line_number=10,
-            status=DocStatus.MISSING, args=["x", "y"],
+            name="my_func",
+            symbol_type="function",
+            file_path="f.py",
+            line_number=10,
+            status=DocStatus.MISSING,
+            args=["x", "y"],
         )
         assert sym.name == "my_func"
         assert sym.status == DocStatus.MISSING
         assert len(sym.args) == 2
 
     def test_symbol_doc_to_dict(self):
-        sym = SymbolDoc(name="MyClass", symbol_type="class", status=DocStatus.DOCUMENTED)
+        sym = SymbolDoc(
+            name="MyClass", symbol_type="class", status=DocStatus.DOCUMENTED
+        )
         d = sym.to_dict()
         assert d["status"] == "documented"
         assert d["symbol_type"] == "class"
@@ -66,6 +72,7 @@ class TestSymbolDoc:
 # -----------------------------------------------------------------------
 # ModuleInfo
 # -----------------------------------------------------------------------
+
 
 class TestModuleInfo:
     def test_create_module_info(self):
@@ -88,6 +95,7 @@ class TestModuleInfo:
 # -----------------------------------------------------------------------
 # DocGenerationResult
 # -----------------------------------------------------------------------
+
 
 class TestDocGenerationResult:
     def test_create_result(self):
@@ -174,6 +182,7 @@ class TestDocAnalyzerFile:
 # DocAnalyzer — directory analysis
 # -----------------------------------------------------------------------
 
+
 class TestDocAnalyzerDirectory:
     def test_analyze_directory(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -217,6 +226,7 @@ class TestDocAnalyzerDirectory:
 # DocGenerator — Google format
 # -----------------------------------------------------------------------
 
+
 class TestDocGeneratorGoogle:
     def test_generate_google_docstring(self):
         sym = SymbolDoc(name="my_func", args=["x", "y"], return_type="int")
@@ -243,6 +253,7 @@ class TestDocGeneratorGoogle:
 # DocGenerator — NumPy format
 # -----------------------------------------------------------------------
 
+
 class TestDocGeneratorNumpy:
     def test_generate_numpy_docstring(self):
         sym = SymbolDoc(name="func", args=["data"], return_type="list")
@@ -262,6 +273,7 @@ class TestDocGeneratorNumpy:
 # DocGenerator — Sphinx format
 # -----------------------------------------------------------------------
 
+
 class TestDocGeneratorSphinx:
     def test_generate_sphinx_docstring(self):
         sym = SymbolDoc(name="func", args=["x"], return_type="str")
@@ -280,6 +292,7 @@ class TestDocGeneratorSphinx:
 # -----------------------------------------------------------------------
 # DocGenerator — JSDoc format
 # -----------------------------------------------------------------------
+
 
 class TestDocGeneratorJSDoc:
     def test_generate_jsdoc(self):
@@ -301,6 +314,7 @@ class TestDocGeneratorJSDoc:
 # DocGenerator — README
 # -----------------------------------------------------------------------
 
+
 class TestDocGeneratorReadme:
     def test_generate_readme(self):
         info = ModuleInfo(
@@ -318,7 +332,8 @@ class TestDocGeneratorReadme:
 
     def test_readme_has_files_section(self):
         info = ModuleInfo(
-            module_path="/src", name="src",
+            module_path="/src",
+            name="src",
             files=["main.py", "utils.py"],
         )
         gen = DocGenerator()
@@ -337,11 +352,17 @@ class TestDocGeneratorReadme:
 # DocGenerator — Mermaid diagrams
 # -----------------------------------------------------------------------
 
+
 class TestDocGeneratorDiagrams:
     def test_class_diagram(self):
         symbols = [
             SymbolDoc(name="Calculator", symbol_type="class"),
-            SymbolDoc(name="Calculator.add", symbol_type="method", args=["a", "b"], return_type="int"),
+            SymbolDoc(
+                name="Calculator.add",
+                symbol_type="method",
+                args=["a", "b"],
+                return_type="int",
+            ),
             SymbolDoc(name="Calculator.sub", symbol_type="method", args=["a", "b"]),
         ]
         gen = DocGenerator()
@@ -351,7 +372,8 @@ class TestDocGeneratorDiagrams:
 
     def test_module_diagram(self):
         info = ModuleInfo(
-            module_path="/src", name="mymod",
+            module_path="/src",
+            name="mymod",
             submodules=["sub1", "sub2"],
             dependencies=["os", "json"],
         )
@@ -372,6 +394,7 @@ class TestDocGeneratorDiagrams:
 # DocumentationAgent — docstrings
 # -----------------------------------------------------------------------
 
+
 class TestDocumentationAgentDocstrings:
     def test_generate_docstrings_from_source(self):
         agent = DocumentationAgent()
@@ -389,7 +412,11 @@ class TestDocumentationAgentDocstrings:
         agent = DocumentationAgent(default_format=DocFormat.SPHINX)
         result = agent.generate_docstrings(source=SAMPLE_SOURCE)
         # Check that at least one generated doc uses Sphinx format
-        has_sphinx = any(":param" in d.generated_doc for d in result.generated_docs if d.generated_doc)
+        has_sphinx = any(
+            ":param" in d.generated_doc
+            for d in result.generated_docs
+            if d.generated_doc
+        )
         assert has_sphinx
 
     def test_generate_docstrings_empty_source(self):
@@ -401,6 +428,7 @@ class TestDocumentationAgentDocstrings:
 # -----------------------------------------------------------------------
 # DocumentationAgent — README
 # -----------------------------------------------------------------------
+
 
 class TestDocumentationAgentReadme:
     def test_generate_module_readme(self):
@@ -429,6 +457,7 @@ class TestDocumentationAgentReadme:
 # DocumentationAgent — coverage
 # -----------------------------------------------------------------------
 
+
 class TestDocumentationAgentCoverage:
     def test_check_coverage(self):
         agent = DocumentationAgent()
@@ -439,7 +468,9 @@ class TestDocumentationAgentCoverage:
         assert "coverage_pct" in coverage
 
     def test_coverage_pct_calculated(self):
-        source = '"""Module."""\ndef a():\n    """Doc."""\n    pass\ndef b():\n    pass\n'
+        source = (
+            '"""Module."""\ndef a():\n    """Doc."""\n    pass\ndef b():\n    pass\n'
+        )
         agent = DocumentationAgent()
         coverage = agent.check_documentation_coverage(source=source)
         # a is documented, b is missing
@@ -455,6 +486,7 @@ class TestDocumentationAgentCoverage:
 # -----------------------------------------------------------------------
 # DocumentationAgent — stats
 # -----------------------------------------------------------------------
+
 
 class TestDocumentationAgentStats:
     def test_stats_empty(self):

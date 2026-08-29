@@ -89,7 +89,9 @@ def test_bounty_runs_all_contestants_in_parallel(spec_dir, project_path):
 
     assert result.status == "completed"
     assert len(result.contestants) == 3
-    assert all(c.worktree_path and Path(c.worktree_path).exists() for c in result.contestants)
+    assert all(
+        c.worktree_path and Path(c.worktree_path).exists() for c in result.contestants
+    )
     assert all(c.score is not None for c in result.contestants)
     # winner should be the most substantive one (A)
     assert result.winner_id is not None
@@ -105,9 +107,7 @@ def test_errored_contestants_do_not_win(spec_dir, project_path):
     ]
     outputs = {"A": "", "B": "This is a valid completion with must-have behaviour."}
     runner = _make_runner(outputs, fail={"A"})
-    result = asyncio.run(
-        run_bounty(spec_dir, project_path, contestants, runner=runner)
-    )
+    result = asyncio.run(run_bounty(spec_dir, project_path, contestants, runner=runner))
     winner = next(c for c in result.contestants if c.id == result.winner_id)
     assert winner.label == "B"
     loser = next(c for c in result.contestants if c.label == "A")
@@ -129,15 +129,26 @@ def test_bounty_provider_agnostic_mix(spec_dir, project_path):
             ("windsurf", "swe-1.5"),
         ]
     ]
-    outputs = {c.label or chr(ord("A") + i): "result must pass." for i, c in enumerate(contestants)}
+    outputs = {
+        c.label or chr(ord("A") + i): "result must pass."
+        for i, c in enumerate(contestants)
+    }
     # ContestantSpec labels auto-assigned by the orchestrator; build by index.
-    outputs_by_index = {chr(ord("A") + i): f"result {i} must pass." for i in range(len(contestants))}
+    outputs_by_index = {
+        chr(ord("A") + i): f"result {i} must pass." for i in range(len(contestants))
+    }
     runner = _make_runner(outputs_by_index)
     result = asyncio.run(run_bounty(spec_dir, project_path, contestants, runner=runner))
     assert len(result.contestants) == 7
     providers = {c.provider for c in result.contestants}
     assert providers == {
-        "anthropic", "openai", "google", "grok", "ollama", "copilot", "windsurf",
+        "anthropic",
+        "openai",
+        "google",
+        "grok",
+        "ollama",
+        "copilot",
+        "windsurf",
     }
 
 
@@ -157,10 +168,24 @@ def test_persists_result_to_spec_dir(spec_dir, project_path):
 
 
 def test_default_judge_ranks_longer_more_relevant_output_higher(spec_dir):
-    a = Contestant(id="a", label="A", provider="x", model="m", status="completed",
-                   output="must", duration_ms=10)
-    b = Contestant(id="b", label="B", provider="y", model="n", status="completed",
-                   output="must " * 200 + " should " * 40, duration_ms=5)
+    a = Contestant(
+        id="a",
+        label="A",
+        provider="x",
+        model="m",
+        status="completed",
+        output="must",
+        duration_ms=10,
+    )
+    b = Contestant(
+        id="b",
+        label="B",
+        provider="y",
+        model="n",
+        status="completed",
+        output="must " * 200 + " should " * 40,
+        duration_ms=5,
+    )
     spec = (spec_dir / "spec.md").read_text(encoding="utf-8")
     winner_id, rationale = asyncio.run(default_judge([a, b], spec, spec_dir))
     assert winner_id == "b"

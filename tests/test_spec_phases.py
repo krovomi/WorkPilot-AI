@@ -289,7 +289,8 @@ class TestPhaseDiscovery:
 
         # Always fail
         with patch(
-            "apps.backend.spec.phases.discovery_phases.discovery.run_discovery_script", return_value=(False, "Script failed")
+            "apps.backend.spec.phases.discovery_phases.discovery.run_discovery_script",
+            return_value=(False, "Script failed"),
         ):
             result = await executor.phase_discovery()
 
@@ -510,9 +511,12 @@ class TestPhaseContext:
         )
 
         with patch(
-            "apps.backend.spec.context.run_context_discovery", return_value=(False, "Failed")
+            "apps.backend.spec.context.run_context_discovery",
+            return_value=(False, "Failed"),
         ):
-            with patch("apps.backend.spec.context.create_minimal_context") as mock_minimal:
+            with patch(
+                "apps.backend.spec.context.create_minimal_context"
+            ) as mock_minimal:
                 result = await executor.phase_context()
 
         mock_minimal.assert_called_once()
@@ -680,6 +684,7 @@ class TestPhaseQuickSpec:
         assert result.phase == "quick_spec"
         # Planning must not run once spec_writing has failed
         planning_mock.assert_not_called()
+
     """Tests for phase_research method."""
 
     @pytest.mark.asyncio
@@ -985,7 +990,9 @@ class TestPhaseValidation:
             project_dir=temp_dir,
             spec_dir=spec_dir,
             task_description="Test task",
-            spec_validator=mock_spec_validator(spec_valid=False, plan_valid=False, context_valid=False),
+            spec_validator=mock_spec_validator(
+                spec_valid=False, plan_valid=False, context_valid=False
+            ),
             run_agent_fn=agent_fn,
             task_logger=mock_task_logger,
             ui_module=mock_ui_module,

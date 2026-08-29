@@ -37,9 +37,12 @@ from apps.backend.scheduling.task_templates import (
 # TemplateVariable
 # -----------------------------------------------------------------------
 
+
 class TestTemplateVariable:
     def test_create_variable(self):
-        var = TemplateVariable(name="component", description="Component name", required=True)
+        var = TemplateVariable(
+            name="component", description="Component name", required=True
+        )
         assert var.name == "component"
         assert var.required is True
 
@@ -50,7 +53,12 @@ class TestTemplateVariable:
         assert d["default"] == "val"
 
     def test_variable_from_dict(self):
-        data = {"name": "endpoint", "description": "API endpoint", "required": False, "default": "/api/"}
+        data = {
+            "name": "endpoint",
+            "description": "API endpoint",
+            "required": False,
+            "default": "/api/",
+        }
         var = TemplateVariable.from_dict(data)
         assert var.name == "endpoint"
         assert var.default == "/api/"
@@ -60,10 +68,12 @@ class TestTemplateVariable:
 # TaskTemplate
 # -----------------------------------------------------------------------
 
+
 class TestTaskTemplate:
     def test_create_template(self):
         tpl = TaskTemplate(
-            id="test-tpl", name="Test Template",
+            id="test-tpl",
+            name="Test Template",
             category=TemplateCategory.FEATURE,
             title_template="Implement {{component}}",
         )
@@ -72,7 +82,9 @@ class TestTaskTemplate:
 
     def test_render_template(self):
         tpl = TaskTemplate(
-            id="t1", name="T1", category=TemplateCategory.FEATURE,
+            id="t1",
+            name="T1",
+            category=TemplateCategory.FEATURE,
             title_template="Build {{component}} for {{project}}",
             body_template="Create the {{component}} component.",
             variables=[
@@ -86,7 +98,9 @@ class TestTaskTemplate:
 
     def test_render_with_checklist(self):
         tpl = TaskTemplate(
-            id="t1", name="T1", category=TemplateCategory.FEATURE,
+            id="t1",
+            name="T1",
+            category=TemplateCategory.FEATURE,
             title_template="Build {{component}}",
             checklist=["Create {{component}}", "Test {{component}}"],
             variables=[TemplateVariable(name="component", required=True)],
@@ -97,7 +111,9 @@ class TestTaskTemplate:
 
     def test_render_missing_required_variable_raises(self):
         tpl = TaskTemplate(
-            id="t1", name="T1", category=TemplateCategory.FEATURE,
+            id="t1",
+            name="T1",
+            category=TemplateCategory.FEATURE,
             title_template="Build {{component}}",
             variables=[TemplateVariable(name="component", required=True)],
         )
@@ -106,8 +122,11 @@ class TestTaskTemplate:
 
     def test_render_returns_metadata(self):
         tpl = TaskTemplate(
-            id="t1", name="T1", category=TemplateCategory.FEATURE,
-            title_template="{{x}}", estimated_complexity="high",
+            id="t1",
+            name="T1",
+            category=TemplateCategory.FEATURE,
+            title_template="{{x}}",
+            estimated_complexity="high",
             variables=[TemplateVariable(name="x", default="val")],
         )
         result = tpl.render()
@@ -117,8 +136,11 @@ class TestTaskTemplate:
 
     def test_template_to_dict(self):
         tpl = TaskTemplate(
-            id="t1", name="T1", category=TemplateCategory.BUGFIX,
-            tags=["bug"], priority=2,
+            id="t1",
+            name="T1",
+            category=TemplateCategory.BUGFIX,
+            tags=["bug"],
+            priority=2,
         )
         d = tpl.to_dict()
         assert d["id"] == "t1"
@@ -127,7 +149,9 @@ class TestTaskTemplate:
 
     def test_template_from_dict(self):
         data = {
-            "id": "t2", "name": "T2", "category": "refactoring",
+            "id": "t2",
+            "name": "T2",
+            "category": "refactoring",
             "title_template": "Refactor {{target}}",
             "variables": [{"name": "target", "required": True}],
             "tags": ["refactor"],
@@ -147,10 +171,20 @@ class TestTaskTemplate:
 # TemplateCategory
 # -----------------------------------------------------------------------
 
+
 class TestTemplateCategory:
     def test_all_categories_exist(self):
-        expected = ["feature", "bugfix", "refactoring", "migration",
-                     "documentation", "testing", "security", "performance", "custom"]
+        expected = [
+            "feature",
+            "bugfix",
+            "refactoring",
+            "migration",
+            "documentation",
+            "testing",
+            "security",
+            "performance",
+            "custom",
+        ]
         for cat in expected:
             assert TemplateCategory(cat) is not None
 
@@ -158,6 +192,7 @@ class TestTemplateCategory:
 # -----------------------------------------------------------------------
 # TaskTemplateManager — Loading
 # -----------------------------------------------------------------------
+
 
 class TestManagerLoading:
     def test_load_builtin_templates(self):
@@ -182,10 +217,13 @@ class TestManagerLoading:
 # TaskTemplateManager — CRUD
 # -----------------------------------------------------------------------
 
+
 class TestManagerCRUD:
     def test_add_template(self):
         manager = TaskTemplateManager()
-        tpl = TaskTemplate(id="custom-1", name="Custom", category=TemplateCategory.CUSTOM)
+        tpl = TaskTemplate(
+            id="custom-1", name="Custom", category=TemplateCategory.CUSTOM
+        )
         manager.add_template(tpl)
         assert manager.get_template("custom-1") is not None
 
@@ -195,7 +233,9 @@ class TestManagerCRUD:
 
     def test_remove_template(self):
         manager = TaskTemplateManager()
-        tpl = TaskTemplate(id="rm-1", name="Remove Me", category=TemplateCategory.CUSTOM)
+        tpl = TaskTemplate(
+            id="rm-1", name="Remove Me", category=TemplateCategory.CUSTOM
+        )
         manager.add_template(tpl)
         assert manager.remove_template("rm-1") is True
         assert manager.get_template("rm-1") is None
@@ -220,6 +260,7 @@ class TestManagerCRUD:
 # TaskTemplateManager — Search
 # -----------------------------------------------------------------------
 
+
 class TestManagerSearch:
     def test_search_by_name(self):
         manager = TaskTemplateManager()
@@ -243,6 +284,7 @@ class TestManagerSearch:
 # -----------------------------------------------------------------------
 # TaskTemplateManager — Rendering
 # -----------------------------------------------------------------------
+
 
 class TestManagerRendering:
     def test_render_feature_template(self):
@@ -276,7 +318,9 @@ class TestManagerRendering:
     def test_render_migration_template(self):
         manager = TaskTemplateManager()
         manager.load_builtin_templates()
-        result = manager.render_template("migration", source="React 18", target="React 19")
+        result = manager.render_template(
+            "migration", source="React 18", target="React 19"
+        )
         assert "React 18" in result["title"]
         assert "React 19" in result["title"]
 
@@ -284,6 +328,7 @@ class TestManagerRendering:
 # -----------------------------------------------------------------------
 # TaskTemplateManager — Import/Export
 # -----------------------------------------------------------------------
+
 
 class TestManagerImportExport:
     def _require_yaml(self):
@@ -303,6 +348,7 @@ class TestManagerImportExport:
     def test_import_template_yaml(self):
         self._require_yaml()
         import yaml
+
         manager = TaskTemplateManager()
         data = {
             "id": "imported-1",
@@ -321,7 +367,8 @@ class TestManagerImportExport:
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = TaskTemplateManager()
             tpl = TaskTemplate(
-                id="save-test", name="Save Test",
+                id="save-test",
+                name="Save Test",
                 category=TemplateCategory.CUSTOM,
                 title_template="Test {{x}}",
             )
@@ -333,6 +380,7 @@ class TestManagerImportExport:
     def test_load_from_yaml_directory(self):
         self._require_yaml()
         import yaml
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Write a YAML template file
             data = {
@@ -364,6 +412,7 @@ class TestManagerImportExport:
 # TaskTemplateManager — Stats
 # -----------------------------------------------------------------------
 
+
 class TestManagerStats:
     def test_stats_empty(self):
         manager = TaskTemplateManager()
@@ -383,14 +432,19 @@ class TestManagerStats:
 # Builtin templates validation
 # -----------------------------------------------------------------------
 
+
 class TestBuiltinTemplates:
     def test_all_builtins_have_id(self):
         for tpl_data in BUILTIN_TEMPLATES:
-            assert tpl_data.get("id"), f"Missing id in builtin template: {tpl_data.get('name')}"
+            assert tpl_data.get("id"), (
+                f"Missing id in builtin template: {tpl_data.get('name')}"
+            )
 
     def test_all_builtins_have_title_template(self):
         for tpl_data in BUILTIN_TEMPLATES:
-            assert tpl_data.get("title_template"), f"Missing title_template: {tpl_data['id']}"
+            assert tpl_data.get("title_template"), (
+                f"Missing title_template: {tpl_data['id']}"
+            )
 
     def test_all_builtins_are_loadable(self):
         for tpl_data in BUILTIN_TEMPLATES:

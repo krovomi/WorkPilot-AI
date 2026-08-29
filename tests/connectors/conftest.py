@@ -1,6 +1,7 @@
 """
 pytest configuration for connector tests
 """
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -8,7 +9,9 @@ from pathlib import Path
 # Add the project root to the Python path for connector tests
 # When pytest runs tests in subdirectories, it needs explicit path configuration
 current_dir = Path(__file__).parent
-project_root = current_dir.parent.parent.parent  # Go up from tests/connectors to project root
+project_root = (
+    current_dir.parent.parent.parent
+)  # Go up from tests/connectors to project root
 src_path = project_root / "src"
 
 # Use absolute paths from the file location
@@ -25,6 +28,7 @@ if str(src_path_abs) not in sys.path:
 
 print(f"Connector tests - Python path includes: {project_root_abs}")
 print(f"Connector tests - Python path includes: {src_path_abs}")
+
 
 # Helper function to import modules directly, bypassing __init__.py circular imports
 def import_module_direct(module_name, file_path):

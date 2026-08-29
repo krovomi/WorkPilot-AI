@@ -36,6 +36,7 @@ from apps.backend.ui.desktop_notifications import (
 # NotificationAction tests (2)
 # ---------------------------------------------------------------------------
 
+
 class TestNotificationAction:
     def test_creation(self):
         a = NotificationAction(action_type="approve_merge", label="Approve")
@@ -51,6 +52,7 @@ class TestNotificationAction:
 # ---------------------------------------------------------------------------
 # DesktopNotification tests (3)
 # ---------------------------------------------------------------------------
+
 
 class TestDesktopNotification:
     def test_creation_defaults(self):
@@ -83,6 +85,7 @@ class TestDesktopNotification:
 # PeriodicSummary tests (3)
 # ---------------------------------------------------------------------------
 
+
 class TestPeriodicSummary:
     def test_creation(self):
         s = PeriodicSummary(tasks_completed=5, tasks_failed=1)
@@ -95,7 +98,9 @@ class TestPeriodicSummary:
         assert d["qa_pass_rate"] == 88.0
 
     def test_to_notification_body(self):
-        s = PeriodicSummary(tasks_completed=3, tasks_failed=1, qa_pass_rate=75.0, total_cost=1.5)
+        s = PeriodicSummary(
+            tasks_completed=3, tasks_failed=1, qa_pass_rate=75.0, total_cost=1.5
+        )
         body = s.to_notification_body()
         assert "3 completed" in body
         assert "1 failed" in body
@@ -105,6 +110,7 @@ class TestPeriodicSummary:
 # ---------------------------------------------------------------------------
 # NotificationPreferences tests (3)
 # ---------------------------------------------------------------------------
+
 
 class TestNotificationPreferences:
     def test_defaults(self):
@@ -127,6 +133,7 @@ class TestNotificationPreferences:
 # ---------------------------------------------------------------------------
 # Task completed notifications (3)
 # ---------------------------------------------------------------------------
+
 
 class TestTaskCompleted:
     def test_basic_notification(self):
@@ -152,6 +159,7 @@ class TestTaskCompleted:
 # Task failed notifications (2)
 # ---------------------------------------------------------------------------
 
+
 class TestTaskFailed:
     def test_basic_notification(self):
         mgr = DesktopNotificationManager()
@@ -169,6 +177,7 @@ class TestTaskFailed:
 # ---------------------------------------------------------------------------
 # QA result notifications (3)
 # ---------------------------------------------------------------------------
+
 
 class TestQAResult:
     def test_qa_passed(self):
@@ -194,6 +203,7 @@ class TestQAResult:
 # Rate limit notifications (2)
 # ---------------------------------------------------------------------------
 
+
 class TestRateLimit:
     def test_basic(self):
         mgr = DesktopNotificationManager()
@@ -212,6 +222,7 @@ class TestRateLimit:
 # Merge ready notifications (2)
 # ---------------------------------------------------------------------------
 
+
 class TestMergeReady:
     def test_basic(self):
         mgr = DesktopNotificationManager()
@@ -229,6 +240,7 @@ class TestMergeReady:
 # Security alert (1)
 # ---------------------------------------------------------------------------
 
+
 class TestSecurityAlert:
     def test_basic(self):
         mgr = DesktopNotificationManager()
@@ -241,6 +253,7 @@ class TestSecurityAlert:
 # Budget alert (1)
 # ---------------------------------------------------------------------------
 
+
 class TestBudgetAlert:
     def test_basic(self):
         mgr = DesktopNotificationManager()
@@ -252,6 +265,7 @@ class TestBudgetAlert:
 # ---------------------------------------------------------------------------
 # Custom notifications (2)
 # ---------------------------------------------------------------------------
+
 
 class TestCustomNotification:
     def test_basic(self):
@@ -269,6 +283,7 @@ class TestCustomNotification:
 # ---------------------------------------------------------------------------
 # Periodic summaries (3)
 # ---------------------------------------------------------------------------
+
 
 class TestPeriodicSummaryCreation:
     def test_create_summary(self):
@@ -300,6 +315,7 @@ class TestPeriodicSummaryCreation:
 # Action handling (2)
 # ---------------------------------------------------------------------------
 
+
 class TestActionHandling:
     def test_handle_action_with_handler(self):
         mgr = DesktopNotificationManager()
@@ -318,6 +334,7 @@ class TestActionHandling:
 # ---------------------------------------------------------------------------
 # Mark read (2)
 # ---------------------------------------------------------------------------
+
 
 class TestMarkRead:
     def test_mark_single_read(self):
@@ -339,6 +356,7 @@ class TestMarkRead:
 # ---------------------------------------------------------------------------
 # Queries & filters (3)
 # ---------------------------------------------------------------------------
+
 
 class TestQueries:
     def test_get_notifications_filtered(self):
@@ -367,6 +385,7 @@ class TestQueries:
 # Dispatch callback (1)
 # ---------------------------------------------------------------------------
 
+
 class TestDispatchCallback:
     def test_callback_called(self):
         dispatched = []
@@ -380,6 +399,7 @@ class TestDispatchCallback:
 # ---------------------------------------------------------------------------
 # Stats (2)
 # ---------------------------------------------------------------------------
+
 
 class TestStats:
     def test_basic_stats(self):

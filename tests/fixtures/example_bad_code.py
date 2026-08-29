@@ -1,5 +1,7 @@
 # Fichier avec problèmes intentionnels pour tester le Quality Scorer
 password = "hardcoded_secret_123"  # CRITICAL: Credentials hardcodées
+
+
 def very_complex_function(x, y, z):
     # MEDIUM/HIGH: Fonction trop complexe
     if x > 0:
@@ -13,8 +15,11 @@ def very_complex_function(x, y, z):
                                     return i * y * z
                                 i += 1
     return 0
+
+
 def some_operation():
     pass
+
 
 try:
     some_operation()

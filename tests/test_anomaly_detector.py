@@ -41,6 +41,7 @@ from apps.backend.security.anomaly_detector import (
 # AgentEvent tests (3)
 # ---------------------------------------------------------------------------
 
+
 class TestAgentEvent:
     def test_creation_defaults(self):
         ev = AgentEvent(event_type="file_write", session_id="s1")
@@ -64,6 +65,7 @@ class TestAgentEvent:
 # Anomaly tests (3)
 # ---------------------------------------------------------------------------
 
+
 class TestAnomaly:
     def test_creation(self):
         a = Anomaly(anomaly_type="mass_file_deletion", severity="critical")
@@ -84,6 +86,7 @@ class TestAnomaly:
 # ---------------------------------------------------------------------------
 # MonitoredSession tests (4)
 # ---------------------------------------------------------------------------
+
 
 class TestMonitoredSession:
     def test_creation_defaults(self):
@@ -115,6 +118,7 @@ class TestMonitoredSession:
 # BehaviorBaseline tests (2)
 # ---------------------------------------------------------------------------
 
+
 class TestBehaviorBaseline:
     def test_defaults(self):
         b = BehaviorBaseline(agent_type="coder")
@@ -132,6 +136,7 @@ class TestBehaviorBaseline:
 # AnomalyAlert tests (2)
 # ---------------------------------------------------------------------------
 
+
 class TestAnomalyAlert:
     def test_creation(self):
         a = AnomalyAlert(session_id="s1", action_taken="paused")
@@ -148,6 +153,7 @@ class TestAnomalyAlert:
 # ---------------------------------------------------------------------------
 # Session lifecycle (4)
 # ---------------------------------------------------------------------------
+
 
 class TestSessionLifecycle:
     def test_start_session(self):
@@ -181,11 +187,14 @@ class TestSessionLifecycle:
 # Event recording (4)
 # ---------------------------------------------------------------------------
 
+
 class TestEventRecording:
     def test_record_event(self):
         detector = AnomalyDetector()
         session = detector.start_session("task-1")
-        ev = detector.record_event(session.session_id, "file_write", {"path": "src/main.py"})
+        ev = detector.record_event(
+            session.session_id, "file_write", {"path": "src/main.py"}
+        )
         assert ev.event_type == "file_write"
         assert len(session.events) == 1
 
@@ -193,7 +202,9 @@ class TestEventRecording:
         detector = AnomalyDetector()
         session = detector.start_session("task-1")
         for i in range(5):
-            detector.record_event(session.session_id, "file_write", {"path": f"src/f{i}.py"})
+            detector.record_event(
+                session.session_id, "file_write", {"path": f"src/f{i}.py"}
+            )
         assert len(session.events) == 5
 
     def test_record_event_on_paused_session_raises(self):
@@ -215,6 +226,7 @@ class TestEventRecording:
 # Mass deletion detection (3)
 # ---------------------------------------------------------------------------
 
+
 class TestMassDeletion:
     def test_no_anomaly_below_threshold(self):
         detector = AnomalyDetector()
@@ -228,7 +240,11 @@ class TestMassDeletion:
         session = detector.start_session("task-1")
         for i in range(5):
             detector.record_event(session.session_id, "file_delete", {"path": f"f{i}"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.MASS_FILE_DELETION.value]
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.MASS_FILE_DELETION.value
+        ]
         assert len(anomalies) == 1
         assert anomalies[0].severity == "critical"
 
@@ -237,7 +253,11 @@ class TestMassDeletion:
         session = detector.start_session("task-1")
         detector.record_event(session.session_id, "file_delete", {"path": "a"})
         detector.record_event(session.session_id, "file_delete", {"path": "b"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.MASS_FILE_DELETION.value]
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.MASS_FILE_DELETION.value
+        ]
         assert len(anomalies) == 1
 
 
@@ -245,19 +265,32 @@ class TestMassDeletion:
 # Sensitive file access (2)
 # ---------------------------------------------------------------------------
 
+
 class TestSensitiveFileAccess:
     def test_env_file_access(self):
         detector = AnomalyDetector()
         session = detector.start_session("task-1")
-        detector.record_event(session.session_id, "file_read", {"path": "/project/.env"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.SENSITIVE_FILE_ACCESS.value]
+        detector.record_event(
+            session.session_id, "file_read", {"path": "/project/.env"}
+        )
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.SENSITIVE_FILE_ACCESS.value
+        ]
         assert len(anomalies) == 1
 
     def test_ssh_key_access(self):
         detector = AnomalyDetector()
         session = detector.start_session("task-1")
-        detector.record_event(session.session_id, "file_read", {"path": "/home/user/.ssh/id_rsa"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.SENSITIVE_FILE_ACCESS.value]
+        detector.record_event(
+            session.session_id, "file_read", {"path": "/home/user/.ssh/id_rsa"}
+        )
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.SENSITIVE_FILE_ACCESS.value
+        ]
         assert len(anomalies) >= 1
 
 
@@ -265,20 +298,33 @@ class TestSensitiveFileAccess:
 # Dangerous command detection (2)
 # ---------------------------------------------------------------------------
 
+
 class TestDangerousCommand:
     def test_sudo_detected(self):
         detector = AnomalyDetector()
         session = detector.start_session("task-1")
-        detector.record_event(session.session_id, "command_exec", {"command": "sudo apt install"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.UNUSUAL_COMMAND_EXECUTION.value]
+        detector.record_event(
+            session.session_id, "command_exec", {"command": "sudo apt install"}
+        )
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.UNUSUAL_COMMAND_EXECUTION.value
+        ]
         assert len(anomalies) == 1
         assert anomalies[0].severity == "critical"
 
     def test_safe_command_no_anomaly(self):
         detector = AnomalyDetector()
         session = detector.start_session("task-1")
-        detector.record_event(session.session_id, "command_exec", {"command": "python test.py"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.UNUSUAL_COMMAND_EXECUTION.value]
+        detector.record_event(
+            session.session_id, "command_exec", {"command": "python test.py"}
+        )
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.UNUSUAL_COMMAND_EXECUTION.value
+        ]
         assert len(anomalies) == 0
 
 
@@ -286,12 +332,19 @@ class TestDangerousCommand:
 # Network access (1)
 # ---------------------------------------------------------------------------
 
+
 class TestNetworkAccess:
     def test_network_request_detected(self):
         detector = AnomalyDetector()
         session = detector.start_session("task-1")
-        detector.record_event(session.session_id, "network_request", {"url": "http://evil.com"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.UNEXPECTED_NETWORK_ACCESS.value]
+        detector.record_event(
+            session.session_id, "network_request", {"url": "http://evil.com"}
+        )
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.UNEXPECTED_NETWORK_ACCESS.value
+        ]
         assert len(anomalies) == 1
 
 
@@ -299,19 +352,30 @@ class TestNetworkAccess:
 # Path traversal (2)
 # ---------------------------------------------------------------------------
 
+
 class TestPathTraversal:
     def test_dotdot_detected(self):
         detector = AnomalyDetector()
         session = detector.start_session("task-1")
-        detector.record_event(session.session_id, "file_read", {"path": "../../etc/passwd"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.PATH_TRAVERSAL_ATTEMPT.value]
+        detector.record_event(
+            session.session_id, "file_read", {"path": "../../etc/passwd"}
+        )
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.PATH_TRAVERSAL_ATTEMPT.value
+        ]
         assert len(anomalies) == 1
 
     def test_etc_path_detected(self):
         detector = AnomalyDetector()
         session = detector.start_session("task-1")
         detector.record_event(session.session_id, "file_write", {"path": "/etc/hosts"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.PATH_TRAVERSAL_ATTEMPT.value]
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.PATH_TRAVERSAL_ATTEMPT.value
+        ]
         assert len(anomalies) == 1
 
 
@@ -319,23 +383,33 @@ class TestPathTraversal:
 # Rapid file changes (1)
 # ---------------------------------------------------------------------------
 
+
 class TestRapidFileChanges:
     def test_rapid_writes_detected(self):
-        detector = AnomalyDetector(thresholds={
-            "rapid_file_change_count": 5,
-            "rapid_file_change_window_s": 100,
-        })
+        detector = AnomalyDetector(
+            thresholds={
+                "rapid_file_change_count": 5,
+                "rapid_file_change_window_s": 100,
+            }
+        )
         session = detector.start_session("task-1")
         # All events get the same timestamp (within the window)
         for i in range(5):
-            detector.record_event(session.session_id, "file_write", {"path": f"f{i}.py"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.RAPID_FILE_CHANGES.value]
+            detector.record_event(
+                session.session_id, "file_write", {"path": f"f{i}.py"}
+            )
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.RAPID_FILE_CHANGES.value
+        ]
         assert len(anomalies) == 1
 
 
 # ---------------------------------------------------------------------------
 # Excessive tokens (2)
 # ---------------------------------------------------------------------------
+
 
 class TestExcessiveTokens:
     def test_excessive_tokens_detected(self):
@@ -346,7 +420,11 @@ class TestExcessiveTokens:
         session = detector.start_session("task-1", agent_type="coder")
         # 3x the baseline
         detector.record_event(session.session_id, "token_usage", {"tokens": 3500})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.EXCESSIVE_TOKEN_USAGE.value]
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.EXCESSIVE_TOKEN_USAGE.value
+        ]
         assert len(anomalies) == 1
 
     def test_normal_tokens_no_anomaly(self):
@@ -356,7 +434,11 @@ class TestExcessiveTokens:
 
         session = detector.start_session("task-1", agent_type="coder")
         detector.record_event(session.session_id, "token_usage", {"tokens": 4000})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.EXCESSIVE_TOKEN_USAGE.value]
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.EXCESSIVE_TOKEN_USAGE.value
+        ]
         assert len(anomalies) == 0
 
 
@@ -364,13 +446,20 @@ class TestExcessiveTokens:
 # Repetitive errors (1)
 # ---------------------------------------------------------------------------
 
+
 class TestRepetitiveErrors:
     def test_errors_detected(self):
         detector = AnomalyDetector(thresholds={"max_error_count": 3})
         session = detector.start_session("task-1")
         for i in range(3):
-            detector.record_event(session.session_id, "error", {"message": f"Error {i}"})
-        anomalies = [a for a in session.anomalies if a.anomaly_type == AnomalyType.REPETITIVE_ERRORS.value]
+            detector.record_event(
+                session.session_id, "error", {"message": f"Error {i}"}
+            )
+        anomalies = [
+            a
+            for a in session.anomalies
+            if a.anomaly_type == AnomalyType.REPETITIVE_ERRORS.value
+        ]
         assert len(anomalies) == 1
 
 
@@ -378,12 +467,15 @@ class TestRepetitiveErrors:
 # Score thresholds — pause & terminate (3)
 # ---------------------------------------------------------------------------
 
+
 class TestScoreThresholds:
     def test_session_paused_at_threshold(self):
-        detector = AnomalyDetector(thresholds={
-            "trust_score_pause_threshold": 60.0,
-            "mass_deletion_count": 1,
-        })
+        detector = AnomalyDetector(
+            thresholds={
+                "trust_score_pause_threshold": 60.0,
+                "mass_deletion_count": 1,
+            }
+        )
         session = detector.start_session("task-1")
         # Mass deletion = -25, sensitive access = -20 => score 55 < 60 => paused
         detector.record_event(session.session_id, "file_delete", {"path": "a"})
@@ -391,11 +483,13 @@ class TestScoreThresholds:
         assert session.status == "paused"
 
     def test_session_terminated_at_threshold(self):
-        detector = AnomalyDetector(thresholds={
-            "trust_score_terminate_threshold": 50.0,
-            "trust_score_pause_threshold": 20.0,
-            "mass_deletion_count": 1,
-        })
+        detector = AnomalyDetector(
+            thresholds={
+                "trust_score_terminate_threshold": 50.0,
+                "trust_score_pause_threshold": 20.0,
+                "mass_deletion_count": 1,
+            }
+        )
         session = detector.start_session("task-1")
         # Mass deletion (-25) + sensitive (-20) => score 55, then 55-20=35 < 50 => terminated
         # pause_threshold is very low (20) so we skip pause and go straight to terminate
@@ -405,10 +499,12 @@ class TestScoreThresholds:
         assert session.status == "terminated"
 
     def test_alert_emitted_on_pause(self):
-        detector = AnomalyDetector(thresholds={
-            "trust_score_pause_threshold": 60.0,
-            "mass_deletion_count": 1,
-        })
+        detector = AnomalyDetector(
+            thresholds={
+                "trust_score_pause_threshold": 60.0,
+                "mass_deletion_count": 1,
+            }
+        )
         session = detector.start_session("task-1")
         detector.record_event(session.session_id, "file_delete", {"path": "a"})
         detector.record_event(session.session_id, "file_read", {"path": ".env"})
@@ -420,6 +516,7 @@ class TestScoreThresholds:
 # ---------------------------------------------------------------------------
 # Analysis & stats (3)
 # ---------------------------------------------------------------------------
+
 
 class TestAnalysisAndStats:
     def test_analyze_session(self):
@@ -443,16 +540,21 @@ class TestAnalysisAndStats:
         detector = AnomalyDetector(thresholds={"mass_deletion_count": 1})
         session = detector.start_session("task-1")
         detector.record_event(session.session_id, "file_delete", {"path": "a"})
-        detector.record_event(session.session_id, "network_request", {"url": "http://x"})
+        detector.record_event(
+            session.session_id, "network_request", {"url": "http://x"}
+        )
         all_anomalies = detector.get_anomalies(session_id=session.session_id)
         assert len(all_anomalies) == 2
-        filtered = detector.get_anomalies(anomaly_type=AnomalyType.MASS_FILE_DELETION.value)
+        filtered = detector.get_anomalies(
+            anomaly_type=AnomalyType.MASS_FILE_DELETION.value
+        )
         assert len(filtered) == 1
 
 
 # ---------------------------------------------------------------------------
 # Baseline updates (2)
 # ---------------------------------------------------------------------------
+
 
 class TestBaselineUpdates:
     def test_baseline_updated_on_clean_session(self):
@@ -476,13 +578,16 @@ class TestBaselineUpdates:
 # Alert listeners (1)
 # ---------------------------------------------------------------------------
 
+
 class TestAlertListeners:
     def test_listener_called_on_alert(self):
         alerts_received = []
-        detector = AnomalyDetector(thresholds={
-            "trust_score_pause_threshold": 60.0,
-            "mass_deletion_count": 1,
-        })
+        detector = AnomalyDetector(
+            thresholds={
+                "trust_score_pause_threshold": 60.0,
+                "mass_deletion_count": 1,
+            }
+        )
         detector.on_alert(lambda a: alerts_received.append(a))
         session = detector.start_session("task-1")
         detector.record_event(session.session_id, "file_delete", {"path": "a"})

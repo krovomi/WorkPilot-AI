@@ -312,46 +312,46 @@ export default UserService
 
 # Test metadata
 TEST_FIXTURES = {
-    'react_component': {
-        'filename': 'Counter.jsx',
-        'content': REACT_COMPONENT_EXAMPLE,
-        'migration_type': 'react_to_vue',
-        'expected_output_filename': 'Counter.vue'
+    "react_component": {
+        "filename": "Counter.jsx",
+        "content": REACT_COMPONENT_EXAMPLE,
+        "migration_type": "react_to_vue",
+        "expected_output_filename": "Counter.vue",
     },
-    'mysql_schema': {
-        'filename': 'schema.sql',
-        'content': MYSQL_SCHEMA_EXAMPLE,
-        'migration_type': 'mysql_to_postgresql',
-        'expected_output_filename': 'schema.sql'
+    "mysql_schema": {
+        "filename": "schema.sql",
+        "content": MYSQL_SCHEMA_EXAMPLE,
+        "migration_type": "mysql_to_postgresql",
+        "expected_output_filename": "schema.sql",
     },
-    'python2_code': {
-        'filename': 'database.py',
-        'content': PYTHON2_CODE_EXAMPLE,
-        'migration_type': 'python2_to_3',
-        'expected_output_filename': 'database.py'
+    "python2_code": {
+        "filename": "database.py",
+        "content": PYTHON2_CODE_EXAMPLE,
+        "migration_type": "python2_to_3",
+        "expected_output_filename": "database.py",
     },
-    'javascript_code': {
-        'filename': 'utils.js',
-        'content': JAVASCRIPT_CODE_EXAMPLE,
-        'migration_type': 'js_to_ts',
-        'expected_output_filename': 'utils.ts'
+    "javascript_code": {
+        "filename": "utils.js",
+        "content": JAVASCRIPT_CODE_EXAMPLE,
+        "migration_type": "js_to_ts",
+        "expected_output_filename": "utils.ts",
     },
-    'rest_api': {
-        'filename': 'routes.js',
-        'content': REST_API_EXAMPLE,
-        'migration_type': 'rest_to_graphql',
-        'expected_output_filename': 'schema.graphql'
+    "rest_api": {
+        "filename": "routes.js",
+        "content": REST_API_EXAMPLE,
+        "migration_type": "rest_to_graphql",
+        "expected_output_filename": "schema.graphql",
     },
-    'react_angular_component': {
-        'filename': 'UserProfile.jsx',
-        'content': REACT_ANGULAR_COMPONENT_EXAMPLE,
-        'migration_type': 'react_to_angular',
-        'expected_output_filename': 'user-profile.component.ts'
+    "react_angular_component": {
+        "filename": "UserProfile.jsx",
+        "content": REACT_ANGULAR_COMPONENT_EXAMPLE,
+        "migration_type": "react_to_angular",
+        "expected_output_filename": "user-profile.component.ts",
     },
-    'js_to_csharp_service': {
-        'filename': 'UserService.js',
-        'content': JS_TO_CSHARP_SERVICE_EXAMPLE,
-        'migration_type': 'js_to_csharp',
-        'expected_output_filename': 'UserService.cs'
-    }
+    "js_to_csharp_service": {
+        "filename": "UserService.js",
+        "content": JS_TO_CSHARP_SERVICE_EXAMPLE,
+        "migration_type": "js_to_csharp",
+        "expected_output_filename": "UserService.cs",
+    },
 }

@@ -30,6 +30,7 @@ from apps.backend.security.audit_trail import (
 # AuditEntry tests
 # ---------------------------------------------------------------------------
 
+
 class TestAuditEntry:
     def test_create_entry(self):
         entry = AuditEntry(
@@ -104,6 +105,7 @@ class TestAuditEntry:
 # Recording tests
 # ---------------------------------------------------------------------------
 
+
 class TestRecording:
     def test_record_basic(self):
         trail = AuditTrail(project_id="proj-1")
@@ -147,7 +149,9 @@ class TestRecording:
 
     def test_record_custom_action(self):
         trail = AuditTrail()
-        entry = trail.record("custom", user="admin", details={"reason": "manual override"})
+        entry = trail.record(
+            "custom", user="admin", details={"reason": "manual override"}
+        )
         assert entry.action == "custom"
         assert entry.details["reason"] == "manual override"
 
@@ -161,16 +165,55 @@ class TestRecording:
 # Querying tests
 # ---------------------------------------------------------------------------
 
+
 class TestQuerying:
     @pytest.fixture
     def populated_trail(self):
         trail = AuditTrail(project_id="proj-1")
-        trail.record("task_created", user="alice", target="task-1", target_type="task", severity="info")
-        trail.record("agent_started", user="system", target="task-1", target_type="agent", severity="info", session_id="s1")
-        trail.record("agent_completed", user="system", target="task-1", target_type="agent", severity="info", session_id="s1")
-        trail.record("file_modified", user="alice", target="src/main.py", target_type="file", severity="info")
-        trail.record("security_violation", user="bob", target=".env", target_type="file", severity="critical")
-        trail.record("config_changed", user="admin", target="settings", target_type="config", severity="warning")
+        trail.record(
+            "task_created",
+            user="alice",
+            target="task-1",
+            target_type="task",
+            severity="info",
+        )
+        trail.record(
+            "agent_started",
+            user="system",
+            target="task-1",
+            target_type="agent",
+            severity="info",
+            session_id="s1",
+        )
+        trail.record(
+            "agent_completed",
+            user="system",
+            target="task-1",
+            target_type="agent",
+            severity="info",
+            session_id="s1",
+        )
+        trail.record(
+            "file_modified",
+            user="alice",
+            target="src/main.py",
+            target_type="file",
+            severity="info",
+        )
+        trail.record(
+            "security_violation",
+            user="bob",
+            target=".env",
+            target_type="file",
+            severity="critical",
+        )
+        trail.record(
+            "config_changed",
+            user="admin",
+            target="settings",
+            target_type="config",
+            severity="warning",
+        )
         return trail
 
     def test_get_entries_by_action(self, populated_trail):
@@ -218,10 +261,13 @@ class TestQuerying:
 # Search tests
 # ---------------------------------------------------------------------------
 
+
 class TestSearch:
     def test_search_keyword(self):
         trail = AuditTrail()
-        trail.record("task_created", user="alice", details={"title": "Login page implementation"})
+        trail.record(
+            "task_created", user="alice", details={"title": "Login page implementation"}
+        )
         trail.record("task_created", user="bob", details={"title": "Dashboard widgets"})
         results = trail.search(keyword="login")
         assert len(results) == 1
@@ -250,6 +296,7 @@ class TestSearch:
 # ---------------------------------------------------------------------------
 # Integrity tests
 # ---------------------------------------------------------------------------
+
 
 class TestIntegrity:
     def test_integrity_valid(self):
@@ -286,6 +333,7 @@ class TestIntegrity:
 # ---------------------------------------------------------------------------
 # Summary tests
 # ---------------------------------------------------------------------------
+
 
 class TestSummary:
     def test_summary_basic(self):
@@ -328,6 +376,7 @@ class TestSummary:
 # ---------------------------------------------------------------------------
 # Export / Import tests
 # ---------------------------------------------------------------------------
+
 
 class TestExportImport:
     def test_export_json(self):
@@ -378,6 +427,7 @@ class TestExportImport:
 # Compliance tests
 # ---------------------------------------------------------------------------
 
+
 class TestCompliance:
     def test_soc2_report(self):
         trail = AuditTrail(project_id="proj-1")
@@ -402,6 +452,7 @@ class TestCompliance:
 # ---------------------------------------------------------------------------
 # Stats tests
 # ---------------------------------------------------------------------------
+
 
 class TestStats:
     def test_stats_basic(self):

@@ -89,10 +89,12 @@ def A11yViolation_factory(
 
 def test_a11y_scan_file_aggregation() -> None:
     scanner = AccessibilityScanner()
-    report = scanner.scan_files({
-        "a.html": "<img src='x.png'>",
-        "b.html": "<html><head></head></html>",
-    })
+    report = scanner.scan_files(
+        {
+            "a.html": "<img src='x.png'>",
+            "b.html": "<html><head></head></html>",
+        }
+    )
     # img-missing-alt is CRITICAL; html-missing-lang is SERIOUS.
     assert report.files_scanned == 2
     assert len(report.findings) >= 2
@@ -201,14 +203,15 @@ def test_flaky_test_exposes_severity_and_file_for_base_protocol() -> None:
 def test_flaky_severity_maps_from_confidence() -> None:
     assert FlakyTest(test_name="a", confidence=FlakyConfidence.HIGH).severity == "high"
     assert (
-        FlakyTest(test_name="a", confidence=FlakyConfidence.MEDIUM).severity
-        == "medium"
+        FlakyTest(test_name="a", confidence=FlakyConfidence.MEDIUM).severity == "medium"
     )
     assert FlakyTest(test_name="a", confidence=FlakyConfidence.LOW).severity == "low"
 
 
 def _make_runs(name: str, pattern: list[bool], err: str = "") -> list[TestRun]:
-    return [TestRun(name, passed=p, error_message=err if not p else "") for p in pattern]
+    return [
+        TestRun(name, passed=p, error_message=err if not p else "") for p in pattern
+    ]
 
 
 def test_flaky_analyze_builds_typed_report() -> None:
@@ -231,17 +234,14 @@ def test_flaky_analyze_builds_typed_report() -> None:
 
 def test_flaky_summary_groups_by_cause() -> None:
     analyzer = FlakyAnalyzer()
-    runs = (
-        _make_runs(
-            "t_net",
-            [True, True, False, True, False],
-            err="ECONNREFUSED to host",
-        )
-        + _make_runs(
-            "t_random",
-            [True, True, False, True, False],
-            err="Math.random returned unexpected seed",
-        )
+    runs = _make_runs(
+        "t_net",
+        [True, True, False, True, False],
+        err="ECONNREFUSED to host",
+    ) + _make_runs(
+        "t_random",
+        [True, True, False, True, False],
+        err="Math.random returned unexpected seed",
     )
     report = analyzer.analyze(runs)
     assert report.flaky_count == 2
@@ -312,8 +312,12 @@ def test_surgery_plan_summary_groups_by_type_stably() -> None:
             )
         return plan
 
-    first = make_plan([HistoryIssueType.LARGE_BLOB, HistoryIssueType.SENSITIVE_DATA]).summary
-    second = make_plan([HistoryIssueType.SENSITIVE_DATA, HistoryIssueType.LARGE_BLOB]).summary
+    first = make_plan(
+        [HistoryIssueType.LARGE_BLOB, HistoryIssueType.SENSITIVE_DATA]
+    ).summary
+    second = make_plan(
+        [HistoryIssueType.SENSITIVE_DATA, HistoryIssueType.LARGE_BLOB]
+    ).summary
     assert first == second
     assert "large_blob" in first
     assert "sensitive_data" in first

@@ -160,9 +160,7 @@ class SonarIssue:
         parsed_date = None
         if creation:
             try:
-                parsed_date = datetime.fromisoformat(
-                    creation.replace("Z", "+00:00")
-                )
+                parsed_date = datetime.fromisoformat(creation.replace("Z", "+00:00"))
             except (ValueError, TypeError):
                 parsed_date = None
 

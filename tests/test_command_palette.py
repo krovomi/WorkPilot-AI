@@ -30,6 +30,7 @@ from apps.backend.ui.command_palette import (
 # PaletteCommand tests (3)
 # ---------------------------------------------------------------------------
 
+
 class TestPaletteCommand:
     def test_creation(self):
         cmd = PaletteCommand(command_id="test", label="Test Command")
@@ -58,6 +59,7 @@ class TestPaletteCommand:
 # SearchResult tests (2)
 # ---------------------------------------------------------------------------
 
+
 class TestSearchResult:
     def test_creation(self):
         r = SearchResult(command_id="test", label="Test", score=85.0)
@@ -72,6 +74,7 @@ class TestSearchResult:
 # ---------------------------------------------------------------------------
 # CommandExecution tests (2)
 # ---------------------------------------------------------------------------
+
 
 class TestCommandExecution:
     def test_creation(self):
@@ -89,6 +92,7 @@ class TestCommandExecution:
 # ---------------------------------------------------------------------------
 # Fuzzy matching tests (5)
 # ---------------------------------------------------------------------------
+
 
 class TestFuzzyMatch:
     def test_exact_match(self):
@@ -117,6 +121,7 @@ class TestFuzzyMatch:
 # Built-in commands (3)
 # ---------------------------------------------------------------------------
 
+
 class TestBuiltinCommands:
     def test_builtins_loaded(self):
         palette = CommandPalette()
@@ -138,6 +143,7 @@ class TestBuiltinCommands:
 # ---------------------------------------------------------------------------
 # Command registration (4)
 # ---------------------------------------------------------------------------
+
 
 class TestCommandRegistration:
     def test_register_command(self):
@@ -168,6 +174,7 @@ class TestCommandRegistration:
 # ---------------------------------------------------------------------------
 # Search tests (6)
 # ---------------------------------------------------------------------------
+
 
 class TestSearch:
     def test_exact_search(self):
@@ -208,6 +215,7 @@ class TestSearch:
 # Execution tests (4)
 # ---------------------------------------------------------------------------
 
+
 class TestExecution:
     def test_execute_command(self):
         palette = CommandPalette()
@@ -238,6 +246,7 @@ class TestExecution:
 # History tests (3)
 # ---------------------------------------------------------------------------
 
+
 class TestHistory:
     def test_execution_recorded(self):
         palette = CommandPalette()
@@ -267,6 +276,7 @@ class TestHistory:
 # Recent commands (3)
 # ---------------------------------------------------------------------------
 
+
 class TestRecentCommands:
     def test_recent_updated_on_execute(self):
         palette = CommandPalette()
@@ -294,6 +304,7 @@ class TestRecentCommands:
 # Stats (2)
 # ---------------------------------------------------------------------------
 
+
 class TestStats:
     def test_basic_stats(self):
         palette = CommandPalette()
@@ -314,6 +325,7 @@ class TestStats:
 # ---------------------------------------------------------------------------
 # Scope filtering (3)
 # ---------------------------------------------------------------------------
+
 
 class TestScopeFiltering:
     def test_list_commands_by_category(self):

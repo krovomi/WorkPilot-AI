@@ -30,6 +30,7 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+
 # Import direct des modules pour éviter les problèmes d'import imbriqués
 def import_module_from_file(module_name, file_path):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
@@ -38,15 +39,24 @@ def import_module_from_file(module_name, file_path):
     spec.loader.exec_module(module)
     return module
 
+
 # Import des modules notifications
 connectors_dir = project_root / "src" / "connectors" / "notifications"
-notifications_exceptions = import_module_from_file("src.connectors.notifications.exceptions", connectors_dir / "exceptions.py")
-notifications_models = import_module_from_file("src.connectors.notifications.models", connectors_dir / "models.py")
-notifications_connector = import_module_from_file("src.connectors.notifications.connector", connectors_dir / "connector.py")
+notifications_exceptions = import_module_from_file(
+    "src.connectors.notifications.exceptions", connectors_dir / "exceptions.py"
+)
+notifications_models = import_module_from_file(
+    "src.connectors.notifications.models", connectors_dir / "models.py"
+)
+notifications_connector = import_module_from_file(
+    "src.connectors.notifications.connector", connectors_dir / "connector.py"
+)
 
 # Import des classes et fonctions
 NotificationError = notifications_exceptions.NotificationError
-NotificationAuthenticationError = notifications_exceptions.NotificationAuthenticationError
+NotificationAuthenticationError = (
+    notifications_exceptions.NotificationAuthenticationError
+)
 NotificationConfigurationError = notifications_exceptions.NotificationConfigurationError
 NotificationDeliveryError = notifications_exceptions.NotificationDeliveryError
 
@@ -64,6 +74,7 @@ NotificationsConnector = notifications_connector.NotificationsConnector
 # -----------------------------------------------------------------------
 # Exceptions
 # -----------------------------------------------------------------------
+
 
 class TestExceptions:
     def test_notification_error(self):
@@ -90,6 +101,7 @@ class TestExceptions:
 # -----------------------------------------------------------------------
 # NotificationEvent
 # -----------------------------------------------------------------------
+
 
 class TestNotificationEvent:
     def test_create_event(self):
@@ -141,7 +153,9 @@ class TestNotificationEvent:
 
     def test_event_default_channels_empty(self):
         event = NotificationEvent(
-            event_type=EventType.CUSTOM, title="X", message="Y",
+            event_type=EventType.CUSTOM,
+            title="X",
+            message="Y",
         )
         assert event.channels == []
 
@@ -149,6 +163,7 @@ class TestNotificationEvent:
 # -----------------------------------------------------------------------
 # NotificationResult
 # -----------------------------------------------------------------------
+
 
 class TestNotificationResult:
     def test_create_result(self):
@@ -177,6 +192,7 @@ class TestNotificationResult:
 # -----------------------------------------------------------------------
 # SlashCommand
 # -----------------------------------------------------------------------
+
 
 class TestSlashCommand:
     def test_parse_simple_command(self):
@@ -213,12 +229,16 @@ class TestSlashCommand:
 # DailySummary
 # -----------------------------------------------------------------------
 
+
 class TestDailySummary:
     def test_create_summary(self):
         summary = DailySummary(
-            project_id="p1", date="2026-02-20",
-            tasks_completed=5, tasks_failed=1,
-            qa_pass_rate=83.3, merges_successful=4,
+            project_id="p1",
+            date="2026-02-20",
+            tasks_completed=5,
+            tasks_failed=1,
+            qa_pass_rate=83.3,
+            merges_successful=4,
             total_cost=2.50,
         )
         assert summary.tasks_completed == 5
@@ -226,8 +246,10 @@ class TestDailySummary:
 
     def test_summary_to_notification_event(self):
         summary = DailySummary(
-            project_id="p1", date="2026-02-20",
-            tasks_completed=3, highlights=["Feature X deployed"],
+            project_id="p1",
+            date="2026-02-20",
+            tasks_completed=3,
+            highlights=["Feature X deployed"],
         )
         event = summary.to_notification_event()
         assert event.event_type == EventType.DAILY_SUMMARY
@@ -242,7 +264,8 @@ class TestDailySummary:
 
     def test_summary_with_highlights(self):
         summary = DailySummary(
-            project_id="p1", date="2026-02-20",
+            project_id="p1",
+            date="2026-02-20",
             highlights=["Deployed v2.0", "Fixed critical bug"],
         )
         event = summary.to_notification_event()
@@ -253,13 +276,16 @@ class TestDailySummary:
 # NotificationsConnector — Init
 # -----------------------------------------------------------------------
 
+
 class TestConnectorInit:
     def test_init_with_slack(self):
         conn = NotificationsConnector(slack_webhook_url="https://hooks.slack.com/test")
         assert NotificationChannel.SLACK in conn._enabled_channels
 
     def test_init_with_teams(self):
-        conn = NotificationsConnector(teams_webhook_url="https://outlook.webhook.office.com/test")
+        conn = NotificationsConnector(
+            teams_webhook_url="https://outlook.webhook.office.com/test"
+        )
         assert NotificationChannel.TEAMS in conn._enabled_channels
 
     def test_init_no_webhook_raises(self):
@@ -270,6 +296,7 @@ class TestConnectorInit:
 # -----------------------------------------------------------------------
 # NotificationsConnector — Delivery (mocked HTTP)
 # -----------------------------------------------------------------------
+
 
 class TestConnectorDelivery:
     def _make_connector(self):
@@ -282,7 +309,9 @@ class TestConnectorDelivery:
     def test_send_to_slack(self, mock_post):
         conn = self._make_connector()
         event = NotificationEvent(
-            event_type=EventType.TASK_COMPLETED, title="Done", message="OK",
+            event_type=EventType.TASK_COMPLETED,
+            title="Done",
+            message="OK",
             channels=[NotificationChannel.SLACK],
         )
         results = conn.send(event)
@@ -294,7 +323,9 @@ class TestConnectorDelivery:
     def test_send_to_teams(self, mock_post):
         conn = self._make_connector()
         event = NotificationEvent(
-            event_type=EventType.TASK_COMPLETED, title="Done", message="OK",
+            event_type=EventType.TASK_COMPLETED,
+            title="Done",
+            message="OK",
             channels=[NotificationChannel.TEAMS],
         )
         results = conn.send(event)
@@ -306,16 +337,24 @@ class TestConnectorDelivery:
     def test_send_to_all_channels(self, mock_post):
         conn = self._make_connector()
         event = NotificationEvent(
-            event_type=EventType.TASK_COMPLETED, title="Done", message="OK",
+            event_type=EventType.TASK_COMPLETED,
+            title="Done",
+            message="OK",
         )
         results = conn.send(event)
         assert len(results) == 2
 
-    @patch.object(NotificationsConnector, "_http_post", side_effect=NotificationDeliveryError("timeout"))
+    @patch.object(
+        NotificationsConnector,
+        "_http_post",
+        side_effect=NotificationDeliveryError("timeout"),
+    )
     def test_send_failure_logged(self, mock_post):
         conn = self._make_connector()
         event = NotificationEvent(
-            event_type=EventType.TASK_FAILED, title="Fail", message="Error",
+            event_type=EventType.TASK_FAILED,
+            title="Fail",
+            message="Error",
             channels=[NotificationChannel.SLACK],
         )
         results = conn.send(event)
@@ -326,7 +365,9 @@ class TestConnectorDelivery:
     def test_delivery_log_updated(self, mock_post):
         conn = self._make_connector()
         event = NotificationEvent(
-            event_type=EventType.TASK_COMPLETED, title="Done", message="OK",
+            event_type=EventType.TASK_COMPLETED,
+            title="Done",
+            message="OK",
             channels=[NotificationChannel.SLACK],
         )
         conn.send(event)
@@ -337,7 +378,9 @@ class TestConnectorDelivery:
     def test_delivery_log_filter_by_channel(self, mock_post):
         conn = self._make_connector()
         event = NotificationEvent(
-            event_type=EventType.TASK_COMPLETED, title="Done", message="OK",
+            event_type=EventType.TASK_COMPLETED,
+            title="Done",
+            message="OK",
         )
         conn.send(event)
         slack_log = conn.get_delivery_log(channel=NotificationChannel.SLACK)
@@ -347,7 +390,9 @@ class TestConnectorDelivery:
     def test_delivery_log_success_only(self, mock_post):
         conn = self._make_connector()
         event = NotificationEvent(
-            event_type=EventType.TASK_COMPLETED, title="Done", message="OK",
+            event_type=EventType.TASK_COMPLETED,
+            title="Done",
+            message="OK",
             channels=[NotificationChannel.SLACK],
         )
         conn.send(event)
@@ -357,7 +402,9 @@ class TestConnectorDelivery:
     def test_send_to_unconfigured_channel(self):
         conn = NotificationsConnector(slack_webhook_url="https://hooks.slack.com/test")
         event = NotificationEvent(
-            event_type=EventType.TASK_COMPLETED, title="Done", message="OK",
+            event_type=EventType.TASK_COMPLETED,
+            title="Done",
+            message="OK",
             channels=[NotificationChannel.TEAMS],
         )
         results = conn.send(event)
@@ -369,6 +416,7 @@ class TestConnectorDelivery:
 # -----------------------------------------------------------------------
 # NotificationsConnector — Convenience methods
 # -----------------------------------------------------------------------
+
 
 class TestConnectorConvenience:
     @patch.object(NotificationsConnector, "_http_post", return_value=200)
@@ -411,13 +459,16 @@ class TestConnectorConvenience:
     @patch.object(NotificationsConnector, "_http_post", return_value=200)
     def test_notify_security_alert(self, mock_post):
         conn = NotificationsConnector(slack_webhook_url="https://hooks.slack.com/test")
-        results = conn.notify_security_alert("p1", "CVE-2026-1234 found", severity="critical")
+        results = conn.notify_security_alert(
+            "p1", "CVE-2026-1234 found", severity="critical"
+        )
         assert results[0].success is True
 
 
 # -----------------------------------------------------------------------
 # NotificationsConnector — Slash commands
 # -----------------------------------------------------------------------
+
 
 class TestConnectorSlashCommands:
     def _make_connector(self):
@@ -457,6 +508,7 @@ class TestConnectorSlashCommands:
 # -----------------------------------------------------------------------
 # NotificationsConnector — Stats
 # -----------------------------------------------------------------------
+
 
 class TestConnectorStats:
     @patch.object(NotificationsConnector, "_http_post", return_value=200)

@@ -19,25 +19,33 @@ import requests
 def import_module_direct(module_name, file_path):
     """Import a module directly from file path, bypassing package __init__.py"""
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
+
 # Import modules directly to avoid circular import issues in __init__.py
 # First import exceptions, then client (which depends on exceptions)
 project_root = Path(__file__).parent.parent.parent.parent
 
 # Import exceptions first
-exceptions_module = import_module_direct("jira_exceptions", project_root / "src" / "connectors" / "jira" / "exceptions.py")
+exceptions_module = import_module_direct(
+    "jira_exceptions", project_root / "src" / "connectors" / "jira" / "exceptions.py"
+)
 
 # Make exceptions available in sys.modules so client can import them
 sys.modules["src.connectors.jira.exceptions"] = exceptions_module
-sys.modules["src.connectors.jira"] = type('Module', (), {'exceptions': exceptions_module})()
+sys.modules["src.connectors.jira"] = type(
+    "Module", (), {"exceptions": exceptions_module}
+)()
 
 # Now import client
-client_module = import_module_direct("jira_client", project_root / "src" / "connectors" / "jira" / "client.py")
+client_module = import_module_direct(
+    "jira_client", project_root / "src" / "connectors" / "jira" / "client.py"
+)
 
 JiraClient = client_module.JiraClient
 JiraAPIError = exceptions_module.JiraAPIError
@@ -80,12 +88,16 @@ class TestJiraClientInit:
     def test_init_missing_email_raises(self):
         """JiraClient raises JiraConfigurationError for empty email."""
         with pytest.raises(JiraConfigurationError, match="email"):
-            JiraClient(base_url="https://test.atlassian.net", email="", token="token123")
+            JiraClient(
+                base_url="https://test.atlassian.net", email="", token="token123"
+            )
 
     def test_init_missing_token_raises(self):
         """JiraClient raises JiraConfigurationError for empty token."""
         with pytest.raises(JiraConfigurationError, match="token"):
-            JiraClient(base_url="https://test.atlassian.net", email="user@test.com", token="")
+            JiraClient(
+                base_url="https://test.atlassian.net", email="user@test.com", token=""
+            )
 
 
 # ── from_env tests ──────────────────────────────────────────────────
@@ -179,7 +191,9 @@ class TestJiraClientConnect:
 
         with patch("requests.Session") as MockSession:
             mock_session = MagicMock()
-            mock_session.get.side_effect = requests.exceptions.ConnectionError("timeout")
+            mock_session.get.side_effect = requests.exceptions.ConnectionError(
+                "timeout"
+            )
             MockSession.return_value = mock_session
 
             with pytest.raises(JiraAPIError, match="Cannot connect"):
@@ -268,7 +282,7 @@ class TestJiraClientGet:
         """get() passes query parameters to the session."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.content = b'{}'
+        mock_response.content = b"{}"
         mock_response.json.return_value = {}
         connected_client._session.get.return_value = mock_response
 
@@ -316,7 +330,7 @@ class TestJiraClientPost:
         """post() sends the JSON body correctly."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.content = b'{}'
+        mock_response.content = b"{}"
         mock_response.json.return_value = {}
         connected_client._session.post.return_value = mock_response
 

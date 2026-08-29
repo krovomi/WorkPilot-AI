@@ -22,11 +22,13 @@ import pytest
 def import_module_direct(module_name, file_path):
     """Import a module directly from file path, bypassing package __init__.py"""
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
 
 # Import modules directly to avoid circular import issues in __init__.py
 project_root = Path(__file__).parent.parent.parent.parent
@@ -35,16 +37,23 @@ project_root = Path(__file__).parent.parent.parent.parent
 connector_path = project_root / "src" / "connectors" / "postman" / "connector.py"
 
 # Import dependencies first
-exceptions_module = import_module_direct("postman_exceptions", project_root / "src" / "connectors" / "postman" / "exceptions.py")
-models_module = import_module_direct("postman_models", project_root / "src" / "connectors" / "postman" / "models.py")
-client_module = import_module_direct("postman_client", project_root / "src" / "connectors" / "postman" / "client.py")
+exceptions_module = import_module_direct(
+    "postman_exceptions",
+    project_root / "src" / "connectors" / "postman" / "exceptions.py",
+)
+models_module = import_module_direct(
+    "postman_models", project_root / "src" / "connectors" / "postman" / "models.py"
+)
+client_module = import_module_direct(
+    "postman_client", project_root / "src" / "connectors" / "postman" / "client.py"
+)
 
 # Make modules available in sys.modules so connector can import them
-postman_package = type('Package', (), {
-    'exceptions': exceptions_module,
-    'models': models_module,
-    'client': client_module
-})()
+postman_package = type(
+    "Package",
+    (),
+    {"exceptions": exceptions_module, "models": models_module, "client": client_module},
+)()
 sys.modules["src.connectors.postman.exceptions"] = exceptions_module
 sys.modules["src.connectors.postman.models"] = models_module
 sys.modules["src.connectors.postman.client"] = client_module
@@ -52,13 +61,15 @@ sys.modules["src.connectors.postman"] = postman_package
 
 # Create parent package structure
 if "src.connectors" not in sys.modules:
-    sys.modules["src.connectors"] = type('Package', (), {})()
+    sys.modules["src.connectors"] = type("Package", (), {})()
 connectors_package = sys.modules["src.connectors"]
-if not hasattr(connectors_package, 'postman'):
+if not hasattr(connectors_package, "postman"):
     connectors_package.postman = postman_package
 
 # Now import connector
-PostmanConnector = import_module_direct("PostmanConnector", str(connector_path)).PostmanConnector
+PostmanConnector = import_module_direct(
+    "PostmanConnector", str(connector_path)
+).PostmanConnector
 
 PostmanWorkspace = models_module.PostmanWorkspace
 PostmanCollection = models_module.PostmanCollection
@@ -67,21 +78,22 @@ PostmanEnvironment = models_module.PostmanEnvironment
 PostmanRequest = models_module.PostmanRequest
 PostmanTestResult = models_module.PostmanTestResult
 
+
 # Helper function to check object attributes instead of exact type
 def check_postman_object(obj, expected_type, required_attrs=None):
     """Check if an object has the expected attributes for a Postman model."""
     if required_attrs is None:
         # Map expected types to their required attributes
         attr_map = {
-            'PostmanWorkspace': ['workspace_id', 'name'],
-            'PostmanCollection': ['collection_id', 'name'],
-            'PostmanCollectionRun': ['collection_id'],
-            'PostmanEnvironment': ['environment_id', 'name'],
-            'PostmanRequest': ['request_id', 'name'],
-            'PostmanTestResult': ['request_name', 'test_name'],
+            "PostmanWorkspace": ["workspace_id", "name"],
+            "PostmanCollection": ["collection_id", "name"],
+            "PostmanCollectionRun": ["collection_id"],
+            "PostmanEnvironment": ["environment_id", "name"],
+            "PostmanRequest": ["request_id", "name"],
+            "PostmanTestResult": ["request_name", "test_name"],
         }
         required_attrs = attr_map.get(expected_type.__name__, [])
-    
+
     return all(hasattr(obj, attr) for attr in required_attrs)
 
 
@@ -122,8 +134,8 @@ class TestListWorkspaces:
 
         assert len(result) == 2
         # Check that the items have the right attributes instead of exact type match
-        assert all(hasattr(w, 'workspace_id') for w in result)
-        assert all(hasattr(w, 'name') for w in result)
+        assert all(hasattr(w, "workspace_id") for w in result)
+        assert all(hasattr(w, "name") for w in result)
         assert result[0].workspace_id == "ws-1"
         assert result[1].workspace_type == "team"
 
@@ -189,7 +201,10 @@ class TestGetCollection:
             "collection": {
                 "info": {"name": "My API", "schema": "v2.1.0"},
                 "item": [
-                    {"name": "Get Users", "request": {"method": "GET", "url": "/users"}},
+                    {
+                        "name": "Get Users",
+                        "request": {"method": "GET", "url": "/users"},
+                    },
                 ],
             }
         }
@@ -332,7 +347,12 @@ class TestGenerateCollection:
 
         endpoints = [
             {"name": "Get Users", "method": "GET", "path": "/api/users"},
-            {"name": "Create User", "method": "POST", "path": "/api/users", "body": '{"name": "test"}'},
+            {
+                "name": "Create User",
+                "method": "POST",
+                "path": "/api/users",
+                "body": '{"name": "test"}',
+            },
         ]
 
         result = connector.generate_collection_from_endpoints(
@@ -563,17 +583,19 @@ class TestPostmanModels:
 
     def test_postman_request_from_api(self):
         """PostmanRequest.from_api_response maps fields correctly."""
-        req = PostmanRequest.from_api_response({
-            "id": "req-1",
-            "name": "Get Users",
-            "request": {
-                "method": "POST",
-                "url": {"raw": "http://localhost/users"},
-                "header": [{"key": "Content-Type", "value": "application/json"}],
-                "body": {"mode": "raw", "raw": "{}"},
-                "description": "Create a user",
-            },
-        })
+        req = PostmanRequest.from_api_response(
+            {
+                "id": "req-1",
+                "name": "Get Users",
+                "request": {
+                    "method": "POST",
+                    "url": {"raw": "http://localhost/users"},
+                    "header": [{"key": "Content-Type", "value": "application/json"}],
+                    "body": {"mode": "raw", "raw": "{}"},
+                    "description": "Create a user",
+                },
+            }
+        )
         assert req.request_id == "req-1"
         assert req.method == "POST"
         assert req.url == "http://localhost/users"
@@ -582,35 +604,41 @@ class TestPostmanModels:
 
     def test_postman_request_string_url(self):
         """PostmanRequest handles string URL format."""
-        req = PostmanRequest.from_api_response({
-            "id": "req-2",
-            "name": "Simple",
-            "request": {
-                "method": "GET",
-                "url": "http://example.com/api",
-            },
-        })
+        req = PostmanRequest.from_api_response(
+            {
+                "id": "req-2",
+                "name": "Simple",
+                "request": {
+                    "method": "GET",
+                    "url": "http://example.com/api",
+                },
+            }
+        )
         assert req.url == "http://example.com/api"
 
     def test_postman_workspace_from_api(self):
         """PostmanWorkspace.from_api_response maps fields correctly."""
-        ws = PostmanWorkspace.from_api_response({
-            "id": "ws-1",
-            "name": "Team",
-            "type": "team",
-            "description": "Team workspace",
-        })
+        ws = PostmanWorkspace.from_api_response(
+            {
+                "id": "ws-1",
+                "name": "Team",
+                "type": "team",
+                "description": "Team workspace",
+            }
+        )
         assert ws.workspace_id == "ws-1"
         assert ws.workspace_type == "team"
 
     def test_postman_environment_from_api(self):
         """PostmanEnvironment.from_api_response maps fields correctly."""
-        env = PostmanEnvironment.from_api_response({
-            "id": "env-1",
-            "name": "Dev",
-            "uid": "123-env-1",
-            "values": [{"key": "url", "value": "http://localhost"}],
-        })
+        env = PostmanEnvironment.from_api_response(
+            {
+                "id": "env-1",
+                "name": "Dev",
+                "uid": "123-env-1",
+                "values": [{"key": "url", "value": "http://localhost"}],
+            }
+        )
         assert env.environment_id == "env-1"
         assert env.name == "Dev"
         assert len(env.values) == 1

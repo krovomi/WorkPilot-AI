@@ -128,16 +128,16 @@ class TestRunAgentSessionRouting:
             messages=[
                 AgentMessage(
                     role=MessageRole.ASSISTANT,
-                    content=[
-                        ContentBlock(type=ContentBlockType.TEXT, text="Done")
-                    ],
+                    content=[ContentBlock(type=ContentBlockType.TEXT, text="Done")],
                 )
             ]
         )
 
         # Mock is_build_complete to return False → "continue"
-        with patch("agents.session.is_build_complete", return_value=False), \
-             patch("agents.session.get_task_logger", return_value=None):
+        with (
+            patch("agents.session.is_build_complete", return_value=False),
+            patch("agents.session.get_task_logger", return_value=None),
+        ):
             status, text, error_info = await run_agent_session(
                 client=client,
                 message="test prompt",
@@ -170,8 +170,10 @@ class TestRunAgentClientSession:
             ]
         )
 
-        with patch("agents.session.is_build_complete", return_value=False), \
-             patch("agents.session.get_task_logger", return_value=None):
+        with (
+            patch("agents.session.is_build_complete", return_value=False),
+            patch("agents.session.get_task_logger", return_value=None),
+        ):
             status, text, error_info = await _run_agent_client_session(
                 client=client,
                 message="test",
@@ -196,8 +198,10 @@ class TestRunAgentClientSession:
             ]
         )
 
-        with patch("agents.session.is_build_complete", return_value=True), \
-             patch("agents.session.get_task_logger", return_value=None):
+        with (
+            patch("agents.session.is_build_complete", return_value=True),
+            patch("agents.session.get_task_logger", return_value=None),
+        ):
             status, text, error_info = await _run_agent_client_session(
                 client=client,
                 message="test",
@@ -245,8 +249,10 @@ class TestRunAgentClientSession:
             ]
         )
 
-        with patch("agents.session.is_build_complete", return_value=False), \
-             patch("agents.session.get_task_logger", return_value=None):
+        with (
+            patch("agents.session.is_build_complete", return_value=False),
+            patch("agents.session.get_task_logger", return_value=None),
+        ):
             status, text, error_info = await _run_agent_client_session(
                 client=client,
                 message="test",
@@ -288,8 +294,10 @@ class TestRunAgentClientSession:
             ]
         )
 
-        with patch("agents.session.is_build_complete", return_value=False), \
-             patch("agents.session.get_task_logger", return_value=None):
+        with (
+            patch("agents.session.is_build_complete", return_value=False),
+            patch("agents.session.get_task_logger", return_value=None),
+        ):
             status, text, error_info = await _run_agent_client_session(
                 client=client,
                 message="test",
@@ -313,7 +321,12 @@ class TestRunAgentClientSession:
             )
 
         assert status == "error"
-        assert error_info["type"] in ("other", "tool_concurrency", "rate_limit", "authentication")
+        assert error_info["type"] in (
+            "other",
+            "tool_concurrency",
+            "rate_limit",
+            "authentication",
+        )
         assert "test error" in error_info["message"]
 
     @pytest.mark.asyncio
@@ -339,8 +352,10 @@ class TestRunAgentClientSession:
 
         client = FakeAgentClient(messages=[])
 
-        with patch("agents.session.is_build_complete", return_value=False), \
-             patch("agents.session.get_task_logger", return_value=None):
+        with (
+            patch("agents.session.is_build_complete", return_value=False),
+            patch("agents.session.get_task_logger", return_value=None),
+        ):
             status, text, error_info = await _run_agent_client_session(
                 client=client,
                 message="test",
@@ -357,8 +372,10 @@ class TestRunAgentClientSession:
 
         client = FakeAgentClient(messages=[], provider="copilot")
 
-        with patch("agents.session.is_build_complete", return_value=False), \
-             patch("agents.session.get_task_logger", return_value=None):
+        with (
+            patch("agents.session.is_build_complete", return_value=False),
+            patch("agents.session.get_task_logger", return_value=None),
+        ):
             await _run_agent_client_session(
                 client=client,
                 message="test",

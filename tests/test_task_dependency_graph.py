@@ -33,6 +33,7 @@ from apps.backend.scheduling.task_dependency_graph import (
 # TaskNode tests (3)
 # ---------------------------------------------------------------------------
 
+
 class TestTaskNode:
     def test_creation(self):
         n = TaskNode(task_id="t1", title="Login page", status="pending")
@@ -57,6 +58,7 @@ class TestTaskNode:
 # DependencyEdge tests (2)
 # ---------------------------------------------------------------------------
 
+
 class TestDependencyEdge:
     def test_creation(self):
         e = DependencyEdge(source_id="t2", target_id="t1")
@@ -74,6 +76,7 @@ class TestDependencyEdge:
 # CriticalPath tests (2)
 # ---------------------------------------------------------------------------
 
+
 class TestCriticalPath:
     def test_defaults(self):
         cp = CriticalPath()
@@ -90,6 +93,7 @@ class TestCriticalPath:
 # GraphAnalysis tests (2)
 # ---------------------------------------------------------------------------
 
+
 class TestGraphAnalysis:
     def test_defaults(self):
         ga = GraphAnalysis()
@@ -105,6 +109,7 @@ class TestGraphAnalysis:
 # ---------------------------------------------------------------------------
 # Task CRUD (5)
 # ---------------------------------------------------------------------------
+
 
 class TestTaskCRUD:
     def test_add_task(self):
@@ -146,6 +151,7 @@ class TestTaskCRUD:
 # ---------------------------------------------------------------------------
 # Dependency management (6)
 # ---------------------------------------------------------------------------
+
 
 class TestDependencyManagement:
     def test_add_dependency(self):
@@ -198,6 +204,7 @@ class TestDependencyManagement:
 # Cycle detection (3)
 # ---------------------------------------------------------------------------
 
+
 class TestCycleDetection:
     def test_cycle_prevented(self):
         g = TaskDependencyGraph()
@@ -232,6 +239,7 @@ class TestCycleDetection:
 # Topological sort (3)
 # ---------------------------------------------------------------------------
 
+
 class TestTopologicalSort:
     def test_basic_sort(self):
         g = TaskDependencyGraph()
@@ -259,6 +267,7 @@ class TestTopologicalSort:
 # ---------------------------------------------------------------------------
 # Critical path (3)
 # ---------------------------------------------------------------------------
+
 
 class TestCriticalPath:
     def test_critical_path_simple(self):
@@ -289,6 +298,7 @@ class TestCriticalPath:
 # ---------------------------------------------------------------------------
 # Blocked/ready tasks (3)
 # ---------------------------------------------------------------------------
+
 
 class TestBlockedReady:
     def test_blocked_tasks(self):
@@ -322,6 +332,7 @@ class TestBlockedReady:
 # Root/leaf tasks (2)
 # ---------------------------------------------------------------------------
 
+
 class TestRootLeaf:
     def test_root_tasks(self):
         g = TaskDependencyGraph()
@@ -346,6 +357,7 @@ class TestRootLeaf:
 # Parallelizable groups (2)
 # ---------------------------------------------------------------------------
 
+
 class TestParallelizableGroups:
     def test_groups(self):
         g = TaskDependencyGraph()
@@ -368,6 +380,7 @@ class TestParallelizableGroups:
 # ---------------------------------------------------------------------------
 # Reactflow export (2)
 # ---------------------------------------------------------------------------
+
 
 class TestReactflowExport:
     def test_export_structure(self):
@@ -395,6 +408,7 @@ class TestReactflowExport:
 # Mermaid export (1)
 # ---------------------------------------------------------------------------
 
+
 class TestMermaidExport:
     def test_mermaid_output(self):
         g = TaskDependencyGraph()
@@ -410,6 +424,7 @@ class TestMermaidExport:
 # ---------------------------------------------------------------------------
 # Stats (1)
 # ---------------------------------------------------------------------------
+
 
 class TestStats:
     def test_get_stats(self):

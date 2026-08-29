@@ -9,11 +9,13 @@ sys.path.insert(0, str(backend_dir))
 
 def test_quality_scorer_import():
     from review.quality_scorer import IssueSeverity, QualityCategory, QualityScorer
+
     assert QualityScorer is not None
 
 
 def test_quality_scorer_creation():
     from review.quality_scorer import QualityScorer
+
     project_dir = Path(".")
     scorer = QualityScorer(project_dir)
     assert scorer is not None
@@ -21,6 +23,7 @@ def test_quality_scorer_creation():
 
 def test_quality_scorer_empty_pr():
     from review.quality_scorer import QualityScorer
+
     project_dir = Path(".")
     scorer = QualityScorer(project_dir)
     score = scorer.score_pr("", [], "")
@@ -29,6 +32,7 @@ def test_quality_scorer_empty_pr():
 
 def test_quality_scorer_self_analysis():
     from review.quality_scorer import QualityScorer
+
     project_dir = Path(".")
     scorer = QualityScorer(project_dir)
     score = scorer.score_pr("", ["apps/backend/review/quality_scorer.py"], "")

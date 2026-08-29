@@ -1,14 +1,19 @@
-from typing import Any, Optional
+from typing import Any
 
 from .llm_base import BaseLLMProvider
 
 
 class MetaAIProvider(BaseLLMProvider):
-    def __init__(self, api_key: str = "", model: str = "llama-3-70b", base_url: str = "https://api.meta.ai/v1"):
+    def __init__(
+        self,
+        api_key: str = "",
+        model: str = "llama-3-70b",
+        base_url: str = "https://api.meta.ai/v1",
+    ):
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
-        self._client: Optional[Any] = None
+        self._client: Any | None = None
 
     def connect(self) -> None:
         # Meta API is not public, placeholder for open source LLaMA endpoints

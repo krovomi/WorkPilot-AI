@@ -25,17 +25,22 @@ from apps.backend.scheduling.intelligent_router import (
 # Data model tests
 # ---------------------------------------------------------------------------
 
+
 class TestProviderConfig:
     def test_create_provider(self):
-        config = ProviderConfig(provider="anthropic", model="claude-sonnet-4-20250514",
-                                capabilities=["coding", "planning"])
+        config = ProviderConfig(
+            provider="anthropic",
+            model="claude-sonnet-4-20250514",
+            capabilities=["coding", "planning"],
+        )
         assert config.provider_model_key == "anthropic/claude-sonnet-4-20250514"
         assert config.is_available
         assert not config.is_local
 
     def test_unavailable_when_down(self):
-        config = ProviderConfig(provider="openai", model="gpt-4o",
-                                status=ProviderStatus.DOWN)
+        config = ProviderConfig(
+            provider="openai", model="gpt-4o", status=ProviderStatus.DOWN
+        )
         assert not config.is_available
 
     def test_to_dict(self):
@@ -48,16 +53,24 @@ class TestProviderConfig:
 class TestPerformanceRecord:
     def test_create_record(self):
         record = PerformanceRecord(
-            provider="anthropic", model="claude-sonnet-4-20250514",
-            task_type="coding", latency_ms=1200, quality_score=85.0, success=True,
+            provider="anthropic",
+            model="claude-sonnet-4-20250514",
+            task_type="coding",
+            latency_ms=1200,
+            quality_score=85.0,
+            success=True,
         )
         assert record.timestamp != ""
         assert record.success
 
     def test_to_dict(self):
         record = PerformanceRecord(
-            provider="openai", model="gpt-4o",
-            task_type="review", latency_ms=800, quality_score=90.0, success=True,
+            provider="openai",
+            model="gpt-4o",
+            task_type="review",
+            latency_ms=800,
+            quality_score=90.0,
+            success=True,
         )
         d = record.to_dict()
         assert d["quality_score"] == 90.0
@@ -66,16 +79,22 @@ class TestPerformanceRecord:
 class TestRoutingDecision:
     def test_create_decision(self):
         decision = RoutingDecision(
-            provider="anthropic", model="claude-sonnet-4-20250514",
-            reason="Best performance", strategy="best_performance", score=85.0,
+            provider="anthropic",
+            model="claude-sonnet-4-20250514",
+            reason="Best performance",
+            strategy="best_performance",
+            score=85.0,
         )
         assert decision.strategy == RoutingStrategy.BEST_PERFORMANCE
         assert decision.timestamp != ""
 
     def test_to_dict(self):
         decision = RoutingDecision(
-            provider="openai", model="gpt-4o",
-            reason="Cheapest", strategy=RoutingStrategy.CHEAPEST, score=90.0,
+            provider="openai",
+            model="gpt-4o",
+            reason="Cheapest",
+            strategy=RoutingStrategy.CHEAPEST,
+            score=90.0,
         )
         d = decision.to_dict()
         assert d["strategy"] == "cheapest"
@@ -84,9 +103,13 @@ class TestRoutingDecision:
 class TestPipelineConfig:
     def test_create_pipeline(self):
         pipeline = PipelineConfig(
-            pipeline_id="pipe-1", name="Default",
+            pipeline_id="pipe-1",
+            name="Default",
             phase_routing={
-                "planning": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
+                "planning": {
+                    "provider": "anthropic",
+                    "model": "claude-sonnet-4-20250514",
+                },
                 "coding": {"provider": "openai", "model": "gpt-4o"},
             },
         )
@@ -101,18 +124,26 @@ class TestPipelineConfig:
 class TestABTest:
     def test_create_test(self):
         test = ABTest(
-            test_id="ab-1", name="Claude vs GPT", task_type="coding",
-            provider_a="anthropic", model_a="claude-sonnet-4-20250514",
-            provider_b="openai", model_b="gpt-4o",
+            test_id="ab-1",
+            name="Claude vs GPT",
+            task_type="coding",
+            provider_a="anthropic",
+            model_a="claude-sonnet-4-20250514",
+            provider_b="openai",
+            model_b="gpt-4o",
         )
         assert test.status == ABTestStatus.RUNNING
         assert test.total_runs == 0
 
     def test_summary(self):
         test = ABTest(
-            test_id="ab-1", name="Test", task_type="coding",
-            provider_a="anthropic", model_a="claude-sonnet-4-20250514",
-            provider_b="openai", model_b="gpt-4o",
+            test_id="ab-1",
+            name="Test",
+            task_type="coding",
+            provider_a="anthropic",
+            model_a="claude-sonnet-4-20250514",
+            provider_b="openai",
+            model_b="gpt-4o",
             results_a=[{"quality_score": 80, "latency_ms": 1000, "cost": 0.01}],
             results_b=[{"quality_score": 90, "latency_ms": 800, "cost": 0.02}],
         )
@@ -123,8 +154,13 @@ class TestABTest:
 
     def test_to_dict(self):
         test = ABTest(
-            test_id="ab-1", name="Test", task_type="coding",
-            provider_a="a", model_a="m-a", provider_b="b", model_b="m-b",
+            test_id="ab-1",
+            name="Test",
+            task_type="coding",
+            provider_a="a",
+            model_a="m-a",
+            provider_b="b",
+            model_b="m-b",
         )
         d = test.to_dict()
         assert d["status"] == "running"
@@ -135,11 +171,13 @@ class TestABTest:
 # IntelligentRouter — Provider management
 # ---------------------------------------------------------------------------
 
+
 class TestRouterProviderManagement:
     def test_register_provider(self):
         router = IntelligentRouter()
-        config = router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                          capabilities=["coding"])
+        config = router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["coding"]
+        )
         assert config.provider == "anthropic"
         assert len(router.get_available_providers()) == 1
 
@@ -162,7 +200,9 @@ class TestRouterProviderManagement:
 
     def test_get_available_filtered_by_capability(self):
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514", capabilities=["coding"])
+        router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["coding"]
+        )
         router.register_provider("openai", "gpt-4o", capabilities=["review"])
         coding = router.get_available_providers("coding")
         assert len(coding) == 1
@@ -171,7 +211,9 @@ class TestRouterProviderManagement:
     def test_update_provider_status(self):
         router = IntelligentRouter()
         router.register_provider("anthropic", "claude-sonnet-4-20250514")
-        assert router.update_provider_status("anthropic", "claude-sonnet-4-20250514", "down")
+        assert router.update_provider_status(
+            "anthropic", "claude-sonnet-4-20250514", "down"
+        )
         config = router.get_provider("anthropic", "claude-sonnet-4-20250514")
         assert config.status == ProviderStatus.DOWN
 
@@ -187,18 +229,34 @@ class TestRouterProviderManagement:
 # IntelligentRouter — Routing strategies
 # ---------------------------------------------------------------------------
 
+
 class TestRouterStrategies:
     def _setup_router(self) -> IntelligentRouter:
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                 capabilities=["coding", "planning"],
-                                 priority=1, cost_per_1m_input=3.0, cost_per_1m_output=15.0)
-        router.register_provider("openai", "gpt-4o",
-                                 capabilities=["coding", "review"],
-                                 priority=2, cost_per_1m_input=2.5, cost_per_1m_output=10.0)
-        router.register_provider("openai", "gpt-4o-mini",
-                                 capabilities=["coding", "quick_feedback"],
-                                 priority=3, cost_per_1m_input=0.15, cost_per_1m_output=0.60)
+        router.register_provider(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            capabilities=["coding", "planning"],
+            priority=1,
+            cost_per_1m_input=3.0,
+            cost_per_1m_output=15.0,
+        )
+        router.register_provider(
+            "openai",
+            "gpt-4o",
+            capabilities=["coding", "review"],
+            priority=2,
+            cost_per_1m_input=2.5,
+            cost_per_1m_output=10.0,
+        )
+        router.register_provider(
+            "openai",
+            "gpt-4o-mini",
+            capabilities=["coding", "quick_feedback"],
+            priority=3,
+            cost_per_1m_input=0.15,
+            cost_per_1m_output=0.60,
+        )
         return router
 
     def test_route_best_performance_default(self):
@@ -216,8 +274,9 @@ class TestRouterStrategies:
 
     def test_route_cheapest_prefers_local(self):
         router = self._setup_router()
-        router.register_provider("ollama", "llama3:8b", capabilities=["coding"],
-                                 is_local=True, priority=5)
+        router.register_provider(
+            "ollama", "llama3:8b", capabilities=["coding"], is_local=True, priority=5
+        )
         decision = router.route("coding", strategy="cheapest")
         assert decision.provider == "ollama"
 
@@ -261,13 +320,18 @@ class TestRouterStrategies:
 # IntelligentRouter — Performance tracking
 # ---------------------------------------------------------------------------
 
+
 class TestRouterPerformance:
     def test_record_performance(self):
         router = IntelligentRouter()
         router.register_provider("anthropic", "claude-sonnet-4-20250514")
         record = router.record_performance(
-            "anthropic", "claude-sonnet-4-20250514", "coding",
-            latency_ms=1200, quality_score=85.0, success=True,
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "coding",
+            latency_ms=1200,
+            quality_score=85.0,
+            success=True,
         )
         assert record.quality_score == 85.0
 
@@ -276,8 +340,12 @@ class TestRouterPerformance:
         router.register_provider("anthropic", "claude-sonnet-4-20250514")
         for _ in range(5):
             router.record_performance(
-                "anthropic", "claude-sonnet-4-20250514", "coding",
-                latency_ms=1000, quality_score=90.0, success=True,
+                "anthropic",
+                "claude-sonnet-4-20250514",
+                "coding",
+                latency_ms=1000,
+                quality_score=90.0,
+                success=True,
             )
         scores = router.get_performance_scores("coding")
         assert "anthropic/claude-sonnet-4-20250514" in scores
@@ -285,28 +353,54 @@ class TestRouterPerformance:
 
     def test_performance_affects_routing(self):
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                 capabilities=["coding"], priority=2)
-        router.register_provider("openai", "gpt-4o",
-                                 capabilities=["coding"], priority=2)
+        router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["coding"], priority=2
+        )
+        router.register_provider(
+            "openai", "gpt-4o", capabilities=["coding"], priority=2
+        )
         # Record great performance for OpenAI
         for _ in range(10):
-            router.record_performance("openai", "gpt-4o", "coding",
-                                      latency_ms=500, quality_score=95.0, success=True)
+            router.record_performance(
+                "openai",
+                "gpt-4o",
+                "coding",
+                latency_ms=500,
+                quality_score=95.0,
+                success=True,
+            )
         # Record poor performance for Anthropic
         for _ in range(10):
-            router.record_performance("anthropic", "claude-sonnet-4-20250514", "coding",
-                                      latency_ms=2000, quality_score=60.0, success=True)
+            router.record_performance(
+                "anthropic",
+                "claude-sonnet-4-20250514",
+                "coding",
+                latency_ms=2000,
+                quality_score=60.0,
+                success=True,
+            )
         decision = router.route("coding", strategy="best_performance")
         assert decision.provider == "openai"
 
     def test_updates_avg_latency(self):
         router = IntelligentRouter()
         router.register_provider("anthropic", "claude-sonnet-4-20250514")
-        router.record_performance("anthropic", "claude-sonnet-4-20250514", "coding",
-                                  latency_ms=1000, quality_score=80, success=True)
-        router.record_performance("anthropic", "claude-sonnet-4-20250514", "coding",
-                                  latency_ms=2000, quality_score=80, success=True)
+        router.record_performance(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "coding",
+            latency_ms=1000,
+            quality_score=80,
+            success=True,
+        )
+        router.record_performance(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "coding",
+            latency_ms=2000,
+            quality_score=80,
+            success=True,
+        )
         config = router.get_provider("anthropic", "claude-sonnet-4-20250514")
         assert config.avg_latency_ms == 1500.0
 
@@ -315,47 +409,63 @@ class TestRouterPerformance:
 # IntelligentRouter — Fallback
 # ---------------------------------------------------------------------------
 
+
 class TestRouterFallback:
     def test_get_fallback_when_primary_fails(self):
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                 capabilities=["coding"], priority=1)
-        router.register_provider("openai", "gpt-4o",
-                                 capabilities=["coding"], priority=2)
-        fallback = router.get_fallback("anthropic", "claude-sonnet-4-20250514", "coding")
+        router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["coding"], priority=1
+        )
+        router.register_provider(
+            "openai", "gpt-4o", capabilities=["coding"], priority=2
+        )
+        fallback = router.get_fallback(
+            "anthropic", "claude-sonnet-4-20250514", "coding"
+        )
         assert fallback is not None
         assert fallback.provider == "openai"
 
     def test_get_fallback_no_alternative(self):
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                 capabilities=["coding"])
-        fallback = router.get_fallback("anthropic", "claude-sonnet-4-20250514", "coding")
+        router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["coding"]
+        )
+        fallback = router.get_fallback(
+            "anthropic", "claude-sonnet-4-20250514", "coding"
+        )
         assert fallback is None
 
     def test_set_and_use_fallback_chain(self):
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                 capabilities=["coding"])
+        router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["coding"]
+        )
         router.register_provider("openai", "gpt-4o", capabilities=["coding"])
-        router.set_fallback_chain("coding", [
-            "anthropic/claude-sonnet-4-20250514",
-            "openai/gpt-4o",
-        ])
+        router.set_fallback_chain(
+            "coding",
+            [
+                "anthropic/claude-sonnet-4-20250514",
+                "openai/gpt-4o",
+            ],
+        )
         decision = router.route("coding", strategy="fallback_chain")
         assert decision.provider == "anthropic"
         assert len(decision.fallback_chain) >= 1
 
     def test_fallback_chain_skips_unavailable(self):
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                 capabilities=["coding"])
+        router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["coding"]
+        )
         router.register_provider("openai", "gpt-4o", capabilities=["coding"])
         router.update_provider_status("anthropic", "claude-sonnet-4-20250514", "down")
-        router.set_fallback_chain("coding", [
-            "anthropic/claude-sonnet-4-20250514",
-            "openai/gpt-4o",
-        ])
+        router.set_fallback_chain(
+            "coding",
+            [
+                "anthropic/claude-sonnet-4-20250514",
+                "openai/gpt-4o",
+            ],
+        )
         decision = router.route("coding", strategy="fallback_chain")
         assert decision.provider == "openai"
 
@@ -364,41 +474,58 @@ class TestRouterFallback:
 # IntelligentRouter — Pipelines
 # ---------------------------------------------------------------------------
 
+
 class TestRouterPipelines:
     def test_create_pipeline(self):
         router = IntelligentRouter()
         router.register_provider("anthropic", "claude-sonnet-4-20250514")
         router.register_provider("openai", "gpt-4o")
-        pipeline = router.create_pipeline("Production", {
-            "planning": {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
-            "coding": {"provider": "openai", "model": "gpt-4o"},
-        })
+        pipeline = router.create_pipeline(
+            "Production",
+            {
+                "planning": {
+                    "provider": "anthropic",
+                    "model": "claude-sonnet-4-20250514",
+                },
+                "coding": {"provider": "openai", "model": "gpt-4o"},
+            },
+        )
         assert pipeline.pipeline_id.startswith("pipe-")
         assert len(router.list_pipelines()) == 1
 
     def test_route_with_pipeline(self):
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                 capabilities=["planning", "coding"])
-        router.register_provider("openai", "gpt-4o",
-                                 capabilities=["planning", "coding"])
-        pipeline = router.create_pipeline("Test", {
-            "coding": {"provider": "openai", "model": "gpt-4o"},
-        })
+        router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["planning", "coding"]
+        )
+        router.register_provider(
+            "openai", "gpt-4o", capabilities=["planning", "coding"]
+        )
+        pipeline = router.create_pipeline(
+            "Test",
+            {
+                "coding": {"provider": "openai", "model": "gpt-4o"},
+            },
+        )
         decision = router.route("coding", pipeline_id=pipeline.pipeline_id)
         assert decision.provider == "openai"
         assert decision.model == "gpt-4o"
 
     def test_pipeline_fallback_if_provider_unavailable(self):
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                 capabilities=["coding"], priority=2)
-        router.register_provider("openai", "gpt-4o",
-                                 capabilities=["coding"], priority=1)
+        router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["coding"], priority=2
+        )
+        router.register_provider(
+            "openai", "gpt-4o", capabilities=["coding"], priority=1
+        )
         router.update_provider_status("openai", "gpt-4o", "down")
-        pipeline = router.create_pipeline("Test", {
-            "coding": {"provider": "openai", "model": "gpt-4o"},
-        })
+        pipeline = router.create_pipeline(
+            "Test",
+            {
+                "coding": {"provider": "openai", "model": "gpt-4o"},
+            },
+        )
         # Should fall through to normal routing since pipeline provider is down
         decision = router.route("coding", pipeline_id=pipeline.pipeline_id)
         assert decision.provider == "anthropic"
@@ -408,13 +535,17 @@ class TestRouterPipelines:
 # IntelligentRouter — A/B Testing
 # ---------------------------------------------------------------------------
 
+
 class TestRouterABTesting:
     def test_create_ab_test(self):
         router = IntelligentRouter()
         test = router.create_ab_test(
-            "Claude vs GPT", "coding",
-            "anthropic", "claude-sonnet-4-20250514",
-            "openai", "gpt-4o",
+            "Claude vs GPT",
+            "coding",
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "openai",
+            "gpt-4o",
         )
         assert test.test_id.startswith("ab-")
         assert test.status == ABTestStatus.RUNNING
@@ -422,9 +553,12 @@ class TestRouterABTesting:
     def test_route_ab_test_alternates(self):
         router = IntelligentRouter()
         test = router.create_ab_test(
-            "Test", "coding",
-            "anthropic", "claude-sonnet-4-20250514",
-            "openai", "gpt-4o",
+            "Test",
+            "coding",
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "openai",
+            "gpt-4o",
         )
         d1 = router.route_ab_test(test.test_id)
         router.record_ab_result(test.test_id, "a", 85, 1000)
@@ -462,11 +596,13 @@ class TestRouterABTesting:
 # IntelligentRouter — Routing log & Stats
 # ---------------------------------------------------------------------------
 
+
 class TestRouterLogAndStats:
     def test_routing_log(self):
         router = IntelligentRouter()
-        router.register_provider("anthropic", "claude-sonnet-4-20250514",
-                                 capabilities=["coding"])
+        router.register_provider(
+            "anthropic", "claude-sonnet-4-20250514", capabilities=["coding"]
+        )
         router.route("coding")
         router.route("coding")
         log = router.get_routing_log()
@@ -476,7 +612,9 @@ class TestRouterLogAndStats:
         router = IntelligentRouter()
         router.register_provider("anthropic", "claude-sonnet-4-20250514")
         router.register_provider("ollama", "llama3:8b", is_local=True)
-        router.update_provider_status("anthropic", "claude-sonnet-4-20250514", "rate_limited")
+        router.update_provider_status(
+            "anthropic", "claude-sonnet-4-20250514", "rate_limited"
+        )
         router.create_ab_test("Test", "coding", "a", "m-a", "b", "m-b")
         stats = router.get_stats()
         assert stats["total_providers"] == 2

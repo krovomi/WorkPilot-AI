@@ -26,11 +26,15 @@ from apps.backend.agents.feedback_learning import (
 # FeedbackEntry tests
 # ---------------------------------------------------------------------------
 
+
 class TestFeedbackEntry:
     def test_create_entry(self):
         entry = FeedbackEntry(
-            feedback_id="fb-1", session_id="s-1", action_id="a-1",
-            project_id="proj-1", rating="positive",
+            feedback_id="fb-1",
+            session_id="s-1",
+            action_id="a-1",
+            project_id="proj-1",
+            rating="positive",
             categories={"code_quality": 5, "relevance": 4},
         )
         assert entry.rating == FeedbackRating.POSITIVE
@@ -40,23 +44,32 @@ class TestFeedbackEntry:
 
     def test_average_score(self):
         entry = FeedbackEntry(
-            feedback_id="fb-1", session_id="s-1", action_id="a-1",
-            project_id="proj-1", rating="neutral",
+            feedback_id="fb-1",
+            session_id="s-1",
+            action_id="a-1",
+            project_id="proj-1",
+            rating="neutral",
             categories={"code_quality": 4, "relevance": 2, "style": 3},
         )
         assert entry.average_score == 3.0
 
     def test_average_score_empty(self):
         entry = FeedbackEntry(
-            feedback_id="fb-1", session_id="s-1", action_id="a-1",
-            project_id="proj-1", rating="negative",
+            feedback_id="fb-1",
+            session_id="s-1",
+            action_id="a-1",
+            project_id="proj-1",
+            rating="negative",
         )
         assert entry.average_score == 0.0
 
     def test_to_dict(self):
         entry = FeedbackEntry(
-            feedback_id="fb-1", session_id="s-1", action_id="a-1",
-            project_id="proj-1", rating="positive",
+            feedback_id="fb-1",
+            session_id="s-1",
+            action_id="a-1",
+            project_id="proj-1",
+            rating="positive",
             categories={"code_quality": 5},
         )
         d = entry.to_dict()
@@ -66,12 +79,20 @@ class TestFeedbackEntry:
 
     def test_from_dict(self):
         d = {
-            "feedback_id": "fb-1", "session_id": "s-1", "action_id": "a-1",
-            "project_id": "proj-1", "rating": "negative",
-            "categories": {"style": 2}, "comment": "Bad style",
-            "agent_type": "coder", "agent_phase": "coding",
-            "task_type": "feature", "prompt_used": "", "output_snippet": "",
-            "timestamp": "2026-01-01T00:00:00+00:00", "user_id": "u1",
+            "feedback_id": "fb-1",
+            "session_id": "s-1",
+            "action_id": "a-1",
+            "project_id": "proj-1",
+            "rating": "negative",
+            "categories": {"style": 2},
+            "comment": "Bad style",
+            "agent_type": "coder",
+            "agent_phase": "coding",
+            "task_type": "feature",
+            "prompt_used": "",
+            "output_snippet": "",
+            "timestamp": "2026-01-01T00:00:00+00:00",
+            "user_id": "u1",
         }
         entry = FeedbackEntry.from_dict(d)
         assert entry.is_negative
@@ -81,6 +102,7 @@ class TestFeedbackEntry:
 # ---------------------------------------------------------------------------
 # FeedbackPattern tests
 # ---------------------------------------------------------------------------
+
 
 class TestFeedbackPattern:
     def test_create_pattern(self):
@@ -98,7 +120,9 @@ class TestFeedbackPattern:
     def test_to_dict(self):
         p = FeedbackPattern(
             pattern_type=PatternType.CONSISTENT_NEGATIVE,
-            description="test", confidence=0.5, sample_size=5,
+            description="test",
+            confidence=0.5,
+            sample_size=5,
         )
         d = p.to_dict()
         assert d["pattern_type"] == "consistent_negative"
@@ -118,6 +142,7 @@ class TestFeedbackPattern:
 # FeedbackCollector tests
 # ---------------------------------------------------------------------------
 
+
 class TestFeedbackCollector:
     def test_record_feedback_basic(self):
         collector = FeedbackCollector(project_id="proj-1")
@@ -129,7 +154,9 @@ class TestFeedbackCollector:
     def test_record_feedback_with_categories(self):
         collector = FeedbackCollector()
         fb = collector.record_feedback(
-            "s-1", "a-1", rating="negative",
+            "s-1",
+            "a-1",
+            rating="negative",
             categories={"code_quality": 2, "relevance": 1},
         )
         assert fb.average_score == 1.5
@@ -138,14 +165,16 @@ class TestFeedbackCollector:
     def test_record_feedback_invalid_score_raises(self):
         collector = FeedbackCollector()
         with pytest.raises(ValueError, match="Category score must be 1-5"):
-            collector.record_feedback("s-1", "a-1", rating="positive",
-                                       categories={"code_quality": 6})
+            collector.record_feedback(
+                "s-1", "a-1", rating="positive", categories={"code_quality": 6}
+            )
 
     def test_record_feedback_invalid_score_zero(self):
         collector = FeedbackCollector()
         with pytest.raises(ValueError):
-            collector.record_feedback("s-1", "a-1", rating="positive",
-                                       categories={"x": 0})
+            collector.record_feedback(
+                "s-1", "a-1", rating="positive", categories={"x": 0}
+            )
 
     def test_get_feedback_all(self):
         collector = FeedbackCollector()
@@ -200,12 +229,15 @@ class TestFeedbackCollector:
 
     def test_get_summary_with_data(self):
         collector = FeedbackCollector()
-        collector.record_feedback("s-1", "a-1", rating="positive",
-                                   categories={"code_quality": 5})
-        collector.record_feedback("s-1", "a-2", rating="negative",
-                                   categories={"code_quality": 2})
-        collector.record_feedback("s-1", "a-3", rating="positive",
-                                   categories={"code_quality": 4})
+        collector.record_feedback(
+            "s-1", "a-1", rating="positive", categories={"code_quality": 5}
+        )
+        collector.record_feedback(
+            "s-1", "a-2", rating="negative", categories={"code_quality": 2}
+        )
+        collector.record_feedback(
+            "s-1", "a-3", rating="positive", categories={"code_quality": 4}
+        )
         summary = collector.get_summary()
         assert summary.total_feedback == 3
         assert summary.positive_count == 2
@@ -214,8 +246,9 @@ class TestFeedbackCollector:
 
     def test_export_import_feedback(self):
         collector = FeedbackCollector(project_id="proj-1")
-        collector.record_feedback("s-1", "a-1", rating="positive",
-                                   categories={"code_quality": 5})
+        collector.record_feedback(
+            "s-1", "a-1", rating="positive", categories={"code_quality": 5}
+        )
         collector.record_feedback("s-1", "a-2", rating="negative")
         exported = collector.export_feedback()
         data = json.loads(exported)
@@ -228,12 +261,22 @@ class TestFeedbackCollector:
 
     def test_get_stats(self):
         collector = FeedbackCollector()
-        collector.record_feedback("s-1", "a-1", rating="positive",
-                                   agent_phase="coding", agent_type="coder",
-                                   categories={"code_quality": 5})
-        collector.record_feedback("s-1", "a-2", rating="negative",
-                                   agent_phase="review", agent_type="reviewer",
-                                   categories={"style": 2})
+        collector.record_feedback(
+            "s-1",
+            "a-1",
+            rating="positive",
+            agent_phase="coding",
+            agent_type="coder",
+            categories={"code_quality": 5},
+        )
+        collector.record_feedback(
+            "s-1",
+            "a-2",
+            rating="negative",
+            agent_phase="review",
+            agent_type="reviewer",
+            categories={"style": 2},
+        )
         stats = collector.get_stats()
         assert stats["total"] == 2
         assert stats["positive"] == 1
@@ -251,6 +294,7 @@ class TestFeedbackCollector:
 # ---------------------------------------------------------------------------
 # Pattern Analysis tests
 # ---------------------------------------------------------------------------
+
 
 class TestPatternAnalysis:
     def test_no_patterns_with_few_entries(self):
@@ -282,11 +326,16 @@ class TestPatternAnalysis:
     def test_category_weakness_pattern(self):
         collector = FeedbackCollector()
         for i in range(5):
-            collector.record_feedback("s-1", f"a-{i}", rating="negative",
-                                       categories={"code_quality": 1, "relevance": 5})
+            collector.record_feedback(
+                "s-1",
+                f"a-{i}",
+                rating="negative",
+                categories={"code_quality": 1, "relevance": 5},
+            )
         patterns = collector.analyze_patterns()
-        weakness_patterns = [p for p in patterns
-                             if p.pattern_type == PatternType.CATEGORY_WEAKNESS]
+        weakness_patterns = [
+            p for p in patterns if p.pattern_type == PatternType.CATEGORY_WEAKNESS
+        ]
         assert len(weakness_patterns) >= 1
         cats = [p.affected_category for p in weakness_patterns]
         assert "code_quality" in cats
@@ -294,21 +343,26 @@ class TestPatternAnalysis:
     def test_category_strength_pattern(self):
         collector = FeedbackCollector()
         for i in range(5):
-            collector.record_feedback("s-1", f"a-{i}", rating="positive",
-                                       categories={"relevance": 5})
+            collector.record_feedback(
+                "s-1", f"a-{i}", rating="positive", categories={"relevance": 5}
+            )
         patterns = collector.analyze_patterns()
-        strength_patterns = [p for p in patterns
-                             if p.pattern_type == PatternType.CATEGORY_STRENGTH]
+        strength_patterns = [
+            p for p in patterns if p.pattern_type == PatternType.CATEGORY_STRENGTH
+        ]
         assert len(strength_patterns) >= 1
 
     def test_phase_issue_pattern(self):
         collector = FeedbackCollector()
         for i in range(4):
-            collector.record_feedback("s-1", f"a-{i}", rating="negative",
-                                       agent_phase="coding")
+            collector.record_feedback(
+                "s-1", f"a-{i}", rating="negative", agent_phase="coding"
+            )
         collector.record_feedback("s-1", "a-4", rating="positive", agent_phase="coding")
         patterns = collector.analyze_patterns()
-        phase_patterns = [p for p in patterns if p.pattern_type == PatternType.PHASE_ISSUE]
+        phase_patterns = [
+            p for p in patterns if p.pattern_type == PatternType.PHASE_ISSUE
+        ]
         assert len(phase_patterns) >= 1
         assert phase_patterns[0].affected_phase == "coding"
 
@@ -317,12 +371,16 @@ class TestPatternAnalysis:
 # PromptOptimizer tests
 # ---------------------------------------------------------------------------
 
+
 class TestPromptOptimizer:
-    def _make_collector_with_weakness(self, category: str, score: int = 1) -> FeedbackCollector:
+    def _make_collector_with_weakness(
+        self, category: str, score: int = 1
+    ) -> FeedbackCollector:
         collector = FeedbackCollector()
         for i in range(5):
-            collector.record_feedback("s-1", f"a-{i}", rating="negative",
-                                       categories={category: score})
+            collector.record_feedback(
+                "s-1", f"a-{i}", rating="negative", categories={category: score}
+            )
         return collector
 
     def test_generate_adjustments_from_category_weakness(self):
@@ -335,8 +393,9 @@ class TestPromptOptimizer:
     def test_generate_adjustments_from_phase_issue(self):
         collector = FeedbackCollector()
         for i in range(5):
-            collector.record_feedback("s-1", f"a-{i}", rating="negative",
-                                       agent_phase="coding")
+            collector.record_feedback(
+                "s-1", f"a-{i}", rating="negative", agent_phase="coding"
+            )
         optimizer = PromptOptimizer(collector)
         adjustments = optimizer.generate_adjustments()
         phase_adjs = [a for a in adjustments if a.source_pattern == "phase_issue"]
@@ -373,8 +432,9 @@ class TestPromptOptimizer:
     def test_get_prompt_for_phase_with_issues(self):
         collector = FeedbackCollector()
         for i in range(5):
-            collector.record_feedback("s-1", f"a-{i}", rating="negative",
-                                       agent_phase="review")
+            collector.record_feedback(
+                "s-1", f"a-{i}", rating="negative", agent_phase="review"
+            )
         optimizer = PromptOptimizer(collector)
         instructions = optimizer.get_prompt_for_phase("review")
         assert "feedback" in instructions.lower() or "review" in instructions.lower()
@@ -382,8 +442,9 @@ class TestPromptOptimizer:
     def test_get_prompt_for_phase_no_issues(self):
         collector = FeedbackCollector()
         for i in range(5):
-            collector.record_feedback("s-1", f"a-{i}", rating="positive",
-                                       agent_phase="coding")
+            collector.record_feedback(
+                "s-1", f"a-{i}", rating="positive", agent_phase="coding"
+            )
         optimizer = PromptOptimizer(collector)
         instructions = optimizer.get_prompt_for_phase("coding")
         assert instructions == ""
@@ -433,12 +494,15 @@ class TestPromptOptimizer:
         """Ensure all AgentPhase values have rules (except general)."""
         for phase in AgentPhase:
             if phase != AgentPhase.GENERAL:
-                assert phase.value in PHASE_PROMPT_RULES, f"Missing rule for {phase.value}"
+                assert phase.value in PHASE_PROMPT_RULES, (
+                    f"Missing rule for {phase.value}"
+                )
 
     def test_feedback_summary_to_dict(self):
         collector = FeedbackCollector()
-        collector.record_feedback("s-1", "a-1", rating="positive",
-                                   categories={"code_quality": 5})
+        collector.record_feedback(
+            "s-1", "a-1", rating="positive", categories={"code_quality": 5}
+        )
         summary = collector.get_summary()
         d = summary.to_dict()
         assert d["total_feedback"] == 1

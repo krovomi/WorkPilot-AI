@@ -2,6 +2,7 @@
 """
 Test End-to-End du Quality Scorer
 """
+
 import sys
 from pathlib import Path
 
@@ -19,11 +20,13 @@ def test_quality_scorer_imports():
         QualityScore,
         QualityScorer,
     )
+
     assert QualityScorer is not None
 
 
 def test_quality_scorer_empty_pr_perfect_score():
     from review.quality_scorer import QualityScorer
+
     scorer = QualityScorer(Path("."))
     score = scorer.score_pr("", [], "")
     assert score.overall_score == 100.0
@@ -34,6 +37,7 @@ def test_quality_scorer_empty_pr_perfect_score():
 
 def test_quality_scorer_self_analysis():
     from review.quality_scorer import QualityScorer
+
     scorer = QualityScorer(Path("."))
     scorer_file = "apps/backend/review/quality_scorer.py"
     score = scorer.score_pr("", [scorer_file], "")
@@ -42,6 +46,7 @@ def test_quality_scorer_self_analysis():
 
 def test_quality_scorer_example_bad_code():
     from review.quality_scorer import QualityScorer
+
     example_file = Path("example_bad_code.py")
     if not example_file.exists():
         pytest.skip("example_bad_code.py not found")

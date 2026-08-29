@@ -4,7 +4,12 @@ from .llm_base import BaseLLMProvider
 
 
 class AWSBedrockProvider(BaseLLMProvider):
-    def __init__(self, api_key: str, model: str = "anthropic.claude-v2", region: str = "us-east-1"):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "anthropic.claude-v2",
+        region: str = "us-east-1",
+    ):
         self.api_key = api_key
         self.model = model
         self.region = region

@@ -14,12 +14,14 @@ from typing import Any
 
 class NotificationChannel(Enum):
     """Supported notification channels."""
+
     SLACK = "slack"
     TEAMS = "teams"
 
 
 class NotificationPriority(Enum):
     """Notification priority levels."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -28,6 +30,7 @@ class NotificationPriority(Enum):
 
 class EventType(Enum):
     """Types of events that can trigger notifications."""
+
     TASK_COMPLETED = "task_completed"
     TASK_FAILED = "task_failed"
     QA_PASSED = "qa_passed"
@@ -56,6 +59,7 @@ class NotificationEvent:
         channels: Target channels to deliver to. If empty, delivers to all configured.
         timestamp: When the event occurred.
     """
+
     event_type: EventType
     title: str
     message: str
@@ -144,7 +148,9 @@ class NotificationEvent:
         if self.task_id:
             facts.append({"title": "Task", "value": self.task_id})
         facts.append({"title": "Priority", "value": self.priority.value.capitalize()})
-        facts.append({"title": "Type", "value": self.event_type.value.replace("_", " ").title()})
+        facts.append(
+            {"title": "Type", "value": self.event_type.value.replace("_", " ").title()}
+        )
 
         body: list[dict[str, Any]] = [
             {
@@ -194,6 +200,7 @@ class NotificationResult:
         error: Error message if delivery failed, or None.
         timestamp: When the delivery was attempted.
     """
+
     success: bool
     channel: NotificationChannel
     event_type: EventType
@@ -225,6 +232,7 @@ class SlashCommand:
         channel_id: The channel where the command was invoked.
         response_url: URL to send the response to.
     """
+
     command: str
     args: str = ""
     channel: NotificationChannel = NotificationChannel.SLACK
@@ -241,7 +249,12 @@ class SlashCommand:
     ]
 
     @classmethod
-    def parse(cls, text: str, channel: NotificationChannel = NotificationChannel.SLACK, **kwargs: Any) -> "SlashCommand":
+    def parse(
+        cls,
+        text: str,
+        channel: NotificationChannel = NotificationChannel.SLACK,
+        **kwargs: Any,
+    ) -> "SlashCommand":
         """Parse a slash command string.
 
         Args:
@@ -295,6 +308,7 @@ class DailySummary:
         total_cost: Total LLM cost for the day in USD.
         highlights: List of notable events.
     """
+
     project_id: str
     date: str
     tasks_completed: int = 0
@@ -352,6 +366,7 @@ class DailySummary:
 
 
 # ---- Helpers ----
+
 
 def _priority_to_color(priority: NotificationPriority) -> str:
     """Map priority to Slack attachment color."""

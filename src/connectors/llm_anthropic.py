@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from .llm_base import BaseLLMProvider
 
@@ -7,13 +7,15 @@ class AnthropicProvider(BaseLLMProvider):
     def __init__(self, api_key: str, model: str = "claude-3-sonnet-20240229"):
         self.api_key = api_key
         self.model = model
-        self._client: Optional[Any] = None
+        self._client: Any | None = None
 
     def connect(self) -> None:
         try:
             import anthropic
         except ImportError:
-            raise ImportError("anthropic package is required. Install with: pip install anthropic")
+            raise ImportError(
+                "anthropic package is required. Install with: pip install anthropic"
+            )
         self._client = anthropic.Anthropic(api_key=self.api_key)
 
     def validate(self) -> bool:
@@ -31,7 +33,11 @@ class AnthropicProvider(BaseLLMProvider):
             messages=[{"role": "user", "content": prompt}],
             max_tokens=kwargs.get("max_tokens", 1024),
         )
-        return response.content[0].text if hasattr(response, "content") and response.content else str(response)
+        return (
+            response.content[0].text
+            if hasattr(response, "content") and response.content
+            else str(response)
+        )
 
     def get_capabilities(self) -> dict[str, Any]:
         return {"models": [self.model], "provider": "anthropic"}

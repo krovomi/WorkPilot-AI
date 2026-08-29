@@ -141,7 +141,12 @@ class TestPolicyLoader:
             "version": "1.0",
             "rules": [
                 {"id": "r1", "scope": "file_path", "action": "warn", "pattern": "*.py"},
-                {"id": "r1", "scope": "file_path", "action": "block", "pattern": "*.js"},
+                {
+                    "id": "r1",
+                    "scope": "file_path",
+                    "action": "block",
+                    "pattern": "*.js",
+                },
             ],
         }
         with pytest.raises(PolicyValidationError, match="Duplicate rule id"):
@@ -217,9 +222,7 @@ rules:
 
     def test_load_caches_by_mtime(self, loader, tmp_path):
         policy_path = tmp_path / "workpilot.policy.yaml"
-        policy_path.write_text(
-            'version: "1.0"\nrules: []', encoding="utf-8"
-        )
+        policy_path.write_text('version: "1.0"\nrules: []', encoding="utf-8")
         pf1 = loader.load(tmp_path)
         pf2 = loader.load(tmp_path)
         assert pf1 is pf2  # same object from cache
@@ -233,50 +236,92 @@ rules:
         assert policy_file.get_rule("nonexistent") is None
 
     def test_merge_policies_child_adds_rule(self, loader):
-        parent = loader.load_from_dict({
-            "version": "1.0",
-            "rules": [
-                {"id": "r1", "scope": "file_path", "action": "warn", "pattern": "*.py"},
-            ],
-        })
-        child = loader.load_from_dict({
-            "version": "1.0",
-            "rules": [
-                {"id": "r2", "scope": "file_path", "action": "block", "pattern": "*.secret"},
-            ],
-        })
+        parent = loader.load_from_dict(
+            {
+                "version": "1.0",
+                "rules": [
+                    {
+                        "id": "r1",
+                        "scope": "file_path",
+                        "action": "warn",
+                        "pattern": "*.py",
+                    },
+                ],
+            }
+        )
+        child = loader.load_from_dict(
+            {
+                "version": "1.0",
+                "rules": [
+                    {
+                        "id": "r2",
+                        "scope": "file_path",
+                        "action": "block",
+                        "pattern": "*.secret",
+                    },
+                ],
+            }
+        )
         merged = loader.merge(parent, child)
         assert len(merged.rules) == 2
 
     def test_merge_policies_child_cannot_weaken(self, loader):
-        parent = loader.load_from_dict({
-            "version": "1.0",
-            "rules": [
-                {"id": "r1", "scope": "file_path", "action": "block", "pattern": "*.py"},
-            ],
-        })
-        child = loader.load_from_dict({
-            "version": "1.0",
-            "rules": [
-                {"id": "r1", "scope": "file_path", "action": "warn", "pattern": "*.py"},
-            ],
-        })
+        parent = loader.load_from_dict(
+            {
+                "version": "1.0",
+                "rules": [
+                    {
+                        "id": "r1",
+                        "scope": "file_path",
+                        "action": "block",
+                        "pattern": "*.py",
+                    },
+                ],
+            }
+        )
+        child = loader.load_from_dict(
+            {
+                "version": "1.0",
+                "rules": [
+                    {
+                        "id": "r1",
+                        "scope": "file_path",
+                        "action": "warn",
+                        "pattern": "*.py",
+                    },
+                ],
+            }
+        )
         with pytest.raises(PolicyValidationError, match="cannot weaken"):
             loader.merge(parent, child)
 
     def test_merge_policies_child_can_tighten(self, loader):
-        parent = loader.load_from_dict({
-            "version": "1.0",
-            "rules": [
-                {"id": "r1", "scope": "file_path", "action": "warn", "pattern": "*.py"},
-            ],
-        })
-        child = loader.load_from_dict({
-            "version": "1.0",
-            "rules": [
-                {"id": "r1", "scope": "file_path", "action": "block", "pattern": "*.py"},
-            ],
-        })
+        parent = loader.load_from_dict(
+            {
+                "version": "1.0",
+                "rules": [
+                    {
+                        "id": "r1",
+                        "scope": "file_path",
+                        "action": "warn",
+                        "pattern": "*.py",
+                    },
+                ],
+            }
+        )
+        child = loader.load_from_dict(
+            {
+                "version": "1.0",
+                "rules": [
+                    {
+                        "id": "r1",
+                        "scope": "file_path",
+                        "action": "block",
+                        "pattern": "*.py",
+                    },
+                ],
+            }
+        )
         merged = loader.merge(parent, child)
         assert merged.get_rule("r1").action == RuleAction.BLOCK
 
@@ -289,16 +334,22 @@ rules:
 class TestPolicyRule:
     def test_matches_file_path_glob(self):
         rule = PolicyRule(
-            id="t", description="", scope=RuleScope.FILE_PATH,
-            action=RuleAction.BLOCK, pattern="**/migrations/**"
+            id="t",
+            description="",
+            scope=RuleScope.FILE_PATH,
+            action=RuleAction.BLOCK,
+            pattern="**/migrations/**",
         )
         assert rule.matches_file_path("src/migrations/0001.py")
         assert not rule.matches_file_path("src/models.py")
 
     def test_matches_code_pattern(self):
         rule = PolicyRule(
-            id="t", description="", scope=RuleScope.CODE_PATTERN,
-            action=RuleAction.WARN, pattern="raw_sql|cursor.execute"
+            id="t",
+            description="",
+            scope=RuleScope.CODE_PATTERN,
+            action=RuleAction.WARN,
+            pattern="raw_sql|cursor.execute",
         )
         assert rule.matches_code_pattern("db.raw_sql('SELECT 1')")
         assert rule.matches_code_pattern("cursor.execute('DROP TABLE')")
@@ -306,8 +357,11 @@ class TestPolicyRule:
 
     def test_evaluate_file_metric(self):
         rule = PolicyRule(
-            id="t", description="", scope=RuleScope.FILE_METRIC,
-            action=RuleAction.WARN, condition="new_file_lines > 500"
+            id="t",
+            description="",
+            scope=RuleScope.FILE_METRIC,
+            action=RuleAction.WARN,
+            condition="new_file_lines > 500",
         )
         assert rule.evaluate_file_metric(501)
         assert not rule.evaluate_file_metric(500)
@@ -332,9 +386,7 @@ class TestPolicyEngine:
         assert result.verdict == PolicyVerdict.ALLOW
 
     def test_evaluate_file_path_block(self, loaded_engine):
-        action = AgentAction(
-            tool_name="write_file", file_path="src/migrations/0001.py"
-        )
+        action = AgentAction(tool_name="write_file", file_path="src/migrations/0001.py")
         result = loaded_engine.evaluate(action)
         assert result.is_blocked
         assert result.verdict == PolicyVerdict.BLOCK
@@ -389,17 +441,13 @@ class TestPolicyEngine:
         assert result.verdict == PolicyVerdict.BLOCK
 
     def test_dry_run_does_not_log(self, loaded_engine):
-        action = AgentAction(
-            tool_name="write_file", file_path="src/migrations/0001.py"
-        )
+        action = AgentAction(tool_name="write_file", file_path="src/migrations/0001.py")
         results = loaded_engine.dry_run([action])
         assert results[0].is_blocked
         assert len(loaded_engine.violation_log) == 0
 
     def test_evaluate_records_violations(self, loaded_engine):
-        action = AgentAction(
-            tool_name="write_file", file_path="src/migrations/0001.py"
-        )
+        action = AgentAction(tool_name="write_file", file_path="src/migrations/0001.py")
         loaded_engine.evaluate(action)
         assert len(loaded_engine.violation_log) >= 1
 
@@ -434,7 +482,10 @@ class TestSemanticAnalyzer:
         violations = analyzer.analyze_diff(
             file_path="tests/test_foo.py",
             added_lines=[],
-            removed_lines=["def test_login_success():", "    assert user.is_authenticated"],
+            removed_lines=[
+                "def test_login_success():",
+                "    assert user.is_authenticated",
+            ],
         )
         assert any(v.violation_type == ViolationType.TEST_DELETION for v in violations)
 
@@ -452,7 +503,9 @@ class TestSemanticAnalyzer:
             added_lines=[],
             removed_lines=["def calculate_total():", "    return sum(items)"],
         )
-        assert not any(v.violation_type == ViolationType.TEST_DELETION for v in violations)
+        assert not any(
+            v.violation_type == ViolationType.TEST_DELETION for v in violations
+        )
 
     def test_detect_raw_sql(self, analyzer):
         violations = analyzer.analyze_diff(
@@ -476,7 +529,9 @@ class TestSemanticAnalyzer:
             added_lines=["result: any = 5"],
             removed_lines=[],
         )
-        assert not any(v.violation_type == ViolationType.TYPESCRIPT_ANY for v in violations)
+        assert not any(
+            v.violation_type == ViolationType.TYPESCRIPT_ANY for v in violations
+        )
 
     def test_detect_security_sensitive(self, analyzer):
         violations = analyzer.analyze_diff(
@@ -484,7 +539,9 @@ class TestSemanticAnalyzer:
             added_lines=["eval(user_input)"],
             removed_lines=[],
         )
-        assert any(v.violation_type == ViolationType.SECURITY_SENSITIVE for v in violations)
+        assert any(
+            v.violation_type == ViolationType.SECURITY_SENSITIVE for v in violations
+        )
 
     def test_detect_dependency_change(self, analyzer):
         violations = analyzer.analyze_diff(
@@ -492,7 +549,9 @@ class TestSemanticAnalyzer:
             added_lines=['"lodash": "^4.17.21"'],
             removed_lines=[],
         )
-        assert any(v.violation_type == ViolationType.DEPENDENCY_CHANGE for v in violations)
+        assert any(
+            v.violation_type == ViolationType.DEPENDENCY_CHANGE for v in violations
+        )
 
     def test_no_dep_change_for_non_manifest(self, analyzer):
         violations = analyzer.analyze_diff(
@@ -500,7 +559,9 @@ class TestSemanticAnalyzer:
             added_lines=["import os"],
             removed_lines=[],
         )
-        assert not any(v.violation_type == ViolationType.DEPENDENCY_CHANGE for v in violations)
+        assert not any(
+            v.violation_type == ViolationType.DEPENDENCY_CHANGE for v in violations
+        )
 
     def test_python_ast_eval_detection(self, analyzer):
         code = 'result = eval("2+2")\n'

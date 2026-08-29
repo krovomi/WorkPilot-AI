@@ -2,6 +2,7 @@
 """
 Tests auto-fix simplifiés - Version SANS imports externes
 """
+
 import py_compile
 import sys
 from pathlib import Path

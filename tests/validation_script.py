@@ -2,6 +2,7 @@
 """
 Quick syntax and import test for auto-fix loop
 """
+
 import sys
 from pathlib import Path
 
@@ -17,11 +18,12 @@ print("=" * 70)
 print("\n[1/7] 🔍 Test de syntaxe Python...")
 try:
     import py_compile
+
     files = [
         backend_dir / "qa" / "auto_fix_loop.py",
         backend_dir / "qa" / "auto_fix_metrics.py",
     ]
-    
+
     for f in files:
         if f.exists():
             py_compile.compile(str(f), doraise=True)
@@ -42,12 +44,14 @@ try:
         AutoFixAttempt,
         AutoFixTestResult,
     )
+
     print("  ✓ AutoFixLoop importé")
     print(f"  ✓ DEFAULT_MAX_AUTO_FIX_ATTEMPTS = {DEFAULT_MAX_AUTO_FIX_ATTEMPTS}")
     print("  ✅ Imports auto_fix_loop OK")
 except ImportError as e:
     print(f"  ❌ Erreur d'import: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 
@@ -59,6 +63,7 @@ try:
 except ImportError as e:
     print(f"  ❌ Erreur d'import: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 
@@ -68,11 +73,13 @@ try:
     from qa import (
         DEFAULT_MAX_AUTO_FIX_ATTEMPTS,
     )
+
     print("  ✓ DEFAULT_MAX_AUTO_FIX_ATTEMPTS via qa")
     print("  ✅ Exports package qa OK")
 except ImportError as e:
     print(f"  ❌ Erreur d'export: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 
@@ -84,6 +91,7 @@ try:
 except ImportError as e:
     print(f"  ❌ Erreur d'export: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 
@@ -91,7 +99,7 @@ except ImportError as e:
 print("\n[6/7] 🏗️  Test instantiation classes...")
 try:
     from qa.auto_fix_loop import AutoFixAttempt, AutoFixTestResult
-    
+
     result = AutoFixTestResult(
         executed=True,
         passed=False,
@@ -101,8 +109,10 @@ try:
         test_count=5,
         failed_count=2,
     )
-    print(f"  ✓ AutoFixTestResult créé: {result.test_count} tests, {result.failed_count} failed")
-    
+    print(
+        f"  ✓ AutoFixTestResult créé: {result.test_count} tests, {result.failed_count} failed"
+    )
+
     attempt = AutoFixAttempt(
         attempt_number=1,
         test_result=result,
@@ -117,6 +127,7 @@ try:
 except Exception as e:
     print(f"  ❌ Erreur instantiation: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 
@@ -128,6 +139,7 @@ try:
 except ImportError as e:
     print(f"  ❌ Erreur import CLI: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 

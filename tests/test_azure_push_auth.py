@@ -48,7 +48,11 @@ def test_chains_onto_existing_git_config(monkeypatch):
     monkeypatch.setattr(mgr, "_get_azure_devops_credentials", lambda: ("", "TOK"))
 
     env = mgr._inject_azure_push_auth(
-        {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.x", "GIT_CONFIG_VALUE_0": "y"}
+        {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "core.x",
+            "GIT_CONFIG_VALUE_0": "y",
+        }
     )
 
     # Appends at index 1 without clobbering the pre-existing entry 0.

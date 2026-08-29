@@ -2,6 +2,7 @@
 Tests d'intégration pour les providers LLM concrets (OpenAI, Claude, Ollama, Google, Anthropic).
 Utilise des clés factices et vérifie la robustesse de l'instanciation et de la validation.
 """
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -13,6 +14,7 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+
 # Import direct des modules pour éviter les problèmes d'import imbriqués
 def import_module_from_file(module_name, file_path):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
@@ -21,28 +23,53 @@ def import_module_from_file(module_name, file_path):
     spec.loader.exec_module(module)
     return module
 
+
 # Import des modules dépendants d'abord
 connectors_dir = project_root / "src" / "connectors"
-llm_base = import_module_from_file("src.connectors.llm_base", connectors_dir / "llm_base.py")
+llm_base = import_module_from_file(
+    "src.connectors.llm_base", connectors_dir / "llm_base.py"
+)
 sys.modules["src.connectors.llm_base"] = llm_base
 
 # Import des providers
-OpenAIProvider = import_module_from_file("src.connectors.llm_openai", connectors_dir / "llm_openai.py").OpenAIProvider
-ClaudeProvider = import_module_from_file("src.connectors.llm_claude", connectors_dir / "llm_claude.py").ClaudeProvider
-OllamaProvider = import_module_from_file("src.connectors.llm_ollama", connectors_dir / "llm_ollama.py").OllamaProvider
-GoogleLLMProvider = import_module_from_file("src.connectors.llm_google", connectors_dir / "llm_google.py").GoogleLLMProvider
-AnthropicProvider = import_module_from_file("src.connectors.llm_anthropic", connectors_dir / "llm_anthropic.py").AnthropicProvider
+OpenAIProvider = import_module_from_file(
+    "src.connectors.llm_openai", connectors_dir / "llm_openai.py"
+).OpenAIProvider
+ClaudeProvider = import_module_from_file(
+    "src.connectors.llm_claude", connectors_dir / "llm_claude.py"
+).ClaudeProvider
+OllamaProvider = import_module_from_file(
+    "src.connectors.llm_ollama", connectors_dir / "llm_ollama.py"
+).OllamaProvider
+GoogleLLMProvider = import_module_from_file(
+    "src.connectors.llm_google", connectors_dir / "llm_google.py"
+).GoogleLLMProvider
+AnthropicProvider = import_module_from_file(
+    "src.connectors.llm_anthropic", connectors_dir / "llm_anthropic.py"
+).AnthropicProvider
 
-@pytest.mark.parametrize("provider_cls,kwargs,should_validate", [
-    (OpenAIProvider, {"api_key": "sk-test", "model": "gpt-3.5-turbo"}, False),
-    (ClaudeProvider, {"api_key": "sk-ant-test", "model": "claude-3-sonnet-20240229"}, True),
-    # Point at an unreachable port so validation is deterministic regardless of
-    # whether a real Ollama happens to be running on the default port locally
-    # (it now often is, since the app can auto-start a portable server).
-    (OllamaProvider, {"model": "llama2", "base_url": "http://127.0.0.1:1"}, False),
-    (GoogleLLMProvider, {"api_key": "test", "model": "gemini-2.0-flash"}, True),
-    (AnthropicProvider, {"api_key": "sk-ant-test", "model": "claude-3-sonnet-20240229"}, True),
-])
+
+@pytest.mark.parametrize(
+    "provider_cls,kwargs,should_validate",
+    [
+        (OpenAIProvider, {"api_key": "sk-test", "model": "gpt-3.5-turbo"}, False),
+        (
+            ClaudeProvider,
+            {"api_key": "sk-ant-test", "model": "claude-3-sonnet-20240229"},
+            True,
+        ),
+        # Point at an unreachable port so validation is deterministic regardless of
+        # whether a real Ollama happens to be running on the default port locally
+        # (it now often is, since the app can auto-start a portable server).
+        (OllamaProvider, {"model": "llama2", "base_url": "http://127.0.0.1:1"}, False),
+        (GoogleLLMProvider, {"api_key": "test", "model": "gemini-2.0-flash"}, True),
+        (
+            AnthropicProvider,
+            {"api_key": "sk-ant-test", "model": "claude-3-sonnet-20240229"},
+            True,
+        ),
+    ],
+)
 def test_provider_instantiation_and_validation(provider_cls, kwargs, should_validate):
     provider = provider_cls(**kwargs)
     assert hasattr(provider, "connect")

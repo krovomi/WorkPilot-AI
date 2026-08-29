@@ -198,9 +198,7 @@ class TestCreateAgentClient:
         mock_tools.return_value = ["Read", "Write"]
 
         # Mock is_linear_enabled
-        monkeypatch.setattr(
-            "core.client.is_linear_enabled", lambda: False
-        )
+        monkeypatch.setattr("core.client.is_linear_enabled", lambda: False)
 
         client = create_agent_client(
             project_dir=tmp_path,

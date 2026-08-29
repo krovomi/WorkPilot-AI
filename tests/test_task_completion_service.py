@@ -32,10 +32,8 @@ def mock_worktree_manager():
 
 def test_create_task_completion_service(temp_project_dir):
     """Test de la factory de création du service"""
-    service = create_task_completion_service(
-        temp_project_dir, base_branch="main"
-    )
-    
+    service = create_task_completion_service(temp_project_dir, base_branch="main")
+
     assert service is not None
     assert isinstance(service, TaskCompletionService)
     assert service.project_path == temp_project_dir
@@ -112,14 +110,12 @@ def test_complete_task_push_failure(temp_project_dir, mock_worktree_manager):
     assert "Network error" in result["error"]
 
 
-def test_complete_task_pr_creation_failure(
-    temp_project_dir, mock_worktree_manager
-):
+def test_complete_task_pr_creation_failure(temp_project_dir, mock_worktree_manager):
     """Test de complétion avec échec de création de PR"""
     # Setup mock
     mock_instance = MagicMock()
     mock_worktree_manager.return_value = mock_instance
-    
+
     # No pre-existing PR; PR creation fails inside the dispatcher
     mock_instance.find_existing_pr_url.return_value = None
     mock_instance.push_and_create_pr.return_value = {
@@ -152,7 +148,7 @@ def test_complete_task_with_custom_target_branch(
     # Setup mock
     mock_instance = MagicMock()
     mock_worktree_manager.return_value = mock_instance
-    
+
     # No pre-existing PR; success via dispatcher
     mock_instance.find_existing_pr_url.return_value = None
     mock_instance.push_and_create_pr.return_value = {
@@ -183,9 +179,7 @@ def test_complete_task_with_custom_target_branch(
     assert call_args[1]["target_branch"] == "main"
 
 
-def test_complete_task_pr_already_exists(
-    temp_project_dir, mock_worktree_manager
-):
+def test_complete_task_pr_already_exists(temp_project_dir, mock_worktree_manager):
     """PR détectée par le dispatcher pendant la création (already_exists)."""
     # Setup mock
     mock_instance = MagicMock()
@@ -307,4 +301,3 @@ def test_build_pr_title(monkeypatch):
     assert service._build_pr_title("update readme") == "feat: update readme"
     # With extra spaces
     assert service._build_pr_title("  Fix tests  ") == "feat: fix tests"
-

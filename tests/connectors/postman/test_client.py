@@ -20,26 +20,33 @@ import requests
 def import_module_direct(module_name, file_path):
     """Import a module directly from file path, bypassing package __init__.py"""
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
+
 # Import modules directly to avoid circular import issues in __init__.py
 project_root = Path(__file__).parent.parent.parent.parent
 
 # Import exceptions first
-exceptions_module = import_module_direct("postman_exceptions", project_root / "src" / "connectors" / "postman" / "exceptions.py")
+exceptions_module = import_module_direct(
+    "postman_exceptions",
+    project_root / "src" / "connectors" / "postman" / "exceptions.py",
+)
 
 # Make exceptions available in sys.modules so client can import them
 sys.modules["src.connectors.postman.exceptions"] = exceptions_module
-postman_package = type('Package', (), {'exceptions': exceptions_module})()
+postman_package = type("Package", (), {"exceptions": exceptions_module})()
 sys.modules["src.connectors.postman"] = postman_package
-sys.modules["src.connectors"] = type('Package', (), {'postman': postman_package})()
+sys.modules["src.connectors"] = type("Package", (), {"postman": postman_package})()
 
 # Now import client
-client_module = import_module_direct("postman_client", project_root / "src" / "connectors" / "postman" / "client.py")
+client_module = import_module_direct(
+    "postman_client", project_root / "src" / "connectors" / "postman" / "client.py"
+)
 
 PostmanClient = client_module.PostmanClient
 PostmanAPIError = exceptions_module.PostmanAPIError
@@ -117,7 +124,9 @@ class TestPostmanClientConnect:
             mock_session.get.return_value = mock_response
             MockSession.return_value = mock_session
 
-            with pytest.raises(PostmanAuthenticationError, match="Authentication failed"):
+            with pytest.raises(
+                PostmanAuthenticationError, match="Authentication failed"
+            ):
                 client.connect()
 
     def test_connect_network_error_raises(self):
@@ -126,7 +135,9 @@ class TestPostmanClientConnect:
 
         with patch("requests.Session") as MockSession:
             mock_session = MagicMock()
-            mock_session.get.side_effect = requests.exceptions.ConnectionError("timeout")
+            mock_session.get.side_effect = requests.exceptions.ConnectionError(
+                "timeout"
+            )
             MockSession.return_value = mock_session
 
             with pytest.raises(PostmanAPIError, match="Cannot connect"):
@@ -207,7 +218,7 @@ class TestPostmanClientGet:
         """get() passes query parameters to the session."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.content = b'{}'
+        mock_response.content = b"{}"
         mock_response.json.return_value = {}
         connected_client._session.get.return_value = mock_response
 
@@ -247,7 +258,7 @@ class TestPostmanClientPost:
         """post() sends the JSON body correctly."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.content = b'{}'
+        mock_response.content = b"{}"
         mock_response.json.return_value = {}
         connected_client._session.post.return_value = mock_response
 
