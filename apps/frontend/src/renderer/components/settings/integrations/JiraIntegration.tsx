@@ -65,32 +65,37 @@ export function JiraIntegration({
 		setConnectionStatus(null);
 
 		try {
-			// Test connection via IPC if available, otherwise show mock status
-			if (
-				globalThis.electronAPI &&
-				typeof globalThis.electronAPI.jiraTestConnection === "function"
-			) {
-				const result = await globalThis.electronAPI.jiraTestConnection({
-					instanceUrl: jiraInstanceUrl,
-					email: jiraEmail,
-					apiToken: jiraApiToken,
-				});
-				setConnectionStatus(
-					result.data || { connected: false, error: result.error },
-				);
-			} else if (jiraInstanceUrl && jiraEmail && jiraApiToken) {
-				// IPC not wired yet — provide feedback to user
-				setConnectionStatus({
-					connected: true,
-					instanceUrl: jiraInstanceUrl,
-					projectKey: jiraProjectKey || undefined,
-				});
-			} else {
+			if (!jiraInstanceUrl || !jiraEmail || !jiraApiToken) {
 				setConnectionStatus({
 					connected: false,
 					error: t("jira.fillAllFields", { ns: "settings" }),
 				});
+				return;
 			}
+
+			// The bridge is `testJiraConnection` (preload/api/modules/jira-api.ts).
+			// This used to call `jiraTestConnection` — a name only `window.d.ts`
+			// ever declared — so the guard never matched and the fallback branch
+			// reported `connected: true` on three filled fields, without once
+			// contacting Jira. Announcing a connection nobody tested is worse
+			// than announcing a failure.
+			const test = globalThis.electronAPI?.testJiraConnection;
+			if (typeof test !== "function") {
+				setConnectionStatus({
+					connected: false,
+					error: t("jira.bridgeUnavailable", { ns: "settings" }),
+				});
+				return;
+			}
+
+			const result = await test({
+				instanceUrl: jiraInstanceUrl,
+				email: jiraEmail,
+				apiToken: jiraApiToken,
+			});
+			setConnectionStatus(
+				result.data || { connected: false, error: result.error },
+			);
 		} catch (err) {
 			setConnectionStatus({
 				connected: false,

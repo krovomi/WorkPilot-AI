@@ -2,6 +2,8 @@
  * Architecture Visualizer API module
  */
 
+import { createIpcListener, invokeIpc } from "./ipc-utils";
+
 export interface ArchitectureVisualizerRequest {
 	projectDir: string;
 	diagramTypes?: string[];
@@ -55,18 +57,18 @@ export interface ArchitectureVisualizerAPI {
 export function createArchitectureVisualizerAPI(): ArchitectureVisualizerAPI {
 	return {
 		generateArchitectureDiagrams: (request) =>
-			globalThis.electronAPI.invoke("architectureVisualizer:generate", request),
+			invokeIpc("architectureVisualizer:generate", request),
 		cancelArchitectureVisualization: () =>
-			globalThis.electronAPI.invoke("architectureVisualizer:cancel"),
+			invokeIpc("architectureVisualizer:cancel"),
 		configureArchitectureVisualizer: (config) =>
-			globalThis.electronAPI.invoke("architectureVisualizer:configure", config),
+			invokeIpc("architectureVisualizer:configure", config),
 		onArchitectureVisualizerStatus: (callback) =>
-			globalThis.electronAPI.on("architectureVisualizer:status", callback),
+			createIpcListener("architectureVisualizer:status", callback),
 		onArchitectureVisualizerStreamChunk: (callback) =>
-			globalThis.electronAPI.on("architectureVisualizer:streamChunk", callback),
+			createIpcListener("architectureVisualizer:streamChunk", callback),
 		onArchitectureVisualizerError: (callback) =>
-			globalThis.electronAPI.on("architectureVisualizer:error", callback),
+			createIpcListener("architectureVisualizer:error", callback),
 		onArchitectureVisualizerComplete: (callback) =>
-			globalThis.electronAPI.on("architectureVisualizer:complete", callback),
+			createIpcListener("architectureVisualizer:complete", callback),
 	};
 }

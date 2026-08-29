@@ -126,6 +126,10 @@ import {
 } from "./modules/continuous-ai-api";
 import { createSwarmAPI, type SwarmAPI } from "./modules/swarm-api";
 import {
+	createGenericIpcAPI,
+	type GenericIpcAPI,
+} from "./modules/generic-ipc-api";
+import {
 	type AutoRefactorAPI,
 	createAutoRefactorAPI,
 } from "./modules/auto-refactor-api";
@@ -284,6 +288,7 @@ export interface ElectronAPI
 		OfflineModeAPI,
 		VisualProgrammingAPI,
 		AutoRefactorAPI,
+		GenericIpcAPI,
 		DesignToCodeAPI {
 	github: GitHubAPI;
 	/** Parallel subtask execution (dependency waves) */
@@ -422,6 +427,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createVisualProgrammingAPI(),
 		...createDesignToCodeAPI(),
 		...createAutoRefactorAPI(),
+		...createGenericIpcAPI(),
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
 		continuousAI: createContinuousAIAPI(),

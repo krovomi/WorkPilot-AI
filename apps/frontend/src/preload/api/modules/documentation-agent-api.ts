@@ -2,6 +2,8 @@
  * Documentation Agent API module
  */
 
+import { createIpcListener, invokeIpc } from "./ipc-utils";
+
 export interface DocumentationAgentRequest {
 	projectDir: string;
 	docTypes?: string[];
@@ -46,18 +48,18 @@ export interface DocumentationAgentAPI {
 export function createDocumentationAgentAPI(): DocumentationAgentAPI {
 	return {
 		generateDocumentation: (request) =>
-			globalThis.electronAPI.invoke("documentationAgent:generate", request),
+			invokeIpc("documentationAgent:generate", request),
 		cancelDocumentation: () =>
-			globalThis.electronAPI.invoke("documentationAgent:cancel"),
+			invokeIpc("documentationAgent:cancel"),
 		configureDocumentationAgent: (config) =>
-			globalThis.electronAPI.invoke("documentationAgent:configure", config),
+			invokeIpc("documentationAgent:configure", config),
 		onDocumentationAgentStatus: (callback) =>
-			globalThis.electronAPI.on("documentationAgent:status", callback),
+			createIpcListener("documentationAgent:status", callback),
 		onDocumentationAgentStreamChunk: (callback) =>
-			globalThis.electronAPI.on("documentationAgent:streamChunk", callback),
+			createIpcListener("documentationAgent:streamChunk", callback),
 		onDocumentationAgentError: (callback) =>
-			globalThis.electronAPI.on("documentationAgent:error", callback),
+			createIpcListener("documentationAgent:error", callback),
 		onDocumentationAgentComplete: (callback) =>
-			globalThis.electronAPI.on("documentationAgent:complete", callback),
+			createIpcListener("documentationAgent:complete", callback),
 	};
 }
