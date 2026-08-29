@@ -5,12 +5,19 @@
  * organized by domain into separate handler modules.
  */
 
-import type { BrowserWindow } from "electron";
+import path from "node:path";
+import { app, type BrowserWindow } from "electron";
 import type { AgentManager } from "../agent";
+import { getClaudeProfileManager } from "../claude-profile-manager";
 import { notificationService } from "../notification-service";
 import type { PythonEnvManager } from "../python-env-manager";
 import type { TerminalManager } from "../terminal-manager";
 import { registerAccessibilityHandlers } from "./accessibility-handlers";
+import { registerAutoRefactorHandlers } from "./auto-refactor-handlers";
+import { registerContinuousAIHandlers } from "./continuous-ai-handlers";
+import { getAutoBuildSourcePath } from "./context/utils";
+import { registerQueueRoutingHandlers } from "./queue-routing-handlers";
+import { registerSwarmHandlers } from "./swarm-handlers";
 import { registerAgentDebuggerHandlers } from "./agent-debugger-handlers";
 import { registerAgenteventsHandlers } from "./agent-events-handlers";
 import { registerBlastRadiusHandlers } from "./blast-radius-handlers";
@@ -259,6 +266,19 @@ export { registerVoiceControlHandlers } from "./voice-control-handlers";
  * @param getMainWindow - Function to get the main BrowserWindow
  * @param pythonEnvManager - The Python environment manager instance
  */
+/**
+ * Where the Python backend lives: the path the user configured, and otherwise
+ * the same packaged/dev resolution every runner-spawning handler performs.
+ */
+function getBackendSourcePath(): string {
+	return (
+		getAutoBuildSourcePath() ??
+		(app.isPackaged
+			? path.resolve(process.resourcesPath, "backend")
+			: path.resolve(app.getAppPath(), "..", "backend"))
+	);
+}
+
 export function setupIpcHandlers(
 	agentManager: AgentManager,
 	terminalManager: TerminalManager,
@@ -562,6 +582,32 @@ export function setupIpcHandlers(
 
 	// Offline Mode handlers (Feature 12 — local model routing + confidentiality)
 	registerOfflineModeHandlers();
+
+	// Auto-Refactor handlers (analysis → plan → optional execution)
+	registerAutoRefactorHandlers();
+
+	// Swarm handlers (parallel subtask execution in dependency waves)
+	registerSwarmHandlers(
+		() => pythonEnvManager.getPythonPath(),
+		getBackendSourcePath,
+		getMainWindow,
+	);
+
+	// Continuous AI handlers (CI/CD watcher, dependency sentinel, PR reviewer)
+	registerContinuousAIHandlers(
+		() => pythonEnvManager.getPythonPath(),
+		getMainWindow,
+	);
+
+	// Queue routing handlers (profile swapping on rate limit). The preload
+	// `queue` bridge invokes these five channels; unregistered, every call
+	// rejected with "No handler registered". The profile manager is the lazy
+	// singleton the rest of the app initializes — same instance, later filled.
+	registerQueueRoutingHandlers(
+		agentManager,
+		getMainWindow,
+		getClaudeProfileManager(),
+	);
 
 	console.warn("[IPC] All handler modules registered successfully");
 }

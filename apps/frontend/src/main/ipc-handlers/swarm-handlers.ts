@@ -60,7 +60,7 @@ function killSwarmProcess(): void {
 // ─── Registration ────────────────────────────────────────────────────────────
 
 export function registerSwarmHandlers(
-	getPythonPath: () => string,
+	getPythonPath: () => string | null,
 	getAutoBuildSourcePath: () => string,
 	getMainWindow: () => BrowserWindow | null,
 ): void {
@@ -75,6 +75,9 @@ export function registerSwarmHandlers(
 				appLog.info(`[Swarm] Analyzing dependencies for spec: ${specId}`);
 
 				const pythonPath = getPythonPath();
+				if (!pythonPath) {
+					throw new Error("Python environment not ready");
+				}
 				const sourcePath = getAutoBuildSourcePath();
 				const runnerPath = path.join(sourcePath, "runners", "swarm_runner.py");
 
@@ -152,6 +155,9 @@ export function registerSwarmHandlers(
 				);
 
 				const pythonPath = getPythonPath();
+				if (!pythonPath) {
+					throw new Error("Python environment not ready");
+				}
 				const sourcePath = getAutoBuildSourcePath();
 				const runnerPath = path.join(sourcePath, "runners", "swarm_runner.py");
 

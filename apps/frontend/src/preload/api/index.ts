@@ -121,6 +121,15 @@ import { createConflictPredictorAPI } from "./modules/conflict-predictor-api";
 import type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 import { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 import {
+	type ContinuousAIAPI,
+	createContinuousAIAPI,
+} from "./modules/continuous-ai-api";
+import { createSwarmAPI, type SwarmAPI } from "./modules/swarm-api";
+import {
+	type AutoRefactorAPI,
+	createAutoRefactorAPI,
+} from "./modules/auto-refactor-api";
+import {
 	type CopilotCliAPI,
 	createCopilotCliAPI,
 } from "./modules/copilot-cli-api";
@@ -274,8 +283,13 @@ export interface ElectronAPI
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
+		AutoRefactorAPI,
 		DesignToCodeAPI {
 	github: GitHubAPI;
+	/** Parallel subtask execution (dependency waves) */
+	swarm: SwarmAPI;
+	/** Continuous AI daemon (CI/CD watcher, dependency sentinel, PR reviewer) */
+	continuousAI: ContinuousAIAPI;
 	/** Multi-user server mode: connection + login (local / Entra ID) */
 	serverAuth: ServerAuthAPI;
 	/** Queue routing API for rate limit recovery */
@@ -407,7 +421,10 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
 		...createDesignToCodeAPI(),
+		...createAutoRefactorAPI(),
 		github: createGitHubAPI(),
+		swarm: createSwarmAPI(),
+		continuousAI: createContinuousAIAPI(),
 		serverAuth: createServerAuthAPI(), // Multi-user server mode
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
 		quality: createQualityAPI(), // Code quality analysis
@@ -486,6 +503,10 @@ export { createArchitectureVisualizerAPI } from "./modules/architecture-visualiz
 export type { ArenaAPI } from "./modules/arena-api";
 export { createArenaAPI } from "./modules/arena-api";
 export { createAutoRefactorAPI } from "./modules/auto-refactor-api";
+export type { ContinuousAIAPI } from "./modules/continuous-ai-api";
+export { createContinuousAIAPI } from "./modules/continuous-ai-api";
+export type { SwarmAPI } from "./modules/swarm-api";
+export { createSwarmAPI } from "./modules/swarm-api";
 export type { ClaudeCodeAPI } from "./modules/claude-code-api";
 export { createClaudeCodeAPI } from "./modules/claude-code-api";
 export type { CodeMigrationAPI } from "./modules/code-migration-api";

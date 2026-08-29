@@ -69,6 +69,42 @@ interface ContinuousAIActions {
 	reset: () => void;
 }
 
+// ─── Bridge ─────────────────────────────────────────────────────────────────
+
+/**
+ * The `electronAPI.continuousAI` bridge, or `null` when it is absent.
+ *
+ * `setConfig` and `setModuleConfig` used to reach through an optional chain
+ * (`electronAPI?.continuousAI?.updateConfig(c).catch(…)`), which short-circuits
+ * the whole expression — including the `.catch` — when the bridge is missing.
+ * Every Settings toggle therefore looked applied while nothing reached the
+ * daemon. Resolving the bridge first makes that state visible instead.
+ */
+function getContinuousAIBridge():
+	| typeof globalThis.electronAPI.continuousAI
+	| null {
+	const bridge = globalThis.electronAPI?.continuousAI;
+	return typeof bridge?.updateConfig === "function" ? bridge : null;
+}
+
+const BRIDGE_UNAVAILABLE = "Continuous AI is unavailable in this environment.";
+
+/**
+ * Persist a config change to the daemon. Best effort by design — the user's
+ * choice is already in the store — but a bridge that is missing entirely is
+ * worth one warning, since it means none of these toggles take effect.
+ */
+function pushConfig(config: ContinuousAIConfig): void {
+	const bridge = getContinuousAIBridge();
+	if (!bridge) {
+		console.warn("[continuous-ai] IPC bridge unavailable; config not applied");
+		return;
+	}
+	bridge.updateConfig(config).catch(() => {
+		// Intentionally silent - config update is best effort
+	});
+}
+
 // ─── Initial State ──────────────────────────────────────────────────────────
 
 const initialState: ContinuousAIState = {
@@ -97,12 +133,7 @@ export const useContinuousAIStore = create<
 			setConfig: (partial) =>
 				set((state) => {
 					const newConfig = { ...state.config, ...partial };
-					// Fire-and-forget config update to backend
-					globalThis.electronAPI?.continuousAI
-						?.updateConfig(newConfig)
-						.catch(() => {
-							// Intentionally silent - config update is best effort
-						});
+					pushConfig(newConfig);
 					return { config: newConfig };
 				}),
 
@@ -117,11 +148,7 @@ export const useContinuousAIStore = create<
 							...state.config,
 							[moduleKey]: { ...current, ...partial },
 						};
-						globalThis.electronAPI?.continuousAI
-							?.updateConfig(newConfig)
-							.catch(() => {
-								// Intentionally silent - config update is best effort
-							});
+						pushConfig(newConfig);
 						return { config: newConfig };
 					}
 					return {};
@@ -130,9 +157,14 @@ export const useContinuousAIStore = create<
 			setError: (error) => set({ error }),
 
 			startDaemon: async () => {
+				const bridge = getContinuousAIBridge();
+				if (!bridge) {
+					set({ error: BRIDGE_UNAVAILABLE });
+					return;
+				}
 				set({ isStarting: true, error: null });
 				try {
-					await globalThis.electronAPI.continuousAI.start(get().config);
+					await bridge.start(get().config);
 				} catch (err) {
 					set({ error: err instanceof Error ? err.message : String(err) });
 				} finally {
@@ -143,7 +175,7 @@ export const useContinuousAIStore = create<
 			stopDaemon: async () => {
 				set({ isStopping: true });
 				try {
-					await globalThis.electronAPI.continuousAI.stop();
+					await getContinuousAIBridge()?.stop();
 				} catch {
 					// Best effort
 				} finally {
@@ -153,7 +185,7 @@ export const useContinuousAIStore = create<
 
 			approveAction: async (actionId) => {
 				try {
-					await globalThis.electronAPI.continuousAI.approveAction(actionId);
+					await getContinuousAIBridge()?.approveAction(actionId);
 					set((state) => ({
 						pendingApprovals: state.pendingApprovals.filter(
 							(a) => a.id !== actionId,
@@ -166,7 +198,7 @@ export const useContinuousAIStore = create<
 
 			rejectAction: async (actionId) => {
 				try {
-					await globalThis.electronAPI.continuousAI.rejectAction(actionId);
+					await getContinuousAIBridge()?.rejectAction(actionId);
 					set((state) => ({
 						pendingApprovals: state.pendingApprovals.filter(
 							(a) => a.id !== actionId,
@@ -179,7 +211,7 @@ export const useContinuousAIStore = create<
 
 			refreshStatus: async () => {
 				try {
-					const status = await globalThis.electronAPI.continuousAI.getStatus();
+					const status = await getContinuousAIBridge()?.getStatus();
 					if (status) {
 						set({ status });
 					}

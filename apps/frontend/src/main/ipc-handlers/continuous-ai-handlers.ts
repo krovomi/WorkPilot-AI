@@ -98,7 +98,7 @@ function killDaemon(): void {
 // ─── Registration ────────────────────────────────────────────────────────────
 
 export function registerContinuousAIHandlers(
-	getPythonPath: () => string,
+	getPythonPath: () => string | null,
 	getMainWindow: () => BrowserWindow | null,
 ): void {
 	/**
@@ -116,6 +116,9 @@ export function registerContinuousAIHandlers(
 				appLog.info("[ContinuousAI] Starting daemon");
 
 				const pythonPath = getPythonPath();
+				if (!pythonPath) {
+					throw new Error("Python environment not ready");
+				}
 				const backendDir = getBackendDir();
 				const runnerPath = path.join(
 					backendDir,
