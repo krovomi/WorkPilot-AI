@@ -618,7 +618,7 @@ class AzureReposClient:
         # Calculate statistics
         additions = sum(file.additions for file in files)
         deletions = sum(file.deletions for file in files)
-        changes = sum(file.changes for file in files)
+        sum(file.changes for file in files)
 
         return {
             "id": pr.pull_request_id,

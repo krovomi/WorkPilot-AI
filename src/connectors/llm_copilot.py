@@ -113,7 +113,7 @@ class CopilotUsageConnector:
             error_msg = f"Command timed out after {timeout}s: {' '.join(cmd)}"
             logger.error(error_msg)
             raise RuntimeError(error_msg) from None
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             error_msg = (
                 "GitHub CLI (gh) not found. Install from https://cli.github.com/"
             )

@@ -246,7 +246,6 @@ class AngularComponentGenerator:
         )
 
         imports = []
-        decorators = []
         class_implements = []
 
         # Add imports based on implements
@@ -290,7 +289,6 @@ class AngularComponentGenerator:
             style_attr = f'\n  styleUrls: ["./{self._kebab_case(options.name)}.component.{options.style_ext}"],'
 
         # Change detection
-        cd_strategy = f"ChangeDetectionStrategy.{options.change_detection}"
 
         # Standalone imports
         standalone_imports = ""

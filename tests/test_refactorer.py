@@ -489,6 +489,6 @@ class TestRefactoringAgentStats:
         agent = RefactoringAgent(thresholds={"max_method_lines": 30})
         proposals = agent.propose_refactoring(source=source)
         agent.execute_refactoring(proposals[0])
-        proposed = agent.get_proposals(status="proposed")
+        agent.get_proposals(status="proposed")
         completed = agent.get_proposals(status="completed")
         assert len(completed) == 1

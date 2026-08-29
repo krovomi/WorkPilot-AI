@@ -140,7 +140,7 @@ class NotificationEvent:
             A Teams-compatible Adaptive Card JSON payload.
         """
         emoji = _event_type_to_emoji(self.event_type)
-        color = _priority_to_teams_color(self.priority)
+        _priority_to_teams_color(self.priority)
 
         facts = []
         if self.project_id:

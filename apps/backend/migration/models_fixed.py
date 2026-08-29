@@ -207,7 +207,6 @@ class MigrationPlan:
         data["target_stack"] = StackInfo.from_dict(data["target_stack"])
         data["risk_level"] = RiskLevel(data["risk_level"])
         # Phases would need similar reconstruction
-        phases = data.get("phases", [])
         data["phases"] = []  # Simplified for now
         data["created_at"] = datetime.fromisoformat(data["created_at"])
         return cls(**data)

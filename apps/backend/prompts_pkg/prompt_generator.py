@@ -281,7 +281,7 @@ def generate_subtask_prompt(
     tdd_active = is_tdd_enabled() and subtask_is_tdd_eligible(subtask, phase)
 
     # Get relative spec path
-    relative_spec = get_relative_spec_path(spec_dir, project_dir)
+    get_relative_spec_path(spec_dir, project_dir)
 
     # Build the prompt
     sections = []

@@ -767,7 +767,7 @@ class AnomalyDetector:
 
         if session.trust_score <= terminate_threshold and session.status == "active":
             session.status = "terminated"
-            alert = self._emit_alert(session, "terminated")
+            self._emit_alert(session, "terminated")
             logger.critical(
                 "Session %s TERMINATED — trust score %.1f below threshold %.1f",
                 session.session_id,
@@ -776,7 +776,7 @@ class AnomalyDetector:
             )
         elif session.trust_score <= pause_threshold and session.status == "active":
             session.status = "paused"
-            alert = self._emit_alert(session, "paused")
+            self._emit_alert(session, "paused")
             logger.warning(
                 "Session %s PAUSED — trust score %.1f below threshold %.1f",
                 session.session_id,

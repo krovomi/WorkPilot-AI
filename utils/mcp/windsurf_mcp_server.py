@@ -187,7 +187,7 @@ class WindsurfMCPServer:
                                 continue  # Essayer l'URL suivante
                     except (aiohttp.ClientConnectorError, asyncio.TimeoutError):
                         continue  # Essayer l'URL suivante
-                    except Exception as e:
+                    except Exception:
                         continue  # Essayer l'URL suivante
 
                 # Si aucune URL n'a fonctionné, essayer avec le backend local
