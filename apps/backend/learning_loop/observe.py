@@ -146,18 +146,15 @@ def _agents_for(pattern: Any) -> list[str]:
     extractor records. A pattern with no phase is not filed anywhere: a lesson
     attributed to every agent is a lesson attributed to none.
     """
+    # Keyed on `AGENT_PHASES`, which is the set the extractor can actually
+    # emit. Rows were once added here for "review", "research" and "spec" to
+    # match the subagent rosters; nothing writes those phases, so the rows
+    # could never fire and only made the table look more complete than it was.
     phase_agents = {
+        "planning": ["spec-explorer", "dependency-tracer"],
         "coding": ["code-reviewer", "test-runner"],
         "qa_review": ["qa-acceptance-checker", "test-runner"],
         "qa_fixing": ["test-runner"],
-        "planning": ["spec-explorer", "dependency-tracer"],
-        # The rosters the registry grew for the features outside the build.
-        # Without these rows a lesson mined from a review or an ideation run
-        # was attributed to nobody and silently dropped — the same reason the
-        # four rows above exist.
-        "review": ["security-auditor", "regression-hunter"],
-        "research": ["codebase-surveyor", "evidence-collector"],
-        "spec": ["prior-art-finder", "constraint-collector"],
     }
     return phase_agents.get(getattr(pattern, "agent_phase", ""), [])
 

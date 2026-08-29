@@ -17,37 +17,53 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# agent_type -> the pattern phase whose lessons apply to it. Mirrors
-# `agents.subagents.phases.PHASE_ALIASES`, because a lesson is scoped to the
-# kind of work an agent does, and that is exactly what the roster keys on.
+# agent_type -> the pattern phase whose lessons apply to it.
 #
-# Deliberately partial: an agent_type absent here reads the "general" bucket
-# only. Guessing a phase for it would hand a reviewer lessons mined from
-# planning runs, which is worse than handing it none.
+# Every value here must be a member of `AGENT_PHASES`, and a test enforces it.
+# The first version of this table keyed the non-build agents on "review",
+# "research" and "spec" — phases that read well and that nothing writes, since
+# `prompts/learning_analyzer.md` offers the model exactly four. The result was
+# a feature that looked wired and returned an empty string on every call, for
+# every project, forever.
+#
+# So each row below maps onto work the extractor genuinely mines, and the
+# mapping has to be defensible as *the same job*, not merely adjacent:
+#
+#   review-type agents -> qa_review
+#       Both read finished code and judge it against criteria someone else
+#       set. A lesson about what the QA reviewer keeps missing is a lesson the
+#       PR reviewer needs.
+#
+#   research- and spec-type agents -> planning
+#       Both decide what should be done before anything is written. What the
+#       planner learned about this codebase's shape is what an ideation pass
+#       is trying to work out.
 _PHASE_BY_AGENT: dict[str, str] = {
+    # Deciding what to do.
     "planner": "planning",
     "architect": "planning",
     "impact_analyzer": "planning",
+    "ideation": "planning",
+    "insights": "planning",
+    "insight_extractor": "planning",
+    "analyzer": "planning",
+    "learning_analyzer": "planning",
+    "context_mesh_analyzer": "planning",
+    "live_companion_analyzer": "planning",
+    "spec_writer": "planning",
+    "spec_gatherer": "planning",
+    # Writing it.
     "coder": "coding",
+    "merge_resolver": "coding",
+    "migration": "coding",
+    # Judging what was written.
     "qa_reviewer": "qa_review",
+    "pr_reviewer": "qa_review",
+    "architecture_reviewer": "qa_review",
+    "pr_finding_validator": "qa_review",
+    # Repairing it.
     "qa_fixer": "qa_fixing",
-    "pr_reviewer": "review",
-    "architecture_reviewer": "review",
-    "pr_finding_validator": "review",
-    "ideation": "research",
-    "insights": "research",
-    "insight_extractor": "research",
-    "analyzer": "research",
-    "learning_analyzer": "research",
-    "spec_writer": "spec",
-    "spec_gatherer": "spec",
 }
-
-# Patterns filed under this phase are not tied to one kind of work, so every
-# agent reads them. The extractor never assigns it today; it exists so a
-# human-promoted, project-wide lesson has somewhere to live that does not
-# require picking a phase for it.
-GENERAL_PHASE = "general"
 
 
 def get_learning_context(
@@ -89,16 +105,16 @@ def context_for_agent(
     pipeline calls it with phases it genuinely has. This is for everything
     else, which has an `agent_type` in hand and no phase.
 
-    Returns the agent's own phase lessons plus the general bucket, or "" when
-    there is nothing to say. Never raises.
+    Returns the lessons filed under this agent's phase, or "" when there are
+    none — or when no phase applies to it. Never raises.
     """
     try:
         phase = _PHASE_BY_AGENT.get(agent_type)
-        chunks = []
-        if phase:
-            chunks.append(get_learning_context(project_dir, phase, task_context))
-        chunks.append(get_learning_context(project_dir, GENERAL_PHASE, task_context))
-        return "\n".join(c for c in chunks if c.strip())
+        if not phase:
+            # No defensible phase for this agent_type. Returning nothing is
+            # honest; inventing a phase would hand it another role's lessons.
+            return ""
+        return get_learning_context(project_dir, phase, task_context)
     except Exception as e:
         logger.debug(f"Learning context unavailable for {agent_type}: {e}")
         return ""

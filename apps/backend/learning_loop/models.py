@@ -37,6 +37,17 @@ class PatternSource(str, Enum):
     ERROR_RECOVERY = "error_recovery"
 
 
+# The only phases a pattern can carry.
+#
+# This is the *producible* set, not an aspiration: `prompts/learning_analyzer.md`
+# offers exactly these to the model, `PatternExtractor` defaults to "coding",
+# and `LearningLoopService._heuristic_extract` emits "coding" and "qa_fixing".
+# Anything reading patterns has to key on a member of this tuple — a reader
+# asking for a phase nothing writes gets an empty answer forever, and says
+# nothing about it.
+AGENT_PHASES: tuple[str, ...] = ("planning", "coding", "qa_review", "qa_fixing")
+
+
 @dataclass
 class LearningPattern:
     """A single learning pattern extracted from build analysis."""
@@ -48,7 +59,8 @@ class LearningPattern:
     description: str
     confidence: float  # 0.0 to 1.0
     occurrence_count: int
-    agent_phase: str  # planning, coding, qa_review, qa_fixing
+    agent_phase: str
+    """One of :data:`AGENT_PHASES`."""
     context_tags: list[str]
     actionable_instruction: str
     first_seen: str = ""
