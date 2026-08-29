@@ -485,6 +485,28 @@ describe("Smart Estimation Store", () => {
 			expect(result.current.phase).toBe("error");
 		});
 
+		it("does not throw when the IPC bridge is missing", () => {
+			// The dialog is mounted for the whole session, so this runs at every
+			// startup — including the browser preview. Throwing here unmounts the
+			// dialog and React takes the rest of the tree with it: a blank window.
+			Object.defineProperty(globalThis, "electronAPI", {
+				value: {},
+				writable: true,
+				configurable: true,
+			});
+
+			expect(() => {
+				cleanup = setupSmartEstimationListeners();
+			}).not.toThrow();
+			expect(() => cleanup?.()).not.toThrow();
+
+			Object.defineProperty(globalThis, "electronAPI", {
+				value: mockElectronAPI,
+				writable: true,
+				configurable: true,
+			});
+		});
+
 		it("should return cleanup function", () => {
 			cleanup = setupSmartEstimationListeners();
 

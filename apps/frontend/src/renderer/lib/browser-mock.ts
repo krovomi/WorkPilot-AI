@@ -734,6 +734,29 @@ const browserMockAPI: ElectronAPI = {
 	onAppEmulatorConfig: () => () => {
 		/* noop */
 	},
+
+	// Smart Estimation API. The dialog is mounted for the whole session, so
+	// these are read at startup even when nobody opens it.
+	runSmartEstimation: async () => undefined,
+	cancelSmartEstimation: async () => false,
+	onSmartEstimationEvent: () => () => {
+		/* noop */
+	},
+	onSmartEstimationError: () => () => {
+		/* noop */
+	},
+	onSmartEstimationComplete: () => () => {
+		/* noop */
+	},
+
+	// Read at startup by useContextUsage and useIpc — both crashed the browser
+	// preview outright when the key was missing.
+	onCostsUpdated: () => () => {
+		/* noop */
+	},
+	onPipelineStatus: () => () => {
+		/* noop */
+	},
 };
 
 /**
