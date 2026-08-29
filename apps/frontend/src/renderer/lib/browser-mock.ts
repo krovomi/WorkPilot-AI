@@ -757,6 +757,57 @@ const browserMockAPI: ElectronAPI = {
 	onPipelineStatus: () => () => {
 		/* noop */
 	},
+
+	// Auto-Refactor API
+	startAutoRefactor: async () => ({ success: false, error: "browser preview" }),
+	cancelAutoRefactor: async () => ({ success: false, cancelled: false }),
+	configureAutoRefactor: async () => ({ success: true }),
+	onAutoRefactorStatus: () => () => {
+		/* noop */
+	},
+	onAutoRefactorStreamChunk: () => () => {
+		/* noop */
+	},
+	onAutoRefactorError: () => () => {
+		/* noop */
+	},
+	onAutoRefactorComplete: () => () => {
+		/* noop */
+	},
+	onAutoRefactorExecutionComplete: () => () => {
+		/* noop */
+	},
+
+	// Swarm API — the store degrades on a missing bridge, but a preview without
+	// these entries would silently have no listeners at all.
+	swarm: {
+		analyze: async () => {
+			throw new Error("Swarm is unavailable in the browser preview");
+		},
+		start: async () => ({ success: false, error: "browser preview" }),
+		cancel: async () => ({ success: false, cancelled: false }),
+		status: async () => null,
+		onEvent: () => () => {
+			/* noop */
+		},
+		onLog: () => () => {
+			/* noop */
+		},
+	},
+
+	// Continuous AI API
+	continuousAI: {
+		start: async () => ({ success: false, error: "browser preview" }),
+		stop: async () => ({ success: true }),
+		getStatus: async () => null,
+		updateConfig: async () => ({ success: true }),
+		approveAction: async () => ({ success: true }),
+		rejectAction: async () => ({ success: true }),
+		isRunning: async () => false,
+		onEvent: () => () => {
+			/* noop */
+		},
+	},
 };
 
 /**
