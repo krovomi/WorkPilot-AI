@@ -329,7 +329,9 @@ class TestTransformerEngineIntegration:
         src_file.write_text("const x = 5")
 
         engine = TransformationEngine(temp_project, "javascript", "typescript")
-        results = engine.transform_code(["simple.js"])
+        # The call performs the transformation; its return value is not
+        # what this test asserts on — `apply_transformations` below is.
+        engine.transform_code(["simple.js"])
 
         # Apply transformations
         summary = engine.apply_transformations(dry_run=False)

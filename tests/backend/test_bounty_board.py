@@ -129,10 +129,6 @@ def test_bounty_provider_agnostic_mix(spec_dir, project_path):
             ("windsurf", "swe-1.5"),
         ]
     ]
-    outputs = {
-        c.label or chr(ord("A") + i): "result must pass."
-        for i, c in enumerate(contestants)
-    }
     # ContestantSpec labels auto-assigned by the orchestrator; build by index.
     outputs_by_index = {
         chr(ord("A") + i): f"result {i} must pass." for i in range(len(contestants))

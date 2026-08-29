@@ -51,7 +51,7 @@ def _force_real_package(name: str) -> None:
 _force_real_package("spec")
 _force_real_package("implementation_plan")
 
-from implementation_plan import Subtask, SubtaskStatus, Verification, VerificationType
+from implementation_plan import Subtask, SubtaskStatus
 from spec.critique import (
     CritiqueResult,
     format_critique_summary,
