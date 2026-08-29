@@ -10,8 +10,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockElectronAPI = {
 	runSmartEstimation: vi.fn(),
 	cancelSmartEstimation: vi.fn(),
-	onSmartEstimationStreamChunk: vi.fn(),
-	onSmartEstimationStatus: vi.fn(),
 	onSmartEstimationError: vi.fn(),
 	onSmartEstimationComplete: vi.fn(),
 	onSmartEstimationEvent: vi.fn(),
@@ -449,7 +447,6 @@ describe("SmartEstimationDialog", () => {
 					spec_name: "Similar task",
 					similarity_score: 0.8,
 					complexity_score: 6,
-					duration_hours: 2.5,
 					qa_iterations: 2,
 					success_rate: 0.9,
 					tokens_used: 5000,
@@ -458,7 +455,6 @@ describe("SmartEstimationDialog", () => {
 				},
 			],
 			risk_factors: ["Authentication complexity"],
-			estimated_duration_hours: 3,
 			estimated_qa_iterations: 2.5,
 			token_cost_estimate: 4,
 			recommendations: ["Use separate branch", "Add comprehensive testing"],
@@ -477,8 +473,10 @@ describe("SmartEstimationDialog", () => {
 					(content) => content.includes("85") && content.includes("confidence"),
 				),
 			).toBeInTheDocument();
-			expect(screen.getByText("3.0h")).toBeInTheDocument();
 			expect(screen.getByText("$4.00")).toBeInTheDocument();
+			// No duration is ever shown: the product rule forbids the prediction
+			// and the runner drops the field before it reaches the renderer.
+			expect(screen.queryByText(/\dh$/)).not.toBeInTheDocument();
 		});
 
 		it("should display reasoning", () => {

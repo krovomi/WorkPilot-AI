@@ -25,6 +25,7 @@ export * from "./multi-repo";
 export * from "./project";
 export * from "./roadmap";
 export * from "./settings";
+export * from "./smart-estimation";
 export * from "./task";
 export * from "./terminal";
 // Time Travel types (Temporal debugger for AI agents)

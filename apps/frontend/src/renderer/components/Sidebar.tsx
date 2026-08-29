@@ -133,6 +133,7 @@ import { LearningLoopDialog } from "./learning-loop/LearningLoopDialog";
 import { NaturalLanguageGitDialog } from "./natural-language-git/NaturalLanguageGitDialog";
 import { PromptOptimizerDialog } from "./prompt-optimizer/PromptOptimizerDialog";
 import { RateLimitIndicator } from "./RateLimitIndicator";
+import { SmartEstimationDialog } from "./smart-estimation/SmartEstimationDialog";
 import { TestGenerationDialog } from "./test-generation/TestGenerationDialog";
 import { UpdateBanner } from "./UpdateBanner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui";
@@ -2440,6 +2441,7 @@ export function Sidebar({
 			/>
 			<AppEmulatorDialog />
 			<LearningLoopDialog />
+			<SmartEstimationDialog />
 
 			<ArenaDialog />
 		</TooltipProvider>

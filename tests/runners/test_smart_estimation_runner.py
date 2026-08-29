@@ -27,8 +27,11 @@ mock_sdk.AgentDefinition = unittest.mock.MagicMock()
 sys.modules["claude_agent_sdk"] = mock_sdk
 sys.modules["claude_agent_sdk.types"] = mock_sdk.types
 
-# Mock core modules
-sys.modules["core.context_manager"] = unittest.mock.MagicMock()
+# Mock core modules.
+#
+# `core.context_manager` is deliberately NOT mocked here: it does not exist in
+# the repo, and stubbing it is what let this suite pass while the runner failed
+# its import on every real machine and only ever answered "under development".
 sys.modules["services.smart_estimation_service"] = unittest.mock.MagicMock()
 
 # Mock QA modules to prevent import chain issues
@@ -64,34 +67,25 @@ class TestSmartEstimationRunner:
         mock_result.reasoning = ["Test reasoning"]
         mock_result.similar_tasks = []
         mock_result.risk_factors = []
-        mock_result.estimated_duration_hours = 3.5
+        mock_result.estimated_duration_hours = 3.5  # stripped by the runner
         mock_result.estimated_qa_iterations = 2.0
         mock_result.token_cost_estimate = 1.75
         mock_result.recommendations = ["Test recommendation"]
         service.analyze_task_description.return_value = mock_result
         return service
 
-    @pytest.fixture
-    def mock_project_context(self):
-        """Mock project context"""
-        return {"project_path": "/test/project/path"}
-
-    @patch("runners.smart_estimation_runner.get_project_context")
-    def test_run_estimation_success(
-        self, mock_get_context, runner, mock_estimation_service
-    ):
+    def test_run_estimation_success(self, tmp_path, runner, mock_estimation_service):
         """Test successful estimation run"""
-        # Setup mocks
-        mock_get_context.return_value = {"project_path": "/test/project"}
         runner.estimation_service = mock_estimation_service
 
         # Mock the print function to capture output
         with patch("builtins.print") as mock_print:
-            result = runner.run_estimation("project-123", "Add user authentication")
+            result = runner.run_estimation(str(tmp_path), "Add user authentication")
 
-        # Verify service was called correctly
+        # The caller supplies the project path directly; the runner no longer
+        # resolves an Electron project id the backend has no registry for.
         mock_estimation_service.analyze_task_description.assert_called_once_with(
-            "Add user authentication", "/test/project"
+            "Add user authentication", str(tmp_path)
         )
 
         # Verify result structure
@@ -100,7 +94,6 @@ class TestSmartEstimationRunner:
         assert "reasoning" in result
         assert "similar_tasks" in result
         assert "risk_factors" in result
-        assert "estimated_duration_hours" in result
         assert "estimated_qa_iterations" in result
         assert "token_cost_estimate" in result
         assert "recommendations" in result
@@ -112,14 +105,33 @@ class TestSmartEstimationRunner:
         ]
         assert len(event_calls) >= 2  # At least start and complete events
 
-    @patch("runners.smart_estimation_runner.get_project_context")
-    def test_run_estimation_no_project_context(self, mock_get_context, runner):
-        """Test estimation with missing project context"""
-        mock_get_context.return_value = {}
+    def test_run_estimation_omits_duration(
+        self, tmp_path, runner, mock_estimation_service
+    ):
+        """No duration prediction ever leaves the runner.
+
+        The service still computes one for its own scoring, but the product
+        rule is to never give a duration, so the field is dropped at the source
+        rather than hidden in the UI.
+        """
+        mock_estimation_service.analyze_task_description.return_value.similar_tasks = [
+            {"build_id": "b-1", "spec_name": "old task", "duration_hours": 4.2}
+        ]
+        runner.estimation_service = mock_estimation_service
+
+        with patch("builtins.print"):
+            result = runner.run_estimation(str(tmp_path), "Test task")
+
+        assert "estimated_duration_hours" not in result
+        assert all("duration_hours" not in task for task in result["similar_tasks"])
+
+    def test_run_estimation_unknown_project_path(self, tmp_path, runner):
+        """A path that is not a directory fails loudly rather than silently."""
+        missing = tmp_path / "does-not-exist"
 
         with patch("builtins.print") as mock_print:
-            with pytest.raises(ValueError, match="Project context not found"):
-                runner.run_estimation("invalid-project", "Test task")
+            with pytest.raises(ValueError, match="Project path not found"):
+                runner.run_estimation(str(missing), "Test task")
 
         # Verify error event was emitted
         print_calls = [call[0][0] for call in mock_print.call_args_list]
@@ -128,12 +140,10 @@ class TestSmartEstimationRunner:
         ]
         assert len(error_calls) == 1
 
-    @patch("runners.smart_estimation_runner.get_project_context")
     def test_run_estimation_service_error(
-        self, mock_get_context, runner, mock_estimation_service
+        self, tmp_path, runner, mock_estimation_service
     ):
         """Test estimation when service raises an error"""
-        mock_get_context.return_value = {"project_path": "/test/project"}
         mock_estimation_service.analyze_task_description.side_effect = Exception(
             "Service error"
         )
@@ -141,7 +151,7 @@ class TestSmartEstimationRunner:
 
         with patch("builtins.print") as mock_print:
             with pytest.raises(Exception, match="Service error"):
-                runner.run_estimation("project-123", "Test task")
+                runner.run_estimation(str(tmp_path), "Test task")
 
         # Verify error event was emitted
         print_calls = [call[0][0] for call in mock_print.call_args_list]
@@ -194,7 +204,7 @@ class TestSmartEstimationRunnerCLI:
         """Test main function with successful execution"""
         # Setup mocks
         mock_args = Mock()
-        mock_args.project_id = "test-project"
+        mock_args.project_path = "/test/project"
         mock_args.task_description = "Test task description"
 
         mock_parser_instance = Mock()
@@ -209,8 +219,8 @@ class TestSmartEstimationRunnerCLI:
             "sys.argv",
             [
                 "smart_estimation_runner.py",
-                "--project-id",
-                "test-project",
+                "--project-path",
+                "/test/project",
                 "--task-description",
                 "Test task",
             ],
@@ -223,7 +233,7 @@ class TestSmartEstimationRunnerCLI:
         # Verify runner was called correctly
         mock_runner_class.assert_called_once()
         mock_runner.run_estimation.assert_called_once_with(
-            "test-project", "Test task description"
+            "/test/project", "Test task description"
         )
 
         # Verify result was printed
@@ -239,7 +249,7 @@ class TestSmartEstimationRunnerCLI:
         """Test main function with error"""
         # Setup mocks
         mock_args = Mock()
-        mock_args.project_id = "test-project"
+        mock_args.project_path = "/test/project"
         mock_args.task_description = "Test task description"
 
         mock_parser_instance = Mock()
@@ -254,8 +264,8 @@ class TestSmartEstimationRunnerCLI:
             "sys.argv",
             [
                 "smart_estimation_runner.py",
-                "--project-id",
-                "test-project",
+                "--project-path",
+                "/test/project",
                 "--task-description",
                 "Test task",
             ],
@@ -287,8 +297,8 @@ class TestSmartEstimationRunnerCLI:
                 "sys.argv",
                 [
                     "smart_estimation_runner.py",
-                    "--project-id",
-                    "test-project",
+                    "--project-path",
+                    "/test/project",
                     "--task-description",
                     "Test task",
                 ],
@@ -304,16 +314,15 @@ class TestSmartEstimationRunnerCLI:
             # Verify runner was called, which means parsing worked
             mock_runner_class.assert_called_once()
             mock_runner.run_estimation.assert_called_once_with(
-                "test-project", "Test task"
+                "/test/project", "Test task"
             )
 
 
 class TestSmartEstimationRunnerIntegration:
     """Integration tests for Smart Estimation Runner"""
 
-    @patch("runners.smart_estimation_runner.get_project_context")
     @patch("runners.smart_estimation_runner.get_smart_estimation_service")
-    def test_full_runner_integration(self, mock_get_service, mock_get_context):
+    def test_full_runner_integration(self, mock_get_service, tmp_path):
         """Test full runner integration with real service"""
         # Setup realistic service response
         mock_service = Mock()
@@ -355,8 +364,6 @@ class TestSmartEstimationRunnerIntegration:
         mock_service.analyze_task_description.return_value = mock_result
         mock_get_service.return_value = mock_service
 
-        mock_get_context.return_value = {"project_path": "/real/project/path"}
-
         # Create runner and run estimation
         with patch(
             "runners.smart_estimation_runner.get_smart_estimation_service"
@@ -366,7 +373,7 @@ class TestSmartEstimationRunnerIntegration:
 
             with patch("builtins.print") as mock_print:
                 result = runner.run_estimation(
-                    "real-project", "Implement OAuth2 authentication"
+                    str(tmp_path), "Implement OAuth2 authentication"
                 )
 
         # Verify comprehensive result
@@ -375,7 +382,10 @@ class TestSmartEstimationRunnerIntegration:
         assert len(result["reasoning"]) == 4
         assert len(result["similar_tasks"]) == 1
         assert len(result["risk_factors"]) == 2
-        assert abs(result["estimated_duration_hours"] - 3.0) < 1e-9
+        # The historical entry keeps its metrics minus the duration.
+        assert "duration_hours" not in result["similar_tasks"][0]
+        assert result["similar_tasks"][0]["build_id"] == "build-123"
+        assert "estimated_duration_hours" not in result
         assert abs(result["estimated_qa_iterations"] - 2.5) < 1e-9
         assert abs(result["token_cost_estimate"] - 4.0) < 1e-9
         assert len(result["recommendations"]) == 3

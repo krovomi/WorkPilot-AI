@@ -76,9 +76,15 @@ import { useToast } from "../hooks/use-toast";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
 import {
+	indexTasksById,
+	isBlocked,
+	resolveBlockers,
+} from "../lib/kanban-dependencies";
+import {
 	compareTasksBySort,
 	taskMatchesFilters,
 } from "../lib/kanban-filter";
+import { orderQueue } from "../lib/kanban-queue";
 import { cn } from "../lib/utils";
 import { openAppEmulatorDialog } from "../stores/app-emulator-store";
 import {
@@ -92,6 +98,10 @@ import { useKanbanFilterStore } from "../stores/kanban-filter-store";
 import {
 	useProjectEnvStore,
 } from "../stores/project-env-store";
+import {
+	type BoardBlockerInfo,
+	useKanbanBlockerStore,
+} from "../stores/kanban-blocker-store";
 import {
 	type BoardConflictInfo,
 	useKanbanConflictStore,
@@ -1594,6 +1604,32 @@ export function KanbanBoard({
 		};
 	}, [conflictRelevantIds, setBoardConflicts]);
 
+	// Task-dependency surfacing: resolve every task's `metadata.blockedBy` in
+	// one pass and publish it to the store the cards subscribe to by id.
+	// Resolved against `tasks`, never `filteredTasks` — a blocker the user has
+	// filtered out of view still blocks the task that depends on it.
+	const setBoardBlockers = useKanbanBlockerStore((s) => s.setBlockers);
+	useEffect(() => {
+		const byId = indexTasksById(tasks);
+		const next: Record<string, BoardBlockerInfo> = {};
+		for (const task of tasks) {
+			const declared = task.metadata?.blockedBy;
+			if (!declared || declared.length === 0) continue;
+			const { pending, resolved, missing } = resolveBlockers(task, byId);
+			if (pending.length === 0 && missing.length === 0) continue;
+			next[task.id] = {
+				pending: pending.map((b) => ({
+					id: b.id,
+					title: b.title,
+					status: b.status,
+				})),
+				resolvedCount: resolved.length,
+				missing,
+			};
+		}
+		setBoardBlockers(next);
+	}, [tasks, setBoardBlockers]);
+
 	const sensors = useSensors(
 		useSensor(PointerSensor, {
 			activationConstraint: {
@@ -2387,12 +2423,16 @@ export function KanbanBoard({
 				const inProgressCount = currentTasks.filter(
 					(t) => t.status === "in_progress" && !t.metadata?.archivedAt,
 				).length;
+				// Resolved against the live list, not the filtered board: a blocker
+				// hidden by a filter still blocks.
+				const byId = indexTasksById(currentTasks);
 				const queuedTasks = currentTasks.filter(
 					(t) =>
 						t.status === "queue" &&
 						!t.metadata?.archivedAt &&
 						!attemptedTaskIds.has(t.id) &&
-						!manuallyQueuedTaskIdsRef.current.has(t.id),
+						!manuallyQueuedTaskIdsRef.current.has(t.id) &&
+						!isBlocked(t, byId),
 				);
 
 				// Stop if no capacity, no queued tasks, or too many consecutive failures
@@ -2407,12 +2447,8 @@ export function KanbanBoard({
 					break;
 				}
 
-				// Get the oldest task in queue (FIFO ordering)
-				const nextTask = [...queuedTasks].sort((a: Task, b: Task) => {
-					const dateA = new Date(a.createdAt).getTime();
-					const dateB = new Date(b.createdAt).getTime();
-					return dateA - dateB; // Ascending order (oldest first)
-				})[0];
+				// Most urgent task first, oldest first within a priority band.
+				const nextTask = orderQueue(queuedTasks)[0];
 				const result = await persistTaskStatus(nextTask.id, "in_progress");
 
 				if (result.success) {
@@ -3223,6 +3259,30 @@ export function KanbanBoard({
 				const inProgressCount = currentTasks.filter(
 					(t) => t.status === "in_progress" && !t.metadata?.archivedAt,
 				).length;
+
+				// Dependency gate: the queue refuses to auto-promote a blocked task,
+				// but a human dropping it here has decided otherwise — same as
+				// `manuallyQueuedTaskIdsRef` treating a manual move as authoritative.
+				// Start it, and say out loud that a prerequisite was overridden.
+				const pendingBlockers = resolveBlockers(
+					task,
+					indexTasksById(currentTasks),
+				).pending;
+				if (pendingBlockers.length > 0) {
+					toast({
+						title: t("kanban.blockers.overrideTitle"),
+						description: t("kanban.blockers.overrideDescription", {
+							count: pendingBlockers.length,
+							title: task.title,
+						}),
+					});
+					announce(
+						t("kanban.blockers.overrideAnnounce", {
+							count: pendingBlockers.length,
+							title: task.title,
+						}),
+					);
+				}
 
 				// If limit reached, move to queue instead
 				if (inProgressCount >= maxParallelTasks) {

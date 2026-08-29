@@ -41,7 +41,8 @@
 		"preview": "Preview",
 		"syncFromBranch": "Sync from branch",
 		"duplicate": "Duplicate",
-		"duplicateSuffix": "(copy)"
+		"duplicateSuffix": "(copy)",
+		"estimate": "Estimate complexity"
 	},
 	"confirmDelete": {
 		"title": "Delete Task",
@@ -322,6 +323,30 @@
 			"runAsTaskLabel": "Run as task",
 			"runAsTaskHint": "Run as an interactive Kanban task (planning, review, conversation) instead of a one-shot.",
 			"taskCreated": "Task created: {{name}}"
+		},
+		"blockers": {
+			"label_one": "1 blocker",
+			"label_other": "{{count}} blockers",
+			"label_zero": "Blockers",
+			"title": "Dependencies",
+			"description": "This task declares prerequisites that are not finished.",
+			"gatedDescription": "The queue will not start it until these prerequisites are done.",
+			"resolved_one": "1 prerequisite already done.",
+			"resolved_other": "{{count}} prerequisites already done.",
+			"missing_one": "1 prerequisite not found (task deleted) — it does not block.",
+			"missing_other": "{{count}} prerequisites not found (tasks deleted) — they do not block.",
+			"overrideTitle": "Started despite its prerequisites",
+			"overrideDescription_one": "“{{title}}” starts while 1 prerequisite is unfinished.",
+			"overrideDescription_other": "“{{title}}” starts while {{count}} prerequisites are unfinished.",
+			"overrideAnnounce_one": "{{title}} moved to in progress despite 1 unfinished prerequisite.",
+			"overrideAnnounce_other": "{{title}} moved to in progress despite {{count}} unfinished prerequisites."
+		},
+		"smartEstimate": {
+			"label": "Complexity {{score}}",
+			"title": "Complexity estimate",
+			"confidence": "Confidence: {{percent}}%",
+			"qaIterations_one": "1 QA pass expected.",
+			"qaIterations_other": "{{count}} QA passes expected."
 		}
 	},
 	"queue": {
@@ -496,7 +521,20 @@
 		"extraNoteHelp": "Saved into requirements.json as additional_context.",
 		"extraNoteSaved": "Saved.",
 		"extraNoteSave": "Save note",
-		"extraNoteSaving": "Saving…"
+		"extraNoteSaving": "Saving…",
+		"blockedBy": {
+			"title": "Blocked by",
+			"empty": "No prerequisites.",
+			"add": "Add a prerequisite",
+			"search": "Search a task…",
+			"noCandidate": "No eligible task (cycles are excluded).",
+			"remove": "Remove {{title}}",
+			"goToTask": "Go to this task",
+			"missingChip": "{{id}} (not found)",
+			"missingHint": "That task no longer exists; the prerequisite is ignored.",
+			"saveErrorTitle": "Could not save",
+			"saveErrorDesc": "The prerequisites could not be saved."
+		}
 	},
 	"images": {
 		"removeImageAriaLabel": "Remove image {{filename}}",
@@ -1019,7 +1057,11 @@
 			"conflictsNone": "No file overlap with other active tasks",
 			"conflictsTitle": "Potential conflicts with parallel tasks",
 			"conflictsDescription": "{{count}} file(s) in this plan are also touched by other active tasks. Merging both worktrees will likely conflict — consider finishing one task first or re-scoping the plan.",
-			"conflictsMoreFiles": "+{{count}} more file(s)"
+			"conflictsMoreFiles": "+{{count}} more file(s)",
+			"conflictsMakeDependency": "Depend on this one",
+			"conflictsDependencyAdded": "Prerequisite added: “{{title}}”",
+			"conflictsDependencyExists": "Already a prerequisite",
+			"conflictsDependencyCycle": "Not possible: would create a cycle"
 		}
 	}
 }

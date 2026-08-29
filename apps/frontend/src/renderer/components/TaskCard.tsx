@@ -14,6 +14,7 @@ import {
 	GitMerge,
 	GitPullRequest,
 	Loader2,
+	Lock,
 	Monitor,
 	MoreVertical,
 	Palette,
@@ -85,6 +86,8 @@ import { Card, CardContent } from "./ui/card";
 import { FormulaBadge } from "./formula-lab/FormulaBadge";
 import { Checkbox } from "./ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { useKanbanBlockerStore } from "../stores/kanban-blocker-store";
+import { openSmartEstimation } from "../stores/smart-estimation-store";
 import { useKanbanConflictStore } from "../stores/kanban-conflict-store";
 import {
 	DropdownMenu,
@@ -304,6 +307,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 	// Shown inline among the other badges so it stays readable and never gets
 	// clipped by the column scroll area or overlapped by the delete button.
 	const conflict = useKanbanConflictStore((s) => s.conflicts[task.id]);
+	// Unfinished dependencies for this card. Amber in `queue`, where the gate
+	// actually holds the task back; neutral elsewhere, where it is context.
+	const blockers = useKanbanBlockerStore((s) => s.blockers[task.id]);
 
 	// Extract status badge variant and label for non-done tasks
 	let statusBadgeVariant:
@@ -374,6 +380,111 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					</TooltipContent>
 				</Tooltip>
 			)}
+
+			{/* Smart estimation - relative complexity from build history. Shown,
+			    never used to order the queue: priority alone decides that. */}
+			{task.metadata?.smartEstimate && (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Badge
+							variant="outline"
+							className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 cursor-help bg-muted text-muted-foreground border-border"
+						>
+							<Gauge className="h-2.5 w-2.5" />
+							{t("kanban.smartEstimate.label", {
+								score: task.metadata.smartEstimate.complexityScore,
+							})}
+						</Badge>
+					</TooltipTrigger>
+					<TooltipContent side="top" className="max-w-xs space-y-1.5">
+						<p className="flex items-center gap-1.5 font-semibold">
+							<Gauge className="h-3.5 w-3.5" />
+							{t("kanban.smartEstimate.title")}
+						</p>
+						<p className="text-xs text-muted-foreground">
+							{t("kanban.smartEstimate.confidence", {
+								percent: Math.round(
+									task.metadata.smartEstimate.confidenceLevel * 100,
+								),
+							})}
+						</p>
+						{task.metadata.smartEstimate.qaIterations !== undefined && (
+							<p className="text-xs text-muted-foreground">
+								{t("kanban.smartEstimate.qaIterations", {
+									count: Math.ceil(task.metadata.smartEstimate.qaIterations),
+								})}
+							</p>
+						)}
+						{task.metadata.smartEstimate.riskFactors.length > 0 && (
+							<ul className="text-xs space-y-0.5">
+								{task.metadata.smartEstimate.riskFactors
+									.slice(0, 4)
+									.map((risk) => (
+										<li key={risk}>• {risk}</li>
+									))}
+							</ul>
+						)}
+					</TooltipContent>
+				</Tooltip>
+			)}
+
+			{/* Task dependencies - unfinished blockers keep this ticket out of the
+			    auto-promotion loop while it sits in `queue`. */}
+			{blockers &&
+				(blockers.pending.length > 0 || blockers.missing.length > 0) && (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Badge
+								variant="outline"
+								className={cn(
+									"text-[10px] px-1.5 py-0.5 flex items-center gap-1 cursor-help",
+									blockers.pending.length > 0 && task.status === "queue"
+										? "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400"
+										: "bg-muted text-muted-foreground border-border",
+								)}
+							>
+								<Lock className="h-2.5 w-2.5" />
+								{t("kanban.blockers.label", {
+									count: blockers.pending.length,
+								})}
+							</Badge>
+						</TooltipTrigger>
+						<TooltipContent side="top" className="max-w-xs space-y-1.5">
+							<p className="flex items-center gap-1.5 font-semibold">
+								<Lock className="h-3.5 w-3.5" />
+								{t("kanban.blockers.title")}
+							</p>
+							{blockers.pending.length > 0 && (
+								<>
+									<p className="text-xs text-muted-foreground">
+										{task.status === "queue"
+											? t("kanban.blockers.gatedDescription")
+											: t("kanban.blockers.description")}
+									</p>
+									<ul className="text-xs space-y-0.5">
+										{blockers.pending.map((b) => (
+											<li key={b.id}>• {b.title}</li>
+										))}
+									</ul>
+								</>
+							)}
+							{blockers.resolvedCount > 0 && (
+								<p className="text-xs text-muted-foreground">
+									{t("kanban.blockers.resolved", {
+										count: blockers.resolvedCount,
+									})}
+								</p>
+							)}
+							{blockers.missing.length > 0 && (
+								<p className="text-xs text-amber-600 dark:text-amber-400">
+									{t("kanban.blockers.missing", {
+										count: blockers.missing.length,
+									})}
+								</p>
+							)}
+						</TooltipContent>
+					</Tooltip>
+				)}
 
 			{/* Stuck indicator - highest priority */}
 			{isStuck && (
@@ -1463,6 +1574,24 @@ export const TaskCard = memo(function TaskCard({
 											align="end"
 											onClick={(e) => e.stopPropagation()}
 										>
+											{/* Smart estimation - complexity score from build history,
+											    written back onto the task when it completes */}
+											<DropdownMenuItem
+												onClick={(e) => {
+													e.stopPropagation();
+													openSmartEstimation(
+														extractTextFromHtml(task.description) ||
+															task.description ||
+															task.title,
+														task.id,
+													);
+												}}
+											>
+												<Gauge className="mr-2 h-4 w-4" />
+												{t("actions.estimate")}
+											</DropdownMenuItem>
+											<DropdownMenuSeparator />
+
 											{/* Duplicate - clone the task into a fresh backlog ticket */}
 											{onDuplicate && (
 												<>
