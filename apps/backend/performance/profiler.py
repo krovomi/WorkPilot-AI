@@ -363,10 +363,6 @@ class PerformanceProfiler:
     def detect_caching_opportunities(self) -> list[Bottleneck]:
         """Detect expensive computations that could benefit from caching."""
         bottlenecks = []
-        expensive_ops = re.compile(
-            r"(?:json\.loads|json\.dumps|hashlib\.\w+\(|base64\.|subprocess\.run|"
-            r"requests\.get|requests\.post|fetch\s*\(|axios\.\w+\s*\()"
-        )
         in_loop_pattern = re.compile(
             r"for\s+.*?:.*?(?:json\.|hashlib\.|base64\.|subprocess\.|requests\.|fetch\(|axios\.)",
             re.DOTALL,

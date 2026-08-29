@@ -141,7 +141,6 @@ Create:
 
             # Check if we have sufficient context before running agent
             context_file = self.spec_dir / "context.json"
-            requirements_file = self.spec_dir / "requirements.json"
 
             # Create enhanced context for minimal scenarios
             additional_context = ""

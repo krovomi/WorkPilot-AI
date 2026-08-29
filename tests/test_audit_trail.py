@@ -243,7 +243,7 @@ class TestQuerying:
         assert len(entries) == 2
 
     def test_get_entries_with_limit_offset(self, populated_trail):
-        all_entries = populated_trail.get_entries(limit=100)
+        populated_trail.get_entries(limit=100)
         page1 = populated_trail.get_entries(limit=2, offset=0)
         page2 = populated_trail.get_entries(limit=2, offset=2)
         assert len(page1) == 2
@@ -416,7 +416,7 @@ class TestExportImport:
 
     def test_import_deduplication(self):
         trail = AuditTrail()
-        entry = trail.record("task_created", user="alice")
+        trail.record("task_created", user="alice")
         exported = trail.export_trail("json")
         # Import same data again
         imported = trail.import_trail(exported, "json")

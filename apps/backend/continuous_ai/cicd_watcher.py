@@ -200,7 +200,7 @@ class CICDWatcher:
         try:
             from runners.self_healing_runner import SelfHealingRunner
 
-            runner = SelfHealingRunner(project_dir=self.project_dir)
+            SelfHealingRunner(project_dir=self.project_dir)
             # The self-healing runner returns a dict with success/error keys
             return {
                 "success": True,

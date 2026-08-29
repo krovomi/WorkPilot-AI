@@ -227,16 +227,12 @@ class TestCoverageAnalyzer:
 
         if coverage_pct >= 80:
             status = "✅ EXCELLENT"
-            color = "green"
         elif coverage_pct >= 60:
             status = "👍 GOOD"
-            color = "yellow"
         elif coverage_pct >= 40:
             status = "⚠️ FAIR"
-            color = "orange"
         else:
             status = "❌ POOR"
-            color = "red"
 
         report = f"""## 🧪 Test Coverage Analysis
 

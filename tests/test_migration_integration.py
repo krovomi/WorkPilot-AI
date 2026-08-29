@@ -191,7 +191,7 @@ class TestFullMigrationPipeline:
 
         # Analyze
         analyzer = StackAnalyzer(temp_project)
-        stack_info = analyzer.detect_stack()
+        analyzer.detect_stack()
 
         # Plan
         source_stack = _make_stack_info("python2", "python")
@@ -722,12 +722,12 @@ def test_component():
         # Run migration
         orchestrator = MigrationOrchestrator(temp_project, enable_llm=False)
         try:
-            context = orchestrator.start_migration("vue", "javascript")
+            orchestrator.start_migration("vue", "javascript")
 
             # Run transformation
             result = orchestrator.transform_phase()
             assert result["status"] in ["in_progress", "complete"]
-        except Exception as e:
+        except Exception:
             # Migration may fail if dependencies are missing, that's ok for this test
             pass
 
@@ -761,7 +761,7 @@ export default function Counter() {
             assert context.migration_id is not None
             assert orchestrator.enable_llm is True
             assert orchestrator.llm_transformer is not None
-        except Exception as e:
+        except Exception:
             # May fail without API key, that's expected
             pass
 

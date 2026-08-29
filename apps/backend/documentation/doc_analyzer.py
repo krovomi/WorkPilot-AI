@@ -164,7 +164,6 @@ class DocumentationAnalyzer:
                     endpoint = (
                         m.group(2) if m.lastindex and m.lastindex >= 2 else m.group(1)
                     )
-                    line = content[: m.start()].count("\n") + 1
                     sections.append(
                         DocSection(
                             section_id=str(uuid.uuid4())[:8],
@@ -245,7 +244,6 @@ class DocumentationAnalyzer:
                 r"(?:export\s+)?(?:const|let)\s+(\w+)\s*=\s*(?:async\s+)?\("
             )
             class_pattern = re.compile(r"(?:export\s+)?class\s+(\w+)")
-            jsdoc_pattern = re.compile(r"/\*\*")
 
             for i, line in enumerate(lines):
                 for m in func_pattern.finditer(line):
