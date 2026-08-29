@@ -30,16 +30,11 @@ import type {
 	ChangelogSaveRequest,
 	ChangelogSaveResult,
 	ChangelogTask,
-	CreateReleaseRequest,
-	CreateReleaseResult,
 	ExistingChangelog,
 	GitBranchInfo,
 	GitCommit,
 	GitHistoryOptions,
 	GitTagInfo,
-	ReleaseableVersion,
-	ReleasePreflightStatus,
-	ReleaseProgress,
 	TaskSpecContent,
 } from "./changelog";
 import type { IPCResult } from "./common";
@@ -485,7 +480,6 @@ export interface ElectronAPI {
 		cols?: number,
 		rows?: number,
 	) => Promise<IPCResult<SessionDateRestoreResult>>;
-	saveTerminalBuffer: (terminalId: string, serialized: string) => Promise<void>;
 	checkTerminalPtyAlive: (
 		terminalId: string,
 	) => Promise<IPCResult<{ alive: boolean }>>;
@@ -1186,27 +1180,6 @@ export interface ElectronAPI {
 		callback: (projectId: string, result: GitLabInvestigationResult) => void,
 	) => () => void;
 	onGitLabInvestigationError: (
-		callback: (projectId: string, error: string) => void,
-	) => () => void;
-
-	// Release operations
-	getReleaseableVersions: (
-		projectId: string,
-	) => Promise<IPCResult<ReleaseableVersion[]>>;
-	runReleasePreflightCheck: (
-		projectId: string,
-		version: string,
-	) => Promise<IPCResult<ReleasePreflightStatus>>;
-	createRelease: (request: CreateReleaseRequest) => void;
-
-	// Release event listeners
-	onReleaseProgress: (
-		callback: (projectId: string, progress: ReleaseProgress) => void,
-	) => () => void;
-	onReleaseComplete: (
-		callback: (projectId: string, result: CreateReleaseResult) => void,
-	) => () => void;
-	onReleaseError: (
 		callback: (projectId: string, error: string) => void,
 	) => () => void;
 
