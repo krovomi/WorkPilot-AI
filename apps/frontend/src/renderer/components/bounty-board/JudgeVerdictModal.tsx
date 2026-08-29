@@ -105,7 +105,7 @@ export function JudgeVerdictModal({ result, onClose }: Props) {
 
 				<div className="flex justify-end">
 					<Button size="sm" onClick={onClose}>
-						{t("common:close", "Close")}
+						{t("common:buttons.close", "Close")}
 					</Button>
 				</div>
 			</div>

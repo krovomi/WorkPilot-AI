@@ -100,7 +100,12 @@
 		"test": "Tester",
 		"testing": "Test...",
 		"generate": "Générer",
-		"generating": "Génération..."
+		"generating": "Génération...",
+		"browse": "Parcourir",
+		"reset": "Réinitialiser",
+		"continueAnyway": "Continuer quand même",
+		"showMore": "Afficher plus",
+		"showLess": "Afficher moins"
 	},
 	"actions": {
 		"save": "Enregistrer",

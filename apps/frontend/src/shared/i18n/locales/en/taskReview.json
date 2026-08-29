@@ -121,7 +121,8 @@
 			"sourceBranch": "Source branch",
 			"targetBranch": "Target branch",
 			"state": "State",
-			"description": "Description"
+			"description": "Description",
+			"changedFiles": "changed files"
 		},
 		"errors": {
 			"unknown": "An unknown error occurred while creating the pull request",
@@ -178,6 +179,9 @@
 			"featuresLabel": "Impacted feature(s)",
 			"featuresPlaceholder": "e.g. Vehicle form, sales document, ...",
 			"featuresHint": "Short list, comma-separated"
+		},
+		"warnings": {
+			"emptyBranch": "Nothing to push: the branch is identical to « {{base}} », so the PR would be empty. Check that the agent committed its changes, or that this is not a duplicate task already merged."
 		}
 	},
 	"mergeProgress": {

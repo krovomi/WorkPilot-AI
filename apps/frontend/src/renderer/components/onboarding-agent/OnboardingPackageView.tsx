@@ -80,7 +80,7 @@ export function OnboardingPackageView({
 			<div className="p-6 space-y-3">
 				<p className="text-sm text-destructive">{error}</p>
 				<Button variant="outline" onClick={reset}>
-					{t("common:retry", "Retry")}
+					{t("common:buttons.retry", "Retry")}
 				</Button>
 			</div>
 		);
@@ -96,7 +96,7 @@ export function OnboardingPackageView({
 					{pkg.guide.project_name}
 				</h2>
 				<Button variant="outline" size="sm" onClick={reset}>
-					{t("common:reset", "Reset")}
+					{t("common:buttons.reset", "Reset")}
 				</Button>
 			</div>
 

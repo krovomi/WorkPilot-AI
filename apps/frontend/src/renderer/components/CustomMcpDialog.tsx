@@ -334,7 +334,7 @@ export function CustomMcpDialog({
 						<Label htmlFor="description">
 							{t("mcp.serverDescription")}{" "}
 							<span className="text-muted-foreground">
-								({t("common:optional")})
+								({t("common:labels.optional")})
 							</span>
 						</Label>
 						<Input
@@ -429,7 +429,7 @@ export function CustomMcpDialog({
 								<Label htmlFor="bearerToken">
 									{t("mcp.authToken")}{" "}
 									<span className="text-muted-foreground">
-										({t("common:optional")})
+										({t("common:labels.optional")})
 									</span>
 								</Label>
 								<Input
@@ -482,7 +482,7 @@ export function CustomMcpDialog({
 												onClick={addHeader}
 												disabled={!headerKey.trim() || !headerValue.trim()}
 											>
-												{t("common:add")}
+												{t("common:buttons.add")}
 											</Button>
 										</div>
 										{/* Show non-Authorization headers */}

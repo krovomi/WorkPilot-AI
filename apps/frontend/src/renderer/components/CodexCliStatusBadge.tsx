@@ -240,7 +240,7 @@ export function CodexCliStatusBadge({
 									t("navigation:codex.notInstalledShort", "Not installed")}
 								{status === "loading" &&
 									t("navigation:codex.checkingShort", "Checking...")}
-								{status === "error" && t("common:error", "Error")}
+								{status === "error" && t("common:labels.error", "Error")}
 							</p>
 						</div>
 					</div>

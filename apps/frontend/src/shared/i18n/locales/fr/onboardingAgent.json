@@ -12,5 +12,13 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet pour générer son guide d'intégration.",
 		"failed": "Échec de la génération : {{error}}"
+	},
+	"packageTitle": "Visite d'intégration",
+	"packageIntro": "Générez une visite interactive avec quiz, premières tâches et glossaire pour ce projet.",
+	"tabs": {
+		"tour": "Visite",
+		"quiz": "Quiz",
+		"firstTasks": "Premières tâches",
+		"glossary": "Glossaire"
 	}
 }

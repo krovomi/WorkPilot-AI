@@ -237,8 +237,8 @@
 		"remindMeLater": "Me rappeler plus tard",
 		"updateDownloaded": "Mise à jour téléchargée avec succès ! Cliquez sur Installer pour redémarrer et appliquer la mise à jour.",
 		"downloadError": "Échec du téléchargement de la mise à jour",
-		"cliChangelog": "Voir le journal des modifications du CLI IA",
-		"cliChangelogAriaLabel": "Voir le journal des modifications du CLI IA (s'ouvre dans une nouvelle fenêtre)",
+		"claudeCodeChangelog": "Voir le journal des modifications de Claude Code",
+		"claudeCodeChangelogAriaLabel": "Voir le journal des modifications de Claude Code (s'ouvre dans une nouvelle fenêtre)",
 		"readOnlyVolumeTitle": "Impossible d'installer depuis une image disque",
 		"readOnlyVolumeDescription": "Veuillez déplacer WorkPilot AI dans votre dossier Applications avant de mettre à jour."
 	},

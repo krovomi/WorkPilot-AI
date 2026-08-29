@@ -602,7 +602,7 @@ export function WorktreeSelector({
 							{isDeleting ? (
 								<>
 									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									{t("common:deleting", "Deleting...")}
+									{t("common:buttons.deleting", "Deleting...")}
 								</>
 							) : (
 								<>
