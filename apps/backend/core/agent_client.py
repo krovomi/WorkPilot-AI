@@ -1896,7 +1896,10 @@ def _openai_cost_usd(model: str, input_tokens: int, output_tokens: int) -> float
 
     # Try prefix match (e.g. "gpt-4o-2024-11-20" → "gpt-4o")
     # This handles dated snapshots by checking if model starts with a known model
-    from apps.backend.models_registry import list_provider
+    try:
+        from models_registry import list_provider
+    except ImportError:  # pragma: no cover - alternate package layout
+        from apps.backend.models_registry import list_provider
 
     for registry_entry in list_provider("openai"):
         if model.startswith(registry_entry.model_id):
