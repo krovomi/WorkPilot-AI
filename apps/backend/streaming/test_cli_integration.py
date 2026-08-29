@@ -39,7 +39,8 @@ class TestCLIStreamingIntegration:
             spec_dir.mkdir()
 
             # Create basic spec files
-            (spec_dir / "spec.md").write_text("""
+            (spec_dir / "spec.md").write_text(
+                """
 # Test Streaming Spec
 
 ## Feature
@@ -48,7 +49,9 @@ Test streaming functionality
 ## Requirements
 - Should emit streaming events
 - Should connect to WebSocket server
-""")
+""",
+                encoding="utf-8",
+            )
 
             (spec_dir / "task_metadata.json").write_text(
                 json.dumps(
@@ -62,7 +65,8 @@ Test streaming functionality
                             "qa": "sonnet",
                         },
                     }
-                )
+                ),
+                encoding="utf-8",
             )
 
             yield project_path

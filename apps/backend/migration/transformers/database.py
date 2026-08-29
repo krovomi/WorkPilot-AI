@@ -91,7 +91,7 @@ class DatabaseTransformer:
                 if not full_path.exists():
                     continue
 
-                content = full_path.read_text()
+                content = full_path.read_text(encoding="utf-8")
 
                 # Transform the SQL content
                 transformed = self._transform_sql(content)
@@ -285,7 +285,7 @@ class DatabaseTransformer:
                 if not full_path.exists():
                     continue
 
-                content = full_path.read_text()
+                content = full_path.read_text(encoding="utf-8")
 
                 if not self._uses_database(content):
                     continue

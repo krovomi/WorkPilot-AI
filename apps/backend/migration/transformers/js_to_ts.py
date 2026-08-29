@@ -28,7 +28,7 @@ class JSToTypeScriptTransformer:
                 ):
                     continue
 
-                content = full_path.read_text()
+                content = full_path.read_text(encoding="utf-8")
 
                 # Transform JavaScript to TypeScript
                 transformed = self._transform_to_typescript(content)

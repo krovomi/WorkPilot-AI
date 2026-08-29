@@ -135,7 +135,7 @@ class RestToGraphQLTransformer:
                 if not full_path.exists():
                     continue
 
-                content = full_path.read_text()
+                content = full_path.read_text(encoding="utf-8")
 
                 if self._is_rest_route_file(content):
                     transformed = self._transform_routes_to_graphql(content, file_path)

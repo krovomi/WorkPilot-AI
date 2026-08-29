@@ -111,7 +111,7 @@ class TestSdlGeneration:
     def test_emits_query_for_get(self, tmp_path: Path) -> None:
         content = "@app.get('/users')\ndef list_users(): pass\n"
         f = tmp_path / "routes.py"
-        f.write_text(content)
+        f.write_text(content, encoding="utf-8")
         results = RestToGraphQLTransformer(str(tmp_path)).transform_files(["routes.py"])
         sdl = results[0].after
         assert "type Query" in sdl
@@ -123,7 +123,7 @@ class TestSdlGeneration:
     def test_emits_mutation_for_post(self, tmp_path: Path) -> None:
         content = "@app.post('/orders')\ndef create_order(): pass\n"
         f = tmp_path / "routes.py"
-        f.write_text(content)
+        f.write_text(content, encoding="utf-8")
         results = RestToGraphQLTransformer(str(tmp_path)).transform_files(["routes.py"])
         sdl = results[0].after
         assert "create_order:" in sdl
@@ -137,7 +137,7 @@ class TestSdlGeneration:
             "@app.get('/orders')\ndef list_orders(): pass\n"
         )
         f = tmp_path / "routes.py"
-        f.write_text(content)
+        f.write_text(content, encoding="utf-8")
         results = RestToGraphQLTransformer(str(tmp_path)).transform_files(["routes.py"])
         sdl = results[0].after
         assert "type User" in sdl
@@ -146,7 +146,7 @@ class TestSdlGeneration:
     def test_path_args_become_field_args(self, tmp_path: Path) -> None:
         content = "@app.get('/users/{id}')\ndef get_user(id): pass\n"
         f = tmp_path / "routes.py"
-        f.write_text(content)
+        f.write_text(content, encoding="utf-8")
         sdl = (
             RestToGraphQLTransformer(str(tmp_path))
             .transform_files(["routes.py"])[0]
@@ -160,7 +160,7 @@ class TestSdlGeneration:
     def test_get_collection_returns_list(self, tmp_path: Path) -> None:
         content = "@app.get('/users')\ndef list_users(): pass\n"
         f = tmp_path / "routes.py"
-        f.write_text(content)
+        f.write_text(content, encoding="utf-8")
         sdl = (
             RestToGraphQLTransformer(str(tmp_path))
             .transform_files(["routes.py"])[0]
@@ -172,7 +172,7 @@ class TestSdlGeneration:
     def test_delete_returns_boolean(self, tmp_path: Path) -> None:
         content = "@app.delete('/users/{id}')\ndef delete_user(id): pass\n"
         f = tmp_path / "routes.py"
-        f.write_text(content)
+        f.write_text(content, encoding="utf-8")
         sdl = (
             RestToGraphQLTransformer(str(tmp_path))
             .transform_files(["routes.py"])[0]
@@ -183,7 +183,7 @@ class TestSdlGeneration:
     def test_resolver_stub_mentions_handler(self, tmp_path: Path) -> None:
         content = "@app.post('/payments')\ndef charge_card(): pass\n"
         f = tmp_path / "routes.py"
-        f.write_text(content)
+        f.write_text(content, encoding="utf-8")
         sdl = (
             RestToGraphQLTransformer(str(tmp_path))
             .transform_files(["routes.py"])[0]
@@ -195,7 +195,7 @@ class TestSdlGeneration:
     def test_no_routes_emits_clear_notice(self, tmp_path: Path) -> None:
         content = "# no routes here\nprint('hello')\n"
         f = tmp_path / "boring.py"
-        f.write_text(content)
+        f.write_text(content, encoding="utf-8")
         # _is_rest_route_file returns False → no transformation result emitted.
         results = RestToGraphQLTransformer(str(tmp_path)).transform_files(["boring.py"])
         assert results == []
@@ -208,7 +208,9 @@ class TestSdlGeneration:
 class TestConfidence:
     def test_routes_found_gives_higher_confidence(self, tmp_path: Path) -> None:
         good = tmp_path / "good.py"
-        good.write_text("@app.get('/users')\ndef list_users(): pass\n")
+        good.write_text(
+            "@app.get('/users')\ndef list_users(): pass\n", encoding="utf-8"
+        )
         result = RestToGraphQLTransformer(str(tmp_path)).transform_files(["good.py"])[0]
         assert result.confidence == pytest.approx(0.75)
 
@@ -216,7 +218,9 @@ class TestConfidence:
         # `def get_X` alone (no decorator, no .get(...) call) is not a route
         # file. The detector intentionally avoids false positives here.
         f = tmp_path / "naming.py"
-        f.write_text("def get_things(): pass\ndef post_stuff(): pass\n")
+        f.write_text(
+            "def get_things(): pass\ndef post_stuff(): pass\n", encoding="utf-8"
+        )
         result = RestToGraphQLTransformer(str(tmp_path)).transform_files(["naming.py"])
         assert result == []
 

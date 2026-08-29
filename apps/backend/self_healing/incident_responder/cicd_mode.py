@@ -198,7 +198,7 @@ class CICDMode:
             import json
 
             try:
-                pkg = json.loads((project / "package.json").read_text())
+                pkg = json.loads((project / "package.json").read_text(encoding="utf-8"))
                 scripts = pkg.get("scripts", {})
                 if "test" in scripts:
                     if (project / "pnpm-lock.yaml").exists():

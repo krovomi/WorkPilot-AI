@@ -206,8 +206,10 @@ class TestCrossRepoSpecManager:
             context={"upstream": ["x"]},
         )
         assert (sub_dir / "spec.md").read_text(encoding="utf-8") == "# sub spec"
-        plan = json.loads((sub_dir / "implementation_plan.json").read_text("utf-8"))
-        ctx = json.loads((sub_dir / "context.json").read_text("utf-8"))
+        plan = json.loads(
+            (sub_dir / "implementation_plan.json").read_text(encoding="utf-8")
+        )
+        ctx = json.loads((sub_dir / "context.json").read_text(encoding="utf-8"))
         assert plan == {"steps": [{"id": "s1"}]}
         assert ctx == {"upstream": ["x"]}
 

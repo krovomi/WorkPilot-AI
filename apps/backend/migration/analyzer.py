@@ -212,7 +212,7 @@ class StackAnalyzer:
         # Check for SQL files
         sql_files = list(self.project_dir.rglob("**/*.sql"))
         if sql_files:
-            content = "\n".join(f.read_text() for f in sql_files[:5])
+            content = "\n".join(f.read_text(encoding="utf-8") for f in sql_files[:5])
             if "PRAGMA" in content or "sqlite" in content.lower():
                 return "sqlite"
 
@@ -424,7 +424,7 @@ class StackAnalyzer:
         """Check for Python version markers."""
         for py_file in self.project_dir.rglob("*.py"):
             try:
-                content = py_file.read_text()[:100]
+                content = py_file.read_text(encoding="utf-8")[:100]
                 if pattern in content:
                     return True
             except Exception:
@@ -439,7 +439,7 @@ class StackAnalyzer:
         path = self.project_dir / "package.json"
         if path.exists():
             try:
-                data = json.loads(path.read_text())
+                data = json.loads(path.read_text(encoding="utf-8"))
                 self.cache["package_json"] = data
                 return data
             except (json.JSONDecodeError, OSError):
@@ -453,7 +453,7 @@ class StackAnalyzer:
 
         path = self.project_dir / "requirements.txt"
         if path.exists():
-            content = path.read_text()
+            content = path.read_text(encoding="utf-8")
             self.cache["requirements"] = content
             return content
         return ""
@@ -465,12 +465,12 @@ class StackAnalyzer:
             try:
                 import tomllib  # Python 3.11+
 
-                return tomllib.loads(path.read_text())
+                return tomllib.loads(path.read_text(encoding="utf-8"))
             except (ImportError, Exception):
                 try:
                     import tomli
 
-                    return tomli.loads(path.read_text())
+                    return tomli.loads(path.read_text(encoding="utf-8"))
                 except Exception:
                     pass
         return None
@@ -480,7 +480,7 @@ class StackAnalyzer:
         path = self.project_dir / "tsconfig.json"
         if path.exists():
             try:
-                return json.loads(path.read_text())
+                return json.loads(path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 pass
         return None

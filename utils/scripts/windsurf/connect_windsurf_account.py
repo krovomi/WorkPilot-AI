@@ -27,7 +27,7 @@ def check_windsurf_config():
 
     if os.path.exists(token_file):
         print(f"✅ Fichier {token_file} trouvé")
-        with open(token_file) as f:
+        with open(token_file, encoding="utf-8") as f:
             for line in f:
                 if line.startswith("WINDSURF_OAUTH_TOKEN="):
                     oauth_token = line.split("=", 1)[1].strip()
@@ -130,7 +130,7 @@ def activate_windsurf_account():
     )
 
     if os.path.exists(config_file):
-        with open(config_file) as f:
+        with open(config_file, encoding="utf-8") as f:
             config = json.load(f)
 
         # Le fichier a une structure {"providers": [...]}
@@ -159,7 +159,7 @@ def activate_windsurf_account():
             providers_list.append(windsurf_provider)
             config["providers"] = providers_list
 
-            with open(config_file, "w") as f:
+            with open(config_file, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
 
             print("✅ Provider Windsurf ajouté à la configuration")

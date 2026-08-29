@@ -87,9 +87,9 @@ class SmartMergeManager:
     def merge_json_files(self, base_file: Path, local_file: Path, remote_file: Path) -> Dict:
         """Intelligently merge JSON files."""
         try:
-            base_data = json.loads(base_file.read_text()) if base_file.exists() else {}
-            local_data = json.loads(local_file.read_text()) if local_file.exists() else {}
-            remote_data = json.loads(remote_file.read_text()) if remote_file.exists() else {}
+            base_data = json.loads(base_file.read_text(encoding="utf-8")) if base_file.exists() else {}
+            local_data = json.loads(local_file.read_text(encoding="utf-8")) if local_file.exists() else {}
+            remote_data = json.loads(remote_file.read_text(encoding="utf-8")) if remote_file.exists() else {}
         except json.JSONDecodeError as e:
             return {"error": f"JSON decode error: {e}", "strategy": "keep_local"}
 
@@ -116,13 +116,13 @@ class SmartMergeManager:
         try:
             base_lines = set()
             if base_file.exists():
-                for line in base_file.read_text().strip().split("\n"):
+                for line in base_file.read_text(encoding="utf-8").strip().split("\n"):
                     if line.strip():
                         base_lines.add(line.strip())
 
             local_lines = {}
             if local_file.exists():
-                for line in local_file.read_text().strip().split("\n"):
+                for line in local_file.read_text(encoding="utf-8").strip().split("\n"):
                     if line.strip():
                         try:
                             data = json.loads(line)
@@ -134,7 +134,7 @@ class SmartMergeManager:
 
             remote_lines = {}
             if remote_file.exists():
-                for line in remote_file.read_text().strip().split("\n"):
+                for line in remote_file.read_text(encoding="utf-8").strip().split("\n"):
                     if line.strip():
                         try:
                             data = json.loads(line)
@@ -234,7 +234,7 @@ class SmartMergeManager:
                         merged_files[str(rel_path)] = merge_result["strategy"]
                         # Write merged content
                         current_file.parent.mkdir(parents=True, exist_ok=True)
-                        current_file.write_text(json.dumps(merge_result["merged"], indent=2))
+                        current_file.write_text(json.dumps(merge_result["merged"], indent=2), encoding="utf-8")
 
                 # For JSONL files, deduplicate
                 elif backup_file.suffix == ".jsonl" or "conversation" in backup_file.name:
@@ -249,7 +249,7 @@ class SmartMergeManager:
                     else:
                         merged_files[str(rel_path)] = strategy
                         current_file.parent.mkdir(parents=True, exist_ok=True)
-                        current_file.write_text("\n".join(merged_lines))
+                        current_file.write_text("\n".join(merged_lines), encoding="utf-8")
 
                 # For other files, keep current (newer)
                 else:

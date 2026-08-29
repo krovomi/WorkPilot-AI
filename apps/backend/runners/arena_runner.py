@@ -102,14 +102,14 @@ def _load_battles() -> list[dict]:
     if not path.exists():
         return []
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return []
 
 
 def _save_battles(battles: list[dict]) -> None:
     path = _get_arena_data_dir() / "battles.json"
-    path.write_text(json.dumps(battles[:100], indent=2))
+    path.write_text(json.dumps(battles[:100], indent=2), encoding="utf-8")
 
 
 def _load_votes() -> list[dict]:
@@ -117,14 +117,14 @@ def _load_votes() -> list[dict]:
     if not path.exists():
         return []
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return []
 
 
 def _save_votes(votes: list[dict]) -> None:
     path = _get_arena_data_dir() / "votes.json"
-    path.write_text(json.dumps(votes, indent=2))
+    path.write_text(json.dumps(votes, indent=2), encoding="utf-8")
 
 
 # ─── Analytics ──────────────────────────────────────────────────────────────────

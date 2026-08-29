@@ -53,7 +53,7 @@ class MigrationExecutor:
     def load_plan(self, plan_path: str) -> dict:
         """Load a migration plan from file."""
         try:
-            with open(plan_path) as f:
+            with open(plan_path, encoding="utf-8") as f:
                 plan = json.load(f)
             self.plans[plan["plan_id"]] = plan
             logger.info(f"Loaded migration plan {plan['plan_id']}")
@@ -337,7 +337,7 @@ def main():
 
     # Output results
     if args.output:
-        with open(args.output, "w") as f:
+        with open(args.output, "w", encoding="utf-8") as f:
             json.dump(result.to_dict(), f, indent=2)
         logger.info(f"Execution results saved to {args.output}")
     else:

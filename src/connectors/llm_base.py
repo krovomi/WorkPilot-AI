@@ -6,6 +6,15 @@ Permet d'assurer une interface cohérente pour tous les providers (OpenAI, Claud
 from abc import ABC, abstractmethod
 from typing import Any, TypedDict
 
+#: Modèle Claude par défaut des connecteurs de cette couche.
+#:
+#: Défini ici plutôt que répété dans chaque connecteur : la valeur précédente,
+#: ``claude-3-sonnet-20240229``, était retirée et figurait à quatre endroits,
+#: si bien qu'un connecteur mis à jour laissait les trois autres périmés.
+#: L'utilisateur reste libre de choisir son modèle — c'est le repli quand il
+#: n'en a pas choisi.
+DEFAULT_CLAUDE_MODEL = "claude-opus-5"
+
 
 class GenerateKwargs(TypedDict, total=False):
     """Paramètres optionnels reconnus par generate()."""

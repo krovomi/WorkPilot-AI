@@ -77,7 +77,7 @@ class PythonToCSharpTransformer:
                 if not full_path.exists() or not file_path.endswith(".py"):
                     continue
 
-                content = full_path.read_text()
+                content = full_path.read_text(encoding="utf-8")
 
                 # Transform to C#
                 transformed = self._transform_to_csharp(content, file_path)

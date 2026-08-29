@@ -218,7 +218,7 @@ class IncrementalMigration:
         """Load incremental migration state."""
         if self.state_file is not None and self.state_file.exists():
             try:
-                with open(self.state_file) as f:
+                with open(self.state_file, encoding="utf-8") as f:
                     return json.load(f)
             except Exception:
                 logger.exception(
@@ -243,7 +243,7 @@ class IncrementalMigration:
         # Atomic write to avoid leaving a truncated state file on crash.
         tmp_file = self.state_file.with_suffix(self.state_file.suffix + ".tmp")
         try:
-            with open(tmp_file, "w") as f:
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(self.state, f, indent=2)
             os.replace(tmp_file, self.state_file)
         except Exception:

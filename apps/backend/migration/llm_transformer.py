@@ -176,7 +176,7 @@ class LLMTransformer:
         prompt_file = self.project_dir.parent / "prompts" / template
 
         if prompt_file.exists():
-            base_prompt = prompt_file.read_text()
+            base_prompt = prompt_file.read_text(encoding="utf-8")
         else:
             # Fallback generic prompt
             base_prompt = self._get_generic_prompt()

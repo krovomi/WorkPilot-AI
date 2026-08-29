@@ -341,7 +341,7 @@ class Phase2Monitor:
         report_path = Path(report_file)
         report_path.parent.mkdir(parents=True, exist_ok=True)
         
-        with open(report_path, 'w') as f:
+        with open(report_path, 'w', encoding="utf-8") as f:
             json.dump(report, f, indent=2)
         
         print(f"\n📊 Monitoring report saved to: {report_path}")

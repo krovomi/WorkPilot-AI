@@ -13,6 +13,8 @@ from typing import Any
 
 from apps.backend.core.auth import get_auth_token
 
+from .llm_base import DEFAULT_CLAUDE_MODEL
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,7 +68,7 @@ class ProviderConfig:
         4. Default: anthropic provider with system auth token
         """
         provider = cli_provider or "anthropic"
-        model = cli_model or "claude-3-sonnet-20240229"
+        model = cli_model or DEFAULT_CLAUDE_MODEL
 
         # Try to load saved provider config from ~/.work_pilot_ai_llm_providers.json
         config_data = load_provider_config(provider)
@@ -240,7 +242,7 @@ def force_claude_provider_config():
     """Crée ou met à jour la config provider 'claude' à partir du token système."""
     token = get_auth_token()
     if token and token.startswith("sk-"):
-        config = {"api_key": token, "model": "claude-3-sonnet-20240229"}
+        config = {"api_key": token, "model": DEFAULT_CLAUDE_MODEL}
         save_provider_config("claude", config)
         logger.info("force_claude_provider_config - config sauvegardée.")
     else:

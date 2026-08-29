@@ -87,7 +87,7 @@ class MigrationOrchestrator:
             raise FileNotFoundError(f"Migration {migration_id} not found")
 
         # Load context
-        with open(state_file) as f:
+        with open(state_file, encoding="utf-8") as f:
             data = json.load(f)
 
         self.context = self._deserialize_context(data)
@@ -473,7 +473,7 @@ class MigrationOrchestrator:
             return
 
         state_file = self.state_dir / f"{self.context.migration_id}.json"
-        with open(state_file, "w") as f:
+        with open(state_file, "w", encoding="utf-8") as f:
             json.dump(self.context.to_dict(), f, indent=2)
 
     def _deserialize_context(self, data: dict) -> MigrationContext:

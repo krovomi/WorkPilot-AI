@@ -97,7 +97,7 @@ class TestApprovalGateApply:
         target = tmp_path / "target"
         sandbox.mkdir()
         target.mkdir()
-        (sandbox / "good.txt").write_text("hello")
+        (sandbox / "good.txt").write_text("hello", encoding="utf-8")
 
         gate = ApprovalGate()
         req = gate.create_request("req-1", self._make_prediction(["good.txt"]))
@@ -105,7 +105,7 @@ class TestApprovalGateApply:
         applied = gate.apply(req, sandbox, target)
 
         assert "good.txt" in applied
-        assert (target / "good.txt").read_text() == "hello"
+        assert (target / "good.txt").read_text(encoding="utf-8") == "hello"
 
     def test_apply_refuses_absolute_path_in_prediction(self, tmp_path: Path) -> None:
         """CRITICAL bug #14 regression.
@@ -154,8 +154,8 @@ class TestApprovalGateApply:
         target = tmp_path / "t"
         sandbox.mkdir()
         target.mkdir()
-        (sandbox / "a.txt").write_text("A")
-        (sandbox / "b.txt").write_text("B")
+        (sandbox / "a.txt").write_text("A", encoding="utf-8")
+        (sandbox / "b.txt").write_text("B", encoding="utf-8")
 
         gate = ApprovalGate()
         req = gate.create_request("req-4", self._make_prediction(["a.txt", "b.txt"]))

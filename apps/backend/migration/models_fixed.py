@@ -257,13 +257,13 @@ class MigrationContext:
 
     def save_to_file(self, filepath: str) -> None:
         """Save context to JSON file."""
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
     def load_from_file(cls, filepath: str) -> "MigrationContext":
         """Load context from JSON file."""
-        with open(filepath) as f:
+        with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
         data["source_stack"] = StackInfo.from_dict(data["source_stack"])
         data["target_stack"] = StackInfo.from_dict(data["target_stack"])

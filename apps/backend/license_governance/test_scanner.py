@@ -74,7 +74,8 @@ class TestManifestDiscovery:
                     "dependencies": {"react": "^18.0.0", "left-pad": "1.3.0"},
                     "devDependencies": {"vitest": "^1.0.0"},
                 }
-            )
+            ),
+            encoding="utf-8",
         )
         deps = LicenseScanner(project_dir=tmp_path).discover()
         names = {(d.name, d.is_direct) for d in deps}
@@ -88,7 +89,8 @@ class TestManifestDiscovery:
             "fastapi==0.110.0\n"
             "pydantic[email]>=2.0\n"
             "-e ./local-pkg  # editable install — should be skipped\n"
-            "\n"
+            "\n",
+            encoding="utf-8",
         )
         deps = LicenseScanner(project_dir=tmp_path).discover()
         names = {d.name for d in deps}
@@ -101,7 +103,8 @@ class TestManifestDiscovery:
             "require (\n"
             "  github.com/foo/bar v1.2.3\n"
             "  github.com/baz/quux v0.0.1\n"
-            ")\n"
+            ")\n",
+            encoding="utf-8",
         )
         deps = LicenseScanner(project_dir=tmp_path).discover()
         names = {d.name for d in deps}
@@ -110,12 +113,14 @@ class TestManifestDiscovery:
 
     def test_node_modules_skipped(self, tmp_path: Path) -> None:
         (tmp_path / "package.json").write_text(
-            json.dumps({"name": "demo", "dependencies": {"a": "1.0.0"}})
+            json.dumps({"name": "demo", "dependencies": {"a": "1.0.0"}}),
+            encoding="utf-8",
         )
         nested = tmp_path / "node_modules" / "junk"
         nested.mkdir(parents=True)
         (nested / "package.json").write_text(
-            json.dumps({"name": "junk", "dependencies": {"transitively-bad": "0.0.1"}})
+            json.dumps({"name": "junk", "dependencies": {"transitively-bad": "0.0.1"}}),
+            encoding="utf-8",
         )
         deps = LicenseScanner(project_dir=tmp_path).discover()
         names = {d.name for d in deps}
@@ -123,17 +128,19 @@ class TestManifestDiscovery:
         assert "transitively-bad" not in names  # node_modules pruned
 
     def test_dedup_same_dep_in_multiple_files(self, tmp_path: Path) -> None:
-        (tmp_path / "requirements.txt").write_text("fastapi==0.110.0\n")
+        (tmp_path / "requirements.txt").write_text(
+            "fastapi==0.110.0\n", encoding="utf-8"
+        )
         sub = tmp_path / "sub"
         sub.mkdir()
-        (sub / "requirements.txt").write_text("fastapi==0.110.0\n")
+        (sub / "requirements.txt").write_text("fastapi==0.110.0\n", encoding="utf-8")
         deps = LicenseScanner(project_dir=tmp_path).discover()
         # Same (ecosystem, name, version) appears twice in the tree but
         # the scanner dedups.
         assert sum(1 for d in deps if d.name == "fastapi") == 1
 
     def test_corrupt_manifest_does_not_crash(self, tmp_path: Path) -> None:
-        (tmp_path / "package.json").write_text("{ not valid json")
+        (tmp_path / "package.json").write_text("{ not valid json", encoding="utf-8")
         # Should silently return [] for the broken manifest.
         deps = LicenseScanner(project_dir=tmp_path).discover()
         assert deps == []
@@ -153,7 +160,8 @@ class TestPolicy:
                     "name": "host",
                     "dependencies": dict.fromkeys(licenses, "1.0.0"),
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         def resolver(dep: DependencyRecord) -> str | None:
@@ -184,7 +192,7 @@ class TestPolicy:
 
     def test_open_source_friendly_allows_lgpl(self, tmp_path: Path) -> None:
         (tmp_path / "package.json").write_text(
-            json.dumps({"name": "h", "dependencies": {"x": "1.0.0"}})
+            json.dumps({"name": "h", "dependencies": {"x": "1.0.0"}}), encoding="utf-8"
         )
 
         def resolver(dep: DependencyRecord) -> str | None:
@@ -223,7 +231,7 @@ class TestPolicy:
 class TestSerialisation:
     def test_to_dict_roundtrips(self, tmp_path: Path) -> None:
         (tmp_path / "package.json").write_text(
-            json.dumps({"name": "h", "dependencies": {"x": "1.0.0"}})
+            json.dumps({"name": "h", "dependencies": {"x": "1.0.0"}}), encoding="utf-8"
         )
 
         def resolver(_dep: DependencyRecord) -> str | None:

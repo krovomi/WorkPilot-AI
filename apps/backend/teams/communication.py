@@ -148,10 +148,10 @@ class CommunicationBus:
             ],
         }
         summary_file = self.debates_dir / "summary.json"
-        with open(summary_file, "w") as f:
+        with open(summary_file, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
 
     def _save_thread(self, thread: DebateThread) -> None:
         thread_file = self.debates_dir / f"{thread.thread_id}.json"
-        with open(thread_file, "w") as f:
+        with open(thread_file, "w", encoding="utf-8") as f:
             json.dump(thread.to_dict(), f, indent=2)

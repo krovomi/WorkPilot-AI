@@ -190,7 +190,7 @@ class AngularVersionUpgrader:
             return None
 
         try:
-            with open(package_json_path) as f:
+            with open(package_json_path, encoding="utf-8") as f:
                 package_data = json.load(f)
 
             deps = package_data.get("dependencies", {})
@@ -360,7 +360,7 @@ class AngularVersionUpgrader:
             return False
 
         try:
-            with open(package_json_path) as f:
+            with open(package_json_path, encoding="utf-8") as f:
                 package_data = json.load(f)
 
             # Update Angular dependencies
@@ -385,7 +385,7 @@ class AngularVersionUpgrader:
                 dev_deps["@angular/cli"] = f"^{target_version}.0.0"
 
             # Write back
-            with open(package_json_path, "w") as f:
+            with open(package_json_path, "w", encoding="utf-8") as f:
                 json.dump(package_data, f, indent=2)
 
             return True

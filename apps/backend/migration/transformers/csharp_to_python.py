@@ -87,7 +87,7 @@ class CSharpToPythonTransformer:
                 if not full_path.exists() or not file_path.endswith(".cs"):
                     continue
 
-                content = full_path.read_text()
+                content = full_path.read_text(encoding="utf-8")
 
                 # Transform to Python
                 transformed = self._transform_to_python(content, file_path)

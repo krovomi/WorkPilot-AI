@@ -288,7 +288,7 @@ class TransformationEngine:
                 if not dry_run:
                     target_file = self.project_dir / result.file_path
                     target_file.parent.mkdir(parents=True, exist_ok=True)
-                    target_file.write_text(result.after)
+                    target_file.write_text(result.after, encoding="utf-8")
                     result.applied = True
                 applied += 1
             except Exception as e:

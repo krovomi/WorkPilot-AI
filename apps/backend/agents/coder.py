@@ -546,7 +546,9 @@ _PLANNING_FAILURES_MARKER = ".planning_validation_failures"
 
 def _read_planning_failures(spec_dir: Path) -> int:
     try:
-        return int((spec_dir / _PLANNING_FAILURES_MARKER).read_text().strip())
+        return int(
+            (spec_dir / _PLANNING_FAILURES_MARKER).read_text(encoding="utf-8").strip()
+        )
     except (OSError, ValueError):
         return 0
 
@@ -554,7 +556,7 @@ def _read_planning_failures(spec_dir: Path) -> int:
 def _bump_planning_failures(spec_dir: Path) -> int:
     count = _read_planning_failures(spec_dir) + 1
     try:
-        (spec_dir / _PLANNING_FAILURES_MARKER).write_text(str(count))
+        (spec_dir / _PLANNING_FAILURES_MARKER).write_text(str(count), encoding="utf-8")
     except OSError:
         pass
     return count

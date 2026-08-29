@@ -57,7 +57,7 @@ class WorkPilotAutoMergeHook:
 
         try:
             self.status_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.status_file, "w") as f:
+            with open(self.status_file, "w", encoding="utf-8") as f:
                 json.dump(status_data, f, indent=2)
         except Exception as e:
             logger.warning(f"Could not write status file: {e}")

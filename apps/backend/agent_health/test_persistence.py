@@ -40,7 +40,7 @@ class TestSaveLoad:
         _seed(m, "planner", 5)
         target = save_to_disk(m, tmp_path / "state.json")
         assert target.exists()
-        assert json.loads(target.read_text()).get("version") == 1
+        assert json.loads(target.read_text(encoding="utf-8")).get("version") == 1
 
     def test_round_trip(self, tmp_path: Path) -> None:
         m1 = HealthMonitor()
@@ -63,13 +63,13 @@ class TestSaveLoad:
 
     def test_load_corrupt_file_returns_zero(self, tmp_path: Path) -> None:
         f = tmp_path / "bad.json"
-        f.write_text("{ not valid json")
+        f.write_text("{ not valid json", encoding="utf-8")
         m = HealthMonitor()
         assert load_from_disk(m, f) == 0
 
     def test_load_unsupported_version_returns_zero(self, tmp_path: Path) -> None:
         f = tmp_path / "v99.json"
-        f.write_text(json.dumps({"version": 99}))
+        f.write_text(json.dumps({"version": 99}), encoding="utf-8")
         m = HealthMonitor()
         assert load_from_disk(m, f) == 0
 
@@ -116,7 +116,8 @@ class TestSaveLoad:
                     },
                     "baselines": {},
                 }
-            )
+            ),
+            encoding="utf-8",
         )
         m = HealthMonitor()
         loaded = load_from_disk(m, f)

@@ -629,7 +629,7 @@ class GitBasedCacheInvalidator:
             ],
         }
 
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2)
 
         logger.info(f"Exported invalidation log to {filepath}")
