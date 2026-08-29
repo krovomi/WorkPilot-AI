@@ -15,7 +15,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
-from apps.backend.models_registry import get_tier
+try:
+    from models_registry import get_tier
+except ImportError:  # pragma: no cover - alternate package layout
+    from apps.backend.models_registry import get_tier
 
 from .live_tracker import LiveCostTracker
 
