@@ -117,6 +117,12 @@ class Evidence:
     build_ids: list[str] = field(default_factory=list)
     replay_regressions: int = 0
     replay_ran: bool = False
+    replay_method: str = ""
+    """How the replay graded its arms — see `ReplayResult.method`.
+
+    Carried into the explanation so a proposal says what was measured rather
+    than the word "replay", which a cheap check and an expensive one share.
+    """
 
     @property
     def verified_count(self) -> int:
@@ -195,11 +201,15 @@ def evaluate(
         )
 
     signals = ", ".join(sorted({s.value for s in evidence.signals}))
+    if evidence.replay_ran:
+        method = evidence.replay_method or "replay"
+        replay_note = f" and a clean {method} replay"
+    else:
+        replay_note = ""
     return (
         True,
         None,
-        f"seen {pattern.occurrence_count}×, corroborated by {signals}"
-        + (" and a clean replay" if evidence.replay_ran else ""),
+        f"seen {pattern.occurrence_count}×, corroborated by {signals}{replay_note}",
     )
 
 

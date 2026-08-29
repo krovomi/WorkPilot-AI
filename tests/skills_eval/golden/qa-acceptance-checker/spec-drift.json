@@ -7,6 +7,10 @@
 	"baseline_signals": [],
 	"context": {
 		"why_this_is_here": "Green tests are a signal about the tests that exist, not about the spec. The baseline missed this; a candidate that catches it is a real improvement, and one that starts reporting drift on compliant specs is a regression.",
-		"observable": "acceptance criteria in spec.md vs assertions in the suite"
+		"observable": "acceptance criteria in spec.md vs assertions in the suite",
+		"requires": [
+			"untested"
+		],
+		"discriminator_note": "Failed. The prompt reports bullets 'missing evidence' but never names an untested criterion as a defect, which is why the drift slipped through."
 	}
 }

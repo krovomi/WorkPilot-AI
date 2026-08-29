@@ -37,7 +37,13 @@ from pathlib import Path
 from typing import Any
 
 from .hermes_ingest import HermesIngestReport, ingest_hermes_skills
-from .replay import ReplayResult, load_episodes
+from .replay import (
+    DISCRIMINATOR,
+    ReplayResult,
+    discriminator_grader,
+    load_episodes,
+    replay_ab,
+)
 from .skill_proposer import (
     Evidence,
     ExternalSignal,
@@ -59,6 +65,7 @@ __all__ = [
     "ObserveReport",
     "signals_from_outcome",
     "run_observe",
+    "baseline_instruction",
     "record_merge_outcome",
     "GOLDEN_RELPATH",
 ]
@@ -217,6 +224,22 @@ def run_observe(
                     if reason is not None:
                         report.rejected.append((pattern.pattern_id, reason))
                     continue
+
+                # The candidate has cleared frequency and corroboration, so it
+                # is now worth measuring. Until this call the replay gate was
+                # written, tested and never reached: `run_observe` was only
+                # ever invoked with `replay=None`, so `RejectionReason.
+                # REPLAY_REGRESSION` could not occur.
+                if replay is None:
+                    measured = _replay_candidate(repo_root, agent_id, pattern)
+                    if measured is not None:
+                        report.replay = measured
+                        measured.apply_to(evidence)
+                        promote, reason, why = evaluate(pattern, evidence)
+                        if not promote:
+                            if reason is not None:
+                                report.rejected.append((pattern.pattern_id, reason))
+                            continue
                 if not write:
                     continue
                 path = write_proposal(
@@ -293,6 +316,71 @@ def _evidence_for(
     if replay is not None:
         replay.apply_to(evidence)
     return evidence
+
+
+def baseline_instruction(agent_id: str) -> str:
+    """The instruction a candidate would be replacing, as the product ships it.
+
+    Every language overlay is folded in rather than the one matching the build
+    that produced the pattern. A skill proposal edits the agent's prompt for
+    every project, so grading it against only the current project's language
+    would let a candidate break the dotnet cases while a Python build measured
+    it clean — and the replay exists to veto exactly that.
+    """
+    try:
+        from agents.subagents.languages import overlays_for
+        from agents.subagents.phases import all_specs
+
+        prompt = ""
+        for roster in all_specs().values():
+            if agent_id in roster:
+                prompt = roster[agent_id].prompt
+                break
+        if not prompt:
+            return ""
+        parts = [prompt]
+        for overlay in overlays_for(
+            ["python", "dotnet", "rust", "typescript", "go", "java"]
+        ):
+            parts.extend(overlay.test_commands)
+            if overlay.notes:
+                parts.append(overlay.notes)
+        return "\n".join(parts)
+    except Exception as exc:  # noqa: BLE001 - a missing baseline skips the replay
+        logger.debug("could not resolve baseline instruction for %s: %s", agent_id, exc)
+        return ""
+
+
+def _replay_candidate(
+    repo_root: Path, agent_id: str, pattern: Any
+) -> ReplayResult | None:
+    """Measure a candidate against the golden corpus, or None when it cannot be.
+
+    Called only once a candidate has already cleared the cheap gates. Running
+    it for every pattern would grade thousands of lessons that occurrence and
+    corroboration counts were going to reject anyway; running it here measures
+    exactly the ones about to become a proposal.
+    """
+    try:
+        episodes = golden_corpus(repo_root, agent_id)
+        if not episodes:
+            return None
+        baseline = baseline_instruction(agent_id)
+        candidate = str(getattr(pattern, "actionable_instruction", "") or "")
+        if not baseline or not candidate:
+            return None
+        result = replay_ab(
+            episodes,
+            agent_id=agent_id,
+            baseline_instruction=baseline,
+            candidate_instruction=candidate,
+            grader=discriminator_grader(),
+        )
+        result.method = DISCRIMINATOR
+        return result
+    except Exception as exc:  # noqa: BLE001 - a failed replay must not fail a build
+        logger.warning("replay skipped for %s: %s", agent_id, exc)
+        return None
 
 
 def golden_corpus(repo_root: Path, agent_id: str = ""):

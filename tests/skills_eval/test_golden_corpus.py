@@ -17,6 +17,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
+from learning_loop.observe import baseline_instruction  # noqa: E402
 from learning_loop.replay import Episode, load_episodes  # noqa: E402
 from learning_loop.skill_proposer import ExternalSignal  # noqa: E402
 
@@ -116,3 +117,38 @@ def test_loading_a_missing_directory_is_empty_not_an_error(tmp_path: Path):
     """A repo with no corpus yet still runs; `ReplayResult.clean` is what
     refuses the promotion, and it says so for the right reason."""
     assert load_episodes(tmp_path / "nope") == []
+
+
+@pytest.mark.parametrize("episode", EPISODES, ids=lambda e: e.episode_id)
+def test_every_episode_carries_a_graded_discriminator(episode: Episode):
+    """An episode with nothing to discriminate on measures nothing.
+
+    `discriminator_grader` returns the same verdict on both arms when
+    `context.requires` is empty, so such a case can neither catch a regression
+    nor credit an improvement — it only inflates the episode count and makes a
+    replay look more thorough than it was.
+    """
+    assert episode.context.get("requires"), (
+        f"{episode.episode_id}: add `context.requires` — the strings an "
+        "instruction must carry for this case to go well"
+    )
+
+
+@pytest.mark.parametrize("episode", EPISODES, ids=lambda e: e.episode_id)
+def test_the_discriminator_agrees_with_the_recorded_verdict(episode: Episode):
+    """The corpus has to describe the world as it is.
+
+    An episode the baseline passed must be satisfied by today's instruction,
+    and one it failed must not be. Where the two disagree the gate is measuring
+    something other than what the episode claims, and every replay built on it
+    is wrong in a direction nobody would notice.
+    """
+    baseline = baseline_instruction(episode.agent_id).lower()
+    if not baseline:
+        pytest.skip(f"no shipped instruction for {episode.agent_id}")
+    satisfied = all(r.lower() in baseline for r in episode.context["requires"])
+    assert satisfied == episode.baseline_passed, (
+        f"{episode.episode_id}: recorded baseline_passed="
+        f"{episode.baseline_passed} but today's instruction "
+        f"{'satisfies' if satisfied else 'does not satisfy'} its discriminator"
+    )

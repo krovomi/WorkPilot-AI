@@ -61,6 +61,8 @@ __all__ = [
     "replay_ab",
     "load_episodes",
     "table_grader",
+    "discriminator_grader",
+    "DISCRIMINATOR",
     "BASELINE",
     "CANDIDATE",
 ]
@@ -166,6 +168,13 @@ class EpisodeComparison:
 class ReplayResult:
     agent_id: str
     comparisons: list[EpisodeComparison] = field(default_factory=list)
+    method: str = ""
+    """How the arms were graded, so a proposal can say what was measured.
+
+    A replay that checked instruction text and a replay that re-ran the agent
+    against real verifiers are both "a replay", and reporting them with the
+    same words would let the cheaper one borrow the authority of the other.
+    """
 
     @property
     def regressions(self) -> list[EpisodeComparison]:
@@ -193,6 +202,7 @@ class ReplayResult:
         """Record this replay on the evidence `skill_proposer.evaluate` reads."""
         evidence.replay_ran = self.ran
         evidence.replay_regressions = len(self.regressions)
+        evidence.replay_method = self.method
         return evidence
 
     def describe(self) -> str:
@@ -316,6 +326,81 @@ def _episode_from_dict(raw: dict[str, Any], path: Path) -> Episode:
         baseline_signals=signals,
         context=raw.get("context") or {},
     )
+
+
+DISCRIMINATOR = "discriminator"
+
+
+def discriminator_grader() -> Grader:
+    """Grade an arm on whether its instruction still carries what the episode
+    is about.
+
+    What this measures, precisely
+    -----------------------------
+    Each episode names the thing that makes the difference — `context.requires`
+    is what an instruction has to say for that case to go well, `context.forbids`
+    what it must not say. This grader checks the candidate instruction against
+    those, and nothing else.
+
+    That is **weaker than re-running the agent**, and the distinction is worth
+    keeping sharp: an instruction can mention `--filter` and still be a worse
+    instruction. What this catches is the regression the corpus was built to
+    catch — a candidate that quietly drops the guidance the case exists for.
+    It is a floor, not a verdict, and `ReplayResult.method` says so, so a
+    proposal cannot claim more than was actually measured.
+
+    Why it is worth having as it stands
+    ----------------------------------
+    `evaluate` uses a replay as a **veto only** — it can block a promotion and
+    can never create one. A cheap check that vetoes correctly is therefore
+    strictly better than no check, and it costs no API call, so it can run on
+    every candidate at every effort level.
+
+    An episode carrying no discriminator grades as unchanged on both arms: it
+    contributes no regression and no improvement, which is the honest answer
+    when a case cannot say what would distinguish two instructions.
+    """
+
+    def grade(episode: Episode, arm: str, instruction: str) -> ArmResult:
+        requires = [str(r) for r in (episode.context.get("requires") or [])]
+        forbids = [str(f) for f in (episode.context.get("forbids") or [])]
+        if not requires and not forbids:
+            # Nothing to discriminate on. Both arms get the same verdict, so
+            # the episode can neither regress nor improve.
+            return ArmResult(
+                episode_id=episode.episode_id,
+                arm=arm,
+                signals=(ExternalSignal.DETECTOR_CLEAN,),
+                note="no discriminator — not measured",
+            )
+
+        text = (instruction or "").lower()
+        missing = [r for r in requires if r.lower() not in text]
+        present = [f for f in forbids if f.lower() in text]
+
+        if missing or present:
+            parts = []
+            if missing:
+                parts.append("missing " + ", ".join(repr(m) for m in missing))
+            if present:
+                parts.append("says " + ", ".join(repr(f) for f in present))
+            return ArmResult(
+                episode_id=episode.episode_id,
+                arm=arm,
+                signals=(),
+                note="; ".join(parts),
+            )
+
+        return ArmResult(
+            episode_id=episode.episode_id,
+            arm=arm,
+            # A deterministic check came back clean, which is exactly what
+            # DETECTOR_CLEAN means everywhere else in the loop.
+            signals=(ExternalSignal.DETECTOR_CLEAN,),
+            note="carries every discriminator",
+        )
+
+    return grade
 
 
 def table_grader(
