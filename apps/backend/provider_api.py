@@ -47,7 +47,10 @@ from slowapi.errors import RateLimitExceeded
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from apps.backend.models_registry import get_default
+try:
+    from models_registry import get_default
+except ImportError:  # pragma: no cover - alternate package layout
+    from apps.backend.models_registry import get_default
 
 # Import specific exception for provider validation failures
 try:
