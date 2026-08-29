@@ -365,12 +365,10 @@ def main():
     )
 
     # CI scan command
-    ci_parser = subparsers.add_parser("ci-scan", help="Run CI/CD security scan")
+    subparsers.add_parser("ci-scan", help="Run CI/CD security scan")
 
     # GitHub Action command
-    github_parser = subparsers.add_parser(
-        "github-action", help="Run security scan for GitHub Actions"
-    )
+    subparsers.add_parser("github-action", help="Run security scan for GitHub Actions")
 
     args = parser.parse_args()
 

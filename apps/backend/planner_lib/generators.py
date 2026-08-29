@@ -54,7 +54,6 @@ class FeaturePlanGenerator(PlanGenerator):
         service_order = determine_service_order(files_by_service)
 
         backend_phase = None
-        worker_phase = None
 
         for service in service_order:
             files = files_by_service[service]
@@ -115,8 +114,6 @@ class FeaturePlanGenerator(PlanGenerator):
             # Track for dependencies
             if service_type in ["backend", "api", "server"]:
                 backend_phase = phase_num
-            elif service_type in ["worker", "celery"]:
-                worker_phase = phase_num
 
         # Add integration phase if multiple services
         if len(service_order) > 1:

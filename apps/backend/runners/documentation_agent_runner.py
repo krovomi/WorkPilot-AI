@@ -112,7 +112,7 @@ class DocumentationAgentRunner:
         if "readme" in self.doc_types:
             print("   📖 Generating README...")
             try:
-                readme = analyzer.analyze_readme()
+                analyzer.analyze_readme()
                 project_context = {
                     "description": "",
                     "tech_stack": [],
@@ -169,7 +169,7 @@ class DocumentationAgentRunner:
             for entry in missing[:30]:
                 parts = entry.split(":")
                 if len(parts) >= 3:
-                    file_path, line, name = parts[0], parts[1], parts[2]
+                    file_path, _, name = parts[0], parts[1], parts[2]
                     symbols_needing_docs.append(
                         {
                             "file_path": str(self.project_dir / file_path),

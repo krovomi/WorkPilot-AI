@@ -41,9 +41,7 @@ Examples:
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # List migrations
-    list_cmd = subparsers.add_parser(
-        "list-migrations", help="List supported migrations"
-    )
+    subparsers.add_parser("list-migrations", help="List supported migrations")
 
     # Analyze
     analyze_cmd = subparsers.add_parser(
@@ -203,7 +201,7 @@ def cmd_rollback(args) -> int:
 
     try:
         orchestrator = MigrationOrchestrator(args.project_dir)
-        context = orchestrator.resume_migration(args.migration_id)
+        orchestrator.resume_migration(args.migration_id)
 
         result = orchestrator.rollback_migration(args.to_phase)
 

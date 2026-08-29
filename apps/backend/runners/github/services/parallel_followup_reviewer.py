@@ -515,7 +515,7 @@ The SDK will run invoked agents in parallel automatically.
                 )
 
             # Capture agent definitions for debug logging (AFTER worktree creation)
-            agent_defs = self._define_specialist_agents(project_root)
+            self._define_specialist_agents(project_root)
 
             # Use model and thinking level from config (user settings)
             # Resolve model shorthand via environment variable override if configured
@@ -578,7 +578,6 @@ The SDK will run invoked agents in parallel automatically.
                 result_text = stream_result["result_text"]
                 structured_output = stream_result["structured_output"]
                 agents_invoked = stream_result["agents_invoked"]
-                msg_count = stream_result["msg_count"]
 
             self._report_progress(
                 "finalizing",

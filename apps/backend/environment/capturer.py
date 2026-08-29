@@ -396,7 +396,6 @@ class EnvironmentCapturer:
 
             info = data[0]
             config = info.get("Config", {})
-            network_settings = info.get("NetworkSettings", {})
 
             # Parse image and tag
             img = config.get("Image", image)

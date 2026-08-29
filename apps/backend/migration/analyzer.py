@@ -422,7 +422,6 @@ class StackAnalyzer:
 
     def _check_python_version_file(self, pattern: str) -> bool:
         """Check for Python version markers."""
-        shebang_pattern = f"#!/usr/bin/env {pattern}"
         for py_file in self.project_dir.rglob("*.py"):
             try:
                 content = py_file.read_text()[:100]
