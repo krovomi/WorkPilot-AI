@@ -5,8 +5,12 @@
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
-import path from "node:path";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { app, ipcMain } from "electron";
+import { projectStore } from "../project-store";
+import { parsePythonCommand } from "../python-detector";
+import { getConfiguredPythonPath } from "../python-env-manager";
 
 interface SmartEstimationRequest {
 	projectId: string;
@@ -24,6 +28,22 @@ export function setupSmartEstimationHandlers() {
 		}
 	};
 
+	// Resolve backend path once (same candidates as conflict-predictor-handlers,
+	// which is the pattern that survives a packaged build).
+	const getBackendPath = (): string => {
+		const candidates = [
+			...(app.isPackaged ? [join(process.resourcesPath, "backend")] : []),
+			join(__dirname, "..", "..", "..", "backend"),
+			join(app.getAppPath(), "..", "backend"),
+			join(process.cwd(), "apps", "backend"),
+		];
+		return (
+			candidates.find((p) => existsSync(p)) ??
+			candidates.at(-1) ??
+			candidates[0]
+		);
+	};
+
 	// Handle smart estimation request
 	ipcMain.handle(
 		"run-smart-estimation",
@@ -31,19 +51,33 @@ export function setupSmartEstimationHandlers() {
 			return new Promise((resolve, reject) => {
 				killExistingProcess();
 
-				const backendPath = path.resolve(app.getAppPath(), "apps", "backend");
-				const runnerPath = path.resolve(
+				// The backend has no registry of Electron project ids; it needs the
+				// path, which only this side knows.
+				const project = projectStore.getProject(projectId);
+				if (!project) {
+					const errorMessage = `Project not found: ${projectId}`;
+					event.sender.send("smart-estimation-error", errorMessage);
+					reject(new Error(errorMessage));
+					return;
+				}
+
+				const backendPath = getBackendPath();
+				const runnerPath = join(
 					backendPath,
 					"runners",
 					"smart_estimation_runner.py",
 				);
 
+				const [pythonCommand, pythonBaseArgs] = parsePythonCommand(
+					getConfiguredPythonPath(),
+				);
 				const spawnedProcess: ChildProcess = spawn(
-					"python",
+					pythonCommand,
 					[
+						...pythonBaseArgs,
 						runnerPath,
-						"--project-id",
-						projectId,
+						"--project-path",
+						project.path,
 						"--task-description",
 						taskDescription,
 					],
@@ -92,11 +126,15 @@ export function setupSmartEstimationHandlers() {
 					}
 				});
 
-				// Handle stderr
+				// Handle stderr. Warnings land here too (Python logging writes to
+				// stderr), so it is kept as context for a failed exit rather than
+				// reported as an error on its own — otherwise a successful run that
+				// logged one warning would surface as a failure.
+				let stderrBuffer = "";
 				spawnedProcess.stderr?.on("data", (data: Buffer) => {
 					const errorOutput = data.toString();
-					console.error("Smart Estimation stderr:", errorOutput);
-					event.sender.send("smart-estimation-error", errorOutput);
+					stderrBuffer += errorOutput;
+					console.warn("Smart Estimation stderr:", errorOutput);
 				});
 
 				// Handle process completion
@@ -107,7 +145,10 @@ export function setupSmartEstimationHandlers() {
 						event.sender.send("smart-estimation-complete", result);
 						resolve(result);
 					} else {
-						const errorMessage = error || `Process exited with code ${code}`;
+						const errorMessage =
+							error ||
+							stderrBuffer.trim() ||
+							`Process exited with code ${code}`;
 						event.sender.send("smart-estimation-error", errorMessage);
 						reject(new Error(errorMessage));
 					}

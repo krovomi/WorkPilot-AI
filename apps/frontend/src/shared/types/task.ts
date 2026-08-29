@@ -12,6 +12,7 @@ import type {
 	PhaseThinkingConfig,
 	ThinkingLevel,
 } from "./settings";
+import type { TaskSmartEstimate } from "./smart-estimation";
 
 export type TaskStatus =
 	| "backlog"
@@ -337,13 +338,31 @@ export interface TaskMetadata {
 
 	// Technical details
 	affectedFiles?: string[]; // Files likely to be modified
-	dependencies?: string[]; // Other features/tasks this depends on
+	dependencies?: string[]; // Other features/tasks this depends on (free text)
+	/**
+	 * Spec ids (= task ids, see project-store `id: dir.name`) of the tasks that
+	 * must reach `done` before the queue may promote this one. Distinct from
+	 * `dependencies` above, which stays the free-text list written by ideation
+	 * and roadmap conversion and never gated anything.
+	 *
+	 * An id with no matching task on the board does NOT block: deleting a task
+	 * would otherwise deadlock every ticket that referenced it.
+	 */
+	blockedBy?: string[];
 	acceptanceCriteria?: string[]; // What defines "done"
 	extraNote?: string; // Free-form note added on the Kanban card; injected
 	// into requirements.json as additional_context for every pipeline phase.
 
 	// Effort estimation
 	estimatedEffort?: TaskComplexity;
+
+	/**
+	 * Last Smart Estimation run for this task: a 1-13 complexity score with the
+	 * confidence and risk factors behind it. Informational — the queue orders
+	 * by `priority` alone, because a complexity score is not an urgency score.
+	 * Carries no duration: see `shared/types/smart-estimation.ts`.
+	 */
+	smartEstimate?: TaskSmartEstimate;
 
 	// Type-specific metadata (from different idea types)
 	securitySeverity?: "low" | "medium" | "high" | "critical";

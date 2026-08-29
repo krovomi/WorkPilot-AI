@@ -41,7 +41,8 @@
 		"preview": "Aperçu",
 		"syncFromBranch": "Synchroniser depuis une branche",
 		"duplicate": "Dupliquer",
-		"duplicateSuffix": "(copie)"
+		"duplicateSuffix": "(copie)",
+		"estimate": "Estimer la complexité"
 	},
 	"confirmDelete": {
 		"title": "Supprimer la tâche",
@@ -322,6 +323,30 @@
 			"runAsTaskLabel": "Lancer en tâche",
 			"runAsTaskHint": "Lancer comme une tâche Kanban interactive (planification, revue, conversation) plutôt qu'un tir unique.",
 			"taskCreated": "Tâche créée : {{name}}"
+		},
+		"blockers": {
+			"label_one": "1 bloqueur",
+			"label_other": "{{count}} bloqueurs",
+			"label_zero": "Bloqueurs",
+			"title": "Dépendances",
+			"description": "Cette tâche déclare des prérequis qui ne sont pas terminés.",
+			"gatedDescription": "La file ne la lancera pas tant que ces prérequis ne sont pas terminés.",
+			"resolved_one": "1 prérequis déjà terminé.",
+			"resolved_other": "{{count}} prérequis déjà terminés.",
+			"missing_one": "1 prérequis introuvable (tâche supprimée) — il ne bloque pas.",
+			"missing_other": "{{count}} prérequis introuvables (tâches supprimées) — ils ne bloquent pas.",
+			"overrideTitle": "Lancée malgré ses prérequis",
+			"overrideDescription_one": "« {{title}} » démarre alors qu'1 prérequis n'est pas terminé.",
+			"overrideDescription_other": "« {{title}} » démarre alors que {{count}} prérequis ne sont pas terminés.",
+			"overrideAnnounce_one": "{{title}} déplacée en cours malgré 1 prérequis non terminé.",
+			"overrideAnnounce_other": "{{title}} déplacée en cours malgré {{count}} prérequis non terminés."
+		},
+		"smartEstimate": {
+			"label": "Complexité {{score}}",
+			"title": "Estimation de complexité",
+			"confidence": "Confiance : {{percent}} %",
+			"qaIterations_one": "1 passe QA attendue.",
+			"qaIterations_other": "{{count}} passes QA attendues."
 		}
 	},
 	"queue": {
@@ -496,7 +521,20 @@
 		"extraNoteHelp": "Enregistré dans requirements.json comme additional_context.",
 		"extraNoteSaved": "Enregistré.",
 		"extraNoteSave": "Enregistrer la note",
-		"extraNoteSaving": "Enregistrement…"
+		"extraNoteSaving": "Enregistrement…",
+		"blockedBy": {
+			"title": "Bloquée par",
+			"empty": "Aucun prérequis.",
+			"add": "Ajouter un prérequis",
+			"search": "Rechercher une tâche…",
+			"noCandidate": "Aucune tâche éligible (les cycles sont exclus).",
+			"remove": "Retirer {{title}}",
+			"goToTask": "Aller à cette tâche",
+			"missingChip": "{{id}} (introuvable)",
+			"missingHint": "Cette tâche n'existe plus ; le prérequis est ignoré.",
+			"saveErrorTitle": "Enregistrement impossible",
+			"saveErrorDesc": "Les prérequis n'ont pas pu être enregistrés."
+		}
 	},
 	"images": {
 		"removeImageAriaLabel": "Supprimer l'image {{filename}}",
@@ -1019,7 +1057,11 @@
 			"conflictsNone": "Aucun chevauchement de fichiers avec les autres tâches actives",
 			"conflictsTitle": "Conflits potentiels avec des tâches parallèles",
 			"conflictsDescription": "{{count}} fichier(s) de ce plan sont aussi modifiés par d'autres tâches actives. La fusion des deux worktrees provoquera probablement un conflit — terminez une tâche d'abord ou ajustez le plan.",
-			"conflictsMoreFiles": "+{{count}} autre(s) fichier(s)"
+			"conflictsMoreFiles": "+{{count}} autre(s) fichier(s)",
+			"conflictsMakeDependency": "Faire dépendre de celle-ci",
+			"conflictsDependencyAdded": "Prérequis ajouté : « {{title}} »",
+			"conflictsDependencyExists": "Déjà un prérequis",
+			"conflictsDependencyCycle": "Impossible : créerait un cycle"
 		}
 	}
 }

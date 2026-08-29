@@ -1,30 +1,10 @@
 import { create } from "zustand";
+import type {
+	SmartEstimationEvent,
+	SmartEstimationResult,
+} from "../../shared/types/smart-estimation";
 
-/**
- * Result of smart estimation analysis
- */
-export interface SmartEstimationResult {
-	complexity_score: number;
-	confidence_level: number;
-	reasoning: string[];
-	similar_tasks: Array<{
-		build_id: string;
-		spec_name: string;
-		similarity_score: number;
-		complexity_score: number;
-		duration_hours?: number;
-		qa_iterations?: number;
-		success_rate?: number;
-		tokens_used?: number;
-		cost_usd?: number;
-		status: string;
-	}>;
-	risk_factors: string[];
-	estimated_duration_hours?: number;
-	estimated_qa_iterations?: number;
-	token_cost_estimate?: number;
-	recommendations: string[];
-}
+export type { SmartEstimationResult };
 
 export type SmartEstimationPhase = "idle" | "analyzing" | "complete" | "error";
 
@@ -37,9 +17,11 @@ interface SmartEstimationState {
 	error: string | null;
 	isOpen: boolean;
 	initialTaskDescription: string;
+	/** Task the dialog was opened from, when it was opened from a card. */
+	sourceTaskId: string | null;
 
 	// Actions
-	openDialog: (taskDescription: string) => void;
+	openDialog: (taskDescription: string, sourceTaskId?: string) => void;
 	closeDialog: () => void;
 	setPhase: (phase: SmartEstimationPhase) => void;
 	setStatus: (status: string) => void;
@@ -57,15 +39,17 @@ const initialState = {
 	error: null as string | null,
 	isOpen: false,
 	initialTaskDescription: "",
+	sourceTaskId: null as string | null,
 };
 
 export const useSmartEstimationStore = create<SmartEstimationState>((set) => ({
 	...initialState,
 
-	openDialog: (taskDescription) =>
+	openDialog: (taskDescription, sourceTaskId) =>
 		set({
 			isOpen: true,
 			initialTaskDescription: taskDescription,
+			sourceTaskId: sourceTaskId ?? null,
 			phase: "idle",
 			status: "",
 			streamingOutput: "",
@@ -76,6 +60,7 @@ export const useSmartEstimationStore = create<SmartEstimationState>((set) => ({
 	closeDialog: () =>
 		set({
 			isOpen: false,
+			sourceTaskId: null,
 			phase: "idle",
 			status: "",
 			streamingOutput: "",
@@ -108,6 +93,20 @@ export const useSmartEstimationStore = create<SmartEstimationState>((set) => ({
 }));
 
 /**
+ * Open the estimation dialog for a task, outside React.
+ *
+ * Same shape as `openAppEmulatorDialog` / `openLearningLoopDialog`: callers
+ * live inside memoized card sub-components where adding a hook would widen
+ * the render surface for no gain.
+ */
+export function openSmartEstimation(
+	taskDescription: string,
+	sourceTaskId?: string,
+): void {
+	useSmartEstimationStore.getState().openDialog(taskDescription, sourceTaskId);
+}
+
+/**
  * Start smart estimation via IPC
  */
 export function startSmartEstimation(projectId: string): void {
@@ -126,8 +125,15 @@ export function startSmartEstimation(projectId: string): void {
 		result: null,
 	});
 
-	// Send estimation request via IPC
-	globalThis.electronAPI.runSmartEstimation(projectId, initialTaskDescription);
+	// The handler rejects when the project or the runner cannot be resolved;
+	// surface it instead of leaving the dialog spinning forever.
+	globalThis.electronAPI
+		.runSmartEstimation(projectId, initialTaskDescription)
+		.catch((err: unknown) => {
+			useSmartEstimationStore
+				.getState()
+				.setError(err instanceof Error ? err.message : String(err));
+		});
 }
 
 /**
@@ -138,46 +144,36 @@ export function startSmartEstimation(projectId: string): void {
 export function setupSmartEstimationListeners(): () => void {
 	const store = () => useSmartEstimationStore.getState();
 
-	// Listen for streaming chunks
-	const unsubChunk = globalThis.electronAPI.onSmartEstimationStreamChunk(
-		(chunk: string) => {
-			store().appendStreamingOutput(chunk);
+	// Progress events carry the human-readable step in `data.status`, and are
+	// also echoed into the streaming pane so a long run shows something.
+	const unsubEvent = globalThis.electronAPI.onSmartEstimationEvent(
+		(event: SmartEstimationEvent) => {
+			const status = event.data?.status;
+			if (typeof status === "string" && status.length > 0) {
+				store().setStatus(status);
+				store().appendStreamingOutput(`${status}\n`);
+			}
+			if (event.type === "error" && typeof event.data?.error === "string") {
+				store().setError(event.data.error);
+			}
 		},
 	);
 
-	// Listen for status updates
-	const unsubStatus = globalThis.electronAPI.onSmartEstimationStatus(
-		(status: string) => {
-			store().setStatus(status);
-		},
-	);
-
-	// Listen for errors
 	const unsubError = globalThis.electronAPI.onSmartEstimationError(
 		(error: string) => {
 			store().setError(error);
 		},
 	);
 
-	// Listen for completion with structured result
 	const unsubComplete = globalThis.electronAPI.onSmartEstimationComplete(
 		(result: SmartEstimationResult) => {
 			store().setResult(result);
 		},
 	);
 
-	// Listen for events (for future extensibility)
-	const unsubEvent = globalThis.electronAPI.onSmartEstimationEvent(
-		(_event: unknown) => {
-			/* intentionally empty */
-		},
-	);
-
 	return () => {
-		unsubChunk();
-		unsubStatus();
+		unsubEvent();
 		unsubError();
 		unsubComplete();
-		unsubEvent();
 	};
 }

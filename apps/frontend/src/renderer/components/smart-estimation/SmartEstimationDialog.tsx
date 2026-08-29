@@ -1,7 +1,6 @@
 import {
 	AlertTriangle,
 	Check,
-	Clock,
 	Copy,
 	DollarSign,
 	Info,
@@ -14,7 +13,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TaskSmartEstimate } from "../../../shared/types/smart-estimation";
 import { useProjectStore } from "../../stores/project-store";
+import { persistUpdateTask } from "../../stores/task-store";
 import type { SmartEstimationResult } from "../../stores/smart-estimation-store";
 import {
 	setupSmartEstimationListeners,
@@ -66,6 +67,7 @@ export function SmartEstimationDialog() {
 		result,
 		error,
 		initialTaskDescription,
+		sourceTaskId,
 		reset,
 	} = useSmartEstimationStore();
 
@@ -93,6 +95,28 @@ export function SmartEstimationDialog() {
 		}
 	}, []);
 
+	// When the dialog was opened from a card, keep the estimate on the task so
+	// the board can show it without re-running the analysis. Only the fields
+	// that survive the "no duration predictions" rule are stored.
+	const persistedRunRef = useRef<string | null>(null);
+	useEffect(() => {
+		if (!result || !sourceTaskId) return;
+		const runKey = `${sourceTaskId}:${result.complexity_score}:${result.confidence_level}`;
+		if (persistedRunRef.current === runKey) return;
+		persistedRunRef.current = runKey;
+
+		const estimate: TaskSmartEstimate = {
+			complexityScore: result.complexity_score,
+			confidenceLevel: result.confidence_level,
+			riskFactors: result.risk_factors,
+			qaIterations: result.estimated_qa_iterations,
+			at: new Date().toISOString(),
+		};
+		void persistUpdateTask(sourceTaskId, {
+			metadata: { smartEstimate: estimate },
+		});
+	}, [result, sourceTaskId]);
+
 	const handleEstimate = useCallback(() => {
 		if (!selectedProjectId) return;
 		if (!editableTaskDescription.trim()) return;
@@ -115,12 +139,15 @@ export function SmartEstimationDialog() {
 	}, []);
 
 	const handleTryAgain = useCallback(() => {
+		// `reset()` clears sourceTaskId; put it back so a second run still
+		// writes its estimate onto the task the dialog was opened from.
 		reset();
 		useSmartEstimationStore.setState({
 			isOpen: true,
 			initialTaskDescription: editableTaskDescription,
+			sourceTaskId,
 		});
-	}, [reset, editableTaskDescription]);
+	}, [reset, editableTaskDescription, sourceTaskId]);
 
 	const handleClose = useCallback(() => {
 		closeDialog();
@@ -363,23 +390,9 @@ function ResultView({
 				</CardContent>
 			</Card>
 
-			{/* Metrics Grid */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-				{/* Duration Estimate */}
-				{result.estimated_duration_hours && (
-					<Card>
-						<CardContent className="p-4">
-							<div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-								<Clock className="h-4 w-4" />
-								{t("smartEstimation:result.estimatedDuration")}
-							</div>
-							<div className="text-xl font-semibold">
-								{result.estimated_duration_hours.toFixed(1)}h
-							</div>
-						</CardContent>
-					</Card>
-				)}
-
+			{/* Metrics Grid — no duration tile: the product rule is to never give a
+			    duration prediction, and the runner strips the field at the source. */}
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 				{/* QA Iterations */}
 				{result.estimated_qa_iterations && (
 					<Card>
@@ -512,8 +525,6 @@ function ResultView({
 									</div>
 									<div className="text-xs text-muted-foreground">
 										{Math.round(task.similarity_score * 100)}% similar
-										{task.duration_hours &&
-											` • ${task.duration_hours.toFixed(1)}h`}
 										{task.cost_usd && ` • $${task.cost_usd.toFixed(2)}`}
 									</div>
 								</div>
