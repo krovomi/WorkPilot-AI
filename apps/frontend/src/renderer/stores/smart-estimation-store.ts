@@ -127,13 +127,18 @@ export function startSmartEstimation(projectId: string): void {
 
 	// The handler rejects when the project or the runner cannot be resolved;
 	// surface it instead of leaving the dialog spinning forever.
-	globalThis.electronAPI
-		.runSmartEstimation(projectId, initialTaskDescription)
-		.catch((err: unknown) => {
+	const run = globalThis.electronAPI?.runSmartEstimation;
+	if (typeof run !== "function") {
+		store.setError("Smart estimation is unavailable in this environment.");
+		return;
+	}
+	Promise.resolve(run(projectId, initialTaskDescription)).catch(
+		(err: unknown) => {
 			useSmartEstimationStore
 				.getState()
 				.setError(err instanceof Error ? err.message : String(err));
-		});
+		},
+	);
 }
 
 /**
@@ -143,6 +148,25 @@ export function startSmartEstimation(projectId: string): void {
  */
 export function setupSmartEstimationListeners(): () => void {
 	const store = () => useSmartEstimationStore.getState();
+	const api = globalThis.electronAPI;
+
+	// The dialog is mounted for the whole session, so this runs on every
+	// startup — including the browser preview, where `browser-mock` stands in
+	// for the bridge. A missing listener must degrade to "no live updates",
+	// never throw: an exception here unmounts the dialog and React takes the
+	// rest of the tree with it, leaving a blank window.
+	if (
+		typeof api?.onSmartEstimationEvent !== "function" ||
+		typeof api?.onSmartEstimationError !== "function" ||
+		typeof api?.onSmartEstimationComplete !== "function"
+	) {
+		console.warn(
+			"[smart-estimation] IPC bridge unavailable; skipping listeners",
+		);
+		return () => {
+			/* nothing was subscribed */
+		};
+	}
 
 	// Progress events carry the human-readable step in `data.status`, and are
 	// also echoed into the streaming pane so a long run shows something.
