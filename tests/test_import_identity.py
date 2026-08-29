@@ -38,11 +38,23 @@ STATEFUL_SINGLETONS = (
 )
 
 
+# Directories that live under apps/backend but are not this repo's source.
+# CI installs the virtualenv there, so an unfiltered rglob walks thousands of
+# third-party files — one of which is not even valid Python 3 and blew up the
+# parser rather than failing an assertion.
+_NOT_OURS = frozenset({".venv", "venv", "site-packages", "node_modules", "__pycache__"})
+
+
 def _production_files() -> list[Path]:
     return [
         p
         for p in sorted(BACKEND.rglob("*.py"))
-        if "test" not in p.name and "__pycache__" not in p.parts
+        if "test" not in p.name
+        # Relative to BACKEND, never absolute: this checkout lives under
+        # `.claude/worktrees/`, so an absolute dot-check excludes every file
+        # and leaves a test that scans nothing while reporting success.
+        and not _NOT_OURS.intersection(p.relative_to(BACKEND).parts)
+        and not any(part.startswith(".") for part in p.relative_to(BACKEND).parts)
     ]
 
 
