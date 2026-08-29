@@ -67,7 +67,7 @@ def check_backend_status():
                 return True
         except requests.exceptions.ConnectionError:
             continue
-        except Exception as e:
+        except Exception:
             continue
 
     print("❌ Backend non démarré")
@@ -107,7 +107,7 @@ def check_windsurf_provider():
                 break
         except requests.exceptions.ConnectionError:
             continue
-        except Exception as e:
+        except Exception:
             continue
 
     return False

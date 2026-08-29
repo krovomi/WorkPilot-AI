@@ -353,7 +353,7 @@ class TestTaskScheduler:
     def test_remove_task(self):
         """Removing a task should reduce the count."""
         scheduler = TaskScheduler()
-        task = scheduler.add_task(ScheduledTask(task_id="rm", name="Remove"))
+        scheduler.add_task(ScheduledTask(task_id="rm", name="Remove"))
         assert scheduler.remove_task("rm")
         assert scheduler.get_task("rm") is None
 

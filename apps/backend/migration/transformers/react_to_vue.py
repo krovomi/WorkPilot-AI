@@ -125,10 +125,8 @@ class ReactToVueTransformer:
 
         def replace_func(match):
             comp_name = match.group(1)
-            props_str = match.group(2)
-            props = [p.strip() for p in props_str.split(",") if p.strip()]
+            match.group(2)
 
-            props_def = ", ".join(props) if props else ""
             return f"function {comp_name}(props) {{"
 
         content = re.sub(pattern, replace_func, content)
@@ -138,10 +136,8 @@ class ReactToVueTransformer:
 
         def replace_arrow(match):
             comp_name = match.group(1)
-            props_str = match.group(2)
-            props = [p.strip() for p in props_str.split(",") if p.strip()]
+            match.group(2)
 
-            props_def = ", ".join(props) if props else ""
             return f"const {comp_name} = (props) => {{"
 
         content = re.sub(arrow_pattern, replace_arrow, content)
@@ -254,8 +250,8 @@ class ReactToVueTransformer:
 
     def _transform_use_memo(self, name: str, compute_func: str, deps: str) -> str:
         """Transform useMemo hook."""
-        deps_list = [d.strip() for d in deps.split(",")]
-        deps_str = ", ".join(deps_list)
+        # Vue 3's `computed()` tracks its own dependencies, so `deps` is
+        # accepted for signature parity with the React hook and not used.
         return f"const {name} = computed(() => {compute_func})"
 
     def _transform_event_handlers(self, content: str) -> str:
@@ -330,11 +326,6 @@ class ReactToVueTransformer:
 
     def _wrap_in_sfc(self, script_content: str, file_path: str) -> str:
         """Wrap content in Vue Single File Component format."""
-        file_name = Path(file_path).stem
-
-        # Extract component name from file path
-        comp_name = "".join(word.capitalize() for word in file_name.split("_") if word)
-
         vue_sfc = f"""<template>
   <div>
     <!-- Component template goes here -->

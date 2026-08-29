@@ -99,9 +99,6 @@ class TestPythonAnalysis:
         analysis = semantic_analyzer.analyze_file("test.py", SAMPLE_PYTHON_MODULE)
 
         # Should detect the Greeter class
-        class_additions = [
-            c for c in analysis.changes if c.change_type == ChangeType.ADD_CLASS
-        ]
         # Depending on implementation, might detect class or its methods
         assert len(analysis.changes) > 0
 

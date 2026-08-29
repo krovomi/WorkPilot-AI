@@ -193,7 +193,7 @@ def main():
         "--screenshot", type=str, help="Screenshot path (uses latest if omitted)"
     )
 
-    list_parser = baseline_sub.add_parser("list", help="List baselines")
+    baseline_sub.add_parser("list", help="List baselines")
 
     delete_parser = baseline_sub.add_parser("delete", help="Delete a baseline")
     delete_parser.add_argument("--name", type=str, required=True, help="Baseline name")

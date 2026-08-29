@@ -3473,11 +3473,6 @@ class WindsurfAgentClient(AgentClient):
 
         # Check if REST mode is forced via environment variable
         # NOTE: sk-ws-* keys are designed for gRPC only and should ignore WINDSURF_FORCE_REST
-        force_rest = _os.environ.get("WINDSURF_FORCE_REST", "").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
 
         # sk-ws-* keys ALWAYS use gRPC mode (ignore WINDSURF_FORCE_REST)
         # These keys are specifically designed for Windsurf IDE gRPC communication

@@ -161,7 +161,6 @@ class MLPatternDetector:
         """Apprend le style d'indentation."""
         for line in lines:
             if line and line[0] in " \t":
-                indent = len(line) - len(line.lstrip())
                 if line.startswith("    "):
                     styles["4_spaces"] += 1
                 elif line.startswith("  "):

@@ -567,9 +567,7 @@ def test_checkpoint_recovery_hints_restoration(test_env):
     )
 
     # Check circular fix detection with restored data
-    is_circular = manager2.is_circular_fix(
-        "subtask-1", "Using async database with asyncio again"
-    )
+    manager2.is_circular_fix("subtask-1", "Using async database with asyncio again")
     # Note: May or may not detect as circular depending on word overlap
 
 
@@ -645,31 +643,6 @@ def run_all_tests():
 
     # Note: This manual runner is kept for backwards compatibility.
     # Prefer running tests with pytest: pytest tests/test_recovery.py -v
-
-    tests = [
-        ("test_initialization", test_initialization),
-        ("test_record_attempt", test_record_attempt),
-        ("test_circular_fix_detection", test_circular_fix_detection),
-        ("test_failure_classification", test_failure_classification),
-        ("test_recovery_action_determination", test_recovery_action_determination),
-        ("test_good_commit_tracking", test_good_commit_tracking),
-        ("test_mark_subtask_stuck", test_mark_subtask_stuck),
-        ("test_recovery_hints", test_recovery_hints),
-        # Session checkpoint and restoration tests
-        (
-            "test_checkpoint_persistence_across_sessions",
-            test_checkpoint_persistence_across_sessions,
-        ),
-        ("test_restoration_after_failure", test_restoration_after_failure),
-        ("test_checkpoint_multiple_subtasks", test_checkpoint_multiple_subtasks),
-        ("test_restoration_with_build_commits", test_restoration_with_build_commits),
-        (
-            "test_checkpoint_recovery_hints_restoration",
-            test_checkpoint_recovery_hints_restoration,
-        ),
-        ("test_restoration_stuck_subtasks_list", test_restoration_stuck_subtasks_list),
-        ("test_checkpoint_clear_and_reset", test_checkpoint_clear_and_reset),
-    ]
 
     print("Note: Running with manual test runner for backwards compatibility.")
     print(

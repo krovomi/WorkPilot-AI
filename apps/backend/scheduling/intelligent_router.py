@@ -533,7 +533,6 @@ class IntelligentRouter:
             RoutingDecision with the selected provider, or None if no provider available.
         """
         strat = RoutingStrategy(strategy) if strategy else self.default_strategy
-        ctx = context or {}
 
         # Pipeline override
         if pipeline_id and pipeline_id in self._pipelines:

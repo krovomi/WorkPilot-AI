@@ -311,6 +311,6 @@ def workflow_profile(
         if include_levels:
             payload["levels"] = _levels(loaded, resolved_provider)
         return {"success": True, "profile": payload}
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         logger.exception("workflow profile resolution failed")
         return {"success": False, "error": "An internal error has occurred."}

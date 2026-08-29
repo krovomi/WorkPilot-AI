@@ -320,7 +320,7 @@ class TestFindExecutableCli:
 
         mock_isfile.side_effect = isfile_side_effect
 
-        result = find_executable("node")
+        find_executable("node")
 
         # Should have tried to find with extension
         assert mock_isfile.called

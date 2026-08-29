@@ -20,7 +20,6 @@ ignore = [
     "C401",   # unnecessary generator
     "C416",   # unnecessary list comprehension
     "E402",   # module level import not at top of file
-    "F841",   # local variable assigned but never used
     "W293",   # blank line contains whitespace
     "B007",   # loop control variable not used
 ]

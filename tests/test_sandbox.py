@@ -353,7 +353,7 @@ class TestManagerSnapshots:
 
             manager = SandboxManager(project_root=tmpdir)
             sandbox = manager.create_sandbox("t-1", "coder")
-            snap_id = manager.create_snapshot(sandbox.sandbox_id, paths=["test.txt"])
+            manager.create_snapshot(sandbox.sandbox_id, paths=["test.txt"])
             snapshots = manager.get_snapshots(sandbox.sandbox_id)
             assert snapshots[0].file_count == 1
             assert snapshots[0].files[0].exists

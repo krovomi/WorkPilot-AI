@@ -362,11 +362,10 @@ async def run_insight_extraction(
     # Ensure SDK can find the token
     ensure_claude_code_oauth_token()
 
-    model = get_extraction_model()
+    get_extraction_model()
     prompt = _build_extraction_prompt(inputs)
 
     # Use current directory if project_dir not specified
-    cwd = str(project_dir.resolve()) if project_dir else os.getcwd()
 
     try:
         # Migration vers runtime provider-agnostique

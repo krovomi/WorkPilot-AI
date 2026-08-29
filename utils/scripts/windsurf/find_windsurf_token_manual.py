@@ -33,7 +33,7 @@ def search_windsurf_token():
 
                 try:
                     search_file_for_token(file_path)
-                except Exception as e:
+                except Exception:
                     pass  # Ignorer les erreurs de lecture
 
 
