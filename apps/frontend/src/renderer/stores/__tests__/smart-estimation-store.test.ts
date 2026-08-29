@@ -9,8 +9,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockElectronAPI = {
 	runSmartEstimation: vi.fn(),
 	cancelSmartEstimation: vi.fn(),
-	onSmartEstimationStreamChunk: vi.fn(),
-	onSmartEstimationStatus: vi.fn(),
 	onSmartEstimationError: vi.fn(),
 	onSmartEstimationComplete: vi.fn(),
 	onSmartEstimationEvent: vi.fn(),
@@ -43,22 +41,14 @@ vi.mock("../project-store", () => ({
 
 describe("Smart Estimation Store", () => {
 	beforeEach(() => {
-		// Mock the listener functions to return the callbacks directly
-		mockElectronAPI.onSmartEstimationStreamChunk.mockImplementation(
-			(callback) => callback,
-		);
-		mockElectronAPI.onSmartEstimationStatus.mockImplementation(
-			(callback) => callback,
-		);
-		mockElectronAPI.onSmartEstimationError.mockImplementation(
-			(callback) => callback,
-		);
-		mockElectronAPI.onSmartEstimationComplete.mockImplementation(
-			(callback) => callback,
-		);
-		mockElectronAPI.onSmartEstimationEvent.mockImplementation(
-			(callback) => callback,
-		);
+		// Each listener returns an unsubscribe function. Read the registered
+		// callback back from `mock.calls[0][0]` when a test needs to fire it.
+		mockElectronAPI.onSmartEstimationError.mockImplementation(() => vi.fn());
+		mockElectronAPI.onSmartEstimationComplete.mockImplementation(() => vi.fn());
+		mockElectronAPI.onSmartEstimationEvent.mockImplementation(() => vi.fn());
+		// The handler resolves with the structured result and rejects on a
+		// failed spawn; the store attaches a .catch to it.
+		mockElectronAPI.runSmartEstimation.mockResolvedValue(undefined);
 
 		// Reset store state before each test
 		useSmartEstimationStore.getState().reset();
@@ -372,12 +362,10 @@ describe("Smart Estimation Store", () => {
 		it("should setup IPC listeners correctly", () => {
 			cleanup = setupSmartEstimationListeners();
 
-			// Verify all listeners are set up
-			expect(mockElectronAPI.onSmartEstimationStreamChunk).toHaveBeenCalled();
-			expect(mockElectronAPI.onSmartEstimationStatus).toHaveBeenCalled();
+			// The three channels the main process actually emits.
+			expect(mockElectronAPI.onSmartEstimationEvent).toHaveBeenCalled();
 			expect(mockElectronAPI.onSmartEstimationError).toHaveBeenCalled();
 			expect(mockElectronAPI.onSmartEstimationComplete).toHaveBeenCalled();
-			expect(mockElectronAPI.onSmartEstimationEvent).toHaveBeenCalled();
 		});
 
 		it("should handle stream chunks", () => {
@@ -458,15 +446,12 @@ describe("Smart Estimation Store", () => {
 			expect(result.current.phase).toBe("complete");
 		});
 
-		it("should handle events", () => {
+		it("should derive status and streaming output from a progress event", () => {
 			cleanup = setupSmartEstimationListeners();
 
-			// Get the event callback from the mock
 			const eventCallback =
-				mockElectronAPI.onSmartEstimationEvent.mock.results[0].value;
-
+				mockElectronAPI.onSmartEstimationEvent.mock.calls[0][0];
 			const { result } = renderHook(() => useSmartEstimationStore());
-			const _store = result.current;
 
 			act(() => {
 				eventCallback({
@@ -476,8 +461,28 @@ describe("Smart Estimation Store", () => {
 				});
 			});
 
-			// Events are handled by the runner, but we can verify the callback was called
-			expect(mockElectronAPI.onSmartEstimationEvent).toHaveBeenCalled();
+			// No status channel exists; the step is read out of the event payload.
+			expect(result.current.status).toBe("Processing...");
+			expect(result.current.streamingOutput).toContain("Processing...");
+		});
+
+		it("should surface an error carried by an event", () => {
+			cleanup = setupSmartEstimationListeners();
+
+			const eventCallback =
+				mockElectronAPI.onSmartEstimationEvent.mock.calls[0][0];
+			const { result } = renderHook(() => useSmartEstimationStore());
+
+			act(() => {
+				eventCallback({
+					type: "error",
+					data: { error: "Project path not found" },
+					timestamp: "2023-01-01T00:00:00",
+				});
+			});
+
+			expect(result.current.error).toBe("Project path not found");
+			expect(result.current.phase).toBe("error");
 		});
 
 		it("should return cleanup function", () => {

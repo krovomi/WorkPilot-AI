@@ -80,7 +80,7 @@ export const TASK_SOURCES: TaskSource[] = [
 ];
 
 /** Numeric weight for priority sorting (higher = more urgent). */
-const PRIORITY_WEIGHT: Record<TaskPriority, number> = {
+export const PRIORITY_WEIGHT: Record<TaskPriority, number> = {
 	urgent: 4,
 	high: 3,
 	medium: 2,

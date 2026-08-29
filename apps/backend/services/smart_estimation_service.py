@@ -5,6 +5,7 @@ Analyzes build history to provide complexity scores for new tasks.
 Uses historical data to estimate relative complexity similar to story points.
 """
 
+import logging
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -24,6 +25,8 @@ from analytics.database_schema import (
 )
 from core.model_info import get_current_model_info
 from sqlalchemy import desc
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -267,8 +270,18 @@ class SmartEstimationService:
     def _find_similar_tasks(
         self, task_description: str, factors: TaskComplexityFactors
     ) -> list[dict[str, Any]]:
-        """Find similar tasks in build history"""
-        db = next(get_db())
+        """Find similar tasks in build history.
+
+        Returns an empty list when the history cannot be read (no analytics
+        database yet, schema not migrated, ...). An absent history lowers the
+        confidence level; it is not a failure of the estimation.
+        """
+        try:
+            db = next(get_db())
+        except Exception:
+            logger.warning("Build history unavailable; estimating without it")
+            return []
+
         try:
             # Get recent builds with their specs
             recent_builds = (
@@ -327,6 +340,11 @@ class SmartEstimationService:
             similar_tasks.sort(key=lambda x: x["similarity_score"], reverse=True)
             return similar_tasks
 
+        except Exception:
+            logger.warning(
+                "Build history unavailable; estimating without it", exc_info=True
+            )
+            return []
         finally:
             db.close()
 

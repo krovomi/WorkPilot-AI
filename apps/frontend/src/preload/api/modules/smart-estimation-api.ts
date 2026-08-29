@@ -1,70 +1,56 @@
 /**
  * Smart Estimation API
  *
- * Provides API interface for Smart Estimation functionality
+ * Bridges the three channels the main process actually emits:
+ * `smart-estimation-event` (progress, `{type, data, timestamp}`),
+ * `smart-estimation-error` and `smart-estimation-complete`.
+ *
+ * There is deliberately no stream-chunk or status listener here: nothing
+ * emits those channels. Status is carried inside the progress event, and the
+ * renderer derives it there rather than waiting on a channel that never fires.
  */
 
-import { invokeIpc } from "./ipc-utils";
+import type {
+	SmartEstimationEvent,
+	SmartEstimationResult,
+} from "../../../shared/types/smart-estimation";
+import { createIpcListener, invokeIpc } from "./ipc-utils";
 
 export interface SmartEstimationAPI {
 	runSmartEstimation: (
 		projectId: string,
 		taskDescription: string,
-	) => Promise<void>;
+	) => Promise<SmartEstimationResult>;
 	cancelSmartEstimation: () => Promise<boolean>;
-	onSmartEstimationStreamChunk: (
-		callback: (chunk: string) => void,
+	onSmartEstimationEvent: (
+		callback: (event: SmartEstimationEvent) => void,
 	) => () => void;
-	onSmartEstimationStatus: (callback: (status: string) => void) => () => void;
 	onSmartEstimationError: (callback: (error: string) => void) => () => void;
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	onSmartEstimationComplete: (callback: (result: any) => void) => () => void;
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	onSmartEstimationEvent: (callback: (event: any) => void) => () => void;
+	onSmartEstimationComplete: (
+		callback: (result: SmartEstimationResult) => void,
+	) => () => void;
 }
 
 export const createSmartEstimationAPI = (): SmartEstimationAPI => ({
 	runSmartEstimation: (projectId: string, taskDescription: string) =>
-		invokeIpc("smart-estimation:run", { projectId, taskDescription }),
+		invokeIpc("run-smart-estimation", { projectId, taskDescription }),
 
-	cancelSmartEstimation: () => invokeIpc("smart-estimation:cancel"),
+	cancelSmartEstimation: () => invokeIpc("cancel-smart-estimation"),
 
-	onSmartEstimationStreamChunk: (_callback: (chunk: string) => void) => {
-		// TODO: Implement event listener setup
-		return () => {
-			/* TODO: Implement cleanup */
-		};
-	},
+	onSmartEstimationEvent: (callback) =>
+		createIpcListener<[SmartEstimationEvent]>(
+			"smart-estimation-event",
+			callback,
+		),
 
-	onSmartEstimationStatus: (_callback: (status: string) => void) => {
-		// TODO: Implement event listener setup
-		return () => {
-			/* TODO: Implement cleanup */
-		};
-	},
+	onSmartEstimationError: (callback) =>
+		createIpcListener<[string]>("smart-estimation-error", callback),
 
-	onSmartEstimationError: (_callback: (error: string) => void) => {
-		// TODO: Implement event listener setup
-		return () => {
-			/* TODO: Implement cleanup */
-		};
-	},
-
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	onSmartEstimationComplete: (_callback: (result: any) => void) => {
-		// TODO: Implement event listener setup
-		return () => {
-			/* TODO: Implement cleanup */
-		};
-	},
-
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	onSmartEstimationEvent: (_callback: (event: any) => void) => {
-		// TODO: Implement event listener setup
-		return () => {
-			/* TODO: Implement cleanup */
-		};
-	},
+	onSmartEstimationComplete: (callback) =>
+		createIpcListener<[SmartEstimationResult]>(
+			"smart-estimation-complete",
+			callback,
+		),
 });
 
 // Note: This module exports functions that are integrated into the main ElectronAPI

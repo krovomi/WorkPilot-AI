@@ -35,6 +35,7 @@ import {
 	CollapsibleTrigger,
 } from "../ui/collapsible";
 import { Textarea } from "../ui/textarea";
+import { TaskBlockers } from "./TaskBlockers";
 
 // Schéma de sanitization personnalisé permettant les styles inline
 const customSanitizeSchema = {
@@ -720,6 +721,9 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 							</p>
 						</div>
 					)}
+
+					{/* Blocked by — the typed dependencies the queue gate reads. */}
+					<TaskBlockers task={task} />
 
 					{/* Dependencies */}
 					{task.metadata.dependencies &&
