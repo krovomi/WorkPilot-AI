@@ -35,9 +35,7 @@ class TestCreateWorkItem:
         """create_work_item() creates a work item with just a title."""
         mock_wit_client.create_work_item.return_value = sample_api_work_item
 
-        result = work_items_client.create_work_item(
-            TEST_PROJECT, "Task", "My new task"
-        )
+        result = work_items_client.create_work_item(TEST_PROJECT, "Task", "My new task")
 
         assert isinstance(result, WorkItem)
         assert result.id == 42
@@ -122,18 +120,14 @@ class TestCreateWorkItem:
         assert len(doc) == 1
         assert doc[0].path == "/fields/System.Title"
 
-    def test_api_failure_raises_api_error(
-        self, work_items_client, mock_wit_client
-    ):
+    def test_api_failure_raises_api_error(self, work_items_client, mock_wit_client):
         """create_work_item() wraps unexpected errors as APIError."""
         mock_wit_client.create_work_item.side_effect = RuntimeError("Server error")
 
         with pytest.raises(APIError, match="Failed to create"):
             work_items_client.create_work_item(TEST_PROJECT, "Task", "Fail")
 
-    def test_azure_devops_error_passthrough(
-        self, work_items_client, mock_wit_client
-    ):
+    def test_azure_devops_error_passthrough(self, work_items_client, mock_wit_client):
         """create_work_item() re-raises AzureDevOpsError subclasses."""
         mock_wit_client.create_work_item.side_effect = AuthenticationError(
             "Token expired"
@@ -186,17 +180,13 @@ class TestUpdateWorkItem:
         """update_work_item() passes correct id and project."""
         mock_wit_client.update_work_item.return_value = sample_api_work_item
 
-        work_items_client.update_work_item(
-            TEST_PROJECT, 42, {"System.State": "Active"}
-        )
+        work_items_client.update_work_item(TEST_PROJECT, 42, {"System.State": "Active"})
 
         call_kwargs = mock_wit_client.update_work_item.call_args.kwargs
         assert call_kwargs["id"] == 42
         assert call_kwargs["project"] == TEST_PROJECT
 
-    def test_404_raises_work_item_not_found(
-        self, work_items_client, mock_wit_client
-    ):
+    def test_404_raises_work_item_not_found(self, work_items_client, mock_wit_client):
         """update_work_item() maps 404 errors to WorkItemNotFoundError."""
         mock_wit_client.update_work_item.side_effect = Exception("HTTP 404 Not Found")
 
@@ -207,9 +197,7 @@ class TestUpdateWorkItem:
 
         assert exc_info.value.work_item_id == 999
 
-    def test_api_failure_raises_api_error(
-        self, work_items_client, mock_wit_client
-    ):
+    def test_api_failure_raises_api_error(self, work_items_client, mock_wit_client):
         """update_work_item() wraps unexpected errors as APIError."""
         mock_wit_client.update_work_item.side_effect = RuntimeError("Timeout")
 
@@ -218,9 +206,7 @@ class TestUpdateWorkItem:
                 TEST_PROJECT, 42, {"System.State": "Active"}
             )
 
-    def test_azure_devops_error_passthrough(
-        self, work_items_client, mock_wit_client
-    ):
+    def test_azure_devops_error_passthrough(self, work_items_client, mock_wit_client):
         """update_work_item() re-raises AzureDevOpsError subclasses."""
         mock_wit_client.update_work_item.side_effect = AuthenticationError(
             "Access denied"
@@ -305,9 +291,7 @@ class TestLinkWorkItems:
         doc = mock_wit_client.update_work_item.call_args.kwargs["document"]
         assert "attributes" not in doc[0].value
 
-    def test_404_raises_work_item_not_found(
-        self, work_items_client, mock_wit_client
-    ):
+    def test_404_raises_work_item_not_found(self, work_items_client, mock_wit_client):
         """link_work_items() maps 404 errors to WorkItemNotFoundError."""
         mock_wit_client.update_work_item.side_effect = Exception("404 Not Found")
 
@@ -316,18 +300,14 @@ class TestLinkWorkItems:
 
         assert exc_info.value.work_item_id == 42
 
-    def test_api_failure_raises_api_error(
-        self, work_items_client, mock_wit_client
-    ):
+    def test_api_failure_raises_api_error(self, work_items_client, mock_wit_client):
         """link_work_items() wraps unexpected errors as APIError."""
         mock_wit_client.update_work_item.side_effect = RuntimeError("Timeout")
 
         with pytest.raises(APIError, match="Failed to link work items"):
             work_items_client.link_work_items(TEST_PROJECT, 42, 55)
 
-    def test_azure_devops_error_passthrough(
-        self, work_items_client, mock_wit_client
-    ):
+    def test_azure_devops_error_passthrough(self, work_items_client, mock_wit_client):
         """link_work_items() re-raises AzureDevOpsError subclasses."""
         mock_wit_client.update_work_item.side_effect = AuthenticationError(
             "Token expired"

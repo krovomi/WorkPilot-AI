@@ -41,6 +41,7 @@ from apps.backend.scheduling.dashboard_metrics import (
 # TaskRecord
 # -----------------------------------------------------------------------
 
+
 class TestTaskRecord:
     def test_create_task_record(self):
         record = TaskRecord(
@@ -74,9 +75,12 @@ class TestTaskRecord:
 # QARecord
 # -----------------------------------------------------------------------
 
+
 class TestQARecord:
     def test_create_qa_record(self):
-        record = QARecord(project_id="p", task_id="t", passed=True, score=92.5, attempt=1)
+        record = QARecord(
+            project_id="p", task_id="t", passed=True, score=92.5, attempt=1
+        )
         assert record.passed is True
         assert record.score == 92.5
         assert record.attempt == 1
@@ -93,11 +97,16 @@ class TestQARecord:
 # TokenRecord
 # -----------------------------------------------------------------------
 
+
 class TestTokenRecord:
     def test_create_token_record(self):
         record = TokenRecord(
-            project_id="p", provider="anthropic", model="claude-sonnet-4-20250514",
-            input_tokens=1000, output_tokens=500, cost=0.01,
+            project_id="p",
+            provider="anthropic",
+            model="claude-sonnet-4-20250514",
+            input_tokens=1000,
+            output_tokens=500,
+            cost=0.01,
         )
         assert record.provider == "anthropic"
         assert record.input_tokens == 1000
@@ -114,11 +123,14 @@ class TestTokenRecord:
 # MergeRecord
 # -----------------------------------------------------------------------
 
+
 class TestMergeRecord:
     def test_create_merge_record(self):
         record = MergeRecord(
-            project_id="p", task_id="t",
-            resolution=MergeResolution.MANUAL, files_affected=3,
+            project_id="p",
+            task_id="t",
+            resolution=MergeResolution.MANUAL,
+            files_affected=3,
         )
         assert record.resolution == MergeResolution.MANUAL
         assert record.files_affected == 3
@@ -132,6 +144,7 @@ class TestMergeRecord:
 # -----------------------------------------------------------------------
 # DashboardSnapshot
 # -----------------------------------------------------------------------
+
 
 class TestDashboardSnapshot:
     def test_create_snapshot(self):
@@ -157,6 +170,7 @@ class TestDashboardSnapshot:
 # DashboardMetrics — recording
 # -----------------------------------------------------------------------
 
+
 class TestDashboardMetricsRecording:
     def setup_method(self):
         self.dashboard = DashboardMetrics()
@@ -167,7 +181,9 @@ class TestDashboardMetricsRecording:
 
     def test_record_task_updates_existing(self):
         self.dashboard.record_task("p", "t1", "Task 1", status="pending")
-        task = self.dashboard.record_task("p", "t1", "Task 1 updated", status="completed")
+        task = self.dashboard.record_task(
+            "p", "t1", "Task 1 updated", status="completed"
+        )
         assert task.status == TaskStatus.COMPLETED
         assert task.title == "Task 1 updated"
         assert len(self.dashboard.get_tasks("p")) == 1
@@ -187,7 +203,12 @@ class TestDashboardMetricsRecording:
 
     def test_record_token_usage(self):
         token = self.dashboard.record_token_usage(
-            "p", "anthropic", "claude-sonnet-4-20250514", input_tokens=1000, output_tokens=500, cost=0.01,
+            "p",
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            input_tokens=1000,
+            output_tokens=500,
+            cost=0.01,
         )
         assert token.input_tokens == 1000
 
@@ -196,7 +217,9 @@ class TestDashboardMetricsRecording:
         assert merge.resolution == MergeResolution.AUTOMATIC
 
     def test_record_merge_manual(self):
-        merge = self.dashboard.record_merge("p", "t1", resolution="manual", files_affected=5)
+        merge = self.dashboard.record_merge(
+            "p", "t1", resolution="manual", files_affected=5
+        )
         assert merge.resolution == MergeResolution.MANUAL
         assert merge.files_affected == 5
 
@@ -204,6 +227,7 @@ class TestDashboardMetricsRecording:
 # -----------------------------------------------------------------------
 # DashboardMetrics — queries
 # -----------------------------------------------------------------------
+
 
 class TestDashboardMetricsQueries:
     def setup_method(self):
@@ -241,12 +265,15 @@ class TestDashboardMetricsQueries:
 # DashboardMetrics — snapshot KPIs
 # -----------------------------------------------------------------------
 
+
 class TestDashboardMetricsSnapshot:
     def setup_method(self):
         self.dashboard = DashboardMetrics()
 
     def test_snapshot_tasks_by_status(self):
-        self.dashboard.record_task("p", "t1", "T1", status="completed", completion_seconds=100)
+        self.dashboard.record_task(
+            "p", "t1", "T1", status="completed", completion_seconds=100
+        )
         self.dashboard.record_task("p", "t2", "T2", status="pending")
         self.dashboard.record_task("p", "t3", "T3", status="failed")
         snap = self.dashboard.get_snapshot("p")
@@ -255,9 +282,30 @@ class TestDashboardMetricsSnapshot:
         assert snap.tasks_by_status["failed"] == 1
 
     def test_snapshot_avg_completion_by_complexity(self):
-        self.dashboard.record_task("p", "t1", "T1", status="completed", complexity="low", completion_seconds=100)
-        self.dashboard.record_task("p", "t2", "T2", status="completed", complexity="low", completion_seconds=200)
-        self.dashboard.record_task("p", "t3", "T3", status="completed", complexity="high", completion_seconds=600)
+        self.dashboard.record_task(
+            "p",
+            "t1",
+            "T1",
+            status="completed",
+            complexity="low",
+            completion_seconds=100,
+        )
+        self.dashboard.record_task(
+            "p",
+            "t2",
+            "T2",
+            status="completed",
+            complexity="low",
+            completion_seconds=200,
+        )
+        self.dashboard.record_task(
+            "p",
+            "t3",
+            "T3",
+            status="completed",
+            complexity="high",
+            completion_seconds=600,
+        )
         snap = self.dashboard.get_snapshot("p")
         assert snap.avg_completion_by_complexity["low"] == 150.0
         assert snap.avg_completion_by_complexity["high"] == 600.0
@@ -276,8 +324,12 @@ class TestDashboardMetricsSnapshot:
         assert snap.qa_avg_score == 85.0
 
     def test_snapshot_tokens(self):
-        self.dashboard.record_token_usage("p", "anthropic", "claude", input_tokens=1000, output_tokens=500)
-        self.dashboard.record_token_usage("p", "openai", "gpt-4o", input_tokens=2000, output_tokens=1000)
+        self.dashboard.record_token_usage(
+            "p", "anthropic", "claude", input_tokens=1000, output_tokens=500
+        )
+        self.dashboard.record_token_usage(
+            "p", "openai", "gpt-4o", input_tokens=2000, output_tokens=1000
+        )
         snap = self.dashboard.get_snapshot("p")
         assert snap.total_tokens == 4500
         assert snap.tokens_by_provider["anthropic"] == 1500
@@ -308,12 +360,17 @@ class TestDashboardMetricsSnapshot:
 # DashboardMetrics — export
 # -----------------------------------------------------------------------
 
+
 class TestDashboardMetricsExport:
     def setup_method(self):
         self.dashboard = DashboardMetrics()
-        self.dashboard.record_task("p", "t1", "T1", status="completed", completion_seconds=100)
+        self.dashboard.record_task(
+            "p", "t1", "T1", status="completed", completion_seconds=100
+        )
         self.dashboard.record_qa_result("p", "t1", True, 90.0)
-        self.dashboard.record_token_usage("p", "anthropic", "claude", input_tokens=1000, output_tokens=500, cost=0.01)
+        self.dashboard.record_token_usage(
+            "p", "anthropic", "claude", input_tokens=1000, output_tokens=500, cost=0.01
+        )
         self.dashboard.record_merge("p", "t1", "automatic")
 
     def test_export_json(self):
@@ -347,6 +404,7 @@ class TestDashboardMetricsExport:
 # -----------------------------------------------------------------------
 # DashboardMetrics — stats
 # -----------------------------------------------------------------------
+
 
 class TestDashboardMetricsStats:
     def test_stats_empty(self):

@@ -28,7 +28,7 @@ class TestReactToVueTransformer:
         """Test React component detection."""
         transformer = ReactToVueTransformer(temp_project)
 
-        react_code = TEST_FIXTURES['react_component']['content']
+        react_code = TEST_FIXTURES["react_component"]["content"]
         assert transformer._is_react_component(react_code)
 
         # Non-React code
@@ -41,9 +41,9 @@ class TestReactToVueTransformer:
         jsx = '<div className="counter"><p>Count: {count}</p></div>'
         result = transformer._transform_jsx_to_template(jsx)
 
-        assert 'class=' in result
-        assert 'className=' not in result
-        assert '{{ count }}' in result or '{ count }' not in result
+        assert "class=" in result
+        assert "className=" not in result
+        assert "{{ count }}" in result or "{ count }" not in result
 
     def test_transform_event_handlers(self, temp_project):
         """Test event handler transformation.
@@ -56,11 +56,11 @@ class TestReactToVueTransformer:
         transformer = ReactToVueTransformer(temp_project)
 
         # _transform_jsx_to_template handles the onClick -> @click conversion
-        jsx = '<button onClick={handleClick}>Click</button>'
+        jsx = "<button onClick={handleClick}>Click</button>"
         result = transformer._transform_jsx_to_template(jsx)
 
-        assert '@click=' in result
-        assert 'onClick=' not in result
+        assert "@click=" in result
+        assert "onClick=" not in result
 
     def test_transform_print_statement(self, temp_project):
         """Test print statement transformation."""
@@ -69,7 +69,7 @@ class TestReactToVueTransformer:
         code = 'print "Hello, World!"'
         result = transformer._transform_print_statements(code)
 
-        assert 'print(' in result
+        assert "print(" in result
         assert '"Hello, World!"' in result
 
 
@@ -90,8 +90,8 @@ class TestDatabaseTransformer:
         sql = "CREATE TABLE users (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY)"
         result = transformer._transform_sql(sql)
 
-        assert 'INTEGER' in result or 'SERIAL' in result
-        assert 'INT' not in result or 'INTEGER' in result
+        assert "INTEGER" in result or "SERIAL" in result
+        assert "INT" not in result or "INTEGER" in result
 
     def test_remove_mysql_options(self, temp_project):
         """Test removal of MySQL-specific options."""
@@ -100,17 +100,17 @@ class TestDatabaseTransformer:
         sql = "CREATE TABLE users (...) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         result = transformer._transform_sql(sql)
 
-        assert 'ENGINE' not in result
-        assert 'CHARSET' not in result
+        assert "ENGINE" not in result
+        assert "CHARSET" not in result
 
     def test_backtick_replacement(self, temp_project):
         """Test backtick to quote conversion."""
         transformer = DatabaseTransformer(temp_project)
 
-        sql = 'CREATE TABLE `users` (`id` INT)'
+        sql = "CREATE TABLE `users` (`id` INT)"
         result = transformer._transform_create_table(sql)
 
-        assert '`' not in result
+        assert "`" not in result
         assert '"users"' in result
 
     def test_auto_increment_transformation(self, temp_project):
@@ -120,8 +120,8 @@ class TestDatabaseTransformer:
         sql = "id INT NOT NULL AUTO_INCREMENT PRIMARY KEY"
         result = transformer._transform_auto_increment(sql)
 
-        assert 'SERIAL' in result
-        assert 'AUTO_INCREMENT' not in result
+        assert "SERIAL" in result
+        assert "AUTO_INCREMENT" not in result
 
 
 class TestPythonTransformer:
@@ -137,7 +137,7 @@ class TestPythonTransformer:
         """Test Python 2 detection."""
         transformer = PythonTransformer(temp_project)
 
-        python2_code = TEST_FIXTURES['python2_code']['content']
+        python2_code = TEST_FIXTURES["python2_code"]["content"]
         assert transformer._is_python2_code(python2_code)
 
         # Python 3 code
@@ -151,8 +151,8 @@ class TestPythonTransformer:
         code = "for i in xrange(10): pass"
         result = transformer._transform_range(code)
 
-        assert 'range(10)' in result
-        assert 'xrange' not in result
+        assert "range(10)" in result
+        assert "xrange" not in result
 
     def test_unicode_to_str(self, temp_project):
         """Test unicode conversion."""
@@ -162,7 +162,7 @@ class TestPythonTransformer:
         result = transformer._transform_string_handling(code)
 
         assert "str('hello')" in result
-        assert 'unicode' not in result
+        assert "unicode" not in result
 
     def test_dict_iteritems(self, temp_project):
         """Test dict.iteritems() conversion."""
@@ -171,8 +171,8 @@ class TestPythonTransformer:
         code = "for k, v in mydict.iteritems(): pass"
         result = transformer._transform_iterators(code)
 
-        assert '.items()' in result
-        assert '.iteritems()' not in result
+        assert ".items()" in result
+        assert ".iteritems()" not in result
 
     def test_exception_syntax(self, temp_project):
         """Test exception syntax conversion."""
@@ -181,7 +181,7 @@ class TestPythonTransformer:
         code = "except Exception, e:"
         result = transformer._transform_exceptions(code)
 
-        assert 'except Exception as e:' in result or 'Exception,' not in result
+        assert "except Exception as e:" in result or "Exception," not in result
 
 
 class TestJSToTypeScriptTransformer:
@@ -200,7 +200,7 @@ class TestJSToTypeScriptTransformer:
         code = "function greet(name) { return `Hello, ${name}`; }"
         result = transformer._add_function_types(code)
 
-        assert 'name:' in result or ': any' in result
+        assert "name:" in result or ": any" in result
 
     def test_arrow_function_annotation(self, temp_project):
         """Test arrow function annotation."""
@@ -209,7 +209,7 @@ class TestJSToTypeScriptTransformer:
         code = "const greet = (name) => `Hello, ${name}`"
         result = transformer._add_function_types(code)
 
-        assert 'name:' in result or ': any' in result
+        assert "name:" in result or ": any" in result
 
     def test_primitive_type_inference(self, temp_project):
         """Test type inference for primitives."""
@@ -218,7 +218,7 @@ class TestJSToTypeScriptTransformer:
         code = "const count = 5"
         result = transformer._add_variable_types(code)
 
-        assert ': number' in result
+        assert ": number" in result
 
     def test_string_type_inference(self, temp_project):
         """Test string type inference.
@@ -233,7 +233,7 @@ class TestJSToTypeScriptTransformer:
         code = 'const name = "Alice Smith"'
         result = transformer._add_variable_types(code)
 
-        assert ': string' in result
+        assert ": string" in result
 
 
 class TestTransformerIntegration:
@@ -251,7 +251,7 @@ class TestTransformerIntegration:
 
         # Create test file
         test_file = project_path / "Counter.jsx"
-        test_file.write_text(TEST_FIXTURES['react_component']['content'])
+        test_file.write_text(TEST_FIXTURES["react_component"]["content"])
 
         # Transform
         transformer = ReactToVueTransformer(temp_project)
@@ -267,7 +267,7 @@ class TestTransformerIntegration:
 
         # Create test file
         test_file = project_path / "legacy.py"
-        test_file.write_text(TEST_FIXTURES['python2_code']['content'])
+        test_file.write_text(TEST_FIXTURES["python2_code"]["content"])
 
         # Transform
         transformer = PythonTransformer(temp_project)
@@ -275,7 +275,7 @@ class TestTransformerIntegration:
 
         assert len(results) == 1
         assert results[0].confidence > 0.7
-        assert 'print(' in results[0].after
+        assert "print(" in results[0].after
 
 
 @pytest.mark.performance
@@ -293,12 +293,13 @@ class TestTransformerPerformance:
         project_path = Path(temp_project)
 
         # Create a large Python file
-        large_content = TEST_FIXTURES['python2_code']['content'] * 100
+        large_content = TEST_FIXTURES["python2_code"]["content"] * 100
         test_file = project_path / "large.py"
         test_file.write_text(large_content)
 
         # Transform and measure time
         import time
+
         transformer = PythonTransformer(temp_project)
 
         start = time.time()
@@ -327,7 +328,7 @@ class TestReactToAngularTransformer:
 
         transformer = ReactToAngularTransformer(temp_project)
 
-        react_code = TEST_FIXTURES['react_component']['content']
+        react_code = TEST_FIXTURES["react_component"]["content"]
         assert transformer._is_react_component(react_code)
 
         # Non-React code
@@ -344,9 +345,9 @@ class TestReactToAngularTransformer:
         code = "function Counter({ count, onIncrement }) { return <div>{count}</div> }"
         result = transformer._transform_props_to_inputs(code)
 
-        assert '@Input()' in result
-        assert 'count' in result
-        assert 'onIncrement' in result
+        assert "@Input()" in result
+        assert "count" in result
+        assert "onIncrement" in result
 
     def test_transform_state_to_properties(self, temp_project):
         """Test state to properties conversion."""
@@ -359,8 +360,8 @@ class TestReactToAngularTransformer:
         code = "const [count, setCount] = useState(0)"
         result = transformer._transform_state_to_properties(code)
 
-        assert 'count: any = 0' in result
-        assert 'useState' not in result
+        assert "count: any = 0" in result
+        assert "useState" not in result
 
     def test_transform_hooks_to_lifecycle(self, temp_project):
         """Test hooks to lifecycle conversion."""
@@ -373,8 +374,8 @@ class TestReactToAngularTransformer:
         code = "useEffect(() => { console.log('init') }, [])"
         result = transformer._transform_hooks_to_lifecycle(code)
 
-        assert 'ngOnInit()' in result
-        assert 'useEffect' not in result
+        assert "ngOnInit()" in result
+        assert "useEffect" not in result
 
     def test_full_react_to_angular_transformation(self, temp_project):
         """Test full React to Angular transformation."""
@@ -388,7 +389,7 @@ class TestReactToAngularTransformer:
 
         # Create test file
         test_file = project_path / "Counter.jsx"
-        test_file.write_text(TEST_FIXTURES['react_component']['content'])
+        test_file.write_text(TEST_FIXTURES["react_component"]["content"])
 
         # Transform
         transformer = ReactToAngularTransformer(temp_project)
@@ -396,8 +397,8 @@ class TestReactToAngularTransformer:
 
         assert len(results) == 1
         assert results[0].confidence > 0.7
-        assert '@Component' in results[0].after
-        assert 'export class' in results[0].after
+        assert "@Component" in results[0].after
+        assert "export class" in results[0].after
 
 
 class TestJSToCSharpTransformer:
@@ -417,10 +418,10 @@ class TestJSToCSharpTransformer:
 
         transformer = JSToCSharpTransformer(temp_project)
 
-        assert transformer.TYPE_MAPPINGS['string'] == 'string'
-        assert transformer.TYPE_MAPPINGS['number'] == 'double'
-        assert transformer.TYPE_MAPPINGS['boolean'] == 'bool'
-        assert transformer.TYPE_MAPPINGS['any'] == 'dynamic'
+        assert transformer.TYPE_MAPPINGS["string"] == "string"
+        assert transformer.TYPE_MAPPINGS["number"] == "double"
+        assert transformer.TYPE_MAPPINGS["boolean"] == "bool"
+        assert transformer.TYPE_MAPPINGS["any"] == "dynamic"
 
     def test_transform_imports_to_using(self, temp_project):
         """Test import to using statement conversion."""
@@ -433,8 +434,8 @@ class TestJSToCSharpTransformer:
         code = "import { Component } from '@angular/core'"
         result = transformer._transform_imports(code)
 
-        assert 'using' in result
-        assert 'import' not in result
+        assert "using" in result
+        assert "import" not in result
 
     def test_transform_variables(self, temp_project):
         """Test variable declaration conversion."""
@@ -447,8 +448,8 @@ class TestJSToCSharpTransformer:
         code = "const name: string = 'John'"
         result = transformer._transform_variables(code)
 
-        assert 'string name =' in result
-        assert 'const' not in result
+        assert "string name =" in result
+        assert "const" not in result
 
     def test_transform_template_literals(self, temp_project):
         """Test template literal conversion."""
@@ -462,7 +463,7 @@ class TestJSToCSharpTransformer:
         result = transformer._transform_template_literals(code)
 
         assert '$"' in result
-        assert '${' not in result
+        assert "${" not in result
 
     def test_transform_array_methods(self, temp_project):
         """Test array method conversion."""
@@ -475,10 +476,10 @@ class TestJSToCSharpTransformer:
         code = "items.map(x => x.id).filter(id => id > 0)"
         result = transformer._transform_arrays(code)
 
-        assert '.Select(' in result
-        assert '.Where(' in result
-        assert '.map(' not in result
-        assert '.filter(' not in result
+        assert ".Select(" in result
+        assert ".Where(" in result
+        assert ".map(" not in result
+        assert ".filter(" not in result
 
     def test_transform_string_methods(self, temp_project):
         """Test string method conversion."""
@@ -491,9 +492,9 @@ class TestJSToCSharpTransformer:
         code = "name.toUpperCase().trim()"
         result = transformer._transform_strings(code)
 
-        assert '.ToUpper(' in result
-        assert '.Trim(' in result
-        assert '.toUpperCase' not in result
+        assert ".ToUpper(" in result
+        assert ".Trim(" in result
+        assert ".toUpperCase" not in result
 
     def test_full_js_to_csharp_transformation(self, temp_project):
         """Test full JavaScript to C# transformation."""
@@ -507,16 +508,18 @@ class TestJSToCSharpTransformer:
 
         # Create test file
         test_file = project_path / "service.js"
-        test_file.write_text("const getData = async (id) => { return await fetch(`/api/${id}`); }")
+        test_file.write_text(
+            "const getData = async (id) => { return await fetch(`/api/${id}`); }"
+        )
 
         # Transform
         transformer = JSToCSharpTransformer(temp_project)
         results = transformer.transform_files(["service.js"])
 
         assert len(results) == 1
-        assert results[0].file_path.endswith('.cs')
-        assert 'namespace' in results[0].after
-        assert 'async Task' in results[0].after
+        assert results[0].file_path.endswith(".cs")
+        assert "namespace" in results[0].after
+        assert "async Task" in results[0].after
 
 
 class TestIntegrationNewTransformers:
@@ -582,7 +585,7 @@ const filterActive = (items) => {
         results = engine.transform_code()
 
         assert len(results) > 0
-        assert any(r.file_path.endswith('.cs') for r in results)
+        assert any(r.file_path.endswith(".cs") for r in results)
 
 
 class TestNewTransformerErrors:

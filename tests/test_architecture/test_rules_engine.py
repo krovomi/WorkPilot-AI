@@ -83,8 +83,7 @@ class TestRulesEngineValidation:
 
         # Clean component that imports correctly
         (tmp_project / "src" / "components" / "App.tsx").write_text(
-            "import React from 'react';\n"
-            "import { useAuth } from '../hooks/useAuth';\n",
+            "import React from 'react';\nimport { useAuth } from '../hooks/useAuth';\n",
             encoding="utf-8",
         )
         (tmp_project / "src" / "hooks" / "useAuth.ts").write_text(
@@ -93,9 +92,7 @@ class TestRulesEngineValidation:
         )
 
         engine = ArchitectureRulesEngine(tmp_project, config)
-        report = engine.validate(
-            changed_files=["src/components/App.tsx"]
-        )
+        report = engine.validate(changed_files=["src/components/App.tsx"])
 
         assert report.passed is True
         assert len(report.violations) == 0
@@ -116,9 +113,7 @@ class TestRulesEngineValidation:
         )
 
         engine = ArchitectureRulesEngine(tmp_project, config)
-        report = engine.validate(
-            changed_files=["src/components/App.tsx"]
-        )
+        report = engine.validate(changed_files=["src/components/App.tsx"])
 
         # Should have violations (layer + possibly forbidden pattern)
         total_issues = len(report.violations) + len(report.warnings)
@@ -135,13 +130,13 @@ class TestRulesEngineValidation:
         )
 
         engine = ArchitectureRulesEngine(tmp_project, config)
-        report = engine.validate(
-            changed_files=["src/components/List.tsx"]
-        )
+        report = engine.validate(changed_files=["src/components/List.tsx"])
 
         # Should have at least one forbidden import violation
         forbidden = [
-            v for v in report.violations + report.warnings if v.type == "forbidden_import"
+            v
+            for v in report.violations + report.warnings
+            if v.type == "forbidden_import"
         ]
         assert len(forbidden) > 0
 

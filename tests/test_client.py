@@ -55,10 +55,12 @@ class TestClientTokenValidation:
         monkeypatch.setattr(
             "core.auth.get_token_from_keychain", lambda _config_dir=None: None
         )
+
         # Mock decrypt_token to raise ValueError (simulates decryption failure)
         # This ensures the encrypted token flows through to validate_token_not_encrypted
         def _raise_decrypt_error(t):
             raise ValueError("Decryption not supported")
+
         monkeypatch.setattr("core.auth.decrypt_token", _raise_decrypt_error)
 
         with pytest.raises(ValueError, match="encrypted format"):
@@ -73,9 +75,11 @@ class TestClientTokenValidation:
         monkeypatch.setattr(
             "core.auth.get_token_from_keychain", lambda _config_dir=None: None
         )
+
         # Mock decrypt_token to raise ValueError (simulates decryption failure)
         def _raise_decrypt_error(t):
             raise ValueError("Decryption not supported")
+
         monkeypatch.setattr("core.auth.decrypt_token", _raise_decrypt_error)
 
         with pytest.raises(ValueError, match="encrypted format"):
@@ -270,7 +274,9 @@ class TestAPIProfileAuthentication:
         mock_sdk_client = MagicMock()
         with (
             patch("core.client.ClaudeSDKClient", return_value=mock_sdk_client),
-            patch("core.auth.require_auth_token", return_value=oauth_token) as mock_require,
+            patch(
+                "core.auth.require_auth_token", return_value=oauth_token
+            ) as mock_require,
             patch("core.auth.validate_token_not_encrypted") as mock_validate,
         ):
             from core.client import create_client
@@ -725,8 +731,9 @@ class TestClaudeOptionsEffortGuard:
                 captured.update(kwargs)
 
         mock_sdk_client = MagicMock()
-        with patch.object(client_module, "ClaudeAgentOptions", StrictOptions), patch(
-            "core.client.ClaudeSDKClient", return_value=mock_sdk_client
+        with (
+            patch.object(client_module, "ClaudeAgentOptions", StrictOptions),
+            patch("core.client.ClaudeSDKClient", return_value=mock_sdk_client),
         ):
             from core.client import create_client
 

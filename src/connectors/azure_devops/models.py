@@ -163,9 +163,7 @@ class WorkItem:
             iteration_path=fields.get("System.IterationPath"),
             priority=priority,
             url=getattr(api_work_item, "url", None),
-            acceptance_criteria=fields.get(
-                "Microsoft.VSTS.Common.AcceptanceCriteria"
-            ),
+            acceptance_criteria=fields.get("Microsoft.VSTS.Common.AcceptanceCriteria"),
         )
 
 
@@ -348,6 +346,7 @@ class PullRequestFileChange:
             change_type=getattr(api_change, "change_type", ""),
             additions=getattr(api_change, "additions", 0),
             deletions=getattr(api_change, "deletions", 0),
-            changes=getattr(api_change, "additions", 0) + getattr(api_change, "deletions", 0),
+            changes=getattr(api_change, "additions", 0)
+            + getattr(api_change, "deletions", 0),
             old_path=getattr(api_change, "source", {}).get("path", None),
         )

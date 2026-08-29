@@ -245,6 +245,7 @@ class TestPostSessionProcessing:
             mock_memory.return_value = (True, "file")
 
             commit_before = get_latest_commit(project_dir)
+
             # Run async function using asyncio.run()
             async def run_test():
                 return await post_session_processing(
@@ -298,6 +299,7 @@ class TestPostSessionProcessing:
             mock_memory.return_value = (True, "file")
 
             commit_before = get_latest_commit(project_dir)
+
             # Run async function using asyncio.run()
             async def run_test():
                 return await post_session_processing(
@@ -352,6 +354,7 @@ class TestPostSessionProcessing:
             mock_memory.return_value = (True, "file")
 
             commit_before = get_latest_commit(project_dir)
+
             # Run async function using asyncio.run()
             async def run_test():
                 return await post_session_processing(

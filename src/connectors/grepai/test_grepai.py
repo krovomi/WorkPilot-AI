@@ -5,7 +5,7 @@ if __name__ == "__main__":
     query = "def my_function"
     print(f"Recherche Grepai pour : {query}")
     result = client.search(query=query)
-    if 'error' in result:
-        print("Erreur lors de la requête Grepai :", result['error'])
+    if "error" in result:
+        print("Erreur lors de la requête Grepai :", result["error"])
     else:
         print("Résultat Grepai :", result)

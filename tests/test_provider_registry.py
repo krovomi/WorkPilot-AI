@@ -21,10 +21,12 @@ def test_list_available_providers(monkeypatch):
     assert "openai" in providers
     assert "claude_opus" not in providers
 
+
 def test_validate_provider(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
     assert validate_provider("anthropic")
     assert not validate_provider("nonexistent_provider")
+
 
 def test_get_provider_status(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "test")

@@ -167,9 +167,7 @@ def test_email_sends_via_smtp(
         asyncio.run(manager._send_email(sample_alert))
 
     smtp_ctor.assert_called_once_with("smtp.example.com", 587, timeout=10)
-    mock_smtp_instance.login.assert_called_once_with(
-        "alerts@example.com", "secret"
-    )
+    mock_smtp_instance.login.assert_called_once_with("alerts@example.com", "secret")
     mock_smtp_instance.send_message.assert_called_once()
     msg = mock_smtp_instance.send_message.call_args.args[0]
     assert msg["To"] == "oncall@example.com"
@@ -217,8 +215,6 @@ def test_github_gh_failure_is_tolerated(
     monkeypatch, manager: AlertManager, sample_alert: Alert
 ) -> None:
     monkeypatch.setenv("SELF_HEALING_GITHUB_REPO", "acme/demo")
-    completed = MagicMock(
-        returncode=1, stdout="", stderr="not authenticated"
-    )
+    completed = MagicMock(returncode=1, stdout="", stderr="not authenticated")
     with patch("subprocess.run", return_value=completed):
         asyncio.run(manager._send_github_issue(sample_alert))

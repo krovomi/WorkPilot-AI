@@ -70,13 +70,11 @@ class JiraClient:
         """
         if not base_url:
             raise JiraConfigurationError(
-                "Jira base URL is required. "
-                "Set the JIRA_URL environment variable."
+                "Jira base URL is required. Set the JIRA_URL environment variable."
             )
         if not email:
             raise JiraConfigurationError(
-                "Jira email is required. "
-                "Set the JIRA_EMAIL environment variable."
+                "Jira email is required. Set the JIRA_EMAIL environment variable."
             )
         if not token:
             raise JiraConfigurationError(
@@ -140,10 +138,12 @@ class JiraClient:
 
         self._session = requests.Session()
         self._session.auth = (self._email, self._token)
-        self._session.headers.update({
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        })
+        self._session.headers.update(
+            {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            }
+        )
 
         try:
             response = self._session.get(
@@ -168,9 +168,7 @@ class JiraClient:
                 f"Cannot connect to Jira at '{self.base_url}': {exc}"
             ) from exc
         except requests.exceptions.RequestException as exc:
-            raise JiraAPIError(
-                f"Failed to connect to Jira: {exc}"
-            ) from exc
+            raise JiraAPIError(f"Failed to connect to Jira: {exc}") from exc
 
         self._connected = True
         logger.info("Successfully connected to Jira.")
@@ -187,9 +185,7 @@ class JiraClient:
             JiraConfigurationError: If connect() has not been called.
         """
         if not self.is_connected:
-            raise JiraConfigurationError(
-                "Not connected to Jira. Call connect() first."
-            )
+            raise JiraConfigurationError("Not connected to Jira. Call connect() first.")
 
     def _handle_error_response(
         self,
@@ -221,9 +217,7 @@ class JiraClient:
             if "/issue/" in endpoint:
                 key = endpoint.split("/issue/")[-1].split("/")[0]
                 raise JiraIssueNotFoundError(key)
-            raise JiraAPIError(
-                f"Resource not found: {endpoint}", status_code=404
-            )
+            raise JiraAPIError(f"Resource not found: {endpoint}", status_code=404)
 
         if response.status_code >= 400:
             error_body = ""
@@ -275,9 +269,7 @@ class JiraClient:
                 timeout=timeout,
             )
         except requests.exceptions.RequestException as exc:
-            raise JiraAPIError(
-                f"Request to {endpoint} failed: {exc}"
-            ) from exc
+            raise JiraAPIError(f"Request to {endpoint} failed: {exc}") from exc
 
         self._handle_error_response(response, endpoint)
 
@@ -319,9 +311,7 @@ class JiraClient:
                 timeout=timeout,
             )
         except requests.exceptions.RequestException as exc:
-            raise JiraAPIError(
-                f"Request to {endpoint} failed: {exc}"
-            ) from exc
+            raise JiraAPIError(f"Request to {endpoint} failed: {exc}") from exc
 
         self._handle_error_response(response, endpoint)
 
@@ -363,9 +353,7 @@ class JiraClient:
                 timeout=timeout,
             )
         except requests.exceptions.RequestException as exc:
-            raise JiraAPIError(
-                f"Request to {endpoint} failed: {exc}"
-            ) from exc
+            raise JiraAPIError(f"Request to {endpoint} failed: {exc}") from exc
 
         self._handle_error_response(response, endpoint)
 

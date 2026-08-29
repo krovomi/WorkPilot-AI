@@ -19,26 +19,33 @@ import requests
 def import_module_direct(module_name, file_path):
     """Import a module directly from file path, bypassing package __init__.py"""
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
+
 # Import modules directly to avoid circular import issues in __init__.py
 project_root = Path(__file__).parent.parent.parent.parent
 
 # Import exceptions first
-exceptions_module = import_module_direct("sonarqube_exceptions", project_root / "src" / "connectors" / "sonarqube" / "exceptions.py")
+exceptions_module = import_module_direct(
+    "sonarqube_exceptions",
+    project_root / "src" / "connectors" / "sonarqube" / "exceptions.py",
+)
 
 # Make exceptions available in sys.modules so client can import them
 sys.modules["src.connectors.sonarqube.exceptions"] = exceptions_module
-sonarqube_package = type('Package', (), {'exceptions': exceptions_module})()
+sonarqube_package = type("Package", (), {"exceptions": exceptions_module})()
 sys.modules["src.connectors.sonarqube"] = sonarqube_package
-sys.modules["src.connectors"] = type('Package', (), {'sonarqube': sonarqube_package})()
+sys.modules["src.connectors"] = type("Package", (), {"sonarqube": sonarqube_package})()
 
 # Now import client
-client_module = import_module_direct("sonarqube_client", project_root / "src" / "connectors" / "sonarqube" / "client.py")
+client_module = import_module_direct(
+    "sonarqube_client", project_root / "src" / "connectors" / "sonarqube" / "client.py"
+)
 
 # Update the package to include the client module for patching
 sonarqube_package.client = client_module
@@ -69,6 +76,7 @@ def sonar_client():
 @pytest.fixture
 def mock_response():
     """Create a reusable mock response factory."""
+
     def _make(status_code=200, json_data=None, text=""):
         resp = MagicMock(spec=requests.Response)
         resp.status_code = status_code
@@ -80,6 +88,7 @@ def mock_response():
         if status_code >= 400:
             resp.raise_for_status.side_effect = requests.exceptions.HTTPError()
         return resp
+
     return _make
 
 
@@ -123,9 +132,7 @@ class TestClientConnect:
 
         with patch("src.connectors.sonarqube.client.requests.Session") as MockSession:
             mock_session = MagicMock()
-            mock_session.get.return_value = mock_response(
-                200, {"status": "UP"}
-            )
+            mock_session.get.return_value = mock_response(200, {"status": "UP"})
             MockSession.return_value = mock_session
 
             client.connect()
@@ -141,7 +148,9 @@ class TestClientConnect:
             mock_session.get.return_value = mock_response(401)
             MockSession.return_value = mock_session
 
-            with pytest.raises(SonarQubeAuthenticationError, match="Authentication failed"):
+            with pytest.raises(
+                SonarQubeAuthenticationError, match="Authentication failed"
+            ):
                 client.connect()
 
     def test_connect_unreachable_raises_api_error(self):
@@ -150,7 +159,9 @@ class TestClientConnect:
 
         with patch("src.connectors.sonarqube.client.requests.Session") as MockSession:
             mock_session = MagicMock()
-            mock_session.get.side_effect = requests.exceptions.ConnectionError("refused")
+            mock_session.get.side_effect = requests.exceptions.ConnectionError(
+                "refused"
+            )
             MockSession.return_value = mock_session
 
             with pytest.raises(SonarQubeAPIError, match="Cannot connect"):

@@ -1,6 +1,7 @@
 """
 Quick test to validate self_healing CLI works
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -14,13 +15,17 @@ print("=" * 70)
 print("\n1. Testing import...")
 try:
     result = subprocess.run(
-        [sys.executable, "-c", "from apps.backend import self_healing; print('Import OK')"],
+        [
+            sys.executable,
+            "-c",
+            "from apps.backend import self_healing; print('Import OK')",
+        ],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,
-        timeout=10
+        timeout=10,
     )
-    
+
     if result.returncode == 0:
         print("   ✅ Import successful")
     else:
@@ -38,9 +43,9 @@ try:
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,
-        timeout=10
+        timeout=10,
     )
-    
+
     if result.returncode == 0 and "Self-Healing Codebase System" in result.stdout:
         print("   ✅ CLI help works")
     else:
@@ -56,24 +61,31 @@ except Exception as e:
 print("\n3. Testing 'check' command...")
 try:
     result = subprocess.run(
-        [sys.executable, "-m", "apps.backend.self_healing", "check", "--project-dir", "apps/backend"],
+        [
+            sys.executable,
+            "-m",
+            "apps.backend.self_healing",
+            "check",
+            "--project-dir",
+            "apps/backend",
+        ],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,
-        timeout=60
+        timeout=60,
     )
-    
+
     print(f"   Return code: {result.returncode}")
     print(f"   Output preview: {result.stdout[:500] if result.stdout else 'No stdout'}")
-    
+
     if result.stderr and "Error:" in result.stderr:
         print(f"   stderr: {result.stderr}")
-    
+
     if result.returncode in [0, 1]:  # 0 = healthy, 1 = needs attention
         print("   ✅ Check command executed")
     else:
         print(f"   ⚠️ Check command returned code {result.returncode}")
-        
+
 except Exception as e:
     print(f"   ⚠️ Check command test failed: {e}")
 

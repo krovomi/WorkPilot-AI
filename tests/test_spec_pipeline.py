@@ -108,7 +108,9 @@ for name in _mocked_module_names:
     sys.modules[name] = MagicMock()
 
 # Set specific return values needed by module-level code
-sys.modules["init"].init_workpilot_dir = MagicMock(return_value=(Path("/tmp/.workpilot"), False))
+sys.modules["init"].init_workpilot_dir = MagicMock(
+    return_value=(Path("/tmp/.workpilot"), False)
+)
 
 # Now import the module under test
 from spec.pipeline import SpecOrchestrator, get_specs_dir
@@ -157,7 +159,9 @@ class TestSpecOrchestratorInit:
         with patch("spec.pipeline.init_workpilot_dir") as mock_init:
             with patch("spec.pipeline.models") as mock_models:
                 mock_init.return_value = (temp_dir / ".workpilot", False)
-                mock_models.create_spec_dir.return_value = temp_dir / ".workpilot" / "specs" / "001-pending"
+                mock_models.create_spec_dir.return_value = (
+                    temp_dir / ".workpilot" / "specs" / "001-pending"
+                )
                 specs_dir = temp_dir / ".workpilot" / "specs"
                 specs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -356,9 +360,7 @@ class TestGenerateSpecName:
 
         from spec.pipeline.models import generate_spec_name
 
-        name = generate_spec_name(
-            "Limitation du numéro de TVA intracommunautaire"
-        )
+        name = generate_spec_name("Limitation du numéro de TVA intracommunautaire")
 
         # No accented characters survive.
         assert "é" not in name

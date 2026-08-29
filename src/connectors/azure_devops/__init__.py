@@ -30,7 +30,7 @@ project_root_str = str(project_root)
 # Verify the path is correct
 import os
 
-if not os.path.exists(project_root / 'src' / 'config' / 'settings.py'):
+if not os.path.exists(project_root / "src" / "config" / "settings.py"):
     raise ImportError(f"Project root path incorrect: {project_root}")
 
 import logging

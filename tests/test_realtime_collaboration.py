@@ -17,7 +17,11 @@ import pytest
 # which pulls heavy dependencies (claude_agent_sdk)
 _spec = importlib.util.spec_from_file_location(
     "realtime_collaboration",
-    Path(__file__).resolve().parent.parent / "apps" / "backend" / "teams" / "realtime_collaboration.py",
+    Path(__file__).resolve().parent.parent
+    / "apps"
+    / "backend"
+    / "teams"
+    / "realtime_collaboration.py",
 )
 _mod = importlib.util.module_from_spec(_spec)
 sys.modules["realtime_collaboration"] = _mod
@@ -39,6 +43,7 @@ UserStatus = _mod.UserStatus
 # Data model tests
 # ---------------------------------------------------------------------------
 
+
 class TestConnectedUser:
     def test_create_user(self):
         user = ConnectedUser(user_id="u-1", display_name="Alice")
@@ -53,7 +58,9 @@ class TestConnectedUser:
         assert d["status"] == "online"
 
     def test_status_from_string(self):
-        user = ConnectedUser(user_id="u-1", display_name="Alice", status=UserStatus.BUSY)
+        user = ConnectedUser(
+            user_id="u-1", display_name="Alice", status=UserStatus.BUSY
+        )
         assert user.status == UserStatus.BUSY
 
 
@@ -65,11 +72,15 @@ class TestTaskLock:
         assert lock.locked_at != ""
 
     def test_agent_lock(self):
-        lock = TaskLock(task_id="t-1", locked_by="agent:coder", lock_type=LockType.AGENT)
+        lock = TaskLock(
+            task_id="t-1", locked_by="agent:coder", lock_type=LockType.AGENT
+        )
         assert lock.is_agent_lock
 
     def test_to_dict(self):
-        lock = TaskLock(task_id="t-1", locked_by="u-1", lock_type=LockType.USER, reason="editing")
+        lock = TaskLock(
+            task_id="t-1", locked_by="u-1", lock_type=LockType.USER, reason="editing"
+        )
         d = lock.to_dict()
         assert d["lock_type"] == "user"
         assert d["reason"] == "editing"
@@ -78,23 +89,29 @@ class TestTaskLock:
 class TestRealtimeEvent:
     def test_create_event(self):
         event = RealtimeEvent(
-            event_id="evt-1", event_type=EventType.USER_JOINED,
-            sender_id="u-1", data={"user_id": "u-1"},
+            event_id="evt-1",
+            event_type=EventType.USER_JOINED,
+            sender_id="u-1",
+            data={"user_id": "u-1"},
         )
         assert event.is_broadcast
         assert event.timestamp != ""
 
     def test_targeted_event(self):
         event = RealtimeEvent(
-            event_id="evt-1", event_type=EventType.NOTIFICATION,
-            sender_id="system", target_users=["u-1"],
+            event_id="evt-1",
+            event_type=EventType.NOTIFICATION,
+            sender_id="system",
+            target_users=["u-1"],
         )
         assert not event.is_broadcast
 
     def test_to_dict(self):
         event = RealtimeEvent(
-            event_id="evt-1", event_type=EventType.TASK_UPDATE,
-            sender_id="u-1", data={"task_id": "t-1"},
+            event_id="evt-1",
+            event_type=EventType.TASK_UPDATE,
+            sender_id="u-1",
+            data={"task_id": "t-1"},
         )
         d = event.to_dict()
         assert d["event_type"] == "task_update"
@@ -103,16 +120,21 @@ class TestRealtimeEvent:
 class TestChatMessage:
     def test_create_message(self):
         msg = ChatMessage(
-            message_id="msg-1", sender_id="u-1",
-            sender_name="Alice", content="Hello!",
+            message_id="msg-1",
+            sender_id="u-1",
+            sender_name="Alice",
+            content="Hello!",
         )
         assert msg.timestamp != ""
         assert msg.reply_to == ""
 
     def test_to_dict(self):
         msg = ChatMessage(
-            message_id="msg-1", sender_id="u-1",
-            sender_name="Alice", content="Hello!", mentions=["u-2"],
+            message_id="msg-1",
+            sender_id="u-1",
+            sender_name="Alice",
+            content="Hello!",
+            mentions=["u-2"],
         )
         d = msg.to_dict()
         assert d["mentions"] == ["u-2"]
@@ -121,18 +143,26 @@ class TestChatMessage:
 class TestConflictRecord:
     def test_create_conflict(self):
         conflict = ConflictRecord(
-            conflict_id="cfl-1", task_id="t-1",
-            user_a="u-1", user_b="u-2",
-            field_name="status", value_a="done", value_b="in_progress",
+            conflict_id="cfl-1",
+            task_id="t-1",
+            user_a="u-1",
+            user_b="u-2",
+            field_name="status",
+            value_a="done",
+            value_b="in_progress",
         )
         assert conflict.resolution == ConflictResolution.MANUAL
         assert not conflict.resolved
 
     def test_to_dict(self):
         conflict = ConflictRecord(
-            conflict_id="cfl-1", task_id="t-1",
-            user_a="u-1", user_b="u-2",
-            field_name="title", value_a="A", value_b="B",
+            conflict_id="cfl-1",
+            task_id="t-1",
+            user_a="u-1",
+            user_b="u-2",
+            field_name="title",
+            value_a="A",
+            value_b="B",
             resolution=ConflictResolution.AUTO_MERGE,
         )
         d = conflict.to_dict()
@@ -142,6 +172,7 @@ class TestConflictRecord:
 # ---------------------------------------------------------------------------
 # CollaborationServer — User management
 # ---------------------------------------------------------------------------
+
 
 class TestServerUserManagement:
     def test_connect_user(self):
@@ -193,6 +224,7 @@ class TestServerUserManagement:
 # ---------------------------------------------------------------------------
 # CollaborationServer — Task locking
 # ---------------------------------------------------------------------------
+
 
 class TestServerTaskLocking:
     def test_lock_task(self):
@@ -265,6 +297,7 @@ class TestServerTaskLocking:
 # CollaborationServer — Task updates
 # ---------------------------------------------------------------------------
 
+
 class TestServerTaskUpdates:
     def test_broadcast_task_update(self):
         server = CollaborationServer()
@@ -317,6 +350,7 @@ class TestServerTaskUpdates:
 # CollaborationServer — Chat
 # ---------------------------------------------------------------------------
 
+
 class TestServerChat:
     def test_send_message(self):
         server = CollaborationServer()
@@ -363,11 +397,14 @@ class TestServerChat:
 # CollaborationServer — Conflicts
 # ---------------------------------------------------------------------------
 
+
 class TestServerConflicts:
     def test_detect_conflict(self):
         server = CollaborationServer()
         # Actual signature: detect_conflict(task_id, user_a, user_b, field_name, value_a, value_b)
-        conflict = server.detect_conflict("t-1", "u-1", "u-2", "status", "in_progress", "done")
+        conflict = server.detect_conflict(
+            "t-1", "u-1", "u-2", "status", "in_progress", "done"
+        )
         assert conflict is not None
         assert conflict.task_id == "t-1"
 
@@ -393,6 +430,7 @@ class TestServerConflicts:
 # CollaborationServer — Events
 # ---------------------------------------------------------------------------
 
+
 class TestServerEvents:
     def test_event_handler(self):
         server = CollaborationServer()
@@ -410,6 +448,7 @@ class TestServerEvents:
         import uuid as _uuid
 
         from realtime_collaboration import RealtimeEvent as RE
+
         evt = RE(
             event_id=str(_uuid.uuid4()),
             event_type=EventType.TASK_UPDATE,
@@ -466,6 +505,7 @@ class TestServerEvents:
 # actual API. These tests are skipped until the feature is implemented.
 # ---------------------------------------------------------------------------
 
+
 class TestServerAgentIntegration:
     def test_notify_agent_started_locks_task(self):
         server = CollaborationServer()
@@ -520,6 +560,7 @@ class TestServerAgentIntegration:
 # CollaborationServer — Sync & Notifications
 # NOTE: request_sync and notify_user do not exist in the actual API.
 # ---------------------------------------------------------------------------
+
 
 class TestServerSync:
     def test_request_sync_returns_full_snapshot(self):
@@ -583,6 +624,7 @@ class TestServerSync:
 # ---------------------------------------------------------------------------
 # CollaborationServer — Stats
 # ---------------------------------------------------------------------------
+
 
 class TestServerStats:
     def test_get_stats_empty(self):

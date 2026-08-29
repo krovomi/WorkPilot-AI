@@ -5,28 +5,28 @@ import time
 import requests
 import yaml
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'grepai.yaml')
-GREPAI_DIR = os.path.join(os.path.dirname(__file__), 'grepai')
-PYTHON_PATH = 'python'
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "grepai.yaml")
+GREPAI_DIR = os.path.join(os.path.dirname(__file__), "grepai")
+PYTHON_PATH = "python"
 PORT = 9000
-INDEX_PATH = '../../apps/backend'
-GIT_URL = 'https://github.com/yoanbernabeu/grepai.git'
-REQUIREMENTS_PATH = os.path.join(GREPAI_DIR, 'requirements.txt')
+INDEX_PATH = "../../apps/backend"
+GIT_URL = "https://github.com/yoanbernabeu/grepai.git"
+REQUIREMENTS_PATH = os.path.join(GREPAI_DIR, "requirements.txt")
 
 DEFAULT_CONFIG = {
-    'index_path': INDEX_PATH,
-    'port': PORT,
-    'log_level': 'info',
-    'max_results': 10
+    "index_path": INDEX_PATH,
+    "port": PORT,
+    "log_level": "info",
+    "max_results": 10,
 }
 
-BINARY_PATH = os.path.join(GREPAI_DIR, 'grepai.exe')
-GO_BUILD_CMD = ['go', 'build', '-o', BINARY_PATH, './cmd/grepai']
+BINARY_PATH = os.path.join(GREPAI_DIR, "grepai.exe")
+GO_BUILD_CMD = ["go", "build", "-o", BINARY_PATH, "./cmd/grepai"]
 
 
 def ensure_config():
     if not os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, 'w') as f:
+        with open(CONFIG_PATH, "w") as f:
             yaml.dump(DEFAULT_CONFIG, f)
         print(f"Fichier de configuration généré : {CONFIG_PATH}")
     else:
@@ -36,12 +36,14 @@ def ensure_config():
 def ensure_grepai_installed():
     if not os.path.exists(GREPAI_DIR):
         print("Clonage du dépôt grepai...")
-        subprocess.run(['git', 'clone', GIT_URL, GREPAI_DIR], check=True)
+        subprocess.run(["git", "clone", GIT_URL, GREPAI_DIR], check=True)
     else:
         print("Dossier grepai déjà présent.")
     if os.path.exists(REQUIREMENTS_PATH):
         print("Installation des dépendances grepai...")
-        subprocess.run([PYTHON_PATH, '-m', 'pip', 'install', '-r', REQUIREMENTS_PATH], check=True)
+        subprocess.run(
+            [PYTHON_PATH, "-m", "pip", "install", "-r", REQUIREMENTS_PATH], check=True
+        )
     else:
         print("requirements.txt introuvable dans grepai.")
 
@@ -56,7 +58,7 @@ def ensure_grepai_built():
 
 def launch_grepai():
     print("Lancement de grepai...")
-    subprocess.Popen([BINARY_PATH, 'serve'], cwd=GREPAI_DIR)
+    subprocess.Popen([BINARY_PATH, "serve"], cwd=GREPAI_DIR)
     time.sleep(2)  # Laisse le temps à grepai de démarrer
 
 
@@ -81,6 +83,7 @@ def main():
             print("grepai lancé et accessible.")
     else:
         print("grepai déjà accessible.")
+
 
 if __name__ == "__main__":
     main()

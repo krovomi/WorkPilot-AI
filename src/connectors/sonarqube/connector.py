@@ -238,7 +238,12 @@ class SonarQubeConnector:
             SonarQubeProjectNotFoundError: If the project does not exist.
             SonarQubeAPIError: If the API call fails.
         """
-        metrics = metric_keys or ["sqale_index", "bugs", "vulnerabilities", "code_smells"]
+        metrics = metric_keys or [
+            "sqale_index",
+            "bugs",
+            "vulnerabilities",
+            "code_smells",
+        ]
 
         logger.info(
             "Getting measures history for '%s' (metrics: %s).",

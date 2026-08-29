@@ -122,9 +122,7 @@ class TestCoderProgressTracking:
         assert detailed["failed"] == 1
         assert detailed["total"] == 4
 
-    def test_unknown_status_falls_back_to_pending_bucket(
-        self, tmp_path: Path
-    ) -> None:
+    def test_unknown_status_falls_back_to_pending_bucket(self, tmp_path: Path) -> None:
         """Forward compat: a new status we don't recognize yet shouldn't
         silently disappear from the UI — it should count as pending so
         the user sees there's still work left."""
@@ -147,9 +145,7 @@ class TestQaGatesBuildCompletion:
         assert get_progress_percentage(tmp_path) == 100.0
 
     def test_one_failed_blocks_build_complete(self, tmp_path: Path) -> None:
-        _write_plan(
-            tmp_path, _make_plan(["completed", "completed", "failed"])
-        )
+        _write_plan(tmp_path, _make_plan(["completed", "completed", "failed"]))
         assert is_build_complete(tmp_path) is False
 
     def test_qa_added_subtask_defers_build_complete(self, tmp_path: Path) -> None:

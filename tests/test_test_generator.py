@@ -53,6 +53,7 @@ def _patch_llm(response: str) -> tuple:
     fake = _FakeOneshot(response)
     return fake, patch("core.oneshot.oneshot_completion", new=fake)
 
+
 # ── CodeAnalyzer tests ──────────────────────────────────────────
 
 
@@ -116,7 +117,7 @@ class TestCodeAnalyzer:
 
     def test_analyze_decorated_function(self, analyzer):
         """analyze_source() extracts decorator information."""
-        source = textwrap.dedent('''
+        source = textwrap.dedent("""
             class MyClass:
                 @property
                 def value(self) -> int:
@@ -125,7 +126,7 @@ class TestCodeAnalyzer:
                 @staticmethod
                 def helper() -> str:
                     return "help"
-        ''')
+        """)
 
         result = analyzer.analyze_source(source, module="deco.py")
 
@@ -135,7 +136,7 @@ class TestCodeAnalyzer:
 
     def test_analyze_complexity(self, analyzer):
         """analyze_source() estimates cyclomatic complexity."""
-        source = textwrap.dedent('''
+        source = textwrap.dedent("""
             def complex_func(x, y):
                 if x > 0:
                     if y > 0:
@@ -149,7 +150,7 @@ class TestCodeAnalyzer:
                         if i % 2 == 0:
                             continue
                     return -1
-        ''')
+        """)
 
         result = analyzer.analyze_source(source, module="complex.py")
 
@@ -170,10 +171,10 @@ class TestCodeAnalyzer:
 
     def test_analyze_no_args_function(self, analyzer):
         """analyze_source() handles function with no arguments."""
-        source = textwrap.dedent('''
+        source = textwrap.dedent("""
             def get_version():
                 return "1.0.0"
-        ''')
+        """)
 
         result = analyzer.analyze_source(source, module="ver.py")
 
@@ -182,7 +183,7 @@ class TestCodeAnalyzer:
 
     def test_analyze_self_excluded_from_args(self, analyzer):
         """analyze_source() excludes self/cls from args."""
-        source = textwrap.dedent('''
+        source = textwrap.dedent("""
             class Foo:
                 def method(self, x):
                     pass
@@ -190,7 +191,7 @@ class TestCodeAnalyzer:
                 @classmethod
                 def class_method(cls, y):
                     pass
-        ''')
+        """)
 
         result = analyzer.analyze_source(source, module="foo.py")
 
@@ -283,8 +284,22 @@ class TestTestGeneratorAgent:
             {
                 "functions_analyzed": 4,
                 "gaps": [
-                    {"name": "get_user", "class_name": "UserService", "line_number": 5, "priority": "high", "reason": "public read", "suggested_test_count": 2},
-                    {"name": "create_user", "class_name": "UserService", "line_number": 9, "priority": "high", "reason": "validates + writes", "suggested_test_count": 3},
+                    {
+                        "name": "get_user",
+                        "class_name": "UserService",
+                        "line_number": 5,
+                        "priority": "high",
+                        "reason": "public read",
+                        "suggested_test_count": 2,
+                    },
+                    {
+                        "name": "create_user",
+                        "class_name": "UserService",
+                        "line_number": 9,
+                        "priority": "high",
+                        "reason": "validates + writes",
+                        "suggested_test_count": 3,
+                    },
                 ],
             }
         )
@@ -323,7 +338,11 @@ class TestTestGeneratorAgent:
                 "functions_analyzed": 3,
                 "gaps": [
                     {"name": "helper_function", "priority": "low", "reason": "trivial"},
-                    {"name": "create_user", "priority": "high", "reason": "business logic"},
+                    {
+                        "name": "create_user",
+                        "priority": "high",
+                        "reason": "business logic",
+                    },
                     {"name": "get_user", "priority": "medium", "reason": "reads db"},
                 ],
             }
@@ -361,8 +380,14 @@ class TestTestGeneratorAgent:
                 "tests_generated": 2,
                 "functions_analyzed": 3,
                 "generated_tests": [
-                    {"test_name": "test_get_user_returns_record", "description": "reads a record"},
-                    {"test_name": "test_create_user_requires_name", "description": "raises on empty name"},
+                    {
+                        "test_name": "test_get_user_returns_record",
+                        "description": "reads a record",
+                    },
+                    {
+                        "test_name": "test_create_user_requires_name",
+                        "description": "raises on empty name",
+                    },
                 ],
             }
         )
@@ -419,7 +444,10 @@ class TestTestGeneratorAgent:
                 "tests_generated": 1,
                 "functions_analyzed": 1,
                 "generated_tests": [
-                    {"test_name": "test_rejects_value_over_limit", "description": "boundary + error"}
+                    {
+                        "test_name": "test_rejects_value_over_limit",
+                        "description": "boundary + error",
+                    }
                 ],
             }
         )
@@ -483,8 +511,14 @@ class TestTestGeneratorAgent:
                 "tests_generated": 2,
                 "functions_analyzed": 0,
                 "generated_tests": [
-                    {"test_name": "test_calculate_price_applies_discount", "description": "happy path"},
-                    {"test_name": "test_calculate_price_rejects_negative", "description": "error case"},
+                    {
+                        "test_name": "test_calculate_price_applies_discount",
+                        "description": "happy path",
+                    },
+                    {
+                        "test_name": "test_calculate_price_rejects_negative",
+                        "description": "error case",
+                    },
                 ],
             }
         )
@@ -517,7 +551,10 @@ class TestTestGeneratorAgent:
                 "tests_generated": 1,
                 "functions_analyzed": 0,
                 "generated_tests": [
-                    {"test_name": "test_user_registration_flow", "description": "happy path"}
+                    {
+                        "test_name": "test_user_registration_flow",
+                        "description": "happy path",
+                    }
                 ],
             }
         )
@@ -544,7 +581,9 @@ class TestTestGeneratorAgent:
         )
         _fake, ctx = _patch_llm(response)
         with ctx:
-            result = agent.generate_tests_from_user_story("A story", target_module="auth")
+            result = agent.generate_tests_from_user_story(
+                "A story", target_module="auth"
+            )
 
         assert "e2e" in result.test_file_path
 
@@ -608,12 +647,7 @@ class TestUtilities:
 
     def test_parse_user_story_with_bullets(self, agent):
         """_parse_user_story() parses bullet-point format."""
-        story = (
-            "Feature test\n"
-            "- Open the page\n"
-            "- Click the button\n"
-            "- Verify result"
-        )
+        story = "Feature test\n- Open the page\n- Click the button\n- Verify result"
 
         scenarios = agent._parse_user_story(story)
 

@@ -172,9 +172,7 @@ class JiraIssue:
         parsed_created = None
         if created:
             try:
-                parsed_created = datetime.fromisoformat(
-                    created.replace("Z", "+00:00")
-                )
+                parsed_created = datetime.fromisoformat(created.replace("Z", "+00:00"))
             except (ValueError, TypeError):
                 parsed_created = None
 
@@ -182,9 +180,7 @@ class JiraIssue:
         parsed_updated = None
         if updated:
             try:
-                parsed_updated = datetime.fromisoformat(
-                    updated.replace("Z", "+00:00")
-                )
+                parsed_updated = datetime.fromisoformat(updated.replace("Z", "+00:00"))
             except (ValueError, TypeError):
                 parsed_updated = None
 
@@ -203,7 +199,8 @@ class JiraIssue:
 
         # Collect custom fields (customfield_XXXXX)
         custom_fields = {
-            k: v for k, v in fields.items()
+            k: v
+            for k, v in fields.items()
             if k.startswith("customfield_") and v is not None
         }
 
@@ -272,9 +269,7 @@ class JiraComment:
         parsed_created = None
         if created:
             try:
-                parsed_created = datetime.fromisoformat(
-                    created.replace("Z", "+00:00")
-                )
+                parsed_created = datetime.fromisoformat(created.replace("Z", "+00:00"))
             except (ValueError, TypeError):
                 parsed_created = None
 
@@ -290,16 +285,18 @@ class JiraComment:
         )
 
 
-_ADF_BLOCK_CONTAINERS = frozenset({
-    "doc",
-    "bulletList",
-    "orderedList",
-    "blockquote",
-    "table",
-    "tableBody",
-    "tableHead",
-    "tableFoot",
-})
+_ADF_BLOCK_CONTAINERS = frozenset(
+    {
+        "doc",
+        "bulletList",
+        "orderedList",
+        "blockquote",
+        "table",
+        "tableBody",
+        "tableHead",
+        "tableFoot",
+    }
+)
 
 
 def _extract_adf_text(adf: dict[str, Any]) -> str:

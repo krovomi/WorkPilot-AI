@@ -19,9 +19,7 @@ from phase_config import get_phase_provider  # noqa: E402
 
 
 def _write_metadata(spec_dir: Path, metadata: dict) -> None:
-    (spec_dir / "task_metadata.json").write_text(
-        json.dumps(metadata), encoding="utf-8"
-    )
+    (spec_dir / "task_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
 
 
 def test_per_phase_provider_takes_precedence(tmp_path: Path) -> None:
@@ -75,6 +73,5 @@ def test_cli_provider_wins_over_metadata(tmp_path: Path) -> None:
     )
 
     assert (
-        get_phase_provider(tmp_path, cli_provider="openai", phase="coding")
-        == "openai"
+        get_phase_provider(tmp_path, cli_provider="openai", phase="coding") == "openai"
     )

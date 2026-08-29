@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_BACKLOG_TYPES = ["Bug", "User Story", "Task"]
 
 
-
 def _wiql_literal(value: str) -> str:
     """Quote a value for use as a WIQL string literal.
 
@@ -552,9 +551,7 @@ class AzureWorkItemsClient:
         from azure.devops.v7_0.work_item_tracking.models import JsonPatchOperation
 
         org_url = self._client.settings.organization_url
-        target_url = (
-            f"{org_url}/{project}/_apis/wit/workItems/{target_id}"
-        )
+        target_url = f"{org_url}/{project}/_apis/wit/workItems/{target_id}"
 
         relation_value: dict[str, Any] = {
             "rel": link_type,

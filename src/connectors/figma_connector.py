@@ -33,6 +33,7 @@ FIGMA_API_BASE = "https://api.figma.com/v1"
 @dataclass
 class FigmaNode:
     """Represents a Figma node (frame, component, etc.)."""
+
     id: str
     name: str
     type: str
@@ -49,6 +50,7 @@ class FigmaNode:
 @dataclass
 class FigmaDesignToken:
     """A design token extracted from Figma."""
+
     name: str
     value: str
     category: str  # color, typography, spacing, effect
@@ -58,6 +60,7 @@ class FigmaDesignToken:
 @dataclass
 class FigmaExportResult:
     """Result of exporting an image from Figma."""
+
     node_id: str
     image_url: str
     image_data: str | None = None  # base64
@@ -79,7 +82,9 @@ class FigmaConnector:
     def __init__(self, access_token: str | None = None):
         self.access_token = access_token or os.getenv("FIGMA_ACCESS_TOKEN", "")
         if not self.access_token:
-            logger.warning("No Figma access token provided. Figma operations will fail.")
+            logger.warning(
+                "No Figma access token provided. Figma operations will fail."
+            )
 
     @property
     def _headers(self) -> dict[str, str]:
@@ -247,12 +252,14 @@ class FigmaConnector:
             images = data.get("images", {})
             for nid in node_ids:
                 url = images.get(nid, "")
-                results.append(FigmaExportResult(
-                    node_id=nid,
-                    image_url=url,
-                    format=format,
-                    scale=scale,
-                ))
+                results.append(
+                    FigmaExportResult(
+                        node_id=nid,
+                        image_url=url,
+                        format=format,
+                        scale=scale,
+                    )
+                )
             return results
 
     # =========================================================================
@@ -283,33 +290,41 @@ class FigmaConnector:
                 key = style.get("key", "")
 
                 if style_type == "FILL":
-                    tokens.append(FigmaDesignToken(
-                        name=self._to_token_name(name),
-                        value="",  # Will be resolved from node data
-                        category="color",
-                        figma_style_key=key,
-                    ))
+                    tokens.append(
+                        FigmaDesignToken(
+                            name=self._to_token_name(name),
+                            value="",  # Will be resolved from node data
+                            category="color",
+                            figma_style_key=key,
+                        )
+                    )
                 elif style_type == "TEXT":
-                    tokens.append(FigmaDesignToken(
-                        name=self._to_token_name(name),
-                        value="",
-                        category="typography",
-                        figma_style_key=key,
-                    ))
+                    tokens.append(
+                        FigmaDesignToken(
+                            name=self._to_token_name(name),
+                            value="",
+                            category="typography",
+                            figma_style_key=key,
+                        )
+                    )
                 elif style_type == "EFFECT":
-                    tokens.append(FigmaDesignToken(
-                        name=self._to_token_name(name),
-                        value="",
-                        category="effect",
-                        figma_style_key=key,
-                    ))
+                    tokens.append(
+                        FigmaDesignToken(
+                            name=self._to_token_name(name),
+                            value="",
+                            category="effect",
+                            figma_style_key=key,
+                        )
+                    )
                 elif style_type == "GRID":
-                    tokens.append(FigmaDesignToken(
-                        name=self._to_token_name(name),
-                        value="",
-                        category="spacing",
-                        figma_style_key=key,
-                    ))
+                    tokens.append(
+                        FigmaDesignToken(
+                            name=self._to_token_name(name),
+                            value="",
+                            category="spacing",
+                            figma_style_key=key,
+                        )
+                    )
 
             # Resolve token values from the file data
             if tokens:

@@ -52,7 +52,8 @@ for _pkg, _subpath in [
 # Now load sdk_utils directly
 _sdk_utils_path = _BACKEND / "runners" / "github" / "services" / "sdk_utils.py"
 _spec = importlib.util.spec_from_file_location(
-    "runners.github.services.sdk_utils", _sdk_utils_path,
+    "runners.github.services.sdk_utils",
+    _sdk_utils_path,
     submodule_search_locations=[],
 )
 _sdk_utils_mod = importlib.util.module_from_spec(_spec)
@@ -208,9 +209,7 @@ class TestProcessAgentStream:
         """Simple text messages should accumulate in result_text."""
         from runners.github.services.sdk_utils import process_agent_stream
 
-        client = MockAgentClient(
-            messages=[_text_msg("Hello "), _text_msg("World")]
-        )
+        client = MockAgentClient(messages=[_text_msg("Hello "), _text_msg("World")])
 
         result = await process_agent_stream(client=client)
 
@@ -306,9 +305,7 @@ class TestProcessAgentStream:
 
         client = MockAgentClient(
             messages=[
-                _tool_use_msg(
-                    "Task", "task_1", {"subagent_type": "security"}
-                ),
+                _tool_use_msg("Task", "task_1", {"subagent_type": "security"}),
                 _tool_result_msg("task_1", "No issues found"),
             ]
         )
@@ -327,9 +324,7 @@ class TestProcessAgentStream:
         msgs = [_text_msg(f"msg{i}") for i in range(10)]
         client = MockAgentClient(messages=msgs)
 
-        result = await process_agent_stream(
-            client=client, max_messages=5
-        )
+        result = await process_agent_stream(client=client, max_messages=5)
 
         assert result["error"] is not None
         assert "Circuit breaker" in result["error"]
@@ -368,9 +363,7 @@ class TestProcessAgentStream:
         from runners.github.services.sdk_utils import process_agent_stream
 
         client = MockAgentClient(
-            messages=[
-                _result_msg(subtype="error_max_structured_output_retries")
-            ]
+            messages=[_result_msg(subtype="error_max_structured_output_retries")]
         )
 
         result = await process_agent_stream(client=client)

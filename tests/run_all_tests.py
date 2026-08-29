@@ -2,6 +2,7 @@
 """
 Script maître - Lance tous les tests de validation
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -11,22 +12,20 @@ def run_test(name, script):
     """Execute un script de test."""
     print(f"\n{'=' * 70}")
     print(f"🧪 {name}")
-    print('=' * 70)
-    
+    print("=" * 70)
+
     try:
         result = subprocess.run(
-            [sys.executable, script],
-            cwd=Path(__file__).parent,
-            timeout=60
+            [sys.executable, script], cwd=Path(__file__).parent, timeout=60
         )
-        
+
         if result.returncode == 0:
             print(f"\n✅ {name} - SUCCÈS")
             return True
         else:
             print(f"\n❌ {name} - ÉCHEC (code: {result.returncode})")
             return False
-            
+
     except subprocess.TimeoutExpired:
         print(f"\n⏱️  {name} - TIMEOUT")
         return False
@@ -37,7 +36,7 @@ def run_test(name, script):
 
 def main():
     """Lance tous les tests."""
-    
+
     print("=" * 70)
     print("🚀 AUTO-FIX LOOPS - SUITE DE TESTS COMPLÈTE")
     print("=" * 70)
@@ -47,7 +46,7 @@ def main():
     print("  3. Tests fonctionnels complets")
     print("  4. Tests CLI")
     print()
-    
+
     tests = [
         ("Syntaxe Python", "check_syntax.py"),
         ("Validation Imports", "test_validation.py"),
@@ -56,29 +55,29 @@ def main():
         ("Tests Multi-Provider LLM", "test_llm_provider.py"),
         ("Tests Providers Concrets LLM", "test_llm_providers_concrets.py"),
     ]
-    
+
     results = []
-    
+
     for name, script in tests:
         script_path = Path(__file__).parent / script
-        
+
         if not script_path.exists():
             print(f"\n⚠️  Script {script} non trouvé, ignoré")
             results.append((name, None))
             continue
-        
+
         success = run_test(name, script_path)
         results.append((name, success))
-    
+
     # Résumé final
     print("\n" + "=" * 70)
     print("📊 RÉSUMÉ DES TESTS")
     print("=" * 70)
-    
+
     passed = 0
     failed = 0
     skipped = 0
-    
+
     for name, result in results:
         if result is True:
             print(f"  ✅ {name}")
@@ -89,17 +88,17 @@ def main():
         else:
             print(f"  ⚠️  {name} (ignoré)")
             skipped += 1
-    
+
     total = passed + failed
-    
+
     print("\n" + "=" * 70)
     print(f"Résultats: {passed}/{total} tests passés")
-    
+
     if skipped > 0:
         print(f"           {skipped} test(s) ignoré(s)")
-    
+
     print("=" * 70)
-    
+
     if failed == 0 and passed > 0:
         print("\n🎉 TOUS LES TESTS PASSENT!")
         print("\n✨ Feature 3: Auto-Fix Loops Intelligents")
@@ -110,7 +109,9 @@ def main():
         print("   - Tests: VALIDATION_CHECKLIST.md")
         print("\n🎮 Utilisation:")
         print("   python apps/backend/cli/main.py --spec 001 --auto-fix")
-        print("   python apps/backend/cli/main.py --spec 001 --auto-fix --auto-fix-max-attempts 10")
+        print(
+            "   python apps/backend/cli/main.py --spec 001 --auto-fix --auto-fix-max-attempts 10"
+        )
         print("\n💡 Prêt pour la production!")
         print()
         return 0

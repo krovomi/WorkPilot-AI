@@ -77,8 +77,18 @@ class TestGitHubIssueSource:
     def test_scan_from_data_creates_findings(self):
         """scan_from_data should create findings from issues."""
         issues = [
-            {"number": 1, "title": "Bug in login", "body": "Details", "labels": [{"name": "bug"}]},
-            {"number": 2, "title": "New feature", "body": "Request", "labels": [{"name": "enhancement"}]},
+            {
+                "number": 1,
+                "title": "Bug in login",
+                "body": "Details",
+                "labels": [{"name": "bug"}],
+            },
+            {
+                "number": 2,
+                "title": "New feature",
+                "body": "Request",
+                "labels": [{"name": "enhancement"}],
+            },
         ]
         findings = self.source.scan_from_data(issues)
         assert len(findings) == 2
@@ -97,7 +107,12 @@ class TestGitHubIssueSource:
         source = GitHubIssueSource(owner="o", repo="r", labels_filter=["bug"])
         issues = [
             {"number": 1, "title": "Bug", "body": "", "labels": [{"name": "bug"}]},
-            {"number": 2, "title": "Feature", "body": "", "labels": [{"name": "enhancement"}]},
+            {
+                "number": 2,
+                "title": "Feature",
+                "body": "",
+                "labels": [{"name": "enhancement"}],
+            },
         ]
         findings = source.scan_from_data(issues)
         assert len(findings) == 1
@@ -105,7 +120,9 @@ class TestGitHubIssueSource:
 
     def test_severity_critical(self):
         """Issues with 'critical' label should get CRITICAL severity."""
-        issues = [{"number": 1, "title": "X", "body": "", "labels": [{"name": "critical"}]}]
+        issues = [
+            {"number": 1, "title": "X", "body": "", "labels": [{"name": "critical"}]}
+        ]
         findings = self.source.scan_from_data(issues)
         assert findings[0].severity == DetectionSeverity.CRITICAL
 
@@ -117,13 +134,22 @@ class TestGitHubIssueSource:
 
     def test_severity_medium_enhancement(self):
         """Issues with 'enhancement' label should get MEDIUM severity."""
-        issues = [{"number": 20, "title": "X", "body": "", "labels": [{"name": "enhancement"}]}]
+        issues = [
+            {
+                "number": 20,
+                "title": "X",
+                "body": "",
+                "labels": [{"name": "enhancement"}],
+            }
+        ]
         findings = self.source.scan_from_data(issues)
         assert findings[0].severity == DetectionSeverity.MEDIUM
 
     def test_severity_low_default(self):
         """Issues with no known labels should get LOW severity."""
-        issues = [{"number": 30, "title": "X", "body": "", "labels": [{"name": "docs"}]}]
+        issues = [
+            {"number": 30, "title": "X", "body": "", "labels": [{"name": "docs"}]}
+        ]
         findings = self.source.scan_from_data(issues)
         assert findings[0].severity == DetectionSeverity.LOW
 
@@ -317,10 +343,20 @@ class TestAutoDetector:
     def test_get_findings_filtered_by_type(self):
         """get_findings should filter by type."""
         detector = AutoDetector()
-        detector.add_findings([
-            DetectionFinding(finding_id="g1", detection_type=DetectionType.GITHUB_ISSUE, title="GH"),
-            DetectionFinding(finding_id="s1", detection_type=DetectionType.SECURITY_VULNERABILITY, title="Sec"),
-        ])
+        detector.add_findings(
+            [
+                DetectionFinding(
+                    finding_id="g1",
+                    detection_type=DetectionType.GITHUB_ISSUE,
+                    title="GH",
+                ),
+                DetectionFinding(
+                    finding_id="s1",
+                    detection_type=DetectionType.SECURITY_VULNERABILITY,
+                    title="Sec",
+                ),
+            ]
+        )
         gh = detector.get_findings(detection_type=DetectionType.GITHUB_ISSUE)
         assert len(gh) == 1
         assert gh[0].title == "GH"
@@ -328,10 +364,16 @@ class TestAutoDetector:
     def test_get_findings_filtered_by_severity(self):
         """get_findings should filter by minimum severity."""
         detector = AutoDetector()
-        detector.add_findings([
-            DetectionFinding(finding_id="h1", severity=DetectionSeverity.HIGH, title="High"),
-            DetectionFinding(finding_id="l1", severity=DetectionSeverity.LOW, title="Low"),
-        ])
+        detector.add_findings(
+            [
+                DetectionFinding(
+                    finding_id="h1", severity=DetectionSeverity.HIGH, title="High"
+                ),
+                DetectionFinding(
+                    finding_id="l1", severity=DetectionSeverity.LOW, title="Low"
+                ),
+            ]
+        )
         high_only = detector.get_findings(min_severity=DetectionSeverity.HIGH)
         assert len(high_only) == 1
         assert high_only[0].title == "High"
@@ -339,15 +381,17 @@ class TestAutoDetector:
     def test_create_tasks_from_findings(self):
         """Should create task dicts from findings."""
         detector = AutoDetector()
-        detector.add_findings([
-            DetectionFinding(
-                finding_id="t1",
-                title="Task 1",
-                severity=DetectionSeverity.HIGH,
-                suggested_action="fix",
-                suggested_tags=["auto"],
-            ),
-        ])
+        detector.add_findings(
+            [
+                DetectionFinding(
+                    finding_id="t1",
+                    title="Task 1",
+                    severity=DetectionSeverity.HIGH,
+                    suggested_action="fix",
+                    suggested_tags=["auto"],
+                ),
+            ]
+        )
         tasks = detector.create_tasks_from_findings()
         assert len(tasks) == 1
         assert tasks[0]["name"] == "Task 1"
@@ -357,9 +401,11 @@ class TestAutoDetector:
     def test_create_tasks_deduplication(self):
         """Should not create duplicate tasks."""
         detector = AutoDetector()
-        detector.add_findings([
-            DetectionFinding(finding_id="d1", title="D"),
-        ])
+        detector.add_findings(
+            [
+                DetectionFinding(finding_id="d1", title="D"),
+            ]
+        )
         detector.create_tasks_from_findings()
         second_run = detector.create_tasks_from_findings()
         assert len(second_run) == 0
@@ -367,10 +413,14 @@ class TestAutoDetector:
     def test_auto_only_filter(self):
         """auto_only=True should skip findings with auto_create_task=False."""
         detector = AutoDetector()
-        detector.add_findings([
-            DetectionFinding(finding_id="a1", title="Auto", auto_create_task=True),
-            DetectionFinding(finding_id="m1", title="Manual", auto_create_task=False),
-        ])
+        detector.add_findings(
+            [
+                DetectionFinding(finding_id="a1", title="Auto", auto_create_task=True),
+                DetectionFinding(
+                    finding_id="m1", title="Manual", auto_create_task=False
+                ),
+            ]
+        )
         tasks = detector.create_tasks_from_findings(auto_only=True)
         assert len(tasks) == 1
         assert tasks[0]["name"] == "Auto"
@@ -379,13 +429,15 @@ class TestAutoDetector:
         """get_stats should return correct counts."""
         detector = AutoDetector()
         detector.register_source(GitHubIssueSource("o", "r"))
-        detector.add_findings([
-            DetectionFinding(
-                finding_id="s1",
-                detection_type=DetectionType.SECURITY_VULNERABILITY,
-                severity=DetectionSeverity.HIGH,
-            ),
-        ])
+        detector.add_findings(
+            [
+                DetectionFinding(
+                    finding_id="s1",
+                    detection_type=DetectionType.SECURITY_VULNERABILITY,
+                    severity=DetectionSeverity.HIGH,
+                ),
+            ]
+        )
         stats = detector.get_stats()
         assert stats["total_findings"] == 1
         assert stats["sources_registered"] == 1

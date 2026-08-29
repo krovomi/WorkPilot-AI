@@ -57,9 +57,7 @@ class NotificationDeliveryError(NotificationError):
         channel: The target channel type ('slack' or 'teams').
     """
 
-    def __init__(
-        self, message: str, status_code: int = 0, channel: str = ""
-    ) -> None:
+    def __init__(self, message: str, status_code: int = 0, channel: str = "") -> None:
         self.status_code = status_code
         self.channel = channel
         parts = []
@@ -68,5 +66,9 @@ class NotificationDeliveryError(NotificationError):
         if status_code:
             parts.append(f"HTTP {status_code}")
         prefix = " ".join(parts)
-        full_message = f"Notification delivery failed {prefix}: {message}" if prefix else f"Notification delivery failed: {message}"
+        full_message = (
+            f"Notification delivery failed {prefix}: {message}"
+            if prefix
+            else f"Notification delivery failed: {message}"
+        )
         super().__init__(full_message)

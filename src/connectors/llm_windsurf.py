@@ -13,7 +13,7 @@ Mode 2 (REST Fallback): Uses the OpenAI-compatible REST API at
 import asyncio
 import logging
 import os
-from typing import Any, Optional
+from typing import Any
 
 from .llm_base import BaseLLMProvider
 
@@ -43,9 +43,9 @@ class WindsurfProvider(BaseLLMProvider):
         )
         self.model = model
         self.base_url = base_url
-        self._client: Optional[Any] = None
+        self._client: Any | None = None
         self._use_local_grpc: bool = False
-        self._credentials: Optional[Any] = None
+        self._credentials: Any | None = None
 
     def connect(self) -> None:
         """Establish connection — tries REST API first if token available, then local gRPC."""
@@ -54,11 +54,15 @@ class WindsurfProvider(BaseLLMProvider):
             try:
                 import openai
             except ImportError:
-                raise ImportError("openai package is required. Install with: pip install openai")
+                raise ImportError(
+                    "openai package is required. Install with: pip install openai"
+                )
 
             self._client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
             self._use_local_grpc = False
-            logger.info(f"[WindsurfProvider] Mode 1: REST API to {self.base_url} (model={self.model})")
+            logger.info(
+                f"[WindsurfProvider] Mode 1: REST API to {self.base_url} (model={self.model})"
+            )
             return
 
         # Mode 2: Local gRPC (fallback when no token, requires Windsurf IDE running)
@@ -105,7 +109,9 @@ class WindsurfProvider(BaseLLMProvider):
         elif self._client:
             return self._generate_via_rest(prompt, **kwargs)
         else:
-            raise RuntimeError("Windsurf provider not connected. Start Windsurf IDE or set API key.")
+            raise RuntimeError(
+                "Windsurf provider not connected. Start Windsurf IDE or set API key."
+            )
 
     def _generate_via_grpc(self, prompt: str, **kwargs) -> str:
         """Generate via local gRPC proxy."""

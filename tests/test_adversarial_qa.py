@@ -150,7 +150,8 @@ class TestEdgeCaseGenerator:
     def test_for_api_endpoint(self):
         gen = EdgeCaseGenerator()
         cases = gen.for_api_endpoint(
-            "POST", "/api/users",
+            "POST",
+            "/api/users",
             body_fields={"name": "str", "email": "str"},
         )
         assert len(cases) > 5
@@ -233,36 +234,40 @@ class TestInjectionTester:
         assert len(payloads) >= 3
 
     def test_scan_code_sql_injection(self):
-        code = '''
+        code = """
 def get_user(name):
     cursor.execute(f"SELECT * FROM users WHERE name = '{name}'")
-'''
+"""
         findings = InjectionTester.scan_code_for_vulnerabilities(code)
         assert any(f.injection_type == InjectionType.SQL_INJECTION for f in findings)
 
     def test_scan_code_os_system(self):
-        code = '''
+        code = """
 import os
 os.system("ls " + user_input)
-'''
+"""
         findings = InjectionTester.scan_code_for_vulnerabilities(code)
-        assert any(f.injection_type == InjectionType.COMMAND_INJECTION for f in findings)
+        assert any(
+            f.injection_type == InjectionType.COMMAND_INJECTION for f in findings
+        )
 
     def test_scan_code_eval(self):
         code = "result = eval(user_input)"
         findings = InjectionTester.scan_code_for_vulnerabilities(code)
-        assert any(f.injection_type == InjectionType.TEMPLATE_INJECTION for f in findings)
+        assert any(
+            f.injection_type == InjectionType.TEMPLATE_INJECTION for f in findings
+        )
 
     def test_scan_code_safe(self):
-        code = '''
+        code = """
 def get_user(name):
     cursor.execute("SELECT * FROM users WHERE name = %s", (name,))
-'''
+"""
         findings = InjectionTester.scan_code_for_vulnerabilities(code)
         assert len(findings) == 0
 
     def test_scan_code_innerhtml(self):
-        code = 'element.innerHTML = userInput;'
+        code = "element.innerHTML = userInput;"
         findings = InjectionTester.scan_code_for_vulnerabilities(code)
         assert any(f.injection_type == InjectionType.XSS for f in findings)
 
@@ -274,22 +279,24 @@ def get_user(name):
 
 class TestConcurrencyAnalyzer:
     def test_detect_shared_mutable_state(self):
-        code = '''
+        code = """
 cache = {}
 data_list = []
 CONSTANT = "OK"
 
 def process():
     cache["key"] = "value"
-'''
+"""
         analyzer = ConcurrencyAnalyzer()
         findings = analyzer.analyze_python_code(code, "module.py")
-        assert any(f.issue_type == ConcurrencyIssueType.SHARED_MUTABLE_STATE for f in findings)
+        assert any(
+            f.issue_type == ConcurrencyIssueType.SHARED_MUTABLE_STATE for f in findings
+        )
         # CONSTANT should not be flagged
         assert not any("CONSTANT" in f.description for f in findings)
 
     def test_detect_missing_lock(self):
-        code = '''
+        code = """
 import threading
 
 counter = 0
@@ -299,13 +306,13 @@ def worker():
     counter += 1
 
 t = threading.Thread(target=worker)
-'''
+"""
         analyzer = ConcurrencyAnalyzer()
         findings = analyzer.analyze_python_code(code)
         assert any(f.issue_type == ConcurrencyIssueType.MISSING_LOCK for f in findings)
 
     def test_no_issue_with_lock(self):
-        code = '''
+        code = """
 import threading
 
 lock = threading.Lock()
@@ -315,10 +322,12 @@ def worker():
     with lock:
         global counter
         counter += 1
-'''
+"""
         analyzer = ConcurrencyAnalyzer()
         findings = analyzer.analyze_python_code(code)
-        missing_lock_findings = [f for f in findings if f.issue_type == ConcurrencyIssueType.MISSING_LOCK]
+        missing_lock_findings = [
+            f for f in findings if f.issue_type == ConcurrencyIssueType.MISSING_LOCK
+        ]
         assert len(missing_lock_findings) == 0
 
     def test_detect_race_conditions(self):
@@ -360,24 +369,24 @@ def worker():
         assert len(races) == 0
 
     def test_deadlock_pattern(self):
-        code = '''
+        code = """
 import threading
 
 def dangerous():
     with self._lock_a:
         with self._lock_b:
             pass
-'''
+"""
         analyzer = ConcurrencyAnalyzer()
         findings = analyzer.analyze_python_code(code)
         assert any(f.issue_type == ConcurrencyIssueType.DEADLOCK_RISK for f in findings)
 
     def test_global_keyword_flagged(self):
-        code = '''
+        code = """
 def update():
     global shared_state
     shared_state = "new"
-'''
+"""
         analyzer = ConcurrencyAnalyzer()
         findings = analyzer.analyze_python_code(code)
         assert any("global" in f.description for f in findings)
@@ -426,13 +435,13 @@ class TestAdversarialAgent:
     def test_run_concurrency(self):
         config = AdversarialConfig(modes=[AttackMode.CONCURRENCY])
         agent = AdversarialAgent(config)
-        code = '''
+        code = """
 import threading
 counter = 0
 def worker():
     global counter
     counter += 1
-'''
+"""
         report = agent.run(target="module.py", source_code=code)
         assert AttackMode.CONCURRENCY in report.modes_run
         assert report.concurrency_issues > 0
@@ -480,9 +489,24 @@ def worker():
     def test_report_counts(self):
         report = AdversarialReport(target="test")
         report.findings = [
-            Finding(mode=AttackMode.FUZZING, severity=FindingSeverity.CRITICAL, title="a", description="a"),
-            Finding(mode=AttackMode.FUZZING, severity=FindingSeverity.HIGH, title="b", description="b"),
-            Finding(mode=AttackMode.FUZZING, severity=FindingSeverity.LOW, title="c", description="c"),
+            Finding(
+                mode=AttackMode.FUZZING,
+                severity=FindingSeverity.CRITICAL,
+                title="a",
+                description="a",
+            ),
+            Finding(
+                mode=AttackMode.FUZZING,
+                severity=FindingSeverity.HIGH,
+                title="b",
+                description="b",
+            ),
+            Finding(
+                mode=AttackMode.FUZZING,
+                severity=FindingSeverity.LOW,
+                title="c",
+                description="c",
+            ),
         ]
         assert report.critical_count == 1
         assert report.high_count == 1
@@ -498,7 +522,7 @@ def worker():
 class TestAdversarialIntegration:
     def test_full_pipeline(self):
         """Run full adversarial pipeline on sample code."""
-        source = '''
+        source = """
 import threading
 
 cache = {}
@@ -509,7 +533,7 @@ def process_request(user_input):
     counter += 1
     result = eval(user_input)
     return result
-'''
+"""
         agent = AdversarialAgent(AdversarialConfig(modes=[AttackMode.ALL]))
         report = agent.run(
             target="process_request",

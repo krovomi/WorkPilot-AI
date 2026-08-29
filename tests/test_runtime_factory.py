@@ -18,6 +18,7 @@ def test_runtime_factory_litellm():
         model = "gpt-3.5-turbo"
         api_key = "test-key"
         base_url = None
+
     runtime = create_agent_runtime(
         spec_dir=None,
         phase="test",
@@ -29,7 +30,8 @@ def test_runtime_factory_litellm():
         config=DummyConfig(),
     )
     assert runtime is not None
-    assert hasattr(runtime, 'run_session')
+    assert hasattr(runtime, "run_session")
+
 
 def test_runtime_factory_claude():
     """Claude SDK runtime is now a real runtime (not NotImplementedError)."""
@@ -37,6 +39,7 @@ def test_runtime_factory_claude():
 
     class DummyConfig:
         is_claude_sdk = True
+
     # The factory now returns a ClaudeSDKRuntime instead of raising NotImplementedError
     runtime = create_agent_runtime(
         spec_dir=None,

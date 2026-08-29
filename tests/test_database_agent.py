@@ -40,20 +40,31 @@ from database_agent.schema_analyzer import (
 
 class TestSchemaAnalyzer:
     def test_detect_postgresql(self):
-        assert SchemaAnalyzer.detect_engine("postgresql://user:password@localhost/mydb") == DatabaseEngine.POSTGRESQL
+        assert (
+            SchemaAnalyzer.detect_engine("postgresql://user:password@localhost/mydb")
+            == DatabaseEngine.POSTGRESQL
+        )
 
     def test_detect_mysql(self):
-        assert SchemaAnalyzer.detect_engine("mysql://root:password@localhost/mydb") == DatabaseEngine.MYSQL
+        assert (
+            SchemaAnalyzer.detect_engine("mysql://root:password@localhost/mydb")
+            == DatabaseEngine.MYSQL
+        )
 
     def test_detect_sqlite(self):
         assert SchemaAnalyzer.detect_engine("sqlite:///app.db") == DatabaseEngine.SQLITE
         assert SchemaAnalyzer.detect_engine("data.sqlite3") == DatabaseEngine.SQLITE
 
     def test_detect_sqlserver(self):
-        assert SchemaAnalyzer.detect_engine("mssql://sa:password@localhost") == DatabaseEngine.SQLSERVER
+        assert (
+            SchemaAnalyzer.detect_engine("mssql://sa:password@localhost")
+            == DatabaseEngine.SQLSERVER
+        )
 
     def test_detect_unknown(self):
-        assert SchemaAnalyzer.detect_engine("redis://localhost") == DatabaseEngine.UNKNOWN
+        assert (
+            SchemaAnalyzer.detect_engine("redis://localhost") == DatabaseEngine.UNKNOWN
+        )
 
     def test_analyze_ddl_simple(self):
         analyzer = SchemaAnalyzer()
@@ -112,10 +123,13 @@ class TestSchemaAnalyzer:
         assert not int_col.is_text_type
 
     def test_table_get_primary_keys(self):
-        t = TableInfo(name="t", columns=[
-            ColumnInfo(name="id", data_type="INTEGER", is_primary_key=True),
-            ColumnInfo(name="name", data_type="TEXT"),
-        ])
+        t = TableInfo(
+            name="t",
+            columns=[
+                ColumnInfo(name="id", data_type="INTEGER", is_primary_key=True),
+                ColumnInfo(name="name", data_type="TEXT"),
+            ],
+        )
         pks = t.get_primary_keys()
         assert len(pks) == 1
         assert pks[0].name == "id"
@@ -123,13 +137,18 @@ class TestSchemaAnalyzer:
     def test_classify_change_destructive(self):
         analyzer = SchemaAnalyzer()
         t = TableInfo(name="users")
-        assert analyzer.classify_change(t, "rename column email to mail") == "destructive"
+        assert (
+            analyzer.classify_change(t, "rename column email to mail") == "destructive"
+        )
         assert analyzer.classify_change(t, "drop column legacy_field") == "destructive"
 
     def test_classify_change_non_destructive(self):
         analyzer = SchemaAnalyzer()
         t = TableInfo(name="users")
-        assert analyzer.classify_change(t, "add column email_verified boolean") == "non_destructive"
+        assert (
+            analyzer.classify_change(t, "add column email_verified boolean")
+            == "non_destructive"
+        )
         assert analyzer.classify_change(t, "create index on email") == "non_destructive"
 
     def test_max_length_parsing(self):
@@ -163,7 +182,10 @@ class TestMigrationPlanner:
     def test_add_column_with_default_single_step(self):
         planner = MigrationPlanner()
         plan = planner.plan_add_column(
-            "users", ColumnInfo(name="active", data_type="BOOLEAN", nullable=True, default="true")
+            "users",
+            ColumnInfo(
+                name="active", data_type="BOOLEAN", nullable=True, default="true"
+            ),
         )
         assert plan.migration_type == MigrationType.NON_DESTRUCTIVE
         assert "DEFAULT" in plan.steps[0].sql_up
@@ -189,7 +211,10 @@ class TestMigrationPlanner:
     def test_rename_column_four_steps(self):
         planner = MigrationPlanner()
         plan = planner.plan_rename_column(
-            "users", "email", "email_address", data_type="VARCHAR(255)",
+            "users",
+            "email",
+            "email_address",
+            data_type="VARCHAR(255)",
             estimated_rows=500_000,
         )
         assert plan.is_destructive
@@ -203,7 +228,10 @@ class TestMigrationPlanner:
     def test_change_type_multi_step(self):
         planner = MigrationPlanner()
         plan = planner.plan_change_type(
-            "orders", "amount", "VARCHAR(50)", "DECIMAL(10,2)",
+            "orders",
+            "amount",
+            "VARCHAR(50)",
+            "DECIMAL(10,2)",
             estimated_rows=100_000,
         )
         assert plan.is_destructive
@@ -236,9 +264,7 @@ class TestMigrationPlanner:
 
     def test_estimated_total_seconds(self):
         planner = MigrationPlanner()
-        plan = planner.plan_rename_column(
-            "users", "a", "b", estimated_rows=1_000_000
-        )
+        plan = planner.plan_rename_column("users", "a", "b", estimated_rows=1_000_000)
         assert plan.estimated_total_seconds > 0
 
 
@@ -256,7 +282,9 @@ class TestLockDetector:
 
     def test_concurrent_index_no_warning(self):
         detector = LockDetector()
-        warnings = detector.analyze("CREATE INDEX CONCURRENTLY idx_email ON users (email);")
+        warnings = detector.analyze(
+            "CREATE INDEX CONCURRENTLY idx_email ON users (email);"
+        )
         assert len(warnings) == 0
 
     def test_detect_drop_column(self):
@@ -266,12 +294,16 @@ class TestLockDetector:
 
     def test_detect_type_change(self):
         detector = LockDetector()
-        warnings = detector.analyze("ALTER TABLE orders ALTER COLUMN amount TYPE DECIMAL(10,2);")
+        warnings = detector.analyze(
+            "ALTER TABLE orders ALTER COLUMN amount TYPE DECIMAL(10,2);"
+        )
         assert any(w.severity == LockSeverity.CRITICAL for w in warnings)
 
     def test_detect_add_not_null_without_default(self):
         detector = LockDetector()
-        warnings = detector.analyze("ALTER TABLE users ADD COLUMN age INTEGER NOT NULL;")
+        warnings = detector.analyze(
+            "ALTER TABLE users ADD COLUMN age INTEGER NOT NULL;"
+        )
         assert any(w.severity == LockSeverity.HIGH for w in warnings)
 
     def test_has_critical_locks(self):
@@ -370,7 +402,8 @@ class TestBackfillEstimator:
     def test_custom_throughput(self):
         estimator = BackfillEstimator()
         est = estimator.estimate(
-            OperationType.SIMPLE_UPDATE, row_count=1_000_000,
+            OperationType.SIMPLE_UPDATE,
+            row_count=1_000_000,
             custom_throughput=500_000,
         )
         assert est.estimated_seconds == pytest.approx(2.0, rel=0.01)
@@ -525,8 +558,11 @@ class TestDatabaseAgentIntegration:
         gen = RollbackGenerator()
 
         plan = planner.plan_rename_column(
-            "users", "email", "primary_email",
-            data_type="VARCHAR(255)", estimated_rows=5_000_000,
+            "users",
+            "email",
+            "primary_email",
+            data_type="VARCHAR(255)",
+            estimated_rows=5_000_000,
         )
         assert plan.is_destructive
         assert plan.step_count == 4
