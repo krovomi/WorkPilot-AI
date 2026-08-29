@@ -244,7 +244,7 @@ def update_readme(version: str, is_prerelease: bool) -> bool:
     """
     version_badge = version.replace("-", "--")
 
-    with open("README.md") as f:
+    with open("README.md", encoding="utf-8") as f:
         original_content = f.read()
 
     if is_prerelease:
@@ -260,7 +260,7 @@ def update_readme(version: str, is_prerelease: bool) -> bool:
         print("No changes needed")
         return False
 
-    with open("README.md", "w") as f:
+    with open("README.md", "w", encoding="utf-8") as f:
         f.write(content)
 
     print(f"README.md updated for {version} (prerelease={is_prerelease})")

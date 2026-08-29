@@ -286,7 +286,7 @@ def main():
 
     # Output results
     if args.output:
-        with open(args.output, "w") as f:
+        with open(args.output, "w", encoding="utf-8") as f:
             json.dump(analysis.to_dict(), f, indent=2)
         logger.info(f"Analysis results saved to {args.output}")
     else:

@@ -49,7 +49,7 @@ class EncodingChecker:
         file_issues = []
 
         # Check 1: open() without encoding
-        # Pattern: open(...) without encoding= parameter
+        # Pattern: open(..., encoding="utf-8") without encoding= parameter
         # Use negative lookbehind to exclude os.open(), urlopen(), etc.
         for match in re.finditer(r"(?<![a-zA-Z_\.])open\s*\([^)]+\)", content):
             call = match.group()
@@ -70,7 +70,7 @@ class EncodingChecker:
             )
 
         # Check 2: Path.read_text() without encoding
-        # Match .read_text() calls - both variable.read_text() and Path(...).read_text()
+        # Match .read_text(encoding="utf-8") calls - both variable.read_text(encoding="utf-8") and Path(...).read_text(encoding="utf-8")
         for match in re.finditer(r"(?:(\w+)|(\))\s*)\.read_text\s*\(", content):
             var_name = match.group(1)  # Will be None if matched closing paren
             start_pos = match.end()
@@ -112,7 +112,7 @@ class EncodingChecker:
             )
 
         # Check 3: Path.write_text() without encoding
-        # Match .write_text() calls - both variable.write_text() and Path(...).write_text()
+        # Match .write_text(encoding="utf-8") calls - both variable.write_text(encoding="utf-8") and Path(...).write_text(encoding="utf-8")
         for match in re.finditer(r"(?:(\w+)|(\))\s*)\.write_text\s*\(", content):
             var_name = match.group(1)  # Will be None if matched closing paren
             start_pos = match.end()

@@ -81,7 +81,7 @@ class AngularProjectAnalyzer:
             return
 
         try:
-            with open(package_json_path) as f:
+            with open(package_json_path, encoding="utf-8") as f:
                 package_data = json.load(f)
 
             # Analyze dependencies
@@ -142,7 +142,7 @@ class AngularProjectAnalyzer:
             return
 
         try:
-            with open(angular_json_path) as f:
+            with open(angular_json_path, encoding="utf-8") as f:
                 angular_config = json.load(f)
 
             analysis.config_files.append("angular.json")
@@ -182,7 +182,7 @@ class AngularProjectAnalyzer:
                     analysis.components.append(path_str)
                     # Check if standalone
                     try:
-                        with open(file_path) as f:
+                        with open(file_path, encoding="utf-8") as f:
                             content = f.read()
                             if (
                                 "@Component" in content

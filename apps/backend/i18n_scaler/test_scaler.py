@@ -186,7 +186,7 @@ class TestFilesystemHelpers:
         self._write_locale(tmp_path, "en", {"common": {"hello": "Hi"}})
         # Drop a broken JSON file in fr
         (tmp_path / "fr").mkdir()
-        (tmp_path / "fr" / "broken.json").write_text("{ not json")
+        (tmp_path / "fr" / "broken.json").write_text("{ not json", encoding="utf-8")
         out = I18nAutoScaler().discover_locale_dir(tmp_path)
         # fr exists with no namespaces (the broken file is silently skipped).
         assert "fr" in out

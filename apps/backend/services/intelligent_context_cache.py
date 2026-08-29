@@ -1016,7 +1016,7 @@ class IntelligentContextCache:
                 }
                 export_data["entries"].append(entry_data)
 
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2)
 
         logger.info(f"Exported cache data to {filepath}")

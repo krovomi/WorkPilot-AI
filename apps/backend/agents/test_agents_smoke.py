@@ -248,7 +248,7 @@ def test_coder_validate_subtask_files_suggests_git_root_when_paths_escape(
     sibling = tmp_path / "Sources"
     sibling.mkdir()
     target_file = sibling / "Foo.cs"
-    target_file.write_text("// stub")
+    target_file.write_text("// stub", encoding="utf-8")
 
     subtask = {
         "id": "s1",

@@ -56,7 +56,7 @@ class Phase2ResultsAnalyzer:
             print(f"📂 Using latest results file: {self.input_file}")
         
         try:
-            with open(self.input_file) as f:
+            with open(self.input_file, encoding="utf-8") as f:
                 self.results = json.load(f)
             
             print(f"📂 Loaded evaluation results from: {self.input_file}")
@@ -217,7 +217,7 @@ class Phase2ResultsAnalyzer:
             output_path = Path(self.output_file)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
-            with open(output_path, 'w') as f:
+            with open(output_path, 'w', encoding="utf-8") as f:
                 json.dump(analysis, f, indent=2)
             
             print(f"\n📄 Analysis report saved to: {output_path}")
@@ -229,7 +229,7 @@ class Phase2ResultsAnalyzer:
             output_path = Path(output_file)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
-            with open(output_path, 'w') as f:
+            with open(output_path, 'w', encoding="utf-8") as f:
                 json.dump(analysis, f, indent=2)
             
             print(f"\n📄 Analysis report saved to: {output_path}")

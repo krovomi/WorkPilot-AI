@@ -531,13 +531,13 @@ class DependencyChangeAnalyzer:
 
         try:
             if package_file == PACKAGE_JSON:
-                with open(file_path) as f:
+                with open(file_path, encoding="utf-8") as f:
                     data = json.load(f)
                     return data.get("dependencies", {})
 
             elif package_file == REQUIREMENTS_TXT:
                 deps = {}
-                with open(file_path) as f:
+                with open(file_path, encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
                         if line and not line.startswith("#"):

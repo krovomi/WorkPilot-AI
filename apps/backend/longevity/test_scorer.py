@@ -223,7 +223,8 @@ class TestEndToEnd:
                     "    # FIXME: broken",
                     "    pass",
                 ]
-            )
+            ),
+            encoding="utf-8",
         )
         report = score_codebase(tmp_path)
         assert report.score < 100.0

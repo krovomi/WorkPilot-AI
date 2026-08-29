@@ -54,7 +54,8 @@ class StreamingE2ETest:
         spec_dir.mkdir()
 
         # Create spec files
-        (spec_dir / "spec.md").write_text("""
+        (spec_dir / "spec.md").write_text(
+            """
 # Streaming Test Spec
 
 ## Feature
@@ -74,7 +75,9 @@ This spec tests the complete streaming pipeline from agent execution to WebSocke
 - Create a simple React component
 - Add basic styling
 - Test file modification events
-""")
+""",
+            encoding="utf-8",
+        )
 
         (spec_dir / "task_metadata.json").write_text(
             json.dumps(
@@ -88,7 +91,8 @@ This spec tests the complete streaming pipeline from agent execution to WebSocke
                         "qa": "haiku",
                     },
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         self.project_dir = project_dir

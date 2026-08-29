@@ -26,7 +26,7 @@ GO_BUILD_CMD = ["go", "build", "-o", BINARY_PATH, "./cmd/grepai"]
 
 def ensure_config():
     if not os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "w") as f:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             yaml.dump(DEFAULT_CONFIG, f)
         print(f"Fichier de configuration généré : {CONFIG_PATH}")
     else:

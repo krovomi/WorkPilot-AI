@@ -145,7 +145,7 @@ def manual_token_input():
 
         # Créer le fichier de configuration
         env_file = os.path.join(os.getcwd(), ".env.windsurf")
-        with open(env_file, "w") as f:
+        with open(env_file, "w", encoding="utf-8") as f:
             f.write(f"WINDSURF_OAUTH_TOKEN={token}\n")
 
         print(f"📁 Token sauvegardé dans: {env_file}")

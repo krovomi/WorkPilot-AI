@@ -1007,7 +1007,7 @@ def handle_merge_preview_command(
         )
         if discard_list_path.exists():
             try:
-                with open(discard_list_path) as f:
+                with open(discard_list_path, encoding="utf-8") as f:
                     discarded_files = [
                         line.strip()
                         for line in f.readlines()

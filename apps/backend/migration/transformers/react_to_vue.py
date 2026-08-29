@@ -26,7 +26,7 @@ class ReactToVueTransformer:
                 if not full_path.exists():
                     continue
 
-                content = full_path.read_text()
+                content = full_path.read_text(encoding="utf-8")
 
                 # Skip if not a React component
                 if not self._is_react_component(content):

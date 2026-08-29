@@ -97,6 +97,8 @@ def test_planning_failures_persist_and_clear(tmp_path: Path) -> None:
 
 
 def test_planning_failures_tolerates_garbage(tmp_path: Path) -> None:
-    (tmp_path / ".planning_validation_failures").write_text("not-an-int")
+    (tmp_path / ".planning_validation_failures").write_text(
+        "not-an-int", encoding="utf-8"
+    )
     assert _read_planning_failures(tmp_path) == 0  # garbage → treated as 0
     assert _bump_planning_failures(tmp_path) == 1

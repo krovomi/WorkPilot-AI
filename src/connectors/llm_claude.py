@@ -1,10 +1,10 @@
 from typing import Any
 
-from .llm_base import BaseLLMProvider
+from .llm_base import DEFAULT_CLAUDE_MODEL, BaseLLMProvider
 
 
 class ClaudeProvider(BaseLLMProvider):
-    def __init__(self, api_key: str, model: str = "claude-3-sonnet-20240229"):
+    def __init__(self, api_key: str, model: str = DEFAULT_CLAUDE_MODEL):
         self.api_key = api_key
         self.model = model
         self._client: Any | None = None

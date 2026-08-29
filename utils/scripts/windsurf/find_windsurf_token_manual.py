@@ -88,7 +88,7 @@ def save_token(token, source_file):
     try:
         # Créer le fichier .env
         env_file = os.path.join(os.getcwd(), ".env.windsurf")
-        with open(env_file, "w") as f:
+        with open(env_file, "w", encoding="utf-8") as f:
             f.write(f"WINDSURF_OAUTH_TOKEN={token}\n")
             f.write(f"# Source: {source_file}\n")
 
@@ -96,12 +96,12 @@ def save_token(token, source_file):
 
         # Créer un script de test
         test_script = os.path.join(os.getcwd(), "test_windsurf_token.py")
-        with open(test_script, "w") as f:
+        with open(test_script, "w", encoding="utf-8") as f:
             f.write("""#!/usr/bin/env python3
 import os
 
 # Charger le token Windsurf
-with open(".env.windsurf", "r") as f:
+with open(".env.windsurf", "r", encoding="utf-8") as f:
     for line in f:
         if line.startswith("WINDSURF_OAUTH_TOKEN="):
             token = line.split("=", 1)[1].strip()

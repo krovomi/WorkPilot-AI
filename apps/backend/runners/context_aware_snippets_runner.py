@@ -201,7 +201,7 @@ class ContextAwareSnippetsRunner:
             file_path = self.project_dir / style_file
             if file_path.exists():
                 try:
-                    with open(file_path) as f:
+                    with open(file_path, encoding="utf-8") as f:
                         content = f.read()
                         detected_rules[style_file] = content
                 except Exception:
