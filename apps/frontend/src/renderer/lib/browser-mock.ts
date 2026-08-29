@@ -655,6 +655,15 @@ const browserMockAPI: ElectronAPI = {
 		return { success: false, error: "Not available in browser mode" };
 	},
 
+	// Generic listeners. `credentialService` subscribes to three channels at
+	// startup, so a missing entry here takes the preview down with it.
+	on: () => () => {
+		/* noop */
+	},
+	onIpcEvent: () => () => {
+		/* noop */
+	},
+
 	// Prompt Optimizer API
 	onPromptOptimizerStreamChunk: () => () => {
 		/* noop */

@@ -2,6 +2,8 @@
  * Performance Profiler Agent API module
  */
 
+import { createIpcListener, invokeIpc } from "./ipc-utils";
+
 export interface PerformanceProfilerRequest {
 	projectDir: string;
 	autoImplement?: boolean;
@@ -58,21 +60,21 @@ export interface PerformanceProfilerAPI {
 export function createPerformanceProfilerAPI(): PerformanceProfilerAPI {
 	return {
 		startPerformanceProfiling: (request) =>
-			globalThis.electronAPI.invoke("performanceProfiler:start", request),
+			invokeIpc("performanceProfiler:start", request),
 		cancelPerformanceProfiling: () =>
-			globalThis.electronAPI.invoke("performanceProfiler:cancel"),
+			invokeIpc("performanceProfiler:cancel"),
 		configurePerformanceProfiler: (config) =>
-			globalThis.electronAPI.invoke("performanceProfiler:configure", config),
+			invokeIpc("performanceProfiler:configure", config),
 		onPerformanceProfilerStatus: (callback) =>
-			globalThis.electronAPI.on("performanceProfiler:status", callback),
+			createIpcListener("performanceProfiler:status", callback),
 		onPerformanceProfilerStreamChunk: (callback) =>
-			globalThis.electronAPI.on("performanceProfiler:streamChunk", callback),
+			createIpcListener("performanceProfiler:streamChunk", callback),
 		onPerformanceProfilerError: (callback) =>
-			globalThis.electronAPI.on("performanceProfiler:error", callback),
+			createIpcListener("performanceProfiler:error", callback),
 		onPerformanceProfilerComplete: (callback) =>
-			globalThis.electronAPI.on("performanceProfiler:complete", callback),
+			createIpcListener("performanceProfiler:complete", callback),
 		onPerformanceProfilerImplementationComplete: (callback) =>
-			globalThis.electronAPI.on(
+			createIpcListener(
 				"performanceProfiler:implementationComplete",
 				callback,
 			),

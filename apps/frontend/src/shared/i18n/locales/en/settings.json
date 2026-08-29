@@ -1944,7 +1944,8 @@
 		"authenticationFailed": "Authentication failed. Verify that your Jira email and API token are valid.",
 		"instance": "Instance",
 		"required": "*",
-		"fillAllFields": "Please fill in all required fields (Instance URL, Email, API Token)"
+		"fillAllFields": "Please fill in all required fields (Instance URL, Email, API Token)",
+		"bridgeUnavailable": "Connection testing is unavailable in this environment"
 	},
 	"channelNotifications": {
 		"navLabel": "Notifications (Teams, Slack…)",

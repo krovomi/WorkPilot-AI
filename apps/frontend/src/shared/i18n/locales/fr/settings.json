@@ -1391,6 +1391,7 @@
 		"enable": "Activer l'intégration Jira",
 		"enableDescription": "Synchroniser les tickets avec Jira Cloud pour un suivi bidirectionnel des tâches",
 		"fillAllFields": "Veuillez remplir tous les champs requis (URL de l'instance, E-mail, Jeton API)",
+		"bridgeUnavailable": "Le test de connexion n'est pas disponible dans cet environnement",
 		"instance": "Instance",
 		"instanceUrl": "URL de l'instance Jira",
 		"instanceUrlDescription": "L'URL de votre instance Jira Cloud (ex : https://votre-org.atlassian.net)",

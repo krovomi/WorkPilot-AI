@@ -2,6 +2,8 @@
  * Code Migration Agent API module
  */
 
+import { createIpcListener, invokeIpc } from "./ipc-utils";
+
 export interface CodeMigrationRequest {
 	projectDir: string;
 	migrationDescription: string;
@@ -51,20 +53,20 @@ export interface CodeMigrationAPI {
 export function createCodeMigrationAPI(): CodeMigrationAPI {
 	return {
 		startCodeMigration: (request) =>
-			window.electronAPI.invoke("codeMigration:start", request),
+			invokeIpc("codeMigration:start", request),
 		cancelCodeMigration: () =>
-			window.electronAPI.invoke("codeMigration:cancel"),
+			invokeIpc("codeMigration:cancel"),
 		configureCodeMigration: (config) =>
-			window.electronAPI.invoke("codeMigration:configure", config),
+			invokeIpc("codeMigration:configure", config),
 		onCodeMigrationStatus: (callback) =>
-			window.electronAPI.on("codeMigration:status", callback),
+			createIpcListener("codeMigration:status", callback),
 		onCodeMigrationStreamChunk: (callback) =>
-			window.electronAPI.on("codeMigration:streamChunk", callback),
+			createIpcListener("codeMigration:streamChunk", callback),
 		onCodeMigrationError: (callback) =>
-			window.electronAPI.on("codeMigration:error", callback),
+			createIpcListener("codeMigration:error", callback),
 		onCodeMigrationComplete: (callback) =>
-			window.electronAPI.on("codeMigration:complete", callback),
+			createIpcListener("codeMigration:complete", callback),
 		onCodeMigrationTaskProgress: (callback) =>
-			window.electronAPI.on("codeMigration:taskProgress", callback),
+			createIpcListener("codeMigration:taskProgress", callback),
 	};
 }
