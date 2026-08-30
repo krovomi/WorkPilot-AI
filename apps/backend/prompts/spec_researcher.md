@@ -47,36 +47,41 @@ First, find the correct Context7 library ID:
 
 ```
 Tool: mcp__context7__resolve-library-id
-Input: { "libraryName": "[library name from requirements]" }
+Input: {
+  "libraryName": "[library name from requirements]",
+  "query": "[what the project needs from it]"
+}
 ```
 
 Example for researching "NextJS":
 ```
 Tool: mcp__context7__resolve-library-id
-Input: { "libraryName": "nextjs" }
+Input: { "libraryName": "nextjs", "query": "app router file conventions" }
 ```
 
 This returns the Context7-compatible ID (e.g., "/vercel/next.js").
 
 #### Step 2: Get Library Documentation
 
-Once you have the ID, fetch documentation for specific topics:
+Once you have the ID, ask it the questions this spec actually raises:
 
 ```
-Tool: mcp__context7__get-library-docs
+Tool: mcp__context7__query-docs
 Input: {
-  "context7CompatibleLibraryID": "/vercel/next.js",
-  "topic": "routing",  // Focus on relevant topic
-  "mode": "code"       // "code" for API examples, "info" for conceptual guides
+  "libraryId": "/vercel/next.js",
+  "query": "how do I define routes and layouts with the app router"
 }
 ```
 
-**Topics to research for each integration:**
-- "getting started" or "installation" - For setup patterns
-- "api" or "reference" - For function signatures
-- "configuration" or "config" - For environment variables and options
-- "examples" - For common usage patterns
-- Specific feature topics relevant to your task
+The answer is reranked against the query, so a real question retrieves more
+than a topic keyword does.
+
+**Questions to answer for each integration:**
+- How is it installed and initialised? - For setup patterns
+- What are the exact signatures of the functions we need? - For the API
+- What must be configured? - Environment variables and options
+- What does idiomatic usage look like? - For common patterns
+- What does the documentation warn about? - For gotchas
 
 #### Step 3: Document Findings
 
@@ -244,7 +249,7 @@ research.json created successfully.
 
 1. **Context7 MCP** (PRIMARY) - Best for official docs, API patterns, code examples
    - Use `resolve-library-id` first to get the library ID
-   - Then `get-library-docs` with relevant topics
+   - Then `query-docs` with the question the spec actually raises
    - Covers most popular libraries (React, Next.js, FastAPI, etc.)
 
 2. **Web Search** - For package verification, recent info, obscure libraries
@@ -265,17 +270,16 @@ For a task involving "Graphiti memory integration":
 **Step 1: Context7 Lookup**
 ```
 Tool: mcp__context7__resolve-library-id
-Input: { "libraryName": "graphiti" }
+Input: { "libraryName": "graphiti", "query": "store and query episodic memory" }
 → Returns library ID or "not found"
 ```
 
 If found in Context7:
 ```
-Tool: mcp__context7__get-library-docs
+Tool: mcp__context7__query-docs
 Input: {
-  "context7CompatibleLibraryID": "/zep/graphiti",
-  "topic": "getting started",
-  "mode": "code"
+  "libraryId": "/zep/graphiti",
+  "query": "how do I install it and initialise a client"
 }
 → Returns installation, imports, initialization code
 ```

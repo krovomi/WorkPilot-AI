@@ -34,6 +34,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   model_router/        classification de tâche → tier qualité → modèle
   learning_loop/       patterns depuis les builds, phase observe, replay A/B des promotions
   mem_search/          lecture de la mémoire par paliers (skill mem-search)
+  libdocs/             docs des bibliothèques que le dépôt n'illustre pas, avant le build
   slash_commands/      sert .agents/skills/ à la barre de commandes du Kanban
   skills_registry/     parseur de frontmatter partagé (source unique)
   prompts/             les prompts système réels des agents

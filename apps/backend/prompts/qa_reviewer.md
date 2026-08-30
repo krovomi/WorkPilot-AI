@@ -274,16 +274,21 @@ grep -rh "^import\|^from\|require(" [modified-files] | sort -u
 **Step 2: Look up each library in Context7**
 ```
 Tool: mcp__context7__resolve-library-id
-Input: { "libraryName": "[library name]" }
+Input: {
+  "libraryName": "[library name]",
+  "query": "[the API the implementation calls]"
+}
 ```
+
+Documentation staged for this build sits in the spec directory under `docs/`.
+Read it first — it is already current, and reading it costs no quota.
 
 **Step 3: Verify API usage matches documentation**
 ```
-Tool: mcp__context7__get-library-docs
+Tool: mcp__context7__query-docs
 Input: {
-  "context7CompatibleLibraryID": "[library-id]",
-  "topic": "[relevant topic - e.g., the function being used]",
-  "mode": "code"
+  "libraryId": "[library-id]",
+  "query": "[the exact call being reviewed, e.g. \"signature of stripe.checkout.sessions.create\"]"
 }
 ```
 
