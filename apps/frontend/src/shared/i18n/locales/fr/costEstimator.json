@@ -18,9 +18,7 @@
 		"providers": {
 			"title": "Fournisseur(s)",
 			"models_one": "{{count}} modèle",
-			"models_other": "{{count}} modèles",
-			"models_plural": "{{count}} modèles",
-			"models": "{{count}} modèle"
+			"models_other": "{{count}} modèles"
 		}
 	},
 	"budget": {

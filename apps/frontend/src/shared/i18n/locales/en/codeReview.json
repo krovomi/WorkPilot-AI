@@ -24,8 +24,8 @@
 	"result": {
 		"passed": "Review Passed",
 		"failed": "Review Failed",
-		"issues": "{{count}} issue found",
-		"issues_plural": "{{count}} issues found",
+		"issues_one": "{{count}} issue found",
+		"issues_other": "{{count}} issues found",
 		"criticalHigh": "critical/high"
 	},
 	"issues": {
