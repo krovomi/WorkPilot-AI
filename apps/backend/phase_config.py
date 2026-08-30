@@ -35,6 +35,9 @@ MODEL_ID_MAP: dict[str, str] = {
     "sonnet": "claude-sonnet-4-5-20250929",
     "haiku": "claude-haiku-4-5",
     # Numbered aliases → full Anthropic ids (mirror the frontend catalog).
+    "opus-5": "claude-opus-5",
+    "fable-5": "claude-fable-5",
+    "sonnet-5": "claude-sonnet-5",
     "opus-4-8": "claude-opus-4-8",
     "opus-4-7": "claude-opus-4-7",
     "opus-4-6": "claude-opus-4-6",
