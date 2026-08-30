@@ -30,7 +30,17 @@ const isElectron =
  * Create mock electronAPI for browser
  * Aggregates all mock implementations from separate modules
  */
-const browserMockAPI: ElectronAPI = {
+/**
+ * `Partial`, parce que c'est la verite : la previsualisation navigateur couvre
+ * les chemins lus au demarrage et ceux qu'on veut pouvoir explorer, pas les
+ * ~660 methodes que le preload compose. Le type le disait autrefois par
+ * accident — `ElectronAPI` ne declarait que 356 membres et portait un index
+ * signature qui absorbait le reste.
+ *
+ * Les stores gardent leurs appels depuis #72 : une methode absente degrade avec
+ * un message, elle ne jette pas.
+ */
+const browserMockAPI: Partial<ElectronAPI> = {
 	// Project Operations
 	...projectMock,
 
@@ -678,29 +688,17 @@ const browserMockAPI: ElectronAPI = {
 		/* noop */
 	},
 
-	// Context-Aware Snippets API
-	onSnippetStreamChunk: () => {
+	// Context-Aware Snippets API — chaque abonnement rend son desabonnement
+	onSnippetStreamChunk: () => () => {
 		/* noop */
 	},
-	onSnippetStatus: () => {
+	onSnippetStatus: () => () => {
 		/* noop */
 	},
-	onSnippetError: () => {
+	onSnippetError: () => () => {
 		/* noop */
 	},
-	onSnippetComplete: () => {
-		/* noop */
-	},
-	removeSnippetStreamChunkListener: () => {
-		/* noop */
-	},
-	removeSnippetStatusListener: () => {
-		/* noop */
-	},
-	removeSnippetErrorListener: () => {
-		/* noop */
-	},
-	removeSnippetCompleteListener: () => {
+	onSnippetComplete: () => () => {
 		/* noop */
 	},
 
@@ -746,7 +744,12 @@ const browserMockAPI: ElectronAPI = {
 
 	// Smart Estimation API. The dialog is mounted for the whole session, so
 	// these are read at startup even when nobody opens it.
-	runSmartEstimation: async () => undefined,
+	// Le handler resout avec une estimation reelle. En previsualisation il n'y a
+	// pas de backend : echouer, plutot que rendre une estimation inventee que le
+	// dialogue afficherait comme un resultat.
+	runSmartEstimation: async () => {
+		throw new Error("Smart estimation is unavailable in the browser preview");
+	},
 	cancelSmartEstimation: async () => false,
 	onSmartEstimationEvent: () => () => {
 		/* noop */
@@ -828,8 +831,12 @@ export function initBrowserMock(): void {
 			"%c[Browser Mock] Initializing mock electronAPI for browser preview",
 			"color: #f0ad4e; font-weight: bold;",
 		);
+		// Le mock est partiel par nature (voir `browserMockAPI`). La conversion
+		// est le seul endroit qui l'assume, et elle est sûre : les appelants
+		// gardent leurs accès depuis #72, et une méthode absente y dégrade avec
+		// un message au lieu de jeter.
 		(window as Window & { electronAPI: ElectronAPI }).electronAPI =
-			browserMockAPI;
+			browserMockAPI as ElectronAPI;
 	}
 }
 

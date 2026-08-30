@@ -127,7 +127,9 @@ export function TeamSyncPanel({ projectDir }: Readonly<Props>) {
 			if (res.success) {
 				showFeedback(
 					"success",
-					t("feedback.pushSuccess", { count: res.data?.episode_count ?? "?" }),
+					// i18next attend un nombre pour `count` : il choisit la forme
+					// plurielle avec.
+					t("feedback.pushSuccess", { count: res.data?.episode_count ?? 0 }),
 				);
 				loadStatus();
 				loadPeers();

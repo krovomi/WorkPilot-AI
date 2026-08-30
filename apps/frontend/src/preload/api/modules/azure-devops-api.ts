@@ -32,9 +32,12 @@ export interface AzureDevOpsAPI {
 		projectId: string,
 		workItemId: number,
 	) => Promise<IPCResult<AzureDevOpsWorkItem>>;
+	// L'implementation juste en dessous et le handler acceptent tous deux
+	// `options` ; seule cette declaration etait restee a deux parametres.
 	importAzureDevOpsWorkItems: (
 		projectId: string,
 		workItemIds: number[],
+		options?: { requireReviewBeforeCoding?: boolean },
 	) => Promise<IPCResult<AzureDevOpsImportResult>>;
 	checkAzureDevOpsConnection: (
 		projectId: string,

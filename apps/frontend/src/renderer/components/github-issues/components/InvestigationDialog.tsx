@@ -12,16 +12,13 @@ import {
 } from "../../ui/dialog";
 import { Progress } from "../../ui/progress";
 import { ScrollArea } from "../../ui/scroll-area";
+import type { GitHubAPIComment } from "../../../../main/ipc-handlers/github/types";
 import type { InvestigationDialogProps } from "../types";
 import { formatDate } from "../utils";
 
-interface GitHubComment {
-	id: number;
-	body: string;
-	user: { login: string; avatar_url?: string };
-	created_at: string;
-	updated_at: string;
-}
+// Le pont expose la forme que le handler renvoie ; la redeclarer ici en faisait
+// une troisieme copie de la meme interface.
+type GitHubComment = GitHubAPIComment;
 
 // Helper component for loading state
 const CommentsLoadingState = () => (
@@ -149,7 +146,7 @@ export function InvestigationDialog({
 
 			globalThis.electronAPI
 				.getIssueComments(projectId, selectedIssue.number)
-				.then((result: { success: boolean; data?: GitHubComment[] }) => {
+				.then((result) => {
 					if (!isMounted) return;
 					if (result.success && result.data) {
 						setComments(result.data);
