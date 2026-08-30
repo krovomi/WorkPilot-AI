@@ -26,6 +26,12 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 	// ---- Anthropic (Claude) ----
 	anthropic: [
 		{
+			value: "claude-opus-5",
+			label: "Claude Opus 5",
+			tier: "flagship",
+			supportsThinking: true,
+		},
+		{
 			value: "claude-fable-5",
 			label: "Claude Fable 5",
 			tier: "flagship",
@@ -660,11 +666,17 @@ export function providerSupportsThinking(provider: string): boolean {
 // ============================================
 
 export const AVAILABLE_MODELS = [
+	{ value: "opus-5", label: "Claude Opus 5" },
+	{ value: "fable-5", label: "Claude Fable 5" },
 	{ value: "opus-4-8", label: "Claude Opus 4.8" },
 	{ value: "opus-4-7", label: "Claude Opus 4.7" },
 	{ value: "opus", label: "Claude Opus 4.6" },
+	{ value: "sonnet-5", label: "Claude Sonnet 5" },
 	{ value: "sonnet", label: "Claude Sonnet 4.6" },
-	{ value: "haiku", label: "Claude Haiku 4.6" },
+	// `haiku` resolves to Claude Haiku 4.5 — see MODEL_ID_MAP. It was labelled
+	// "Claude Haiku 4.6" here, a version Anthropic never shipped, so the picker
+	// offered a model that does not exist under a value that silently ran 4.5.
+	{ value: "haiku", label: "Claude Haiku 4.5" },
 	{ value: "opus-4-5", label: "Claude Opus 4.5" },
 	{ value: "sonnet-4-5", label: "Claude Sonnet 4.5" },
 	{ value: "haiku-4-5", label: "Claude Haiku 4.5" },
@@ -675,6 +687,9 @@ export const AVAILABLE_MODELS = [
 // existing tasks persisted with these values keep working. Newer versions
 // are exposed under explicit version-suffixed keys (e.g. "opus-4-7").
 export const MODEL_ID_MAP: Record<string, string> = {
+	"opus-5": "claude-opus-5",
+	"fable-5": "claude-fable-5",
+	"sonnet-5": "claude-sonnet-5",
 	"opus-4-8": "claude-opus-4-8",
 	"opus-4-7": "claude-opus-4-7",
 	opus: "claude-opus-4-6",

@@ -409,9 +409,16 @@ const DATA_DIRECTORIES = ["specs", "ideation", "insights", "roadmap"];
 /**
  * Result of initialization operation
  */
+/**
+ * The blocker union lives in `shared/types` because the renderer branches on
+ * it; re-exported here so this module's own result type reads on its own.
+ */
+export type { InitializationBlocker } from "../shared/types";
+
 export interface InitializationResult {
 	success: boolean;
 	error?: string;
+	blocker?: import("../shared/types").InitializationBlocker;
 }
 
 /**
@@ -463,6 +470,7 @@ export function initializeProject(projectPath: string): InitializationResult {
 		return {
 			success: false,
 			error: `Project directory not found: ${projectPath}`,
+			blocker: "path-missing",
 		};
 	}
 
@@ -475,6 +483,7 @@ export function initializeProject(projectPath: string): InitializationResult {
 			error:
 				gitStatus.error ||
 				"Git repository required. WorkPilot AI uses git worktrees for isolated builds.",
+			blocker: gitStatus.isGitRepo ? "no-commits" : "not-a-git-repo",
 		};
 	}
 
@@ -486,6 +495,7 @@ export function initializeProject(projectPath: string): InitializationResult {
 		return {
 			success: false,
 			error: "Project already has auto-claude initialized (.workpilot exists)",
+			blocker: "already-initialized",
 		};
 	}
 

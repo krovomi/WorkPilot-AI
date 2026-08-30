@@ -324,3 +324,63 @@ class TestParallelReviewerImportResolution:
         # Verify resolve_model_id is imported and used
         assert "resolve_model_id" in orchestrator_content
         assert "resolve_model_id" in followup_content
+
+
+class TestTheAnthropicCatalogIsCurrent:
+    """The registry is the single source of truth, so what it omits, nothing has.
+
+    Two ways this fails quietly. A model released after the catalogue was last
+    touched is simply unreachable — the picker cannot offer what the registry
+    does not list. And `get_default("anthropic")` decides what an
+    auto-configured provider runs, so a stale default silently bills every
+    build to a model two generations old while the UI shows a current one.
+    """
+
+    def test_the_current_flagship_is_listed(self):
+        from models_registry import list_provider
+
+        ids = {entry.model_id for entry in list_provider("anthropic")}
+        assert "claude-opus-5" in ids
+        assert "claude-sonnet-5" in ids
+        assert "claude-fable-5" in ids
+
+    def test_no_model_anthropic_never_shipped(self):
+        """There is no Haiku 4.6 — 4.6 was Sonnet and Opus only."""
+        from models_registry import list_provider
+
+        ids = {entry.model_id for entry in list_provider("anthropic")}
+        assert "claude-haiku-4-6" not in ids
+
+    def test_the_default_is_the_current_flagship(self):
+        from models_registry import get_default
+
+        default = get_default("anthropic")
+        assert default is not None
+        assert default.model_id == "claude-opus-5"
+
+    @pytest.mark.parametrize(
+        "model_id,price_input,price_output",
+        [
+            ("claude-opus-5", 5.0, 25.0),
+            ("claude-opus-4-8", 5.0, 25.0),
+            ("claude-sonnet-5", 2.0, 10.0),
+            ("claude-haiku-4-5", 1.0, 5.0),
+            ("claude-fable-5", 10.0, 50.0),
+        ],
+    )
+    def test_published_pricing(self, model_id, price_input, price_output):
+        """Cost estimates are only as honest as this table."""
+        from models_registry import get_pricing
+
+        entry = get_pricing("anthropic", model_id)
+        assert entry is not None, f"{model_id} missing from the registry"
+        assert entry.price_input == price_input
+        assert entry.price_output == price_output
+
+    def test_every_alias_resolves_to_a_registered_model(self):
+        """An alias pointing at nothing reaches the API as an unknown model."""
+        from models_registry import list_provider
+
+        ids = {entry.model_id for entry in list_provider("anthropic")}
+        for alias, model_id in MODEL_ID_MAP.items():
+            assert model_id in ids, f"alias {alias!r} → {model_id!r} not registered"

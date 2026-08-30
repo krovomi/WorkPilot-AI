@@ -1675,7 +1675,15 @@
 		"titleWithProject": "Vue d'ensemble des serveurs MCP pour {{projectName}}",
 		"typeCommand": "Commande (npx/npm)",
 		"typeHttp": "HTTP",
-		"url": "URL"
+		"url": "URL",
+		"configureServer": "Configurer ce serveur",
+		"serverDialog": {
+			"enabled": "Activé pour ce projet",
+			"enabledHint": "Les agents qui déclarent ce serveur le démarreront.",
+			"requirementMissing": "Ce serveur attend sa propre configuration avant de pouvoir être activé.",
+			"alwaysOn": "Les outils propres à WorkPilot AI sont toujours disponibles pour les agents qui les déclarent : il n'y a rien à configurer.",
+			"configuredInIntegrations": "Ce serveur s'authentifie avec un jeton défini dans Réglages → Intégrations. Configurez-le là-bas et il devient disponible pour les agents qui le déclarent."
+		}
 	},
 	"modelSelect": {
 		"discoveryNotAvailable": "Découverte de modèles non disponible. Saisissez le nom du modèle manuellement.",
@@ -1711,7 +1719,26 @@
 			"notInitializedDescription": "Initialisez Auto-Build pour activer la création de tâches et les workflows d'agents.",
 			"initializing": "Initialisation en cours...",
 			"initializeButton": "Initialiser Auto-Build",
-			"checkingStatus": "Vérification du statut..."
+			"checkingStatus": "Vérification du statut...",
+			"blocker": {
+				"notGitRepo": {
+					"title": "Ce dossier n'est pas encore un dépôt Git",
+					"body": "WorkPilot AI construit chaque tâche dans un worktree git isolé : le projet a donc besoin d'un dépôt avec au moins un commit avant que les agents puissent travailler."
+				},
+				"noCommits": {
+					"title": "Ce dépôt n'a pas encore de commit",
+					"body": "Un worktree part d'un commit existant : git en attend donc un premier avant que WorkPilot AI puisse isoler un build."
+				},
+				"whatHappens": "Un clic va :",
+				"stepInit": "Créer le dépôt git (git init)",
+				"stepCommit": "Indexer les fichiers présents et créer le commit initial",
+				"stepRetry": "Initialiser WorkPilot AI pour ce projet",
+				"repairButton": "Préparer le dépôt et initialiser",
+				"repairing": "Préparation du dépôt...",
+				"manual": "Vous préférez le faire vous-même ?",
+				"pathMissing": "Le dossier {{path}} n'existe plus. Remettez le projet en place ou retirez-le de la liste.",
+				"alreadyInitialized": "Ce projet possède déjà un dossier .workpilot : il est initialisé. Rouvrez les réglages pour rafraîchir son statut."
+			}
 		},
 		"azure-devops": {
 			"description": "Éléments de travail Azure DevOps",

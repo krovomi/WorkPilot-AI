@@ -141,8 +141,17 @@ export function createHookProxy(
 		get isCheckingAzureDevOps() {
 			return hookRef.current.isCheckingAzureDevOps;
 		},
+		get initBlocker() {
+			return hookRef.current.initBlocker;
+		},
+		get isRepairingGit() {
+			return hookRef.current.isRepairingGit;
+		},
 		get handleInitialize() {
 			return hookRef.current.handleInitialize;
+		},
+		get handleRepairGit() {
+			return hookRef.current.handleRepairGit;
 		},
 		get handleClaudeSetup() {
 			return hookRef.current.handleClaudeSetup;
