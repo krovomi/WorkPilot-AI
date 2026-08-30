@@ -322,13 +322,21 @@ Understand:
 cat [service-path]/SERVICE_CONTEXT.md 2>/dev/null || echo "No service context"
 ```
 
-### 5.4: Look Up External Library Documentation (Use Context7)
+### 5.4: Look Up External Library Documentation
 
-**If your subtask involves external libraries or APIs**, use Context7 to get accurate documentation BEFORE implementing.
+**If your subtask involves external libraries or APIs**, work from documentation, not from memory, BEFORE implementing.
 
-#### When to Use Context7
+#### Step 0: Check what was already downloaded
 
-Use Context7 when:
+If your prompt contains a **"Library documentation already downloaded"** section,
+those pages are on disk because the codebase has no example of the library to
+copy. **Read the file listed there before writing any code against that
+library.** It was fetched for this task, it is current, and it costs one Read.
+
+#### When to call Context7 yourself
+
+Call it when the downloaded pages do not cover what you need, or when your
+subtask involves a library none of them mention:
 - Implementing API integrations (Stripe, Auth0, AWS, etc.)
 - Using new libraries not yet in the codebase
 - Unsure about correct function signatures or patterns
@@ -339,23 +347,29 @@ Use Context7 when:
 **Step 1: Find the library in Context7**
 ```
 Tool: mcp__context7__resolve-library-id
-Input: { "libraryName": "[library name from subtask]" }
+Input: {
+  "libraryName": "[library name from subtask]",
+  "query": "[what you are trying to do, in words]"
+}
 ```
 
 **Step 2: Get relevant documentation**
 ```
-Tool: mcp__context7__get-library-docs
+Tool: mcp__context7__query-docs
 Input: {
-  "context7CompatibleLibraryID": "[library-id]",
-  "topic": "[specific feature you're implementing]",
-  "mode": "code"  // Use "code" for API examples, "info" for concepts
+  "libraryId": "[library-id, e.g. /vercel/next.js]",
+  "query": "[the question you need answered]"
 }
 ```
 
+The answer is reranked against your query, so ask the real question
+("how do I create a checkout session with a trial period") rather than naming
+a topic.
+
 **Example workflow:**
 If subtask says "Add Stripe payment integration":
-1. `resolve-library-id` with "stripe"
-2. `get-library-docs` with topic "payments" or "checkout"
+1. `resolve-library-id` with libraryName "stripe"
+2. `query-docs` with the id it returned and query "create a checkout session"
 3. Use the exact patterns from documentation
 
 **This prevents:**

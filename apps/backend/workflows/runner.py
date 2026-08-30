@@ -82,10 +82,11 @@ __all__ = [
 # runner tries to execute it as a one-shot session — losing the entire coder
 # loop to a one-line edit in a YAML file.
 #
-# So: these three ids are executed by `run_autonomous_agent` and
-# `run_qa_validation_loop`, whatever methodology they name, and the methodology
-# they name is handed to that executor rather than replacing it.
-BUILTIN_EXECUTORS = frozenset({"planning", "coding", "qa"})
+# So: these ids are executed by WorkPilot's own Python — `planning` and
+# `coding` by `run_autonomous_agent`, `qa` by `run_qa_validation_loop`, `docs`
+# by `libdocs.run_preflight` — whatever methodology they name, and the
+# methodology they name is handed to that executor rather than replacing it.
+BUILTIN_EXECUTORS = frozenset({"docs", "planning", "coding", "qa"})
 
 # Packs whose phases are executed by another part of the engine: impeccable by
 # `gates.run_deterministic_gates`, task-observer by `learning_loop.observe`.

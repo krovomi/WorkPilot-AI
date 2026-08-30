@@ -1601,8 +1601,10 @@
 				"name": "Outils WorkPilot AI"
 			},
 			"context7": {
-				"description": "Recherche de documentation pour les bibliothèques",
-				"name": "Context7"
+				"description": "Recherche de documentation pour les bibliothèques. Les pages des bibliothèques dont le dépôt n'a aucun exemple sont téléchargées avant chaque build.",
+				"name": "Context7",
+				"apiKeyPlaceholder": "Clé API Context7 (facultative)",
+				"apiKeyHint": "Sans clé, Context7 applique son quota anonyme par IP. Clés gratuites : context7.com/dashboard"
 			},
 			"electron": {
 				"description": "Automatisation d'app desktop via Chrome DevTools",

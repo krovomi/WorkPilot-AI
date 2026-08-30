@@ -44,8 +44,16 @@ TOOL_UPDATE_QA_STATUS = "mcp__workpilot__update_qa_status"
 # =============================================================================
 
 # Context7 MCP tools for documentation lookup (always enabled)
+#
+# Both spellings of the fetch tool are listed on purpose. `@upstash/context7-mcp`
+# renamed `get-library-docs` to `query-docs` and changed its parameters, and the
+# server is started with `npx -y` — unpinned — so the tool a given checkout gets
+# depends on when npx last resolved the package. An allowlist entry for a tool
+# the running server does not expose is inert; a missing entry for the tool it
+# does expose silently costs the whole documentation lookup.
 CONTEXT7_TOOLS = [
     "mcp__context7__resolve-library-id",
+    "mcp__context7__query-docs",
     "mcp__context7__get-library-docs",
 ]
 

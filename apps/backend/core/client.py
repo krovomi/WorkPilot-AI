@@ -495,6 +495,7 @@ def load_project_mcp_config(project_dir: Path) -> dict:
 
     Returns a dict of MCP-related env vars:
     - CONTEXT7_ENABLED (default: true)
+    - CONTEXT7_API_KEY (optional: raises the Context7 quota above anonymous)
     - LINEAR_MCP_ENABLED (default: true)
     - ELECTRON_MCP_ENABLED (default: false)
     - PUPPETEER_MCP_ENABLED (default: false)
@@ -515,6 +516,7 @@ def load_project_mcp_config(project_dir: Path) -> dict:
     config = {}
     mcp_keys = {
         "CONTEXT7_ENABLED",
+        "CONTEXT7_API_KEY",
         "LINEAR_MCP_ENABLED",
         "ELECTRON_MCP_ENABLED",
         "PUPPETEER_MCP_ENABLED",
@@ -994,10 +996,20 @@ def create_client(
     mcp_servers = {}
 
     if "context7" in required_servers:
+        # The key is passed through the environment rather than `--api-key`:
+        # the server reads CONTEXT7_API_KEY itself, and an argument would put
+        # the secret in every `ps` listing on the machine. Anonymous access
+        # still works — rate limited per IP, which is fine for one developer
+        # and hopeless for a machine running builds all day.
+        context7_api_key = mcp_config.get(
+            "CONTEXT7_API_KEY", os.environ.get("CONTEXT7_API_KEY", "")
+        )
         mcp_servers["context7"] = {
             "command": "npx",
             "args": ["-y", "@upstash/context7-mcp"],
         }
+        if context7_api_key:
+            mcp_servers["context7"]["env"] = {"CONTEXT7_API_KEY": context7_api_key}
 
     if "electron" in required_servers:
         # Electron MCP for desktop apps

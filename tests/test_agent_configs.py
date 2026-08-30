@@ -144,6 +144,21 @@ class TestGetRequiredMcpServers:
         assert "context7" in servers
         assert "workpilot" in servers
 
+    def test_the_context7_allowlist_covers_the_tool_the_server_exposes(self):
+        """`@upstash/context7-mcp` renamed get-library-docs to query-docs.
+
+        The server is started with `npx -y` — unpinned — so which of the two a
+        checkout gets depends on when npx last resolved the package. Listing
+        only the old name meant the coder was told to fetch documentation with
+        a tool its own allowlist forbade, on every current install.
+        """
+        from agents.tools_pkg.models import CONTEXT7_TOOLS
+        from agents.tools_pkg.permissions import get_allowed_tools
+
+        assert "mcp__context7__query-docs" in CONTEXT7_TOOLS
+        assert "mcp__context7__get-library-docs" in CONTEXT7_TOOLS
+        assert "mcp__context7__query-docs" in get_allowed_tools("coder")
+
     def test_linear_optional_not_included_by_default(self):
         """Linear should not be included unless linear_enabled=True."""
         from agents.tools_pkg.models import get_required_mcp_servers

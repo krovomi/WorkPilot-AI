@@ -404,6 +404,8 @@ export interface ProjectEnvConfig {
 	mcpServers?: {
 		/** Context7 documentation lookup - default: true */
 		context7Enabled?: boolean;
+		/** Context7 API key - optional, raises the quota above anonymous */
+		context7ApiKey?: string;
 		/** Graphiti knowledge graph - default: true (if graphitiProviderConfig set) */
 		graphitiEnabled?: boolean;
 		/** Linear MCP integration - default: follows linearEnabled */

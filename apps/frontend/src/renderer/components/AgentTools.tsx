@@ -63,6 +63,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "./ui/dialog";
+import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Switch } from "./ui/switch";
 
@@ -313,8 +314,11 @@ const MCP_SERVERS: Record<
 		description:
 			"Documentation lookup for libraries and frameworks via @upstash/context7-mcp",
 		icon: Search,
+		// Both spellings of the fetch tool: @upstash/context7-mcp renamed
+		// get-library-docs to query-docs, and the server is started unpinned.
 		tools: [
 			"mcp__context7__resolve-library-id",
+			"mcp__context7__query-docs",
 			"mcp__context7__get-library-docs",
 		],
 	},
@@ -1094,7 +1098,7 @@ export function AgentTools() {
 	const updateMcpServer = useCallback(
 		async (
 			key: keyof NonNullable<ProjectEnvConfig["mcpServers"]>,
-			value: boolean,
+			value: boolean | string,
 		) => {
 			if (!selectedProjectId || !envConfig) return;
 
@@ -1591,6 +1595,32 @@ export function AgentTools() {
 										}
 									/>
 								</div>
+
+								{/* Context7 API key — optional; without it the quota is
+								    the anonymous per-IP one, which a machine running
+								    builds all day exhausts. Saved on blur rather than on
+								    every keystroke: each save rewrites .workpilot/.env. */}
+								{mcpServers.context7Enabled !== false && (
+									<div className="pl-7 pb-2 space-y-1 border-b border-border last:border-0">
+										<Input
+											type="password"
+											placeholder={t(
+												"settings:mcp.servers.context7.apiKeyPlaceholder",
+											)}
+											defaultValue={mcpServers.context7ApiKey || ""}
+											onBlur={(e) => {
+												const value = e.target.value.trim();
+												if (value !== (mcpServers.context7ApiKey || "")) {
+													updateMcpServer("context7ApiKey", value);
+												}
+											}}
+											className="h-8 text-xs"
+										/>
+										<p className="text-xs text-muted-foreground">
+											{t("settings:mcp.servers.context7.apiKeyHint")}
+										</p>
+									</div>
+								)}
 
 								{/* Graphiti Memory */}
 								<div className="flex items-center justify-between py-2 border-b border-border last:border-0">

@@ -8,6 +8,16 @@ description: >-
 # Phase ids reuse the vocabulary phase_config already knows (spec, planning,
 # coding, qa), so per-phase model and effort resolution keeps working unchanged.
 phases:
+  - id: docs
+    impl: workpilot/libdocs
+    always: true
+    description: >-
+      Downloads the current documentation of every library this task needs and
+      the repository shows no example of. Costs no API call — manifests and
+      import counts decide, not a model — so there is no effort level at which
+      skipping it saves anything. First, because every phase after it reasons
+      about those APIs.
+
   - id: brainstorm
     impl: superpowers/brainstorming
     min_effort: high

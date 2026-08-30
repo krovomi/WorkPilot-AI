@@ -572,6 +572,21 @@ def _clear_planning_failures(spec_dir: Path) -> None:
         pass
 
 
+def _docs_section(spec_dir: Path, subtask: dict | None = None) -> str:
+    """Pointers to the documentation the preflight staged for this build.
+
+    Read from `docs_context.json` rather than re-detected here: the download
+    happened once, before planning, and a coder loop that re-ran the detection
+    every subtask would pay for the same answer on every iteration.
+    """
+    try:
+        from libdocs import format_docs_for_prompt, load_result
+
+        return format_docs_for_prompt(load_result(spec_dir), subtask=subtask)
+    except Exception:  # noqa: BLE001 - a missing section never stops a subtask
+        return ""
+
+
 async def run_autonomous_agent(
     project_dir: Path,
     spec_dir: Path,
@@ -1174,6 +1189,13 @@ async def run_autonomous_agent(
                 prompt += "\n\n" + planner_context
                 print_status("Graphiti memory context loaded for planner", "success")
 
+            # The plan decides which APIs the subtasks will call. A planner
+            # that knows the current signatures plans against them.
+            planner_docs = _docs_section(spec_dir)
+            if planner_docs:
+                prompt += "\n\n" + planner_docs
+                print_status("Library documentation available to planner", "success")
+
             first_run = False
             current_log_phase = LogPhase.PLANNING
 
@@ -1437,6 +1459,12 @@ async def run_autonomous_agent(
             if graphiti_context:
                 prompt += "\n\n" + graphiti_context
                 print_status("Graphiti memory context loaded", "success")
+
+            # Documentation downloaded before the build, as paths rather than
+            # inlined pages: the agent reads the one its subtask is about.
+            docs_context = _docs_section(spec_dir, next_subtask)
+            if docs_context:
+                prompt += "\n\n" + docs_context
 
             # Add concurrency error context if recovering from 400 error
             if concurrency_error_context:

@@ -54,9 +54,26 @@ class TestTheEngineIsOnByDefault:
         spec = tmp_path / "001-x"
         spec.mkdir()
         profile = _resolve_workflow_profile(spec, announce=False)
-        assert profile.declared[0] == "brainstorm"
+        assert profile.declared[0] == "docs"
         assert profile.declared[-1] == "observe"
         assert "qa" in profile.declared
+
+    def test_the_documentation_phase_survives_the_weakest_effort(
+        self, tmp_path, monkeypatch
+    ):
+        """`docs` costs no API call, so no effort level may drop it.
+
+        The phase reads manifests and counts imports; pruning it saves nothing
+        and buys a coder writing against remembered API signatures.
+        """
+        monkeypatch.delenv("WORKPILOT_WORKFLOW_ENGINE", raising=False)
+        spec = tmp_path / "001-x"
+        spec.mkdir()
+        (spec / "task_metadata.json").write_text(
+            '{"phase_thinking": {"coding": "low"}}', encoding="utf-8"
+        )
+        profile = _resolve_workflow_profile(spec, announce=False)
+        assert profile.will_run("docs")
 
 
 class TestTestEvidence:
