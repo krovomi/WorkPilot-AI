@@ -1224,12 +1224,14 @@ async def run_agent_session(
                                     block.text[:300]
                                 )
                             except Exception:
+                                # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                                 pass
                         # Record agent response in replay
                         if _rr and _rs_id and block.text.strip():
                             try:
                                 _rr.record_response(_rs_id, block.text)
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
                     elif block_type == "ToolUseBlock" and hasattr(block, "name"):
                         tool_name = block.name
@@ -1295,6 +1297,7 @@ async def run_agent_session(
                                         _rs_id, tool_name, tool_input_dict=inp or {}
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
                         # Record tool call in decision log (non-blocking)
@@ -1302,6 +1305,7 @@ async def run_agent_session(
                             try:
                                 _decision_logger.log_tool_call(tool_name, inp)
                             except Exception:
+                                # Le journal de decisions est annexe : il n'interrompt pas l'agent.
                                 pass
 
                         # Stream tool use events to live view
@@ -1324,6 +1328,7 @@ async def run_agent_session(
                                 elif command:
                                     await streaming_wrapper.emit_command(command[:500])
                             except Exception:
+                                # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                                 pass
 
             # Handle UserMessage (tool results)
@@ -1414,6 +1419,7 @@ async def run_agent_session(
                                         str(result_content)[:1000], is_error=is_error
                                     )
                             except Exception:
+                                # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                                 pass
 
                         # Record tool result in replay
@@ -1432,6 +1438,7 @@ async def run_agent_session(
                                         success=not is_error,
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
                         current_tool = None
@@ -1508,6 +1515,7 @@ async def run_agent_session(
                         "anthropic" if _active in ("claude", "anthropic") else _active
                     )
                 except Exception:
+                    # Le provider actif n'est qu'une etiquette de journal : sans lui on continue.
                     pass
                 _record_usage(
                     spec_dir=spec_dir,
@@ -1544,6 +1552,7 @@ async def run_agent_session(
                     cost_usd=_cost,
                 )
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
 
         # Check if build is complete
@@ -1559,6 +1568,7 @@ async def run_agent_session(
                 try:
                     _rr.end_session(_rs_id)
                 except Exception:
+                    # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                     pass
             return "complete", response_text, {}
 
@@ -1612,11 +1622,13 @@ async def run_agent_session(
                     )
                 _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
             except OSError:
+                # L'archivage des logs est du menage : il ne doit pas masquer la vraie cause.
                 pass
             if _rr and _rs_id:
                 try:
                     _rr.end_session(_rs_id, status="failed")
                 except Exception:
+                    # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                     pass
             return "error", response_text, error_info
 
@@ -1631,6 +1643,7 @@ async def run_agent_session(
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "continue", response_text, {}
 
@@ -1740,6 +1753,7 @@ async def run_agent_session(
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", sanitized_error, error_info
 
@@ -1861,6 +1875,7 @@ async def _run_agent_client_session(
                                 block.text[:300]
                             )
                         except Exception:
+                            # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_USE:
@@ -1911,6 +1926,7 @@ async def _run_agent_client_session(
                             elif command:
                                 await streaming_wrapper.emit_command(command[:500])
                         except Exception:
+                            # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_RESULT:
@@ -1986,6 +2002,7 @@ async def _run_agent_client_session(
                                     str(result_content)[:1000], is_error=is_error
                                 )
                         except Exception:
+                            # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                             pass
 
                     current_tool = None
@@ -2141,6 +2158,7 @@ async def _run_agent_client_session(
                     )
                 _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
             except OSError:
+                # L'archivage des logs est du menage : il ne doit pas masquer la vraie cause.
                 pass
             return (
                 "error",

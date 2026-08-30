@@ -1672,6 +1672,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                             ):
                                 return value
             except Exception:
+                # Une source de provider illisible : on passe a la suivante, c'est le but de la chaine.
                 pass
 
     # 4. Default
@@ -1785,6 +1786,7 @@ def _log_llm_context_switch(
             if tl is not None and Path(tl.spec_dir) == Path(spec_dir):
                 tl.log_info(message)
         except Exception:
+            # Le task logger est optionnel : le message part deja sur stdout.
             pass
 
         try:
@@ -1796,6 +1798,7 @@ def _log_llm_context_switch(
                 encoding="utf-8",
             )
         except OSError:
+            # Le marqueur est un cache : le lecteur gere deja son absence.
             pass
     except Exception as e:  # pragma: no cover - defensive guard
         logger.debug("Could not record LLM context switch: %s", e)
@@ -1962,6 +1965,7 @@ def create_agent_client(
 
             model = normalize_anthropic_model_id(model)
         except Exception:
+            # La normalisation est un filet : un id non normalise reste utilisable.
             pass
 
     logger.info(
