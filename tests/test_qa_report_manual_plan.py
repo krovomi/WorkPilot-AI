@@ -57,21 +57,21 @@ class TestCreateManualTestPlan:
         """Test that plan contains spec name."""
         result = create_manual_test_plan(spec_dir, "my-feature")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "my-feature" in content
 
     def test_contains_checklist(self, spec_dir: Path) -> None:
         """Test that plan contains checklist items."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "[ ]" in content  # Checkbox items
 
     def test_contains_required_sections(self, spec_dir: Path) -> None:
         """Test that plan contains required sections."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "## Overview" in content
         assert "## Functional Tests" in content
         assert "## Non-Functional Tests" in content
@@ -81,14 +81,14 @@ class TestCreateManualTestPlan:
         """Test that plan contains pre-test setup section."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "## Pre-Test Setup" in content
 
     def test_contains_browser_testing(self, spec_dir: Path) -> None:
         """Test that plan contains browser testing section."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "## Browser/Environment Testing" in content
 
     def test_extracts_acceptance_criteria(self, spec_dir: Path) -> None:
@@ -107,11 +107,11 @@ A test feature.
 ## Implementation
 Details here.
 """
-        (spec_dir / "spec.md").write_text(spec_content)
+        (spec_dir / "spec.md").write_text(spec_content, encoding="utf-8")
 
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "Feature does X" in content
         assert "Feature handles Y" in content
         assert "Feature reports Z" in content
@@ -120,7 +120,7 @@ Details here.
         """Test default criteria when spec doesn't exist."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "Core functionality works as expected" in content
 
     def test_default_criteria_when_no_acceptance_section(self, spec_dir: Path) -> None:
@@ -133,32 +133,32 @@ A test feature without acceptance criteria.
 ## Implementation
 Details here.
 """
-        (spec_dir / "spec.md").write_text(spec_content)
+        (spec_dir / "spec.md").write_text(spec_content, encoding="utf-8")
 
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "Core functionality works as expected" in content
 
     def test_contains_timestamp(self, spec_dir: Path) -> None:
         """Test that plan contains generated timestamp."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "**Generated**:" in content
 
     def test_contains_reason(self, spec_dir: Path) -> None:
         """Test that plan contains reason for manual testing."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "**Reason**: No automated test framework detected" in content
 
     def test_happy_path_section(self, spec_dir: Path) -> None:
         """Test that plan contains happy path section."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "### Happy Path" in content
         assert "Primary use case works correctly" in content
 
@@ -166,7 +166,7 @@ Details here.
         """Test that plan contains edge cases section."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "### Edge Cases" in content
         assert "Empty input handling" in content
 
@@ -174,19 +174,19 @@ Details here.
         """Test that plan contains error handling section."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "### Error Handling" in content
 
     def test_performance_section(self, spec_dir: Path) -> None:
         """Test that plan contains performance section."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "### Performance" in content
 
     def test_security_section(self, spec_dir: Path) -> None:
         """Test that plan contains security section."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "### Security" in content

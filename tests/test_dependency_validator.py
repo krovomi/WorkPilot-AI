@@ -375,7 +375,7 @@ class TestExitWithSecretstorageWarning:
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
         activate_script = bin_dir / "activate"
-        activate_script.write_text("#!/bin/bash\n")
+        activate_script.write_text("#!/bin/bash\n", encoding="utf-8")
 
         with patch("sys.prefix", str(tmp_path)):
             _warn_missing_secretstorage()
@@ -567,7 +567,7 @@ class TestImportOrderPreventsEarlyFailure:
         # Read cli/utils.py to verify the import is NOT at module level
         backend_dir = Path(__file__).parent.parent / "apps" / "backend"
         utils_py = backend_dir / "cli" / "utils.py"
-        utils_content = utils_py.read_text()
+        utils_content = utils_py.read_text(encoding="utf-8")
 
         # Parse the file with AST to find the first function definition
         tree = ast.parse(utils_content)
@@ -632,7 +632,7 @@ class TestImportOrderPreventsEarlyFailure:
 
         # Check run.py
         run_py = backend_dir / "run.py"
-        run_content = run_py.read_text()
+        run_content = run_py.read_text(encoding="utf-8")
 
         # Verify validate_platform_dependencies is imported and called
         assert "validate_platform_dependencies" in run_content, (
@@ -651,7 +651,7 @@ class TestImportOrderPreventsEarlyFailure:
 
         # Check spec_runner.py
         spec_runner_py = backend_dir / "runners" / "spec_runner.py"
-        spec_runner_content = spec_runner_py.read_text()
+        spec_runner_content = spec_runner_py.read_text(encoding="utf-8")
 
         assert "validate_platform_dependencies" in spec_runner_content, (
             "spec_runner.py should import validate_platform_dependencies"
@@ -689,7 +689,7 @@ class TestCliUtilsFindSpec:
         specs_dir.mkdir(parents=True)
         spec_dir = specs_dir / "001-test-feature"
         spec_dir.mkdir()
-        (spec_dir / "spec.md").write_text("# Test Spec")
+        (spec_dir / "spec.md").write_text("# Test Spec", encoding="utf-8")
 
         result = find_spec(temp_dir, "001")
         assert result == spec_dir
@@ -702,7 +702,7 @@ class TestCliUtilsFindSpec:
         specs_dir.mkdir(parents=True)
         spec_dir = specs_dir / "001-test-feature"
         spec_dir.mkdir()
-        (spec_dir / "spec.md").write_text("# Test Spec")
+        (spec_dir / "spec.md").write_text("# Test Spec", encoding="utf-8")
 
         result = find_spec(temp_dir, "001-test-feature")
         assert result == spec_dir
@@ -746,7 +746,7 @@ class TestCliUtilsGetProjectDir:
         # Create apps/backend structure
         backend_dir = temp_dir / "apps" / "backend"
         backend_dir.mkdir(parents=True)
-        (backend_dir / "run.py").write_text("# run.py")
+        (backend_dir / "run.py").write_text("# run.py", encoding="utf-8")
 
         # Change to backend directory
         import os

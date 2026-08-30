@@ -101,7 +101,7 @@ def temp_git_repo():
 
             # Create initial commit
             test_file = repo_dir / "test.txt"
-            test_file.write_text("initial content")
+            test_file.write_text("initial content", encoding="utf-8")
             subprocess.run(
                 ["git", "add", "."], cwd=repo_dir, check=True, capture_output=True
             )
@@ -208,7 +208,7 @@ def test_cleanup_orphaned_worktrees(temp_git_repo):
     # Manually create an orphan directory (looks like worktree but not registered)
     orphan_path = manager.worktree_base_dir / "pr-456-orphaned-12345"
     orphan_path.mkdir(parents=True)
-    (orphan_path / "test.txt").write_text("orphan content")
+    (orphan_path / "test.txt").write_text("orphan content", encoding="utf-8")
 
     # Verify directory exists but is not in git worktree list
     assert orphan_path.exists()

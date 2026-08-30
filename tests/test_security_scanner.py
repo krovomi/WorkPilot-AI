@@ -53,8 +53,8 @@ def scanner():
 @pytest.fixture
 def python_project(temp_dir):
     """Create a simple Python project structure."""
-    (temp_dir / "requirements.txt").write_text("flask==2.0.0\n")
-    (temp_dir / "app.py").write_text("print('hello')\n")
+    (temp_dir / "requirements.txt").write_text("flask==2.0.0\n", encoding="utf-8")
+    (temp_dir / "app.py").write_text("print('hello')\n", encoding="utf-8")
     return temp_dir
 
 
@@ -62,7 +62,8 @@ def python_project(temp_dir):
 def node_project(temp_dir):
     """Create a simple Node.js project structure."""
     (temp_dir / "package.json").write_text(
-        json.dumps({"name": "test", "dependencies": {"express": "^4.18.0"}})
+        json.dumps({"name": "test", "dependencies": {"express": "^4.18.0"}}),
+        encoding="utf-8",
     )
     return temp_dir
 
@@ -202,7 +203,8 @@ class TestSecretsDetection:
         # Create a file with a fake API key
         code_file = temp_dir / "config.py"
         code_file.write_text(
-            'API_KEY = "sk-test1234567890abcdefghij1234567890abcdefghij"'
+            'API_KEY = "sk-test1234567890abcdefghij1234567890abcdefghij"',
+            encoding="utf-8",
         )
 
         result = scanner.scan(temp_dir, run_sast=False, run_dependency_audit=False)
@@ -358,7 +360,7 @@ class TestConvenienceFunctions:
 
     def test_has_security_issues_clean(self, temp_dir):
         """Test has_security_issues on clean project."""
-        (temp_dir / "app.py").write_text("print('hello')")
+        (temp_dir / "app.py").write_text("print('hello')", encoding="utf-8")
 
         # This should return False for a clean project
         # (actual behavior depends on secrets scanner availability)
@@ -367,7 +369,7 @@ class TestConvenienceFunctions:
 
     def test_scan_secrets_only_function(self, temp_dir):
         """Test scan_secrets_only function."""
-        (temp_dir / "app.py").write_text("print('hello')")
+        (temp_dir / "app.py").write_text("print('hello')", encoding="utf-8")
 
         secrets = scan_secrets_only(temp_dir)
         assert isinstance(secrets, list)
@@ -420,12 +422,14 @@ class TestEdgeCases:
         """Test Python project detection."""
         assert scanner._is_python_project(temp_dir) is False
 
-        (temp_dir / "requirements.txt").write_text("flask\n")
+        (temp_dir / "requirements.txt").write_text("flask\n", encoding="utf-8")
         assert scanner._is_python_project(temp_dir) is True
 
     def test_is_python_project_pyproject(self, scanner, temp_dir):
         """Test Python project detection with pyproject.toml."""
-        (temp_dir / "pyproject.toml").write_text("[project]\nname='test'")
+        (temp_dir / "pyproject.toml").write_text(
+            "[project]\nname='test'", encoding="utf-8"
+        )
         assert scanner._is_python_project(temp_dir) is True
 
 

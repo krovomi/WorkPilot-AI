@@ -24,6 +24,162 @@ if sys.platform == "win32":
         sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer, "strict")
 
 
+def _code_only(content: str) -> str:
+    """
+    Le fichier avec ses commentaires et ses litteraux remplaces par des espaces.
+
+    Les offsets et les numeros de ligne sont preserves, si bien que tout ce qui
+    scanne ce texte rapporte les memes positions que sur l'original — mais ne
+    voit plus que du code.
+
+    Sans cela, un `open()` cite dans un commentaire (`# Missing encoding in
+    open()`) ou dans une chaine de test etait signale comme un vrai appel.
+
+    Ce texte sert a *reperer* les appels, jamais a les lire : le mode binaire
+    d'un `open(path, "wb")` vit dans un litteral, donc dans ce qui est masque.
+    Les arguments sont relus sur l'original, a la position trouvee ici.
+
+    Sur un fichier que `tokenize` refuse (syntaxe invalide), on rend le contenu
+    tel quel : mieux vaut un faux positif qu'un fichier non verifie.
+    """
+    import io
+    import tokenize
+
+    masked = list(content)
+    lines = content.splitlines(keepends=True)
+    starts = []
+    acc = 0
+    for line in lines:
+        starts.append(acc)
+        acc += len(line)
+
+    def offset(row: int, col: int) -> int:
+        return starts[row - 1] + col if 0 < row <= len(starts) else len(content)
+
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(content).readline))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return content
+
+    for tok in tokens:
+        if tok.type not in (tokenize.COMMENT, tokenize.STRING):
+            continue
+        begin, end = offset(*tok.start), offset(*tok.end)
+        for i in range(begin, min(end, len(masked))):
+            if masked[i] != "\n":
+                masked[i] = " "
+    return "".join(masked)
+
+
+def _call_source(content: str, start: int, open_paren: int) -> str | None:
+    """
+    Le texte d'un appel, de `start` jusqu'a la parenthese appariee.
+
+    Les parentheses sont equilibrees et les chaines ignorees, pour qu'un appel
+    imbrique (`open(os.path.join(d, "f"), "w", encoding="utf-8")`) ou une
+    parenthese dans un litteral ne tronquent pas la lecture.
+    """
+    depth, i, quote = 0, open_paren, None
+    while i < len(content):
+        ch = content[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if content.startswith(quote, i):
+                i += len(quote)
+                quote = None
+                continue
+            i += 1
+            continue
+        if content.startswith(('"""', "'''"), i):
+            quote = content[i : i + 3]
+            i += 3
+            continue
+        if ch in "\"'":
+            quote = ch
+            i += 1
+            continue
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return content[start : i + 1]
+        i += 1
+    return None
+
+
+def _positional_args(args_src: str) -> int:
+    """
+    Le nombre d'arguments positionnels d'une liste d'arguments.
+
+    Le decoupage se fait sur les virgules de premier niveau, hors chaines et
+    hors parentheses/crochets/accolades, et s'arrete au premier mot-cle : dans
+    `write_text(json.dumps(d), "utf-8")` il y a deux positionnels, pas trois.
+    """
+    depth, quote, count, current = 0, None, 0, ""
+    i = 0
+    segments = []
+    while i < len(args_src):
+        ch = args_src[i]
+        if quote:
+            if ch == "\\":
+                current += args_src[i : i + 2]
+                i += 2
+                continue
+            if args_src.startswith(quote, i):
+                current += quote
+                i += len(quote)
+                quote = None
+                continue
+            current += ch
+            i += 1
+            continue
+        if args_src.startswith(('"""', "'''"), i):
+            quote = args_src[i : i + 3]
+            current += quote
+            i += 3
+            continue
+        if ch in "\"'":
+            quote = ch
+            current += ch
+            i += 1
+            continue
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            segments.append(current)
+            current = ""
+            i += 1
+            continue
+        current += ch
+        i += 1
+    if current.strip():
+        segments.append(current)
+
+    for segment in segments:
+        if re.match(r"\s*\w+\s*=[^=]", segment):
+            break  # premier mot-cle : tout ce qui suit est nomme
+        count += 1
+    return count
+
+
+def _encoding_is_positional(args_src: str, slot: int) -> bool:
+    """
+    Vrai si `encoding` est passe positionnellement, a l'index `slot`.
+
+    `Path.read_text(encoding, errors, newline)` accepte l'encodage en premier
+    argument, `write_text(data, encoding, …)` en deuxieme : `p.read_text("utf-8")`
+    declare bien son encodage, meme sans le nommer. Ne chercher que `encoding=`
+    signalait ces appels comme fautifs, et la seule facon de faire taire le hook
+    etait de reecrire du code deja correct.
+    """
+    return _positional_args(args_src) > slot
+
+
 class EncodingChecker:
     """Checks Python files for missing UTF-8 encoding parameters."""
 
@@ -48,11 +204,31 @@ class EncodingChecker:
 
         file_issues = []
 
+        # Les cinq motifs ci-dessous sont cherches dans `scan`, ou commentaires
+        # et litteraux sont blanchis, et relus dans `content`. Chercher dans le
+        # fichier brut signalait le `open()` d'une phrase de commentaire ou d'une
+        # fixture de test ; lire dans le texte blanchi ferait disparaitre le mode
+        # `"wb"` qui exempte les ouvertures binaires. Les offsets etant les memes
+        # des deux cotes, une position trouvee dans l'un s'utilise dans l'autre.
+        scan = _code_only(content)
+
         # Check 1: open() without encoding
         # Pattern: open(..., encoding="utf-8") without encoding= parameter
         # Use negative lookbehind to exclude os.open(), urlopen(), etc.
-        for match in re.finditer(r"(?<![a-zA-Z_\.])open\s*\([^)]+\)", content):
-            call = match.group()
+        #
+        # The argument list is delimited by balancing parentheses, not by the
+        # first `)`. A pattern like `open\s*\([^)]+\)` stops inside a nested
+        # call — `open(os.path.join(d, "f"), "w", encoding="utf-8")` matched
+        # only up to `join(d, "f")`, saw no `encoding=`, and reported a file
+        # that was already correct. Nesting is common enough that the false
+        # positives outnumbered the real findings in `tests/`. Check 2 below
+        # has always balanced properly; this one had not caught up.
+        for match in re.finditer(r"(?<![a-zA-Z_\.])open\s*\(", scan):
+            call = _call_source(
+                content, match.start(), content.index("(", match.start())
+            )
+            if call is None:
+                continue
 
             # Skip if it's binary mode (must contain 'b' in mode string)
             # Matches: "rb", "wb", "ab", "r+b", "w+b", etc.
@@ -63,6 +239,10 @@ class EncodingChecker:
             if re.search(r"\bencoding\s*=", call):
                 continue
 
+            # open(file, mode, buffering, encoding, …) : quatrieme positionnel
+            if _encoding_is_positional(call[call.index("(") + 1 : -1], 3):
+                continue
+
             # Get line number
             line_num = content[: match.start()].count("\n") + 1
             file_issues.append(
@@ -71,7 +251,7 @@ class EncodingChecker:
 
         # Check 2: Path.read_text() without encoding
         # Match .read_text(encoding="utf-8") calls - both variable.read_text(encoding="utf-8") and Path(...).read_text(encoding="utf-8")
-        for match in re.finditer(r"(?:(\w+)|(\))\s*)\.read_text\s*\(", content):
+        for match in re.finditer(r"(?:(\w+)|(\))\s*)\.read_text\s*\(", scan):
             var_name = match.group(1)  # Will be None if matched closing paren
             start_pos = match.end()
 
@@ -88,6 +268,10 @@ class EncodingChecker:
 
             # Skip if it already has encoding
             if re.search(r"\bencoding\s*=", args):
+                continue
+
+            # read_text(encoding, errors, newline) : premier positionnel
+            if _encoding_is_positional(args, 0):
                 continue
 
             # Skip method calls on self/cls (custom methods, not Path)
@@ -113,7 +297,7 @@ class EncodingChecker:
 
         # Check 3: Path.write_text() without encoding
         # Match .write_text(encoding="utf-8") calls - both variable.write_text(encoding="utf-8") and Path(...).write_text(encoding="utf-8")
-        for match in re.finditer(r"(?:(\w+)|(\))\s*)\.write_text\s*\(", content):
+        for match in re.finditer(r"(?:(\w+)|(\))\s*)\.write_text\s*\(", scan):
             var_name = match.group(1)  # Will be None if matched closing paren
             start_pos = match.end()
 
@@ -130,6 +314,10 @@ class EncodingChecker:
 
             # Skip if it already has encoding
             if re.search(r"\bencoding\s*=", args):
+                continue
+
+            # write_text(data, encoding, errors, newline) : deuxieme positionnel
+            if _encoding_is_positional(args, 1):
                 continue
 
             # Skip method calls on self/cls (custom methods, not Path)
@@ -154,8 +342,8 @@ class EncodingChecker:
             )
 
         # Check 4: json.load() with open() without encoding
-        for match in re.finditer(r"json\.load\s*\(\s*open\s*\([^)]+\)", content):
-            call = match.group()
+        for match in re.finditer(r"json\.load\s*\(\s*open\s*\([^)]+\)", scan):
+            call = content[match.start() : match.end()]
 
             # Skip if open() has encoding (use word boundary for robustness)
             if re.search(r"\bencoding\s*=", call):
@@ -167,8 +355,8 @@ class EncodingChecker:
             )
 
         # Check 5: json.dump() with open() without encoding
-        for match in re.finditer(r"json\.dump\s*\([^,]+,\s*open\s*\([^)]+\)", content):
-            call = match.group()
+        for match in re.finditer(r"json\.dump\s*\([^,]+,\s*open\s*\([^)]+\)", scan):
+            call = content[match.start() : match.end()]
 
             # Skip if open() has encoding (use word boundary for robustness)
             if re.search(r"\bencoding\s*=", call):

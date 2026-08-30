@@ -75,7 +75,7 @@ def create_implementation_plan(spec_dir: Path, subtasks: list[dict]) -> Path:
         ],
     }
     plan_file = spec_dir / "implementation_plan.json"
-    plan_file.write_text(json.dumps(plan, indent=2))
+    plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
     return plan_file
 
 
@@ -455,7 +455,7 @@ class TestSubtaskStateTransitions:
             ],
         }
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text(json.dumps(plan, indent=2))
+        plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
 
         loaded_plan = load_implementation_plan(spec_dir)
 
@@ -540,7 +540,9 @@ class TestHandoffDataPreservation:
         _, spec_dir, project_dir = test_env
 
         # Create spec.md
-        (spec_dir / "spec.md").write_text("# Test Spec\n\nTest content")
+        (spec_dir / "spec.md").write_text(
+            "# Test Spec\n\nTest content", encoding="utf-8"
+        )
 
         # Create context.json
         context = {
@@ -551,7 +553,7 @@ class TestHandoffDataPreservation:
             "patterns_from": ["app/utils.py"],
         }
         context_file = spec_dir / "context.json"
-        context_file.write_text(json.dumps(context, indent=2))
+        context_file.write_text(json.dumps(context, indent=2), encoding="utf-8")
 
         # Create subtask
         subtask = {
@@ -560,7 +562,7 @@ class TestHandoffDataPreservation:
             "files_to_modify": ["app/main.py"],
         }
         subtask_file = spec_dir / "subtask-1.json"
-        subtask_file.write_text(json.dumps(subtask, indent=2))
+        subtask_file.write_text(json.dumps(subtask, indent=2), encoding="utf-8")
 
         loaded_context = load_subtask_context(spec_dir, project_dir, subtask)
 
@@ -611,7 +613,7 @@ class TestHandoffDataPreservation:
 
         # Create a new commit
         test_file = project_dir / "new_file.txt"
-        test_file.write_text("New content")
+        test_file.write_text("New content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=project_dir, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Add new file"],
@@ -666,7 +668,7 @@ class TestPlannerOutputValidation:
             "phases": [],
         }
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text(json.dumps(plan, indent=2))
+        plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
 
         next_subtask = get_next_subtask(spec_dir)
         assert next_subtask is None, "Empty phases should return None"
@@ -837,7 +839,9 @@ class TestSubtaskCompletionDetection:
             "status": "in_progress",
             "phases": [],
         }
-        (spec_dir / "implementation_plan.json").write_text(json.dumps(plan))
+        (spec_dir / "implementation_plan.json").write_text(
+            json.dumps(plan), encoding="utf-8"
+        )
 
         assert is_build_complete(spec_dir) is False, (
             "Plan with no subtasks should not be complete"
@@ -1079,7 +1083,9 @@ class TestSubtaskCompletionDetection:
                 },
             ],
         }
-        (spec_dir / "implementation_plan.json").write_text(json.dumps(plan))
+        (spec_dir / "implementation_plan.json").write_text(
+            json.dumps(plan), encoding="utf-8"
+        )
 
         completed, total = count_subtasks(spec_dir)
         assert completed == 1 and total == 3, "Should count across phases: 1/3"
@@ -1088,7 +1094,9 @@ class TestSubtaskCompletionDetection:
         # Complete all in second phase
         plan["phases"][1]["subtasks"][0]["status"] = "completed"
         plan["phases"][1]["subtasks"][1]["status"] = "completed"
-        (spec_dir / "implementation_plan.json").write_text(json.dumps(plan))
+        (spec_dir / "implementation_plan.json").write_text(
+            json.dumps(plan), encoding="utf-8"
+        )
 
         completed, total = count_subtasks(spec_dir)
         assert completed == 3 and total == 3, "All phases complete: 3/3"
@@ -1681,7 +1689,7 @@ class TestWorktreeIsolation:
 
         # Make changes in first worktree
         file1 = info1.path / "agent1_work.txt"
-        file1.write_text("Work from agent 1")
+        file1.write_text("Work from agent 1", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info1.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Agent 1 work"], cwd=info1.path, capture_output=True
@@ -1689,7 +1697,7 @@ class TestWorktreeIsolation:
 
         # Make different changes in second worktree
         file2 = info2.path / "agent2_work.txt"
-        file2.write_text("Work from agent 2")
+        file2.write_text("Work from agent 2", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info2.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Agent 2 work"], cwd=info2.path, capture_output=True
@@ -1736,7 +1744,7 @@ class TestWorktreeIsolation:
         for i, info in enumerate(worktrees):
             # Each worktree starts with the same file (from base branch)
             modified_file = info.path / "test.txt"
-            modified_file.write_text(f"Modified by agent {i}")
+            modified_file.write_text(f"Modified by agent {i}", encoding="utf-8")
             subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
             subprocess.run(
                 ["git", "commit", "-m", f"Agent {i} modification"],
@@ -1746,7 +1754,7 @@ class TestWorktreeIsolation:
 
         # Verify each worktree has its own version
         for i, info in enumerate(worktrees):
-            content = (info.path / "test.txt").read_text()
+            content = (info.path / "test.txt").read_text(encoding="utf-8")
             assert content == f"Modified by agent {i}", (
                 f"Worktree {i} should have agent {i}'s changes"
             )
@@ -1787,7 +1795,7 @@ class TestWorktreeIsolation:
             ],
         }
         plan_file = worktree_spec_dir / "implementation_plan.json"
-        plan_file.write_text(json.dumps(plan, indent=2))
+        plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
 
         # Verify the spec directory exists only in the worktree
         assert worktree_spec_dir.exists(), "Spec dir should exist in worktree"
@@ -1816,7 +1824,7 @@ class TestWorktreeIsolation:
         # Make some changes in each
         for info in [info1, info2, info3]:
             (info.path / f"{info.spec_name}.txt").write_text(
-                f"Data for {info.spec_name}"
+                f"Data for {info.spec_name}", encoding="utf-8"
             )
             subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
             subprocess.run(
@@ -1863,7 +1871,9 @@ class TestWorktreeIsolation:
         info2 = manager.create_worktree("merge-test-2")
 
         # Make changes in first worktree
-        (info1.path / "feature1.txt").write_text("Feature 1 implementation")
+        (info1.path / "feature1.txt").write_text(
+            "Feature 1 implementation", encoding="utf-8"
+        )
         subprocess.run(["git", "add", "."], cwd=info1.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Add feature 1"],
@@ -1872,7 +1882,9 @@ class TestWorktreeIsolation:
         )
 
         # Make changes in second worktree
-        (info2.path / "feature2.txt").write_text("Feature 2 implementation")
+        (info2.path / "feature2.txt").write_text(
+            "Feature 2 implementation", encoding="utf-8"
+        )
         subprocess.run(["git", "add", "."], cwd=info2.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Add feature 2"],
@@ -1912,7 +1924,7 @@ class TestWorktreeIsolation:
         # Create a worktree and add some data
         info1 = manager.create_worktree("existing-test")
         marker_file = info1.path / "marker.txt"
-        marker_file.write_text("This is a marker")
+        marker_file.write_text("This is a marker", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info1.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Add marker"], cwd=info1.path, capture_output=True

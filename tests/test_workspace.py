@@ -77,21 +77,21 @@ class TestHasUncommittedChanges:
 
     def test_untracked_file_has_changes(self, temp_git_repo: Path):
         """Untracked file counts as changes."""
-        (temp_git_repo / "new_file.txt").write_text("content")
+        (temp_git_repo / "new_file.txt").write_text("content", encoding="utf-8")
 
         result = has_uncommitted_changes(temp_git_repo)
         assert result is True
 
     def test_modified_file_has_changes(self, temp_git_repo: Path):
         """Modified tracked file counts as changes."""
-        (temp_git_repo / "README.md").write_text("modified content")
+        (temp_git_repo / "README.md").write_text("modified content", encoding="utf-8")
 
         result = has_uncommitted_changes(temp_git_repo)
         assert result is True
 
     def test_staged_file_has_changes(self, temp_git_repo: Path):
         """Staged file counts as changes."""
-        (temp_git_repo / "README.md").write_text("modified")
+        (temp_git_repo / "README.md").write_text("modified", encoding="utf-8")
         subprocess.run(
             ["git", "add", "README.md"], cwd=temp_git_repo, capture_output=True
         )
@@ -210,7 +210,7 @@ class TestWorkspaceIntegration:
         )
 
         # Make changes in workspace
-        (working_dir / "feature.py").write_text("# New feature\n")
+        (working_dir / "feature.py").write_text("# New feature\n", encoding="utf-8")
 
         # Verify changes are in workspace
         assert (working_dir / "feature.py").exists()
@@ -231,7 +231,7 @@ class TestWorkspaceIntegration:
         assert working_dir == temp_git_repo
 
         # Make changes directly
-        (working_dir / "feature.py").write_text("# New feature\n")
+        (working_dir / "feature.py").write_text("# New feature\n", encoding="utf-8")
 
         # Changes are in main project
         assert (temp_git_repo / "feature.py").exists()
@@ -246,7 +246,7 @@ class TestWorkspaceIntegration:
         )
 
         # Make changes and commit using git directly
-        (working_dir / "feature.py").write_text("# New feature\n")
+        (working_dir / "feature.py").write_text("# New feature\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=working_dir, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Add feature"], cwd=working_dir, capture_output=True
@@ -278,7 +278,7 @@ class TestWorkspaceCleanup:
         )
 
         # Commit changes using git directly
-        (working_dir / "test.py").write_text("test")
+        (working_dir / "test.py").write_text("test", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=working_dir, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Test"], cwd=working_dir, capture_output=True
@@ -299,7 +299,7 @@ class TestWorkspaceCleanup:
         )
 
         # Commit changes using git directly
-        (working_dir / "test.py").write_text("test")
+        (working_dir / "test.py").write_text("test", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=working_dir, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Test"], cwd=working_dir, capture_output=True
@@ -325,7 +325,7 @@ class TestWorkspaceReuse:
         )
 
         # Add a marker file
-        (working_dir1 / "marker.txt").write_text("marker")
+        (working_dir1 / "marker.txt").write_text("marker", encoding="utf-8")
 
         # Second setup (should reuse)
         working_dir2, _, _ = setup_workspace(
@@ -479,7 +479,9 @@ class TestMergeErrorHandling:
 
         # Create a worktree with changes
         worker_info = manager.create_worktree("worker-spec")
-        (worker_info.path / "worker-file.txt").write_text("worker content")
+        (worker_info.path / "worker-file.txt").write_text(
+            "worker content", encoding="utf-8"
+        )
         subprocess.run(["git", "add", "."], cwd=worker_info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Worker commit"],
@@ -493,7 +495,7 @@ class TestMergeErrorHandling:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "worker-file.txt").write_text("main content")
+        (temp_git_repo / "worker-file.txt").write_text("main content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Main commit"],
@@ -514,7 +516,7 @@ class TestMergeErrorHandling:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        base_content = (temp_git_repo / "worker-file.txt").read_text()
+        base_content = (temp_git_repo / "worker-file.txt").read_text(encoding="utf-8")
         assert base_content == "main content", (
             "Base branch should be unchanged after failed merge"
         )
@@ -525,7 +527,9 @@ class TestMergeErrorHandling:
         )
 
         # Verify worktree content is unchanged
-        worktree_content = (worker_info.path / "worker-file.txt").read_text()
+        worktree_content = (worker_info.path / "worker-file.txt").read_text(
+            encoding="utf-8"
+        )
         assert worktree_content == "worker content", (
             "Worktree content should be unchanged"
         )
@@ -537,7 +541,9 @@ class TestMergeErrorHandling:
 
         # Create a worktree with non-conflicting changes
         worker_info = manager.create_worktree("worker-spec")
-        (worker_info.path / "worker-file.txt").write_text("worker content")
+        (worker_info.path / "worker-file.txt").write_text(
+            "worker content", encoding="utf-8"
+        )
         subprocess.run(["git", "add", "."], cwd=worker_info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Worker commit"],
@@ -559,7 +565,7 @@ class TestMergeErrorHandling:
         assert (temp_git_repo / "worker-file.txt").exists(), (
             "Merged file should exist in base branch"
         )
-        merged_content = (temp_git_repo / "worker-file.txt").read_text()
+        merged_content = (temp_git_repo / "worker-file.txt").read_text(encoding="utf-8")
         assert merged_content == "worker content", (
             "Merged file should have worktree content"
         )
@@ -581,7 +587,7 @@ class TestRebaseDetection:
         )
 
         # Add a commit to spec branch
-        (temp_git_repo / "spec-file.txt").write_text("spec content")
+        (temp_git_repo / "spec-file.txt").write_text("spec content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec commit"],
@@ -595,7 +601,7 @@ class TestRebaseDetection:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "main-file.txt").write_text("main content")
+        (temp_git_repo / "main-file.txt").write_text("main content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Main commit after spec"],
@@ -624,7 +630,7 @@ class TestRebaseDetection:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "spec-file.txt").write_text("spec content")
+        (temp_git_repo / "spec-file.txt").write_text("spec content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec commit"],
@@ -660,7 +666,7 @@ class TestRebaseDetection:
         )
 
         # Add a commit to spec branch
-        (temp_git_repo / "spec-file.txt").write_text("spec content")
+        (temp_git_repo / "spec-file.txt").write_text("spec content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec commit"],
@@ -675,7 +681,9 @@ class TestRebaseDetection:
             capture_output=True,
         )
         for i in range(3):
-            (temp_git_repo / f"main-file-{i}.txt").write_text(f"main content {i}")
+            (temp_git_repo / f"main-file-{i}.txt").write_text(
+                f"main content {i}", encoding="utf-8"
+            )
             subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
             subprocess.run(
                 ["git", "commit", "-m", f"Main commit {i}"],
@@ -707,7 +715,7 @@ class TestRebaseSpecBranch:
         )
 
         # Add a commit to spec branch
-        (temp_git_repo / "spec-file.txt").write_text("spec content")
+        (temp_git_repo / "spec-file.txt").write_text("spec content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec commit"],
@@ -721,7 +729,7 @@ class TestRebaseSpecBranch:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "main-file.txt").write_text("main content")
+        (temp_git_repo / "main-file.txt").write_text("main content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Main commit"],
@@ -777,7 +785,7 @@ class TestRebaseSpecBranch:
         )
 
         # Create a file that will conflict
-        (temp_git_repo / "conflict.txt").write_text("spec version")
+        (temp_git_repo / "conflict.txt").write_text("spec version", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec conflict"],
@@ -791,7 +799,7 @@ class TestRebaseSpecBranch:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "conflict.txt").write_text("main version")
+        (temp_git_repo / "conflict.txt").write_text("main version", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Main conflict"],
@@ -861,7 +869,7 @@ class TestRebaseSpecBranch:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "spec-file.txt").write_text("spec content")
+        (temp_git_repo / "spec-file.txt").write_text("spec content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec commit"],
@@ -899,7 +907,9 @@ class TestRebaseIntegration:
         worker_info = manager.create_worktree("test-spec")
 
         # Add a file in spec worktree and commit
-        (worker_info.path / "spec-file.txt").write_text("spec content")
+        (worker_info.path / "spec-file.txt").write_text(
+            "spec content", encoding="utf-8"
+        )
         subprocess.run(["git", "add", "."], cwd=worker_info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec commit"],
@@ -914,7 +924,7 @@ class TestRebaseIntegration:
             capture_output=True,
         )
         for i in range(2):
-            (temp_git_repo / f"main-{i}.txt").write_text(f"main {i}")
+            (temp_git_repo / f"main-{i}.txt").write_text(f"main {i}", encoding="utf-8")
             subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
             subprocess.run(
                 ["git", "commit", "-m", f"Main {i}"],
@@ -946,7 +956,7 @@ class TestRebaseIntegration:
         )
 
         # Add a commit to spec
-        (temp_git_repo / "spec.txt").write_text("spec")
+        (temp_git_repo / "spec.txt").write_text("spec", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec"],
@@ -960,7 +970,7 @@ class TestRebaseIntegration:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "main.txt").write_text("main")
+        (temp_git_repo / "main.txt").write_text("main", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Main"],
@@ -1006,7 +1016,7 @@ class TestRebaseErrorHandling:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "spec-file.txt").write_text("spec content")
+        (temp_git_repo / "spec-file.txt").write_text("spec content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec commit"],
@@ -1058,7 +1068,7 @@ class TestRebaseErrorHandling:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "spec-file.txt").write_text("spec content")
+        (temp_git_repo / "spec-file.txt").write_text("spec content", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec commit"],
@@ -1189,7 +1199,7 @@ class TestCheckGitConflictsDetection:
 
         # Seed a shared file on main
         shared = temp_git_repo / "shared.txt"
-        shared.write_text("line1\nbase\nline3\n")
+        shared.write_text("line1\nbase\nline3\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Add shared file"],
@@ -1204,7 +1214,7 @@ class TestCheckGitConflictsDetection:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        shared.write_text("line1\nSPEC\nline3\n")
+        shared.write_text("line1\nSPEC\nline3\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec change"],
@@ -1218,7 +1228,7 @@ class TestCheckGitConflictsDetection:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        shared.write_text("line1\nMAIN\nline3\n")
+        shared.write_text("line1\nMAIN\nline3\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Main change"],
@@ -1246,7 +1256,7 @@ class TestCheckGitConflictsDetection:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "spec_only.txt").write_text("spec\n")
+        (temp_git_repo / "spec_only.txt").write_text("spec\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Spec only file"],
@@ -1259,7 +1269,7 @@ class TestCheckGitConflictsDetection:
             cwd=temp_git_repo,
             capture_output=True,
         )
-        (temp_git_repo / "main_only.txt").write_text("main\n")
+        (temp_git_repo / "main_only.txt").write_text("main\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Main only file"],

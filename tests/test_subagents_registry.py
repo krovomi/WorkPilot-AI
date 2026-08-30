@@ -103,7 +103,9 @@ class TestSpecialisation:
         return prompt[prompt.index(marker) :] if marker in prompt else ""
 
     def test_test_runner_learns_the_stack_commands(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
         section = self._overlay_section(
             resolve("coder", project_dir=tmp_path)["test-runner"].prompt
         )
@@ -114,12 +116,15 @@ class TestSpecialisation:
     def test_a_rust_card_and_a_dotnet_card_get_different_prompts(self, tmp_path):
         rust = tmp_path / "rust"
         rust.mkdir()
-        (rust / "Cargo.toml").write_text("[package]\nname='x'\nversion='0.1.0'\n")
+        (rust / "Cargo.toml").write_text(
+            "[package]\nname='x'\nversion='0.1.0'\n", encoding="utf-8"
+        )
         dotnet = tmp_path / "dotnet"
         dotnet.mkdir()
         (dotnet / "app.csproj").write_text(
             "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework>"
-            "</PropertyGroup></Project>"
+            "</PropertyGroup></Project>",
+            encoding="utf-8",
         )
         # detect_project_stack keys off Cargo.toml / *.csproj presence
         rust_section = self._overlay_section(
@@ -137,7 +142,9 @@ class TestSpecialisation:
         assert resolve("coder", project_dir=tmp_path)["test-runner"].prompt == generic
 
     def test_other_roles_are_not_touched_by_overlays(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
         before = phase_defaults("coder")["code-reviewer"].prompt
         assert resolve("coder", project_dir=tmp_path)["code-reviewer"].prompt == before
 
@@ -178,10 +185,14 @@ class TestProviderGating:
 
 class TestRobustness:
     def test_roster_stays_within_the_cap(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
-        (tmp_path / "package.json").write_text('{"name":"x"}')
-        (tmp_path / "Cargo.toml").write_text("[package]\nname='x'\nversion='0.1.0'\n")
-        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n")
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
+        (tmp_path / "package.json").write_text('{"name":"x"}', encoding="utf-8")
+        (tmp_path / "Cargo.toml").write_text(
+            "[package]\nname='x'\nversion='0.1.0'\n", encoding="utf-8"
+        )
+        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n", encoding="utf-8")
         assert len(resolve("coder", project_dir=tmp_path)) <= MAX_ROSTER
 
     def test_broken_stack_detection_does_not_raise(self, tmp_path, monkeypatch):
@@ -198,7 +209,7 @@ class TestRobustness:
         assert detect_languages("/nonexistent/path/xyz") == []
 
     def test_detection_is_cached_per_project(self, tmp_path):
-        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n")
+        (tmp_path / "go.mod").write_text("module x\n\ngo 1.23\n", encoding="utf-8")
         first = detect_languages(tmp_path)
         (tmp_path / "go.mod").unlink()
         assert detect_languages(tmp_path) == first, "expected a cached answer"
@@ -213,7 +224,9 @@ class TestDotnetDetection:
     and the whole dotnet skill pack -- could never fire on a real project."""
 
     def test_solution_at_the_root_is_detected(self, tmp_path):
-        (tmp_path / "App.sln").write_text("Microsoft Visual Studio Solution File")
+        (tmp_path / "App.sln").write_text(
+            "Microsoft Visual Studio Solution File", encoding="utf-8"
+        )
         assert "dotnet" in {
             o.language for o in overlays_for(detect_languages(tmp_path))
         }
@@ -221,7 +234,9 @@ class TestDotnetDetection:
     def test_project_file_in_a_subdirectory_is_detected(self, tmp_path):
         # The usual layout: solution at the root, .csproj one level down.
         (tmp_path / "src").mkdir()
-        (tmp_path / "src" / "App.csproj").write_text("<Project></Project>")
+        (tmp_path / "src" / "App.csproj").write_text(
+            "<Project></Project>", encoding="utf-8"
+        )
         assert "dotnet" in {
             o.language for o in overlays_for(detect_languages(tmp_path))
         }
@@ -329,6 +344,8 @@ class TestProviderDegradationReachesTheClient:
 
     def test_a_provider_without_subagents_still_yields_none(self, tmp_path):
         """Guards the other half: `resolve` must keep honouring the argument."""
-        (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
         assert resolve("coder", project_dir=tmp_path, provider="mistral") is None
         assert resolve("coder", project_dir=tmp_path, provider="claude") is not None

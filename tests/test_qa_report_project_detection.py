@@ -69,7 +69,7 @@ class TestCheckTestDiscovery:
             "test_directories": ["tests/"],
         }
         discovery_file = spec_dir / "test_discovery.json"
-        with open(discovery_file, "w") as f:
+        with open(discovery_file, "w", encoding="utf-8") as f:
             json.dump(discovery, f)
 
         result = check_test_discovery(spec_dir)
@@ -80,7 +80,7 @@ class TestCheckTestDiscovery:
     def test_invalid_json(self, spec_dir: Path) -> None:
         """Test handling of invalid JSON."""
         discovery_file = spec_dir / "test_discovery.json"
-        discovery_file.write_text("invalid json{")
+        discovery_file.write_text("invalid json{", encoding="utf-8")
 
         result = check_test_discovery(spec_dir)
         assert result is None
@@ -88,7 +88,7 @@ class TestCheckTestDiscovery:
     def test_empty_json(self, spec_dir: Path) -> None:
         """Test handling of empty JSON object."""
         discovery_file = spec_dir / "test_discovery.json"
-        discovery_file.write_text("{}")
+        discovery_file.write_text("{}", encoding="utf-8")
 
         result = check_test_discovery(spec_dir)
         assert result == {}
@@ -110,7 +110,7 @@ class TestIsNoTestProject:
     # Python test configuration files
     def test_project_with_pytest_ini(self, spec_dir: Path, project_dir: Path) -> None:
         """Test detection of pytest.ini."""
-        (project_dir / "pytest.ini").write_text("[pytest]")
+        (project_dir / "pytest.ini").write_text("[pytest]", encoding="utf-8")
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -119,14 +119,14 @@ class TestIsNoTestProject:
         self, spec_dir: Path, project_dir: Path
     ) -> None:
         """Test detection of pyproject.toml."""
-        (project_dir / "pyproject.toml").write_text("[tool.pytest]")
+        (project_dir / "pyproject.toml").write_text("[tool.pytest]", encoding="utf-8")
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
 
     def test_project_with_setup_cfg(self, spec_dir: Path, project_dir: Path) -> None:
         """Test detection of setup.cfg."""
-        (project_dir / "setup.cfg").write_text("[options]")
+        (project_dir / "setup.cfg").write_text("[options]", encoding="utf-8")
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -134,7 +134,9 @@ class TestIsNoTestProject:
     # JavaScript test configuration files
     def test_project_with_jest_config(self, spec_dir: Path, project_dir: Path) -> None:
         """Test detection of Jest config."""
-        (project_dir / "jest.config.js").write_text("module.exports = {}")
+        (project_dir / "jest.config.js").write_text(
+            "module.exports = {}", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -143,7 +145,9 @@ class TestIsNoTestProject:
         self, spec_dir: Path, project_dir: Path
     ) -> None:
         """Test detection of Jest TypeScript config."""
-        (project_dir / "jest.config.ts").write_text("export default {}")
+        (project_dir / "jest.config.ts").write_text(
+            "export default {}", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -152,7 +156,9 @@ class TestIsNoTestProject:
         self, spec_dir: Path, project_dir: Path
     ) -> None:
         """Test detection of Vitest config."""
-        (project_dir / "vitest.config.js").write_text("export default {}")
+        (project_dir / "vitest.config.js").write_text(
+            "export default {}", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -161,14 +167,18 @@ class TestIsNoTestProject:
         self, spec_dir: Path, project_dir: Path
     ) -> None:
         """Test detection of Vitest TypeScript config."""
-        (project_dir / "vitest.config.ts").write_text("export default {}")
+        (project_dir / "vitest.config.ts").write_text(
+            "export default {}", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
 
     def test_project_with_karma_config(self, spec_dir: Path, project_dir: Path) -> None:
         """Test detection of Karma config."""
-        (project_dir / "karma.conf.js").write_text("module.exports = function() {}")
+        (project_dir / "karma.conf.js").write_text(
+            "module.exports = function() {}", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -177,7 +187,9 @@ class TestIsNoTestProject:
         self, spec_dir: Path, project_dir: Path
     ) -> None:
         """Test detection of Cypress config."""
-        (project_dir / "cypress.config.js").write_text("module.exports = {}")
+        (project_dir / "cypress.config.js").write_text(
+            "module.exports = {}", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -186,7 +198,9 @@ class TestIsNoTestProject:
         self, spec_dir: Path, project_dir: Path
     ) -> None:
         """Test detection of Playwright config."""
-        (project_dir / "playwright.config.ts").write_text("export default {}")
+        (project_dir / "playwright.config.ts").write_text(
+            "export default {}", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -194,7 +208,7 @@ class TestIsNoTestProject:
     # Ruby test configuration files
     def test_project_with_rspec(self, spec_dir: Path, project_dir: Path) -> None:
         """Test detection of RSpec config."""
-        (project_dir / ".rspec").write_text("--format documentation")
+        (project_dir / ".rspec").write_text("--format documentation", encoding="utf-8")
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -203,7 +217,9 @@ class TestIsNoTestProject:
         """Test detection of RSpec helper."""
         spec_dir_ruby = project_dir / "spec"
         spec_dir_ruby.mkdir()
-        (spec_dir_ruby / "spec_helper.rb").write_text("RSpec.configure")
+        (spec_dir_ruby / "spec_helper.rb").write_text(
+            "RSpec.configure", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -215,7 +231,9 @@ class TestIsNoTestProject:
         """Test detection of test directory."""
         tests_dir = project_dir / "tests"
         tests_dir.mkdir()
-        (tests_dir / "test_app.py").write_text("def test_example(): pass")
+        (tests_dir / "test_app.py").write_text(
+            "def test_example(): pass", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -226,7 +244,7 @@ class TestIsNoTestProject:
         """Test detection of empty test directory."""
         tests_dir = project_dir / "tests"
         tests_dir.mkdir()
-        (tests_dir / "conftest.py").write_text("# fixtures only")
+        (tests_dir / "conftest.py").write_text("# fixtures only", encoding="utf-8")
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is True
@@ -235,7 +253,9 @@ class TestIsNoTestProject:
         """Test detection of spec files."""
         tests_dir = project_dir / "__tests__"
         tests_dir.mkdir()
-        (tests_dir / "app.spec.js").write_text("describe('app', () => {})")
+        (tests_dir / "app.spec.js").write_text(
+            "describe('app', () => {})", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -246,7 +266,9 @@ class TestIsNoTestProject:
         """Test detection of .test.js files."""
         tests_dir = project_dir / "__tests__"
         tests_dir.mkdir()
-        (tests_dir / "app.test.js").write_text("test('works', () => {})")
+        (tests_dir / "app.test.js").write_text(
+            "test('works', () => {})", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -257,7 +279,9 @@ class TestIsNoTestProject:
         """Test detection of .test.ts files."""
         tests_dir = project_dir / "test"
         tests_dir.mkdir()
-        (tests_dir / "app.test.ts").write_text("test('works', () => {})")
+        (tests_dir / "app.test.ts").write_text(
+            "test('works', () => {})", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -268,7 +292,9 @@ class TestIsNoTestProject:
         """Test detection of .spec.ts files."""
         tests_dir = project_dir / "tests"
         tests_dir.mkdir()
-        (tests_dir / "app.spec.ts").write_text("describe('app', () => {})")
+        (tests_dir / "app.spec.ts").write_text(
+            "describe('app', () => {})", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -279,7 +305,9 @@ class TestIsNoTestProject:
         """Test detection of _test.py files."""
         tests_dir = project_dir / "tests"
         tests_dir.mkdir()
-        (tests_dir / "app_test.py").write_text("def test_example(): pass")
+        (tests_dir / "app_test.py").write_text(
+            "def test_example(): pass", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -293,7 +321,7 @@ class TestIsNoTestProject:
         # But discovery.json says there are frameworks
         discovery = {"frameworks": [{"name": "pytest"}]}
         discovery_file = spec_dir / "test_discovery.json"
-        with open(discovery_file, "w") as f:
+        with open(discovery_file, "w", encoding="utf-8") as f:
             json.dump(discovery, f)
 
         result = is_no_test_project(spec_dir, project_dir)
@@ -305,7 +333,7 @@ class TestIsNoTestProject:
         """Test that empty discovery means no tests."""
         discovery = {"frameworks": []}
         discovery_file = spec_dir / "test_discovery.json"
-        with open(discovery_file, "w") as f:
+        with open(discovery_file, "w", encoding="utf-8") as f:
             json.dump(discovery, f)
 
         result = is_no_test_project(spec_dir, project_dir)

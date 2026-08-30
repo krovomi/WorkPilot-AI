@@ -166,7 +166,7 @@ class TestQualityReviewIntegration:
         """Test review d'une PR."""
         # Créer un fichier de test
         test_file = temp_project / "test.py"
-        test_file.write_text("def hello():\n    pass\n")
+        test_file.write_text("def hello():\n    pass\n", encoding="utf-8")
 
         integration = QualityReviewIntegration(temp_project)
         result = await integration.review_pr(

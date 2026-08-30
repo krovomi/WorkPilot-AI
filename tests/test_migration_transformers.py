@@ -251,7 +251,9 @@ class TestTransformerIntegration:
 
         # Create test file
         test_file = project_path / "Counter.jsx"
-        test_file.write_text(TEST_FIXTURES["react_component"]["content"])
+        test_file.write_text(
+            TEST_FIXTURES["react_component"]["content"], encoding="utf-8"
+        )
 
         # Transform
         transformer = ReactToVueTransformer(temp_project)
@@ -267,7 +269,7 @@ class TestTransformerIntegration:
 
         # Create test file
         test_file = project_path / "legacy.py"
-        test_file.write_text(TEST_FIXTURES["python2_code"]["content"])
+        test_file.write_text(TEST_FIXTURES["python2_code"]["content"], encoding="utf-8")
 
         # Transform
         transformer = PythonTransformer(temp_project)
@@ -295,7 +297,7 @@ class TestTransformerPerformance:
         # Create a large Python file
         large_content = TEST_FIXTURES["python2_code"]["content"] * 100
         test_file = project_path / "large.py"
-        test_file.write_text(large_content)
+        test_file.write_text(large_content, encoding="utf-8")
 
         # Transform and measure time
         import time
@@ -389,7 +391,9 @@ class TestReactToAngularTransformer:
 
         # Create test file
         test_file = project_path / "Counter.jsx"
-        test_file.write_text(TEST_FIXTURES["react_component"]["content"])
+        test_file.write_text(
+            TEST_FIXTURES["react_component"]["content"], encoding="utf-8"
+        )
 
         # Transform
         transformer = ReactToAngularTransformer(temp_project)
@@ -509,7 +513,8 @@ class TestJSToCSharpTransformer:
         # Create test file
         test_file = project_path / "service.js"
         test_file.write_text(
-            "const getData = async (id) => { return await fetch(`/api/${id}`); }"
+            "const getData = async (id) => { return await fetch(`/api/${id}`); }",
+            encoding="utf-8",
         )
 
         # Transform
@@ -541,7 +546,8 @@ class TestIntegrationNewTransformers:
 
         # Create test component
         test_file = project_path / "Button.jsx"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 import React, { useState } from 'react'
 
 function Button({ label, onClick }) {
@@ -551,7 +557,9 @@ function Button({ label, onClick }) {
 }
 
 export default Button
-""")
+""",
+            encoding="utf-8",
+        )
 
         # Transform
         engine = TransformationEngine(temp_project, "react", "angular")
@@ -570,7 +578,8 @@ export default Button
 
         # Create test file
         test_file = project_path / "utils.js"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 const formatName = (firstName, lastName) => {
   return `${firstName.toUpperCase()} ${lastName.toUpperCase()}`
 }
@@ -578,7 +587,9 @@ const formatName = (firstName, lastName) => {
 const filterActive = (items) => {
   return items.filter(x => x.active).map(x => x.name)
 }
-""")
+""",
+            encoding="utf-8",
+        )
 
         # Transform
         engine = TransformationEngine(temp_project, "javascript", "csharp")
@@ -619,7 +630,9 @@ class TestNewTransformerErrors:
 
         project_path = Path(temp_project)
         test_file = project_path / "broken.js"
-        test_file.write_text("function test() {{{{{")  # Invalid syntax
+        test_file.write_text(
+            "function test() {{{{{", encoding="utf-8"
+        )  # Invalid syntax
 
         transformer = JSToCSharpTransformer(temp_project)
         results = transformer.transform_files(["broken.js"])

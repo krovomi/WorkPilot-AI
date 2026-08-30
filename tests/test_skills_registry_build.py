@@ -86,9 +86,9 @@ class TestOutputs:
         out = tmp_path / "out"
         build(source, out)
         assert (out / ".agents/skills/hello/SKILL.md").is_file()
-        assert (
-            out / ".agents/skills/hello/reference.md"
-        ).read_text() == "deep detail\n"
+        assert (out / ".agents/skills/hello/reference.md").read_text(
+            encoding="utf-8"
+        ) == "deep detail\n"
         assert (out / ".agents/agents/greeter.md").is_file()
         assert (out / "skills-lock.json").is_file()
 
@@ -148,9 +148,9 @@ class TestReproducibility:
         a, b = tmp_path / "a", tmp_path / "b"
         build(source, a)
         build(source, b)
-        assert (a / ".agents/skills/hello/SKILL.md").read_text() == (
+        assert (a / ".agents/skills/hello/SKILL.md").read_text(encoding="utf-8") == (
             b / ".agents/skills/hello/SKILL.md"
-        ).read_text()
+        ).read_text(encoding="utf-8")
 
     def test_content_hash_covers_bundled_resources(self, source, tmp_path):
         packs = load_packs(source / "skills")

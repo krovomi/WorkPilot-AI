@@ -97,7 +97,7 @@ def mock_is_build_complete(spec_dir: Path) -> bool:
         return False
 
     try:
-        with open(plan_file) as f:
+        with open(plan_file, encoding="utf-8") as f:
             plan = json.load(f)
     except (json.JSONDecodeError, OSError):
         return False
@@ -157,7 +157,7 @@ class TestImplementationPlanIO:
     ):
         """Loads implementation plan from JSON."""
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text(json.dumps(sample_implementation_plan))
+        plan_file.write_text(json.dumps(sample_implementation_plan), encoding="utf-8")
 
         plan = load_implementation_plan(spec_dir)
 
@@ -172,7 +172,7 @@ class TestImplementationPlanIO:
     def test_load_invalid_json_returns_none(self, spec_dir: Path):
         """Returns None for invalid JSON."""
         plan_file = spec_dir / "implementation_plan.json"
-        plan_file.write_text("{ invalid json }")
+        plan_file.write_text("{ invalid json }", encoding="utf-8")
 
         plan = load_implementation_plan(spec_dir)
         assert plan is None
@@ -186,7 +186,9 @@ class TestImplementationPlanIO:
         assert result is True
         assert (spec_dir / "implementation_plan.json").exists()
 
-        loaded = json.loads((spec_dir / "implementation_plan.json").read_text())
+        loaded = json.loads(
+            (spec_dir / "implementation_plan.json").read_text(encoding="utf-8")
+        )
         assert loaded["feature"] == "Test"
 
 
