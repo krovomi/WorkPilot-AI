@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
 	AutoBuildVersionInfo,
 	AzureDevOpsSyncStatus,
+	InitializationBlocker,
 	GitHubSyncStatus,
 	GitLabSyncStatus,
 	LinearSyncStatus,
@@ -89,8 +90,14 @@ export interface UseProjectSettingsReturn {
 	azureDevOpsConnectionStatus: AzureDevOpsSyncStatus | null;
 	isCheckingAzureDevOps: boolean;
 
+	// Why the last initialization attempt could not proceed, when the reason is
+	// one the settings screen can act on rather than only report.
+	initBlocker: InitializationBlocker | null;
+	isRepairingGit: boolean;
+
 	// Actions
 	handleInitialize: () => Promise<void>;
+	handleRepairGit: () => Promise<void>;
 	handleClaudeSetup: () => Promise<void>;
 	handleSave: (onClose: () => void) => Promise<void>;
 }
@@ -109,6 +116,10 @@ export function useProjectSettings(
 	);
 	const [isCheckingVersion, setIsCheckingVersion] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
+	const [initBlocker, setInitBlocker] = useState<InitializationBlocker | null>(
+		null,
+	);
+	const [isRepairingGit, setIsRepairingGit] = useState(false);
 
 	// Environment configuration state
 	// NOTE: We maintain local envConfig state AND update the global project-env-store.
@@ -413,6 +424,7 @@ export function useProjectSettings(
 	const handleInitialize = async () => {
 		setIsUpdating(true);
 		setError(null);
+		setInitBlocker(null);
 		try {
 			const result = await initializeProject(project.id);
 			if (result?.success) {
@@ -430,12 +442,46 @@ export function useProjectSettings(
 					setProjectEnvConfig(project.id, envResult.data);
 				}
 			} else {
-				setError(result?.error || "Failed to initialize");
+				// A blocker the screen knows how to walk the user out of is shown
+				// as a recovery card, not as a raw error line — so it is recorded
+				// instead of the message, and only the rest falls through to the
+				// generic error display.
+				const blocker = result?.data?.blocker ?? null;
+				setInitBlocker(blocker);
+				if (!blocker) {
+					setError(result?.error || "Failed to initialize");
+				}
 			}
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Unknown error");
 		} finally {
 			setIsUpdating(false);
+		}
+	};
+
+	/**
+	 * Make the repository buildable, then finish what the user asked for.
+	 *
+	 * `initializeGit` creates the repository and/or the first commit — the two
+	 * blockers that stopped initialization — and the Auto-Build initialization
+	 * is retried straight away, because "prepare git" was never the goal: the
+	 * user clicked a button that said initialize.
+	 */
+	const handleRepairGit = async () => {
+		setIsRepairingGit(true);
+		setError(null);
+		try {
+			const result = await window.electronAPI.initializeGit(project.path);
+			if (!result?.success) {
+				setError(result?.error || "Failed to prepare the git repository");
+				return;
+			}
+			setInitBlocker(null);
+			await handleInitialize();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Unknown error");
+		} finally {
+			setIsRepairingGit(false);
 		}
 	};
 
@@ -601,7 +647,10 @@ export function useProjectSettings(
 		setShowAzureDevOpsImportModal,
 		azureDevOpsConnectionStatus,
 		isCheckingAzureDevOps,
+		initBlocker,
+		isRepairingGit,
 		handleInitialize,
+		handleRepairGit,
 		handleClaudeSetup,
 		handleSave,
 	};

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	AVAILABLE_MODELS,
 	isAnthropicNativeVersionedModelId,
+	MODEL_ID_MAP,
+	PROVIDER_MODELS_MAP,
 	sortClaudeCatalog,
 } from "./models";
 
@@ -29,6 +32,17 @@ describe("sortClaudeCatalog", () => {
 			"claude-sonnet-4-6",
 			"claude-sonnet-4-5",
 			"claude-haiku-4-5",
+		]);
+	});
+
+	it("place Opus 5 au-dessus des 4.x", () => {
+		const input = ["claude-opus-4-8", "claude-opus-5", "claude-opus-4-7"].map(
+			(value) => ({ value }),
+		);
+		expect(sortClaudeCatalog(input).map((m) => m.value)).toEqual([
+			"claude-opus-5",
+			"claude-opus-4-8",
+			"claude-opus-4-7",
 		]);
 	});
 
@@ -88,5 +102,35 @@ describe("isAnthropicNativeVersionedModelId", () => {
 		expect(isAnthropicNativeVersionedModelId("gpt-5.5")).toBe(false);
 		expect(isAnthropicNativeVersionedModelId("gemini-3.1-pro")).toBe(false);
 		expect(isAnthropicNativeVersionedModelId("claude-3.7-sonnet")).toBe(false);
+	});
+});
+
+describe("catalogue Anthropic", () => {
+	const catalog = PROVIDER_MODELS_MAP.anthropic;
+
+	it("expose le flagship courant", () => {
+		expect(catalog.map((m) => m.value)).toContain("claude-opus-5");
+	});
+
+	it("chaque alias court résout vers un modèle réellement au catalogue", () => {
+		// Le piège que ça ferme : AVAILABLE_MODELS proposait « Claude Haiku 4.6 »,
+		// une version qu'Anthropic n'a jamais publiée, sous une valeur qui
+		// exécutait silencieusement la 4.5. Un libellé ne peut pas promettre un
+		// modèle que le catalogue ne contient pas.
+		const ids = new Set(catalog.map((m) => m.value));
+		for (const { value } of AVAILABLE_MODELS) {
+			const resolved = MODEL_ID_MAP[value];
+			expect(resolved, `alias ${value} sans id`).toBeDefined();
+			expect(
+				ids.has(resolved) ||
+					catalog.some((m) => m.value.startsWith(`${resolved}-`)),
+				`${value} → ${resolved} absent du catalogue`,
+			).toBe(true);
+		}
+	});
+
+	it("ne propose aucun libellé de version inexistante", () => {
+		const labels = AVAILABLE_MODELS.map((m) => m.label);
+		expect(labels).not.toContain("Claude Haiku 4.6");
 	});
 });

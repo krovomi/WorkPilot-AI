@@ -121,7 +121,10 @@ function ProjectSettingsContentInner({
 		setShowAzureDevOpsImportModal,
 		azureDevOpsConnectionStatus,
 		isCheckingAzureDevOps,
+		initBlocker,
+		isRepairingGit,
 		handleInitialize,
+		handleRepairGit,
 		error,
 	} = hook;
 
@@ -169,7 +172,10 @@ function ProjectSettingsContentInner({
 				setShowAzureDevOpsToken={setShowAzureDevOpsToken}
 				azureDevOpsConnectionStatus={azureDevOpsConnectionStatus}
 				isCheckingAzureDevOps={isCheckingAzureDevOps}
+				initBlocker={initBlocker}
+				isRepairingGit={isRepairingGit}
 				handleInitialize={handleInitialize}
+				handleRepairGit={handleRepairGit}
 				onOpenLinearImport={() => setShowLinearImportModal(true)}
 				onOpenAzureDevOpsImport={() => setShowAzureDevOpsImportModal(true)}
 			/>

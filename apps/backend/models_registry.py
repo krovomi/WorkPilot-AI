@@ -49,15 +49,27 @@ _ANTHROPIC_MODELS = [
         price_output=50.0,
         is_default=False,
     ),
-    # Flagship
+    # Flagship. Claude Opus 5 is the current default: `get_default("anthropic")`
+    # decides what an auto-configured provider runs, and it was still pointing
+    # at Opus 4.5 — two generations behind what the catalogue already offered.
+    ModelEntry(
+        "anthropic",
+        "claude-opus-5",
+        "Claude Opus 5",
+        "flagship",
+        supports_thinking=True,
+        price_input=5.0,
+        price_output=25.0,
+        is_default=True,
+    ),
     ModelEntry(
         "anthropic",
         "claude-opus-4-8",
         "Claude Opus 4.8",
         "flagship",
         supports_thinking=True,
-        price_input=15.0,
-        price_output=75.0,
+        price_input=5.0,
+        price_output=25.0,
         is_default=False,
     ),
     ModelEntry(
@@ -66,8 +78,8 @@ _ANTHROPIC_MODELS = [
         "Claude Opus 4.7",
         "flagship",
         supports_thinking=True,
-        price_input=15.0,
-        price_output=75.0,
+        price_input=5.0,
+        price_output=25.0,
         is_default=False,
     ),
     ModelEntry(
@@ -75,8 +87,8 @@ _ANTHROPIC_MODELS = [
         "claude-opus-4-6",
         "Claude Opus 4.6",
         "flagship",
-        price_input=15.0,
-        price_output=75.0,
+        price_input=5.0,
+        price_output=25.0,
         is_default=False,
     ),
     ModelEntry(
@@ -86,7 +98,7 @@ _ANTHROPIC_MODELS = [
         "flagship",
         price_input=15.0,
         price_output=75.0,
-        is_default=True,
+        is_default=False,
     ),
     ModelEntry(
         "anthropic",
@@ -124,8 +136,8 @@ _ANTHROPIC_MODELS = [
         "Claude Sonnet 5",
         "standard",
         supports_thinking=True,
-        price_input=3.0,
-        price_output=15.0,
+        price_input=2.0,
+        price_output=10.0,
         is_default=False,
     ),
     ModelEntry(
@@ -161,8 +173,8 @@ _ANTHROPIC_MODELS = [
         "claude-haiku-4-5-20251001",
         "Claude Haiku 4.5",
         "fast",
-        price_input=0.80,
-        price_output=4.0,
+        price_input=1.0,
+        price_output=5.0,
         is_default=False,
     ),
     ModelEntry(
@@ -170,8 +182,8 @@ _ANTHROPIC_MODELS = [
         "claude-haiku-4-5",
         "Claude Haiku 4.5",
         "fast",
-        price_input=0.80,
-        price_output=4.0,
+        price_input=1.0,
+        price_output=5.0,
         is_default=False,
     ),
 ]

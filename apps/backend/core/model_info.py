@@ -233,6 +233,7 @@ def _get_model_info_for_provider(provider: str) -> dict[str, str]:
 def _format_anthropic_model_label(model: str) -> str:
     """Format Anthropic model label for display."""
     model_labels = {
+        "claude-opus-5": "Claude Opus 5",
         "claude-fable-5": "Claude Fable 5",
         "claude-opus-4-8": "Claude Opus 4.8",
         "claude-opus-4-7": "Claude Opus 4.7",

@@ -24,6 +24,7 @@ export interface ModelPricing {
 
 const RAW: Record<string, Record<string, { input: number; output: number }>> = {
 	anthropic: {
+		"claude-opus-5": { input: 5.0, output: 25.0 },
 		"claude-opus-4-8": { input: 5.0, output: 25.0 },
 		// Fable 5 (Mythos-class, GA 2026-06-09) — prix public $10 / $50 par MTok.
 		"claude-fable-5": { input: 10.0, output: 50.0 },
@@ -35,7 +36,7 @@ const RAW: Record<string, Record<string, { input: number; output: number }>> = {
 		"claude-sonnet-4-7": { input: 3.0, output: 15.0 },
 		"claude-haiku-4-7": { input: 1.0, output: 5.0 },
 		"claude-opus-4-6": { input: 5.0, output: 25.0 },
-		"claude-sonnet-5": { input: 3.0, output: 15.0 },
+		"claude-sonnet-5": { input: 2.0, output: 10.0 },
 		"claude-sonnet-4-6": { input: 3.0, output: 15.0 },
 		"claude-haiku-4-6": { input: 1.0, output: 5.0 },
 		"claude-opus-4-5": { input: 5.0, output: 25.0 },
@@ -45,6 +46,9 @@ const RAW: Record<string, Record<string, { input: number; output: number }>> = {
 		"claude-haiku-4-5": { input: 1.0, output: 5.0 },
 		"claude-haiku-4-5-20251001": { input: 1.0, output: 5.0 },
 		// Shorthand aliases used by AVAILABLE_MODELS / MODEL_ID_MAP.
+		"opus-5": { input: 5.0, output: 25.0 },
+		"sonnet-5": { input: 2.0, output: 10.0 },
+		"fable-5": { input: 10.0, output: 50.0 },
 		opus: { input: 5.0, output: 25.0 },
 		sonnet: { input: 3.0, output: 15.0 },
 		haiku: { input: 1.0, output: 5.0 },

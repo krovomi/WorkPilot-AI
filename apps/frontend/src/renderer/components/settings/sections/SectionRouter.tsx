@@ -4,6 +4,7 @@ import type {
 	AzureDevOpsSyncStatus,
 	GitHubSyncStatus,
 	GitLabSyncStatus,
+	InitializationBlocker,
 	LinearSyncStatus,
 	Project,
 	ProjectEnvConfig,
@@ -52,7 +53,10 @@ interface SectionRouterProps {
 	setShowAzureDevOpsToken: React.Dispatch<React.SetStateAction<boolean>>;
 	azureDevOpsConnectionStatus: AzureDevOpsSyncStatus | null;
 	isCheckingAzureDevOps: boolean;
+	initBlocker: InitializationBlocker | null;
+	isRepairingGit: boolean;
 	handleInitialize: () => Promise<void>;
+	handleRepairGit: () => Promise<void>;
 	onOpenLinearImport: () => void;
 	onOpenAzureDevOpsImport: () => void;
 }
@@ -93,7 +97,10 @@ export function SectionRouter({
 	setShowAzureDevOpsToken,
 	azureDevOpsConnectionStatus,
 	isCheckingAzureDevOps,
+	initBlocker,
+	isRepairingGit,
 	handleInitialize,
+	handleRepairGit,
 	onOpenLinearImport,
 	onOpenAzureDevOpsImport,
 }: SectionRouterProps) {
@@ -115,7 +122,10 @@ export function SectionRouter({
 						versionInfo={versionInfo}
 						isCheckingVersion={isCheckingVersion}
 						isUpdating={isUpdating}
+						initBlocker={initBlocker}
+						isRepairingGit={isRepairingGit}
 						handleInitialize={handleInitialize}
+						handleRepairGit={handleRepairGit}
 					/>
 				</SettingsSection>
 			);
