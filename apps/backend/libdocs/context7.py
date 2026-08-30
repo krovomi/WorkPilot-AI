@@ -28,11 +28,8 @@ with the same library ids.
 from __future__ import annotations
 
 import json
-import logging
 import os
 from dataclasses import dataclass, field
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "DEFAULT_BASE_URL",

@@ -69,6 +69,26 @@ _CONTEXT7_ENABLED_ENV = "CONTEXT7_ENABLED"
 _LIMIT_ENV = "LIBDOCS_MAX_LIBRARIES"
 _QUERY_CHARS = 180
 
+# The three sentences the agents read. Kept out of the list literals they end
+# up in: adjacent string literals inside a list concatenate silently, so a
+# missing comma there reads as prose rather than as the bug it is.
+_STAGED_NOTE = (
+    "Downloaded by WorkPilot before this build. For anything this page does "
+    "not answer, call `mcp__context7__query-docs` with the library id above."
+)
+
+_PROMPT_INTRO = (
+    "The codebase has no usable example for these libraries, so their current "
+    "documentation was fetched before this session started. **Read the file "
+    "before writing code against the library** — do not write the API from "
+    "memory."
+)
+
+_PROMPT_OUTRO = (
+    "If a page does not cover what you need, call `mcp__context7__query-docs` "
+    "with the library id above and a precise question."
+)
+
 
 @dataclass(frozen=True)
 class DocEntry:
@@ -198,6 +218,8 @@ def read_task_text(spec_dir: Path) -> str:
         try:
             parts.append(spec_md.read_text(encoding="utf-8", errors="replace"))
         except OSError:
+            # The task text is assembled from whichever artefacts can be read;
+            # one unreadable file narrows the detection, it does not stop it.
             pass
     for name in ("requirements.json", "task_metadata.json"):
         path = Path(spec_dir) / name
@@ -396,9 +418,7 @@ def _stage(
             f"- Query: {query}",
             f"- Why it was fetched: {', '.join(need.reasons) or 'unspecified'}",
             "",
-            "Downloaded by WorkPilot before this build. For anything this page "
-            "does not answer, call `mcp__context7__query-docs` with the library "
-            "id above.",
+            _STAGED_NOTE,
             "",
             "---",
             "",
@@ -473,20 +493,10 @@ def format_docs_for_prompt(
     lines = [
         "## Library documentation already downloaded",
         "",
-        "The codebase has no usable example for these libraries, so their "
-        "current documentation was fetched before this session started. "
-        "**Read the file before writing code against the library** — do not "
-        "write the API from memory.",
+        _PROMPT_INTRO,
         "",
     ]
     for entry in entries:
         lines.append(f"- **{entry.library}** (`{entry.library_id}`) → `{entry.path}`")
-    lines.extend(
-        [
-            "",
-            "If a page does not cover what you need, call "
-            "`mcp__context7__query-docs` with the library id above and a "
-            "precise question.",
-        ]
-    )
+    lines.extend(["", _PROMPT_OUTRO])
     return "\n".join(lines)

@@ -17,15 +17,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import os
 import re
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "CACHE_DIRNAME",
@@ -161,6 +158,10 @@ class DocsCache:
                     try:
                         doc.path.unlink(missing_ok=True)
                     except OSError:
+                        # The index entry goes either way. A page left on disk
+                        # that nothing points at costs a few kilobytes; a
+                        # pruning pass that aborts on one locked file leaves
+                        # every later entry expired and still served.
                         pass
                 index.pop(key, None)
                 dropped += 1
@@ -271,5 +272,7 @@ def _atomic_write(path: Path, text: str) -> None:
         try:
             os.unlink(handle.name)
         except OSError:
+            # Cleanup of the temporary file is a courtesy; the write failure
+            # below it is what the caller needs to hear about.
             pass
         raise
