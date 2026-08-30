@@ -22,6 +22,7 @@ import {
 // Icons
 import {
 	Accessibility,
+	Activity,
 	AlertTriangle,
 	BarChart3,
 	Bug,
@@ -60,6 +61,7 @@ import {
 	MessageSquare,
 	Mic,
 	Monitor,
+	Network,
 	PanelLeft,
 	PanelLeftClose,
 	Plus,
@@ -172,6 +174,8 @@ export type SidebarView =
 	| "worktrees"
 	| "agent-tools"
 	| "migration"
+	| "architecture-visualizer"
+	| "performance-profiler"
 	| "visual-to-code"
 	| "dashboard"
 	| "analytics"
@@ -413,6 +417,12 @@ const navGroups: NavGroup[] = [
 				icon: AlertTriangle,
 				shortcut: "FT",
 			},
+			{
+				id: "performance-profiler",
+				labelKey: "navigation:items.performanceProfiler",
+				icon: Activity,
+				shortcut: "PF",
+			},
 		],
 		defaultExpanded: false,
 	},
@@ -432,6 +442,12 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.context",
 				icon: BookOpen,
 				shortcut: "CT",
+			},
+			{
+				id: "architecture-visualizer",
+				labelKey: "navigation:items.architectureVisualizer",
+				icon: Network,
+				shortcut: "AV",
 			},
 			{
 				id: "ideation",

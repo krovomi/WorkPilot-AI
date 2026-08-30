@@ -19,6 +19,10 @@ export interface SettingsAPI {
 			python: ToolDetectionResult;
 			git: ToolDetectionResult;
 			gh: ToolDetectionResult;
+			// `settings-handlers` detecte aussi glab et le renvoie ; seul ce type
+			// l'omettait, et l'index signature d'`ElectronAPI` cachait l'ecart a
+			// `GeneralSettings`, qui l'affiche.
+			glab: ToolDetectionResult;
 			claude: ToolDetectionResult;
 		}>
 	>;
@@ -71,6 +75,10 @@ export const createSettingsAPI = (): SettingsAPI => ({
 			python: ToolDetectionResult;
 			git: ToolDetectionResult;
 			gh: ToolDetectionResult;
+			// `settings-handlers` detecte aussi glab et le renvoie ; seul ce type
+			// l'omettait, et l'index signature d'`ElectronAPI` cachait l'ecart a
+			// `GeneralSettings`, qui l'affiche.
+			glab: ToolDetectionResult;
 			claude: ToolDetectionResult;
 		}>
 	> => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_CLI_TOOLS_INFO),

@@ -13,15 +13,18 @@ export interface CodeMigrationRequest {
 	thinkingLevel?: string;
 }
 
-export interface CodeMigrationResult {
-	migration_description: string;
-	dry_run: boolean;
-	summary: {
-		files_modified: number;
-		plan_status: string;
-		execution_status: string;
-	};
-}
+/**
+ * Re-exporte le type du service qui produit reellement ce resultat.
+ *
+ * Le handler transmet tel quel ce que le service emet
+ * (`service.on("complete", (result) => webContents.send(..., result))`), donc
+ * c'est ce type-la qui traverse le pont. Ce module en declarait un autre, de
+ * forme differente, qu'aucun code ne produisait ; le store du renderer, lui,
+ * importait deja le bon depuis le service. L'index signature d'`ElectronAPI`
+ * rendait les deux interchangeables aux yeux du compilateur.
+ */
+import type { CodeMigrationResult } from "../../../main/code-migration-service";
+export type { CodeMigrationResult };
 
 export interface CodeMigrationAPI {
 	startCodeMigration: (

@@ -234,7 +234,7 @@ Working examples: `agents/planner.py`, `agents/coder.py`, `qa/reviewer.py`, `qa/
 
 ### Agent Prompts (`apps/backend/prompts/`)
 
-38 root-level prompts + 22 GitHub-specific prompts in `prompts/github/`.
+37 root-level prompts + 18 GitHub-specific prompts in `prompts/github/`.
 
 | Category | Prompts |
 |----------|---------|
@@ -246,7 +246,13 @@ Working examples: `agents/planner.py`, `agents/coder.py`, `qa/reviewer.py`, `qa/
 | **Analysis** | architecture_reviewer.md, architecture_visualizer.md, breaking_change_detector.md, performance_profiler.md, insight_extractor.md, learning_analyzer.md |
 | **Advanced** | browser_agent.md, code_migration.md, documentation_agent.md, environment_cloner.md, multi_repo_planner.md, intent_templates.md, followup_planner.md |
 | **Roadmap** | roadmap_discovery.md, roadmap_features.md, competitor_analysis.md |
-| **GitHub** | issue_analyzer.md, issue_triager.md, duplicate_detector.md, pr_reviewer.md, pr_orchestrator.md, pr_parallel_orchestrator.md, pr_fixer.md, pr_finding_validator.md, pr_template_filler.md, pr_ai_triage.md, pr_codebase_fit_agent.md, + 11 more |
+| **GitHub** | issue_analyzer.md, issue_triager.md, pr_reviewer.md, pr_orchestrator.md, pr_parallel_orchestrator.md, pr_finding_validator.md, pr_template_filler.md, pr_ai_triage.md, pr_codebase_fit_agent.md, + 9 more |
+
+Duplicate detection and issue auto-fix are listed as features above but are not
+prompt-driven: `runners/github/duplicates.py` compares embeddings, and
+`runners/github/orchestrator.py` drives `auto_fix_issue`. The
+`duplicate_detector.md` and `pr_fixer.md` this table used to name were left over
+from an earlier design and loaded by nothing.
 
 ### Spec Directory Structure
 
@@ -494,19 +500,20 @@ React 19, TypeScript 5.9 (strict), Electron 41, Zustand 5, Tailwind CSS v4, Radi
 
 ### Path Aliases (tsconfig.json)
 
-| Alias | Maps to | Usable |
-|-------|---------|--------|
-| `@/*` | `src/renderer/*` | yes |
-| `@shared/*` | `src/shared/*` | yes |
-| `@preload/*` | `src/preload/*` | yes |
-| `@lib/*` | `src/renderer/lib/*` | yes |
-| `@features/*` | `src/renderer/features/*` | **no — target does not exist** |
-| `@components/*` | `src/renderer/shared/components/*` | **no — target does not exist** |
-| `@hooks/*` | `src/renderer/shared/hooks/*` | **no — target does not exist** |
+| Alias | Maps to |
+|-------|---------|
+| `@/*` | `src/renderer/*` |
+| `@shared/*` | `src/shared/*` |
+| `@preload/*` | `src/preload/*` |
+| `@lib/*` | `src/renderer/lib/*` |
 
-The last three are declared in `tsconfig.json` but point at directories that
-were never created, and no file imports through them. Components live in
-`src/renderer/components/`, hooks in `src/renderer/hooks/`.
+Components live in `src/renderer/components/`, hooks in `src/renderer/hooks/`.
+
+`@features/*`, `@components/*` et `@hooks/*` ont été retirés : ils étaient
+déclarés dans `tsconfig.json`, `vitest.config.ts` et `electron.vite.config.ts`,
+pointaient vers des répertoires qui n'ont jamais existé, et aucun fichier
+n'importait au travers. Cette table les documentait comme inutilisables au lieu
+de les supprimer.
 
 ### State Management (Zustand)
 

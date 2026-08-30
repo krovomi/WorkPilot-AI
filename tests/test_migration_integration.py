@@ -73,11 +73,13 @@ class TestFullMigrationPipeline:
         src_dir.mkdir()
 
         comp_file = src_dir / "Counter.jsx"
-        comp_file.write_text(TEST_FIXTURES["react_component"]["content"])
+        comp_file.write_text(
+            TEST_FIXTURES["react_component"]["content"], encoding="utf-8"
+        )
 
         # Also create package.json so the analyzer can detect react
         (project_path / "package.json").write_text(
-            json.dumps({"dependencies": {"react": "^18.0.0"}})
+            json.dumps({"dependencies": {"react": "^18.0.0"}}), encoding="utf-8"
         )
 
         # 2. Analyze the project
@@ -121,9 +123,11 @@ class TestFullMigrationPipeline:
 
         # Create test component + package.json
         comp_file = project_path / "UserCard.jsx"
-        comp_file.write_text(TEST_FIXTURES["react_component"]["content"])
+        comp_file.write_text(
+            TEST_FIXTURES["react_component"]["content"], encoding="utf-8"
+        )
         (project_path / "package.json").write_text(
-            json.dumps({"dependencies": {"react": "^18.0.0"}})
+            json.dumps({"dependencies": {"react": "^18.0.0"}}), encoding="utf-8"
         )
 
         # Analyze
@@ -159,7 +163,9 @@ class TestFullMigrationPipeline:
 
         # Create schema file
         schema_file = project_path / "schema.sql"
-        schema_file.write_text(TEST_FIXTURES["mysql_schema"]["content"])
+        schema_file.write_text(
+            TEST_FIXTURES["mysql_schema"]["content"], encoding="utf-8"
+        )
 
         # Analyze
         analyzer = StackAnalyzer(temp_project)
@@ -187,7 +193,7 @@ class TestFullMigrationPipeline:
 
         # Create Python 2 file
         py_file = project_path / "legacy.py"
-        py_file.write_text(TEST_FIXTURES["python2_code"]["content"])
+        py_file.write_text(TEST_FIXTURES["python2_code"]["content"], encoding="utf-8")
 
         # Analyze
         analyzer = StackAnalyzer(temp_project)
@@ -221,9 +227,11 @@ class TestOrchestratorIntegration:
         """Test orchestrator analysis phase."""
         project_path = Path(temp_project)
         comp_file = project_path / "App.jsx"
-        comp_file.write_text(TEST_FIXTURES["react_component"]["content"])
+        comp_file.write_text(
+            TEST_FIXTURES["react_component"]["content"], encoding="utf-8"
+        )
         (project_path / "package.json").write_text(
-            json.dumps({"dependencies": {"react": "^18.0.0"}})
+            json.dumps({"dependencies": {"react": "^18.0.0"}}), encoding="utf-8"
         )
 
         orchestrator = MigrationOrchestrator(temp_project, enable_llm=False)
@@ -240,16 +248,19 @@ class TestOrchestratorIntegration:
         """Test orchestrator transformation phase."""
         project_path = Path(temp_project)
         comp_file = project_path / "Button.jsx"
-        comp_file.write_text("""
+        comp_file.write_text(
+            """
 import React, { useState } from 'react'
 
 function Button({ label }) {
   const [clicked, setClicked] = useState(false)
   return <button onClick={() => setClicked(true)}>{label}</button>
 }
-""")
+""",
+            encoding="utf-8",
+        )
         (project_path / "package.json").write_text(
-            json.dumps({"dependencies": {"react": "^18.0.0"}})
+            json.dumps({"dependencies": {"react": "^18.0.0"}}), encoding="utf-8"
         )
 
         orchestrator = MigrationOrchestrator(temp_project, enable_llm=False)
@@ -265,7 +276,7 @@ function Button({ label }) {
         """Test orchestrator validation phase."""
         project_path = Path(temp_project)
         comp_file = project_path / "test.jsx"
-        comp_file.write_text("const x = 5")
+        comp_file.write_text("const x = 5", encoding="utf-8")
 
         # MigrationValidator takes project_dir and validate() takes no args
         validator = MigrationValidator(temp_project)
@@ -289,7 +300,7 @@ class TestTransformerEngineIntegration:
 
         # Create React file
         comp = project_path / "App.jsx"
-        comp.write_text(TEST_FIXTURES["react_component"]["content"])
+        comp.write_text(TEST_FIXTURES["react_component"]["content"], encoding="utf-8")
 
         engine = TransformationEngine(temp_project, "react", "vue")
         results = engine.transform_code()
@@ -304,10 +315,12 @@ class TestTransformerEngineIntegration:
 
         # Create multiple file types
         jsx_file = project_path / "Component.jsx"
-        jsx_file.write_text(TEST_FIXTURES["react_component"]["content"])
+        jsx_file.write_text(
+            TEST_FIXTURES["react_component"]["content"], encoding="utf-8"
+        )
 
         sql_file = project_path / "schema.sql"
-        sql_file.write_text(TEST_FIXTURES["mysql_schema"]["content"])
+        sql_file.write_text(TEST_FIXTURES["mysql_schema"]["content"], encoding="utf-8")
 
         # Transform React to Vue
         react_engine = TransformationEngine(temp_project, "react", "vue")
@@ -326,7 +339,7 @@ class TestTransformerEngineIntegration:
 
         # Create test file
         src_file = project_path / "simple.js"
-        src_file.write_text("const x = 5")
+        src_file.write_text("const x = 5", encoding="utf-8")
 
         engine = TransformationEngine(temp_project, "javascript", "typescript")
         # The call performs the transformation; its return value is not
@@ -451,7 +464,7 @@ class TestRollbackIntegration:
 
             # Create initial commit
             test_file = project_path / "test.txt"
-            test_file.write_text("initial")
+            test_file.write_text("initial", encoding="utf-8")
             subprocess.run(["git", "add", "."], cwd=tmpdir, capture_output=True)
             subprocess.run(
                 ["git", "commit", "-m", "initial"], cwd=tmpdir, capture_output=True
@@ -491,7 +504,7 @@ class TestValidatorIntegration:
 
         # Create mock test file
         test_file = project_path / "test.js"
-        test_file.write_text('console.log("test")')
+        test_file.write_text('console.log("test")', encoding="utf-8")
 
         # MigrationValidator.validate() takes no keyword arguments
         validator = MigrationValidator(temp_project)
@@ -521,15 +534,16 @@ class TestComplexMigrationScenarios:
 
             # Create multiple components
             (components_dir / "Button.jsx").write_text(
-                TEST_FIXTURES["react_component"]["content"][:100]
+                TEST_FIXTURES["react_component"]["content"][:100], encoding="utf-8"
             )
             (components_dir / "Header.jsx").write_text(
-                "import React from 'react'\nfunction Header() { return <h1>Header</h1> }"
+                "import React from 'react'\nfunction Header() { return <h1>Header</h1> }",
+                encoding="utf-8",
             )
 
             # Create service files
             (services_dir / "api.js").write_text(
-                TEST_FIXTURES["javascript_code"]["content"][:100]
+                TEST_FIXTURES["javascript_code"]["content"][:100], encoding="utf-8"
             )
 
             yield tmpdir
@@ -548,12 +562,12 @@ class TestComplexMigrationScenarios:
 
         # Add SQL file
         (project_path / "schema.sql").write_text(
-            TEST_FIXTURES["mysql_schema"]["content"][:100]
+            TEST_FIXTURES["mysql_schema"]["content"][:100], encoding="utf-8"
         )
 
         # Add Python file
         (project_path / "utils.py").write_text(
-            TEST_FIXTURES["python2_code"]["content"][:100]
+            TEST_FIXTURES["python2_code"]["content"][:100], encoding="utf-8"
         )
 
         # React migration
@@ -604,7 +618,7 @@ class TestErrorHandlingIntegration:
 
         # Create malformed file
         bad_file = project_path / "bad.jsx"
-        bad_file.write_text("function Test() { {{{{{ invalid syntax")
+        bad_file.write_text("function Test() { {{{{{ invalid syntax", encoding="utf-8")
 
         engine = TransformationEngine(temp_project, "react", "vue")
         results = engine.transform_code()
@@ -625,14 +639,17 @@ class TestPerformanceIntegration:
             # Create multiple component files
             for i in range(5):
                 comp_file = project_path / f"Component{i}.jsx"
-                comp_file.write_text(f"""
+                comp_file.write_text(
+                    f"""
 import React, {{ useState }} from 'react'
 
 function Component{i}() {{
   const [state, setState] = useState(0)
   return <div>Component {i}: {{state}}</div>
 }}
-""")
+""",
+                    encoding="utf-8",
+                )
 
             yield tmpdir
 
@@ -661,7 +678,8 @@ function Component{i}() {{
         # Create test file
         test_file = project_path / "test.jsx"
         test_file.write_text(
-            TEST_FIXTURES.get("react_component", {}).get("content", "")
+            TEST_FIXTURES.get("react_component", {}).get("content", ""),
+            encoding="utf-8",
         )
 
         # Create base transformation
@@ -707,17 +725,23 @@ function Component{i}() {{
         test_dir = project_path / "tests"
         test_dir.mkdir()
         test_file = test_dir / "test_component.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 import pytest
 
 def test_component():
     # This will fail initially after migration
     assert True, "Test passes"
-""")
+""",
+            encoding="utf-8",
+        )
 
         # Create source file
         src_file = project_path / "component.jsx"
-        src_file.write_text(TEST_FIXTURES.get("react_component", {}).get("content", ""))
+        src_file.write_text(
+            TEST_FIXTURES.get("react_component", {}).get("content", ""),
+            encoding="utf-8",
+        )
 
         # Run migration
         orchestrator = MigrationOrchestrator(temp_project, enable_llm=False)
@@ -739,19 +763,23 @@ def test_component():
         src_dir = project_path / "src"
         src_dir.mkdir()
         comp_file = src_dir / "Counter.jsx"
-        comp_file.write_text("""
+        comp_file.write_text(
+            """
 import React, { useState } from 'react';
 
 export default function Counter() {
   const [count, setCount] = useState(0);
   return <div><button onClick={() => setCount(count + 1)}>{count}</button></div>;
 }
-""")
+""",
+            encoding="utf-8",
+        )
 
         # Create package.json to identify as React project
         package_json = project_path / "package.json"
         package_json.write_text(
-            json.dumps({"name": "test-project", "dependencies": {"react": "^18.0.0"}})
+            json.dumps({"name": "test-project", "dependencies": {"react": "^18.0.0"}}),
+            encoding="utf-8",
         )
 
         # Run migration with LLM enabled
@@ -775,13 +803,16 @@ export default function Counter() {
 
         for i in range(10):
             comp_file = src_dir / f"Component{i}.jsx"
-            comp_file.write_text(f"""
+            comp_file.write_text(
+                f"""
 import React from 'react';
 
 export default function Component{i}() {{
   return <div>Component {i}</div>;
 }}
-""")
+""",
+                encoding="utf-8",
+            )
 
         # Run transformation
         transformer = TransformationEngine(temp_project, "react", "vue")

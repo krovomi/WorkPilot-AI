@@ -1,4 +1,5 @@
 import { IPC_CHANNELS } from "../../../shared/constants";
+import type { GitHubAPIComment } from "../../../main/ipc-handlers/github/types";
 import type {
 	GitHubImportResult,
 	GitHubInvestigationResult,
@@ -16,6 +17,21 @@ import {
 	invokeIpc,
 	sendIpc,
 } from "./ipc-utils";
+
+/**
+ * What `github:startAuth` resolves with — the `gh auth login --web` device flow.
+ *
+ * `browserOpened` is false when the handler could not launch a browser, and
+ * `fallbackUrl` then carries the URL to open by hand.
+ */
+export interface GitHubAuthStartResult {
+	success: boolean;
+	message?: string;
+	deviceCode?: string;
+	authUrl?: string;
+	browserOpened?: boolean;
+	fallbackUrl?: string;
+}
 
 /**
  * Auto-fix configuration
@@ -197,10 +213,16 @@ export interface GitHubAPI {
 		projectId: string,
 		issueNumber: number,
 	) => Promise<IPCResult<GitHubIssue>>;
+	/**
+	 * Les commentaires d'une issue. Le handler les type
+	 * (`IPCResult<GitHubAPIComment[]>`) ; ce pont disait `unknown[]`, et
+	 * `InvestigationDialog` redeclarait la meme forme une troisieme fois pour
+	 * compenser.
+	 */
 	getIssueComments: (
 		projectId: string,
 		issueNumber: number,
-	) => Promise<IPCResult<unknown[]>>;
+	) => Promise<IPCResult<GitHubAPIComment[]>>;
 	checkGitHubConnection: (
 		projectId: string,
 	) => Promise<IPCResult<GitHubSyncStatus>>;
@@ -236,9 +258,14 @@ export interface GitHubAPI {
 	checkGitHubAuth: () => Promise<
 		IPCResult<{ authenticated: boolean; username?: string }>
 	>;
-	startGitHubAuth: () => Promise<
-		IPCResult<{ success: boolean; message?: string }>
-	>;
+	/**
+	 * Device-flow login. The handler returns the device code, the verification
+	 * URL, whether it managed to open a browser, and a manual fallback URL when
+	 * it did not — `GitHubOAuthFlow` renders all four. The type declared only
+	 * `{ success, message }`; the index signature on `ElectronAPI` was what let
+	 * the component read the rest anyway.
+	 */
+	startGitHubAuth: () => Promise<IPCResult<GitHubAuthStartResult>>;
 	getGitHubToken: () => Promise<IPCResult<{ token: string }>>;
 	getGitHubUser: () => Promise<IPCResult<{ username: string; name?: string }>>;
 	listGitHubUserRepos: () => Promise<
@@ -682,7 +709,7 @@ export const createGitHubAPI = (): GitHubAPI => ({
 	getIssueComments: (
 		projectId: string,
 		issueNumber: number,
-	): Promise<IPCResult<unknown[]>> =>
+	): Promise<IPCResult<GitHubAPIComment[]>> =>
 		invokeIpc(IPC_CHANNELS.GITHUB_GET_ISSUE_COMMENTS, projectId, issueNumber),
 
 	checkGitHubConnection: (
@@ -742,9 +769,8 @@ export const createGitHubAPI = (): GitHubAPI => ({
 		IPCResult<{ authenticated: boolean; username?: string }>
 	> => invokeIpc(IPC_CHANNELS.GITHUB_CHECK_AUTH),
 
-	startGitHubAuth: (): Promise<
-		IPCResult<{ success: boolean; message?: string }>
-	> => invokeIpc(IPC_CHANNELS.GITHUB_START_AUTH),
+	startGitHubAuth: (): Promise<IPCResult<GitHubAuthStartResult>> =>
+		invokeIpc(IPC_CHANNELS.GITHUB_START_AUTH),
 
 	getGitHubToken: (): Promise<IPCResult<{ token: string }>> =>
 		invokeIpc(IPC_CHANNELS.GITHUB_GET_TOKEN),

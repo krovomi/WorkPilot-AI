@@ -12,21 +12,18 @@ export interface ArchitectureVisualizerRequest {
 	thinkingLevel?: string;
 }
 
-export interface ArchitectureVisualizerResult {
-	project_dir: string;
-	diagram_types_analyzed: string[];
-	diagrams: Record<
-		string,
-		{
-			title: string;
-			mermaid_code: string;
-			nodes?: unknown[];
-			edges?: unknown[];
-		}
-	>;
-	output_dir: string;
-	summary: { total_diagrams: number; total_nodes: number; total_edges: number };
-}
+/**
+ * Re-exporte le type du service qui produit reellement ce resultat.
+ *
+ * Le handler transmet tel quel ce que le service emet
+ * (`service.on("complete", (result) => webContents.send(..., result))`), donc
+ * c'est ce type-la qui traverse le pont. Ce module en declarait un autre, de
+ * forme differente, qu'aucun code ne produisait ; le store du renderer, lui,
+ * importait deja le bon depuis le service. L'index signature d'`ElectronAPI`
+ * rendait les deux interchangeables aux yeux du compilateur.
+ */
+import type { ArchitectureVisualizerResult } from "../../../main/architecture-visualizer-service";
+export type { ArchitectureVisualizerResult };
 
 export interface ArchitectureVisualizerAPI {
 	generateArchitectureDiagrams: (

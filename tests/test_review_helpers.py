@@ -134,7 +134,7 @@ class TestReviewStatusSummary:
         state.approve(review_spec_dir, approved_by="user")
 
         # Modify spec after approval
-        (review_spec_dir / "spec.md").write_text("Changed!")
+        (review_spec_dir / "spec.md").write_text("Changed!", encoding="utf-8")
 
         summary = get_review_status_summary(review_spec_dir)
 
@@ -180,7 +180,7 @@ class TestReviewStatusSummary:
         assert not summary2["spec_changed"]
 
         # Spec changed
-        (complete_spec_dir / "spec.md").write_text("Changed content")
+        (complete_spec_dir / "spec.md").write_text("Changed content", encoding="utf-8")
 
         summary3 = get_review_status_summary(complete_spec_dir)
         assert summary3["approved"]  # Still marked approved

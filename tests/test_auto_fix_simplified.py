@@ -44,7 +44,9 @@ def test_create_instance():
         spec_dir = Path(tmpdir) / "spec"
         spec_dir.mkdir()
         plan = {"spec_name": "test"}
-        (spec_dir / "implementation_plan.json").write_text(json.dumps(plan))
+        (spec_dir / "implementation_plan.json").write_text(
+            json.dumps(plan), encoding="utf-8"
+        )
         loop = AutoFixLoop(
             project_dir=project_dir,
             spec_dir=spec_dir,

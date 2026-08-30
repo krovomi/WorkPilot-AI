@@ -275,7 +275,7 @@ class TestTestGeneratorAgent:
         ''')
 
         file_path = tmp_path / "user_service.py"
-        file_path.write_text(source)
+        file_path.write_text(source, encoding="utf-8")
         return str(file_path)
 
     def test_analyze_coverage_finds_gaps(self, agent, sample_source):
@@ -320,7 +320,7 @@ class TestTestGeneratorAgent:
         can exclude already-covered functions."""
         test_source = "def test_get_user_returns_expected():\n    pass\n"
         test_path = tmp_path / "test_user_service.py"
-        test_path.write_text(test_source)
+        test_path.write_text(test_source, encoding="utf-8")
 
         response = json.dumps({"functions_analyzed": 4, "gaps": []})
         fake, ctx = _patch_llm(response)
@@ -467,7 +467,7 @@ class TestTestGeneratorAgent:
         """The unit prompt carries max_tests_per_function and existing tests."""
         test_source = "def test_get_user_returns_expected():\n    pass\n"
         test_path = tmp_path / "test_existing.py"
-        test_path.write_text(test_source)
+        test_path.write_text(test_source, encoding="utf-8")
 
         response = json.dumps(
             {

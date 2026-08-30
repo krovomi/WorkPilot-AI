@@ -126,7 +126,9 @@ def test_add_writes_manifest_ignore_block_and_pin(repo: Path):
     plan = plan_add(repo, "obra/superpowers")
     apply_add(repo, plan, project_dir=repo)
 
-    manifest = json.loads((repo / "skills" / "superpowers" / "pack.json").read_text())
+    manifest = json.loads(
+        (repo / "skills" / "superpowers" / "pack.json").read_text(encoding="utf-8")
+    )
     assert manifest["source"] == "obra/superpowers"
     # A git clone, not `npx skills add`: that tool writes into every harness
     # directory it knows and overwrites skills-lock.json at the repo root.
@@ -136,11 +138,11 @@ def test_add_writes_manifest_ignore_block_and_pin(repo: Path):
     ]
     assert "--into" in manifest["bootstrap"]["command"]
 
-    ignore = (repo / ".gitignore").read_text()
+    ignore = (repo / ".gitignore").read_text(encoding="utf-8")
     assert "skills/superpowers/*" in ignore
     assert "!skills/superpowers/pack.json" in ignore
 
-    config = (repo / ".workpilot" / "skills.toml").read_text()
+    config = (repo / ".workpilot" / "skills.toml").read_text(encoding="utf-8")
     assert 'superpowers = "latest"' in config
     assert "# a comment worth keeping" in config, "editing the pins ate the comments"
 
@@ -148,7 +150,9 @@ def test_add_writes_manifest_ignore_block_and_pin(repo: Path):
 def test_add_records_the_ref_when_one_is_pinned(repo: Path):
     plan = plan_add(repo, "obra/superpowers@v3.0.0")
     apply_add(repo, plan, project_dir=repo)
-    manifest = json.loads((repo / "skills" / "superpowers" / "pack.json").read_text())
+    manifest = json.loads(
+        (repo / "skills" / "superpowers" / "pack.json").read_text(encoding="utf-8")
+    )
     command = manifest["bootstrap"]["command"]
     assert "--ref" in command and "v3.0.0" in command
     assert manifest["source"] == "obra/superpowers"
@@ -166,7 +170,9 @@ def test_add_leaves_an_authored_manifest_alone(repo: Path):
     plan = plan_add(repo, "bmad-code-org/BMAD-METHOD", name="bmad")
     apply_add(repo, plan, project_dir=repo)
 
-    manifest = json.loads((repo / "skills" / "bmad" / "pack.json").read_text())
+    manifest = json.loads(
+        (repo / "skills" / "bmad" / "pack.json").read_text(encoding="utf-8")
+    )
     assert manifest["bootstrap"]["command"] == ["npx", "bmad-method@6", "install"]
     assert manifest["version"] == "6.0.0"
 
@@ -176,7 +182,7 @@ def test_add_does_not_untrack_a_committed_pack(repo: Path):
     write_pack(repo, "bmad", source="bmad-code-org/BMAD-METHOD")
     plan = plan_add(repo, "bmad-code-org/BMAD-METHOD", name="bmad")
     apply_add(repo, plan, project_dir=repo)
-    assert "skills/bmad/*" not in (repo / ".gitignore").read_text()
+    assert "skills/bmad/*" not in (repo / ".gitignore").read_text(encoding="utf-8")
 
 
 def test_add_refuses_to_repoint_an_existing_pack(repo: Path):
@@ -194,22 +200,24 @@ def test_add_rejects_unusable_pack_names(repo: Path, name: str):
 def test_add_can_skip_the_pin(repo: Path):
     plan = plan_add(repo, "obra/superpowers", pin="")
     apply_add(repo, plan, project_dir=repo)
-    assert "superpowers" not in (repo / ".workpilot" / "skills.toml").read_text()
+    assert "superpowers" not in (repo / ".workpilot" / "skills.toml").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_add_is_idempotent(repo: Path):
     plan_one = plan_add(repo, "obra/superpowers")
     apply_add(repo, plan_one, project_dir=repo)
     first = (
-        (repo / ".gitignore").read_text(),
-        (repo / ".workpilot" / "skills.toml").read_text(),
+        (repo / ".gitignore").read_text(encoding="utf-8"),
+        (repo / ".workpilot" / "skills.toml").read_text(encoding="utf-8"),
     )
 
     plan_two = plan_add(repo, "obra/superpowers")
     apply_add(repo, plan_two, project_dir=repo)
     second = (
-        (repo / ".gitignore").read_text(),
-        (repo / ".workpilot" / "skills.toml").read_text(),
+        (repo / ".gitignore").read_text(encoding="utf-8"),
+        (repo / ".workpilot" / "skills.toml").read_text(encoding="utf-8"),
     )
 
     assert first == second
@@ -220,7 +228,7 @@ def test_add_is_idempotent(repo: Path):
 
 def test_pin_replaces_an_existing_entry_in_place(repo: Path):
     assert pin_pack(repo, "comms", "^2") is True
-    text = (repo / ".workpilot" / "skills.toml").read_text()
+    text = (repo / ".workpilot" / "skills.toml").read_text(encoding="utf-8")
     assert 'comms = "^2"' in text
     assert 'comms = "^1"' not in text
     assert text.count("comms =") == 1
@@ -236,14 +244,16 @@ def test_pin_creates_the_packs_table_when_missing(tmp_path: Path):
         '[targets]\npython = "3.13"\n', encoding="utf-8"
     )
     pin_pack(tmp_path, "tooling", "^1")
-    text = (tmp_path / ".workpilot" / "skills.toml").read_text()
+    text = (tmp_path / ".workpilot" / "skills.toml").read_text(encoding="utf-8")
     assert "[packs]" in text
     assert 'tooling = "^1"' in text
 
 
 def test_pin_creates_the_file_when_missing(tmp_path: Path):
     pin_pack(tmp_path, "tooling", "latest")
-    assert 'tooling = "latest"' in (tmp_path / ".workpilot" / "skills.toml").read_text()
+    assert 'tooling = "latest"' in (tmp_path / ".workpilot" / "skills.toml").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_unpin_only_touches_the_packs_table(repo: Path):
@@ -253,7 +263,7 @@ def test_unpin_only_touches_the_packs_table(repo: Path):
         '[targets]\npython = "3.13"\n\n[packs]\npython = "^1"\n', encoding="utf-8"
     )
     assert unpin_pack(repo, "python") is True
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     assert '[targets]\npython = "3.13"' in text
     assert text.count("python =") == 1
 
@@ -266,18 +276,20 @@ def test_unpin_reports_when_there_was_nothing_to_do(repo: Path):
 
 
 def test_gitignore_block_round_trips(repo: Path):
-    before = (repo / ".gitignore").read_text()
+    before = (repo / ".gitignore").read_text(encoding="utf-8")
     assert add_gitignore_block(repo, "sp") is True
     assert add_gitignore_block(repo, "sp") is False, "added a duplicate block"
     assert remove_gitignore_block(repo, "sp") is True
-    assert (repo / ".gitignore").read_text().rstrip("\n") == before.rstrip("\n")
+    assert (repo / ".gitignore").read_text(encoding="utf-8").rstrip(
+        "\n"
+    ) == before.rstrip("\n")
 
 
 def test_gitignore_removal_leaves_other_packs_alone(repo: Path):
     add_gitignore_block(repo, "one")
     add_gitignore_block(repo, "two")
     remove_gitignore_block(repo, "one")
-    text = (repo / ".gitignore").read_text()
+    text = (repo / ".gitignore").read_text(encoding="utf-8")
     assert "skills/one/*" not in text
     assert "skills/two/*" in text
     assert "node_modules/" in text
@@ -298,8 +310,12 @@ def test_remove_takes_the_pin_the_ignore_block_and_the_lock_entry(repo: Path):
     apply_remove(repo, removal, project_dir=repo)
 
     assert not (repo / "skills" / "superpowers").exists()
-    assert "skills/superpowers/*" not in (repo / ".gitignore").read_text()
-    assert "superpowers" not in (repo / ".workpilot" / "skills.toml").read_text()
+    assert "skills/superpowers/*" not in (repo / ".gitignore").read_text(
+        encoding="utf-8"
+    )
+    assert "superpowers" not in (repo / ".workpilot" / "skills.toml").read_text(
+        encoding="utf-8"
+    )
     assert "superpowers" not in recorded_shas(repo / "skills-lock.json")
 
 
@@ -331,7 +347,7 @@ def test_remove_leaves_the_emitted_list_for_the_build_to_settle(repo: Path):
     write_pack(repo, "sp", source="obra/superpowers")
     record_shas(repo / "skills-lock.json", {"sp": "deadbeef"})
     apply_remove(repo, plan_remove(repo, "sp"), project_dir=repo)
-    lock = json.loads((repo / "skills-lock.json").read_text())
+    lock = json.loads((repo / "skills-lock.json").read_text(encoding="utf-8"))
     assert lock["emitted"] == ["a.md"]
     assert "sp" not in lock["packs"]
 
@@ -376,7 +392,9 @@ def test_vendored_skill_count_sees_agents_too(repo: Path):
     pack_dir = write_pack(repo, "sp")
     write_skill(pack_dir, "one")
     (pack_dir / "agents").mkdir()
-    (pack_dir / "agents" / "reviewer.md").write_text("---\nname: r\n---\n", "utf-8")
+    (pack_dir / "agents" / "reviewer.md").write_text(
+        "---\nname: r\n---\n", encoding="utf-8"
+    )
     assert vendored_skill_count(pack_dir) == 2
 
 
@@ -386,7 +404,7 @@ def test_vendored_skill_count_sees_agents_too(repo: Path):
 def test_record_shas_preserves_everything_the_build_owns(repo: Path):
     lock = repo / "skills-lock.json"
     record_shas(lock, {"sp": "abc"})
-    data = json.loads(lock.read_text())
+    data = json.loads(lock.read_text(encoding="utf-8"))
     assert data["packs"]["sp"]["upstreamTreeSha"] == "abc"
     assert data["emitted"] == ["a.md"], "provenance write clobbered the emitted list"
 
@@ -395,14 +413,14 @@ def test_record_shas_ignores_empty_values(repo: Path):
     """An unreachable upstream records nothing rather than an empty SHA."""
     lock = repo / "skills-lock.json"
     record_shas(lock, {"sp": ""})
-    assert "sp" not in json.loads(lock.read_text())["packs"]
+    assert "sp" not in json.loads(lock.read_text(encoding="utf-8"))["packs"]
 
 
 def test_forget_pack_is_a_no_op_for_an_absent_entry(repo: Path):
     lock = repo / "skills-lock.json"
-    before = lock.read_text()
+    before = lock.read_text(encoding="utf-8")
     forget_pack(lock, "never-there")
-    assert lock.read_text() == before
+    assert lock.read_text(encoding="utf-8") == before
 
 
 def test_real_repo_manifests_all_declare_a_reachable_source():

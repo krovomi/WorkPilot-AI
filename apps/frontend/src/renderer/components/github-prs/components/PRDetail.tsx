@@ -665,7 +665,10 @@ export function PRDetail({
 					label: t("prReview.readyToMerge"),
 					description: t("prReview.nonBlockingSuggestions", {
 						resolved: resolvedCount,
-						suggestions: suggestionsCount,
+						// `count` et pas `suggestions` : c'est la variable sur laquelle
+						// i18next choisit entre `_one` et `_other`. Nommée autrement,
+						// elle s'interpolait mais la phrase restait au singulier.
+						count: suggestionsCount,
 					}),
 					icon: <CheckCheck className="h-5 w-5" />,
 					color: "bg-success/20 text-success border-success/50",
@@ -678,7 +681,7 @@ export function PRDetail({
 				label: t("prReview.blockingIssues"),
 				description: t("prReview.blockingIssuesDesc", {
 					resolved: resolvedCount,
-					unresolved: unresolvedCount,
+					count: unresolvedCount,
 				}),
 				icon: <AlertTriangle className="h-5 w-5" />,
 				color: "bg-warning/20 text-warning border-warning/50",

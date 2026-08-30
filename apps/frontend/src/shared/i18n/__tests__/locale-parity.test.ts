@@ -16,8 +16,13 @@
  *   1. every key the source calls exists in both locales;
  *   2. EN and FR declare the same keys, namespace by namespace.
  *
- * (2) has known debt, listed below. The list may shrink; an entry added to it
- * is a namespace someone let drift.
+ * (2) had known debt when this test was written — `settings` and `dashboard`
+ * were exempted. Both are now at parity and the exemption list is gone, so a
+ * namespace that drifts fails here instead of being written down.
+ *
+ * (3) checks that a plural is declared the way i18next v25 reads it. The v3
+ * `_plural` suffix parses fine and is never looked up, so a key carrying it
+ * silently renders its singular for every count — 73 keys did.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -28,16 +33,12 @@ const LOCALES = path.resolve(import.meta.dirname, "..", "locales");
 const SRC = path.resolve(import.meta.dirname, "..", "..", "..");
 
 /**
- * Namespaces whose two locales are not yet key-for-key identical.
- *
- * `settings` carries ~290 keys that exist on one side only; all but the five
- * `accounts.toast.*` entries fixed alongside this test are unreferenced
- * leftovers, and deleting them is its own change. `dashboard` holds a single
- * `completed_plural` — an i18next v3 suffix that v25 never reads, part of a
- * wider dead-plural problem (73 keys across 15 files) also left for its own
- * change rather than rushed here.
+ * `i18nAgent:issueType.missing_plural` is not a plural form: it labels the
+ * issue type the i18n agent itself calls `missing_plural`
+ * (`shared/types/i18n-agent.ts`, `i18n_scanner.py`), reached through
+ * ``t(`issueType.${issue.issueType}`)``. Renaming it would break that label.
  */
-const KNOWN_DRIFT = new Set(["settings", "dashboard"]);
+const NOT_A_PLURAL = new Set(["i18nAgent:issueType.missing_plural"]);
 
 type Tree = Record<string, unknown>;
 
@@ -93,14 +94,61 @@ describe("locale parity", () => {
 
 	for (const file of namespaces) {
 		const ns = file.replace(/\.json$/, "");
-		const skip = KNOWN_DRIFT.has(ns);
 
-		it.skipIf(skip)(`declares the same keys in en and fr — ${ns}`, () => {
+		it(`declares the same keys in en and fr — ${ns}`, () => {
 			const en = [...load("en", file)].sort();
 			const fr = [...load("fr", file)].sort();
 			expect(fr).toEqual(en);
 		});
 	}
+});
+
+describe("plural forms", () => {
+	it("uses the suffixes i18next v25 actually reads", () => {
+		// `_plural` is the i18next v3 spelling. v25 resolves a count through
+		// Intl.PluralRules and looks up `_one`/`_other`, never `_plural`, then
+		// falls back to the unsuffixed key — so the plural text is parsed,
+		// shipped, translated, and never shown. It was on 73 keys.
+		const stale: string[] = [];
+		for (const locale of ["en", "fr"] as const) {
+			for (const file of namespaces) {
+				const ns = file.replace(/\.json$/, "");
+				for (const key of load(locale, file)) {
+					if (!key.endsWith("_plural")) continue;
+					if (NOT_A_PLURAL.has(`${ns}:${key}`)) continue;
+					stale.push(`${locale}/${ns}:${key}`);
+				}
+			}
+		}
+		expect(stale.sort()).toEqual([]);
+	});
+
+	it("always leaves something for count === 1 to resolve to", () => {
+		// Measured against the installed i18next, not assumed:
+		//
+		//   base + `_other`   count 1 -> the base       (correct)
+		//   `_other` alone    count 1 -> "the.key.name" (the key, to the user)
+		//   base + `_plural`  count 5 -> the base       (the singular, always)
+		//
+		// So an unsuffixed key next to `_other` is a working singular and not a
+		// half-finished migration — but `_other` on its own has nothing to fall
+		// back to, and puts the key itself on screen.
+		const unresolvable: string[] = [];
+		for (const locale of ["en", "fr"] as const) {
+			for (const file of namespaces) {
+				const keys = load(locale, file);
+				const ns = file.replace(/\.json$/, "");
+				for (const key of keys) {
+					if (!key.endsWith("_other")) continue;
+					const base = key.slice(0, -"_other".length);
+					if (!keys.has(`${base}_one`) && !keys.has(base)) {
+						unresolvable.push(`${locale}/${ns}:${base}`);
+					}
+				}
+			}
+		}
+		expect([...new Set(unresolvable)].sort()).toEqual([]);
+	});
 });
 
 describe("translation keys used in the source", () => {

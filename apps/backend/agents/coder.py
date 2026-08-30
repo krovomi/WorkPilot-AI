@@ -532,6 +532,7 @@ def _cleanup_stray_root_plan(project_dir: Path, spec_dir: Path) -> str | None:
                 f"to the project root ({stray.name}) instead of the spec directory."
             )
     except OSError:
+        # Le marqueur est un cache : le lecteur gere deja son absence.
         pass
     return None
 
@@ -558,6 +559,7 @@ def _bump_planning_failures(spec_dir: Path) -> int:
     try:
         (spec_dir / _PLANNING_FAILURES_MARKER).write_text(str(count), encoding="utf-8")
     except OSError:
+        # Le marqueur est un cache : le lecteur gere deja son absence.
         pass
     return count
 
@@ -566,6 +568,7 @@ def _clear_planning_failures(spec_dir: Path) -> None:
     try:
         (spec_dir / _PLANNING_FAILURES_MARKER).unlink()
     except OSError:
+        # Le marqueur est un cache : le lecteur gere deja son absence.
         pass
 
 
@@ -705,6 +708,7 @@ async def run_autonomous_agent(
                 payload={"addendum_chars": len(domain_addendum)},
             )
     except Exception:
+        # Le journal d'evenements est annexe : il n'interrompt pas le build.
         pass
 
     # Cognitive Context Optimizer flag — record whether opt-in was active
@@ -731,6 +735,7 @@ async def run_autonomous_agent(
                 provider="anthropic",
             )
         except Exception:
+            # Le suivi d'usage est de la telemetrie : jamais au prix du build.
             pass
 
     # Set environment variable for security hooks to find the correct project directory
@@ -1592,6 +1597,7 @@ async def run_autonomous_agent(
                     dest_dir=source_spec_dir,
                 )
             except Exception:
+                # L'instantane du plan est un confort de diagnostic, pas une etape du build.
                 pass
             if valid:
                 plan_validated = True
@@ -2195,11 +2201,13 @@ async def run_autonomous_agent(
             try:
                 _ut_finish_build(spec_dir, status="complete")
             except Exception:
+                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
                 pass
         if _ut_record_task is not None:
             try:
                 _ut_record_task(project_dir, spec_dir.name, "completed")
             except Exception:
+                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
                 pass
         # Log agent completion
         workflow_logger.log_agent_end(
@@ -2233,11 +2241,13 @@ async def run_autonomous_agent(
             try:
                 _ut_finish_build(spec_dir, status="paused")
             except Exception:
+                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
                 pass
         if _ut_record_task is not None:
             try:
                 _ut_record_task(project_dir, spec_dir.name, "in_progress")
             except Exception:
+                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
                 pass
         # Log agent pause
         workflow_logger.log_agent_end(

@@ -239,6 +239,7 @@ async def run_qa_fixer_session(
             prompt += "\n\n" + learning_context
             debug_success("qa_fixer", "Learning loop patterns injected for fixer")
     except Exception:
+        # L'injection de patterns est un bonus : sans elle le prompt reste valide.
         pass
 
     # Add session context - use full path so agent can find files
@@ -304,6 +305,7 @@ async def run_qa_fixer_session(
                             cost_usd=_cost,
                         )
                     except Exception:
+                        # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                         pass
                 continue
 
@@ -327,6 +329,7 @@ async def run_qa_fixer_session(
                             try:
                                 _rr.record_response(_rs_id, block.text)
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
                     elif block_type == "ToolUseBlock" and hasattr(block, "name"):
                         tool_name = block.name
@@ -400,6 +403,7 @@ async def run_qa_fixer_session(
                                         _rs_id, tool_name, tool_input_dict=inp or {}
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
             elif msg_type == "UserMessage" and hasattr(msg, "content"):
@@ -474,6 +478,7 @@ async def run_qa_fixer_session(
                                         success=not is_error,
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
                         current_tool = None
@@ -494,6 +499,7 @@ async def run_qa_fixer_session(
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return _fix_result
 
@@ -510,6 +516,7 @@ async def run_qa_fixer_session(
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", str(e)
 
@@ -583,6 +590,7 @@ async def _run_qa_fixer_agent_client_session(
                         try:
                             _rr.record_response(_rs_id, block.text)
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_USE:
@@ -654,6 +662,7 @@ async def _run_qa_fixer_agent_client_session(
                                     _rs_id, tool_name, tool_input_dict=inp or {}
                                 )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_RESULT:
@@ -722,6 +731,7 @@ async def _run_qa_fixer_agent_client_session(
                                     success=not is_error,
                                 )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                     current_tool = None
@@ -742,6 +752,7 @@ async def _run_qa_fixer_agent_client_session(
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return _fix_result
 
@@ -758,6 +769,7 @@ async def _run_qa_fixer_agent_client_session(
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", str(e)
 

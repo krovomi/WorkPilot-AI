@@ -117,10 +117,9 @@ export function AuthStatusIndicator() {
 			globalThis.electronAPI
 				.getGithubCliStatus?.()
 				.then(
-					(result: {
-						success: boolean;
-						data: { available: boolean; isAuth?: boolean; username?: string };
-					}) => {
+					// Le type vient du pont : le reecrire ici le faisait diverger
+					// (`data` requis alors qu'il est optionnel).
+					(result) => {
 						if (result.success && result.data) {
 							setGithubStatus(result.data);
 						} else {

@@ -285,7 +285,8 @@ class TestLLMTransformerIntegration:
         src_dir.mkdir()
 
         test_file = src_dir / "Component.jsx"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 import React, { useState } from 'react';
 
 export default function Component() {
@@ -298,7 +299,9 @@ export default function Component() {
     </div>
   );
 }
-""")
+""",
+            encoding="utf-8",
+        )
 
         # Run base transformation
         transformer = TransformationEngine(temp_project, "react", "vue")

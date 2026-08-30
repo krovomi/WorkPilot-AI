@@ -426,7 +426,7 @@ class TestCleanupOrphanedPendingFolders:
             # Create pending folder with requirements
             pending_with_req = specs_dir / "001-pending"
             pending_with_req.mkdir()
-            (pending_with_req / "requirements.json").write_text("{}")
+            (pending_with_req / "requirements.json").write_text("{}", encoding="utf-8")
 
             # Set modification time to 15 minutes ago
             old_time = time.time() - (15 * 60)
@@ -449,7 +449,7 @@ class TestCleanupOrphanedPendingFolders:
             # Create pending folder with spec
             pending_with_spec = specs_dir / "001-pending"
             pending_with_spec.mkdir()
-            (pending_with_spec / "spec.md").write_text("# Spec")
+            (pending_with_spec / "spec.md").write_text("# Spec", encoding="utf-8")
 
             # Set modification time to 15 minutes ago
             old_time = time.time() - (15 * 60)
@@ -497,7 +497,7 @@ class TestRenameSpecDirFromRequirements:
             # Write requirements
             requirements = {"task_description": "Add user authentication system"}
             (orchestrator.spec_dir / "requirements.json").write_text(
-                json.dumps(requirements)
+                json.dumps(requirements), encoding="utf-8"
             )
 
             # Rename
@@ -535,7 +535,7 @@ class TestRenameSpecDirFromRequirements:
             # Write requirements with empty task
             requirements = {"task_description": ""}
             (orchestrator.spec_dir / "requirements.json").write_text(
-                json.dumps(requirements)
+                json.dumps(requirements), encoding="utf-8"
             )
 
             result = orchestrator._rename_spec_dir_from_requirements()
@@ -561,7 +561,7 @@ class TestRenameSpecDirFromRequirements:
             # Write requirements
             requirements = {"task_description": "Different name task"}
             (orchestrator.spec_dir / "requirements.json").write_text(
-                json.dumps(requirements)
+                json.dumps(requirements), encoding="utf-8"
             )
 
             result = orchestrator._rename_spec_dir_from_requirements()

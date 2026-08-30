@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { isUnix, isWindows } from "./platform";
 
 type AssetsTarget = Record<
 	string,
@@ -68,7 +69,7 @@ export function ensureLegacyWorktreeBuildAssets(
 			symlinkSync(
 				sourcePath,
 				targetPath,
-				process.platform === "win32" ? "junction" : "dir",
+				isWindows() ? "junction" : "dir",
 			);
 			onMessage?.(`Linked legacy build assets: ${targetPath} -> ${sourcePath}`);
 		} catch (error) {
@@ -276,7 +277,7 @@ function findNetStandardFacadePaths(): string[] {
 	].filter((candidate) => existsSync(candidate));
 
 	const dotnetPacksRoot =
-		process.platform === "win32"
+		isWindows()
 			? "C:\\Program Files\\dotnet\\packs\\NETStandard.Library.Ref"
 			: "/usr/share/dotnet/packs/NETStandard.Library.Ref";
 	if (existsSync(dotnetPacksRoot)) {
@@ -535,7 +536,7 @@ export function findRoslynCscTool(): RoslynCscTool | null {
 
 	let dotnetPath: string;
 	try {
-		const lookupCommand = process.platform === "win32" ? "where" : "which";
+		const lookupCommand = isWindows() ? "where" : "which";
 		dotnetPath = execFileSync(lookupCommand, ["dotnet"], { encoding: "utf-8" })
 			.split(/\r?\n/)
 			.find(Boolean) ?? "";
@@ -582,7 +583,7 @@ export function createLegacyCompilerBuildArgs(msbuildCommand: string): string[] 
 }
 
 function findSdkToolsInDirectory(toolPath: string): string | null {
-	return existsSync(path.join(toolPath, process.platform === "win32" ? "al.exe" : "al"))
+	return existsSync(path.join(toolPath, isWindows() ? "al.exe" : "al"))
 		? toolPath
 		: null;
 }
@@ -597,7 +598,7 @@ export function findLegacySdkToolsPath(msbuildCommand: string): string | null {
 	}
 
 	const candidates =
-		process.platform === "win32"
+		isWindows()
 			? [
 					"C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8 Tools",
 					"C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8 Tools\\x64",
@@ -636,7 +637,7 @@ export async function runWithShortLegacySolutionPath<T>(
 	action: (context: LegacyBuildPathContext) => Promise<T>,
 	onMessage?: (message: string) => void,
 ): Promise<T> {
-	if (process.platform !== "win32") {
+	if (isUnix()) {
 		return action({ csprojPath, solutionDir });
 	}
 

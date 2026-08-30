@@ -65,8 +65,8 @@ class TestLanguageDetection:
 
     def test_detects_python(self, temp_dir: Path):
         """Detects Python projects."""
-        (temp_dir / "app.py").write_text("print('hello')")
-        (temp_dir / "requirements.txt").write_text("flask\n")
+        (temp_dir / "app.py").write_text("print('hello')", encoding="utf-8")
+        (temp_dir / "requirements.txt").write_text("flask\n", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_languages()
@@ -75,8 +75,8 @@ class TestLanguageDetection:
 
     def test_detects_javascript(self, temp_dir: Path):
         """Detects JavaScript projects."""
-        (temp_dir / "package.json").write_text('{"name": "test"}')
-        (temp_dir / "index.js").write_text("console.log('hello');")
+        (temp_dir / "package.json").write_text('{"name": "test"}', encoding="utf-8")
+        (temp_dir / "index.js").write_text("console.log('hello');", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_languages()
@@ -85,9 +85,11 @@ class TestLanguageDetection:
 
     def test_detects_typescript(self, temp_dir: Path):
         """Detects TypeScript projects."""
-        (temp_dir / "tsconfig.json").write_text("{}")
+        (temp_dir / "tsconfig.json").write_text("{}", encoding="utf-8")
         (temp_dir / "src").mkdir()
-        (temp_dir / "src" / "index.ts").write_text("export const x = 1;")
+        (temp_dir / "src" / "index.ts").write_text(
+            "export const x = 1;", encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_languages()
@@ -96,9 +98,11 @@ class TestLanguageDetection:
 
     def test_detects_rust(self, temp_dir: Path):
         """Detects Rust projects."""
-        (temp_dir / "Cargo.toml").write_text('[package]\nname = "test"')
+        (temp_dir / "Cargo.toml").write_text(
+            '[package]\nname = "test"', encoding="utf-8"
+        )
         (temp_dir / "src").mkdir()
-        (temp_dir / "src" / "main.rs").write_text("fn main() {}")
+        (temp_dir / "src" / "main.rs").write_text("fn main() {}", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_languages()
@@ -107,8 +111,8 @@ class TestLanguageDetection:
 
     def test_detects_go(self, temp_dir: Path):
         """Detects Go projects."""
-        (temp_dir / "go.mod").write_text("module test")
-        (temp_dir / "main.go").write_text("package main")
+        (temp_dir / "go.mod").write_text("module test", encoding="utf-8")
+        (temp_dir / "main.go").write_text("package main", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_languages()
@@ -117,8 +121,8 @@ class TestLanguageDetection:
 
     def test_detects_multiple_languages(self, temp_dir: Path):
         """Detects multiple languages in same project."""
-        (temp_dir / "app.py").write_text("print('hello')")
-        (temp_dir / "package.json").write_text('{"name": "test"}')
+        (temp_dir / "app.py").write_text("print('hello')", encoding="utf-8")
+        (temp_dir / "package.json").write_text('{"name": "test"}', encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_languages()
@@ -132,8 +136,8 @@ class TestPackageManagerDetection:
 
     def test_detects_npm(self, temp_dir: Path):
         """Detects npm from package-lock.json."""
-        (temp_dir / "package.json").write_text('{"name": "test"}')
-        (temp_dir / "package-lock.json").write_text("{}")
+        (temp_dir / "package.json").write_text('{"name": "test"}', encoding="utf-8")
+        (temp_dir / "package-lock.json").write_text("{}", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_package_managers()
@@ -142,8 +146,8 @@ class TestPackageManagerDetection:
 
     def test_detects_yarn(self, temp_dir: Path):
         """Detects yarn from yarn.lock."""
-        (temp_dir / "package.json").write_text('{"name": "test"}')
-        (temp_dir / "yarn.lock").write_text("")
+        (temp_dir / "package.json").write_text('{"name": "test"}', encoding="utf-8")
+        (temp_dir / "yarn.lock").write_text("", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_package_managers()
@@ -152,8 +156,8 @@ class TestPackageManagerDetection:
 
     def test_detects_pnpm(self, temp_dir: Path):
         """Detects pnpm from pnpm-lock.yaml."""
-        (temp_dir / "package.json").write_text('{"name": "test"}')
-        (temp_dir / "pnpm-lock.yaml").write_text("")
+        (temp_dir / "package.json").write_text('{"name": "test"}', encoding="utf-8")
+        (temp_dir / "pnpm-lock.yaml").write_text("", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_package_managers()
@@ -162,7 +166,7 @@ class TestPackageManagerDetection:
 
     def test_detects_pip(self, temp_dir: Path):
         """Detects pip from requirements.txt."""
-        (temp_dir / "requirements.txt").write_text("flask\n")
+        (temp_dir / "requirements.txt").write_text("flask\n", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_package_managers()
@@ -175,7 +179,7 @@ class TestPackageManagerDetection:
 name = "test"
 version = "0.1.0"
 """
-        (temp_dir / "pyproject.toml").write_text(pyproject)
+        (temp_dir / "pyproject.toml").write_text(pyproject, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_package_managers()
@@ -184,7 +188,9 @@ version = "0.1.0"
 
     def test_detects_cargo(self, temp_dir: Path):
         """Detects cargo from Cargo.toml."""
-        (temp_dir / "Cargo.toml").write_text('[package]\nname = "test"')
+        (temp_dir / "Cargo.toml").write_text(
+            '[package]\nname = "test"', encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_package_managers()
@@ -198,7 +204,7 @@ class TestFrameworkDetection:
     def test_detects_nextjs(self, temp_dir: Path):
         """Detects Next.js framework."""
         pkg = {"dependencies": {"next": "^14.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_frameworks()
@@ -208,7 +214,7 @@ class TestFrameworkDetection:
     def test_detects_react(self, temp_dir: Path):
         """Detects React framework."""
         pkg = {"dependencies": {"react": "^18.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_frameworks()
@@ -221,7 +227,7 @@ class TestFrameworkDetection:
 name = "test"
 dependencies = ["flask>=2.0"]
 """
-        (temp_dir / "pyproject.toml").write_text(pyproject)
+        (temp_dir / "pyproject.toml").write_text(pyproject, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_frameworks()
@@ -230,7 +236,9 @@ dependencies = ["flask>=2.0"]
 
     def test_detects_flask_from_requirements(self, temp_dir: Path):
         """Detects Flask framework from requirements.txt."""
-        (temp_dir / "requirements.txt").write_text("flask>=2.0\npytest\n")
+        (temp_dir / "requirements.txt").write_text(
+            "flask>=2.0\npytest\n", encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_frameworks()
@@ -240,7 +248,7 @@ dependencies = ["flask>=2.0"]
     def test_detects_prisma(self, temp_dir: Path):
         """Detects Prisma ORM."""
         pkg = {"dependencies": {"prisma": "^5.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_frameworks()
@@ -249,7 +257,7 @@ dependencies = ["flask>=2.0"]
 
     def test_detects_pytest(self, temp_dir: Path):
         """Detects pytest framework."""
-        (temp_dir / "requirements.txt").write_text("pytest>=7.0\n")
+        (temp_dir / "requirements.txt").write_text("pytest>=7.0\n", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_frameworks()
@@ -262,7 +270,9 @@ class TestDatabaseDetection:
 
     def test_detects_postgres_from_env(self, temp_dir: Path):
         """Detects PostgreSQL from .env file."""
-        (temp_dir / ".env").write_text("DATABASE_URL=postgresql://localhost/test\n")
+        (temp_dir / ".env").write_text(
+            "DATABASE_URL=postgresql://localhost/test\n", encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_databases()
@@ -271,7 +281,9 @@ class TestDatabaseDetection:
 
     def test_detects_mongodb_from_env(self, temp_dir: Path):
         """Detects MongoDB from .env file."""
-        (temp_dir / ".env").write_text("MONGODB_URI=mongodb://localhost/test\n")
+        (temp_dir / ".env").write_text(
+            "MONGODB_URI=mongodb://localhost/test\n", encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_databases()
@@ -284,7 +296,7 @@ class TestDatabaseDetection:
   redis:
     image: redis:7
 """
-        (temp_dir / "docker-compose.yml").write_text(compose)
+        (temp_dir / "docker-compose.yml").write_text(compose, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_databases()
@@ -299,7 +311,7 @@ class TestDatabaseDetection:
   url = env("DATABASE_URL")
 }
 """
-        (temp_dir / "prisma" / "schema.prisma").write_text(schema)
+        (temp_dir / "prisma" / "schema.prisma").write_text(schema, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_databases()
@@ -312,7 +324,7 @@ class TestInfrastructureDetection:
 
     def test_detects_docker(self, temp_dir: Path):
         """Detects Docker from Dockerfile."""
-        (temp_dir / "Dockerfile").write_text("FROM python:3.11")
+        (temp_dir / "Dockerfile").write_text("FROM python:3.11", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_infrastructure()
@@ -321,7 +333,9 @@ class TestInfrastructureDetection:
 
     def test_detects_docker_compose(self, temp_dir: Path):
         """Detects Docker from docker-compose.yml."""
-        (temp_dir / "docker-compose.yml").write_text("services:\n  app:\n    build: .")
+        (temp_dir / "docker-compose.yml").write_text(
+            "services:\n  app:\n    build: .", encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_infrastructure()
@@ -331,7 +345,9 @@ class TestInfrastructureDetection:
     def test_detects_terraform(self, temp_dir: Path):
         """Detects Terraform from .tf files."""
         (temp_dir / "infra").mkdir()
-        (temp_dir / "infra" / "main.tf").write_text('resource "aws_instance" "web" {}')
+        (temp_dir / "infra" / "main.tf").write_text(
+            'resource "aws_instance" "web" {}', encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_infrastructure()
@@ -340,7 +356,9 @@ class TestInfrastructureDetection:
 
     def test_detects_helm(self, temp_dir: Path):
         """Detects Helm from Chart.yaml."""
-        (temp_dir / "Chart.yaml").write_text("name: myapp\nversion: 1.0.0")
+        (temp_dir / "Chart.yaml").write_text(
+            "name: myapp\nversion: 1.0.0", encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_infrastructure()
@@ -353,7 +371,9 @@ class TestCloudProviderDetection:
 
     def test_detects_vercel(self, temp_dir: Path):
         """Detects Vercel from vercel.json."""
-        (temp_dir / "vercel.json").write_text('{"buildCommand": "npm run build"}')
+        (temp_dir / "vercel.json").write_text(
+            '{"buildCommand": "npm run build"}', encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_cloud_providers()
@@ -362,7 +382,9 @@ class TestCloudProviderDetection:
 
     def test_detects_netlify(self, temp_dir: Path):
         """Detects Netlify from netlify.toml."""
-        (temp_dir / "netlify.toml").write_text('[build]\ncommand = "npm run build"')
+        (temp_dir / "netlify.toml").write_text(
+            '[build]\ncommand = "npm run build"', encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_cloud_providers()
@@ -371,7 +393,7 @@ class TestCloudProviderDetection:
 
     def test_detects_fly(self, temp_dir: Path):
         """Detects Fly.io from fly.toml."""
-        (temp_dir / "fly.toml").write_text('app = "myapp"')
+        (temp_dir / "fly.toml").write_text('app = "myapp"', encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_cloud_providers()
@@ -391,7 +413,7 @@ class TestCustomScriptDetection:
                 "test": "jest",
             }
         }
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_custom_scripts()
@@ -410,7 +432,7 @@ test:
 
 .PHONY: build test
 """
-        (temp_dir / "Makefile").write_text(makefile)
+        (temp_dir / "Makefile").write_text(makefile, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_custom_scripts()
@@ -420,8 +442,12 @@ test:
 
     def test_detects_shell_scripts(self, temp_dir: Path):
         """Detects shell scripts in root."""
-        (temp_dir / "setup.sh").write_text("#!/bin/bash\necho 'setup'")
-        (temp_dir / "deploy.sh").write_text("#!/bin/bash\necho 'deploy'")
+        (temp_dir / "setup.sh").write_text(
+            "#!/bin/bash\necho 'setup'", encoding="utf-8"
+        )
+        (temp_dir / "deploy.sh").write_text(
+            "#!/bin/bash\necho 'deploy'", encoding="utf-8"
+        )
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_custom_scripts()
@@ -439,7 +465,7 @@ class TestCustomAllowlist:
 my-custom-tool
 another-command
 """
-        (temp_dir / ".workpilot-allowlist").write_text(allowlist)
+        (temp_dir / ".workpilot-allowlist").write_text(allowlist, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._load_custom_allowlist()
@@ -637,7 +663,7 @@ version: 1.0.0
 environment:
   sdk: ">=3.0.0 <4.0.0"
 """
-        (temp_dir / "pubspec.yaml").write_text(pubspec)
+        (temp_dir / "pubspec.yaml").write_text(pubspec, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_languages()
@@ -647,7 +673,7 @@ environment:
     def test_detects_dart_from_files(self, temp_dir: Path):
         """Detects Dart from .dart files."""
         (temp_dir / "lib").mkdir()
-        (temp_dir / "lib" / "main.dart").write_text("void main() {}")
+        (temp_dir / "lib" / "main.dart").write_text("void main() {}", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_languages()
@@ -666,7 +692,7 @@ dependencies:
   flutter:
     sdk: flutter
 """
-        (temp_dir / "pubspec.yaml").write_text(pubspec)
+        (temp_dir / "pubspec.yaml").write_text(pubspec, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_frameworks()
@@ -678,7 +704,7 @@ dependencies:
         pubspec = """name: my_app
 version: 1.0.0
 """
-        (temp_dir / "pubspec.yaml").write_text(pubspec)
+        (temp_dir / "pubspec.yaml").write_text(pubspec, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_package_managers()
@@ -687,7 +713,7 @@ version: 1.0.0
 
     def test_detects_pub_from_lock_file(self, temp_dir: Path):
         """Detects pub package manager from pubspec.lock."""
-        (temp_dir / "pubspec.lock").write_text("packages:\n")
+        (temp_dir / "pubspec.lock").write_text("packages:\n", encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_package_managers()
@@ -704,7 +730,7 @@ class TestMelosMonorepoDetection:
 packages:
   - packages/*
 """
-        (temp_dir / "melos.yaml").write_text(melos_config)
+        (temp_dir / "melos.yaml").write_text(melos_config, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_package_managers()
@@ -717,7 +743,7 @@ packages:
 packages:
   - packages/*
 """
-        (temp_dir / "melos.yaml").write_text(melos_config)
+        (temp_dir / "melos.yaml").write_text(melos_config, encoding="utf-8")
 
         profile = get_or_create_profile(temp_dir, force_reanalyze=True)
 
@@ -739,7 +765,7 @@ class TestFvmVersionManagerDetection:
     def test_detects_fvm_from_config(self, temp_dir: Path):
         """Detects FVM from fvm_config.json."""
         fvm_config = '{"flutterSdkVersion": "3.19.0"}'
-        (temp_dir / "fvm_config.json").write_text(fvm_config)
+        (temp_dir / "fvm_config.json").write_text(fvm_config, encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_version_managers()
@@ -748,7 +774,7 @@ class TestFvmVersionManagerDetection:
 
     def test_detects_fvm_from_fvmrc(self, temp_dir: Path):
         """Detects FVM from .fvmrc file."""
-        (temp_dir / ".fvmrc").write_text('{"flutter": "3.19.0"}')
+        (temp_dir / ".fvmrc").write_text('{"flutter": "3.19.0"}', encoding="utf-8")
 
         analyzer = ProjectAnalyzer(temp_dir)
         analyzer._detect_version_managers()
@@ -772,7 +798,7 @@ class TestDartFlutterCommandsAllowed:
         pubspec = """name: my_app
 version: 1.0.0
 """
-        (temp_dir / "pubspec.yaml").write_text(pubspec)
+        (temp_dir / "pubspec.yaml").write_text(pubspec, encoding="utf-8")
 
         profile = get_or_create_profile(temp_dir, force_reanalyze=True)
 
@@ -790,7 +816,7 @@ dependencies:
   flutter:
     sdk: flutter
 """
-        (temp_dir / "pubspec.yaml").write_text(pubspec)
+        (temp_dir / "pubspec.yaml").write_text(pubspec, encoding="utf-8")
 
         profile = get_or_create_profile(temp_dir, force_reanalyze=True)
 

@@ -19,12 +19,19 @@
  * is for one-off channels and for code that picks its channel at runtime.
  */
 
-import { createIpcListener, invokeIpc } from "./ipc-utils";
+import { createIpcListener, invokeIpc, sendIpc } from "./ipc-utils";
 
 export interface GenericIpcAPI {
 	/** Invoke any channel and await its reply. */
 	// biome-ignore lint/suspicious/noExplicitAny: a generic escape hatch
 	invoke: (channel: string, ...args: any[]) => Promise<any>;
+	/**
+	 * Fire a channel without awaiting a reply — the `ipcMain.on` counterpart.
+	 * `context-mesh-store` has always called it against a bridge that never
+	 * defined it, while `context-mesh-handlers` listened on the other end.
+	 */
+	// biome-ignore lint/suspicious/noExplicitAny: a generic escape hatch
+	send: (channel: string, ...args: any[]) => void;
 	/** Subscribe to any channel. Returns the unsubscribe function. */
 	// biome-ignore lint/suspicious/noExplicitAny: a generic escape hatch
 	on: (channel: string, callback: (...args: any[]) => void) => () => void;
@@ -39,6 +46,9 @@ export interface GenericIpcAPI {
 export const createGenericIpcAPI = (): GenericIpcAPI => ({
 	// biome-ignore lint/suspicious/noExplicitAny: a generic escape hatch
 	invoke: (channel: string, ...args: any[]) => invokeIpc(channel, ...args),
+
+	// biome-ignore lint/suspicious/noExplicitAny: a generic escape hatch
+	send: (channel: string, ...args: any[]) => sendIpc(channel, ...args),
 
 	// biome-ignore lint/suspicious/noExplicitAny: a generic escape hatch
 	on: (channel: string, callback: (...args: any[]) => void) =>

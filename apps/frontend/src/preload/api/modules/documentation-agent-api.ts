@@ -13,13 +13,18 @@ export interface DocumentationAgentRequest {
 	thinkingLevel?: string;
 }
 
-export interface DocumentationAgentResult {
-	doc_types_generated: string[];
-	files_created: string[];
-	outdated_docs_updated?: string[];
-	coverage_before?: { overall_coverage: number };
-	coverage_after?: { overall_coverage: number };
-}
+/**
+ * Re-exporte le type du service qui produit reellement ce resultat.
+ *
+ * Le handler transmet tel quel ce que le service emet
+ * (`service.on("complete", (result) => webContents.send(..., result))`), donc
+ * c'est ce type-la qui traverse le pont. Ce module en declarait un autre, de
+ * forme differente, qu'aucun code ne produisait ; le store du renderer, lui,
+ * importait deja le bon depuis le service. L'index signature d'`ElectronAPI`
+ * rendait les deux interchangeables aux yeux du compilateur.
+ */
+import type { DocumentationAgentResult } from "../../../main/documentation-agent-service";
+export type { DocumentationAgentResult };
 
 export interface DocumentationAgentAPI {
 	generateDocumentation: (

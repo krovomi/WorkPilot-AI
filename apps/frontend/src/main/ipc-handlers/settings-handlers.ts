@@ -48,6 +48,7 @@ import { credentialManager } from "../services/credential-manager";
 import { getSettingsPath, readSettingsFile } from "../settings-utils";
 import { testGenerationService } from "../test-generation-service";
 import { parseEnvFile } from "./utils";
+import { getCurrentOS } from "../platform";
 
 const settingsPath = getSettingsPath();
 
@@ -94,7 +95,7 @@ function openLinuxTerminal(resolvedPath: string): IPCResult<void> {
  * Opens terminal based on platform
  */
 function openTerminalForPlatform(resolvedPath: string): IPCResult<void> {
-	const platform = process.platform;
+	const platform = getCurrentOS();
 
 	if (platform === "darwin") {
 		// macOS: Use execFileSync with argument array to prevent injection

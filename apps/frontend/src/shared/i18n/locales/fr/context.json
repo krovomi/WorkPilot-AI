@@ -12,11 +12,12 @@
 		"errorTitle": "Échec du chargement de l'index du projet",
 		"noIndexTitle": "Aucun Index de Projet Trouvé",
 		"noIndexDescription": "Cliquez sur le bouton Actualiser pour analyser la structure de votre projet et créer un index.",
-		"services": "Services",
+		"servicesHeading": "Services",
 		"infrastructure": "Infrastructure",
 		"conventions": "Conventions",
 		"service": "service",
-		"services_plural": "services"
+		"serviceCount_one": "{{count}} service",
+		"serviceCount_other": "{{count}} services"
 	},
 	"infrastructure": {
 		"dockerCompose": "Docker Compose",
@@ -42,7 +43,6 @@
 		"authentication": "Authentification",
 		"apiRoutes": "Routes API",
 		"route": "route",
-		"routes_plural": "routes",
 		"dependencies": "Dépendances",
 		"devDependencies": "Dépendances de Développement",
 		"externalServices": "Services Externes",

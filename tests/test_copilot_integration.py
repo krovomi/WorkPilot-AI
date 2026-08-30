@@ -387,7 +387,7 @@ class TestProviderSwitching:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=copilot\n")
+        env_file.write_text("AI_PROVIDER=copilot\n", encoding="utf-8")
 
         client = create_agent_client(
             project_dir=tmp_path,

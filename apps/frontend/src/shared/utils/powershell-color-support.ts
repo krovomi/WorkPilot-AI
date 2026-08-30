@@ -5,6 +5,7 @@
  */
 
 import { supportsColor } from "./frontend-colored-logs";
+import { isUnix, isWindows } from "../platform";
 
 /**
  * Get diagnostic information about color support
@@ -27,7 +28,7 @@ export function getColorDiagnostics(): {
 	}
 
 	// Check PowerShell specific
-	if (process.platform === "win32") {
+	if (isWindows()) {
 		if (!process.env.WT_SESSION && !process.env.ConEmuANSI) {
 			recommendations.push(
 				"Consider using Windows Terminal for better color support",
@@ -67,7 +68,7 @@ export function getColorDiagnostics(): {
  * Force enable colors for Windows PowerShell
  */
 export function forceEnableWindowsColors(): boolean {
-	if (process.platform !== "win32") return false;
+	if (isUnix()) return false;
 
 	try {
 		// Try to enable virtual terminal processing

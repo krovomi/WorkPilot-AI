@@ -70,7 +70,9 @@ def mock_spec_dir(tmp_path):
 
     # Create implementation_plan.json
     plan = {"spec_name": "test-spec", "subtasks": []}
-    (spec_dir / "implementation_plan.json").write_text(json.dumps(plan))
+    (spec_dir / "implementation_plan.json").write_text(
+        json.dumps(plan), encoding="utf-8"
+    )
 
     return spec_dir
 
@@ -300,14 +302,14 @@ class TestAutoFixLoop:
         assert fix_request_file.exists()
 
         # Check file content
-        content = fix_request_file.read_text()
+        content = fix_request_file.read_text(encoding="utf-8")
         assert "Auto-Fix Request" in content
         assert "pytest" in content
 
         fix_request_file = mock_spec_dir / "QA_FIX_REQUEST.md"
         assert fix_request_file.exists()
 
-        content = fix_request_file.read_text()
+        content = fix_request_file.read_text(encoding="utf-8")
         assert "Test Execution Failed" in content
         assert "assertion_failure" in content
         assert "memory context" in content

@@ -348,7 +348,7 @@ class TestManagerSnapshots:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a test file
             test_file = os.path.join(tmpdir, "test.txt")
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write("hello world")
 
             manager = SandboxManager(project_root=tmpdir)
@@ -361,7 +361,7 @@ class TestManagerSnapshots:
     def test_rollback_snapshot(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = os.path.join(tmpdir, "test.txt")
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write("original content")
 
             manager = SandboxManager(project_root=tmpdir)
@@ -369,13 +369,13 @@ class TestManagerSnapshots:
             snap_id = manager.create_snapshot(sandbox.sandbox_id, paths=["test.txt"])
 
             # Modify file
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write("modified content")
 
             # Rollback
             assert manager.rollback_snapshot(sandbox.sandbox_id, snap_id)
 
-            with open(test_file) as f:
+            with open(test_file, encoding="utf-8") as f:
                 assert f.read() == "original content"
 
     def test_rollback_nonexistent_snapshot(self):
@@ -405,14 +405,14 @@ class TestManagerExecution:
     def test_execute_failure_with_auto_rollback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = os.path.join(tmpdir, "test.txt")
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write("original")
 
             manager = SandboxManager(project_root=tmpdir)
             sandbox = manager.create_sandbox("t-1", "coder", allowed_paths=["test.txt"])
 
             def failing_func():
-                with open(test_file, "w") as f:
+                with open(test_file, "w", encoding="utf-8") as f:
                     f.write("corrupted")
                 raise RuntimeError("Agent crashed")
 
@@ -422,7 +422,7 @@ class TestManagerExecution:
             assert result.rolled_back
 
             # File should be restored
-            with open(test_file) as f:
+            with open(test_file, encoding="utf-8") as f:
                 assert f.read() == "original"
 
     def test_execute_nonexistent_sandbox(self):

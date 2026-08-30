@@ -44,7 +44,9 @@ async def test_complete_workflow():
                 "runs": [],
             },
         }
-        (spec_dir / "implementation_plan.json").write_text(json.dumps(plan, indent=2))
+        (spec_dir / "implementation_plan.json").write_text(
+            json.dumps(plan, indent=2), encoding="utf-8"
+        )
 
         print("\n[1/6] 🏗️  Environnement de test créé")
         print(f"  Project dir: {project_dir}")
@@ -198,7 +200,7 @@ async def test_complete_workflow():
 
             fix_request = spec_dir / "QA_FIX_REQUEST.md"
             if fix_request.exists():
-                content = fix_request.read_text()
+                content = fix_request.read_text(encoding="utf-8")
                 if (
                     "Test Execution Failed" in content
                     and "assertion_failure" in content

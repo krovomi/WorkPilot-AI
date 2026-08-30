@@ -244,12 +244,15 @@ class TestSecretsIgnoreFile:
     def test_loads_ignore_patterns(self, temp_dir: Path):
         """Loads patterns from .secretsignore."""
         ignore_file = temp_dir / ".secretsignore"
-        ignore_file.write_text("""
+        ignore_file.write_text(
+            """
 # Comment line
 tests/fixtures/
 *.test.py
 config/local.yaml
-""")
+""",
+            encoding="utf-8",
+        )
         patterns = load_secretsignore(temp_dir)
 
         assert "tests/fixtures/" in patterns
@@ -270,7 +273,7 @@ class TestScanFiles:
         """Scans source files for secrets."""
         # Create a file with a secret
         (temp_dir / "config.py").write_text(
-            'API_KEY = "sk-1234567890abcdefghijklmnop"\n'
+            'API_KEY = "sk-1234567890abcdefghijklmnop"\n', encoding="utf-8"
         )
 
         matches = scan_files(["config.py"], temp_dir)
@@ -282,10 +285,12 @@ class TestScanFiles:
         """Skips files matching ignore patterns."""
         # Create files
         (temp_dir / "src").mkdir()
-        (temp_dir / "src" / "main.py").write_text('KEY = "sk-secret123456789012345678"')
+        (temp_dir / "src" / "main.py").write_text(
+            'KEY = "sk-secret123456789012345678"', encoding="utf-8"
+        )
 
         # Create .secretsignore
-        (temp_dir / ".secretsignore").write_text("src/\n")
+        (temp_dir / ".secretsignore").write_text("src/\n", encoding="utf-8")
 
         matches = scan_files(["src/main.py"], temp_dir)
 
@@ -312,7 +317,7 @@ import os
 # API Key
 API_KEY = "sk-1234567890abcdefghijklmnop"
 """
-        (temp_dir / "config.py").write_text(content)
+        (temp_dir / "config.py").write_text(content, encoding="utf-8")
 
         matches = scan_files(["config.py"], temp_dir)
 
@@ -367,7 +372,7 @@ API_KEY = "sk-1234567890abcdefghijklmnop"
 AWS_KEY = "AKIAIOSFODNN7EXAMPLE"
 STRIPE = "sk_test_abcdefghijklmnopqrstuvwxyz"
 """
-        (temp_dir / "secrets.py").write_text(content)
+        (temp_dir / "secrets.py").write_text(content, encoding="utf-8")
 
         matches = scan_files(["secrets.py"], temp_dir)
 
@@ -381,7 +386,7 @@ API_KEY=your-api-key-here
 DATABASE_URL=postgresql://localhost/mydb
 SECRET=changeme
 """
-        (temp_dir / ".env.example").write_text(content)
+        (temp_dir / ".env.example").write_text(content, encoding="utf-8")
 
         # .example files should be skipped by default
         matches = scan_files([".env.example"], temp_dir)

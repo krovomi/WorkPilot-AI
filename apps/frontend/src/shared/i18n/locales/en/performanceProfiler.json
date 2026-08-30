@@ -1,0 +1,48 @@
+{
+	"title": "Performance Profiler",
+	"subtitle": "Identify bottlenecks and auto-generate optimizations",
+	"actions": {
+		"analyze": "Analyze Performance",
+		"reanalyze": "Re-analyze",
+		"cancel": "Cancel"
+	},
+	"phases": {
+		"idle": "Ready",
+		"profiling": "Profiling codebase…",
+		"analyzing": "Running benchmarks…",
+		"optimizing": "Generating optimizations…",
+		"complete": "Complete",
+		"error": "Error"
+	},
+	"options": {
+		"heading": "Options",
+		"autoImplement": "Auto-implement",
+		"autoImplementHint": "Apply safe fixes automatically"
+	},
+	"summary": {
+		"heading": "Summary",
+		"bottlenecks": "Bottlenecks found",
+		"critical": "Critical",
+		"highPriority": "High priority",
+		"optimizations": "Optimizations"
+	},
+	"results": {
+		"autoImplemented": "Auto-implementation complete",
+		"benchmarks": "Benchmarks",
+		"notAvailable": "N/A",
+		"bottlenecks": "Bottlenecks ({{count}})",
+		"noBottlenecks": "No bottlenecks detected 🎉",
+		"optimizations": "Optimizations ({{count}})",
+		"viewImplementation": "View implementation"
+	},
+	"effort": {
+		"trivial": "Trivial",
+		"low": "Low effort",
+		"medium": "Medium effort",
+		"high": "High effort"
+	},
+	"empty": {
+		"title": "Performance Profiler",
+		"body": "Analyze your codebase for performance bottlenecks — algorithm complexity, memory leaks, slow queries, React render issues, and more."
+	}
+}

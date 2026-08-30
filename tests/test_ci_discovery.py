@@ -76,7 +76,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: npm test
 """
-        (workflows / "ci.yml").write_text(workflow_content)
+        (workflows / "ci.yml").write_text(workflow_content, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -102,7 +102,7 @@ jobs:
       - run: npm test
       - run: pytest tests/
 """
-        (workflows / "test.yml").write_text(workflow_content)
+        (workflows / "test.yml").write_text(workflow_content, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -123,7 +123,7 @@ jobs:
     steps:
       - run: pytest tests/
 """
-        (workflows / "test.yml").write_text(workflow_content)
+        (workflows / "test.yml").write_text(workflow_content, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -148,7 +148,7 @@ jobs:
     steps:
       - run: echo test
 """
-        (workflows / "ci.yml").write_text(workflow_content)
+        (workflows / "ci.yml").write_text(workflow_content, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -163,7 +163,8 @@ jobs:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
 
-        (workflows / "ci.yml").write_text("""
+        (workflows / "ci.yml").write_text(
+            """
 name: CI
 on: push
 jobs:
@@ -171,9 +172,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: npm build
-""")
+""",
+            encoding="utf-8",
+        )
 
-        (workflows / "test.yml").write_text("""
+        (workflows / "test.yml").write_text(
+            """
 name: Test
 on: pull_request
 jobs:
@@ -181,7 +185,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: npm test
-""")
+""",
+            encoding="utf-8",
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -209,7 +215,7 @@ test:
   script:
     - npm test
 """
-        (temp_dir / ".gitlab-ci.yml").write_text(gitlab_ci)
+        (temp_dir / ".gitlab-ci.yml").write_text(gitlab_ci, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -228,7 +234,7 @@ integration:
   script:
     - pytest tests/integration/
 """
-        (temp_dir / ".gitlab-ci.yml").write_text(gitlab_ci)
+        (temp_dir / ".gitlab-ci.yml").write_text(gitlab_ci, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -245,7 +251,7 @@ test:
   script:
     - npm test
 """
-        (temp_dir / ".gitlab-ci.yml").write_text(gitlab_ci)
+        (temp_dir / ".gitlab-ci.yml").write_text(gitlab_ci, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -276,7 +282,7 @@ jobs:
       - checkout
       - run: npm test
 """
-        (circleci_dir / "config.yml").write_text(config)
+        (circleci_dir / "config.yml").write_text(config, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -300,7 +306,7 @@ jobs:
           name: Run tests
           command: pytest tests/ --cov
 """
-        (circleci_dir / "config.yml").write_text(config)
+        (circleci_dir / "config.yml").write_text(config, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -330,7 +336,7 @@ pipeline {
     }
 }
 """
-        (temp_dir / "Jenkinsfile").write_text(jenkinsfile)
+        (temp_dir / "Jenkinsfile").write_text(jenkinsfile, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -351,7 +357,7 @@ pipeline {
     }
 }
 """
-        (temp_dir / "Jenkinsfile").write_text(jenkinsfile)
+        (temp_dir / "Jenkinsfile").write_text(jenkinsfile, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -377,7 +383,7 @@ pipeline {
     }
 }
 """
-        (temp_dir / "Jenkinsfile").write_text(jenkinsfile)
+        (temp_dir / "Jenkinsfile").write_text(jenkinsfile, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -399,7 +405,8 @@ class TestCommandExtraction:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
 
-        (workflows / "test.yml").write_text("""
+        (workflows / "test.yml").write_text(
+            """
 name: Test
 on: push
 jobs:
@@ -407,7 +414,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: pytest tests/ -v
-""")
+""",
+            encoding="utf-8",
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -419,7 +428,8 @@ jobs:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
 
-        (workflows / "test.yml").write_text("""
+        (workflows / "test.yml").write_text(
+            """
 name: Test
 on: push
 jobs:
@@ -427,7 +437,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: pytest tests/ --cov=src
-""")
+""",
+            encoding="utf-8",
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -440,7 +452,8 @@ jobs:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
 
-        (workflows / "ci.yml").write_text("""
+        (workflows / "ci.yml").write_text(
+            """
 name: CI
 on: push
 jobs:
@@ -448,7 +461,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: npm test
-""")
+""",
+            encoding="utf-8",
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -460,7 +475,8 @@ jobs:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
 
-        (workflows / "e2e.yml").write_text("""
+        (workflows / "e2e.yml").write_text(
+            """
 name: E2E
 on: push
 jobs:
@@ -468,7 +484,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: npx playwright test
-""")
+""",
+            encoding="utf-8",
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -480,7 +498,8 @@ jobs:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
 
-        (workflows / "test.yml").write_text("""
+        (workflows / "test.yml").write_text(
+            """
 name: Test
 on: push
 jobs:
@@ -488,7 +507,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: pytest tests/integration/
-""")
+""",
+            encoding="utf-8",
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -508,7 +529,8 @@ class TestSerialization:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
 
-        (workflows / "ci.yml").write_text("""
+        (workflows / "ci.yml").write_text(
+            """
 name: CI
 on: push
 jobs:
@@ -516,7 +538,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: npm test
-""")
+""",
+            encoding="utf-8",
+        )
 
         result = discovery.discover(temp_dir)
         result_dict = discovery.to_dict(result)
@@ -532,7 +556,8 @@ jobs:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
 
-        (workflows / "ci.yml").write_text("""
+        (workflows / "ci.yml").write_text(
+            """
 name: CI
 on: push
 jobs:
@@ -540,7 +565,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: npm test
-""")
+""",
+            encoding="utf-8",
+        )
 
         result = discovery.discover(temp_dir)
         result_dict = discovery.to_dict(result)
@@ -563,7 +590,8 @@ class TestConvenienceFunctions:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
         (workflows / "ci.yml").write_text(
-            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n"
+            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n",
+            encoding="utf-8",
         )
 
         result = discover_ci(temp_dir)
@@ -582,7 +610,8 @@ class TestConvenienceFunctions:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
         (workflows / "ci.yml").write_text(
-            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pytest tests/\n"
+            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pytest tests/\n",
+            encoding="utf-8",
         )
 
         commands = get_ci_test_commands(temp_dir)
@@ -594,7 +623,8 @@ class TestConvenienceFunctions:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
         (workflows / "ci.yml").write_text(
-            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n"
+            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n",
+            encoding="utf-8",
         )
 
         system = get_ci_system(temp_dir)
@@ -620,7 +650,9 @@ class TestEdgeCases:
         """Test handling of invalid YAML."""
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
-        (workflows / "bad.yml").write_text("invalid: yaml: content: [")
+        (workflows / "bad.yml").write_text(
+            "invalid: yaml: content: [", encoding="utf-8"
+        )
 
         # Should not raise
         result = discovery.discover(temp_dir)
@@ -630,7 +662,7 @@ class TestEdgeCases:
         """Test handling of empty workflow file."""
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
-        (workflows / "empty.yml").write_text("")
+        (workflows / "empty.yml").write_text("", encoding="utf-8")
 
         # Should not raise
         result = discovery.discover(temp_dir)
@@ -650,10 +682,13 @@ class TestEdgeCases:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
         (workflows / "ci.yml").write_text(
-            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n"
+            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n",
+            encoding="utf-8",
         )
 
-        (temp_dir / ".gitlab-ci.yml").write_text("test:\n  script:\n    - npm test\n")
+        (temp_dir / ".gitlab-ci.yml").write_text(
+            "test:\n  script:\n    - npm test\n", encoding="utf-8"
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -665,7 +700,8 @@ class TestEdgeCases:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
         (workflows / "ci.yml").write_text(
-            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n"
+            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n",
+            encoding="utf-8",
         )
 
         result1 = discovery.discover(temp_dir)
@@ -678,7 +714,8 @@ class TestEdgeCases:
         workflows = temp_dir / ".github" / "workflows"
         workflows.mkdir(parents=True)
         (workflows / "ci.yml").write_text(
-            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n"
+            "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n",
+            encoding="utf-8",
         )
 
         result1 = discovery.discover(temp_dir)

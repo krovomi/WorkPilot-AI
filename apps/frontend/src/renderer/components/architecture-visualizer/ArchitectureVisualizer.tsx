@@ -1,5 +1,5 @@
 import type React from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import {
 	cancelArchitectureVisualization,
 	DIAGRAM_TYPES,
@@ -9,13 +9,6 @@ import {
 } from "../../stores/architecture-visualizer-store";
 import { useProjectStore } from "../../stores/project-store";
 
-const DIAGRAM_LABELS: Record<DiagramType, string> = {
-	module_dependencies: "Module Dependencies",
-	component_hierarchy: "Component Hierarchy",
-	data_flow: "Data Flow",
-	database_schema: "Database Schema",
-};
-
 const DIAGRAM_ICONS: Record<DiagramType, string> = {
 	module_dependencies: "🔗",
 	component_hierarchy: "🌳",
@@ -24,8 +17,7 @@ const DIAGRAM_ICONS: Record<DiagramType, string> = {
 };
 
 export function ArchitectureVisualizer(): React.ReactElement {
-	// biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
-	const { t } = useTranslation(["common"]);
+	const { t } = useTranslation(["architectureVisualizer"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const {
 		phase,
@@ -47,6 +39,9 @@ export function ArchitectureVisualizer(): React.ReactElement {
 		generateArchitectureDiagrams(activeProject.path);
 	}
 
+	const diagramLabel = (type: DiagramType) =>
+		t(`architectureVisualizer:diagramTypes.${type}`);
+
 	const selectedDiagram =
 		result && selectedDiagramView ? result.diagrams[selectedDiagramView] : null;
 
@@ -55,9 +50,11 @@ export function ArchitectureVisualizer(): React.ReactElement {
 			{/* Header */}
 			<div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)]">
 				<div>
-					<h1 className="text-xl font-semibold">Architecture Visualizer</h1>
+					<h1 className="text-xl font-semibold">
+						{t("architectureVisualizer:title")}
+					</h1>
 					<p className="text-sm text-[var(--text-secondary)] mt-0.5">
-						Generate interactive architecture diagrams from your codebase
+						{t("architectureVisualizer:subtitle")}
 					</p>
 				</div>
 				<div className="flex gap-2">
@@ -67,7 +64,7 @@ export function ArchitectureVisualizer(): React.ReactElement {
 							onClick={cancelArchitectureVisualization}
 							className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
 						>
-							Cancel
+							{t("architectureVisualizer:actions.cancel")}
 						</button>
 					) : (
 						<button
@@ -76,7 +73,9 @@ export function ArchitectureVisualizer(): React.ReactElement {
 							disabled={!activeProject || selectedDiagramTypes.length === 0}
 							className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity text-sm font-medium"
 						>
-							{isComplete ? "Regenerate" : "Generate Diagrams"}
+							{isComplete
+								? t("architectureVisualizer:actions.regenerate")
+								: t("architectureVisualizer:actions.generate")}
 						</button>
 					)}
 				</div>
@@ -88,7 +87,7 @@ export function ArchitectureVisualizer(): React.ReactElement {
 					{/* Diagram type selection */}
 					<div>
 						<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-							Diagram Types
+							{t("architectureVisualizer:diagramTypes.heading")}
 						</h3>
 						<div className="flex flex-col gap-1">
 							{DIAGRAM_TYPES.map((type) => (
@@ -104,7 +103,7 @@ export function ArchitectureVisualizer(): React.ReactElement {
 										className="rounded accent-[var(--accent)]"
 									/>
 									<span className="text-sm">
-										{DIAGRAM_ICONS[type]} {DIAGRAM_LABELS[type]}
+										{DIAGRAM_ICONS[type]} {diagramLabel(type)}
 									</span>
 								</label>
 							))}
@@ -115,7 +114,7 @@ export function ArchitectureVisualizer(): React.ReactElement {
 					{isComplete && result && (
 						<div>
 							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-								View Diagram
+								{t("architectureVisualizer:view.heading")}
 							</h3>
 							<div className="flex flex-col gap-1">
 								{result.diagram_types_analyzed.map((type) => (
@@ -130,7 +129,7 @@ export function ArchitectureVisualizer(): React.ReactElement {
 										}`}
 									>
 										{DIAGRAM_ICONS[type as DiagramType]}{" "}
-										{DIAGRAM_LABELS[type as DiagramType]}
+										{diagramLabel(type as DiagramType)}
 									</button>
 								))}
 							</div>
@@ -141,12 +140,24 @@ export function ArchitectureVisualizer(): React.ReactElement {
 					{isComplete && result?.summary && (
 						<div className="mt-auto">
 							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-								Summary
+								{t("architectureVisualizer:summary.heading")}
 							</h3>
 							<div className="flex flex-col gap-1 text-xs text-[var(--text-secondary)]">
-								<div>{result.summary.total_diagrams} diagrams</div>
-								<div>{result.summary.total_nodes} nodes</div>
-								<div>{result.summary.total_edges} edges</div>
+								<div>
+									{t("architectureVisualizer:summary.diagrams", {
+										count: result.summary.total_diagrams,
+									})}
+								</div>
+								<div>
+									{t("architectureVisualizer:summary.nodes", {
+										count: result.summary.total_nodes,
+									})}
+								</div>
+								<div>
+									{t("architectureVisualizer:summary.edges", {
+										count: result.summary.total_edges,
+									})}
+								</div>
 							</div>
 						</div>
 					)}
@@ -199,8 +210,10 @@ export function ArchitectureVisualizer(): React.ReactElement {
 								</span>
 								<h2 className="text-lg font-medium">{selectedDiagram.title}</h2>
 								<span className="text-xs text-[var(--text-secondary)] ml-2">
-									{selectedDiagram.nodes?.length ?? 0} nodes •{" "}
-									{selectedDiagram.edges?.length ?? 0} edges
+									{t("architectureVisualizer:diagram.counts", {
+										nodes: selectedDiagram.nodes?.length ?? 0,
+										edges: selectedDiagram.edges?.length ?? 0,
+									})}
 								</span>
 							</div>
 							<div className="bg-[var(--bg-secondary)] rounded-lg p-4 overflow-auto">
@@ -209,16 +222,19 @@ export function ArchitectureVisualizer(): React.ReactElement {
 								</pre>
 							</div>
 							<p className="text-xs text-[var(--text-secondary)] mt-2">
-								Copy the Mermaid code above and paste it into{" "}
-								<a
-									href="https://mermaid.live"
-									target="_blank"
-									rel="noreferrer"
-									className="text-[var(--accent)] hover:underline"
-								>
-									mermaid.live
-								</a>{" "}
-								to view the interactive diagram.
+								<Trans
+									i18nKey="architectureVisualizer:diagram.copyHint"
+									components={[
+										// biome-ignore lint/a11y/useAnchorContent: Trans fills the content
+										<a
+											key="mermaid-live"
+											href="https://mermaid.live"
+											target="_blank"
+											rel="noreferrer"
+											className="text-[var(--accent)] hover:underline"
+										/>,
+									]}
+								/>
 							</p>
 						</div>
 					)}
@@ -238,12 +254,10 @@ export function ArchitectureVisualizer(): React.ReactElement {
 							<div>
 								<div className="text-5xl mb-4">🏗️</div>
 								<h3 className="text-lg font-medium mb-2">
-									Architecture Visualizer
+									{t("architectureVisualizer:empty.title")}
 								</h3>
 								<p className="text-sm text-[var(--text-secondary)] max-w-sm">
-									Select diagram types and click "Generate Diagrams" to
-									automatically analyze your codebase and generate architecture
-									diagrams.
+									{t("architectureVisualizer:empty.body")}
 								</p>
 							</div>
 						</div>

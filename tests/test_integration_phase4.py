@@ -278,27 +278,34 @@ class TestImportDetection:
         src_dir.mkdir()
 
         # Create utils.ts file
-        (src_dir / "utils.ts").write_text("export const helper = () => {};")
+        (src_dir / "utils.ts").write_text(
+            "export const helper = () => {};", encoding="utf-8"
+        )
 
         # Create config.ts file
-        (src_dir / "config.ts").write_text("export const config = { debug: true };")
+        (src_dir / "config.ts").write_text(
+            "export const config = { debug: true };", encoding="utf-8"
+        )
 
         # Create index.ts that re-exports
         (src_dir / "index.ts").write_text(
-            "export * from './utils';\nexport { config } from './config';"
+            "export * from './utils';\nexport { config } from './config';",
+            encoding="utf-8",
         )
 
         # Create shared directory
         shared_dir = src_dir / "shared"
         shared_dir.mkdir()
-        (shared_dir / "types.ts").write_text("export type User = { id: string };")
+        (shared_dir / "types.ts").write_text(
+            "export type User = { id: string };", encoding="utf-8"
+        )
 
         # Create Python module
         (src_dir / "python_module.py").write_text(
-            "from .helpers import util_func\nimport os"
+            "from .helpers import util_func\nimport os", encoding="utf-8"
         )
-        (src_dir / "helpers.py").write_text("def util_func(): pass")
-        (src_dir / "__init__.py").write_text("")
+        (src_dir / "helpers.py").write_text("def util_func(): pass", encoding="utf-8")
+        (src_dir / "__init__.py").write_text("", encoding="utf-8")
 
         return tmp_path
 
@@ -312,11 +319,13 @@ class TestImportDetection:
                 "paths": {"@/*": ["src/*"], "@shared/*": ["src/shared/*"]}
             }
         }
-        (temp_project / "tsconfig.json").write_text(json.dumps(tsconfig))
+        (temp_project / "tsconfig.json").write_text(
+            json.dumps(tsconfig), encoding="utf-8"
+        )
 
         # Create the target file that the alias points to
         (temp_project / "src" / "utils.ts").write_text(
-            "export const helper = () => {};"
+            "export const helper = () => {};", encoding="utf-8"
         )
 
         # Test file with alias import
@@ -380,8 +389,10 @@ class TestImportDetection:
         """Python absolute imports should be checked for project-internal modules."""
         # Create a project-internal module
         (temp_project / "myapp").mkdir()
-        (temp_project / "myapp" / "__init__.py").write_text("")
-        (temp_project / "myapp" / "config.py").write_text("DEBUG = True")
+        (temp_project / "myapp" / "__init__.py").write_text("", encoding="utf-8")
+        (temp_project / "myapp" / "config.py").write_text(
+            "DEBUG = True", encoding="utf-8"
+        )
 
         test_content = "from myapp import config"
         source_path = Path("src/test.py")
@@ -417,15 +428,17 @@ class TestReverseDepDetection:
 
         # Create a utility file with non-generic name
         (src_dir / "formatter.ts").write_text(
-            "export function format(s: string) { return s; }"
+            "export function format(s: string) { return s; }", encoding="utf-8"
         )
 
         # Create files that import formatter
         (src_dir / "auth.ts").write_text(
-            "import { format } from './formatter';\nexport const login = () => {};"
+            "import { format } from './formatter';\nexport const login = () => {};",
+            encoding="utf-8",
         )
         (src_dir / "api.ts").write_text(
-            "import { format } from './formatter';\nexport const fetch = () => {};"
+            "import { format } from './formatter';\nexport const fetch = () => {};",
+            encoding="utf-8",
         )
 
         return tmp_path
@@ -452,8 +465,10 @@ class TestReverseDepDetection:
         src_dir = tmp_path / "src"
         src_dir.mkdir()
 
-        (src_dir / "index.ts").write_text("export * from './utils';")
-        (src_dir / "main.ts").write_text("import { x } from './index';")
+        (src_dir / "index.ts").write_text("export * from './utils';", encoding="utf-8")
+        (src_dir / "main.ts").write_text(
+            "import { x } from './index';", encoding="utf-8"
+        )
 
         gatherer = PRContextGathererIsolated(tmp_path, pr_number=1)
         dependents = gatherer._find_dependents("src/index.ts")
@@ -465,7 +480,7 @@ class TestReverseDepDetection:
         """Verify _find_dependents() returns correct type (set)."""
         src_dir = tmp_path / "src"
         src_dir.mkdir()
-        (src_dir / "file.ts").write_text("export const x = 1;")
+        (src_dir / "file.ts").write_text("export const x = 1;", encoding="utf-8")
 
         gatherer = PRContextGathererIsolated(tmp_path, pr_number=1)
         dependents = gatherer._find_dependents("src/file.ts")

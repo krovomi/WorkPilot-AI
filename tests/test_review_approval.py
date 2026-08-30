@@ -124,7 +124,7 @@ class TestReviewStateApproval:
         assert state.review_count == 1
 
         # Modify spec to invalidate
-        (review_spec_dir / "spec.md").write_text("Changed content")
+        (review_spec_dir / "spec.md").write_text("Changed content", encoding="utf-8")
         state.invalidate(review_spec_dir)
 
         # Second review - reject

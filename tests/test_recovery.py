@@ -68,7 +68,7 @@ def test_initialization(test_env):
     )
 
     # Verify initial structure
-    with open(spec_dir / "memory" / "attempt_history.json") as f:
+    with open(spec_dir / "memory" / "attempt_history.json", encoding="utf-8") as f:
         history = json.load(f)
         assert "subtasks" in history, "subtasks key missing"
         assert "stuck_subtasks" in history, "stuck_subtasks key missing"
@@ -224,7 +224,7 @@ def test_good_commit_tracking(test_env):
 
     # Record another commit
     test_file = project_dir / "test2.txt"
-    test_file.write_text("Second content")
+    test_file.write_text("Second content", encoding="utf-8")
     subprocess.run(["git", "add", "."], cwd=project_dir, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Second commit"], cwd=project_dir, capture_output=True
@@ -498,7 +498,7 @@ def test_restoration_with_build_commits(test_env):
 
     for i in range(3):
         test_file = project_dir / f"test_file_{i}.txt"
-        test_file.write_text(f"Content {i}")
+        test_file.write_text(f"Content {i}", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=project_dir, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", f"Commit {i}"], cwd=project_dir, capture_output=True

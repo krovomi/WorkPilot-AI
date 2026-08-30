@@ -54,7 +54,7 @@ class TestDesignTokenExtractor:
 }"""
         css_file = tmp_path / "styles" / "variables.css"
         css_file.parent.mkdir(parents=True, exist_ok=True)
-        css_file.write_text(css_content)
+        css_file.write_text(css_content, encoding="utf-8")
 
         extractor = DesignTokenExtractor(tmp_path)
         tokens = extractor.extract()
@@ -74,7 +74,7 @@ class TestDesignTokenExtractor:
             },
         }
         tokens_file = tmp_path / "design-tokens.json"
-        tokens_file.write_text(json.dumps(tokens_data))
+        tokens_file.write_text(json.dumps(tokens_data), encoding="utf-8")
 
         extractor = DesignTokenExtractor(tmp_path)
         tokens = extractor.extract()
@@ -86,7 +86,7 @@ class TestDesignTokenExtractor:
         custom_dir = tmp_path / "my-design-system"
         custom_dir.mkdir()
         css_file = custom_dir / "variables.css"
-        css_file.write_text(":root { --brand-color: #ff0000; }")
+        css_file.write_text(":root { --brand-color: #ff0000; }", encoding="utf-8")
 
         extractor = DesignTokenExtractor(tmp_path)
         tokens = extractor.extract(design_system_path="my-design-system")
@@ -300,7 +300,9 @@ class TestDesignToCodeService:
         # Create a CSS tokens file
         css_file = tmp_path / "styles" / "tokens.css"
         css_file.parent.mkdir(parents=True, exist_ok=True)
-        css_file.write_text(":root { --primary: #3b82f6; --bg: #ffffff; }")
+        css_file.write_text(
+            ":root { --primary: #3b82f6; --bg: #ffffff; }", encoding="utf-8"
+        )
 
         with patch.dict("os.environ", {}, clear=True):
             import os

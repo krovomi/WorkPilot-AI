@@ -52,7 +52,9 @@ class TestQualityScorer:
         """Test détection d'erreur de syntaxe Python."""
         # Créer un fichier Python avec erreur de syntaxe
         bad_file = temp_project / "bad.py"
-        bad_file.write_text("def broken(\n  print('missing closing paren')")
+        bad_file.write_text(
+            "def broken(\n  print('missing closing paren')", encoding="utf-8"
+        )
 
         score = scorer.score_pr("", ["bad.py"], "")
 
@@ -69,7 +71,7 @@ except:
     pass
 """
         test_file = temp_project / "test.py"
-        test_file.write_text(code)
+        test_file.write_text(code, encoding="utf-8")
 
         scorer._analyze_file("test.py")
 
@@ -95,7 +97,7 @@ def complex_function(x):
     return 0
 """
         test_file = temp_project / "complex.py"
-        test_file.write_text(code)
+        test_file.write_text(code, encoding="utf-8")
 
         scorer._analyze_file("complex.py")
 
@@ -112,7 +114,7 @@ password = "hardcoded_secret"
 eval(user_input)
 """
         test_file = temp_project / "insecure.py"
-        test_file.write_text(code)
+        test_file.write_text(code, encoding="utf-8")
 
         scorer._analyze_file("insecure.py")
 

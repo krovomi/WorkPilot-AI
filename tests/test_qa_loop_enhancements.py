@@ -81,7 +81,7 @@ def spec_with_plan(spec_dir):
         },
     }
     plan_file = spec_dir / "implementation_plan.json"
-    with open(plan_file, "w") as f:
+    with open(plan_file, "w", encoding="utf-8") as f:
         json.dump(plan, f)
     return spec_dir
 
@@ -360,7 +360,7 @@ class TestCheckTestDiscovery:
             "test_directories": ["tests/"],
         }
         discovery_file = spec_dir / "test_discovery.json"
-        with open(discovery_file, "w") as f:
+        with open(discovery_file, "w", encoding="utf-8") as f:
             json.dump(discovery, f)
 
         result = check_test_discovery(spec_dir)
@@ -371,7 +371,7 @@ class TestCheckTestDiscovery:
     def test_invalid_json(self, spec_dir):
         """Test handling of invalid JSON."""
         discovery_file = spec_dir / "test_discovery.json"
-        discovery_file.write_text("invalid json{")
+        discovery_file.write_text("invalid json{", encoding="utf-8")
 
         result = check_test_discovery(spec_dir)
         assert result is None
@@ -387,14 +387,16 @@ class TestIsNoTestProject:
 
     def test_project_with_pytest_ini(self, spec_dir, project_dir):
         """Test detection of pytest.ini."""
-        (project_dir / "pytest.ini").write_text("[pytest]")
+        (project_dir / "pytest.ini").write_text("[pytest]", encoding="utf-8")
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
 
     def test_project_with_jest_config(self, spec_dir, project_dir):
         """Test detection of Jest config."""
-        (project_dir / "jest.config.js").write_text("module.exports = {}")
+        (project_dir / "jest.config.js").write_text(
+            "module.exports = {}", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -403,7 +405,9 @@ class TestIsNoTestProject:
         """Test detection of test directory."""
         tests_dir = project_dir / "tests"
         tests_dir.mkdir()
-        (tests_dir / "test_app.py").write_text("def test_example(): pass")
+        (tests_dir / "test_app.py").write_text(
+            "def test_example(): pass", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -412,7 +416,9 @@ class TestIsNoTestProject:
         """Test detection of spec files."""
         tests_dir = project_dir / "__tests__"
         tests_dir.mkdir()
-        (tests_dir / "app.spec.js").write_text("describe('app', () => {})")
+        (tests_dir / "app.spec.js").write_text(
+            "describe('app', () => {})", encoding="utf-8"
+        )
 
         result = is_no_test_project(spec_dir, project_dir)
         assert result is False
@@ -423,7 +429,7 @@ class TestIsNoTestProject:
         # But discovery.json says there are frameworks
         discovery = {"frameworks": [{"name": "pytest"}]}
         discovery_file = spec_dir / "test_discovery.json"
-        with open(discovery_file, "w") as f:
+        with open(discovery_file, "w", encoding="utf-8") as f:
             json.dump(discovery, f)
 
         result = is_no_test_project(spec_dir, project_dir)
@@ -433,7 +439,7 @@ class TestIsNoTestProject:
         """Test that empty discovery means no tests."""
         discovery = {"frameworks": []}
         discovery_file = spec_dir / "test_discovery.json"
-        with open(discovery_file, "w") as f:
+        with open(discovery_file, "w", encoding="utf-8") as f:
             json.dump(discovery, f)
 
         result = is_no_test_project(spec_dir, project_dir)
@@ -454,21 +460,21 @@ class TestCreateManualTestPlan:
         """Test that plan contains spec name."""
         result = create_manual_test_plan(spec_dir, "my-feature")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "my-feature" in content
 
     def test_contains_checklist(self, spec_dir):
         """Test that plan contains checklist items."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "[ ]" in content  # Checkbox items
 
     def test_contains_sections(self, spec_dir):
         """Test that plan contains required sections."""
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "## Overview" in content
         assert "## Functional Tests" in content
         assert "## Non-Functional Tests" in content
@@ -490,11 +496,11 @@ A test feature.
 ## Implementation
 Details here.
 """
-        (spec_dir / "spec.md").write_text(spec_content)
+        (spec_dir / "spec.md").write_text(spec_content, encoding="utf-8")
 
         result = create_manual_test_plan(spec_dir, "test")
 
-        content = result.read_text()
+        content = result.read_text(encoding="utf-8")
         assert "Feature does X" in content
         assert "Feature handles Y" in content
         assert "Feature reports Z" in content

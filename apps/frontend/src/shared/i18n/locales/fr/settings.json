@@ -324,10 +324,7 @@
 			"description": "Choisir votre langue préférée",
 			"title": "Langue"
 		},
-		"llm-router": {
-			"description": "Routage intelligent des fournisseurs et tests A/B",
-			"title": "Routeur LLM"
-		},
+		"llm-router": {},
 		"notifications": {
 			"description": "Préférences d'alertes",
 			"title": "Notifications"
@@ -388,10 +385,7 @@
 				"description": "Ces commandes sont toujours bloquées à l'intérieur du bac à sable."
 			}
 		},
-		"scheduler": {
-			"description": "Planification de tâches de type cron et chaînes",
-			"title": "Planificateur"
-		},
+		"scheduler": {},
 		"terminal-fonts": {
 			"description": "Personnaliser l'apparence des polices du terminal",
 			"title": "Polices de terminal"
@@ -1032,8 +1026,8 @@
 		"filterStateLabel": "État",
 		"filterTypeAll": "Tous les types",
 		"filterTypeLabel": "Type d'élément de travail",
-		"importButton": "Importer les éléments depuis Azure DevOps",
-		"importButton_plural": "Importer {{count}} éléments",
+		"importButton_one": "Importer les éléments depuis Azure DevOps",
+		"importButton_other": "Importer {{count}} éléments",
 		"importConfirmButton": "Importer {{count}} élément(s)",
 		"importConfirmDescription": "Les éléments suivants seront importés dans la colonne {{column}}.",
 		"importConfirmTitle": "Importer {{count}} élément(s) de travail",
@@ -1050,8 +1044,8 @@
 		"selectionCount": "{{selected}} sur {{total}} sélectionné(s)",
 		"sidePanelDescription": "Glissez-déposez les éléments dans les colonnes Kanban",
 		"sidePanelTitle": "Importer depuis Azure DevOps",
-		"successCount": "{{count}} élément de travail importé.",
-		"successCount_plural": "{{count}} éléments de travail importés.",
+		"successCount_one": "{{count}} élément de travail importé.",
+		"successCount_other": "{{count}} éléments de travail importés.",
 		"successFailedSuffix": "{{count}} échoué(s).",
 		"successTitle": "Import réussi !",
 		"title": "Importer les éléments Azure DevOps",
@@ -1343,12 +1337,7 @@
 			"tokenSaveFailed": "Échec de l'enregistrement du jeton",
 			"tokenSaved": "Jeton enregistré",
 			"tokenSavedDescription": "Votre jeton a été enregistré avec succès.",
-			"tryAgain": "Veuillez réessayer.",
-			"permissionDenied": "Permission refusée",
-			"checkFilePermissions": "Veuillez vérifier vos permissions de fichier et réessayer.",
-			"pathNotFound": "Chemin introuvable",
-			"checkPath": "Veuillez vérifier que le chemin existe et réessayer.",
-			"authFailed": "Échec de l'authentification"
+			"tryAgain": "Veuillez réessayer."
 		},
 		"tokenPlaceholder": "sk-ant-oat01-...",
 		"weeklyThreshold": "Seuil d'utilisation hebdomadaire",
@@ -1508,8 +1497,6 @@
 		"filterStateLabel": "État",
 		"filterTypeAll": "Tous les types",
 		"filterTypeLabel": "Type de ticket",
-		"importButton": "Importer les tickets depuis Jira",
-		"importButton_plural": "Importer {{count}} éléments",
 		"importConfirmButton": "Importer {{count}} élément(s)",
 		"importConfirmDescription": "Les éléments suivants seront importés dans la colonne {{column}}.",
 		"importConfirmTitle": "Importer {{count}} ticket(s)",
@@ -1525,8 +1512,6 @@
 		"selectionCount": "{{selected}} sur {{total}} sélectionné(s)",
 		"sidePanelDescription": "Glissez-déposez les éléments dans les colonnes Kanban",
 		"sidePanelTitle": "Importer depuis Jira",
-		"successCount": "{{count}} ticket importé.",
-		"successCount_plural": "{{count}} tickets importés.",
 		"successFailedSuffix": "{{count}} échoué(s).",
 		"successTitle": "Import réussi !",
 		"title": "Importer les tickets Jira",
@@ -1710,10 +1695,8 @@
 		"title": "Notifications"
 	},
 	"projectSections": {
-		"activeProvider": "Fournisseur actif : {{provider}}",
 		"agentConfiguration": {
 			"title": "Configuration de l'agent",
-			"description": "Configurer le modèle et les paramètres de l'agent",
 			"model": "Modèle Claude",
 			"modelGeneric": "Modèle",
 			"summary": "Profil : {{profile}} · Modèle phare : {{model}}",
@@ -1721,7 +1704,6 @@
 		},
 		"autoBuild": {
 			"title": "Intégration Auto-Build",
-			"description": "Configurer l'intégration de build automatique",
 			"initialized": "Initialisé",
 			"notInitialized": "Non initialisé",
 			"notInitializedDescription": "Initialisez Auto-Build pour activer la création de tâches et les workflows d'agents.",
@@ -1741,7 +1723,6 @@
 			"title": "Auth Claude"
 		},
 		"customModelPlaceholder": "Saisir le nom du modèle (ex : llama3.3:latest)",
-		"customized": "Personnalisé",
 		"flagshipModel": "Modèle flagship : {{model}}",
 		"general": {
 			"title": "Général",
@@ -1812,10 +1793,7 @@
 			"syncDescription": "Synchroniser avec les issues GitLab",
 			"title": "GitLab"
 		},
-		"jira": {
-			"description": "Intégration Jira",
-			"title": "Jira"
-		},
+		"jira": {},
 		"linear": {
 			"apiKey": "YOUR_LINEAR_API_KEY",
 			"checking": "Vérification...",
@@ -1851,7 +1829,6 @@
 			"databasePath": "Chemin de la base de données (Optionnel)",
 			"databasePathDescription": "Emplacement de stockage personnalisé. Par défaut : ~/.workpilot/memories/"
 		},
-		"phaseConfigNote": "Ces paramètres seront utilisés par défaut lors de la création de nouvelles tâches avec ce profil. Vous pouvez les remplacer par tâche dans l'assistant de création de tâche.",
 		"phaseConfigNoteProvider": "Ces paramètres de modèle s'appliquent au fournisseur {{provider}}. Ils sont enregistrés indépendamment et restaurés lorsque vous revenez à ce fournisseur.",
 		"phases": {
 			"coding": {
@@ -1871,7 +1848,6 @@
 				"label": "Création de spec"
 			}
 		},
-		"profilesInfoProvider": "Configurez le modèle utilisé pour chaque phase du pipeline. Les paramètres sont enregistrés par fournisseur et restaurés lorsque vous y revenez.",
 		"resetToProviderDefaults": "Réinitialiser aux valeurs par défaut du fournisseur",
 		"supportsThinking": "Raisonnement",
 		"tierFlagship": "Flagship"

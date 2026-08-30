@@ -273,6 +273,7 @@ async def run_qa_agent_session(
             prompt += "\n\n" + learning_context
             debug_success("qa_reviewer", "Learning loop patterns injected for QA")
     except Exception:
+        # L'injection de patterns est un bonus : sans elle le prompt reste valide.
         pass
 
     # Add session context
@@ -431,6 +432,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                                 cost_usd=msg.total_cost_usd or 0.0,
                             )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
                 continue
 
@@ -454,6 +456,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                             try:
                                 _rr.record_response(_rs_id, block.text)
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
                     elif block_type == "ToolUseBlock" and hasattr(block, "name"):
                         tool_name = block.name
@@ -525,6 +528,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                                         _rs_id, tool_name, tool_input_dict=inp or {}
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
             elif msg_type == "UserMessage" and hasattr(msg, "content"):
@@ -599,6 +603,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
                                         success=not is_error,
                                     )
                             except Exception:
+                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
                         current_tool = None
@@ -620,6 +625,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return _qa_result
 
@@ -636,6 +642,7 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", str(e)
 
@@ -709,6 +716,7 @@ async def _run_qa_agent_client_session(
                         try:
                             _rr.record_response(_rs_id, block.text)
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_USE:
@@ -780,6 +788,7 @@ async def _run_qa_agent_client_session(
                                     _rs_id, tool_name, tool_input_dict=inp or {}
                                 )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                 elif block.type == ContentBlockType.TOOL_RESULT:
@@ -848,6 +857,7 @@ async def _run_qa_agent_client_session(
                                     success=not is_error,
                                 )
                         except Exception:
+                            # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                             pass
 
                     current_tool = None
@@ -869,6 +879,7 @@ async def _run_qa_agent_client_session(
             try:
                 _rr.end_session(_rs_id)
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return _qa_result
 
@@ -885,6 +896,7 @@ async def _run_qa_agent_client_session(
             try:
                 _rr.end_session(_rs_id, status="failed")
             except Exception:
+                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                 pass
         return "error", str(e)
 
@@ -946,6 +958,7 @@ async def _process_qa_result(
             try:
                 _ut_record_qa(project_dir, spec_dir.name, passed=True, score=100.0)
             except Exception:
+                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
                 pass
         qa_discoveries["patterns_found"].append(
             f"QA session {qa_session}: All acceptance criteria validated successfully"
@@ -967,6 +980,7 @@ async def _process_qa_result(
             try:
                 _ut_record_qa(project_dir, spec_dir.name, passed=False, score=0.0)
             except Exception:
+                # Le suivi d'usage est de la telemetrie : jamais au prix du build.
                 pass
         issues = status.get("issues_found", [])
         for issue in issues:

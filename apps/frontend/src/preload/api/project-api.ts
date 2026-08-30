@@ -3,16 +3,21 @@ import { IPC_CHANNELS } from "../../shared/constants";
 import type {
 	AutoBuildVersionInfo,
 	ClaudeAuthResult,
+	ContextSearchResult,
 	GitBranchDetail,
 	GitStatus,
 	GraphitiConnectionTestResult,
+	GraphitiMemoryStatus,
 	GraphitiValidationResult,
+	MemoryEpisode,
+	ProjectIndex,
 	InfrastructureStatus,
 	InitializationResult,
 	IPCResult,
 	KanbanBoardState,
 	KanbanPreferences,
 	Project,
+	ProjectContextData,
 	ProjectEnvConfig,
 	ProjectSettings,
 	RepoProviderDetectionResult,
@@ -85,17 +90,21 @@ export interface ProjectAPI {
 	) => Promise<IPCResult>;
 
 	// Context Operations
-	getProjectContext: (projectId: string) => Promise<IPCResult<unknown>>;
-	refreshProjectIndex: (projectId: string) => Promise<IPCResult<unknown>>;
-	getMemoryStatus: (projectId: string) => Promise<IPCResult<unknown>>;
+	getProjectContext: (
+		projectId: string,
+	) => Promise<IPCResult<ProjectContextData>>;
+	refreshProjectIndex: (projectId: string) => Promise<IPCResult<ProjectIndex>>;
+	getMemoryStatus: (
+		projectId: string,
+	) => Promise<IPCResult<GraphitiMemoryStatus>>;
 	searchMemories: (
 		projectId: string,
 		query: string,
-	) => Promise<IPCResult<unknown>>;
+	) => Promise<IPCResult<ContextSearchResult[]>>;
 	getRecentMemories: (
 		projectId: string,
 		limit?: number,
-	) => Promise<IPCResult<unknown>>;
+	) => Promise<IPCResult<MemoryEpisode[]>>;
 
 	// Environment Configuration
 	getProjectEnv: (projectId: string) => Promise<IPCResult<ProjectEnvConfig>>;

@@ -126,16 +126,17 @@ export const CopilotOAuthAuth: React.FC<CopilotOAuthAuthProps> = ({
 					try {
 						const statusResponse =
 							await globalThis.electronAPI.copilotOAuthStatus();
-						if (statusResponse.success && statusResponse.data.authenticated) {
+						// `data` est optionnel : le poll tourne toutes les secondes et
+						// dereferencait sans garde. L'index signature d'`ElectronAPI`
+						// empechait le compilateur de le dire.
+						if (statusResponse.success && statusResponse.data?.authenticated) {
 							clearInterval(pollInterval);
 							setIsLoading(false);
 							setIsStartingOAuth(false);
 
 							// Get the latest profile
-							const latestProfile =
-								statusResponse.data.profiles[
-									statusResponse.data.profiles.length - 1
-								];
+							const profiles = statusResponse.data.profiles;
+							const latestProfile = profiles[profiles.length - 1];
 
 							toast({
 								title: t("settings:copilotOAuth.toast.authSuccess"),

@@ -191,7 +191,7 @@ class TestVotingSystem:
             # Check file contains result
             import json
 
-            with open(vote_files[0]) as f:
+            with open(vote_files[0], encoding="utf-8") as f:
                 saved = json.load(f)
 
             assert saved["decision"] == result.decision

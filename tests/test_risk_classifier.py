@@ -294,7 +294,7 @@ class TestLoadAssessment:
     def test_load_invalid_json(self, temp_spec_dir, classifier):
         """Returns None for invalid JSON."""
         assessment_file = temp_spec_dir / "complexity_assessment.json"
-        assessment_file.write_text("invalid json {{{")
+        assessment_file.write_text("invalid json {{{", encoding="utf-8")
 
         assessment = classifier.load_assessment(temp_spec_dir)
         assert assessment is None

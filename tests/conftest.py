@@ -316,7 +316,7 @@ def temp_git_repo(tmp_path):
 
         # Create an initial commit so HEAD exists
         readme = repo / "README.md"
-        readme.write_text("# Test repo\n")
+        readme.write_text("# Test repo\n", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
         subprocess.run(
             ["git", "commit", "-m", INITIAL_COMMIT_MESSAGE],
@@ -813,10 +813,12 @@ def temp_project(tmp_path):
     src.mkdir()
 
     (src / "App.tsx").write_text(
-        "import React from 'react';\n\nfunction App() {\n  return <div>Hello</div>;\n}\n\nexport default App;\n"
+        "import React from 'react';\n\nfunction App() {\n  return <div>Hello</div>;\n}\n\nexport default App;\n",
+        encoding="utf-8",
     )
     (src / "utils.py").write_text(
-        '"""Sample Python module."""\nimport os\nfrom pathlib import Path\n\ndef hello():\n    """Say hello."""\n    print("Hello")\n\ndef goodbye():\n    """Say goodbye."""\n    print("Goodbye")\n\nclass Greeter:\n    """A greeter class."""\n\n    def greet(self, name: str) -> str:\n        return f"Hello, {name}"\n'
+        '"""Sample Python module."""\nimport os\nfrom pathlib import Path\n\ndef hello():\n    """Say hello."""\n    print("Hello")\n\ndef goodbye():\n    """Say goodbye."""\n    print("Goodbye")\n\nclass Greeter:\n    """A greeter class."""\n\n    def greet(self, name: str) -> str:\n        return f"Hello, {name}"\n',
+        encoding="utf-8",
     )
 
     subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
@@ -934,10 +936,12 @@ def python_project(tmp_path):
     """Create a temporary Python project directory."""
     project = tmp_path / "python_project"
     project.mkdir()
-    (project / "requirements.txt").write_text("flask\nrequests\n")
-    (project / "app.py").write_text("from flask import Flask\napp = Flask(__name__)\n")
+    (project / "requirements.txt").write_text("flask\nrequests\n", encoding="utf-8")
+    (project / "app.py").write_text(
+        "from flask import Flask\napp = Flask(__name__)\n", encoding="utf-8"
+    )
     (project / "setup.py").write_text(
-        "from setuptools import setup\nsetup(name='test')\n"
+        "from setuptools import setup\nsetup(name='test')\n", encoding="utf-8"
     )
     return project
 
@@ -955,9 +959,11 @@ def node_project(tmp_path):
         "scripts": {"start": "node index.js", "test": "jest"},
         "dependencies": {"express": "^4.18.0"},
     }
-    (project / "package.json").write_text(json.dumps(pkg))
-    (project / "package-lock.json").write_text("{}")
-    (project / "index.js").write_text("const express = require('express');\n")
+    (project / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
+    (project / "package-lock.json").write_text("{}", encoding="utf-8")
+    (project / "index.js").write_text(
+        "const express = require('express');\n", encoding="utf-8"
+    )
     return project
 
 
@@ -966,11 +972,13 @@ def docker_project(tmp_path):
     """Create a temporary Docker project directory."""
     project = tmp_path / "docker_project"
     project.mkdir()
-    (project / "Dockerfile").write_text("FROM python:3.11\nWORKDIR /app\n")
-    (project / "docker-compose.yml").write_text(
-        "version: '3'\nservices:\n  app:\n    build: .\n"
+    (project / "Dockerfile").write_text(
+        "FROM python:3.11\nWORKDIR /app\n", encoding="utf-8"
     )
-    (project / "requirements.txt").write_text("flask\n")
+    (project / "docker-compose.yml").write_text(
+        "version: '3'\nservices:\n  app:\n    build: .\n", encoding="utf-8"
+    )
+    (project / "requirements.txt").write_text("flask\n", encoding="utf-8")
     return project
 
 
@@ -990,7 +998,7 @@ def stage_files(tmp_path, temp_git_repo):
         for name, content in files.items():
             file_path = temp_git_repo / name
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(content)
+            file_path.write_text(content, encoding="utf-8")
         subprocess.run(
             ["git", "add", "."], cwd=temp_git_repo, capture_output=True, check=True
         )
@@ -1128,7 +1136,7 @@ def temp_project_dir(tmp_path):
 
         # Create initial commit
         readme = project / "README.md"
-        readme.write_text("# Test Project\n")
+        readme.write_text("# Test Project\n", encoding="utf-8")
         subprocess.run(
             ["git", "add", "."], cwd=project, capture_output=True, check=True
         )

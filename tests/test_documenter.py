@@ -188,10 +188,10 @@ class TestDocAnalyzerDirectory:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a simple module
             init = os.path.join(tmpdir, "__init__.py")
-            with open(init, "w") as f:
+            with open(init, "w", encoding="utf-8") as f:
                 f.write('"""My module."""\n')
             mod = os.path.join(tmpdir, "utils.py")
-            with open(mod, "w") as f:
+            with open(mod, "w", encoding="utf-8") as f:
                 f.write("def helper():\n    pass\n")
 
             analyzer = DocAnalyzer()
@@ -203,7 +203,7 @@ class TestDocAnalyzerDirectory:
     def test_analyze_directory_extracts_description(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             init = os.path.join(tmpdir, "__init__.py")
-            with open(init, "w") as f:
+            with open(init, "w", encoding="utf-8") as f:
                 f.write('"""My awesome module."""\n')
 
             analyzer = DocAnalyzer()
@@ -214,7 +214,7 @@ class TestDocAnalyzerDirectory:
         with tempfile.TemporaryDirectory() as tmpdir:
             sub = os.path.join(tmpdir, "sub")
             os.makedirs(sub)
-            with open(os.path.join(sub, "__init__.py"), "w") as f:
+            with open(os.path.join(sub, "__init__.py"), "w", encoding="utf-8") as f:
                 f.write("")
 
             analyzer = DocAnalyzer()
@@ -433,9 +433,9 @@ class TestDocumentationAgentDocstrings:
 class TestDocumentationAgentReadme:
     def test_generate_module_readme(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            with open(os.path.join(tmpdir, "__init__.py"), "w") as f:
+            with open(os.path.join(tmpdir, "__init__.py"), "w", encoding="utf-8") as f:
                 f.write('"""Test module."""\n')
-            with open(os.path.join(tmpdir, "main.py"), "w") as f:
+            with open(os.path.join(tmpdir, "main.py"), "w", encoding="utf-8") as f:
                 f.write("def main():\n    pass\n")
 
             agent = DocumentationAgent()
@@ -445,7 +445,7 @@ class TestDocumentationAgentReadme:
 
     def test_readme_includes_diagram(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            with open(os.path.join(tmpdir, "__init__.py"), "w") as f:
+            with open(os.path.join(tmpdir, "__init__.py"), "w", encoding="utf-8") as f:
                 f.write("")
 
             agent = DocumentationAgent()

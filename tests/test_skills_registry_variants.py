@@ -213,7 +213,9 @@ def test_forking_preserves_the_pinned_cut_and_moves_the_root(repo: Path):
     write_pack(repo / "skills", "dotnet", "2.4.0", {"dotnet": ">=8.0 <10.0"})
     variant = fork_variant(repo, "dotnet", new_version="3.0.0")
 
-    manifest = json.loads((repo / "skills" / "dotnet" / "pack.json").read_text())
+    manifest = json.loads(
+        (repo / "skills" / "dotnet" / "pack.json").read_text(encoding="utf-8")
+    )
     assert manifest["version"] == "3.0.0"
     assert manifest["variants"] == [
         {
@@ -231,7 +233,9 @@ def test_forking_twice_keeps_both_older_cuts_newest_first(repo: Path):
     fork_variant(repo, "dotnet", new_version="3.0.0")
     fork_variant(repo, "dotnet", new_version="4.0.0")
 
-    manifest = json.loads((repo / "skills" / "dotnet" / "pack.json").read_text())
+    manifest = json.loads(
+        (repo / "skills" / "dotnet" / "pack.json").read_text(encoding="utf-8")
+    )
     assert [v["version"] for v in manifest["variants"]] == ["3.0.0", "2.4.0"]
     assert manifest["version"] == "4.0.0"
 
@@ -453,7 +457,7 @@ def test_a_breaking_upstream_release_forks_and_leaves_the_pin_alone(upstream_rep
         sync._apply_release("superpowers", sync._pack_facts("superpowers"))
     )
 
-    manifest = json.loads((pack_dir / "pack.json").read_text())
+    manifest = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
     assert manifest["version"] == "3.0.0"
     assert manifest["variants"] == [
         {
@@ -482,7 +486,7 @@ def test_a_quiet_upstream_release_is_taken_in_place(upstream_repo):
         sync._apply_release("superpowers", sync._pack_facts("superpowers"))
     )
 
-    manifest = json.loads((pack_dir / "pack.json").read_text())
+    manifest = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
     assert "variants" not in manifest, "a non-breaking release must not fork"
     assert manifest["version"] == "2.4.1"
     assert "bumped in place" in report
@@ -492,12 +496,12 @@ def test_a_release_that_cannot_be_fetched_changes_nothing(upstream_repo):
     sync, root, pack_dir = upstream_repo
     sync._refetch = lambda _pack: False
 
-    before = (pack_dir / "pack.json").read_text()
+    before = (pack_dir / "pack.json").read_text(encoding="utf-8")
     report = "\n".join(
         sync._apply_release("superpowers", sync._pack_facts("superpowers"))
     )
 
-    assert (pack_dir / "pack.json").read_text() == before
+    assert (pack_dir / "pack.json").read_text(encoding="utf-8") == before
     assert "not applied" in report
 
 
@@ -522,6 +526,6 @@ def test_an_unbootstrapped_pack_is_reported_unclassified_not_assumed_safe(
     report = "\n".join(sync._apply_release("superpowers", []))
     assert "unclassified" in report
     manifest = json.loads(
-        (tmp_path / "skills" / "superpowers" / "pack.json").read_text()
+        (tmp_path / "skills" / "superpowers" / "pack.json").read_text(encoding="utf-8")
     )
     assert manifest["version"] == "2.4.0", "an unclassified release must not bump"

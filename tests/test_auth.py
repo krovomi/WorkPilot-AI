@@ -166,7 +166,7 @@ class TestWindowsCredentialFiles:
 
         # Create a temporary credential file
         cred_file = tmp_path / ".credentials.json"
-        cred_file.write_text(credentials)
+        cred_file.write_text(credentials, encoding="utf-8")
 
         monkeypatch.setattr(platform, "system", lambda: "Windows")
         monkeypatch.setattr(
@@ -187,7 +187,7 @@ class TestWindowsCredentialFiles:
     def test_windows_credential_file_invalid_json(self, monkeypatch, tmp_path):
         """Returns None when credential file contains invalid JSON."""
         cred_file = tmp_path / ".credentials.json"
-        cred_file.write_text("invalid json")
+        cred_file.write_text("invalid json", encoding="utf-8")
 
         monkeypatch.setattr(platform, "system", lambda: "Windows")
         monkeypatch.setattr(
@@ -534,7 +534,7 @@ class TestTokenSourceDetection:
         credentials = json.dumps({"claudeAiOauth": {"accessToken": test_token}})
 
         cred_file = tmp_path / ".credentials.json"
-        cred_file.write_text(credentials)
+        cred_file.write_text(credentials, encoding="utf-8")
 
         monkeypatch.setattr(platform, "system", lambda: "Windows")
         monkeypatch.setattr(

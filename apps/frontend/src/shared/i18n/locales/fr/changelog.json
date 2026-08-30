@@ -59,8 +59,8 @@
 		"loadingTags": "Chargement des tags...",
 		"loadingCommits": "Chargement des commits...",
 		"noCommits": "Aucun commit trouvé",
-		"commitsFound": "{{count}} commit trouvé",
-		"commitsFound_plural": "{{count}} commits trouvés"
+		"commitsFound_one": "{{count}} commit trouvé",
+		"commitsFound_other": "{{count}} commits trouvés"
 	},
 	"branchDiff": {
 		"title": "Options de comparaison de branches",
@@ -76,10 +76,6 @@
 	"configuration": {
 		"title": "Configuration",
 		"summary": "Résumé",
-		"summaryTasks": "{{count}} tâche sélectionnée",
-		"summaryTasks_plural": "{{count}} tâches sélectionnées",
-		"summaryCommits": "{{count}} commit sélectionné",
-		"summaryCommits_plural": "{{count}} commits sélectionnés",
 		"tasksSelectedCount": "{{selected}} sur {{total}} tâches sélectionnées",
 		"backToSelection": "Retour à la sélection",
 		"including": "Incluant",
@@ -154,8 +150,6 @@
 		"title": "Publication terminée",
 		"success": "Votre journal des modifications a été généré et enregistré !",
 		"archiveTitle": "Archiver les tâches terminées",
-		"archiveDescription": "Souhaitez-vous archiver la {{count}} tâche terminée utilisée dans ce journal ?",
-		"archiveDescription_plural": "Souhaitez-vous archiver les {{count}} tâches terminées utilisées dans ce journal ?",
 		"archiveNote": "Les tâches archivées seront déplacées vers la version {{version}} et n'apparaîtront pas dans les futures sélections de journal.",
 		"archiveYes": "Oui, archiver les tâches",
 		"archiveNo": "Non, conserver les tâches",
