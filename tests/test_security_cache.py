@@ -79,7 +79,7 @@ def test_cache_invalidation_on_file_creation(mock_project_dir, mock_profile_path
     # 3. Overwrite the file with our custom content
     # Use the SAME hash we computed before (directory structure hasn't changed)
     mock_profile_path.write_text(
-        create_valid_profile_json(["unique_cmd_A"], current_hash)
+        create_valid_profile_json(["unique_cmd_A"], current_hash), encoding="utf-8"
     )
 
     # 4. Second call - should detect file modification and reload
@@ -93,7 +93,7 @@ def test_cache_invalidation_on_file_modification(mock_project_dir, mock_profile_
     # 1. Create initial file
     current_hash = get_dir_hash(mock_project_dir)
     mock_profile_path.write_text(
-        create_valid_profile_json(["unique_cmd_A"], current_hash)
+        create_valid_profile_json(["unique_cmd_A"], current_hash), encoding="utf-8"
     )
 
     # 2. Load initial profile
@@ -105,7 +105,7 @@ def test_cache_invalidation_on_file_modification(mock_project_dir, mock_profile_
 
     # 3. Modify the file
     mock_profile_path.write_text(
-        create_valid_profile_json(["unique_cmd_B"], current_hash)
+        create_valid_profile_json(["unique_cmd_B"], current_hash), encoding="utf-8"
     )
 
     # 4. Call again - should detect modification
@@ -119,7 +119,7 @@ def test_cache_invalidation_on_file_deletion(mock_project_dir, mock_profile_path
     # 1. Create file
     current_hash = get_dir_hash(mock_project_dir)
     mock_profile_path.write_text(
-        create_valid_profile_json(["unique_cmd_A"], current_hash)
+        create_valid_profile_json(["unique_cmd_A"], current_hash), encoding="utf-8"
     )
 
     # 2. Load profile

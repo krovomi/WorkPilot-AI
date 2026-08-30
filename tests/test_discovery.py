@@ -58,19 +58,19 @@ class TestPackageManagerDetection:
 
     def test_detect_npm(self, discovery, temp_dir):
         """Test npm detection via package-lock.json."""
-        (temp_dir / "package-lock.json").write_text("{}")
+        (temp_dir / "package-lock.json").write_text("{}", encoding="utf-8")
         result = discovery.discover(temp_dir)
         assert result.package_manager == "npm"
 
     def test_detect_yarn(self, discovery, temp_dir):
         """Test yarn detection via yarn.lock."""
-        (temp_dir / "yarn.lock").write_text("")
+        (temp_dir / "yarn.lock").write_text("", encoding="utf-8")
         result = discovery.discover(temp_dir)
         assert result.package_manager == "yarn"
 
     def test_detect_pnpm(self, discovery, temp_dir):
         """Test pnpm detection via pnpm-lock.yaml."""
-        (temp_dir / "pnpm-lock.yaml").write_text("")
+        (temp_dir / "pnpm-lock.yaml").write_text("", encoding="utf-8")
         result = discovery.discover(temp_dir)
         assert result.package_manager == "pnpm"
 
@@ -82,31 +82,31 @@ class TestPackageManagerDetection:
 
     def test_detect_bun_text_lockfile(self, discovery, temp_dir):
         """Test bun detection via bun.lock (text format, Bun 1.2.0+)."""
-        (temp_dir / "bun.lock").write_text("")
+        (temp_dir / "bun.lock").write_text("", encoding="utf-8")
         result = discovery.discover(temp_dir)
         assert result.package_manager == "bun"
 
     def test_detect_uv(self, discovery, temp_dir):
         """Test uv detection via uv.lock."""
-        (temp_dir / "uv.lock").write_text("")
+        (temp_dir / "uv.lock").write_text("", encoding="utf-8")
         result = discovery.discover(temp_dir)
         assert result.package_manager == "uv"
 
     def test_detect_poetry(self, discovery, temp_dir):
         """Test poetry detection via poetry.lock."""
-        (temp_dir / "poetry.lock").write_text("")
+        (temp_dir / "poetry.lock").write_text("", encoding="utf-8")
         result = discovery.discover(temp_dir)
         assert result.package_manager == "poetry"
 
     def test_detect_cargo(self, discovery, temp_dir):
         """Test cargo detection via Cargo.lock."""
-        (temp_dir / "Cargo.lock").write_text("")
+        (temp_dir / "Cargo.lock").write_text("", encoding="utf-8")
         result = discovery.discover(temp_dir)
         assert result.package_manager == "cargo"
 
     def test_detect_bundler(self, discovery, temp_dir):
         """Test bundler detection via Gemfile.lock."""
-        (temp_dir / "Gemfile.lock").write_text("")
+        (temp_dir / "Gemfile.lock").write_text("", encoding="utf-8")
         result = discovery.discover(temp_dir)
         assert result.package_manager == "bundler"
 
@@ -122,7 +122,7 @@ class TestJSFrameworkDetection:
     def test_detect_jest_from_dependencies(self, discovery, temp_dir):
         """Test Jest detection from package.json dependencies."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -133,7 +133,7 @@ class TestJSFrameworkDetection:
     def test_detect_jest_version(self, discovery, temp_dir):
         """Test Jest version extraction."""
         pkg = {"devDependencies": {"jest": "^29.5.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
         jest = next(f for f in result.frameworks if f.name == "jest")
@@ -142,8 +142,10 @@ class TestJSFrameworkDetection:
     def test_detect_jest_config_file(self, discovery, temp_dir):
         """Test Jest config file detection."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
-        (temp_dir / "jest.config.js").write_text("module.exports = {}")
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
+        (temp_dir / "jest.config.js").write_text(
+            "module.exports = {}", encoding="utf-8"
+        )
 
         result = discovery.discover(temp_dir)
         jest = next(f for f in result.frameworks if f.name == "jest")
@@ -152,7 +154,7 @@ class TestJSFrameworkDetection:
     def test_detect_vitest(self, discovery, temp_dir):
         """Test Vitest detection."""
         pkg = {"devDependencies": {"vitest": "^1.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -162,7 +164,7 @@ class TestJSFrameworkDetection:
     def test_detect_playwright(self, discovery, temp_dir):
         """Test Playwright detection."""
         pkg = {"devDependencies": {"@playwright/test": "^1.40.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -175,7 +177,7 @@ class TestJSFrameworkDetection:
     def test_detect_cypress(self, discovery, temp_dir):
         """Test Cypress detection."""
         pkg = {"devDependencies": {"cypress": "^13.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -191,7 +193,7 @@ class TestJSFrameworkDetection:
             "scripts": {"test": "vitest run"},
             "devDependencies": {},
         }
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -205,7 +207,7 @@ class TestJSFrameworkDetection:
             "scripts": {"test": 'echo "Error: no test specified" && exit 1'},
             "devDependencies": {},
         }
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
         assert len(result.frameworks) == 0
@@ -221,7 +223,7 @@ class TestPythonFrameworkDetection:
 
     def test_detect_pytest_from_requirements(self, discovery, temp_dir):
         """Test pytest detection from requirements.txt."""
-        (temp_dir / "requirements.txt").write_text("pytest==7.4.0\n")
+        (temp_dir / "requirements.txt").write_text("pytest==7.4.0\n", encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -237,7 +239,7 @@ dependencies = ["pytest>=7.0.0"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 """
-        (temp_dir / "pyproject.toml").write_text(pyproject)
+        (temp_dir / "pyproject.toml").write_text(pyproject, encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -246,7 +248,7 @@ testpaths = ["tests"]
 
     def test_detect_pytest_from_conftest(self, discovery, temp_dir):
         """Test pytest detection from conftest.py presence."""
-        (temp_dir / "conftest.py").write_text("import pytest\n")
+        (temp_dir / "conftest.py").write_text("import pytest\n", encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -257,7 +259,7 @@ testpaths = ["tests"]
         """Test pytest detection from tests/conftest.py."""
         tests_dir = temp_dir / "tests"
         tests_dir.mkdir()
-        (tests_dir / "conftest.py").write_text("import pytest\n")
+        (tests_dir / "conftest.py").write_text("import pytest\n", encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -266,8 +268,10 @@ testpaths = ["tests"]
 
     def test_detect_pytest_ini(self, discovery, temp_dir):
         """Test pytest.ini config file detection."""
-        (temp_dir / "pytest.ini").write_text("[pytest]\ntestpaths = tests\n")
-        (temp_dir / "requirements.txt").write_text("pytest\n")
+        (temp_dir / "pytest.ini").write_text(
+            "[pytest]\ntestpaths = tests\n", encoding="utf-8"
+        )
+        (temp_dir / "requirements.txt").write_text("pytest\n", encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -285,7 +289,9 @@ class TestOtherLanguageFrameworks:
 
     def test_detect_cargo_test(self, discovery, temp_dir):
         """Test Rust cargo test detection."""
-        (temp_dir / "Cargo.toml").write_text('[package]\nname = "test"')
+        (temp_dir / "Cargo.toml").write_text(
+            '[package]\nname = "test"', encoding="utf-8"
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -297,7 +303,7 @@ class TestOtherLanguageFrameworks:
 
     def test_detect_go_test(self, discovery, temp_dir):
         """Test Go test detection."""
-        (temp_dir / "go.mod").write_text("module test")
+        (temp_dir / "go.mod").write_text("module test", encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -309,7 +315,7 @@ class TestOtherLanguageFrameworks:
 
     def test_detect_rspec(self, discovery, temp_dir):
         """Test RSpec detection."""
-        (temp_dir / "Gemfile").write_text('gem "rspec"')
+        (temp_dir / "Gemfile").write_text('gem "rspec"', encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -318,8 +324,8 @@ class TestOtherLanguageFrameworks:
 
     def test_detect_rspec_with_dotfile(self, discovery, temp_dir):
         """Test RSpec detection via .rspec file."""
-        (temp_dir / "Gemfile").write_text('gem "rails"')
-        (temp_dir / ".rspec").write_text("--format documentation\n")
+        (temp_dir / "Gemfile").write_text('gem "rails"', encoding="utf-8")
+        (temp_dir / ".rspec").write_text("--format documentation\n", encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -331,7 +337,7 @@ class TestOtherLanguageFrameworks:
 
     def test_detect_minitest(self, discovery, temp_dir):
         """Test Minitest detection."""
-        (temp_dir / "Gemfile").write_text('gem "minitest"')
+        (temp_dir / "Gemfile").write_text('gem "minitest"', encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -392,7 +398,9 @@ class TestFileDetection:
         """Test detecting Python test files."""
         tests_dir = temp_dir / "tests"
         tests_dir.mkdir()
-        (tests_dir / "test_main.py").write_text("def test_example(): pass")
+        (tests_dir / "test_main.py").write_text(
+            "def test_example(): pass", encoding="utf-8"
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -402,7 +410,9 @@ class TestFileDetection:
         """Test detecting JavaScript test files."""
         src_dir = temp_dir / "src"
         src_dir.mkdir()
-        (src_dir / "app.test.js").write_text("test('example', () => {})")
+        (src_dir / "app.test.js").write_text(
+            "test('example', () => {})", encoding="utf-8"
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -410,7 +420,9 @@ class TestFileDetection:
 
     def test_detect_ts_test_files(self, discovery, temp_dir):
         """Test detecting TypeScript test files."""
-        (temp_dir / "component.spec.ts").write_text("describe('test', () => {})")
+        (temp_dir / "component.spec.ts").write_text(
+            "describe('test', () => {})", encoding="utf-8"
+        )
 
         result = discovery.discover(temp_dir)
 
@@ -434,7 +446,7 @@ class TestSerialization:
     def test_to_dict(self, discovery, temp_dir):
         """Test converting result to dictionary."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
         result_dict = discovery.to_dict(result)
@@ -448,8 +460,8 @@ class TestSerialization:
     def test_framework_dict_structure(self, discovery, temp_dir):
         """Test framework dictionary structure."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
-        (temp_dir / "jest.config.js").write_text("{}")
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
+        (temp_dir / "jest.config.js").write_text("{}", encoding="utf-8")
 
         result = discovery.discover(temp_dir)
         result_dict = discovery.to_dict(result)
@@ -465,7 +477,7 @@ class TestSerialization:
     def test_json_serializable(self, discovery, temp_dir):
         """Test that result is JSON serializable."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
         result_dict = discovery.to_dict(result)
@@ -486,7 +498,7 @@ class TestConvenienceFunctions:
     def test_discover_tests(self, temp_dir):
         """Test discover_tests function."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discover_tests(temp_dir)
 
@@ -495,7 +507,7 @@ class TestConvenienceFunctions:
     def test_get_test_command(self, temp_dir):
         """Test get_test_command function."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         cmd = get_test_command(temp_dir)
 
@@ -504,7 +516,7 @@ class TestConvenienceFunctions:
     def test_get_test_frameworks(self, temp_dir):
         """Test get_test_frameworks function."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         frameworks = get_test_frameworks(temp_dir)
 
@@ -522,7 +534,7 @@ class TestEdgeCases:
 
     def test_invalid_package_json(self, discovery, temp_dir):
         """Test handling of invalid package.json."""
-        (temp_dir / "package.json").write_text("not valid json")
+        (temp_dir / "package.json").write_text("not valid json", encoding="utf-8")
 
         # Should not raise
         result = discovery.discover(temp_dir)
@@ -545,7 +557,7 @@ class TestEdgeCases:
                 "@playwright/test": "^1.40.0",
             }
         }
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result = discovery.discover(temp_dir)
 
@@ -556,7 +568,7 @@ class TestEdgeCases:
     def test_caching(self, discovery, temp_dir):
         """Test that results are cached."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         # First call
         result1 = discovery.discover(temp_dir)
@@ -569,7 +581,7 @@ class TestEdgeCases:
     def test_clear_cache(self, discovery, temp_dir):
         """Test cache clearing."""
         pkg = {"devDependencies": {"jest": "^29.0.0"}}
-        (temp_dir / "package.json").write_text(json.dumps(pkg))
+        (temp_dir / "package.json").write_text(json.dumps(pkg), encoding="utf-8")
 
         result1 = discovery.discover(temp_dir)
         discovery.clear_cache()

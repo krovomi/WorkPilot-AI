@@ -1,5 +1,6 @@
-import { type IpcRendererEvent, ipcRenderer } from "electron";
+import { ipcRenderer } from "electron";
 import type { ContextAwareSnippetResult } from "../../../main/context-aware-snippets-service";
+import { createIpcListener, type IpcListenerCleanup } from "./ipc-utils";
 
 /**
  * Context-Aware Snippets API
@@ -33,18 +34,21 @@ export interface ContextAwareSnippetsAPI {
 		pythonPath?: string,
 		autoBuildSourcePath?: string,
 	) => Promise<{ success: boolean; error?: string }>;
-	onSnippetStreamChunk: (callback: (chunk: string) => void) => void;
-	onSnippetStatus: (callback: (status: string) => void) => void;
-	onSnippetError: (callback: (error: string) => void) => void;
+	// Chaque abonnement rend sa fonction de desabonnement, comme partout
+	// ailleurs dans ce dossier. Ils rendaient `void`, et les quatre
+	// `removeSnippet*Listener` qui devaient compenser passaient a
+	// `removeListener` une fleche fraichement creee, qui ne pouvait
+	// correspondre a celle enregistree par `on` : aucun des deux chemins ne
+	// liberait quoi que ce soit, et le store rouvrait un ecouteur a chaque
+	// generation. Ces quatre methodes sont parties avec le probleme.
+	onSnippetStreamChunk: (
+		callback: (chunk: string) => void,
+	) => IpcListenerCleanup;
+	onSnippetStatus: (callback: (status: string) => void) => IpcListenerCleanup;
+	onSnippetError: (callback: (error: string) => void) => IpcListenerCleanup;
 	onSnippetComplete: (
 		callback: (result: ContextAwareSnippetResult) => void,
-	) => void;
-	removeSnippetStreamChunkListener: (callback: (chunk: string) => void) => void;
-	removeSnippetStatusListener: (callback: (status: string) => void) => void;
-	removeSnippetErrorListener: (callback: (error: string) => void) => void;
-	removeSnippetCompleteListener: (
-		callback: (result: ContextAwareSnippetResult) => void,
-	) => void;
+	) => IpcListenerCleanup;
 }
 
 export const createContextAwareSnippetsAPI = (): ContextAwareSnippetsAPI => ({
@@ -91,67 +95,20 @@ export const createContextAwareSnippetsAPI = (): ContextAwareSnippetsAPI => ({
 		});
 	},
 
-	onSnippetStreamChunk: (callback: (chunk: string) => void) => {
-		ipcRenderer.on(
-			"context-aware-snippets:stream-chunk",
-			(_event: IpcRendererEvent, chunk: string) => callback(chunk),
-		);
-	},
+	onSnippetStreamChunk: (callback: (chunk: string) => void) =>
+		createIpcListener<[string]>("context-aware-snippets:stream-chunk", callback),
 
-	onSnippetStatus: (callback: (status: string) => void) => {
-		ipcRenderer.on(
-			"context-aware-snippets:status",
-			(_event: IpcRendererEvent, status: string) => callback(status),
-		);
-	},
+	onSnippetStatus: (callback: (status: string) => void) =>
+		createIpcListener<[string]>("context-aware-snippets:status", callback),
 
-	onSnippetError: (callback: (error: string) => void) => {
-		ipcRenderer.on(
-			"context-aware-snippets:error",
-			(_event: IpcRendererEvent, error: string) => callback(error),
-		);
-	},
+	onSnippetError: (callback: (error: string) => void) =>
+		createIpcListener<[string]>("context-aware-snippets:error", callback),
 
-	onSnippetComplete: (
-		callback: (result: ContextAwareSnippetResult) => void,
-	) => {
-		ipcRenderer.on(
+	onSnippetComplete: (callback: (result: ContextAwareSnippetResult) => void) =>
+		createIpcListener<[ContextAwareSnippetResult]>(
 			"context-aware-snippets:complete",
-			(_event: IpcRendererEvent, result: ContextAwareSnippetResult) =>
-				callback(result),
-		);
-	},
-
-	removeSnippetStreamChunkListener: (callback: (chunk: string) => void) => {
-		ipcRenderer.removeListener(
-			"context-aware-snippets:stream-chunk",
-			(_event: IpcRendererEvent, chunk: string) => callback(chunk),
-		);
-	},
-
-	removeSnippetStatusListener: (callback: (status: string) => void) => {
-		ipcRenderer.removeListener(
-			"context-aware-snippets:status",
-			(_event: IpcRendererEvent, status: string) => callback(status),
-		);
-	},
-
-	removeSnippetErrorListener: (callback: (error: string) => void) => {
-		ipcRenderer.removeListener(
-			"context-aware-snippets:error",
-			(_event: IpcRendererEvent, error: string) => callback(error),
-		);
-	},
-
-	removeSnippetCompleteListener: (
-		callback: (result: ContextAwareSnippetResult) => void,
-	) => {
-		ipcRenderer.removeListener(
-			"context-aware-snippets:complete",
-			(_event: IpcRendererEvent, result: ContextAwareSnippetResult) =>
-				callback(result),
-		);
-	},
+			callback,
+		),
 });
 
 // Export individual functions for backward compatibility
@@ -167,14 +124,6 @@ export const onSnippetStatus = createContextAwareSnippetsAPI().onSnippetStatus;
 export const onSnippetError = createContextAwareSnippetsAPI().onSnippetError;
 export const onSnippetComplete =
 	createContextAwareSnippetsAPI().onSnippetComplete;
-export const removeSnippetStreamChunkListener =
-	createContextAwareSnippetsAPI().removeSnippetStreamChunkListener;
-export const removeSnippetStatusListener =
-	createContextAwareSnippetsAPI().removeSnippetStatusListener;
-export const removeSnippetErrorListener =
-	createContextAwareSnippetsAPI().removeSnippetErrorListener;
-export const removeSnippetCompleteListener =
-	createContextAwareSnippetsAPI().removeSnippetCompleteListener;
 
 // Note: This module exports functions that are integrated into the main ElectronAPI
 // The contextBridge exposure is handled in the main preload/index.ts file

@@ -119,9 +119,11 @@ class TestIntelligentContextCache:
         try:
             # Create basic project structure
             (project_path / "src").mkdir()
-            (project_path / "src" / "main.py").write_text("print('Hello, World!')")
+            (project_path / "src" / "main.py").write_text(
+                "print('Hello, World!')", encoding="utf-8"
+            )
             (project_path / "package.json").write_text(
-                '{"name": "test", "dependencies": {}}'
+                '{"name": "test", "dependencies": {}}', encoding="utf-8"
             )
 
             # Initialize git repo
@@ -375,8 +377,12 @@ class TestFreshnessCalculator:
         try:
             # Create project files
             (project_path / "src").mkdir()
-            (project_path / "src" / "main.py").write_text("print('Hello')")
-            (project_path / "package.json").write_text('{"name": "test"}')
+            (project_path / "src" / "main.py").write_text(
+                "print('Hello')", encoding="utf-8"
+            )
+            (project_path / "package.json").write_text(
+                '{"name": "test"}', encoding="utf-8"
+            )
 
             # Initialize git
             subprocess.run(["git", "init"], cwd=project_path, capture_output=True)
@@ -506,7 +512,7 @@ class TestGitRepositoryMonitor:
             )
 
             # Create initial commit
-            (repo_path / "file1.txt").write_text("content1")
+            (repo_path / "file1.txt").write_text("content1", encoding="utf-8")
             subprocess.run(["git", "add", "."], cwd=repo_path, capture_output=True)
             subprocess.run(
                 ["git", "commit", "-m", "Initial"], cwd=repo_path, capture_output=True
@@ -545,8 +551,8 @@ class TestGitRepositoryMonitor:
         initial_commit = git_monitor.get_current_commit()
 
         # Make changes
-        (temp_repo / "file2.txt").write_text("content2")
-        (temp_repo / "file3.txt").write_text("content3")
+        (temp_repo / "file2.txt").write_text("content2", encoding="utf-8")
+        (temp_repo / "file3.txt").write_text("content3", encoding="utf-8")
 
         import subprocess
 
@@ -568,7 +574,7 @@ class TestGitRepositoryMonitor:
         assert not git_monitor.has_new_commits()
 
         # Add new commit
-        (temp_repo / "new_file.txt").write_text("new content")
+        (temp_repo / "new_file.txt").write_text("new content", encoding="utf-8")
 
         import subprocess
 
@@ -592,8 +598,12 @@ class TestContextCacheIntegrator:
 
             # Create project structure
             (project_path / "src").mkdir()
-            (project_path / "src" / "main.py").write_text("print('Hello')")
-            (project_path / "package.json").write_text('{"name": "test"}')
+            (project_path / "src" / "main.py").write_text(
+                "print('Hello')", encoding="utf-8"
+            )
+            (project_path / "package.json").write_text(
+                '{"name": "test"}', encoding="utf-8"
+            )
 
             # Initialize git
             import subprocess
@@ -760,8 +770,12 @@ class TestAgentWorkflowIntegrator:
 
             # Create project structure
             (project_path / "src").mkdir()
-            (project_path / "src" / "main.py").write_text("print('Hello')")
-            (project_path / "package.json").write_text('{"name": "test"}')
+            (project_path / "src" / "main.py").write_text(
+                "print('Hello')", encoding="utf-8"
+            )
+            (project_path / "package.json").write_text(
+                '{"name": "test"}', encoding="utf-8"
+            )
 
             yield project_path
 
@@ -862,7 +876,8 @@ class TestCacheIntegration:
             (project_path / "tests").mkdir()
 
             # Create files
-            (project_path / "src" / "main.py").write_text("""
+            (project_path / "src" / "main.py").write_text(
+                """
 from flask import Flask
 import sys
 import os
@@ -877,26 +892,37 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     return format_data("Hello World")
-""")
+""",
+                encoding="utf-8",
+            )
 
-            (project_path / "src" / "utils" / "helpers.py").write_text("""
+            (project_path / "src" / "utils" / "helpers.py").write_text(
+                """
 def format_data(data):
     return f"Formatted: {data}"
-""")
+""",
+                encoding="utf-8",
+            )
 
-            (project_path / "package.json").write_text("""
+            (project_path / "package.json").write_text(
+                """
 {
   "name": "test-app",
   "dependencies": {
     "flask": "^2.0.0",
     "requests": "^2.25.0"
   }
-}""")
+}""",
+                encoding="utf-8",
+            )
 
-            (project_path / "requirements.txt").write_text("""
+            (project_path / "requirements.txt").write_text(
+                """
 flask==2.0.0
 requests==2.25.0
-""")
+""",
+                encoding="utf-8",
+            )
 
             # Initialize git
             import subprocess
@@ -1045,7 +1071,8 @@ requests==2.25.0
             assert response2.cache_hit
 
             # Make git changes
-            (unique_project / "src" / "main.py").write_text("""
+            (unique_project / "src" / "main.py").write_text(
+                """
 from flask import Flask
 from src.utils.helpers import format_data
 
@@ -1058,7 +1085,9 @@ def home():
 @app.route('/api/data')
 def api_data():
     return {"data": "test"}
-""")
+""",
+                encoding="utf-8",
+            )
 
             import subprocess
 
@@ -1100,7 +1129,7 @@ class TestCachePerformance:
             # Create many files
             for i in range(100):
                 (project_path / "src" / f"file{i}.py").write_text(
-                    f"# File {i}\nprint('test')"
+                    f"# File {i}\nprint('test')", encoding="utf-8"
                 )
 
             yield project_path

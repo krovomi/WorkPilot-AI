@@ -112,10 +112,9 @@ export function ProjectIndexTab({
 									</Badge>
 									{Object.keys(projectIndex.services).length > 0 && (
 										<Badge variant="secondary">
-											{Object.keys(projectIndex.services).length} service
-											{Object.keys(projectIndex.services).length === 1
-												? ""
-												: "s"}
+											{t("context:projectIndex.serviceCount", {
+												count: Object.keys(projectIndex.services).length,
+											})}
 										</Badge>
 									)}
 								</div>
@@ -129,7 +128,7 @@ export function ProjectIndexTab({
 						{Object.keys(projectIndex.services).length > 0 && (
 							<div className="space-y-4">
 								<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-									Services
+									{t("context:projectIndex.servicesHeading")}
 								</h3>
 								<div className="grid gap-4 md:grid-cols-2">
 									{Object.entries(projectIndex.services).map(

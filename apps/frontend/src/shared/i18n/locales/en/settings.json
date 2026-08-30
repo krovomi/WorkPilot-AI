@@ -456,119 +456,6 @@
 				"name": "Hourly log check"
 			},
 			"ciPipeline": "CI Pipeline"
-		},
-		"addButton": "Add Profile",
-		"presets": {
-			"anthropic": "Anthropic (Claude)",
-			"copilot": "GitHub Copilot",
-			"openai": "OpenAI",
-			"mistral": "Mistral AI",
-			"grok": "Grok (xAI)",
-			"gemini": "Gemini (Google)",
-			"windsurf": "Windsurf (Codeium)"
-		},
-		"fields": {
-			"name": "Name",
-			"preset": "Preset",
-			"baseUrl": "Base URL",
-			"apiKey": "API Key"
-		},
-		"placeholders": {
-			"name": "My Custom API",
-			"preset": "Choose a provider preset",
-			"baseUrl": "https://api.anthropic.com",
-			"apiKey": "sk-ant-..."
-		},
-		"hints": {
-			"preset": "Presets fill the base URL; you still need to paste your API key.",
-			"baseUrl": "Example: https://api.anthropic.com or http://localhost:8080"
-		},
-		"validation": {
-			"nameRequired": "Name is required",
-			"baseUrlRequired": "Base URL is required",
-			"baseUrlInvalid": "Invalid URL format (must be http:// or https://)",
-			"apiKeyRequired": "API Key is required",
-			"apiKeyInvalid": "Invalid API Key format"
-		},
-		"actions": {
-			"save": "Save Profile",
-			"saving": "Saving...",
-			"cancel": "Cancel",
-			"changeKey": "Change",
-			"cancelKeyChange": "Cancel"
-		},
-		"testConnection": {
-			"label": "Test Connection",
-			"testing": "Testing...",
-			"success": "Connection Successful",
-			"failure": "Connection Failed"
-		},
-		"models": {
-			"title": "Optional: Model Name Mappings",
-			"description": "Select models from your API provider. Leave blank to use defaults.",
-			"defaultLabel": "Default Model (Optional)",
-			"haikuLabel": "Haiku Model (Optional)",
-			"sonnetLabel": "Sonnet Model (Optional)",
-			"opusLabel": "Opus Model (Optional)",
-			"defaultPlaceholder": "e.g., claude-sonnet-4-5-20250929",
-			"haikuPlaceholder": "e.g., claude-haiku-4-5-20251001",
-			"sonnetPlaceholder": "e.g., claude-sonnet-4-5-20250929",
-			"opusPlaceholder": "e.g., claude-opus-4-5-20251101"
-		},
-		"empty": {
-			"title": "No API profiles configured",
-			"description": "Create a profile to configure custom API endpoints for your builds.",
-			"action": "Create First Profile"
-		},
-		"switchToOauth": {
-			"label": "Switch to OAuth",
-			"loading": "Switching..."
-		},
-		"activeBadge": "Active",
-		"customModels": "Custom models: {{models}}",
-		"setActive": {
-			"label": "Set Active",
-			"loading": "Setting..."
-		},
-		"tooltips": {
-			"edit": "Edit profile",
-			"deleteActive": "Switch to OAuth before deleting",
-			"deleteInactive": "Delete profile"
-		},
-		"deleteAriaLabel": "Delete profile {{name}}",
-		"toast": {
-			"create": {
-				"title": "Profile created",
-				"description": "\"{{name}}\" has been added successfully."
-			},
-			"update": {
-				"title": "Profile updated",
-				"description": "\"{{name}}\" has been updated successfully."
-			},
-			"delete": {
-				"title": "Profile deleted",
-				"description": "\"{{name}}\" has been removed.",
-				"errorTitle": "Failed to delete profile",
-				"errorFallback": "An error occurred while deleting the profile."
-			},
-			"switch": {
-				"oauthTitle": "Switched to OAuth",
-				"oauthDescription": "Now using OAuth authentication",
-				"profileTitle": "Profile activated",
-				"profileDescription": "Now using {{name}}",
-				"errorTitle": "Failed to switch authentication",
-				"errorFallback": "An error occurred while switching authentication method."
-			}
-		},
-		"dialog": {
-			"createTitle": "Add API Profile",
-			"editTitle": "Edit Profile",
-			"description": "Configure a custom Anthropic-compatible API endpoint for your builds.",
-			"deleteTitle": "Delete Profile?",
-			"deleteDescription": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
-			"cancel": "Cancel",
-			"delete": "Delete",
-			"deleting": "Deleting..."
 		}
 	},
 	"apiProfiles": {
@@ -985,7 +872,20 @@
 			"description": "Graphiti memory backend",
 			"integrationTitle": "Memory Settings",
 			"integrationDescription": "Configure Graphiti memory backend for cross-session context",
-			"syncDescription": "Configure Graphiti memory"
+			"syncDescription": "Configure Graphiti memory",
+			"enableMemory": "Enable memory",
+			"enableMemoryDescription": "Persistent cross-session memory backed by LadybugDB (embedded database)",
+			"fileBasedMemoryDescription": "Using file-based memory. Session insights are stored locally in JSON files. Enable memory for persistent cross-session context with semantic search.",
+			"enableAgentMemoryAccess": "Enable agent memory access",
+			"enableAgentMemoryAccessDescription": "Let agents search and add to the knowledge graph through MCP",
+			"graphitiMcpServerUrl": "Graphiti MCP server URL",
+			"graphitiMcpServerUrlDescription": "Graphiti MCP server URL for agent memory access",
+			"embeddingProvider": "Embedding provider",
+			"embeddingProviderDescription": "Provider for semantic search (optional — keyword search works without it)",
+			"databaseName": "Database name",
+			"databaseNameDescription": "Stored in ~/.workpilot/memories/",
+			"databasePath": "Database path (optional)",
+			"databasePathDescription": "Custom storage location. Defaults to ~/.workpilot/memories/"
 		},
 		"flagshipModel": "Flagship model: {{model}}",
 		"tierFlagship": "Flagship",
@@ -1769,8 +1669,8 @@
 		"importSuccess": "{{count}} work item(s) imported successfully",
 		"importSuccessSingle": "Work item \"{{title}}\" imported successfully",
 		"successTitle": "Import Successful!",
-		"successCount": "Imported {{count}} work item.",
-		"successCount_plural": "Imported {{count}} work items.",
+		"successCount_one": "Imported {{count}} work item.",
+		"successCount_other": "Imported {{count}} work items.",
 		"successFailedSuffix": "{{count}} failed.",
 		"errorNotConfigured": "Azure DevOps not configured",
 		"errorCheckConnectionFailed": "Connection check failed",
@@ -1791,8 +1691,8 @@
 		"done": "Done",
 		"cancel": "Cancel",
 		"importing": "Importing...",
-		"importButton": "Import Work Items from Azure DevOps",
-		"importButton_plural": "Import {{count}} items",
+		"importButton_one": "Import Work Items from Azure DevOps",
+		"importButton_other": "Import {{count}} items",
 		"dropZone": "Drop items here",
 		"dropZoneItems": "{{count}} item(s) to import",
 		"dropToColumn": "Drop to {{column}} column",
@@ -2039,8 +1939,6 @@
 		"description": "Select Jira issues to import into WorkPilot AI",
 		"importSuccess": "{{count}} issue(s) imported successfully",
 		"successTitle": "Import Successful!",
-		"successCount": "Imported {{count}} issue.",
-		"successCount_plural": "Imported {{count}} issues.",
 		"successFailedSuffix": "{{count}} failed.",
 		"errorNotConfigured": "Jira not configured",
 		"errorCheckConnectionFailed": "Connection check failed",
@@ -2061,8 +1959,6 @@
 		"done": "Done",
 		"cancel": "Cancel",
 		"importing": "Importing...",
-		"importButton": "Import Issues from Jira",
-		"importButton_plural": "Import {{count}} items",
 		"dropZone": "Drop items here",
 		"dropZoneItems": "{{count}} item(s) to import",
 		"dropToColumn": "Drop to {{column}} column",
@@ -2237,128 +2133,128 @@
 		"extensionNotInstalled": "Extension not installed",
 		"gitHubCliNotFoundShort": "GitHub CLI not found",
 		"checking": "Checking...",
-		"error": "Error",
-		"llmRouter": {
-			"title": "LLM Router",
-			"description": "Configure intelligent provider routing with fallback chains, A/B testing, and strategy-based selection.",
-			"routingStrategy": {
-				"title": "Default Routing Strategy",
-				"description": "How the router selects a provider when multiple are available.",
-				"bestPerformance": "Best Performance",
-				"bestPerformanceDescription": "Prioritize quality score",
-				"cheapest": "Cheapest",
-				"cheapestDescription": "Minimize cost per task",
-				"lowestLatency": "Lowest Latency",
-				"lowestLatencyDescription": "Fastest response time",
-				"roundRobin": "Round Robin",
-				"roundRobinDescription": "Distribute evenly"
-			},
-			"registeredProviders": {
-				"title": "Registered Providers",
-				"description": "Providers available for routing. Configure accounts in Settings > Accounts.",
-				"table": {
-					"providerModel": "Provider / Model",
-					"capabilities": "Capabilities",
-					"priority": "Priority",
-					"status": "Status"
-				},
-				"status": {
-					"active": "Active",
-					"disabled": "Disabled",
-					"local": "local"
-				}
-			},
-			"fallbackChains": {
-				"title": "Fallback Chains",
-				"description": "If the primary provider is rate-limited or unavailable, the router automatically falls back to the next in the chain."
-			},
-			"abTesting": {
-				"title": "A/B Testing",
-				"description": "Compare two providers on the same task type. The router alternates between them and tracks quality, latency, and cost.",
-				"noActiveTests": "No active A/B tests",
-				"createTest": "Create a test from the Command Palette or from the task detail view."
-			}
+		"error": "Error"
+	},
+	"cicdTriggers": {
+		"title": "CI/CD Deployment Triggers",
+		"description": "Automatically trigger deployment pipelines after agent creates a PR",
+		"provider": "Provider",
+		"enabled": "Auto-trigger enabled",
+		"triggerOnPr": "Trigger on PR creation",
+		"triggerOnMerge": "Trigger on merge",
+		"recentRuns": "Recent pipeline runs",
+		"triggerNow": "Trigger Now",
+		"noRuns": "No pipeline runs yet",
+		"providers": {
+			"github": "GitHub Actions",
+			"gitlab": "GitLab CI",
+			"azure": "Azure DevOps",
+			"jenkins": "Jenkins"
 		},
-		"memoryLifecycle": {
-			"title": "Memory Lifecycle Manager",
-			"description": "Manage Graphiti memory — pruning, retention policies, freshness control",
-			"status": "Status",
-			"episodeCount": "Episodes stored",
-			"diskUsage": "Disk usage",
-			"retentionDays": "Retention (days)",
-			"maxEpisodes": "Max episodes",
-			"pruneStrategy": "Prune strategy",
-			"autoPrune": "Auto-prune",
-			"runPrune": "Run Prune Now",
-			"export": "Export Memories",
-			"pruneStrategies": {
-				"lru": "LRU (least recently used)",
-				"oldest": "Oldest first",
-				"duplicates": "Duplicates only"
-			}
+		"runStatus": {
+			"pending": "Pending",
+			"triggered": "Triggered",
+			"running": "Running",
+			"success": "Success",
+			"failed": "Failed"
+		}
+	},
+	"crossLangTranslation": {
+		"title": "Cross-Language Translation",
+		"description": "AI-powered code translation between programming languages",
+		"sourceLang": "Source language",
+		"targetLang": "Target language",
+		"inputCode": "Input code",
+		"outputCode": "Translated code",
+		"translate": "Translate",
+		"cancel": "Cancel",
+		"history": "Translation history",
+		"clearHistory": "Clear history",
+		"preserveComments": "Preserve comments",
+		"generateTests": "Generate tests",
+		"noHistory": "No translations yet",
+		"status": {
+			"pending": "Pending",
+			"complete": "Complete",
+			"failed": "Failed"
+		}
+	},
+	"llmRouter": {
+		"title": "LLM Router",
+		"description": "Configure intelligent provider routing with fallback chains, A/B testing, and strategy-based selection.",
+		"routingStrategy": {
+			"title": "Default Routing Strategy",
+			"description": "How the router selects a provider when multiple are available.",
+			"bestPerformance": "Best Performance",
+			"bestPerformanceDescription": "Prioritize quality score",
+			"cheapest": "Cheapest",
+			"cheapestDescription": "Minimize cost per task",
+			"lowestLatency": "Lowest Latency",
+			"lowestLatencyDescription": "Fastest response time",
+			"roundRobin": "Round Robin",
+			"roundRobinDescription": "Distribute evenly"
 		},
-		"cicdTriggers": {
-			"title": "CI/CD Deployment Triggers",
-			"description": "Automatically trigger deployment pipelines after agent creates a PR",
-			"provider": "Provider",
-			"enabled": "Auto-trigger enabled",
-			"triggerOnPr": "Trigger on PR creation",
-			"triggerOnMerge": "Trigger on merge",
-			"recentRuns": "Recent pipeline runs",
-			"triggerNow": "Trigger Now",
-			"noRuns": "No pipeline runs yet",
-			"providers": {
-				"github": "GitHub Actions",
-				"gitlab": "GitLab CI",
-				"azure": "Azure DevOps",
-				"jenkins": "Jenkins"
+		"registeredProviders": {
+			"title": "Registered Providers",
+			"description": "Providers available for routing. Configure accounts in Settings > Accounts.",
+			"table": {
+				"providerModel": "Provider / Model",
+				"capabilities": "Capabilities",
+				"priority": "Priority",
+				"status": "Status"
 			},
-			"runStatus": {
-				"pending": "Pending",
-				"triggered": "Triggered",
-				"running": "Running",
-				"success": "Success",
-				"failed": "Failed"
-			}
-		},
-		"crossLangTranslation": {
-			"title": "Cross-Language Translation",
-			"description": "AI-powered code translation between programming languages",
-			"sourceLang": "Source language",
-			"targetLang": "Target language",
-			"inputCode": "Input code",
-			"outputCode": "Translated code",
-			"translate": "Translate",
-			"cancel": "Cancel",
-			"history": "Translation history",
-			"clearHistory": "Clear history",
-			"preserveComments": "Preserve comments",
-			"generateTests": "Generate tests",
-			"noHistory": "No translations yet",
 			"status": {
-				"pending": "Pending",
-				"complete": "Complete",
-				"failed": "Failed"
+				"active": "Active",
+				"disabled": "Disabled",
+				"local": "local"
 			}
 		},
-		"specApproval": {
-			"title": "Spec Approval Workflow",
-			"description": "Review and approve AI-generated specifications before execution",
-			"pendingSpecs": "Pending approval",
-			"history": "Approval history",
-			"approve": "Approve",
-			"reject": "Reject",
-			"requestChanges": "Request Changes",
-			"amendments": "Amendments (optional)",
-			"feedback": "Feedback",
-			"noPending": "No specs awaiting approval",
-			"specContent": "Spec content",
-			"status": {
-				"pending": "Pending",
-				"approved": "Approved",
-				"rejected": "Rejected",
-				"changes_requested": "Changes requested"
-			}
+		"fallbackChains": {
+			"title": "Fallback Chains",
+			"description": "If the primary provider is rate-limited or unavailable, the router automatically falls back to the next in the chain."
+		},
+		"abTesting": {
+			"title": "A/B Testing",
+			"description": "Compare two providers on the same task type. The router alternates between them and tracks quality, latency, and cost.",
+			"noActiveTests": "No active A/B tests",
+			"createTest": "Create a test from the Command Palette or from the task detail view."
+		}
+	},
+	"memoryLifecycle": {
+		"title": "Memory Lifecycle Manager",
+		"description": "Manage Graphiti memory — pruning, retention policies, freshness control",
+		"status": "Status",
+		"episodeCount": "Episodes stored",
+		"diskUsage": "Disk usage",
+		"retentionDays": "Retention (days)",
+		"maxEpisodes": "Max episodes",
+		"pruneStrategy": "Prune strategy",
+		"autoPrune": "Auto-prune",
+		"runPrune": "Run Prune Now",
+		"export": "Export Memories",
+		"pruneStrategies": {
+			"lru": "LRU (least recently used)",
+			"oldest": "Oldest first",
+			"duplicates": "Duplicates only"
+		}
+	},
+	"specApproval": {
+		"title": "Spec Approval Workflow",
+		"description": "Review and approve AI-generated specifications before execution",
+		"pendingSpecs": "Pending approval",
+		"history": "Approval history",
+		"approve": "Approve",
+		"reject": "Reject",
+		"requestChanges": "Request Changes",
+		"amendments": "Amendments (optional)",
+		"feedback": "Feedback",
+		"noPending": "No specs awaiting approval",
+		"specContent": "Spec content",
+		"status": {
+			"pending": "Pending",
+			"approved": "Approved",
+			"rejected": "Rejected",
+			"changes_requested": "Changes requested"
 		}
 	},
 	"githubCopilot": {

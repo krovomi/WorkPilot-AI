@@ -193,7 +193,7 @@ class TestCommunicationBus:
             # Check content
             import json
 
-            with open(thread_file) as f:
+            with open(thread_file, encoding="utf-8") as f:
                 saved = json.load(f)
 
             assert saved["thread_id"] == thread.thread_id
@@ -221,7 +221,7 @@ class TestCommunicationBus:
 
             import json
 
-            with open(summary_file) as f:
+            with open(summary_file, encoding="utf-8") as f:
                 summary = json.load(f)
 
             assert summary["total_threads"] == 2

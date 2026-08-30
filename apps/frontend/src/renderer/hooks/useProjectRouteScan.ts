@@ -44,7 +44,11 @@ export function useProjectRouteScan() {
 					projectName,
 				);
 				if (result.success && result.data) {
-					setSpec(result.data as OpenApiSpec);
+					// Le scan vient d'un runner Python : le pont le type
+					// `Record<string, unknown>`, ce qui est honnete — personne ne
+					// valide la forme au passage. La conversion passe par `unknown`
+					// pour que ce saut de foi soit visible plutot qu'implicite.
+					setSpec(result.data as unknown as OpenApiSpec);
 					setSpecSource("scan");
 					setSpecError(null);
 					setScannedProjectId(projectId);

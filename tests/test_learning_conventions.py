@@ -225,7 +225,9 @@ class TestPhaseEntryPoint:
 
     def test_a_broken_ledger_does_not_raise(self, tmp_path: Path):
         conventions_dir(tmp_path).mkdir(parents=True)
-        (conventions_dir(tmp_path) / "ledger.json").write_text("{ broken", "utf-8")
+        (conventions_dir(tmp_path) / "ledger.json").write_text(
+            "{ broken", encoding="utf-8"
+        )
         recorded, proposals = run_convention_pass(tmp_path, FILES, GREEN, "b")
         assert recorded  # unreadable ledger is treated as empty, not fatal
 

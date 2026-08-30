@@ -9,6 +9,7 @@ import { promises as fs } from "node:fs";
 import { promisify } from "node:util";
 import { app, ipcMain } from "electron";
 import path from "node:path";
+import { isWindows } from "../platform";
 
 const execFileAsync = promisify(execFile);
 
@@ -101,7 +102,7 @@ async function getCodexVersion(): Promise<string | undefined> {
 	const home = os.homedir();
 
 	// Windows: check known global install paths (npm + pnpm)
-	if (process.platform === "win32") {
+	if (isWindows()) {
 		const candidates = [
 			path.join(home, "AppData", "Roaming", "npm", "codex.cmd"),
 			path.join(home, "AppData", "Local", "pnpm", "codex.CMD"),
@@ -177,9 +178,8 @@ function runShellCommand(
 	args: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
 	return new Promise((resolve, reject) => {
-		const isWindows = process.platform === "win32";
 		const child = spawn(cmd, args, {
-			shell: isWindows,
+			shell: isWindows(),
 			windowsHide: true,
 			env: { ...process.env, CI: "1" },
 		});

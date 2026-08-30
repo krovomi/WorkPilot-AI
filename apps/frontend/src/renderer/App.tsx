@@ -101,10 +101,20 @@ const AgentTools = lazy(() =>
 const Worktrees = lazy(() =>
 	import("./components/Worktrees").then((m) => ({ default: m.Worktrees })),
 );
-const MigrationWizard = lazy(() =>
-	import("./components/MigrationWizard").then((m) => ({
-		default: m.MigrationWizard,
+const CodeMigrationDashboard = lazy(() =>
+	import("./components/code-migration/CodeMigrationDashboard").then((m) => ({
+		default: m.CodeMigrationDashboard,
 	})),
+);
+const ArchitectureVisualizer = lazy(() =>
+	import("./components/architecture-visualizer/ArchitectureVisualizer").then(
+		(m) => ({ default: m.ArchitectureVisualizer }),
+	),
+);
+const PerformanceProfilerDashboard = lazy(() =>
+	import(
+		"./components/performance-profiler/PerformanceProfilerDashboard"
+	).then((m) => ({ default: m.PerformanceProfilerDashboard })),
 );
 const VisualToCodeHub = lazy(() =>
 	import("./components/visual-to-code/VisualToCodeHub").then((m) => ({
@@ -1840,7 +1850,15 @@ export function App() {
 															}
 														/>
 													)}
-												{activeView === "migration" && <MigrationWizard />}
+												{activeView === "migration" && (
+													<CodeMigrationDashboard />
+												)}
+												{activeView === "architecture-visualizer" && (
+													<ArchitectureVisualizer />
+												)}
+												{activeView === "performance-profiler" && (
+													<PerformanceProfilerDashboard />
+												)}
 												{activeView === "visual-to-code" && <VisualToCodeHub />}
 												{activeView === "dashboard" &&
 													selectedProject?.path && (

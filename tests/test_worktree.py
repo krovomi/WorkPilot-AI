@@ -195,7 +195,7 @@ class TestWorktreeCreation:
 
         info1 = manager.create_worktree("test-spec")
         # Create a file in the worktree
-        (info1.path / "test-file.txt").write_text("test")
+        (info1.path / "test-file.txt").write_text("test", encoding="utf-8")
 
         # get_or_create should return existing
         info2 = manager.get_or_create_worktree("test-spec")
@@ -215,7 +215,7 @@ class TestWorktreeCreation:
         assert info1.branch == "workpilot/test-spec"
 
         # Create a file in the worktree to verify it's preserved
-        (info1.path / "test-file.txt").write_text("test content")
+        (info1.path / "test-file.txt").write_text("test content", encoding="utf-8")
 
         # Second creation should also succeed (idempotent)
         info2 = manager.create_worktree("test-spec")
@@ -225,7 +225,9 @@ class TestWorktreeCreation:
         assert info2.branch == "workpilot/test-spec"
         # The test file should still be there (same worktree returned)
         assert (info2.path / "test-file.txt").exists()
-        assert (info2.path / "test-file.txt").read_text() == "test content"
+        assert (info2.path / "test-file.txt").read_text(
+            encoding="utf-8"
+        ) == "test content"
 
     def test_create_worktree_branch_exists_no_worktree(self, temp_git_repo: Path):
         """create_worktree reuses existing branch when worktree is missing."""
@@ -277,7 +279,7 @@ class TestWorktreeCreation:
         assert worktree_path.exists()
 
         # Add a file to the worktree so we can verify it gets cleaned up
-        (worktree_path / "test-file.txt").write_text("test content")
+        (worktree_path / "test-file.txt").write_text("test content", encoding="utf-8")
 
         # Force-remove the worktree from git's tracking, but leave directory intact
         # This simulates a stale state where directory exists but git doesn't track it
@@ -293,7 +295,7 @@ class TestWorktreeCreation:
         # Recreate the directory manually to simulate stale state
         # (git worktree remove also deletes the directory, so we recreate it)
         worktree_path.mkdir(parents=True, exist_ok=True)
-        (worktree_path / "stale-file.txt").write_text("stale content")
+        (worktree_path / "stale-file.txt").write_text("stale content", encoding="utf-8")
 
         # Verify directory exists but is not tracked by git
         assert worktree_path.exists()
@@ -355,7 +357,7 @@ class TestWorktreeCreation:
 
         # Recreate stale directory manually (simulates orphaned directory)
         worktree_path.mkdir(parents=True, exist_ok=True)
-        (worktree_path / "stale-file.txt").write_text("stale content")
+        (worktree_path / "stale-file.txt").write_text("stale content", encoding="utf-8")
 
         # Verify: directory exists, worktree NOT registered, branch EXISTS
         assert worktree_path.exists()
@@ -574,7 +576,7 @@ class TestWorktreeRemoval:
         info = manager.create_worktree("test-spec")
 
         # Create an uncommitted change in the worktree
-        (info.path / "new-file.txt").write_text("uncommitted content")
+        (info.path / "new-file.txt").write_text("uncommitted content", encoding="utf-8")
 
         # Should raise RuntimeError instead of silently deleting
         with pytest.raises(RuntimeError) as exc_info:
@@ -592,7 +594,7 @@ class TestWorktreeRemoval:
         info = manager.create_worktree("test-spec")
 
         # Create and commit a change in the worktree
-        (info.path / "new-file.txt").write_text("committed content")
+        (info.path / "new-file.txt").write_text("committed content", encoding="utf-8")
         subprocess.run(
             ["git", "add", "."],
             cwd=info.path,
@@ -619,7 +621,9 @@ class TestWorktreeCommitAndMerge:
 
         # Create a worktree with changes
         worker_info = manager.create_worktree("worker-spec")
-        (worker_info.path / "worker-file.txt").write_text("worker content")
+        (worker_info.path / "worker-file.txt").write_text(
+            "worker content", encoding="utf-8"
+        )
         subprocess.run(["git", "add", "."], cwd=worker_info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Worker commit"],
@@ -655,7 +659,9 @@ class TestWorktreeCommitAndMerge:
 
         # Create a worktree with changes
         worker_info = manager.create_worktree("worker-spec")
-        (worker_info.path / "worker-file.txt").write_text("worker content")
+        (worker_info.path / "worker-file.txt").write_text(
+            "worker content", encoding="utf-8"
+        )
         result = subprocess.run(
             ["git", "add", "."], cwd=worker_info.path, capture_output=True
         )
@@ -682,7 +688,9 @@ class TestWorktreeCommitAndMerge:
 
         # Create a worktree with changes
         worker_info = manager.create_worktree("worker-spec")
-        (worker_info.path / "worker-file.txt").write_text("worker content")
+        (worker_info.path / "worker-file.txt").write_text(
+            "worker content", encoding="utf-8"
+        )
         add_result = subprocess.run(
             ["git", "add", "."], cwd=worker_info.path, capture_output=True
         )
@@ -713,7 +721,9 @@ class TestWorktreeCommitAndMerge:
 
         # Create a worktree with changes
         worker_info = manager.create_worktree("worker-spec")
-        (worker_info.path / "worker-file.txt").write_text("worker content")
+        (worker_info.path / "worker-file.txt").write_text(
+            "worker content", encoding="utf-8"
+        )
         add_result = subprocess.run(
             ["git", "add", "."], cwd=worker_info.path, capture_output=True
         )
@@ -759,7 +769,9 @@ class TestWorktreeCommitAndMerge:
         # Create a worktree with changes
         worker_info = manager.create_worktree("worker-spec")
         branch_name = worker_info.branch
-        (worker_info.path / "worker-file.txt").write_text("worker content")
+        (worker_info.path / "worker-file.txt").write_text(
+            "worker content", encoding="utf-8"
+        )
         add_result = subprocess.run(
             ["git", "add", "."], cwd=worker_info.path, capture_output=True
         )
@@ -802,7 +814,9 @@ class TestWorktreeCommitAndMerge:
 
         # Create a worktree with changes
         worker_info = manager.create_worktree("worker-spec")
-        (worker_info.path / "worker-file.txt").write_text("worker content")
+        (worker_info.path / "worker-file.txt").write_text(
+            "worker content", encoding="utf-8"
+        )
         add_result = subprocess.run(
             ["git", "add", "."], cwd=worker_info.path, capture_output=True
         )
@@ -821,7 +835,9 @@ class TestWorktreeCommitAndMerge:
         assert result is True
 
         # Now create an uncommitted change in the worktree
-        (worker_info.path / "uncommitted.txt").write_text("uncommitted content")
+        (worker_info.path / "uncommitted.txt").write_text(
+            "uncommitted content", encoding="utf-8"
+        )
 
         # Second merge with delete_after=True should succeed but NOT delete worktree
         # because it has uncommitted changes
@@ -842,7 +858,7 @@ class TestWorktreeCommitAndMerge:
         manager.setup()
 
         # Create initial file on base branch
-        (temp_git_repo / "shared.txt").write_text("base content")
+        (temp_git_repo / "shared.txt").write_text("base content", encoding="utf-8")
         add_result = subprocess.run(
             ["git", "add", "."], cwd=temp_git_repo, capture_output=True
         )
@@ -858,7 +874,7 @@ class TestWorktreeCommitAndMerge:
 
         # Create worktree with conflicting change
         worker_info = manager.create_worktree("worker-spec")
-        (worker_info.path / "shared.txt").write_text("worker content")
+        (worker_info.path / "shared.txt").write_text("worker content", encoding="utf-8")
         add_result = subprocess.run(
             ["git", "add", "."], cwd=worker_info.path, capture_output=True
         )
@@ -873,7 +889,7 @@ class TestWorktreeCommitAndMerge:
         )
 
         # Make conflicting change on base branch
-        (temp_git_repo / "shared.txt").write_text("base change")
+        (temp_git_repo / "shared.txt").write_text("base change", encoding="utf-8")
         add_result = subprocess.run(
             ["git", "add", "."], cwd=temp_git_repo, capture_output=True
         )
@@ -921,7 +937,7 @@ class TestWorktreeCommitAndMerge:
         manager.setup()
 
         # Create initial file on base branch
-        (temp_git_repo / "shared.txt").write_text("base content")
+        (temp_git_repo / "shared.txt").write_text("base content", encoding="utf-8")
         add_result = subprocess.run(
             ["git", "add", "."], cwd=temp_git_repo, capture_output=True
         )
@@ -937,7 +953,7 @@ class TestWorktreeCommitAndMerge:
 
         # Create worktree with conflicting change
         worker_info = manager.create_worktree("worker-spec")
-        (worker_info.path / "shared.txt").write_text("worker content")
+        (worker_info.path / "shared.txt").write_text("worker content", encoding="utf-8")
         add_result = subprocess.run(
             ["git", "add", "."], cwd=worker_info.path, capture_output=True
         )
@@ -952,7 +968,7 @@ class TestWorktreeCommitAndMerge:
         )
 
         # Make conflicting change on base branch
-        (temp_git_repo / "shared.txt").write_text("base change")
+        (temp_git_repo / "shared.txt").write_text("base change", encoding="utf-8")
         add_result = subprocess.run(
             ["git", "add", "."], cwd=temp_git_repo, capture_output=True
         )
@@ -1012,7 +1028,7 @@ class TestChangeTracking:
         manager.setup()
 
         # Make uncommitted changes
-        (temp_git_repo / "dirty.txt").write_text("uncommitted")
+        (temp_git_repo / "dirty.txt").write_text("uncommitted", encoding="utf-8")
 
         assert manager.has_uncommitted_changes() is True
 
@@ -1023,8 +1039,8 @@ class TestChangeTracking:
         info = manager.create_worktree("test-spec")
 
         # Make various changes
-        (info.path / "new-file.txt").write_text("new")
-        (info.path / "README.md").write_text("modified")
+        (info.path / "new-file.txt").write_text("new", encoding="utf-8")
+        (info.path / "README.md").write_text("modified", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Changes"], cwd=info.path, capture_output=True
@@ -1042,7 +1058,7 @@ class TestChangeTracking:
         info = manager.create_worktree("test-spec")
 
         # Make changes
-        (info.path / "added.txt").write_text("new file")
+        (info.path / "added.txt").write_text("new file", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Add file"], cwd=info.path, capture_output=True
@@ -1124,7 +1140,7 @@ class TestWorktreeUtilities:
         info = manager.create_worktree("test-spec")
 
         # Create requirements.txt
-        (info.path / "requirements.txt").write_text("flask\n")
+        (info.path / "requirements.txt").write_text("flask\n", encoding="utf-8")
 
         commands = manager.get_test_commands("test-spec")
 
@@ -1137,7 +1153,7 @@ class TestWorktreeUtilities:
         info = manager.create_worktree("test-spec-node")
 
         # Create package.json
-        (info.path / "package.json").write_text('{"name": "test"}')
+        (info.path / "package.json").write_text('{"name": "test"}', encoding="utf-8")
 
         commands = manager.get_test_commands("test-spec-node")
 
@@ -1155,7 +1171,7 @@ class TestWorktreeCleanup:
 
         # Make a commit in the worktree
         test_file = info.path / "test.txt"
-        test_file.write_text("test")
+        test_file.write_text("test", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "test commit"], cwd=info.path, capture_output=True
@@ -1177,7 +1193,7 @@ class TestWorktreeCleanup:
         # Create a worktree with a commit
         info = manager.create_worktree("test-spec")
         test_file = info.path / "test.txt"
-        test_file.write_text("test")
+        test_file.write_text("test", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "test commit"], cwd=info.path, capture_output=True
@@ -1200,7 +1216,7 @@ class TestWorktreeCleanup:
         # Create a worktree with a commit
         info = manager.create_worktree("test-spec")
         test_file = info.path / "test.txt"
-        test_file.write_text("test")
+        test_file.write_text("test", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "test commit"], cwd=info.path, capture_output=True
@@ -1221,7 +1237,7 @@ class TestWorktreeCleanup:
         # Create a worktree with a commit
         info = manager.create_worktree("test-spec")
         test_file = info.path / "test.txt"
-        test_file.write_text("test")
+        test_file.write_text("test", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "test commit"], cwd=info.path, capture_output=True
@@ -1242,7 +1258,7 @@ class TestWorktreeCleanup:
         # Create a worktree with a commit
         info = manager.create_worktree("test-spec")
         test_file = info.path / "test.txt"
-        test_file.write_text("test")
+        test_file.write_text("test", encoding="utf-8")
         subprocess.run(["git", "add", "."], cwd=info.path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "test commit"], cwd=info.path, capture_output=True
@@ -1316,7 +1332,7 @@ class TestEmptyPRGuard:
         manager.setup()
         info = manager.create_worktree("work-spec")
 
-        (info.path / "feature.txt").write_text("nouveau contenu\n")
+        (info.path / "feature.txt").write_text("nouveau contenu\n", encoding="utf-8")
         assert manager.commit_in_worktree("work-spec", "feat: ajout feature")
 
         ahead = manager._count_commits_ahead("work-spec", manager.base_branch)
@@ -1383,7 +1399,7 @@ class TestApplyDiscardList:
         manager.setup()
         info = manager.create_worktree("no-discard-spec")
 
-        (info.path / "feature.txt").write_text("contenu\n")
+        (info.path / "feature.txt").write_text("contenu\n", encoding="utf-8")
         assert manager.commit_in_worktree("no-discard-spec", "feat: feature")
 
         reverted = manager._apply_discard_list("no-discard-spec", manager.base_branch)
@@ -1401,11 +1417,13 @@ class TestApplyDiscardList:
         info = manager.create_worktree("discard-spec")
 
         # Fichier ajouté par la tâche (absent de la base)
-        (info.path / "added.txt").write_text("ajout tâche\n")
+        (info.path / "added.txt").write_text("ajout tâche\n", encoding="utf-8")
         # Fichier existant modifié par la tâche
-        (info.path / "README.md").write_text("# Modifié par la tâche\n")
+        (info.path / "README.md").write_text(
+            "# Modifié par la tâche\n", encoding="utf-8"
+        )
         # Fichier conservé (hors discard list)
-        (info.path / "keep.txt").write_text("à garder\n")
+        (info.path / "keep.txt").write_text("à garder\n", encoding="utf-8")
         assert manager.commit_in_worktree("discard-spec", "feat: trois fichiers")
 
         # L'utilisateur abandonne added.txt et README.md
@@ -1427,7 +1445,7 @@ class TestApplyDiscardList:
         # added.txt est physiquement supprimé du worktree
         assert not (info.path / "added.txt").exists()
         # README.md est restauré au contenu de la base
-        assert (info.path / "README.md").read_text() == "# Test repo\n"
+        assert (info.path / "README.md").read_text(encoding="utf-8") == "# Test repo\n"
 
     def test_discard_list_excludes_files_from_pr_branch(self, temp_git_repo: Path):
         """Le commit de revert généré exclut bien les fichiers de la branche
@@ -1436,8 +1454,8 @@ class TestApplyDiscardList:
         manager.setup()
         info = manager.create_worktree("corr-spec")
 
-        (info.path / "secret.txt").write_text("ne pas pousser\n")
-        (info.path / "wanted.txt").write_text("à pousser\n")
+        (info.path / "secret.txt").write_text("ne pas pousser\n", encoding="utf-8")
+        (info.path / "wanted.txt").write_text("à pousser\n", encoding="utf-8")
         assert manager.commit_in_worktree("corr-spec", "feat: deux fichiers")
 
         (info.path / ".workpilot-discard-list").write_text(

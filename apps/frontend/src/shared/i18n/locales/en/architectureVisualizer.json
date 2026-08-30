@@ -1,0 +1,36 @@
+{
+	"title": "Architecture Visualizer",
+	"subtitle": "Generate interactive architecture diagrams from your codebase",
+	"actions": {
+		"generate": "Generate Diagrams",
+		"regenerate": "Regenerate",
+		"cancel": "Cancel"
+	},
+	"diagramTypes": {
+		"heading": "Diagram Types",
+		"module_dependencies": "Module Dependencies",
+		"component_hierarchy": "Component Hierarchy",
+		"data_flow": "Data Flow",
+		"database_schema": "Database Schema"
+	},
+	"view": {
+		"heading": "View Diagram"
+	},
+	"summary": {
+		"heading": "Summary",
+		"diagrams_one": "{{count}} diagram",
+		"diagrams_other": "{{count}} diagrams",
+		"nodes_one": "{{count}} node",
+		"nodes_other": "{{count}} nodes",
+		"edges_one": "{{count}} edge",
+		"edges_other": "{{count}} edges"
+	},
+	"diagram": {
+		"counts": "{{nodes}} nodes • {{edges}} edges",
+		"copyHint": "Copy the Mermaid code above and paste it into <0>mermaid.live</0> to view the interactive diagram."
+	},
+	"empty": {
+		"title": "Architecture Visualizer",
+		"body": "Select diagram types and click “Generate Diagrams” to automatically analyze your codebase and generate architecture diagrams."
+	}
+}

@@ -1,3 +1,4 @@
+import { isWindows } from "../platform";
 /**
  * Frontend Colored Logs Utility
  *
@@ -68,7 +69,7 @@ function supportsColor(): boolean {
 	if (term === "dumb" || term === "unknown") return false;
 
 	// Enhanced PowerShell detection
-	if (process.platform === "win32") {
+	if (isWindows()) {
 		// Windows PowerShell or Windows Terminal
 		if (process.env.PSModulePath || process.env.WINDIR) {
 			return true;

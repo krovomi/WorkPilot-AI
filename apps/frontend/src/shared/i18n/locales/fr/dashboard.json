@@ -4,8 +4,8 @@
 	"kpi": {
 		"totalTasks": {
 			"title": "Total tâches",
-			"completed": "{{count}} terminée",
-			"completed_plural": "{{count}} terminées"
+			"completed_one": "{{count}} terminée",
+			"completed_other": "{{count}} terminées"
 		},
 		"qaFirstPassRate": {
 			"title": "Taux QA premier passage",

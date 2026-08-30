@@ -13,6 +13,7 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "electron";
+import { isUnix, isWindows } from "./platform";
 import {
 	buildPowerShellKnownMsBuildArray,
 	LEGACY_MSBUILD_UNAVAILABLE_MESSAGE,
@@ -980,7 +981,7 @@ export class AppEmulatorService extends EventEmitter {
 	}
 
 	private buildIisExpressCommand(projectDir: string, port: number): string {
-		if (process.platform !== "win32") {
+		if (isUnix()) {
 			const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 			const root = shellQuote(projectDir);
 			const unavailable = shellQuote(IIS_EXPRESS_UNAVAILABLE_MESSAGE);
@@ -1539,7 +1540,7 @@ exit $launched.ExitCode
 				? [`/p:CustomBeforeMicrosoftCommonTargets=${referencesTarget}`]
 				: []),
 		];
-		if (process.platform !== "win32") {
+		if (isUnix()) {
 			const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 			const shBuildPath = shellQuote(csprojPath);
 			const shBuildArgs = buildArgs.map(shellQuote).join(" ");
@@ -1646,7 +1647,7 @@ exit $launched.ExitCode
 		shell?: boolean;
 	} {
 		const useShell =
-			process.platform === "win32" ||
+			isWindows() ||
 			/["'|&;<>()$]/.test(startCommand) ||
 			startCommand.startsWith("sh -lc ") ||
 			startCommand.startsWith("bash -lc ");
@@ -2136,7 +2137,6 @@ exit $launched.ExitCode
 		if (existsSync(nodeModulesPath)) return Promise.resolve();
 
 		const pm = this.detectPackageManager(projectDir);
-		const isWindows = process.platform === "win32";
 
 		this.emit("status", `${prefix}Installing dependencies with ${pm}...`);
 		this.emit(
@@ -2148,7 +2148,7 @@ exit $launched.ExitCode
 			const proc = spawn(pm, ["install"], {
 				cwd: projectDir,
 				env: process.env as Record<string, string>,
-				shell: isWindows ? true : undefined,
+				shell: isWindows() ? true : undefined,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
 			proc.stdout?.on("data", (data: Buffer) => {
@@ -2216,8 +2216,6 @@ exit $launched.ExitCode
 		else if (hasPyproject) installCmd = "pip install -e .";
 
 		if (!installCmd) return Promise.resolve();
-
-		const isWindows = process.platform === "win32";
 		this.emit("status", `${prefix}Installing Python dependencies...`);
 		this.emit(
 			"output",
@@ -2229,7 +2227,7 @@ exit $launched.ExitCode
 			const proc = spawn(cmd, args, {
 				cwd: projectDir,
 				env: process.env as Record<string, string>,
-				shell: isWindows ? true : undefined,
+				shell: isWindows() ? true : undefined,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
 			proc.stdout?.on("data", (data: Buffer) => {
@@ -2938,7 +2936,7 @@ exit $launched.ExitCode
 	}
 
 	private killProcessOnPort(port: number): Promise<void> {
-		if (process.platform !== "win32") return Promise.resolve();
+		if (isUnix()) return Promise.resolve();
 		return new Promise<void>((resolve) => {
 			const ps = spawn(
 				"powershell",
@@ -2976,7 +2974,7 @@ exit $launched.ExitCode
 		const killProc = (proc: ChildProcess) => {
 			const pid = proc.pid;
 			try {
-				if (process.platform === "win32" && pid) {
+				if (isWindows() && pid) {
 					spawn("taskkill", ["/pid", String(pid), "/f", "/t"], {
 						stdio: "ignore",
 					});

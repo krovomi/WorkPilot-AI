@@ -24,10 +24,11 @@ def temp_project():
         project_dir = Path(tmpdir)
 
         # Create some test files
-        (project_dir / "README.md").write_text("# Test Project")
+        (project_dir / "README.md").write_text("# Test Project", encoding="utf-8")
 
         # Python file with issues
-        (project_dir / "bad_code.py").write_text('''
+        (project_dir / "bad_code.py").write_text(
+            '''
 def long_function():
     """A function with many statements."""
     x = 1
@@ -46,7 +47,9 @@ def long_function():
 def function_with_many_params(a, b, c, d, e, f, g):
     """Too many parameters."""
     return a + b + c + d + e + f + g
-''')
+''',
+            encoding="utf-8",
+        )
 
         yield project_dir
 

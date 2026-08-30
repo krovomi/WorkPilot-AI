@@ -113,7 +113,7 @@ class TestValidatedDir:
 
     def test_a_file_is_not_a_directory(self, tmp_path):
         f = tmp_path / "f.txt"
-        f.write_text("x")
+        f.write_text("x", encoding="utf-8")
         with pytest.raises(ValueError, match="does not exist or is not a directory"):
             validated_dir(str(f), "project_dir")
 

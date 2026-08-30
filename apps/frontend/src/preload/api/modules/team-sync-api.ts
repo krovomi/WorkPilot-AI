@@ -50,16 +50,38 @@ export interface TeamSyncConfig {
 	auto_push?: boolean;
 }
 
+/**
+ * Ce que `SyncManager.push()` renvoie, tel que documenté et produit côté Python
+ * (`integrations/graphiti/team_sync/sync_manager.py`).
+ */
+export interface TeamSyncPushResult {
+	success: boolean;
+	path?: string;
+	episode_count?: number;
+	error?: string;
+}
+
+/** Ce que `SyncManager.pull()` renvoie. */
+export interface TeamSyncPullResult {
+	success: boolean;
+	imported?: number;
+	peers?: string[];
+	error?: string;
+}
+
 export interface TeamSyncAPI {
 	teamSyncGetStatus: (
 		projectDir: string,
 	) => Promise<{ success: boolean; data?: TeamSyncStatus; error?: string }>;
+	// `data` etait `unknown` des deux cotes du pont, alors que le runner Python
+	// documente sa forme et que `TeamSyncPanel` lit `episode_count`, `imported`
+	// et `peers`.
 	teamSyncPush: (
 		projectDir: string,
-	) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+	) => Promise<{ success: boolean; data?: TeamSyncPushResult; error?: string }>;
 	teamSyncPull: (
 		projectDir: string,
-	) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+	) => Promise<{ success: boolean; data?: TeamSyncPullResult; error?: string }>;
 	teamSyncListPeers: (
 		projectDir: string,
 	) => Promise<{ success: boolean; data?: TeamSyncPeer[]; error?: string }>;

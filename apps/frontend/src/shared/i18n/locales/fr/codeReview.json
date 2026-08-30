@@ -24,8 +24,8 @@
 	"result": {
 		"passed": "Revue Réussie",
 		"failed": "Revue Échouée",
-		"issues": "{{count}} problème trouvé",
-		"issues_plural": "{{count}} problèmes trouvés",
+		"issues_one": "{{count}} problème trouvé",
+		"issues_other": "{{count}} problèmes trouvés",
 		"criticalHigh": "critique/élevé"
 	},
 	"issues": {

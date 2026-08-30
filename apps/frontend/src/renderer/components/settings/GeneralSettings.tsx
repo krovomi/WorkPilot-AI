@@ -141,16 +141,9 @@ export function GeneralSettings({
 		globalThis.electronAPI
 			.getCliToolsInfo()
 			.then(
-				(result: {
-					success: boolean;
-					data?: {
-						python: ToolDetectionResult;
-						git: ToolDetectionResult;
-						gh: ToolDetectionResult;
-						glab: ToolDetectionResult;
-						claude: ToolDetectionResult;
-					};
-				}) => {
+				// Le type vient du pont, qui declare desormais `glab` comme le
+				// handler le renvoie.
+				(result) => {
 					if (cancelled || !result.success || !result.data) return;
 					setToolsInfo(result.data);
 					// Sync claudePath with detected path only when it differs, to avoid

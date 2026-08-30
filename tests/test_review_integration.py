@@ -53,8 +53,10 @@ class TestFullReviewFlow:
 
         # 2. Modify spec.md
         spec_file = review_spec_dir / "spec.md"
-        original_content = spec_file.read_text()
-        spec_file.write_text(original_content + "\n## New Section\n\nAdded content.")
+        original_content = spec_file.read_text(encoding="utf-8")
+        spec_file.write_text(
+            original_content + "\n## New Section\n\nAdded content.", encoding="utf-8"
+        )
 
         # 3. Approval should now be invalid
         assert not state.is_approval_valid(review_spec_dir)
@@ -99,7 +101,7 @@ class TestFullReviewFlow:
         assert state.review_count == 1
 
         # Modify spec to invalidate
-        (review_spec_dir / "spec.md").write_text("Changed content")
+        (review_spec_dir / "spec.md").write_text("Changed content", encoding="utf-8")
         state.invalidate(review_spec_dir)
 
         # Second review - reject
@@ -163,9 +165,10 @@ class TestFullReviewWorkflowIntegration:
 
         # 6. Modify spec.md (simulating user edit)
         spec_file = complete_spec_dir / "spec.md"
-        original_content = spec_file.read_text()
+        original_content = spec_file.read_text(encoding="utf-8")
         spec_file.write_text(
-            original_content + "\n\n## Additional Notes\n\nSome extra information.\n"
+            original_content + "\n\n## Additional Notes\n\nSome extra information.\n",
+            encoding="utf-8",
         )
 
         # 7. Approval should now be invalid (spec changed)
@@ -218,20 +221,20 @@ class TestFullReviewWorkflowIntegration:
 
         # Test 1: Whitespace-only change should change hash
         spec_file = complete_spec_dir / "spec.md"
-        original_content = spec_file.read_text()
-        spec_file.write_text(original_content + "\n\n\n")
+        original_content = spec_file.read_text(encoding="utf-8")
+        spec_file.write_text(original_content + "\n\n\n", encoding="utf-8")
         assert not state.is_approval_valid(complete_spec_dir)
 
         # Restore
-        spec_file.write_text(original_content)
+        spec_file.write_text(original_content, encoding="utf-8")
         assert state.is_approval_valid(complete_spec_dir)
 
         # Test 2: Plan modification should invalidate
         plan_file = complete_spec_dir / "implementation_plan.json"
-        plan_content = plan_file.read_text()
+        plan_content = plan_file.read_text(encoding="utf-8")
         plan = json.loads(plan_content)
         plan["phases"][0]["chunks"][0]["status"] = "completed"
-        plan_file.write_text(json.dumps(plan, indent=2))
+        plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
         assert not state.is_approval_valid(complete_spec_dir)
 
         # Test 3: New hash should be different
@@ -350,7 +353,7 @@ class TestFullReviewWorkflowIntegration:
         assert not summary2["spec_changed"]
 
         # Spec changed
-        (complete_spec_dir / "spec.md").write_text("Changed content")
+        (complete_spec_dir / "spec.md").write_text("Changed content", encoding="utf-8")
 
         summary3 = get_review_status_summary(complete_spec_dir)
         assert summary3["approved"]  # Still marked approved

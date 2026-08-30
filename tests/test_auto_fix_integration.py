@@ -123,7 +123,7 @@ def test_metrics():
 
             # Create implementation_plan.json
             plan_file = spec_dir / "implementation_plan.json"
-            plan_file.write_text('{"spec_name": "test"}')
+            plan_file.write_text('{"spec_name": "test"}', encoding="utf-8")
 
             tracker = AutoFixMetricsTracker(spec_dir)
             print(f"✓ MetricsTracker created for {spec_dir}")
@@ -176,7 +176,9 @@ def test_error_patterns():
             spec_dir.mkdir()
 
             # Create implementation_plan.json
-            (spec_dir / "implementation_plan.json").write_text('{"spec_name": "test"}')
+            (spec_dir / "implementation_plan.json").write_text(
+                '{"spec_name": "test"}', encoding="utf-8"
+            )
 
             loop = AutoFixLoop(project_dir, spec_dir, "test-model")
 
@@ -240,7 +242,9 @@ def test_test_count_parsing():
             project_dir = Path(tmpdir)
             spec_dir = Path(tmpdir) / "spec"
             spec_dir.mkdir()
-            (spec_dir / "implementation_plan.json").write_text('{"spec_name": "test"}')
+            (spec_dir / "implementation_plan.json").write_text(
+                '{"spec_name": "test"}', encoding="utf-8"
+            )
 
             loop = AutoFixLoop(project_dir, spec_dir, "test-model")
 

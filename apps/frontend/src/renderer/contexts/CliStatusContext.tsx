@@ -112,7 +112,8 @@ export function CliStatusProvider({
 					copilot: {
 						...prev.copilot,
 						status,
-						versionInfo: result.data,
+						// `IPCResult.data` est optionnel, `versionInfo` est `| null`.
+						versionInfo: result.data ?? null,
 						lastChecked: new Date(),
 					},
 				}));
@@ -229,7 +230,7 @@ export function CliStatusProvider({
 			if (result.success && result.data) {
 				setData((prev) => ({
 					...prev,
-					copilot: { ...prev.copilot, authStatus: result.data },
+					copilot: { ...prev.copilot, authStatus: result.data ?? null },
 				}));
 			}
 		} catch (err) {

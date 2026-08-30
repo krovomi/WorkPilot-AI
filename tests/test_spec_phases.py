@@ -241,7 +241,7 @@ class TestPhaseDiscovery:
         # Create the project_index.json file
         index_file = spec_dir / "project_index.json"
         index_file.write_text(
-            json.dumps({"files": [1, 2, 3], "project_type": "python"})
+            json.dumps({"files": [1, 2, 3], "project_type": "python"}), encoding="utf-8"
         )
 
         executor = PhaseExecutor(
@@ -314,7 +314,9 @@ class TestPhaseHistoricalContext:
     ):
         """Historical context phase returns early if hints file exists."""
         hints_file = spec_dir / "graph_hints.json"
-        hints_file.write_text(json.dumps({"hints": [], "enabled": True}))
+        hints_file.write_text(
+            json.dumps({"hints": [], "enabled": True}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -375,7 +377,9 @@ class TestPhaseRequirements:
     ):
         """Requirements phase returns early if file exists."""
         requirements_file = spec_dir / "requirements.json"
-        requirements_file.write_text(json.dumps({"task_description": "Test"}))
+        requirements_file.write_text(
+            json.dumps({"task_description": "Test"}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -420,7 +424,7 @@ class TestPhaseRequirements:
         assert (spec_dir / "requirements.json").exists()
 
         # Verify content
-        content = (spec_dir / "requirements.json").read_text()
+        content = (spec_dir / "requirements.json").read_text(encoding="utf-8")
         req = json.loads(content)
         assert req["task_description"] == "Add user authentication"
 
@@ -440,7 +444,9 @@ class TestPhaseContext:
     ):
         """Context phase returns early if file exists."""
         context_file = spec_dir / "context.json"
-        context_file.write_text(json.dumps({"task_description": "Test"}))
+        context_file.write_text(
+            json.dumps({"task_description": "Test"}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -537,8 +543,10 @@ class TestPhaseQuickSpec:
         mock_spec_validator,
     ):
         """Quick spec phase returns early if files exist."""
-        (spec_dir / "spec.md").write_text("# Test Spec")
-        (spec_dir / "implementation_plan.json").write_text(json.dumps({"phases": []}))
+        (spec_dir / "spec.md").write_text("# Test Spec", encoding="utf-8")
+        (spec_dir / "implementation_plan.json").write_text(
+            json.dumps({"phases": []}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -570,7 +578,7 @@ class TestPhaseQuickSpec:
 
         # Agent creates spec.md on success
         async def agent_side_effect(*args, **kwargs):
-            (spec_dir / "spec.md").write_text("# Generated Spec")
+            (spec_dir / "spec.md").write_text("# Generated Spec", encoding="utf-8")
             return (True, "Done")
 
         agent_fn = AsyncMock(side_effect=agent_side_effect)
@@ -617,12 +625,12 @@ class TestPhaseQuickSpec:
             return PhaseResult("context", True, [], [], 0)
 
         async def spec_writing_ok():
-            (spec_dir / "spec.md").write_text("# Escalated Spec")
+            (spec_dir / "spec.md").write_text("# Escalated Spec", encoding="utf-8")
             return PhaseResult("spec_writing", True, [], [], 0)
 
         async def planning_ok():
             (spec_dir / "implementation_plan.json").write_text(
-                json.dumps({"phases": []})
+                json.dumps({"phases": []}), encoding="utf-8"
             )
             return PhaseResult("planning", True, [], [], 0)
 
@@ -698,7 +706,9 @@ class TestPhaseQuickSpec:
         mock_spec_validator,
     ):
         """Research phase returns early if file exists."""
-        (spec_dir / "research.json").write_text(json.dumps({"findings": []}))
+        (spec_dir / "research.json").write_text(
+            json.dumps({"findings": []}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -757,7 +767,9 @@ class TestPhaseSpecWriting:
         mock_spec_validator,
     ):
         """Spec writing phase returns early if valid spec exists."""
-        (spec_dir / "spec.md").write_text("# Test Spec\n\n## Overview\n")
+        (spec_dir / "spec.md").write_text(
+            "# Test Spec\n\n## Overview\n", encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -786,10 +798,12 @@ class TestPhaseSpecWriting:
         mock_spec_validator,
     ):
         """Spec writing phase regenerates invalid spec."""
-        (spec_dir / "spec.md").write_text("Invalid spec")
+        (spec_dir / "spec.md").write_text("Invalid spec", encoding="utf-8")
 
         async def agent_side_effect(*args, **kwargs):
-            (spec_dir / "spec.md").write_text("# Valid Spec\n\n## Overview\n")
+            (spec_dir / "spec.md").write_text(
+                "# Valid Spec\n\n## Overview\n", encoding="utf-8"
+            )
             return (True, "Done")
 
         agent_fn = AsyncMock(side_effect=agent_side_effect)
@@ -877,14 +891,15 @@ class TestPhaseSelfCritique:
         mock_spec_validator,
     ):
         """Self-critique returns early if already completed."""
-        (spec_dir / "spec.md").write_text("# Test Spec")
+        (spec_dir / "spec.md").write_text("# Test Spec", encoding="utf-8")
         (spec_dir / "critique_report.json").write_text(
             json.dumps(
                 {
                     "issues_fixed": True,
                     "no_issues_found": False,
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         executor = PhaseExecutor(
@@ -918,7 +933,7 @@ class TestPhasePlanning:
     ):
         """Planning phase returns early if valid plan exists."""
         (spec_dir / "implementation_plan.json").write_text(
-            json.dumps({"phases": [{"phase": 1, "subtasks": []}]})
+            json.dumps({"phases": [{"phase": 1, "subtasks": []}]}), encoding="utf-8"
         )
 
         executor = PhaseExecutor(
@@ -1062,9 +1077,11 @@ class TestPhaseWorkflow:
         """Running a phase twice with existing output is idempotent."""
         # Pre-create files
         (spec_dir / "requirements.json").write_text(
-            json.dumps({"task_description": "Test"})
+            json.dumps({"task_description": "Test"}), encoding="utf-8"
         )
-        (spec_dir / "context.json").write_text(json.dumps({"task_description": "Test"}))
+        (spec_dir / "context.json").write_text(
+            json.dumps({"task_description": "Test"}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,
@@ -1096,7 +1113,9 @@ class TestPhaseWorkflow:
         mock_spec_validator,
     ):
         """Phases log messages to task logger."""
-        (spec_dir / "project_index.json").write_text(json.dumps({"files": []}))
+        (spec_dir / "project_index.json").write_text(
+            json.dumps({"files": []}), encoding="utf-8"
+        )
 
         executor = PhaseExecutor(
             project_dir=temp_dir,

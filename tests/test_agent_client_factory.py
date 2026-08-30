@@ -84,7 +84,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=copilot\nSOME_OTHER=value\n")
+        env_file.write_text("AI_PROVIDER=copilot\nSOME_OTHER=value\n", encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "copilot"
 
@@ -94,7 +94,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=claude\n")
+        env_file.write_text("AI_PROVIDER=claude\n", encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "claude"
 
@@ -105,7 +105,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text('AI_PROVIDER="copilot"\n')
+        env_file.write_text('AI_PROVIDER="copilot"\n', encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "copilot"
 
@@ -121,7 +121,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("GITHUB_TOKEN=ghp_test\n")
+        env_file.write_text("GITHUB_TOKEN=ghp_test\n", encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "claude"
 
@@ -132,7 +132,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=copilot\n")
+        env_file.write_text("AI_PROVIDER=copilot\n", encoding="utf-8")
 
         assert _get_active_provider(spec_dir=tmp_path) == "claude"
 
@@ -144,7 +144,7 @@ class TestGetActiveProvider:
         auto_claude_dir = tmp_path / ".workpilot"
         auto_claude_dir.mkdir()
         env_file = auto_claude_dir / ".env"
-        env_file.write_text("AI_PROVIDER=copilot\n")
+        env_file.write_text("AI_PROVIDER=copilot\n", encoding="utf-8")
 
         spec_dir = auto_claude_dir / "spec"
         spec_dir.mkdir()

@@ -11,24 +11,18 @@ export interface PerformanceProfilerRequest {
 	thinkingLevel?: string;
 }
 
-export interface PerformanceProfilerResult {
-	bottlenecks: Array<{
-		description: string;
-		severity: string;
-		bottleneck_type: string;
-		file_path?: string;
-		line_number?: number;
-	}>;
-	benchmarks: Array<{ name: string; duration_ms?: number; error?: string }>;
-	suggestions: Array<{
-		title: string;
-		description: string;
-		effort: string;
-		estimated_improvement?: string;
-		implementation?: string;
-	}>;
-	summary: { total_bottlenecks: number; suggestions_count: number };
-}
+/**
+ * Re-exporte le type du service qui produit reellement ce resultat.
+ *
+ * Le handler transmet tel quel ce que le service emet
+ * (`service.on("complete", (result) => webContents.send(..., result))`), donc
+ * c'est ce type-la qui traverse le pont. Ce module en declarait un autre, de
+ * forme differente, qu'aucun code ne produisait ; le store du renderer, lui,
+ * importait deja le bon depuis le service. L'index signature d'`ElectronAPI`
+ * rendait les deux interchangeables aux yeux du compilateur.
+ */
+import type { PerformanceProfilerResult } from "../../../main/performance-profiler-service";
+export type { PerformanceProfilerResult };
 
 export interface PerformanceProfilerAPI {
 	startPerformanceProfiling: (

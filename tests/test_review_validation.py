@@ -24,7 +24,7 @@ class TestSpecHashValidation:
     def test_compute_file_hash_existing_file(self, tmp_path: Path) -> None:
         """_compute_file_hash() returns hash for existing file."""
         test_file = tmp_path / "test.txt"
-        test_file.write_text("Hello, World!")
+        test_file.write_text("Hello, World!", encoding="utf-8")
 
         file_hash = _compute_file_hash(test_file)
 
@@ -43,7 +43,7 @@ class TestSpecHashValidation:
     def test_compute_file_hash_deterministic(self, tmp_path: Path) -> None:
         """_compute_file_hash() returns same hash for same content."""
         test_file = tmp_path / "test.txt"
-        test_file.write_text("Consistent content")
+        test_file.write_text("Consistent content", encoding="utf-8")
 
         hash1 = _compute_file_hash(test_file)
         hash2 = _compute_file_hash(test_file)
@@ -54,10 +54,10 @@ class TestSpecHashValidation:
         """_compute_file_hash() returns different hash for different content."""
         test_file = tmp_path / "test.txt"
 
-        test_file.write_text("Content A")
+        test_file.write_text("Content A", encoding="utf-8")
         hash_a = _compute_file_hash(test_file)
 
-        test_file.write_text("Content B")
+        test_file.write_text("Content B", encoding="utf-8")
         hash_b = _compute_file_hash(test_file)
 
         assert hash_a != hash_b
@@ -76,7 +76,7 @@ class TestSpecHashValidation:
 
         # Modify spec.md
         spec_file = review_spec_dir / "spec.md"
-        spec_file.write_text("Modified content")
+        spec_file.write_text("Modified content", encoding="utf-8")
 
         hash_after = _compute_spec_hash(review_spec_dir)
 
@@ -88,7 +88,7 @@ class TestSpecHashValidation:
 
         # Modify implementation_plan.json
         plan_file = review_spec_dir / "implementation_plan.json"
-        plan_file.write_text('{"modified": true}')
+        plan_file.write_text('{"modified": true}', encoding="utf-8")
 
         hash_after = _compute_spec_hash(review_spec_dir)
 
@@ -108,7 +108,7 @@ class TestSpecHashValidation:
 
         # Modify spec after approval
         spec_file = review_spec_dir / "spec.md"
-        spec_file.write_text("New content after approval")
+        spec_file.write_text("New content after approval", encoding="utf-8")
 
         assert state.is_approval_valid(review_spec_dir) is False
 
@@ -138,22 +138,22 @@ class TestSpecHashValidation:
 
         # Test 1: Whitespace-only change should change hash
         spec_file = review_spec_dir / "spec.md"
-        original_content = spec_file.read_text()
-        spec_file.write_text(original_content + "\n\n\n")
+        original_content = spec_file.read_text(encoding="utf-8")
+        spec_file.write_text(original_content + "\n\n\n", encoding="utf-8")
         assert not state.is_approval_valid(review_spec_dir)
 
         # Restore
-        spec_file.write_text(original_content)
+        spec_file.write_text(original_content, encoding="utf-8")
         assert state.is_approval_valid(review_spec_dir)
 
         # Test 2: Plan modification should invalidate
         import json
 
         plan_file = review_spec_dir / "implementation_plan.json"
-        plan_content = plan_file.read_text()
+        plan_content = plan_file.read_text(encoding="utf-8")
         plan = json.loads(plan_content)
         plan["phases"][0]["chunks"][0]["status"] = "completed"
-        plan_file.write_text(json.dumps(plan, indent=2))
+        plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
         assert not state.is_approval_valid(review_spec_dir)
 
         # Test 3: New hash should be different
@@ -169,8 +169,10 @@ class TestSpecHashValidation:
 
         # 2. Modify spec.md
         spec_file = review_spec_dir / "spec.md"
-        original_content = spec_file.read_text()
-        spec_file.write_text(original_content + "\n## New Section\n\nAdded content.")
+        original_content = spec_file.read_text(encoding="utf-8")
+        spec_file.write_text(
+            original_content + "\n## New Section\n\nAdded content.", encoding="utf-8"
+        )
 
         # 3. Approval should now be invalid
         assert not state.is_approval_valid(review_spec_dir)

@@ -170,7 +170,7 @@ class TestTaskLoggerAnsiIntegration:
 
         # Load the log file and verify content is sanitized
         log_file = tmp_path / "task_logs.json"
-        with open(log_file) as f:
+        with open(log_file, encoding="utf-8") as f:
             logs = json.load(f)
 
         coding_entries = logs["phases"]["coding"]["entries"]
@@ -189,7 +189,7 @@ class TestTaskLoggerAnsiIntegration:
         )
 
         log_file = tmp_path / "task_logs.json"
-        with open(log_file) as f:
+        with open(log_file, encoding="utf-8") as f:
             logs = json.load(f)
 
         coding_entries = logs["phases"]["coding"]["entries"]
@@ -208,7 +208,7 @@ class TestTaskLoggerAnsiIntegration:
         )
 
         log_file = tmp_path / "task_logs.json"
-        with open(log_file) as f:
+        with open(log_file, encoding="utf-8") as f:
             logs = json.load(f)
 
         coding_entries = logs["phases"]["coding"]["entries"]
@@ -229,7 +229,7 @@ class TestTaskLoggerAnsiIntegration:
         )
 
         log_file = tmp_path / "task_logs.json"
-        with open(log_file) as f:
+        with open(log_file, encoding="utf-8") as f:
             logs = json.load(f)
 
         coding_entries = logs["phases"]["coding"]["entries"]
@@ -252,7 +252,7 @@ class TestTaskLoggerAnsiIntegration:
         )
 
         log_file = tmp_path / "task_logs.json"
-        with open(log_file) as f:
+        with open(log_file, encoding="utf-8") as f:
             logs = json.load(f)
 
         coding_entries = logs["phases"]["coding"]["entries"]
@@ -279,7 +279,7 @@ class TestStreamingLogCaptureAnsiIntegration:
             capture.process_text("\x1b[90m[DEBUG]\x1b[0m Processing...")
 
         log_file = tmp_path / "task_logs.json"
-        with open(log_file) as f:
+        with open(log_file, encoding="utf-8") as f:
             logs = json.load(f)
 
         coding_entries = logs["phases"]["coding"]["entries"]
@@ -296,7 +296,7 @@ class TestStreamingLogCaptureAnsiIntegration:
             capture.process_text("\x1b[32mSuccess\x1b[0m")
 
         log_file = tmp_path / "task_logs.json"
-        with open(log_file) as f:
+        with open(log_file, encoding="utf-8") as f:
             logs = json.load(f)
 
         coding_entries = logs["phases"]["coding"]["entries"]

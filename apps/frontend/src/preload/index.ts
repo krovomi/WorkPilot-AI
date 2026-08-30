@@ -1,5 +1,6 @@
 import { contextBridge } from "electron";
 import { createElectronAPI } from "./api";
+import { isLinux, isMacOS, isUnix, isWindows } from "../shared/platform";
 
 // Create the unified API by combining all domain-specific APIs
 const electronAPI = createElectronAPI();
@@ -12,8 +13,8 @@ contextBridge.exposeInMainWorld("DEBUG", process.env.DEBUG === "true");
 
 // Expose platform information for platform-specific behavior (e.g., PTY resize timing)
 contextBridge.exposeInMainWorld("platform", {
-	isWindows: process.platform === "win32",
-	isMacOS: process.platform === "darwin",
-	isLinux: process.platform === "linux",
-	isUnix: process.platform !== "win32",
+	isWindows: isWindows(),
+	isMacOS: isMacOS(),
+	isLinux: isLinux(),
+	isUnix: isUnix(),
 });

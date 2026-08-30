@@ -1,4 +1,4 @@
-"""Le code livré ne doit jamais ouvrir un fichier texte sans déclarer son encodage.
+"""Aucun fichier texte du dépôt ne doit être ouvert sans déclarer son encodage.
 
 Sans `encoding=`, Python retombe sur la locale du système. Sur Linux et macOS
 c'est UTF-8 et rien ne se voit ; sur Windows c'est cp1252, et lire ou écrire un
@@ -15,6 +15,11 @@ Il le réutilise plutôt que d'en reproduire la logique.
 Ruff couvre aussi la règle (`PLW1514`), mais elle est en préversion : l'activer
 imposerait `preview = true` dans `ruff.toml` et, avec lui, tout un lot de règles
 instables sur un dépôt qui épingle ses versions d'outils.
+
+`tests/` a d'abord été laissé de côté — ses fixtures ne partent pas chez
+l'utilisateur — puis inclus, parce que la CI teste Windows et que ces fixtures y
+écrivent de vrais fichiers : un test qui échoue sur cp1252 coûte le même
+diagnostic qu'un bug, sans en être un.
 """
 
 from __future__ import annotations
@@ -27,11 +32,8 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from check_encoding import EncodingChecker  # noqa: E402
 
-#: Le code qui part chez l'utilisateur. `tests/` en est absent volontairement :
-#: ses fixtures écrivent dans des répertoires temporaires, elles ne sont pas
-#: livrées, et les y inclure ajouterait ~700 corrections à un sujet qui n'est
-#: pas le leur. À traiter séparément.
-SHIPPED = ("apps/backend", "src", "utils", "scripts")
+#: Tout le Python du dépôt : ce qui est livré, et les tests qui l'exercent.
+SCANNED = ("apps/backend", "src", "utils", "scripts", "tests")
 
 EXCLUDED_DIRS = {
     ".venv",
@@ -40,20 +42,10 @@ EXCLUDED_DIRS = {
     "grepai",  # dépendance embarquée, pas notre code
 }
 
-#: Faux positifs : du code Python à l'intérieur d'une chaîne de caractères.
-#: `check_encoding` lit le fichier ligne à ligne et ne distingue pas une chaîne
-#: d'une instruction. Ces trois-là sont des extraits montrés à l'utilisateur ou
-#: exécutés dans le bac à sable — les corriger changerait le texte, pas un appel.
-KNOWN_FALSE_POSITIVES = {
-    ("apps/backend/code_playground/test_runner.py", 145),
-    ("apps/backend/code_playground/test_runner.py", 157),
-    ("apps/backend/performance/optimizer.py", 190),
-}
 
-
-def _shipped_python_files() -> list[Path]:
+def _scanned_python_files() -> list[Path]:
     files: list[Path] = []
-    for root in SHIPPED:
+    for root in SCANNED:
         base = REPO_ROOT / root
         if not base.is_dir():
             continue
@@ -64,37 +56,20 @@ def _shipped_python_files() -> list[Path]:
     return files
 
 
-def _parse(issue: str) -> tuple[str, int] | None:
-    """« chemin:ligne - message » -> (chemin relatif au dépôt, ligne)."""
-    location = issue.split(" - ", 1)[0]
-    path, _, lineno = location.rpartition(":")
-    if not lineno.isdigit():
-        return None
-    # Le checker rapporte le chemin tel qu'il l'a reçu, ici absolu.
-    try:
-        path = str(Path(path).resolve().relative_to(REPO_ROOT))
-    except ValueError:
-        pass
-    return path.replace("\\", "/"), int(lineno)
-
-
-def test_scan_covers_the_shipped_code() -> None:
+def test_scan_covers_the_repository() -> None:
     """Un déplacement de répertoire doit casser ici plutôt que vider le test."""
-    assert len(_shipped_python_files()) > 500
+    assert len(_scanned_python_files()) > 1000
 
 
-def test_shipped_code_declares_an_encoding() -> None:
+def test_every_file_operation_declares_an_encoding() -> None:
+    # Il n'y a plus de liste de faux positifs à tenir : les trois qui existaient
+    # étaient du code Python cité dans une chaîne, et `check_encoding` ne
+    # regarde plus que le code — commentaires et littéraux sont blanchis avant
+    # le scan. La dette a disparu avec sa cause, pas avec une exception.
     checker = EncodingChecker()
-    checker.check_files(_shipped_python_files())
+    checker.check_files(_scanned_python_files())
 
-    offenders = []
-    for issue in checker.issues:
-        parsed = _parse(issue)
-        if parsed and parsed in KNOWN_FALSE_POSITIVES:
-            continue
-        offenders.append(issue)
-
-    assert offenders == [], (
+    assert checker.issues == [], (
         "fichier texte ouvert sans encoding= — cp1252 sur Windows :\n"
-        + "\n".join(offenders)
+        + "\n".join(checker.issues)
     )

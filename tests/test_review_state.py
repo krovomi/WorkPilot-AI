@@ -124,7 +124,7 @@ class TestReviewStatePersistence:
         state.save(spec_dir)
 
         state_file = spec_dir / REVIEW_STATE_FILE
-        with open(state_file) as f:
+        with open(state_file, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["approved"] is True
@@ -147,7 +147,7 @@ class TestReviewStatePersistence:
             "review_count": 1,
         }
         state_file = spec_dir / REVIEW_STATE_FILE
-        state_file.write_text(json.dumps(data))
+        state_file.write_text(json.dumps(data), encoding="utf-8")
 
         state = ReviewState.load(spec_dir)
 
@@ -172,7 +172,7 @@ class TestReviewStatePersistence:
         spec_dir.mkdir()
 
         state_file = spec_dir / REVIEW_STATE_FILE
-        state_file.write_text("{ invalid json }")
+        state_file.write_text("{ invalid json }", encoding="utf-8")
 
         state = ReviewState.load(spec_dir)
 
@@ -185,7 +185,7 @@ class TestReviewStatePersistence:
         spec_dir.mkdir()
 
         state_file = spec_dir / REVIEW_STATE_FILE
-        state_file.write_text("")
+        state_file.write_text("", encoding="utf-8")
 
         state = ReviewState.load(spec_dir)
 

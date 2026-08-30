@@ -309,9 +309,13 @@ class ProviderRegistry {
 			if (name === "copilot" && provider.requiresCLI) {
 				if (typeof globalThis !== "undefined" && globalThis.electronAPI) {
 					// Dans Electron, utiliser Node.js pour vérifier gh CLI
-					const isAuthenticated =
-						await globalThis.electronAPI.checkCopilotAuth();
-					status.authenticated = isAuthenticated;
+					// `checkCopilotAuth` rend `{success, data?: {authenticated}}`, pas un
+					// booleen : l'objet entier etait affecte a `status.authenticated`,
+					// donc toujours truthy — Copilot passait pour authentifie meme
+					// quand gh CLI ne l'etait pas.
+					const authResult = await globalThis.electronAPI.checkCopilotAuth();
+					status.authenticated =
+						authResult.success && authResult.data?.authenticated === true;
 				} else {
 					// Fallback dans le navigateur (assume disponible pour le développement)
 					status.authenticated = true;

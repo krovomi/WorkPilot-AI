@@ -142,7 +142,7 @@ class TestReviewResultE2E:
         await sample_review_with_findings.save(temp_github_dir)
 
         review_file = temp_github_dir / "pr" / "review_42.json"
-        with open(review_file) as f:
+        with open(review_file, encoding="utf-8") as f:
             data = json.load(f)
 
         # Verify key fields exist with snake_case

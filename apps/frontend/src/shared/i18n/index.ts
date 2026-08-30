@@ -56,7 +56,9 @@ import enIdeation from "./locales/en/ideation.json";
 import enInitDialog from "./locales/en/initDialog.json";
 import enInsights from "./locales/en/insights.json";
 import enLearningLoop from "./locales/en/learningLoop.json";
-import enMigrationWizard from "./locales/en/migration-wizard.json";
+import enArchitectureVisualizer from "./locales/en/architectureVisualizer.json";
+import enPerformanceProfiler from "./locales/en/performanceProfiler.json";
+import enCodeMigration from "./locales/en/codeMigration.json";
 import enMissionControl from "./locales/en/missionControl.json";
 import enMultiRepo from "./locales/en/multiRepo.json";
 import enNaturalLanguageGit from "./locales/en/naturalLanguageGit.json";
@@ -141,7 +143,9 @@ import frIdeation from "./locales/fr/ideation.json";
 import frInitDialog from "./locales/fr/initDialog.json";
 import frInsights from "./locales/fr/insights.json";
 import frLearningLoop from "./locales/fr/learningLoop.json";
-import frMigrationWizard from "./locales/fr/migration-wizard.json";
+import frArchitectureVisualizer from "./locales/fr/architectureVisualizer.json";
+import frPerformanceProfiler from "./locales/fr/performanceProfiler.json";
+import frCodeMigration from "./locales/fr/codeMigration.json";
 import frMissionControl from "./locales/fr/missionControl.json";
 import frMultiRepo from "./locales/fr/multiRepo.json";
 import frNaturalLanguageGit from "./locales/fr/naturalLanguageGit.json";
@@ -223,7 +227,9 @@ export const resources = {
 		insights: enInsights,
 		learningLoop: enLearningLoop,
 		multiRepo: enMultiRepo,
-		migrationWizard: enMigrationWizard,
+		architectureVisualizer: enArchitectureVisualizer,
+		performanceProfiler: enPerformanceProfiler,
+		codeMigration: enCodeMigration,
 		missionControl: enMissionControl,
 		pixelOffice: enPixelOffice,
 		selfHealing: enSelfHealing,
@@ -308,7 +314,9 @@ export const resources = {
 		insights: frInsights,
 		learningLoop: frLearningLoop,
 		multiRepo: frMultiRepo,
-		migrationWizard: frMigrationWizard,
+		architectureVisualizer: frArchitectureVisualizer,
+		performanceProfiler: frPerformanceProfiler,
+		codeMigration: frCodeMigration,
 		missionControl: frMissionControl,
 		pixelOffice: frPixelOffice,
 		selfHealing: frSelfHealing,
@@ -400,7 +408,9 @@ i18n.use(initReactI18next).init({
 		"insights",
 		"learningLoop",
 		"multiRepo",
-		"migrationWizard",
+		"architectureVisualizer",
+		"performanceProfiler",
+		"codeMigration",
 		"missionControl",
 		"pixelOffice",
 		"selfHealing",

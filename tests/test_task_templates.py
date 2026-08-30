@@ -391,7 +391,7 @@ class TestManagerImportExport:
                 "variables": [{"name": "module", "required": True}],
             }
             filepath = os.path.join(tmpdir, "from-file.yaml")
-            with open(filepath, "w") as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 yaml.dump(data, f)
 
             manager = TaskTemplateManager()

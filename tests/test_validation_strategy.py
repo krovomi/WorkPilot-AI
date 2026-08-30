@@ -65,7 +65,8 @@ class TestProjectTypeDetection:
                     "name": "my-app",
                     "dependencies": {"react": "^18.0.0", "react-dom": "^18.0.0"},
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         assert detect_project_type(temp_dir) == "react_spa"
@@ -74,7 +75,8 @@ class TestProjectTypeDetection:
         """Test detection of Vue SPA project."""
         package_json = temp_dir / "package.json"
         package_json.write_text(
-            json.dumps({"name": "my-vue-app", "dependencies": {"vue": "^3.0.0"}})
+            json.dumps({"name": "my-vue-app", "dependencies": {"vue": "^3.0.0"}}),
+            encoding="utf-8",
         )
 
         assert detect_project_type(temp_dir) == "vue_spa"
@@ -88,7 +90,8 @@ class TestProjectTypeDetection:
                     "name": "my-next-app",
                     "dependencies": {"next": "^14.0.0", "react": "^18.0.0"},
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         assert detect_project_type(temp_dir) == "nextjs"
@@ -99,7 +102,8 @@ class TestProjectTypeDetection:
         package_json.write_text(
             json.dumps(
                 {"name": "my-angular-app", "dependencies": {"@angular/core": "^17.0.0"}}
-            )
+            ),
+            encoding="utf-8",
         )
 
         assert detect_project_type(temp_dir) == "angular_spa"
@@ -108,7 +112,8 @@ class TestProjectTypeDetection:
         """Test detection of plain Node.js project."""
         package_json = temp_dir / "package.json"
         package_json.write_text(
-            json.dumps({"name": "my-api", "dependencies": {"express": "^4.18.0"}})
+            json.dumps({"name": "my-api", "dependencies": {"express": "^4.18.0"}}),
+            encoding="utf-8",
         )
 
         assert detect_project_type(temp_dir) == "nodejs"
@@ -116,70 +121,76 @@ class TestProjectTypeDetection:
     def test_detect_python_api_fastapi(self, temp_dir):
         """Test detection of Python FastAPI project."""
         requirements = temp_dir / "requirements.txt"
-        requirements.write_text("fastapi==0.100.0\nuvicorn==0.23.0\n")
+        requirements.write_text("fastapi==0.100.0\nuvicorn==0.23.0\n", encoding="utf-8")
 
         assert detect_project_type(temp_dir) == "python_api"
 
     def test_detect_python_api_flask(self, temp_dir):
         """Test detection of Python Flask project."""
         requirements = temp_dir / "requirements.txt"
-        requirements.write_text("flask==2.0.0\ngunicorn==21.0.0\n")
+        requirements.write_text("flask==2.0.0\ngunicorn==21.0.0\n", encoding="utf-8")
 
         assert detect_project_type(temp_dir) == "python_api"
 
     def test_detect_python_api_django(self, temp_dir):
         """Test detection of Python Django project."""
         pyproject = temp_dir / "pyproject.toml"
-        pyproject.write_text('[project]\ndependencies = ["django>=4.0"]\n')
+        pyproject.write_text(
+            '[project]\ndependencies = ["django>=4.0"]\n', encoding="utf-8"
+        )
 
         assert detect_project_type(temp_dir) == "python_api"
 
     def test_detect_python_cli_click(self, temp_dir):
         """Test detection of Python CLI project with click."""
         requirements = temp_dir / "requirements.txt"
-        requirements.write_text("click==8.0.0\n")
+        requirements.write_text("click==8.0.0\n", encoding="utf-8")
 
         assert detect_project_type(temp_dir) == "python_cli"
 
     def test_detect_python_cli_typer(self, temp_dir):
         """Test detection of Python CLI project with typer."""
         requirements = temp_dir / "requirements.txt"
-        requirements.write_text("typer==0.9.0\n")
+        requirements.write_text("typer==0.9.0\n", encoding="utf-8")
 
         assert detect_project_type(temp_dir) == "python_cli"
 
     def test_detect_generic_python(self, temp_dir):
         """Test detection of generic Python project."""
         requirements = temp_dir / "requirements.txt"
-        requirements.write_text("numpy==1.24.0\npandas==2.0.0\n")
+        requirements.write_text("numpy==1.24.0\npandas==2.0.0\n", encoding="utf-8")
 
         assert detect_project_type(temp_dir) == "python"
 
     def test_detect_rust(self, temp_dir):
         """Test detection of Rust project."""
         cargo = temp_dir / "Cargo.toml"
-        cargo.write_text('[package]\nname = "my-app"\n')
+        cargo.write_text('[package]\nname = "my-app"\n', encoding="utf-8")
 
         assert detect_project_type(temp_dir) == "rust"
 
     def test_detect_go(self, temp_dir):
         """Test detection of Go project."""
         go_mod = temp_dir / "go.mod"
-        go_mod.write_text("module github.com/user/myapp\n")
+        go_mod.write_text("module github.com/user/myapp\n", encoding="utf-8")
 
         assert detect_project_type(temp_dir) == "go"
 
     def test_detect_ruby(self, temp_dir):
         """Test detection of Ruby project."""
         gemfile = temp_dir / "Gemfile"
-        gemfile.write_text('source "https://rubygems.org"\ngem "rails"\n')
+        gemfile.write_text(
+            'source "https://rubygems.org"\ngem "rails"\n', encoding="utf-8"
+        )
 
         assert detect_project_type(temp_dir) == "ruby"
 
     def test_detect_html_css(self, temp_dir):
         """Test detection of simple HTML/CSS project."""
         index = temp_dir / "index.html"
-        index.write_text("<!DOCTYPE html>\n<html><body>Hello</body></html>")
+        index.write_text(
+            "<!DOCTYPE html>\n<html><body>Hello</body></html>", encoding="utf-8"
+        )
 
         assert detect_project_type(temp_dir) == "html_css"
 
@@ -191,7 +202,7 @@ class TestProjectTypeDetection:
     def test_invalid_package_json(self, temp_dir):
         """Test handling of invalid package.json."""
         package_json = temp_dir / "package.json"
-        package_json.write_text("not valid json")
+        package_json.write_text("not valid json", encoding="utf-8")
 
         assert detect_project_type(temp_dir) == "nodejs"
 
@@ -201,7 +212,8 @@ class TestProjectTypeDetection:
         package_json.write_text(
             json.dumps(
                 {"name": "my-electron-app", "dependencies": {"electron": "^28.0.0"}}
-            )
+            ),
+            encoding="utf-8",
         )
 
         assert detect_project_type(temp_dir) == "electron"
@@ -212,7 +224,8 @@ class TestProjectTypeDetection:
         package_json.write_text(
             json.dumps(
                 {"name": "my-electron-app", "devDependencies": {"electron": "^28.0.0"}}
-            )
+            ),
+            encoding="utf-8",
         )
 
         assert detect_project_type(temp_dir) == "electron"
@@ -227,7 +240,8 @@ class TestProjectTypeDetection:
                     "dependencies": {"react": "^18.0.0", "react-dom": "^18.0.0"},
                     "devDependencies": {"electron": "^28.0.0"},
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         assert detect_project_type(temp_dir) == "electron"
@@ -244,7 +258,8 @@ class TestProjectTypeDetection:
                         "electron-vite": "^2.0.0",
                     },
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         assert detect_project_type(temp_dir) == "electron"
@@ -332,7 +347,9 @@ class TestStrategyBuilderByRisk:
     def test_trivial_risk_skips_validation(self, builder, temp_dir):
         """Test that trivial risk allows skipping validation."""
         # Create a simple Python project
-        (temp_dir / "requirements.txt").write_text("requests==2.31.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "requests==2.31.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "trivial")
 
@@ -341,7 +358,9 @@ class TestStrategyBuilderByRisk:
 
     def test_low_risk_requires_unit_tests(self, builder, temp_dir):
         """Test that low risk requires unit tests."""
-        (temp_dir / "requirements.txt").write_text("requests==2.31.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "requests==2.31.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "low")
 
@@ -351,7 +370,9 @@ class TestStrategyBuilderByRisk:
 
     def test_medium_risk_requires_integration(self, builder, temp_dir):
         """Test that medium risk requires integration tests."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
 
@@ -361,7 +382,9 @@ class TestStrategyBuilderByRisk:
 
     def test_high_risk_requires_security(self, builder, temp_dir):
         """Test that high risk requires security scanning."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "high")
 
@@ -371,7 +394,9 @@ class TestStrategyBuilderByRisk:
 
     def test_critical_risk_full_validation(self, builder, temp_dir):
         """Test that critical risk gets full validation."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "critical")
 
@@ -391,7 +416,9 @@ class TestStrategyBuilderByProjectType:
 
     def test_html_css_strategy(self, builder, temp_dir):
         """Test HTML/CSS project strategy."""
-        (temp_dir / "index.html").write_text("<!DOCTYPE html><html></html>")
+        (temp_dir / "index.html").write_text(
+            "<!DOCTYPE html><html></html>", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
 
@@ -404,7 +431,7 @@ class TestStrategyBuilderByProjectType:
     def test_react_spa_strategy(self, builder, temp_dir):
         """Test React SPA project strategy."""
         (temp_dir / "package.json").write_text(
-            json.dumps({"dependencies": {"react": "^18.0.0"}})
+            json.dumps({"dependencies": {"react": "^18.0.0"}}), encoding="utf-8"
         )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
@@ -418,7 +445,9 @@ class TestStrategyBuilderByProjectType:
 
     def test_python_api_strategy(self, builder, temp_dir):
         """Test Python API project strategy."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
 
@@ -429,7 +458,9 @@ class TestStrategyBuilderByProjectType:
 
     def test_rust_strategy(self, builder, temp_dir):
         """Test Rust project strategy."""
-        (temp_dir / "Cargo.toml").write_text('[package]\nname = "test"')
+        (temp_dir / "Cargo.toml").write_text(
+            '[package]\nname = "test"', encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
 
@@ -439,7 +470,7 @@ class TestStrategyBuilderByProjectType:
 
     def test_go_strategy(self, builder, temp_dir):
         """Test Go project strategy."""
-        (temp_dir / "go.mod").write_text("module test")
+        (temp_dir / "go.mod").write_text("module test", encoding="utf-8")
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
 
@@ -449,7 +480,7 @@ class TestStrategyBuilderByProjectType:
 
     def test_ruby_strategy(self, builder, temp_dir):
         """Test Ruby project strategy."""
-        (temp_dir / "Gemfile").write_text('gem "rails"')
+        (temp_dir / "Gemfile").write_text('gem "rails"', encoding="utf-8")
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
 
@@ -469,7 +500,7 @@ class TestStrategyBuilderByProjectType:
     def test_electron_strategy(self, builder, temp_dir):
         """Test Electron project strategy."""
         (temp_dir / "package.json").write_text(
-            json.dumps({"devDependencies": {"electron": "^28.0.0"}})
+            json.dumps({"devDependencies": {"electron": "^28.0.0"}}), encoding="utf-8"
         )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
@@ -485,7 +516,7 @@ class TestStrategyBuilderByProjectType:
     def test_electron_low_risk_strategy(self, builder, temp_dir):
         """Test Electron project with low risk only has unit tests."""
         (temp_dir / "package.json").write_text(
-            json.dumps({"dependencies": {"electron": "^28.0.0"}})
+            json.dumps({"dependencies": {"electron": "^28.0.0"}}), encoding="utf-8"
         )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "low")
@@ -498,7 +529,7 @@ class TestStrategyBuilderByProjectType:
     def test_electron_high_risk_has_console_check(self, builder, temp_dir):
         """Test Electron high risk includes console error check."""
         (temp_dir / "package.json").write_text(
-            json.dumps({"devDependencies": {"electron": "^28.0.0"}})
+            json.dumps({"devDependencies": {"electron": "^28.0.0"}}), encoding="utf-8"
         )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "high")
@@ -518,7 +549,9 @@ class TestSecuritySteps:
 
     def test_high_risk_adds_secrets_scan(self, builder, temp_dir):
         """Test that high risk adds secrets scanning."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "high")
 
@@ -527,7 +560,9 @@ class TestSecuritySteps:
 
     def test_high_risk_python_adds_bandit(self, builder, temp_dir):
         """Test that high risk Python adds Bandit scan."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "high")
 
@@ -537,7 +572,7 @@ class TestSecuritySteps:
     def test_high_risk_nodejs_adds_npm_audit(self, builder, temp_dir):
         """Test that high risk Node.js adds npm audit."""
         (temp_dir / "package.json").write_text(
-            json.dumps({"dependencies": {"express": "^4.18.0"}})
+            json.dumps({"dependencies": {"express": "^4.18.0"}}), encoding="utf-8"
         )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "high")
@@ -547,7 +582,9 @@ class TestSecuritySteps:
 
     def test_low_risk_no_security_scan(self, builder, temp_dir):
         """Test that low risk doesn't add security scanning."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "low")
 
@@ -566,7 +603,9 @@ class TestStrategySerialization:
 
     def test_to_dict(self, builder, temp_dir):
         """Test converting strategy to dictionary."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
         result = builder.to_dict(strategy)
@@ -579,7 +618,9 @@ class TestStrategySerialization:
 
     def test_to_dict_step_structure(self, builder, temp_dir):
         """Test that step dictionaries have correct structure."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
         result = builder.to_dict(strategy)
@@ -596,7 +637,9 @@ class TestStrategySerialization:
 
     def test_to_json_serializable(self, builder, temp_dir):
         """Test that result is JSON serializable."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
         result = builder.to_dict(strategy)
@@ -616,7 +659,9 @@ class TestConvenienceFunctions:
 
     def test_build_validation_strategy(self, temp_dir):
         """Test build_validation_strategy convenience function."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         strategy = build_validation_strategy(temp_dir, temp_dir, "medium")
 
@@ -625,7 +670,9 @@ class TestConvenienceFunctions:
 
     def test_get_strategy_as_dict(self, temp_dir):
         """Test get_strategy_as_dict convenience function."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         result = get_strategy_as_dict(temp_dir, temp_dir, "medium")
 
@@ -651,7 +698,9 @@ class TestEdgeCases:
 
     def test_empty_risk_level_defaults_medium(self, builder, temp_dir):
         """Test that None risk level defaults to medium."""
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         # When no risk level and no assessment file
         strategy = builder.build_strategy(temp_dir, temp_dir, None)
@@ -670,7 +719,8 @@ class TestEdgeCases:
                         "react-dom": "^18.0.0",
                     }
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         # Next.js should take priority
@@ -678,8 +728,12 @@ class TestEdgeCases:
 
     def test_python_with_pyproject_and_requirements(self, temp_dir):
         """Test Python detection with both pyproject.toml and requirements.txt."""
-        (temp_dir / "pyproject.toml").write_text('[project]\nname = "test"')
-        (temp_dir / "requirements.txt").write_text("fastapi==0.100.0\n")
+        (temp_dir / "pyproject.toml").write_text(
+            '[project]\nname = "test"', encoding="utf-8"
+        )
+        (temp_dir / "requirements.txt").write_text(
+            "fastapi==0.100.0\n", encoding="utf-8"
+        )
 
         # Should still detect as python_api
         assert detect_project_type(temp_dir) == "python_api"
@@ -696,7 +750,7 @@ class TestFullstackProjects:
     def test_nextjs_strategy_has_api_tests(self, builder, temp_dir):
         """Test Next.js includes API tests for medium+ risk."""
         (temp_dir / "package.json").write_text(
-            json.dumps({"dependencies": {"next": "^14.0.0"}})
+            json.dumps({"dependencies": {"next": "^14.0.0"}}), encoding="utf-8"
         )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "medium")
@@ -708,7 +762,7 @@ class TestFullstackProjects:
     def test_nextjs_high_risk_has_e2e(self, builder, temp_dir):
         """Test Next.js high risk includes E2E tests."""
         (temp_dir / "package.json").write_text(
-            json.dumps({"dependencies": {"next": "^14.0.0"}})
+            json.dumps({"dependencies": {"next": "^14.0.0"}}), encoding="utf-8"
         )
 
         strategy = builder.build_strategy(temp_dir, temp_dir, "high")

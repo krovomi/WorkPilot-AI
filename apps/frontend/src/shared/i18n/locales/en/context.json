@@ -12,11 +12,12 @@
 		"errorTitle": "Failed to load project index",
 		"noIndexTitle": "No Project Index Found",
 		"noIndexDescription": "Click the Refresh button to analyze your project structure and create an index.",
-		"services": "Services",
+		"servicesHeading": "Services",
 		"infrastructure": "Infrastructure",
 		"conventions": "Conventions",
 		"service": "service",
-		"services_plural": "services"
+		"serviceCount_one": "{{count}} service",
+		"serviceCount_other": "{{count}} services"
 	},
 	"infrastructure": {
 		"dockerCompose": "Docker Compose",
@@ -42,7 +43,6 @@
 		"authentication": "Authentication",
 		"apiRoutes": "API Routes",
 		"route": "route",
-		"routes_plural": "routes",
 		"dependencies": "Dependencies",
 		"devDependencies": "Dev Dependencies",
 		"externalServices": "External Services",
