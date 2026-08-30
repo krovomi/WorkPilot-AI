@@ -45,6 +45,19 @@ def _code_only(content: str) -> str:
     import io
     import tokenize
 
+    # Depuis Python 3.12 (PEP 701), une f-string n'est plus un seul jeton
+    # STRING : son texte litteral arrive en FSTRING_MIDDLE, et ses champs de
+    # remplacement en vrais jetons de code. Ne masquer que STRING laissait donc
+    # passer le `open()` de
+    # `f"{path}:{n} - json.load(open()) without encoding in open()"`, et ce
+    # fichier se signalait lui-meme — sur 3.12 et 3.13, pas sur 3.11.
+    # Masquer FSTRING_MIDDLE est exactement ce qu'il faut : le texte se tait,
+    # les `{…}` restent du code a inspecter.
+    masked_types = {tokenize.COMMENT, tokenize.STRING}
+    fstring_middle = getattr(tokenize, "FSTRING_MIDDLE", None)
+    if fstring_middle is not None:
+        masked_types.add(fstring_middle)
+
     masked = list(content)
     lines = content.splitlines(keepends=True)
     starts = []
@@ -62,7 +75,7 @@ def _code_only(content: str) -> str:
         return content
 
     for tok in tokens:
-        if tok.type not in (tokenize.COMMENT, tokenize.STRING):
+        if tok.type not in masked_types:
             continue
         begin, end = offset(*tok.start), offset(*tok.end)
         for i in range(begin, min(end, len(masked))):

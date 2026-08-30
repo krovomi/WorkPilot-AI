@@ -418,6 +418,71 @@ def documented():
         finally:
             temp_path.unlink()
 
+    def test_ignores_calls_quoted_inside_an_f_string(self):
+        """An f-string is text too, on every Python the project supports.
+
+        PEP 701 (3.12) split f-strings into FSTRING_START/MIDDLE/END, so the
+        literal text stopped arriving as a STRING token. Masking only STRING
+        left `f"… open() …"` visible as code, and `check_encoding.py` — whose
+        own messages name `open()` — reported itself. It passed on 3.11 and
+        failed on 3.12 and 3.13, which is the split this pins.
+        """
+        code = """
+def report(path, line):
+    return f"{path}:{line} - json.load(open()) without encoding in open()"
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, encoding="utf-8"
+        ) as f:
+            f.write(code)
+            temp_path = Path(f.name)
+
+        try:
+            checker = EncodingChecker()
+            result = checker.check_file(temp_path)
+
+            assert result is True, checker.issues
+            assert len(checker.issues) == 0
+        finally:
+            temp_path.unlink()
+
+    def test_still_reads_replacement_fields_as_code(self):
+        """Masking an f-string's text must not blind the scan to its `{…}`.
+
+        The guard here is against over-correcting: masking the whole f-string
+        span would silence the version-split above, and quietly stop the
+        checker from seeing a real call inside a replacement field.
+
+        What the field resolves to is version-dependent, so this asserts what
+        the running Python can actually see. Before PEP 701 the f-string is one
+        STRING token and the field is masked with the rest of it — a known
+        limitation of the pre-3.12 path, and below the project's own 3.12 floor.
+        """
+        import tokenize
+
+        code = """
+def load(path):
+    return f"{open(path).read()}"
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, encoding="utf-8"
+        ) as f:
+            f.write(code)
+            temp_path = Path(f.name)
+
+        try:
+            checker = EncodingChecker()
+            result = checker.check_file(temp_path)
+
+            if hasattr(tokenize, "FSTRING_MIDDLE"):
+                assert result is False
+                assert len(checker.issues) == 1
+                assert "open() without encoding" in checker.issues[0]
+            else:
+                assert result is True, checker.issues
+        finally:
+            temp_path.unlink()
+
     def test_allows_positional_encoding_on_path_helpers(self):
         """`read_text(encoding, …)` and `write_text(data, encoding, …)`.
 
