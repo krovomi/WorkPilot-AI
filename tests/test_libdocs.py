@@ -384,7 +384,9 @@ class TestCache:
     def test_a_page_older_than_the_ttl_is_not_served(self, tmp_path):
         DocsCache(tmp_path).put("/vercel/next.js", "next", "routing", "old")
         index = json.loads(
-            (tmp_path / ".workpilot" / "docs-cache" / "index.json").read_text()
+            (tmp_path / ".workpilot" / "docs-cache" / "index.json").read_text(
+                encoding="utf-8"
+            )
         )
         for record in index.values():
             record["fetched_at"] = "2020-01-01T00:00:00+00:00"
