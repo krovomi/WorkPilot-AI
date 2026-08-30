@@ -215,7 +215,13 @@ def _ttl_from_env() -> int:
 
 
 def _key(library_id: str, query: str) -> str:
-    digest = hashlib.sha1(f"{library_id}\n{query}".encode()).hexdigest()
+    """The cache key for one (library, question) pair.
+
+    A filename, not a security primitive — but sha256 is what the rest of the
+    backend keys its caches on, and picking anything weaker here only buys an
+    argument with the security scanner.
+    """
+    digest = hashlib.sha256(f"{library_id}\n{query}".encode()).hexdigest()
     return digest[:16]
 
 
