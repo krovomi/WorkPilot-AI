@@ -1,0 +1,43 @@
+{
+	"title": "Code Migration Agent",
+	"subtitle": "Automated framework, version, and language migrations",
+	"phases": {
+		"idle": "Ready",
+		"analyzing": "Analyzing codebase…",
+		"planning": "Planning migration…",
+		"executing": "Executing migration…",
+		"validating": "Validating changes…",
+		"complete": "Complete",
+		"error": "Error"
+	},
+	"config": {
+		"descriptionLabel": "Migration Description",
+		"descriptionPlaceholder": "Describe the migration you want to perform…",
+		"examplesLabel": "Examples:",
+		"dryRun": "Dry Run",
+		"dryRunHint": "Analyze only, no file changes"
+	},
+	"examples": {
+		"reactHooks": "Migrate React Class Components to Hooks",
+		"jsToTs": "Convert JavaScript files to TypeScript",
+		"python312": "Upgrade Python 3.9 deprecated patterns to 3.12",
+		"asyncAwait": "Replace callbacks with async/await",
+		"dateFns": "Migrate from Moment.js to date-fns"
+	},
+	"actions": {
+		"start": "Start Migration",
+		"analyze": "Analyze Migration",
+		"cancel": "Cancel Migration"
+	},
+	"results": {
+		"dryRunComplete": "Dry Run Analysis Complete",
+		"migrationComplete": "Migration Complete",
+		"filesModified": "Files Modified",
+		"planStatus": "Plan Status",
+		"execution": "Execution"
+	},
+	"empty": {
+		"title": "Code Migration Agent",
+		"body": "Describe the migration you want to perform and click Start. Use Dry Run first to preview changes before applying them."
+	}
+}

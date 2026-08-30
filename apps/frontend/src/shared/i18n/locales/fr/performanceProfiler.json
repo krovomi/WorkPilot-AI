@@ -1,0 +1,48 @@
+{
+	"title": "Profileur de performance",
+	"subtitle": "Repérer les goulots d'étranglement et générer les optimisations",
+	"actions": {
+		"analyze": "Analyser la performance",
+		"reanalyze": "Relancer l'analyse",
+		"cancel": "Annuler"
+	},
+	"phases": {
+		"idle": "Prêt",
+		"profiling": "Profilage du code…",
+		"analyzing": "Exécution des mesures…",
+		"optimizing": "Génération des optimisations…",
+		"complete": "Terminé",
+		"error": "Erreur"
+	},
+	"options": {
+		"heading": "Options",
+		"autoImplement": "Application automatique",
+		"autoImplementHint": "Appliquer automatiquement les correctifs sûrs"
+	},
+	"summary": {
+		"heading": "Résumé",
+		"bottlenecks": "Goulots trouvés",
+		"critical": "Critiques",
+		"highPriority": "Priorité haute",
+		"optimizations": "Optimisations"
+	},
+	"results": {
+		"autoImplemented": "Application automatique terminée",
+		"benchmarks": "Mesures",
+		"notAvailable": "N/D",
+		"bottlenecks": "Goulots d'étranglement ({{count}})",
+		"noBottlenecks": "Aucun goulot détecté 🎉",
+		"optimizations": "Optimisations ({{count}})",
+		"viewImplementation": "Voir l'implémentation"
+	},
+	"effort": {
+		"trivial": "Trivial",
+		"low": "Effort faible",
+		"medium": "Effort moyen",
+		"high": "Effort élevé"
+	},
+	"empty": {
+		"title": "Profileur de performance",
+		"body": "Analysez votre code à la recherche de goulots d'étranglement : complexité algorithmique, fuites mémoire, requêtes lentes, rendus React coûteux, et le reste."
+	}
+}

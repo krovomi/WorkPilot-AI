@@ -8,15 +8,6 @@ import {
 } from "../../stores/performance-profiler-store";
 import { useProjectStore } from "../../stores/project-store";
 
-const PHASE_LABELS: Record<PerformanceProfilerPhase, string> = {
-	idle: "Ready",
-	profiling: "Profiling codebase...",
-	analyzing: "Running benchmarks...",
-	optimizing: "Generating optimizations...",
-	complete: "Complete",
-	error: "Error",
-};
-
 const SEVERITY_COLORS: Record<string, string> = {
 	critical: "text-red-400 bg-red-500/10 border-red-500/20",
 	high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
@@ -24,16 +15,8 @@ const SEVERITY_COLORS: Record<string, string> = {
 	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
-const EFFORT_LABELS: Record<string, string> = {
-	trivial: "Trivial",
-	low: "Low effort",
-	medium: "Medium effort",
-	high: "High effort",
-};
-
 export function PerformanceProfilerDashboard(): React.ReactElement {
-	// biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
-	const { t } = useTranslation(["common"]);
+	const { t } = useTranslation(["performanceProfiler"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const {
 		phase,
@@ -47,6 +30,8 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 	} = usePerformanceProfilerStore();
 
 	const isRunning = ["profiling", "analyzing", "optimizing"].includes(phase);
+	const phaseLabel = (p: PerformanceProfilerPhase) =>
+		t(`performanceProfiler:phases.${p}`);
 	const isComplete = phase === "complete";
 
 	function handleStart() {
@@ -67,9 +52,11 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 			<div className="px-6 py-4 border-b border-[var(--border-color)]">
 				<div className="flex items-center justify-between">
 					<div>
-						<h1 className="text-xl font-semibold">Performance Profiler</h1>
+						<h1 className="text-xl font-semibold">
+							{t("performanceProfiler:title")}
+						</h1>
 						<p className="text-sm text-[var(--text-secondary)] mt-0.5">
-							Identify bottlenecks and auto-generate optimizations
+							{t("performanceProfiler:subtitle")}
 						</p>
 					</div>
 					<div className="flex items-center gap-3">
@@ -79,7 +66,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 								onClick={cancelPerformanceProfiling}
 								className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
 							>
-								Cancel
+								{t("performanceProfiler:actions.cancel")}
 							</button>
 						) : (
 							<button
@@ -88,7 +75,9 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 								disabled={!activeProject}
 								className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity text-sm font-medium"
 							>
-								{isComplete ? "Re-analyze" : "Analyze Performance"}
+								{isComplete
+										? t("performanceProfiler:actions.reanalyze")
+										: t("performanceProfiler:actions.analyze")}
 							</button>
 						)}
 					</div>
@@ -101,7 +90,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 					{/* Options */}
 					<div>
 						<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
-							Options
+							{t("performanceProfiler:options.heading")}
 						</h3>
 						<label className="flex items-center gap-2 cursor-pointer">
 							<input
@@ -112,9 +101,11 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 								className="rounded accent-[var(--accent)]"
 							/>
 							<div>
-								<div className="text-sm font-medium">Auto-implement</div>
+								<div className="text-sm font-medium">
+									{t("performanceProfiler:options.autoImplement")}
+								</div>
 								<div className="text-xs text-[var(--text-secondary)]">
-									Apply safe fixes automatically
+									{t("performanceProfiler:options.autoImplementHint")}
 								</div>
 							</div>
 						</label>
@@ -124,7 +115,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 					{isComplete && result?.report?.summary && (
 						<div>
 							<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-								Summary
+								{t("performanceProfiler:summary.heading")}
 							</h3>
 							<div className="flex flex-col gap-2">
 								<div className="bg-[var(--bg-secondary)] rounded-lg p-2.5">
@@ -132,7 +123,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 										{result.report.summary.total_bottlenecks}
 									</div>
 									<div className="text-xs text-[var(--text-secondary)]">
-										Bottlenecks found
+										{t("performanceProfiler:summary.bottlenecks")}
 									</div>
 								</div>
 								{criticalCount > 0 && (
@@ -140,7 +131,9 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 										<div className="text-lg font-bold text-red-400">
 											{criticalCount}
 										</div>
-										<div className="text-xs text-red-400/70">Critical</div>
+										<div className="text-xs text-red-400/70">
+											{t("performanceProfiler:summary.critical")}
+										</div>
 									</div>
 								)}
 								{highCount > 0 && (
@@ -149,7 +142,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 											{highCount}
 										</div>
 										<div className="text-xs text-orange-400/70">
-											High priority
+											{t("performanceProfiler:summary.highPriority")}
 										</div>
 									</div>
 								)}
@@ -158,7 +151,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 										{result.report.summary.total_suggestions}
 									</div>
 									<div className="text-xs text-[var(--text-secondary)]">
-										Optimizations
+										{t("performanceProfiler:summary.optimizations")}
 									</div>
 								</div>
 							</div>
@@ -191,9 +184,9 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 										/>
 									</svg>
 								)}
-								<span className="text-xs">{PHASE_LABELS[phase]}</span>
+								<span className="text-xs">{phaseLabel(phase)}</span>
 							</div>
-							{status && status !== PHASE_LABELS[phase] && (
+							{status && status !== phaseLabel(phase) && (
 								<div className="text-xs text-[var(--text-secondary)] mt-1 ml-5">
 									{status}
 								</div>
@@ -217,14 +210,16 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 							{/* Implementation result banner */}
 							{Boolean(implementationResult) && (
 								<div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
-									✅ Auto-implementation complete
+									✅ {t("performanceProfiler:results.autoImplemented")}
 								</div>
 							)}
 
 							{/* Benchmarks */}
 							{(result.report?.benchmarks?.length ?? 0) > 0 && (
 								<div>
-									<h2 className="text-sm font-semibold mb-2">Benchmarks</h2>
+									<h2 className="text-sm font-semibold mb-2">
+										{t("performanceProfiler:results.benchmarks")}
+									</h2>
 									<div className="grid grid-cols-2 gap-2">
 										{result.report.benchmarks.map((b, i) => (
 											<div
@@ -238,7 +233,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 												<div className="text-sm font-mono">
 													{b.duration_ms != null
 														? `${b.duration_ms.toFixed(1)}ms`
-														: "N/A"}
+														: t("performanceProfiler:results.notAvailable")}
 												</div>
 											</div>
 										))}
@@ -250,7 +245,9 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 							{(result.report?.bottlenecks?.length ?? 0) > 0 ? (
 								<div>
 									<h2 className="text-sm font-semibold mb-2">
-										Bottlenecks ({result.report.bottlenecks.length})
+										{t("performanceProfiler:results.bottlenecks", {
+											count: result.report.bottlenecks.length,
+										})}
 									</h2>
 									<div className="flex flex-col gap-2">
 										{result.report.bottlenecks.map((b, i) => (
@@ -284,7 +281,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 								</div>
 							) : (
 								<div className="text-sm text-[var(--text-secondary)] text-center py-8">
-									No bottlenecks detected 🎉
+									{t("performanceProfiler:results.noBottlenecks")}
 								</div>
 							)}
 
@@ -292,7 +289,9 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 							{(result.report?.suggestions?.length ?? 0) > 0 && (
 								<div>
 									<h2 className="text-sm font-semibold mb-2">
-										Optimizations ({result.report.suggestions.length})
+										{t("performanceProfiler:results.optimizations", {
+											count: result.report.suggestions.length,
+										})}
 									</h2>
 									<div className="flex flex-col gap-3">
 										{result.report.suggestions.map((s, i) => (
@@ -304,7 +303,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 												<div className="flex items-start justify-between gap-2 mb-1">
 													<div className="font-medium text-sm">{s.title}</div>
 													<span className="text-xs text-[var(--text-secondary)] shrink-0">
-														{EFFORT_LABELS[s.effort] ?? s.effort}
+														{t(`performanceProfiler:effort.${s.effort}`, s.effort)}
 													</span>
 												</div>
 												<div className="text-xs text-[var(--text-secondary)] mb-2">
@@ -318,7 +317,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 												{s.implementation && (
 													<details className="mt-2">
 														<summary className="text-xs text-[var(--accent)] cursor-pointer">
-															View implementation
+															{t("performanceProfiler:results.viewImplementation")}
 														</summary>
 														<pre className="mt-1 text-xs font-mono text-[var(--text-secondary)] whitespace-pre-wrap overflow-x-auto bg-[var(--bg-primary)] rounded p-2">
 															{s.implementation}
@@ -348,12 +347,10 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 							<div>
 								<div className="text-5xl mb-4">⚡</div>
 								<h3 className="text-lg font-medium mb-2">
-									Performance Profiler
+									{t("performanceProfiler:empty.title")}
 								</h3>
 								<p className="text-sm text-[var(--text-secondary)] max-w-sm">
-									Analyze your codebase for performance bottlenecks — algorithm
-									complexity, memory leaks, slow queries, React render issues,
-									and more.
+									{t("performanceProfiler:empty.body")}
 								</p>
 							</div>
 						</div>

@@ -1,0 +1,36 @@
+{
+	"title": "Visualiseur d'architecture",
+	"subtitle": "Générer des diagrammes d'architecture interactifs depuis votre code",
+	"actions": {
+		"generate": "Générer les diagrammes",
+		"regenerate": "Regénérer",
+		"cancel": "Annuler"
+	},
+	"diagramTypes": {
+		"heading": "Types de diagramme",
+		"module_dependencies": "Dépendances entre modules",
+		"component_hierarchy": "Hiérarchie des composants",
+		"data_flow": "Flux de données",
+		"database_schema": "Schéma de base de données"
+	},
+	"view": {
+		"heading": "Afficher le diagramme"
+	},
+	"summary": {
+		"heading": "Résumé",
+		"diagrams_one": "{{count}} diagramme",
+		"diagrams_other": "{{count}} diagrammes",
+		"nodes_one": "{{count}} nœud",
+		"nodes_other": "{{count}} nœuds",
+		"edges_one": "{{count}} arête",
+		"edges_other": "{{count}} arêtes"
+	},
+	"diagram": {
+		"counts": "{{nodes}} nœuds • {{edges}} arêtes",
+		"copyHint": "Copiez le code Mermaid ci-dessus et collez-le dans <0>mermaid.live</0> pour afficher le diagramme interactif."
+	},
+	"empty": {
+		"title": "Visualiseur d'architecture",
+		"body": "Sélectionnez des types de diagramme puis cliquez sur « Générer les diagrammes » pour analyser votre code et produire les diagrammes d'architecture."
+	}
+}

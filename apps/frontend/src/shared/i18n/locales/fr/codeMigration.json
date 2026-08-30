@@ -1,0 +1,43 @@
+{
+	"title": "Agent de migration de code",
+	"subtitle": "Migrations automatisées de framework, de version et de langage",
+	"phases": {
+		"idle": "Prêt",
+		"analyzing": "Analyse du code…",
+		"planning": "Planification de la migration…",
+		"executing": "Exécution de la migration…",
+		"validating": "Validation des changements…",
+		"complete": "Terminé",
+		"error": "Erreur"
+	},
+	"config": {
+		"descriptionLabel": "Description de la migration",
+		"descriptionPlaceholder": "Décrivez la migration à effectuer…",
+		"examplesLabel": "Exemples :",
+		"dryRun": "Simulation",
+		"dryRunHint": "Analyser seulement, sans modifier de fichier"
+	},
+	"examples": {
+		"reactHooks": "Migrer les composants de classe React vers les hooks",
+		"jsToTs": "Convertir les fichiers JavaScript en TypeScript",
+		"python312": "Remplacer les motifs Python 3.9 obsolètes par leurs équivalents 3.12",
+		"asyncAwait": "Remplacer les callbacks par async/await",
+		"dateFns": "Migrer de Moment.js vers date-fns"
+	},
+	"actions": {
+		"start": "Lancer la migration",
+		"analyze": "Analyser la migration",
+		"cancel": "Annuler la migration"
+	},
+	"results": {
+		"dryRunComplete": "Analyse en simulation terminée",
+		"migrationComplete": "Migration terminée",
+		"filesModified": "Fichiers modifiés",
+		"planStatus": "État du plan",
+		"execution": "Exécution"
+	},
+	"empty": {
+		"title": "Agent de migration de code",
+		"body": "Décrivez la migration à effectuer puis cliquez sur Lancer. Utilisez la simulation d'abord, pour voir les changements avant de les appliquer."
+	}
+}
