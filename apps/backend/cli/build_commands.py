@@ -176,6 +176,39 @@ def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
         return None
 
 
+def _run_docs_preflight(
+    working_dir: Path, spec_dir: Path, source_project_dir: Path
+) -> None:
+    """Download the documentation of libraries this task has no example of.
+
+    Runs before planning, so the plan is written against the API that exists
+    rather than the one the model remembers, and so the coder finds the page
+    already staged next to the spec. The cache lives in the *source* project:
+    a worktree is thrown away on merge and the download should not go with it.
+
+    Never raises. No network, no API key, quota spent — the build proceeds, and
+    the Context7 MCP tools the agents already hold cover the rest in-session.
+    """
+    try:
+        from libdocs import run_preflight
+    except Exception as exc:  # noqa: BLE001 - the package is optional at runtime
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Documentation preflight unavailable: {exc}")
+        return
+
+    try:
+        result = run_preflight(working_dir, spec_dir, cache_dir=source_project_dir)
+    except Exception as exc:  # noqa: BLE001 - documentation never fails a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Documentation preflight skipped: {exc}")
+        return
+
+    if summary := result.describe():
+        print("\n" + summary)
+
+
 def _phase_context(
     profile,
     project_dir: Path,
@@ -623,6 +656,10 @@ def handle_build_command(
 
     try:
         debug("run.py", "Starting agent execution")
+
+        # The `docs` phase. Everything below reasons about library APIs, so
+        # the reference they reason about is fetched first.
+        _run_docs_preflight(working_dir, spec_dir, project_dir)
 
         # Phases the workflow declares before `planning`. At low and medium
         # effort the profile has already dropped them, so this is a no-op there

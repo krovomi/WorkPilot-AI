@@ -1277,7 +1277,9 @@
 		"servers": {
 			"context7": {
 				"name": "Context7",
-				"description": "Documentation lookup for libraries"
+				"description": "Documentation lookup for libraries. Pages for libraries the codebase has no example of are downloaded before each build.",
+				"apiKeyPlaceholder": "Context7 API key (optional)",
+				"apiKeyHint": "Without a key, Context7 applies its anonymous per-IP quota. Free keys: context7.com/dashboard"
 			},
 			"graphiti": {
 				"name": "Graphiti Memory",

@@ -44,7 +44,7 @@ def write_workflow(tmp_path: Path, body: str) -> Path:
 class TestSpecParsing:
     def test_the_shipped_workflow_loads(self, workflow):
         assert workflow.name == "feature-build"
-        assert [p.id for p in workflow.phases][:2] == ["brainstorm", "spec"]
+        assert [p.id for p in workflow.phases][:3] == ["docs", "brainstorm", "spec"]
 
     def test_every_phase_names_an_implementation(self, workflow):
         for phase in workflow.phases:
@@ -133,9 +133,13 @@ class TestEffortPruning:
             )
 
     def test_the_cheapest_level_runs_only_what_cannot_be_skipped(self, workflow):
-        """Coding, the hard gate, and the near-free observation. Nothing else."""
+        """Coding, the hard gate, and the two near-free phases. Nothing else.
+
+        `docs` is in that set for the same reason `observe` is: it spends no
+        API call, so no effort level saves anything by dropping it.
+        """
         profile = resolve_profile(workflow, "none", changed_files=[])
-        assert set(profile.phase_ids) == {"coding", "verify", "observe"}
+        assert set(profile.phase_ids) == {"docs", "coding", "verify", "observe"}
 
     def test_ultrathink_buys_the_second_opinion(self, workflow):
         """What the top level is for: a reading that did not write the code.
