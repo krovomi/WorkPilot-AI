@@ -234,7 +234,7 @@ Working examples: `agents/planner.py`, `agents/coder.py`, `qa/reviewer.py`, `qa/
 
 ### Agent Prompts (`apps/backend/prompts/`)
 
-38 root-level prompts + 22 GitHub-specific prompts in `prompts/github/`.
+37 root-level prompts + 18 GitHub-specific prompts in `prompts/github/`.
 
 | Category | Prompts |
 |----------|---------|
@@ -246,7 +246,13 @@ Working examples: `agents/planner.py`, `agents/coder.py`, `qa/reviewer.py`, `qa/
 | **Analysis** | architecture_reviewer.md, architecture_visualizer.md, breaking_change_detector.md, performance_profiler.md, insight_extractor.md, learning_analyzer.md |
 | **Advanced** | browser_agent.md, code_migration.md, documentation_agent.md, environment_cloner.md, multi_repo_planner.md, intent_templates.md, followup_planner.md |
 | **Roadmap** | roadmap_discovery.md, roadmap_features.md, competitor_analysis.md |
-| **GitHub** | issue_analyzer.md, issue_triager.md, duplicate_detector.md, pr_reviewer.md, pr_orchestrator.md, pr_parallel_orchestrator.md, pr_fixer.md, pr_finding_validator.md, pr_template_filler.md, pr_ai_triage.md, pr_codebase_fit_agent.md, + 11 more |
+| **GitHub** | issue_analyzer.md, issue_triager.md, pr_reviewer.md, pr_orchestrator.md, pr_parallel_orchestrator.md, pr_finding_validator.md, pr_template_filler.md, pr_ai_triage.md, pr_codebase_fit_agent.md, + 9 more |
+
+Duplicate detection and issue auto-fix are listed as features above but are not
+prompt-driven: `runners/github/duplicates.py` compares embeddings, and
+`runners/github/orchestrator.py` drives `auto_fix_issue`. The
+`duplicate_detector.md` and `pr_fixer.md` this table used to name were left over
+from an earlier design and loaded by nothing.
 
 ### Spec Directory Structure
 
