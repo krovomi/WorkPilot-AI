@@ -14,6 +14,7 @@ import { access, constants } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { isUnix } from "../platform";
 
 const execFileAsync = promisify(execFile);
 
@@ -101,7 +102,7 @@ export function getWindowsExecutablePaths(
 	logPrefix: string = "[Windows Paths]",
 ): string[] {
 	// Only run on Windows
-	if (process.platform !== "win32") {
+	if (isUnix()) {
 		return [];
 	}
 
@@ -162,7 +163,7 @@ export function findWindowsExecutableViaWhere(
 	executable: string,
 	logPrefix: string = "[Windows Where]",
 ): string | null {
-	if (process.platform !== "win32") {
+	if (isUnix()) {
 		return null;
 	}
 
@@ -230,7 +231,7 @@ export async function getWindowsExecutablePathsAsync(
 	logPrefix: string = "[Windows Paths]",
 ): Promise<string[]> {
 	// Only run on Windows
-	if (process.platform !== "win32") {
+	if (isUnix()) {
 		return [];
 	}
 
@@ -283,7 +284,7 @@ export async function findWindowsExecutableViaWhereAsync(
 	executable: string,
 	logPrefix: string = "[Windows Where]",
 ): Promise<string | null> {
-	if (process.platform !== "win32") {
+	if (isUnix()) {
 		return null;
 	}
 

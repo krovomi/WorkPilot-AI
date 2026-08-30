@@ -33,6 +33,7 @@ import { getAppLanguage } from "./app-language";
 import { logger } from "./app-logger";
 import type { AppEmulatorConfig } from "./app-emulator-service";
 import { appEmulatorService } from "./app-emulator-service";
+import { isUnix, isWindows } from "./platform";
 import {
 	findCommandInPath,
 	findMsBuildInvocation,
@@ -888,7 +889,7 @@ async function captureDesktopImage(
 	outputPath: string,
 	options: DesktopImageCaptureOptions = {},
 ): Promise<{ width: number; height: number }> {
-	if (process.platform === "win32") {
+	if (isWindows()) {
 		return captureAppWindowByPid(
 			outputPath,
 			options.pid,
@@ -1012,7 +1013,7 @@ async function waitForProcessWindowNames(
 	fallbackNames: readonly string[],
 ): Promise<string[]> {
 	const names = new Set(fallbackNames.filter((name) => name.trim().length > 0));
-	if (process.platform !== "win32" || !pid) {
+	if (isUnix() || !pid) {
 		await delay(3000);
 		return [...names];
 	}
@@ -1276,7 +1277,7 @@ async function collectWebDomCandidates(
  * Windows-only: returns an empty list off Windows, on timeout, or any error.
  */
 async function collectDesktopUiElements(pid: number): Promise<NavUiElement[]> {
-	if (process.platform !== "win32") return [];
+	if (isUnix()) return [];
 	const script = `$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -1511,7 +1512,7 @@ async function runDesktopNavigationStep(
 ): Promise<void> {
 	if (
 		canDrive &&
-		process.platform === "win32" &&
+		isWindows() &&
 		pid &&
 		(step.invoke || step.setText)
 	) {
@@ -1655,7 +1656,7 @@ let cachedElevation: boolean | null = null;
  */
 async function isCurrentProcessElevated(): Promise<boolean> {
 	if (cachedElevation !== null) return cachedElevation;
-	if (process.platform !== "win32") {
+	if (isUnix()) {
 		cachedElevation =
 			typeof process.getuid === "function" && process.getuid() === 0;
 		return cachedElevation;
@@ -1725,7 +1726,7 @@ async function launchDesktopApplication(
 		};
 	};
 
-	if (process.platform !== "win32") {
+	if (isUnix()) {
 		return spawnDirect(false);
 	}
 
@@ -2022,7 +2023,7 @@ interface DesktopRuntimeInvocation {
 function findDesktopRuntimeInvocation(
 	executablePath: string,
 ): DesktopRuntimeInvocation | null {
-	if (process.platform === "win32") {
+	if (isWindows()) {
 		return {
 			command: executablePath,
 			args: [],
@@ -2252,7 +2253,7 @@ class LocalWindowsDesktopProvider implements VisualProofProvider {
 
 	canHandle(context: VisualProofProviderContext): boolean {
 		return (
-			(process.platform === "win32" ||
+			(isWindows() ||
 				Boolean(findCommandInPath("mono") ?? findCommandInPath("wine"))) &&
 			Boolean(
 				findFirstDotNetProject(

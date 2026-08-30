@@ -494,19 +494,20 @@ React 19, TypeScript 5.9 (strict), Electron 41, Zustand 5, Tailwind CSS v4, Radi
 
 ### Path Aliases (tsconfig.json)
 
-| Alias | Maps to | Usable |
-|-------|---------|--------|
-| `@/*` | `src/renderer/*` | yes |
-| `@shared/*` | `src/shared/*` | yes |
-| `@preload/*` | `src/preload/*` | yes |
-| `@lib/*` | `src/renderer/lib/*` | yes |
-| `@features/*` | `src/renderer/features/*` | **no — target does not exist** |
-| `@components/*` | `src/renderer/shared/components/*` | **no — target does not exist** |
-| `@hooks/*` | `src/renderer/shared/hooks/*` | **no — target does not exist** |
+| Alias | Maps to |
+|-------|---------|
+| `@/*` | `src/renderer/*` |
+| `@shared/*` | `src/shared/*` |
+| `@preload/*` | `src/preload/*` |
+| `@lib/*` | `src/renderer/lib/*` |
 
-The last three are declared in `tsconfig.json` but point at directories that
-were never created, and no file imports through them. Components live in
-`src/renderer/components/`, hooks in `src/renderer/hooks/`.
+Components live in `src/renderer/components/`, hooks in `src/renderer/hooks/`.
+
+`@features/*`, `@components/*` et `@hooks/*` ont été retirés : ils étaient
+déclarés dans `tsconfig.json`, `vitest.config.ts` et `electron.vite.config.ts`,
+pointaient vers des répertoires qui n'ont jamais existé, et aucun fichier
+n'importait au travers. Cette table les documentait comme inutilisables au lieu
+de les supprimer.
 
 ### State Management (Zustand)
 

@@ -35,7 +35,7 @@ import {
 	getToolPath,
 } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
-import { isWindows } from "../platform";
+import { isMacOS, isWindows } from "../platform";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import { isSecurePath } from "../utils/windows-paths";
 
@@ -322,8 +322,8 @@ async function openTerminalWithCommand(command: string): Promise<void> {
 				}).unref();
 			} else {
 				// macOS / Linux — try common terminals
-				const terminal = process.platform === "darwin" ? "open" : "xterm";
-				if (process.platform === "darwin") {
+				const terminal = isMacOS() ? "open" : "xterm";
+				if (isMacOS()) {
 					spawn("open", ["-a", "Terminal.app", "--args", "-e", command], {
 						detached: true,
 						stdio: "ignore",

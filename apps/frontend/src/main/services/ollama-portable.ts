@@ -27,7 +27,7 @@ import * as path from "node:path";
 import { promisify } from "node:util";
 import { app, net } from "electron";
 import unzipper from "unzipper";
-import { getOllamaExecutablePaths } from "../platform";
+import { getOllamaExecutablePaths, isUnix, isWindows } from "../platform";
 
 const execFileAsync = promisify(execFile);
 
@@ -83,13 +83,13 @@ function extractedDir(): string {
  * across the various release layouts (root, or under bin/).
  */
 function binaryCandidates(): string[] {
-	const exe = process.platform === "win32" ? "ollama.exe" : "ollama";
+	const exe = isWindows() ? "ollama.exe" : "ollama";
 	return [exe, path.join("bin", exe)];
 }
 
 /** Recursively search a directory for the ollama binary (last-resort locator). */
 function findBinaryRecursive(dir: string): string | null {
-	const exe = process.platform === "win32" ? "ollama.exe" : "ollama";
+	const exe = isWindows() ? "ollama.exe" : "ollama";
 	let entries: fs.Dirent[];
 	try {
 		entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -371,7 +371,7 @@ export async function ensureOllamaBinary(
 			"Ollama a été téléchargé mais le binaire est introuvable après extraction.",
 		);
 	}
-	if (process.platform !== "win32") {
+	if (isUnix()) {
 		try {
 			fs.chmodSync(binary, 0o755);
 		} catch {
@@ -425,7 +425,7 @@ async function stopManagedServer(baseUrl: string): Promise<void> {
 		/* keep default */
 	}
 	try {
-		if (process.platform === "win32") {
+		if (isWindows()) {
 			await execFileAsync("powershell", [
 				"-NoProfile",
 				"-Command",

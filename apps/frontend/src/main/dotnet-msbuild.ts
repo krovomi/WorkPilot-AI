@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { isUnix, isWindows } from "./platform";
 
 export const MSBUILD_ENV = "WORKPILOT_MSBUILD_PATH";
 
@@ -48,7 +49,7 @@ export function quotePowerShellSingle(value: string): string {
 }
 
 export function findCommandInPath(command: string): string | null {
-	const lookupCommand = process.platform === "win32" ? "where" : "which";
+	const lookupCommand = isWindows() ? "where" : "which";
 	try {
 		const stdout = execFileSync(lookupCommand, [command], { encoding: "utf-8" });
 		return stdout.split(/\r?\n/).find(Boolean) ?? null;
@@ -91,7 +92,7 @@ function resolveConfiguredCommand(value: string | undefined): string | null {
 }
 
 function findMsBuildViaVsWhere(): MsBuildInvocation | null {
-	if (process.platform !== "win32") return null;
+	if (isUnix()) return null;
 	const vswhere = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
 	if (!existsSync(vswhere)) return null;
 	const findPatterns = [
@@ -137,7 +138,7 @@ export function findMsBuildInvocation(
 	if (vswhereMsBuild) return vswhereMsBuild;
 
 	const knownPath =
-		process.platform === "win32"
+		isWindows()
 			? KNOWN_MSBUILD_PATHS.find((candidate) => existsSync(candidate))
 			: null;
 	if (knownPath) return fromExecutable(knownPath, "known-path", options);
