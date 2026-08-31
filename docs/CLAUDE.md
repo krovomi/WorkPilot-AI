@@ -666,7 +666,7 @@ Semantic code search tool integrated for enhanced AI agent code exploration:
 ```bash
 # Start grepai server (Docker or CLI on http://localhost:9000)
 cd src/connectors/grepai
-python test_grepai.py  # Test integration
+python grepai_check.py  # Check integration
 ```
 
 **Usage in Agents:**

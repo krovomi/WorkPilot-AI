@@ -82,7 +82,7 @@ def main():
     print("\n🔄 End-to-End Test")
     print("-" * 30)
 
-    e2e_cmd = ["python", "test_streaming_e2e.py"]
+    e2e_cmd = ["python", "streaming_e2e_check.py"]
     if not run_command(e2e_cmd, project_root, "End-to-End Streaming Test"):
         all_passed = False
 
