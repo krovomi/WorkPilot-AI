@@ -197,6 +197,7 @@ class TestRouteCoverage:
         """
         try:
             from provider_api import app
+
             return app
         except Exception as exc:  # pragma: no cover - dependency-dependent
             pytest.skip(f"provider_api could not be imported: {exc}")
