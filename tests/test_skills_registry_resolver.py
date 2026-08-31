@@ -160,7 +160,7 @@ class TestRequiresGate:
 
     def test_command_accepts_alternatives(self, tmp_path):
         ok, _ = check_requires(
-            {"command": ["definitely-not-a-real-binary", "sh"]}, tmp_path
+            {"command": ["definitely-not-a-real-binary", sys.executable]}, tmp_path
         )
         assert ok
         ok, reason = check_requires(

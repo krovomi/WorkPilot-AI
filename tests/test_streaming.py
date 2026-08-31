@@ -7,6 +7,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -184,6 +185,7 @@ class TestStreamingAgentWrapper:
     async def test_wrapper_lifecycle(self):
         """Test wrapper start and end session."""
         wrapper = StreamingAgentWrapper("test-wrapper-1", enable_recording=False)
+        wrapper._connect = AsyncMock(return_value=False)
 
         await wrapper.start_session({"task": "test"})
         assert wrapper._is_active
@@ -195,6 +197,7 @@ class TestStreamingAgentWrapper:
     async def test_wrapper_events(self):
         """Test wrapper event emission."""
         wrapper = StreamingAgentWrapper("test-wrapper-2", enable_recording=False)
+        wrapper._connect = AsyncMock(return_value=False)
 
         await wrapper.start_session({"task": "test"})
 

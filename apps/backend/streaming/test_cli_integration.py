@@ -35,7 +35,12 @@ class TestCLIStreamingIntegration:
         in. Patching the gate keeps the test on the parameter propagation it
         actually asserts.
         """
-        with patch("cli.utils.validate_environment", return_value=True):
+        with (
+            patch("cli.utils.validate_environment", return_value=True),
+            patch("cli.build_commands._run_docs_preflight"),
+            patch("cli.build_commands._run_deterministic_gates"),
+            patch("cli.build_commands._run_workflow_phases"),
+        ):
             yield
 
     @pytest.fixture
