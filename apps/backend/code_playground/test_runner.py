@@ -79,7 +79,7 @@ class TestPythonExecution:
 
 @pytest.mark.skipif(
     shutil.which("node") is None or platform.system() == "Windows",
-    reason="node interpreter not on PATH or Windows platform incompatibility"
+    reason="node interpreter not on PATH or Windows platform incompatibility",
 )
 class TestNodeExecution:
     def test_node_print_captured(self) -> None:
