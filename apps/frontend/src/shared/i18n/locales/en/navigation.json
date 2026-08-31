@@ -11,7 +11,8 @@
 		"gitIntegrations": "Git & Integrations",
 		"planning": "Planning",
 		"toolbox": "Toolbox",
-		"favorites": "Favorites"
+		"favorites": "Favorites",
+		"administration": "Administration"
 	},
 	"favorites": {
 		"dropHint": "Drop here to pin"
@@ -105,7 +106,8 @@
 		"blastRadius": "Impact Blast Radius",
 		"guardrails": "Agent Guardrails",
 		"envSnapshot": "Environment Snapshots",
-		"offlineMode": "Offline Mode"
+		"offlineMode": "Offline Mode",
+		"administration": "Administration"
 	},
 	"search": {
 		"placeholder": "Search...",

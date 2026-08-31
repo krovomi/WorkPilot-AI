@@ -54,14 +54,24 @@ async def get_db() -> AsyncIterator[AsyncSession]:
 
 
 async def init_db() -> None:
-    """Create all tables if they don't exist.
+    """Create all tables if they don't exist, then seed what the app assumes.
 
     Used at startup as a safety net and by tests. Production deployments
     run ``alembic upgrade head`` first; ``create_all`` is a no-op then.
+
+    The seed runs in both cases and is idempotent. It has to: a database
+    created by ``create_all`` never executes revision ``0003``, so without this
+    a fresh dev or test instance would come up with no built-in roles at all
+    and every membership write would fail on a missing ``role_id``. Running it
+    after Alembic too is what propagates a permission newly granted to a
+    built-in role.
     """
+    from server.db.seed import backfill_existing_deployment
+
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(backfill_existing_deployment)
 
 
 async def dispose_engine() -> None:

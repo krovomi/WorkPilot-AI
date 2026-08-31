@@ -1,0 +1,108 @@
+{
+	"title": "Administration",
+	"description": "Organisations, rôles, membres et quotas de ce déploiement.",
+	"noAccess": "Vous n'avez accès à aucune section d'administration.",
+	"tabs": {
+		"overview": "Vue d'ensemble",
+		"members": "Membres",
+		"roles": "Rôles et permissions",
+		"organizations": "Organisations",
+		"invitations": "Invitations",
+		"audit": "Audit",
+		"quotas": "Quotas"
+	},
+	"common": {
+		"loading": "Chargement…",
+		"save": "Enregistrer",
+		"cancel": "Annuler",
+		"dismiss": "Fermer"
+	},
+	"localMode": {
+		"title": "Rien à administrer en mode local",
+		"description": "Cette installation fonctionne avec un utilisateur unique disposant de tous les droits. Connectez-vous à un serveur WorkPilot pour gérer les organisations, les rôles et les membres."
+	},
+	"overview": {
+		"empty": "Aucune activité à signaler pour l'instant.",
+		"activeRuns": "Exécutions actives",
+		"queued": "{{count}} en file",
+		"failed24h": "Échecs (24 h)",
+		"of24h": "sur {{count}} exécutions",
+		"members": "Membres actifs",
+		"ofTotal": "sur {{count}} au total",
+		"projects": "Projets",
+		"specs": "{{count}} specs",
+		"runsByDay": "Exécutions des 7 derniers jours",
+		"capacity": "Capacité",
+		"successRate": "Taux de succès (7 jours)",
+		"topUsers": "Membres les plus actifs",
+		"runsCount": "{{count}} exécutions",
+		"recentFailures": "Échecs récents"
+	},
+	"members": {
+		"empty": "Aucun membre pour l'instant.",
+		"active": "Actif",
+		"inactive": "Désactivé",
+		"activate": "Réactiver ce compte",
+		"deactivate": "Désactiver ce compte",
+		"remove": "Retirer de l'organisation",
+		"revokeSessions": "Déconnecter cet utilisateur partout",
+		"columns": {
+			"user": "Utilisateur",
+			"role": "Rôle",
+			"status": "Statut",
+			"sessions": "Sessions",
+			"actions": "Actions"
+		}
+	},
+	"roles": {
+		"title": "Rôles",
+		"create": "Nouveau rôle",
+		"newRole": "Nouveau rôle",
+		"slug": "Identifiant",
+		"name": "Nom",
+		"save": "Créer",
+		"builtIn": "Intégré",
+		"custom": "Personnalisé",
+		"builtInReadOnly": "Les rôles intégrés ne sont pas modifiables, afin qu'une mise à jour ajoutant une permission atteigne toutes les organisations. Créez un rôle personnalisé pour définir le vôtre.",
+		"permissionCount": "{{count}} permissions",
+		"privileged": "Action à privilège",
+		"selectPrompt": "Sélectionnez un rôle pour voir les permissions qu'il accorde."
+	},
+	"organizations": {
+		"platformAdminOnly": "Seul un administrateur de la plateforme peut gérer les organisations.",
+		"create": "Créer une organisation",
+		"name": "Nom",
+		"slug": "Identifiant",
+		"status": "Statut",
+		"actions": "Actions",
+		"active": "Active",
+		"suspended": "Suspendue",
+		"current": "Actuelle",
+		"switch": "Basculer vers",
+		"suspend": "Suspendre",
+		"reactivate": "Réactiver"
+	},
+	"audit": {
+		"empty": "Aucun événement d'administration enregistré pour l'instant.",
+		"filter": "Filtrer par action ou utilisateur",
+		"export": "Exporter",
+		"columns": {
+			"when": "Quand",
+			"who": "Qui",
+			"action": "Action",
+			"details": "Détails"
+		}
+	},
+	"quotas": {
+		"description": "Limites appliquées à cette organisation. Laissez un champ vide pour ne pas limiter.",
+		"maxUsers": "Membres maximum",
+		"maxProjects": "Projets maximum",
+		"maxConcurrentRuns": "Exécutions simultanées maximum",
+		"monthlyTokenBudget": "Budget mensuel de tokens",
+		"unlimited": "Illimité",
+		"unlimitedUsage": "{{used}} (sans limite)",
+		"currentlyUsed": "{{count}} utilisés",
+		"enforceHardStop": "Bloquer les nouvelles exécutions quand le budget de tokens est épuisé",
+		"hardStopHint": "Si décoché, le dépassement est signalé mais les exécutions démarrent quand même."
+	}
+}

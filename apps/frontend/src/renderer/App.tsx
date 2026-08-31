@@ -227,6 +227,11 @@ const PluginMarketplace = lazy(() =>
 		default: m.PluginMarketplace,
 	})),
 );
+const AdministrationView = lazy(() =>
+	import("./components/administration/AdministrationView").then((m) => ({
+		default: m.AdministrationView,
+	})),
+);
 const ApiExplorer = lazy(() =>
 	import("./components/api-explorer").then((m) => ({ default: m.ApiExplorer })),
 );
@@ -1738,6 +1743,9 @@ export function App() {
 											<PluginMarketplace />
 										)}
 										{activeView === "api-explorer" && <ApiExplorer />}
+										{activeView === "administration" && (
+											<AdministrationView />
+										)}
 										{activeView === "mission-control" && (
 											<MissionControlDashboard />
 										)}
