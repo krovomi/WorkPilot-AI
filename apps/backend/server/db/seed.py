@@ -147,9 +147,7 @@ def backfill_existing_deployment(conn: Connection, slug: str = DEFAULT_ORG_SLUG)
         )
 
     conn.execute(
-        sa_update(projects)
-        .where(projects.c.org_id.is_(None))
-        .values(org_id=org_id)
+        sa_update(projects).where(projects.c.org_id.is_(None)).values(org_id=org_id)
     )
 
     return org_id

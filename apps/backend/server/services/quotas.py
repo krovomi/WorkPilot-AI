@@ -37,9 +37,7 @@ async def count_users(db: AsyncSession, org_id: str) -> int:
 
 async def count_projects(db: AsyncSession, org_id: str) -> int:
     return (
-        await db.scalar(
-            select(func.count(Project.id)).where(Project.org_id == org_id)
-        )
+        await db.scalar(select(func.count(Project.id)).where(Project.org_id == org_id))
     ) or 0
 
 

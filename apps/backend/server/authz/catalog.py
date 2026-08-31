@@ -48,9 +48,7 @@ class Permission:
             raise ValueError(f"Permission key {self.key!r} does not match {expected!r}")
 
 
-def _p(
-    domain: str, action: str, *, privileged: bool = False
-) -> Permission:
+def _p(domain: str, action: str, *, privileged: bool = False) -> Permission:
     key = f"{domain}.{action}"
     return Permission(
         key=key,

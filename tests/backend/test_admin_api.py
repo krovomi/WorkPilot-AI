@@ -83,7 +83,9 @@ async def env():
         roles = {
             slug: rid
             for slug, rid in (
-                await db.execute(select(Role.slug, Role.id).where(Role.org_id.is_(None)))
+                await db.execute(
+                    select(Role.slug, Role.id).where(Role.org_id.is_(None))
+                )
             ).all()
         }
         db.add_all(

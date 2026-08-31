@@ -103,9 +103,7 @@ class TestValidatedDirConfinement:
 
         from core.api_safety import validated_dir
 
-        assert (
-            validated_dir(str(other), "d", allowed_roots=[other]) == other.resolve()
-        )
+        assert validated_dir(str(other), "d", allowed_roots=[other]) == other.resolve()
 
     def test_traversal_is_still_refused(self, monkeypatch, tmp_path):
         repos_root = tmp_path / "repos"
@@ -225,7 +223,9 @@ class TestRouteCoverage:
         prefixes = {r.path.split("/")[1] for r in routes if "/" in r.path}
         assert "api" in prefixes, "the /api feature routers are not mounted"
 
-    def test_no_route_declares_an_unprotected_path_parameter(self, monkeypatch, tmp_path):
+    def test_no_route_declares_an_unprotected_path_parameter(
+        self, monkeypatch, tmp_path
+    ):
         """Every ``project_dir``-style parameter must be covered.
 
         A parameter is acceptable when the middleware would refuse it in the

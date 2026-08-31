@@ -49,9 +49,7 @@ def _disabled_for(org: Organization | None) -> frozenset[str]:
     return frozenset(str(k) for k in raw)
 
 
-async def org_role_for(
-    db: AsyncSession, user_id: str, org_id: str
-) -> Role | None:
+async def org_role_for(db: AsyncSession, user_id: str, org_id: str) -> Role | None:
     """The user's role in this organization, or ``None`` if not a member."""
     return await db.scalar(
         select(Role)
@@ -137,7 +135,9 @@ async def user_organizations(db: AsyncSession, user_id: str) -> list[Organizatio
     )
 
 
-async def default_org_id(db: AsyncSession, user_id: str, platform_role: str) -> str | None:
+async def default_org_id(
+    db: AsyncSession, user_id: str, platform_role: str
+) -> str | None:
     """The organization to act in when the caller named none.
 
     A single membership is unambiguous, so use it. Several is genuinely

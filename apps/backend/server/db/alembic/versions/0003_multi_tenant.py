@@ -172,9 +172,7 @@ def upgrade() -> None:
     # Only now can org_id be required. SQLite cannot ALTER a column in place,
     # so this goes through batch mode, which rebuilds the table.
     with op.batch_alter_table("projects") as batch:
-        batch.alter_column(
-            "org_id", existing_type=sa.String(length=36), nullable=False
-        )
+        batch.alter_column("org_id", existing_type=sa.String(length=36), nullable=False)
 
 
 def downgrade() -> None:

@@ -47,9 +47,10 @@ async def can_act_in(
     every organization role and never granted by one.
     """
     if platform_role == GlobalRole.ADMIN.value:
-        return await db.scalar(
-            select(Organization.id).where(Organization.id == org_id)
-        ) is not None
+        return (
+            await db.scalar(select(Organization.id).where(Organization.id == org_id))
+            is not None
+        )
     return await _is_member(db, user_id, org_id)
 
 

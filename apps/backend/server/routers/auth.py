@@ -159,9 +159,9 @@ async def my_permissions(
     memberships = {
         row.org_id: row.slug
         for row in await db.execute(
-            select(OrgMember.org_id, Role.slug).join(
-                Role, Role.id == OrgMember.role_id
-            ).where(OrgMember.user_id == user.id)
+            select(OrgMember.org_id, Role.slug)
+            .join(Role, Role.id == OrgMember.role_id)
+            .where(OrgMember.user_id == user.id)
         )
     }
 
@@ -199,14 +199,10 @@ async def switch_org(
         raise HTTPException(status_code=401, detail="Account is disabled or gone")
 
     if not await can_act_in(db, user.id, db_user.role, body.org_id):
-        raise HTTPException(
-            status_code=403, detail="Not a member of that organization"
-        )
+        raise HTTPException(status_code=403, detail="Not a member of that organization")
 
     ua, ip = _client_meta(request)
-    pair = await issue_token_pair(
-        db, db_user, user_agent=ua, ip=ip, org_id=body.org_id
-    )
+    pair = await issue_token_pair(db, db_user, user_agent=ua, ip=ip, org_id=body.org_id)
     return TokenResponse(
         access_token=pair.access_token,
         refresh_token=pair.refresh_token,

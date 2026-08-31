@@ -165,7 +165,9 @@ class TestOverridesAreEnforced:
         def run():
             return {"ok": True}
 
-        app = _app_with(_principal("agent.read", "agent.write"), (router, "slash_commands"))
+        app = _app_with(
+            _principal("agent.read", "agent.write"), (router, "slash_commands")
+        )
         with TestClient(app) as client:
             resp = client.post("/api/slash-commands/run")
             assert resp.status_code == 403

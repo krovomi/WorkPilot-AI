@@ -82,9 +82,7 @@ async def overview(
         )
     ) or 0
     projects_total = (
-        await db.scalar(
-            select(func.count(Project.id)).where(Project.org_id == org_id)
-        )
+        await db.scalar(select(func.count(Project.id)).where(Project.org_id == org_id))
     ) or 0
     specs_total = (
         await db.scalar(

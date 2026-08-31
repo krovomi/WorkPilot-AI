@@ -88,9 +88,7 @@ def _feature_guard(feature: str):
         route_path = getattr(route, "path", request.url.path)
         needed = permission_for(request.method, route_path, domain)
         if not principal.has(needed):
-            raise HTTPException(
-                status_code=403, detail=f"Missing permission: {needed}"
-            )
+            raise HTTPException(status_code=403, detail=f"Missing permission: {needed}")
         return principal
 
     return _check

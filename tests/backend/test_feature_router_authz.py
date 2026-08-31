@@ -60,7 +60,9 @@ class TestEveryRouterIsGuarded:
 
     def test_all_thirty_four_routers_are_mounted_through_the_helper(self):
         calls = _mount_calls()
-        assert len(calls) >= 34, f"expected at least 34 guarded mounts, got {len(calls)}"
+        assert len(calls) >= 34, (
+            f"expected at least 34 guarded mounts, got {len(calls)}"
+        )
 
     def test_every_mounted_feature_is_in_the_catalog(self):
         """An unmapped feature raises at boot; catch it here instead."""
@@ -103,7 +105,8 @@ class TestDangerousRoutesAreRaisedAboveTheirVerb:
         from server.authz.mounting import ROUTE_OVERRIDES, permission_for
 
         assert (
-            permission_for("POST", "/api/slash-commands/run", "agent") == "agent.execute"
+            permission_for("POST", "/api/slash-commands/run", "agent")
+            == "agent.execute"
         )
         executing = {
             path

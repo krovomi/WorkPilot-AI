@@ -38,7 +38,6 @@ def _clean_settings(monkeypatch, tmp_path):
     server_config.reset_settings_cache()
 
 
-
 async def _default_org_id() -> str:
     """The organization every project now belongs to.
 
@@ -50,7 +49,9 @@ async def _default_org_id() -> str:
     from sqlalchemy import select
 
     async with get_session_factory()() as db:
-        return await db.scalar(select(Organization.id).where(Organization.slug == "default"))
+        return await db.scalar(
+            select(Organization.id).where(Organization.slug == "default")
+        )
 
 
 async def _fresh_db():
@@ -85,7 +86,10 @@ async def test_cancel_rejects_a_run_belonging_to_another_spec(monkeypatch):
             org_id=org_id, name="Mine", repo_url="https://x/a.git", server_path="/tmp/a"
         )
         theirs = Project(
-            org_id=org_id, name="Theirs", repo_url="https://x/b.git", server_path="/tmp/b"
+            org_id=org_id,
+            name="Theirs",
+            repo_url="https://x/b.git",
+            server_path="/tmp/b",
         )
         db.add_all([mine, theirs])
         await db.flush()

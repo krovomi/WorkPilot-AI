@@ -309,6 +309,7 @@ def _mount(router, feature: str) -> None:
 
     mount_guarded(app, router, feature)
 
+
 # Single shared limiter instance (also imported by server.routers.* so all
 # rate-limit decorators share one backend).
 from server.ratelimit import limiter  # noqa: E402
