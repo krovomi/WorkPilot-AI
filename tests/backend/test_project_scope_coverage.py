@@ -187,11 +187,20 @@ class TestRouteCoverage:
 
     @staticmethod
     def _load_app():
+        """The real application, or skip when its dependencies are absent.
+
+        The ``return`` sits inside the ``try`` on purpose: after a
+        ``pytest.skip`` the name is unbound, and returning it below the
+        ``except`` would only ever work because ``skip`` happens to raise.
+        Binding and returning in the same branch says that outright instead of
+        leaning on a library's control flow.
+        """
         try:
             from provider_api import app
+
+            return app
         except Exception as exc:  # pragma: no cover - dependency-dependent
             pytest.skip(f"provider_api could not be imported: {exc}")
-        return app
 
     def _routes(self):
         app = self._load_app()
