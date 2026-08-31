@@ -12,7 +12,7 @@ import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -24,77 +24,8 @@ if str(_github_dir) not in sys.path:
 if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 
-# ---------------------------------------------------------------------------
-# sys.modules mocking  – prevent deep backend imports from failing in CI
-# ---------------------------------------------------------------------------
-_MOCKED_MODULES: dict[str, MagicMock] = {}
-
-
-def _ensure(name: str) -> MagicMock:
-    if name not in sys.modules:
-        mod = MagicMock()
-        mod.__name__ = name
-        sys.modules[name] = mod
-        _MOCKED_MODULES[name] = mod
-    return sys.modules[name]
-
-
-# core.* chain (needed by context_gatherer → core.io_utils, gh_client → core.gh_executable)
-for _m in [
-    "core",
-    "core.io_utils",
-    "core.gh_executable",
-    "core.platform",
-    "core.platform.detect",
-    "core.client",
-    "core.auth",
-    "core.agent",
-    "core.worktree",
-]:
-    _ensure(_m)
-
-# Provide safe_print and get_gh_executable as callables
-sys.modules["core.io_utils"].safe_print = MagicMock()
-sys.modules["core.gh_executable"].get_gh_executable = MagicMock(return_value="gh")
-
-# rate_limiter (needed by gh_client)
-_rl = _ensure("rate_limiter")
-_rl.RateLimiter = MagicMock()
-_rl.RateLimitExceeded = type("RateLimitExceeded", (Exception,), {})
-
-# file_lock (needed by models)
-_fl = _ensure("file_lock")
-_fl.locked_json_update = MagicMock()
-_fl.locked_json_write = MagicMock()
-
-# ---------------------------------------------------------------------------
-# Now safe to import
-# ---------------------------------------------------------------------------
-_modules_before = set(sys.modules)
-
 from context_gatherer import AI_BOT_PATTERNS, FollowupContextGatherer
 from models import FollowupReviewContext, PRReviewResult
-
-# ---------------------------------------------------------------------------
-# …and put sys.modules back.
-#
-# The stubs above were installed permanently, at import time. Everything that
-# ran afterwards in the same session saw them: `rate_limiter` in particular,
-# which `gh_client` imports under that bare name, so `GHClient._rate_limiter`
-# became a MagicMock and `available, msg = check_github_available()` unpacked
-# an empty tuple. The modules this file loads under bare names (`gh_client`,
-# `context_gatherer`, `models`) stayed cached with the stubs bound inside them,
-# so a later `from gh_client import GHClient` got the polluted copy rather than
-# re-importing a clean one.
-#
-# It never showed while `tests/` and the backend's own tests ran in separate
-# sessions. The names imported just above stay bound in this module, so these
-# tests keep the environment they asked for; nothing else inherits it.
-for _name in set(sys.modules) - _modules_before:
-    del sys.modules[_name]
-for _name, _mod in _MOCKED_MODULES.items():
-    if sys.modules.get(_name) is _mod:
-        del sys.modules[_name]
 
 
 class TestAIReviewsInclusion:

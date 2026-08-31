@@ -26,6 +26,7 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -232,7 +233,9 @@ def main() -> int:
     )
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument(
-        "--workdir", type=Path, default=Path("/tmp/workpilot-wiki-sync")
+        "--workdir",
+        type=Path,
+        default=Path(tempfile.gettempdir()) / "workpilot-wiki-sync",
     )
     parser.add_argument("--no-push", action="store_true")
     args = parser.parse_args()

@@ -358,7 +358,7 @@ class PRContextGatherer:
             merge_state_status=merge_state_status,
         )
 
-    async def _get_file_extension(self, file_path: str) -> str:
+    def _get_file_extension(self, file_path: str) -> str:
         """Return the syntax highlighting language for a file."""
         extension = Path(file_path).suffix.lower()
 
@@ -1030,7 +1030,7 @@ class PRContextGatherer:
                 if candidate.exists() and candidate.is_file():
                     try:
                         rel_path = candidate.relative_to(self.project_dir)
-                        return str(rel_path)
+                        return rel_path.as_posix()
                     except ValueError:
                         # File is outside project directory
                         return None
@@ -1041,7 +1041,7 @@ class PRContextGatherer:
                 if index_file.exists() and index_file.is_file():
                     try:
                         rel_path = index_file.relative_to(self.project_dir)
-                        return str(rel_path)
+                        return rel_path.as_posix()
                     except ValueError:
                         return None
 
@@ -1049,7 +1049,7 @@ class PRContextGatherer:
         if resolved.exists() and resolved.is_file():
             try:
                 rel_path = resolved.relative_to(self.project_dir)
-                return str(rel_path)
+                return rel_path.as_posix()
             except ValueError:
                 return None
 
