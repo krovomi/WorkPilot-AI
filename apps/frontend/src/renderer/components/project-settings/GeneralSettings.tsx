@@ -3,6 +3,8 @@ import {
 	CheckCircle2,
 	ChevronRight,
 	Download,
+	FolderGit2,
+	GitBranch,
 	Loader2,
 	RefreshCw,
 } from "lucide-react";
@@ -10,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { DEFAULT_AGENT_PROFILES } from "../../../shared/constants";
 import type {
 	AutoBuildVersionInfo,
+	InitializationBlocker,
 	Project,
 	ProjectSettings as ProjectSettingsType,
 } from "../../../shared/types";
@@ -32,6 +35,9 @@ interface GeneralSettingsProps {
 	readonly isCheckingVersion: boolean;
 	readonly isUpdating: boolean;
 	readonly handleInitialize: () => Promise<void>;
+	readonly initBlocker: InitializationBlocker | null;
+	readonly isRepairingGit: boolean;
+	readonly handleRepairGit: () => Promise<void>;
 }
 
 export function GeneralSettings({
@@ -42,6 +48,9 @@ export function GeneralSettings({
 	isCheckingVersion,
 	isUpdating,
 	handleInitialize,
+	initBlocker,
+	isRepairingGit,
+	handleRepairGit,
 }: GeneralSettingsProps) {
 	const { t } = useTranslation(["settings"]);
 	const { selectedProvider } = useProviderContext();
@@ -59,6 +68,16 @@ export function GeneralSettings({
 		(m) => (m as { tier?: string }).tier === "flagship",
 	);
 	const flagshipLabel = flagshipModel?.label || liveCatalog.models[0]?.label;
+
+	// The two blockers a click can clear: a folder that is not a repository, and
+	// a repository with no commit. Everything else is reported, not offered as a
+	// button — a repair that cannot work is worse than an honest message.
+	const repairableBlocker =
+		initBlocker === "not-a-git-repo" || initBlocker === "no-commits"
+			? initBlocker
+			: null;
+	const blockerKey =
+		repairableBlocker === "not-a-git-repo" ? "notGitRepo" : "noCommits";
 
 	const handleOpenAgentSettings = () => {
 		globalThis.dispatchEvent(
@@ -118,7 +137,7 @@ export function GeneralSettings({
 									size="sm"
 									className="mt-3"
 									onClick={handleInitialize}
-									disabled={isUpdating}
+									disabled={isUpdating || isRepairingGit}
 								>
 									{isUpdating ? (
 										<>
@@ -132,6 +151,93 @@ export function GeneralSettings({
 										</>
 									)}
 								</Button>
+
+								{repairableBlocker && (
+									<div className="mt-4 rounded-lg border border-warning/40 bg-warning/5 p-4 space-y-3">
+										<div className="flex items-start gap-3">
+											<FolderGit2 className="h-5 w-5 text-warning mt-0.5 shrink-0" />
+											<div className="space-y-1">
+												<p className="text-sm font-medium text-foreground">
+													{t(
+														`projectSections.autoBuild.blocker.${blockerKey}.title`,
+													)}
+												</p>
+												<p className="text-xs text-muted-foreground">
+													{t(
+														`projectSections.autoBuild.blocker.${blockerKey}.body`,
+													)}
+												</p>
+											</div>
+										</div>
+
+										<div className="rounded-md border border-border bg-background/60 p-3">
+											<p className="text-xs font-medium text-foreground mb-2">
+												{t("projectSections.autoBuild.blocker.whatHappens")}
+											</p>
+											<ul className="space-y-1.5">
+												{repairableBlocker === "not-a-git-repo" && (
+													<li className="flex items-center gap-2 text-xs text-muted-foreground">
+														<GitBranch className="h-3.5 w-3.5 text-primary shrink-0" />
+														{t("projectSections.autoBuild.blocker.stepInit")}
+													</li>
+												)}
+												<li className="flex items-center gap-2 text-xs text-muted-foreground">
+													<CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+													{t("projectSections.autoBuild.blocker.stepCommit")}
+												</li>
+												<li className="flex items-center gap-2 text-xs text-muted-foreground">
+													<Download className="h-3.5 w-3.5 text-primary shrink-0" />
+													{t("projectSections.autoBuild.blocker.stepRetry")}
+												</li>
+											</ul>
+										</div>
+
+										<Button
+											size="sm"
+											onClick={handleRepairGit}
+											disabled={isRepairingGit || isUpdating}
+										>
+											{isRepairingGit ? (
+												<>
+													<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+													{t("projectSections.autoBuild.blocker.repairing")}
+												</>
+											) : (
+												<>
+													<GitBranch className="mr-2 h-4 w-4" />
+													{t("projectSections.autoBuild.blocker.repairButton")}
+												</>
+											)}
+										</Button>
+
+										<details className="text-xs">
+											<summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+												{t("projectSections.autoBuild.blocker.manual")}
+											</summary>
+											<div className="mt-2 rounded-md bg-muted/60 p-3 font-mono text-[11px] space-y-1 text-muted-foreground">
+												{repairableBlocker === "not-a-git-repo" && (
+													<p>git init</p>
+												)}
+												<p>git add -A</p>
+												<p>git commit -m "Initial commit"</p>
+											</div>
+										</details>
+									</div>
+								)}
+
+								{initBlocker === "path-missing" && (
+									<p className="mt-3 text-xs text-destructive">
+										{t("projectSections.autoBuild.blocker.pathMissing", {
+											path: project.path,
+										})}
+									</p>
+								)}
+
+								{initBlocker === "already-initialized" && (
+									<p className="mt-3 text-xs text-muted-foreground">
+										{t("projectSections.autoBuild.blocker.alreadyInitialized")}
+									</p>
+								)}
 							</div>
 						</div>
 					</div>

@@ -55,7 +55,7 @@ class TestResolution:
         res = ask(project, effort="high")
         assert res["success"] is True
         ids = [p["id"] for p in res["profile"]["phases"]]
-        assert ids[0] == "brainstorm"
+        assert ids[0] == "docs"
         assert ids[-1] == "observe"
 
     def test_dropped_phases_stay_in_place_with_a_reason(self, project):
@@ -65,7 +65,7 @@ class TestResolution:
         assert by_id["brainstorm"]["skipReason"] == "effort"
         assert by_id["brainstorm"]["minEffort"] == "high"
         # …and the position is preserved, not filtered out.
-        assert [p["id"] for p in res["profile"]["phases"]][0] == "brainstorm"
+        assert [p["id"] for p in res["profile"]["phases"]][1] == "brainstorm"
 
     def test_the_hard_gate_runs_at_the_cheapest_level(self, project):
         res = ask(project, effort="low")

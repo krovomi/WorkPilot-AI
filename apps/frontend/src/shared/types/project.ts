@@ -404,6 +404,8 @@ export interface ProjectEnvConfig {
 	mcpServers?: {
 		/** Context7 documentation lookup - default: true */
 		context7Enabled?: boolean;
+		/** Context7 API key - optional, raises the quota above anonymous */
+		context7ApiKey?: string;
 		/** Graphiti knowledge graph - default: true (if graphitiProviderConfig set) */
 		graphitiEnabled?: boolean;
 		/** Linear MCP integration - default: follows linearEnabled */
@@ -534,9 +536,24 @@ export interface AutoBuildVersionInfo {
 	updateAvailable: boolean; // Always false - .workpilot only contains data, no code to update
 }
 
+/**
+ * Why an initialization could not proceed, as a value the UI can branch on.
+ *
+ * The message alone was not enough: two of these — a folder that is not a git
+ * repository, and one with no commit yet — are one click away from being
+ * fixed, and the settings screen was reduced to printing an English sentence
+ * because it could not tell them from the reasons it cannot fix.
+ */
+export type InitializationBlocker =
+	| "path-missing"
+	| "not-a-git-repo"
+	| "no-commits"
+	| "already-initialized";
+
 export interface InitializationResult {
 	success: boolean;
 	error?: string;
+	blocker?: InitializationBlocker;
 }
 
 export interface GitStatus {

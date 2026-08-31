@@ -29,6 +29,7 @@ import {
 	RotateCcw,
 	Search,
 	Server,
+	Settings2,
 	Terminal,
 	Trash2,
 	Wrench,
@@ -55,6 +56,7 @@ import {
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
 import { CustomMcpDialog } from "./CustomMcpDialog";
+import { McpServerSettingsDialog } from "./McpServerSettingsDialog";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -63,6 +65,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "./ui/dialog";
+import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Switch } from "./ui/switch";
 
@@ -313,8 +316,11 @@ const MCP_SERVERS: Record<
 		description:
 			"Documentation lookup for libraries and frameworks via @upstash/context7-mcp",
 		icon: Search,
+		// Both spellings of the fetch tool: @upstash/context7-mcp renamed
+		// get-library-docs to query-docs, and the server is started unpinned.
 		tools: [
 			"mcp__context7__resolve-library-id",
+			"mcp__context7__query-docs",
 			"mcp__context7__get-library-docs",
 		],
 	},
@@ -566,6 +572,7 @@ interface AgentCardProps {
 	readonly customServers: CustomMcpServer[];
 	readonly onAddMcp: (agentId: string, mcpId: string) => void;
 	readonly onRemoveMcp: (agentId: string, mcpId: string) => void;
+	readonly onConfigureMcp: (mcpId: string) => void;
 }
 
 // Status indicator component for MCP servers
@@ -605,6 +612,7 @@ function AgentCard({
 	customServers,
 	onAddMcp,
 	onRemoveMcp,
+	onConfigureMcp,
 }: AgentCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [showAddDialog, setShowAddDialog] = useState(false);
@@ -804,10 +812,21 @@ function AgentCard({
 											key={server}
 											className="flex items-center justify-between group"
 										>
-											<div className="flex items-center gap-2 text-sm">
+											{/* The row itself opens the server's settings: seeing a
+											    server on an agent and changing that server used to be
+											    two unrelated places on the same screen. */}
+											<button
+												type="button"
+												onClick={(e) => {
+													e.stopPropagation();
+													onConfigureMcp(server);
+												}}
+												className="flex items-center gap-2 text-sm text-left rounded px-1 -mx-1 hover:bg-muted/60 transition-colors"
+												title={t("mcp.configureServer")}
+											>
 												<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
 												<ServerIcon className="h-3.5 w-3.5 text-muted-foreground" />
-												<span className="font-medium">
+												<span className="font-medium group-hover:underline">
 													{serverInfo?.name || server}
 												</span>
 												{isAdded && (
@@ -815,20 +834,33 @@ function AgentCard({
 														{t("mcp.added")}
 													</span>
 												)}
-											</div>
-											{canRemove && (
+											</button>
+											<div className="flex items-center">
 												<button
 													type="button"
 													onClick={(e) => {
 														e.stopPropagation();
-														onRemoveMcp(id, server);
+														onConfigureMcp(server);
 													}}
-													className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all"
-													title={t("mcp.remove")}
+													className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-primary transition-all"
+													title={t("mcp.configureServer")}
 												>
-													<X className="h-3.5 w-3.5" />
+													<Settings2 className="h-3.5 w-3.5" />
 												</button>
-											)}
+												{canRemove && (
+													<button
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															onRemoveMcp(id, server);
+														}}
+														className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all"
+														title={t("mcp.remove")}
+													>
+														<X className="h-3.5 w-3.5" />
+													</button>
+												)}
+											</div>
 										</div>
 									);
 								})}
@@ -1091,10 +1123,31 @@ export function AgentTools() {
 	}, [selectedProjectId, selectedProject?.autoBuildPath]);
 
 	// Update MCP server toggle
+	// Which server's settings are open. A custom server routes to the editor it
+	// already has; a built-in one gets the dialog above.
+	const [configuringServerId, setConfiguringServerId] = useState<string | null>(
+		null,
+	);
+
+	const handleConfigureMcp = useCallback(
+		(mcpId: string) => {
+			const custom = (envConfig?.customMcpServers || []).find(
+				(server) => server.id === mcpId,
+			);
+			if (custom) {
+				setEditingCustomServer(custom);
+				setShowCustomMcpDialog(true);
+				return;
+			}
+			setConfiguringServerId(mcpId);
+		},
+		[envConfig],
+	);
+
 	const updateMcpServer = useCallback(
 		async (
 			key: keyof NonNullable<ProjectEnvConfig["mcpServers"]>,
-			value: boolean,
+			value: boolean | string,
 		) => {
 			if (!selectedProjectId || !envConfig) return;
 
@@ -1592,6 +1645,32 @@ export function AgentTools() {
 									/>
 								</div>
 
+								{/* Context7 API key — optional; without it the quota is
+								    the anonymous per-IP one, which a machine running
+								    builds all day exhausts. Saved on blur rather than on
+								    every keystroke: each save rewrites .workpilot/.env. */}
+								{mcpServers.context7Enabled !== false && (
+									<div className="pl-7 pb-2 space-y-1 border-b border-border last:border-0">
+										<Input
+											type="password"
+											placeholder={t(
+												"settings:mcp.servers.context7.apiKeyPlaceholder",
+											)}
+											defaultValue={mcpServers.context7ApiKey || ""}
+											onBlur={(e) => {
+												const value = e.target.value.trim();
+												if (value !== (mcpServers.context7ApiKey || "")) {
+													updateMcpServer("context7ApiKey", value);
+												}
+											}}
+											className="h-8 text-xs"
+										/>
+										<p className="text-xs text-muted-foreground">
+											{t("settings:mcp.servers.context7.apiKeyHint")}
+										</p>
+									</div>
+								)}
+
 								{/* Graphiti Memory */}
 								<div className="flex items-center justify-between py-2 border-b border-border last:border-0">
 									<div className="flex items-center gap-3">
@@ -1906,6 +1985,7 @@ export function AgentTools() {
 													customServers={envConfig?.customMcpServers || []}
 													onAddMcp={handleAddMcp}
 													onRemoveMcp={handleRemoveMcp}
+													onConfigureMcp={handleConfigureMcp}
 												/>
 											);
 										})}
@@ -1918,6 +1998,32 @@ export function AgentTools() {
 			</ScrollArea>
 
 			{/* Custom MCP Server Dialog */}
+			<McpServerSettingsDialog
+				open={configuringServerId !== null}
+				onOpenChange={(next) => {
+					if (!next) setConfiguringServerId(null);
+				}}
+				serverId={configuringServerId}
+				serverName={
+					(configuringServerId && MCP_SERVERS[configuringServerId]?.name) ||
+					configuringServerId ||
+					""
+				}
+				serverDescription={
+					configuringServerId
+						? MCP_SERVERS[configuringServerId]?.description
+						: undefined
+				}
+				icon={
+					configuringServerId
+						? MCP_SERVERS[configuringServerId]?.icon
+						: undefined
+				}
+				mcpServers={mcpServers}
+				envConfig={envConfig}
+				onUpdate={updateMcpServer}
+			/>
+
 			<CustomMcpDialog
 				open={showCustomMcpDialog}
 				onOpenChange={setShowCustomMcpDialog}

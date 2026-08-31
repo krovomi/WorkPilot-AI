@@ -511,6 +511,9 @@ export function registerEnvHandlers(
 					? "true"
 					: "false";
 			}
+			if (config.mcpServers.context7ApiKey !== undefined) {
+				existingVars.CONTEXT7_API_KEY = config.mcpServers.context7ApiKey;
+			}
 			if (config.mcpServers.linearMcpEnabled !== undefined) {
 				existingVars.LINEAR_MCP_ENABLED = config.mcpServers.linearMcpEnabled
 					? "true"
@@ -677,6 +680,8 @@ ${existingVars.ENABLE_FANCY_UI ? `ENABLE_FANCY_UI=${existingVars.ENABLE_FANCY_UI
 # =============================================================================
 # Context7 documentation lookup (default: enabled)
 ${existingVars.CONTEXT7_ENABLED ? `CONTEXT7_ENABLED=${existingVars.CONTEXT7_ENABLED}` : "# CONTEXT7_ENABLED=true"}
+# Context7 API key - optional; without it the quota is the anonymous per-IP one
+${existingVars.CONTEXT7_API_KEY ? `CONTEXT7_API_KEY=${existingVars.CONTEXT7_API_KEY}` : "# CONTEXT7_API_KEY="}
 # Linear MCP integration (default: follows LINEAR_API_KEY)
 ${existingVars.LINEAR_MCP_ENABLED ? `LINEAR_MCP_ENABLED=${existingVars.LINEAR_MCP_ENABLED}` : "# LINEAR_MCP_ENABLED=true"}
 # Electron desktop automation - QA agents only (default: disabled)
@@ -1057,6 +1062,7 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 			// Default: context7=true, linear=true (if API key set), electron/puppeteer=false
 			config.mcpServers = {
 				context7Enabled: vars.CONTEXT7_ENABLED?.toLowerCase() !== "false", // default true
+				context7ApiKey: vars.CONTEXT7_API_KEY,
 				graphitiEnabled: config.graphitiEnabled, // follows GRAPHITI_ENABLED
 				linearMcpEnabled: vars.LINEAR_MCP_ENABLED?.toLowerCase() !== "false", // default true
 				electronEnabled: vars.ELECTRON_MCP_ENABLED?.toLowerCase() === "true", // default false

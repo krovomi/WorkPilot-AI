@@ -772,7 +772,26 @@
 			"notInitializedDescription": "Initialize Auto-Build to enable task creation and agent workflows.",
 			"initializing": "Initializing...",
 			"initializeButton": "Initialize Auto-Build",
-			"checkingStatus": "Checking status..."
+			"checkingStatus": "Checking status...",
+			"blocker": {
+				"notGitRepo": {
+					"title": "This folder is not a Git repository yet",
+					"body": "WorkPilot AI builds every task in an isolated git worktree, so the project needs a repository with at least one commit before agents can run."
+				},
+				"noCommits": {
+					"title": "This repository has no commit yet",
+					"body": "A worktree branches off an existing commit, so git needs a first one before WorkPilot AI can isolate a build."
+				},
+				"whatHappens": "One click will:",
+				"stepInit": "Create the git repository (git init)",
+				"stepCommit": "Stage the current files and create the initial commit",
+				"stepRetry": "Initialize WorkPilot AI for this project",
+				"repairButton": "Prepare the repository and initialize",
+				"repairing": "Preparing the repository...",
+				"manual": "Prefer to run it yourself?",
+				"pathMissing": "The folder {{path}} no longer exists. Move the project back or remove it from the list.",
+				"alreadyInitialized": "This project already has a .workpilot folder — it is initialized. Reopen the settings to refresh its status."
+			}
 		},
 		"agentConfiguration": {
 			"title": "Agent Configuration",
@@ -1277,7 +1296,9 @@
 		"servers": {
 			"context7": {
 				"name": "Context7",
-				"description": "Documentation lookup for libraries"
+				"description": "Documentation lookup for libraries. Pages for libraries the codebase has no example of are downloaded before each build.",
+				"apiKeyPlaceholder": "Context7 API key (optional)",
+				"apiKeyHint": "Without a key, Context7 applies its anonymous per-IP quota. Free keys: context7.com/dashboard"
 			},
 			"graphiti": {
 				"name": "Graphiti Memory",
@@ -1383,6 +1404,14 @@
 			"createAnthropicKey": "Create Anthropic API Key",
 			"openai": "This looks like an OpenAI API. You'll need an API key.",
 			"createOpenaiKey": "Create OpenAI API Key"
+		},
+		"configureServer": "Configure this server",
+		"serverDialog": {
+			"enabled": "Enabled for this project",
+			"enabledHint": "Agents that declare this server will start it.",
+			"requirementMissing": "This server needs its own configuration before it can be enabled.",
+			"alwaysOn": "WorkPilot AI's own tools are always available to the agents that declare them — there is nothing to configure.",
+			"configuredInIntegrations": "This server authenticates with a token set in Settings → Integrations. Configure it there and it becomes available to the agents that declare it."
 		}
 	},
 	"terminalFonts": {
