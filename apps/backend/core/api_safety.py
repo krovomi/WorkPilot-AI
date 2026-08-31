@@ -122,6 +122,35 @@ def safe_error(
     return _FALLBACK
 
 
+def server_mode_roots() -> list[Path] | None:
+    """The only directories a request may reach in multi-user server mode.
+
+    ``None`` in local mode, where there is no privilege boundary to draw: the
+    backend runs as the person who chose the directory in their own desktop app.
+
+    In server mode there very much is one. Every project the server knows about
+    is cloned under ``REPOS_ROOT``, so confining resolution to that subtree
+    turns "read any path on the host" into "read a checkout", and the per-tenant
+    half of the check is done by ``server.authz.scope`` on top.
+
+    Import-guarded so ``core`` keeps no hard dependency on ``server``: the
+    desktop app ships without a database, and this must not change that.
+    """
+    try:
+        from server.config import get_settings
+    except ImportError:  # pragma: no cover - local mode without server extras
+        return None
+
+    try:
+        settings = get_settings()
+    except Exception:  # pragma: no cover - misconfiguration surfaces at boot
+        return None
+
+    if not settings.server_mode:
+        return None
+    return [Path(settings.repos_root)]
+
+
 def validated_dir(
     raw: str,
     label: str = "path",
@@ -134,6 +163,13 @@ def validated_dir(
     Raises `ValueError` with a message naming only `label` and the rule that
     was broken — never the resolved path, which is the caller-visible half of
     the stack-trace-exposure problem.
+
+    **In server mode the confinement is not optional.** When no ``allowed_roots``
+    is supplied the repository root is imposed, so the ~60 call sites written
+    for the single-user desktop app cannot resolve a path outside the server's
+    own checkouts — including the ones that read ``project_dir`` out of a JSON
+    body, which the middleware's query-string check never sees. A caller that
+    genuinely needs a different root passes one explicitly.
     """
     if not raw or not raw.strip() or raw.strip().startswith("-"):
         raise ValueError(f"{label} must be a non-empty path not starting with '-'")
@@ -145,6 +181,9 @@ def validated_dir(
         raise ValueError(f"{label} must not contain '..'")
 
     resolved = candidate.resolve()
+
+    if allowed_roots is None:
+        allowed_roots = server_mode_roots()
 
     if allowed_roots is not None:
         roots = [Path(r).expanduser().resolve() for r in allowed_roots]

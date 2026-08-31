@@ -41,7 +41,15 @@ WORKPILOT_SMTP_FROM=WorkPilot <noreply@example.com>
 WORKPILOT_SMTP_USE_TLS=true
 WORKPILOT_SMTP_USE_SSL=false
 
+# Where the server clones registered repositories. In server mode this is also
+# the ONLY directory tree a request can resolve a filesystem path inside:
+# `project_dir` from a client is refused, and paths are confined here.
+WORKPILOT_REPOS_ROOT=/var/lib/workpilot/repos
+
 # Tuning
+# Deployment-wide ceiling on concurrent agent runs. Per-organization ceilings
+# are set per tenant in the administration console (Quotas tab); without one an
+# organization is unlimited, which is the historical behaviour.
 WORKPILOT_MAX_CONCURRENT_RUNS=3
 WORKPILOT_ACCESS_TOKEN_TTL_MINUTES=15
 WORKPILOT_REFRESH_TOKEN_TTL_DAYS=14

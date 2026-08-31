@@ -210,6 +210,10 @@ import { createProjectAPI, type ProjectAPI } from "./project-api";
 import { createQueueAPI, type QueueAPI } from "./queue-api";
 import { createScreenshotAPI, type ScreenshotAPI } from "./screenshot-api";
 import {
+	createServerAdminAPI,
+	type ServerAdminAPI,
+} from "./modules/server-admin-api";
+import {
 	createServerAuthAPI,
 	type ServerAuthAPI,
 } from "./modules/server-auth-api";
@@ -297,6 +301,7 @@ export interface ElectronAPI
 	continuousAI: ContinuousAIAPI;
 	/** Multi-user server mode: connection + login (local / Entra ID) */
 	serverAuth: ServerAuthAPI;
+	serverAdmin: ServerAdminAPI;
 	/** Queue routing API for rate limit recovery */
 	queue: QueueAPI;
 	/** Code quality analysis API */
@@ -432,6 +437,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		swarm: createSwarmAPI(),
 		continuousAI: createContinuousAIAPI(),
 		serverAuth: createServerAuthAPI(), // Multi-user server mode
+		serverAdmin: createServerAdminAPI(), // Multi-tenant administration
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
 		quality: createQualityAPI(), // Code quality analysis
 		selfHealing: createSelfHealingAPI(),

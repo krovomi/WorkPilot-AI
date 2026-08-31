@@ -106,6 +106,176 @@ class AcceptInvitationRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Organizations / roles / permissions
+# ---------------------------------------------------------------------------
+
+
+class OrganizationPublic(BaseModel):
+    id: str
+    name: str
+    slug: str
+    is_active: bool
+    created_at: datetime
+    my_role: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class CreateOrganizationRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9][a-z0-9-]*$")
+
+
+class UpdateOrganizationRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    is_active: bool | None = None
+    disabled_permissions: list[str] | None = None
+
+
+class RolePublic(BaseModel):
+    id: str
+    org_id: str | None
+    slug: str
+    name: str
+    description: str
+    is_system: bool
+    scope: str
+    permissions: list[str]
+
+    model_config = {"from_attributes": True}
+
+
+class CreateRoleRequest(BaseModel):
+    slug: str = Field(min_length=2, max_length=60, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    name: str = Field(min_length=1, max_length=120)
+    description: str = ""
+    scope: str = "org"
+    permissions: list[str] = Field(default_factory=list)
+
+
+class UpdateRoleRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = None
+    permissions: list[str] | None = None
+
+
+class PermissionPublic(BaseModel):
+    key: str
+    domain: str
+    action: str
+    labelKey: str
+    descriptionKey: str
+    privileged: bool
+
+
+class MyPermissionsResponse(BaseModel):
+    """What the caller may do right now, and where.
+
+    The desktop app uses this to hide what would 403 anyway. It is a
+    convenience, never the control: the backend re-checks every request.
+    """
+
+    user_id: str
+    platform_role: str
+    is_platform_admin: bool
+    org_id: str | None
+    org_role: str | None
+    permissions: list[str]
+    organizations: list[OrganizationPublic]
+
+
+class SwitchOrgRequest(BaseModel):
+    org_id: str
+
+
+class OrgMemberPublic(BaseModel):
+    user_id: str
+    email: str
+    display_name: str
+    avatar_url: str | None = None
+    role_id: str
+    role_slug: str
+    role_name: str
+    is_active: bool
+    created_at: datetime
+
+
+class AddOrgMemberRequest(BaseModel):
+    user_id: str
+    role_slug: str = "contributor"
+
+
+class UpdateOrgMemberRequest(BaseModel):
+    role_slug: str
+
+
+class QuotaPublic(BaseModel):
+    org_id: str
+    max_users: int | None = None
+    max_projects: int | None = None
+    max_concurrent_runs: int | None = None
+    monthly_token_budget: int | None = None
+    enforce_hard_stop: bool = False
+    # Live counters, so the console can show "7 of 25 seats".
+    used_users: int = 0
+    used_projects: int = 0
+    used_concurrent_runs: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateQuotaRequest(BaseModel):
+    max_users: int | None = None
+    max_projects: int | None = None
+    max_concurrent_runs: int | None = None
+    monthly_token_budget: int | None = None
+    enforce_hard_stop: bool | None = None
+
+
+class AuditEntryPublic(BaseModel):
+    id: str
+    user_id: str | None
+    user_email: str | None = None
+    org_id: str | None
+    project_id: str | None
+    action: str
+    payload: dict | None
+    ip: str | None
+    created_at: datetime
+
+
+class SessionPublic(BaseModel):
+    id: str
+    user_id: str
+    user_email: str | None = None
+    user_agent: str | None
+    ip: str | None
+    created_at: datetime
+    expires_at: datetime
+
+
+class AdminOverviewResponse(BaseModel):
+    """The control dashboard's aggregate, for one organization."""
+
+    org_id: str
+    org_name: str
+    users_total: int
+    users_active: int
+    projects_total: int
+    specs_total: int
+    runs_active: int
+    runs_queued: int
+    runs_24h: int
+    runs_failed_24h: int
+    run_success_rate_7d: float
+    quota: QuotaPublic
+    runs_by_day: list[dict]
+    runs_by_status: dict[str, int]
+    top_users: list[dict]
+    recent_failures: list[dict]
+
+
+# ---------------------------------------------------------------------------
 # Projects / members
 # ---------------------------------------------------------------------------
 
@@ -118,6 +288,7 @@ class CreateProjectRequest(BaseModel):
 
 class ProjectPublic(BaseModel):
     id: str
+    org_id: str | None = None
     name: str
     repo_url: str
     default_branch: str
