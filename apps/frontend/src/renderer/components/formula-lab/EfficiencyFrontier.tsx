@@ -158,6 +158,7 @@ export function EfficiencyFrontier({
 						const isSelected = p.key === selectedKey;
 						const color = providerColor(p.f.provider);
 						return (
+							// biome-ignore lint/a11y/useSemanticElements: an SVG data point cannot be a <button>
 							<circle
 								key={p.key}
 								cx={p.x}
@@ -175,9 +176,14 @@ export function EfficiencyFrontier({
 										? { filter: `drop-shadow(0 0 4px ${color})` }
 										: undefined
 								}
+								// The point already handled Enter/Space but was not
+								// focusable, so a keyboard could never reach it.
+								role="button"
+								tabIndex={0}
 								onClick={() => onSelect(p.f)}
 								onKeyDown={(e) => {
 									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
 										onSelect(p.f);
 									}
 								}}

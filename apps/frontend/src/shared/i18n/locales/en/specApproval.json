@@ -1,0 +1,43 @@
+{
+	"title": "Spec Approval",
+	"subtitle": "Read a specification before the agents build on it, and record your decision",
+	"pending": {
+		"heading_one": "{{count}} spec awaiting review",
+		"heading_other": "{{count}} specs awaiting review",
+		"empty": "Nothing is waiting for a review."
+	},
+	"history": {
+		"heading": "Already reviewed"
+	},
+	"status": {
+		"pending": "Pending",
+		"approved": "Approved",
+		"rejected": "Rejected",
+		"changes_requested": "Changes requested"
+	},
+	"content": {
+		"spec": "Specification",
+		"requirements": "Requirements",
+		"plan": "Implementation plan",
+		"context": "Context",
+		"loading": "Loading the specification…",
+		"unavailable": "This specification has no readable content."
+	},
+	"decision": {
+		"feedbackLabel": "Feedback",
+		"feedbackPlaceholder": "What should change, and why.",
+		"feedbackRequired": "Rejecting or requesting changes needs feedback.",
+		"approve": "Approve",
+		"requestChanges": "Request changes",
+		"reject": "Reject"
+	},
+	"actions": {
+		"refresh": "Refresh",
+		"dismiss": "Dismiss"
+	},
+	"empty": {
+		"title": "Pick a specification",
+		"body": "Select a spec on the left to read what the agents are about to build, then approve it, send it back, or reject it.",
+		"noProject": "Open a project to review the specs waiting on it."
+	}
+}

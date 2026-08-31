@@ -34,18 +34,28 @@ GIT_CONFIG_USER_EMAIL = "user.email"
 GIT_CONFIG_USER_NAME = "user.name"
 INITIAL_COMMIT_MESSAGE = "Initial commit"
 
-# Add the project root to the Python path
+# The project root must come before the backend root: both ship a `src`
+# package, and only the project one has `src.connectors.llm_config` —
+# azure_devops tests likewise rely on ``from src.config.settings import
+# Settings``. The backend root is on the path so `core`, `review`, etc. import
+# without an `apps.backend.` prefix.
+#
+# This used to be two `if <root> not in sys.path` inserts, which enforce
+# presence but not order. The CI job exports
+# `PYTHONPATH=<workspace>/apps/backend:<workspace>`, so both roots were already
+# present, both guards were false, neither insert ran, and the backend root
+# kept the precedence PYTHONPATH gave it — `src.connectors` then resolved to
+# `apps/backend/src`, which has no `llm_config`. Ordering is the invariant, so
+# set the order rather than test for membership.
 _PROJECT_ROOT = str(Path(__file__).parent.parent)
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
-
-# Add the backend root to sys.path so that `core`, `review`, etc. can be
-# imported directly (without the `apps.backend.` prefix).
-# Insert at position 1 (not 0) so that project-root "src.*" imports keep
-# precedence — azure_devops tests rely on ``from src.config.settings import Settings``.
 _BACKEND_ROOT = str(Path(__file__).parent.parent / "apps" / "backend")
-if _BACKEND_ROOT not in sys.path:
-    sys.path.insert(1, _BACKEND_ROOT)
+
+for _root in (_BACKEND_ROOT, _PROJECT_ROOT):
+    while _root in sys.path:
+        sys.path.remove(_root)
+# Inserted last ends up first: [_PROJECT_ROOT, _BACKEND_ROOT, ...].
+sys.path.insert(0, _BACKEND_ROOT)
+sys.path.insert(0, _PROJECT_ROOT)
 
 # ---------------------------------------------------------------------------
 # Save real module objects BEFORE any test-file collection can pollute them.

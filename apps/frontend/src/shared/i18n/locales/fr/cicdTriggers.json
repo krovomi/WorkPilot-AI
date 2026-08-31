@@ -1,0 +1,49 @@
+{
+	"title": "Déclencheurs CI/CD",
+	"subtitle": "Lancer un pipeline depuis WorkPilot et suivre les exécutions déclenchées",
+	"providers": {
+		"github": "GitHub Actions",
+		"gitlab": "GitLab CI",
+		"azure": "Azure Pipelines",
+		"jenkins": "Jenkins"
+	},
+	"config": {
+		"heading": "Configuration",
+		"provider": "Fournisseur",
+		"noProvider": "Aucun sélectionné",
+		"enabled": "Déclencheurs actifs",
+		"onPr": "Déclencher à l'ouverture d'une PR",
+		"onMerge": "Déclencher à la fusion"
+	},
+	"trigger": {
+		"heading": "Lancer un pipeline",
+		"branch": "Branche",
+		"branchPlaceholder": "develop",
+		"prUrl": "URL de la pull request",
+		"prUrlPlaceholder": "https://github.com/proprietaire/depot/pull/1",
+		"selectProviderFirst": "Choisissez un fournisseur avant de lancer une exécution."
+	},
+	"actions": {
+		"trigger": "Lancer le pipeline",
+		"triggering": "Lancement…",
+		"refresh": "Rafraîchir",
+		"dismiss": "Masquer"
+	},
+	"status": {
+		"pending": "En attente",
+		"triggered": "Déclenchée",
+		"running": "En cours",
+		"success": "Réussie",
+		"failed": "Échouée"
+	},
+	"runs": {
+		"heading_one": "{{count}} exécution",
+		"heading_other": "{{count}} exécutions",
+		"noBranch": "Aucune branche enregistrée"
+	},
+	"empty": {
+		"title": "Aucune exécution pour l'instant",
+		"body": "Les exécutions lancées d'ici — ou automatiquement sur une PR ou une fusion — apparaissent dans cette liste avec le statut rapporté par le fournisseur.",
+		"noProject": "Ouvrez un projet pour configurer ses déclencheurs CI/CD."
+	}
+}

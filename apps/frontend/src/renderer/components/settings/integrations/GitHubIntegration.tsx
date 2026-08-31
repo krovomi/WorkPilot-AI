@@ -30,7 +30,10 @@ import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
 
 // Debug logging — disabled (kept as a no-op so call sites stay valid).
-function debugLog(_message: string, _data?: unknown) {}
+function debugLog(_message: string, _data?: unknown) {
+	// Intentionally does nothing: the call sites are kept as breadcrumbs so the
+	// logging can be switched back on in one place.
+}
 
 interface GitHubRepo {
 	fullName: string;

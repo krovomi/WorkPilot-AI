@@ -1,12 +1,9 @@
 import {
 	ChevronDown,
 	ChevronRight,
-	Copy,
 	File,
-	FileX,
 	Folder,
 	FolderOpen,
-	Plus,
 	Trash2,
 } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -97,13 +94,16 @@ function FileTreeNode({
 	readonly onFileClick?: (path: string) => void;
 	readonly onDelete?: (path: string) => void;
 }) {
+	const { t } = useTranslation(["tasks"]);
 	const [expanded, setExpanded] = useState(false);
 
 	if (node.isFolder) {
 		return (
 			<>
-				<div
-					className="flex items-center justify-between p-1.5 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer select-none"
+				<button
+					type="button"
+					aria-expanded={expanded}
+					className="w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer select-none text-left"
 					style={{ paddingLeft: depth * 16 + 8 }}
 					onClick={() => setExpanded(!expanded)}
 				>
@@ -120,7 +120,7 @@ function FileTreeNode({
 						)}
 						<span className="text-sm font-medium truncate">{node.name}</span>
 					</div>
-				</div>
+				</button>
 				{expanded &&
 					node.children.map((child) => (
 						<FileTreeNode
@@ -137,14 +137,19 @@ function FileTreeNode({
 
 	return (
 		<div
-			className="flex items-center justify-between p-1.5 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer select-none group"
+			className="flex items-center justify-between p-1.5 rounded-lg hover:bg-secondary/50 transition-colors select-none group"
 			style={{ paddingLeft: depth * 16 + 8 }}
-			onClick={() => onFileClick?.(node.path)}
 		>
-			<div className="flex items-center gap-1.5 min-w-0 flex-1">
+			{/* The row carries a delete button, so the label — not the row — is the
+			    control: nesting one button inside another is invalid. */}
+			<button
+				type="button"
+				className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer text-left"
+				onClick={() => onFileClick?.(node.path)}
+			>
 				<File className="h-4 w-4 shrink-0 text-blue-400" />
 				<span className="text-sm truncate">{node.name}</span>
-			</div>
+			</button>
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<Button
@@ -159,7 +164,7 @@ function FileTreeNode({
 						<Trash2 className="h-3.5 w-3.5 text-destructive" />
 					</Button>
 				</TooltipTrigger>
-				<TooltipContent>Delete file</TooltipContent>
+				<TooltipContent>{t("tasks:codeEditor.deleteFile")}</TooltipContent>
 			</Tooltip>
 		</div>
 	);
@@ -284,14 +289,14 @@ export function TaskCodeEditor({
 								value={currentFileContent}
 								onChange={handleContentChange}
 								filename={selectedFile}
-								placeholder="File content..."
+								placeholder={t("tasks:codeEditor.contentPlaceholder")}
 								className="flex-1 min-h-0 rounded-none border-0"
 							/>
 						</div>
 					</>
 				) : (
 					<div className="flex-1 flex items-center justify-center text-muted-foreground">
-						<p>Select a file to edit</p>
+						<p>{t("tasks:codeEditor.selectFile")}</p>
 					</div>
 				)}
 

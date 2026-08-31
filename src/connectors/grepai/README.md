@@ -6,7 +6,7 @@ Pour tester l'intégration de Grepai :
 2. Exécutez le script de test :
 
     cd src/connectors/grepai
-    python test_grepai.py
+    python grepai_check.py
 
 Le script effectue une recherche (exemple : "def my_function") et affiche le résultat ou une erreur.
 

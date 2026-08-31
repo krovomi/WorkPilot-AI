@@ -70,10 +70,16 @@ class TestAuditEvent:
     def test_no_op_when_audit_trail_unavailable(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from agents import agent_audit
-
         # Simulate "audit_trail import failed at module load".
-        monkeypatch.setattr(agent_audit, "AuditTrail", None)
+        #
+        # Patch the globals dict `_open_trail` actually reads, not a module
+        # object looked up by name: once the backend and `tests/` are collected
+        # in one session, `from agents import agent_audit` can hand back a
+        # different object than the one this module's functions were defined
+        # in, and the patch then lands on a copy nobody consults — the
+        # "unavailable" branch was never taken and the trail directory got
+        # created after all. `__globals__` is that dict, whichever copy won.
+        monkeypatch.setitem(audit_event.__globals__, "AuditTrail", None)
         audit_event(
             tmp_path,
             kind="agent_invoked",

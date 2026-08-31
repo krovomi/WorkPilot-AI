@@ -70,8 +70,31 @@ _fl.locked_json_write = MagicMock()
 # ---------------------------------------------------------------------------
 # Now safe to import
 # ---------------------------------------------------------------------------
+_modules_before = set(sys.modules)
+
 from context_gatherer import AI_BOT_PATTERNS, FollowupContextGatherer
 from models import FollowupReviewContext, PRReviewResult
+
+# ---------------------------------------------------------------------------
+# …and put sys.modules back.
+#
+# The stubs above were installed permanently, at import time. Everything that
+# ran afterwards in the same session saw them: `rate_limiter` in particular,
+# which `gh_client` imports under that bare name, so `GHClient._rate_limiter`
+# became a MagicMock and `available, msg = check_github_available()` unpacked
+# an empty tuple. The modules this file loads under bare names (`gh_client`,
+# `context_gatherer`, `models`) stayed cached with the stubs bound inside them,
+# so a later `from gh_client import GHClient` got the polluted copy rather than
+# re-importing a clean one.
+#
+# It never showed while `tests/` and the backend's own tests ran in separate
+# sessions. The names imported just above stay bound in this module, so these
+# tests keep the environment they asked for; nothing else inherits it.
+for _name in set(sys.modules) - _modules_before:
+    del sys.modules[_name]
+for _name, _mod in _MOCKED_MODULES.items():
+    if sys.modules.get(_name) is _mod:
+        del sys.modules[_name]
 
 
 class TestAIReviewsInclusion:

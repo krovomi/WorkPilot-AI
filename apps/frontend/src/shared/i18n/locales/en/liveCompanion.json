@@ -65,6 +65,7 @@
 		"close": "Close"
 	},
 	"fileChange": {
+		"title": "Recent changes",
 		"created": "Created",
 		"modified": "Modified",
 		"deleted": "Deleted",

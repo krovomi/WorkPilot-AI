@@ -219,6 +219,7 @@ export function SmartFilePicker({
 			{/* Selected file chip / trigger.
 			    Rendered as a div (not a button) because it can contain the clear
 			    button, and a <button> may not nest another <button>. */}
+			{/* biome-ignore lint/a11y/useSemanticElements: see above — a <button> cannot nest the clear button */}
 			<div
 				role="button"
 				tabIndex={0}

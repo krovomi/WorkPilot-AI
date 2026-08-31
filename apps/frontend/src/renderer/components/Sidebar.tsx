@@ -34,6 +34,7 @@ import {
 	Calendar,
 	Camera,
 	CheckCircle,
+	ClipboardCheck,
 	ChevronRight,
 	Code,
 	Coins,
@@ -54,6 +55,7 @@ import {
 	HelpCircle,
 	History,
 	Layers,
+	Languages,
 	LayoutGrid,
 	Leaf,
 	Lightbulb,
@@ -66,11 +68,13 @@ import {
 	PanelLeftClose,
 	Plus,
 	Puzzle,
+	Radio,
 	RefreshCcw,
 	Rocket,
 	RotateCcw,
 	Search,
 	Settings,
+	Share2,
 	Shield,
 	ShieldAlert,
 	ShieldCheck,
@@ -87,6 +91,7 @@ import {
 	Wand2,
 	WandSparkles,
 	WifiOff,
+	Workflow,
 	Wrench,
 	X,
 	Zap,
@@ -233,6 +238,11 @@ export type SidebarView =
 	| "guardrails"
 	| "env-snapshot"
 	| "offline-mode"
+	| "cicd-triggers"
+	| "cross-language-translation"
+	| "spec-approval"
+	| "live-companion"
+	| "context-mesh"
 	| "administration"
 	| "phase35-hub";
 
@@ -358,6 +368,12 @@ const navGroups: NavGroup[] = [
 				icon: UserCheck,
 				shortcut: "AC",
 			},
+			{
+				id: "live-companion",
+				labelKey: "navigation:items.liveCompanion",
+				icon: Radio,
+				shortcut: "LC",
+			},
 		],
 		defaultExpanded: false,
 	},
@@ -426,6 +442,12 @@ const navGroups: NavGroup[] = [
 				icon: Activity,
 				shortcut: "PF",
 			},
+			{
+				id: "cross-language-translation",
+				labelKey: "navigation:items.crossLanguageTranslation",
+				icon: Languages,
+				shortcut: "CX",
+			},
 		],
 		defaultExpanded: false,
 	},
@@ -445,6 +467,12 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.context",
 				icon: BookOpen,
 				shortcut: "CT",
+			},
+			{
+				id: "context-mesh",
+				labelKey: "navigation:items.contextMesh",
+				icon: Share2,
+				shortcut: "CM",
 			},
 			{
 				id: "architecture-visualizer",
@@ -491,6 +519,12 @@ const navGroups: NavGroup[] = [
 				shortcut: "CF",
 			},
 			{
+				id: "cicd-triggers",
+				labelKey: "navigation:items.cicdTriggers",
+				icon: Workflow,
+				shortcut: "CD",
+			},
+			{
 				id: "git-surgeon",
 				labelKey: "navigation:items.gitSurgeon",
 				icon: GitBranch,
@@ -521,6 +555,12 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.costEstimator",
 				icon: Coins,
 				shortcut: "CE",
+			},
+			{
+				id: "spec-approval",
+				labelKey: "navigation:items.specApproval",
+				icon: ClipboardCheck,
+				shortcut: "SA",
 			},
 			{
 				id: "changelog",

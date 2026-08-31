@@ -1,0 +1,49 @@
+{
+	"title": "CI/CD Triggers",
+	"subtitle": "Fire a pipeline from WorkPilot and follow the runs it started",
+	"providers": {
+		"github": "GitHub Actions",
+		"gitlab": "GitLab CI",
+		"azure": "Azure Pipelines",
+		"jenkins": "Jenkins"
+	},
+	"config": {
+		"heading": "Configuration",
+		"provider": "Provider",
+		"noProvider": "None selected",
+		"enabled": "Triggers enabled",
+		"onPr": "Trigger when a PR opens",
+		"onMerge": "Trigger on merge"
+	},
+	"trigger": {
+		"heading": "Run a pipeline",
+		"branch": "Branch",
+		"branchPlaceholder": "develop",
+		"prUrl": "Pull request URL",
+		"prUrlPlaceholder": "https://github.com/owner/repo/pull/1",
+		"selectProviderFirst": "Pick a provider before triggering a run."
+	},
+	"actions": {
+		"trigger": "Trigger pipeline",
+		"triggering": "Triggering…",
+		"refresh": "Refresh",
+		"dismiss": "Dismiss"
+	},
+	"status": {
+		"pending": "Pending",
+		"triggered": "Triggered",
+		"running": "Running",
+		"success": "Succeeded",
+		"failed": "Failed"
+	},
+	"runs": {
+		"heading_one": "{{count}} run",
+		"heading_other": "{{count}} runs",
+		"noBranch": "No branch recorded"
+	},
+	"empty": {
+		"title": "No pipeline runs yet",
+		"body": "Runs triggered from here — or automatically on a PR or a merge — show up in this list with the status the provider reports.",
+		"noProject": "Open a project to configure its CI/CD triggers."
+	}
+}

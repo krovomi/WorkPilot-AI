@@ -62,7 +62,7 @@ export function ProviderConfigDialog({
 					defaultValue: "Fournisseur enregistré",
 				}),
 				description:
-					model && model.trim()
+					model?.trim()
 						? `${providerName} enregistré (modèle : ${model.trim()}) et défini comme fournisseur actif.`
 						: `${providerName} enregistré et défini comme fournisseur actif.`,
 			});

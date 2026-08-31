@@ -200,8 +200,14 @@ export function ModelRouterPanel() {
 										const checked = providers.includes(opt.value);
 										return (
 											<li key={opt.value}>
-												<label className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent cursor-pointer">
+												{/* Checkbox renders a button, not a native input, so
+												    the label needs an explicit target. */}
+												<label
+													htmlFor={`provider-${opt.value}`}
+													className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent cursor-pointer"
+												>
 													<Checkbox
+														id={`provider-${opt.value}`}
 														checked={checked}
 														onCheckedChange={() => toggleProvider(opt.value)}
 													/>

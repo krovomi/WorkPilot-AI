@@ -1,0 +1,36 @@
+{
+	"title": "Cross-Language Translation",
+	"subtitle": "Port a piece of code from one language to another, comments and tests included",
+	"languages": {
+		"heading": "Languages",
+		"source": "From",
+		"target": "To"
+	},
+	"options": {
+		"heading": "Options",
+		"preserveComments": "Keep comments",
+		"generateTests": "Generate tests"
+	},
+	"editor": {
+		"source": "Source ({{language}})",
+		"result": "Result ({{language}})",
+		"placeholder": "Paste the code to translate here.",
+		"resultEmpty": "The translation appears here once it runs.",
+		"translating": "Translating…"
+	},
+	"history": {
+		"heading": "History",
+		"clear": "Clear",
+		"empty": "No translation yet for this project."
+	},
+	"historyStatus": {
+		"pending": "In progress",
+		"complete": "Done",
+		"failed": "Failed"
+	},
+	"actions": {
+		"translate": "Translate",
+		"cancel": "Cancel",
+		"dismiss": "Dismiss"
+	}
+}
