@@ -141,35 +141,65 @@ class FileLock:
         """Get lock file path (separate .lock file)."""
         return self.filepath.parent / f"{self.filepath.name}.lock"
 
-    def _acquire_lock(self) -> None:
-        """Acquire the file lock (blocking with timeout)."""
+    def _open_lock_fd(self) -> None:
+        """Create and open the side-car lock file."""
         self._lock_file = self._get_lock_file()
         self._lock_file.parent.mkdir(parents=True, exist_ok=True)
-
-        # Open lock file
         self._fd = os.open(str(self._lock_file), os.O_CREAT | os.O_RDWR)
 
-        # Try to acquire lock with timeout
-        start_time = time.time()
+    def _try_acquire_once(self) -> bool:
+        """One non-blocking attempt. True when the lock is now held."""
+        try:
+            _try_lock(self._fd, self.exclusive)
+            return True
+        except (BlockingIOError, OSError):
+            return False
+
+    def _timeout_error(self) -> FileLockTimeout:
+        """Close the descriptor and build the timeout error."""
+        os.close(self._fd)
+        self._fd = None
+        return FileLockTimeout(
+            f"Failed to acquire lock on {self.filepath} within {self.timeout}s"
+        )
+
+    def _acquire_lock(self) -> None:
+        """Acquire the file lock (blocking with timeout)."""
+        self._open_lock_fd()
+        start_time = time.monotonic()
 
         while True:
-            try:
-                # Non-blocking lock attempt
-                _try_lock(self._fd, self.exclusive)
-                return  # Lock acquired
-            except (BlockingIOError, OSError):
-                # Lock held by another process
-                elapsed = time.time() - start_time
-                if elapsed >= self.timeout:
-                    os.close(self._fd)
-                    self._fd = None
-                    raise FileLockTimeout(
-                        f"Failed to acquire lock on {self.filepath} within "
-                        f"{self.timeout}s"
-                    )
+            if self._try_acquire_once():
+                return
+            if time.monotonic() - start_time >= self.timeout:
+                raise self._timeout_error()
+            # Wait a bit before retrying
+            time.sleep(0.01)
 
-                # Wait a bit before retrying
-                time.sleep(0.01)
+    async def _acquire_lock_async(self) -> None:
+        """Acquire the lock while yielding the event loop between attempts.
+
+        `__aenter__` used to hand `_acquire_lock` to the default executor, which
+        made every *waiter* occupy a thread and spin there in `time.sleep`. The
+        default pool holds `min(32, cpu_count + 4)` threads — eight on a
+        four-core machine — so a handful of concurrent waiters filled it, and
+        the coroutine actually *holding* the lock could no longer get a thread
+        to read, write or release. The waiters starved the holder, and every one
+        of them then failed on timeout: a lock that deadlocked precisely when it
+        was contended, which is the only time it matters.
+
+        Waiting here instead of in a thread keeps the pool free for the work
+        that has to make progress for the lock to be released at all.
+        """
+        self._open_lock_fd()
+        start_time = time.monotonic()
+
+        while True:
+            if self._try_acquire_once():
+                return
+            if time.monotonic() - start_time >= self.timeout:
+                raise self._timeout_error()
+            await asyncio.sleep(0.01)
 
     def _release_lock(self) -> None:
         """Release the file lock."""
@@ -201,8 +231,7 @@ class FileLock:
 
     async def __aenter__(self):
         """Async context manager entry."""
-        # Run blocking lock acquisition in thread pool
-        await asyncio.get_running_loop().run_in_executor(None, self._acquire_lock)
+        await self._acquire_lock_async()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
