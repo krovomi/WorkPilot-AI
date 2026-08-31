@@ -480,7 +480,7 @@ export function DiffViewDialog({
 				console.error("[DiffViewDialog] No worktreePath provided to edit file");
 				return;
 			}
-			const api = (globalThis as any).electronAPI;
+			const api = globalThis.electronAPI;
 			if (!api?.worktreeReadFile) {
 				console.error("[DiffViewDialog] electron.worktreeReadFile not available");
 				return;
@@ -493,7 +493,7 @@ export function DiffViewDialog({
 					file.path,
 				);
 				if (result.success) {
-					setEditContent(result.data);
+					setEditContent(result.data ?? "");
 				} else {
 					console.error("[DiffViewDialog] Failed to read file:", result);
 				}
@@ -516,7 +516,7 @@ export function DiffViewDialog({
 			return;
 		}
 
-		const api = (globalThis as any).electronAPI;
+		const api = globalThis.electronAPI;
 		if (!api?.worktreeWriteFile) {
 			console.error("[DiffViewDialog] electron.worktreeWriteFile not available");
 			return;
@@ -558,7 +558,7 @@ export function DiffViewDialog({
 			return;
 		}
 
-		const api = (globalThis as any).electronAPI;
+		const api = globalThis.electronAPI;
 		if (!api?.worktreeDeleteFiles) {
 			toast({
 				title: t("taskReview:diff.error"),
@@ -571,19 +571,15 @@ export function DiffViewDialog({
 		setIsDeletingSelected(true);
 		try {
 			const filesToDelete = Array.from(selectedPaths);
-			console.log("[DiffViewDialog] Deleting files:", filesToDelete);
-
 			const result = await api.worktreeDeleteFiles(
 				worktreePath,
 				filesToDelete,
 			);
 
-			console.log("[DiffViewDialog] Delete result:", result);
-
 			if (result.success) {
 				toast({
 					title: "Success",
-					description: `${result.data.deleted.length} file(s) discarded`,
+					description: `${result.data?.deleted.length ?? 0} file(s) discarded`,
 				});
 				setSelectedPaths(new Set());
 				// Force refresh to update the list with filtered files
@@ -617,7 +613,7 @@ export function DiffViewDialog({
 			return;
 		}
 
-		const api = (globalThis as any).electronAPI;
+		const api = globalThis.electronAPI;
 		if (!api?.worktreeWriteFile) {
 			console.error("[DiffViewDialog] electron.worktreeWriteFile not available");
 			return;
@@ -676,26 +672,29 @@ export function DiffViewDialog({
 			return (
 				<div className="h-full flex flex-col gap-4">
 					<div className="space-y-2">
-						<label className="text-sm font-medium">
+						<label htmlFor="new-file-path" className="text-sm font-medium">
 							{t("taskReview:diff.filePath")}
 						</label>
 						<Input
+							id="new-file-path"
 							placeholder="src/example.ts"
 							value={newFilePath}
 							onChange={(e) => setNewFilePath(e.target.value)}
 						/>
 					</div>
-					<div className="flex-1 flex flex-col gap-2">
-						<label className="text-sm font-medium">
+					{/* CodeEditor is a CodeMirror widget, not a native form control, so
+					    it is named by a fieldset legend rather than by a <label>. */}
+					<fieldset className="flex-1 flex flex-col gap-2 min-w-0 border-0 p-0 m-0">
+						<legend className="text-sm font-medium">
 							{t("taskReview:diff.fileContent")}
-						</label>
+						</legend>
 						<CodeEditor
 							value={newFileContent}
 							onChange={setNewFileContent}
 							filename={newFilePath || undefined}
 							className="flex-1 min-h-0"
 						/>
-					</div>
+					</fieldset>
 				</div>
 			);
 		}

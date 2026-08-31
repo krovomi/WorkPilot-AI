@@ -149,7 +149,6 @@ describe("CanvasPanel", () => {
 		// exceeded". The fix runs it only when the dialog opens.
 		let tick = 0;
 		const RealDate = Date;
-		// biome-ignore lint/suspicious/noExplicitAny: minimal Date stub for the test
 		vi.stubGlobal(
 			"Date",
 			class extends RealDate {

@@ -9,6 +9,7 @@ import type {
 	TaskLogPhase,
 	TaskLogs,
 	WorktreeDiff,
+	WorktreeMergeResult,
 	WorktreeStatus,
 } from "../../../../shared/types";
 import { getActiveLogPhase } from "../../../../shared/utils/task-logs";
@@ -84,6 +85,28 @@ function validateTaskSubtasks(task: Task): boolean {
 
 export interface UseTaskDetailOptions {
 	task: Task;
+}
+
+// Process a single API result and collect errors. It closes over nothing, so it
+// lives at module scope: re-created inside the component it became a dependency
+// of `loadMergePreview` that changed on every render.
+function processAPIResult<T>(
+	result: PromiseSettledResult<IPCResult<T>>,
+	label: string,
+	onSuccess: (data: T) => void,
+	errors: string[],
+): void {
+	if (result.status === "fulfilled") {
+		const res = result.value;
+		if (res.success && res.data) {
+			onSuccess(res.data);
+		} else if (!res.success && res.error) {
+			errors.push(`${label}: ${res.error}`);
+		}
+	} else {
+		console.error(`[useTaskDetail] Failed to load ${label}:`, result.reason);
+		errors.push(`Failed to load ${label}`);
+	}
 }
 
 export function useTaskDetail({ task }: UseTaskDetailOptions) {
@@ -531,26 +554,6 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		}
 	}, [task.id]);
 
-	// Helper to process a single API result and collect errors
-	const processAPIResult = <T,>(
-		result: PromiseSettledResult<IPCResult<T>>,
-		label: string,
-		onSuccess: (data: T) => void,
-		errors: string[],
-	) => {
-		if (result.status === "fulfilled") {
-			const res = result.value;
-			if (res.success && res.data) {
-				onSuccess(res.data);
-			} else if (!res.success && res.error) {
-				errors.push(`${label}: ${res.error}`);
-			}
-		} else {
-			console.error(`[useTaskDetail] Failed to load ${label}:`, result.reason);
-			errors.push(`Failed to load ${label}`);
-		}
-	};
-
 	// Load merge preview (conflict detection) and refresh worktree status
 	const loadMergePreview = useCallback(async () => {
 		setIsLoadingPreview(true);
@@ -574,8 +577,8 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 			processAPIResult(
 				previewResult,
 				"Merge preview",
-				(data: any) => {
-					setMergePreview(data?.preview);
+				(data: WorktreeMergeResult) => {
+					setMergePreview(data?.preview ?? null);
 				},
 				errors,
 			);
@@ -583,8 +586,12 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 			// Collect errors for status/diff (side-effect only); the actual
 			// values are extracted directly from the settled results below so
 			// TS control-flow analysis can narrow them correctly.
-			processAPIResult(statusResult, "Worktree status", () => {}, errors);
-			processAPIResult(diffResult, "Worktree diff", () => {}, errors);
+			const collectErrorsOnly = () => {
+				// The values are read from the settled results below; this call is
+				// only here to push any error message into `errors`.
+			};
+			processAPIResult(statusResult, "Worktree status", collectErrorsOnly, errors);
+			processAPIResult(diffResult, "Worktree diff", collectErrorsOnly, errors);
 
 			const latestStatus: WorktreeStatus | null =
 				statusResult.status === "fulfilled" &&
