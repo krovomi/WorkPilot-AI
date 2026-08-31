@@ -1,5 +1,5 @@
 """
-Security Hooks for Auto-Build Framework
+Security Hooks for WorkPilot AI Framework
 =======================================
 
 BACKWARD COMPATIBILITY FACADE

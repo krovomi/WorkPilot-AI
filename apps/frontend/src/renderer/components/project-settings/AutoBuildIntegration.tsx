@@ -29,7 +29,7 @@ export function AutoBuildIntegration(props: AutoBuildIntegrationProps) {
 	return (
 		<section className="space-y-4">
 			<h3 className="text-sm font-semibold text-foreground">
-				Auto-Build Integration
+				WorkPilot AI Integration
 			</h3>
 			{autoBuildPath == null ? (
 				<div className="rounded-lg border border-border bg-muted/50 p-4">
@@ -40,7 +40,7 @@ export function AutoBuildIntegration(props: AutoBuildIntegrationProps) {
 								Not Initialized
 							</p>
 							<p className="text-xs text-muted-foreground mt-1">
-								Initialize Auto-Build to enable task creation and agent
+								Initialize WorkPilot AI to enable task creation and agent
 								workflows.
 							</p>
 							<Button
@@ -57,7 +57,7 @@ export function AutoBuildIntegration(props: AutoBuildIntegrationProps) {
 								) : (
 									<>
 										<Download className="mr-2 h-4 w-4" />
-										Initialize Auto-Build
+										Initialize WorkPilot AI
 									</>
 								)}
 							</Button>

@@ -1,5 +1,5 @@
 """
-UI Utilities for Auto-Build
+UI Utilities for WorkPilot AI
 ===========================
 
 Main entry point for UI utilities. This module re-exports all UI components

@@ -758,20 +758,20 @@
 	"projectSections": {
 		"general": {
 			"title": "General",
-			"description": "Auto-Build and agent config",
-			"configureFor": "Configure Auto-Build, agent model, and notifications for {{projectName}}",
+			"description": "WorkPilot AI and agent config",
+			"configureFor": "Configure WorkPilot AI, agent model, and notifications for {{projectName}}",
 			"useClaudeMd": "Use CLAUDE.md",
 			"useClaudeMdDescription": "Include CLAUDE.md instructions in agent context",
 			"tddMode": "TDD Mode",
 			"tddModeDescription": "Enforce strict TDD (Red-Green-Refactor): the agent writes the test, watches it fail, then implements"
 		},
 		"autoBuild": {
-			"title": "Auto-Build Integration",
+			"title": "WorkPilot AI Integration",
 			"initialized": "Initialized",
 			"notInitialized": "Not Initialized",
-			"notInitializedDescription": "Initialize Auto-Build to enable task creation and agent workflows.",
+			"notInitializedDescription": "Initialize WorkPilot AI to enable task creation and agent workflows.",
 			"initializing": "Initializing...",
-			"initializeButton": "Initialize Auto-Build",
+			"initializeButton": "Initialize WorkPilot AI",
 			"checkingStatus": "Checking status...",
 			"blocker": {
 				"notGitRepo": {

@@ -1,4 +1,4 @@
-# Auto-Build Framework Dependencies
+# WorkPilot AI Framework Dependencies
 # SDK 0.1.25+ required for improved tool use concurrency handling
 # Earlier versions had 400 errors when tool_use blocks had partial failures
 # Utiliser le nom correct du package (tiret) pour l'installation via pip

@@ -1713,12 +1713,12 @@
 			"managedInSettings": "Géré dans Paramètres → Agent. Cliquez pour modifier."
 		},
 		"autoBuild": {
-			"title": "Intégration Auto-Build",
+			"title": "Intégration WorkPilot AI",
 			"initialized": "Initialisé",
 			"notInitialized": "Non initialisé",
-			"notInitializedDescription": "Initialisez Auto-Build pour activer la création de tâches et les workflows d'agents.",
+			"notInitializedDescription": "Initialisez WorkPilot AI pour activer la création de tâches et les workflows d'agents.",
 			"initializing": "Initialisation en cours...",
-			"initializeButton": "Initialiser Auto-Build",
+			"initializeButton": "Initialiser WorkPilot AI",
 			"checkingStatus": "Vérification du statut...",
 			"blocker": {
 				"notGitRepo": {
@@ -1755,8 +1755,8 @@
 		"flagshipModel": "Modèle flagship : {{model}}",
 		"general": {
 			"title": "Général",
-			"description": "Configuration Auto-Build et agent",
-			"configureFor": "Configurer Auto-Build, modèle d'agent et notifications pour {{projectName}}",
+			"description": "Configuration WorkPilot AI et agent",
+			"configureFor": "Configurer WorkPilot AI, modèle d'agent et notifications pour {{projectName}}",
 			"useClaudeMd": "Utiliser CLAUDE.md",
 			"useClaudeMdDescription": "Inclure les instructions CLAUDE.md dans le contexte de l'agent",
 			"tddMode": "Mode TDD",

@@ -22,7 +22,7 @@ export const integrationMock = {
 		success: true,
 	}),
 
-	// Auto-Build Source Environment Operations
+	// WorkPilot AI Source Environment Operations
 	getSourceEnv: async () => ({
 		success: true,
 		data: {

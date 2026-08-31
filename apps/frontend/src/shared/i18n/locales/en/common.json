@@ -466,7 +466,7 @@
 	},
 	"ideation": {
 		"converting": "Converting...",
-		"convertToTask": "Convert to Auto-Build Task",
+		"convertToTask": "Convert to WorkPilot AI Task",
 		"dismissIdea": "Dismiss Idea",
 		"description": "Description",
 		"rationale": "Rationale",

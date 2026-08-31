@@ -255,7 +255,7 @@ export function FeatureDetailPanel({
 					<div className="shrink-0 p-4 border-t border-border">
 						<Button className="w-full" onClick={() => onConvertToSpec(feature)}>
 							<Zap className="h-4 w-4 mr-2" />
-							Convert to Auto-Build Task
+							Convert to WorkPilot AI Task
 						</Button>
 					</div>
 				)

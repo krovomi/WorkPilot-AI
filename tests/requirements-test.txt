@@ -1,4 +1,4 @@
-# Test dependencies for the Auto-Build Framework
+# Test dependencies for the WorkPilot AI Framework
 # Install with: pip install -r tests/requirements-test.txt
 
 # Testing framework
