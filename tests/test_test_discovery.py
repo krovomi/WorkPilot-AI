@@ -18,6 +18,9 @@ rejoindre silencieusement les 120.
 from __future__ import annotations
 
 import configparser
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -72,3 +75,28 @@ def test_every_test_file_is_collected() -> None:
         "fichiers de test hors des `testpaths` d'apps/backend/pytest.ini — "
         "ils ne tourneront nulle part :\n" + "\n".join(sorted(stranded))
     )
+
+
+def test_package_qualified_backend_import_survives_collection_mock_pollution() -> None:
+    """Un faux ``apps.backend`` laissé par un test ne doit pas casser le suivant."""
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join((str(BACKEND), str(REPO_ROOT)))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--collect-only",
+            "-q",
+            "core/test_conversation_log.py",
+            "../../tests/backend/test_ssrf_protection.py",
+        ],
+        cwd=BACKEND,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
