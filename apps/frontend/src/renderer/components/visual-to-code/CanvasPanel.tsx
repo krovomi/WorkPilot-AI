@@ -859,16 +859,16 @@ export const CanvasPanel: React.FC = () => {
 		};
 	}, [getFallbackExplorerRoot]);
 
+	// Refresh the suggested filename ONLY when the dialog opens. Depending on
+	// getDefaultFileName (a new function every render, returning a millisecond
+	// timestamp) re-ran this on every render and wrote a new value each time —
+	// an infinite setState loop that surfaced as "Maximum update depth
+	// exceeded" through the Radix Dialog's Presence refs.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: only refresh on open
 	React.useEffect(() => {
-		// Refresh the suggested filename ONLY when the dialog opens. Depending on
-		// getDefaultFileName (a new function every render, returning a millisecond
-		// timestamp) re-ran this on every render and wrote a new value each time —
-		// an infinite setState loop that surfaced as "Maximum update depth
-		// exceeded" through the Radix Dialog's Presence refs.
 		if (showSaveAsDialog) {
 			setSaveAsFileName(getDefaultFileName());
 		}
-		// biome-ignore lint/correctness/useExhaustiveDependencies: only refresh on open
 	}, [showSaveAsDialog]);
 
 	return (
@@ -1062,9 +1062,13 @@ export const CanvasPanel: React.FC = () => {
 						<Controls />
 						{/* Collapsed to a small thumbnail; expands on hover. Pannable/
 						    zoomable so clicking-dragging it navigates the diagram. */}
+						{/* biome-ignore lint/a11y/noStaticElementInteractions: expands a preview on hover, carries no action of its own */}
+						{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: expands a preview on hover, carries no action of its own */}
 						<div
 							onMouseEnter={() => setMiniMapExpanded(true)}
 							onMouseLeave={() => setMiniMapExpanded(false)}
+							onFocus={() => setMiniMapExpanded(true)}
+							onBlur={() => setMiniMapExpanded(false)}
 							style={{
 								position: "absolute",
 								right: 12,
@@ -1303,7 +1307,6 @@ export const CanvasPanel: React.FC = () => {
 									</Button>
 								</div>
 							</div>
-							{/* biome-ignore lint/a11y/noLabelWithoutControl: input is nested inside */}
 							<label className="flex items-center gap-2 text-sm">
 								<input
 									type="checkbox"

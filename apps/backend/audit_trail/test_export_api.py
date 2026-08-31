@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,24 @@ def _reset_trail_registry() -> None:
     _trails.clear()
     yield
     _trails.clear()
+
+
+@pytest.fixture(autouse=True)
+def _allow_tmp_path_as_storage_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Let the endpoint accept the `tmp_path` these tests write to.
+
+    `_allowed_storage_roots()` confines `storage_dir` to
+    `AUDIT_TRAIL_ALLOWED_ROOTS`, or to the working directory when that is
+    unset — and `tmp_path` is under neither. Every request here was refused
+    with "storage_dir is outside every allowed root".
+
+    The allowlist is the real containment on an endpoint that takes a path
+    from the request body and calls `mkdir` on it, so it is the fixture that
+    declares the root, never the guard that relaxes.
+    """
+    monkeypatch.setenv("AUDIT_TRAIL_ALLOWED_ROOTS", str(tmp_path))
 
 
 @pytest.fixture
@@ -118,16 +137,30 @@ class TestExportGdpr:
         assert body["bundle"]["event_count"] == 2
 
     def test_missing_subject_returns_error(
-        self, client: TestClient, tmp_path: Path
+        self,
+        client: TestClient,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
+        """The caller gets a generic message; the reason goes to the log.
+
+        This asserted `"exactly one" in body["error"]` — the wording raised by
+        `build_dsar_bundle`. `safe_error` maps by exception *type* precisely so
+        that nothing derived from an exception's text reaches the response, so
+        the assertion was asking the endpoint to leak what it is built not to.
+        Both halves are checked here instead: what the caller sees, and that
+        the real reason was recorded.
+        """
         _seed_via_api(client, tmp_path)
-        resp = client.get(
-            "/api/audit-trail/export/gdpr",
-            params={"storage_dir": str(tmp_path)},
-        )
+        with caplog.at_level(logging.ERROR):
+            resp = client.get(
+                "/api/audit-trail/export/gdpr",
+                params={"storage_dir": str(tmp_path)},
+            )
         body = resp.json()
         assert body["success"] is False
-        assert "exactly one" in body["error"]
+        assert body["error"] == "Invalid input"
+        assert "exactly one" in caplog.text
 
     def test_both_subjects_returns_error(
         self, client: TestClient, tmp_path: Path

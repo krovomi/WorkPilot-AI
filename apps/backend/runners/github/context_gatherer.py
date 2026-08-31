@@ -358,6 +358,24 @@ class PRContextGatherer:
             merge_state_status=merge_state_status,
         )
 
+    async def _get_file_extension(self, file_path: str) -> str:
+        """Return the syntax highlighting language for a file."""
+        extension = Path(file_path).suffix.lower()
+
+        extensions = {
+            ".ts": "typescript",
+            ".tsx": "typescript",
+            ".js": "javascript",
+            ".jsx": "javascript",
+            ".py": "python",
+            ".json": "json",
+            ".md": "markdown",
+            ".yml": "yaml",
+            ".yaml": "yaml",
+        }
+
+        return extensions.get(extension, "")
+
     async def _fetch_pr_metadata(self) -> dict:
         """Fetch PR metadata from GitHub API via gh CLI."""
         return await self.gh_client.pr_get(

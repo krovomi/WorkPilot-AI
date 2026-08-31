@@ -24,10 +24,27 @@ class TestGHClient:
 
     @pytest.mark.asyncio
     async def test_timeout_raises_error(self, client):
-        """Test that commands timeout after max retries."""
-        # Use a command that will timeout (sleep longer than timeout)
-        with pytest.raises(GHTimeoutError) as exc_info:
-            await client.run(["api", "/repos/nonexistent/repo"], timeout=0.1)
+        """Test that commands timeout after max retries.
+
+        This used to shell out to the real `gh` against a real repository, so
+        it needed the CLI installed and the network reachable — and on a machine
+        without `gh` it raised `GHCommandError: not found` long before any
+        timeout. The retry-then-give-up logic is what the test is for, so the
+        subprocess is simulated here, on the pattern
+        `TestGHClientGhExecutableDetection` already uses below.
+        """
+
+        async def _never_returns(*_args, **_kwargs):
+            await asyncio.sleep(10)
+
+        mock_proc = MagicMock()
+        mock_proc.communicate = _never_returns
+        mock_proc.returncode = None
+
+        with patch("gh_client.get_gh_executable", return_value="/usr/bin/gh"):
+            with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+                with pytest.raises(GHTimeoutError) as exc_info:
+                    await client.run(["api", "/repos/nonexistent/repo"], timeout=0.1)
 
         assert "timed out after 3 attempts" in str(exc_info.value)
 

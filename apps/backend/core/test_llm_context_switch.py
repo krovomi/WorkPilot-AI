@@ -4,6 +4,11 @@ Every execution phase resolves its agent client through `create_agent_client`,
 which records the active (provider, model, effort) in `.llm_context.json` and,
 when it changes, writes a human-readable trace into the task activity feed. These
 tests cover the change-detection logic and the per-spec activity-feed attribution.
+
+The trace is emitted in **English** and localised by the frontend
+(`translateLogMessage`). These assertions matched the French wording that
+predates that split, so every one of them filtered an empty list and compared
+it against a length — never noticed, because `testpaths` excluded this file.
 """
 
 from __future__ import annotations
@@ -47,11 +52,11 @@ def test_baseline_is_traced_with_effort(tmp_path: Path) -> None:
     _log_llm_context_switch(tmp_path, "anthropic", "claude-opus-4-8", "medium")
 
     infos = [e for e in _feed_entries(tmp_path) if e.get("type") == "info"]
-    baseline = [e for e in infos if "Contexte LLM initial" in e["content"]]
+    baseline = [e for e in infos if "Initial LLM context" in e["content"]]
     assert len(baseline) == 1
     assert "anthropic" in baseline[0]["content"]
     # The thinking effort is now part of the trace.
-    assert "Effort : medium" in baseline[0]["content"]
+    assert "Effort: medium" in baseline[0]["content"]
 
 
 def test_provider_change_is_traced(tmp_path: Path) -> None:
@@ -64,12 +69,12 @@ def test_provider_change_is_traced(tmp_path: Path) -> None:
     _log_llm_context_switch(tmp_path, "copilot", "claude-opus-4-8", "medium")
 
     infos = [e for e in _feed_entries(tmp_path) if e.get("type") == "info"]
-    switch = [e for e in infos if "Changement de contexte LLM" in e["content"]]
+    switch = [e for e in infos if "LLM context switch" in e["content"]]
     assert len(switch) == 1
-    assert "Fournisseur : anthropic → copilot" in switch[0]["content"]
+    assert "Provider: anthropic → copilot" in switch[0]["content"]
     # Only the provider changed — model/effort lines must be omitted.
-    assert "Modèle" not in switch[0]["content"]
-    assert "Effort" not in switch[0]["content"]
+    assert "Model:" not in switch[0]["content"]
+    assert "Effort:" not in switch[0]["content"]
     assert _state(tmp_path) == {
         "provider": "copilot",
         "model": "claude-opus-4-8",
@@ -86,12 +91,12 @@ def test_effort_only_change_is_traced(tmp_path: Path) -> None:
     _log_llm_context_switch(tmp_path, "anthropic", "claude-opus-4-8", "ultrathink")
 
     infos = [e for e in _feed_entries(tmp_path) if e.get("type") == "info"]
-    switch = [e for e in infos if "Changement de contexte LLM" in e["content"]]
+    switch = [e for e in infos if "LLM context switch" in e["content"]]
     assert len(switch) == 1
-    assert "Effort : medium → ultrathink" in switch[0]["content"]
+    assert "Effort: medium → ultrathink" in switch[0]["content"]
     # Provider/model unchanged — only the effort line is present.
-    assert "Fournisseur" not in switch[0]["content"]
-    assert "Modèle" not in switch[0]["content"]
+    assert "Provider:" not in switch[0]["content"]
+    assert "Model:" not in switch[0]["content"]
 
 
 def test_model_and_effort_change_listed_together(tmp_path: Path) -> None:
@@ -103,10 +108,10 @@ def test_model_and_effort_change_listed_together(tmp_path: Path) -> None:
     _log_llm_context_switch(tmp_path, "anthropic", "claude-opus-4-8", "high")
 
     infos = [e for e in _feed_entries(tmp_path) if e.get("type") == "info"]
-    switch = [e for e in infos if "Changement de contexte LLM" in e["content"]]
+    switch = [e for e in infos if "LLM context switch" in e["content"]]
     assert len(switch) == 1
-    assert "Modèle : claude-sonnet-4-6 → claude-opus-4-8" in switch[0]["content"]
-    assert "Effort : low → high" in switch[0]["content"]
+    assert "Model: claude-sonnet-4-6 → claude-opus-4-8" in switch[0]["content"]
+    assert "Effort: low → high" in switch[0]["content"]
 
 
 def test_unchanged_context_emits_nothing_new(tmp_path: Path) -> None:

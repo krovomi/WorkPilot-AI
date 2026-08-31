@@ -312,15 +312,20 @@ export function QuickCommandBar({
 			</Button>
 
 			{open && filtered.length > 0 && (
-				<ul
-					role="listbox"
+				// A listbox needs options and a selected one; this menu has neither —
+				// it is click-only, with no roving selection. `menu`/`menuitem`
+				// describes what it actually is, and the items are direct children
+				// as those roles require.
+				<div
+					role="menu"
 					aria-label={t("tasks:kanban.quickCommand.ariaListLabel")}
 					className="absolute top-9 left-5 z-50 max-h-72 w-96 overflow-auto rounded-md border bg-popover p-1 shadow-md"
 				>
 					{filtered.map((cmd) => (
-						<li key={`${cmd.source}-${cmd.name}`}>
 							<button
+								key={`${cmd.source}-${cmd.name}`}
 								type="button"
+								role="menuitem"
 								onMouseDown={(e) => {
 									// onMouseDown so it fires before the input's onBlur.
 									e.preventDefault();
@@ -344,9 +349,8 @@ export function QuickCommandBar({
 									</span>
 								)}
 							</button>
-						</li>
 					))}
-				</ul>
+				</div>
 			)}
 			{open && filtered.length === 0 && input.trim().length > 0 && (
 				<div className="absolute top-9 left-5 z-50 w-72 rounded-md border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md">

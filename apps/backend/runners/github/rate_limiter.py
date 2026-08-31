@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import math
 import threading
 import time
 from collections.abc import Callable
@@ -134,10 +135,30 @@ class TokenBucket:
                 if elapsed >= timeout:
                     return False
 
+            # A bucket with no refill rate never gets those tokens back, so
+            # waiting cannot change the answer — and dividing by it raised
+            # ZeroDivisionError out of a rate limiter, which is the one place
+            # that must degrade rather than throw. `refill_rate=0` is a
+            # supported configuration meaning "a fixed budget, no replenishment".
+            if self.refill_rate <= 0:
+                return False
+
             # Wait for next refill
             # Calculate time until we have enough tokens
             tokens_needed = tokens - self.tokens
             wait_time = min(tokens_needed / self.refill_rate, 1.0)  # Max 1 second wait
+
+            # …but never past the caller's deadline. The timeout was only
+            # checked at the top of the loop, so a request with `timeout=0.1`
+            # still slept the full second before noticing: the method returned
+            # False, ten times later than asked. Callers use this timeout to
+            # bound latency, so overshooting it defeats its purpose.
+            if timeout is not None:
+                remaining = timeout - (time.monotonic() - start_time)
+                if remaining <= 0:
+                    return False
+                wait_time = min(wait_time, remaining)
+
             await asyncio.sleep(wait_time)
 
     def available(self) -> int:
@@ -155,6 +176,9 @@ class TokenBucket:
         self._refill()
         if self.tokens >= tokens:
             return 0.0
+        if self.refill_rate <= 0:
+            # Never replenishes: no finite wait produces the tokens.
+            return math.inf
         tokens_needed = tokens - self.tokens
         return tokens_needed / self.refill_rate
 
@@ -397,6 +421,8 @@ class RateLimiter:
             return True, f"{available} requests available"
 
         wait_time = self.github_bucket.time_until_available()
+        if math.isinf(wait_time):
+            return False, "Rate limited. Budget exhausted and does not replenish"
         return False, f"Rate limited. Wait {wait_time:.1f}s for next request"
 
     def track_ai_cost(
@@ -535,17 +561,17 @@ def rate_limited(
                 try:
                     # Pre-flight check
                     if operation_type == "github":
-                        available, msg = limiter.check_github_available()
-                        if not available and attempt == 0:
-                            # Try to acquire (will wait if needed)
-                            if not await limiter.acquire_github(timeout=30.0):
-                                raise RateLimitExceeded(
-                                    f"GitHub API rate limit exceeded: {msg}"
-                                )
-                        elif not available:
-                            # On retry, wait for token
-                            await limiter.acquire_github(
-                                timeout=limiter.max_retry_delay
+                        # Every decorated call spends a token. This branch used
+                        # to call `acquire_github` only when the bucket was
+                        # *already* empty, and `check_github_available` neither
+                        # consumes nor counts — so on the normal path the bucket
+                        # never drained, and the decorator that exists to hold
+                        # the line at GitHub's 5000/hour enforced nothing.
+                        timeout = 30.0 if attempt == 0 else limiter.max_retry_delay
+                        if not await limiter.acquire_github(timeout=timeout):
+                            _, msg = limiter.check_github_available()
+                            raise RateLimitExceeded(
+                                f"GitHub API rate limit exceeded: {msg}"
                             )
 
                     # Execute function

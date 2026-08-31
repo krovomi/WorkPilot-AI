@@ -94,6 +94,18 @@
 					}
 				}
 			}
+		},
+		{
+			// Developer CLI scripts: the console IS the user interface here, not
+			// leftover debug logging.
+			"includes": ["scripts/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noConsole": "off"
+					}
+				}
+			}
 		}
 	],
 	"css": {

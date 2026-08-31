@@ -1087,5 +1087,10 @@
 		"empty": "No decisions recorded yet",
 		"emptyHint": "Decisions appear here while the agent is running.",
 		"noMatch": "No entries match the current filter."
+	},
+	"codeEditor": {
+		"deleteFile": "Delete file",
+		"contentPlaceholder": "File content...",
+		"selectFile": "Select a file to edit"
 	}
 }

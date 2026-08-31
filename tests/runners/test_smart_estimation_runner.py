@@ -46,6 +46,20 @@ sys.modules["qa.reviewer"] = mock_qa.reviewer
 
 from runners.smart_estimation_runner import SmartEstimationRunner
 
+# The `qa` stubs were only needed to get the import above through, but they were
+# left in sys.modules for the rest of the session. A later
+# `from qa.criteria import save_implementation_plan` then resolved through the
+# MagicMock and succeeded silently, so `agents/test_session_changed_files.py`
+# saw neither the real save nor its own fake. Nothing showed it while `tests/`
+# and the backend's own tests ran in separate sessions.
+#
+# `smart_estimation_runner` above keeps whatever it bound during its import, so
+# these tests are unaffected. The other stubs stay: they name packages that are
+# absent or expensive here, not ones another test reaches for.
+for _qa_name in ("qa", "qa.loop", "qa.reviewer"):
+    if sys.modules.get(_qa_name) in (mock_qa, mock_qa.loop, mock_qa.reviewer):
+        del sys.modules[_qa_name]
+
 
 class TestSmartEstimationRunner:
     """Test suite for SmartEstimationRunner"""

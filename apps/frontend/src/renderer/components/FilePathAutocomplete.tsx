@@ -205,32 +205,33 @@ export function FilePathAutocomplete({
 			/>
 
 			{showDropdown && (
-				<ul
+				// An ARIA listbox owns its options directly: the <ul>/<li> wrappers
+				// broke that parent-child relation, so the container is a plain
+				// element and each option is a direct child.
+				<div
 					id={listboxId}
-					// biome-ignore lint/a11y/useSemanticElements: listbox pattern for combobox
 					role="listbox"
 					className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
 				>
 					{loading && suggestions.length === 0 && (
-						<li className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+						<div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
 							<Loader2 className="h-3.5 w-3.5 animate-spin" />
 							{t("documentation:autocomplete.searching")}
-						</li>
+						</div>
 					)}
 
 					{!loading && suggestions.length === 0 && (
-						<li className="px-3 py-2 text-xs text-muted-foreground">
+						<div className="px-3 py-2 text-xs text-muted-foreground">
 							{rootPath
 								? noResultsLabel
 								: t("documentation:autocomplete.noProject")}
-						</li>
+						</div>
 					)}
 
 					{suggestions.map((item, index) => (
-						<li key={item.relativePath}>
 							<button
+								key={item.relativePath}
 								type="button"
-								// biome-ignore lint/a11y/useSemanticElements: option inside listbox
 								role="option"
 								aria-selected={index === activeIndex}
 								// Use onMouseDown so selection fires before the input blurs.
@@ -253,9 +254,8 @@ export function FilePathAutocomplete({
 								)}
 								<span className="truncate">{item.relativePath}</span>
 							</button>
-						</li>
 					))}
-				</ul>
+				</div>
 			)}
 		</div>
 	);

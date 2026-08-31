@@ -24,6 +24,20 @@ from websockets.client import WebSocketClientProtocol
 class TestCLIStreamingIntegration:
     """Integration tests for CLI streaming functionality."""
 
+    @pytest.fixture(autouse=True)
+    def _skip_credential_validation(self):
+        """These tests are about streaming options, not about credentials.
+
+        `handle_build_command` lazily imports `validate_environment` from `cli.utils`
+        and calls it before it reaches
+        the mocked `run_autonomous_agent`, and that call resolves real auth —
+        so the assertions below could only ever run on a machine already logged
+        in. Patching the gate keeps the test on the parameter propagation it
+        actually asserts.
+        """
+        with patch("cli.utils.validate_environment", return_value=True):
+            yield
+
     @pytest.fixture
     def temp_project_dir(self):
         """Create a temporary project directory for testing."""
@@ -166,11 +180,19 @@ Test streaming functionality
         """Test streaming wrapper integration with agent execution."""
         spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
 
-        # Mock streaming components
+        # Mock streaming components. `create_agent_client` is mocked too: it
+        # resolves real credentials, and this test is about the streaming
+        # wrapper's lifecycle, not about being logged in.
         with (
             patch("agents.coder.create_streaming_wrapper") as mock_create_wrapper,
             patch("agents.coder.run_agent_session") as mock_run_session,
+            patch("agents.coder.create_agent_client") as mock_create_client,
         ):
+            # `handle_local_model_no_tools` reads `tool_calling_unsupported`
+            # off the client and halts the phase when it is truthy — which a
+            # bare MagicMock always is. Saying so explicitly keeps the mock
+            # from impersonating a failure it is not meant to represent.
+            mock_create_client.return_value = MagicMock(tool_calling_unsupported=False)
             # Setup mocks
             mock_wrapper = MagicMock()
             mock_wrapper.start_session = AsyncMock()
@@ -320,8 +342,10 @@ Test streaming functionality
         with (
             patch("agents.coder.STREAMING_AVAILABLE", False),
             patch("agents.coder.run_agent_session") as mock_run_session,
+            patch("agents.coder.create_agent_client") as mock_create_client,
         ):
             mock_run_session.return_value = ("continue", "Test response", None)
+            mock_create_client.return_value = MagicMock(tool_calling_unsupported=False)
 
             from agents.coder import run_autonomous_agent
 

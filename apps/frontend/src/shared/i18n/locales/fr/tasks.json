@@ -1087,5 +1087,10 @@
 		"empty": "Aucune décision enregistrée pour l'instant",
 		"emptyHint": "Les décisions apparaissent ici pendant que l'agent tourne.",
 		"noMatch": "Aucune entrée ne correspond au filtre actuel."
+	},
+	"codeEditor": {
+		"deleteFile": "Supprimer le fichier",
+		"contentPlaceholder": "Contenu du fichier...",
+		"selectFile": "Sélectionnez un fichier à modifier"
 	}
 }

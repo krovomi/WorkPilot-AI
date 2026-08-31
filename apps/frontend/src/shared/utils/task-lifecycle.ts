@@ -29,9 +29,7 @@ export function computeCompletionChecklist(
 ): CompletionChecklist {
 	const hasPr = Boolean(task.prUrl ?? task.metadata?.prUrl);
 	const proof = task.metadata?.visualProof;
-	const hasVisualProof = Boolean(
-		proof && proof.screenshots && proof.screenshots.length > 0,
-	);
+	const hasVisualProof = Boolean(proof?.screenshots?.length);
 	return { hasPr, hasVisualProof, ready: hasPr && hasVisualProof };
 }
 

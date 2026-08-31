@@ -9,7 +9,7 @@ Contient tous les scripts Python et JavaScript utilisés pour le développement,
 
 - **Scripts de diagnostic** : `complete_diagnostic.py`, `deep_diagnostic.py`, `debug_ipc.py`
 - **Scripts de profilage** : `create_copilot_profile.py`, `create_copilot_profile_clean.py`
-- **Scripts de test** : `run_streaming_tests.py`, `test_streaming_e2e.py`
+- **Scripts de test** : `run_streaming_tests.py`, `streaming_e2e_check.py`
 - **Scripts de validation** : `check_compiled_code.py`, `check_compiled_js.py`
 - **Scripts de configuration** : `fix_provider_selection.py`, `fix_quality_scorer.py`, `update_copilot_models.py`
 - **Scripts utilitaires** : `create_learning_modules.py`, `direct_test.py`

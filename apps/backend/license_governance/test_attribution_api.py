@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -68,14 +69,26 @@ class TestAttributionEndpoint:
         assert target.exists()
         assert "react" in target.read_text(encoding="utf-8")
 
-    def test_invalid_project_path_returns_error(self, client: TestClient) -> None:
-        resp = client.post(
-            "/api/license-governance/attribution",
-            json={"project_path": "/does/not/exist/anywhere"},
-        )
+    def test_invalid_project_path_returns_error(
+        self, client: TestClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The caller gets a generic message; the field name goes to the log.
+
+        This asserted `"project_path" in body["error"]`.
+        `core.api_safety.safe_error` maps by exception *type* so that nothing
+        derived from the exception text reaches the response — naming the
+        rejected field to an unauthenticated caller is what it exists to
+        prevent.
+        """
+        with caplog.at_level(logging.ERROR):
+            resp = client.post(
+                "/api/license-governance/attribution",
+                json={"project_path": "/does/not/exist/anywhere"},
+            )
         body = resp.json()
         assert body["success"] is False
-        assert "project_path" in body["error"]
+        assert body["error"] == "Invalid input"
+        assert "project_path" in caplog.text
 
 
 if __name__ == "__main__":

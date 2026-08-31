@@ -1,0 +1,43 @@
+{
+	"title": "Approbation des specs",
+	"subtitle": "Lire une spécification avant que les agents ne construisent dessus, et consigner votre décision",
+	"pending": {
+		"heading_one": "{{count}} spec en attente de revue",
+		"heading_other": "{{count}} specs en attente de revue",
+		"empty": "Rien n'attend de revue."
+	},
+	"history": {
+		"heading": "Déjà revues"
+	},
+	"status": {
+		"pending": "En attente",
+		"approved": "Approuvée",
+		"rejected": "Rejetée",
+		"changes_requested": "Modifications demandées"
+	},
+	"content": {
+		"spec": "Spécification",
+		"requirements": "Exigences",
+		"plan": "Plan d'implémentation",
+		"context": "Contexte",
+		"loading": "Chargement de la spécification…",
+		"unavailable": "Cette spécification n'a aucun contenu lisible."
+	},
+	"decision": {
+		"feedbackLabel": "Retour",
+		"feedbackPlaceholder": "Ce qui doit changer, et pourquoi.",
+		"feedbackRequired": "Rejeter ou demander des modifications exige un retour.",
+		"approve": "Approuver",
+		"requestChanges": "Demander des modifications",
+		"reject": "Rejeter"
+	},
+	"actions": {
+		"refresh": "Rafraîchir",
+		"dismiss": "Masquer"
+	},
+	"empty": {
+		"title": "Choisissez une spécification",
+		"body": "Sélectionnez une spec à gauche pour lire ce que les agents s'apprêtent à construire, puis approuvez-la, renvoyez-la ou rejetez-la.",
+		"noProject": "Ouvrez un projet pour revoir les specs qui l'attendent."
+	}
+}

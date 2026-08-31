@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
-End-to-End Streaming Test
-========================
+End-to-End Streaming Check
+==========================
 
-Complete end-to-end test for streaming live coding functionality.
-This script tests the entire pipeline from CLI to WebSocket to frontend.
+Manual check of the streaming live-coding pipeline, from CLI to WebSocket to
+frontend. A diagnostic script, not a test: it declares no test function and
+drives real processes and sockets — there is nothing for pytest to assert.
+
+It was called `test_streaming_e2e.py`, which is pytest's discovery pattern, so
+widening `testpaths` would have collected it and run the whole pipeline during
+a unit-test job. Renamed to say what it is.
+
+    python utils/scripts/streaming_e2e_check.py
 """
 
 import asyncio

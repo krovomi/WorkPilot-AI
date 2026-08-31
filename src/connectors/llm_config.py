@@ -11,7 +11,15 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from apps.backend.core.auth import get_auth_token
+# Le backend est importable sous deux noms selon qui lance le processus :
+# `core.auth` quand `apps/backend` est sur le sys.path (ses runners, sa CLI, son
+# conftest), `apps.backend.core.auth` quand c'est la racine du dépôt. Ce module
+# ne fixait que la seconde forme et échouait sur « 'apps.backend' is not a
+# package » dès qu'on l'importait depuis le backend lui-même.
+try:
+    from core.auth import get_auth_token
+except ImportError:  # pragma: no cover - dépend du sys.path de l'appelant
+    from apps.backend.core.auth import get_auth_token
 
 from .llm_base import DEFAULT_CLAUDE_MODEL
 

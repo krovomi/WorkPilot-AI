@@ -260,10 +260,22 @@ _cg_spec = importlib.util.spec_from_file_location(
 _cg_module = importlib.util.module_from_spec(_cg_spec)
 # Set up minimal module environment
 sys.modules["context_gatherer_isolated"] = _cg_module
-# Mock only the gh_client dependency
+# Mock only the gh_client dependency, and only while this module loads.
+# This used to install the MagicMock into sys.modules permanently, at import
+# time, with no restore — so every later test that imported `gh_client` got
+# the mock instead of the module. `runners/github/test_gh_client.py` then saw
+# its own exception classes as MagicMocks ("Expected a BaseException type").
+# Invisible until the backend tests and `tests/` ran in the same session.
 _mock_gh = MagicMock()
+_saved_gh = sys.modules.get("gh_client")
 sys.modules["gh_client"] = _mock_gh
-_cg_spec.loader.exec_module(_cg_module)
+try:
+    _cg_spec.loader.exec_module(_cg_module)
+finally:
+    if _saved_gh is None:
+        sys.modules.pop("gh_client", None)
+    else:
+        sys.modules["gh_client"] = _saved_gh
 PRContextGathererIsolated = _cg_module.PRContextGatherer
 
 

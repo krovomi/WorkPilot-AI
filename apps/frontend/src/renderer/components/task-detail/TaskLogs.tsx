@@ -733,10 +733,17 @@ export function TaskLogs({
 	}
 
 	return (
+		// The scroll buttons only appear while the pointer is over the log; the
+		// focus handlers give a keyboard the same reveal when a control inside
+		// takes focus.
+		// biome-ignore lint/a11y/noStaticElementInteractions: reveals a hover affordance, carries no action of its own
+		// biome-ignore lint/a11y/noNoninteractiveElementInteractions: reveals a hover affordance, carries no action of its own
 		<div
 			className="relative flex h-full flex-col"
 			onMouseEnter={() => setIsHoveringLogs(true)}
 			onMouseLeave={() => setIsHoveringLogs(false)}
+			onFocus={() => setIsHoveringLogs(true)}
+			onBlur={() => setIsHoveringLogs(false)}
 		>
 			{/* Search bar — filters log entries across all phases */}
 			{!isLoadingLogs && hasAnyLogs && (
@@ -1561,10 +1568,14 @@ function PhaseLogSection({
 							{t("tasks:logs.phaseEmpty")}
 						</p>
 					) : (
-						modelGroups.map((group, groupIdx) =>
+						// `group.key` is the (provider, model) pair, which repeats when a
+						// run switches model A -> B -> A. The first entry's timestamp
+						// distinguishes those runs and, unlike the array index, follows
+						// the group when the list is reversed.
+						modelGroups.map((group) =>
 							group.provider || group.model ? (
 								<ModelLogGroupView
-									key={`${group.key}-${groupIdx}`}
+									key={`${group.key}-${group.entries[0]?.timestamp}`}
 									group={group}
 									phase={phase}
 									searchQuery={searchQuery}
@@ -1573,7 +1584,7 @@ function PhaseLogSection({
 								/>
 							) : (
 								<PhaseEntryList
-									key={`flat-${groupIdx}`}
+									key={`flat-${group.entries[0]?.timestamp}`}
 									entries={group.entries}
 									phase={phase}
 									searchQuery={searchQuery}

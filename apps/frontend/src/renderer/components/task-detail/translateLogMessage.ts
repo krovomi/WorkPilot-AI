@@ -47,42 +47,55 @@ export function translateLogMessage(
 	if (!content) return content ?? "";
 	const s = content.trim();
 
-	let m: RegExpMatchArray | null;
-
-	if ((m = s.match(QA_COVERAGE))) {
-		const n = Number(m[1]);
+	// Each branch returns, so a later `match` only runs when every earlier one
+	// missed — the short-circuiting of the previous shared `let m` is kept
+	// without assigning inside a condition.
+	const qaCoverage = s.match(QA_COVERAGE);
+	if (qaCoverage) {
+		const n = Number(qaCoverage[1]);
 		return t("tasks:execution.logMessages.qaCoverageRejected", {
 			n,
 			next: n + 1,
 		});
 	}
-	if ((m = s.match(QA_ARCH))) {
-		const n = Number(m[1]);
+	const qaArch = s.match(QA_ARCH);
+	if (qaArch) {
+		const n = Number(qaArch[1]);
 		return t("tasks:execution.logMessages.qaArchRejected", {
 			n,
-			count: Number(m[2]),
+			count: Number(qaArch[2]),
 			next: n + 1,
 		});
 	}
-	if ((m = s.match(QA_ISSUES))) {
-		const n = Number(m[1]);
+	const qaIssues = s.match(QA_ISSUES);
+	if (qaIssues) {
+		const n = Number(qaIssues[1]);
 		return t("tasks:execution.logMessages.qaRejected", {
 			n,
-			count: Number(m[2]),
+			count: Number(qaIssues[2]),
 			next: n + 1,
 		});
 	}
-	if ((m = s.match(QA_APPROVED))) {
-		return t("tasks:execution.logMessages.qaApproved", { n: Number(m[1]) });
+	const qaApproved = s.match(QA_APPROVED);
+	if (qaApproved) {
+		return t("tasks:execution.logMessages.qaApproved", {
+			n: Number(qaApproved[1]),
+		});
 	}
-	if ((m = s.match(QA_MANUAL))) {
-		const key = m[2]
+	const qaManual = s.match(QA_MANUAL);
+	if (qaManual) {
+		const key = qaManual[2]
 			? "qaManualVerificationSandbox"
 			: "qaManualVerification";
-		return t(`tasks:execution.logMessages.${key}`, { n: Number(m[1]) });
+		return t(`tasks:execution.logMessages.${key}`, {
+			n: Number(qaManual[1]),
+		});
 	}
-	if ((m = s.match(MODEL_UNAVAILABLE))) {
-		return t("tasks:execution.logMessages.modelUnavailable", { model: m[1] });
+	const modelUnavailable = s.match(MODEL_UNAVAILABLE);
+	if (modelUnavailable) {
+		return t("tasks:execution.logMessages.modelUnavailable", {
+			model: modelUnavailable[1],
+		});
 	}
 	if (HOT_SWAP_RESUMED.test(s)) {
 		return t("tasks:execution.logMessages.hotSwapResumed");

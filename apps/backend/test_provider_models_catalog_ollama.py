@@ -71,6 +71,17 @@ def _install_fake_client(monkeypatch, routes):
     return captured
 
 
+def _identities(entries: list[dict]) -> list[dict]:
+    """The fields these tests are about: which models came back, and their tier.
+
+    They used whole-dict equality, which also pinned `supports_tools` and
+    `param_b` — filled in by `model_meta`, and not what an endpoint-selection
+    test is checking. Adding those two fields to the catalog entry broke all
+    three at once, for a reason none of them is about.
+    """
+    return [{k: e[k] for k in ("value", "label", "tier")} for e in entries]
+
+
 def test_prefers_openai_v1_models_and_honours_base_url(monkeypatch):
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:1234")
     captured = _install_fake_client(
@@ -80,7 +91,7 @@ def test_prefers_openai_v1_models_and_honours_base_url(monkeypatch):
 
     out = cat._fetch_ollama()
 
-    assert out == [
+    assert _identities(out) == [
         {"value": "qwen2.5-coder", "label": "qwen2.5-coder", "tier": "local"}
     ]
     # The configured port must be used (not the default 11434).
@@ -99,7 +110,9 @@ def test_falls_back_to_api_tags(monkeypatch):
 
     out = cat._fetch_ollama()
 
-    assert out == [{"value": "llama3.3", "label": "llama3.3", "tier": "local"}]
+    assert _identities(out) == [
+        {"value": "llama3.3", "label": "llama3.3", "tier": "local"}
+    ]
 
 
 def test_empty_v1_falls_back_to_tags(monkeypatch):
@@ -113,7 +126,9 @@ def test_empty_v1_falls_back_to_tags(monkeypatch):
 
     out = cat._fetch_ollama()
 
-    assert out == [{"value": "mistral-nemo", "label": "mistral-nemo", "tier": "local"}]
+    assert _identities(out) == [
+        {"value": "mistral-nemo", "label": "mistral-nemo", "tier": "local"}
+    ]
 
 
 def test_returns_empty_when_unreachable(monkeypatch):

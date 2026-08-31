@@ -174,6 +174,7 @@ export function I18nScalerPanel() {
 										aria-describedby={sourceError ? "source-error" : undefined}
 										placeholder={t("i18nScaler.sourceLocaleCustomPlaceholder")}
 										className="w-full rounded border bg-background p-2 text-sm"
+										// biome-ignore lint/a11y/noAutofocus: field is revealed by a user action, not focused on page load
 										autoFocus
 									/>
 									<Button

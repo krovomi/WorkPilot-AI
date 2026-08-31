@@ -135,7 +135,7 @@ function relaunchElevated() {
 			"[dev] Elevation was declined or failed — running non-elevated.\n" +
 				"      Visual proof on an elevated app (EBP) will capture a blank frame\n" +
 				"      and automated navigation is disabled. Set WORKPILOT_NO_ELEVATE=1 to silence.",
-			err && err.message ? `\n      (${err.message})` : "",
+			err?.message ? `\n      (${err.message})` : "",
 		);
 		runDevInProcess();
 	}

@@ -1138,13 +1138,17 @@ L'Arena Mode est maintenant intégré dans WorkPilot AI ! Comparez vos modèles 
 
 ##### 🏗️ Architecture technique
 
-**Backend** (`apps/backend/runners/arena_runner.py`) :
-- `run_arena_battle()` — Orchestration async de tous les participants en parallèle
-- `compute_analytics()` — Calcul des win-rates, coûts et recommandations de routage
-- `record_vote()` — Persistance des votes dans `~/.workpilot/arena/`
-- `get_analytics()` — Récupération des statistiques agrégées
-- Intégration avec `core.client` (Claude Agent SDK) via le système de profils
-- Mode fallback avec génération mock pour le développement/tests
+**Backend** (`apps/frontend/src/main/ipc-handlers/arena-handlers.ts`) :
+- `runBattle()` — Orchestration async de tous les participants en parallèle
+- `arena:getAnalytics` — Win-rates, coûts et recommandations de routage
+- `arena:vote` — Persistance des votes
+- `arena:getBattles`, `arena:getProfiles`, `arena:clearHistory`
+- Intégration avec le système de profils
+
+> Cette section décrivait un `runners/arena_runner.py` : une seconde implémentation
+> Python, avec son propre stockage JSON, qu'aucun appel n'atteignait. `ArenaDialog.tsx`
+> passe par `electronAPI.arena*`, donc par les handlers TypeScript ci-dessus. Le doublon
+> a été retiré plutôt que laissé à diverger.
 
 **Frontend** :
 - `apps/frontend/src/renderer/components/arena/ArenaDialog.tsx` — Interface principale avec 4 onglets
@@ -3233,8 +3237,9 @@ Les fichiers sont créés dans `.workpilot/environment/` :
 - `apps/backend/environment/capturer.py` — Capture depuis Docker Compose, containers, fichiers .env
 - `apps/backend/environment/generator.py` — Génération docker-compose.yml, .env, seed.sh
 - `apps/backend/environment/validator.py` — Validation services, ports, health checks
-- `apps/backend/runners/environment_cloner_runner.py` — Runner avec protocole stdout EVENT
-- `apps/backend/cli/env_commands.py` — Commandes CLI --env-capture, --env-reproduce, --env-validate
+- `apps/backend/cli/env_commands.py` — Commandes CLI --env-capture, --env-reproduce, --env-validate,
+  branchées via `cli/main.py`. Un `runners/environment_cloner_runner.py` offrait les mêmes
+  trois actions sur les mêmes trois modules, sans être branché nulle part : il a été retiré.
 - `apps/backend/prompts/environment_cloner.md` — Prompt agent pour analyse AI-driven
 
 </details>

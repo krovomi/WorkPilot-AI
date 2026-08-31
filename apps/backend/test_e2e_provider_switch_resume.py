@@ -37,6 +37,12 @@ from core.client import (
 )
 from core.conversation_log import append_message
 
+#: The (provider, model) pair `_seed_claude_conversation` writes under.
+#: `conversation_log_path` derives the log filename from it, so a replay must
+#: name the same pair to see the history.
+_SEEDED_PROVIDER = "claude"
+_SEEDED_MODEL = "claude-opus-4-7"
+
 
 def _seed_claude_conversation(spec_dir: Path) -> None:
     """Persist 3 messages as if a Claude session had been running."""
@@ -156,10 +162,21 @@ async def test_e2e_claude_to_copilot_provider_switch_with_replay(
     # Marker is single-shot — gone after consumption.
     assert not (spec_dir / RESUME_WITH_PROVIDER_FILE).exists()
 
-    # --- Step 2: the new Copilot client is created and the session replays ---
+    # --- Step 2a: Copilot does not inherit Claude's transcript ---
+    # Conversation logs are per (provider, model) — `read_log` keys on the pair
+    # so that switching a phase's LLM resumes *that* model's own context. This
+    # test predates that split: it seeded Claude's history and replayed it into
+    # Copilot, which the design now deliberately refuses.
+    fresh_copilot = _FakeCopilotClient()
+    await _maybe_replay_conversation(
+        fresh_copilot, spec_dir, provider="copilot", model="gpt-4o"
+    )
+    assert fresh_copilot.resume_calls == []
+
+    # --- Step 2b: replaying the pair that owns the history does resume ---
     copilot = _FakeCopilotClient()
     await _maybe_replay_conversation(
-        copilot, spec_dir, provider="copilot", model="gpt-4o"
+        copilot, spec_dir, provider=_SEEDED_PROVIDER, model=_SEEDED_MODEL
     )
 
     # resume() was called once with the full 3-message history in order.
@@ -221,7 +238,12 @@ async def test_e2e_no_marker_means_default_provider_kept(tmp_path: Path) -> None
     # No marker written.
     assert _consume_resume_with_provider_marker(spec_dir) is None
 
-    # Replay still fires (provider choice is orthogonal).
+    # Replay still fires (the marker is orthogonal to replay) — for the
+    # (provider, model) pair that owns the log. It used to pass "opus" here,
+    # a different slug from the seeded model, and only passed back when a
+    # single log served every pair.
     fake_client = AsyncMock()
-    await _maybe_replay_conversation(fake_client, spec_dir, "claude", "opus")
+    await _maybe_replay_conversation(
+        fake_client, spec_dir, _SEEDED_PROVIDER, _SEEDED_MODEL
+    )
     fake_client.resume.assert_awaited_once()

@@ -392,10 +392,23 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 				) : (
 					// View mode
 					task.subtasks.map((subtask, index) => (
+							// The card holds its own action buttons, so it cannot be a
+							// <button>; role + tabIndex + key handling give keyboard
+							// users the same access as the click.
+							// biome-ignore lint/a11y/useSemanticElements: card holds its own action buttons; a <button> cannot nest one
 							<div
 								key={subtask.id}
+								role="button"
+								tabIndex={0}
 								onClick={() => {
 									setSelectedSubtaskForFilesView(subtask);
+								}}
+								onKeyDown={(e) => {
+									if (e.target !== e.currentTarget) return;
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										setSelectedSubtaskForFilesView(subtask);
+									}
 								}}
 								className={cn(
 									"rounded-xl border border-border bg-secondary/30 p-3 transition-all duration-200 hover:bg-secondary/50 cursor-pointer group",

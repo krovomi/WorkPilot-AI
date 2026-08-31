@@ -96,10 +96,14 @@ export function PlanApprovalSection({
 				{/* Rejection reason textarea - shown when user wants to reject */}
 				{isRejecting && (
 					<div className="mb-4">
-						<label className="text-xs font-medium text-foreground mb-2 block">
+						<label
+							htmlFor="plan-rejection-reason"
+							className="text-xs font-medium text-foreground mb-2 block"
+						>
 							{t("tasks:modal.plan.rejectionReason")}
 						</label>
 						<textarea
+							id="plan-rejection-reason"
 							value={rejectionReason}
 							onChange={(e) => setRejectionReason(e.target.value)}
 							placeholder={t("tasks:modal.plan.rejectionPlaceholder")}

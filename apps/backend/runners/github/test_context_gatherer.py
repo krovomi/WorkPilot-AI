@@ -66,7 +66,9 @@ def test_find_test_files(tmp_path):
     source_path = Path("src/utils.ts")
     test_files = gatherer._find_test_files(source_path)
 
-    assert "src/utils.test.ts" in test_files
+    # Normalize paths to use forward slashes for cross-platform compatibility
+    normalized_test_files = {Path(f).as_posix() for f in test_files}
+    assert "src/utils.test.ts" in normalized_test_files
 
 
 def test_resolve_import_path(tmp_path):
@@ -149,8 +151,10 @@ def test_find_config_files(tmp_path):
 
     config_files = gatherer._find_config_files(Path("src"))
 
-    assert "src/tsconfig.json" in config_files
-    assert "src/package.json" in config_files
+    # Normalize paths to use forward slashes for cross-platform compatibility
+    normalized_config_files = {Path(f).as_posix() for f in config_files}
+    assert "src/tsconfig.json" in normalized_config_files
+    assert "src/package.json" in normalized_config_files
 
 
 def test_get_file_extension():
