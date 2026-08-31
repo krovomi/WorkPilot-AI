@@ -66,7 +66,9 @@ def test_find_test_files(tmp_path):
     source_path = Path("src/utils.ts")
     test_files = gatherer._find_test_files(source_path)
 
-    assert "src/utils.test.ts" in test_files
+    # Normalize paths to use forward slashes for cross-platform compatibility
+    normalized_test_files = {Path(f).as_posix() for f in test_files}
+    assert "src/utils.test.ts" in normalized_test_files
 
 
 def test_resolve_import_path(tmp_path):
@@ -149,16 +151,24 @@ def test_find_config_files(tmp_path):
 
     config_files = gatherer._find_config_files(Path("src"))
 
-    assert "src/tsconfig.json" in config_files
-    assert "src/package.json" in config_files
+    # Normalize paths to use forward slashes for cross-platform compatibility
+    normalized_config_files = {Path(f).as_posix() for f in config_files}
+    assert "src/tsconfig.json" in normalized_config_files
+    assert "src/package.json" in normalized_config_files
 
 
-# `test_get_file_extension` covered `PRContextGatherer._get_file_extension`, a
-# path-to-language mapping used for syntax-highlighting hints. The method is
-# gone from production and has no successor anywhere in the backend — the whole
-# mapping only survived inside this test's assertions. There is nothing left to
-# assert against, so the test goes with the behaviour it covered rather than
-# being rewritten against an invented replacement.
+def test_get_file_extension():
+    """Test file extension mapping for syntax highlighting."""
+    gatherer = PRContextGatherer(Path("/tmp"), 1)
+
+    assert gatherer._get_file_extension("app.ts") == "typescript"
+    assert gatherer._get_file_extension("utils.tsx") == "typescript"
+    assert gatherer._get_file_extension("script.js") == "javascript"
+    assert gatherer._get_file_extension("script.jsx") == "javascript"
+    assert gatherer._get_file_extension("main.py") == "python"
+    assert gatherer._get_file_extension("config.json") == "json"
+    assert gatherer._get_file_extension("readme.md") == "markdown"
+    assert gatherer._get_file_extension("config.yml") == "yaml"
 
 
 def test_find_imports_typescript(tmp_path):
