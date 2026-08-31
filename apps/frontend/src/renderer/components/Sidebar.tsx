@@ -110,9 +110,11 @@ import {
 	loadProjectEnvConfig,
 	useProjectEnvStore,
 } from "@/stores/project-env-store";
+import { useAnyPermission } from "@/stores/permissions-store";
 // Stores
 import { useProjectStore } from "@/stores/project-store";
 import { openPromptOptimizerDialog } from "@/stores/prompt-optimizer-store";
+import { useServerSessionStore } from "@/stores/server-session-store";
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
 import { useSetupHubStore } from "@/stores/setup-hub-store";
 import { openTestGenerationDialog } from "@/stores/test-generation-store";
@@ -231,6 +233,7 @@ export type SidebarView =
 	| "guardrails"
 	| "env-snapshot"
 	| "offline-mode"
+	| "administration"
 	| "phase35-hub";
 
 interface SidebarProps {
@@ -759,6 +762,24 @@ const navGroups: NavGroup[] = [
 ];
 
 // GitHub nav items shown when GitHub is enabled
+// The administration console. Kept out of `navGroups` and appended only when
+// the signed-in user can actually reach it: in local mode, and for a member
+// with no administration permission, the entry would lead to a page that only
+// explains why it is empty.
+const administrationNavGroup: NavGroup = {
+	id: "administration",
+	labelKey: "navigation:groups.administration",
+	icon: ShieldCheck,
+	items: [
+		{
+			id: "administration",
+			labelKey: "navigation:items.administration",
+			icon: ShieldCheck,
+			shortcut: "AD",
+		},
+	],
+};
+
 const githubNavItems: NavItem[] = [
 	{
 		id: "github-issues",
@@ -923,6 +944,19 @@ export function Sidebar({
 		(state) => state.envConfig?.gitlabEnabled ?? false,
 	);
 
+	// The administration console is reachable only in server mode, and only for
+	// someone holding at least one administration permission. `useAnyPermission`
+	// reports true in local mode, so the server-mode check is what keeps the
+	// entry out of the desktop app, where there is nothing to administer.
+	const isServerMode = useServerSessionStore((state) => state.mode) === "server";
+	const hasAdminPermission = useAnyPermission([
+		"org.member.read",
+		"org.role.read",
+		"org.quota.read",
+		"audit.read",
+	]);
+	const canAdminister = isServerMode && hasAdminPermission;
+
 	// Track the last loaded project ID to avoid redundant loads
 	const lastLoadedProjectIdRef = useRef<string | null>(null);
 
@@ -942,6 +976,10 @@ export function Sidebar({
 			if (gitlabEnabled) {
 				integrationGroup.items.push(...gitlabNavItems);
 			}
+		}
+
+		if (canAdminister) {
+			groups.push({ ...administrationNavGroup, items: [...administrationNavGroup.items] });
 		}
 
 		// Apply custom group order
@@ -966,6 +1004,7 @@ export function Sidebar({
 	}, [
 		githubEnabled,
 		gitlabEnabled,
+		canAdminister,
 		sidebarPrefs.groupOrder,
 		sidebarPrefs.itemOrder,
 		mergeOrder,
@@ -1503,7 +1542,8 @@ export function Sidebar({
 				<button
 					type="button"
 					onClick={() => handleNavClick(item.id)}
-					disabled={!selectedProjectId}
+					// The console is deployment-scoped, not project-scoped.
+					disabled={!selectedProjectId && item.id !== "administration"}
 					aria-keyshortcuts={item.shortcut}
 					className={cn(
 						"flex w-full min-w-0 items-center rounded-lg text-sm transition-all duration-200",
@@ -1583,7 +1623,7 @@ export function Sidebar({
 				key={item.id}
 				type="button"
 				onClick={() => handleNavClick(item.id)}
-				disabled={!selectedProjectId}
+				disabled={!selectedProjectId && item.id !== "administration"}
 				aria-keyshortcuts={item.shortcut}
 				className={cn(
 					"w-full flex items-center gap-2 text-xs p-1 rounded text-left",

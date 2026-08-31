@@ -1,6 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import enAccessibility from "./locales/en/accessibility.json";
+import enAdministration from "./locales/en/administration.json";
 import enAgentCoach from "./locales/en/agentCoach.json";
 import enAgentDebugger from "./locales/en/agentDebugger.json";
 import enBlastRadius from "./locales/en/blastRadius.json";
@@ -88,6 +89,7 @@ import enVisualToCode from "./locales/en/visualToCode.json";
 import enVoiceControl from "./locales/en/voiceContol.json";
 import enWelcome from "./locales/en/welcome.json";
 import frAccessibility from "./locales/fr/accessibility.json";
+import frAdministration from "./locales/fr/administration.json";
 import frAgentCoach from "./locales/fr/agentCoach.json";
 import frAgentDebugger from "./locales/fr/agentDebugger.json";
 import frBlastRadius from "./locales/fr/blastRadius.json";
@@ -180,6 +182,7 @@ export const defaultNS = "common";
 export const resources = {
 	en: {
 		accessibility: enAccessibility,
+		administration: enAdministration,
 		agentCoach: enAgentCoach,
 		agentDebugger: enAgentDebugger,
 		blastRadius: enBlastRadius,
@@ -267,6 +270,7 @@ export const resources = {
 	},
 	fr: {
 		accessibility: frAccessibility,
+		administration: frAdministration,
 		agentCoach: frAgentCoach,
 		agentDebugger: frAgentDebugger,
 		blastRadius: frBlastRadius,
@@ -361,6 +365,7 @@ i18n.use(initReactI18next).init({
 	defaultNS,
 	ns: [
 		"accessibility",
+		"administration",
 		"agentCoach",
 		"agentDebugger",
 		"blastRadius",

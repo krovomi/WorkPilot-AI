@@ -6,6 +6,7 @@ configuration. It covers:
 1. The LLM provider registry (`configured_providers.json`).
 2. The per-user provider configurations (`~/.work_pilot_ai_llm_providers.json`).
 3. The authentication token resolution order.
+4. Multi-user server mode: tenants, roles and permissions.
 
 ---
 
@@ -134,6 +135,107 @@ pip install secretstorage
 Tokens prefixed with `enc:` are Claude Code CLI-encrypted. They are
 auto-decrypted via `_try_decrypt_token`. If decryption fails, the backend
 raises a clear error pointing the user at `claude setup-token`.
+
+---
+
+## 4. Multi-user server mode — tenants, roles and permissions
+
+Everything below applies **only** when `WORKPILOT_SERVER_MODE=1`. The desktop
+app runs unchanged without it: a single implicit owner holding every
+permission, no database, no authentication. That is deliberate — there is no
+privilege boundary to draw when the backend runs as the person who opened the
+project.
+
+### Enabling it
+
+`mount_server_mode` ([apps/backend/server/integration.py](../apps/backend/server/integration.py))
+fails **closed**: if server mode is requested and cannot initialize, the API
+refuses to start rather than booting unauthenticated. See
+[deploy/server-env.example](../deploy/server-env.example) for the full
+environment file and [deploy/docker-compose.yml](../deploy/docker-compose.yml)
+for a PostgreSQL-backed deployment.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `WORKPILOT_SERVER_MODE` | `false` | Master switch. Everything in this section is inert without it. |
+| `WORKPILOT_JWT_SECRET` | — | HS256 secret, **32 characters minimum**. A shorter or missing value aborts startup. |
+| `WORKPILOT_DATABASE_URL` | local SQLite | `postgresql+asyncpg://…` in production. |
+| `WORKPILOT_REPOS_ROOT` | `~/.workpilot/server-repos` | Where the server clones registered repositories — and, in server mode, the **only** directory tree a request can resolve a path inside. |
+| `WORKPILOT_SECRETS_MASTER_KEY` | — | Fernet key encrypting per-user integration secrets. |
+| `WORKPILOT_MAX_CONCURRENT_RUNS` | `3` | Deployment-wide ceiling. Per-organization ceilings are set in the console (see quotas below). |
+
+### Tenancy
+
+An **organization** is the tenant. Users, projects, specs, runs, secrets and
+audit entries all belong to one, and every query is scoped on `org_id`.
+
+The organization a request acts in is resolved, in order: the
+`X-WorkPilot-Org` header, the `org` claim of the access token, then the
+caller's only membership when they have exactly one. **Both the header and the
+claim are verified against membership on every request** — they select among
+the organizations a user already belongs to, they never grant access. Several
+memberships with no explicit choice is left unresolved rather than guessed.
+
+Upgrading an existing single-tenant deployment is automatic: Alembic revision
+`0003_multi_tenant` creates a "Default" organization, makes every existing user
+a member with the role their old global role maps onto, and attributes every
+existing project to it. Nobody loses access.
+
+### Platform administrator vs. organization administrator
+
+`users.role` is the **platform** role — what a user is to the deployment, not
+to any tenant. `admin` there means the operator of the whole installation: they
+can create and suspend organizations and reach into any tenant. That authority
+is never grantable from inside an organization.
+
+Business roles live in `org_members.role_id` and are scoped to one tenant.
+
+### Permissions
+
+The catalog lives in code, at
+[apps/backend/server/authz/catalog.py](../apps/backend/server/authz/catalog.py),
+not in the database: a permission the code does not implement cannot gate
+anything, so a second copy could only drift. Keys are `<domain>.<action>` over
+~17 domains (`task`, `agent`, `qa`, `vcs`, `analytics`, `ops`, `settings`,
+`org`, `platform`…).
+
+Permissions marked **privileged** are the ones whose blast radius exceeds the
+data they touch — `agent.execute`, `settings.provider.write`, `project.delete`,
+`org.role.write`, everything under `platform.` They are not granted by any
+default role below administrator, and the console shows them apart.
+
+Eight built-in roles (`owner`, `admin`, `maintainer`, `contributor`,
+`reviewer`, `operator`, `analyst`, `viewer`) are seeded from
+[server/authz/roles.py](../apps/backend/server/authz/roles.py) and are
+read-only, so an upgrade that grants a new permission to `admin` reaches every
+tenant. Organizations create custom roles instead; their permission list is
+validated against the catalog on write.
+
+**Effective permissions are resolved per request from the database, never
+carried in the token.** A token lives 15 minutes; a permission removed from a
+role has to bite on the next request, not a quarter of an hour later.
+
+An organization can also switch permissions off wholesale — a licence tier or a
+feature flag — through `disabled_permissions` in its settings, subtracted from
+every member's effective set.
+
+### Paths are no longer supplied by the client
+
+The single-user API let a caller pass `project_dir`, an absolute filesystem
+path, and read it. On a shared server that is a cross-tenant read and write, so
+in server mode it is refused outright (HTTP 400) and callers identify a project
+by `project_id`; the server resolves its own checkout. Two barriers enforce it:
+the auth middleware rejects the parameter in a query string, and
+`core.api_safety.validated_dir` confines resolution to `WORKPILOT_REPOS_ROOT`
+when no allowed root is given — which also covers the endpoints that read a
+path out of a JSON body.
+
+### Quotas
+
+Per-organization ceilings on members, projects, concurrent runs and monthly
+token budget, set in the console. **Absent means unlimited**, and an
+organization with no quota row is unconstrained — so an upgraded deployment
+behaves exactly as it did before quotas existed.
 
 ---
 

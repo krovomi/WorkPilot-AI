@@ -95,12 +95,27 @@ class RunManager:
         phase: str,
         user_id: str,
         model: str | None = None,
+        org_id: str | None = None,
     ) -> AgentRun:
-        """Queue a run and return its DB row immediately (status=queued)."""
+        """Queue a run and return its DB row immediately (status=queued).
+
+        ``org_id`` applies the tenant's own concurrency and budget ceiling on
+        top of the deployment-wide semaphore. Without it one organization
+        queueing twenty builds would own the server, since the global semaphore
+        cannot tell whose work it is admitting.
+        """
         if phase not in PHASE_ARGS:
             raise RunManagerError(f"Unknown phase: {phase}")
         if spec.id in self._running_specs:
             raise RunManagerError("A run is already in progress for this spec")
+
+        if org_id:
+            from server.services.quotas import enforce_run_quota
+
+            async with get_session_factory()() as quota_db:
+                # Raises HTTPException(429/402) — checked before the spec is
+                # reserved, so a refused run leaves no reservation behind.
+                await enforce_run_quota(quota_db, org_id)
 
         # Reserve the spec BEFORE the first await. The reservation used to
         # happen after the DB round-trip below, so two concurrent requests

@@ -273,10 +273,11 @@ _SERVER_MODE_REQUESTED = os.environ.get(
     "yes",
     "on",
 }
+_SERVER_MODE_ACTIVE = False
 try:
     from server.integration import mount_server_mode
 
-    mount_server_mode(app)
+    _SERVER_MODE_ACTIVE = mount_server_mode(app)
 except Exception as e:
     if _SERVER_MODE_REQUESTED:
         raise RuntimeError(
@@ -284,6 +285,30 @@ except Exception as e:
             "refusing to start an unauthenticated server."
         ) from e
     logging.getLogger(__name__).warning("Could not initialize server mode: %s", e)
+
+
+def _mount(router, feature: str) -> None:
+    """Mount a feature router with its permission attached.
+
+    In server mode the router's whole surface is gated by the permission its
+    feature maps onto (``server.authz.catalog.FEATURE_DOMAINS``): ``<domain>.read``
+    for GET, ``<domain>.write`` otherwise, with ``ROUTE_OVERRIDES`` raising the
+    bar for the routes that execute agents. In local mode the router mounts
+    untouched, so the desktop app pays nothing for a check that would always
+    pass.
+
+    Attaching the guard here rather than editing ~150 endpoint signatures is
+    deliberate, and so is doing it at the mount rather than from a table keyed
+    on ``router.prefix``: seven of these routers declare absolute paths with no
+    prefix at all, and a prefix-keyed policy would silently skip them.
+    """
+    if not _SERVER_MODE_ACTIVE:
+        app.include_router(router)
+        return
+    from server.authz.mounting import mount_guarded
+
+    mount_guarded(app, router, feature)
+
 
 # Single shared limiter instance (also imported by server.routers.* so all
 # rate-limit decorators share one backend).
@@ -1766,7 +1791,7 @@ try:
     _init_analytics_db()
     from analytics.api_simple import router as analytics_router
 
-    app.include_router(analytics_router)
+    _mount(analytics_router, "analytics")
 except Exception as e:
     logging.getLogger(__name__).warning(
         "Could not load real analytics router (%s), falling back to minimal stub",
@@ -1775,7 +1800,7 @@ except Exception as e:
     try:
         from analytics.api_minimal import router as analytics_router
 
-        app.include_router(analytics_router)
+        _mount(analytics_router, "analytics")
     except ImportError as e2:
         logging.getLogger(__name__).warning("Could not import analytics router: %s", e2)
 
@@ -1783,7 +1808,7 @@ except Exception as e:
 try:
     from mission_control.api import router as mission_control_router
 
-    app.include_router(mission_control_router)
+    _mount(mission_control_router, "mission_control")
 except ImportError as e:
     print(f"Warning: Could not import mission control router: {e}")
 
@@ -1791,7 +1816,7 @@ except ImportError as e:
 try:
     from replay.api import router as replay_router
 
-    app.include_router(replay_router)
+    _mount(replay_router, "replay")
 except ImportError as e:
     print(f"Warning: Could not import replay router: {e}")
 
@@ -1799,7 +1824,7 @@ except ImportError as e:
 try:
     from model_router.api import router as model_router_api
 
-    app.include_router(model_router_api)
+    _mount(model_router_api, "model_router")
 except ImportError as e:
     print(f"Warning: Could not import model_router api: {e}")
 
@@ -1807,7 +1832,7 @@ except ImportError as e:
 try:
     from longevity.api import router as longevity_router
 
-    app.include_router(longevity_router)
+    _mount(longevity_router, "longevity")
 except ImportError as e:
     print(f"Warning: Could not import longevity router: {e}")
 
@@ -1815,7 +1840,7 @@ except ImportError as e:
 try:
     from architecture_drift.api import router as architecture_drift_router
 
-    app.include_router(architecture_drift_router)
+    _mount(architecture_drift_router, "architecture_drift")
 except ImportError as e:
     print(f"Warning: Could not import architecture_drift router: {e}")
 
@@ -1823,7 +1848,7 @@ except ImportError as e:
 try:
     from generational_tests.api import router as generational_tests_router
 
-    app.include_router(generational_tests_router)
+    _mount(generational_tests_router, "generational_tests")
 except ImportError as e:
     print(f"Warning: Could not import generational_tests router: {e}")
 
@@ -1831,7 +1856,7 @@ except ImportError as e:
 try:
     from cognitive_context.api import router as cognitive_context_router
 
-    app.include_router(cognitive_context_router)
+    _mount(cognitive_context_router, "cognitive_context")
 except ImportError as e:
     print(f"Warning: Could not import cognitive_context router: {e}")
 
@@ -1839,7 +1864,7 @@ except ImportError as e:
 try:
     from agent_health.api import router as agent_health_router
 
-    app.include_router(agent_health_router)
+    _mount(agent_health_router, "agent_health")
 except ImportError as e:
     print(f"Warning: Could not import agent_health router: {e}")
 
@@ -1847,7 +1872,7 @@ except ImportError as e:
 try:
     from cicd_anomaly.api import router as cicd_anomaly_router
 
-    app.include_router(cicd_anomaly_router)
+    _mount(cicd_anomaly_router, "cicd_anomaly")
 except ImportError as e:
     print(f"Warning: Could not import cicd_anomaly router: {e}")
 
@@ -1855,7 +1880,7 @@ except ImportError as e:
 try:
     from license_governance.api import router as license_governance_router
 
-    app.include_router(license_governance_router)
+    _mount(license_governance_router, "license_governance")
 except ImportError as e:
     print(f"Warning: Could not import license_governance router: {e}")
 
@@ -1863,7 +1888,7 @@ except ImportError as e:
 try:
     from domain_agents.api import router as domain_agents_router
 
-    app.include_router(domain_agents_router)
+    _mount(domain_agents_router, "domain_agents")
 except ImportError as e:
     print(f"Warning: Could not import domain_agents router: {e}")
 
@@ -1871,7 +1896,7 @@ except ImportError as e:
 try:
     from i18n_scaler.api import router as i18n_scaler_router
 
-    app.include_router(i18n_scaler_router)
+    _mount(i18n_scaler_router, "i18n_scaler")
 except ImportError as e:
     print(f"Warning: Could not import i18n_scaler router: {e}")
 
@@ -1879,7 +1904,7 @@ except ImportError as e:
 try:
     from audit_trail.api import router as audit_trail_router
 
-    app.include_router(audit_trail_router)
+    _mount(audit_trail_router, "audit_trail")
 except ImportError as e:
     print(f"Warning: Could not import audit_trail router: {e}")
 
@@ -1887,7 +1912,7 @@ except ImportError as e:
 try:
     from pair_realtime.api import router as pair_realtime_router
 
-    app.include_router(pair_realtime_router)
+    _mount(pair_realtime_router, "pair_realtime")
 except ImportError as e:
     print(f"Warning: Could not import pair_realtime router: {e}")
 
@@ -1895,7 +1920,7 @@ except ImportError as e:
 try:
     from code_playground.api import router as code_playground_router
 
-    app.include_router(code_playground_router)
+    _mount(code_playground_router, "code_playground")
 except ImportError as e:
     print(f"Warning: Could not import code_playground router: {e}")
 
@@ -1903,7 +1928,7 @@ except ImportError as e:
 try:
     from cost_intelligence.api import router as cost_estimator_router
 
-    app.include_router(cost_estimator_router)
+    _mount(cost_estimator_router, "cost_estimator")
 except ImportError as e:
     print(f"Warning: Could not import cost_estimator router: {e}")
 
@@ -1911,7 +1936,7 @@ except ImportError as e:
 try:
     from restart_planner.api import router as restart_planner_router
 
-    app.include_router(restart_planner_router)
+    _mount(restart_planner_router, "restart_planner")
 except ImportError as e:
     print(f"Warning: Could not import restart_planner router: {e}")
 
@@ -1919,7 +1944,7 @@ except ImportError as e:
 try:
     from core.prompt_preview_api import router as prompt_preview_router
 
-    app.include_router(prompt_preview_router)
+    _mount(prompt_preview_router, "prompt_preview")
 except ImportError as e:
     print(f"Warning: Could not import prompt_preview router: {e}")
 
@@ -1927,7 +1952,7 @@ except ImportError as e:
 try:
     from timeline.api import router as timeline_router
 
-    app.include_router(timeline_router)
+    _mount(timeline_router, "timeline")
 except ImportError as e:
     print(f"Warning: Could not import timeline router: {e}")
 
@@ -1935,7 +1960,7 @@ except ImportError as e:
 try:
     from progress_indicator.api import router as progress_indicator_router
 
-    app.include_router(progress_indicator_router)
+    _mount(progress_indicator_router, "progress_indicator")
 except ImportError as e:
     print(f"Warning: Could not import progress_indicator router: {e}")
 
@@ -1943,7 +1968,7 @@ except ImportError as e:
 try:
     from qa_promotion.api import router as qa_promotion_router
 
-    app.include_router(qa_promotion_router)
+    _mount(qa_promotion_router, "qa_promotion")
 except ImportError as e:
     print(f"Warning: Could not import qa_promotion router: {e}")
 
@@ -1951,7 +1976,7 @@ except ImportError as e:
 try:
     from workflows.api import router as workflow_profile_router
 
-    app.include_router(workflow_profile_router)
+    _mount(workflow_profile_router, "workflow_profile")
 except ImportError as e:
     print(f"Warning: Could not import workflow_profile router: {e}")
 
@@ -1959,7 +1984,7 @@ except ImportError as e:
 try:
     from slash_commands.api import router as slash_commands_router
 
-    app.include_router(slash_commands_router)
+    _mount(slash_commands_router, "slash_commands")
 except ImportError as e:
     print(f"Warning: Could not import slash_commands router: {e}")
 
@@ -1967,7 +1992,7 @@ except ImportError as e:
 try:
     from parallel_variations.api import router as parallel_variations_router
 
-    app.include_router(parallel_variations_router)
+    _mount(parallel_variations_router, "parallel_variations")
 except ImportError as e:
     print(f"Warning: Could not import parallel_variations router: {e}")
 
@@ -1975,7 +2000,7 @@ except ImportError as e:
 try:
     from virtual_reviewer.api import router as virtual_reviewer_router
 
-    app.include_router(virtual_reviewer_router)
+    _mount(virtual_reviewer_router, "virtual_reviewer")
 except ImportError as e:
     print(f"Warning: Could not import virtual_reviewer router: {e}")
 
@@ -1983,7 +2008,7 @@ except ImportError as e:
 try:
     from test_generation.api import router as test_generation_router
 
-    app.include_router(test_generation_router)
+    _mount(test_generation_router, "test_generation")
 except ImportError as e:
     print(f"Warning: Could not import test_generation router: {e}")
 
@@ -1991,7 +2016,7 @@ except ImportError as e:
 try:
     from runners.github.api import router as github_api_router
 
-    app.include_router(github_api_router)
+    _mount(github_api_router, "github")
 except ImportError as e:
     print(f"Warning: Could not import github api router: {e}")
 
@@ -1999,7 +2024,7 @@ except ImportError as e:
 try:
     from system_status.api import router as system_status_router
 
-    app.include_router(system_status_router)
+    _mount(system_status_router, "system_status")
 except ImportError as e:
     print(f"Warning: Could not import system_status router: {e}")
 
@@ -2007,7 +2032,7 @@ except ImportError as e:
 try:
     from dashboard.api import router as dashboard_router
 
-    app.include_router(dashboard_router)
+    _mount(dashboard_router, "dashboard")
 except ImportError as e:
     print(f"Warning: Could not import dashboard router: {e}")
 
@@ -2015,7 +2040,7 @@ except ImportError as e:
 try:
     from agent_endpoints.api import router as agent_endpoints_router
 
-    app.include_router(agent_endpoints_router)
+    _mount(agent_endpoints_router, "agent_endpoints")
 except ImportError as e:
     print(f"Warning: Could not import agent_endpoints router: {e}")
 
@@ -2023,7 +2048,7 @@ except ImportError as e:
 try:
     from event_hooks.api import router as event_hooks_router
 
-    app.include_router(event_hooks_router)
+    _mount(event_hooks_router, "event_hooks")
 except ImportError as e:
     print(f"Warning: Could not import event_hooks router: {e}")
 
@@ -2031,7 +2056,7 @@ except ImportError as e:
 try:
     from services.notifications.api import router as notifications_router
 
-    app.include_router(notifications_router)
+    _mount(notifications_router, "notifications")
 except ImportError as e:
     print(f"Warning: Could not import notifications router: {e}")
 

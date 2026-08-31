@@ -19,20 +19,27 @@ from server.auth.local import (
     create_local_user,
 )
 from server.auth.oidc import OidcError, provision_entra_user, validate_id_token
+from server.authz.engine import user_organizations
+from server.authz.principal import get_principal
+from server.authz.tenancy import can_act_in
 from server.config import get_settings
 from server.db.engine import get_db
-from server.db.models import AuditLog, User
+from server.db.models import AuditLog, OrgMember, Role, User
 from server.ratelimit import limiter
 from server.schemas import (
     ChangePasswordRequest,
     CreateUserRequest,
     LoginRequest,
     LogoutRequest,
+    MyPermissionsResponse,
     OidcExchangeRequest,
+    OrganizationPublic,
     RefreshRequest,
+    SwitchOrgRequest,
     TokenResponse,
     UserPublic,
 )
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -133,6 +140,75 @@ async def me(
     if db_user is None or not db_user.is_active:
         raise HTTPException(status_code=401, detail="Account is disabled or gone")
     return UserPublic.model_validate(db_user)
+
+
+@router.get("/me/permissions", response_model=MyPermissionsResponse)
+async def my_permissions(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MyPermissionsResponse:
+    """What the caller may do, in the organization they are acting in.
+
+    The desktop app calls this once per session to decide what to show. It is
+    presentation only — hiding a button is not a control, and every route
+    re-checks the same permissions server-side.
+    """
+    principal = get_principal(request)
+    orgs = await user_organizations(db, user.id)
+    memberships = {
+        row.org_id: row.slug
+        for row in await db.execute(
+            select(OrgMember.org_id, Role.slug)
+            .join(Role, Role.id == OrgMember.role_id)
+            .where(OrgMember.user_id == user.id)
+        )
+    }
+
+    org_list = []
+    for org in orgs:
+        item = OrganizationPublic.model_validate(org)
+        item.my_role = memberships.get(org.id)
+        org_list.append(item)
+
+    return MyPermissionsResponse(
+        user_id=user.id,
+        platform_role=principal.platform_role,
+        is_platform_admin=principal.is_platform_admin,
+        org_id=principal.org_id,
+        org_role=principal.org_role_slug,
+        permissions=sorted(principal.permissions),
+        organizations=org_list,
+    )
+
+
+@router.post("/switch-org", response_model=TokenResponse)
+async def switch_org(
+    body: SwitchOrgRequest,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Re-mint a token bound to another organization the caller belongs to.
+
+    Membership is verified here and again on every subsequent request, so a
+    token naming an organization the user has since left grants nothing.
+    """
+    db_user = await db.get(User, user.id)
+    if db_user is None or not db_user.is_active:
+        raise HTTPException(status_code=401, detail="Account is disabled or gone")
+
+    if not await can_act_in(db, user.id, db_user.role, body.org_id):
+        raise HTTPException(status_code=403, detail="Not a member of that organization")
+
+    ua, ip = _client_meta(request)
+    pair = await issue_token_pair(db, db_user, user_agent=ua, ip=ip, org_id=body.org_id)
+    return TokenResponse(
+        access_token=pair.access_token,
+        refresh_token=pair.refresh_token,
+        expires_in=pair.expires_in,
+        user=UserPublic.model_validate(db_user),
+    )
 
 
 @router.post("/users", response_model=UserPublic, status_code=201)
