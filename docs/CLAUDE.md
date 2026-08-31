@@ -76,6 +76,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Conflict Predictor** — AI-powered git conflict prediction
 - **Arena Mode** — Compare AI model outputs side-by-side
 - **MCP Marketplace** — Browse and install Model Context Protocol servers
+- **Multi-Tenancy & RBAC** — In server mode, one deployment serves several isolated organizations, with fine-grained `domain.action` permissions composed into built-in and custom roles, an administration console (members, roles, organizations, invitations, audit, quotas) and a per-tenant control dashboard
 - **Flexible Authentication** — Use a Claude Code subscription (OAuth) or API profiles with any Anthropic-compatible endpoint (e.g., Anthropic API, z.ai for GLM models)
 - **Multi-Account Swapping** — Register multiple Claude accounts; when one hits a rate limit, WorkPilot AI automatically switches to an available account
 - **Cross-Platform** — Native desktop app for Windows, macOS, and Linux with auto-updates
@@ -89,6 +90,8 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 **Platform abstraction** — Never use `process.platform` directly. Import from `apps/frontend/src/main/platform/` or `apps/backend/core/platform/`. CI tests all three platforms.
 
 **No time estimates** — Never provide duration predictions. Use priority-based ordering instead.
+
+**Authorization is the server's job** — In server mode every route carries a permission (`server/authz/`), and the UI only *masks* what the user cannot do. Never treat a hidden button as a control. A client-supplied filesystem path (`project_dir`, `spec_dir`, `file_path`…) is refused outright: identify a project by `project_id` and let the server resolve its own checkout.
 
 **PR target** — Always target the `develop` branch for PRs to krovomi/WorkPilot-AI, NOT `main`.
 
