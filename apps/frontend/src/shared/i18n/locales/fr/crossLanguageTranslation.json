@@ -1,0 +1,36 @@
+{
+	"title": "Traduction inter-langages",
+	"subtitle": "Porter un morceau de code d'un langage à un autre, commentaires et tests compris",
+	"languages": {
+		"heading": "Langages",
+		"source": "Depuis",
+		"target": "Vers"
+	},
+	"options": {
+		"heading": "Options",
+		"preserveComments": "Conserver les commentaires",
+		"generateTests": "Générer les tests"
+	},
+	"editor": {
+		"source": "Source ({{language}})",
+		"result": "Résultat ({{language}})",
+		"placeholder": "Collez ici le code à traduire.",
+		"resultEmpty": "La traduction s'affiche ici une fois lancée.",
+		"translating": "Traduction en cours…"
+	},
+	"history": {
+		"heading": "Historique",
+		"clear": "Vider",
+		"empty": "Aucune traduction pour ce projet."
+	},
+	"historyStatus": {
+		"pending": "En cours",
+		"complete": "Terminée",
+		"failed": "Échouée"
+	},
+	"actions": {
+		"translate": "Traduire",
+		"cancel": "Annuler",
+		"dismiss": "Masquer"
+	}
+}

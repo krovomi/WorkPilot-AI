@@ -59,6 +59,11 @@ import enLearningLoop from "./locales/en/learningLoop.json";
 import enArchitectureVisualizer from "./locales/en/architectureVisualizer.json";
 import enPerformanceProfiler from "./locales/en/performanceProfiler.json";
 import enCodeMigration from "./locales/en/codeMigration.json";
+import enCicdTriggers from "./locales/en/cicdTriggers.json";
+import enCrossLanguageTranslation from "./locales/en/crossLanguageTranslation.json";
+import enSpecApproval from "./locales/en/specApproval.json";
+import enLiveCompanion from "./locales/en/liveCompanion.json";
+import enContextMesh from "./locales/en/contextMesh.json";
 import enMissionControl from "./locales/en/missionControl.json";
 import enMultiRepo from "./locales/en/multiRepo.json";
 import enNaturalLanguageGit from "./locales/en/naturalLanguageGit.json";
@@ -146,6 +151,11 @@ import frLearningLoop from "./locales/fr/learningLoop.json";
 import frArchitectureVisualizer from "./locales/fr/architectureVisualizer.json";
 import frPerformanceProfiler from "./locales/fr/performanceProfiler.json";
 import frCodeMigration from "./locales/fr/codeMigration.json";
+import frCicdTriggers from "./locales/fr/cicdTriggers.json";
+import frCrossLanguageTranslation from "./locales/fr/crossLanguageTranslation.json";
+import frSpecApproval from "./locales/fr/specApproval.json";
+import frLiveCompanion from "./locales/fr/liveCompanion.json";
+import frContextMesh from "./locales/fr/contextMesh.json";
 import frMissionControl from "./locales/fr/missionControl.json";
 import frMultiRepo from "./locales/fr/multiRepo.json";
 import frNaturalLanguageGit from "./locales/fr/naturalLanguageGit.json";
@@ -230,6 +240,11 @@ export const resources = {
 		architectureVisualizer: enArchitectureVisualizer,
 		performanceProfiler: enPerformanceProfiler,
 		codeMigration: enCodeMigration,
+		cicdTriggers: enCicdTriggers,
+		crossLanguageTranslation: enCrossLanguageTranslation,
+		specApproval: enSpecApproval,
+		liveCompanion: enLiveCompanion,
+		contextMesh: enContextMesh,
 		missionControl: enMissionControl,
 		pixelOffice: enPixelOffice,
 		selfHealing: enSelfHealing,
@@ -317,6 +332,11 @@ export const resources = {
 		architectureVisualizer: frArchitectureVisualizer,
 		performanceProfiler: frPerformanceProfiler,
 		codeMigration: frCodeMigration,
+		cicdTriggers: frCicdTriggers,
+		crossLanguageTranslation: frCrossLanguageTranslation,
+		specApproval: frSpecApproval,
+		liveCompanion: frLiveCompanion,
+		contextMesh: frContextMesh,
 		missionControl: frMissionControl,
 		pixelOffice: frPixelOffice,
 		selfHealing: frSelfHealing,
@@ -411,6 +431,11 @@ i18n.use(initReactI18next).init({
 		"architectureVisualizer",
 		"performanceProfiler",
 		"codeMigration",
+		"cicdTriggers",
+		"crossLanguageTranslation",
+		"specApproval",
+		"liveCompanion",
+		"contextMesh",
 		"missionControl",
 		"pixelOffice",
 		"selfHealing",

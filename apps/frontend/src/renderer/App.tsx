@@ -121,6 +121,31 @@ const VisualToCodeHub = lazy(() =>
 		default: m.VisualToCodeHub,
 	})),
 );
+const CICDTriggersDashboard = lazy(() =>
+	import("./components/cicd-triggers/CICDTriggersDashboard").then((m) => ({
+		default: m.CICDTriggersDashboard,
+	})),
+);
+const CrossLanguageTranslationDashboard = lazy(() =>
+	import(
+		"./components/cross-language-translation/CrossLanguageTranslationDashboard"
+	).then((m) => ({ default: m.CrossLanguageTranslationDashboard })),
+);
+const SpecApprovalDashboard = lazy(() =>
+	import("./components/spec-approval/SpecApprovalDashboard").then((m) => ({
+		default: m.SpecApprovalDashboard,
+	})),
+);
+const LiveCompanionDashboard = lazy(() =>
+	import("./components/live-companion/LiveCompanionDashboard").then((m) => ({
+		default: m.LiveCompanionDashboard,
+	})),
+);
+const ContextMeshDashboard = lazy(() =>
+	import("./components/context-mesh/ContextMeshDashboard").then((m) => ({
+		default: m.ContextMeshDashboard,
+	})),
+);
 const DashboardMetrics = lazy(() =>
 	import("./components/DashboardMetrics").then((m) => ({
 		default: m.DashboardMetrics,
@@ -1860,6 +1885,21 @@ export function App() {
 													<PerformanceProfilerDashboard />
 												)}
 												{activeView === "visual-to-code" && <VisualToCodeHub />}
+												{activeView === "cicd-triggers" && (
+													<CICDTriggersDashboard />
+												)}
+												{activeView === "cross-language-translation" && (
+													<CrossLanguageTranslationDashboard />
+												)}
+												{activeView === "spec-approval" && (
+													<SpecApprovalDashboard />
+												)}
+												{activeView === "live-companion" && (
+													<LiveCompanionDashboard />
+												)}
+												{activeView === "context-mesh" && (
+													<ContextMeshDashboard />
+												)}
 												{activeView === "dashboard" &&
 													selectedProject?.path && (
 														<DashboardMetrics
