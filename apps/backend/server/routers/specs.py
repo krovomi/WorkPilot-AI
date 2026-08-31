@@ -11,12 +11,13 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import (
     CurrentUser,
     get_project_role,
     require_project_role,
 )
+from server.authz.principal import get_principal
 from server.db.engine import get_db
 from server.db.models import (
     AgentRun,
@@ -187,11 +188,21 @@ async def start_run(
     project_id: str,
     spec_id: str,
     body: StartRunRequest,
+    request: Request,
     user: CurrentUser = Depends(require_project_role(ProjectRole.MEMBER.value)),
     db: AsyncSession = Depends(get_db),
 ) -> AgentRunPublic:
-    """Launch an agent run on the server. Auto-claims the spec for the caller."""
+    """Launch an agent run on the server. Auto-claims the spec for the caller.
+
+    Requires ``agent.execute`` on top of project membership: starting a run
+    executes code against a repository with file and network tools, which is
+    not the same authority as being able to edit the board.
+    """
     from server.services.run_manager import RunManagerError, get_run_manager
+
+    principal = get_principal(request)
+    if not principal.has("agent.execute"):
+        raise HTTPException(status_code=403, detail="Missing permission: agent.execute")
 
     project = await _get_project_or_404(db, project_id)
     spec = await _get_spec_or_404(db, project_id, spec_id)
@@ -209,6 +220,7 @@ async def start_run(
             phase=body.phase,
             user_id=user.id,
             model=body.model,
+            org_id=project.org_id,
         )
     except RunManagerError as e:
         raise HTTPException(status_code=409, detail=str(e))

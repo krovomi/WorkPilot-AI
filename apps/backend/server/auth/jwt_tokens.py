@@ -43,7 +43,17 @@ def hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def create_access_token(user: User) -> tuple[str, int]:
+def create_access_token(user: User, org_id: str | None = None) -> tuple[str, int]:
+    """Mint an access token.
+
+    ``org`` names the organization the holder was last acting in. It is a
+    *hint*: every request re-checks membership against the database, because a
+    membership can be revoked while a 15-minute token is still valid.
+
+    Permissions are deliberately absent. Putting them in the token would make a
+    revoked permission keep working until the token expired; resolving them per
+    request costs one indexed join and revokes immediately.
+    """
     settings = get_settings()
     ttl = timedelta(minutes=settings.access_token_ttl_minutes)
     now = _utcnow()
@@ -56,6 +66,8 @@ def create_access_token(user: User) -> tuple[str, int]:
         "iat": int(now.timestamp()),
         "exp": int((now + ttl).timestamp()),
     }
+    if org_id:
+        payload["org"] = org_id
     return (
         pyjwt.encode(payload, settings.jwt_secret, algorithm="HS256"),
         int(ttl.total_seconds()),
@@ -82,9 +94,21 @@ async def issue_token_pair(
     user: User,
     user_agent: str | None = None,
     ip: str | None = None,
+    org_id: str | None = None,
 ) -> TokenPair:
-    """Create a new refresh session and return access+refresh tokens."""
+    """Create a new refresh session and return access+refresh tokens.
+
+    ``org_id`` defaults to the user's organization when they belong to exactly
+    one, so the common single-tenant case needs no extra round trip. With
+    several memberships the choice is left to the client, which calls
+    ``POST /auth/switch-org``.
+    """
     settings = get_settings()
+    if org_id is None:
+        from server.authz.engine import default_org_id
+
+        org_id = await default_org_id(db, user.id, user.role)
+
     refresh_token = secrets.token_urlsafe(48)
     db.add(
         AuthSession(
@@ -96,7 +120,7 @@ async def issue_token_pair(
         )
     )
     await db.commit()
-    access_token, expires_in = create_access_token(user)
+    access_token, expires_in = create_access_token(user, org_id=org_id)
     return TokenPair(
         access_token=access_token, refresh_token=refresh_token, expires_in=expires_in
     )
