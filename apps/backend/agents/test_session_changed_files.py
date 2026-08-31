@@ -8,10 +8,17 @@ planner's pre-coding prediction.
 
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 
 import pytest
 from agents.session import _persist_subtask_changed_files
+
+# `analysis.insight_extractor` is reachable under more than one name once the
+# backend and `tests/` are collected in the same run, and a dotted-string
+# `monkeypatch.setattr` resolves the attribute on the *package* — bound only if
+# that exact name was imported first. Patching the module object is unambiguous.
+from analysis import insight_extractor as _insight_extractor
 
 
 class TestPersistSubtaskChangedFiles:
@@ -28,9 +35,19 @@ class TestPersistSubtaskChangedFiles:
             return True
 
         monkeypatch.setattr(
-            "analysis.insight_extractor.get_changed_files", fake_get_changed_files
+            _insight_extractor, "get_changed_files", fake_get_changed_files
         )
-        monkeypatch.setattr("qa.criteria.save_implementation_plan", fake_save)
+        # Resolve `qa.criteria` here, not at module import: while this file is
+        # being collected another test module may still have a MagicMock parked
+        # at `sys.modules["qa"]`, and `from qa import criteria` would then bind
+        # a mock attribute that patching does nothing to — the real save ran and
+        # `fake_save` never did. By the time a test body runs, collection is
+        # over and the name resolves to the module the lazy import will find.
+        monkeypatch.setattr(
+            importlib.import_module("qa.criteria"),
+            "save_implementation_plan",
+            fake_save,
+        )
         return captured
 
     def _run(self, plan: dict, subtask: dict) -> None:
@@ -96,7 +113,7 @@ class TestPersistSubtaskChangedFiles:
         def boom(*_args, **_kwargs):
             raise RuntimeError("git exploded")
 
-        monkeypatch.setattr("analysis.insight_extractor.get_changed_files", boom)
+        monkeypatch.setattr(_insight_extractor, "get_changed_files", boom)
         subtask = {"id": "s1"}
         plan = {"phases": [{"subtasks": [subtask]}]}
 

@@ -153,18 +153,12 @@ def test_find_config_files(tmp_path):
     assert "src/package.json" in config_files
 
 
-def test_get_file_extension():
-    """Test file extension mapping for syntax highlighting."""
-    gatherer = PRContextGatherer(Path("/tmp"), 1)
-
-    assert gatherer._get_file_extension("app.ts") == "typescript"
-    assert gatherer._get_file_extension("utils.tsx") == "typescript"
-    assert gatherer._get_file_extension("script.js") == "javascript"
-    assert gatherer._get_file_extension("script.jsx") == "javascript"
-    assert gatherer._get_file_extension("main.py") == "python"
-    assert gatherer._get_file_extension("config.json") == "json"
-    assert gatherer._get_file_extension("readme.md") == "markdown"
-    assert gatherer._get_file_extension("config.yml") == "yaml"
+# `test_get_file_extension` covered `PRContextGatherer._get_file_extension`, a
+# path-to-language mapping used for syntax-highlighting hints. The method is
+# gone from production and has no successor anywhere in the backend — the whole
+# mapping only survived inside this test's assertions. There is nothing left to
+# assert against, so the test goes with the behaviour it covered rather than
+# being rewritten against an invented replacement.
 
 
 def test_find_imports_typescript(tmp_path):

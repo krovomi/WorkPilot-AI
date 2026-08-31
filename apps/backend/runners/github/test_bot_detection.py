@@ -79,8 +79,18 @@ class TestBotDetectorInit:
     """Test BotDetector initialization."""
 
     def test_init_with_token(self, temp_state_dir):
-        """Test initialization with bot token."""
-        with patch("subprocess.run") as mock_run:
+        """Test initialization with bot token.
+
+        `_get_bot_username` resolves the CLI through `get_gh_executable()`
+        before it ever reaches `subprocess.run`, so on a machine without `gh`
+        it returned None without touching the patched call. Patching both
+        keeps the test about the token-to-username path and off the question
+        of what is installed.
+        """
+        with (
+            patch("bot_detection.get_gh_executable", return_value="/usr/bin/gh"),
+            patch("subprocess.run") as mock_run,
+        ):
             mock_run.return_value = MagicMock(
                 returncode=0,
                 stdout=json.dumps({"login": "my-bot"}),

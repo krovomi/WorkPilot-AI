@@ -6,6 +6,7 @@ import os
 
 import pytest
 
+from src.connectors import llm_config as llm_config_module
 from src.connectors.llm_base import BaseLLMProvider
 from src.connectors.llm_config import (
     delete_provider_config,
@@ -21,8 +22,13 @@ class DummyProvider(BaseLLMProvider):
         self.key = key
 
     def connect(self):
-        if not self.key:
-            raise Exception("Missing key")
+        # `test_provider_validation` expects a rejected key to raise one of
+        # (ValueError, ConnectionError, RuntimeError). This accepted any
+        # non-empty string and raised a bare `Exception` when empty, so the
+        # "invalid key" case never raised at all and the "missing key" case
+        # would not have matched either.
+        if self.key != "valid":
+            raise ValueError(f"Invalid key: {self.key!r}")
 
     def validate(self):
         return self.key == "valid"
@@ -41,7 +47,11 @@ class DummyProvider(BaseLLMProvider):
 
 
 def test_save_and_load_provider_config(tmp_path, monkeypatch):
-    monkeypatch.setattr("src.connectors.llm_config.CONFIG_FILE", tmp_path / "llm.json")
+    # The module object, not the dotted string: `src.connectors.llm_config` is
+    # reachable under more than one name, and the string form resolves the
+    # attribute on the package — bound only if that exact name was imported
+    # first.
+    monkeypatch.setattr(llm_config_module, "CONFIG_FILE", tmp_path / "llm.json")
     save_provider_config("dummy", {"key": "valid"})
     config = load_provider_config("dummy")
     assert config["key"] == "valid"
@@ -51,9 +61,11 @@ def test_save_and_load_provider_config(tmp_path, monkeypatch):
 
 
 def test_discover_llm_providers(monkeypatch):
-    monkeypatch.setattr(
-        "src.connectors.llm_discovery.discover_llm_providers", lambda: [DummyProvider]
-    )
+    # The name is bound in this module at import time, so patching the
+    # attribute on `llm_discovery` left this call pointing at the real
+    # function — which returns the shipped providers, and `AnthropicProvider()`
+    # then failed on its required `api_key`. Patch the name the call uses.
+    monkeypatch.setattr(f"{__name__}.discover_llm_providers", lambda: [DummyProvider])
     providers = discover_llm_providers()
     assert any(p().get_name() == "dummy" for p in providers)
 
