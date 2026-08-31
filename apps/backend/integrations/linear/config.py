@@ -251,7 +251,7 @@ def format_subtask_description(subtask: dict, phase: dict = None) -> str:
 
     # Auto-build metadata
     lines.append("\n---")
-    lines.append("*This issue was created by the Auto-Build Framework*")
+    lines.append("*This issue was created by the WorkPilot AI Framework*")
 
     return "\n".join(lines)
 

@@ -89,7 +89,7 @@ export function GeneralSettings({
 
 	return (
 		<>
-			{/* Auto-Build Integration */}
+			{/* WorkPilot AI Integration */}
 			<section className="space-y-4">
 				<h3 className="text-sm font-semibold text-foreground">
 					{t("projectSections.autoBuild.title")}

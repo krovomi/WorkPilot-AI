@@ -2,7 +2,7 @@
 Linear Integration Manager
 ==========================
 
-Manages synchronization between Auto-Build subtasks and Linear issues.
+Manages synchronization between WorkPilot AI subtasks and Linear issues.
 Provides real-time visibility into build progress through Linear.
 
 The integration is OPTIONAL - if LINEAR_API_KEY is not set, all operations
@@ -35,7 +35,7 @@ from .config import (
 
 class LinearManager:
     """
-    Manages Linear integration for an Auto-Build spec.
+    Manages Linear integration for an WorkPilot AI spec.
 
     This class provides a high-level interface for:
     - Creating/syncing issues from implementation_plan.json

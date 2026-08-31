@@ -22,7 +22,7 @@ This directory contains the refactored components from the original 1,445-line `
 project-settings/
 ├── README.md                         # This file
 ├── index.ts                          # Barrel export for all components
-├── AutoBuildIntegration.tsx          # Auto-Build setup and status
+├── AutoBuildIntegration.tsx          # WorkPilot AI setup and status
 ├── ClaudeAuthSection.tsx             # Claude authentication configuration
 ├── LinearIntegrationSection.tsx      # Linear project management integration
 ├── GitHubIntegrationSection.tsx      # GitHub issues integration
@@ -50,18 +50,18 @@ hooks/
 ### Section Components (Feature-Specific)
 
 #### AutoBuildIntegration.tsx
-**Purpose**: Manages Auto-Build framework initialization and status.
+**Purpose**: Manages WorkPilot AI framework initialization and status.
 **Props**:
-- `autoBuildPath`: Current Auto-Build path
+- `autoBuildPath`: Current WorkPilot AI path
 - `versionInfo`: Version and initialization status
 - `isCheckingVersion`: Loading state
 - `isUpdating`: Update in progress state
-- `onInitialize`: Initialize Auto-Build handler
-- `onUpdate`: Update Auto-Build handler
+- `onInitialize`: Initialize WorkPilot AI handler
+- `onUpdate`: Update WorkPilot AI handler
 
 **Responsibilities**:
 - Display initialization status
-- Show Auto-Build version information
+- Show WorkPilot AI version information
 - Handle initialization and updates
 
 #### ClaudeAuthSection.tsx
@@ -217,7 +217,7 @@ hooks/
 **Returns**:
 - `settings`: Current project settings
 - `setSettings`: Settings updater
-- `versionInfo`: Auto-Build version info
+- `versionInfo`: WorkPilot AI version info
 - `setVersionInfo`: Version info updater
 - `isCheckingVersion`: Loading state
 

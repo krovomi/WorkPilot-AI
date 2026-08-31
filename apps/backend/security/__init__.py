@@ -1,5 +1,5 @@
 """
-Security Module for Auto-Build Framework
+Security Module for WorkPilot AI Framework
 =========================================
 
 Provides comprehensive security features for the WorkPilot AI framework:

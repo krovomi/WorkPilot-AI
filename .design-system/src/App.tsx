@@ -49,7 +49,7 @@ export default function App() {
 				<Card className="rounded-2xl!">
 					<div className="flex items-center justify-between">
 						<div>
-							<h1 className="text-display-medium">Auto-Build Design System</h1>
+							<h1 className="text-display-medium">WorkPilot AI Design System</h1>
 							<p className="text-body-large text-(--color-text-secondary) mt-1">
 								A modern, friendly design system for building beautiful
 								interfaces

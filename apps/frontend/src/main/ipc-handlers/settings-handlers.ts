@@ -994,7 +994,7 @@ export function registerSettingsHandlers(
 	);
 
 	// ============================================
-	// Auto-Build Source Environment Operations
+	// WorkPilot AI Source Environment Operations
 	// ============================================
 
 	/**

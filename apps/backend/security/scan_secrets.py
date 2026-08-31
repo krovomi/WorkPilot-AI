@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Secret Scanning Script for Auto-Build Framework
+Secret Scanning Script for WorkPilot AI Framework
 ================================================
 
 Scans staged git files for potential secrets before commit.

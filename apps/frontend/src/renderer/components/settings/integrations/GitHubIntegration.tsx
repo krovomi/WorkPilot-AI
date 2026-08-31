@@ -386,7 +386,7 @@ export function GitHubIntegration({
 									<code className="px-1 bg-muted rounded">repo</code>{" "}
 									{t("projectSections.github.patHelpAfter")}{" "}
 									<a
-										href="https://github.com/settings/tokens/new?scopes=repo&description=Auto-Build-UI"
+										href="https://github.com/settings/tokens/new?scopes=repo&description=WorkPilot AI-UI"
 										target="_blank"
 										rel="noopener noreferrer"
 										className="text-info hover:underline"

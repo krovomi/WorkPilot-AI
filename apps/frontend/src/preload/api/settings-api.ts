@@ -35,7 +35,7 @@ export interface SettingsAPI {
 	// App Info
 	getAppVersion: () => Promise<string>;
 
-	// Auto-Build Source Environment
+	// WorkPilot AI Source Environment
 	getSourceEnv: () => Promise<IPCResult<SourceEnvConfig>>;
 	updateSourceEnv: (config: {
 		claudeOAuthToken?: string;
@@ -93,7 +93,7 @@ export const createSettingsAPI = (): SettingsAPI => ({
 	getAppVersion: (): Promise<string> =>
 		ipcRenderer.invoke(IPC_CHANNELS.APP_VERSION),
 
-	// Auto-Build Source Environment
+	// WorkPilot AI Source Environment
 	getSourceEnv: (): Promise<IPCResult<SourceEnvConfig>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.AUTOBUILD_SOURCE_ENV_GET),
 

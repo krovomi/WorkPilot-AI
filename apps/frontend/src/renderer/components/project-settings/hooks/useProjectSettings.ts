@@ -463,7 +463,7 @@ export function useProjectSettings(
 	 * Make the repository buildable, then finish what the user asked for.
 	 *
 	 * `initializeGit` creates the repository and/or the first commit — the two
-	 * blockers that stopped initialization — and the Auto-Build initialization
+	 * blockers that stopped initialization — and the WorkPilot AI initialization
 	 * is retried straight away, because "prepare git" was never the goal: the
 	 * user clicked a button that said initialize.
 	 */
