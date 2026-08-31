@@ -189,18 +189,18 @@ class TestRouteCoverage:
     def _load_app():
         """The real application, or skip when its dependencies are absent.
 
-        The ``return`` sits inside the ``try`` on purpose: after a
-        ``pytest.skip`` the name is unbound, and returning it below the
-        ``except`` would only ever work because ``skip`` happens to raise.
-        Binding and returning in the same branch says that outright instead of
-        leaning on a library's control flow.
+        The bare ``raise`` is unreachable — ``pytest.skip`` raises ``Skipped``
+        — and it is there to say so. Without it the ``except`` branch falls off
+        the end and returns ``None``, so the function would depend on a
+        library's control flow to never hand its caller a null app. Making the
+        branch explicitly terminal states the contract instead of relying on it.
         """
         try:
             from provider_api import app
-
-            return app
         except Exception as exc:  # pragma: no cover - dependency-dependent
             pytest.skip(f"provider_api could not be imported: {exc}")
+            raise
+        return app
 
     def _routes(self):
         app = self._load_app()
