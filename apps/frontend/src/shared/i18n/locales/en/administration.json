@@ -1,0 +1,108 @@
+{
+	"title": "Administration",
+	"description": "Organizations, roles, members and quotas for this deployment.",
+	"noAccess": "You do not have access to any administration section.",
+	"tabs": {
+		"overview": "Overview",
+		"members": "Members",
+		"roles": "Roles & permissions",
+		"organizations": "Organizations",
+		"invitations": "Invitations",
+		"audit": "Audit",
+		"quotas": "Quotas"
+	},
+	"common": {
+		"loading": "Loading…",
+		"save": "Save",
+		"cancel": "Cancel",
+		"dismiss": "Dismiss"
+	},
+	"localMode": {
+		"title": "Nothing to administer in local mode",
+		"description": "This installation runs as a single user with full rights. Connect to a WorkPilot server to manage organizations, roles and members."
+	},
+	"overview": {
+		"empty": "No activity to report yet.",
+		"activeRuns": "Active runs",
+		"queued": "{{count}} queued",
+		"failed24h": "Failed (24h)",
+		"of24h": "of {{count}} runs",
+		"members": "Active members",
+		"ofTotal": "of {{count}} total",
+		"projects": "Projects",
+		"specs": "{{count}} specs",
+		"runsByDay": "Runs over the last 7 days",
+		"capacity": "Capacity",
+		"successRate": "Success rate (7 days)",
+		"topUsers": "Most active members",
+		"runsCount": "{{count}} runs",
+		"recentFailures": "Recent failures"
+	},
+	"members": {
+		"empty": "No members yet.",
+		"active": "Active",
+		"inactive": "Disabled",
+		"activate": "Re-enable this account",
+		"deactivate": "Disable this account",
+		"remove": "Remove from the organization",
+		"revokeSessions": "Sign this user out everywhere",
+		"columns": {
+			"user": "User",
+			"role": "Role",
+			"status": "Status",
+			"sessions": "Sessions",
+			"actions": "Actions"
+		}
+	},
+	"roles": {
+		"title": "Roles",
+		"create": "New role",
+		"newRole": "New role",
+		"slug": "Identifier",
+		"name": "Name",
+		"save": "Create",
+		"builtIn": "Built-in",
+		"custom": "Custom",
+		"builtInReadOnly": "Built-in roles cannot be edited, so an upgrade that adds a permission reaches every organization. Create a custom role to define your own.",
+		"permissionCount": "{{count}} permissions",
+		"privileged": "Privileged action",
+		"selectPrompt": "Select a role to see the permissions it grants."
+	},
+	"organizations": {
+		"platformAdminOnly": "Only a platform administrator can manage organizations.",
+		"create": "Create an organization",
+		"name": "Name",
+		"slug": "Identifier",
+		"status": "Status",
+		"actions": "Actions",
+		"active": "Active",
+		"suspended": "Suspended",
+		"current": "Current",
+		"switch": "Switch to",
+		"suspend": "Suspend",
+		"reactivate": "Reactivate"
+	},
+	"audit": {
+		"empty": "No administrative events recorded yet.",
+		"filter": "Filter by action or user",
+		"export": "Export",
+		"columns": {
+			"when": "When",
+			"who": "Who",
+			"action": "Action",
+			"details": "Details"
+		}
+	},
+	"quotas": {
+		"description": "Limits applied to this organization. Leave a field empty for no limit.",
+		"maxUsers": "Maximum members",
+		"maxProjects": "Maximum projects",
+		"maxConcurrentRuns": "Maximum concurrent runs",
+		"monthlyTokenBudget": "Monthly token budget",
+		"unlimited": "Unlimited",
+		"unlimitedUsage": "{{used}} (no limit)",
+		"currentlyUsed": "{{count}} in use",
+		"enforceHardStop": "Block new runs once the token budget is spent",
+		"hardStopHint": "When unchecked, exceeding the budget is reported but runs still start."
+	}
+}
