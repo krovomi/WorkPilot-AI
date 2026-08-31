@@ -101,6 +101,8 @@ for _mod_name in _MODULES_TO_PRESERVE:
 # This list must cover EVERY top-level package name that any test file mocks via
 # sys.modules so the cleanup hook can restore real imports between test files.
 _PROTECTED_PACKAGES = [
+    # Package-qualified backend imports
+    "apps",
     # Core infrastructure
     "core",
     "client",
