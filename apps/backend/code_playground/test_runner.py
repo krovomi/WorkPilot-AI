@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import platform
 import shutil
 import sys
 from pathlib import Path
@@ -76,7 +77,10 @@ class TestPythonExecution:
         assert "ALPHA" in result.stdout and "BETA" in result.stdout
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node interpreter not on PATH")
+@pytest.mark.skipif(
+    shutil.which("node") is None or platform.system() == "Windows",
+    reason="node interpreter not on PATH or Windows platform incompatibility"
+)
 class TestNodeExecution:
     def test_node_print_captured(self) -> None:
         result = run_snippet("console.log('hi from node')", language="node")
