@@ -1207,6 +1207,62 @@ function RequestPanel({
 	const clearResponse = useApiExplorerStore((s) => s.clearResponse);
 	const setIsSendingRequest = useApiExplorerStore((s) => s.setIsSendingRequest);
 	const updateEnvironment = useApiExplorerStore((s) => s.updateEnvironment);
+	const activeProjectId = useProjectStore((s) => s.activeProjectId);
+	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
+	const projectId = activeProjectId ?? selectedProjectId;
+	const secretScope = projectId
+		? `request:${projectId}:${makeEndpointKey(method, path)}`
+		: null;
+	const loadedSecretScope = useRef<string | null>(null);
+
+	useEffect(() => {
+		if (!secretScope) return;
+		let cancelled = false;
+		loadedSecretScope.current = null;
+		void globalThis.electronAPI
+			.loadApiExplorerSecrets(secretScope)
+			.then((requestResult) => {
+			if (cancelled) return;
+			if (requestResult.success && requestResult.data) {
+				setRequestAuth({
+					bearer: requestResult.data.bearer ?? "",
+					password: requestResult.data.password ?? "",
+					keyValue: requestResult.data.keyValue ?? "",
+					oauth2ClientSecret:
+						requestResult.data.oauth2ClientSecret ?? "",
+					oauth2AccessToken: requestResult.data.oauth2AccessToken ?? "",
+				});
+			}
+			loadedSecretScope.current = secretScope;
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		secretScope,
+		setRequestAuth,
+	]);
+
+	useEffect(() => {
+		if (
+			!secretScope || loadedSecretScope.current !== secretScope
+		)
+			return;
+		void globalThis.electronAPI.saveApiExplorerSecrets(secretScope, {
+			bearer: requestAuth.bearer,
+			password: requestAuth.password,
+			keyValue: requestAuth.keyValue,
+			oauth2ClientSecret: requestAuth.oauth2ClientSecret,
+			oauth2AccessToken: requestAuth.oauth2AccessToken,
+		});
+	}, [
+		secretScope,
+		requestAuth.bearer,
+		requestAuth.password,
+		requestAuth.keyValue,
+		requestAuth.oauth2ClientSecret,
+		requestAuth.oauth2AccessToken,
+	]);
 
 	// Extract a token from a JSON response body (common field names)
 	const TOKEN_FIELDS = [
@@ -3083,6 +3139,9 @@ export function ApiExplorer() {
 	const setSpecSource = useApiExplorerStore((s) => s.setSpecSource);
 	const setIsLoadingSpec = useApiExplorerStore((s) => s.setIsLoadingSpec);
 	const setSpecError = useApiExplorerStore((s) => s.setSpecError);
+	const setScannedProjectId = useApiExplorerStore(
+		(s) => s.setScannedProjectId,
+	);
 	const setActiveEnvironment = useApiExplorerStore(
 		(s) => s.setActiveEnvironment,
 	);
@@ -3091,11 +3150,11 @@ export function ApiExplorer() {
 	);
 	const setSearchQuery = useApiExplorerStore((s) => s.setSearchQuery);
 	const toggleTag = useApiExplorerStore((s) => s.toggleTag);
-	const clearRequestState = useApiExplorerStore((s) => s.clearRequestState);
 
 	const [showEnvManager, setShowEnvManager] = useState(false);
 	const [showExport, setShowExport] = useState(false);
 	const [urlInput, setUrlInput] = useState(specUrl);
+	useEffect(() => setUrlInput(specUrl), [specUrl]);
 
 	// Background scan hook — rescan() forces a new scan of the active project
 	const { rescan } = useProjectRouteScan();
@@ -3108,6 +3167,48 @@ export function ApiExplorer() {
 	const emulatorUrl = useAppEmulatorStore((s) => s.url);
 	const emulatorStatus = useAppEmulatorStore((s) => s.status);
 	const updateEnvironment = useApiExplorerStore((s) => s.updateEnvironment);
+	const activeProjectId = useProjectStore((s) => s.activeProjectId);
+	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
+	const currentProjectId = activeProjectId ?? selectedProjectId;
+	const activeEnvironmentKey = activeEnv?.id;
+	const environmentSecretScope =
+		currentProjectId && activeEnvironmentKey
+			? `environment:${currentProjectId}:${activeEnvironmentKey}`
+			: null;
+	const loadedEnvironmentSecretScope = useRef<string | null>(null);
+
+	useEffect(() => {
+		if (!environmentSecretScope || !activeEnvironmentKey) return;
+		let cancelled = false;
+		loadedEnvironmentSecretScope.current = null;
+		updateEnvironment(activeEnvironmentKey, { token: "" });
+		void globalThis.electronAPI
+			.loadApiExplorerSecrets(environmentSecretScope)
+			.then((result) => {
+				if (cancelled) return;
+				if (result.success && result.data) {
+					updateEnvironment(activeEnvironmentKey, {
+						token: result.data.environmentToken ?? "",
+					});
+				}
+				loadedEnvironmentSecretScope.current = environmentSecretScope;
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [environmentSecretScope, activeEnvironmentKey, updateEnvironment]);
+
+	useEffect(() => {
+		if (
+			!environmentSecretScope ||
+			loadedEnvironmentSecretScope.current !== environmentSecretScope
+		)
+			return;
+		void globalThis.electronAPI.saveApiExplorerSecrets(
+			environmentSecretScope,
+			{ environmentToken: activeEnv?.token ?? "" },
+		);
+	}, [environmentSecretScope, activeEnv?.token]);
 
 	// Set up IPC listeners for emulator events
 	useEffect(() => {
@@ -3153,6 +3254,10 @@ export function ApiExplorer() {
 				const data: OpenApiSpec = JSON.parse(result.body ?? "");
 				setSpec(data);
 				setSpecSource("url");
+				const projectState = useProjectStore.getState();
+				setScannedProjectId(
+					projectState.activeProjectId ?? projectState.selectedProjectId,
+				);
 			} catch (err) {
 				setSpecError(String(err));
 				setSpec(null);
@@ -3160,7 +3265,13 @@ export function ApiExplorer() {
 				setIsLoadingSpec(false);
 			}
 		},
-		[setIsLoadingSpec, setSpecError, setSpec, setSpecSource],
+		[
+			setIsLoadingSpec,
+			setSpecError,
+			setSpec,
+			setSpecSource,
+			setScannedProjectId,
+		],
 	);
 
 	function applySpecUrl() {
@@ -3192,7 +3303,6 @@ export function ApiExplorer() {
 
 	function selectEndpoint(method: string, path: string) {
 		setSelectedEndpointKey(makeEndpointKey(method, path));
-		clearRequestState();
 	}
 
 	// Emulator button derived values (avoids nested ternaries in JSX)

@@ -133,14 +133,47 @@ export const DEFAULT_REQUEST_AUTH: RequestAuth = {
 	oauth2HeaderPrefix: "Bearer",
 };
 
+export interface ApiRequestDraft {
+	pathParams: Record<string, string>;
+	queryParams: Record<string, string>;
+	headers: Record<string, string>;
+	body: string;
+	auth: RequestAuth;
+}
+
+const EMPTY_REQUEST_DRAFT: ApiRequestDraft = {
+	pathParams: {},
+	queryParams: {},
+	headers: {},
+	body: "",
+	auth: { ...DEFAULT_REQUEST_AUTH },
+};
+
+function requestDraftKey(projectId: string, endpointKey: string): string {
+	return `${projectId}::${endpointKey}`;
+}
+
+function withoutSecrets(auth: RequestAuth): RequestAuth {
+	return {
+		...auth,
+		bearer: "",
+		password: "",
+		keyValue: "",
+		oauth2ClientSecret: "",
+		oauth2AccessToken: "",
+	};
+}
+
 // ── Store ────────────────────────────────────────────────────────────────────
 
 export type SpecSource = "url" | "scan" | null;
 
 interface ApiExplorerState {
+	activeProjectId: string | null;
 	// Spec
 	spec: OpenApiSpec | null;
 	specUrl: string;
+	specUrlsByProject: Record<string, string>;
 	isLoadingSpec: boolean;
 	specError: string | null;
 	/** Where the current spec came from: 'url' = loaded via URL, 'scan' = scanned from source code */
@@ -169,6 +202,8 @@ interface ApiExplorerState {
 	requestHeaders: Record<string, string>;
 	requestBody: string;
 	requestAuth: RequestAuth;
+	requestDrafts: Record<string, ApiRequestDraft>;
+	selectedEndpointByProject: Record<string, string | null>;
 
 	// Response state
 	responseStatus: number | null;
@@ -198,6 +233,7 @@ interface ApiExplorerState {
 	setActiveEnvironment: (id: string) => void;
 
 	setSelectedEndpointKey: (key: string | null) => void;
+	setActiveProjectContext: (projectId: string | null) => void;
 	setSearchQuery: (query: string) => void;
 	toggleTag: (tag: string) => void;
 
@@ -219,6 +255,28 @@ interface ApiExplorerState {
 	setIsSendingRequest: (sending: boolean) => void;
 }
 
+function updateCurrentDraft(
+	state: ApiExplorerState,
+	updates: Partial<ApiRequestDraft>,
+): Record<string, ApiRequestDraft> {
+	if (!state.activeProjectId || !state.selectedEndpointKey) {
+		return state.requestDrafts;
+	}
+	const key = requestDraftKey(
+		state.activeProjectId,
+		state.selectedEndpointKey,
+	);
+	const existing = state.requestDrafts[key] ?? EMPTY_REQUEST_DRAFT;
+	return {
+		...state.requestDrafts,
+		[key]: {
+			...existing,
+			...updates,
+			auth: updates.auth ?? existing.auth,
+		},
+	};
+}
+
 const DEFAULT_ENVIRONMENTS: ApiEnvironment[] = [
 	{
 		id: "local",
@@ -232,9 +290,11 @@ const DEFAULT_ENVIRONMENTS: ApiEnvironment[] = [
 export const useApiExplorerStore = create<ApiExplorerState>()(
 	persist(
 		(set) => ({
+			activeProjectId: null,
 			// Spec
 			spec: null,
-			specUrl: "http://localhost:9000/openapi.json",
+			specUrl: "",
+			specUrlsByProject: {},
 			isLoadingSpec: false,
 			specError: null,
 			specSource: null,
@@ -260,6 +320,8 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 			requestHeaders: {},
 			requestBody: "",
 			requestAuth: { ...DEFAULT_REQUEST_AUTH },
+			requestDrafts: {},
+			selectedEndpointByProject: {},
 
 			// Response
 			responseStatus: null,
@@ -271,7 +333,13 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 
 			// Spec actions
 			setSpec: (spec) => set({ spec }),
-			setSpecUrl: (specUrl) => set({ specUrl }),
+			setSpecUrl: (specUrl) =>
+				set((state) => ({
+					specUrl,
+					specUrlsByProject: state.activeProjectId
+						? { ...state.specUrlsByProject, [state.activeProjectId]: specUrl }
+						: state.specUrlsByProject,
+				})),
 			setIsLoadingSpec: (isLoadingSpec) => set({ isLoadingSpec }),
 			setSpecError: (specError) => set({ specError }),
 			setSpecSource: (specSource) => set({ specSource }),
@@ -306,12 +374,58 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 				set({ activeEnvironmentId }),
 
 			// Navigation actions
+			setActiveProjectContext: (activeProjectId) =>
+				set((state) => {
+					const selectedEndpointKey = activeProjectId
+						? (state.selectedEndpointByProject[activeProjectId] ?? null)
+						: null;
+					const draft =
+						activeProjectId && selectedEndpointKey
+							? state.requestDrafts[
+									requestDraftKey(activeProjectId, selectedEndpointKey)
+								]
+							: undefined;
+					return {
+						activeProjectId,
+						specUrl: activeProjectId
+							? (state.specUrlsByProject[activeProjectId] ?? "")
+							: "",
+						selectedEndpointKey,
+						requestPathParams: { ...(draft?.pathParams ?? {}) },
+						requestQueryParams: { ...(draft?.queryParams ?? {}) },
+						requestHeaders: { ...(draft?.headers ?? {}) },
+						requestBody: draft?.body ?? "",
+						requestAuth: { ...(draft?.auth ?? DEFAULT_REQUEST_AUTH) },
+						responseStatus: null,
+						responseBody: "",
+						responseTime: null,
+					};
+				}),
 			setSelectedEndpointKey: (selectedEndpointKey) =>
-				set({
-					selectedEndpointKey,
-					responseStatus: null,
-					responseBody: "",
-					responseTime: null,
+				set((state) => {
+					const draft =
+						state.activeProjectId && selectedEndpointKey
+							? state.requestDrafts[
+									requestDraftKey(state.activeProjectId, selectedEndpointKey)
+								]
+							: undefined;
+					return {
+						selectedEndpointKey,
+						selectedEndpointByProject: state.activeProjectId
+							? {
+									...state.selectedEndpointByProject,
+									[state.activeProjectId]: selectedEndpointKey,
+								}
+							: state.selectedEndpointByProject,
+						requestPathParams: { ...(draft?.pathParams ?? {}) },
+						requestQueryParams: { ...(draft?.queryParams ?? {}) },
+						requestHeaders: { ...(draft?.headers ?? {}) },
+						requestBody: draft?.body ?? "",
+						requestAuth: { ...(draft?.auth ?? DEFAULT_REQUEST_AUTH) },
+						responseStatus: null,
+						responseBody: "",
+						responseTime: null,
+					};
 				}),
 			setSearchQuery: (searchQuery) => set({ searchQuery }),
 			toggleTag: (tag) =>
@@ -322,13 +436,40 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 				})),
 
 			// Request actions
-			setRequestPathParams: (requestPathParams) => set({ requestPathParams }),
+			setRequestPathParams: (requestPathParams) =>
+				set((state) => ({
+					requestPathParams,
+					requestDrafts: updateCurrentDraft(state, {
+						pathParams: requestPathParams,
+					}),
+				})),
 			setRequestQueryParams: (requestQueryParams) =>
-				set({ requestQueryParams }),
-			setRequestHeaders: (requestHeaders) => set({ requestHeaders }),
-			setRequestBody: (requestBody) => set({ requestBody }),
+				set((state) => ({
+					requestQueryParams,
+					requestDrafts: updateCurrentDraft(state, {
+						queryParams: requestQueryParams,
+					}),
+				})),
+			setRequestHeaders: (requestHeaders) =>
+				set((state) => ({
+					requestHeaders,
+					requestDrafts: updateCurrentDraft(state, {
+						headers: requestHeaders,
+					}),
+				})),
+			setRequestBody: (requestBody) =>
+				set((state) => ({
+					requestBody,
+					requestDrafts: updateCurrentDraft(state, { body: requestBody }),
+				})),
 			setRequestAuth: (auth) =>
-				set((state) => ({ requestAuth: { ...state.requestAuth, ...auth } })),
+				set((state) => {
+					const requestAuth = { ...state.requestAuth, ...auth };
+					return {
+						requestAuth,
+						requestDrafts: updateCurrentDraft(state, { auth: requestAuth }),
+					};
+				}),
 			clearRequestState: () =>
 				set({
 					requestPathParams: {},
@@ -361,10 +502,17 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 		{
 			name: "api-explorer-store",
 			partialize: (state) => ({
-				specUrl: state.specUrl,
-				environments: state.environments,
+				specUrlsByProject: state.specUrlsByProject,
+				environments: state.environments.map(({ token: _token, ...env }) => env),
 				activeEnvironmentId: state.activeEnvironmentId,
 				collapsedTags: state.collapsedTags,
+				selectedEndpointByProject: state.selectedEndpointByProject,
+				requestDrafts: Object.fromEntries(
+					Object.entries(state.requestDrafts).map(([key, draft]) => [
+						key,
+						{ ...draft, auth: withoutSecrets(draft.auth) },
+					]),
+				),
 			}),
 		},
 	),

@@ -33,9 +33,17 @@ export function useProjectRouteScan() {
 		(s) => s.setLastProjectScanAt,
 	);
 	const setSpecError = useApiExplorerStore((s) => s.setSpecError);
+	const setActiveProjectContext = useApiExplorerStore(
+		(s) => s.setActiveProjectContext,
+	);
 
 	const scan = useCallback(
 		async (projectId: string, projectPath: string, projectName: string) => {
+			setActiveProjectContext(projectId);
+			const explorerState = useApiExplorerStore.getState();
+			if (explorerState.scannedProjectId !== projectId) {
+				setSpec(null);
+			}
 			setIsProjectScanning(true);
 			setProjectScanError(null);
 			try {
@@ -43,6 +51,10 @@ export function useProjectRouteScan() {
 					projectPath,
 					projectName,
 				);
+				const projectState = useProjectStore.getState();
+				const currentProjectId =
+					projectState.activeProjectId ?? projectState.selectedProjectId;
+				if (currentProjectId !== projectId) return;
 				if (result.success && result.data) {
 					// Le scan vient d'un runner Python : le pont le type
 					// `Record<string, unknown>`, ce qui est honnete — personne ne
@@ -57,9 +69,21 @@ export function useProjectRouteScan() {
 					setProjectScanError(result.error ?? "Failed to scan project routes");
 				}
 			} catch (err) {
-				setProjectScanError(String(err));
+				const projectState = useProjectStore.getState();
+				if (
+					(projectState.activeProjectId ?? projectState.selectedProjectId) ===
+					projectId
+				) {
+					setProjectScanError(String(err));
+				}
 			} finally {
-				setIsProjectScanning(false);
+				const projectState = useProjectStore.getState();
+				if (
+					(projectState.activeProjectId ?? projectState.selectedProjectId) ===
+					projectId
+				) {
+					setIsProjectScanning(false);
+				}
 			}
 		},
 		[
@@ -70,6 +94,7 @@ export function useProjectRouteScan() {
 			setScannedProjectId,
 			setLastProjectScanAt,
 			setSpecError,
+			setActiveProjectContext,
 		],
 	);
 

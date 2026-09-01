@@ -11,6 +11,15 @@ export interface ApiExplorerProxyResponse {
 	error?: string;
 }
 
+export interface ApiExplorerSecretValues {
+	bearer?: string;
+	password?: string;
+	keyValue?: string;
+	oauth2ClientSecret?: string;
+	oauth2AccessToken?: string;
+	environmentToken?: string;
+}
+
 export interface ApiExplorerAPI {
 	scanProjectRoutes: (
 		projectPath: string,
@@ -27,6 +36,15 @@ export interface ApiExplorerAPI {
 		headers: Record<string, string>;
 		body?: string;
 	}) => Promise<ApiExplorerProxyResponse>;
+	loadApiExplorerSecrets: (scope: string) => Promise<{
+		success: boolean;
+		data?: ApiExplorerSecretValues;
+		error?: string;
+	}>;
+	saveApiExplorerSecrets: (
+		scope: string,
+		values: ApiExplorerSecretValues,
+	) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const createApiExplorerAPI = (): ApiExplorerAPI => ({
@@ -38,4 +56,8 @@ export const createApiExplorerAPI = (): ApiExplorerAPI => ({
 		),
 	proxyHttpRequest: (payload) =>
 		ipcRenderer.invoke(IPC_CHANNELS.API_EXPLORER_PROXY_REQUEST, payload),
+	loadApiExplorerSecrets: (scope) =>
+		ipcRenderer.invoke(IPC_CHANNELS.API_EXPLORER_LOAD_SECRETS, scope),
+	saveApiExplorerSecrets: (scope, values) =>
+		ipcRenderer.invoke(IPC_CHANNELS.API_EXPLORER_SAVE_SECRETS, scope, values),
 });

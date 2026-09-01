@@ -1,7 +1,11 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { ipcMain, net } from "electron";
+import { app, ipcMain, net, safeStorage } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
+import {
+	ApiExplorerSecretStore,
+	type ApiExplorerSecretValues,
+} from "../api-explorer-secret-store";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -511,6 +515,31 @@ interface ProxyResponse {
 }
 
 export function registerApiExplorerHandlers(): void {
+	const secretStore = new ApiExplorerSecretStore(
+		path.join(app.getPath("userData"), "api-explorer-secrets.json"),
+		safeStorage,
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.API_EXPLORER_LOAD_SECRETS,
+		(_event, scope: string) => {
+			try {
+				return { success: true, data: secretStore.load(scope) };
+			} catch (err) {
+				return { success: false, error: String(err) };
+			}
+		},
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.API_EXPLORER_SAVE_SECRETS,
+		(_event, scope: string, values: ApiExplorerSecretValues) => {
+			try {
+				secretStore.save(scope, values);
+				return { success: true };
+			} catch (err) {
+				return { success: false, error: String(err) };
+			}
+		},
+	);
 	ipcMain.handle(
 		IPC_CHANNELS.API_EXPLORER_SCAN_ROUTES,
 		(_event, projectPath: string, projectName: string) => {
