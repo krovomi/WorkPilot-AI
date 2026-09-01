@@ -120,14 +120,17 @@
 					"tokenLoaded": "Le jeton SSO Windsurf a été automatiquement chargé depuis votre environnement IDE local."
 				},
 				"openaiAuth": {
-					"codexCliAuth": "Utilisez une clé API OpenAI depuis platform.openai.com pour vous connecter.",
-					"oauthNotSupported": "Le token OAuth Codex CLI ne peut pas être utilisé pour les appels API",
-					"oauthExplanation": "OpenAI n'autorise pas les tokens OAuth ChatGPT/Codex CLI pour appeler directement l'API. Une clé API payante (sk-...) avec facturation est requise.",
-					"useApiKeyInstead": "Pour utiliser le provider OpenAI, obtenez une clé API sur platform.openai.com :",
-					"step1": "Aller sur platform.openai.com/api-keys",
-					"step2": "Créer une nouvelle clé API (commence par sk-...)",
-					"step3": "La saisir dans l'onglet \"Clé API\"",
-					"openPlatform": "Ouvrir platform.openai.com"
+					"codexCliAuth": "Réutilisez la session ChatGPT gérée par Codex CLI.",
+					"description": "WorkPilot exécute les tâches OpenAI via Codex CLI. L'authentification reste dans Codex et aucun jeton OAuth n'est copié dans WorkPilot.",
+					"login": "Se connecter avec ChatGPT",
+					"authenticating": "Connexion en cours…",
+					"connected": "Compte connecté",
+					"reconnect": "Se reconnecter",
+					"active": "Authentification Codex CLI active ({{profile}})",
+					"inProgress": "Authentification Codex CLI en cours…",
+					"notConnected": "Aucune authentification Codex CLI active. Connectez-vous d'abord.",
+					"timeout": "Le délai d'authentification Codex CLI est dépassé. Réessayez.",
+					"checkError": "Impossible de vérifier l'authentification Codex CLI."
 				}
 			},
 			"providerToggle": {
