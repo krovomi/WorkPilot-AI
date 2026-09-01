@@ -2102,6 +2102,7 @@ def create_agent_client(
 
     elif provider == "openai":
         from core.agent_client import OpenAIAgentClient
+        from core.codex_cli_client import CodexCliAgentClient, openai_uses_codex_cli
         from core.llm_optimization import (
             build_base_system_prompt,
             openai_prompt_cache_key,
@@ -2128,6 +2129,23 @@ def create_agent_client(
             resolved_openai_model, max_thinking_tokens
         )
         prompt_cache_key = openai_prompt_cache_key(spec_dir, agent_type)
+
+        if openai_uses_codex_cli():
+            logger.info(
+                "[create_agent_client] Using CodexCliAgentClient "
+                "(model=%s, agent_type=%s, reasoning_effort=%s)",
+                resolved_openai_model,
+                agent_type,
+                reasoning_effort,
+            )
+            return CodexCliAgentClient(
+                model=model or None,
+                system_prompt=openai_system_prompt,
+                project_dir=str(project_dir),
+                agent_type=agent_type,
+                reasoning_effort=reasoning_effort,
+                thread_id=resume,
+            )
 
         logger.info(
             "[create_agent_client] Using OpenAIAgentClient (model=%s, agent_type=%s, "

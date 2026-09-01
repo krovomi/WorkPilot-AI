@@ -148,6 +148,15 @@ def _build_client(
 
     if provider == "openai":
         from core.agent_client import OpenAIAgentClient
+        from core.codex_cli_client import CodexCliAgentClient, openai_uses_codex_cli
+
+        if openai_uses_codex_cli():
+            return CodexCliAgentClient(
+                model=None if model == _DEFAULT_MODELS["openai"] else model,
+                system_prompt=system_prompt,
+                project_dir=cwd or str(Path.cwd()),
+                agent_type="commit_message",
+            )
 
         return OpenAIAgentClient(
             model=model,
@@ -263,16 +272,25 @@ async def oneshot_completion(
     )
 
     text = ""
-    async with client:
-        await client.query(prompt)
-        async for msg in client.receive_response():
-            delta = _extract_text(msg)
-            if not delta:
-                continue
-            text += delta
-            if on_delta is not None:
-                try:
-                    on_delta(delta)
-                except Exception:  # noqa: BLE001 — a flaky consumer must not break generation
-                    logger.debug("[oneshot] on_delta callback raised", exc_info=True)
+    try:
+        async with client:
+            await client.query(prompt)
+            async for msg in client.receive_response():
+                delta = _extract_text(msg)
+                if not delta:
+                    continue
+                text += delta
+                if on_delta is not None:
+                    try:
+                        on_delta(delta)
+                    except Exception:  # noqa: BLE001 — a flaky consumer must not break generation
+                        logger.debug(
+                            "[oneshot] on_delta callback raised", exc_info=True
+                        )
+    except Exception as error:  # noqa: BLE001 — one-shot callers own degradation
+        # Do not echo provider diagnostics: they may contain credential material.
+        logger.warning(
+            "[oneshot] provider completion failed (%s)", type(error).__name__
+        )
+        return ""
     return text.strip()
