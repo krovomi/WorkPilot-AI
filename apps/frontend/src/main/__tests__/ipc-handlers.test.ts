@@ -193,6 +193,11 @@ vi.mock("electron", () => {
 			isPackaged: false,
 		},
 		ipcMain: mockIpcMain,
+		safeStorage: {
+			isEncryptionAvailable: vi.fn(() => true),
+			encryptString: vi.fn((value: string) => Buffer.from(value)),
+			decryptString: vi.fn((value: Buffer) => value.toString()),
+		},
 		dialog: {
 			showOpenDialog: vi.fn(() =>
 				Promise.resolve({ canceled: false, filePaths: [TEST_PROJECT_PATH] }),
