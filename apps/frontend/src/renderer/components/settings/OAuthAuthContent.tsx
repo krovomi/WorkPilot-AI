@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle, Loader2, LogIn, Users } from "lucide-react";
+import { CheckCircle, Loader2, LogIn, Users } from "lucide-react";
 import { Button } from "../ui/button";
 import { AuthTerminal } from "./AuthTerminal";
 
@@ -26,7 +26,10 @@ interface OAuthAuthContentProps {
 	readonly authTerminal: AuthTerminalState | null;
 	readonly windsurfAccountInfo: WindsurfAccountInfo | null;
 	readonly windsurfSsoToken: string;
-	readonly testResult: { success: boolean; message: string } | null;
+	readonly openAICodexStatus?: {
+		isAuthenticated: boolean;
+		profileName?: string;
+	};
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 	readonly t: any;
 	readonly onOAuthAuth: () => void;
@@ -45,8 +48,7 @@ export function OAuthAuthContent({
 	authTerminal,
 	windsurfAccountInfo,
 	windsurfSsoToken,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
-	testResult,
+	openAICodexStatus,
 	t,
 	onOAuthAuth,
 	onAuthTerminalClose,
@@ -191,7 +193,17 @@ export function OAuthAuthContent({
 	if (providerId === "openai") {
 		return (
 			<div className="space-y-4">
-				<OpenAICodexAuthContent t={t} />
+				<OpenAICodexAuthContent
+					isAuthenticating={isAuthenticating}
+					authTerminal={authTerminal}
+					isAuthenticated={openAICodexStatus?.isAuthenticated === true}
+					profileName={openAICodexStatus?.profileName}
+					t={t}
+					onOAuthAuth={onOAuthAuth}
+					onAuthTerminalClose={onAuthTerminalClose}
+					onAuthTerminalSuccess={onAuthTerminalSuccess}
+					onAuthTerminalError={onAuthTerminalError}
+				/>
 			</div>
 		);
 	}
@@ -311,52 +323,82 @@ function WindsurfAuthContent({
 	);
 }
 
-function OpenAICodexAuthContent({
+export function OpenAICodexAuthContent({
+	isAuthenticating,
+	authTerminal,
+	isAuthenticated,
+	profileName,
 	t,
+	onOAuthAuth,
+	onAuthTerminalClose,
+	onAuthTerminalSuccess,
+	onAuthTerminalError,
 }: {
+	readonly isAuthenticating: boolean;
+	readonly authTerminal: AuthTerminalState | null;
+	readonly isAuthenticated: boolean;
+	readonly profileName?: string;
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 	readonly t: any;
+	readonly onOAuthAuth: () => void;
+	readonly onAuthTerminalClose: () => void;
+	readonly onAuthTerminalSuccess: (email?: string) => void;
+	readonly onAuthTerminalError: (error: string) => void;
 }) {
+	if (authTerminal) {
+		return (
+			<div
+				className="rounded-lg border border-primary/30 overflow-hidden"
+				style={{ height: "320px" }}
+			>
+				<AuthTerminal
+					terminalId={authTerminal.terminalId}
+					configDir={authTerminal.configDir}
+					profileName={authTerminal.profileName}
+					onClose={onAuthTerminalClose}
+					onAuthSuccess={onAuthTerminalSuccess}
+					onAuthError={onAuthTerminalError}
+				/>
+			</div>
+		);
+	}
+
 	return (
 		<div className="space-y-4">
-			<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
-				<div className="flex items-start gap-2">
-					<AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-					<div className="text-sm text-amber-700 dark:text-amber-400 space-y-1">
-						<p className="font-medium">
-							{t(
-								"sections.accounts.providerConfig.openaiAuth.oauthNotSupported",
-							)}
-						</p>
-						<p className="text-xs text-muted-foreground">
-							{t(
-								"sections.accounts.providerConfig.openaiAuth.oauthExplanation",
-							)}
-						</p>
-					</div>
-				</div>
-			</div>
+			<p className="text-sm text-muted-foreground">
+				{t("sections.accounts.providerConfig.openaiAuth.description")}
+			</p>
 
-			<div className="text-sm text-muted-foreground space-y-2">
-				<p>
-					{t("sections.accounts.providerConfig.openaiAuth.useApiKeyInstead")}
-				</p>
-				<ol className="list-decimal list-inside space-y-1 text-xs">
-					<li>{t("sections.accounts.providerConfig.openaiAuth.step1")}</li>
-					<li>{t("sections.accounts.providerConfig.openaiAuth.step2")}</li>
-					<li>{t("sections.accounts.providerConfig.openaiAuth.step3")}</li>
-				</ol>
-			</div>
+			{isAuthenticated && (
+				<div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+					<div className="flex items-center gap-2 text-sm font-medium">
+						<CheckCircle className="w-4 h-4 text-green-600" />
+						{t("sections.accounts.providerConfig.openaiAuth.connected")}
+					</div>
+					{profileName && <p className="mt-1 text-xs">{profileName}</p>}
+				</div>
+			)}
 
 			<Button
-				variant="outline"
 				className="w-full"
-				onClick={() =>
-					window.open("https://platform.openai.com/api-keys", "_blank")
-				}
+				disabled={isAuthenticating}
+				onClick={onOAuthAuth}
 			>
-				<LogIn className="w-4 h-4 mr-2" />
-				{t("sections.accounts.providerConfig.openaiAuth.openPlatform")}
+				{isAuthenticating ? (
+					<>
+						<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+						{t("sections.accounts.providerConfig.openaiAuth.authenticating")}
+					</>
+				) : (
+					<>
+						<LogIn className="w-4 h-4 mr-2" />
+						{t(
+							isAuthenticated
+								? "sections.accounts.providerConfig.openaiAuth.reconnect"
+								: "sections.accounts.providerConfig.openaiAuth.login",
+						)}
+					</>
+				)}
 			</Button>
 		</div>
 	);

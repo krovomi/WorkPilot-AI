@@ -40,8 +40,10 @@ from core.agent_client import (
     ClaudeAgentClient,
     CopilotAgentClient,
     LocalAgentClient,
+    OpenAIAgentClient,
 )
 from core.client import _get_active_provider
+from core.codex_cli_client import CodexCliAgentClient
 
 # =============================================================================
 # _get_active_provider() Tests
@@ -182,6 +184,37 @@ class TestCreateAgentClient:
         assert isinstance(client, AgentClient)
         assert client.inner is mock_sdk
         mock_create_client.assert_called_once()
+
+    def test_openai_codex_mode_creates_codex_cli_client(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-5.6-sol",
+            provider="openai",
+            resume="thread-previous",
+        )
+
+        assert isinstance(client, CodexCliAgentClient)
+        assert client.provider_name() == "openai-codex-cli"
+        assert client.thread_id == "thread-previous"
+
+    def test_openai_api_mode_keeps_rest_client(self, tmp_path, monkeypatch):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "api-key")
+
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-5.6-sol",
+            provider="openai",
+        )
+
+        assert isinstance(client, OpenAIAgentClient)
 
     @patch("core.client._get_cached_project_data")
     @patch("core.client.load_project_mcp_config")

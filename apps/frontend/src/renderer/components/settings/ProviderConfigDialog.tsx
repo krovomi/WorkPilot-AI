@@ -84,6 +84,10 @@ export function ProviderConfigDialog({
 	const [_isTestPending, setIsTestPending] = useState(false);
 	const [activeTab, setActiveTab] = useState<ActiveTab>("api");
 	const [showApiKey, setShowApiKey] = useState(false);
+	const [codexAuthStatus, setCodexAuthStatus] = useState<{
+		isAuthenticated: boolean;
+		profileName?: string;
+	}>({ isAuthenticated: false });
 
 	const {
 		isAuthenticating,
@@ -99,6 +103,34 @@ export function ProviderConfigDialog({
 		loadWindsurfAccountInfo,
 		setWindsurfAccountInfo,
 	} = useProviderAuth();
+
+	// Refresh an existing Codex CLI session whenever the OAuth tab is opened.
+	// The saved settings label is intentionally ignored: only the main-process
+	// credential check may establish the connected state.
+	useEffect(() => {
+		if (
+			provider?.id !== "openai" ||
+			activeTab !== "oauth" ||
+			authTerminal ||
+			!globalThis.electronAPI?.checkOpenAICodexOAuth
+		) {
+			return;
+		}
+
+		let cancelled = false;
+		void globalThis.electronAPI
+			.checkOpenAICodexOAuth()
+			.then((result) => {
+				if (!cancelled) setCodexAuthStatus(result);
+			})
+			.catch(() => {
+				// The login button remains available when status cannot be checked.
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [provider?.id, activeTab, authTerminal]);
 
 	// Auto-check Codex CLI authentication status when terminal is active
 	// Polls the actual ~/.codex/auth.json file via IPC instead of matching terminal output
@@ -128,15 +160,23 @@ export function ProviderConfigDialog({
 						clearInterval(checkInterval);
 
 						const profileLabel = result.profileName || "Codex CLI";
+						setCodexAuthStatus({
+							isAuthenticated: true,
+							profileName: profileLabel,
+						});
 						setTestResult({
 							success: true,
-							message: `Authentification Codex CLI active (${profileLabel})`,
+							message: t(
+								"sections.accounts.providerConfig.openaiAuth.active",
+								{ profile: profileLabel },
+							),
 						});
 						setIsTestPending(false);
 
 						// Auto-save: persist the OAuth token to settings so provider shows as configured
 						const newSettings = { ...settings };
 						newSettings.globalOpenAICodexOAuthToken = profileLabel;
+						newSettings.globalOpenAIAuthMode = "codex-cli";
 						onSettingsChange(newSettings);
 						onProviderActivated?.(provider.id);
 
@@ -146,13 +186,15 @@ export function ProviderConfigDialog({
 						}, 1500);
 					} else if (checkCount >= maxChecks) {
 						clearInterval(checkInterval);
+						setCodexAuthStatus({ isAuthenticated: false });
 						console.warn(
 							"[ProviderConfigDialog] Codex OAuth check timeout after maximum attempts",
 						);
 						setTestResult({
 							success: false,
-							message:
-								"Authentification Codex CLI timeout. Veuillez réessayer.",
+							message: t(
+								"sections.accounts.providerConfig.openaiAuth.timeout",
+							),
 						});
 						setIsTestPending(false);
 						handleAuthTerminalClose();
@@ -166,8 +208,9 @@ export function ProviderConfigDialog({
 						clearInterval(checkInterval);
 						setTestResult({
 							success: false,
-							message:
-								"Erreur lors de la vérification de l'authentification Codex CLI.",
+							message: t(
+								"sections.accounts.providerConfig.openaiAuth.checkError",
+							),
 						});
 						setIsTestPending(false);
 						handleAuthTerminalClose();
@@ -186,6 +229,7 @@ export function ProviderConfigDialog({
 		onSettingsChange,
 		onProviderActivated,
 		handleAuthTerminalClose,
+		t,
 	]);
 
 	const providerConfig = provider ? providerFields[provider.id] : null;
@@ -303,21 +347,29 @@ export function ProviderConfigDialog({
 
 		// For OpenAI on OAuth tab: persist Codex CLI OAuth state instead of API keys
 		if (provider.id === "openai" && activeTab === "oauth") {
-			if (testResult?.success) {
-				newSettings.globalOpenAICodexOAuthToken =
-					testResult.message || "codex-authenticated";
-			} else if (!newSettings.globalOpenAICodexOAuthToken) {
+			let liveStatus = codexAuthStatus;
+			if (!liveStatus.isAuthenticated) {
 				try {
 					const result =
 						await globalThis.electronAPI?.checkOpenAICodexOAuth?.();
-					if (result?.isAuthenticated) {
-						newSettings.globalOpenAICodexOAuthToken =
-							result.profileName || "codex-authenticated";
-					}
+					liveStatus = result || { isAuthenticated: false };
 				} catch {
-					// IPC not available
+					liveStatus = { isAuthenticated: false };
 				}
 			}
+			if (!liveStatus.isAuthenticated) {
+				setCodexAuthStatus({ isAuthenticated: false });
+				setTestResult({
+					success: false,
+					message: t(
+						"sections.accounts.providerConfig.openaiAuth.notConnected",
+					),
+				});
+				return;
+			}
+			newSettings.globalOpenAIAuthMode = "codex-cli";
+			newSettings.globalOpenAICodexOAuthToken =
+				liveStatus.profileName || "OpenAI Codex CLI";
 			onSettingsChange(newSettings);
 			onProviderActivated?.(provider.id);
 			onOpenChange(false);
@@ -338,6 +390,9 @@ export function ProviderConfigDialog({
 		if (providerConfig.apiKey) {
 			newSettings[providerConfig.apiKey] = formData.apiKey || "";
 			newSettings[`${providerConfig.apiKey}Enabled`] = !!formData.apiKey;
+		}
+		if (provider.id === "openai") {
+			newSettings.globalOpenAIAuthMode = "api-key";
 		}
 		if (providerConfig.apiUrl) {
 			newSettings[providerConfig.apiUrl] = formData.apiUrl || "";
@@ -389,13 +444,16 @@ export function ProviderConfigDialog({
 						await globalThis.electronAPI?.checkOpenAICodexOAuth?.();
 
 					if (result?.isAuthenticated) {
+						setCodexAuthStatus(result);
 						setTestResult({
 							success: true,
-							message: result.profileName
-								? `Authentification Codex CLI active (${result.profileName})`
-								: "Authentification Codex CLI active",
+							message: t(
+								"sections.accounts.providerConfig.openaiAuth.active",
+								{ profile: result.profileName || "OpenAI Codex CLI" },
+							),
 						});
 					} else {
+						setCodexAuthStatus({ isAuthenticated: false });
 						// Check if there's an active Codex authentication terminal
 						const hasActiveCodexTerminal =
 							authTerminal?.terminalId?.startsWith("auth-codex-");
@@ -405,15 +463,17 @@ export function ProviderConfigDialog({
 						if (isAuthenticatingCodex) {
 							setTestResult({
 								success: false,
-								message:
-									"Authentification Codex CLI en cours... Veuillez patienter.",
+								message: t(
+									"sections.accounts.providerConfig.openaiAuth.inProgress",
+								),
 							});
 							setIsTestPending(true);
 						} else {
 							setTestResult({
 								success: false,
-								message:
-									"Aucune authentification Codex CLI détectée. Veuillez vous connecter d'abord.",
+								message: t(
+									"sections.accounts.providerConfig.openaiAuth.notConnected",
+								),
 							});
 						}
 					}
@@ -424,8 +484,9 @@ export function ProviderConfigDialog({
 					);
 					setTestResult({
 						success: false,
-						message:
-							"Erreur lors de la vérification de l'authentification Codex CLI.",
+						message: t(
+							"sections.accounts.providerConfig.openaiAuth.checkError",
+						),
 					});
 				}
 				return;
@@ -565,20 +626,23 @@ export function ProviderConfigDialog({
 									authTerminal={authTerminal}
 									windsurfAccountInfo={windsurfAccountInfo}
 									windsurfSsoToken={windsurfSsoToken}
-									testResult={testResult}
+									openAICodexStatus={codexAuthStatus}
 									t={t}
-									onOAuthAuth={() =>
-										handleOAuthAuth(provider.id, provider.name)
-									}
+									onOAuthAuth={() => {
+										setCodexAuthStatus({ isAuthenticated: false });
+										void handleOAuthAuth(provider.id, provider.name);
+									}}
 									onAuthTerminalClose={handleAuthTerminalClose}
-									onAuthTerminalSuccess={(email) =>
-										handleAuthTerminalSuccess(
-											email,
-											onSettingsChange,
-											settings,
-											provider.id,
-										)
-									}
+									onAuthTerminalSuccess={(email) => {
+										if (provider.id !== "openai") {
+											handleAuthTerminalSuccess(
+												email,
+												onSettingsChange,
+												settings,
+												provider.id,
+											);
+										}
+									}}
 									onAuthTerminalError={handleAuthTerminalError}
 									onWindsurfDetect={async () => {
 										const result = await handleWindsurfDetect();
