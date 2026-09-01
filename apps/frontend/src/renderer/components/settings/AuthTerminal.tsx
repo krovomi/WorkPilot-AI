@@ -227,14 +227,17 @@ export function AuthTerminal({
 							// Determine the appropriate command based on terminal type
 							let command: string;
 							if (isCodexAuth) {
-								command = "codex";
+								command = "codex login";
 							} else if (isCopilotAuth) {
 								command = "copilot update";
 							} else {
 								command = "claude /login";
 							}
 
-							globalThis.electronAPI.sendTerminalInput(terminalId, command);
+							globalThis.electronAPI.sendTerminalInput(
+								terminalId,
+								isCodexAuth ? `${command}\r` : command,
+							);
 						}
 					}, 500);
 				}

@@ -151,6 +151,7 @@ export function useProviderAuth() {
 				const newSettings = { ...settings };
 				newSettings.globalOpenAICodexOAuthToken =
 					email || "codex-authenticated";
+				newSettings.globalOpenAIAuthMode = "codex-cli";
 				onSettingsChange(newSettings);
 			}
 		},

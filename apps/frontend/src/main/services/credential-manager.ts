@@ -5,11 +5,47 @@
  * Fournit une interface unifiée pour le frontend via IPC
  */
 
+import { execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { promisify } from "node:util";
 import type { ProfilesFile } from "../../shared/types/profile";
 import { detectProvider } from "../../shared/utils/provider-detection";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
+import { findExecutable } from "../env-utils";
+import { isWindows } from "../platform";
 import { loadProfilesFile, saveProfilesFile } from "../utils/profile-manager";
+
+const execFileAsync = promisify(execFile);
+
+export async function checkCodexCliLoginStatus(): Promise<boolean> {
+	const codexPath = findExecutable("codex");
+	if (!codexPath) return false;
+
+	try {
+		const options = {
+			encoding: "utf-8" as const,
+			timeout: 5000,
+			windowsHide: true,
+		};
+		if (isWindows() && /\.(cmd|bat)$/i.test(codexPath)) {
+			// Windows file names cannot contain a quote, but guard explicitly
+			// before placing the discovered launcher path inside cmd.exe quotes.
+			if (/["\r\n]/.test(codexPath)) return false;
+			const cmdExe =
+				process.env.ComSpec || String.raw`C:\Windows\System32\cmd.exe`;
+			await execFileAsync(
+				cmdExe,
+				["/d", "/s", "/c", `""${codexPath}" login status"`],
+				options,
+			);
+		} else {
+			await execFileAsync(codexPath, ["login", "status"], options);
+		}
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 export interface CredentialConfig {
 	provider: string;
@@ -77,6 +113,13 @@ export class CredentialManager extends EventEmitter {
 	private profiles: ProfilesFile | null = null;
 	private activeCredential: CredentialConfig | null = null;
 	private readonly usageData: Map<string, UsageData> = new Map();
+
+	constructor(
+		private readonly codexLoginStatusChecker: () => Promise<boolean> =
+			checkCodexCliLoginStatus,
+	) {
+		super();
+	}
 
 	/**
 	 * Initialisation du service
@@ -1060,148 +1103,10 @@ export class CredentialManager extends EventEmitter {
 		isAuthenticated: boolean;
 		profileName?: string;
 	}> {
-		try {
-			const fs = require("node:fs").promises;
-			const path = require("node:path");
-			const os = require("node:os");
-
-			// Source 1: Check Codex CLI config files
-			const candidatePaths = [
-				// Windows: %APPDATA%\codex\auth.json
-				process.env.APPDATA
-					? path.join(process.env.APPDATA, "codex", "auth.json")
-					: null,
-				// Unix/macOS: ~/.config/codex/auth.json
-				path.join(os.homedir(), ".config", "codex", "auth.json"),
-				// Also check ~/.codex/auth.json (alternative location)
-				path.join(os.homedir(), ".codex", "auth.json"),
-				// OpenAI CLI config: ~/.openai/auth.json
-				process.env.APPDATA
-					? path.join(process.env.APPDATA, "openai", "auth.json")
-					: null,
-				path.join(os.homedir(), ".config", "openai", "auth.json"),
-				path.join(os.homedir(), ".openai", "auth.json"),
-			].filter(Boolean) as string[];
-
-			for (const configPath of candidatePaths) {
-				try {
-					const authData = await fs.readFile(configPath, "utf-8");
-					const auth = JSON.parse(authData);
-
-					// Codex CLI stores tokens in a nested `tokens` object:
-					//   { auth_mode, OPENAI_API_KEY, tokens: { id_token, access_token, refresh_token, account_id }, last_refresh }
-					const tokens = auth.tokens || {};
-					const hasAccessToken = !!(tokens.access_token || auth.access_token);
-					const hasRefreshToken = !!(
-						tokens.refresh_token || auth.refresh_token
-					);
-					const hasApiKey = !!(
-						auth.OPENAI_API_KEY?.trim() || auth.api_key?.trim()
-					);
-					const hasAnyAuth = hasAccessToken || hasRefreshToken || hasApiKey;
-
-					if (hasAnyAuth) {
-						// Try to extract email from id_token JWT payload
-						let profileName = auth.email || auth.user || "OpenAI Codex CLI";
-						try {
-							const idToken = tokens.id_token || auth.id_token;
-							if (idToken) {
-								const parts = idToken.split(".");
-								if (parts.length >= 2) {
-									// Base64url decode the payload
-									let payload = parts[1]
-										.replaceAll("-", "+")
-										.replaceAll("_", "/");
-									while (payload.length % 4) payload += "=";
-									const decoded = Buffer.from(payload, "base64").toString(
-										"utf-8",
-									);
-									const claims = JSON.parse(decoded);
-									if (claims.email) {
-										profileName = claims.email;
-									}
-								}
-							}
-						} catch {
-							// JWT decode failed, use fallback name
-						}
-						return {
-							isAuthenticated: true,
-							profileName,
-						};
-					}
-				} catch (error) {
-					// This path doesn't exist, try next
-					// Silently ignore ENOENT errors - missing config files are expected
-					if (
-						error instanceof Error &&
-						"code" in error &&
-						error.code !== "ENOENT"
-					) {
-						// Non-ENOENT errors are intentionally ignored here
-						// as we fall back to other credential sources
-					}
-				}
-			} // Added missing closing brace here
-
-			// Source 2: Check app's own profiles.json for OpenAI API profile
-			try {
-				const profilesFile = await loadProfilesFile();
-				const openaiProfile = profilesFile.profiles.find((p) => {
-					const detected = detectProvider(p.baseUrl);
-					return detected === "openai";
-				});
-				if (
-					openaiProfile?.apiKey &&
-					!isPlaceholderApiKey(openaiProfile.apiKey)
-				) {
-					return {
-						isAuthenticated: true,
-						profileName: openaiProfile.name || "OpenAI (API Key)",
-					};
-				}
-			} catch (error) {
-				console.warn(
-					"[CredentialManager] Failed to check profiles.json:",
-					error,
-				);
-			}
-
-			// Source 3: Check global settings for globalOpenAIApiKey
-			try {
-				const settings = readSettingsFile();
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-				const openaiKey = (settings as any)?.globalOpenAIApiKey as
-					| string
-					| undefined;
-				if (openaiKey?.trim()) {
-					return {
-						isAuthenticated: true,
-						profileName: "OpenAI (API Key)",
-					};
-				}
-
-				// Source 4: Also check for Codex OAuth token in settings
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-				const codexOAuthToken = (settings as any)
-					?.globalOpenAICodexOAuthToken as string | undefined;
-				if (codexOAuthToken?.trim()) {
-					return {
-						isAuthenticated: true,
-						profileName: codexOAuthToken,
-					};
-				}
-			} catch (error) {
-				console.warn("[CredentialManager] Failed to check settings:", error);
-			}
-			return { isAuthenticated: false };
-		} catch (error) {
-			console.warn(
-				"[CredentialManager] Failed to check OpenAI Codex OAuth status:",
-				error,
-			);
-			return { isAuthenticated: false };
-		}
+		const isAuthenticated = await this.codexLoginStatusChecker();
+		return isAuthenticated
+			? { isAuthenticated: true, profileName: "OpenAI Codex CLI" }
+			: { isAuthenticated: false };
 	}
 
 	/**

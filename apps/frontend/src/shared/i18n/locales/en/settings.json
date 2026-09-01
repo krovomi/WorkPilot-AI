@@ -98,14 +98,17 @@
 					"accountFlowActions": "Flow Actions"
 				},
 				"openaiAuth": {
-					"codexCliAuth": "Use an OpenAI API key from platform.openai.com to connect.",
-					"oauthNotSupported": "Codex CLI OAuth cannot be used for API calls",
-					"oauthExplanation": "OpenAI does not allow ChatGPT/Codex CLI OAuth tokens to call the API directly. A paid API key (sk-...) with billing is required.",
-					"useApiKeyInstead": "To use the OpenAI provider, get an API key from platform.openai.com:",
-					"step1": "Go to platform.openai.com/api-keys",
-					"step2": "Create a new API key (starts with sk-...)",
-					"step3": "Enter it in the \"API Key\" tab",
-					"openPlatform": "Open platform.openai.com"
+					"codexCliAuth": "Reuse the ChatGPT session managed by Codex CLI.",
+					"description": "WorkPilot runs OpenAI tasks through Codex CLI. Authentication stays in Codex and no OAuth token is copied into WorkPilot.",
+					"login": "Sign in with ChatGPT",
+					"authenticating": "Signing in…",
+					"connected": "Connected account",
+					"reconnect": "Reconnect",
+					"active": "Codex CLI authentication active ({{profile}})",
+					"inProgress": "Codex CLI authentication is in progress…",
+					"notConnected": "No active Codex CLI authentication. Sign in first.",
+					"timeout": "Codex CLI authentication timed out. Try again.",
+					"checkError": "Could not verify Codex CLI authentication."
 				}
 			},
 			"providerCard": {
