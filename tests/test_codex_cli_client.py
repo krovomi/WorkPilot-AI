@@ -48,7 +48,7 @@ class _FakeProcess:
         self,
         stdout_lines: list[str],
         stderr_lines: list[str] | None = None,
-        returncode: int = 0,
+        returncode: int | None = 0,
     ) -> None:
         self.stdout = _LineReader(stdout_lines)
         self.stderr = _LineReader(stderr_lines or [])
@@ -57,6 +57,8 @@ class _FakeProcess:
         self.terminated = False
 
     async def wait(self) -> int:
+        if self.returncode is None:
+            self.returncode = -15 if self.terminated else 0
         return self.returncode
 
     def terminate(self) -> None:
@@ -64,16 +66,6 @@ class _FakeProcess:
 
     def kill(self) -> None:
         self.terminated = True
-
-
-class _ActiveFakeProcess(_FakeProcess):
-    def __init__(self, stdout_lines: list[str]) -> None:
-        super().__init__(stdout_lines)
-        self.returncode = None
-
-    async def wait(self) -> int:
-        self.returncode = -15 if self.terminated else 0
-        return self.returncode
 
 
 class _ProcessFactory:
@@ -286,14 +278,15 @@ async def test_missing_final_message_is_an_error(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_closing_stream_terminates_active_process(tmp_path: Path) -> None:
-    process = _ActiveFakeProcess(
+    process = _FakeProcess(
         [
             _event(
                 "item.completed",
                 item={"id": "i1", "type": "agent_message", "text": "partial"},
             ),
             _event("turn.completed", usage={}),
-        ]
+        ],
+        returncode=None,
     )
     client = CodexCliAgentClient(
         project_dir=str(tmp_path),
