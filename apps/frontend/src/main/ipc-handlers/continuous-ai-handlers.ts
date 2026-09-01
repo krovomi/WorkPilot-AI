@@ -12,10 +12,14 @@ import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import type { ContinuousAIConfig } from "../../shared/types/continuous-ai";
 import { appLog } from "../app-logger";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
