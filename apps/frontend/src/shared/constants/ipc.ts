@@ -585,6 +585,8 @@ export const IPC_CHANNELS = {
 	API_EXPLORER_SCAN_ROUTES: "apiExplorer:scanRoutes",
 	// API Explorer — HTTP proxy (bypasses renderer CSP)
 	API_EXPLORER_PROXY_REQUEST: "apiExplorer:proxyRequest",
+	API_EXPLORER_LOAD_SECRETS: "apiExplorer:loadSecrets",
+	API_EXPLORER_SAVE_SECRETS: "apiExplorer:saveSecrets",
 
 	// Git operations
 	GIT_GET_BRANCHES: "git:getBranches",
