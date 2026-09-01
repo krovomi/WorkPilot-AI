@@ -77,3 +77,43 @@ describe("CredentialManager OpenAI environment", () => {
 		expect(env.OPENAI_API_KEY).toBe("sk-real-key");
 	});
 });
+
+describe("CredentialManager Codex CLI status", () => {
+	it("does not trust a saved display label when live credentials are absent", async () => {
+		vi.mocked(readSettingsFile).mockReturnValue({
+			globalOpenAICodexOAuthToken: "stale@example.com",
+		});
+		const checkCodexLogin = vi.fn().mockResolvedValue(false);
+
+		const status =
+			await new CredentialManager(
+				checkCodexLogin,
+			).checkOpenAICodexOAuthStatusPublic();
+
+		expect(status).toEqual({ isAuthenticated: false });
+		expect(checkCodexLogin).toHaveBeenCalledOnce();
+	});
+
+	it("does not classify an OpenAI API key as Codex CLI login", async () => {
+		vi.mocked(readSettingsFile).mockReturnValue({
+			globalOpenAIApiKey: "sk-real-key",
+		});
+
+		const status = await new CredentialManager(
+			vi.fn().mockResolvedValue(false),
+		).checkOpenAICodexOAuthStatusPublic();
+
+		expect(status).toEqual({ isAuthenticated: false });
+	});
+
+	it("reports a live Codex CLI session without reading token files", async () => {
+		const status = await new CredentialManager(
+			vi.fn().mockResolvedValue(true),
+		).checkOpenAICodexOAuthStatusPublic();
+
+		expect(status).toEqual({
+			isAuthenticated: true,
+			profileName: "OpenAI Codex CLI",
+		});
+	});
+});
