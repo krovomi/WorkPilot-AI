@@ -9,7 +9,6 @@ import asyncio
 import json
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -44,22 +43,30 @@ class TestCLIStreamingIntegration:
             yield
 
     @pytest.fixture
-    def temp_project_dir(self):
-        """Create a temporary project directory for testing."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            project_path = Path(temp_dir)
+    def temp_project_dir(self, tmp_path: Path):
+        """Create a project whose cleanup is owned by pytest.
 
-            # Create basic project structure
-            (project_path / ".workpilot").mkdir()
-            (project_path / ".workpilot" / "specs").mkdir()
+        ``run_autonomous_agent`` can finish asynchronous finalizers after this
+        fixture yields.  An inline ``TemporaryDirectory`` removed the tree at
+        fixture teardown and sporadically raced with those finalizers in the
+        full suite (``OSError: Directory not empty``).  ``tmp_path`` keeps the
+        directory alive until pytest's session-level cleanup, after the event
+        loop has been drained.
+        """
+        project_path = tmp_path / "project"
+        project_path.mkdir()
 
-            # Create a test spec
-            spec_dir = project_path / ".workpilot" / "specs" / "001-test-streaming"
-            spec_dir.mkdir()
+        # Create basic project structure
+        (project_path / ".workpilot").mkdir()
+        (project_path / ".workpilot" / "specs").mkdir()
 
-            # Create basic spec files
-            (spec_dir / "spec.md").write_text(
-                """
+        # Create a test spec
+        spec_dir = project_path / ".workpilot" / "specs" / "001-test-streaming"
+        spec_dir.mkdir()
+
+        # Create basic spec files
+        (spec_dir / "spec.md").write_text(
+            """
 # Test Streaming Spec
 
 ## Feature
@@ -69,26 +76,26 @@ Test streaming functionality
 - Should emit streaming events
 - Should connect to WebSocket server
 """,
-                encoding="utf-8",
-            )
+            encoding="utf-8",
+        )
 
-            (spec_dir / "task_metadata.json").write_text(
-                json.dumps(
-                    {
-                        "title": "Test Streaming",
-                        "description": "Test streaming functionality",
-                        "phaseModels": {
-                            "spec": "sonnet",
-                            "planning": "sonnet",
-                            "coding": "sonnet",
-                            "qa": "sonnet",
-                        },
-                    }
-                ),
-                encoding="utf-8",
-            )
+        (spec_dir / "task_metadata.json").write_text(
+            json.dumps(
+                {
+                    "title": "Test Streaming",
+                    "description": "Test streaming functionality",
+                    "phaseModels": {
+                        "spec": "sonnet",
+                        "planning": "sonnet",
+                        "coding": "sonnet",
+                        "qa": "sonnet",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
 
-            yield project_path
+        return project_path
 
     def test_parse_args_with_streaming_options(self):
         """Test CLI argument parsing with streaming options."""
