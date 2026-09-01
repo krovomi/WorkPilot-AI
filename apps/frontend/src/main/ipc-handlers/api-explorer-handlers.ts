@@ -104,7 +104,41 @@ function detectDotnet(projectPath: string): DetectedRoute[] {
 
 	for (const filePath of files) {
 		const content = readFile(filePath);
-		if (!content || !/class\s+\w+Controller/.test(content)) continue;
+		if (!content) continue;
+
+		// ASP.NET Core Minimal APIs. Route groups are assigned to variables and
+		// then used just like the root app: `api.MapGet("/items", ...)`.
+		const groupPrefixes = new Map<string, string>();
+		const groupRe = /(?:const|var)\s+(\w+)\s*=\s*\w+\.MapGroup\(\s*["']([^"']*)["']\s*\)/g;
+		let groupMatch: RegExpExecArray | null;
+		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
+		while ((groupMatch = groupRe.exec(content)) !== null) {
+			groupPrefixes.set(groupMatch[1], groupMatch[2]);
+		}
+
+		const minimalRe = /(\w+)\.Map(Get|Post|Put|Delete|Patch)\(\s*["']([^"']*)["']/g;
+		let minimalMatch: RegExpExecArray | null;
+		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
+		while ((minimalMatch = minimalRe.exec(content)) !== null) {
+			const receiver = minimalMatch[1];
+			const prefix = groupPrefixes.get(receiver) ?? "";
+			const routePath = `${prefix}/${minimalMatch[3]}`.replace(/\/+/g, "/");
+			const statementEnd = content.indexOf(";", minimalMatch.index);
+			const statement = content.slice(
+				minimalMatch.index,
+				statementEnd === -1 ? minimalMatch.index + 500 : statementEnd + 1,
+			);
+			routes.push({
+				path: routePath.startsWith("/") ? routePath : `/${routePath}`,
+				methods: [minimalMatch[2].toUpperCase()],
+				tag: prefix.split("/").filter(Boolean).at(-1) ?? "minimal-api",
+				file: path.relative(projectPath, filePath),
+				framework: "ASP.NET Core",
+				requiresAuth: /\.RequireAuthorization\s*\(/.test(statement),
+			});
+		}
+
+		if (!/class\s+\w+Controller/.test(content)) continue;
 
 		// Class-level [Route("...")] + controller name
 		const classMatch = content.match(
@@ -174,6 +208,49 @@ function detectDotnet(projectPath: string): DetectedRoute[] {
 		}
 	}
 	return routes;
+}
+
+const OPENAPI_PATHS_BY_FRAMEWORK: Record<string, string[]> = {
+	"ASP.NET Core": [
+		"/swagger/v1/swagger.json",
+		"/swagger.json",
+		"/openapi/v1.json",
+	],
+};
+
+function detectLiveSpecUrls(
+	projectPath: string,
+	frameworks: string[],
+): string[] {
+	const paths = frameworks.flatMap(
+		(framework) => OPENAPI_PATHS_BY_FRAMEWORK[framework] ?? [],
+	);
+	if (paths.length === 0) return [];
+
+	const launchFiles = walkFiles(projectPath, ["launchSettings.json"], 5);
+	const baseUrls = new Set<string>();
+	for (const launchFile of launchFiles) {
+		const content = readFile(launchFile);
+		if (!content) continue;
+		try {
+			const parsed = JSON.parse(content) as {
+				profiles?: Record<string, { applicationUrl?: string }>;
+			};
+			for (const profile of Object.values(parsed.profiles ?? {})) {
+				for (const url of profile.applicationUrl?.split(";") ?? []) {
+					if (/^https?:\/\//.test(url.trim())) {
+						baseUrls.add(url.trim().replace(/\/$/, ""));
+					}
+				}
+			}
+		} catch {
+			// A malformed launch profile must not prevent source route discovery.
+		}
+	}
+
+	return [...baseUrls].flatMap((baseUrl) =>
+		paths.map((specPath) => `${baseUrl}${specPath}`),
+	);
 }
 
 /** FastAPI / Flask / Django — Python */
@@ -555,7 +632,14 @@ export function registerApiExplorerHandlers(): void {
 				];
 
 				const spec = buildOpenApiSpec(routes, projectName || "Project");
-				return { success: true, data: spec, routeCount: routes.length };
+				const frameworks = [...new Set(routes.map((route) => route.framework))];
+				return {
+					success: true,
+					data: spec,
+					routeCount: routes.length,
+					frameworks,
+					specUrls: detectLiveSpecUrls(projectPath, frameworks),
+				};
 			} catch (err) {
 				return { success: false, error: String(err) };
 			}
