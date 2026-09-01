@@ -3260,7 +3260,9 @@ export function ApiExplorer() {
 				);
 			} catch (err) {
 				setSpecError(String(err));
-				setSpec(null);
+				if (useApiExplorerStore.getState().specSource !== "scan") {
+					setSpec(null);
+				}
 			} finally {
 				setIsLoadingSpec(false);
 			}

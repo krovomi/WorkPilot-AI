@@ -61,4 +61,51 @@ describe("useProjectRouteScan", () => {
 		expect(useApiExplorerStore.getState().spec?.info.title).toBe("test");
 		expect(useApiExplorerStore.getState().scannedProjectId).toBe("test");
 	});
+
+	it("keeps source-discovered endpoints when live OpenAPI URLs are unavailable", async () => {
+		const scanned = spec("Scanned .NET API");
+		const scanProjectRoutes = vi.fn().mockResolvedValue({
+			success: true,
+			data: scanned,
+			specUrls: ["http://localhost:5180/swagger/v1/swagger.json"],
+		});
+		const proxyHttpRequest = vi.fn().mockResolvedValue({
+			success: false,
+			status: 0,
+			statusText: "Network Error",
+		});
+		Object.assign(window.electronAPI, { scanProjectRoutes, proxyHttpRequest });
+
+		renderHook(() => useProjectRouteScan());
+		await act(async () => await Promise.resolve());
+		await act(async () => await Promise.resolve());
+
+		expect(useApiExplorerStore.getState().spec).toEqual(scanned);
+		expect(useApiExplorerStore.getState().specSource).toBe("scan");
+		expect(useApiExplorerStore.getState().specError).toBeNull();
+	});
+
+	it("prefers a live OpenAPI document discovered from the project profile", async () => {
+		const live = spec("Live .NET API");
+		const discoveredUrl = "http://localhost:5180/swagger/v1/swagger.json";
+		const scanProjectRoutes = vi.fn().mockResolvedValue({
+			success: true,
+			data: spec("Scanned .NET API"),
+			specUrls: [discoveredUrl],
+		});
+		const proxyHttpRequest = vi.fn().mockResolvedValue({
+			success: true,
+			status: 200,
+			body: JSON.stringify(live),
+		});
+		Object.assign(window.electronAPI, { scanProjectRoutes, proxyHttpRequest });
+
+		renderHook(() => useProjectRouteScan());
+		await act(async () => await Promise.resolve());
+		await act(async () => await Promise.resolve());
+
+		expect(useApiExplorerStore.getState().spec).toEqual(live);
+		expect(useApiExplorerStore.getState().specSource).toBe("url");
+		expect(useApiExplorerStore.getState().specUrl).toBe(discoveredUrl);
+	});
 });

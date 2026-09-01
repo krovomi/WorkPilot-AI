@@ -28,6 +28,8 @@ export interface ApiExplorerAPI {
 		success: boolean;
 		data?: Record<string, unknown>;
 		routeCount?: number;
+		frameworks?: string[];
+		specUrls?: string[];
 		error?: string;
 	}>;
 	proxyHttpRequest: (payload: {
