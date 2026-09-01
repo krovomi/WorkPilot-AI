@@ -6,11 +6,15 @@
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { app, ipcMain } from "electron";
 import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface ConflictPredictorRequest {
 	projectId: string;
