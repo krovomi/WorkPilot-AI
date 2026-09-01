@@ -269,6 +269,8 @@ export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
 	favoritesExpanded: true,
 };
 
+export type OpenAIAuthMode = "api-key" | "codex-cli";
+
 export interface AppSettings {
 	theme: "light" | "dark" | "system";
 	colorTheme?: ColorTheme;
@@ -286,6 +288,7 @@ export interface AppSettings {
 	// Global API keys (used as defaults for all projects)
 	globalClaudeOAuthToken?: string;
 	globalOpenAICodexOAuthToken?: string;
+	globalOpenAIAuthMode?: OpenAIAuthMode;
 	globalOpenAIApiKey?: string;
 	globalAnthropicApiKey?: string;
 	globalGoogleApiKey?: string;

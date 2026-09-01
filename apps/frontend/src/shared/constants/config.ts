@@ -48,6 +48,7 @@ export const DEFAULT_APP_SETTINGS = {
 	// Global API keys (used as defaults for all projects)
 	globalClaudeOAuthToken: undefined as string | undefined,
 	globalOpenAICodexOAuthToken: undefined as string | undefined,
+	globalOpenAIAuthMode: "api-key" as const,
 	globalOpenAIApiKey: undefined as string | undefined,
 	// Selected agent profile - defaults to 'auto' for per-phase optimized model selection
 	selectedAgentProfile: "auto",

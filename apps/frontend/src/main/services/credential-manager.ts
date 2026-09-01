@@ -1578,6 +1578,14 @@ export class CredentialManager extends EventEmitter {
 				// The active credential from profiles.json may be a Claude profile —
 				// still force SELECTED_LLM_PROVIDER so the backend routes to the right client.
 				env.SELECTED_LLM_PROVIDER = selectedProvider;
+				const openAIAuthMode =
+					selectedProvider === "openai" &&
+					settings?.globalOpenAIAuthMode === "codex-cli"
+						? "codex-cli"
+						: "api-key";
+				if (selectedProvider === "openai") {
+					env.OPENAI_AUTH_MODE = openAIAuthMode;
+				}
 
 				// For Copilot: auth is via `gh auth token` CLI — no extra env vars needed.
 				if (selectedProvider === "copilot") {
@@ -1658,7 +1666,13 @@ export class CredentialManager extends EventEmitter {
 				// Users must provide a real API key (sk-...) from platform.openai.com.
 
 				const envVar = envVarMap[selectedProvider];
-				if (envVar && apiKey) env[envVar] = apiKey;
+				if (
+					envVar &&
+					apiKey &&
+					!(selectedProvider === "openai" && openAIAuthMode === "codex-cli")
+				) {
+					env[envVar] = apiKey;
+				}
 				const baseUrlVar = baseUrlMap[selectedProvider];
 				if (baseUrlVar && baseUrl) env[baseUrlVar] = baseUrl;
 
