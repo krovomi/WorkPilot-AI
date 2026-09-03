@@ -3125,6 +3125,7 @@ export function ApiExplorer() {
 	const isLoadingSpec = useApiExplorerStore((s) => s.isLoadingSpec);
 	const specError = useApiExplorerStore((s) => s.specError);
 	const specSource = useApiExplorerStore((s) => s.specSource);
+	const specFilePath = useApiExplorerStore((s) => s.specFilePath);
 	const isProjectScanning = useApiExplorerStore((s) => s.isProjectScanning);
 	const projectScanError = useApiExplorerStore((s) => s.projectScanError);
 	const lastProjectScanAt = useApiExplorerStore((s) => s.lastProjectScanAt);
@@ -3469,6 +3470,14 @@ export function ApiExplorer() {
 											{t("apiExplorer:scan.sourceBadge")}
 										</span>
 									)}
+									{specSource === "file" && (
+										<span
+											className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded bg-violet-400/10 text-violet-400 border border-violet-400/20"
+											title={specFilePath ?? undefined}
+										>
+											{t("apiExplorer:scan.fileBadge")}
+										</span>
+									)}
 									{specSource === "url" && (
 										<span className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-400/10 text-blue-400 border border-blue-400/20">
 											URL
@@ -3478,6 +3487,9 @@ export function ApiExplorer() {
 								<div className="text-[10px] text-[var(--color-text-muted)] font-mono">
 									v{spec.info.version} · {totalEndpoints}{" "}
 									{t("apiExplorer:sidebar.endpoints")}
+									{specSource === "file" && specFilePath && (
+										<span className="ml-1 opacity-60">· {specFilePath}</span>
+									)}
 									{specSource === "scan" && lastProjectScanAt && (
 										<span className="ml-1 opacity-60">
 											·{" "}

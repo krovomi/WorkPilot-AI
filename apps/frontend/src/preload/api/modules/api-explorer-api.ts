@@ -27,6 +27,10 @@ export interface ApiExplorerAPI {
 	) => Promise<{
 		success: boolean;
 		data?: Record<string, unknown>;
+		/** Where the document came from: a committed spec, or the source scan. */
+		source?: "file" | "scan";
+		/** Project-relative path of the committed spec, when there was one. */
+		specFile?: string;
 		routeCount?: number;
 		filesScanned?: number;
 		frameworks?: string[];

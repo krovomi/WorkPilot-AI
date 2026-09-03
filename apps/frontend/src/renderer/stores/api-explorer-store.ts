@@ -166,7 +166,7 @@ function withoutSecrets(auth: RequestAuth): RequestAuth {
 
 // ── Store ────────────────────────────────────────────────────────────────────
 
-export type SpecSource = "url" | "scan" | null;
+export type SpecSource = "url" | "file" | "scan" | null;
 
 interface ApiExplorerState {
 	activeProjectId: string | null;
@@ -176,8 +176,14 @@ interface ApiExplorerState {
 	specUrlsByProject: Record<string, string>;
 	isLoadingSpec: boolean;
 	specError: string | null;
-	/** Where the current spec came from: 'url' = loaded via URL, 'scan' = scanned from source code */
+	/**
+	 * Where the current spec came from: 'url' = fetched from the running app,
+	 * 'file' = an OpenAPI document committed to the repository, 'scan' =
+	 * inferred from the source code.
+	 */
 	specSource: SpecSource;
+	/** Project-relative path of the committed spec, when `specSource` is 'file'. */
+	specFilePath: string | null;
 
 	// Background project scan state (not persisted)
 	isProjectScanning: boolean;
@@ -219,6 +225,7 @@ interface ApiExplorerState {
 	setIsLoadingSpec: (loading: boolean) => void;
 	setSpecError: (error: string | null) => void;
 	setSpecSource: (source: SpecSource) => void;
+	setSpecFilePath: (path: string | null) => void;
 	setIsProjectScanning: (scanning: boolean) => void;
 	setProjectScanError: (error: string | null) => void;
 	setScannedProjectId: (projectId: string | null) => void;
@@ -298,6 +305,7 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 			isLoadingSpec: false,
 			specError: null,
 			specSource: null,
+			specFilePath: null,
 
 			// Project scan
 			isProjectScanning: false,
@@ -343,6 +351,7 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 			setIsLoadingSpec: (isLoadingSpec) => set({ isLoadingSpec }),
 			setSpecError: (specError) => set({ specError }),
 			setSpecSource: (specSource) => set({ specSource }),
+			setSpecFilePath: (specFilePath) => set({ specFilePath }),
 			setIsProjectScanning: (isProjectScanning) => set({ isProjectScanning }),
 			setProjectScanError: (projectScanError) => set({ projectScanError }),
 			setScannedProjectId: (scannedProjectId) => set({ scannedProjectId }),

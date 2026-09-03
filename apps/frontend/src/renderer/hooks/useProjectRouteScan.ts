@@ -34,6 +34,7 @@ export function useProjectRouteScan() {
 	);
 	const setSpecError = useApiExplorerStore((s) => s.setSpecError);
 	const setSpecUrl = useApiExplorerStore((s) => s.setSpecUrl);
+	const setSpecFilePath = useApiExplorerStore((s) => s.setSpecFilePath);
 	const setActiveProjectContext = useApiExplorerStore(
 		(s) => s.setActiveProjectContext,
 	);
@@ -62,7 +63,10 @@ export function useProjectRouteScan() {
 					// valide la forme au passage. La conversion passe par `unknown`
 					// pour que ce saut de foi soit visible plutot qu'implicite.
 					setSpec(result.data as unknown as OpenApiSpec);
-					setSpecSource("scan");
+					// The handler says where the document came from: a spec committed
+					// to the repository when there is one, the source scan otherwise.
+					setSpecSource(result.source ?? "scan");
+					setSpecFilePath(result.specFile ?? null);
 					setSpecError(null);
 					setScannedProjectId(projectId);
 					setLastProjectScanAt(Date.now());
@@ -94,6 +98,7 @@ export function useProjectRouteScan() {
 							}
 							setSpec(liveSpec);
 							setSpecSource("url");
+							setSpecFilePath(null);
 							setSpecUrl(specUrl);
 							break;
 						} catch {
@@ -130,6 +135,7 @@ export function useProjectRouteScan() {
 			setLastProjectScanAt,
 			setSpecError,
 			setSpecUrl,
+			setSpecFilePath,
 			setActiveProjectContext,
 		],
 	);

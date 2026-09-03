@@ -16,6 +16,8 @@ async function scan(project: string, name: string): Promise<{
 	};
 	routeCount: number;
 	filesScanned: number;
+	source?: "file" | "scan";
+	specFile?: string;
 	frameworks: string[];
 	specUrls: string[];
 	error?: string;
@@ -161,5 +163,63 @@ public class OrdersController : ControllerBase
 		expect(result.success).toBe(true);
 		expect(result.routeCount).toBe(0);
 		expect(result.filesScanned).toBe(1);
+	});
+
+	it("prefers a spec committed to the repository over the source scan", async () => {
+		const project = mkdtempSync(path.join(tmpdir(), "workpilot-dotnet-"));
+		tempProjects.push(project);
+		mkdirSync(path.join(project, "Controllers"), { recursive: true });
+		writeFileSync(
+			path.join(project, "Controllers", "ThingsController.cs"),
+			`[Route("api/[controller]")]
+public class ThingsController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok();
+}`,
+		);
+		writeFileSync(
+			path.join(project, "openapi.yaml"),
+			`openapi: 3.0.3
+info:
+  title: Things
+  version: "2.0.0"
+paths:
+  /v2/things:
+    get:
+      summary: The document the team actually maintains
+      responses:
+        "200":
+          description: OK
+`,
+		);
+
+		const result = await scan(project, "Things");
+
+		expect(result.source).toBe("file");
+		expect(result.specFile).toBe("openapi.yaml");
+		expect(Object.keys(result.data.paths)).toEqual(["/v2/things"]);
+		expect(result.routeCount).toBe(1);
+	});
+
+	it("falls back to the source scan when no spec is committed", async () => {
+		const project = mkdtempSync(path.join(tmpdir(), "workpilot-dotnet-"));
+		tempProjects.push(project);
+		mkdirSync(path.join(project, "Controllers"), { recursive: true });
+		writeFileSync(
+			path.join(project, "Controllers", "ThingsController.cs"),
+			`[Route("api/[controller]")]
+public class ThingsController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok();
+}`,
+		);
+
+		const result = await scan(project, "Things");
+
+		expect(result.source).toBe("scan");
+		expect(result.specFile).toBeUndefined();
+		expect(Object.keys(result.data.paths)).toEqual(["/api/Things"]);
 	});
 });

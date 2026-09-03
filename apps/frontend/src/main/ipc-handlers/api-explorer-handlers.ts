@@ -2,6 +2,7 @@ import path from "node:path";
 import { app, ipcMain, net, safeStorage } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import { detectDotnet } from "../api-explorer/dotnet";
+import { findCommittedSpec } from "../api-explorer/spec-files";
 import {
 	readDirectory,
 	readFile,
@@ -510,16 +511,23 @@ export function registerApiExplorerHandlers(): void {
 					...detectRails(projectPath),
 				];
 
-				const spec = buildOpenApiSpec(
+				const scanned = buildOpenApiSpec(
 					routes,
 					projectName || "Project",
 					dotnet.schemas,
 				);
 				const frameworks = [...new Set(routes.map((route) => route.framework))];
+
+				// A description the team wrote and versions beats anything inferred
+				// from source: it states the paths, parameters and schemas outright.
+				const committed = findCommittedSpec(projectPath);
+
 				return {
 					success: true,
-					data: spec,
-					routeCount: routes.length,
+					data: committed?.document ?? scanned,
+					source: committed ? "file" : "scan",
+					specFile: committed?.relativePath,
+					routeCount: committed ? committed.pathCount : routes.length,
 					filesScanned: dotnet.filesScanned,
 					frameworks,
 					specUrls: detectLiveSpecUrls(projectPath, frameworks),
