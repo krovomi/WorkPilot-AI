@@ -37,7 +37,7 @@ pandas>=3.0.5; python_version >= "3.12"
 pywin32>=312; sys_platform == "win32"
 
 # Google AI (optional - for Gemini LLM and embeddings)
-google-generativeai>=0.8.0
+google-generativeai>=0.8.6
 
 # Pydantic for structured output schemas
 pydantic>=2.13.4
