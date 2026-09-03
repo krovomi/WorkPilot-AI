@@ -205,6 +205,8 @@
 		"organization": "Organization",
 		"pat": "PAT",
 		"fillRequiredFields": "Please fill all required fields",
+		"locationMustBeLocalPath": "The location must be a local path, not a repository URL. Click “Browse” to pick a folder.",
+		"willBeCreatedAt": "Will be created at",
 		"successTitle": "Project Created",
 		"successDescription": "The project has been successfully created and configured.",
 		"failedToCreateTitle": "Creation Error",

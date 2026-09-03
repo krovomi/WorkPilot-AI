@@ -205,6 +205,8 @@
 		"organization": "Organisation",
 		"pat": "PAT",
 		"fillRequiredFields": "Veuillez remplir tous les champs obligatoires",
+		"locationMustBeLocalPath": "L’emplacement doit être un chemin local, pas une URL de dépôt. Cliquez sur « Parcourir » pour choisir un dossier.",
+		"willBeCreatedAt": "Sera créé dans",
 		"successTitle": "Projet créé",
 		"successDescription": "Le projet a bien été créé et configuré.",
 		"failedToCreateTitle": "Erreur lors de la création",

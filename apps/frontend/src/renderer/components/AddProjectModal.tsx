@@ -1,6 +1,10 @@
 import type { Project } from "@shared/types/project";
+import {
+	joinProjectPath,
+	sanitizeProjectFolderName,
+} from "@shared/utils/project-folder-name";
 import { Radio } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { Globe } from "@/lib/icons";
@@ -279,11 +283,21 @@ export function AddProjectModal({
 		return "unknown";
 	}, []);
 
+	// The folder the main process will actually create. It kebab-cases the
+	// name and folds its accents, so the raw input pointed every git probe at
+	// a path that does not exist — "POC Dotnet New" is created as
+	// "poc-dotnet-new".
+	const targetProjectPath = useMemo(() => {
+		const folderName = sanitizeProjectFolderName(projectName);
+		if (!projectLocation || !folderName) return null;
+		return joinProjectPath(projectLocation, folderName);
+	}, [projectLocation, projectName]);
+
 	// Auto-detect repository type when project path changes
 	useEffect(() => {
 		const autoDetectProvider = async () => {
-			if (projectLocation && projectName && step === 0) {
-				const projectPath = `${projectLocation}/${projectName.trim()}`;
+			if (targetProjectPath && step === 0) {
+				const projectPath = targetProjectPath;
 
 				// Check if it's an existing git repository
 				const gitStatus =
@@ -313,13 +327,7 @@ export function AddProjectModal({
 		};
 
 		autoDetectProvider();
-	}, [
-		projectLocation,
-		projectName,
-		step,
-		providerSelected,
-		detectRepositoryProvider,
-	]);
+	}, [targetProjectPath, step, providerSelected, detectRepositoryProvider]);
 
 	// Determine which provider options to show.
 	// Jira is always offered as an explicit option because it cannot be detected from a git remote.
@@ -389,6 +397,12 @@ export function AddProjectModal({
 							{t("addProject.browse")}
 						</Button>
 					</div>
+					{targetProjectPath && (
+						<p className="text-xs text-muted-foreground">
+							{t("addProject.willBeCreatedAt")}{" "}
+							<span className="font-mono">{targetProjectPath}</span>
+						</p>
+					)}
 				</div>
 				<div className="space-y-2">
 					<label className="flex items-center gap-2">
@@ -661,9 +675,7 @@ export function AddProjectModal({
 
 		// Check if projectLocation is a repository URL instead of a local path
 		if (isRepositoryUrl(projectLocation)) {
-			setError(
-				"L'emplacement doit être un chemin local, pas une URL de repository. Cliquez sur 'Parcourir' pour sélectionner un dossier.",
-			);
+			setError(t("addProject.locationMustBeLocalPath"));
 			return;
 		}
 
@@ -821,9 +833,9 @@ export function AddProjectModal({
 										} else if (remoteType === "jira") {
 											// Jira has no git remote config — credentials are set later in settings.
 											setStep(1);
-										} else if (projectLocation && projectName) {
+										} else if (targetProjectPath) {
 											// Auto-detect repository type for existing git repositories
-											const projectPath = `${projectLocation}/${projectName.trim()}`;
+											const projectPath = targetProjectPath;
 
 											// Check if .git directory exists (indicating an existing repository)
 											try {
@@ -889,8 +901,8 @@ export function AddProjectModal({
 						onSave={async (config: AzureDevOpsConfig) => {
 							setRemoteConfig(config);
 							setShowRemoteConfigModal(false);
-							if (projectLocation && projectName) {
-								const projectPath = `${projectLocation}/${projectName.trim()}`;
+							if (targetProjectPath) {
+								const projectPath = targetProjectPath;
 								const status =
 									await globalThis.electronAPI.checkGitStatus(projectPath);
 
@@ -922,8 +934,8 @@ export function AddProjectModal({
 						onSave={async (config: GitHubConfig) => {
 							setRemoteConfig(config);
 							setShowRemoteConfigModal(false);
-							if (projectLocation && projectName) {
-								const projectPath = `${projectLocation}/${projectName.trim()}`;
+							if (targetProjectPath) {
+								const projectPath = targetProjectPath;
 								const status =
 									await globalThis.electronAPI.checkGitStatus(projectPath);
 								if (
