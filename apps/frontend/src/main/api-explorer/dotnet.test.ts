@@ -2,6 +2,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+	SchemaFactory,
+	type TypeDeclaration,
+	parseTypeName,
+} from "./csharp-types";
 import { detectDotnet, normalizeRouteTemplate } from "./dotnet";
 import type { DetectedRoute, JsonSchema } from "./types";
 
@@ -130,6 +135,47 @@ describe("normalizeRouteTemplate", () => {
 			{ name: "id", schema: { type: "integer", format: "int32" }, required: true },
 			{ name: "slug", schema: { type: "string" }, required: false },
 		]);
+	});
+});
+
+describe("C# type parsing", () => {
+	it("reads array suffixes, multi-dimensional ones included", () => {
+		expect(parseTypeName("int[]")).toMatchObject({
+			name: "int",
+			isArray: true,
+		});
+		expect(parseTypeName("string[ , ]")).toMatchObject({
+			name: "string",
+			isArray: true,
+		});
+		expect(parseTypeName("List<Foo?>?")).toMatchObject({
+			name: "List",
+			genericArguments: ["Foo?"],
+			isNullable: true,
+		});
+	});
+
+	it("does not backtrack over a declaration full of unclosed brackets", () => {
+		const types: Map<string, TypeDeclaration> = new Map([
+			[
+				"Pathological",
+				{
+					kind: "class",
+					name: "Pathological",
+					typeParameters: [],
+					// The witness CodeQL reported for the property pattern: an
+					// array suffix whose brackets never close. With an ambiguous
+					// `\s*,*\s*` this takes seconds at 30 repetitions and doubles
+					// with each one after that.
+					body: `\npublic\t.[${"\t][".repeat(30)}`,
+				},
+			],
+		]);
+
+		const started = Date.now();
+		new SchemaFactory(types).fromType("Pathological");
+
+		expect(Date.now() - started).toBeLessThan(1000);
 	});
 });
 

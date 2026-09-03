@@ -194,6 +194,14 @@ export interface ParsedType {
 	isArray: boolean;
 }
 
+/**
+ * Splits a C# type reference into its parts.
+ *
+ * The array suffix — `[]` through `[ , , ]` — is matched with the comma group
+ * entered only on a literal `,`. The obvious `\s*,*\s*` lets the whitespace of
+ * a bracket be split two ways, and two parses per bracket is exponential over
+ * a type whose brackets never close.
+ */
 export function parseTypeName(raw: string): ParsedType {
 	let text = raw.trim().replace(/^global::/, "");
 	let isNullable = false;
@@ -203,9 +211,9 @@ export function parseTypeName(raw: string): ParsedType {
 		isNullable = true;
 		text = text.slice(0, -1).trim();
 	}
-	while (/\[\s*,*\s*\]$/.test(text)) {
+	while (/\[\s*(?:,\s*)*\]$/.test(text)) {
 		isArray = true;
-		text = text.replace(/\[\s*,*\s*\]$/, "").trim();
+		text = text.replace(/\[\s*(?:,\s*)*\]$/, "").trim();
 		while (text.endsWith("?")) text = text.slice(0, -1).trim();
 	}
 
@@ -287,7 +295,7 @@ export class SchemaFactory {
 
 		if (parsed.isArray) {
 			if (lower === "byte") return { type: "string", format: "byte" };
-			const item = substituted.replace(/\?*\s*\[\s*,*\s*\]\s*$/, "");
+			const item = substituted.replace(/\?*\s*\[\s*(?:,\s*)*\]\s*$/, "");
 			return { type: "array", items: this.build(item, substitutions, stack) };
 		}
 
@@ -399,7 +407,8 @@ function enumMembers(body: string): string[] {
  * `\s+` that follows it, that shape backtracks quadratically over a long line
  * that never reaches the `{ get` lookahead. It is also kept as a literal —
  * inside a template literal, `\s` reads as a useless escape the formatter
- * removes on sight, which would quietly defuse the pattern.
+ * removes on sight, which would quietly defuse the pattern. Its array suffix
+ * is the unambiguous one `parseTypeName` documents, for the same reason.
  */
 function declarationMembers(declaration: TypeDeclaration): DeclarationMember[] {
 	const members: DeclarationMember[] = [];
@@ -416,7 +425,7 @@ function declarationMembers(declaration: TypeDeclaration): DeclarationMember[] {
 
 	const body = declaration.body ?? "";
 	const propertyRe =
-		/(?:^|\n)[ \t]*public\s+((?:(?:virtual|override|new|required|sealed|readonly|static|const|abstract|extern|unsafe)\s+)*)([\w.]+(?:<[^<>]*(?:<[^<>]*>[^<>]*)*>)?(?:\?|\[\s*,*\s*\])*)\s+(\w+)\s*(?=\{\s*(?:get|set|init))/g;
+		/(?:^|\n)[ \t]*public\s+((?:(?:virtual|override|new|required|sealed|readonly|static|const|abstract|extern|unsafe)\s+)*)([\w.]+(?:<[^<>]*(?:<[^<>]*>[^<>]*)*>)?(?:\?|\[\s*(?:,\s*)*\])*)\s+(\w+)\s*(?=\{\s*(?:get|set|init))/g;
 	let match: RegExpExecArray | null;
 	// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
 	while ((match = propertyRe.exec(body)) !== null) {
