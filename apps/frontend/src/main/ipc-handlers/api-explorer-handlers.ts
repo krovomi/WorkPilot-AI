@@ -2,6 +2,8 @@ import path from "node:path";
 import { app, ipcMain, net, safeStorage } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import { detectDotnet } from "../api-explorer/dotnet";
+import { detectNode } from "../api-explorer/node";
+import { detectPython } from "../api-explorer/python";
 import {
 	buildProbeUrls,
 	discoverBaseUrls,
@@ -28,102 +30,6 @@ import {
 // ASP.NET Core lives in ../api-explorer/dotnet.ts: it reads action signatures
 // and DTOs, so it needs more than a regex sweep. The detectors below stay
 // declaration-level on purpose.
-
-/** FastAPI / Flask / Django — Python */
-function detectPython(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".py"]);
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content) continue;
-		const tag = path.basename(filePath, ".py");
-
-		// FastAPI: @app.get("/path") @router.post("/path")
-		const fastapiRe =
-			/@(?:app|router)\.(get|post|put|delete|patch)\(["']([^"']+)["']/g;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = fastapiRe.exec(content)) !== null) {
-			routes.push({
-				path: m[2],
-				methods: [m[1].toUpperCase()],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "FastAPI",
-				requiresAuth: /Depends/.test(content.slice(m.index, m.index + 120)),
-			});
-		}
-
-		// Flask: @app.route("/path", methods=["GET","POST"])
-		const flaskRe =
-			/@(?:app|bp|blueprint)\.route\(["']([^"']+)["'](?:[^)]*methods\s*=\s*\[([^\]]+)\])?/g;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = flaskRe.exec(content)) !== null) {
-			const methods = m[2]
-				? m[2]
-						.split(",")
-						.map((x) => x.trim().replace(/["']/g, "").toUpperCase())
-				: ["GET"];
-			routes.push({
-				path: m[1],
-				methods,
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "Flask",
-				requiresAuth: /login_required/.test(
-					content.slice(Math.max(0, m.index - 100), m.index),
-				),
-			});
-		}
-	}
-	return routes;
-}
-
-/** Express / Fastify / NestJS — TypeScript / JavaScript */
-function detectExpress(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".ts", ".js", ".mts", ".mjs"]);
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content) continue;
-		const tag = path.basename(filePath).replace(/\.(ts|js|mts|mjs)$/, "");
-
-		// Express/Fastify: router.get('/path', ...)  app.post('/path', ...)
-		const expressRe =
-			/(?:app|router|server)\.(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']/g;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = expressRe.exec(content)) !== null) {
-			routes.push({
-				path: m[2],
-				methods: [m[1].toUpperCase()],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "Express",
-				requiresAuth: false,
-			});
-		}
-
-		// NestJS decorators: @Get('/path') @Post('/path') etc.
-		const nestRe =
-			/@(Get|Post|Put|Delete|Patch)\s*\(\s*["']?([^"')\s]*)["']?\s*\)/g;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = nestRe.exec(content)) !== null) {
-			const p = m[2] ? (m[2].startsWith("/") ? m[2] : `/${m[2]}`) : "/";
-			routes.push({
-				path: p,
-				methods: [m[1].toUpperCase()],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "NestJS",
-				requiresAuth: false,
-			});
-		}
-	}
-	return routes;
-}
 
 /** Spring Boot — Java */
 function detectSpring(projectPath: string): DetectedRoute[] {
@@ -502,7 +408,7 @@ export function registerApiExplorerHandlers(): void {
 				const routes: DetectedRoute[] = [
 					...dotnet.routes,
 					...detectPython(projectPath),
-					...detectExpress(projectPath),
+					...detectNode(projectPath),
 					...detectSpring(projectPath),
 					...detectGo(projectPath),
 					...detectRust(projectPath),
