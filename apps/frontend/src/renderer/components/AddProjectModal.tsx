@@ -353,11 +353,28 @@ export function AddProjectModal({
 	const renderStep0 = () => (
 		<>
 			<DialogHeader>
-				<DialogTitle>{t("addProject.createNewTitle")}</DialogTitle>
-				<DialogDescription>
-					{t("addProject.createNewSubtitle")}
-				</DialogDescription>
+				<DialogTitle>{t("addProject.title")}</DialogTitle>
+				<DialogDescription>{t("addProject.chooseHow")}</DialogDescription>
 			</DialogHeader>
+			<div className="pt-4">
+				<Button
+					type="button"
+					variant="outline"
+					className="w-full h-auto justify-start py-3"
+					aria-label={t("addProject.openExistingAriaLabel")}
+					onClick={handleOpenExisting}
+				>
+					<span className="flex flex-col items-start gap-0.5 text-left">
+						<span className="font-medium">{t("addProject.openExisting")}</span>
+						<span className="text-xs font-normal text-muted-foreground">
+							{t("addProject.openExistingDescription")}
+						</span>
+					</span>
+				</Button>
+			</div>
+			<div className="pt-4 text-xs font-medium text-muted-foreground">
+				{t("addProject.orCreateNew")}
+			</div>
 			<div className="py-4 space-y-4">
 				<div className="space-y-2">
 					<Label htmlFor="project-name">{t("addProject.projectName")}</Label>
@@ -665,6 +682,43 @@ export function AddProjectModal({
 			</div>
 		</div>
 	);
+
+	// Ajout d'un projet déjà présent sur le disque. Rien n'est créé : le dossier
+	// est enregistré tel quel. C'était jusqu'ici accessible par le seul raccourci
+	// Ctrl/Cmd+T, sans bouton ni menu, et le modal ne savait que créer un dossier
+	// vide — d'où des projets ajoutés qui ne contenaient que `.git`.
+	const handleOpenExisting = async () => {
+		setError(null);
+		try {
+			const path = await globalThis.electronAPI.selectDirectory();
+			if (!path) return;
+
+			const added = await addProject(path);
+			const project = added?.project ?? null;
+			if (!project) {
+				setError(t("addProject.failedToCreate"));
+				return;
+			}
+			if (added?.warning) {
+				toast({
+					title: t("addProject.gitRootWarningTitle"),
+					description: added.warning,
+					variant: "default",
+				});
+			}
+			toast({
+				title: t("addProject.successTitle"),
+				description: t("addProject.successDescription"),
+				variant: "default",
+			});
+			onProjectAdded?.(project, false);
+			onOpenChange(false);
+		} catch (err: unknown) {
+			setError(
+				err instanceof Error ? err.message : t("addProject.failedToCreate"),
+			);
+		}
+	};
 
 	// Création effective du projet
 	const handleCreate = async () => {

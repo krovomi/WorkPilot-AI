@@ -169,6 +169,8 @@
 		"description": "Choisissez comment vous souhaitez ajouter un projet",
 		"openExisting": "Ouvrir un dossier existant",
 		"openExistingDescription": "Parcourir vers un projet existant sur votre ordinateur",
+		"chooseHow": "Ouvrez un projet déjà présent sur votre disque, ou créez-en un nouveau.",
+		"orCreateNew": "Ou créer un nouveau projet",
 		"createNew": "Créer un nouveau projet",
 		"createNewDescription": "Commencer avec un nouveau dossier de projet",
 		"createNewTitle": "Créer un nouveau projet",

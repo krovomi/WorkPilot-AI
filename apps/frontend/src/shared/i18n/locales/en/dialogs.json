@@ -169,6 +169,8 @@
 		"description": "Choose how you'd like to add a project",
 		"openExisting": "Open Existing Folder",
 		"openExistingDescription": "Browse to an existing project on your computer",
+		"chooseHow": "Open a project that already exists, or create a new one.",
+		"orCreateNew": "Or create a new project",
 		"createNew": "Create New Project",
 		"createNewDescription": "Start fresh with a new project folder",
 		"createNewTitle": "Create New Project",
