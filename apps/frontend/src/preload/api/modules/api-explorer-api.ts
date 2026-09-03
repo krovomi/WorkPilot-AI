@@ -28,6 +28,7 @@ export interface ApiExplorerAPI {
 		success: boolean;
 		data?: Record<string, unknown>;
 		routeCount?: number;
+		filesScanned?: number;
 		frameworks?: string[];
 		specUrls?: string[];
 		error?: string;

@@ -907,5 +907,5 @@ export function detectDotnet(projectPath: string): ScanResult {
 		}
 	}
 
-	return { routes, schemas: factory.schemas };
+	return { routes, schemas: factory.schemas, filesScanned: sources.length };
 }

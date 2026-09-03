@@ -15,8 +15,10 @@ async function scan(project: string, name: string): Promise<{
 		components?: { schemas?: Record<string, unknown> };
 	};
 	routeCount: number;
+	filesScanned: number;
 	frameworks: string[];
 	specUrls: string[];
+	error?: string;
 }> {
 	registerApiExplorerHandlers();
 	return (await (
@@ -135,5 +137,29 @@ public class OrdersController : ControllerBase
 			},
 			required: ["reference", "amount"],
 		});
+	});
+
+	it("reports an unreadable project directory instead of an empty scan", async () => {
+		const missing = path.join(tmpdir(), "workpilot-does-not-exist-42");
+
+		const result = await scan(missing, "Ghost");
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain(missing);
+	});
+
+	it("reports how many sources it read, so an empty result is legible", async () => {
+		const project = mkdtempSync(path.join(tmpdir(), "workpilot-dotnet-"));
+		tempProjects.push(project);
+		writeFileSync(
+			path.join(project, "Helper.cs"),
+			"public static class Helper { public static int Add(int a, int b) => a + b; }",
+		);
+
+		const result = await scan(project, "NoRoutes");
+
+		expect(result.success).toBe(true);
+		expect(result.routeCount).toBe(0);
+		expect(result.filesScanned).toBe(1);
 	});
 });

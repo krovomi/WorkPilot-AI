@@ -2,7 +2,11 @@ import path from "node:path";
 import { app, ipcMain, net, safeStorage } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import { detectDotnet } from "../api-explorer/dotnet";
-import { readFile, walkFiles } from "../api-explorer/source-files";
+import {
+	readDirectory,
+	readFile,
+	walkFiles,
+} from "../api-explorer/source-files";
 import type {
 	DetectedRoute,
 	JsonSchema,
@@ -485,6 +489,16 @@ export function registerApiExplorerHandlers(): void {
 		IPC_CHANNELS.API_EXPLORER_SCAN_ROUTES,
 		(_event, projectPath: string, projectName: string) => {
 			try {
+				// An unreadable root walks to an empty list exactly like a project
+				// with no sources, and "0 endpoints" would then mean two different
+				// things. Say which one it is.
+				if (readDirectory(projectPath) === null) {
+					return {
+						success: false,
+						error: `Cannot read project directory: ${projectPath}`,
+					};
+				}
+
 				const dotnet = detectDotnet(projectPath);
 				const routes: DetectedRoute[] = [
 					...dotnet.routes,
@@ -506,6 +520,7 @@ export function registerApiExplorerHandlers(): void {
 					success: true,
 					data: spec,
 					routeCount: routes.length,
+					filesScanned: dotnet.filesScanned,
 					frameworks,
 					specUrls: detectLiveSpecUrls(projectPath, frameworks),
 				};

@@ -61,6 +61,8 @@ export interface DetectedRoute {
 
 export interface ScanResult {
 	routes: DetectedRoute[];
+	/** How many source files the detector actually read. */
+	filesScanned: number;
 	/** Component schemas referenced by the routes, keyed by schema name. */
 	schemas: Record<string, JsonSchema>;
 }
