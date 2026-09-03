@@ -71,39 +71,27 @@ export function useProjectRouteScan() {
 					setScannedProjectId(projectId);
 					setLastProjectScanAt(Date.now());
 
-					// Prefer the framework's real OpenAPI document when the app is
-					// running. Network failures are deliberately silent: the source scan
-					// remains useful while the application is stopped.
-					for (const specUrl of result.specUrls ?? []) {
-						const live = await window.electronAPI.proxyHttpRequest({
-							url: specUrl,
-							method: "GET",
-							headers: { Accept: "application/json" },
-						});
-						const latestProjectState = useProjectStore.getState();
-						if (
-							(latestProjectState.activeProjectId ??
-								latestProjectState.selectedProjectId) !== projectId
-						) {
-							return;
-						}
-						if (!live.success || !live.status || live.status >= 400) continue;
-						try {
-							const liveSpec = JSON.parse(live.body ?? "") as OpenApiSpec;
-							if (
-								!liveSpec.paths ||
-								(!liveSpec.openapi && !("swagger" in liveSpec))
-							) {
-								continue;
-							}
-							setSpec(liveSpec);
-							setSpecSource("url");
-							setSpecFilePath(null);
-							setSpecUrl(specUrl);
-							break;
-						} catch {
-							// Try the next conventional URL.
-						}
+					// Prefer the document the running application generates from the
+					// routes it actually registered. The probe is bounded in the main
+					// process — candidates, per-request timeout, total budget — and
+					// answers `data: null` when nothing is listening, which is the
+					// ordinary case and not an error.
+					const live = await window.electronAPI.probeLiveApiSpec(
+						projectPath,
+						result.frameworks ?? [],
+					);
+					const latestProjectState = useProjectStore.getState();
+					if (
+						(latestProjectState.activeProjectId ??
+							latestProjectState.selectedProjectId) !== projectId
+					) {
+						return;
+					}
+					if (live.success && live.data) {
+						setSpec(live.data as unknown as OpenApiSpec);
+						setSpecSource("url");
+						setSpecFilePath(null);
+						if (live.url) setSpecUrl(live.url);
 					}
 				} else {
 					setProjectScanError(result.error ?? "Failed to scan project routes");

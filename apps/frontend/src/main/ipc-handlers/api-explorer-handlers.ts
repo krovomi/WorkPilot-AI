@@ -2,6 +2,12 @@ import path from "node:path";
 import { app, ipcMain, net, safeStorage } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import { detectDotnet } from "../api-explorer/dotnet";
+import {
+	buildProbeUrls,
+	discoverBaseUrls,
+	type LiveSpec,
+	probeLiveSpec,
+} from "../api-explorer/live-spec";
 import { findCommittedSpec } from "../api-explorer/spec-files";
 import {
 	readDirectory,
@@ -22,49 +28,6 @@ import {
 // ASP.NET Core lives in ../api-explorer/dotnet.ts: it reads action signatures
 // and DTOs, so it needs more than a regex sweep. The detectors below stay
 // declaration-level on purpose.
-
-const OPENAPI_PATHS_BY_FRAMEWORK: Record<string, string[]> = {
-	"ASP.NET Core": [
-		"/swagger/v1/swagger.json",
-		"/swagger.json",
-		"/openapi/v1.json",
-	],
-};
-
-function detectLiveSpecUrls(
-	projectPath: string,
-	frameworks: string[],
-): string[] {
-	const paths = frameworks.flatMap(
-		(framework) => OPENAPI_PATHS_BY_FRAMEWORK[framework] ?? [],
-	);
-	if (paths.length === 0) return [];
-
-	const launchFiles = walkFiles(projectPath, ["launchSettings.json"], 5);
-	const baseUrls = new Set<string>();
-	for (const launchFile of launchFiles) {
-		const content = readFile(launchFile);
-		if (!content) continue;
-		try {
-			const parsed = JSON.parse(content) as {
-				profiles?: Record<string, { applicationUrl?: string }>;
-			};
-			for (const profile of Object.values(parsed.profiles ?? {})) {
-				for (const url of profile.applicationUrl?.split(";") ?? []) {
-					if (/^https?:\/\//.test(url.trim())) {
-						baseUrls.add(url.trim().replace(/\/$/, ""));
-					}
-				}
-			}
-		} catch {
-			// A malformed launch profile must not prevent source route discovery.
-		}
-	}
-
-	return [...baseUrls].flatMap((baseUrl) =>
-		paths.map((specPath) => `${baseUrl}${specPath}`),
-	);
-}
 
 /** FastAPI / Flask / Django — Python */
 function detectPython(projectPath: string): DetectedRoute[] {
@@ -441,6 +404,41 @@ function buildResponses(route: DetectedRoute): Record<string, unknown> {
 	return responses;
 }
 
+
+/**
+ * One probe request: abandoned at `timeoutMs`, and yielding a body only for a
+ * successful response small enough to be a description rather than a dump.
+ */
+const fetchSpecBody = async (
+	url: string,
+	timeoutMs: number,
+): Promise<string | null> => {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), timeoutMs);
+	try {
+		const res = await net.fetch(url, {
+			method: "GET",
+			headers: { Accept: "application/json, application/yaml, text/plain" },
+			signal: controller.signal,
+		});
+		if (!res.ok) return null;
+		const declaredLength = Number.parseInt(
+			res.headers.get("content-length") ?? "",
+			10,
+		);
+		if (Number.isFinite(declaredLength) && declaredLength > 8 * 1024 * 1024) {
+			return null;
+		}
+		return await res.text();
+	} catch {
+		// A refused connection, a timeout, a TLS the dev certificate cannot
+		// satisfy: none of them are errors here, they are simply not a match.
+		return null;
+	} finally {
+		clearTimeout(timer);
+	}
+};
+
 // ── IPC handler registration ──────────────────────────────────────────────────
 
 interface ProxyRequestPayload {
@@ -530,8 +528,50 @@ export function registerApiExplorerHandlers(): void {
 					routeCount: committed ? committed.pathCount : routes.length,
 					filesScanned: dotnet.filesScanned,
 					frameworks,
-					specUrls: detectLiveSpecUrls(projectPath, frameworks),
+					specUrls: buildProbeUrls(
+						discoverBaseUrls(projectPath, frameworks),
+						frameworks,
+					),
 				};
+			} catch (err) {
+				return { success: false, error: String(err) };
+			}
+		},
+	);
+
+	// Live document — asks the running application for its own description.
+	// Bounded on every axis (candidates, per-request timeout, total budget) so
+	// a fallback can never become a wait; see PROBE_LIMITS.
+	ipcMain.handle(
+		IPC_CHANNELS.API_EXPLORER_PROBE_LIVE_SPEC,
+		async (
+			_event,
+			projectPath: string,
+			frameworks: string[],
+		): Promise<{
+			success: boolean;
+			data?: Record<string, unknown> | null;
+			url?: string;
+			routeCount?: number;
+			error?: string;
+		}> => {
+			try {
+				const urls = buildProbeUrls(
+					discoverBaseUrls(projectPath, frameworks ?? []),
+					frameworks ?? [],
+				);
+				const found: LiveSpec | null = await probeLiveSpec(
+					urls,
+					fetchSpecBody,
+				);
+				return found
+					? {
+							success: true,
+							data: found.document,
+							url: found.url,
+							routeCount: found.pathCount,
+						}
+					: { success: true, data: null };
 			} catch (err) {
 				return { success: false, error: String(err) };
 			}
