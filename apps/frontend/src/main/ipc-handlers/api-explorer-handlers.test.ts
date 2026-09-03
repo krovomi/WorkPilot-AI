@@ -8,6 +8,33 @@ import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 
 const tempProjects: string[] = [];
 
+async function scan(project: string, name: string): Promise<{
+	success: boolean;
+	data: {
+		paths: Record<string, Record<string, Record<string, unknown>>>;
+		components?: { schemas?: Record<string, unknown> };
+	};
+	routeCount: number;
+	frameworks: string[];
+	specUrls: string[];
+}> {
+	registerApiExplorerHandlers();
+	return (await (
+		ipcMain as typeof ipcMain & {
+			invokeHandler: (
+				channel: string,
+				event: unknown,
+				...args: unknown[]
+			) => Promise<unknown>;
+		}
+	).invokeHandler(
+		IPC_CHANNELS.API_EXPLORER_SCAN_ROUTES,
+		null,
+		project,
+		name,
+	)) as never;
+}
+
 afterEach(() => {
 	for (const project of tempProjects.splice(0)) {
 		rmSync(project, { recursive: true, force: true });
@@ -41,26 +68,7 @@ app.MapGet("/health", () => "ok");`,
 			}),
 		);
 
-		registerApiExplorerHandlers();
-		const result = (await (
-			ipcMain as typeof ipcMain & {
-				invokeHandler: (
-					channel: string,
-					event: unknown,
-					...args: unknown[]
-				) => Promise<unknown>;
-			}
-		).invokeHandler(
-			IPC_CHANNELS.API_EXPLORER_SCAN_ROUTES,
-			null,
-			project,
-			"Sample",
-		)) as {
-			success: boolean;
-			data: { paths: Record<string, unknown> };
-			frameworks: string[];
-			specUrls: string[];
-		};
+		const result = await scan(project, "Sample");
 
 		expect(Object.keys(result.data.paths).sort()).toEqual([
 			"/api/weather",
@@ -71,5 +79,61 @@ app.MapGet("/health", () => "ok");`,
 		expect(result.specUrls).toContain(
 			"http://localhost:5180/swagger/v1/swagger.json",
 		);
+	});
+
+	it("turns a controller action into a callable operation", async () => {
+		const project = mkdtempSync(path.join(tmpdir(), "workpilot-dotnet-"));
+		tempProjects.push(project);
+		mkdirSync(path.join(project, "Controllers"), { recursive: true });
+		writeFileSync(
+			path.join(project, "Controllers", "OrdersController.cs"),
+			`using Microsoft.AspNetCore.Mvc;
+
+public record CreateOrderRequest(string Reference, decimal Amount);
+
+[ApiController]
+[Authorize]
+[Route("api/[controller]")]
+public class OrdersController : ControllerBase
+{
+    /// <summary>Creates an order.</summary>
+    [HttpPost("{customerId:int}")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    public IActionResult Create(int customerId, [FromBody] CreateOrderRequest request) => Ok();
+}`,
+		);
+
+		const result = await scan(project, "Shop");
+		const operation = result.data.paths["/api/Orders/{customerId}"].post;
+
+		expect(result.success).toBe(true);
+		expect(operation.summary).toBe("Creates an order.");
+		expect(operation.security).toEqual([{ bearerAuth: [] }]);
+		expect(operation.parameters).toEqual([
+			{
+				name: "customerId",
+				in: "path",
+				required: true,
+				schema: { type: "integer", format: "int32" },
+				description: undefined,
+			},
+		]);
+		expect(operation.requestBody).toEqual({
+			required: true,
+			content: {
+				"application/json": {
+					schema: { $ref: "#/components/schemas/CreateOrderRequest" },
+				},
+			},
+		});
+		expect(operation.responses).toEqual({ "201": { description: "Created" } });
+		expect(result.data.components?.schemas?.CreateOrderRequest).toEqual({
+			type: "object",
+			properties: {
+				reference: { type: "string" },
+				amount: { type: "number", format: "double" },
+			},
+			required: ["reference", "amount"],
+		});
 	});
 });

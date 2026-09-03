@@ -1,214 +1,22 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { app, ipcMain, net, safeStorage } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
+import { detectDotnet } from "../api-explorer/dotnet";
+import { readFile, walkFiles } from "../api-explorer/source-files";
+import type {
+	DetectedRoute,
+	JsonSchema,
+	RouteParameter,
+} from "../api-explorer/types";
 import {
 	ApiExplorerSecretStore,
 	type ApiExplorerSecretValues,
 } from "../api-explorer-secret-store";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface DetectedRoute {
-	path: string;
-	methods: string[];
-	summary?: string;
-	tag: string;
-	file: string;
-	framework: string;
-	requiresAuth: boolean;
-}
-
-// ── Directory walker ──────────────────────────────────────────────────────────
-
-const EXCLUDED_DIRS = new Set([
-	"node_modules",
-	".git",
-	"__pycache__",
-	"dist",
-	"build",
-	".next",
-	".nuxt",
-	"coverage",
-	".cache",
-	".venv",
-	"venv",
-	"out",
-	".turbo",
-	".worktrees",
-	"vendor",
-	"target",
-	".gradle",
-	".maven",
-	"obj",
-	"bin",
-	".vs",
-]);
-
-function walkFiles(
-	dir: string,
-	extensions: string[],
-	maxDepth = 12,
-	depth = 0,
-): string[] {
-	if (depth > maxDepth) return [];
-	let results: string[] = [];
-	let entries: string[];
-	try {
-		entries = readdirSync(dir);
-	} catch {
-		return [];
-	}
-	for (const entry of entries) {
-		if (EXCLUDED_DIRS.has(entry)) continue;
-		const full = path.join(dir, entry);
-		// biome-ignore lint/suspicious/noImplicitAnyLet: type inferred from assignment
-		let stat;
-		try {
-			stat = statSync(full);
-		} catch {
-			continue;
-		}
-		if (stat.isDirectory()) {
-			results = results.concat(
-				walkFiles(full, extensions, maxDepth, depth + 1),
-			);
-		} else if (extensions.some((ext) => full.endsWith(ext))) {
-			results.push(full);
-		}
-	}
-	return results;
-}
-
-function readFile(filePath: string): string | null {
-	try {
-		return readFileSync(filePath, "utf8");
-	} catch {
-		return null;
-	}
-}
-
 // ── Language detectors ────────────────────────────────────────────────────────
-
-/** ASP.NET Core — C# controllers */
-function detectDotnet(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".cs"]);
-	const verbMap: Record<string, string> = {
-		Get: "GET",
-		Post: "POST",
-		Put: "PUT",
-		Delete: "DELETE",
-		Patch: "PATCH",
-	};
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content) continue;
-
-		// ASP.NET Core Minimal APIs. Route groups are assigned to variables and
-		// then used just like the root app: `api.MapGet("/items", ...)`.
-		const groupPrefixes = new Map<string, string>();
-		const groupRe = /(?:const|var)\s+(\w+)\s*=\s*\w+\.MapGroup\(\s*["']([^"']*)["']\s*\)/g;
-		let groupMatch: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((groupMatch = groupRe.exec(content)) !== null) {
-			groupPrefixes.set(groupMatch[1], groupMatch[2]);
-		}
-
-		const minimalRe = /(\w+)\.Map(Get|Post|Put|Delete|Patch)\(\s*["']([^"']*)["']/g;
-		let minimalMatch: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((minimalMatch = minimalRe.exec(content)) !== null) {
-			const receiver = minimalMatch[1];
-			const prefix = groupPrefixes.get(receiver) ?? "";
-			const routePath = `${prefix}/${minimalMatch[3]}`.replace(/\/+/g, "/");
-			const statementEnd = content.indexOf(";", minimalMatch.index);
-			const statement = content.slice(
-				minimalMatch.index,
-				statementEnd === -1 ? minimalMatch.index + 500 : statementEnd + 1,
-			);
-			routes.push({
-				path: routePath.startsWith("/") ? routePath : `/${routePath}`,
-				methods: [minimalMatch[2].toUpperCase()],
-				tag: prefix.split("/").filter(Boolean).at(-1) ?? "minimal-api",
-				file: path.relative(projectPath, filePath),
-				framework: "ASP.NET Core",
-				requiresAuth: /\.RequireAuthorization\s*\(/.test(statement),
-			});
-		}
-
-		if (!/class\s+\w+Controller/.test(content)) continue;
-
-		// Class-level [Route("...")] + controller name
-		const classMatch = content.match(
-			/\[Route\(["']([^"']*)["'].*?\)\][\s\S]{0,300}?class\s+(\w+)Controller/,
-		);
-		let classBase: string;
-		let controllerName: string;
-
-		if (classMatch) {
-			controllerName = classMatch[2];
-			classBase = classMatch[1].replace(
-				"[controller]",
-				controllerName.toLowerCase(),
-			);
-		} else {
-			const cn = content.match(/class\s+(\w+)Controller/);
-			if (!cn) continue;
-			controllerName = cn[1];
-			classBase = `/${controllerName.toLowerCase()}s`;
-		}
-		if (!classBase.startsWith("/")) classBase = `/${classBase}`;
-
-		const tag = controllerName.toLowerCase();
-
-		// Method-level [HttpVerb] attributes with optional sub-path + XML doc summary
-		// Two-pass approach to avoid ReDoS from nested quantifiers
-		const methodRe =
-			/\[Http(Get|Post|Put|Delete|Patch)(?:\(["']?([^"')\]]*?)["']?\))?\]/g;
-
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = methodRe.exec(content)) !== null) {
-			// Extract XML doc summary from the preceding context (separate pass to avoid ReDoS)
-			const preceding = content.slice(Math.max(0, m.index - 600), m.index);
-			const summaryMatch = preceding.match(
-				/<summary>\s*([\s\S]*?)<\/summary>/,
-			);
-			const summary = summaryMatch
-				? summaryMatch[1]
-						.split("\n")
-						.map((l) => l.replace(/^\s*\/\/\/\s*/, "").trim())
-						.filter(Boolean)
-						.join(" ") || undefined
-				: undefined;
-
-			const verb = m[1];
-			const subPath = (m[2] ?? "").trim().replace(/^["']|["']$/g, "");
-			const method = verbMap[verb] ?? verb.toUpperCase();
-
-			const fullPath = subPath
-				? `${classBase}/${subPath}`.replace(/\/+/g, "/")
-				: classBase;
-
-			const ctx = content.slice(Math.max(0, m.index - 300), m.index);
-			const requiresAuth =
-				/\[Authorize\b/.test(ctx) && !/\[AllowAnonymous\]/.test(ctx);
-
-			routes.push({
-				path: fullPath,
-				methods: [method],
-				summary,
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "ASP.NET Core",
-				requiresAuth,
-			});
-		}
-	}
-	return routes;
-}
+// ASP.NET Core lives in ../api-explorer/dotnet.ts: it reads action signatures
+// and DTOs, so it needs more than a regex sweep. The detectors below stay
+// declaration-level on purpose.
 
 const OPENAPI_PATHS_BY_FRAMEWORK: Record<string, string[]> = {
 	"ASP.NET Core": [
@@ -512,6 +320,7 @@ function detectRails(projectPath: string): DetectedRoute[] {
 function buildOpenApiSpec(
 	routes: DetectedRoute[],
 	projectName: string,
+	schemas: Record<string, JsonSchema> = {},
 ): Record<string, unknown> {
 	const paths: Record<string, Record<string, unknown>> = {};
 	const tags = new Set<string>();
@@ -532,28 +341,41 @@ function buildOpenApiSpec(
 					.replace(/[^a-zA-Z0-9]/g, "_")
 					.replace(/_+/g, "_")
 					.replace(/^_|_$/g, "")}`,
-				responses: { "200": { description: "Success" } },
+				responses: buildResponses(route),
 			};
+
+			if (route.description) op.description = route.description;
+			if (route.deprecated) op.deprecated = true;
 
 			if (route.requiresAuth) {
 				op.security = [{ bearerAuth: [] }];
 			}
 
-			// Extract path parameters from the path
-			const pathParams = [...openApiPath.matchAll(/\{([^}]+)\}/g)].map(
-				(pm) => ({
-					name: pm[1],
-					in: "path",
-					required: true,
-					schema: { type: "string" },
-				}),
-			);
-			if (pathParams.length > 0) op.parameters = pathParams;
+			const parameters = buildParameters(route, openApiPath);
+			if (parameters.length > 0) op.parameters = parameters;
+
+			if (route.requestBody) {
+				op.requestBody = {
+					required: route.requestBody.required,
+					content: {
+						[route.requestBody.contentType]: {
+							schema: route.requestBody.schema,
+						},
+					},
+				};
+			}
 
 			paths[openApiPath][method.toLowerCase()] = op;
 			tags.add(route.tag);
 		}
 	}
+
+	const components: Record<string, unknown> = {
+		securitySchemes: {
+			bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+		},
+	};
+	if (Object.keys(schemas).length > 0) components.schemas = schemas;
 
 	return {
 		openapi: "3.0.0",
@@ -564,12 +386,54 @@ function buildOpenApiSpec(
 		},
 		tags: [...tags].map((name) => ({ name })),
 		paths,
-		components: {
-			securitySchemes: {
-				bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
-			},
-		},
+		components,
 	};
+}
+
+/**
+ * Parameters as the detector read them, completed with any path placeholder it
+ * did not describe — a detector that only knows the template still yields a
+ * form with one field per `{param}`.
+ */
+function buildParameters(
+	route: DetectedRoute,
+	openApiPath: string,
+): RouteParameter[] {
+	const parameters = [...(route.parameters ?? [])];
+	const known = new Set(
+		parameters
+			.filter((parameter) => parameter.in === "path")
+			.map((parameter) => parameter.name),
+	);
+
+	for (const match of openApiPath.matchAll(/\{([^}]+)\}/g)) {
+		if (known.has(match[1])) continue;
+		parameters.push({
+			name: match[1],
+			in: "path",
+			required: true,
+			schema: { type: "string" },
+		});
+	}
+
+	return parameters;
+}
+
+function buildResponses(route: DetectedRoute): Record<string, unknown> {
+	if (!route.responses || Object.keys(route.responses).length === 0) {
+		return { "200": { description: "Success" } };
+	}
+
+	const responses: Record<string, unknown> = {};
+	for (const [status, response] of Object.entries(route.responses)) {
+		responses[status] = response.schema
+			? {
+					description: response.description,
+					content: { "application/json": { schema: response.schema } },
+				}
+			: { description: response.description };
+	}
+	return responses;
 }
 
 // ── IPC handler registration ──────────────────────────────────────────────────
@@ -621,8 +485,9 @@ export function registerApiExplorerHandlers(): void {
 		IPC_CHANNELS.API_EXPLORER_SCAN_ROUTES,
 		(_event, projectPath: string, projectName: string) => {
 			try {
+				const dotnet = detectDotnet(projectPath);
 				const routes: DetectedRoute[] = [
-					...detectDotnet(projectPath),
+					...dotnet.routes,
 					...detectPython(projectPath),
 					...detectExpress(projectPath),
 					...detectSpring(projectPath),
@@ -631,7 +496,11 @@ export function registerApiExplorerHandlers(): void {
 					...detectRails(projectPath),
 				];
 
-				const spec = buildOpenApiSpec(routes, projectName || "Project");
+				const spec = buildOpenApiSpec(
+					routes,
+					projectName || "Project",
+					dotnet.schemas,
+				);
 				const frameworks = [...new Set(routes.map((route) => route.framework))];
 				return {
 					success: true,
