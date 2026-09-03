@@ -2,6 +2,8 @@ import path from "node:path";
 import { app, ipcMain, net, safeStorage } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import { detectDotnet } from "../api-explorer/dotnet";
+import { detectGo } from "../api-explorer/go";
+import { detectSpring } from "../api-explorer/jvm";
 import { detectNode } from "../api-explorer/node";
 import { detectPython } from "../api-explorer/python";
 import {
@@ -30,85 +32,6 @@ import {
 // ASP.NET Core lives in ../api-explorer/dotnet.ts: it reads action signatures
 // and DTOs, so it needs more than a regex sweep. The detectors below stay
 // declaration-level on purpose.
-
-/** Spring Boot — Java */
-function detectSpring(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".java"]);
-	const verbMap: Record<string, string> = {
-		GetMapping: "GET",
-		PostMapping: "POST",
-		PutMapping: "PUT",
-		DeleteMapping: "DELETE",
-		PatchMapping: "PATCH",
-	};
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content || !/@(?:Rest)?Controller/.test(content)) continue;
-		const tag = path
-			.basename(filePath, ".java")
-			.replace("Controller", "")
-			.toLowerCase();
-
-		// Class-level @RequestMapping
-		const clsMatch = content.match(
-			/@RequestMapping\(\s*["']?([^"')\s]+)["']?\s*\)/,
-		);
-		const classBase = clsMatch
-			? clsMatch[1].startsWith("/")
-				? clsMatch[1]
-				: `/${clsMatch[1]}`
-			: "";
-
-		const methodRe =
-			/@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping)\s*\(\s*(?:value\s*=\s*)?["']?([^"')\s]*)["']?\s*\)/g;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = methodRe.exec(content)) !== null) {
-			const method = verbMap[m[1]] ?? "GET";
-			const sub = m[2] ? (m[2].startsWith("/") ? m[2] : `/${m[2]}`) : "";
-			const fullPath = `${classBase}${sub}`.replace(/\/+/g, "/") || "/";
-			routes.push({
-				path: fullPath,
-				methods: [method],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "Spring Boot",
-				requiresAuth: false,
-			});
-		}
-	}
-	return routes;
-}
-
-/** Go — Gin / Echo / Chi / Fiber */
-function detectGo(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".go"]);
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content) continue;
-		const tag = path.basename(filePath, ".go");
-
-		const goRe =
-			/(?:r|e|app|router)\.(GET|POST|PUT|DELETE|PATCH|Get|Post|Put|Delete|Patch)\s*\(\s*["']([^"']+)["']/g;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = goRe.exec(content)) !== null) {
-			routes.push({
-				path: m[2],
-				methods: [m[1].toUpperCase()],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "Go",
-				requiresAuth: false,
-			});
-		}
-	}
-	return routes;
-}
 
 /** Rust — Axum / Actix */
 function detectRust(projectPath: string): DetectedRoute[] {
