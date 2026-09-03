@@ -6,7 +6,7 @@ claude-agent-sdk>=0.2.144
 python-dotenv>=1.2.2
 
 # WebSocket support for streaming development mode
-websockets>=17.0.1
+websockets>=17.1
 
 # TOML parsing fallback for Python < 3.11
 tomli>=2.0.0; python_version < "3.11"
@@ -37,7 +37,7 @@ pandas>=3.0.5; python_version >= "3.12"
 pywin32>=312; sys_platform == "win32"
 
 # Google AI (optional - for Gemini LLM and embeddings)
-google-generativeai>=0.8.0
+google-generativeai>=0.8.6
 
 # Pydantic for structured output schemas
 pydantic>=2.13.4
@@ -46,7 +46,7 @@ pydantic>=2.13.4
 rich>=15.0.0
 
 # Error tracking (optional - requires SENTRY_DSN environment variable)
-sentry-sdk>=2.63.0
+sentry-sdk>=2.68.1
 
 # Security-First Features
 # Basic secret scanning is built-in, these enhance capabilities
@@ -67,7 +67,7 @@ asyncpg>=0.31.0          # PostgreSQL async driver (server mode)
 aiosqlite>=0.22.1        # SQLite async driver (dev/tests fallback)
 argon2-cffi>=25.1.0      # Password hashing for local accounts
 PyJWT[crypto]>=2.13.0     # JWT access/refresh tokens + Entra ID JWKS validation
-cryptography>=49.0.0     # Fernet encryption for per-user integration secrets
+cryptography>=50.0.1     # Fernet encryption for per-user integration secrets
 email-validator>=2.3.0   # pydantic EmailStr support (auth schemas)
 requests>=2.34.2
 httpx[http2]>=0.28.1
@@ -89,7 +89,7 @@ msrest>=0.7.1           # Required by azure-devops SDK
 defusedxml>=0.7.1
 
 # Anthropic SDK for Claude API integration
-anthropic>=0.113.0
+anthropic>=1.2.0
 
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:
