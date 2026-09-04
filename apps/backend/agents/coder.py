@@ -587,6 +587,21 @@ def _docs_section(spec_dir: Path, subtask: dict | None = None) -> str:
         return ""
 
 
+def _constitution_section(project_dir: Path) -> str:
+    """The house rules of a spec-kit project, when the target project is one.
+
+    Costs one `is_file()` on every other project. See
+    `project.spec_kit` for why only the constitution is read and not the rest
+    of spec-kit's artifacts.
+    """
+    try:
+        from project.spec_kit import format_constitution_for_prompt
+
+        return format_constitution_for_prompt(project_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a subtask
+        return ""
+
+
 async def run_autonomous_agent(
     project_dir: Path,
     spec_dir: Path,
@@ -1270,6 +1285,13 @@ async def run_autonomous_agent(
                 prompt += "\n\n" + planner_docs
                 print_status("Library documentation available to planner", "success")
 
+            # A spec-kit project states its own rules; a plan written without
+            # them is one its own tooling would reject.
+            planner_rules = _constitution_section(project_dir)
+            if planner_rules:
+                prompt += "\n\n" + planner_rules
+                print_status("spec-kit constitution applied to planning", "success")
+
             first_run = False
             current_log_phase = LogPhase.PLANNING
 
@@ -1539,6 +1561,12 @@ async def run_autonomous_agent(
             docs_context = _docs_section(spec_dir, next_subtask)
             if docs_context:
                 prompt += "\n\n" + docs_context
+
+            # The constitution applies to every subtask, not to the one that
+            # happens to mention a library — so it goes in whole, each time.
+            constitution = _constitution_section(project_dir)
+            if constitution:
+                prompt += "\n\n" + constitution
 
             # Add concurrency error context if recovering from 400 error
             if concurrency_error_context:

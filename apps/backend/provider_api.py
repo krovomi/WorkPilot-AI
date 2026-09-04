@@ -1980,6 +1980,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import workflow_profile router: {e}")
 
+# --- Spec Traceability API (open questions + requirement coverage for a spec) ---
+try:
+    from spec.api import router as spec_traceability_router
+
+    _mount(spec_traceability_router, "spec_traceability")
+except ImportError as e:
+    print(f"Warning: Could not import spec_traceability router: {e}")
+
 # --- Slash Commands API (Kanban Quick-Command bar: list + run .claude/commands) ---
 try:
     from slash_commands.api import router as slash_commands_router

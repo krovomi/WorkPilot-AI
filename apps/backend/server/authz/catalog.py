@@ -265,6 +265,7 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "timeline": "analytics",
         "progress_indicator": "task",
         "qa_promotion": "qa",
+        "spec_traceability": "task",
         "workflow_profile": "task",
         "slash_commands": "agent",
         "parallel_variations": "lab",

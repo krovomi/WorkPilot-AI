@@ -30,7 +30,11 @@ import logging
 import os
 from pathlib import Path
 
-from core.api_safety import validated_dir
+from core.api_safety import (
+    SPEC_ADDRESS_REASONS,
+    SpecAddressError,
+    resolve_spec_dir,
+)
 from fastapi import APIRouter, Query
 
 logger = logging.getLogger(__name__)
@@ -48,104 +52,22 @@ _DEFAULT_WORKFLOW = "feature-build"
 # supposed to hand back — CodeQL flags it, and it is right to. The detail still
 # reaches the log, where the person debugging can see it and a caller cannot.
 _REASONS = {
-    "addressing": "pass spec_dir, or both project_dir and spec_id",
-    "spec_id": "spec_id must be a plain directory name",
-    "escapes": "spec_id escapes the project directory",
-    "empty": "the path must be non-empty and must not start with '-'",
-    "missing": "no such directory",
-    "traversal": "the path must not contain '..'",
+    **SPEC_ADDRESS_REASONS,
+    # The one rejection that is this endpoint's own: `workflow` names a file
+    # under `workflows/` in this repository, which — unlike a project
+    # directory — is a root we own and therefore do confine.
     "workflow": "unknown workflow",
 }
 
 
-class _BadRequest(ValueError):
+class _BadRequest(SpecAddressError):
     """A rejected request, named by a reason the caller may be told.
 
     The reason is a key into `_REASONS`, not free text, so what reaches the
-    response is always a literal written here.
+    response is always a literal written here. Subclasses `SpecAddressError`
+    so the addressing rules — which now live in `core.api_safety` alongside
+    every other endpoint's — are caught by the same `except`.
     """
-
-    def __init__(self, reason: str, detail: str = "") -> None:
-        self.reason = reason
-        super().__init__(detail or reason)
-
-
-def _validate_dir(raw: str, label: str) -> Path:
-    """Normalise a caller-supplied directory path.
-
-    Delegates to `core.api_safety.validated_dir`, which is where the
-    normalisation, the length cap and the `..` refusal now live for every
-    endpoint in this backend. Kept as a local function only to translate its
-    `ValueError` into a `_BadRequest` carrying a `_REASONS` key.
-
-    **The project directory is not confined to this repository, and must not
-    be.** An autofix once "resolved" `py/path-injection` that way (PR #20):
-    WorkPilot builds other people's projects, so the directory is outside
-    this repository by definition, and confining it made the endpoint answer
-    only for people building WorkPilot itself — ten red tests and an empty
-    task panel for everyone else. `TestItAnswersForRealProjects` fails if it
-    comes back.
-
-    What guards traversal is elsewhere and is kept: `spec_id` must be a bare
-    name, the derived spec directory must sit under the given project
-    directory, and `workflow` is confined to `workflows/` — see
-    `_resolve_spec_dir` and `_workflow_path`.
-    """
-    try:
-        return validated_dir(raw, label)
-    except ValueError as exc:
-        # `validated_dir` names the rule that was broken; map it onto the
-        # reason table so the caller still gets a literal from `_REASONS`
-        # rather than a message built from their own input.
-        text = str(exc)
-        if "'..'" in text:
-            raise _BadRequest("traversal", text) from None
-        if "does not exist" in text:
-            raise _BadRequest("missing", text) from None
-        raise _BadRequest("empty", text) from None
-
-
-def _resolve_spec_dir(
-    spec_dir: str | None, project_dir: str | None, spec_id: str | None
-) -> Path:
-    """The spec directory, given either the path or the pair that names it.
-
-    The renderer knows a task by its project and its spec id, not by an
-    absolute path — so accepting the pair keeps the `.workpilot/specs/` layout
-    written down once, here, instead of once here and once in TypeScript.
-
-    Why the project directory is **not** confined to this repository
-    ---------------------------------------------------------------
-    Because WorkPilot builds other people's projects. `project_dir` is the
-    checkout the user opened in the desktop app; it is outside this repository
-    by definition, and requiring otherwise means the endpoint only answers for
-    people building WorkPilot itself. That confinement was added to silence a
-    `py/path-injection` alert and it silenced the feature with it.
-
-    What actually guards the traversal, and is kept:
-
-    * ``spec_id`` must be a bare directory name — no separator, no ``..``;
-    * the derived spec directory must sit **under the project directory the
-      caller gave**, so the pair form cannot address anything else;
-    * ``workflow`` is resolved under ``workflows/`` in this repo (see
-      `_workflow_path`), because that one *is* ours.
-
-    The remaining input is an absolute path the local user chose in their own
-    desktop app, read by a backend running as that same user. There is no
-    privilege boundary there to cross — and `progress_indicator/api.py`, which
-    takes the same input in the same way, is the existing convention.
-    """
-    if spec_dir:
-        return _validate_dir(spec_dir, "spec_dir")
-    if not (project_dir and spec_id):
-        raise _BadRequest("addressing")
-    if "/" in spec_id or "\\" in spec_id or spec_id in ("", ".", ".."):
-        raise _BadRequest("spec_id", f"spec_id is not a directory name: {spec_id!r}")
-    root = _validate_dir(project_dir, "project_dir")
-    candidate = (root / ".workpilot" / "specs" / spec_id).resolve()
-    if not candidate.is_relative_to(root):
-        raise _BadRequest("escapes")
-    return _validate_dir(str(candidate), "spec_dir")
 
 
 def _workflow_path(name: str) -> Path:
@@ -283,9 +205,9 @@ def workflow_profile(
 ):
     """The resolved execution profile for a spec."""
     try:
-        sd = _resolve_spec_dir(spec_dir, project_dir, spec_id)
+        sd = resolve_spec_dir(spec_dir, project_dir, spec_id)
         path = _workflow_path(workflow)
-    except _BadRequest as exc:
+    except SpecAddressError as exc:
         # The detail goes to the log; the caller gets the literal reason. An
         # exception message here would carry a resolved filesystem path.
         logger.warning("invalid workflow profile request: %s", exc)

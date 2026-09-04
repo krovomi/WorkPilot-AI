@@ -72,7 +72,14 @@ import logging
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
-__all__ = ["MAX_PATH_LEN", "safe_error", "validated_dir"]
+__all__ = [
+    "MAX_PATH_LEN",
+    "SPEC_ADDRESS_REASONS",
+    "SpecAddressError",
+    "resolve_spec_dir",
+    "safe_error",
+    "validated_dir",
+]
 
 # Longest caller-supplied path we will even look at. Matches the ceiling
 # `slash_commands.api` already used.
@@ -194,3 +201,80 @@ def validated_dir(
         raise ValueError(f"{label} does not exist or is not a directory")
 
     return resolved
+
+
+# ---------------------------------------------------------------------------
+# Addressing a spec directory
+# ---------------------------------------------------------------------------
+
+# What a caller may be told when their addressing is rejected. Keys, not free
+# text: what reaches a response is always a literal written here, never a
+# message built from the caller's own input or from an exception carrying a
+# resolved filesystem path.
+SPEC_ADDRESS_REASONS = {
+    "addressing": "pass spec_dir, or both project_dir and spec_id",
+    "spec_id": "spec_id must be a plain directory name",
+    "escapes": "spec_id escapes the project directory",
+    "empty": "the path must be non-empty and must not start with '-'",
+    "missing": "no such directory",
+    "traversal": "the path must not contain '..'",
+}
+
+
+class SpecAddressError(ValueError):
+    """A rejected spec address, named by a key into `SPEC_ADDRESS_REASONS`."""
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        self.reason = reason
+        super().__init__(detail or reason)
+
+
+def resolve_spec_dir(
+    spec_dir: str | None,
+    project_dir: str | None = None,
+    spec_id: str | None = None,
+) -> Path:
+    """The spec directory, given either the path or the pair that names it.
+
+    The renderer knows a task by its project and its spec id, not by an
+    absolute path — so accepting the pair keeps the `.workpilot/specs/` layout
+    written down once, here, rather than once per endpoint and once again in
+    TypeScript.
+
+    **The project directory is not confined to this repository, and must not
+    be.** WorkPilot builds other people's projects: the checkout the user
+    opened in the desktop app is outside this repository by definition, and
+    confining it once made `workflows/api.py` answer only for people building
+    WorkPilot itself. What guards traversal instead, and is kept: ``spec_id``
+    must be a bare directory name, and the derived directory must sit under
+    the project directory the caller gave.
+
+    Lived in `workflows/api.py` until a second endpoint needed the same
+    addressing. Two copies of a path rule is how two rules start.
+    """
+    if spec_dir:
+        return _validated_spec_path(spec_dir, "spec_dir")
+    if not (project_dir and spec_id):
+        raise SpecAddressError("addressing")
+    if "/" in spec_id or "\\" in spec_id or spec_id in ("", ".", ".."):
+        raise SpecAddressError(
+            "spec_id", f"spec_id is not a directory name: {spec_id!r}"
+        )
+    root = _validated_spec_path(project_dir, "project_dir")
+    candidate = (root / ".workpilot" / "specs" / spec_id).resolve()
+    if not candidate.is_relative_to(root):
+        raise SpecAddressError("escapes")
+    return _validated_spec_path(str(candidate), "spec_dir")
+
+
+def _validated_spec_path(raw: str, label: str) -> Path:
+    """`validated_dir`, with its ValueError translated to a reason key."""
+    try:
+        return validated_dir(raw, label)
+    except ValueError as exc:
+        text = str(exc)
+        if "'..'" in text:
+            raise SpecAddressError("traversal", text) from None
+        if "does not exist" in text:
+            raise SpecAddressError("missing", text) from None
+        raise SpecAddressError("empty", text) from None
