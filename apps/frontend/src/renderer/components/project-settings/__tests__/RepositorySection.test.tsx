@@ -4,8 +4,8 @@
  *
  * @vitest-environment jsdom
  */
-import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { render, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project, ProjectSettings } from "../../../../shared/types";
 import { TooltipProvider } from "../../ui/tooltip";
 import { RepositorySection } from "../RepositorySection";
@@ -45,6 +45,28 @@ function renderSection(project: Project, settings: ProjectSettings) {
 }
 
 describe("RepositorySection", () => {
+	const getCurrentGitBranch = vi.fn();
+	const detectRepoProvider = vi.fn();
+
+	beforeEach(() => {
+		getCurrentGitBranch.mockResolvedValue({ success: true, data: "feature/x" });
+		detectRepoProvider.mockResolvedValue({
+			success: true,
+			data: {
+				provider: "github",
+				remoteName: "origin",
+				remoteUrl: "https://github.com/krovomi/WorkPilot-AI.git",
+			},
+		});
+		Object.assign(globalThis, {
+			electronAPI: { getCurrentGitBranch, detectRepoProvider },
+		});
+	});
+
+	afterEach(() => {
+		vi.clearAllMocks();
+	});
+
 	it("shows the repository path and the WorkPilot folder", () => {
 		const project = createProject();
 		const { getByText } = renderSection(project, baseSettings);
@@ -75,5 +97,30 @@ describe("RepositorySection", () => {
 			mainBranch: "develop",
 		});
 		expect(getByText("develop")).toBeTruthy();
+	});
+
+	it("reads the current branch and the remote from git", async () => {
+		const project = createProject();
+		const { getByText } = renderSection(project, baseSettings);
+
+		await waitFor(() => {
+			expect(getByText("feature/x")).toBeTruthy();
+			expect(
+				getByText("https://github.com/krovomi/WorkPilot-AI.git"),
+			).toBeTruthy();
+		});
+		expect(getCurrentGitBranch).toHaveBeenCalledWith(project.path);
+		expect(detectRepoProvider).toHaveBeenCalledWith(project.path);
+	});
+
+	it("falls back to an empty state when the folder is not a git checkout", async () => {
+		getCurrentGitBranch.mockResolvedValue({ success: false });
+		detectRepoProvider.mockResolvedValue({ success: false });
+		const { getByText } = renderSection(createProject(), baseSettings);
+
+		await waitFor(() => {
+			expect(getByText(/Unavailable/i)).toBeTruthy();
+			expect(getByText(/No remote configured/i)).toBeTruthy();
+		});
 	});
 });

@@ -944,6 +944,11 @@
 			"changeFolder": "Change folder…",
 			"workpilotPath": "WorkPilot folder",
 			"workpilotPathMissing": "Not created yet — initialize WorkPilot AI below.",
+			"currentBranch": "Current branch",
+			"currentBranchUnknown": "Unavailable (not a git checkout?)",
+			"remote": "Remote",
+			"remoteNone": "No remote configured",
+			"openRemote": "Open",
 			"mainBranch": "Main branch",
 			"mainBranchAuto": "Auto-detected (configurable under GitHub / GitLab)"
 		}

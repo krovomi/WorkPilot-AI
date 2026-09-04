@@ -2,10 +2,12 @@ import {
 	AlertTriangle,
 	Check,
 	Copy,
+	ExternalLink,
 	FolderSearch,
+	Loader2,
 	TerminalSquare,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
 	Project,
@@ -36,6 +38,7 @@ export function RepositorySection({
 	const missingPaths = useProjectStore((state) => state.missingPaths);
 	const repathProject = useProjectStore((state) => state.repathProject);
 	const isMissing = missingPaths.has(project.id);
+	const git = useGitFacts(project.path, isMissing);
 
 	const handleRepath = async () => {
 		try {
@@ -124,6 +127,51 @@ export function RepositorySection({
 							{t("projectSections.repository.workpilotPathMissing")}
 						</span>
 					)}
+				</Row>
+
+				<Row label={t("projectSections.repository.currentBranch")}>
+					<GitFact
+						loading={git.loading}
+						value={git.currentBranch}
+						empty={t("projectSections.repository.currentBranchUnknown")}
+					>
+						<code className="text-xs bg-background px-2 py-1 rounded border border-border">
+							{git.currentBranch}
+						</code>
+					</GitFact>
+				</Row>
+
+				<Row label={t("projectSections.repository.remote")}>
+					<GitFact
+						loading={git.loading}
+						value={git.remoteUrl}
+						empty={t("projectSections.repository.remoteNone")}
+					>
+						<div className="space-y-2">
+							<PathValue value={git.remoteUrl ?? ""} />
+							<div className="flex flex-wrap items-center gap-1">
+								<CopyButton
+									value={git.remoteUrl ?? ""}
+									label={t("projectSections.repository.copyPath")}
+								/>
+								{isWebUrl(git.remoteUrl) && (
+									<Button
+										variant="ghost"
+										size="sm"
+										className="h-7 gap-1.5 px-2 text-xs"
+										onClick={() => {
+											void globalThis.electronAPI?.openExternal?.(
+												git.remoteUrl as string,
+											);
+										}}
+									>
+										<ExternalLink className="h-3.5 w-3.5" />
+										{t("projectSections.repository.openRemote")}
+									</Button>
+								)}
+							</div>
+						</div>
+					</GitFact>
 				</Row>
 
 				<Row label={t("projectSections.repository.mainBranch")}>
@@ -222,4 +270,84 @@ function CopyButton({
 			)}
 		</Button>
 	);
+}
+
+/**
+ * The two facts that are only knowable by asking git: which branch the checkout
+ * is on right now, and where it pushes. Read once per path — a settings pane is
+ * not a git client, and polling would be noise.
+ */
+function useGitFacts(projectPath: string, skip: boolean) {
+	const [currentBranch, setCurrentBranch] = useState<string | null>(null);
+	const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+	const [loading, setLoading] = useState(false);
+
+	useEffect(() => {
+		if (skip || !projectPath) {
+			setCurrentBranch(null);
+			setRemoteUrl(null);
+			return;
+		}
+		let cancelled = false;
+		setLoading(true);
+
+		void (async () => {
+			try {
+				const [branch, provider] = await Promise.all([
+					globalThis.electronAPI?.getCurrentGitBranch?.(projectPath),
+					globalThis.electronAPI?.detectRepoProvider?.(projectPath),
+				]);
+				if (cancelled) return;
+				setCurrentBranch(branch?.success ? (branch.data ?? null) : null);
+				setRemoteUrl(
+					provider?.success ? (provider.data?.remoteUrl ?? null) : null,
+				);
+			} catch (err) {
+				// A folder that is not a repository is an ordinary answer here, not
+				// an error to surface: the rows fall back to their empty state.
+				console.error("[RepositorySection] git lookup failed:", err);
+				if (!cancelled) {
+					setCurrentBranch(null);
+					setRemoteUrl(null);
+				}
+			} finally {
+				if (!cancelled) setLoading(false);
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [projectPath, skip]);
+
+	return { currentBranch, remoteUrl, loading };
+}
+
+function GitFact({
+	loading,
+	value,
+	empty,
+	children,
+}: {
+	readonly loading: boolean;
+	readonly value: string | null;
+	readonly empty: string;
+	readonly children: React.ReactNode;
+}) {
+	if (loading && !value) {
+		return (
+			<span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+				<Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+			</span>
+		);
+	}
+	if (!value) {
+		return <span className="text-sm text-muted-foreground">{empty}</span>;
+	}
+	return <>{children}</>;
+}
+
+/** Only an http(s) remote can be handed to a browser; an SSH one is copied. */
+function isWebUrl(url: string | null): boolean {
+	return !!url && /^https?:\/\//i.test(url);
 }

@@ -1894,6 +1894,11 @@
 			"changeFolder": "Changer de dossier…",
 			"workpilotPath": "Dossier WorkPilot",
 			"workpilotPathMissing": "Pas encore créé — initialisez WorkPilot AI ci-dessous.",
+			"currentBranch": "Branche courante",
+			"currentBranchUnknown": "Indisponible (dossier non versionné ?)",
+			"remote": "Remote",
+			"remoteNone": "Aucun remote configuré",
+			"openRemote": "Ouvrir",
 			"mainBranch": "Branche principale",
 			"mainBranchAuto": "Auto-détectée (configurable dans GitHub / GitLab)"
 		}

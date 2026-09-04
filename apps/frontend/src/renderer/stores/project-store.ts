@@ -286,6 +286,36 @@ function saveTabStateToMain(): void {
 }
 
 /**
+ * Re-read the project records from the main process without touching selection,
+ * tab state or the loading flag.
+ *
+ * `loadProjects()` is the startup path: it also restores the selected project
+ * and the tab layout, which is wrong for a mid-session refresh — initializing a
+ * project from its settings must not move the user to another tab. What that
+ * caller needs is narrower: the same project, with the fields the main process
+ * just changed on disk (`autoBuildPath` above all).
+ */
+export async function refreshProjects(): Promise<boolean> {
+	try {
+		const result = await window.electronAPI.getProjects();
+		if (
+			typeof result === "object" &&
+			result !== null &&
+			"success" in result &&
+			result.success &&
+			result.data
+		) {
+			useProjectStore.getState().setProjects(result.data);
+			return true;
+		}
+		return false;
+	} catch (error) {
+		console.error("[ProjectStore] refreshProjects failed:", error);
+		return false;
+	}
+}
+
+/**
  * Load projects from main process
  */
 export async function loadProjects(): Promise<void> {
