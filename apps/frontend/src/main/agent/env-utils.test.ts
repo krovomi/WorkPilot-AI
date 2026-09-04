@@ -4,7 +4,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { applyTddOverride, getOAuthModeClearVars } from "./env-utils";
+import {
+	applyMobileTargets,
+	applyTddOverride,
+	getOAuthModeClearVars,
+} from "./env-utils";
 
 describe("applyTddOverride", () => {
 	it("forces TDD_MODE=true when tddMode is true", () => {
@@ -164,5 +168,35 @@ describe("getOAuthModeClearVars", () => {
 				ANTHROPIC_DEFAULT_OPUS_MODEL: "",
 			});
 		});
+	});
+});
+
+describe("applyMobileTargets", () => {
+	it("passes the chosen platforms to the backend", () => {
+		expect(applyMobileTargets({}, ["android", "ios"])).toEqual({
+			WORKPILOT_MOBILE_TARGETS: "android,ios",
+		});
+	});
+
+	it("narrows to a single platform when the card asked for one", () => {
+		expect(applyMobileTargets({ OTHER: "x" }, ["android"])).toEqual({
+			OTHER: "x",
+			WORKPILOT_MOBILE_TARGETS: "android",
+		});
+	});
+
+	it("sets nothing when no platform was chosen", () => {
+		// An empty choice means "every platform the project has", not "none":
+		// setting the variable to "" would silently disable the specialisation.
+		expect(applyMobileTargets({ OTHER: "x" }, [])).toEqual({ OTHER: "x" });
+		expect(applyMobileTargets({ OTHER: "x" }, undefined)).toEqual({
+			OTHER: "x",
+		});
+	});
+
+	it("does not mutate the map it was given", () => {
+		const env = { OTHER: "x" };
+		applyMobileTargets(env, ["ios"]);
+		expect(env).toEqual({ OTHER: "x" });
 	});
 });

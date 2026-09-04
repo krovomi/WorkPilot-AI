@@ -51,6 +51,19 @@ phases:
       criterion nothing can verify. The gap costs a sentence here and a fix
       cycle after QA. Fresh context because the reader must not be the planner.
 
+  - id: mobile-design
+    impl: mobile/mobile-design-review
+    min_effort: medium
+    when: touches("**/AndroidManifest.xml,**/*.gradle.kts,**/*.gradle,**/*.kt,**/*.swift,**/Info.plist,**/*.xcodeproj/**,**/*.xcworkspace/**,**/pubspec.yaml,**/*.dart,**/*.xaml,**/capacitor.config.*,**/PrivacyInfo.xcprivacy,**/*.entitlements")
+    dispatch: fresh-context
+    description: >-
+      Applications smartphone uniquement. Ce qu'`impeccable` vérifie sur le web
+      n'a pas d'équivalent ici : profondeur de pile de navigation, cibles
+      tactiles, les quatre états d'un écran, le comportement hors-ligne, les
+      libellés que TalkBack et VoiceOver sont seuls à lire. Avant le codage,
+      parce qu'un écran mal découpé se corrige en une phrase à ce moment-là et
+      en un cycle complet après la QA.
+
   - id: coding
     impl: superpowers/test-driven-development
     dispatch: subagent-per-task
@@ -101,6 +114,19 @@ phases:
       `qa-acceptance-checker` subagent does this inside the QA loop; this is
       the same audit run against the finished branch with nothing else in
       context.
+
+  - id: store-readiness
+    impl: mobile/mobile-store-readiness
+    min_effort: medium
+    when: touches("**/AndroidManifest.xml,**/*.gradle.kts,**/*.gradle,**/*.kt,**/*.swift,**/Info.plist,**/*.xcodeproj/**,**/*.xcworkspace/**,**/pubspec.yaml,**/*.dart,**/*.xaml,**/capacitor.config.*,**/PrivacyInfo.xcprivacy,**/*.entitlements")
+    dispatch: fresh-context
+    description: >-
+      Ce sur quoi le Play Store et l'App Store rejettent, et qu'aucun test du
+      dépôt n'attrape : une permission déclarée jamais demandée, une chaîne
+      d'usage manquante dans Info.plist, un artefact signé avec la clé de debug,
+      une déclaration de confidentialité en retard sur ce que le code envoie.
+      Un rejet coûte des jours ; le même constat posé ici coûte une ligne. En
+      lecture seule — le correctif appartient à la phase de codage.
 
   - id: verify
     impl: superpowers/verification-before-completion

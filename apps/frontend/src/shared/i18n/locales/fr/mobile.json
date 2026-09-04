@@ -1,0 +1,47 @@
+{
+	"preview": {
+		"tab": "Mobile",
+		"title": "Aperçu mobile",
+		"description": "Construire cette tâche et l'exécuter sur un émulateur Android ou un simulateur Apple. Une application smartphone n'a pas d'URL à ouvrir : la preuve est une capture prise sur l'appareil.",
+		"platformGroup": "Plateforme cible",
+		"device": "Appareil",
+		"noDevice": "Aucun appareil disponible",
+		"booted": "démarré",
+		"logs": "Journal de l'appareil et du build",
+		"noLogs": "Aucune sortie pour l'instant.",
+		"noScreenshot": "Lancez l'application pour capturer une image de l'appareil.",
+		"screenshotAlt": "Capture d'écran prise sur l'appareil",
+		"cannotBuildHere": "Cette plateforme ne peut pas être construite sur cette machine",
+		"noProjectTitle": "Aucun répertoire de projet",
+		"noProjectDescription": "Cette tâche n'a encore ni worktree ni chemin de projet : il n'y a rien à construire.",
+		"notMobileTitle": "Projet non mobile",
+		"notMobileDescription": "Aucun projet Android, Apple, Flutter, React Native, .NET MAUI, Kotlin Multiplatform ou Capacitor n'a été trouvé dans ce répertoire."
+	},
+	"platform": {
+		"android": "Android",
+		"ios": "Apple (iOS)"
+	},
+	"phase": {
+		"idle": "En attente",
+		"detecting": "Détection",
+		"booting": "Démarrage de l'appareil",
+		"building": "Compilation",
+		"installing": "Installation",
+		"running": "En cours d'exécution",
+		"stopped": "Arrêté",
+		"error": "Erreur"
+	},
+	"actions": {
+		"run": "Lancer sur l'appareil",
+		"stop": "Arrêter",
+		"capture": "Capturer une image",
+		"refreshDevices": "Rafraîchir les appareils"
+	},
+	"targets": {
+		"label": "Plateformes mobiles",
+		"description": "Les plateformes visées par cette tâche. Les agents ne construisent et ne vérifient que celles-ci, et signalent celle qui n'est pas constructible sur cette machine.",
+		"android": "Android",
+		"ios": "Apple (iOS)",
+		"badgeTitle": "Cible mobile : {{platforms}}"
+	}
+}

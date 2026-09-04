@@ -103,6 +103,7 @@ import { TaskVisualProof } from "./TaskVisualProof";
 import { TaskWarnings } from "./TaskWarnings";
 import { SyncFromBranchDialog } from "./task-review/SyncFromBranchDialog";
 import { TaskEmulator } from "./TaskEmulator";
+import { TaskMobilePreview } from "./TaskMobilePreview";
 
 interface TaskDetailModalProps {
 	readonly open: boolean;
@@ -523,7 +524,7 @@ function TaskDetailModalContent({
 	readonly hasPrevious?: boolean;
 	readonly hasNext?: boolean;
 }) {
-	const { t } = useTranslation(["tasks"]);
+	const { t } = useTranslation(["tasks", "mobile"]);
 	const { toast } = useToast();
 	const state = useTaskDetail({ task });
 	const { maximized, toggle: toggleMaximized } = useDialogMaximize(
@@ -1232,6 +1233,12 @@ function TaskDetailModalContent({
 									>
 										{t("tasks:emulator.tab")}
 									</TabsTrigger>
+									<TabsTrigger
+										value="mobile"
+										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+									>
+										{t("mobile:preview.tab")}
+									</TabsTrigger>
 								</TabsList>
 
 								{/* Overview Tab */}
@@ -1374,6 +1381,20 @@ function TaskDetailModalContent({
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
 									<TaskEmulator
+										taskId={task.id}
+										project={taskProject ?? activeProject}
+										worktreePath={state.worktreeStatus?.worktreePath}
+									/>
+								</TabsContent>
+
+								{/* Mobile Tab — an Android emulator or an Apple simulator,
+								    which is what "preview" means for a phone application:
+								    there is no URL to put in a webview. */}
+								<TabsContent
+									value="mobile"
+									className="flex-1 min-h-0 overflow-hidden mt-0"
+								>
+									<TaskMobilePreview
 										taskId={task.id}
 										project={taskProject ?? activeProject}
 										worktreePath={state.worktreeStatus?.worktreePath}

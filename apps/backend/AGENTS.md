@@ -62,6 +62,7 @@ propre dict `agents` : **il gagne sur les défauts**.
 | `learning_loop/replay.py` | replay A/B sur les épisodes dorés — la porte que `tests/skills_eval/` exécute |
 | `mem_search/` | récupération par paliers (index ~100 tokens → timeline → détail par ID) |
 | `libdocs/` | phase `docs` : télécharge via Context7 la doc des bibliothèques dont le dépôt n'a aucun exemple, avant le planning |
+| `mobile/` | apps smartphone : `stacks` (Android/Apple/Flutter/RN/MAUI/KMP/Capacitor + commandes), `devices` (émulateurs et simulateurs réels), `readiness` (constructible ici ?), `prompt` (la section donnée à chaque phase) |
 | `continuous_ai/daemon.py` | boucle de polling par module, avec plafond de coût journalier |
 | `self_healing/` | surveillance, checks de santé, remédiation |
 | `task_logger/` | capture structurée de toutes les traces d'exécution |

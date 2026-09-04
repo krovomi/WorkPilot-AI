@@ -68,7 +68,7 @@ from prompt_generator import (
     generate_subtask_prompt,
     load_subtask_context,
 )
-from prompts import constitution_section, is_first_run
+from prompts import constitution_section, is_first_run, mobile_section
 from recovery import RecoveryManager
 from security.constants import PROJECT_DIR_ENV_VAR
 from task_logger import (
@@ -1277,6 +1277,17 @@ async def run_autonomous_agent(
                 prompt += "\n\n" + planner_rules
                 print_status("spec-kit constitution applied to planning", "success")
 
+            # A phone application has no dev server and no URL: the plan has to
+            # say which platform each subtask is verified on, and on a machine
+            # without the toolchain for one of them, that it is not. A planner
+            # told this after the fact writes subtasks nobody can execute.
+            planner_mobile = mobile_section(project_dir)
+            if planner_mobile:
+                prompt += "\n\n" + planner_mobile
+                print_status(
+                    "Mobile stack and device toolchain applied to planning", "success"
+                )
+
             first_run = False
             current_log_phase = LogPhase.PLANNING
 
@@ -1552,6 +1563,12 @@ async def run_autonomous_agent(
             constitution = constitution_section(project_dir)
             if constitution:
                 prompt += "\n\n" + constitution
+
+            # Same reasoning as the constitution: the platform rules apply to
+            # every subtask, not to the one that happens to mention a device.
+            mobile = mobile_section(project_dir)
+            if mobile:
+                prompt += "\n\n" + mobile
 
             # Add concurrency error context if recovering from 400 error
             if concurrency_error_context:

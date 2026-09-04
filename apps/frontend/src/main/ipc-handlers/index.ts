@@ -27,6 +27,7 @@ import { registerTeamBotHandlers } from "./team-bot-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
 import { registerAppEmulatorHandlers } from "./app-emulator-handlers";
+import { registerMobileHandlers } from "./mobile-handlers";
 import { registerAppUpdateHandlers } from "./app-update-handlers";
 import {
 	registerArchitectureVisualizerHandlers,
@@ -150,6 +151,7 @@ export { registerAgenteventsHandlers } from "./agent-events-handlers";
 export { registerApiExplorerHandlers } from "./api-explorer-handlers";
 export { registerApiWatcherHandlers } from "./api-watcher-handlers";
 export { registerAppEmulatorHandlers } from "./app-emulator-handlers";
+export { registerMobileHandlers } from "./mobile-handlers";
 export { registerAppUpdateHandlers } from "./app-update-handlers";
 export {
 	registerArchitectureVisualizerHandlers,
@@ -408,6 +410,7 @@ export function setupIpcHandlers(
 
 	// App Emulator handlers
 	registerAppEmulatorHandlers(getMainWindow);
+	registerMobileHandlers(getMainWindow);
 
 	// Learning Loop handlers (Autonomous Agent Learning Loop)
 	registerLearningLoopHandlers(getMainWindow);

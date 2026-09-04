@@ -21,6 +21,7 @@ Pipeline : **spec → planner → coder → QA reviewer → QA fixer → revue h
 | **i18n obligatoire** — tout texte visible passe par une clé `react-i18next` | l'app est livrée en FR et EN |
 | **Abstraction plateforme** — jamais `process.platform` en direct | Windows / macOS / Linux sont tous supportés en CI |
 | **PR vers `develop`**, jamais `main` | `main` est la branche de release |
+| **iOS ne se construit que sur macOS** — le signaler, jamais réessayer | la chaîne d'outils Apple n'existe pas ailleurs ; `mobile/readiness.py` répond avant la phase |
 | **Versions d'outils épinglées** — ruff `0.15.7`, Biome `2.4.10` | toute autre version produit un diff que la CI refuse |
 
 ## Carte du dépôt
@@ -35,6 +36,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   learning_loop/       patterns depuis les builds, phase observe, replay A/B des promotions
   mem_search/          lecture de la mémoire par paliers (skill mem-search)
   libdocs/             docs des bibliothèques que le dépôt n'illustre pas, avant le build
+  mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt
   slash_commands/      sert .agents/skills/ à la barre de commandes du Kanban
   skills_registry/     parseur de frontmatter partagé (source unique)
   prompts/             les prompts système réels des agents
