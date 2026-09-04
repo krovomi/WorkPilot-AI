@@ -91,6 +91,8 @@ class TestAnEmptyFrameIsNotASuccess:
 def test_the_script_still_exposes_the_cli_the_workflow_calls():
     """`mobile-device-check.yml` passes these four flags; a rename would turn
     the job into an argparse error four minutes into a run."""
-    source = (REPO_ROOT / "scripts" / "mobile_device_check.py").read_text()
+    source = (REPO_ROOT / "scripts" / "mobile_device_check.py").read_text(
+        encoding="utf-8"
+    )
     for flag in ("--project-dir", "--platform", "--require-device", "--launch"):
         assert flag in source, f"{flag} disappeared from the script"
