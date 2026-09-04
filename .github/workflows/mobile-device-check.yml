@@ -74,12 +74,12 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            python scripts/mobile_device_check.py \
-              --project-dir tests/fixtures/android-sample \
-              --platform android \
-              --require-device \
-              --launch
+          # One line, no backslash continuations: the action hands `script` to
+          # `sh -c` a line at a time, so a wrapped command arrives as
+          # `python scripts/mobile_device_check.py \` on its own and argparse
+          # sees no arguments at all. The first run failed exactly there, after
+          # the emulator had booted successfully.
+          script: python scripts/mobile_device_check.py --project-dir tests/fixtures/android-sample --platform android --require-device --launch
 
       - name: Publish the captured frame
         # Uploaded on failure too: a frame of the launcher instead of the app is

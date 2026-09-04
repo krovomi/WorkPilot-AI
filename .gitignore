@@ -243,3 +243,16 @@ skills/_proposed/_ledgers/
 # skills-cli: vendored on demand (claude-mem)
 skills/claude-mem/*
 !skills/claude-mem/pack.json
+
+# ===========================
+# Gradle / Android
+# ===========================
+# `tests/fixtures/android-sample/` is the repository's first Gradle project, so
+# nothing here ignored Gradle's local state before it. `build/` above already
+# covers the outputs (it is in the Python section, and catches `app/build/` by
+# coincidence rather than by intent); `.gradle/` is the per-machine cache and
+# daemon state, which is what actually shows up untracked after a build.
+.gradle/
+local.properties
+*.apk
+*.aab
