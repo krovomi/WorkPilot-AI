@@ -81,6 +81,14 @@ export function AddProjectModal({
 	const [pendingProjectPath, setPendingProjectPath] = useState<string | null>(
 		null,
 	);
+	// What "Create" would actually do here — see the effect below.
+	const [locationCheck, setLocationCheck] = useState<{
+		targetExists: boolean;
+		targetHasEntries: boolean;
+		locationIsProject: boolean;
+		insideRepository: string | null;
+		markers: string[];
+	} | null>(null);
 	const [detectedProvider, setDetectedProvider] = useState<
 		"github" | "azure_devops" | "unknown" | null
 	>(null);
@@ -293,6 +301,58 @@ export function AddProjectModal({
 		return joinProjectPath(projectLocation, folderName);
 	}, [projectLocation, projectName]);
 
+	// "Create" and "Open existing folder" are two different acts, and the form
+	// cannot say which one the user meant without looking at the disk: pointing
+	// the location at a folder that already holds the code adds an empty sibling
+	// next to it. Asking here is what lets the wizard say so before it happens.
+	useEffect(() => {
+		if (step !== 0 || !projectLocation) {
+			setLocationCheck(null);
+			return;
+		}
+		let current = true;
+		const inspect = async () => {
+			const result = await globalThis.electronAPI.inspectProjectLocation(
+				projectLocation,
+				projectName,
+			);
+			if (!current) return;
+			setLocationCheck(
+				result.success && result.data
+					? {
+							targetExists: result.data.targetExists,
+							targetHasEntries: result.data.targetHasEntries,
+							locationIsProject: result.data.locationIsProject,
+							insideRepository: result.data.insideRepository,
+							markers: result.data.markers,
+						}
+					: null,
+			);
+		};
+		void inspect();
+		return () => {
+			current = false;
+		};
+	}, [projectLocation, projectName, step]);
+
+	/**
+	 * The folder the user probably meant to open rather than create under.
+	 *
+	 * Two cases, and they point at different folders: the target already exists
+	 * and holds something, or the location itself is the project — which is the
+	 * one that bites, because creating then succeeds and registers an empty
+	 * sibling that no scan will ever find endpoints in.
+	 */
+	const openSuggestion = useMemo(() => {
+		if (!locationCheck) return null;
+		if (locationCheck.targetExists) {
+			return locationCheck.targetHasEntries ? targetProjectPath : null;
+		}
+		return locationCheck.locationIsProject || locationCheck.insideRepository
+			? projectLocation
+			: null;
+	}, [locationCheck, targetProjectPath, projectLocation]);
+
 	// Auto-detect repository type when project path changes
 	useEffect(() => {
 		const autoDetectProvider = async () => {
@@ -372,8 +432,13 @@ export function AddProjectModal({
 					</span>
 				</Button>
 			</div>
-			<div className="pt-4 text-xs font-medium text-muted-foreground">
-				{t("addProject.orCreateNew")}
+			<div className="pt-4 space-y-1">
+				<div className="text-xs font-medium text-muted-foreground">
+					{t("addProject.orCreateNew")}
+				</div>
+				<p className="text-xs text-muted-foreground/80">
+					{t("addProject.orCreateNewHint")}
+				</p>
 			</div>
 			<div className="py-4 space-y-4">
 				<div className="space-y-2">
@@ -420,6 +485,34 @@ export function AddProjectModal({
 							<span className="font-mono">{targetProjectPath}</span>
 						</p>
 					)}
+					{locationCheck &&
+						(locationCheck.targetExists ||
+							locationCheck.locationIsProject ||
+							locationCheck.insideRepository) && (
+							<div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
+								<p className="text-xs text-amber-600 dark:text-amber-400">
+									{locationCheck.targetExists
+										? t("addProject.targetAlreadyExists")
+										: locationCheck.locationIsProject
+											? t("addProject.locationLooksLikeProject", {
+													markers: locationCheck.markers.join(", "),
+												})
+											: t("addProject.locationInsideRepository", {
+													repository: locationCheck.insideRepository,
+												})}
+								</p>
+								{openSuggestion && (
+									<Button
+										type="button"
+										size="sm"
+										variant="outline"
+										onClick={() => openFolder(openSuggestion)}
+									>
+										{t("addProject.openThisFolderInstead")}
+									</Button>
+								)}
+							</div>
+						)}
 				</div>
 				<div className="space-y-2">
 					<label className="flex items-center gap-2">
@@ -687,12 +780,9 @@ export function AddProjectModal({
 	// est enregistré tel quel. C'était jusqu'ici accessible par le seul raccourci
 	// Ctrl/Cmd+T, sans bouton ni menu, et le modal ne savait que créer un dossier
 	// vide — d'où des projets ajoutés qui ne contenaient que `.git`.
-	const handleOpenExisting = async () => {
+	const openFolder = async (path: string) => {
 		setError(null);
 		try {
-			const path = await globalThis.electronAPI.selectDirectory();
-			if (!path) return;
-
 			const added = await addProject(path);
 			const project = added?.project ?? null;
 			if (!project) {
@@ -718,6 +808,11 @@ export function AddProjectModal({
 				err instanceof Error ? err.message : t("addProject.failedToCreate"),
 			);
 		}
+	};
+
+	const handleOpenExisting = async () => {
+		const path = await globalThis.electronAPI.selectDirectory();
+		if (path) await openFolder(path);
 	};
 
 	// Création effective du projet

@@ -212,7 +212,12 @@
 		"successTitle": "Projet créé",
 		"successDescription": "Le projet a bien été créé et configuré.",
 		"failedToCreateTitle": "Erreur lors de la création",
-		"next": "Suivant"
+		"next": "Suivant",
+		"orCreateNewHint": "« Créer » fabrique un nouveau dossier vide à l’emplacement ci-dessous et ajoute celui-là. Pour travailler sur du code que vous avez déjà, utilisez « Ouvrir un dossier existant ».",
+		"targetAlreadyExists": "Ce dossier existe déjà : la création échouera.",
+		"locationLooksLikeProject": "Cet emplacement est déjà un projet ({{markers}}). « Créer » y ajouterait un sous-dossier vide, et c’est ce dossier vide qui serait ajouté.",
+		"openThisFolderInstead": "Ouvrir plutôt ce dossier",
+		"locationInsideRepository": "Cet emplacement est à l’intérieur du dépôt {{repository}}. « Créer » y ajouterait un sous-dossier vide, et c’est ce dossier vide qui serait ajouté."
 	},
 	"customModel": {
 		"title": "Configuration du modèle personnalisé",

@@ -18,6 +18,17 @@ export interface ScanOptions {
 	 * where a template literal may hold braces that must not be counted.
 	 */
 	templateLiterals?: boolean;
+	/**
+	 * Read `'` as a char literal only when it closes right away (`'x'`, `'\n'`).
+	 * On for Rust: `&'static str` is a lifetime, and reading it as an
+	 * unterminated literal swallows the rest of the line — braces included.
+	 */
+	lifetimes?: boolean;
+}
+
+/** True when `'` at `index` opens a char literal rather than a lifetime. */
+export function isCharLiteral(source: string, index: number): boolean {
+	return /^'(?:\\.|[^\\'])'/.test(source.slice(index, index + 4));
 }
 
 /** Index of the closing quote of the literal that starts at `index`. */
@@ -82,6 +93,7 @@ export function findMatching(
 			i = end === -1 ? source.length : end + 1;
 			continue;
 		}
+		if (ch === "'" && options.lifetimes && !isCharLiteral(source, i)) continue;
 		if (ch === '"' || ch === "'" || (options.templateLiterals && ch === "`")) {
 			i = skipStringLiteral(source, i);
 			continue;
@@ -116,6 +128,7 @@ export function findStatementEnd(
 			i = end === -1 ? source.length : end + 1;
 			continue;
 		}
+		if (ch === "'" && options.lifetimes && !isCharLiteral(source, i)) continue;
 		if (ch === '"' || ch === "'" || (options.templateLiterals && ch === "`")) {
 			i = skipStringLiteral(source, i);
 			continue;

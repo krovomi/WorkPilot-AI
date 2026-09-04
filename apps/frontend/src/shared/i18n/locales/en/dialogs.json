@@ -212,7 +212,12 @@
 		"successTitle": "Project Created",
 		"successDescription": "The project has been successfully created and configured.",
 		"failedToCreateTitle": "Creation Error",
-		"next": "Next"
+		"next": "Next",
+		"orCreateNewHint": "Creating makes a new, empty folder at the location below and adds that. To work on code you already have, use “Open Existing Folder”.",
+		"targetAlreadyExists": "That folder already exists, so creating it will fail.",
+		"locationLooksLikeProject": "This location is already a project ({{markers}}). Creating would add an empty sub-folder inside it, and the empty folder is what gets added.",
+		"openThisFolderInstead": "Open this folder instead",
+		"locationInsideRepository": "This location is inside the repository at {{repository}}. Creating would add an empty sub-folder there, and the empty folder is what gets added."
 	},
 	"customModel": {
 		"title": "Custom Model Configuration",
