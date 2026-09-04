@@ -20,6 +20,7 @@ import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
 import { useProviderContext } from "../ProviderContext";
+import { RepositorySection } from "./RepositorySection";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
@@ -89,6 +90,11 @@ export function GeneralSettings({
 
 	return (
 		<>
+			{/* Repository — shown whether or not WorkPilot AI is initialized */}
+			<RepositorySection project={project} settings={settings} />
+
+			<Separator />
+
 			{/* WorkPilot AI Integration */}
 			<section className="space-y-4">
 				<h3 className="text-sm font-semibold text-foreground">

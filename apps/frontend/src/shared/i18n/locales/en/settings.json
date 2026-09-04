@@ -932,6 +932,20 @@
 				"label": "QA Review",
 				"description": "Quality assurance and validation"
 			}
+		},
+		"repository": {
+			"title": "Repository",
+			"name": "Project name",
+			"path": "Repository path",
+			"copyPath": "Copy",
+			"copied": "Copied",
+			"openTerminal": "Open a terminal",
+			"openTerminalHint": "Opens a system terminal at the repository root",
+			"changeFolder": "Change folder…",
+			"workpilotPath": "WorkPilot folder",
+			"workpilotPathMissing": "Not created yet — initialize WorkPilot AI below.",
+			"mainBranch": "Main branch",
+			"mainBranchAuto": "Auto-detected (configurable under GitHub / GitLab)"
 		}
 	},
 	"workspace": {
