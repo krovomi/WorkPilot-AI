@@ -15,6 +15,7 @@ import { setProjectEnvConfig } from "../../../stores/project-env-store";
 import {
 	checkProjectVersion,
 	initializeProject,
+	refreshProjects,
 	updateProjectSettings,
 } from "../../../stores/project-store";
 
@@ -428,6 +429,12 @@ export function useProjectSettings(
 		try {
 			const result = await initializeProject(project.id);
 			if (result?.success) {
+				// The main process wrote `.workpilot/` and stamped `autoBuildPath`
+				// on the stored record; the renderer still holds the pre-init copy.
+				// Without this the pane keeps claiming "Not Initialized" — and every
+				// section gated on `autoBuildPath` stays hidden — until the dialog is
+				// closed and reopened.
+				await refreshProjects();
 				const versionResult = await checkProjectVersion(project.id);
 				if (versionResult.success && versionResult.data) {
 					setVersionInfo(versionResult.data);
