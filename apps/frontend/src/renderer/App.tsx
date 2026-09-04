@@ -375,6 +375,7 @@ import {
 	UI_SCALE_MAX,
 	UI_SCALE_MIN,
 } from "@shared/constants";
+import { resolveInterfaceLanguage } from "@shared/constants/i18n";
 import type { ColorTheme, Project, Task } from "@shared/types";
 import { AlertCircle } from "lucide-react";
 import {
@@ -975,6 +976,20 @@ export function App() {
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when settings.language changes, not on every i18n object change
 	}, [settings.language, i18n.language, i18n.changeLanguage]);
+
+	// First run: nobody has chosen a language yet, so take the one the desktop
+	// is already set to. It is written to the settings rather than only applied,
+	// so Settings → Language shows the language the app is actually speaking —
+	// and the moment the user picks one, this never fires again.
+	useEffect(() => {
+		if (settingsLoading || settings.language) return;
+		const resolved = resolveInterfaceLanguage([
+			...(globalThis.navigator?.languages ?? []),
+			globalThis.navigator?.language ?? "",
+		]);
+		saveSettings({ language: resolved });
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- Runs once, when settings have loaded without a language
+	}, [settingsLoading, settings.language]);
 
 	// Sync spell check language with i18n language
 	useEffect(() => {
