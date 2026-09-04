@@ -69,12 +69,13 @@ describe("useProjectRouteScan", () => {
 			data: scanned,
 			specUrls: ["http://localhost:5180/swagger/v1/swagger.json"],
 		});
-		const proxyHttpRequest = vi.fn().mockResolvedValue({
-			success: false,
-			status: 0,
-			statusText: "Network Error",
+		// Nothing is listening — the ordinary case, reported as an absence of
+		// document rather than as a failure.
+		const probeLiveApiSpec = vi.fn().mockResolvedValue({
+			success: true,
+			data: null,
 		});
-		Object.assign(window.electronAPI, { scanProjectRoutes, proxyHttpRequest });
+		Object.assign(window.electronAPI, { scanProjectRoutes, probeLiveApiSpec });
 
 		renderHook(() => useProjectRouteScan());
 		await act(async () => await Promise.resolve());
@@ -93,12 +94,12 @@ describe("useProjectRouteScan", () => {
 			data: spec("Scanned .NET API"),
 			specUrls: [discoveredUrl],
 		});
-		const proxyHttpRequest = vi.fn().mockResolvedValue({
+		const probeLiveApiSpec = vi.fn().mockResolvedValue({
 			success: true,
-			status: 200,
-			body: JSON.stringify(live),
+			data: live,
+			url: discoveredUrl,
 		});
-		Object.assign(window.electronAPI, { scanProjectRoutes, proxyHttpRequest });
+		Object.assign(window.electronAPI, { scanProjectRoutes, probeLiveApiSpec });
 
 		renderHook(() => useProjectRouteScan());
 		await act(async () => await Promise.resolve());

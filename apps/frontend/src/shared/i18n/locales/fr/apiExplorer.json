@@ -150,6 +150,7 @@
 		"error": "Impossible de scanner les routes du projet",
 		"resync": "Resynchroniser",
 		"sourceBadge": "Source",
+		"fileBadge": "Fichier spec",
 		"scannedAt": "scanné à {{time}}"
 	},
 	"emulator": {

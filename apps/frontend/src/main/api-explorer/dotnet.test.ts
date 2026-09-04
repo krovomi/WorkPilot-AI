@@ -489,3 +489,114 @@ app.MapMethods("/health", new[] { "GET", "HEAD" }, () => "ok");
 		).toEqual(["GET", "HEAD"]);
 	});
 });
+
+describe("detectDotnet — solution roots", () => {
+	const SOLUTION = {
+		"Rag.sln": "Microsoft Visual Studio Solution File, Format Version 12.00",
+		"src/Rag.Api/Rag.Api.csproj": '<Project Sdk="Microsoft.NET.Sdk.Web"></Project>',
+		"src/Rag.Api/Rag.Api.http": "GET http://localhost:5180/api/documents",
+		"src/Rag.Api/Program.cs": `var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+app.MapGet("/health", () => "ok");
+app.Run();`,
+		"src/Rag.Api/Controllers/DocumentsController.cs": `using Microsoft.AspNetCore.Mvc;
+
+[ApiController]
+[Route("api/[controller]")]
+public class DocumentsController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult GetAll() => Ok();
+}`,
+		"src/Rag.Domain/Rag.Domain.csproj": '<Project Sdk="Microsoft.NET.Sdk"></Project>',
+		"src/Rag.Domain/Document.cs": "public record Document(Guid Id, string Name);",
+		"tests/Rag.Api.Tests/Rag.Api.Tests.csproj":
+			'<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="xunit" Version="2.9.0" /></ItemGroup></Project>',
+		"tests/Rag.Api.Tests/FakeController.cs": `[Route("test-only")]
+public class FakeController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok();
+}`,
+	};
+
+	function paths(routes: DetectedRoute[]): string[] {
+		return routes.map((entry) => `${entry.methods[0]} ${entry.path}`).sort();
+	}
+
+	it("finds from the folder holding the .sln what the API project holds", () => {
+		const root = createProject(SOLUTION);
+
+		expect(paths(detectDotnet(root).routes)).toEqual(
+			paths(detectDotnet(path.join(root, "src/Rag.Api")).routes),
+		);
+	});
+
+	it("leaves the fake controller of the test project out", () => {
+		const { routes } = detectDotnet(createProject(SOLUTION));
+
+		expect(paths(routes)).toEqual(["GET /api/Documents", "GET /health"]);
+	});
+
+	it("names the project each route came from", () => {
+		const { routes } = detectDotnet(createProject(SOLUTION));
+
+		expect(new Set(routes.map((entry) => entry.project))).toEqual(
+			new Set(["Rag.Api"]),
+		);
+	});
+
+	it("keeps the controllers a referenced library declares", () => {
+		const { routes } = detectDotnet(
+			createProject({
+				"Rag.sln": "Microsoft Visual Studio Solution File",
+				"src/Rag.Api/Rag.Api.csproj":
+					'<Project Sdk="Microsoft.NET.Sdk.Web"></Project>',
+				"src/Rag.Api/Program.cs": "var app = WebApplication.Create(args);",
+				"src/Rag.Presentation/Rag.Presentation.csproj":
+					'<Project Sdk="Microsoft.NET.Sdk"></Project>',
+				"src/Rag.Presentation/DocumentsController.cs": `[ApiController]
+[Route("api/[controller]")]
+public class DocumentsController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult GetAll() => Ok();
+}`,
+			}),
+		);
+
+		expect(route(routes, "GET", "/api/Documents").project).toBe(
+			"Rag.Presentation",
+		);
+	});
+
+	it("tells two API projects of one solution apart", () => {
+		const controller = (name: string) => `[ApiController]
+[Route("api/[controller]")]
+public class ${name}Controller : ControllerBase
+{
+    [HttpGet]
+    public IActionResult GetAll() => Ok();
+}`;
+		const { routes } = detectDotnet(
+			createProject({
+				"src/Rag.Api/Rag.Api.csproj":
+					'<Project Sdk="Microsoft.NET.Sdk.Web"></Project>',
+				"src/Rag.Api/Controllers/DocumentsController.cs":
+					controller("Documents"),
+				"src/Rag.Admin/Rag.Admin.csproj":
+					'<Project Sdk="Microsoft.NET.Sdk.Web"></Project>',
+				"src/Rag.Admin/Controllers/UsersController.cs": controller("Users"),
+			}),
+		);
+
+		expect(
+			Object.fromEntries(
+				routes.map((entry) => [entry.path, entry.project]),
+			),
+		).toEqual({
+			"/api/Documents": "Rag.Api",
+			"/api/Users": "Rag.Admin",
+		});
+	});
+});

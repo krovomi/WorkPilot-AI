@@ -2,7 +2,22 @@ import path from "node:path";
 import { app, ipcMain, net, safeStorage } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import { detectDotnet } from "../api-explorer/dotnet";
-import { readFile, walkFiles } from "../api-explorer/source-files";
+import { detectGo } from "../api-explorer/go";
+import { detectSpring } from "../api-explorer/jvm";
+import { detectNode } from "../api-explorer/node";
+import { detectPython } from "../api-explorer/python";
+import {
+	buildProbeUrls,
+	discoverBaseUrls,
+	type LiveSpec,
+	probeLiveSpec,
+} from "../api-explorer/live-spec";
+import { findCommittedSpec } from "../api-explorer/spec-files";
+import {
+	readDirectory,
+	readFile,
+	walkFiles,
+} from "../api-explorer/source-files";
 import type {
 	DetectedRoute,
 	JsonSchema,
@@ -17,224 +32,6 @@ import {
 // ASP.NET Core lives in ../api-explorer/dotnet.ts: it reads action signatures
 // and DTOs, so it needs more than a regex sweep. The detectors below stay
 // declaration-level on purpose.
-
-const OPENAPI_PATHS_BY_FRAMEWORK: Record<string, string[]> = {
-	"ASP.NET Core": [
-		"/swagger/v1/swagger.json",
-		"/swagger.json",
-		"/openapi/v1.json",
-	],
-};
-
-function detectLiveSpecUrls(
-	projectPath: string,
-	frameworks: string[],
-): string[] {
-	const paths = frameworks.flatMap(
-		(framework) => OPENAPI_PATHS_BY_FRAMEWORK[framework] ?? [],
-	);
-	if (paths.length === 0) return [];
-
-	const launchFiles = walkFiles(projectPath, ["launchSettings.json"], 5);
-	const baseUrls = new Set<string>();
-	for (const launchFile of launchFiles) {
-		const content = readFile(launchFile);
-		if (!content) continue;
-		try {
-			const parsed = JSON.parse(content) as {
-				profiles?: Record<string, { applicationUrl?: string }>;
-			};
-			for (const profile of Object.values(parsed.profiles ?? {})) {
-				for (const url of profile.applicationUrl?.split(";") ?? []) {
-					if (/^https?:\/\//.test(url.trim())) {
-						baseUrls.add(url.trim().replace(/\/$/, ""));
-					}
-				}
-			}
-		} catch {
-			// A malformed launch profile must not prevent source route discovery.
-		}
-	}
-
-	return [...baseUrls].flatMap((baseUrl) =>
-		paths.map((specPath) => `${baseUrl}${specPath}`),
-	);
-}
-
-/** FastAPI / Flask / Django — Python */
-function detectPython(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".py"]);
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content) continue;
-		const tag = path.basename(filePath, ".py");
-
-		// FastAPI: @app.get("/path") @router.post("/path")
-		const fastapiRe =
-			/@(?:app|router)\.(get|post|put|delete|patch)\(["']([^"']+)["']/g;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = fastapiRe.exec(content)) !== null) {
-			routes.push({
-				path: m[2],
-				methods: [m[1].toUpperCase()],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "FastAPI",
-				requiresAuth: /Depends/.test(content.slice(m.index, m.index + 120)),
-			});
-		}
-
-		// Flask: @app.route("/path", methods=["GET","POST"])
-		const flaskRe =
-			/@(?:app|bp|blueprint)\.route\(["']([^"']+)["'](?:[^)]*methods\s*=\s*\[([^\]]+)\])?/g;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = flaskRe.exec(content)) !== null) {
-			const methods = m[2]
-				? m[2]
-						.split(",")
-						.map((x) => x.trim().replace(/["']/g, "").toUpperCase())
-				: ["GET"];
-			routes.push({
-				path: m[1],
-				methods,
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "Flask",
-				requiresAuth: /login_required/.test(
-					content.slice(Math.max(0, m.index - 100), m.index),
-				),
-			});
-		}
-	}
-	return routes;
-}
-
-/** Express / Fastify / NestJS — TypeScript / JavaScript */
-function detectExpress(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".ts", ".js", ".mts", ".mjs"]);
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content) continue;
-		const tag = path.basename(filePath).replace(/\.(ts|js|mts|mjs)$/, "");
-
-		// Express/Fastify: router.get('/path', ...)  app.post('/path', ...)
-		const expressRe =
-			/(?:app|router|server)\.(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']/g;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = expressRe.exec(content)) !== null) {
-			routes.push({
-				path: m[2],
-				methods: [m[1].toUpperCase()],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "Express",
-				requiresAuth: false,
-			});
-		}
-
-		// NestJS decorators: @Get('/path') @Post('/path') etc.
-		const nestRe =
-			/@(Get|Post|Put|Delete|Patch)\s*\(\s*["']?([^"')\s]*)["']?\s*\)/g;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = nestRe.exec(content)) !== null) {
-			const p = m[2] ? (m[2].startsWith("/") ? m[2] : `/${m[2]}`) : "/";
-			routes.push({
-				path: p,
-				methods: [m[1].toUpperCase()],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "NestJS",
-				requiresAuth: false,
-			});
-		}
-	}
-	return routes;
-}
-
-/** Spring Boot — Java */
-function detectSpring(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".java"]);
-	const verbMap: Record<string, string> = {
-		GetMapping: "GET",
-		PostMapping: "POST",
-		PutMapping: "PUT",
-		DeleteMapping: "DELETE",
-		PatchMapping: "PATCH",
-	};
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content || !/@(?:Rest)?Controller/.test(content)) continue;
-		const tag = path
-			.basename(filePath, ".java")
-			.replace("Controller", "")
-			.toLowerCase();
-
-		// Class-level @RequestMapping
-		const clsMatch = content.match(
-			/@RequestMapping\(\s*["']?([^"')\s]+)["']?\s*\)/,
-		);
-		const classBase = clsMatch
-			? clsMatch[1].startsWith("/")
-				? clsMatch[1]
-				: `/${clsMatch[1]}`
-			: "";
-
-		const methodRe =
-			/@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping)\s*\(\s*(?:value\s*=\s*)?["']?([^"')\s]*)["']?\s*\)/g;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = methodRe.exec(content)) !== null) {
-			const method = verbMap[m[1]] ?? "GET";
-			const sub = m[2] ? (m[2].startsWith("/") ? m[2] : `/${m[2]}`) : "";
-			const fullPath = `${classBase}${sub}`.replace(/\/+/g, "/") || "/";
-			routes.push({
-				path: fullPath,
-				methods: [method],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "Spring Boot",
-				requiresAuth: false,
-			});
-		}
-	}
-	return routes;
-}
-
-/** Go — Gin / Echo / Chi / Fiber */
-function detectGo(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".go"]);
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content) continue;
-		const tag = path.basename(filePath, ".go");
-
-		const goRe =
-			/(?:r|e|app|router)\.(GET|POST|PUT|DELETE|PATCH|Get|Post|Put|Delete|Patch)\s*\(\s*["']([^"']+)["']/g;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = goRe.exec(content)) !== null) {
-			routes.push({
-				path: m[2],
-				methods: [m[1].toUpperCase()],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "Go",
-				requiresAuth: false,
-			});
-		}
-	}
-	return routes;
-}
 
 /** Rust — Axum / Actix */
 function detectRust(projectPath: string): DetectedRoute[] {
@@ -325,6 +122,15 @@ function buildOpenApiSpec(
 	const paths: Record<string, Record<string, unknown>> = {};
 	const tags = new Set<string>();
 
+	// One scan root can hold several applications — a solution with an API and
+	// an admin host, a monorepo with a Go gateway beside a .NET service. When it
+	// does, the project name joins the tag, so two `Documents` controllers are
+	// not read as one. A single-project scan keeps the bare controller name.
+	const projects = new Set(
+		routes.map((route) => route.project).filter(Boolean),
+	);
+	const qualify = projects.size > 1;
+
 	for (const route of routes) {
 		// Convert {param} style (ASP.NET / Java) and [param] style to OpenAPI {param}
 		const openApiPath = route.path
@@ -333,9 +139,12 @@ function buildOpenApiSpec(
 
 		if (!paths[openApiPath]) paths[openApiPath] = {};
 
+		const tag =
+			qualify && route.project ? `${route.project} / ${route.tag}` : route.tag;
+
 		for (const method of route.methods) {
 			const op: Record<string, unknown> = {
-				tags: [route.tag],
+				tags: [tag],
 				summary: route.summary ?? `${method} ${openApiPath}`,
 				operationId: `${method.toLowerCase()}_${openApiPath
 					.replace(/[^a-zA-Z0-9]/g, "_")
@@ -366,7 +175,7 @@ function buildOpenApiSpec(
 			}
 
 			paths[openApiPath][method.toLowerCase()] = op;
-			tags.add(route.tag);
+			tags.add(tag);
 		}
 	}
 
@@ -436,6 +245,41 @@ function buildResponses(route: DetectedRoute): Record<string, unknown> {
 	return responses;
 }
 
+
+/**
+ * One probe request: abandoned at `timeoutMs`, and yielding a body only for a
+ * successful response small enough to be a description rather than a dump.
+ */
+const fetchSpecBody = async (
+	url: string,
+	timeoutMs: number,
+): Promise<string | null> => {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), timeoutMs);
+	try {
+		const res = await net.fetch(url, {
+			method: "GET",
+			headers: { Accept: "application/json, application/yaml, text/plain" },
+			signal: controller.signal,
+		});
+		if (!res.ok) return null;
+		const declaredLength = Number.parseInt(
+			res.headers.get("content-length") ?? "",
+			10,
+		);
+		if (Number.isFinite(declaredLength) && declaredLength > 8 * 1024 * 1024) {
+			return null;
+		}
+		return await res.text();
+	} catch {
+		// A refused connection, a timeout, a TLS the dev certificate cannot
+		// satisfy: none of them are errors here, they are simply not a match.
+		return null;
+	} finally {
+		clearTimeout(timer);
+	}
+};
+
 // ── IPC handler registration ──────────────────────────────────────────────────
 
 interface ProxyRequestPayload {
@@ -485,30 +329,91 @@ export function registerApiExplorerHandlers(): void {
 		IPC_CHANNELS.API_EXPLORER_SCAN_ROUTES,
 		(_event, projectPath: string, projectName: string) => {
 			try {
+				// An unreadable root walks to an empty list exactly like a project
+				// with no sources, and "0 endpoints" would then mean two different
+				// things. Say which one it is.
+				if (readDirectory(projectPath) === null) {
+					return {
+						success: false,
+						error: `Cannot read project directory: ${projectPath}`,
+					};
+				}
+
 				const dotnet = detectDotnet(projectPath);
 				const routes: DetectedRoute[] = [
 					...dotnet.routes,
 					...detectPython(projectPath),
-					...detectExpress(projectPath),
+					...detectNode(projectPath),
 					...detectSpring(projectPath),
 					...detectGo(projectPath),
 					...detectRust(projectPath),
 					...detectRails(projectPath),
 				];
 
-				const spec = buildOpenApiSpec(
+				const scanned = buildOpenApiSpec(
 					routes,
 					projectName || "Project",
 					dotnet.schemas,
 				);
 				const frameworks = [...new Set(routes.map((route) => route.framework))];
+
+				// A description the team wrote and versions beats anything inferred
+				// from source: it states the paths, parameters and schemas outright.
+				const committed = findCommittedSpec(projectPath);
+
 				return {
 					success: true,
-					data: spec,
-					routeCount: routes.length,
+					data: committed?.document ?? scanned,
+					source: committed ? "file" : "scan",
+					specFile: committed?.relativePath,
+					routeCount: committed ? committed.pathCount : routes.length,
+					filesScanned: dotnet.filesScanned,
+					apiProjects: dotnet.apiProjects ?? [],
 					frameworks,
-					specUrls: detectLiveSpecUrls(projectPath, frameworks),
+					specUrls: buildProbeUrls(
+						discoverBaseUrls(projectPath, frameworks),
+						frameworks,
+					),
 				};
+			} catch (err) {
+				return { success: false, error: String(err) };
+			}
+		},
+	);
+
+	// Live document — asks the running application for its own description.
+	// Bounded on every axis (candidates, per-request timeout, total budget) so
+	// a fallback can never become a wait; see PROBE_LIMITS.
+	ipcMain.handle(
+		IPC_CHANNELS.API_EXPLORER_PROBE_LIVE_SPEC,
+		async (
+			_event,
+			projectPath: string,
+			frameworks: string[],
+		): Promise<{
+			success: boolean;
+			data?: Record<string, unknown> | null;
+			url?: string;
+			routeCount?: number;
+			error?: string;
+		}> => {
+			try {
+				const urls = buildProbeUrls(
+					discoverBaseUrls(projectPath, frameworks ?? []),
+					frameworks ?? [],
+				);
+				const found: LiveSpec | null = await probeLiveSpec(
+					urls,
+					fetchSpecBody,
+				);
+				return found
+					? {
+							success: true,
+							data: found.document,
+							url: found.url,
+							routeCount: found.pathCount,
+						}
+					: { success: true, data: null };
 			} catch (err) {
 				return { success: false, error: String(err) };
 			}

@@ -26,6 +26,21 @@ export const EXCLUDED_DIRS = new Set([
 	".vs",
 ]);
 
+/**
+ * Lists a directory, or returns `null` when it cannot be read.
+ *
+ * The distinction matters: a project whose root is unreadable and one that
+ * genuinely holds no source file both walk to an empty list, and the caller
+ * has no way to tell "nothing to find" from "could not look".
+ */
+export function readDirectory(dir: string): string[] | null {
+	try {
+		return readdirSync(dir);
+	} catch {
+		return null;
+	}
+}
+
 export function walkFiles(
 	dir: string,
 	extensions: string[],
@@ -34,12 +49,8 @@ export function walkFiles(
 ): string[] {
 	if (depth > maxDepth) return [];
 	let results: string[] = [];
-	let entries: string[];
-	try {
-		entries = readdirSync(dir);
-	} catch {
-		return [];
-	}
+	const entries = readDirectory(dir);
+	if (entries === null) return [];
 	for (const entry of entries) {
 		if (EXCLUDED_DIRS.has(entry)) continue;
 		const full = path.join(dir, entry);

@@ -57,6 +57,8 @@ export default defineConfig({
 					"minimatch",
 					// XState for task state machine
 					"xstate",
+					// YAML, for the OpenAPI documents the API Explorer reads
+					"yaml",
 				],
 			},
 			rollupOptions: {

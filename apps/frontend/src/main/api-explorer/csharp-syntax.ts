@@ -8,6 +8,18 @@
  * several lines.
  */
 
+/**
+ * Options for the scanners below, so one implementation serves more than one
+ * language.
+ */
+export interface ScanOptions {
+	/**
+	 * Treat a backtick as a string delimiter. Off for C#, on for JS and TS,
+	 * where a template literal may hold braces that must not be counted.
+	 */
+	templateLiterals?: boolean;
+}
+
 /** Index of the closing quote of the literal that starts at `index`. */
 export function skipStringLiteral(source: string, index: number): number {
 	if (source.startsWith('"""', index)) {
@@ -20,6 +32,9 @@ export function skipStringLiteral(source: string, index: number): number {
 	while (prefixStart > 0 && "@$".includes(source[prefixStart - 1])) prefixStart--;
 	const verbatim = source.slice(prefixStart, index).includes("@");
 	const quote = source[index];
+	// A template literal ends on its backtick; `\n` inside it is legal, so the
+	// newline bail-out below must not apply.
+	const isTemplate = quote === "`";
 	for (let i = index + 1; i < source.length; i++) {
 		const ch = source[i];
 		if (verbatim) {
@@ -37,7 +52,7 @@ export function skipStringLiteral(source: string, index: number): number {
 			continue;
 		}
 		if (ch === quote) return i;
-		if (ch === "\n") return i;
+		if (ch === "\n" && !isTemplate) return i;
 	}
 	return source.length;
 }
@@ -51,6 +66,7 @@ export function findMatching(
 	openIndex: number,
 	open: string,
 	close: string,
+	options: ScanOptions = {},
 ): number {
 	let depth = 0;
 	for (let i = openIndex; i < source.length; i++) {
@@ -66,7 +82,7 @@ export function findMatching(
 			i = end === -1 ? source.length : end + 1;
 			continue;
 		}
-		if (ch === '"' || ch === "'") {
+		if (ch === '"' || ch === "'" || (options.templateLiterals && ch === "`")) {
 			i = skipStringLiteral(source, i);
 			continue;
 		}
@@ -80,7 +96,11 @@ export function findMatching(
 }
 
 /** Index of the `;` that ends the statement starting at `startIndex`. */
-export function findStatementEnd(source: string, startIndex: number): number {
+export function findStatementEnd(
+	source: string,
+	startIndex: number,
+	options: ScanOptions = {},
+): number {
 	let parens = 0;
 	let braces = 0;
 	for (let i = startIndex; i < source.length; i++) {
@@ -96,7 +116,7 @@ export function findStatementEnd(source: string, startIndex: number): number {
 			i = end === -1 ? source.length : end + 1;
 			continue;
 		}
-		if (ch === '"' || ch === "'") {
+		if (ch === '"' || ch === "'" || (options.templateLiterals && ch === "`")) {
 			i = skipStringLiteral(source, i);
 			continue;
 		}
@@ -110,13 +130,17 @@ export function findStatementEnd(source: string, startIndex: number): number {
 }
 
 /** Splits on `separator` while ignoring nested brackets and string literals. */
-export function splitTopLevel(text: string, separator = ","): string[] {
+export function splitTopLevel(
+	text: string,
+	separator = ",",
+	options: ScanOptions = {},
+): string[] {
 	const parts: string[] = [];
 	let depth = 0;
 	let start = 0;
 	for (let i = 0; i < text.length; i++) {
 		const ch = text[i];
-		if (ch === '"' || ch === "'") {
+		if (ch === '"' || ch === "'" || (options.templateLiterals && ch === "`")) {
 			i = skipStringLiteral(text, i);
 			continue;
 		}
