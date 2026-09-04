@@ -132,6 +132,23 @@ export interface ProjectAPI {
 	) => Promise<
 		IPCResult<import("../../shared/types").CreateProjectFolderResult>
 	>;
+	/**
+	 * What "Create" would do at this location: the folder it would make, and
+	 * whether the location is itself a project that ought to be opened instead.
+	 */
+	inspectProjectLocation: (
+		location: string,
+		name: string,
+	) => Promise<
+		IPCResult<{
+			targetPath: string | null;
+			targetExists: boolean;
+			targetHasEntries: boolean;
+			locationIsProject: boolean;
+			insideRepository: string | null;
+			markers: string[];
+		}>
+	>;
 	getDefaultProjectLocation: () => Promise<string | null>;
 
 	// Memory Infrastructure Operations (LadybugDB - no Docker required)
@@ -413,6 +430,29 @@ export const createProjectAPI = (): ProjectAPI => ({
 			location,
 			name,
 			initGit,
+		),
+
+	/**
+	 * What "Create" would do at this location: the folder it would make, and
+	 * whether the location is itself a project that ought to be opened instead.
+	 */
+	inspectProjectLocation: (
+		location: string,
+		name: string,
+	): Promise<
+		IPCResult<{
+			targetPath: string | null;
+			targetExists: boolean;
+			targetHasEntries: boolean;
+			locationIsProject: boolean;
+			insideRepository: string | null;
+			markers: string[];
+		}>
+	> =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.DIALOG_INSPECT_PROJECT_LOCATION,
+			location,
+			name,
 		),
 
 	getDefaultProjectLocation: (): Promise<string | null> =>
