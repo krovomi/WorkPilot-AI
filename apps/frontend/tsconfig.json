@@ -15,6 +15,7 @@
 		"jsx": "react-jsx",
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"types": ["vitest/globals", "vitest"],
+		"ignoreDeprecations":"6.0",
 		"baseUrl": ".",
 		"paths": {
 			"@/*": ["src/renderer/*"],
