@@ -470,6 +470,25 @@ def _load_prompt_file(filename: str) -> str:
     return prompt_file.read_text(encoding="utf-8")
 
 
+def constitution_section(project_dir: Path) -> str:
+    """The house rules of a spec-kit project, when the target project is one.
+
+    One `is_file()` for every other project, and "" for it. See
+    `project.spec_kit` for why only the constitution is read and not the rest
+    of spec-kit's artifacts.
+
+    Public and single: the planner, every coding subtask, the QA reviewer and
+    the workflow's skill phases all need the same section, and four copies of
+    a three-line wrapper is four places to forget the guard.
+    """
+    try:
+        from project.spec_kit import format_constitution_for_prompt
+
+        return format_constitution_for_prompt(project_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def get_qa_reviewer_prompt(spec_dir: Path, project_dir: Path) -> str:
     """
     Load the QA reviewer prompt with project-specific MCP tools dynamically injected.
@@ -570,6 +589,14 @@ This shows only changes made in the spec branch since it diverged from `{base_br
         )
 
     spec_context += "---\n\n"
+
+    # A spec-kit project's own binding rules. The planner and the coder already
+    # get them; QA is the phase that decides whether the result is acceptable,
+    # and a reviewer judging against conventions it inferred from the codebase
+    # while the project has written its rules down is judging the wrong thing.
+    # Empty for every project without `.specify/`.
+    if constitution := constitution_section(project_dir):
+        spec_context += constitution + "\n\n---\n\n"
 
     # Find injection point in base prompt (after PHASE 4, before PHASE 5)
     injection_marker = (

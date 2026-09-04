@@ -348,10 +348,18 @@ people's projects; when one of them is a spec-kit project, those rules are the
 house rules, and a plan written without them is one the project's own tooling
 would reject.
 
-`project/spec_kit.py` reads that one file and hands it to the planner and to
-every coding subtask. There is nothing to install and nothing to configure: a
-project without `.specify/` costs one `is_file()` call and produces no prompt
-section at all.
+`project/spec_kit.py` reads that one file, and `prompts.constitution_section`
+is the single wrapper that hands it to everyone who needs it: the planner,
+every coding subtask, the QA reviewer, and every skill phase the workflow runs.
+There is nothing to install and nothing to configure — a project without
+`.specify/` costs one `is_file()` call and produces no prompt section at all.
+
+Those four readers are the point, not an afterthought. QA is the phase that
+decides whether the result is acceptable, and `analyze` is asked outright what
+the plan does that the project forbids; both were answering from conventions
+they had inferred out of the codebase while the project had written its rules
+down. A finding that cites the constitution is at least `HIGH`, because the
+project wrote it precisely where inference was getting it wrong.
 
 **Only the constitution.** spec-kit also keeps `specs/###-name/spec.md` and
 `tasks.md` — its own equivalents of `spec.md` and `implementation_plan.json`.
