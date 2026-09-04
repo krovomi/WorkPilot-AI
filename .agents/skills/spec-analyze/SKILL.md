@@ -7,7 +7,7 @@ metadata:
     provenance: adapté de github/spec-kit — /speckit.analyze (MIT)
     pack: tooling
     version: 1.0.0
-    content_sha256: 4ee0e086211304ef6137031350e7107bcecc8934764c8c6cc031d46803c0ba7f
+    content_sha256: 52123e8ba3c45cb2ea80eaa49c779ee811db4c1f4b86fa215fbe843733ae01ea
 ---
 
 # spec-analyze — la dernière relecture avant le code
@@ -28,6 +28,7 @@ pas « relire le spec », mais le relire **quand la correction est encore gratui
 | `<spec_dir>/spec.md` | exigences, critères de succès, cas limites, marqueurs ouverts |
 | `<spec_dir>/implementation_plan.json` | phases, subtasks, vérifications, dépendances |
 | `AGENTS.md` / `CLAUDE.md` du projet | les conventions que le plan doit respecter |
+| la constitution spec-kit, si le projet en a une | ses règles contraignantes, injectées dans ce prompt |
 
 **Ne recalcule pas la couverture.** `traceability.json` la contient : `coverage.uncovered`
 (exigences qu'aucune subtask ne réclame), `coverage.unknown_refs` (subtasks qui citent
@@ -47,7 +48,11 @@ continue : les cinq autres catégories ne dépendent pas de lui.
 | 3 | **Sous-spécification** | Quelle exigence n'a pas de critère d'acceptation vérifiable ? Quelle subtask n'a pas de `verification` exploitable ? |
 | 4 | **Contradiction** | Où les deux documents se contredisent — un chemin de fichier, un nom d'endpoint, un ordre de dépendances, un modèle de données ? |
 | 5 | **Doublon** | Deux exigences qui disent la même chose sous deux noms ? Deux subtasks qui écriraient le même fichier ? |
-| 6 | **Conventions** | Que fait le plan que `AGENTS.md` / `CLAUDE.md` du projet interdit — chemin en dur, dépendance non épinglée, texte non i18n, contournement d'une abstraction ? |
+| 6 | **Conventions** | Que fait le plan que le projet interdit — `AGENTS.md`, `CLAUDE.md`, ou la constitution spec-kit reproduite plus haut dans ce prompt : chemin en dur, dépendance non épinglée, texte non i18n, contournement d'une abstraction ? |
+
+Quand une constitution spec-kit est présente, elle **prime** sur ce que tu déduirais
+du code : le projet l'a écrite précisément parce que la déduction se trompait. Un
+constat de catégorie 6 qui la cite est au minimum `HIGH`.
 
 Les catégories 4 et 6 sont celles qui justifient le passage. Les trois premières
 attrapent des oublis ; la 4 attrape le moment où quelqu'un a corrigé un document et

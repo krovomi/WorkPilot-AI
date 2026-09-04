@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 _BACKEND = Path(__file__).resolve().parents[2] / "apps" / "backend"
 if str(_BACKEND) not in sys.path:
@@ -94,3 +95,77 @@ def test_an_unreadable_constitution_is_not_an_error(tmp_path):
     target.mkdir(parents=True)
     assert find_constitution(tmp_path) is None
     assert format_constitution_for_prompt(tmp_path) == ""
+
+
+class TestWhoReadsIt:
+    """Every phase that judges the project against rules gets the rules.
+
+    The planner and the coder had them from the start. QA and the workflow's
+    skill phases did not, which meant the phase that *decides whether the
+    result is acceptable* and the phase asked outright "what does this plan do
+    that the project forbids" were both answering from conventions they had
+    inferred — while the project had written its rules down.
+    """
+
+    def test_one_implementation_of_the_section(self):
+        """Four callers, one wrapper. Four is four places to forget the guard."""
+        from prompts import constitution_section
+        from prompts_pkg.prompts import (
+            constitution_section as canonical,
+        )
+
+        assert constitution_section is canonical
+
+    def test_it_is_empty_for_a_project_that_is_not_one(self, tmp_path):
+        from prompts import constitution_section
+
+        assert constitution_section(tmp_path) == ""
+
+    def test_the_qa_reviewer_is_given_the_rules(self, tmp_path):
+        from prompts_pkg.prompts import get_qa_reviewer_prompt
+
+        spec_dir = tmp_path / ".workpilot" / "specs" / "001-x"
+        spec_dir.mkdir(parents=True)
+        _speckit_project(tmp_path)
+
+        prompt = get_qa_reviewer_prompt(spec_dir, tmp_path)
+        assert "PROJECT CONSTITUTION (spec-kit)" in prompt
+        assert "Every feature MUST start as a standalone library." in prompt
+
+    def test_a_plain_project_adds_nothing_to_the_qa_prompt(self, tmp_path):
+        from prompts_pkg.prompts import get_qa_reviewer_prompt
+
+        spec_dir = tmp_path / ".workpilot" / "specs" / "001-x"
+        spec_dir.mkdir(parents=True)
+
+        assert "PROJECT CONSTITUTION" not in get_qa_reviewer_prompt(spec_dir, tmp_path)
+
+    def test_a_skill_phase_prompt_carries_the_rules(self, tmp_path):
+        from workflows.runner import PhaseContext, _build_prompt
+
+        _speckit_project(tmp_path)
+        spec_dir = tmp_path / ".workpilot" / "specs" / "001-x"
+        spec_dir.mkdir(parents=True)
+
+        phase = SimpleNamespace(
+            id="analyze",
+            impl="tooling/spec-analyze",
+            pack="tooling",
+            skill="spec-analyze",
+            description="Read the spec and the plan together.",
+        )
+        resolved = SimpleNamespace(
+            phase=phase, dispatch="fresh-context", degraded_from=None, reason=""
+        )
+        ctx = PhaseContext(
+            project_dir=tmp_path,
+            spec_dir=spec_dir,
+            model="sonnet",
+            repo_root=tmp_path,
+        )
+
+        prompt = _build_prompt(resolved, "procedure body", ctx)
+        assert "PROJECT CONSTITUTION (spec-kit)" in prompt
+        assert "Tests MUST be written" in prompt
+        # The procedure still follows the context, not the other way round.
+        assert prompt.index("PROJECT CONSTITUTION") < prompt.index("procedure body")
