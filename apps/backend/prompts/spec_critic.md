@@ -100,6 +100,26 @@ Check within spec.md:
 
 Flag any inconsistencies.
 
+### 1.3b: Traceability and Open Questions
+
+Check the two things everything downstream depends on:
+
+- **Every requirement has an identifier** - `FR-001`, `FR-002`, `NFR-001`, unique,
+  none reused for two different requirements. The implementation plan and the QA
+  report reference these; a requirement with no id cannot be traced, and a
+  duplicated id traces to the wrong thing.
+- **Ids are not renumbered** - if the spec already had ids, keep them exactly.
+  Renumbering to close a gap silently rewrites every reference made to them.
+- **`[NEEDS CLARIFICATION: …]` markers are honest** - each one must be a question
+  the inputs genuinely cannot answer. **Do not delete a marker to make the
+  document look finished**: answer it from `research.json`, `context.json` or the
+  codebase and remove it *with the answer written in*, or leave it standing.
+  A marker removed without an answer is a guess promoted to a decision.
+- **No marker over a question already answered** - if `context.json` or the
+  research settles it, resolve it now and say so in the critique report.
+
+Flag any gaps.
+
 ### 1.4: Feasibility
 
 Check practicality:
@@ -294,6 +314,7 @@ spec.md has been updated with fixes.
 - **Consistency**: Internal coherence of the document
 - **Feasibility**: Practical implementability
 - **Alignment**: Match with research findings
+- **Traceability**: Requirement identifiers and unresolved open questions
 
 ---
 

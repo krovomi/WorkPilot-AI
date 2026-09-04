@@ -61,6 +61,17 @@ Use the **`Write` tool** to create `spec.md` in the spec directory with this con
 
 **Keep it short!** A simple spec should be 20-50 lines, not 200+.
 
+**If something is genuinely ambiguous, say so instead of guessing.** Write the
+assumption you went with, followed by `[NEEDS CLARIFICATION: <one-line
+question>]`, on the line it affects. The validator counts these markers and the
+human reviewer sees them, so an unavoidable guess stops being invisible.
+
+Two limits, because this is the quick path: no requirement identifiers here
+(`FR-###` earns its keep when a plan has several subtasks to trace, and this one
+usually has one), and if you find yourself writing a third marker, the task is
+not simple — that is a signal it belongs on the full spec pipeline, not a reason
+to keep going.
+
 ---
 
 ## PHASE 3: CREATE SIMPLE PLAN
@@ -138,7 +149,8 @@ Ready for implementation.
 2. **BE CONCISE** - Short spec, simple plan, one subtask if possible
 3. **JUST THE ESSENTIALS** - Only include what's needed to do the task
 4. **DON'T OVER-ENGINEER** - This is a simple task, treat it simply
-5. **USE YOUR FILE TOOLS** - Create files with `Write`, read with `Read`. Never use
+5. **FLAG, DON'T GUESS** - `[NEEDS CLARIFICATION: …]` beats a silent assumption
+6. **USE YOUR FILE TOOLS** - Create files with `Write`, read with `Read`. Never use
    shell heredocs (`cat > ... << EOF`) or Unix-only commands (`ls`, `head`, `chmod`);
    they break on Windows and the spec files will not be created.
 

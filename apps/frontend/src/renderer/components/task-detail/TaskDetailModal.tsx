@@ -93,6 +93,7 @@ import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
+import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
 import { WorkflowProfileCard } from "./WorkflowProfileCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
 import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
@@ -1248,6 +1249,16 @@ function TaskDetailModalContent({
 
 											{/* What the chosen effort level actually runs, before it runs */}
 											<WorkflowProfileCard
+												task={task}
+												projectPath={
+													taskProject?.path ?? activeProject?.path
+												}
+											/>
+
+											{/* What the spec had to guess, and what the plan
+											    does not build. Renders nothing when there is
+											    neither. */}
+											<SpecTraceabilityCard
 												task={task}
 												projectPath={
 													taskProject?.path ?? activeProject?.path

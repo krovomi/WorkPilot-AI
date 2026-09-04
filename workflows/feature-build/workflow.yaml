@@ -38,6 +38,19 @@ phases:
       The existing planner. Human approval before implementation starts is a
       deliberate stop, not a formality.
 
+  - id: analyze
+    impl: tooling/spec-analyze
+    min_effort: medium
+    dispatch: fresh-context
+    description: >-
+      Read `spec.md` and `implementation_plan.json` together, once, before any
+      code is written. `traceability.json` has already answered the mechanical
+      half — which requirement no subtask claims — so this pass spends its
+      budget on what a parser cannot see: the two documents contradicting each
+      other, a plan that violates the project's own conventions, an acceptance
+      criterion nothing can verify. The gap costs a sentence here and a fix
+      cycle after QA. Fresh context because the reader must not be the planner.
+
   - id: coding
     impl: superpowers/test-driven-development
     dispatch: subagent-per-task

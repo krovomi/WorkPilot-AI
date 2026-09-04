@@ -8,6 +8,7 @@ Validates implementation_plan.json structure, phases, subtasks, and dependencies
 import json
 from pathlib import Path
 
+from ...traceability import compute_coverage
 from ..models import ValidationResult
 from ..schemas import IMPLEMENTATION_PLAN_SCHEMA
 
@@ -86,6 +87,9 @@ class ImplementationPlanValidator:
         dep_errors = self._validate_dependencies(phases)
         errors.extend(dep_errors)
 
+        # Requirements the plan leaves to nobody
+        warnings.extend(self._coverage_warnings(plan))
+
         return ValidationResult(
             valid=len(errors) == 0,
             checkpoint="plan",
@@ -93,6 +97,46 @@ class ImplementationPlanValidator:
             warnings=warnings,
             fixes=fixes,
         )
+
+    def _coverage_warnings(self, plan: dict) -> list[str]:
+        """Requirements declared in spec.md that no subtask claims.
+
+        Warnings, never errors, for two reasons. A requirement can be
+        deliberately out of scope for this build, and that is a judgement the
+        plan's author makes, not one a regex makes. And an error here would be
+        handed to the validation auto-fix agent, whose cheapest way to satisfy
+        it is to bolt a requirement id onto whichever subtask is nearest --
+        turning the coverage signal into a thing that is always green and
+        always meaningless.
+
+        Silent when the spec declares no identifiers: coverage is a question
+        that only exists once requirements have names.
+        """
+        spec_file = self.spec_dir / "spec.md"
+        if not spec_file.exists():
+            return []
+
+        try:
+            spec_text = spec_file.read_text(encoding="utf-8")
+        except OSError:
+            return []
+
+        coverage = compute_coverage(spec_text, plan)
+        if not coverage.applicable:
+            return []
+
+        warnings = []
+        if coverage.uncovered:
+            warnings.append(
+                f"{len(coverage.uncovered)} requirement(s) claimed by no subtask: "
+                + ", ".join(coverage.uncovered)
+            )
+        for req_id, subtask_ids in coverage.unknown_refs.items():
+            warnings.append(
+                f"Subtask(s) {', '.join(subtask_ids)} reference '{req_id}', "
+                "which spec.md does not declare"
+            )
+        return warnings
 
     def _validate_phase(self, phase: dict, index: int) -> list[str]:
         """Validate a single phase.

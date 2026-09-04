@@ -721,10 +721,17 @@ def mock_spec_validator():
 
         # Create mock validation results
         class MockValidationResult:
-            def __init__(self, valid, checkpoint, errors=None, fixes=None):
+            # Mirrors spec.validate_pkg.models.ValidationResult, `warnings`
+            # included: the phase prints them, and a stand-in missing a field
+            # of the type it stands in for fails on the caller rather than on
+            # the thing under test.
+            def __init__(
+                self, valid, checkpoint, errors=None, warnings=None, fixes=None
+            ):
                 self.valid = valid
                 self.checkpoint = checkpoint
                 self.errors = errors or []
+                self.warnings = warnings or []
                 self.fixes = fixes or []
 
         # Mock validate_all method
