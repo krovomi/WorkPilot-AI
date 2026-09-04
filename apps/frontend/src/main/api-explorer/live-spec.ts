@@ -34,6 +34,7 @@ const SPEC_PATHS_BY_FRAMEWORK: Record<string, string[]> = {
 	Express: ["/openapi.json", "/swagger.json", "/api-docs.json"],
 	Go: ["/swagger/doc.json", "/openapi.json", "/swagger.json"],
 	"Rust/Axum": ["/api-docs/openapi.json", "/openapi.json"],
+	"Rust/Actix": ["/api-docs/openapi.json", "/openapi.json"],
 	Rails: ["/api-docs/v1/swagger.json", "/openapi.json"],
 };
 
@@ -56,6 +57,7 @@ const DEFAULT_PORTS_BY_FRAMEWORK: Record<string, number[]> = {
 	Express: [3000],
 	Go: [8080],
 	"Rust/Axum": [3000],
+	"Rust/Actix": [8080],
 	Rails: [3000],
 };
 
