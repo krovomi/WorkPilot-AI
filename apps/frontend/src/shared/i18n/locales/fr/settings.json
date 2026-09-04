@@ -1882,7 +1882,26 @@
 		},
 		"resetToProviderDefaults": "Réinitialiser aux valeurs par défaut du fournisseur",
 		"supportsThinking": "Raisonnement",
-		"tierFlagship": "Flagship"
+		"tierFlagship": "Flagship",
+		"repository": {
+			"title": "Dépôt",
+			"name": "Nom du projet",
+			"path": "Chemin du dépôt",
+			"copyPath": "Copier",
+			"copied": "Copié",
+			"openTerminal": "Ouvrir un terminal",
+			"openTerminalHint": "Ouvre un terminal système à la racine du dépôt",
+			"changeFolder": "Changer de dossier…",
+			"workpilotPath": "Dossier WorkPilot",
+			"workpilotPathMissing": "Pas encore créé — initialisez WorkPilot AI ci-dessous.",
+			"currentBranch": "Branche courante",
+			"currentBranchUnknown": "Indisponible (dossier non versionné ?)",
+			"remote": "Remote",
+			"remoteNone": "Aucun remote configuré",
+			"openRemote": "Ouvrir",
+			"mainBranch": "Branche principale",
+			"mainBranchAuto": "Auto-détectée (configurable dans GitHub / GitLab)"
+		}
 	},
 	"projectSettings": {
 		"noProjectSelected": {

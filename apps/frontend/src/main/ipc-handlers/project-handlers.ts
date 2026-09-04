@@ -894,9 +894,23 @@ export function registerProjectHandlers(
 
 				const result = initializeProject(project.path);
 
-				if (result.success) {
+				// A `.workpilot/` that already exists is not a failure to report back:
+				// the project is initialized, and the only thing out of date is the
+				// stored record, which never got its `autoBuildPath` (a project added
+				// from a checkout that already had the folder, or stamped before a
+				// path change). Stamping it here is what "initialize" means for that
+				// project, so it is reported as the success it is — otherwise the UI
+				// showed "Not Initialized" next to a note telling the user to reopen
+				// the settings, and reopening changed nothing.
+				const alreadyInitialized = result.blocker === "already-initialized";
+
+				if (result.success || alreadyInitialized) {
 					// Update project's autoBuildPath
 					projectStore.updateAutoBuildPath(projectId, ".workpilot");
+				}
+
+				if (alreadyInitialized) {
+					return { success: true, data: { success: true } };
 				}
 
 				return { success: result.success, data: result, error: result.error };

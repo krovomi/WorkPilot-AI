@@ -5,8 +5,29 @@
  *
  * @vitest-environment jsdom
  */
+import { fireEvent, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "../../../shared/types";
+import { SortableProjectTab } from "../SortableProjectTab";
+import { TooltipProvider } from "../ui/tooltip";
+
+// The tab is rendered outside a DndContext here; stub the sortable hook so the
+// test exercises the tab's own behaviour rather than dnd-kit's.
+vi.mock("@dnd-kit/sortable", () => ({
+	useSortable: () => ({
+		attributes: {},
+		listeners: {},
+		setNodeRef: () => {
+			/* noop */
+		},
+		transform: null,
+		transition: undefined,
+		isDragging: false,
+	}),
+}));
+vi.mock("@dnd-kit/utilities", () => ({
+	CSS: { Transform: { toString: () => undefined } },
+}));
 
 // Helper to create test projects
 function createTestProject(overrides: Partial<Project> = {}): Project {
@@ -152,6 +173,51 @@ describe("SortableProjectTab", () => {
 
 			expect(mockEvent.stopPropagation).toHaveBeenCalled();
 			expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
+		});
+
+		it("should pass its own project id to onSettingsClick when the gear is clicked", () => {
+			const project = createTestProject({ id: "proj-42" });
+			const { getByLabelText } = render(
+				<TooltipProvider>
+					<SortableProjectTab
+						project={project}
+						isActive={true}
+						canClose={true}
+						tabIndex={0}
+						onSelect={mockOnSelect}
+						onClose={mockOnClose}
+						onSettingsClick={mockOnSettingsClick}
+					/>
+				</TooltipProvider>,
+			);
+
+			fireEvent.click(getByLabelText("Project settings"));
+
+			// The id is what lets the caller open *this* project's settings
+			// instead of the global application ones.
+			expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
+			expect(mockOnSettingsClick).toHaveBeenCalledWith("proj-42");
+		});
+
+		it("should not select the tab when the gear is clicked", () => {
+			const project = createTestProject({ id: "proj-43" });
+			const { getByLabelText } = render(
+				<TooltipProvider>
+					<SortableProjectTab
+						project={project}
+						isActive={true}
+						canClose={true}
+						tabIndex={0}
+						onSelect={mockOnSelect}
+						onClose={mockOnClose}
+						onSettingsClick={mockOnSettingsClick}
+					/>
+				</TooltipProvider>,
+			);
+
+			fireEvent.click(getByLabelText("Project settings"));
+
+			expect(mockOnSelect).not.toHaveBeenCalled();
 		});
 
 		it("should have correct aria-label for settings button", () => {
