@@ -613,6 +613,33 @@ system noise around the one crash you are looking for. When a platform cannot be
 built here, the panel says so instead of offering a Run button that can only
 fail.
 
+**How it is verified.** The layers split by what they need:
+
+| Layer | Proven by | Where |
+|---|---|---|
+| stack detection, prompt, roster, workflow phases | fixtures and real repos | `test_mobile_stacks.py`, `test_mobile_chain.py` |
+| devices and toolchain, against whatever is really installed | the machine's own `adb` / `xcrun` | `test_mobile_toolchain_contract.py`, in the existing 3-OS `test-python` matrix |
+| boot → build → install → launch → capture | a real emulator and a real APK | `mobile-device-check.yml`, manual trigger |
+
+The middle row exists because of a bug the other two could not catch: a cold
+`adb devices -l` prints two lines of its own *before* the header, so a parser
+that skipped a fixed first line read `* daemon started successfully` as a
+device with the serial `*`. Sixty-four tests passed over it, because they all
+fed the code a string somebody wrote — they tested our idea of adb. adb is cold
+exactly once per machine boot, which is the first time anyone opens the Mobile
+tab. Those contract tests assert what must hold *whatever* is installed, never
+that a particular device exists: a runner image with one simulator fewer is not
+a defect here, and a test that says otherwise gets disabled within a month.
+
+`scripts/mobile_device_check.py` is the same code path as a command. Read-only
+by default — stack, devices, toolchain verdict, no build and no device needed —
+and `--launch` adds build, install, start and a captured frame:
+
+```bash
+python scripts/mobile_device_check.py --project-dir ../my-app
+python scripts/mobile_device_check.py --project-dir ../my-app --launch
+```
+
 **The agent chain.** Three additions, each where it changes a decision:
 
 | Where | What |

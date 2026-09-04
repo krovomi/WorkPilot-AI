@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WorkPilot Sample</string>
+    <string name="on_screen">Mobile preview works</string>
+</resources>

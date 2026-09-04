@@ -127,14 +127,20 @@ def _android_report(stack: MobileStack | None) -> PlatformReport:
             has_wrapper = (
                 wrapper.exists() or (Path(stack.project_dir) / "gradlew.bat").exists()
             )
+            # The remedy is keyed on `gradle_ok`, not on `has_wrapper`: a
+            # remedy attached to a check that passed — "you have Gradle, now
+            # commit a wrapper" — reads as an unsolved problem in every UI
+            # that lists the checks.
+            gradle_ok = has_wrapper or bool(
+                find_tool("gradle") or shutil.which("gradle")
+            )
             checks.append(
                 ToolCheck(
                     tool="gradle",
-                    ok=has_wrapper
-                    or bool(find_tool("gradle") or shutil.which("gradle")),
+                    ok=gradle_ok,
                     detail="gradle wrapper" if has_wrapper else "gradle on PATH",
                     remedy=""
-                    if has_wrapper
+                    if gradle_ok
                     else "Commit a Gradle wrapper (`gradle wrapper`) or install Gradle.",
                 )
             )
