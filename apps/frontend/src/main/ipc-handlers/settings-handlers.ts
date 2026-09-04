@@ -23,6 +23,7 @@ import {
 	IPC_CHANNELS,
 	SPELL_CHECK_LANGUAGE_MAP,
 } from "../../shared/constants";
+import { sanitizeProjectFolderName } from "../../shared/utils/project-folder-name";
 import type {
 	AppSettings,
 	IPCResult,
@@ -821,13 +822,8 @@ export function registerSettingsHandlers(
 					return { success: false, error: "Location and name are required" };
 				}
 
-				// Sanitize project name (convert to kebab-case, remove invalid chars)
-				const sanitizedName = name
-					.toLowerCase()
-					.replaceAll(/\s+/g, "-")
-					.replaceAll(/[^a-z0-9-_]/g, "")
-					.replaceAll(/-+/g, "-")
-					.replaceAll(/^-|-$/g, "");
+				// Kebab-case the name, folding accents rather than deleting them.
+				const sanitizedName = sanitizeProjectFolderName(name);
 
 				if (!sanitizedName) {
 					return { success: false, error: "Invalid project name" };

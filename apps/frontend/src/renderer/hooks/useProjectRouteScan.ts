@@ -29,11 +29,15 @@ export function useProjectRouteScan() {
 	);
 	const setProjectScanError = useApiExplorerStore((s) => s.setProjectScanError);
 	const setScannedProjectId = useApiExplorerStore((s) => s.setScannedProjectId);
+	const setScannedApiProjects = useApiExplorerStore(
+		(s) => s.setScannedApiProjects,
+	);
 	const setLastProjectScanAt = useApiExplorerStore(
 		(s) => s.setLastProjectScanAt,
 	);
 	const setSpecError = useApiExplorerStore((s) => s.setSpecError);
 	const setSpecUrl = useApiExplorerStore((s) => s.setSpecUrl);
+	const setSpecFilePath = useApiExplorerStore((s) => s.setSpecFilePath);
 	const setActiveProjectContext = useApiExplorerStore(
 		(s) => s.setActiveProjectContext,
 	);
@@ -62,43 +66,36 @@ export function useProjectRouteScan() {
 					// valide la forme au passage. La conversion passe par `unknown`
 					// pour que ce saut de foi soit visible plutot qu'implicite.
 					setSpec(result.data as unknown as OpenApiSpec);
-					setSpecSource("scan");
+					// The handler says where the document came from: a spec committed
+					// to the repository when there is one, the source scan otherwise.
+					setSpecSource(result.source ?? "scan");
+					setSpecFilePath(result.specFile ?? null);
 					setSpecError(null);
 					setScannedProjectId(projectId);
+					setScannedApiProjects(result.apiProjects ?? []);
 					setLastProjectScanAt(Date.now());
 
-					// Prefer the framework's real OpenAPI document when the app is
-					// running. Network failures are deliberately silent: the source scan
-					// remains useful while the application is stopped.
-					for (const specUrl of result.specUrls ?? []) {
-						const live = await window.electronAPI.proxyHttpRequest({
-							url: specUrl,
-							method: "GET",
-							headers: { Accept: "application/json" },
-						});
-						const latestProjectState = useProjectStore.getState();
-						if (
-							(latestProjectState.activeProjectId ??
-								latestProjectState.selectedProjectId) !== projectId
-						) {
-							return;
-						}
-						if (!live.success || !live.status || live.status >= 400) continue;
-						try {
-							const liveSpec = JSON.parse(live.body ?? "") as OpenApiSpec;
-							if (
-								!liveSpec.paths ||
-								(!liveSpec.openapi && !("swagger" in liveSpec))
-							) {
-								continue;
-							}
-							setSpec(liveSpec);
-							setSpecSource("url");
-							setSpecUrl(specUrl);
-							break;
-						} catch {
-							// Try the next conventional URL.
-						}
+					// Prefer the document the running application generates from the
+					// routes it actually registered. The probe is bounded in the main
+					// process — candidates, per-request timeout, total budget — and
+					// answers `data: null` when nothing is listening, which is the
+					// ordinary case and not an error.
+					const live = await window.electronAPI.probeLiveApiSpec(
+						projectPath,
+						result.frameworks ?? [],
+					);
+					const latestProjectState = useProjectStore.getState();
+					if (
+						(latestProjectState.activeProjectId ??
+							latestProjectState.selectedProjectId) !== projectId
+					) {
+						return;
+					}
+					if (live.success && live.data) {
+						setSpec(live.data as unknown as OpenApiSpec);
+						setSpecSource("url");
+						setSpecFilePath(null);
+						if (live.url) setSpecUrl(live.url);
 					}
 				} else {
 					setProjectScanError(result.error ?? "Failed to scan project routes");
@@ -127,9 +124,11 @@ export function useProjectRouteScan() {
 			setIsProjectScanning,
 			setProjectScanError,
 			setScannedProjectId,
+			setScannedApiProjects,
 			setLastProjectScanAt,
 			setSpecError,
 			setSpecUrl,
+			setSpecFilePath,
 			setActiveProjectContext,
 		],
 	);

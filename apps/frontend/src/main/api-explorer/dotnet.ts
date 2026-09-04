@@ -19,6 +19,7 @@ import {
 	parseTypeName,
 	SchemaFactory,
 } from "./csharp-types";
+import { type DotnetProject, selectDotnetSources } from "./dotnet-projects";
 import { readFile, walkFiles } from "./source-files";
 import type {
 	DetectedRoute,
@@ -880,11 +881,24 @@ function lambdaParameters(handler: string): string[] {
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export function detectDotnet(projectPath: string): ScanResult {
-	const files = walkFiles(projectPath, [".cs"]);
-	const sources: Array<{ file: string; content: string }> = [];
-	for (const file of files) {
+	// A scan root is as often the folder holding the `.sln` as the one holding
+	// `Program.cs`. Reading the `.csproj` files first is what keeps the two
+	// equivalent: the walk finds the whole solution either way, and the
+	// selection drops the fake controllers its test projects declare.
+	const selection = selectDotnetSources(
+		projectPath,
+		walkFiles(projectPath, [".cs"]),
+	);
+	const sources: Array<{
+		file: string;
+		content: string;
+		project?: DotnetProject;
+	}> = [];
+	for (const file of selection.files) {
 		const content = readFile(file);
-		if (content) sources.push({ file, content });
+		if (content) {
+			sources.push({ file, content, project: selection.owners.get(file) });
+		}
 	}
 
 	const types = indexTypeDeclarations(sources.map((source) => source.content));
@@ -899,13 +913,25 @@ export function detectDotnet(projectPath: string): ScanResult {
 			factory,
 			types,
 		};
+		const found: DetectedRoute[] = [];
 		if (/class\s+\w*Controller\b|\[ApiController\]/.test(source.content)) {
-			routes.push(...detectControllerRoutes(context));
+			found.push(...detectControllerRoutes(context));
 		}
 		if (/\.\s*Map(Get|Post|Put|Delete|Patch|Head|Options|Methods)\s*\(/.test(source.content)) {
-			routes.push(...detectMinimalApiRoutes(context));
+			found.push(...detectMinimalApiRoutes(context));
 		}
+		if (source.project) {
+			for (const route of found) route.project = source.project.name;
+		}
+		routes.push(...found);
 	}
 
-	return { routes, schemas: factory.schemas };
+	return {
+		routes,
+		schemas: factory.schemas,
+		filesScanned: sources.length,
+		apiProjects: selection.projects
+			.filter((project) => project.kind === "web")
+			.map((project) => project.name),
+	};
 }

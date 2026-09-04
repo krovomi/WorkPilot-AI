@@ -15,8 +15,12 @@ async function scan(project: string, name: string): Promise<{
 		components?: { schemas?: Record<string, unknown> };
 	};
 	routeCount: number;
+	filesScanned: number;
+	source?: "file" | "scan";
+	specFile?: string;
 	frameworks: string[];
 	specUrls: string[];
+	error?: string;
 }> {
 	registerApiExplorerHandlers();
 	return (await (
@@ -135,5 +139,122 @@ public class OrdersController : ControllerBase
 			},
 			required: ["reference", "amount"],
 		});
+	});
+
+	it("reports an unreadable project directory instead of an empty scan", async () => {
+		const missing = path.join(tmpdir(), "workpilot-does-not-exist-42");
+
+		const result = await scan(missing, "Ghost");
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain(missing);
+	});
+
+	it("reports how many sources it read, so an empty result is legible", async () => {
+		const project = mkdtempSync(path.join(tmpdir(), "workpilot-dotnet-"));
+		tempProjects.push(project);
+		writeFileSync(
+			path.join(project, "Helper.cs"),
+			"public static class Helper { public static int Add(int a, int b) => a + b; }",
+		);
+
+		const result = await scan(project, "NoRoutes");
+
+		expect(result.success).toBe(true);
+		expect(result.routeCount).toBe(0);
+		expect(result.filesScanned).toBe(1);
+	});
+
+	it("prefers a spec committed to the repository over the source scan", async () => {
+		const project = mkdtempSync(path.join(tmpdir(), "workpilot-dotnet-"));
+		tempProjects.push(project);
+		mkdirSync(path.join(project, "Controllers"), { recursive: true });
+		writeFileSync(
+			path.join(project, "Controllers", "ThingsController.cs"),
+			`[Route("api/[controller]")]
+public class ThingsController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok();
+}`,
+		);
+		writeFileSync(
+			path.join(project, "openapi.yaml"),
+			`openapi: 3.0.3
+info:
+  title: Things
+  version: "2.0.0"
+paths:
+  /v2/things:
+    get:
+      summary: The document the team actually maintains
+      responses:
+        "200":
+          description: OK
+`,
+		);
+
+		const result = await scan(project, "Things");
+
+		expect(result.source).toBe("file");
+		expect(result.specFile).toBe("openapi.yaml");
+		expect(Object.keys(result.data.paths)).toEqual(["/v2/things"]);
+		expect(result.routeCount).toBe(1);
+	});
+
+	it("falls back to the source scan when no spec is committed", async () => {
+		const project = mkdtempSync(path.join(tmpdir(), "workpilot-dotnet-"));
+		tempProjects.push(project);
+		mkdirSync(path.join(project, "Controllers"), { recursive: true });
+		writeFileSync(
+			path.join(project, "Controllers", "ThingsController.cs"),
+			`[Route("api/[controller]")]
+public class ThingsController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok();
+}`,
+		);
+
+		const result = await scan(project, "Things");
+
+		expect(result.source).toBe("scan");
+		expect(result.specFile).toBeUndefined();
+		expect(Object.keys(result.data.paths)).toEqual(["/api/Things"]);
+	});
+
+	it("qualifies the tag when a solution root holds several APIs", async () => {
+		const project = mkdtempSync(path.join(tmpdir(), "workpilot-sln-"));
+		tempProjects.push(project);
+		for (const [name, controller] of [
+			["Rag.Api", "Documents"],
+			["Rag.Admin", "Users"],
+		]) {
+			const dir = path.join(project, "src", name);
+			mkdirSync(dir, { recursive: true });
+			writeFileSync(
+				path.join(dir, `${name}.csproj`),
+				'<Project Sdk="Microsoft.NET.Sdk.Web"></Project>',
+			);
+			writeFileSync(
+				path.join(dir, `${controller}Controller.cs`),
+				`[ApiController]
+[Route("api/[controller]")]
+public class ${controller}Controller : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok();
+}`,
+			);
+		}
+
+		const result = await scan(project, "Rag");
+
+		expect(result.data.paths["/api/Documents"].get.tags).toEqual([
+			"Rag.Api / Documents",
+		]);
+		expect(result.data.paths["/api/Users"].get.tags).toEqual([
+			"Rag.Admin / Users",
+		]);
 	});
 });

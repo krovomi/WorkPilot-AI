@@ -57,10 +57,24 @@ export interface DetectedRoute {
 	parameters?: RouteParameter[];
 	requestBody?: RouteRequestBody;
 	responses?: Record<string, RouteResponse>;
+	/**
+	 * The project the route belongs to — a .NET assembly name, say. Set when a
+	 * scan root holds several applications, so `Rag.Api` and `Rag.Admin` stay
+	 * told apart in the endpoint list.
+	 */
+	project?: string;
 }
 
 export interface ScanResult {
 	routes: DetectedRoute[];
+	/** How many source files the detector actually read. */
+	filesScanned: number;
 	/** Component schemas referenced by the routes, keyed by schema name. */
 	schemas: Record<string, JsonSchema>;
+	/**
+	 * The applications found under the scan root, when it holds several — the
+	 * `.sln` case. Names only: what the user needs to see is that pointing at
+	 * the solution folder found `Rag.Api`, not the folder itself.
+	 */
+	apiProjects?: string[];
 }
