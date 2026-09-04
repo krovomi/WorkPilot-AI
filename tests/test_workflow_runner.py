@@ -27,6 +27,8 @@ sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 from workflows.runner import (  # noqa: E402
     BUILTIN_EXECUTORS,
+    CONFIG_PHASE,
+    SKILL_PHASE_AGENTS,
     PhaseContext,
     PhaseOutcome,
     builtin_plan,
@@ -58,10 +60,12 @@ class TestPhaseWindows:
     def test_the_windows_partition_the_skill_phases(self, workflow):
         profile = profile_at(workflow, "ultrathink")
         pre = phases_between(profile, after=None, before="planning")
+        planned = phases_between(profile, after="planning", before="coding")
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
 
         assert [r.id for r in pre] == ["brainstorm", "spec"]
+        assert [r.id for r in planned] == ["analyze"]
         assert [r.id for r in mid] == ["review"]
         assert [r.id for r in post] == [
             "adversarial-review",
@@ -69,12 +73,37 @@ class TestPhaseWindows:
             "verify",
         ]
 
+    def test_every_skill_phase_belongs_to_a_window(self, workflow):
+        """No phase is declared, resolved, printed — and then run by nobody.
+
+        `analyze` sits between `planning` and `coding`, two phases the coder
+        loop owns, and there was no window between them: adding the phase
+        without opening one would have resolved it into the profile the user
+        is shown and executed it never.
+        """
+        profile = profile_at(workflow, "ultrathink")
+        windows = [
+            phases_between(profile, after=None, before="planning"),
+            phases_between(profile, after="planning", before="coding"),
+            phases_between(profile, after="coding", before="qa"),
+            phases_between(profile, after="qa", before=None),
+        ]
+        covered = {r.id for window in windows for r in window}
+        elsewhere = {"design-check", "observe"}  # gates, observer
+        expected = {
+            r.id
+            for r in profile.run
+            if r.id not in BUILTIN_EXECUTORS and r.id not in elsewhere
+        }
+        assert covered == expected
+
     def test_no_phase_is_run_by_two_windows(self, workflow):
         profile = profile_at(workflow, "ultrathink")
         seen = [
             r.id
             for window in (
                 phases_between(profile, after=None, before="planning"),
+                phases_between(profile, after="planning", before="coding"),
                 phases_between(profile, after="coding", before="qa"),
                 phases_between(profile, after="qa", before=None),
             )
@@ -110,6 +139,7 @@ class TestPhaseWindows:
             r.id
             for window in (
                 phases_between(profile, after=None, before="planning"),
+                phases_between(profile, after="planning", before="coding"),
                 phases_between(profile, after="coding", before="qa"),
                 phases_between(profile, after="qa", before=None),
             )
@@ -126,9 +156,11 @@ class TestPhaseWindows:
     def test_low_effort_leaves_the_windows_empty_except_what_it_bought(self, workflow):
         profile = profile_at(workflow, "low")
         pre = phases_between(profile, after=None, before="planning")
+        planned = phases_between(profile, after="planning", before="coding")
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
         assert pre == []
+        assert planned == []  # `analyze` is bought at medium
         assert mid == []
         # `verify` is a hard gate: never pruned, at any level.
         assert [r.id for r in post] == ["verify"]
@@ -454,3 +486,58 @@ def _install_fake_agent_stack(
     import agents.session as agent_session
 
     monkeypatch.setattr(agent_session, "run_agent_session", _fake_session)
+
+
+class TestAnalyzePhase:
+    """The pass that reads `spec.md` and the plan together, before any code.
+
+    Everything here is about *when* and *how* it runs. What it looks for is in
+    the skill body; what a parser can already answer is in
+    `spec.traceability`, and the skill is told to read that rather than
+    recompute it.
+    """
+
+    def test_it_runs_between_planning_and_coding(self, workflow):
+        profile = profile_at(workflow, "medium")
+        window = phases_between(profile, after="planning", before="coding")
+        assert [r.id for r in window] == ["analyze"]
+
+    def test_the_reader_is_not_the_planner(self, workflow):
+        """`fresh-context`, for the same reason `review` has it.
+
+        A pass that inherits the planner's transcript inherits its reasoning,
+        and a reader who already agrees is not a second opinion.
+        """
+        profile = profile_at(workflow, "medium")
+        (analyze,) = [r for r in profile.run if r.id == "analyze"]
+        assert analyze.dispatch == "fresh-context"
+        assert fresh_context(analyze.dispatch)
+
+    def test_it_is_paid_for_as_planning_not_as_coding(self):
+        """It reviews the plan, so it is a planning cost.
+
+        The default for an unmapped phase is `coding` — which would bill a
+        read-only pass at the model and budget the user picked for writing
+        code.
+        """
+        assert CONFIG_PHASE["analyze"] == "planning"
+
+    def test_it_cannot_edit_what_it_reviews(self):
+        from agents.tools_pkg.models import AGENT_CONFIGS
+
+        agent = SKILL_PHASE_AGENTS["analyze"]
+        tools = set(AGENT_CONFIGS[agent]["tools"])
+        assert not tools & {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+
+    def test_the_procedure_exists_and_defers_to_the_computed_record(self):
+        found = find_skill_body(REPO_ROOT, "tooling", "spec-analyze")
+        assert found is not None, "run `pnpm run skills:build`"
+        body, _path = found
+        # The mechanical half is already answered; asking the model to redo it
+        # buys a second number that can only disagree with the first.
+        assert "traceability.json" in body
+
+    def test_low_effort_does_not_buy_it(self, workflow):
+        profile = profile_at(workflow, "low")
+        assert "analyze" not in [r.id for r in profile.run]
+        assert "analyze" in profile.declared

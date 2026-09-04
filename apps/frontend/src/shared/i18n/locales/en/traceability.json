@@ -1,0 +1,27 @@
+{
+	"title": "Open questions and coverage",
+	"subtitle": "What the spec had to guess, and what the plan does not build",
+	"expand": "Details",
+	"collapse": "Hide",
+	"badge": {
+		"questions": "{{count}} open question",
+		"questions_other": "{{count}} open questions",
+		"uncovered": "{{count}} unclaimed requirement",
+		"uncovered_other": "{{count}} unclaimed requirements"
+	},
+	"coverage": {
+		"summary": "{{covered}} of {{total}} requirements claimed by a subtask ({{percent}}%)"
+	},
+	"questions": {
+		"title": "Marked [NEEDS CLARIFICATION]",
+		"unspecified": "unspecified"
+	},
+	"uncovered": {
+		"title": "No subtask claims these",
+		"body": "Either the plan is missing work, or the requirement is deliberately out of scope. Both are decisions — this is only the moment to make one."
+	},
+	"unknown": {
+		"title": "Referenced but not declared",
+		"body": "A subtask cites a requirement spec.md does not declare: the two documents have drifted."
+	}
+}

@@ -87,16 +87,50 @@ export class SpecInterviewService {
 		}
 	}
 
+	/**
+	 * The nine areas a spec can be underspecified in, swept in order before
+	 * choosing what to ask.
+	 *
+	 * Adapted from github/spec-kit's `/speckit.clarify` (MIT). The prompt used
+	 * to say "focus on edge cases, behaviours, validation rules" — a list of
+	 * examples, which a model reads as a direction rather than as a checklist.
+	 * Given a budget of five questions and no map of where the gaps could be,
+	 * it spends them on the area the description already talks about most,
+	 * because that is the area it has the most to say about. A spec that never
+	 * mentions failure handling scores no questions on failure handling.
+	 *
+	 * The sweep costs nothing — the questions asked are still 3 to 5 — and it
+	 * changes which five.
+	 */
+	private static readonly COVERAGE_AREAS = [
+		"Functional scope: what is in and out of scope",
+		"Domain and data model: entities, fields, relationships, lifecycle",
+		"Interaction and UX flow: entry points, states, feedback",
+		"Non-functional attributes: performance, security, accessibility, limits",
+		"Integrations and dependencies: external systems, versions, contracts",
+		"Edge cases and failure handling: empty, invalid, concurrent, offline",
+		"Constraints and trade-offs: what may be sacrificed for what",
+		"Terminology: terms used inconsistently or left undefined",
+		"Completion signals: how anyone knows the task is done",
+	];
+
 	private buildPrompt(description: string, appLanguage: string): string {
 		const languageName = appLanguage === "fr" ? "French" : "English";
 		return [
 			"You are a senior software analyst preparing the implementation of a task.",
 			"Read the task specification below and produce the 3 to 5 most valuable",
 			"clarifying questions to ask BEFORE planning the implementation.",
-			"Focus on: edge cases, expected behaviours, validation rules, error handling,",
-			"impacted surfaces, and acceptance criteria that are ambiguous or missing.",
-			"Do NOT ask anything already answered by the spec. Prefer questions whose",
-			"answer changes the implementation.",
+			"",
+			"First, sweep these nine areas and mark each one Clear, Partial or Missing:",
+			...SpecInterviewService.COVERAGE_AREAS.map((area) => `  - ${area}`),
+			"",
+			"Then ask about the Missing and Partial areas whose answer would change",
+			"the implementation the most. Do not report the sweep — it decides what",
+			"you ask, it is not part of the output.",
+			"",
+			"Do NOT ask anything already answered by the spec. Prefer a question a",
+			"person can answer in one line or by picking between two options; a",
+			"question that needs a paragraph will not be answered.",
 			"",
 			`Write the questions in ${languageName}.`,
 			"Output ONLY a JSON array, no markdown fences, with objects of the shape:",

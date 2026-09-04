@@ -16,6 +16,8 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Claude Agent SDK Usage](#claude-agent-sdk-usage)
   - [Agent Prompts](#agent-prompts)
   - [Spec Directory Structure](#spec-directory-structure)
+  - [Requirement Traceability](#requirement-traceability)
+  - [spec-kit projects](#spec-kit-projects)
   - [Memory System (Graphiti)](#memory-system-graphiti)
   - [Skills System](#skills-system)
   - [Memory Search (mem-search)](#memory-search-mem-search)
@@ -262,6 +264,107 @@ from an earlier design and loaded by nothing.
 
 Each spec in `.workpilot/specs/XXX-name/` contains: `spec.md`, `requirements.json`, `context.json`, `implementation_plan.json`, `qa_report.md`, `QA_FIX_REQUEST.md`
 
+### Requirement Traceability
+
+`spec.md` names its requirements — `FR-001`, `NFR-001` — and every subtask in
+`implementation_plan.json` claims the ones it implements:
+
+```json
+{ "id": "subtask-1-1", "requirements": ["FR-001", "FR-002"], ... }
+```
+
+Positions are not names. Numbering requirements `1.`, `2.`, `3.` meant inserting
+one in the middle silently repointed every reference to the ones below it, so
+nothing downstream referenced a requirement at all — and "which requirement is
+covered by no subtask?" had no answer until QA read the finished branch.
+
+`spec/traceability.py` is the single reader: `parse_requirements`,
+`parse_open_questions`, `compute_coverage`. The parsing takes text, so the
+validators, a workflow phase and a test all use it the same way.
+
+Once the plan validates, `write_record` puts the answer in
+`<spec_dir>/traceability.json` — requirements, open questions, and the coverage
+map — and the coder loop prints the summary. That is the last moment a missing
+requirement is cheap: the plan is valid, no code has been written against it,
+and the fix is a sentence. The `analyze` phase, the Kanban and QA read that
+record rather than each re-parsing `spec.md`; three parsers of one document is
+how three answers to one question start.
+
+**`[NEEDS CLARIFICATION: <question>]`** marks an assumption the inputs could not
+settle. `spec_writer.md` used to be told to "make reasonable assumptions" full
+stop, and in the finished document a guess reads exactly like a decision
+somebody made. The marker keeps the two apart and makes the guesses countable.
+It is not an escape hatch: a question the codebase or `context.json` answers is
+work, not a clarification.
+
+Both signals are **warnings, never errors**, in `validate_pkg`:
+
+| Reported | Why not an error |
+|---|---|
+| open questions in `spec.md` | flagging what you do not know is the spec doing its job |
+| no `FR-###` ids at all | specs written before ids existed are not broken |
+| a requirement no subtask claims | it can be deliberately out of scope — the plan's author decides |
+| a subtask referencing an undeclared id | the two documents drifted; which one is wrong is a judgement |
+
+Coverage reports *not applicable* rather than 0% when the spec declares no ids —
+a legacy spec scoring zero on every build teaches everyone to ignore the line.
+And an error here would reach the validation auto-fix agent, whose cheapest way
+to satisfy it is to bolt an id onto the nearest subtask: a signal that is always
+green and always meaningless.
+
+The quick path (`spec_quick.md`) takes the marker and skips the ids: identifiers
+earn their keep when a plan has several subtasks to trace, and a quick spec
+usually has one.
+
+**In the Kanban.** `GET /api/spec-traceability/` (`spec/api.py`) answers the
+same question at any moment, and `SpecTraceabilityCard` renders it in the task
+panel — but only when there is something to say. A spec with nothing open and a
+plan that claims everything renders nothing: a badge that is green 95% of the
+time is a badge nobody reads. The endpoint **recomputes** rather than reading
+back `traceability.json`, because the panel is opened most often on tasks that
+have never been planned, where the file does not exist and the answer still has
+to be right. Like `workflows/api.py`, it is refused in server mode — a client
+naming a directory on a shared server is a cross-tenant read — so it is a
+desktop feature until a `project_id`-addressed endpoint exists.
+
+**Before the spec exists**, the clarification is already someone else's job:
+`SpecInterviewBanner` asks 3-5 questions on a backlog task and appends the
+answers as a `## Clarifications` section. Its prompt now sweeps nine coverage
+areas (scope, data model, UX flow, non-functional, integrations, failure
+handling, trade-offs, terminology, completion signals) and marks each Clear,
+Partial or Missing before choosing what to ask — adapted from spec-kit's
+`/speckit.clarify`. The sweep is not reported; it decides which five questions
+get asked. Given a budget and no map, a model spends its questions on the area
+the description already talks about most, because that is where it has the most
+to say — so a spec that never mentions failure handling was never asked about
+it.
+
+### spec-kit projects
+
+[spec-kit](https://github.com/github/spec-kit) (GitHub, MIT) is a
+spec-driven-development toolkit, and a project initialised with it keeps its
+binding rules in `.specify/memory/constitution.md`. WorkPilot builds other
+people's projects; when one of them is a spec-kit project, those rules are the
+house rules, and a plan written without them is one the project's own tooling
+would reject.
+
+`project/spec_kit.py` reads that one file and hands it to the planner and to
+every coding subtask. There is nothing to install and nothing to configure: a
+project without `.specify/` costs one `is_file()` call and produces no prompt
+section at all.
+
+**Only the constitution.** spec-kit also keeps `specs/###-name/spec.md` and
+`tasks.md` — its own equivalents of `spec.md` and `implementation_plan.json`.
+Reading those would mean deciding which of two specs a build is following, and
+that question has no good answer: WorkPilot has its own spec, written by its own
+pipeline, for this task. The constitution is different because it is not about
+this task at all — it is about the project, and it holds whichever spec is
+driving the work.
+
+The document goes in whole rather than as extracted rules: a `MUST` quoted out
+of its section loses the scope that qualified it, and a sentence about what the
+project *used* to require would be quoted as current law.
+
 ### Memory System (Graphiti)
 
 Graph-based semantic memory in `integrations/graphiti/`. Configured through the Electron app's onboarding/settings UI (CLI users can alternatively set `GRAPHITI_ENABLED=true` in `.env-files/.env`). See [shared_docs/CONFIGURATION.md](../shared_docs/CONFIGURATION.md) for details.
@@ -465,7 +568,7 @@ little else.
 
 | Phase | Who runs it |
 |---|---|
-| `brainstorm`, `spec`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
+| `brainstorm`, `spec`, `analyze`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
 | `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
 | the `tests-pass` hard gate | the engine (`workflows/hard_gates.py`) |
@@ -477,6 +580,25 @@ A skill phase runs where the workflow file declares it. The window is looked up
 by phase id in the **declared** order, so inserting a phase into
 `workflow.yaml` between two existing ones needs no Python change — and pruning
 a phase that bounds a window does not hand its work to the neighbouring one.
+
+There are **four** windows: before `planning`, between `planning` and `coding`,
+between `coding` and `qa`, and after `qa`. The second one is opened from inside
+`run_autonomous_agent`, because that function owns both phases it sits between —
+which is also why it did not exist until a phase needed it. A phase declared
+where no window opens is resolved, printed in the profile the user is shown, and
+run by nobody; `test_every_skill_phase_belongs_to_a_window` is what keeps that
+from happening quietly.
+
+`analyze` is the phase in that second window: `spec.md` and
+`implementation_plan.json` read together, once, before any code exists. The
+mechanical half of the question — which requirement no subtask claims — is
+already in `traceability.json` by then, so the skill is told to cite it rather
+than recompute it, and spends its budget on what a parser cannot see: the two
+documents contradicting each other, a plan that breaks the project's own
+conventions, an acceptance criterion nothing can verify. It runs read-only
+(`spec_validation`) and in a fresh context: a reader who inherits the planner's
+reasoning is not a second opinion, and a reviewer who can rewrite the document
+ends up reviewing his own.
 
 `impl:` reaches the two built-in phases as well. `coding` declares
 `superpowers/test-driven-development`: the skill is the *methodology*, the

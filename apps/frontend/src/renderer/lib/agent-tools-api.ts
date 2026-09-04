@@ -469,6 +469,90 @@ export interface WorkflowProfileQuery {
 	includeLevels?: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Spec traceability — what the spec left open, and what the plan will not build
+//
+// The backend recomputes this rather than reading back the `traceability.json`
+// a build wrote, so the answer is right for a task that has not been planned
+// yet — which is most of the tasks someone opens this panel on.
+
+export interface TraceabilityRequirement {
+	id: string;
+	title: string;
+	line: number;
+}
+
+export interface TraceabilityOpenQuestion {
+	question: string;
+	section: string;
+	line: number;
+}
+
+export interface TraceabilityCoverage {
+	/** False when the question cannot be asked — see `reason`. */
+	applicable: boolean;
+	reason: string;
+	/** Null when not applicable: a spec with no ids is not a spec at 0%. */
+	percent: number | null;
+	covered: Record<string, string[]>;
+	uncovered: string[];
+	/** A subtask citing a requirement `spec.md` does not declare. */
+	unknownRefs: Record<string, string[]>;
+	summary: string;
+}
+
+export interface TraceabilityPayload {
+	spec: string;
+	requirements: TraceabilityRequirement[];
+	openQuestions: TraceabilityOpenQuestion[];
+	coverage: TraceabilityCoverage;
+}
+
+export interface SpecTraceabilityQuery {
+	specDir?: string;
+	projectDir?: string;
+	specId?: string;
+}
+
+/** The backend speaks snake_case; the renderer speaks camelCase. */
+interface RawTraceability {
+	spec: string;
+	requirements: TraceabilityRequirement[];
+	open_questions: TraceabilityOpenQuestion[];
+	coverage: Omit<TraceabilityCoverage, "unknownRefs"> & {
+		unknown_refs: Record<string, string[]>;
+	};
+}
+
+export async function fetchSpecTraceability(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<TraceabilityPayload>> {
+	const params: Record<string, string> = {};
+	if (query.specDir) params.spec_dir = query.specDir;
+	if (query.projectDir) params.project_dir = query.projectDir;
+	if (query.specId) params.spec_id = query.specId;
+
+	const res = await _get<{ traceability: RawTraceability }>(
+		"/api/spec-traceability/",
+		params,
+		signal,
+	);
+	if (!res.ok) return res;
+
+	const raw = res.data.traceability;
+	const { unknown_refs, ...coverage } = raw.coverage;
+	return {
+		ok: true,
+		data: {
+			spec: raw.spec,
+			requirements: raw.requirements,
+			openQuestions: raw.open_questions,
+			coverage: { ...coverage, unknownRefs: unknown_refs },
+		},
+	};
+}
+
 export async function fetchWorkflowProfile(
 	query: WorkflowProfileQuery,
 	signal?: AbortSignal,
