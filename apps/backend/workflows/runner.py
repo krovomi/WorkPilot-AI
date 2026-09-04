@@ -103,11 +103,15 @@ CONFIG_PHASE = {
     "spec": "spec",
     "planning": "planning",
     "analyze": "planning",
+    # A design review before the code exists is a planning cost, not a QA one:
+    # nothing has been built yet for it to judge.
+    "mobile-design": "planning",
     "coding": "coding",
     "review": "qa",
     "qa": "qa",
     "adversarial-review": "qa",
     "spec-conformance": "qa",
+    "store-readiness": "qa",
     "verify": "qa",
 }
 _DEFAULT_CONFIG_PHASE = "coding"
@@ -120,6 +124,8 @@ SKILL_PHASE_AGENTS = {
     "brainstorm": "spec_critic",
     "spec": "spec_writer",
     "analyze": "spec_validation",
+    "mobile-design": "pr_reviewer",
+    "store-readiness": "pr_reviewer",
     "review": "pr_reviewer",
     "adversarial-review": "pr_reviewer",
     "spec-conformance": "spec_validation",
@@ -305,6 +311,22 @@ def _constitution(project_dir: Path) -> str:
         return ""
 
 
+def _mobile(project_dir: Path) -> str:
+    """`prompts.mobile_section`, deferred for the same reason as the above.
+
+    The mobile phases need it by definition, but so does every other phase on a
+    phone project: a reviewer that thinks it can open a URL, or an analyst that
+    plans an iOS verification on a Linux runner, is reasoning about a machine
+    that does not exist.
+    """
+    try:
+        from prompts import mobile_section
+
+        return mobile_section(project_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
     """The procedure, plus the minimum context needed to apply it.
 
@@ -348,6 +370,11 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
     # answering the wrong question. Empty for a project without `.specify/`.
     if rules := _constitution(ctx.project_dir):
         lines += ["", "---", "", rules]
+
+    # The stack, the commands and what this machine cannot build. Empty for
+    # every project that is not a phone application.
+    if mobile := _mobile(ctx.project_dir):
+        lines += ["", "---", "", mobile]
 
     lines += [
         "",

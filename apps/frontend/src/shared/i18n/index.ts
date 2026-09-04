@@ -33,6 +33,7 @@ import enTraceability from "./locales/en/traceability.json";
 
 // Import English translation resources
 import enAppEmulator from "./locales/en/appEmulator.json";
+import enMobile from "./locales/en/mobile.json";
 import enPhase35 from "./locales/en/phase35.json";
 import enArena from "./locales/en/arena.json";
 import enBrowserAgent from "./locales/en/browserAgent.json";
@@ -127,6 +128,7 @@ import frTraceability from "./locales/fr/traceability.json";
 
 // Import French translation resources
 import frAppEmulator from "./locales/fr/appEmulator.json";
+import frMobile from "./locales/fr/mobile.json";
 import frPhase35 from "./locales/fr/phase35.json";
 import frArena from "./locales/fr/arena.json";
 import frBrowserAgent from "./locales/fr/browserAgent.json";
@@ -207,6 +209,7 @@ export const resources = {
 		i18nAgent: enI18nAgent,
 		onboardingAgent: enOnboardingAgent,
 		appEmulator: enAppEmulator,
+		mobile: enMobile,
 		phase35: enPhase35,
 		analytics: enAnalytics,
 		browserAgent: enBrowserAgent,
@@ -301,6 +304,7 @@ export const resources = {
 		i18nAgent: frI18nAgent,
 		onboardingAgent: frOnboardingAgent,
 		appEmulator: frAppEmulator,
+		mobile: frMobile,
 		phase35: frPhase35,
 		analytics: frAnalytics,
 		browserAgent: frBrowserAgent,
@@ -402,6 +406,7 @@ i18n.use(initReactI18next).init({
 		"i18nAgent",
 		"onboardingAgent",
 		"appEmulator",
+		"mobile",
 		"phase35",
 		"analytics",
 		"browserAgent",

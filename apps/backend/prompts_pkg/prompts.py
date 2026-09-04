@@ -489,6 +489,22 @@ def constitution_section(project_dir: Path) -> str:
         return ""
 
 
+def mobile_section(project_dir: Path) -> str:
+    """What a phone application adds to a phase's prompt, when it is one.
+
+    Public and single for the same reason `constitution_section` is: the
+    planner, every coding subtask and the QA reviewer need the identical
+    section, and a phase that gets it wrong plans against commands that do not
+    build. One `detect_stack` for every other project, and "" for it.
+    """
+    try:
+        from mobile import mobile_section as _section
+
+        return _section(project_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def get_qa_reviewer_prompt(spec_dir: Path, project_dir: Path) -> str:
     """
     Load the QA reviewer prompt with project-specific MCP tools dynamically injected.
@@ -597,6 +613,13 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     # Empty for every project without `.specify/`.
     if constitution := constitution_section(project_dir):
         spec_context += constitution + "\n\n---\n\n"
+
+    # A phone application is not validated the way a web app is: there is no
+    # URL to open, the evidence is a screenshot from a device, and one of the
+    # two platforms may not be buildable on this machine at all. A reviewer
+    # that does not know which is which reports "could not verify" as a defect.
+    if mobile := mobile_section(project_dir):
+        spec_context += mobile + "\n\n---\n\n"
 
     # Find injection point in base prompt (after PHASE 4, before PHASE 5)
     injection_marker = (

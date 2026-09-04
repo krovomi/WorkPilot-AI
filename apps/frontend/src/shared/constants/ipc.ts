@@ -983,4 +983,23 @@ export const IPC_CHANNELS = {
 	// Pair Programming SSE event (main -> renderer)
 	PAIR_RT_OP_EVENT: "pairRT:opEvent",
 	PAIR_RT_STREAM_ERROR: "pairRT:streamError",
+
+	// Mobile applications (Android / Apple). Distinct from the App Emulator's
+	// channels rather than folded into them: the two answer different questions
+	// ("what URL" vs "which device"), and a `start` meaning one thing for a web
+	// project and another for a phone one is a channel nobody can reason about.
+	MOBILE_DETECT: "mobile:detect",
+	MOBILE_DEVICES: "mobile:devices",
+	MOBILE_LAUNCH: "mobile:launch",
+	MOBILE_SCREENSHOT: "mobile:screenshot",
+	MOBILE_STOP: "mobile:stop",
+	MOBILE_STATUS: "mobile:status",
+	// Mobile events (main -> renderer)
+	MOBILE_PLAN_EVENT: "mobile:plan",
+	MOBILE_PHASE_EVENT: "mobile:phase",
+	MOBILE_STATUS_EVENT: "mobile:status-update",
+	MOBILE_OUTPUT_EVENT: "mobile:output",
+	MOBILE_SCREENSHOT_EVENT: "mobile:screenshot-update",
+	MOBILE_ERROR_EVENT: "mobile:error",
+	MOBILE_STOPPED_EVENT: "mobile:stopped",
 } as const;

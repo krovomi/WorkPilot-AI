@@ -14,6 +14,8 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
 | `QuickCommandBar.tsx` | ~300 | palette `/slash` — lit `.agents/skills/` via le backend |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
+| `../task-detail/TaskMobilePreview.tsx` | ~350 | onglet *Mobile* : plateforme, appareil, run, capture, logs |
+| `../../stores/mobile-store.ts` | ~200 | plateforme / appareil / dernière capture sélectionnés |
 | `../../stores/task-store.ts` | ~1 300 | état des tâches (Zustand) |
 | `../../stores/kanban-settings-store.ts` | — | largeur, ordre, collapse, WIP par colonne |
 | `../../../shared/constants/task.ts` | — | `TASK_STATUS_COLUMNS`, libellés de statut |
@@ -59,7 +61,8 @@ Deux statuts n'ont pas de colonne à eux et sont projetés par `getVisualColumn(
 
 ## Règles du domaine
 
-- **i18n** — namespaces `["tasks", "dialogs", "common"]`. Aucun texte en dur.
+- **i18n** — namespaces `["tasks", "dialogs", "common"]`, plus `"mobile"` pour l'onglet
+  Mobile et le badge de cible. Aucun texte en dur.
 - **Accessibilité** — tout déplacement passe par `announce()` ; ne pas court-circuiter.
 - **Rendu** — `COLUMN_RENDER_CAP = 60` borne les cartes affichées par colonne. Les
   comparateurs mémo sont le garde-fou perf du tableau ; les modifier sans mesurer régresse.

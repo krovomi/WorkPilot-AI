@@ -103,7 +103,9 @@ import {
 	createI18nAgentAPI,
 } from "./modules/i18n-agent-api";
 import type { AppEmulatorAPI } from "./modules/app-emulator-api";
+import type { MobileAPI } from "./modules/mobile-api";
 import { createAppEmulatorAPI } from "./modules/app-emulator-api";
+import { createMobileAPI } from "./modules/mobile-api";
 import type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 import { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 import type { ArenaAPI } from "./modules/arena-api";
@@ -249,6 +251,7 @@ export interface ElectronAPI
 		SmartEstimationAPI,
 		ContextAwareSnippetsAPI,
 		AppEmulatorAPI,
+		MobileAPI,
 		LearningLoopAPI,
 		MultiRepoAPI,
 		ArchitectureVisualizerAPI,
@@ -388,6 +391,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createSmartEstimationAPI(),
 		...createContextAwareSnippetsAPI(),
 		...createAppEmulatorAPI(),
+		...createMobileAPI(),
 		...createLearningLoopAPI(),
 		...createMultiRepoAPI(),
 		...createArchitectureVisualizerAPI(),
@@ -509,7 +513,9 @@ export { createFileAPI } from "./file-api";
 export type { ApiExplorerAPI } from "./modules/api-explorer-api";
 export { createApiExplorerAPI } from "./modules/api-explorer-api";
 export type { AppEmulatorAPI } from "./modules/app-emulator-api";
+export type { MobileAPI } from "./modules/mobile-api";
 export { createAppEmulatorAPI } from "./modules/app-emulator-api";
+export { createMobileAPI } from "./modules/mobile-api";
 export type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 export { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 export type { ArenaAPI } from "./modules/arena-api";

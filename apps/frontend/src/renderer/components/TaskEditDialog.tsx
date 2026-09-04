@@ -44,6 +44,7 @@ import type {
 	TaskPriority,
 	ThinkingLevel,
 } from "../../shared/types";
+import type { MobilePlatform } from "../../shared/types/mobile";
 import type {
 	PhaseModelConfig,
 	PhaseThinkingConfig,
@@ -81,6 +82,24 @@ interface TaskEditDialogProps {
 	readonly mode?: "edit" | "duplicate";
 	/** Optional callback when a duplicate is successfully created (duplicate mode) */
 	readonly onCreated?: (newTaskId: string) => void;
+}
+
+/**
+ * Whether two target lists mean the same thing.
+ *
+ * Order does not: `["ios", "android"]` and `["android", "ios"]` are one choice,
+ * and comparing them by identity would mark the dialog dirty for a user who
+ * only unchecked and rechecked a box.
+ */
+function sameTargets(
+	current: MobilePlatform[],
+	saved: MobilePlatform[] | undefined,
+): boolean {
+	const previous = saved ?? [];
+	return (
+		current.length === previous.length &&
+		current.every((platform) => previous.includes(platform))
+	);
 }
 
 export function TaskEditDialog({
@@ -196,6 +215,9 @@ export function TaskEditDialog({
 
 	// TDD override (per-task)
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
+	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>(
+		task.metadata?.mobileTargets ?? [],
+	);
 
 	// Reset form when task changes or dialog opens
 	useEffect(() => {
@@ -249,6 +271,7 @@ export function TaskEditDialog({
 				task.metadata?.requireReviewBeforeCoding ?? false,
 			);
 			setTddMode(task.metadata?.tddMode ?? false);
+			setMobileTargets(task.metadata?.mobileTargets ?? []);
 			const resolvedProvider =
 				task.metadata?.provider || selectedProvider || "anthropic";
 			setProvider(resolvedProvider);
@@ -355,6 +378,7 @@ export function TaskEditDialog({
 				requireReviewBeforeCoding !==
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
+				!sameTargets(mobileTargets, task.metadata?.mobileTargets) ||
 				JSON.stringify(images) !==
 					JSON.stringify(task.metadata?.attachedImages || []) ||
 				JSON.stringify(phaseModels) !==
@@ -403,6 +427,9 @@ export function TaskEditDialog({
 		metadataUpdates.requireReviewBeforeCoding = requireReviewBeforeCoding;
 		// Only persist tddMode when it diverges from the current value, so that
 		// "inherit project default" (undefined) is preserved unless explicitly changed.
+		if (!sameTargets(mobileTargets, task.metadata?.mobileTargets)) {
+			metadataUpdates.mobileTargets = mobileTargets;
+		}
 		if (tddMode !== (task.metadata?.tddMode ?? false)) {
 			metadataUpdates.tddMode = tddMode;
 		}
@@ -564,6 +591,8 @@ export function TaskEditDialog({
 				onImagesChange={setImages}
 				requireReviewBeforeCoding={requireReviewBeforeCoding}
 				onRequireReviewChange={setRequireReviewBeforeCoding}
+				mobileTargets={mobileTargets}
+				onMobileTargetsChange={setMobileTargets}
 				tddMode={tddMode}
 				onTddModeChange={setTddMode}
 				disabled={isSaving}

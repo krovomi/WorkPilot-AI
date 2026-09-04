@@ -39,6 +39,7 @@ import type {
 	TaskPriority,
 	ThinkingLevel,
 } from "../../shared/types";
+import type { MobilePlatform } from "../../shared/types/mobile";
 import type {
 	PhaseModelConfig,
 	PhaseThinkingConfig,
@@ -169,6 +170,9 @@ export function TaskCreationWizard({
 
 	// TDD override (per-task) - default false (inherit project setting)
 	const [tddMode, setTddMode] = useState(false);
+	// Empty is the default and means "every platform the project has":
+	// a card that names none on a mobile repo is not asking for none.
+	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>([]);
 
 	// Draft state
 	const [isDraftRestored, setIsDraftRestored] = useState(false);
@@ -221,6 +225,7 @@ export function TaskCreationWizard({
 				setReferencedFiles(draft.referencedFiles ?? []);
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
+				setMobileTargets(draft.mobileTargets ?? []);
 				setIsDraftRestored(true);
 
 				if (
@@ -346,6 +351,7 @@ export function TaskCreationWizard({
 			referencedFiles,
 			requireReviewBeforeCoding,
 			tddMode,
+			mobileTargets,
 			savedAt: new Date(),
 		}),
 		[
@@ -365,6 +371,7 @@ export function TaskCreationWizard({
 			referencedFiles,
 			requireReviewBeforeCoding,
 			tddMode,
+			mobileTargets,
 		],
 	);
 
@@ -566,6 +573,7 @@ export function TaskCreationWizard({
 				metadata.referencedFiles = allReferencedFiles;
 			if (requireReviewBeforeCoding) metadata.requireReviewBeforeCoding = true;
 			if (tddMode) metadata.tddMode = true;
+			if (mobileTargets.length > 0) metadata.mobileTargets = mobileTargets;
 			// Always include baseBranch - resolve PROJECT_DEFAULT_BRANCH to actual branch name
 			// This ensures the backend always knows which branch to use for worktree creation
 			if (baseBranch === PROJECT_DEFAULT_BRANCH) {
@@ -820,6 +828,8 @@ export function TaskCreationWizard({
 					onRequireReviewChange={setRequireReviewBeforeCoding}
 					tddMode={tddMode}
 					onTddModeChange={setTddMode}
+					mobileTargets={mobileTargets}
+					onMobileTargetsChange={setMobileTargets}
 					disabled={isCreating}
 					error={error}
 					onError={setError}
