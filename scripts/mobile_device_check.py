@@ -77,6 +77,20 @@ def capture(command: list[str], timeout: int = 60) -> tuple[int, str]:
     return completed.returncode, completed.stdout
 
 
+def _is_png(path: Path) -> bool:
+    """Whether a real image landed, rather than an empty or truncated file.
+
+    A non-zero exit code is not enough: adb happily exits 0 having written
+    nothing when the device goes away mid-capture, and an empty
+    `device-frame.png` uploads as an artifact that looks like a success.
+    """
+    try:
+        with path.open("rb") as handle:
+            return handle.read(8) == b"\x89PNG\r\n\x1a\n"
+    except OSError:
+        return False
+
+
 def report_plan(project_dir: Path, platform: MobilePlatform | None) -> tuple:
     """The read-only half: stack, toolchain, devices."""
     stack = detect_stack(project_dir)
@@ -149,31 +163,37 @@ def launch(stack, platform: MobilePlatform, device, project_dir: Path) -> int:
             time.sleep(5)
 
         say("capturing frame")
-        code, _ = capture([adb, "-s", device.id, "exec-out", "screencap", "-p"])
-        if code != 0:
-            say("ERROR", "could not capture a frame")
-            return 1
-        with open("device-frame.png", "wb") as handle:
+        # Straight to the file, in binary, once. `capture()` decodes stdout as
+        # UTF-8, and `screencap -p` emits a PNG — its first byte is 0x89, which
+        # is not valid UTF-8, so probing the exit code that way raised
+        # UnicodeDecodeError after the app had already launched. Nor is there
+        # anything to probe: running the command twice to check it worked and
+        # then to keep the output captures two different frames.
+        frame = Path("device-frame.png")
+        with frame.open("wb") as handle:
             proc = subprocess.run(  # noqa: S603 - fixed argv
                 [adb, "-s", device.id, "exec-out", "screencap", "-p"],
                 stdout=handle,
                 check=False,
             )
-        if proc.returncode != 0 or Path("device-frame.png").stat().st_size == 0:
-            say("ERROR", "the captured frame is empty")
+        if proc.returncode != 0 or not _is_png(frame):
+            say("ERROR", "no readable frame was captured")
             return 1
-        say(
-            "frame",
-            f"device-frame.png ({Path('device-frame.png').stat().st_size} bytes)",
-        )
+        say("frame", f"{frame} ({frame.stat().st_size} bytes)")
         return 0
 
     xcrun = find_tool("xcrun") or "xcrun"
     say("capturing frame")
-    if run([xcrun, "simctl", "io", device.id, "screenshot", "device-frame.png"]) != 0:
+    frame = Path("device-frame.png")
+    if run([xcrun, "simctl", "io", device.id, "screenshot", str(frame)]) != 0:
         say("ERROR", "could not capture a frame")
         return 1
-    say("frame", "device-frame.png")
+    # simctl writes the file itself and can exit 0 having written nothing
+    # useful, so the same check applies on this side.
+    if not _is_png(frame):
+        say("ERROR", "no readable frame was captured")
+        return 1
+    say("frame", f"{frame} ({frame.stat().st_size} bytes)")
     return 0
 
 
