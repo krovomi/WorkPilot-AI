@@ -37,6 +37,7 @@ document is how three answers to one question start.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -293,6 +294,7 @@ def _as_ids(raw: object) -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 
 TRACEABILITY_FILENAME = "traceability.json"
+logger = logging.getLogger(__name__)
 
 
 def collect(spec_dir: Path) -> dict:
@@ -346,8 +348,13 @@ def write_record(spec_dir: Path) -> dict:
             json.dumps(record, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.warning(
+            "Failed to write %s for spec %s: %s",
+            TRACEABILITY_FILENAME,
+            spec_dir,
+            exc,
+        )
     return record
 
 
