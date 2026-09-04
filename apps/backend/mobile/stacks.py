@@ -259,8 +259,14 @@ def _detect_android_native(directory: Path) -> MobileStack | None:
         return None
 
     gradle = _gradle_wrapper(directory)
+    # A single-module Android project has no `app/` and its tasks are unqualified:
+    # `./gradlew installDebug`, not `./gradlew :installDebug`, which Gradle reads
+    # as a task on the root project and refuses with "task not found".
     module = "app" if (directory / "app").is_dir() else ""
-    prefix = f":{module}" if module else ""
+
+    def task(name: str) -> str:
+        return f"{gradle} :{module}:{name}" if module else f"{gradle} {name}"
+
     return MobileStack(
         framework="android-native",
         platforms=(ANDROID,),
@@ -270,10 +276,10 @@ def _detect_android_native(directory: Path) -> MobileStack | None:
         + tuple(m.name for m in manifests if m.exists()),
         commands={
             ANDROID: PlatformCommands(
-                run=f"{gradle} {prefix}:installDebug".replace("::", ":"),
-                build=f"{gradle} {prefix}:assembleDebug".replace("::", ":"),
-                test=f"{gradle} {prefix}:testDebugUnitTest".replace("::", ":"),
-                lint=f"{gradle} {prefix}:lintDebug".replace("::", ":"),
+                run=task("installDebug"),
+                build=task("assembleDebug"),
+                test=task("testDebugUnitTest"),
+                lint=task("lintDebug"),
                 artifact=f"{module or 'app'}/build/outputs/apk/debug/*.apk",
                 notes=(
                     "installDebug puts the APK on the booted device but does not "

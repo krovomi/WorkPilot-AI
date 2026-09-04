@@ -70,6 +70,28 @@ class TestNativeProjects:
         stack = detect_stack(root)
         assert stack.commands_for(ANDROID).build.startswith("gradle ")
 
+    def test_a_single_module_project_gets_unqualified_gradle_tasks(self, tmp_path):
+        """No `app/` means no module to qualify with.
+
+        `./gradlew :installDebug` reads as a task on the root project, and
+        Gradle refuses it with "task not found" — a failure that looks like a
+        broken build rather than a wrong command.
+        """
+        (tmp_path / "src" / "main").mkdir(parents=True)
+        (tmp_path / "build.gradle.kts").write_text(
+            'plugins { id("com.android.application") }', encoding="utf-8"
+        )
+        (tmp_path / "src" / "main" / "AndroidManifest.xml").write_text(
+            "<manifest/>", encoding="utf-8"
+        )
+        commands = detect_stack(tmp_path).commands_for(ANDROID)
+        assert commands.build.endswith(" assembleDebug")
+        assert ":" not in commands.build.split()[-1]
+
+    def test_a_multi_module_project_qualifies_them(self, tmp_path):
+        commands = detect_stack(_android_native(tmp_path)).commands_for(ANDROID)
+        assert commands.build.endswith(" :app:assembleDebug")
+
     def test_an_xcode_project_is_detected(self, tmp_path):
         (tmp_path / "Demo.xcodeproj").mkdir()
         stack = detect_stack(tmp_path)
