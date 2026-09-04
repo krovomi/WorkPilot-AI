@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 from agents.subagents.mobile import MOBILE_ROLES, overlay_for  # noqa: E402
+from mobile.devices import parse_adb_devices  # noqa: E402
 from mobile.prompt import TARGETS_ENV, mobile_section, requested_targets  # noqa: E402
 from mobile.readiness import doctor  # noqa: E402
 from mobile.stacks import ANDROID, IOS  # noqa: E402
@@ -266,3 +267,63 @@ class TestTheSkillsExist:
             meta, _ = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
             assert meta.get("name") == skill_md.parent.name
             assert meta.get("description")
+
+
+class TestReadingAdbDevices:
+    """`adb devices -l`, including the output adb produces when it is cold.
+
+    Found by installing the real platform-tools and running the code against
+    them rather than against a fixture: a cold adb writes two lines of its own
+    before the header, and skipping a fixed first line left
+    `* daemon started successfully` to be parsed as a device with the serial
+    `*`. adb is cold exactly once per machine boot — which is the first time
+    anyone opens the Mobile tab.
+    """
+
+    COLD = (
+        "* daemon not running; starting now at tcp:5037\n"
+        "* daemon started successfully\n"
+        "List of devices attached\n"
+        "\n"
+    )
+
+    def test_a_cold_adb_reports_no_phantom_devices(self):
+        assert parse_adb_devices(self.COLD) == []
+
+    def test_a_cold_adb_still_finds_the_real_ones(self):
+        output = self.COLD.replace(
+            "List of devices attached\n\n",
+            "List of devices attached\nemulator-5554\tdevice model:Pixel_8\n",
+        )
+        (device,) = parse_adb_devices(output)
+        assert device.id == "emulator-5554"
+        assert device.kind == "emulator"
+        assert device.name == "Pixel 8"
+
+    def test_a_warm_adb_is_read_the_same_way(self):
+        output = "List of devices attached\nemulator-5554\tdevice\n"
+        assert [d.id for d in parse_adb_devices(output)] == ["emulator-5554"]
+
+    def test_a_physical_phone_is_told_from_an_emulator(self):
+        output = "List of devices attached\n1A2B3C4D\tdevice model:SM_G991B\n"
+        (device,) = parse_adb_devices(output)
+        assert device.kind == "physical"
+        assert device.name == "SM G991B"
+
+    @pytest.mark.parametrize("state", ["offline", "unauthorized", "connecting"])
+    def test_a_device_that_cannot_be_installed_onto_is_not_offered(self, state):
+        # Installing onto one fails with a message that reads like a broken
+        # build; offering it in the picker is how that happens.
+        output = f"List of devices attached\nemulator-5554\t{state}\n"
+        assert parse_adb_devices(output) == []
+
+    def test_chatter_that_survives_the_header_is_not_a_device(self):
+        output = (
+            "List of devices attached\n"
+            "adb server version (41) doesn't match this client\n"
+            "emulator-5554\tdevice\n"
+        )
+        assert [d.id for d in parse_adb_devices(output)] == ["emulator-5554"]
+
+    def test_empty_output_is_an_answer(self):
+        assert parse_adb_devices("") == []

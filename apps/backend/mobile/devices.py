@@ -26,7 +26,7 @@ from pathlib import Path
 from .stacks import ANDROID, IOS, MobilePlatform
 from .toolchain import android_sdk_root, find_tool
 
-__all__ = ["MobileDevice", "DeviceListing", "list_devices"]
+__all__ = ["MobileDevice", "DeviceListing", "list_devices", "parse_adb_devices"]
 
 # Listing is a local command; anything slower than this is a hung adb server or
 # a simulator service that will not answer, and waiting longer only delays the
@@ -117,23 +117,64 @@ def _android_avds() -> list[MobileDevice]:
     return devices
 
 
-def _android_attached() -> list[MobileDevice]:
-    """Devices `adb` can see right now — booted emulators and plugged-in phones."""
-    adb = find_tool("adb")
-    if not adb:
-        return []
-    code, output = _run([adb, "devices", "-l"])
-    if code != 0:
-        return []
+# The states `adb devices` reports. Anything else on a line is not a device —
+# which matters because adb writes its startup chatter to the same stream.
+_ADB_STATES = {
+    "device",
+    "offline",
+    "unauthorized",
+    "authorizing",
+    "connecting",
+    "bootloader",
+    "recovery",
+    "sideload",
+    "host",
+    "no",  # "no permissions"
+}
+
+
+def parse_adb_devices(output: str) -> list[MobileDevice]:
+    """Read `adb devices -l` output.
+
+    Anchored to the "List of devices attached" header rather than skipping a
+    fixed first line: a **cold** adb prints two lines of its own before the
+    header —
+
+        * daemon not running; starting now at tcp:5037
+        * daemon started successfully
+        List of devices attached
+
+    — and dropping only line one leaves `* daemon started successfully` to be
+    parsed as a device with the serial `*`. That is not a hypothetical: adb is
+    cold exactly once per machine boot, which is the first time anyone opens
+    the Mobile tab, and the picker would offer two phantom devices named `*`.
+
+    The state is checked against the set adb actually emits, so a line that
+    survives the header anchor but is still chatter is dropped rather than
+    guessed at.
+    """
+    lines = output.splitlines()
+    start = 0
+    for index, line in enumerate(lines):
+        if line.strip().lower().startswith("list of devices"):
+            start = index + 1
+            break
+
     devices: list[MobileDevice] = []
-    for line in output.splitlines()[1:]:
+    for line in lines[start:]:
         line = line.strip()
-        if not line or "offline" in line:
+        if not line or line.startswith("*"):
             continue
         parts = line.split()
         if len(parts) < 2:
             continue
         serial, state = parts[0], parts[1]
+        if state not in _ADB_STATES:
+            continue
+        if state != "device":
+            # Offline or unauthorized: installing onto it fails with a message
+            # that reads like a broken build, so it is not offered at all.
+            continue
         model = next(
             (p.split(":", 1)[1] for p in parts[2:] if p.startswith("model:")), serial
         )
@@ -147,6 +188,17 @@ def _android_attached() -> list[MobileDevice]:
             )
         )
     return devices
+
+
+def _android_attached() -> list[MobileDevice]:
+    """Devices `adb` can see right now — booted emulators and plugged-in phones."""
+    adb = find_tool("adb")
+    if not adb:
+        return []
+    code, output = _run([adb, "devices", "-l"])
+    if code != 0:
+        return []
+    return parse_adb_devices(output)
 
 
 def _merge_android(
