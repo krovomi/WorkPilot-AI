@@ -283,6 +283,7 @@ All file paths in `files_to_modify`, `files_to_create`, `files_to_reference`, `p
           "id": "subtask-1-1",
           "description": "Create data models for [feature]",
           "service": "backend",
+          "requirements": ["FR-001", "FR-002"],
           "files_to_modify": ["src/models/user.py"],
           "files_to_create": ["src/models/analytics.py"],
           "patterns_from": ["src/models/existing_model.py"],
@@ -297,6 +298,7 @@ All file paths in `files_to_modify`, `files_to_create`, `files_to_reference`, `p
           "id": "subtask-1-2",
           "description": "Create API endpoints for [feature]",
           "service": "backend",
+          "requirements": ["FR-003"],
           "files_to_modify": ["src/routes/api.py"],
           "files_to_create": ["src/routes/analytics.py"],
           "patterns_from": ["src/routes/users.py"],
@@ -409,14 +411,42 @@ Use ONLY these values for the `type` field in phases:
 
 1. **One service per subtask** - Never mix backend and frontend in one subtask
 2. **Small scope** - Each subtask should take 1-3 files max
-3. **Clear verification** - Every subtask must have a way to verify it works
-4. **Explicit dependencies** - Phases block until dependencies complete
-5. **Test coverage is mandatory** - Each implementation subtask must include the
+3. **Claim the requirements you satisfy** - `"requirements": ["FR-001"]` on every
+   subtask that implements part of a requirement declared in `spec.md`. See
+   **Requirement Coverage** below; this is what makes "which requirement is
+   nobody building?" a question with an answer.
+4. **Clear verification** - Every subtask must have a way to verify it works
+5. **Explicit dependencies** - Phases block until dependencies complete
+6. **Test coverage is mandatory** - Each implementation subtask must include the
    unit/integration tests needed to reach **{{MIN_COVERAGE}}%** line + branch
    coverage on the code it adds or changes. Prefer `command` verifications that
    run the tests **with coverage** (e.g. `pytest --cov=. --cov-branch`,
    `vitest run --coverage`). The QA stage enforces this threshold and will reject
    the task otherwise (e2e coverage is best-effort).
+
+### Requirement Coverage
+
+`spec.md` identifies its requirements — `FR-001`, `FR-002`, `NFR-001`. Read them
+before planning and carry the ids into the plan:
+
+```json
+"requirements": ["FR-001", "FR-003"]
+```
+
+- Put the field on the **subtask** that implements the requirement. Put it on a
+  **phase** only when every subtask in it serves the same requirements — it is
+  inherited by subtasks that declare none of their own.
+- **Every requirement in `spec.md` must be claimed by at least one subtask.**
+  Before writing the file, go through the list and check each id appears
+  somewhere in the plan. A requirement nobody claims is one nobody builds, and
+  the first moment anyone notices is QA — after the code is written.
+- A requirement you are **deliberately** not implementing (out of scope for this
+  build) stays unclaimed on purpose: say so in `workflow_rationale`, so the
+  gap reads as a decision rather than an oversight.
+- Never invent an id. Referencing an `FR-###` that `spec.md` does not declare
+  means one of the two documents has drifted, and validation reports it.
+- A spec with no `FR-###` identifiers is an older one: skip the field entirely
+  rather than making ids up.
 
 ### Verification Types
 

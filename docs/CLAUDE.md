@@ -16,6 +16,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Claude Agent SDK Usage](#claude-agent-sdk-usage)
   - [Agent Prompts](#agent-prompts)
   - [Spec Directory Structure](#spec-directory-structure)
+  - [Requirement Traceability](#requirement-traceability)
   - [Memory System (Graphiti)](#memory-system-graphiti)
   - [Skills System](#skills-system)
   - [Memory Search (mem-search)](#memory-search-mem-search)
@@ -261,6 +262,50 @@ from an earlier design and loaded by nothing.
 ### Spec Directory Structure
 
 Each spec in `.workpilot/specs/XXX-name/` contains: `spec.md`, `requirements.json`, `context.json`, `implementation_plan.json`, `qa_report.md`, `QA_FIX_REQUEST.md`
+
+### Requirement Traceability
+
+`spec.md` names its requirements — `FR-001`, `NFR-001` — and every subtask in
+`implementation_plan.json` claims the ones it implements:
+
+```json
+{ "id": "subtask-1-1", "requirements": ["FR-001", "FR-002"], ... }
+```
+
+Positions are not names. Numbering requirements `1.`, `2.`, `3.` meant inserting
+one in the middle silently repointed every reference to the ones below it, so
+nothing downstream referenced a requirement at all — and "which requirement is
+covered by no subtask?" had no answer until QA read the finished branch.
+
+`spec/traceability.py` is the single reader: `parse_requirements`,
+`parse_open_questions`, `compute_coverage`. It touches no files, so the
+validators, a workflow phase and a test all use the same parser.
+
+**`[NEEDS CLARIFICATION: <question>]`** marks an assumption the inputs could not
+settle. `spec_writer.md` used to be told to "make reasonable assumptions" full
+stop, and in the finished document a guess reads exactly like a decision
+somebody made. The marker keeps the two apart and makes the guesses countable.
+It is not an escape hatch: a question the codebase or `context.json` answers is
+work, not a clarification.
+
+Both signals are **warnings, never errors**, in `validate_pkg`:
+
+| Reported | Why not an error |
+|---|---|
+| open questions in `spec.md` | flagging what you do not know is the spec doing its job |
+| no `FR-###` ids at all | specs written before ids existed are not broken |
+| a requirement no subtask claims | it can be deliberately out of scope — the plan's author decides |
+| a subtask referencing an undeclared id | the two documents drifted; which one is wrong is a judgement |
+
+Coverage reports *not applicable* rather than 0% when the spec declares no ids —
+a legacy spec scoring zero on every build teaches everyone to ignore the line.
+And an error here would reach the validation auto-fix agent, whose cheapest way
+to satisfy it is to bolt an id onto the nearest subtask: a signal that is always
+green and always meaningless.
+
+The quick path (`spec_quick.md`) takes the marker and skips the ids: identifiers
+earn their keep when a plan has several subtasks to trace, and a quick spec
+usually has one.
 
 ### Memory System (Graphiti)
 

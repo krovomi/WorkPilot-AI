@@ -261,6 +261,11 @@ class PlanningPhaseMixin:
                     self.ui.print_status(f"{result.checkpoint}: FAIL", "error")
                 for err in result.errors:
                     print(f"    {self.ui.muted('Error:')} {err}")
+                # Warnings never fail the checkpoint, but they are the only
+                # place open questions and requirement coverage surface --
+                # collecting them and printing nothing made them unreadable.
+                for warn in result.warnings:
+                    print(f"    {self.ui.muted('Warning:')} {warn}")
 
             if all_valid:
                 print()

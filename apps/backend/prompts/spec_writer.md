@@ -42,6 +42,27 @@ Extract from these files:
 - Tech stack (based on file extensions in task description)
 - Implementation approach (based on task type)
 
+**AND MARK THE ONES THAT MATTER**: an assumption that changes what gets built is
+not the same thing as a decision somebody made, and in a finished document the
+two read identically. Where you had to guess and the guess is load-bearing,
+write the guess AND flag it:
+
+```
+- Export format: CSV [NEEDS CLARIFICATION: CSV or XLSX? nothing in the repo settles it]
+```
+
+Rules for the marker:
+- Use the exact form `[NEEDS CLARIFICATION: <question>]`. It is counted by the
+  validator and surfaced to the human reviewer, so the spelling matters.
+- Ask a question that can be answered in one line, not "clarify the export".
+- **Never** use it as an escape from work you can do yourself: if the answer is
+  in `context.json`, in the codebase, or settled by an existing convention, go
+  and find it. A marker over a question the repository already answers is worse
+  than no marker at all.
+- Keep it to what is genuinely undecidable from the inputs. Zero markers is a
+  perfectly good outcome; five markers on a two-file change means you stopped
+  reading too early.
+
 ---
 
 ## PHASE 1: ANALYZE CONTEXT
@@ -159,12 +180,23 @@ From `[reference file path or "Industry best practices"]`:
 
 ### Functional Requirements
 
-1. **[Requirement Name from requirements.json or task description]**
+Every requirement gets an identifier: `FR-001`, `FR-002`, … in declaration
+order, and `NFR-001`, `NFR-002`, … for non-functional ones (performance,
+security, accessibility, compatibility). The identifier is how the
+implementation plan, the QA report and the reviewers refer to this exact
+requirement, so it must be **stable and unique**: never renumber to close a gap
+if a requirement is dropped, and never reuse an id for something else.
+
+1. **FR-001 — [Requirement Name from requirements.json or task description]**
    - Description: [What it does]
    - Acceptance: [How to verify - from acceptance_criteria or task description]
 
-2. **[Requirement Name]**
+2. **FR-002 — [Requirement Name]**
    - Description: [What it does]
+   - Acceptance: [How to verify]
+
+3. **NFR-001 — [Non-functional requirement, if any]**
+   - Description: [The constraint, with a number in it where one applies]
    - Acceptance: [How to verify]
 
 ### Edge Cases
@@ -172,7 +204,19 @@ From `[reference file path or "Industry best practices"]`:
 1. **[Edge Case]** - [How to handle it]
 2. **[Edge Case]** - [How to handle it]
 
-**IF NO SPECIFIC REQUIREMENTS**: Use standard requirements for the task type (e.g., "Input validation", "Error handling", "Logging", etc.)
+**IF NO SPECIFIC REQUIREMENTS**: Use standard requirements for the task type (e.g., "Input validation", "Error handling", "Logging", etc.) — identified the same way.
+
+## Clarifications
+
+*Omit this section entirely when there is nothing to clarify — an empty
+"Clarifications" heading is noise. When there is, list one line per open
+question, each carrying the marker so it stays countable:*
+
+- [NEEDS CLARIFICATION: <question>] — affects: FR-002, FR-005
+
+*Answers get appended here under a `### Session YYYY-MM-DD` heading when a
+human resolves them, and the marker is then removed from the requirement it
+was blocking.*
 
 ## Implementation Notes
 
@@ -203,8 +247,8 @@ From `[reference file path or "Industry best practices"]`:
 
 The task is complete when:
 
-1. [ ] [From requirements.json acceptance_criteria or "Main requirement implemented"]
-2. [ ] [From requirements.json acceptance_criteria or "Functionality works as described"]
+1. [ ] (FR-001) [From requirements.json acceptance_criteria or "Main requirement implemented"]
+2. [ ] (FR-002) [From requirements.json acceptance_criteria or "Functionality works as described"]
 3. [ ] No console errors
 4. [ ] Existing tests still pass
 5. [ ] New functionality verified via browser/API or appropriate testing method
@@ -314,6 +358,8 @@ Next phase: Implementation Planning
 3. **Use information from input files** - Don't make up data
 4. **Be specific about files** - Use exact paths from context.json
 5. **Include QA criteria** - The QA agent needs this for validation
+6. **Identify every requirement** - `FR-###` / `NFR-###`, unique and stable. The planner references them, and a requirement nothing can reference is a requirement nothing can be held to.
+7. **Flag what you guessed** - `[NEEDS CLARIFICATION: …]` on a load-bearing assumption, never on a question the repo answers
 
 ---
 
