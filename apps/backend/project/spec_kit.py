@@ -54,6 +54,26 @@ _MAX_CHARS = 6000
 _BINDING = re.compile(r"\b(MUST NOT|MUST|SHALL NOT|SHALL|NEVER|REQUIRED)\b")
 
 
+# The two paragraphs the prompt section opens with, named rather than written
+# inline in the list that builds it. Adjacent string literals inside a list
+# concatenate silently, so a wrapped paragraph and a forgotten comma look
+# exactly alike — to a reader and to CodeQL, which flags the shape rather than
+# guessing which one it is. `workflows/runner.py` names its own for the same
+# reason; this file now follows it.
+_AUTHORITY = (
+    "This project is a spec-kit project and states its own binding rules in"
+    " `{where}`. They apply to the plan and to the code, and they outrank any"
+    " convention you would otherwise infer from the codebase — the project"
+    " wrote them down precisely because inference was getting it wrong."
+)
+
+_ON_CONFLICT = (
+    "Where a rule here conflicts with the task, do not silently pick one:"
+    " follow the rule and say in your output that you did, so the person"
+    " reviewing sees the conflict."
+)
+
+
 @dataclass(frozen=True)
 class Constitution:
     """A spec-kit constitution found in the project being built."""
@@ -116,15 +136,9 @@ def format_constitution_for_prompt(project_dir: Path) -> str:
     lines = [
         "## PROJECT CONSTITUTION (spec-kit)",
         "",
-        f"This project is a spec-kit project and states its own binding rules in"
-        f" `{where}`. They apply to the plan and to the code, and they outrank"
-        " any convention you would otherwise infer from the codebase — the"
-        " project wrote them down precisely because inference was getting it"
-        " wrong.",
+        _AUTHORITY.format(where=where),
         "",
-        "Where a rule here conflicts with the task, do not silently pick one:"
-        " follow the rule and say in your output that you did, so the person"
-        " reviewing sees the conflict.",
+        _ON_CONFLICT,
         "",
         "---",
         "",
