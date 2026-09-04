@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
+	readdirSync,
 	readFileSync,
 	statSync,
 	writeFileSync,
@@ -803,6 +804,125 @@ export function registerSettingsHandlers(
 
 			if (result.canceled) return [];
 			return result.filePaths;
+		},
+	);
+
+	/**
+	 * What the wizard would be creating, and what is already there.
+	 *
+	 * "Create" and "Open existing folder" are not the same act: the first makes
+	 * `<location>/<name>` and registers *that*, so pointing it at a folder that
+	 * already holds the code adds an empty sibling instead. The form cannot say
+	 * so without looking at the disk, and this is that look.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.DIALOG_INSPECT_PROJECT_LOCATION,
+		async (
+			_,
+			location: string,
+			name: string,
+		): Promise<
+			IPCResult<{
+				targetPath: string | null;
+				targetExists: boolean;
+				targetHasEntries: boolean;
+				locationIsProject: boolean;
+				insideRepository: string | null;
+				markers: string[];
+			}>
+		> => {
+			try {
+				const empty = {
+					targetPath: null,
+					targetExists: false,
+					targetHasEntries: false,
+					locationIsProject: false,
+					insideRepository: null,
+					markers: [] as string[],
+				};
+				if (!location || !existsSync(location)) {
+					return { success: true, data: empty };
+				}
+
+				let entries: string[];
+				try {
+					entries = readdirSync(location);
+				} catch {
+					return { success: true, data: empty };
+				}
+
+				// Files a project root carries and an ordinary parent folder does
+				// not. A folder that merely *contains* projects — `~/repositories`
+				// — has none of them, which is what keeps the warning quiet where
+				// creating really is what the user meant.
+				const markers = entries.filter(
+					(entry) =>
+						entry === ".git" ||
+						/\.(sln|slnx|csproj|fsproj)$/i.test(entry) ||
+						[
+							"package.json",
+							"pnpm-workspace.yaml",
+							"Cargo.toml",
+							"go.mod",
+							"pom.xml",
+							"build.gradle",
+							"build.gradle.kts",
+							"pyproject.toml",
+							"requirements.txt",
+							"Gemfile",
+							"composer.json",
+						].includes(entry),
+				);
+
+				// A marker at the top level only catches a location that *is* the
+				// project root. `…/dotnet` with the solution one level down has
+				// none — but it is inside a checkout, and creating a project
+				// inside a repository someone already cloned is nearly always the
+				// mistake this warning exists for.
+				let insideRepository: string | null = null;
+				let ancestor = path.dirname(location);
+				for (let depth = 0; depth < 12; depth++) {
+					if (existsSync(path.join(ancestor, ".git"))) {
+						insideRepository = ancestor;
+						break;
+					}
+					const parent = path.dirname(ancestor);
+					if (parent === ancestor) break;
+					ancestor = parent;
+				}
+
+				const sanitized = sanitizeProjectFolderName(name);
+				const targetPath = sanitized ? path.join(location, sanitized) : null;
+				const targetExists = targetPath !== null && existsSync(targetPath);
+				let targetHasEntries = false;
+				if (targetExists && targetPath) {
+					try {
+						targetHasEntries = readdirSync(targetPath).length > 0;
+					} catch {
+						targetHasEntries = false;
+					}
+				}
+
+				return {
+					success: true,
+					data: {
+						targetPath,
+						targetExists,
+						targetHasEntries,
+						locationIsProject: markers.length > 0,
+						insideRepository,
+						markers: markers.slice(0, 4),
+					},
+				};
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to inspect project location",
+				};
+			}
 		},
 	);
 

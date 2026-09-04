@@ -6,6 +6,8 @@ import { detectGo } from "../api-explorer/go";
 import { detectSpring } from "../api-explorer/jvm";
 import { detectNode } from "../api-explorer/node";
 import { detectPython } from "../api-explorer/python";
+import { detectRails } from "../api-explorer/rails";
+import { detectRust } from "../api-explorer/rust";
 import {
 	buildProbeUrls,
 	discoverBaseUrls,
@@ -13,11 +15,7 @@ import {
 	probeLiveSpec,
 } from "../api-explorer/live-spec";
 import { findCommittedSpec } from "../api-explorer/spec-files";
-import {
-	readDirectory,
-	readFile,
-	walkFiles,
-} from "../api-explorer/source-files";
+import { readDirectory } from "../api-explorer/source-files";
 import type {
 	DetectedRoute,
 	JsonSchema,
@@ -27,90 +25,6 @@ import {
 	ApiExplorerSecretStore,
 	type ApiExplorerSecretValues,
 } from "../api-explorer-secret-store";
-
-// ── Language detectors ────────────────────────────────────────────────────────
-// ASP.NET Core lives in ../api-explorer/dotnet.ts: it reads action signatures
-// and DTOs, so it needs more than a regex sweep. The detectors below stay
-// declaration-level on purpose.
-
-/** Rust — Axum / Actix */
-function detectRust(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".rs"]);
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content) continue;
-		const tag = path.basename(filePath, ".rs");
-
-		const axumRe =
-			/\.route\s*\(\s*["']([^"']+)["']\s*,\s*(get|post|put|delete|patch)/g;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = axumRe.exec(content)) !== null) {
-			routes.push({
-				path: m[1],
-				methods: [m[2].toUpperCase()],
-				tag,
-				file: path.relative(projectPath, filePath),
-				framework: "Rust/Axum",
-				requiresAuth: false,
-			});
-		}
-	}
-	return routes;
-}
-
-/** Rails — Ruby config/routes.rb */
-function detectRails(projectPath: string): DetectedRoute[] {
-	const routes: DetectedRoute[] = [];
-	const files = walkFiles(projectPath, [".rb"]).filter((f) =>
-		f.endsWith("routes.rb"),
-	);
-
-	for (const filePath of files) {
-		const content = readFile(filePath);
-		if (!content) continue;
-
-		const verbRe = /(get|post|put|patch|delete)\s+['"]([^'"]+)['"]/gi;
-		let m: RegExpExecArray | null;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = verbRe.exec(content)) !== null) {
-			const p = m[2].startsWith("/") ? m[2] : `/${m[2]}`;
-			routes.push({
-				path: p,
-				methods: [m[1].toUpperCase()],
-				tag: "routes",
-				file: path.relative(projectPath, filePath),
-				framework: "Rails",
-				requiresAuth: false,
-			});
-		}
-
-		const resourcesRe = /resources\s+:(\w+)/g;
-		// biome-ignore lint/suspicious/noAssignInExpressions: intentional assignment
-		while ((m = resourcesRe.exec(content)) !== null) {
-			const base = `/${m[1]}`;
-			for (const [p, method] of [
-				[base, "GET"],
-				[base, "POST"],
-				[`${base}/{id}`, "GET"],
-				[`${base}/{id}`, "PUT"],
-				[`${base}/{id}`, "DELETE"],
-			] as [string, string][]) {
-				routes.push({
-					path: p,
-					methods: [method],
-					tag: m[1],
-					file: path.relative(projectPath, filePath),
-					framework: "Rails",
-					requiresAuth: false,
-				});
-			}
-		}
-	}
-	return routes;
-}
 
 // ── OpenAPI spec builder ──────────────────────────────────────────────────────
 
