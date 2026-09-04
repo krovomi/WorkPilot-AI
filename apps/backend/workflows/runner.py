@@ -290,6 +290,21 @@ def find_skill_body(repo_root: Path, pack: str, skill: str) -> tuple[str, Path] 
     return None
 
 
+def _constitution(project_dir: Path) -> str:
+    """`prompts.constitution_section`, deferred and never fatal.
+
+    Imported here rather than at module scope because this module is loaded by
+    the engine before the agent stack is on the path — `run_skill_phase` defers
+    its own imports for the same reason.
+    """
+    try:
+        from prompts import constitution_section
+
+        return constitution_section(project_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
     """The procedure, plus the minimum context needed to apply it.
 
@@ -325,6 +340,15 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
             lines.append(f"  … and {len(ctx.changed_files) - len(shown)} more")
     if phase.description:
         lines += ["", f"WHY THIS PHASE EXISTS: {phase.description.strip()}"]
+
+    # A spec-kit project's own binding rules, when the target project is one.
+    # Every skill phase reasons about the project — `analyze` is asked outright
+    # what the plan does that the project forbids — and inferring conventions
+    # from the codebase while the project has written its rules down is
+    # answering the wrong question. Empty for a project without `.specify/`.
+    if rules := _constitution(ctx.project_dir):
+        lines += ["", "---", "", rules]
+
     lines += [
         "",
         "---",
