@@ -102,6 +102,7 @@ CONFIG_PHASE = {
     "brainstorm": "spec",
     "spec": "spec",
     "planning": "planning",
+    "analyze": "planning",
     "coding": "coding",
     "review": "qa",
     "qa": "qa",
@@ -118,6 +119,7 @@ _DEFAULT_CONFIG_PHASE = "coding"
 SKILL_PHASE_AGENTS = {
     "brainstorm": "spec_critic",
     "spec": "spec_writer",
+    "analyze": "spec_validation",
     "review": "pr_reviewer",
     "adversarial-review": "pr_reviewer",
     "spec-conformance": "spec_validation",

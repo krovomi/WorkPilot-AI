@@ -26,25 +26,33 @@ following a prompt, not by a serializer, so the reader accepts the shapes a
 model actually produces (`**FR-001**: …`, `- FR-001 — …`, `1. **FR-001**`) and
 treats anything it cannot parse as absent rather than as an error.
 
-Nothing here reads or writes files: callers pass the text and the parsed plan.
-That keeps it usable from the validators, from a workflow phase and from a test
-without a spec directory on disk.
+The parsing takes text and a parsed plan, never paths, so the validators, a
+workflow phase and a test all use it the same way. The one part that does touch
+disk is kept to the bottom of the file and to a single artifact,
+`traceability.json`: the record the Kanban, the QA stage and the `analyze` phase
+read instead of each re-deriving it from `spec.md` — three parsers of the same
+document is how three answers to one question start.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 __all__ = [
     "CLARIFICATION_MARKER",
+    "TRACEABILITY_FILENAME",
     "Coverage",
     "OpenQuestion",
     "Requirement",
+    "collect",
     "compute_coverage",
     "parse_open_questions",
     "parse_requirements",
     "plan_requirement_refs",
+    "write_record",
 ]
 
 # `FR-001` (functional) and `NFR-001` (non-functional). Digits are not padded
@@ -154,9 +162,12 @@ def parse_requirements(spec_text: str) -> list[Requirement]:
         req_id = match.group("id").upper()
         if req_id in found:
             continue
+        # A marker sitting on the declaration line belongs to the open
+        # questions, not to the requirement's name.
+        title = _CLARIFICATION_RE.sub("", match.group("title") or "")
         found[req_id] = Requirement(
             id=req_id,
-            title=_TITLE_TRIM.sub("", match.group("title") or "").strip(),
+            title=_TITLE_TRIM.sub("", title).strip(),
             line=number,
         )
 
@@ -275,3 +286,81 @@ def _as_ids(raw: object) -> tuple[str, ...]:
             if found not in ids:
                 ids.append(found)
     return tuple(ids)
+
+
+# ---------------------------------------------------------------------------
+# Reading a spec directory
+# ---------------------------------------------------------------------------
+
+TRACEABILITY_FILENAME = "traceability.json"
+
+
+def collect(spec_dir: Path) -> dict:
+    """The traceability record for a spec directory.
+
+    Always returns a record. A missing `spec.md`, an unreadable plan or invalid
+    JSON produce a record saying coverage was not checked and why — the callers
+    are a build step, an API endpoint and a review phase, none of which should
+    have to distinguish "no answer" from "the file was not there".
+    """
+    spec_text = _read_text(spec_dir / "spec.md")
+    plan = _read_json(spec_dir / "implementation_plan.json")
+
+    coverage = compute_coverage(spec_text, plan)
+    questions = parse_open_questions(spec_text)
+
+    return {
+        "spec": spec_dir.name,
+        "requirements": [
+            {"id": req.id, "title": req.title, "line": req.line}
+            for req in (coverage.requirements or parse_requirements(spec_text))
+        ],
+        "open_questions": [
+            {"question": q.question, "section": q.section, "line": q.line}
+            for q in questions
+        ],
+        "coverage": {
+            "applicable": coverage.applicable,
+            "reason": coverage.reason,
+            "percent": coverage.percent if coverage.applicable else None,
+            "covered": {key: list(value) for key, value in coverage.covered.items()},
+            "uncovered": list(coverage.uncovered),
+            "unknown_refs": {
+                key: list(value) for key, value in coverage.unknown_refs.items()
+            },
+            "summary": coverage.summary(),
+        },
+    }
+
+
+def write_record(spec_dir: Path) -> dict:
+    """Write `traceability.json` into ``spec_dir`` and return what was written.
+
+    Best-effort on the write: a spec directory that cannot be written to is a
+    real problem, but not one this record should be the messenger for — the
+    caller still gets the record and the build still runs.
+    """
+    record = collect(spec_dir)
+    try:
+        (spec_dir / TRACEABILITY_FILENAME).write_text(
+            json.dumps(record, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+    return record
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def _read_json(path: Path) -> dict | None:
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return loaded if isinstance(loaded, dict) else None

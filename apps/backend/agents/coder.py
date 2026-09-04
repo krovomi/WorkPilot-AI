@@ -871,6 +871,80 @@ async def run_autonomous_agent(
 
         return False, result.errors
 
+    def _report_traceability() -> None:
+        """Requirement coverage, at the moment the plan stops changing.
+
+        This is the last point at which a missing requirement is cheap: the
+        plan is valid, no code has been written for it yet, and adding a
+        subtask costs a sentence. The same gap found by QA costs a fix cycle
+        over code that was written against an incomplete plan.
+
+        Printed, and written to `traceability.json` so the Kanban and the
+        review phases read one record rather than each re-parsing `spec.md`.
+        Never raises: this reports on the build, it is not part of it.
+        """
+        try:
+            from spec.traceability import write_record
+
+            record = write_record(spec_dir)
+        except Exception as exc:  # noqa: BLE001 - a report never fails a build
+            logger.debug("traceability record unavailable: %s", exc)
+            return
+
+        coverage = record.get("coverage") or {}
+        if questions := record.get("open_questions"):
+            print_status(
+                f"{len(questions)} open question(s) left in spec.md — the coder "
+                "will have to decide them alone",
+                "warning",
+            )
+        if not coverage.get("applicable"):
+            return
+
+        uncovered = coverage.get("uncovered") or []
+        print_status(f"Requirement coverage: {coverage.get('summary')}", "info")
+        if uncovered:
+            print_status(
+                "No subtask claims: " + ", ".join(uncovered),
+                "warning",
+            )
+        for req_id, subtask_ids in (coverage.get("unknown_refs") or {}).items():
+            print_status(
+                f"Subtask(s) {', '.join(subtask_ids)} reference {req_id}, which "
+                "spec.md does not declare",
+                "warning",
+            )
+
+    async def _run_post_planning_phases() -> None:
+        """The workflow phases declared between `planning` and `coding`.
+
+        The three existing windows are (start → planning), (coding → qa) and
+        (qa → end): a phase declared between planning and coding was resolved,
+        printed in the profile, and then run by nobody. It belongs here rather
+        than in `build_commands` because this function owns both of the phases
+        it sits between — the window has no other place it could open.
+        """
+        if profile is None:
+            return
+        try:
+            from workflows import PhaseContext, run_skill_phases
+
+            ctx = PhaseContext(
+                project_dir=project_dir,
+                spec_dir=spec_dir,
+                model=model,
+                repo_root=_workflow_repo_root,
+                effort=getattr(profile, "effort", "medium"),
+                verbose=verbose,
+            )
+            run = await run_skill_phases(
+                profile, ctx, after="planning", before="coding"
+            )
+            if summary := run.describe():
+                print("\n" + summary)
+        except Exception as exc:  # noqa: BLE001 - the engine never blocks a build
+            logger.debug("post-planning phases skipped: %s", exc)
+
     if first_run:
         print_status(
             "Fresh start - will use Planner Agent to create implementation plan", "info"
@@ -1631,6 +1705,8 @@ async def run_autonomous_agent(
                 plan_validated = True
                 planning_retry_context = None
                 _clear_planning_failures(spec_dir)  # success → reset the cap
+                _report_traceability()
+                await _run_post_planning_phases()
             else:
                 planning_validation_failures = _bump_planning_failures(spec_dir)
                 # The plan WorkPilot reads lives in the spec dir; a model that

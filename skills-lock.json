@@ -50,6 +50,14 @@
 			"contentSha256": "c3ac1b28906d63849cb56be3eaedc231642287913ec4cdcc6349b6016cf0318c",
 			"targets": {}
 		},
+		"spec-analyze": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/spec-analyze/SKILL.md",
+			"contentSha256": "4ee0e086211304ef6137031350e7107bcecc8934764c8c6cc031d46803c0ba7f",
+			"targets": {}
+		},
 		"webapp-testing": {
 			"kind": "skill",
 			"pack": "tooling",
@@ -87,6 +95,7 @@
 		".agents/skills/mcp-builder/SKILL.md",
 		".agents/skills/mem-search/SKILL.md",
 		".agents/skills/mem-search/scripts/mem_search.py",
+		".agents/skills/spec-analyze/SKILL.md",
 		".agents/skills/webapp-testing/SKILL.md",
 		".agents/skills/webapp-testing/scripts/with_server.py",
 		".claude-plugin/marketplace.json",
@@ -94,6 +103,7 @@
 		".gemini/commands/business-comms.toml",
 		".gemini/commands/mcp-builder.toml",
 		".gemini/commands/mem-search.toml",
+		".gemini/commands/spec-analyze.toml",
 		".gemini/commands/webapp-testing.toml"
 	]
 }

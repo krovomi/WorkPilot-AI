@@ -278,8 +278,16 @@ nothing downstream referenced a requirement at all — and "which requirement is
 covered by no subtask?" had no answer until QA read the finished branch.
 
 `spec/traceability.py` is the single reader: `parse_requirements`,
-`parse_open_questions`, `compute_coverage`. It touches no files, so the
-validators, a workflow phase and a test all use the same parser.
+`parse_open_questions`, `compute_coverage`. The parsing takes text, so the
+validators, a workflow phase and a test all use it the same way.
+
+Once the plan validates, `write_record` puts the answer in
+`<spec_dir>/traceability.json` — requirements, open questions, and the coverage
+map — and the coder loop prints the summary. That is the last moment a missing
+requirement is cheap: the plan is valid, no code has been written against it,
+and the fix is a sentence. The `analyze` phase, the Kanban and QA read that
+record rather than each re-parsing `spec.md`; three parsers of one document is
+how three answers to one question start.
 
 **`[NEEDS CLARIFICATION: <question>]`** marks an assumption the inputs could not
 settle. `spec_writer.md` used to be told to "make reasonable assumptions" full
@@ -510,7 +518,7 @@ little else.
 
 | Phase | Who runs it |
 |---|---|
-| `brainstorm`, `spec`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
+| `brainstorm`, `spec`, `analyze`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
 | `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
 | the `tests-pass` hard gate | the engine (`workflows/hard_gates.py`) |
@@ -522,6 +530,25 @@ A skill phase runs where the workflow file declares it. The window is looked up
 by phase id in the **declared** order, so inserting a phase into
 `workflow.yaml` between two existing ones needs no Python change — and pruning
 a phase that bounds a window does not hand its work to the neighbouring one.
+
+There are **four** windows: before `planning`, between `planning` and `coding`,
+between `coding` and `qa`, and after `qa`. The second one is opened from inside
+`run_autonomous_agent`, because that function owns both phases it sits between —
+which is also why it did not exist until a phase needed it. A phase declared
+where no window opens is resolved, printed in the profile the user is shown, and
+run by nobody; `test_every_skill_phase_belongs_to_a_window` is what keeps that
+from happening quietly.
+
+`analyze` is the phase in that second window: `spec.md` and
+`implementation_plan.json` read together, once, before any code exists. The
+mechanical half of the question — which requirement no subtask claims — is
+already in `traceability.json` by then, so the skill is told to cite it rather
+than recompute it, and spends its budget on what a parser cannot see: the two
+documents contradicting each other, a plan that breaks the project's own
+conventions, an acceptance criterion nothing can verify. It runs read-only
+(`spec_validation`) and in a fresh context: a reader who inherits the planner's
+reasoning is not a second opinion, and a reviewer who can rewrite the document
+ends up reviewing his own.
 
 `impl:` reaches the two built-in phases as well. `coding` declares
 `superpowers/test-driven-development`: the skill is the *methodology*, the
