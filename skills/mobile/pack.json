@@ -1,0 +1,7 @@
+{
+	"name": "mobile",
+	"version": "1.0.0",
+	"description": "Développement d'applications smartphone — Android (Kotlin/Compose), Apple (Swift/SwiftUI) et les stacks multiplateformes (Flutter, React Native, .NET MAUI, KMP) : conception, build sur appareil, tests sur device et conformité aux stores.",
+	"targets": { "android": ">=8.0", "ios": ">=16.0" },
+	"maintainer": "WorkPilot AI Team"
+}

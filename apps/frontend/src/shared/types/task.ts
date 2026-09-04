@@ -12,6 +12,7 @@ import type {
 	PhaseThinkingConfig,
 	ThinkingLevel,
 } from "./settings";
+import type { MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
 
 export type TaskStatus =
@@ -239,6 +240,7 @@ export interface TaskDraft {
 	referencedFiles: ReferencedFile[];
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
+	mobileTargets?: MobilePlatform[];
 	savedAt: Date;
 }
 
@@ -324,6 +326,13 @@ export interface TaskMetadata {
 	// marker that lets the UI treat a clone like an import (e.g. propose the
 	// Provider × LLM × Effort prerequisite before it runs).
 	duplicatedFrom?: string;
+
+	// Which smartphone platforms this task targets. Empty or absent means every
+	// platform the project has — a card that names none on a mobile repo means
+	// "the usual ones", not "none". Reaches the agents as
+	// WORKPILOT_MOBILE_TARGETS, which narrows the platform rules the planner,
+	// the coder and QA are given.
+	mobileTargets?: MobilePlatform[];
 
 	// Classification
 	category?: TaskCategory;

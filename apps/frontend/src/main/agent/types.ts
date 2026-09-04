@@ -1,3 +1,4 @@
+import type { MobilePlatform } from "../../shared/types/mobile";
 import type { ChildProcess } from "node:child_process";
 import type {
 	CompletablePhase,
@@ -76,6 +77,11 @@ export interface TaskExecutionOptions {
 	// Per-task TDD override. true -> force strict TDD, false -> force disabled,
 	// undefined -> inherit project default. Injected as TDD_MODE env at spawn time.
 	tddMode?: boolean;
+	// Which smartphone platforms this task targets ("android", "ios"). Injected
+	// as WORKPILOT_MOBILE_TARGETS at spawn time, which is what narrows the
+	// planner's, the coder's and QA's platform rules to the ones asked for.
+	// Empty or undefined means every platform the project actually has.
+	mobileTargets?: MobilePlatform[];
 }
 
 export interface SpecCreationMetadata {
@@ -105,6 +111,11 @@ export interface SpecCreationMetadata {
 	// Workspace mode - whether to use worktree isolation
 	useWorktree?: boolean; // If false, use --direct mode (no worktree isolation)
 	useLocalBranch?: boolean; // If true, use local branch directly instead of preferring origin/branch
+	// Which smartphone platforms this task targets ("android", "ios"). Injected
+	// as WORKPILOT_MOBILE_TARGETS at spawn time, which is what narrows the
+	// planner's, the coder's and QA's platform rules to the ones asked for.
+	// Empty or undefined means every platform the project actually has.
+	mobileTargets?: MobilePlatform[];
 }
 
 export interface IdeationProgressData {

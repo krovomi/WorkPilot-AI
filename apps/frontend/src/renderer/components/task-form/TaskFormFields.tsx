@@ -20,6 +20,10 @@ import {
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MAX_IMAGES_PER_TASK } from "../../../shared/constants";
+import {
+	MOBILE_PLATFORMS,
+	type MobilePlatform,
+} from "../../../shared/types/mobile";
 import { providerRegistry } from "../../../shared/services/providerRegistry";
 import type {
 	ImageAttachment,
@@ -128,6 +132,9 @@ interface TaskFormFieldsProps {
 	// TDD override (per-task)
 	tddMode: boolean;
 	onTddModeChange: (tdd: boolean) => void;
+	/** Smartphone platforms this task targets. Empty means "whatever the project has". */
+	mobileTargets: MobilePlatform[];
+	onMobileTargetsChange: (targets: MobilePlatform[]) => void;
 
 	// Form state
 	disabled?: boolean;
@@ -192,6 +199,8 @@ export function TaskFormFields({
 	onRequireReviewChange,
 	tddMode,
 	onTddModeChange,
+	mobileTargets,
+	onMobileTargetsChange,
 	disabled = false,
 	error,
 	onError,
@@ -200,7 +209,7 @@ export function TaskFormFields({
 	children,
 	onFileReferenceDrop,
 }: TaskFormFieldsProps) {
-	const { t } = useTranslation(["tasks", "common"]);
+	const { t } = useTranslation(["tasks", "common", "mobile"]);
 	// Which step of the (optional) 2-step wizard this render belongs to.
 	const inContent = section !== "engine";
 	const inEngine = section !== "content";
@@ -760,6 +769,42 @@ export function TaskFormFields({
 						</p>
 					</div>
 				</div>
+
+				{/* Smartphone targets. Checking neither is the default and means
+				    "every platform the project has" — the agents narrow to what
+				    is checked only when something is. */}
+				<fieldset className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
+					<legend className="text-sm font-medium text-foreground">
+						{t("mobile:targets.label")}
+					</legend>
+					<p className="text-xs text-muted-foreground">
+						{t("mobile:targets.description")}
+					</p>
+					<div className="flex flex-wrap gap-4 pt-1">
+						{MOBILE_PLATFORMS.map((platform) => (
+							<div key={platform} className="flex items-center gap-2">
+								<Checkbox
+									id={`${prefix}mobile-${platform}`}
+									checked={mobileTargets.includes(platform)}
+									disabled={disabled}
+									onCheckedChange={(checked) =>
+										onMobileTargetsChange(
+											checked === true
+												? [...mobileTargets, platform]
+												: mobileTargets.filter((entry) => entry !== platform),
+										)
+									}
+								/>
+								<Label
+									htmlFor={`${prefix}mobile-${platform}`}
+									className="cursor-pointer text-sm text-foreground"
+								>
+									{t(`mobile:targets.${platform}`)}
+								</Label>
+							</div>
+						))}
+					</div>
+				</fieldset>
 
 				</div>
 

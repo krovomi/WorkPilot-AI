@@ -28,6 +28,7 @@ skills/
 | Pack | What it is |
 |---|---|
 | `dotnet` | .NET: modern stack (C# 14 / ASP.NET Core 10) plus a .NET Framework 4.8 specialist |
+| `mobile` | smartphone applications: Android (Kotlin/Compose), Apple (Swift/SwiftUI), the cross-platform stacks, device testing and store readiness |
 | `tooling` | toolchain-agnostic: building MCP servers, driving web apps under test |
 | `comms` | business communication and brand guidelines |
 | `bmad` | BMAD Method v6, vendored and pinned — needs `skills:bootstrap` |

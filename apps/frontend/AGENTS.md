@@ -25,6 +25,7 @@ Electron + React + TypeScript + Vite + Zustand + Tailwind. 196 composants, 99 st
 | `src/main/ipc-handlers/task/execution-handlers.ts` | ~3 500 | — |
 | `src/main/ipc-handlers/github/pr-handlers.ts` | ~3 500 | — |
 | `src/main/app-emulator-service.ts` | ~3 200 | — |
+| `src/main/mobile-service.ts` | ~600 | pilote un émulateur Android / simulateur Apple ; toute la détection vient de `apps/backend/mobile/` |
 | `src/renderer/stores/task-store.ts` | ~1 300 | — |
 
 Cibler avec `grep -n`, lire le voisinage, éditer. Le hook `pre-tool-large-file` bloque

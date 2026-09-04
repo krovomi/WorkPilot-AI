@@ -26,6 +26,8 @@ comms = "^1"
 tooling = "^1"
 # Not listed, therefore not emitted here:
 #   dotnet       authored for consumer projects; this repo is Python + TS
+#   mobile       same: Android/Apple procedures for the projects WorkPilot builds,
+#                not for WorkPilot itself, which ships no phone application
 #   bmad         76 wrappers, needs `skills:bootstrap` and a _bmad/ runtime
 #   superpowers, mattpocock, impeccable, task-observer, claude-mem
 #                upstream packs, available to any project that lists them

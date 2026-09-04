@@ -64,12 +64,16 @@ class TestPhaseWindows:
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
 
+        # `mobile-design` and `store-readiness` are conditional on mobile files
+        # being touched, and an unknown change set runs a conditional phase —
+        # erring towards running is the safe direction the engine documents.
         assert [r.id for r in pre] == ["brainstorm", "spec"]
-        assert [r.id for r in planned] == ["analyze"]
+        assert [r.id for r in planned] == ["analyze", "mobile-design"]
         assert [r.id for r in mid] == ["review"]
         assert [r.id for r in post] == [
             "adversarial-review",
             "spec-conformance",
+            "store-readiness",
             "verify",
         ]
 
@@ -130,6 +134,7 @@ class TestPhaseWindows:
         assert [r.id for r in post] == [
             "adversarial-review",
             "spec-conformance",
+            "store-readiness",
             "verify",
         ]
 
@@ -498,7 +503,12 @@ class TestAnalyzePhase:
     """
 
     def test_it_runs_between_planning_and_coding(self, workflow):
-        profile = profile_at(workflow, "medium")
+        # A change set that touches no mobile file, so the window holds `analyze`
+        # alone: this test is about where `analyze` runs, not about which
+        # conditional phases share the window with it.
+        profile = profile_at(
+            workflow, "medium", changed_files=["apps/backend/api/routes.py"]
+        )
         window = phases_between(profile, after="planning", before="coding")
         assert [r.id for r in window] == ["analyze"]
 

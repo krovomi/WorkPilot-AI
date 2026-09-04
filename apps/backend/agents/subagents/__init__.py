@@ -6,7 +6,12 @@ Three layers, in order, each able to override the one before it:
 2. **Language overlays** — what the detected stack changes about those roles.
    A `test-runner` that knows `pytest -x` and `vitest run` beats one that has
    to rediscover the framework every time.
-3. **Caller-supplied agents** — always win. That was the contract of the three
+3. **The mobile overlay** — what a phone application changes, which is a
+   different axis from language: Flutter is Dart, Expo is TypeScript, MAUI is
+   C#, and all three need a device run and a store audit that no language
+   overlay describes. Applied after the language ones so its build commands are
+   the last word on a project that is both.
+4. **Caller-supplied agents** — always win. That was the contract of the three
    `merge_with_user_agents` functions this module replaces, and it is preserved
    exactly.
 
@@ -26,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from .languages import LanguageOverlay, overlays_for
+from .mobile import overlay_for as mobile_overlay_for
 from .phases import PHASE_ALIASES, phase_defaults, sdk_available
 
 logger = logging.getLogger(__name__)
@@ -105,6 +111,16 @@ def _specialise_test_runner(base: Any, overlays: list[LanguageOverlay]) -> Any:
         return base
 
 
+def _as_language_overlay(mobile: Any) -> LanguageOverlay:
+    """The mobile overlay, in the shape `_specialise_test_runner` already reads."""
+    return LanguageOverlay(
+        language=f"{mobile.framework} ({'/'.join(mobile.platforms)})",
+        test_commands=list(mobile.test_commands) + list(mobile.build_commands),
+        extra_agents=dict(mobile.extra_agents),
+        notes=mobile.notes,
+    )
+
+
 def _apply_cap(roster: dict[str, Any], protected: set[str]) -> dict[str, Any]:
     """Trim to MAX_ROSTER, dropping unprotected generic entries first."""
     if len(roster) <= MAX_ROSTER:
@@ -145,6 +161,14 @@ def resolve(
     roster: dict[str, Any] = phase_defaults(agent_type)
 
     overlays = overlays_for(detect_languages(project_dir))
+    mobile = mobile_overlay_for(project_dir)
+    if mobile:
+        # The mobile overlay speaks the same LanguageOverlay shape on purpose,
+        # so `_specialise_test_runner` folds its commands in without a second
+        # code path. Appended last: on a Flutter or MAUI project both fire, and
+        # the platform commands are the ones that actually build the artefact.
+        overlays = [*overlays, _as_language_overlay(mobile)]
+
     if overlays:
         if "test-runner" in roster:
             roster["test-runner"] = _specialise_test_runner(
@@ -153,7 +177,12 @@ def resolve(
         for overlay in overlays:
             roster.update(overlay.extra_agents)
 
+    # A mobile specialist is never dropped for a generic phase default: it is
+    # the only entry in the roster that knows the project is a phone app, and
+    # the cap exists to shed the entries that carry nothing the parent lacks.
     protected = {"test-runner"} | set(user_agents or {})
+    if mobile:
+        protected |= set(mobile.extra_agents)
     roster = _apply_cap(roster, protected)
 
     if user_agents:

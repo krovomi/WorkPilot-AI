@@ -1,0 +1,47 @@
+{
+	"preview": {
+		"tab": "Mobile",
+		"title": "Mobile preview",
+		"description": "Build this task and run it on an Android emulator or an Apple simulator. A phone application has no URL to open — the evidence is a frame captured from the device.",
+		"platformGroup": "Target platform",
+		"device": "Device",
+		"noDevice": "No device available",
+		"booted": "booted",
+		"logs": "Device and build log",
+		"noLogs": "No output yet.",
+		"noScreenshot": "Run the app to capture a frame from the device.",
+		"screenshotAlt": "Screenshot captured from the device",
+		"cannotBuildHere": "This platform cannot be built on this machine",
+		"noProjectTitle": "No project directory",
+		"noProjectDescription": "This task has no worktree or project path yet, so there is nothing to build.",
+		"notMobileTitle": "Not a mobile project",
+		"notMobileDescription": "No Android, Apple, Flutter, React Native, .NET MAUI, Kotlin Multiplatform or Capacitor project was found under this directory."
+	},
+	"platform": {
+		"android": "Android",
+		"ios": "Apple (iOS)"
+	},
+	"phase": {
+		"idle": "Idle",
+		"detecting": "Detecting",
+		"booting": "Booting device",
+		"building": "Building",
+		"installing": "Installing",
+		"running": "Running",
+		"stopped": "Stopped",
+		"error": "Error"
+	},
+	"actions": {
+		"run": "Run on device",
+		"stop": "Stop",
+		"capture": "Capture frame",
+		"refreshDevices": "Refresh devices"
+	},
+	"targets": {
+		"label": "Mobile platforms",
+		"description": "Which platforms this task targets. Agents build and verify only these, and say so when one cannot be built on this machine.",
+		"android": "Android",
+		"ios": "Apple (iOS)",
+		"badgeTitle": "Mobile target: {{platforms}}"
+	}
+}

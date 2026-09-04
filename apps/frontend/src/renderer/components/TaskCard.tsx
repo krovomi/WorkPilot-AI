@@ -22,6 +22,7 @@ import {
 	Play,
 	RotateCcw,
 	Shield,
+	Smartphone,
 	Square,
 	Target,
 	Undo2,
@@ -571,6 +572,26 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					{t("labels.tdd")}
 				</Badge>
 			)}
+
+			{/* Smartphone targets — which platforms this card is for. Only shown
+			    when the card narrowed them: on a repo that ships both, a badge
+			    reading "Android, iOS" on every card says nothing. */}
+			{task.metadata?.mobileTargets?.length ? (
+				<Badge
+					variant="outline"
+					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-sky-500/10 text-sky-400 border-sky-500/30"
+					title={t("mobile:targets.badgeTitle", {
+						platforms: task.metadata.mobileTargets
+							.map((platform: string) => t(`mobile:targets.${platform}`))
+							.join(", "),
+					})}
+				>
+					<Smartphone className="h-2.5 w-2.5" />
+					{task.metadata.mobileTargets
+						.map((platform: string) => t(`mobile:targets.${platform}`))
+						.join(" · ")}
+				</Badge>
+			) : null}
 
 			{/* Category badge with icon */}
 			{task.metadata?.category && (
@@ -1124,7 +1145,7 @@ export const TaskCard = memo(function TaskCard({
 	onViewPRFiles,
 	onPreviewApp,
 }: TaskCardProps) {
-	const { t } = useTranslation(["tasks", "errors"]);
+	const { t } = useTranslation(["tasks", "errors", "mobile"]);
 	const formatRelativeTime = useFormatRelativeTime();
 	const [isStuck, setIsStuck] = useState(false);
 	const [isRecovering, setIsRecovering] = useState(false);
