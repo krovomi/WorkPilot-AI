@@ -51,19 +51,35 @@ class TestTheFrameIsReadBinary:
         assert frame.read_bytes() == payload
         assert mdc._is_png(frame)
 
-    def test_text_mode_is_what_used_to_break(self):
-        """Pins the cause, so nobody reintroduces `text=True` here."""
-        with pytest.raises(UnicodeDecodeError):
-            subprocess.run(  # noqa: S603
-                [
-                    sys.executable,
-                    "-c",
-                    "import sys; sys.stdout.buffer.write(b'\\x89PNG')",
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
+    def test_text_mode_does_not_return_the_bytes_intact(self):
+        """Pins the cause, so nobody reintroduces `text=True` at this call site.
+
+        Not by asserting `UnicodeDecodeError`: that is what UTF-8 platforms do,
+        and this test failed on Windows for saying so. cp1252 decodes 0x89
+        quite happily — to U+2030 — and hands back a *corrupted* string instead
+        of refusing. Both outcomes are the same defect (the bytes do not
+        survive), and only the second is silent, so the invariant worth pinning
+        is the round-trip, not the exception.
+        """
+        payload = b"\x89PNG\r\n\x1a\n\xff\xfe"
+        argv = [
+            sys.executable,
+            "-c",
+            f"import sys; sys.stdout.buffer.write({payload!r})",
+        ]
+
+        binary = subprocess.run(argv, capture_output=True, check=True)  # noqa: S603
+        assert binary.stdout == payload, "binary mode must round-trip"
+
+        try:
+            text = subprocess.run(  # noqa: S603
+                argv, capture_output=True, text=True, check=False
             )
+        except UnicodeDecodeError:
+            return  # UTF-8 platforms refuse outright — the loud half.
+
+        # cp1252 and friends: no exception, and the bytes are gone anyway.
+        assert text.stdout.encode("latin-1", errors="replace") != payload
 
 
 class TestAnEmptyFrameIsNotASuccess:
