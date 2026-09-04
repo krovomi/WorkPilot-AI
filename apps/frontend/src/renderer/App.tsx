@@ -447,7 +447,7 @@ interface ProjectTabBarWithContextProps {
 	readonly onProjectClose: (projectId: string) => void;
 	readonly onAddProject: () => void;
 	readonly onProjectRename: (projectId: string, name: string) => void;
-	readonly onSettingsClick: () => void;
+	readonly onSettingsClick: (projectId: string) => void;
 }
 
 function ProjectTabBarWithContext({
@@ -574,6 +574,12 @@ export function App() {
 	>(undefined);
 	const [settingsInitialProjectSection, setSettingsInitialProjectSection] =
 		useState<ProjectSettingsSection | undefined>(undefined);
+	// Project whose settings the dialog must show, when it was opened from a
+	// project tab. Null means "no explicit target" and the dialog falls back to
+	// the active/selected project.
+	const [settingsProjectId, setSettingsProjectId] = useState<string | null>(
+		null,
+	);
 	const [activeView, setActiveView] = useState<SidebarView>("kanban");
 	const [hasRestoredView, setHasRestoredView] = useState(false);
 	const isRestoringView = useRef(false);
@@ -1402,6 +1408,16 @@ export function App() {
 		renameProject(projectId, name);
 	};
 
+	// The gear on a project tab opens *that project's* settings — the "Projet"
+	// pane of the settings dialog, scoped to the tab's own project — not the
+	// global WorkPilot preferences the sidebar gear opens.
+	const handleProjectTabSettingsClick = (projectId: string) => {
+		setSettingsProjectId(projectId);
+		setSettingsInitialSection(undefined);
+		setSettingsInitialProjectSection("general");
+		setIsSettingsDialogOpen(true);
+	};
+
 	// Handle confirm remove project
 	const handleConfirmRemoveProject = () => {
 		if (projectToRemove) {
@@ -1707,7 +1723,7 @@ export function App() {
 												onProjectClose={handleProjectTabClose}
 												onAddProject={handleAddProject}
 												onProjectRename={handleProjectRename}
-												onSettingsClick={() => setIsSettingsDialogOpen(true)}
+												onSettingsClick={handleProjectTabSettingsClick}
 											/>
 										</SortableContext>
 
@@ -2135,6 +2151,7 @@ export function App() {
 									// Reset initial sections when the dialog closes
 									setSettingsInitialSection(undefined);
 									setSettingsInitialProjectSection(undefined);
+									setSettingsProjectId(null);
 								}
 							}}
 							initialSection={settingsInitialSection}
@@ -2147,7 +2164,13 @@ export function App() {
 							// since the tour's anchors never mount without a resolved
 							// project, it also auto-skipped every project step with no
 							// element to wait for.
-							initialProjectId={(activeProjectId || selectedProjectId) ?? undefined}
+							// A tab's settings icon names its own project, which wins over
+							// the ambient active/selected one.
+							initialProjectId={
+								settingsProjectId ??
+								(activeProjectId || selectedProjectId) ??
+								undefined
+							}
 							onOpenSetupHub={() => {
 								setIsSettingsDialogOpen(false);
 								setSetupHubOpen(true);

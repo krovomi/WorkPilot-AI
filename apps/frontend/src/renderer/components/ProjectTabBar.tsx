@@ -19,7 +19,7 @@ interface ProjectTabBarProps {
 	readonly onAddProject: () => void;
 	readonly onProjectRename?: (projectId: string, name: string) => void;
 	readonly className?: string;
-	readonly onSettingsClick?: () => void;
+	readonly onSettingsClick?: (projectId: string) => void;
 }
 
 export function ProjectTabBar({

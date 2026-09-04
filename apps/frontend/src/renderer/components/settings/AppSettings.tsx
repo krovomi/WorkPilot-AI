@@ -449,6 +449,13 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 			} else if (initialSection) {
 				setActiveTopLevel("app");
 				setAppSection(initialSection);
+			} else {
+				// No explicit target: this is the global settings entry point, so
+				// land on the app pane. Without this the dialog kept whichever
+				// top level the previous opening left behind — after opening a
+				// project's settings from its tab, the sidebar gear would come
+				// back on the project pane.
+				setActiveTopLevel("app");
 			}
 		}
 	}, [open, initialSection, initialProjectSection]);
