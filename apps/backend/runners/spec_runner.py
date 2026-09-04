@@ -292,23 +292,32 @@ Examples:
             f"Injected SELECTED_LLM_PROVIDER={args.provider} into environment from --provider arg",
         )
 
-    # Resolve model: if provider is non-Anthropic and model is the default "sonnet",
-    # use the provider-specific default model instead of the Claude shorthand.
-    from phase_config import PROVIDER_DEFAULT_MODELS
+    # Resolve the model the way every other phase does — provider-aware.
+    #
+    # This used to substitute the provider default ONLY when args.model was
+    # still argparse's "sonnet", which meant any explicitly-passed model went
+    # through untouched. The frontend always passes one (metadata.phaseModels.spec,
+    # or metadata.model), so a task switched to Ollama while its saved spec model
+    # was still a Claude id ran the whole spec pipeline as
+    # `provider=ollama, model=claude-opus-4-5-…`: seven phases each asking the
+    # local server for a model it cannot have, each falling back to pulling a
+    # Claude manifest from the Ollama registry, each failing with
+    # "pull model manifest: file does not exist".
+    #
+    # `_resolve_provider_model` is the shared resolver used by get_phase_model
+    # for planning/coding/QA; routing the spec phase through it too means the
+    # four phases finally agree on what "this provider's model" is.
+    from phase_config import _resolve_provider_model
 
-    if (
-        args.provider
-        and args.provider not in ("anthropic", "claude")
-        and args.model
-        == "sonnet"  # argparse default — user didn't explicitly set a model
-    ):
-        provider_defaults = PROVIDER_DEFAULT_MODELS.get(args.provider, {})
-        resolved_model = provider_defaults.get("spec", args.model)
-        debug(
-            "spec_runner",
-            f"Using provider-specific default model for '{args.provider}'",
-            resolved_model=resolved_model,
-        )
+    if args.provider and args.provider not in ("anthropic", "claude"):
+        resolved_model = _resolve_provider_model(args.model, args.provider)
+        if resolved_model != args.model:
+            debug(
+                "spec_runner",
+                f"Model '{args.model}' is not valid for provider "
+                f"'{args.provider}' — using the provider's model instead",
+                resolved_model=resolved_model,
+            )
     else:
         resolved_model = resolve_model_id(args.model)
 

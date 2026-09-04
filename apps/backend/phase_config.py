@@ -447,6 +447,66 @@ def get_phase_provider(
     return None
 
 
+LOCAL_PROVIDERS = frozenset({"ollama", "local", "lmstudio"})
+
+
+def is_local_provider(provider: str | None) -> bool:
+    """True when `provider` names a locally-hosted OpenAI-compatible server."""
+    return (provider or "").strip().lower() in LOCAL_PROVIDERS
+
+
+# Model ids that only ever exist behind a hosted API. A local server (Ollama,
+# LM Studio, llama.cpp…) can legitimately serve `mistral`, `deepseek-r1`,
+# `qwen2.5-coder` or `gemma3` — those names ARE in the Ollama library — so the
+# pattern stays deliberately narrow: the proprietary families nobody can pull.
+# Anything wider would reject a model the user really has on disk.
+_HOSTED_ONLY_MODEL_RE = re.compile(
+    r"^(claude-|chatgpt-|gpt-[0-9]|o[1-9](-|$)|gemini-|models/gemini-|grok-|"
+    r"anthropic\.|swe-1)",
+    re.IGNORECASE,
+)
+
+
+def is_hosted_only_model(model: str) -> bool:
+    """True when `model` is an API-only id that no local server can serve.
+
+    Handing one to Ollama is not a slow path, it is a guaranteed 404: the server
+    answers "model not found", the pull-on-demand fallback then asks the Ollama
+    registry for a Claude manifest, and the run dies on
+    ``pull model manifest: file does not exist`` — once per phase, with the real
+    cause (a hosted model id on a local provider) nowhere in the message.
+    """
+    return bool(model) and _HOSTED_ONLY_MODEL_RE.match(model.strip()) is not None
+
+
+def local_default_model() -> str:
+    """The model a local provider should run when nothing valid was selected.
+
+    Reads the live environment first so a model picked in Settings after import
+    time still wins (the frontend injects it as ``OLLAMA_MODEL`` /
+    ``LOCAL_LLM_MODEL``), then falls back to the module-level default.
+    """
+    return (
+        os.getenv("OLLAMA_MODEL")
+        or os.getenv("LOCAL_LLM_MODEL")
+        or OLLAMA_MODEL
+        or "llama3.3"
+    ).strip()
+
+
+def coerce_local_model(model: str | None) -> str:
+    """Return a model id a local server can actually serve.
+
+    A hosted-only id (or an empty one) is replaced by the configured local
+    model; anything else — including HF ids like ``hf.co/org/model`` and any
+    Ollama tag — is passed through untouched.
+    """
+    candidate = (model or "").strip()
+    if not candidate or is_hosted_only_model(candidate):
+        return local_default_model()
+    return candidate
+
+
 def _resolve_provider_model(model: str, provider: str | None) -> str:
     """
     Resolve a model identifier to a full model ID, provider-aware.
@@ -467,6 +527,16 @@ def _resolve_provider_model(model: str, provider: str | None) -> str:
     # form before it reaches the API, which rejects the dotted spelling.
     if not provider or provider in ("anthropic", "claude"):
         return resolve_model_id(normalize_anthropic_model_id(model))
+
+    # Local servers are the strictest case: they can only serve what is pulled
+    # on the machine, so a hosted-only id is resolved to the configured local
+    # model here rather than being discovered as a 404 mid-run. Checked before
+    # the MODEL_ID_MAP branch below, which would otherwise expand the "sonnet"
+    # shorthand into a full Claude id and hand THAT to Ollama.
+    if is_local_provider(provider):
+        return coerce_local_model(
+            resolve_model_id(model) if model in MODEL_ID_MAP else model
+        )
 
     # For non-Anthropic providers, check if it's a Claude shorthand
     # (could happen if user switched providers but metadata still has "sonnet")

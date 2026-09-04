@@ -9,7 +9,7 @@ import { execFileSync, spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import {
 	getOllamaExecutablePaths,
 	getOllamaInstallCommand as getPlatformOllamaInstallCommand,
@@ -46,6 +46,52 @@ import {
 	resolveOllamaBinary,
 } from "../services/ollama-portable";
 import { openTerminalWithCommand } from "./claude-code-handlers";
+
+/**
+ * A model download running in the main process.
+ *
+ * Downloads live here rather than in a renderer on purpose: a model is
+ * gigabytes, and the user is expected to close the task panel and do something
+ * else while it lands. `promise` is what a second request for the same model
+ * attaches to; `cancel` kills the underlying process.
+ */
+interface ActivePull {
+	promise: Promise<IPCResult<OllamaPullResult>>;
+	cancel: () => void;
+}
+
+const activePulls = new Map<string, ActivePull>();
+
+/**
+ * How long a pull may go without a single byte of progress before we call it
+ * stalled. Generous, because Ollama is silent while it verifies a freshly
+ * downloaded layer on a slow disk — but bounded, so a dead server does not
+ * leave a spinner running forever.
+ */
+const PULL_STALL_TIMEOUT_MS = 10 * 60 * 1000;
+
+/**
+ * Send pull progress to every open window.
+ *
+ * The download belongs to the app, not to the view that happened to start it:
+ * the global indicator, the phase selector and the settings page all render
+ * the same download, and the task panel that started it may well be closed by
+ * the time it finishes.
+ */
+function broadcastPullProgress(payload: {
+	modelName: string;
+	status: string;
+	completed: number;
+	total: number;
+	percentage: number;
+	error?: string;
+}): void {
+	for (const win of BrowserWindow.getAllWindows()) {
+		if (!win.isDestroyed()) {
+			win.webContents.send(IPC_CHANNELS.OLLAMA_PULL_PROGRESS, payload);
+		}
+	}
+}
 
 /**
  * Ollama Service Status
@@ -924,11 +970,27 @@ export function registerMemoryHandlers(): void {
 	 */
 	ipcMain.handle(
 		IPC_CHANNELS.OLLAMA_PULL_MODEL,
+		// Progress is broadcast to every window rather than replied to the sender,
+		// so the invoking event is not needed here.
 		async (
-			event,
+			_event,
 			modelName: string,
 			baseUrl?: string,
 		): Promise<IPCResult<OllamaPullResult>> => {
+			const model = (modelName || "").trim();
+			if (!model) {
+				return { success: false, error: "Nom de modèle manquant." };
+			}
+
+			// One pull per model, app-wide. The same model can be requested from
+			// the phase selector, the onboarding picker and the settings page at
+			// once; starting three `ollama pull` processes for it would triple the
+			// bandwidth to land the same bytes. Late callers await the running one.
+			const inFlight = activePulls.get(model);
+			if (inFlight) {
+				return inFlight.promise;
+			}
+
 			try {
 				// Use configured Python path (venv if ready, otherwise bundled/system)
 				const pythonCmd = getConfiguredPythonPath();
@@ -978,17 +1040,23 @@ export function registerMemoryHandlers(): void {
 				}
 
 				const [pythonExe, baseArgs] = parsePythonCommand(pythonCmd);
-				const args = [...baseArgs, scriptPath, "pull-model", modelName];
+				const args = [...baseArgs, scriptPath, "pull-model", model];
 				// Pull against the configured server so a custom host/port (or a
 				// non-default Ollama instance) actually receives the download.
 				if (baseUrl?.trim()) {
 					args.push("--base-url", baseUrl.trim());
 				}
 
-				return new Promise((resolve) => {
+				const promise = new Promise<IPCResult<OllamaPullResult>>((resolve) => {
 					const proc = spawn(pythonExe, args, {
 						stdio: ["ignore", "pipe", "pipe"],
-						timeout: 600000, // 10 minute timeout for large models
+						// Deliberately NO `timeout`. This used to be 600 000 ms, which
+						// killed the process at ten minutes — so every model that does
+						// not fit in ten minutes of bandwidth (llama3.3 is ~43 GB) was
+						// structurally impossible to download, and reported as a
+						// failure rather than as the deadline it was. What we actually
+						// need to detect is a STALLED pull, which the inactivity
+						// watchdog below does without capping the total duration.
 						// Use sanitized Python environment to prevent PYTHONHOME contamination
 						// Fixes "Could not find platform independent libraries" error on Windows
 						env: pythonEnvManager.getPythonEnv(),
@@ -997,6 +1065,29 @@ export function registerMemoryHandlers(): void {
 					let stdout = "";
 					let stderr = "";
 					let stderrBuffer = ""; // Buffer for NDJSON parsing
+					let cancelled = false;
+					let stalled = false;
+
+					// Watchdog: Ollama streams progress continuously while a pull is
+					// live, so silence — not elapsed time — is the signal that
+					// something is wrong (server gone, network dead, disk full).
+					let watchdog: NodeJS.Timeout | undefined;
+					const armWatchdog = () => {
+						if (watchdog) clearTimeout(watchdog);
+						watchdog = setTimeout(() => {
+							stalled = true;
+							proc.kill();
+						}, PULL_STALL_TIMEOUT_MS);
+					};
+					armWatchdog();
+
+					activePulls.set(model, {
+						promise,
+						cancel: () => {
+							cancelled = true;
+							proc.kill();
+						},
+					});
 
 					proc.stdout.on("data", (data) => {
 						stdout += data.toString("utf-8");
@@ -1006,6 +1097,7 @@ export function registerMemoryHandlers(): void {
 						const chunk = data.toString("utf-8");
 						stderr += chunk;
 						stderrBuffer += chunk;
+						armWatchdog();
 
 						// Parse NDJSON (newline-delimited JSON) from stderr
 						// Ollama sends progress data as: {"status":"downloading","completed":X,"total":Y}
@@ -1030,9 +1122,8 @@ export function registerMemoryHandlers(): void {
 													)
 												: 0;
 
-										// Emit progress event to renderer
-										event.sender.send(IPC_CHANNELS.OLLAMA_PULL_PROGRESS, {
-											modelName,
+										broadcastPullProgress({
+											modelName: model,
 											status: progressData.status || "downloading",
 											completed: progressData.completed,
 											total: progressData.total,
@@ -1046,7 +1137,42 @@ export function registerMemoryHandlers(): void {
 						});
 					});
 
+					const settle = (result: IPCResult<OllamaPullResult>) => {
+						if (watchdog) clearTimeout(watchdog);
+						activePulls.delete(model);
+						// Always emit a terminal event. Every renderer view tracks this
+						// download in the shared store, but only the one that started it
+						// holds the invoke promise — without this the others would keep
+						// showing a spinner for a pull that finished minutes ago.
+						broadcastPullProgress({
+							modelName: model,
+							status: result.success ? "completed" : "failed",
+							completed: 0,
+							total: 0,
+							percentage: result.success ? 100 : 0,
+							error: result.success ? undefined : result.error,
+						});
+						resolve(result);
+					};
+
 					proc.on("close", (code) => {
+						if (cancelled) {
+							settle({
+								success: false,
+								error: "PULL_CANCELLED",
+							});
+							return;
+						}
+						if (stalled) {
+							settle({
+								success: false,
+								error:
+									"Le téléchargement ne progresse plus. Vérifiez que le " +
+									"serveur Ollama tourne, votre connexion et l'espace disque " +
+									"disponible, puis relancez.",
+							});
+							return;
+						}
 						// The detector writes a structured {success,error} JSON to
 						// stdout even on FAILURE (then exits 1), so always try to parse
 						// stdout first — otherwise a real, actionable error (e.g. "no
@@ -1057,12 +1183,12 @@ export function registerMemoryHandlers(): void {
 							try {
 								const result = JSON.parse(stdout);
 								if (result.success) {
-									resolve({
+									settle({
 										success: true,
 										data: result.data as OllamaPullResult,
 									});
 								} else {
-									resolve({
+									settle({
 										success: false,
 										error:
 											result.error ||
@@ -1076,9 +1202,9 @@ export function registerMemoryHandlers(): void {
 							}
 						}
 						if (code === 0) {
-							resolve({ success: false, error: `Invalid JSON: ${stdout}` });
+							settle({ success: false, error: `Invalid JSON: ${stdout}` });
 						} else {
-							resolve({
+							settle({
 								success: false,
 								error: stderr.trim() || `Échec du téléchargement (code ${code})`,
 							});
@@ -1086,10 +1212,13 @@ export function registerMemoryHandlers(): void {
 					});
 
 					proc.on("error", (err) => {
-						resolve({ success: false, error: err.message });
+						settle({ success: false, error: err.message });
 					});
 				});
+
+				return promise;
 			} catch (error) {
+				activePulls.delete(model);
 				return {
 					success: false,
 					error:
@@ -1097,5 +1226,38 @@ export function registerMemoryHandlers(): void {
 				};
 			}
 		},
+	);
+
+	/**
+	 * Cancel an in-flight model download. Resolves the original pull promise
+	 * with `PULL_CANCELLED` so the caller can tell a cancellation apart from a
+	 * failure and stay quiet about it.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_CANCEL_PULL,
+		async (_, modelName: string): Promise<IPCResult<{ cancelled: boolean }>> => {
+			const entry = activePulls.get((modelName || "").trim());
+			if (!entry) {
+				return { success: true, data: { cancelled: false } };
+			}
+			entry.cancel();
+			return { success: true, data: { cancelled: true } };
+		},
+	);
+
+	/**
+	 * List the downloads currently running in the main process.
+	 *
+	 * A pull outlives the view that started it — that is the whole point of
+	 * running it here — so a renderer that mounts later (reopened task panel,
+	 * reloaded window) needs a way to learn about a download already in flight
+	 * instead of showing the model as "to download" while it is at 60%.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.OLLAMA_ACTIVE_PULLS,
+		async (): Promise<IPCResult<{ models: string[] }>> => ({
+			success: true,
+			data: { models: [...activePulls.keys()] },
+		}),
 	);
 }
