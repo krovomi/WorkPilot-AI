@@ -78,7 +78,7 @@ CLARIFICATION_MARKER = "[NEEDS CLARIFICATION"
 # still counts, because a marker with no question is a real thing an agent
 # writes and dropping it would under-report.
 _CLARIFICATION_RE = re.compile(
-    r"\[NEEDS\s+CLARIFICATION(?:\s*[::-]\s*(?P<question>[^\]]*))?\]",
+    r"\[NEEDS\s+CLARIFICATION(?:\s*[:-]\s*(?P<question>[^\]]*))?\]",
     re.IGNORECASE,
 )
 
