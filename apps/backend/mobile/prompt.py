@@ -73,6 +73,24 @@ _PLATFORM_RULES: dict[MobilePlatform, tuple[str, ...]] = {
     ),
 }
 
+# The two paragraphs the prompt body wraps over several lines, held here rather
+# than inline in the list that builds it. Same reason `workflows/runner.py` names
+# `_REPORTING`: adjacent string literals inside a list concatenate silently, so a
+# wrapped paragraph sitting among single-line entries and a forgotten comma look
+# exactly alike to a reader and to CodeQL. The rule tuples below wrap every entry,
+# which reads as deliberate and needs no such treatment.
+_NO_URL = (
+    "There is no localhost URL to open here: the app is compiled, installed"
+    " onto a device or an emulator, and looked at. Plan and verify accordingly."
+)
+
+_UNVERIFIED = (
+    "Do not spend attempts working around this. Implement the change, verify"
+    " what can be verified here, and state plainly in your report which"
+    " platform went unverified and why. A build that cannot run is not a defect"
+    " in the code you wrote."
+)
+
 _SHARED_RULES = (
     "Test on a **device or emulator**, not only in unit tests. A phone UI that "
     "compiles and never renders correctly is the normal failure mode here.",
@@ -158,8 +176,7 @@ def mobile_section(
             f"Its mobile root is `{stack.project_dir}`"
             + (f" (`{stack.package_id}`)." if stack.package_id else "."),
             "",
-            "There is no localhost URL to open here: the app is compiled, installed "
-            "onto a device or an emulator, and looked at. Plan and verify accordingly.",
+            _NO_URL,
             "",
             "## Commands for this stack",
             "",
@@ -186,10 +203,7 @@ def mobile_section(
                 lines.extend(
                     [
                         "",
-                        "Do not spend attempts working around this. Implement the change, "
-                        "verify what can be verified here, and state plainly in your "
-                        "report which platform went unverified and why. A build that "
-                        "cannot run is not a defect in the code you wrote.",
+                        _UNVERIFIED,
                         "",
                     ]
                 )
