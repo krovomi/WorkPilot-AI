@@ -122,6 +122,15 @@ function buildOpenApiSpec(
 	const paths: Record<string, Record<string, unknown>> = {};
 	const tags = new Set<string>();
 
+	// One scan root can hold several applications — a solution with an API and
+	// an admin host, a monorepo with a Go gateway beside a .NET service. When it
+	// does, the project name joins the tag, so two `Documents` controllers are
+	// not read as one. A single-project scan keeps the bare controller name.
+	const projects = new Set(
+		routes.map((route) => route.project).filter(Boolean),
+	);
+	const qualify = projects.size > 1;
+
 	for (const route of routes) {
 		// Convert {param} style (ASP.NET / Java) and [param] style to OpenAPI {param}
 		const openApiPath = route.path
@@ -130,9 +139,12 @@ function buildOpenApiSpec(
 
 		if (!paths[openApiPath]) paths[openApiPath] = {};
 
+		const tag =
+			qualify && route.project ? `${route.project} / ${route.tag}` : route.tag;
+
 		for (const method of route.methods) {
 			const op: Record<string, unknown> = {
-				tags: [route.tag],
+				tags: [tag],
 				summary: route.summary ?? `${method} ${openApiPath}`,
 				operationId: `${method.toLowerCase()}_${openApiPath
 					.replace(/[^a-zA-Z0-9]/g, "_")
@@ -163,7 +175,7 @@ function buildOpenApiSpec(
 			}
 
 			paths[openApiPath][method.toLowerCase()] = op;
-			tags.add(route.tag);
+			tags.add(tag);
 		}
 	}
 
@@ -356,6 +368,7 @@ export function registerApiExplorerHandlers(): void {
 					specFile: committed?.relativePath,
 					routeCount: committed ? committed.pathCount : routes.length,
 					filesScanned: dotnet.filesScanned,
+					apiProjects: dotnet.apiProjects ?? [],
 					frameworks,
 					specUrls: buildProbeUrls(
 						discoverBaseUrls(projectPath, frameworks),

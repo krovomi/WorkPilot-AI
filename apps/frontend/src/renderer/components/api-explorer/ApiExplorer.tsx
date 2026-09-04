@@ -3126,6 +3126,7 @@ export function ApiExplorer() {
 	const specError = useApiExplorerStore((s) => s.specError);
 	const specSource = useApiExplorerStore((s) => s.specSource);
 	const specFilePath = useApiExplorerStore((s) => s.specFilePath);
+	const scannedApiProjects = useApiExplorerStore((s) => s.scannedApiProjects);
 	const isProjectScanning = useApiExplorerStore((s) => s.isProjectScanning);
 	const projectScanError = useApiExplorerStore((s) => s.projectScanError);
 	const lastProjectScanAt = useApiExplorerStore((s) => s.lastProjectScanAt);
@@ -3489,6 +3490,14 @@ export function ApiExplorer() {
 									{t("apiExplorer:sidebar.endpoints")}
 									{specSource === "file" && specFilePath && (
 										<span className="ml-1 opacity-60">· {specFilePath}</span>
+									)}
+									{specSource === "scan" && scannedApiProjects.length > 0 && (
+										<span
+											className="ml-1 opacity-60"
+											title={scannedApiProjects.join(", ")}
+										>
+											· {scannedApiProjects.join(", ")}
+										</span>
 									)}
 									{specSource === "scan" && lastProjectScanAt && (
 										<span className="ml-1 opacity-60">

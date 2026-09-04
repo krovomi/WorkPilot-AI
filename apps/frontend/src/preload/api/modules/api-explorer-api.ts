@@ -33,6 +33,8 @@ export interface ApiExplorerAPI {
 		specFile?: string;
 		routeCount?: number;
 		filesScanned?: number;
+		/** The applications found under the root, when it holds several. */
+		apiProjects?: string[];
 		frameworks?: string[];
 		specUrls?: string[];
 		error?: string;

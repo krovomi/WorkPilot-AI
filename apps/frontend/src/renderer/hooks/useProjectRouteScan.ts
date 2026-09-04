@@ -29,6 +29,9 @@ export function useProjectRouteScan() {
 	);
 	const setProjectScanError = useApiExplorerStore((s) => s.setProjectScanError);
 	const setScannedProjectId = useApiExplorerStore((s) => s.setScannedProjectId);
+	const setScannedApiProjects = useApiExplorerStore(
+		(s) => s.setScannedApiProjects,
+	);
 	const setLastProjectScanAt = useApiExplorerStore(
 		(s) => s.setLastProjectScanAt,
 	);
@@ -69,6 +72,7 @@ export function useProjectRouteScan() {
 					setSpecFilePath(result.specFile ?? null);
 					setSpecError(null);
 					setScannedProjectId(projectId);
+					setScannedApiProjects(result.apiProjects ?? []);
 					setLastProjectScanAt(Date.now());
 
 					// Prefer the document the running application generates from the
@@ -120,6 +124,7 @@ export function useProjectRouteScan() {
 			setIsProjectScanning,
 			setProjectScanError,
 			setScannedProjectId,
+			setScannedApiProjects,
 			setLastProjectScanAt,
 			setSpecError,
 			setSpecUrl,

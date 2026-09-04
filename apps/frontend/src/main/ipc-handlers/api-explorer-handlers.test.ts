@@ -222,4 +222,39 @@ public class ThingsController : ControllerBase
 		expect(result.specFile).toBeUndefined();
 		expect(Object.keys(result.data.paths)).toEqual(["/api/Things"]);
 	});
+
+	it("qualifies the tag when a solution root holds several APIs", async () => {
+		const project = mkdtempSync(path.join(tmpdir(), "workpilot-sln-"));
+		tempProjects.push(project);
+		for (const [name, controller] of [
+			["Rag.Api", "Documents"],
+			["Rag.Admin", "Users"],
+		]) {
+			const dir = path.join(project, "src", name);
+			mkdirSync(dir, { recursive: true });
+			writeFileSync(
+				path.join(dir, `${name}.csproj`),
+				'<Project Sdk="Microsoft.NET.Sdk.Web"></Project>',
+			);
+			writeFileSync(
+				path.join(dir, `${controller}Controller.cs`),
+				`[ApiController]
+[Route("api/[controller]")]
+public class ${controller}Controller : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok();
+}`,
+			);
+		}
+
+		const result = await scan(project, "Rag");
+
+		expect(result.data.paths["/api/Documents"].get.tags).toEqual([
+			"Rag.Api / Documents",
+		]);
+		expect(result.data.paths["/api/Users"].get.tags).toEqual([
+			"Rag.Admin / Users",
+		]);
+	});
 });

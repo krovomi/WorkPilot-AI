@@ -190,6 +190,12 @@ interface ApiExplorerState {
 	projectScanError: string | null;
 	/** ID of the project that was last scanned */
 	scannedProjectId: string | null;
+	/**
+	 * The API sub-projects the scan found under the project root — the .NET
+	 * solution case, where the endpoints belong to `Rag.Api` rather than to the
+	 * folder the tab points at. Empty when the root is the application itself.
+	 */
+	scannedApiProjects: string[];
 	/** Timestamp of last successful scan */
 	lastProjectScanAt: number | null;
 
@@ -229,6 +235,7 @@ interface ApiExplorerState {
 	setIsProjectScanning: (scanning: boolean) => void;
 	setProjectScanError: (error: string | null) => void;
 	setScannedProjectId: (projectId: string | null) => void;
+	setScannedApiProjects: (projects: string[]) => void;
 	setLastProjectScanAt: (ts: number | null) => void;
 
 	addEnvironment: (env: Omit<ApiEnvironment, "id">) => void;
@@ -311,6 +318,7 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 			isProjectScanning: false,
 			projectScanError: null,
 			scannedProjectId: null,
+			scannedApiProjects: [],
 			lastProjectScanAt: null,
 
 			// Environments
@@ -355,6 +363,8 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 			setIsProjectScanning: (isProjectScanning) => set({ isProjectScanning }),
 			setProjectScanError: (projectScanError) => set({ projectScanError }),
 			setScannedProjectId: (scannedProjectId) => set({ scannedProjectId }),
+			setScannedApiProjects: (scannedApiProjects) =>
+				set({ scannedApiProjects }),
 			setLastProjectScanAt: (lastProjectScanAt) => set({ lastProjectScanAt }),
 
 			// Environment actions

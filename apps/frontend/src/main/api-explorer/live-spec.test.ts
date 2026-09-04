@@ -53,6 +53,21 @@ describe("discoverBaseUrls", () => {
 		]);
 	});
 
+	it("reads the address a .http request file calls, loopback only", () => {
+		const project = createProject({
+			"src/Rag.Api/Rag.Api.http": `@Rag.Api_HostAddress = http://localhost:5180
+
+GET {{Rag.Api_HostAddress}}/api/documents/
+Accept: application/json
+
+### Production — must never be probed from here
+GET https://rag.example.com/api/documents/
+`,
+		});
+
+		expect(discoverBaseUrls(project, [])).toEqual(["http://localhost:5180"]);
+	});
+
 	it("reads a Spring port, an env PORT and a compose host port", () => {
 		expect(
 			discoverBaseUrls(

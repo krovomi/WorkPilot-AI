@@ -102,6 +102,24 @@ function portsFromText(text: string, patterns: RegExp[]): number[] {
  * a Spring property, a compose mapping, a `PORT` in an env file. Framework
  * defaults come last, so a configured port is always tried first.
  */
+/** The origin of `url`, when it points at this machine — otherwise nothing. */
+function loopbackOrigin(url: string): string | undefined {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return undefined;
+	}
+	const host = parsed.hostname.toLowerCase();
+	const local =
+		host === "localhost" ||
+		host === "127.0.0.1" ||
+		host === "0.0.0.0" ||
+		host === "::1" ||
+		host === "[::1]";
+	return local ? parsed.origin : undefined;
+}
+
 export function discoverBaseUrls(
 	projectPath: string,
 	frameworks: string[],
@@ -128,6 +146,19 @@ export function discoverBaseUrls(
 			}
 		} catch {
 			// A malformed launch profile costs one source, not the probe.
+		}
+	}
+
+	// `Rag.Api.http` — the request file the .NET templates scaffold next to the
+	// project. Its `@HostAddress` is the address the developer actually calls.
+	// Only loopback is kept: a request file may well name the production API,
+	// and the probe must not reach for it.
+	for (const file of walkFiles(projectPath, [".http", ".rest"], 6)) {
+		const content = readFile(file);
+		if (!content) continue;
+		for (const match of content.matchAll(/https?:\/\/[^\s"'{}<>]+/g)) {
+			const origin = loopbackOrigin(match[0]);
+			if (origin) push(origin);
 		}
 	}
 
