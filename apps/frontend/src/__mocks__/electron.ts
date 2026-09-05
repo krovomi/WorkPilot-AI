@@ -95,6 +95,17 @@ export class BrowserWindow extends EventEmitter {
 
 	id = 1;
 
+	/**
+	 * Windows a test has declared as open. Real Electron tracks these itself;
+	 * here a test pushes to it when it needs `getAllWindows()` to return
+	 * something (code that broadcasts to every window, for instance).
+	 */
+	static readonly openWindows: BrowserWindow[] = [];
+
+	static getAllWindows(): BrowserWindow[] {
+		return BrowserWindow.openWindows;
+	}
+
 	constructor(_options?: unknown) {
 		super();
 	}
