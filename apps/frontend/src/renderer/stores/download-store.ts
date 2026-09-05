@@ -1,8 +1,15 @@
 import { create } from "zustand";
 
+export type DownloadStatus =
+	| "starting"
+	| "downloading"
+	| "completed"
+	| "failed"
+	| "cancelled";
+
 export interface DownloadProgress {
 	modelName: string;
-	status: "starting" | "downloading" | "completed" | "failed";
+	status: DownloadStatus;
 	percentage: number;
 	speed?: string;
 	timeRemaining?: string;
@@ -21,11 +28,15 @@ interface DownloadState {
 	) => void;
 	completeDownload: (modelName: string) => void;
 	failDownload: (modelName: string, error: string) => void;
+	cancelDownload: (modelName: string) => void;
 	clearDownload: (modelName: string) => void;
+	/** Adopt the downloads already running in the main process. */
+	rehydrate: () => Promise<void>;
 
 	// Selectors
 	hasActiveDownloads: () => boolean;
 	getActiveDownloads: () => DownloadProgress[];
+	isDownloading: (modelName: string) => boolean;
 }
 
 // Progress tracking state for speed calculation
@@ -60,8 +71,15 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 
 	updateProgress: (modelName: string, progress: Partial<DownloadProgress>) =>
 		set((state) => {
-			const existing = state.downloads[modelName];
-			if (!existing) return state;
+			// Upsert, not update. Progress is broadcast to every window, and a
+			// view that did not start the download (or mounted after it began)
+			// has no entry yet — dropping those events was how a download started
+			// from the settings page stayed invisible in the task panel.
+			const existing = state.downloads[modelName] ?? {
+				modelName,
+				status: "starting" as DownloadStatus,
+				percentage: 0,
+			};
 
 			return {
 				downloads: {
@@ -80,8 +98,11 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 
 	completeDownload: (modelName: string) =>
 		set((state) => {
-			const existing = state.downloads[modelName];
-			if (!existing) return state;
+			const existing = state.downloads[modelName] ?? {
+				modelName,
+				status: "starting" as DownloadStatus,
+				percentage: 0,
+			};
 
 			// Clean up progress tracker when download completes
 			cleanupProgressTracker(modelName);
@@ -100,8 +121,11 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 
 	failDownload: (modelName: string, error: string) =>
 		set((state) => {
-			const existing = state.downloads[modelName];
-			if (!existing) return state;
+			const existing = state.downloads[modelName] ?? {
+				modelName,
+				status: "starting" as DownloadStatus,
+				percentage: 0,
+			};
 
 			// Clean up progress tracker when download fails
 			cleanupProgressTracker(modelName);
@@ -114,6 +138,21 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 						status: "failed",
 						error,
 					},
+				},
+			};
+		}),
+
+	cancelDownload: (modelName: string) =>
+		set((state) => {
+			const existing = state.downloads[modelName];
+			if (!existing) return state;
+
+			cleanupProgressTracker(modelName);
+
+			return {
+				downloads: {
+					...state.downloads,
+					[modelName]: { ...existing, status: "cancelled", error: undefined },
 				},
 			};
 		}),
@@ -140,6 +179,35 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 			(d) => d.status === "starting" || d.status === "downloading",
 		);
 	},
+
+	isDownloading: (modelName: string) => {
+		const d = get().downloads[modelName];
+		return d?.status === "starting" || d?.status === "downloading";
+	},
+
+	rehydrate: async () => {
+		try {
+			const res = await window.electronAPI?.getActiveOllamaPulls?.();
+			const running = res?.success ? (res.data?.models ?? []) : [];
+			if (running.length === 0) return;
+			set((state) => {
+				const downloads = { ...state.downloads };
+				for (const modelName of running) {
+					if (!downloads[modelName]) {
+						downloads[modelName] = {
+							modelName,
+							status: "starting",
+							percentage: 0,
+						};
+					}
+				}
+				return { downloads };
+			});
+		} catch {
+			// The main process is the only source of truth here; if it cannot be
+			// reached the store simply starts empty.
+		}
+	},
 }));
 
 /**
@@ -153,9 +221,28 @@ export function initDownloadProgressListener(): () => void {
 		completed: number;
 		total: number;
 		percentage: number;
+		error?: string;
 	}) => {
 		const store = useDownloadStore.getState();
 		const now = Date.now();
+
+		// Terminal events. The main process broadcasts one to every window when a
+		// pull settles, because only the window that called `pullOllamaModel`
+		// holds its promise — the others would otherwise spin forever on a
+		// download that finished. A cancellation is the user's own decision, so
+		// it is recorded as such rather than as a failure.
+		if (data.status === "completed") {
+			store.completeDownload(data.modelName);
+			return;
+		}
+		if (data.status === "failed") {
+			if (data.error === "PULL_CANCELLED") {
+				store.cancelDownload(data.modelName);
+			} else {
+				store.failDownload(data.modelName, data.error || "");
+			}
+			return;
+		}
 
 		// Initialize tracking for this model if needed
 		if (!progressTracker[data.modelName]) {
@@ -215,6 +302,12 @@ export function initDownloadProgressListener(): () => void {
 	if (window.electronAPI?.onDownloadProgress) {
 		unsubscribe = window.electronAPI.onDownloadProgress(handleProgress);
 	}
+
+	// Adopt whatever the main process is already downloading. A pull survives
+	// closing the task panel and reloading the window — that is the point of
+	// running it in main — so on start-up the store asks what is in flight
+	// instead of presenting an in-progress model as "to download".
+	void useDownloadStore.getState().rehydrate();
 
 	return () => {
 		if (unsubscribe) {

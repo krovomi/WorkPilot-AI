@@ -53,6 +53,10 @@ import {
 	type PhaseDefaults,
 	resolvePhaseDefaults,
 } from "../../../shared/utils/task-thinking";
+import {
+	isLocalProvider,
+	resolveLocalModel,
+} from "../../../shared/utils/local-models";
 import { getStaticProviders } from "../../../shared/utils/providers";
 import { entryMatchesQuery } from "../../../shared/utils/task-logs-search";
 import {
@@ -62,6 +66,7 @@ import {
 } from "../../../shared/utils/task-logs-by-model";
 import { debugError } from "../../../shared/utils/debug-logger";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
+import { useOllamaModelDownload } from "../../hooks/useOllamaModelDownload";
 import { useDownloadStore } from "../../stores/download-store";
 import { Badge } from "../ui/badge";
 import {
@@ -86,6 +91,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
+import { ModelDownloadChip } from "./ModelDownloadChip";
 import { TaskPhaseBar } from "./TaskPhaseBar";
 import { buildPhaseSubSteps } from "./task-log-substep";
 import { translateLogMessage } from "./translateLogMessage";
@@ -224,16 +230,18 @@ function getPhaseConfig(
 		metadata.phaseModels?.[configPhase] ||
 		metadata.model ||
 		defaults.phaseModels[configPhase];
-	// A local server runs ONE configured model for every phase (the backend
-	// forces OLLAMA_MODEL), so a stale per-phase value (e.g. an old
-	// "qwen2.5-coder") would mislabel the dropdown while runs are tagged with the
-	// REAL model — breaking the per-LLM Logs filter/compare. Show the real model
-	// so the labels match the entry tags.
-	if (
-		/^(ollama|local|lmstudio)$/i.test(provider) &&
-		settings?.globalOllamaModel?.trim()
-	) {
-		modelValue = settings.globalOllamaModel.trim();
+	// Show the model the run will REALLY use, so the header and the log entry
+	// tags agree (they feed the per-LLM Logs filter and the compare view).
+	//
+	// The rule matches `phase_config._resolve_provider_model` exactly: a stored
+	// id a local server cannot serve — a Claude/GPT id left over from before the
+	// task was switched to Ollama — resolves to the configured local model,
+	// while an id it CAN serve is kept. This used to override unconditionally,
+	// which flattened a deliberate per-phase pick onto the global default and,
+	// worse, displayed that default while the run still went out with the
+	// hosted id underneath it.
+	if (isLocalProvider(provider)) {
+		modelValue = resolveLocalModel(modelValue, settings?.globalOllamaModel);
 	}
 	const thinkingValue =
 		metadata.phaseThinking?.[configPhase] ||
@@ -1041,10 +1049,6 @@ function PhaseLogSection({
 	isHotSwapPending,
 }: PhaseLogSectionProps) {
 	const { t } = useTranslation(["tasks"]);
-	const { toast } = useToast();
-	const startDownload = useDownloadStore((s) => s.startDownload);
-	const completeDownload = useDownloadStore((s) => s.completeDownload);
-	const failDownload = useDownloadStore((s) => s.failDownload);
 	const Icon = PHASE_ICONS[phase];
 	const logOrder = useSettingsStore((s) => s.settings.logOrder);
 
@@ -1077,9 +1081,11 @@ function PhaseLogSection({
 	// Live model catalog for the phase's currently-selected provider. The hook
 	// is always called (provider may be "") so it complies with the rules of
 	// hooks; an empty provider just yields the static fallback list.
-	const { models: catalogModels } = useProviderModelCatalog(
-		phaseConfig?.provider ?? "",
-	);
+	const {
+		models: catalogModels,
+		loading: catalogLoading,
+		refresh: refreshCatalog,
+	} = useProviderModelCatalog(phaseConfig?.provider ?? "");
 
 	// Provider options: the configured providers, augmented with the current
 	// one so a previously-saved (now unconfigured) provider stays visible.
@@ -1179,52 +1185,61 @@ function PhaseLogSection({
 
 	// Local providers expose a static catalog of pullable models; flag it so the
 	// model dropdown can mark which entries are actually installed vs downloadable.
-	const isLocalProvider = ((phaseConfig?.provider ?? "") as string)
-		.toLowerCase()
-		.match(/^(ollama|local|lmstudio)$/) != null;
+	const isLocal = isLocalProvider(phaseConfig?.provider);
 
 	// For local providers, surface installed models first so the user's actual
 	// (downloaded) models sit at the top, above look-alike catalog suggestions.
 	// Array.sort is stable, so the original order is preserved within each group.
-	const sortedModelOptions = isLocalProvider
+	const sortedModelOptions = isLocal
 		? [...modelOptions].sort(
 				(a, b) => Number(b.installed ?? false) - Number(a.installed ?? false),
 			)
 		: modelOptions;
 
+	// Downloads are owned by `useOllamaModelDownload`: it runs the pull in the
+	// main process, reports it in the global indicator, and refreshes this
+	// catalog when the model lands so the entry flips from "à télécharger" to
+	// "✓ installé" without a manual reload.
+	const { download: downloadModel, cancel: cancelModelDownload } =
+		useOllamaModelDownload({ onDownloaded: () => refreshCatalog() });
+
+	// This phase's model in the shared download store, if it is being pulled.
+	// Keyed on the value the `<Select>` shows, so the chip and the dropdown
+	// always talk about the same model even when the persisted id is an
+	// alternate spelling the catalog collapsed.
+	const downloads = useDownloadStore((s) => s.downloads);
+	const selectedModelDownload = downloads[modelSelectValue.trim()];
+	const clearDownload = useDownloadStore((s) => s.clearDownload);
+
+	// Is the phase's model actually on the local server? `undefined` while the
+	// catalog is still loading — the chip stays silent rather than flashing
+	// "Télécharger" at a model that turns out to be installed.
+	const selectedModelInstalled = useMemo(() => {
+		if (!isLocal) return true;
+		if (catalogLoading) return undefined;
+		return (
+			modelOptions.find((o) => o.value === modelSelectValue)?.installed === true
+		);
+	}, [isLocal, catalogLoading, modelOptions, modelSelectValue]);
+
 	// Persist the chosen model; if it's a local model that isn't installed yet,
-	// start pulling it now (progress surfaces in the global download indicator)
-	// so it's ready by the time the phase runs — instead of silently 404-ing.
+	// start pulling it now (progress surfaces in the chip beside the selector and
+	// in the global download indicator) so it's ready by the time the phase runs
+	// — instead of silently 404-ing.
 	// When this phase is actively running, a dropdown change is a LIVE swap:
 	// besides persisting to metadata, drop a HOT_SWAP marker (applied next turn).
 	// The parent gates on `status` via buildHotSwapRequest.
 	const handleModelChange = (value: string) => {
 		onModelChange?.(phase, value);
 		onHotSwap?.(phase, status, { model: value });
-		if (!isLocalProvider) return;
+		if (!isLocal) return;
 		const opt = modelOptions.find((o) => o.value === value);
-		if (!opt || opt.installed) return;
-		const api = globalThis.electronAPI;
-		if (!api?.pullOllamaModel) return;
-		startDownload(value);
-		toast({
-			title: t("tasks:logs.model.downloadStartedTitle", "Downloading model"),
-			description: t(
-				"tasks:logs.model.downloadStartedDesc",
-				"{{model}} is downloading in the background.",
-				{ model: value },
-			),
-		});
-		void (async () => {
-			try {
-				await api.ensureOllama?.();
-				const res = await api.pullOllamaModel(value);
-				if (res?.success) completeDownload(value);
-				else failDownload(value, res?.error || "");
-			} catch (e) {
-				failDownload(value, e instanceof Error ? e.message : String(e));
-			}
-		})();
+		// `installed === true` is the only proof the model is there. An option the
+		// catalog never flagged (server not started yet, so nothing listed) is
+		// treated as missing and downloaded — `download()` starts the server
+		// first, which is exactly what that case needs.
+		if (opt?.installed === true) return;
+		void downloadModel(value);
 	};
 
 	// Table « entrée → libellé de sous-étape » pour cette phase : bornes
@@ -1415,16 +1430,72 @@ function PhaseLogSection({
 									</SelectTrigger>
 									<SelectContent>
 										{sortedModelOptions.map((m) => (
-											<SelectItem key={m.value} value={m.value}>
+											<SelectItem
+												key={m.value}
+												value={m.value}
+												// Clicking a model that is not on the local server
+												// downloads it — whether or not it is already the
+												// selected one. `onValueChange` alone could not do
+												// this: re-picking the value a <Select> already holds
+												// fires no change event, so the model a user is most
+												// likely to click (the one the phase is stuck on) had
+												// no way to be downloaded at all. `download()` is
+												// idempotent, so the pair never starts two pulls.
+												onPointerUp={() => {
+													if (isLocal && m.installed !== true) {
+														void downloadModel(m.value);
+													}
+												}}
+												onKeyDown={(e) => {
+													if (
+														(e.key === "Enter" || e.key === " ") &&
+														isLocal &&
+														m.installed !== true
+													) {
+														void downloadModel(m.value);
+													}
+												}}
+											>
 												<span className="flex items-center gap-1.5">
 													<span>{m.label}</span>
 													{m.installed ? (
 														<span className="text-[10px] text-success">
 															{t("tasks:logs.model.installed", "✓ installed")}
 														</span>
-													) : isLocalProvider ? (
-														<span className="text-[10px] text-muted-foreground">
-															{t("tasks:logs.model.downloadable", "to download")}
+													) : isLocal ? (
+														// Reads as the action it is. Selecting this row
+														// starts the download (see the item handlers
+														// above), and the live percentage replaces the
+														// label so the list itself shows what is landing.
+														<span
+															className={cn(
+																"text-[10px]",
+																downloads[m.value]?.status === "starting" ||
+																	downloads[m.value]?.status === "downloading"
+																	? "text-primary"
+																	: "text-amber-500",
+															)}
+															title={t(
+																"tasks:logs.model.downloadTip",
+																"« {{model}} » n'est pas installé sur le serveur local. Le téléchargement se fait en arrière-plan : vous pouvez continuer à travailler.",
+																{ model: m.value },
+															)}
+														>
+															{(() => {
+																const d = downloads[m.value];
+																if (
+																	d?.status === "starting" ||
+																	d?.status === "downloading"
+																) {
+																	return d.percentage > 0
+																		? `↓ ${Math.round(d.percentage)}%`
+																		: t("tasks:logs.model.downloadQueued", "…");
+																}
+																if (d?.status === "completed") {
+																	return t("tasks:logs.model.ready", "Prêt");
+																}
+																return `↓ ${t("tasks:logs.model.download", "Télécharger")}`;
+															})()}
 														</span>
 													) : null}
 													{typeof m.param_b === "number" && m.param_b < 24 ? (
@@ -1455,6 +1526,18 @@ function PhaseLogSection({
 									<Cpu className="h-3 w-3" />
 									<span>{phaseConfig.model}</span>
 								</div>
+							)}
+							{/* Download state of the selected local model. Renders nothing
+							    when the model is installed or the provider is not local. */}
+							{isLocal && (
+								<ModelDownloadChip
+									model={modelSelectValue}
+									installed={selectedModelInstalled}
+									download={selectedModelDownload}
+									onDownload={() => void downloadModel(modelSelectValue)}
+									onCancel={() => cancelModelDownload(modelSelectValue)}
+									onDismiss={() => clearDownload(modelSelectValue)}
+								/>
 							)}
 							<span className="text-muted-foreground/50">|</span>
 							{/* Thinking-effort selector */}
