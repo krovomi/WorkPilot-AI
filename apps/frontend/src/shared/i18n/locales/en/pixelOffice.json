@@ -3,21 +3,37 @@
 	"description": "Visualize your AI agents as pixel art characters in a virtual office",
 	"emptyState": {
 		"title": "Your office is empty",
-		"description": "Open agent terminals to see your AI workers appear at their desks. Each terminal becomes a character with live activity tracking."
+		"description": "Start a task in the Kanban or open terminals to see your AI agents appear at their desks with live activity tracking."
 	},
+	"pendingOnly": "Agents will start as soon as the tasks are launched",
 	"toolbar": {
-		"zoomIn": "Zoom In",
-		"zoomOut": "Zoom Out",
-		"toggleGrid": "Toggle Grid",
-		"toggleSound": "Toggle Sound",
-		"addAgent": "New terminal"
+		"zoomIn": "Zoom in",
+		"zoomOut": "Zoom out",
+		"toggleGrid": "Toggle grid",
+		"soundOn": "Mute notifications",
+		"soundOff": "Unmute notifications",
+		"addAgent": "New terminal",
+		"shortcuts": "Shortcuts: +/- zoom · G grid · M sound · ←/→ agent · Esc close"
 	},
-	"agents": {
-		"count_one": "{{count}} agent",
-		"count_other": "{{count}} agents",
-		"active": "{{count}} active",
-		"goToTerminal": "Go to Terminal",
-		"claudeMode": "Claude Mode"
+	"badges": {
+		"terminals_one": "{{count}} terminal",
+		"terminals_other": "{{count}} terminals",
+		"tasks_one": "{{count}} task",
+		"tasks_other": "{{count}} tasks",
+		"swarm_one": "{{count}} subtask",
+		"swarm_other": "{{count}} subtasks",
+		"active_one": "{{count}} active",
+		"active_other": "{{count}} active",
+		"pending_one": "{{count}} queued",
+		"pending_other": "{{count}} queued"
+	},
+	"canvas": {
+		"emptyDesk": "empty"
+	},
+	"queue": {
+		"title": "Waiting to start",
+		"count_one": "{{count}} task queued",
+		"count_other": "{{count}} tasks queued"
 	},
 	"activity": {
 		"idle": "Idle",
@@ -25,16 +41,70 @@
 		"reading": "Analysing",
 		"running": "Running",
 		"waiting": "Waiting",
-		"exited": "Closed"
+		"pending": "Queued",
+		"exited": "Session ended"
+	},
+	"activityDescription": {
+		"typingWithTask": "Implementing \"{{task}}\" — the agent is actively writing code.",
+		"typing": "The agent is writing code.",
+		"running": "The agent is running a command (tests, build, install…). Wait for it or interrupt it.",
+		"readingWithTask": "Reading the code to understand \"{{task}}\".",
+		"reading": "The agent is analysing the project files.",
+		"waiting": "The agent is waiting for your answer or an approval.",
+		"idle": "The agent is available. Give it an order or start Claude.",
+		"exited": "This terminal has been closed.",
+		"pending": "This task is waiting to start. Launch it from the Kanban."
+	},
+	"phase": {
+		"idle": "Standing by",
+		"planning": "Planning",
+		"coding": "Development",
+		"qa_review": "QA review",
+		"qa_fixing": "QA fixes",
+		"rate_limit_paused": "API limit",
+		"auth_failure_paused": "Auth failed",
+		"complete": "Done",
+		"failed": "Failed"
+	},
+	"phaseDescription": {
+		"idle": "Ready to start.",
+		"planning": "The AI is analysing your request and preparing a detailed action plan.",
+		"coding": "Code is being written. Subtasks run one after another automatically.",
+		"qa_review": "An agent is checking the quality of the code produced: tests, consistency, best practices.",
+		"qa_fixing": "Problems were found. The agent is fixing them before delivery.",
+		"rate_limit_paused": "The Claude API hit its limit. It will resume automatically in a moment.",
+		"auth_failure_paused": "Authentication problem. Check your Claude profiles in the settings.",
+		"complete": "The task is complete and ready for your review.",
+		"failed": "The task failed. Check the logs to understand what happened."
 	},
 	"bubble": {
-		"taskLabel": "Task:",
-		"sendPlaceholderWaiting": "Reply to the agent…",
+		"close": "Close",
+		"kanbanBadge": "Kanban",
+		"claudeBadge": "Claude",
+		"swarmBadge": "Subtask",
+		"taskLabel": "Task",
+		"cwdLabel": "Directory",
+		"sessionLabel": "Session",
+		"branchLabel": "Branch",
+		"progress": "Overall progress",
+		"logs": "Agent logs",
+		"copy": "Copy",
+		"copied": "Copied",
+		"copyAll": "Copy all logs",
+		"waitingForLogs": "Waiting for logs…",
 		"sendPlaceholder": "Give an order to the terminal…",
-		"sendHint": "↵ Enter to send · The message will be typed in the terminal",
+		"sendPlaceholderWaiting": "Reply to the agent…",
+		"sendHint": "↵ Enter to send · Typed straight into the terminal",
+		"send": "Send",
 		"viewTerminal": "View terminal",
 		"interrupt": "Interrupt",
 		"resumeClaude": "Resume Claude",
-		"close": "Close"
+		"kill": "Close",
+		"goToKanban": "View in Kanban",
+		"stopTask": "Stop"
+	},
+	"pending": {
+		"description": "This task is queued and has not started yet. Go to the Kanban to launch it, reprioritise it or edit its specification.",
+		"hint": "Waiting for an available agent"
 	}
 }

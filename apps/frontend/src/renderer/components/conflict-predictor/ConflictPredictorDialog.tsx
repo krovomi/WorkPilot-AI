@@ -567,7 +567,7 @@ export function ConflictPredictorDialog() {
 					)}
 
 					{/* Streaming Output (for debugging) */}
-					{process.env.NODE_ENV === "development" && streamingOutput && (
+					{import.meta.env?.DEV && streamingOutput && (
 						<Card className="mt-4">
 							<CardHeader>
 								<CardTitle className="text-sm">
