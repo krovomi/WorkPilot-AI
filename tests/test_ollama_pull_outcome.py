@@ -33,10 +33,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
-from ollama_model_detector import (  # noqa: E402
-    classify_pull_error,
-    model_is_installed,
-)
+# Imported as a module rather than by name: the pull driver below patches
+# attributes ON it (`fetch_ollama_api`, `model_is_installed`), and mixing the
+# two import styles for one module is what CodeQL flags.
+import ollama_model_detector as det  # noqa: E402
 
 # The real message from the bug report, trimmed of its hash.
 PARTIAL_BLOB_ERROR = (
@@ -53,14 +53,14 @@ def tags(*names: str) -> dict:
 class TestClassification:
     def test_a_filesystem_error_is_not_blamed_on_hugging_face(self):
         """The exact mis-classification the user saw."""
-        message = classify_pull_error("llama3.3", PARTIAL_BLOB_ERROR, "0.5.0")
+        message = det.classify_pull_error("llama3.3", PARTIAL_BLOB_ERROR, "0.5.0")
         assert "Hugging Face" not in message
         assert "GGUF" not in message
         # …and the raw detail is still carried, so nothing is hidden.
         assert "no such file or directory" in message
 
     def test_a_missing_gguf_build_still_says_so(self):
-        message = classify_pull_error(
+        message = det.classify_pull_error(
             "hf.co/org/model",
             "error converting model: no GGUF file found in repository",
             "0.5.0",
@@ -68,39 +68,42 @@ class TestClassification:
         assert "GGUF" in message
 
     def test_an_unknown_name_says_the_registry_does_not_know_it(self):
-        message = classify_pull_error(
+        message = det.classify_pull_error(
             "llama99", "pull model manifest: file does not exist", "0.5.0"
         )
         assert "introuvable" in message
         assert "GGUF" not in message
 
     def test_a_version_requirement_is_named(self):
-        message = classify_pull_error(
+        message = det.classify_pull_error(
             "gemma3", "requires a newer version of Ollama", "0.1.0"
         )
         assert "0.1.0" in message
         assert "ollama.com/download" in message
 
     def test_a_full_disk_says_so(self):
-        message = classify_pull_error(
+        message = det.classify_pull_error(
             "llama3.3", "write blob: no space left on device", None
         )
         assert "Espace disque" in message
 
     def test_a_dropped_connection_says_a_retry_resumes(self):
         # Ollama resumes a partial pull, so "start over" would be wrong advice.
-        message = classify_pull_error("llama3.3", "unexpected EOF", None)
+        message = det.classify_pull_error("llama3.3", "unexpected EOF", None)
         assert "Relancez" in message
 
     def test_an_unrecognised_error_is_passed_through_verbatim(self):
         # Better a raw message than a confident wrong one.
-        assert classify_pull_error("llama3.3", "something odd", None) == "something odd"
+        assert (
+            det.classify_pull_error("llama3.3", "something odd", None)
+            == "something odd"
+        )
 
     def test_whitespace_and_newlines_are_collapsed(self):
-        assert classify_pull_error("m", "a\n  b\tc", None) == "a b c"
+        assert det.classify_pull_error("m", "a\n  b\tc", None) == "a b c"
 
     def test_an_empty_error_still_produces_a_message(self):
-        assert classify_pull_error("m", "", None) == "erreur inconnue"
+        assert det.classify_pull_error("m", "", None) == "erreur inconnue"
 
 
 class TestInstalledCheck:
@@ -113,36 +116,36 @@ class TestInstalledCheck:
         # Ollama stores `llama3.3` as `llama3.3:latest`; a literal comparison
         # would have reported a freshly pulled model as missing.
         with self._with_tags(tags("llama3.3:latest")):
-            assert model_is_installed("http://x", "llama3.3") is True
+            assert det.model_is_installed("http://x", "llama3.3") is True
 
     def test_a_bare_name_matches_an_explicit_size_tag(self):
         with self._with_tags(tags("llama3.3:70b")):
-            assert model_is_installed("http://x", "llama3.3") is True
+            assert det.model_is_installed("http://x", "llama3.3") is True
 
     def test_an_exact_tag_matches(self):
         with self._with_tags(tags("qwen3-embedding:8b")):
-            assert model_is_installed("http://x", "qwen3-embedding:8b") is True
+            assert det.model_is_installed("http://x", "qwen3-embedding:8b") is True
 
     def test_a_tagged_request_does_not_match_a_different_tag(self):
         with self._with_tags(tags("llama3.3:70b")):
-            assert model_is_installed("http://x", "llama3.3:8b") is False
+            assert det.model_is_installed("http://x", "llama3.3:8b") is False
 
     def test_a_different_model_does_not_match(self):
         with self._with_tags(tags("mistral:latest", "gemma3:latest")):
-            assert model_is_installed("http://x", "llama3.3") is False
+            assert det.model_is_installed("http://x", "llama3.3") is False
 
     def test_matching_ignores_case(self):
         with self._with_tags(tags("Llama3.3:latest")):
-            assert model_is_installed("http://x", "LLAMA3.3") is True
+            assert det.model_is_installed("http://x", "LLAMA3.3") is True
 
     def test_an_unreachable_server_is_not_a_match(self):
         # Fail closed: without an answer we must not claim the model is there.
         with self._with_tags(None):
-            assert model_is_installed("http://x", "llama3.3") is False
+            assert det.model_is_installed("http://x", "llama3.3") is False
 
     def test_an_empty_name_is_never_installed(self):
         with self._with_tags(tags("llama3.3:latest")):
-            assert model_is_installed("http://x", "") is False
+            assert det.model_is_installed("http://x", "") is False
 
 
 class TestPullReportsTheEndState:
@@ -155,7 +158,6 @@ class TestPullReportsTheEndState:
         Electron handler reads both: it parses stdout first and falls back to
         the code, so the two must agree.
         """
-        import ollama_model_detector as det
 
         class FakeResponse:
             def __enter__(self):
