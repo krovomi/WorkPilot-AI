@@ -2903,7 +2903,45 @@ class LocalAgentClient(OpenAIAgentClient):
                 f"Espace disque insuffisant pour télécharger « {model} ». "
                 f"Détail : {detail}"
             )
+        if "no such file or directory" in low or "partial" in low:
+            return (
+                f"Le cache Ollama de « {model} » est incohérent (un fichier "
+                "temporaire a disparu en cours de route). Relancez le "
+                "téléchargement ; si cela persiste, `ollama rm " + model + "` "
+                f"puis réessayez. Détail : {detail}"
+            )
         return detail or "erreur inconnue"
+
+    async def _model_is_installed(self) -> bool:
+        """Is ``self.model`` on the local server right now?
+
+        Mirrors ``ollama_model_detector.model_is_installed``: Ollama tags carry
+        an explicit version (``llama3.3:latest``) while the configured name
+        usually does not, so a bare name matches its ``:latest`` tag.
+        """
+        import aiohttp
+
+        root = self._api_base.split("/v1/")[0] or self._api_base
+        wanted = (self.model or "").strip().lower()
+        if not wanted:
+            return False
+        try:
+            async with self._get_http_client().get(
+                f"{root.rstrip('/')}/api/tags",
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                if resp.status != 200:
+                    return False
+                data = await resp.json()
+        except Exception:  # noqa: BLE001 — a probe, never fatal
+            return False
+        for entry in data.get("models") or []:
+            name = str(entry.get("name", "")).strip().lower()
+            if name == wanted or name == f"{wanted}:latest":
+                return True
+            if ":" not in wanted and name.split(":", 1)[0] == wanted:
+                return True
+        return False
 
     async def _pull_ollama_model_stream(
         self,
@@ -2955,6 +2993,14 @@ class LocalAgentClient(OpenAIAgentClient):
                     except _json.JSONDecodeError:
                         continue
                     if chunk.get("error"):
+                        # Ollama reports housekeeping failures the same way it
+                        # reports real ones: a pull that fetched every layer and
+                        # then failed to unlink a `-partial` blob ends with
+                        # "no such file or directory". The model is usable, so
+                        # the only honest answer is the one the server gives.
+                        if await self._model_is_installed():
+                            yield "done", ""
+                            return
                         yield (
                             "error",
                             self._explain_pull_error(self.model, chunk["error"]),
@@ -2979,6 +3025,11 @@ class LocalAgentClient(OpenAIAgentClient):
                         )
             yield "done", ""
         except Exception as e:  # noqa: BLE001 — surface as a soft failure
+            # A dropped connection after the last layer landed looks identical
+            # here to one that dropped mid-transfer; ask the server which it was.
+            if await self._model_is_installed():
+                yield "done", ""
+                return
             yield "error", self._explain_pull_error(self.model, str(e))
 
     async def receive_response(self) -> AsyncIterator[AgentMessage]:
