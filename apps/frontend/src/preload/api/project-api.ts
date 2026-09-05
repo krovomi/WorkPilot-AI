@@ -195,6 +195,8 @@ export interface ProjectAPI {
 			completed: number;
 			total: number;
 			percentage: number;
+			/** Set on the terminal event when the pull failed. */
+			error?: string;
 		}) => void,
 	) => () => void;
 
@@ -289,6 +291,20 @@ export interface ProjectAPI {
 			output: string[];
 		}>
 	>;
+	/**
+	 * Abort an in-flight model download. The pending `pullOllamaModel` promise
+	 * resolves with `error: "PULL_CANCELLED"`, which callers treat as "the user
+	 * stopped it", not as a failure worth reporting.
+	 */
+	cancelOllamaPull: (
+		modelName: string,
+	) => Promise<IPCResult<{ cancelled: boolean }>>;
+	/**
+	 * Models currently downloading in the main process. A pull outlives the view
+	 * that started it, so a freshly mounted view asks for this instead of
+	 * showing a model as "to download" while it is already at 60%.
+	 */
+	getActiveOllamaPulls: () => Promise<IPCResult<{ models: string[] }>>;
 	/** Delete a pulled model to free disk space. */
 	deleteOllamaModel: (
 		modelName: string,
@@ -515,6 +531,7 @@ export const createProjectAPI = (): ProjectAPI => ({
 			completed: number;
 			total: number;
 			percentage: number;
+			error?: string;
 		}) => void,
 	) => {
 		type ProgressPayload = Parameters<typeof callback>[0];
@@ -591,6 +608,12 @@ export const createProjectAPI = (): ProjectAPI => ({
 
 	pullOllamaModel: (modelName: string, baseUrl?: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_PULL_MODEL, modelName, baseUrl),
+
+	cancelOllamaPull: (modelName: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_CANCEL_PULL, modelName),
+
+	getActiveOllamaPulls: () =>
+		ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_ACTIVE_PULLS),
 
 	deleteOllamaModel: (modelName: string, baseUrl?: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_DELETE_MODEL, modelName, baseUrl),

@@ -900,7 +900,20 @@
 			"downloadStartedTitle": "Téléchargement du modèle",
 			"downloadStartedDesc": "{{model}} se télécharge en arrière-plan.",
 			"smallWarn": "⚠ petit — déconseillé planif",
-			"smallWarnTip": "Petit modèle ({{n}}B) — déconseillé pour la planification (préférez ≥24B ou Claude) ; limité sur les tâches complexes."
+			"smallWarnTip": "Petit modèle ({{n}}B) — déconseillé pour la planification (préférez ≥24B ou Claude) ; limité sur les tâches complexes.",
+			"download": "Télécharger",
+			"downloadTip": "« {{model}} » n'est pas installé sur le serveur local. Le téléchargement se fait en arrière-plan : vous pouvez continuer à travailler et revenir plus tard.",
+			"downloadingTip": "Téléchargement de « {{model}} »",
+			"downloadQueued": "en attente…",
+			"cancelDownload": "Annuler le téléchargement",
+			"retryDownload": "Relancer le téléchargement",
+			"ready": "Prêt",
+			"downloadDoneTitle": "Modèle prêt",
+			"downloadDoneDesc": "{{model}} est installé et utilisable.",
+			"downloadFailedTitle": "Échec du téléchargement",
+			"downloadFailedDesc": "{{model}} n'a pas pu être téléchargé.",
+			"downloadUnavailable": "Le téléchargement de modèles n'est disponible que dans l'application de bureau.",
+			"serverUnavailable": "Le serveur Ollama local n'a pas pu être démarré."
 		},
 		"modelGroup": {
 			"toggleAria": "Afficher ou masquer les logs du modèle {{model}}",

@@ -2212,7 +2212,30 @@ def create_agent_client(
                 local_system_prompt, agent_type, spec_dir
             )
 
-        resolved_local_model = model or "llama3.3"
+        # Last line of defence on the model id. A local server can only answer
+        # for what is pulled on the machine, so a hosted-only id arriving here
+        # (a task whose saved model is still `claude-…`/`gpt-…` after switching
+        # to Ollama) is a guaranteed 404 followed by a doomed registry pull.
+        # Coerce it to the configured local model and say so where the user
+        # looks — silently running a different model than the one displayed is
+        # worse than the 404 it replaces.
+        from phase_config import coerce_local_model, is_hosted_only_model
+
+        resolved_local_model = coerce_local_model(model)
+        if model and is_hosted_only_model(model):
+            logger.warning(
+                "[create_agent_client] %r cannot run on a local server "
+                "(provider=%s) — using %r instead.",
+                model,
+                provider,
+                resolved_local_model,
+            )
+            print(
+                f"⚠️  « {model} » n'est pas un modèle local — "
+                f"exécution avec « {resolved_local_model} » "
+                f"(modèle configuré pour {provider}).",
+                flush=True,
+            )
         logger.info(
             "[create_agent_client] Using LocalAgentClient (model=%s, agent_type=%s)",
             resolved_local_model,

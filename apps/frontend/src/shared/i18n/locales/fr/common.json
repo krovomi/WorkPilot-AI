@@ -462,7 +462,11 @@
 		"clearAll": "Effacer tous les téléchargements terminés",
 		"done": "Terminé",
 		"failedLabel": "Échoué",
-		"starting": "Démarrage..."
+		"starting": "Démarrage...",
+		"cancel": "Annuler ce téléchargement",
+		"retry": "Réessayer",
+		"cancelledLabel": "Annulé",
+		"hint": "Les téléchargements continuent en arrière-plan, même si vous fermez cette tâche."
 	},
 	"ideation": {
 		"converting": "Conversion...",

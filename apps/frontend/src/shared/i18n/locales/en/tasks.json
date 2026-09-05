@@ -900,7 +900,20 @@
 			"downloadStartedTitle": "Downloading model",
 			"downloadStartedDesc": "{{model}} is downloading in the background.",
 			"smallWarn": "⚠ small — not advised for planning",
-			"smallWarnTip": "Small model ({{n}}B) — not advised for planning (prefer ≥24B or Claude); limited on complex tasks."
+			"smallWarnTip": "Small model ({{n}}B) — not advised for planning (prefer ≥24B or Claude); limited on complex tasks.",
+			"download": "Download",
+			"downloadTip": "“{{model}}” is not installed on the local server. The download runs in the background — you can keep working and come back later.",
+			"downloadingTip": "Downloading “{{model}}”",
+			"downloadQueued": "queued…",
+			"cancelDownload": "Cancel download",
+			"retryDownload": "Retry download",
+			"ready": "Ready",
+			"downloadDoneTitle": "Model ready",
+			"downloadDoneDesc": "{{model}} is installed and ready to use.",
+			"downloadFailedTitle": "Download failed",
+			"downloadFailedDesc": "{{model}} could not be downloaded.",
+			"downloadUnavailable": "Model downloads are only available in the desktop app.",
+			"serverUnavailable": "The local Ollama server could not be started."
 		},
 		"modelGroup": {
 			"toggleAria": "Show or hide logs from model {{model}}",

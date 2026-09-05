@@ -2865,33 +2865,121 @@ class LocalAgentClient(OpenAIAgentClient):
         except (TypeError, ValueError):
             return 8192
 
-    async def _pull_ollama_model(self) -> tuple[bool, str]:
-        """Pull ``self.model`` into the server (Ollama API: POST /api/pull).
+    @staticmethod
+    def _format_bytes(n: float) -> str:
+        """Human-readable byte count (Go/Mo), for pull-progress lines."""
+        if n >= 1024**3:
+            return f"{n / 1024**3:.1f} Go"
+        if n >= 1024**2:
+            return f"{n / 1024**2:.0f} Mo"
+        return f"{max(int(n), 0)} o"
 
-        Returns ``(ok, error)``. Uses a long per-request timeout since a model
-        can be several GB. Never raises.
+    @staticmethod
+    def _explain_pull_error(model: str, raw: str) -> str:
+        """Turn Ollama's pull error into something the user can act on.
+
+        ``pull model manifest: file does not exist`` is the message Ollama
+        returns for ANY name its registry does not know — a typo, a Hugging Face
+        repo with no GGUF build, or (the case that produced this function) a
+        hosted model id that was never a local model at all. On its own it names
+        no cause and no fix.
+        """
+        detail = " ".join((raw or "").split())
+        low = detail.lower()
+        if "manifest" in low or "not found" in low or "file does not exist" in low:
+            return (
+                f"« {model} » est introuvable dans la bibliothèque Ollama. "
+                "Vérifiez le nom du modèle (ollama.com/library), ou choisissez "
+                "un modèle installé dans le sélecteur de la phase. "
+                f"Détail : {detail}"
+            )
+        if "gguf" in low:
+            return (
+                f"« {model} » ne fournit pas de version GGUF (requise par Ollama). "
+                f"Choisissez un dépôt « -GGUF ». Détail : {detail}"
+            )
+        if "no space" in low or "disk" in low:
+            return (
+                f"Espace disque insuffisant pour télécharger « {model} ». "
+                f"Détail : {detail}"
+            )
+        return detail or "erreur inconnue"
+
+    async def _pull_ollama_model_stream(
+        self,
+    ) -> AsyncIterator[tuple[str, str]]:
+        """Pull ``self.model`` (Ollama API: POST /api/pull), streaming progress.
+
+        Yields ``("progress", human_text)`` as the download advances, then
+        exactly one terminal ``("done", "")`` or ``("error", message)``.
+
+        Streaming matters more than it looks: a model is several gigabytes, and
+        the non-streaming form left the task log frozen on "téléchargement
+        automatique en cours" for the whole download with no way to tell a live
+        pull from a hung one. Never raises.
         """
         import json as _json
+        import time as _time
 
         import aiohttp
 
         root = self._api_base.split("/v1/")[0] or self._api_base
         url = f"{root.rstrip('/')}/api/pull"
+        # Emit at most one progress line every few seconds: the log is a
+        # scrollback a person reads, not a progress bar, and Ollama streams
+        # several updates per second.
+        emit_interval = 5.0
+        last_emit = 0.0
         try:
             async with self._get_http_client().post(
                 url,
-                json={"name": self.model, "stream": False},
-                timeout=aiohttp.ClientTimeout(total=1800, sock_connect=20),
+                json={"name": self.model, "stream": True},
+                # No total cap: a 40 GB model on a slow link legitimately takes
+                # longer than any fixed budget. `sock_read` is the real guard —
+                # it fires when the server stops sending, which is what "stuck"
+                # actually means.
+                timeout=aiohttp.ClientTimeout(
+                    total=None, sock_connect=20, sock_read=180
+                ),
             ) as resp:
-                text = await resp.text()
-                if resp.status == 200 and '"error"' not in text:
-                    return True, ""
-                try:
-                    return False, _json.loads(text).get("error", text)
-                except (_json.JSONDecodeError, AttributeError, TypeError):
-                    return False, text
+                if resp.status != 200:
+                    text = await resp.text()
+                    yield "error", self._explain_pull_error(self.model, text)
+                    return
+                async for raw_line in resp.content:
+                    line = raw_line.decode("utf-8", "replace").strip()
+                    if not line:
+                        continue
+                    try:
+                        chunk = _json.loads(line)
+                    except _json.JSONDecodeError:
+                        continue
+                    if chunk.get("error"):
+                        yield (
+                            "error",
+                            self._explain_pull_error(self.model, chunk["error"]),
+                        )
+                        return
+                    completed = chunk.get("completed")
+                    total = chunk.get("total")
+                    now = _time.monotonic()
+                    if (
+                        isinstance(completed, (int, float))
+                        and isinstance(total, (int, float))
+                        and total > 0
+                        and now - last_emit >= emit_interval
+                    ):
+                        last_emit = now
+                        pct = int(completed / total * 100)
+                        yield (
+                            "progress",
+                            f"📥 « {self.model} » — {pct}% "
+                            f"({self._format_bytes(completed)} / "
+                            f"{self._format_bytes(total)})",
+                        )
+            yield "done", ""
         except Exception as e:  # noqa: BLE001 — surface as a soft failure
-            return False, str(e)
+            yield "error", self._explain_pull_error(self.model, str(e))
 
     async def receive_response(self) -> AsyncIterator[AgentMessage]:
         """Run the tool-use loop against Ollama's NATIVE ``/api/chat`` endpoint.
@@ -2988,38 +3076,66 @@ class LocalAgentClient(OpenAIAgentClient):
                             and not model_pull_attempted
                         ):
                             model_pull_attempted = True
+
+                            def _system_text(text: str) -> AgentMessage:
+                                return AgentMessage(
+                                    role=MessageRole.SYSTEM,
+                                    content=[
+                                        ContentBlock(
+                                            type=ContentBlockType.TEXT, text=text
+                                        )
+                                    ],
+                                )
+
+                            # A hosted-only id can never be pulled: asking the
+                            # Ollama registry for a Claude manifest is a round
+                            # trip whose only possible outcome is "file does not
+                            # exist". Say what is actually wrong instead.
+                            from phase_config import is_hosted_only_model
+
+                            if is_hosted_only_model(self.model):
+                                logger.error(
+                                    "[LocalAgentClient] %s is a hosted-only model; "
+                                    "refusing to pull it from the Ollama registry.",
+                                    self.model,
+                                )
+                                yield _system_text(
+                                    f"« {self.model} » est un modèle d'API "
+                                    "(Claude/GPT/Gemini) : il ne peut pas "
+                                    "s'exécuter sur un serveur local. Choisissez "
+                                    "un modèle Ollama dans le sélecteur de la "
+                                    "phase, ou changez le fournisseur de la tâche."
+                                )
+                                return
+
                             logger.warning(
                                 "[LocalAgentClient] Model %s not installed — "
                                 "pulling on demand.",
                                 self.model,
                             )
-                            yield AgentMessage(
-                                role=MessageRole.SYSTEM,
-                                content=[
-                                    ContentBlock(
-                                        type=ContentBlockType.TEXT,
-                                        text=(
-                                            f"📥 Modèle « {self.model} » non installé "
-                                            "— téléchargement automatique en cours "
-                                            "(cela peut prendre plusieurs minutes)…"
-                                        ),
-                                    )
-                                ],
+                            yield _system_text(
+                                f"📥 Modèle « {self.model} » non installé "
+                                "— téléchargement automatique en cours "
+                                "(cela peut prendre plusieurs minutes)…"
                             )
-                            pulled, pull_err = await self._pull_ollama_model()
+                            pulled = False
+                            pull_err = "téléchargement interrompu"
+                            async for kind, detail in self._pull_ollama_model_stream():
+                                if kind == "progress":
+                                    yield _system_text(detail)
+                                elif kind == "done":
+                                    pulled = True
+                                else:
+                                    pull_err = detail
                             if pulled:
+                                yield _system_text(
+                                    f"✅ Modèle « {self.model} » téléchargé — "
+                                    "reprise de la phase."
+                                )
                                 continue  # retry the same turn now that it exists
-                            yield AgentMessage(
-                                role=MessageRole.SYSTEM,
-                                content=[
-                                    ContentBlock(
-                                        type=ContentBlockType.TEXT,
-                                        text=(
-                                            f"Échec du téléchargement du modèle "
-                                            f"« {self.model} » : {pull_err}"
-                                        ),
-                                    )
-                                ],
+                            yield _system_text(
+                                f"Échec du téléchargement du modèle "
+                                f"« {self.model} » : {pull_err}"
                             )
                             return
                         logger.error(

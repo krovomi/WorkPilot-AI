@@ -462,7 +462,11 @@
 		"clearAll": "Clear all completed downloads",
 		"done": "Done",
 		"failedLabel": "Failed",
-		"starting": "Starting..."
+		"starting": "Starting...",
+		"cancel": "Cancel this download",
+		"retry": "Retry",
+		"cancelledLabel": "Cancelled",
+		"hint": "Downloads keep running in the background, even if you close this task."
 	},
 	"ideation": {
 		"converting": "Converting...",

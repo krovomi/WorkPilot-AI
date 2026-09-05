@@ -5,11 +5,13 @@ import {
 	ChevronUp,
 	Download,
 	Loader2,
+	RotateCw,
 	X,
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../lib/utils";
+import { useOllamaModelDownload } from "../hooks/useOllamaModelDownload";
 import { useDownloadStore } from "../stores/download-store";
 
 /**
@@ -23,6 +25,9 @@ export function GlobalDownloadIndicator() {
 	const { t } = useTranslation("common");
 	const downloads = useDownloadStore((state) => state.downloads);
 	const clearDownload = useDownloadStore((state) => state.clearDownload);
+	// `retry` is the same "pull this model" call the phase selector uses; the
+	// row variable below is already named `download`, so it is aliased here.
+	const { download: retry, cancel } = useOllamaModelDownload();
 	const [isExpanded, setIsExpanded] = useState(true);
 
 	const allDownloads = Object.values(downloads);
@@ -61,8 +66,10 @@ export function GlobalDownloadIndicator() {
 		statusText = t("downloads.downloading", { count: activeDownloads.length });
 	} else if (completedDownloads.length > 0) {
 		statusText = t("downloads.complete", { count: completedDownloads.length });
-	} else {
+	} else if (failedDownloads.length > 0) {
 		statusText = t("downloads.failed", { count: failedDownloads.length });
+	} else {
+		statusText = t("downloads.cancelledLabel");
 	}
 
 	// Determine button background color based on active state
@@ -94,7 +101,7 @@ export function GlobalDownloadIndicator() {
 									e.stopPropagation();
 									// Clear all completed/failed downloads
 									allDownloads.forEach((d) => {
-										if (d.status === "completed" || d.status === "failed") {
+										if (d.status !== "starting" && d.status !== "downloading") {
 											clearDownload(d.modelName);
 										}
 									});
@@ -135,16 +142,43 @@ export function GlobalDownloadIndicator() {
 												{t("downloads.failedLabel")}
 											</span>
 										)}
+										{download.status === "cancelled" && (
+											<span className="text-xs text-muted-foreground">
+												{t("downloads.cancelledLabel")}
+											</span>
+										)}
+										{download.status === "failed" && (
+											<button
+												type="button"
+												onClick={() => void retry(download.modelName)}
+												className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+												aria-label={t("downloads.retry")}
+												title={t("downloads.retry")}
+											>
+												<RotateCw className="h-3 w-3" />
+											</button>
+										)}
 										{(download.status === "starting" ||
 											download.status === "downloading") && (
-											<span className="text-xs text-muted-foreground">
-												{(() => {
-													if (download.percentage > 0) {
-														return `${Math.round(download.percentage)}%`;
-													}
-													return t("downloads.starting");
-												})()}
-											</span>
+											<>
+												<span className="text-xs text-muted-foreground">
+													{(() => {
+														if (download.percentage > 0) {
+															return `${Math.round(download.percentage)}%`;
+														}
+														return t("downloads.starting");
+													})()}
+												</span>
+												<button
+													type="button"
+													onClick={() => cancel(download.modelName)}
+													className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+													aria-label={t("downloads.cancel")}
+													title={t("downloads.cancel")}
+												>
+													<X className="h-3 w-3" />
+												</button>
+											</>
 										)}
 									</div>
 								</div>
@@ -182,6 +216,11 @@ export function GlobalDownloadIndicator() {
 								)}
 							</div>
 						))}
+						{hasActive && (
+							<p className="px-3 py-2 text-[10px] text-muted-foreground">
+								{t("downloads.hint")}
+							</p>
+						)}
 					</div>
 				)}
 			</div>

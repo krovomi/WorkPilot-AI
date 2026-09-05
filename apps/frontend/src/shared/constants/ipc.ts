@@ -529,6 +529,8 @@ export const IPC_CHANNELS = {
 	OLLAMA_LIST_EMBEDDING_MODELS: "ollama:listEmbeddingModels",
 	OLLAMA_PULL_MODEL: "ollama:pullModel",
 	OLLAMA_PULL_PROGRESS: "ollama:pullProgress",
+	OLLAMA_CANCEL_PULL: "ollama:cancelPull",
+	OLLAMA_ACTIVE_PULLS: "ollama:activePulls",
 	OLLAMA_DELETE_MODEL: "ollama:deleteModel",
 
 	// WorkPilot AI source environment configuration
