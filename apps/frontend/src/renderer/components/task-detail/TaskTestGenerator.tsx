@@ -7,6 +7,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Task, WorktreeDiff } from "../../../shared/types";
+import type { TestGenerationError } from "../../../shared/types/test-generation";
+import { normalizeTestGenerationError } from "../../../shared/types/test-generation";
 import {
 	classifyTestStrategy,
 	isGeneratableStrategy,
@@ -153,9 +155,16 @@ export function TaskTestGenerator({
 					reject(new Error(t("tasks:testGen.emptyResult")));
 				}
 			};
-			const onError = (error: string) => {
+			// The main process now sends a structured failure; normalising here
+			// keeps the per-file error chip readable instead of "[object Object]".
+			const onError = (error: TestGenerationError | string) => {
 				cleanup();
-				reject(new Error(error));
+				reject(
+					new Error(
+						normalizeTestGenerationError(error, t("tasks:testGen.emptyResult"))
+							.message,
+					),
+				);
 			};
 			api.onTestGenerationComplete(onComplete);
 			api.onTestGenerationError(onError);

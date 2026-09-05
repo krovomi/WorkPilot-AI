@@ -283,18 +283,18 @@ export function PresetsPanel({
 	return (
 		<div className="space-y-6">
 			{/* Built-in Presets */}
-			<div className="space-y-3">
+			<div className="space-y-2.5">
 				<Label className="text-sm font-medium text-foreground">
 					{t("settings:terminalFonts.presets.builtin", {
 						defaultValue: "Built-in Presets",
 					})}
 				</Label>
-				<p className="text-sm text-muted-foreground">
+				<p className="text-xs leading-relaxed text-muted-foreground">
 					{t("settings:terminalFonts.presets.builtinDescription", {
 						defaultValue: "Click to apply a pre-configured preset",
 					})}
 				</p>
-				<div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+				<div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
 					{BUILTIN_PRESETS.map((preset) => {
 						const Icon = preset.icon;
 						return (
@@ -303,16 +303,18 @@ export function PresetsPanel({
 								key={preset.id}
 								onClick={() => handleApplyBuiltInPreset(preset.id)}
 								className={cn(
-									"flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
+									"flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all",
 									"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
 									"border-border hover:border-primary/50 hover:bg-accent/50",
 								)}
 								title={t(preset.description)}
 							>
-								<Icon className="h-5 w-5" />
-								<div className="text-center">
-									<div className="text-sm font-medium">{t(preset.nameKey)}</div>
-									<div className="text-xs text-muted-foreground">
+								<Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+								<div className="min-w-0">
+									<div className="truncate text-sm font-medium">
+										{t(preset.nameKey)}
+									</div>
+									<div className="truncate text-[11px] text-muted-foreground">
 										{t(preset.description)}
 									</div>
 								</div>
@@ -320,36 +322,34 @@ export function PresetsPanel({
 						);
 					})}
 				</div>
-			</div>
-
-			{/* Reset to OS Default */}
-			<div className="space-y-3">
-				<Label className="text-sm font-medium text-foreground">
-					{t("settings:terminalFonts.presets.reset", {
-						defaultValue: "Reset to Defaults",
-					})}
-				</Label>
-				<p className="text-sm text-muted-foreground">
-					{t("settings:terminalFonts.presets.resetDescription", {
-						defaultValue:
-							"Restore the default settings for your operating system",
-					})}
-				</p>
-				<div className="pt-1">
+				<div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/40 p-3">
+					<div className="min-w-0">
+						<Label className="text-sm font-medium text-foreground">
+							{t("settings:terminalFonts.presets.reset", {
+								defaultValue: "Reset to Defaults",
+							})}
+						</Label>
+						<p className="text-[11px] leading-relaxed text-muted-foreground">
+							{t("settings:terminalFonts.presets.resetDescription", {
+								defaultValue:
+									"Restore the default settings for your operating system",
+							})}
+						</p>
+					</div>
 					<button
 						type="button"
 						onClick={handleResetToDefaults}
 						className={cn(
-							"inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all",
+							"inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
 							"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-							"border-border hover:border-primary/50 hover:bg-accent/50 text-sm font-medium",
+							"border-border hover:border-primary/50 hover:bg-accent/50",
 						)}
 						title={t("settings:terminalFonts.presets.resetToOS", {
 							os: osLabel,
 							defaultValue: "Reset to {{os}} defaults",
 						})}
 					>
-						<RotateCcw className="h-4 w-4" />
+						<RotateCcw className="h-3.5 w-3.5" />
 						<span>
 							{t("settings:terminalFonts.presets.resetButton", {
 								defaultValue: "Reset to OS Default",
@@ -360,21 +360,21 @@ export function PresetsPanel({
 			</div>
 
 			{/* Custom Presets */}
-			<div className="space-y-3">
-				<Label className="text-sm font-medium text-foreground flex items-center gap-2">
-					<FolderOpen className="h-4 w-4" />
+			<div className="space-y-2.5 border-t border-border/60 pt-5">
+				<Label className="flex items-center gap-2 text-sm font-medium text-foreground">
+					<FolderOpen className="h-4 w-4 text-muted-foreground" />
 					{t("settings:terminalFonts.presets.custom", {
 						defaultValue: "Custom Presets",
 					})}
 				</Label>
-				<p className="text-sm text-muted-foreground">
+				<p className="text-xs leading-relaxed text-muted-foreground">
 					{t("settings:terminalFonts.presets.customDescription", {
 						defaultValue: "Save your current configuration as a custom preset",
 					})}
 				</p>
 
 				{/* Save New Custom Preset */}
-				<div className="flex items-center gap-2 max-w-md pt-1">
+				<div className="flex items-center gap-2">
 					<input
 						type="text"
 						id="newPresetNameInput"
@@ -395,8 +395,8 @@ export function PresetsPanel({
 							defaultValue: "Preset name",
 						})}
 						className={cn(
-							"flex-1 h-10 px-3 rounded-lg",
-							"border border-border bg-card",
+							"h-9 min-w-0 flex-1 rounded-lg px-3",
+							"border border-border bg-background",
 							"text-sm text-foreground",
 							"focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary",
 							"transition-colors duration-200",
@@ -407,7 +407,7 @@ export function PresetsPanel({
 						onClick={handleSaveCustomPreset}
 						disabled={!newPresetName.trim()}
 						className={cn(
-							"inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors",
+							"inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 transition-colors",
 							"bg-primary text-primary-foreground hover:bg-primary/90",
 							"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 							"disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary",
@@ -424,22 +424,22 @@ export function PresetsPanel({
 
 				{/* List of Custom Presets */}
 				{customPresets.length > 0 && (
-					<div className="space-y-2 pt-2">
+					<div className="space-y-2 pt-1">
 						{customPresets.map((preset) => {
 							return (
 								<div
 									key={preset.id}
 									className={cn(
-										"flex items-center justify-between p-3 rounded-lg border",
-										"border-border bg-card",
+										"flex items-center justify-between gap-3 rounded-lg border p-3",
+										"border-border bg-background/40",
 										"transition-colors",
 									)}
 								>
-									<div className="flex-1">
-										<div className="text-sm font-medium text-foreground">
+									<div className="min-w-0 flex-1">
+										<div className="truncate text-sm font-medium text-foreground">
 											{preset.name}
 										</div>
-										<div className="text-xs text-muted-foreground">
+										<div className="truncate text-[11px] text-muted-foreground">
 											{t("settings:terminalFonts.presets.summary", {
 												font:
 													preset.settings.fontFamily[0] ??
@@ -452,12 +452,12 @@ export function PresetsPanel({
 											})}
 										</div>
 									</div>
-									<div className="flex items-center gap-2">
+									<div className="flex shrink-0 items-center gap-1">
 										<button
 											type="button"
 											onClick={() => handleApplyCustomPreset(preset)}
 											className={cn(
-												"inline-flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors",
+												"inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 transition-colors",
 												"bg-primary text-primary-foreground hover:bg-primary/90",
 												"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 												"text-xs font-medium",
@@ -475,7 +475,7 @@ export function PresetsPanel({
 											type="button"
 											onClick={() => handleDeleteCustomPreset(preset.id)}
 											className={cn(
-												"inline-flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors",
+												"inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 transition-colors",
 												"hover:bg-destructive/10 text-destructive hover:text-destructive",
 												"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 												"text-xs font-medium",
@@ -498,9 +498,9 @@ export function PresetsPanel({
 
 				{/* Empty State */}
 				{customPresets.length === 0 && (
-					<div className="p-6 rounded-lg border border-dashed border-border text-center">
-						<FolderOpen className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-						<p className="text-sm text-muted-foreground">
+					<div className="rounded-lg border border-dashed border-border p-4 text-center">
+						<FolderOpen className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+						<p className="text-xs text-muted-foreground">
 							{t("settings:terminalFonts.presets.noCustomPresets", {
 								defaultValue:
 									"No custom presets yet. Save your current configuration to get started.",

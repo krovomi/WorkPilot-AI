@@ -124,6 +124,85 @@
 		"copied": "Copié",
 		"cancel": "Annuler la génération",
 		"assertions": "assertions",
-		"viewCode": "Voir le code"
+		"viewCode": "Voir le code",
+		"stageLines_one": "{{count}} ligne",
+		"stageLines_other": "{{count}} lignes",
+		"stageFailed": "échec ici",
+		"stageSkipped": "non atteinte",
+		"noCodeGenerated": "Aucun code n'a été généré."
+	},
+	"failure": {
+		"technicalDetails": "Détails techniques",
+		"copyReport": "Copier le rapport",
+		"copied": "Copié",
+		"retry": "Réessayer",
+		"facts": {
+			"stage": "Étape",
+			"provider": "Fournisseur",
+			"model": "Modèle",
+			"exitCode": "Code de sortie"
+		},
+		"codes": {
+			"auth": {
+				"title": "Le fournisseur d'IA a refusé vos identifiants",
+				"hint": "Ouvrez Paramètres → Fournisseurs et ré-authentifiez le fournisseur actif. Si vous utilisez un abonnement Claude, votre session a peut-être simplement expiré."
+			},
+			"rate_limit": {
+				"title": "Limite de débit atteinte",
+				"hint": "Le fournisseur bride les requêtes. Patientez un instant puis réessayez, ou basculez sur un autre compte ou fournisseur dans les Paramètres."
+			},
+			"quota": {
+				"title": "Plus de crédit sur ce compte",
+				"hint": "Le fournisseur a accepté la requête mais a refusé de la facturer. Vérifiez votre offre ou votre facturation, puis réessayez."
+			},
+			"network": {
+				"title": "Le fournisseur est injoignable",
+				"hint": "Vérifiez votre connexion internet, ainsi que tout VPN ou proxy d'entreprise entre vous et le fournisseur."
+			},
+			"timeout": {
+				"title": "Le fournisseur a mis trop de temps à répondre",
+				"hint": "Un fichier source volumineux ralentit le modèle. Réessayez, ou générez les tests pour un fichier plus petit."
+			},
+			"provider_unavailable": {
+				"title": "Le fournisseur n'a pas pu être démarré",
+				"hint": "La CLI ou la dépendance Python du fournisseur sélectionné est absente ou hors du PATH. Vérifiez Paramètres → Fournisseurs et votre installation locale."
+			},
+			"empty_response": {
+				"title": "Le fournisseur n'a rien renvoyé",
+				"hint": "La requête a été acceptée mais n'a produit aucun texte. Le modèle a généralement refusé le prompt ou la réponse a été tronquée — réessayez, ou choisissez un autre modèle dans les Paramètres."
+			},
+			"file_not_found": {
+				"title": "Le fichier source n'a pas pu être lu",
+				"hint": "Vérifiez que le fichier existe toujours, qu'il n'est pas vide, et qu'il s'agit bien de texte UTF-8 et non d'un binaire."
+			},
+			"write_failed": {
+				"title": "Le fichier de test n'a pas pu être écrit",
+				"hint": "Les tests ont été générés mais pas enregistrés. Vérifiez les droits du dossier et l'espace disque, et copiez le code ci-dessus avant de réessayer."
+			},
+			"parse_failed": {
+				"title": "La réponse du fournisseur est illisible",
+				"hint": "Le modèle a répondu autre chose que le JSON attendu. Réessayer suffit généralement ; un modèle plus performant y parvient plus sûrement."
+			},
+			"invalid_input": {
+				"title": "Il manque un élément à la requête",
+				"hint": "Complétez le champ concerné puis relancez la génération."
+			},
+			"backend_missing": {
+				"title": "Le backend WorkPilot AI est introuvable",
+				"hint": "Le backend Python qui exécute le générateur est absent de cette installation. Réinstallez l'application, ou lancez-la depuis le dépôt pour que apps/backend soit présent."
+			},
+			"runner_crashed": {
+				"title": "Le générateur s'est arrêté brutalement",
+				"hint": "Le processus est mort avant d'avoir pu signaler quoi que ce soit. Les détails techniques ci-dessous contiennent ce qu'il a affiché en s'arrêtant."
+			},
+			"no_output": {
+				"title": "Le générateur s'est terminé sans produire de tests",
+				"hint": "Le processus est allé au bout sans rien écrire. Vérifiez que le fichier source est lisible et que votre fournisseur est authentifié dans les Paramètres."
+			},
+			"unknown": {
+				"title": "La génération de tests a échoué",
+				"hint": "Ouvrez les détails techniques ci-dessous pour l'erreur brute. Réessayer est sans risque : rien n'a été écrit dans votre projet."
+			}
+		}
 	}
 }

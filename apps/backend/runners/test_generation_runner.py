@@ -7,7 +7,14 @@ Output protocol:
   - Lines NOT starting with __ are status/progress messages forwarded to UI.
   - __TEST_GENERATION_RESULT__:<json>  — success payload for analyze-coverage
   - __TEST_GENERATION_RESULT__:<json>  — success payload for generate-* actions
-  - __TEST_GENERATION_ERROR__:<message> — error payload
+  - __TG_ERROR__:<json>                — structured failure (see below)
+  - __TEST_GENERATION_ERROR__:<message> — the same failure, message only
+
+Every failure is reported twice, richest first. ``__TG_ERROR__`` carries
+``{message, code, stage, details, provider, model}`` — enough for the UI to name
+the failure, say what to do about it, and offer the technical text behind a
+disclosure. The plain line that follows keeps an older frontend working; a
+frontend that understands both ignores the second.
 
 Usage:
   python runners/test_generation_runner.py --action analyze-coverage --file-path /path/to/file.ts --project-path /path/to/project
@@ -21,6 +28,7 @@ import dataclasses
 import json
 import os
 import sys
+import traceback
 from pathlib import Path
 
 # Ensure the backend root (parent of 'runners/') is on sys.path so that
@@ -28,6 +36,10 @@ from pathlib import Path
 _BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _BACKEND_ROOT not in sys.path:
     sys.path.insert(0, _BACKEND_ROOT)
+
+
+# The pipeline step currently in flight, so an unexpected exception can name it.
+_CURRENT_STAGE: str | None = None
 
 
 def _serialize(obj):
@@ -45,8 +57,55 @@ def _print_result(payload: dict) -> None:
     print(f"__TEST_GENERATION_RESULT__:{json.dumps(payload)}", flush=True)
 
 
-def _print_error(message: str) -> None:
-    print(f"__TEST_GENERATION_ERROR__:{message}", flush=True)
+def _print_error(
+    message: str, *, code: str = "unknown", stage: str | None = None
+) -> None:
+    """Report a failure the runner detected itself (bad arguments, no input)."""
+    from core.error_details import ErrorDetail
+
+    _print_error_detail(ErrorDetail(message=message, code=code, stage=stage).to_dict())
+
+
+def _print_error_detail(payload: dict) -> None:
+    """Emit one failure on both channels — structured first, then message-only."""
+    try:
+        print(f"__TG_ERROR__:{json.dumps(payload, ensure_ascii=False)}", flush=True)
+    except Exception:  # noqa: BLE001 — never let reporting swallow the message
+        pass
+    print(
+        f"__TEST_GENERATION_ERROR__:{payload.get('message', 'Unknown error')}",
+        flush=True,
+    )
+
+
+def _fail(exc: BaseException, *, stage: str | None = None) -> None:
+    """Report an exception, then exit non-zero.
+
+    An exception that already carries an ``ErrorDetail`` (``DetailedError``) is
+    forwarded untouched — the layer that raised it knew more about the failure
+    than this one does. Anything else is classified from its type and message,
+    with the tail of the traceback attached as technical detail: without it the
+    UI can only say "it failed", which is what this whole protocol exists to
+    stop.
+    """
+    from core.error_details import DetailedError, ErrorDetail, classify
+
+    if isinstance(exc, DetailedError):
+        detail = exc.detail
+        if not detail.stage:
+            detail.stage = stage or _CURRENT_STAGE
+    else:
+        message = str(exc).strip() or type(exc).__name__
+        detail = ErrorDetail(
+            message=message,
+            code=classify(type(exc).__name__, message),
+            stage=stage or _CURRENT_STAGE,
+            details="".join(traceback.format_exception(exc)),
+        )
+    if detail.stage:
+        _emit_event({"type": "stage", "stage": detail.stage, "status": "failed"})
+    _print_error_detail(detail.to_dict())
+    sys.exit(1)
 
 
 def _status(message: str) -> None:
@@ -59,7 +118,16 @@ def _emit_event(event: dict) -> None:
     One JSON object per line, prefixed with ``__TG_EVENT__:``. ``json.dumps``
     escapes newlines inside string values, so a ``code`` delta spanning several
     lines still arrives as a single stdout line (the frontend splits on '\\n').
+
+    Also records the last stage entered, so a failure raised deep inside the
+    agent can be attributed to the step the user is watching rather than to
+    nothing at all.
     """
+    global _CURRENT_STAGE
+    if event.get("type") == "stage" and event.get("status") is None:
+        stage = event.get("stage")
+        if isinstance(stage, str):
+            _CURRENT_STAGE = stage
     try:
         print(f"__TG_EVENT__:{json.dumps(event, ensure_ascii=False)}", flush=True)
     except Exception:  # noqa: BLE001 — progress reporting must never abort a run
@@ -85,8 +153,23 @@ def _write_test_file(
         else:
             resolved = resolved.resolve()
 
-    resolved.parent.mkdir(parents=True, exist_ok=True)
-    resolved.write_text(content, encoding="utf-8")
+    from core.error_details import WRITE_FAILED, DetailedError, ErrorDetail
+
+    try:
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        resolved.write_text(content, encoding="utf-8")
+    except OSError as exc:
+        # The generation succeeded; only the disk write failed. Say so — the
+        # generic "test generation failed" hides both the real cause and the
+        # fact that there is a finished file to recover.
+        raise DetailedError(
+            ErrorDetail(
+                message=f"The tests were generated but could not be written to {resolved}.",
+                code=WRITE_FAILED,
+                stage="write",
+                details=f"{type(exc).__name__}: {exc}",
+            )
+        ) from exc
     result.test_file_path = str(resolved)
     _status(f"Test file written: {resolved}")
 
@@ -96,7 +179,10 @@ def _write_test_file(
 
 def _run_analyze_coverage(agent, args) -> None:
     if not args.file_path:
-        _print_error("--file-path is required for analyze-coverage")
+        _print_error(
+            "No source file was selected. Pick the file you want covered by tests.",
+            code="invalid_input",
+        )
         sys.exit(1)
 
     _status(f"Analyzing test coverage for: {args.file_path}")
@@ -108,14 +194,16 @@ def _run_analyze_coverage(agent, args) -> None:
         )
         _status(f"Found {len(gaps)} coverage gap(s)")
         _print_result({"success": True, "gaps": _serialize(gaps)})
-    except Exception as exc:  # noqa: BLE001
-        _print_error(str(exc))
-        sys.exit(1)
+    except Exception as exc:  # noqa: BLE001 — every failure is reported, not raised
+        _fail(exc)
 
 
 def _run_generate_unit(agent, args) -> None:
     if not args.file_path:
-        _print_error("--file-path is required for generate-unit")
+        _print_error(
+            "No source file was selected. Pick the file you want covered by tests.",
+            code="invalid_input",
+        )
         sys.exit(1)
 
     _status(f"Generating unit tests for: {args.file_path}")
@@ -140,17 +228,22 @@ def _run_generate_unit(agent, args) -> None:
             }
         )
         _print_result({"success": True, "result": _serialize(result)})
-    except Exception as exc:  # noqa: BLE001
-        _print_error(str(exc))
-        sys.exit(1)
+    except Exception as exc:  # noqa: BLE001 — every failure is reported, not raised
+        _fail(exc)
 
 
 def _run_generate_e2e(agent, args) -> None:
     if not args.user_story:
-        _print_error("--user-story is required for generate-e2e")
+        _print_error(
+            "No user story was provided. Describe the scenario the E2E test should cover.",
+            code="invalid_input",
+        )
         sys.exit(1)
     if not args.target_module:
-        _print_error("--target-module is required for generate-e2e")
+        _print_error(
+            "No target module was provided. Name the file or module the scenario runs against.",
+            code="invalid_input",
+        )
         sys.exit(1)
 
     _status(f"Generating E2E tests for module: {args.target_module}")
@@ -174,14 +267,16 @@ def _run_generate_e2e(agent, args) -> None:
             }
         )
         _print_result({"success": True, "result": _serialize(result)})
-    except Exception as exc:  # noqa: BLE001
-        _print_error(str(exc))
-        sys.exit(1)
+    except Exception as exc:  # noqa: BLE001 — every failure is reported, not raised
+        _fail(exc)
 
 
 def _run_generate_tdd(agent, args) -> None:
     if not args.description:
-        _print_error("--description is required for generate-tdd")
+        _print_error(
+            "No description was provided. Describe the behaviour the tests should pin down.",
+            code="invalid_input",
+        )
         sys.exit(1)
 
     _status(f"Generating TDD tests: {args.description[:60]}")
@@ -214,9 +309,8 @@ def _run_generate_tdd(agent, args) -> None:
             }
         )
         _print_result({"success": True, "result": _serialize(result)})
-    except Exception as exc:  # noqa: BLE001
-        _print_error(str(exc))
-        sys.exit(1)
+    except Exception as exc:  # noqa: BLE001 — every failure is reported, not raised
+        _fail(exc)
 
 
 # ── Entry point ──────────────────────────────────────────────────────
@@ -273,7 +367,10 @@ def main() -> None:
     try:
         from agents.test_generator import TestGeneratorAgent
     except ImportError as exc:
-        _print_error(f"Failed to import TestGeneratorAgent: {exc}")
+        _print_error(
+            f"The test-generation backend could not be loaded: {exc}",
+            code="provider_unavailable",
+        )
         sys.exit(1)
 
     agent = TestGeneratorAgent()

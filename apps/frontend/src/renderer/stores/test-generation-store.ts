@@ -1,4 +1,9 @@
 import { create } from "zustand";
+import type {
+	TestGenerationError,
+	TestGenStageId,
+} from "../../shared/types/test-generation";
+import { normalizeTestGenerationError } from "../../shared/types/test-generation";
 import { useProjectStore } from "./project-store";
 
 /**
@@ -74,25 +79,29 @@ export type TestGenerationPhase =
 	| "error";
 
 /** Pipeline stage ids emitted by the backend during a live generation. */
-export type StageId = "detect" | "read" | "generate" | "write" | "done";
+export type StageId = TestGenStageId;
 
 /** A live pipeline-stage event coming from the backend runner. */
 export interface TestGenStageEvent {
 	type: "stage";
 	stage: StageId;
-	status?: "done";
+	status?: "done" | "failed";
 	detail?: string;
 	language?: string;
 	framework?: string;
 	path?: string;
 	tests?: number;
+	/** Line count of the source that was read — localised by the UI. */
+	lines?: number;
 }
 
 /** A stage as tracked in the store (arrival order preserved). */
 export interface LiveStage {
 	id: StageId;
-	status: "active" | "done";
+	status: "active" | "done" | "failed";
 	detail?: string;
+	/** Structured payload behind ``detail``, so the UI can localise the chip. */
+	lines?: number;
 }
 
 /** Rolling metadata surfaced in the live stats strip. */
@@ -109,7 +118,10 @@ interface TestGenerationState {
 	status: string;
 	result: TestGenerationResult | null;
 	postBuildResults: PostBuildResult[] | null;
+	/** Message only — kept for consumers that just print something. */
 	error: string | null;
+	/** The same failure with everything the UI needs to explain it. */
+	errorDetail: TestGenerationError | null;
 	isOpen: boolean;
 	selectedFile: string;
 	existingTestPath: string | null;
@@ -122,8 +134,12 @@ interface TestGenerationState {
 	streamedCode: string;
 	liveMeta: LiveMeta;
 	genStartedAt: number | null;
+	/** Set when the run stops (complete, error or cancel) so elapsed freezes. */
+	genEndedAt: number | null;
 	/** True when the current/last run is a streaming generation (not analyze). */
 	isLiveRun: boolean;
+	/** Re-runs the last launched generation — powers the panel's Retry button. */
+	lastRun: (() => Promise<unknown>) | null;
 
 	// Actions
 	openDialog: (filePath: string, existingTestPath?: string) => void;
@@ -132,7 +148,9 @@ interface TestGenerationState {
 	setStatus: (status: string) => void;
 	setResult: (result: TestGenerationResult) => void;
 	setPostBuildResults: (postBuildResults: PostBuildResult[]) => void;
-	setError: (error: string) => void;
+	setError: (error: TestGenerationError | string) => void;
+	clearError: () => void;
+	retryLastRun: () => void;
 	setCoverageTarget: (target: number) => void;
 	setTddLanguage: (language: string) => void;
 	setTddSnippetType: (snippetType: string) => void;
@@ -145,7 +163,7 @@ interface TestGenerationState {
 	createErrorHandler: (
 		cleanup: () => void,
 		reject: (reason?: unknown) => void,
-	) => (error: string) => void;
+	) => (error: TestGenerationError | string) => void;
 	createCleanupHandler: (listeners: Array<() => void>) => () => void;
 
 	// API Actions
@@ -179,6 +197,7 @@ const initialState = {
 	result: null,
 	postBuildResults: null,
 	error: null,
+	errorDetail: null as TestGenerationError | null,
 	isOpen: false,
 	selectedFile: "",
 	existingTestPath: null,
@@ -189,8 +208,34 @@ const initialState = {
 	streamedCode: "",
 	liveMeta: {} as LiveMeta,
 	genStartedAt: null as number | null,
+	genEndedAt: null as number | null,
 	isLiveRun: false,
+	lastRun: null as (() => Promise<unknown>) | null,
 };
+
+/**
+ * Mark the stage a run died on, leaving the ones before it as they were.
+ *
+ * Which stage failed is the first thing the stepper has to get right: the
+ * user's next move is completely different depending on whether the model was
+ * never reached, answered nothing, or answered and the file could not be
+ * written. When the runner names no stage, the one still in flight is the one
+ * that broke.
+ */
+function markStageFailed(
+	stages: LiveStage[],
+	stage: StageId | undefined,
+): LiveStage[] {
+	if (stages.length === 0) return stages;
+	const target =
+		stage && stage !== "done" && stages.some((s) => s.id === stage)
+			? stage
+			: stages.find((s) => s.status === "active")?.id;
+	if (!target) return stages;
+	return stages.map((s) =>
+		s.id === target ? { ...s, status: "failed" as const } : s,
+	);
+}
 
 export const useTestGenerationStore = create<TestGenerationState>(
 	(set, get) => ({
@@ -201,12 +246,23 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			cleanup: () => void,
 			reject: (reason?: unknown) => void,
 		) => {
-			const { setPhase, setError } = get();
-			return (error: string) => {
+			return (error) => {
 				cleanup();
-				setPhase("error");
-				setError(error);
-				reject(new Error(error));
+				const detail = normalizeTestGenerationError(
+					error,
+					"Test generation failed.",
+				);
+				// The stage the runner names beats the one we inferred from the
+				// last event: a failure during "write" arrives after "generate"
+				// was already marked done.
+				set((state) => ({
+					phase: "error",
+					error: detail.message,
+					errorDetail: detail,
+					genEndedAt: state.genEndedAt ?? Date.now(),
+					liveStages: markStageFailed(state.liveStages, detail.stage),
+				}));
+				reject(new Error(detail.message));
 			};
 		},
 
@@ -226,6 +282,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				status: "",
 				result: null,
 				error: null,
+				errorDetail: null,
 			});
 		},
 
@@ -236,6 +293,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				status: "",
 				result: null,
 				error: null,
+				errorDetail: null,
 			});
 		},
 
@@ -244,7 +302,24 @@ export const useTestGenerationStore = create<TestGenerationState>(
 		setResult: (result: TestGenerationResult) => set({ result }),
 		setPostBuildResults: (postBuildResults: PostBuildResult[]) =>
 			set({ postBuildResults }),
-		setError: (error: string) => set({ error }),
+		setError: (error: TestGenerationError | string) => {
+			const detail = normalizeTestGenerationError(
+				error,
+				"Test generation failed.",
+			);
+			set({ error: detail.message, errorDetail: detail });
+		},
+
+		clearError: () => set({ error: null, errorDetail: null }),
+
+		retryLastRun: () => {
+			const { lastRun } = get();
+			if (!lastRun) return;
+			set({ error: null, errorDetail: null });
+			// The run reports through the store; a rejection here is already
+			// rendered as the error panel, so there is nothing to do with it.
+			void lastRun().catch(() => undefined);
+		},
 		setCoverageTarget: (coverageTarget: number) => set({ coverageTarget }),
 		setTddLanguage: (tddLanguage: string) => set({ tddLanguage }),
 		setTddSnippetType: (tddSnippetType: string) => set({ tddSnippetType }),
@@ -258,7 +333,10 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				streamedCode: "",
 				liveMeta: {},
 				genStartedAt: Date.now(),
+				genEndedAt: null,
 				isLiveRun: true,
+				error: null,
+				errorDetail: null,
 			}),
 
 		applyStageEvent: (event: TestGenStageEvent) =>
@@ -278,6 +356,11 @@ export const useTestGenerationStore = create<TestGenerationState>(
 						liveMeta,
 					};
 				}
+				if (event.status === "failed") {
+					return {
+						liveStages: markStageFailed(state.liveStages, event.stage),
+					};
+				}
 				const isDone = event.status === "done";
 				const existing = state.liveStages.find((s) => s.id === event.stage);
 				let liveStages: LiveStage[];
@@ -288,6 +371,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 									id: s.id,
 									status: isDone ? "done" : s.status,
 									detail: event.detail ?? s.detail,
+									lines: event.lines ?? s.lines,
 								}
 							: s,
 					);
@@ -302,6 +386,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 							id: event.stage,
 							status: isDone ? "done" : "active",
 							detail: event.detail,
+							lines: event.lines,
 						},
 					];
 				}
@@ -329,6 +414,9 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				streamedCode: "",
 				liveMeta: {},
 				genStartedAt: null,
+				genEndedAt: null,
+				error: null,
+				errorDetail: null,
 			});
 		},
 
@@ -336,7 +424,12 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			const { setPhase, setStatus } = get();
 			setPhase("analyzing");
 			setStatus("Analyzing test coverage...");
-			set({ isLiveRun: false });
+			set({
+				isLiveRun: false,
+				error: null,
+				errorDetail: null,
+				lastRun: () => get().analyzeCoverage(filePath, existingTestPath),
+			});
 
 			return new Promise<CoverageGap[]>((resolve, reject) => {
 				const onStatus = (status: string) => setStatus(status);
@@ -351,6 +444,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 				const onResult = (data: any) => {
 					cleanup();
+					set({ genEndedAt: Date.now() });
 					setPhase("complete");
 					setStatus("Coverage analysis complete");
 					resolve((data as { gaps?: CoverageGap[] }).gaps || []);
@@ -377,6 +471,10 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			setPhase("generating");
 			setStatus("Generating unit tests...");
 			resetLive();
+			set({
+				lastRun: () =>
+					get().generateUnitTests(filePath, existingTestPath, coverageTarget),
+			});
 
 			return new Promise<TestGenerationResult>((resolve, reject) => {
 				const onStatus = (status: string) => setStatus(status);
@@ -403,6 +501,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					cleanup();
 					const parsed = data as { result?: TestGenerationResult };
 					const result = parsed.result as TestGenerationResult;
+					set({ genEndedAt: Date.now() });
 					setPhase("complete");
 					setStatus("Unit tests generated successfully");
 					setResult(result);
@@ -429,6 +528,9 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			setPhase("generating");
 			setStatus("Generating E2E tests...");
 			resetLive();
+			set({
+				lastRun: () => get().generateE2ETests(userStory, targetModule),
+			});
 
 			return new Promise<TestGenerationResult>((resolve, reject) => {
 				const onStatus = (status: string) => setStatus(status);
@@ -455,6 +557,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					cleanup();
 					const parsed = data as { result?: TestGenerationResult };
 					const result = parsed.result as TestGenerationResult;
+					set({ genEndedAt: Date.now() });
 					setPhase("complete");
 					setStatus("E2E tests generated successfully");
 					setResult(result);
@@ -484,6 +587,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			setPhase("generating");
 			setStatus("Generating TDD tests...");
 			resetLive();
+			set({ lastRun: () => get().generateTDDTests(spec) });
 
 			return new Promise<TestGenerationResult>((resolve, reject) => {
 				const onStatus = (status: string) => setStatus(status);
@@ -510,6 +614,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					cleanup();
 					const parsed = data as { result?: TestGenerationResult };
 					const result = parsed.result as TestGenerationResult;
+					set({ genEndedAt: Date.now() });
 					setPhase("complete");
 					setStatus("TDD tests generated successfully");
 					setResult(result);

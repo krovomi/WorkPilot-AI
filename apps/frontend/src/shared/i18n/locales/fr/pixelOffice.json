@@ -3,21 +3,37 @@
 	"description": "Visualisez vos agents IA sous forme de personnages pixel art dans un bureau virtuel",
 	"emptyState": {
 		"title": "Votre bureau est vide",
-		"description": "Ouvrez des terminaux agents pour voir vos travailleurs IA apparaître à leurs bureaux. Chaque terminal devient un personnage avec un suivi d'activité en temps réel."
+		"description": "Démarrez une tâche dans le Kanban ou ouvrez des terminaux pour voir vos agents IA apparaître à leurs bureaux avec un suivi d'activité en direct."
 	},
+	"pendingOnly": "Les agents démarreront dès le lancement des tâches",
 	"toolbar": {
 		"zoomIn": "Zoom avant",
 		"zoomOut": "Zoom arrière",
 		"toggleGrid": "Afficher/Masquer la grille",
-		"toggleSound": "Activer/Désactiver le son",
-		"addAgent": "Nouveau terminal"
+		"soundOn": "Couper les notifications",
+		"soundOff": "Activer les notifications",
+		"addAgent": "Nouveau terminal",
+		"shortcuts": "Raccourcis : +/- zoom · G grille · M son · ←/→ agent · Échap fermer"
 	},
-	"agents": {
-		"count_one": "{{count}} agent",
-		"count_other": "{{count}} agents",
-		"active": "{{count}} actif(s)",
-		"goToTerminal": "Aller au terminal",
-		"claudeMode": "Mode Claude"
+	"badges": {
+		"terminals_one": "{{count}} terminal",
+		"terminals_other": "{{count}} terminaux",
+		"tasks_one": "{{count}} tâche",
+		"tasks_other": "{{count}} tâches",
+		"swarm_one": "{{count}} sous-tâche",
+		"swarm_other": "{{count}} sous-tâches",
+		"active_one": "{{count}} actif",
+		"active_other": "{{count}} actifs",
+		"pending_one": "{{count}} en attente",
+		"pending_other": "{{count}} en attente"
+	},
+	"canvas": {
+		"emptyDesk": "libre"
+	},
+	"queue": {
+		"title": "En attente de lancement",
+		"count_one": "{{count}} tâche en file",
+		"count_other": "{{count}} tâches en file"
 	},
 	"activity": {
 		"idle": "Au repos",
@@ -25,16 +41,70 @@
 		"reading": "Analyse",
 		"running": "Exécution",
 		"waiting": "En attente",
-		"exited": "Terminé"
+		"pending": "File d'attente",
+		"exited": "Session terminée"
+	},
+	"activityDescription": {
+		"typingWithTask": "Implémentation de « {{task}} » — l'agent écrit du code activement.",
+		"typing": "L'agent est en train d'écrire du code.",
+		"running": "L'agent exécute une commande (tests, build, installation…). Attends ou interromps-le.",
+		"readingWithTask": "Lecture du code pour comprendre « {{task}} ».",
+		"reading": "L'agent analyse les fichiers du projet.",
+		"waiting": "L'agent attend ta réponse ou une approbation.",
+		"idle": "L'agent est disponible. Donne-lui un ordre ou démarre Claude.",
+		"exited": "Ce terminal a été fermé.",
+		"pending": "Cette tâche attend son lancement. Démarre-la depuis le Kanban."
+	},
+	"phase": {
+		"idle": "En veille",
+		"planning": "Planification",
+		"coding": "Développement",
+		"qa_review": "Vérification QA",
+		"qa_fixing": "Correction QA",
+		"rate_limit_paused": "Limite API",
+		"auth_failure_paused": "Auth. échouée",
+		"complete": "Terminé",
+		"failed": "Échec"
+	},
+	"phaseDescription": {
+		"idle": "Prêt à démarrer.",
+		"planning": "L'IA analyse ta demande et prépare un plan d'action détaillé.",
+		"coding": "Le code est en cours d'écriture. Les sous-tâches s'enchaînent automatiquement.",
+		"qa_review": "Un agent vérifie la qualité du code produit : tests, cohérence, bonnes pratiques.",
+		"qa_fixing": "Des problèmes ont été détectés. L'agent les corrige avant livraison.",
+		"rate_limit_paused": "L'API Claude a atteint sa limite. Reprise automatique dans quelques instants.",
+		"auth_failure_paused": "Problème d'authentification. Vérifie tes profils Claude dans les paramètres.",
+		"complete": "La tâche est complète et prête pour ta revue.",
+		"failed": "La tâche a échoué. Consulte les logs pour comprendre ce qui s'est passé."
 	},
 	"bubble": {
-		"taskLabel": "Tâche :",
-		"sendPlaceholderWaiting": "Réponds à l'agent…",
+		"close": "Fermer",
+		"kanbanBadge": "Kanban",
+		"claudeBadge": "Claude",
+		"swarmBadge": "Sous-tâche",
+		"taskLabel": "Tâche",
+		"cwdLabel": "Répertoire",
+		"sessionLabel": "Session",
+		"branchLabel": "Branche",
+		"progress": "Progression globale",
+		"logs": "Logs de l'agent",
+		"copy": "Copier",
+		"copied": "Copié",
+		"copyAll": "Copier tous les logs",
+		"waitingForLogs": "En attente de logs…",
 		"sendPlaceholder": "Donne un ordre au terminal…",
-		"sendHint": "↵ Entrée pour envoyer · Le message sera tapé dans le terminal",
+		"sendPlaceholderWaiting": "Réponds à l'agent…",
+		"sendHint": "↵ Entrée pour envoyer · Tapé directement dans le terminal",
+		"send": "Envoyer",
 		"viewTerminal": "Voir terminal",
 		"interrupt": "Interrompre",
 		"resumeClaude": "Reprendre Claude",
-		"close": "Fermer"
+		"kill": "Fermer",
+		"goToKanban": "Voir dans Kanban",
+		"stopTask": "Arrêter"
+	},
+	"pending": {
+		"description": "Cette tâche est en file d'attente et n'a pas encore démarré. Rends-toi dans le Kanban pour la lancer, la prioriser ou modifier sa spécification.",
+		"hint": "En attente d'un agent disponible"
 	}
 }

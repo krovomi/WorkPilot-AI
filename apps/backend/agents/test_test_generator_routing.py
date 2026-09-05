@@ -19,7 +19,7 @@ def test_call_llm_routes_through_oneshot_with_project_path() -> None:
     agent = TestGeneratorAgent()
     captured: dict[str, object] = {}
 
-    async def fake_oneshot(prompt, system_prompt=None, project_dir=None):
+    async def fake_oneshot(prompt, system_prompt=None, project_dir=None, **_kwargs):
         captured["prompt"] = prompt
         captured["system_prompt"] = system_prompt
         captured["project_dir"] = project_dir

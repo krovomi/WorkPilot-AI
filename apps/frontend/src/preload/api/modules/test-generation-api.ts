@@ -1,4 +1,8 @@
 import { type IpcRendererEvent, ipcRenderer } from "electron";
+import type {
+	TestGenerationError,
+	TestGenStageEvent,
+} from "../../../shared/types/test-generation";
 
 /**
  * Test Generation API
@@ -6,17 +10,7 @@ import { type IpcRendererEvent, ipcRenderer } from "electron";
  * Provides access to test generation functionality from the renderer process.
  */
 
-/** A live pipeline-stage event streamed during generation. */
-export interface TestGenStageEvent {
-	type: "stage";
-	stage: "detect" | "read" | "generate" | "write" | "done";
-	status?: "done";
-	detail?: string;
-	language?: string;
-	framework?: string;
-	path?: string;
-	tests?: number;
-}
+export type { TestGenerationError, TestGenStageEvent };
 
 export interface TestGenerationAPI {
 	analyzeTestCoverage: (
@@ -47,7 +41,14 @@ export interface TestGenerationAPI {
 		error?: string;
 	}>;
 	onTestGenerationStatus: (callback: (status: string) => void) => void;
-	onTestGenerationError: (callback: (error: string) => void) => void;
+	/**
+	 * Failures, as a structured payload (message + code + stage + details).
+	 * Older main processes send a bare string; consumers normalise with
+	 * ``normalizeTestGenerationError`` rather than assuming either shape.
+	 */
+	onTestGenerationError: (
+		callback: (error: TestGenerationError | string) => void,
+	) => void;
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 	onTestGenerationResult: (callback: (result: any) => void) => void;
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
@@ -62,7 +63,7 @@ export interface TestGenerationAPI {
 		callback: (status: string) => void,
 	) => void;
 	removeTestGenerationErrorListener: (
-		callback: (error: string) => void,
+		callback: (error: TestGenerationError | string) => void,
 	) => void;
 	removeTestGenerationResultListener: (callback: (result: unknown) => void) => void;
 	removeTestGenerationCompleteListener: (
@@ -76,7 +77,7 @@ export interface TestGenerationAPI {
 
 // Type aliases for different callback signatures
 type StatusListenerFn = (status: string) => void;
-type ErrorListenerFn = (error: string) => void;
+type ErrorListenerFn = (error: TestGenerationError | string) => void;
 type ResultListenerFn = (result: unknown) => void;
 type CompleteListenerFn = (result: unknown) => void;
 type ProgressListenerFn = (event: TestGenStageEvent) => void;
@@ -89,7 +90,7 @@ const statusListeners = new Map<
 >();
 const errorListeners = new Map<
 	ErrorListenerFn,
-	(event: IpcRendererEvent, error: string) => void
+	(event: IpcRendererEvent, error: TestGenerationError | string) => void
 >();
 const resultListeners = new Map<
 	ResultListenerFn,
@@ -181,13 +182,15 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		ipcRenderer.on("test-generation:status", listener);
 	},
 
-	onTestGenerationError: (callback: (error: string) => void) => {
+	onTestGenerationError: (callback: ErrorListenerFn) => {
 		const existing = errorListeners.get(callback);
 		if (existing) {
 			ipcRenderer.removeListener("test-generation:error", existing);
 		}
-		const listener = (_event: IpcRendererEvent, error: string) =>
-			callback(error);
+		const listener = (
+			_event: IpcRendererEvent,
+			error: TestGenerationError | string,
+		) => callback(error);
 		errorListeners.set(callback, listener);
 		ipcRenderer.on("test-generation:error", listener);
 	},
@@ -266,7 +269,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		}
 	},
 
-	removeTestGenerationErrorListener: (callback: (error: string) => void) => {
+	removeTestGenerationErrorListener: (callback: ErrorListenerFn) => {
 		const listener = errorListeners.get(callback);
 		if (listener) {
 			ipcRenderer.removeListener("test-generation:error", listener);
