@@ -85,103 +85,95 @@ export function CursorConfigPanel({
 	return (
 		<div className="space-y-6">
 			{/* Cursor Style */}
-			<div className="space-y-3">
-				<Label className="text-sm font-medium text-foreground flex items-center gap-2">
-					<MousePointer2 className="h-4 w-4" />
-					{t("terminalFonts.cursorConfig.cursorStyle", {
-						defaultValue: "Cursor Style",
-					})}
-				</Label>
-				<p className="text-sm text-muted-foreground">
-					{t("terminalFonts.cursorConfig.cursorStyleDescription", {
-						defaultValue: "Choose the appearance of the terminal cursor",
-					})}
-				</p>
-				<div className="max-w-md">
-					<Select
-						value={settings.cursorStyle}
-						onValueChange={handleCursorStyleChange}
-					>
-						<SelectTrigger id="cursor-style">
-							<SelectValue
-								placeholder={t("terminalFonts.cursorConfig.selectStyle", {
-									defaultValue: "Select cursor style...",
-								})}
-							/>
-						</SelectTrigger>
-						<SelectContent>
-							{cursorStyles.map((style) => (
-								<SelectItem key={style.value} value={style.value}>
-									<div className="flex flex-col">
-										<span className="font-medium">{style.label}</span>
-										<span className="text-xs text-muted-foreground">
-											{style.description}
-										</span>
-									</div>
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
-				{/* Current cursor style display */}
-				<div className="text-xs text-muted-foreground">
-					{t("terminalFonts.cursorConfig.currentStyle", {
-						defaultValue: "Current:",
-					})}{" "}
-					<span className="font-medium text-foreground">
+			<div className="space-y-2.5">
+				<div className="flex flex-wrap items-center justify-between gap-2">
+					<Label className="flex items-center gap-2 text-sm font-medium text-foreground">
+						<MousePointer2 className="h-4 w-4 text-muted-foreground" />
+						{t("terminalFonts.cursorConfig.cursorStyle", {
+							defaultValue: "Cursor Style",
+						})}
+					</Label>
+					<span className="rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-medium text-foreground">
 						{cursorStyles.find((s) => s.value === settings.cursorStyle)
 							?.label || settings.cursorStyle}
 					</span>
 				</div>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("terminalFonts.cursorConfig.cursorStyleDescription", {
+						defaultValue: "Choose the appearance of the terminal cursor",
+					})}
+				</p>
+				<Select
+					value={settings.cursorStyle}
+					onValueChange={handleCursorStyleChange}
+				>
+					<SelectTrigger id="cursor-style">
+						<SelectValue
+							placeholder={t("terminalFonts.cursorConfig.selectStyle", {
+								defaultValue: "Select cursor style...",
+							})}
+						/>
+					</SelectTrigger>
+					<SelectContent>
+						{cursorStyles.map((style) => (
+							<SelectItem key={style.value} value={style.value}>
+								<div className="flex flex-col">
+									<span className="font-medium">{style.label}</span>
+									<span className="text-xs text-muted-foreground">
+										{style.description}
+									</span>
+								</div>
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</div>
 
 			{/* Cursor Blink */}
-			<div className="space-y-3">
-				<div className="flex items-center justify-between">
-					<div className="space-y-1">
-						<Label className="text-sm font-medium text-foreground">
-							{t("terminalFonts.cursorConfig.cursorBlink", {
-								defaultValue: "Cursor Blink",
-							})}
-						</Label>
-						<p className="text-sm text-muted-foreground">
-							{t("terminalFonts.cursorConfig.cursorBlinkDescription", {
-								defaultValue: "Enable or disable cursor blinking animation",
-							})}
-						</p>
-					</div>
-					<Switch
-						id="cursor-blink"
-						checked={settings.cursorBlink}
-						onCheckedChange={handleCursorBlinkChange}
-						className="shrink-0"
-					/>
+			<div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-background/40 p-3">
+				<div className="min-w-0 space-y-1">
+					<Label className="text-sm font-medium text-foreground">
+						{t("terminalFonts.cursorConfig.cursorBlink", {
+							defaultValue: "Cursor Blink",
+						})}
+					</Label>
+					<p className="text-xs leading-relaxed text-muted-foreground">
+						{t("terminalFonts.cursorConfig.cursorBlinkDescription", {
+							defaultValue: "Enable or disable cursor blinking animation",
+						})}
+					</p>
+					<p className="text-[11px] text-muted-foreground">
+						{t("terminalFonts.cursorConfig.blinkStatus", {
+							defaultValue: "Status:",
+						})}{" "}
+						<span
+							className={cn(
+								"font-medium",
+								settings.cursorBlink
+									? "text-green-600 dark:text-green-400"
+									: "text-muted-foreground",
+							)}
+						>
+							{settings.cursorBlink
+								? t("terminalFonts.cursorConfig.enabled", {
+										defaultValue: "Enabled",
+									})
+								: t("terminalFonts.cursorConfig.disabled", {
+										defaultValue: "Disabled",
+									})}
+						</span>
+					</p>
 				</div>
-				<div className="text-xs text-muted-foreground">
-					{t("terminalFonts.cursorConfig.blinkStatus", {
-						defaultValue: "Status:",
-					})}{" "}
-					<span
-						className={cn(
-							"font-medium",
-							settings.cursorBlink
-								? "text-green-600 dark:text-green-400"
-								: "text-muted-foreground",
-						)}
-					>
-						{settings.cursorBlink
-							? t("terminalFonts.cursorConfig.enabled", {
-									defaultValue: "Enabled",
-								})
-							: t("terminalFonts.cursorConfig.disabled", {
-									defaultValue: "Disabled",
-								})}
-					</span>
-				</div>
+				<Switch
+					id="cursor-blink"
+					checked={settings.cursorBlink}
+					onCheckedChange={handleCursorBlinkChange}
+					className="mt-0.5 shrink-0"
+				/>
 			</div>
 
 			{/* Cursor Accent Color */}
-			<div className="space-y-3">
+			<div className="space-y-2.5">
 				<Label className="text-sm font-medium text-foreground">
 					{t("terminalFonts.cursorConfig.cursorAccentColor", {
 						defaultValue: "Cursor Accent Color",
@@ -189,98 +181,75 @@ export function CursorConfigPanel({
 				</Label>
 				<p
 					id="cursor-color-description"
-					className="text-sm text-muted-foreground"
+					className="text-xs leading-relaxed text-muted-foreground"
 				>
 					{t("terminalFonts.cursorConfig.cursorAccentColorDescription", {
 						defaultValue:
 							"Color of the cursor when visible (affects contrast and visibility)",
 					})}
 				</p>
-				<div className="flex items-center gap-3 max-w-xs">
-					{/* Color preview/input */}
-					<div className="relative flex items-center gap-2">
-						<input
-							type="color"
-							id="cursor-accent-color"
-							value={settings.cursorAccentColor}
-							onChange={handleCursorAccentColorChange}
-							aria-label={t("terminalFonts.cursorConfig.cursorAccentColor", {
-								defaultValue: "Cursor Accent Color",
-							})}
-							aria-describedby="cursor-color-description"
-							className={cn(
-								"h-10 w-10 rounded-lg cursor-pointer border-2 border-border",
-								"focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary",
-								"transition-colors duration-200",
-							)}
-							title={t("terminalFonts.cursorConfig.pickColor", {
-								defaultValue: "Click to pick a color",
-							})}
-						/>
-						<div className="flex items-center gap-2 flex-1">
-							<code
-								className={cn(
-									"px-3 py-2 rounded-lg text-sm font-mono",
-									"border border-border bg-card",
-									"text-foreground",
-								)}
-							>
-								{settings.cursorAccentColor.toUpperCase()}
-							</code>
-							<button
-								type="button"
-								onClick={() => onSettingChange("cursorAccentColor", "#000000")}
-								className={cn(
-									"px-3 py-2 rounded-lg text-sm font-medium",
-									"border border-border bg-card hover:bg-accent",
-									"text-foreground transition-colors duration-200",
-									"focus:outline-none focus:ring-2 focus:ring-ring",
-								)}
-								title={t("terminalFonts.cursorConfig.resetColor", {
-									defaultValue: "Reset to black",
-								})}
-							>
-								{t("terminalFonts.cursorConfig.reset", {
-									defaultValue: "Reset",
-								})}
-							</button>
-						</div>
-					</div>
-				</div>
-				{/* Color preview box with sample cursor */}
-				<div className="flex items-center gap-2 pt-2">
-					<span className="text-xs text-muted-foreground">
-						{t("terminalFonts.cursorConfig.preview", {
-							defaultValue: "Preview:",
+				<div className="flex flex-wrap items-center gap-2">
+					<input
+						type="color"
+						id="cursor-accent-color"
+						value={settings.cursorAccentColor}
+						onChange={handleCursorAccentColorChange}
+						aria-label={t("terminalFonts.cursorConfig.cursorAccentColor", {
+							defaultValue: "Cursor Accent Color",
 						})}
-					</span>
-					<div
+						aria-describedby="cursor-color-description"
 						className={cn(
-							"w-16 h-6 rounded-md border border-border",
-							"relative overflow-hidden",
-							"bg-card",
+							"h-9 w-9 shrink-0 cursor-pointer rounded-lg border border-border bg-transparent p-0",
+							"focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary",
+							"transition-colors duration-200",
 						)}
-					>
-						{/* Sample cursor showing the accent color */}
+						title={t("terminalFonts.cursorConfig.pickColor", {
+							defaultValue: "Click to pick a color",
+						})}
+					/>
+					<code className="rounded-md border border-border bg-muted/60 px-2.5 py-1.5 font-mono text-xs text-foreground">
+						{settings.cursorAccentColor.toUpperCase()}
+					</code>
+
+					{/* Live sample of the cursor over a terminal-like background */}
+					<div className="relative h-9 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
 						{settings.cursorStyle === "block" && (
 							<div
-								className="absolute top-0 left-0 w-3 h-full"
+								className="absolute left-2 top-2 h-5 w-2.5"
 								style={{ backgroundColor: settings.cursorAccentColor }}
 							/>
 						)}
 						{settings.cursorStyle === "underline" && (
 							<div
-								className="absolute bottom-0 left-0 w-3 h-1"
+								className="absolute bottom-2 left-2 h-1 w-2.5"
 								style={{ backgroundColor: settings.cursorAccentColor }}
 							/>
 						)}
 						{settings.cursorStyle === "bar" && (
 							<div
-								className="absolute top-0 left-1 w-0.5 h-full"
+								className="absolute left-2 top-2 h-5 w-0.5"
 								style={{ backgroundColor: settings.cursorAccentColor }}
 							/>
 						)}
 					</div>
+
+					<button
+						type="button"
+						onClick={() => onSettingChange("cursorAccentColor", "#000000")}
+						className={cn(
+							"ml-auto rounded-md px-2.5 py-1.5 text-xs font-medium",
+							"border border-border bg-card hover:bg-accent",
+							"text-foreground transition-colors duration-200",
+							"focus:outline-none focus:ring-2 focus:ring-ring",
+						)}
+						title={t("terminalFonts.cursorConfig.resetColor", {
+							defaultValue: "Reset to black",
+						})}
+					>
+						{t("terminalFonts.cursorConfig.reset", {
+							defaultValue: "Reset",
+						})}
+					</button>
 				</div>
 			</div>
 		</div>

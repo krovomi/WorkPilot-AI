@@ -330,6 +330,12 @@ const createSettingsThemes = (t: {
 });
 
 /**
+ * App sections that manage their own multi-column layout and are rendered at the
+ * full width of the settings pane.
+ */
+const WIDE_APP_SECTIONS = new Set(["accounts", "terminal-fonts"]);
+
+/**
  * Main application settings dialog container
  * Coordinates app and project settings sections
  */
@@ -935,7 +941,11 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 							<ScrollArea className="h-full">
 								<div
 									className={cn(
-										appSection === "accounts" ? "p-8" : "p-8 max-w-2xl",
+										"p-8",
+										// Sections that lay out two columns of their own need the
+										// full pane; capping them at max-w-2xl squeezed both
+										// columns until their content overlapped.
+										!WIDE_APP_SECTIONS.has(appSection) && "max-w-2xl",
 									)}
 								>
 									{renderContent()}
