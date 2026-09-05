@@ -696,6 +696,31 @@ class TestGeneratorAgent:
         except Exception:  # noqa: BLE001 — progress reporting must never break generation
             logger.debug("test-gen on_event callback raised", exc_info=True)
 
+    @staticmethod
+    def _unreadable_source(file_path: str) -> Exception:
+        """The failure for a source file that could not be read.
+
+        ``_read_file`` swallows the underlying OSError and returns "", so the
+        reason (missing, unreadable, empty, not UTF-8) is gone by the time we get
+        here — hence the check that turns "cannot read" into the one thing the
+        user can act on.
+        """
+        from core.error_details import FILE_NOT_FOUND, DetailedError, ErrorDetail
+
+        exists = os.path.exists(file_path)
+        if exists:
+            message = f"The source file is empty or could not be decoded as UTF-8: {file_path}"
+        else:
+            message = f"The source file does not exist: {file_path}"
+        return DetailedError(
+            ErrorDetail(
+                message=message,
+                code=FILE_NOT_FOUND,
+                stage="read",
+                details=f"path={file_path}\nexists={exists}",
+            )
+        )
+
     async def _generate_with_events(
         self,
         prompt: str,
@@ -720,7 +745,7 @@ class TestGeneratorAgent:
         framework_info = self._project_analyzer.detect(file_path, project_path)
         source = self._read_file(file_path)
         if not source:
-            raise FileNotFoundError(f"Cannot read source file: {file_path}")
+            raise self._unreadable_source(file_path)
 
         existing = (
             self._read_file(existing_test_path)
@@ -765,7 +790,7 @@ class TestGeneratorAgent:
         self._emit(on_event, {"type": "stage", "stage": "read"})
         source = self._read_file(file_path)
         if not source:
-            raise FileNotFoundError(f"Cannot read source file: {file_path}")
+            raise self._unreadable_source(file_path)
 
         existing = (
             self._read_file(existing_test_path)
@@ -778,7 +803,12 @@ class TestGeneratorAgent:
                 "type": "stage",
                 "stage": "read",
                 "status": "done",
-                "detail": f"{len(source.splitlines())} lignes",
+                # ``lines`` is the datum; ``detail`` is only the fallback for a
+                # consumer that cannot format it. The UI localises the count —
+                # this string used to be hardcoded French and read "105 lignes"
+                # to an English user.
+                "lines": len(source.splitlines()),
+                "detail": f"{len(source.splitlines())} lines",
             },
         )
 
@@ -932,8 +962,24 @@ class TestGeneratorAgent:
 
         Raises on failure (including an empty response) so the runner surfaces a
         clear error rather than the UI hanging on "Asking the model…".
+
+        ``oneshot_completion`` degrades to an empty string on *any* provider
+        failure, so "empty response" used to be the only thing the UI could say
+        about a 401, a rate limit and an unreachable endpoint alike. The
+        ``on_error`` hook captures the real (redacted) diagnostic, and it is
+        re-raised as a ``DetailedError`` the runner forwards verbatim.
         """
+        from core.error_details import (
+            EMPTY_RESPONSE,
+            DetailedError,
+            ErrorDetail,
+        )
         from core.oneshot import oneshot_completion
+
+        failure: dict[str, Any] = {}
+
+        def _capture(detail: dict[str, Any]) -> None:
+            failure.update(detail)
 
         kwargs: dict[str, Any] = {}
         if on_delta is not None:
@@ -942,12 +988,31 @@ class TestGeneratorAgent:
             prompt,
             system_prompt=_TEST_GEN_SYSTEM_PROMPT,
             project_dir=project_path,
+            on_error=_capture,
             **kwargs,
         )
         if not text or not text.strip():
-            raise RuntimeError(
-                "The LLM returned an empty response. Check that your AI provider "
-                "is selected and authenticated in Settings."
+            if failure:
+                raise DetailedError(
+                    ErrorDetail(
+                        message=failure.get("message")
+                        or "The AI provider could not complete the request.",
+                        code=failure.get("code") or EMPTY_RESPONSE,
+                        stage="generate",
+                        details=failure.get("details"),
+                        provider=failure.get("provider"),
+                        model=failure.get("model"),
+                    )
+                )
+            raise DetailedError(
+                ErrorDetail(
+                    message=(
+                        "The AI provider returned an empty response — it accepted "
+                        "the request but produced no text."
+                    ),
+                    code=EMPTY_RESPONSE,
+                    stage="generate",
+                )
             )
         return text
 

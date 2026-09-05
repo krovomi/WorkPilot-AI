@@ -19,9 +19,11 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
+	type LiveStage,
 	type StageId,
 	useTestGenerationStore,
 } from "../../stores/test-generation-store";
+import { GenerationErrorPanel } from "./GenerationErrorPanel";
 
 /**
  * LiveGenerationSurface — the real-time view of a running test generation.
@@ -84,6 +86,25 @@ function tokenize(line: string): Tok[] {
 	return out;
 }
 
+/**
+ * The chip under a stage.
+ *
+ * Prefers the structured payload over the runner's pre-rendered ``detail``:
+ * that string was hardcoded French ("105 lignes") and read that way to an
+ * English user. ``detail`` stays the fallback for anything without a
+ * structured form, like "csharp · xunit".
+ */
+function stageDetail(
+	stage: LiveStage | undefined,
+	t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+	if (!stage) return "";
+	if (typeof stage.lines === "number") {
+		return t("live.stageLines", { count: stage.lines });
+	}
+	return stage.detail ?? "";
+}
+
 function useTypewriter(target: string, animate: boolean): string {
 	const [revealed, setRevealed] = useState("");
 	const targetRef = useRef(target);
@@ -119,6 +140,7 @@ export function LiveGenerationSurface() {
 	const streamedCode = useTestGenerationStore((s) => s.streamedCode);
 	const liveMeta = useTestGenerationStore((s) => s.liveMeta);
 	const genStartedAt = useTestGenerationStore((s) => s.genStartedAt);
+	const genEndedAt = useTestGenerationStore((s) => s.genEndedAt);
 	const result = useTestGenerationStore((s) => s.result);
 	const cancelGeneration = useTestGenerationStore((s) => s.cancelGeneration);
 
@@ -148,7 +170,11 @@ export function LiveGenerationSurface() {
 		const id = setInterval(() => forceTick((n) => n + 1), 100);
 		return () => clearInterval(id);
 	}, [isGenerating]);
-	const elapsed = genStartedAt ? (Date.now() - genStartedAt) / 1000 : 0;
+	// Frozen at the moment the run stopped: recomputing from Date.now() after
+	// the ticker stops makes the number jump on the next unrelated re-render.
+	const elapsed = genStartedAt
+		? ((genEndedAt ?? Date.now()) - genStartedAt) / 1000
+		: 0;
 
 	// Auto-scroll the editor as code streams in.
 	const scrollRef = useRef<HTMLDivElement>(null);
@@ -186,10 +212,14 @@ export function LiveGenerationSurface() {
 				{STAGE_ORDER.map((id) => {
 					const stage = liveStages.find((s) => s.id === id);
 					const Icon = STAGE_ICONS[id];
-					const active = stage?.status === "active";
 					const isDone = stage?.status === "done";
-					const isFailed = isError && active; // the stage we stalled on
-					const isActive = active && !isError;
+					// The runner names the stage it died on, so a "write" failure no
+					// longer paints the already-finished "generate" step red.
+					const isFailed = stage?.status === "failed";
+					const isActive = stage?.status === "active" && !isError;
+					// A stage never reached, on a run that already failed, is not
+					// pending — it is cancelled, and shows as skipped.
+					const isSkipped = isError && !stage;
 					const seen = Boolean(stage);
 					return (
 						<div
@@ -197,13 +227,13 @@ export function LiveGenerationSurface() {
 							className={[
 								"relative flex flex-col gap-1.5 rounded-lg border p-2.5 transition-all duration-300",
 								isFailed
-									? "border-red-500/50 bg-red-500/5"
+									? "border-destructive/50 bg-destructive/5"
 									: isActive
 										? "border-primary/50 bg-primary/5 ring-1 ring-primary/25"
 										: isDone
 											? "border-emerald-600/30 bg-emerald-500/5"
 											: "border-border bg-muted/30",
-								seen ? "opacity-100" : "opacity-50",
+								seen ? "opacity-100" : isSkipped ? "opacity-35" : "opacity-50",
 							].join(" ")}
 						>
 							<div className="flex items-center gap-2">
@@ -211,7 +241,7 @@ export function LiveGenerationSurface() {
 									className={[
 										"grid h-5 w-5 place-items-center rounded",
 										isFailed
-											? "text-red-400"
+											? "text-destructive"
 											: isDone
 												? "text-emerald-400"
 												: isActive
@@ -236,8 +266,17 @@ export function LiveGenerationSurface() {
 									<span className="ml-auto h-1.5 w-1.5 flex-none animate-pulse rounded-full bg-primary shadow-[0_0_8px_var(--color-primary)]" />
 								)}
 							</div>
-							<span className="min-h-[14px] truncate font-mono text-[10.5px] text-muted-foreground">
-								{stage?.detail ?? ""}
+							<span
+								className={[
+									"min-h-[14px] truncate font-mono text-[10.5px]",
+									isFailed ? "text-destructive" : "text-muted-foreground",
+								].join(" ")}
+							>
+								{isFailed
+									? t("live.stageFailed")
+									: isSkipped
+										? t("live.stageSkipped")
+										: stageDetail(stage, t)}
 							</span>
 						</div>
 					);
@@ -291,6 +330,13 @@ export function LiveGenerationSurface() {
 								</div>
 							))}
 						</pre>
+					) : isError ? (
+						// A spinner on a run that has already failed reads as "still
+						// working" — the one thing that is certainly not happening.
+						<div className="flex items-center gap-2 px-4 py-6 font-mono text-xs text-destructive">
+							<AlertTriangle className="h-3.5 w-3.5" />
+							{t("live.noCodeGenerated")}
+						</div>
 					) : (
 						<div className="flex items-center gap-2 px-4 py-6 font-mono text-xs text-zinc-500">
 							<Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -319,7 +365,9 @@ export function LiveGenerationSurface() {
 				</Stat>
 			</div>
 
-			{/* ── footer: cancel while running, written-to (full path) when done ── */}
+			{/* ── footer: what happened — cancel, failure, or the written path ── */}
+			{isError && <GenerationErrorPanel />}
+
 			{isGenerating ? (
 				<button
 					type="button"

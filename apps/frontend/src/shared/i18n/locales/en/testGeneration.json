@@ -124,6 +124,85 @@
 		"copied": "Copied",
 		"cancel": "Cancel generation",
 		"assertions": "assertions",
-		"viewCode": "View code"
+		"viewCode": "View code",
+		"stageLines_one": "{{count}} line",
+		"stageLines_other": "{{count}} lines",
+		"stageFailed": "failed here",
+		"stageSkipped": "not reached",
+		"noCodeGenerated": "No code was generated."
+	},
+	"failure": {
+		"technicalDetails": "Technical details",
+		"copyReport": "Copy report",
+		"copied": "Copied",
+		"retry": "Try again",
+		"facts": {
+			"stage": "Step",
+			"provider": "Provider",
+			"model": "Model",
+			"exitCode": "Exit code"
+		},
+		"codes": {
+			"auth": {
+				"title": "The AI provider rejected your credentials",
+				"hint": "Open Settings → Providers and re-authenticate the active provider. If you sign in with a Claude subscription, your session may simply have expired."
+			},
+			"rate_limit": {
+				"title": "Rate limit reached",
+				"hint": "The provider is throttling requests. Wait a moment and try again, or switch to another account or provider in Settings."
+			},
+			"quota": {
+				"title": "No credit left on this account",
+				"hint": "The provider accepted the request but refused to bill it. Check your plan or billing status, then try again."
+			},
+			"network": {
+				"title": "The provider could not be reached",
+				"hint": "Check your internet connection, and any VPN or corporate proxy between you and the provider."
+			},
+			"timeout": {
+				"title": "The provider took too long to answer",
+				"hint": "Large source files make the model slower. Try again, or generate tests for a smaller file."
+			},
+			"provider_unavailable": {
+				"title": "The provider could not be started",
+				"hint": "The CLI or Python dependency behind the selected provider is missing or not on PATH. Check Settings → Providers and your local installation."
+			},
+			"empty_response": {
+				"title": "The provider returned nothing",
+				"hint": "The request was accepted but produced no text. This usually means the model refused the prompt or the response was cut short — try again, or pick another model in Settings."
+			},
+			"file_not_found": {
+				"title": "The source file could not be read",
+				"hint": "Check that the file still exists, is not empty, and is UTF-8 text rather than a binary."
+			},
+			"write_failed": {
+				"title": "The test file could not be written",
+				"hint": "The tests were generated but not saved. Check the folder's permissions and free disk space, then copy the code above before retrying."
+			},
+			"parse_failed": {
+				"title": "The provider's answer could not be read",
+				"hint": "The model replied with something other than the expected JSON. Trying again usually resolves it; a more capable model resolves it more reliably."
+			},
+			"invalid_input": {
+				"title": "Something is missing from the request",
+				"hint": "Fill in the highlighted field and start the generation again."
+			},
+			"backend_missing": {
+				"title": "The WorkPilot AI backend was not found",
+				"hint": "The Python backend that runs the generator is missing from this installation. Reinstall the app, or run it from the repository so apps/backend is present."
+			},
+			"runner_crashed": {
+				"title": "The generator stopped unexpectedly",
+				"hint": "The generator process died before it could report anything. The technical details below carry the reason it printed on the way out."
+			},
+			"no_output": {
+				"title": "The generator finished without producing tests",
+				"hint": "The process ran to completion but wrote nothing. Check that the source file is readable and that your provider is authenticated in Settings."
+			},
+			"unknown": {
+				"title": "Test generation failed",
+				"hint": "Open the technical details below for the raw error. Trying again is safe — nothing has been written to your project."
+			}
+		}
 	}
 }
