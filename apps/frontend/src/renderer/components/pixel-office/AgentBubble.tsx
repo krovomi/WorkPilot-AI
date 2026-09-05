@@ -2,25 +2,42 @@
  * AgentBubble — Interactive comic-style speech bubble overlay.
  *
  * Appears when the user clicks an agent in the Pixel Office canvas.
- * Handles both terminal agents and Kanban task agents.
+ * Handles terminal agents, Kanban task agents and swarm subtask agents.
  */
 
 import {
+	BookOpen,
 	Check,
 	ChevronDown,
 	ChevronRight,
+	ClipboardList,
+	CircleCheck,
+	CircleX,
+	Cog,
 	Copy,
+	FolderOpen,
+	GitBranch,
+	Hourglass,
+	KeyRound,
 	LayoutDashboard,
+	type LucideIcon,
 	Maximize2,
+	MessageCircle,
+	Moon,
+	PenLine,
 	Play,
 	Plus,
+	PowerOff,
+	ScanSearch,
 	Send,
 	Square,
 	Terminal as TerminalIcon,
+	Wrench,
 	X,
 	Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { stripAnsiCodes } from "../../../shared/utils/ansi-sanitizer";
 import { flattenTaskLogsToLines } from "../../../shared/utils/task-logs";
 import type { PixelAgent } from "../../stores/pixel-office-store";
@@ -29,134 +46,45 @@ import type { Terminal } from "../../stores/terminal-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 
-// ── Phase descriptions (human-friendly) ──────────────────────
-
-interface PhaseInfo {
-	emoji: string;
-	label: string;
-	description: string;
-}
-
-const PHASE_INFO: Record<string, PhaseInfo> = {
-	idle: { emoji: "😴", label: "En veille", description: "Prêt à démarrer." },
-	planning: {
-		emoji: "📋",
-		label: "Planification",
-		description:
-			"L'IA analyse ta demande et prépare un plan d'action détaillé.",
-	},
-	coding: {
-		emoji: "✍️",
-		label: "Développement",
-		description:
-			"Le code est en cours d'écriture. Les sous-tâches s'enchaînent automatiquement.",
-	},
-	qa_review: {
-		emoji: "🔍",
-		label: "Vérification QA",
-		description:
-			"Un agent vérifie la qualité du code produit : tests, cohérence, bonnes pratiques.",
-	},
-	qa_fixing: {
-		emoji: "🔧",
-		label: "Correction QA",
-		description:
-			"Des problèmes ont été détectés. L'agent les corrige avant livraison.",
-	},
-	rate_limit_paused: {
-		emoji: "⏳",
-		label: "Limite API",
-		description:
-			"L'API Claude a atteint sa limite. Reprise automatique dans quelques instants.",
-	},
-	auth_failure_paused: {
-		emoji: "🔑",
-		label: "Auth. échouée",
-		description:
-			"Problème d'authentification. Vérifie tes profils Claude dans les paramètres.",
-	},
-	complete: {
-		emoji: "✅",
-		label: "Terminé",
-		description: "La tâche est complète et prête pour ta revue.",
-	},
-	failed: {
-		emoji: "❌",
-		label: "Échec",
-		description:
-			"La tâche a échoué. Consulte les logs pour comprendre ce qui s'est passé.",
-	},
+/**
+ * Phase and activity icons.
+ *
+ * These were emoji. Emoji are a font, not a glyph guarantee: on a Linux desktop
+ * without an emoji font installed — and inside the app's pixel/mono stack on
+ * every platform — they render as tofu boxes, which is exactly what the office
+ * header and this bubble were showing. Lucide draws SVG, so the icon is the
+ * same on Windows, macOS and Linux and scales with the text around it.
+ */
+const PHASE_ICONS: Record<string, LucideIcon> = {
+	idle: Moon,
+	planning: ClipboardList,
+	coding: PenLine,
+	qa_review: ScanSearch,
+	qa_fixing: Wrench,
+	rate_limit_paused: Hourglass,
+	auth_failure_paused: KeyRound,
+	complete: CircleCheck,
+	failed: CircleX,
 };
 
-// ── Activity descriptions for terminal agents ─────────────────
+const ACTIVITY_ICONS: Record<string, LucideIcon> = {
+	typing: PenLine,
+	running: Cog,
+	reading: BookOpen,
+	waiting: MessageCircle,
+	idle: Moon,
+	exited: PowerOff,
+	pending: Hourglass,
+};
 
-interface ActivityInfo {
-	emoji: string;
-	label: string;
-	description: (agent: PixelAgent) => string;
-	color: string;
-	bgColor: string;
-}
-
-const ACTIVITY_INFO: Record<string, ActivityInfo> = {
-	typing: {
-		emoji: "✍️",
-		label: "En train de coder",
-		description: (a) =>
-			a.taskName
-				? `Implémentation de "${a.taskName}" — l'agent écrit du code activement.`
-				: "L'agent est en train d'écrire du code.",
-		color: "#4A90D9",
-		bgColor: "rgba(74,144,217,0.12)",
-	},
-	running: {
-		emoji: "⚙️",
-		label: "Exécution",
-		description: () =>
-			"L'agent exécute une commande (tests, build, installation…). Attends ou interromps-le.",
-		color: "#1ABC9C",
-		bgColor: "rgba(26,188,156,0.12)",
-	},
-	reading: {
-		emoji: "📖",
-		label: "Analyse",
-		description: (a) =>
-			a.taskName
-				? `Lecture du code pour comprendre "${a.taskName}".`
-				: "L'agent analyse les fichiers du projet.",
-		color: "#27AE60",
-		bgColor: "rgba(39,174,96,0.12)",
-	},
-	waiting: {
-		emoji: "💬",
-		label: "En attente",
-		description: () => "L'agent attend ta réponse ou une approbation.",
-		color: "#F39C12",
-		bgColor: "rgba(243,156,18,0.12)",
-	},
-	idle: {
-		emoji: "😴",
-		label: "Au repos",
-		description: () =>
-			"L'agent est disponible. Donne-lui un ordre ou démarre Claude.",
-		color: "#6B7280",
-		bgColor: "rgba(107,114,128,0.12)",
-	},
-	exited: {
-		emoji: "💤",
-		label: "Session terminée",
-		description: () => "Ce terminal a été fermé.",
-		color: "#E74C3C",
-		bgColor: "rgba(231,76,60,0.12)",
-	},
-	pending: {
-		emoji: "⏳",
-		label: "File d'attente",
-		description: () =>
-			"Cette tâche attend son lancement. Démarre-la depuis le Kanban.",
-		color: "#8B5CF6",
-		bgColor: "rgba(139,92,246,0.12)",
-	},
+const ACTIVITY_COLORS: Record<string, { color: string; bgColor: string }> = {
+	typing: { color: "#4A90D9", bgColor: "rgba(74,144,217,0.12)" },
+	running: { color: "#1ABC9C", bgColor: "rgba(26,188,156,0.12)" },
+	reading: { color: "#27AE60", bgColor: "rgba(39,174,96,0.12)" },
+	waiting: { color: "#F39C12", bgColor: "rgba(243,156,18,0.12)" },
+	idle: { color: "#6B7280", bgColor: "rgba(107,114,128,0.12)" },
+	exited: { color: "#E74C3C", bgColor: "rgba(231,76,60,0.12)" },
+	pending: { color: "#8B5CF6", bgColor: "rgba(139,92,246,0.12)" },
 };
 
 const PHASE_COLOR: Record<string, string> = {
@@ -175,7 +103,7 @@ function getAgentColor(agent: PixelAgent): string {
 	if (agent.activity === "pending") return "#8B5CF6";
 	if (agent.type === "task")
 		return PHASE_COLOR[agent.phase ?? "idle"] ?? "#6B7280";
-	return ACTIVITY_INFO[agent.activity]?.color ?? "#6B7280";
+	return ACTIVITY_COLORS[agent.activity]?.color ?? "#6B7280";
 }
 
 // ── Syntax-highlighted inline code chip ──────────────────────
@@ -187,6 +115,25 @@ function CodeChip({ text }: { readonly text: string }) {
 			style={{ background: "rgba(99,102,241,0.15)", color: "#818CF8" }}
 		>
 			{text}
+		</span>
+	);
+}
+
+/** Icon + code chip pair used for the terminal's cwd, session and branch. */
+function MetaChip({
+	icon: Icon,
+	label,
+	text,
+}: {
+	readonly icon: LucideIcon;
+	readonly label: string;
+	readonly text: string;
+}) {
+	return (
+		<span className="flex items-center gap-1" title={label}>
+			<Icon className="h-3 w-3 shrink-0" aria-hidden />
+			<span className="sr-only">{label}</span>
+			<CodeChip text={text} />
 		</span>
 	);
 }
@@ -225,6 +172,7 @@ function logLineColor(line: string): string {
 }
 
 function LogStream({ taskId }: { readonly taskId: string }) {
+	const { t } = useTranslation(["pixelOffice"]);
 	const task = useTaskStore((s) => s.tasks.find((t) => t.id === taskId));
 	const liveLogs = task?.logs ?? [];
 	const specId = task?.specId;
@@ -238,7 +186,7 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 	// A finished task streams no live logs into `task.logs` (that array is only
 	// filled while the pipeline runs). Fall back to the persisted phase logs
 	// (task_logs.json) — the same source the Kanban's Logs tab reads — so the
-	// bubble isn't stuck on "En attente de logs…" for a completed task.
+	// bubble isn't stuck on "waiting for logs" for a completed task.
 	const hasLiveLogs = liveLogs.length > 0;
 	useEffect(() => {
 		if (hasLiveLogs || !projectId || !specId) return;
@@ -298,7 +246,7 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 					onClick={() => setOpen((v) => !v)}
 				>
 					<TerminalIcon className="h-3.5 w-3.5" />
-					<span>Logs de l&apos;agent</span>
+					<span>{t("pixelOffice:bubble.logs")}</span>
 					{visibleLines.length > 0 && (
 						<span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white/50">
 							{visibleLines.length}
@@ -322,15 +270,15 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 								: "rgba(255,255,255,0.06)",
 							border: `1px solid ${copied ? "rgba(110,231,183,0.3)" : "rgba(255,255,255,0.08)"}`,
 						}}
-						title="Copier tous les logs"
+						title={t("pixelOffice:bubble.copyAll")}
 					>
 						{copied ? (
 							<>
-								<Check className="h-3 w-3" /> Copié
+								<Check className="h-3 w-3" /> {t("pixelOffice:bubble.copied")}
 							</>
 						) : (
 							<>
-								<Copy className="h-3 w-3" /> Copier
+								<Copy className="h-3 w-3" /> {t("pixelOffice:bubble.copy")}
 							</>
 						)}
 					</button>
@@ -365,7 +313,9 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 					{visibleLines.length === 0 ? (
 						<div className="flex flex-col items-center justify-center h-full gap-2 text-white/20">
 							<TerminalIcon className="h-5 w-5" />
-							<p className="text-[10px] font-mono">En attente de logs…</p>
+							<p className="text-[10px] font-mono">
+								{t("pixelOffice:bubble.waitingForLogs")}
+							</p>
 						</div>
 					) : (
 						<div className="p-3 space-y-1">
@@ -396,13 +346,12 @@ function PendingTaskPanel({
 	readonly onGoToTask: () => void;
 	readonly onClose: () => void;
 }) {
+	const { t } = useTranslation(["pixelOffice"]);
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<div className="px-4 py-4 flex-1">
 				<p className="text-xs text-white/75 leading-relaxed">
-					Cette tâche est en file d&apos;attente et n&apos;a pas encore démarré.
-					Rends-toi dans le Kanban pour la lancer, la prioriser ou modifier sa
-					spécification.
+					{t("pixelOffice:pending.description")}
 				</p>
 				<div
 					className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-mono"
@@ -412,8 +361,8 @@ function PendingTaskPanel({
 						color: "rgba(196,181,253,0.8)",
 					}}
 				>
-					<span>📋</span>
-					<span>En attente d&apos;un agent disponible</span>
+					<Hourglass className="h-3.5 w-3.5 shrink-0" aria-hidden />
+					<span>{t("pixelOffice:pending.hint")}</span>
 				</div>
 			</div>
 			<div
@@ -431,7 +380,7 @@ function PendingTaskPanel({
 					onClick={onGoToTask}
 				>
 					<LayoutDashboard className="h-3 w-3 mr-1" />
-					Voir dans Kanban
+					{t("pixelOffice:bubble.goToKanban")}
 				</Button>
 				<Button
 					size="sm"
@@ -440,7 +389,7 @@ function PendingTaskPanel({
 					onClick={onClose}
 				>
 					<X className="h-3 w-3 mr-1" />
-					Fermer
+					{t("pixelOffice:bubble.close")}
 				</Button>
 			</div>
 		</div>
@@ -462,19 +411,22 @@ function TaskPanel({
 	readonly onStopTask: () => void;
 	readonly onClose: () => void;
 }) {
+	const { t } = useTranslation(["pixelOffice"]);
 	const taskId = agent.taskId ?? "";
-	const phaseInfo = PHASE_INFO[agent.phase ?? "idle"] ?? PHASE_INFO.idle;
+	const phase = agent.phase ?? "idle";
 	const isRunning = agent.activity !== "idle" && agent.activity !== "exited";
 	const isPaused =
-		agent.phase === "rate_limit_paused" ||
-		agent.phase === "auth_failure_paused";
+		phase === "rate_limit_paused" || phase === "auth_failure_paused";
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			{/* Phase status — fixed */}
 			<div className="px-4 py-3 shrink-0">
 				<p className="text-xs text-white/75 leading-relaxed">
-					{phaseInfo.description}
+					{t([
+						`pixelOffice:phaseDescription.${phase}`,
+						"pixelOffice:phaseDescription.idle",
+					])}
 				</p>
 				{agent.currentSubtask && (
 					<div className="mt-2 flex items-start gap-1.5 text-xs">
@@ -490,7 +442,7 @@ function TaskPanel({
 			{agent.progress !== undefined && (
 				<div className="px-4 pb-3 shrink-0">
 					<div className="flex justify-between text-[10px] text-white/40 font-mono mb-1.5">
-						<span>Progression globale</span>
+						<span>{t("pixelOffice:bubble.progress")}</span>
 						<span>{Math.round(agent.progress)}%</span>
 					</div>
 					<ProgressBar value={agent.progress} color={color} />
@@ -516,7 +468,7 @@ function TaskPanel({
 					onClick={onGoToTask}
 				>
 					<LayoutDashboard className="h-3 w-3 mr-1" />
-					Voir dans Kanban
+					{t("pixelOffice:bubble.goToKanban")}
 				</Button>
 
 				{isRunning && !isPaused && (
@@ -527,7 +479,7 @@ function TaskPanel({
 						onClick={onStopTask}
 					>
 						<Square className="h-3 w-3 mr-1" />
-						Arrêter
+						{t("pixelOffice:bubble.stopTask")}
 					</Button>
 				)}
 
@@ -539,7 +491,7 @@ function TaskPanel({
 						onClick={onClose}
 					>
 						<X className="h-3 w-3 mr-1" />
-						Fermer
+						{t("pixelOffice:bubble.close")}
 					</Button>
 				)}
 			</div>
@@ -566,12 +518,27 @@ function TerminalPanel({
 	readonly onResumeClaude: () => void;
 	readonly onSendCommand: (cmd: string) => void;
 }) {
+	const { t } = useTranslation(["pixelOffice"]);
 	const [command, setCommand] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
-	const info = ACTIVITY_INFO[agent.activity] ?? ACTIVITY_INFO.idle;
+	const palette = ACTIVITY_COLORS[agent.activity] ?? ACTIVITY_COLORS.idle;
 	const isExited = agent.activity === "exited";
 	const isBusy = agent.activity === "typing" || agent.activity === "running";
 	const isWaiting = agent.activity === "waiting";
+
+	// The two activities whose copy names the task read better with it, and fall
+	// back to a generic line when the terminal is not attached to one.
+	const describesTask =
+		agent.taskName &&
+		(agent.activity === "typing" || agent.activity === "reading");
+	const description = describesTask
+		? t(`pixelOffice:activityDescription.${agent.activity}WithTask`, {
+				task: agent.taskName,
+			})
+		: t([
+				`pixelOffice:activityDescription.${agent.activity}`,
+				"pixelOffice:activityDescription.idle",
+			]);
 
 	useEffect(() => {
 		if (!isExited) setTimeout(() => inputRef.current?.focus(), 50);
@@ -588,37 +555,40 @@ function TerminalPanel({
 		<>
 			{/* Description */}
 			<div className="px-4 py-3">
-				<p className="text-xs text-white/75 leading-relaxed">
-					{info.description(agent)}
-				</p>
+				<p className="text-xs text-white/75 leading-relaxed">{description}</p>
 
 				{agent.taskName && (
 					<div className="mt-2 flex items-center gap-1.5 text-xs text-white/50">
-						<span>📋 Tâche :</span>
-						<CodeChip text={agent.taskName} />
+						<MetaChip
+							icon={ClipboardList}
+							label={t("pixelOffice:bubble.taskLabel")}
+							text={agent.taskName}
+						/>
 					</div>
 				)}
 
 				{terminal && (
 					<div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-white/40 font-mono">
 						{terminal.cwd && (
-							<span className="flex items-center gap-1">
-								📁{" "}
-								<CodeChip
-									text={terminal.cwd.split(/[\\/]/).slice(-2).join("/")}
-								/>
-							</span>
+							<MetaChip
+								icon={FolderOpen}
+								label={t("pixelOffice:bubble.cwdLabel")}
+								text={terminal.cwd.split(/[\\/]/).slice(-2).join("/")}
+							/>
 						)}
 						{terminal.claudeSessionId && (
-							<span className="flex items-center gap-1">
-								🔑{" "}
-								<CodeChip text={`${terminal.claudeSessionId.slice(0, 8)}…`} />
-							</span>
+							<MetaChip
+								icon={KeyRound}
+								label={t("pixelOffice:bubble.sessionLabel")}
+								text={`${terminal.claudeSessionId.slice(0, 8)}…`}
+							/>
 						)}
 						{terminal.worktreeConfig && (
-							<span className="flex items-center gap-1">
-								🌿 <CodeChip text={terminal.worktreeConfig.branchName} />
-							</span>
+							<MetaChip
+								icon={GitBranch}
+								label={t("pixelOffice:bubble.branchLabel")}
+								text={terminal.worktreeConfig.branchName}
+							/>
 						)}
 					</div>
 				)}
@@ -635,7 +605,9 @@ function TerminalPanel({
 							onChange={(e) => setCommand(e.target.value)}
 							onKeyDown={(e) => e.key === "Enter" && handleSend()}
 							placeholder={
-								isWaiting ? "Réponds à l'agent…" : "Donne un ordre au terminal…"
+								isWaiting
+									? t("pixelOffice:bubble.sendPlaceholderWaiting")
+									: t("pixelOffice:bubble.sendPlaceholder")
 							}
 							className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-white/30 font-mono focus:outline-none focus:border-white/30"
 						/>
@@ -643,19 +615,17 @@ function TerminalPanel({
 							size="sm"
 							variant="ghost"
 							className="h-7 px-2.5 text-xs"
-							style={{
-								background: ACTIVITY_INFO[agent.activity]?.bgColor,
-								color: ACTIVITY_INFO[agent.activity]?.color,
-							}}
+							style={{ background: palette.bgColor, color: palette.color }}
 							onClick={handleSend}
 							disabled={!command.trim()}
+							title={t("pixelOffice:bubble.send")}
 						>
 							<Send className="h-3 w-3" />
 						</Button>
 					</div>
 					{isWaiting && (
 						<p className="text-[10px] text-white/30 mt-1 font-mono">
-							↵ Entrée pour envoyer · Tapé directement dans le terminal
+							{t("pixelOffice:bubble.sendHint")}
 						</p>
 					)}
 				</div>
@@ -677,7 +647,7 @@ function TerminalPanel({
 					onClick={onGoToTerminal}
 				>
 					<Maximize2 className="h-3 w-3 mr-1" />
-					Voir terminal
+					{t("pixelOffice:bubble.viewTerminal")}
 				</Button>
 
 				{isBusy && (
@@ -688,7 +658,7 @@ function TerminalPanel({
 						onClick={onInterrupt}
 					>
 						<Square className="h-3 w-3 mr-1" />
-						Interrompre
+						{t("pixelOffice:bubble.interrupt")}
 					</Button>
 				)}
 
@@ -700,7 +670,7 @@ function TerminalPanel({
 						onClick={onResumeClaude}
 					>
 						<Play className="h-3 w-3 mr-1" />
-						Reprendre Claude
+						{t("pixelOffice:bubble.resumeClaude")}
 					</Button>
 				)}
 
@@ -712,7 +682,7 @@ function TerminalPanel({
 						onClick={onKill}
 					>
 						<X className="h-3 w-3 mr-1" />
-						Fermer
+						{t("pixelOffice:bubble.kill")}
 					</Button>
 				)}
 			</div>
@@ -751,6 +721,7 @@ export function AgentBubble({
 	onSendCommand,
 	onStopTask,
 }: AgentBubbleProps) {
+	const { t } = useTranslation(["pixelOffice"]);
 	const bubbleRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -770,24 +741,26 @@ export function AgentBubble({
 	);
 
 	const isTaskAgent = agent.type === "task";
+	const isSwarmAgent = agent.type === "swarm";
 	const isPending = agent.activity === "pending";
-	const phaseInfo = PHASE_INFO[agent.phase ?? "idle"] ?? PHASE_INFO.idle;
-	const actInfo = ACTIVITY_INFO[agent.activity] ?? ACTIVITY_INFO.idle;
-	const pendingInfo = ACTIVITY_INFO.pending;
 
-	// Extract header information based on agent state
-	let headerEmoji: string;
+	// Header: what the agent is doing, and the icon that says it at a glance.
+	let HeaderIcon: LucideIcon;
 	let headerLabel: string;
 
 	if (isPending) {
-		headerEmoji = pendingInfo.emoji;
-		headerLabel = pendingInfo.label;
+		HeaderIcon = ACTIVITY_ICONS.pending;
+		headerLabel = t("pixelOffice:activity.pending");
 	} else if (isTaskAgent) {
-		headerEmoji = phaseInfo.emoji;
-		headerLabel = phaseInfo.label;
+		const phase = agent.phase ?? "idle";
+		HeaderIcon = PHASE_ICONS[phase] ?? PHASE_ICONS.idle;
+		headerLabel = t([`pixelOffice:phase.${phase}`, "pixelOffice:phase.idle"]);
 	} else {
-		headerEmoji = actInfo.emoji;
-		headerLabel = actInfo.label;
+		HeaderIcon = ACTIVITY_ICONS[agent.activity] ?? ACTIVITY_ICONS.idle;
+		headerLabel = t([
+			`pixelOffice:activity.${agent.activity}`,
+			"pixelOffice:activity.idle",
+		]);
 	}
 
 	// Determine which panel to render based on agent state
@@ -796,7 +769,9 @@ export function AgentBubble({
 			return <PendingTaskPanel onGoToTask={onGoToTask} onClose={onClose} />;
 		}
 
-		if (isTaskAgent) {
+		// A swarm subtask has progress and logs like a task, but no Kanban card of
+		// its own to jump to — it belongs to the run its parent task is driving.
+		if (isTaskAgent || isSwarmAgent) {
 			return (
 				<TaskPanel
 					agent={agent}
@@ -827,6 +802,7 @@ export function AgentBubble({
 			ref={bubbleRef}
 			role="dialog"
 			aria-modal="false"
+			aria-label={agent.fullName}
 			className="absolute z-50 select-none flex flex-col"
 			style={{ left: 16, right: 16, top, bottom: 16 }}
 			onClick={(e) => e.stopPropagation()}
@@ -859,8 +835,12 @@ export function AgentBubble({
 					}}
 				>
 					<div className="flex items-center gap-3 min-w-0">
-						<span className="text-2xl shrink-0">{headerEmoji}</span>
-						<span className="font-mono font-bold text-xl text-white leading-tight">
+						<HeaderIcon
+							className="h-6 w-6 shrink-0"
+							style={{ color }}
+							aria-hidden
+						/>
+						<span className="font-mono font-bold text-xl text-white leading-tight truncate">
 							{agent.fullName}
 						</span>
 
@@ -870,16 +850,25 @@ export function AgentBubble({
 								className="text-xs px-2 py-0.5 border-orange-500/50 text-orange-400 shrink-0"
 							>
 								<LayoutDashboard className="h-3 w-3 mr-1" />
-								Kanban
+								{t("pixelOffice:bubble.kanbanBadge")}
 							</Badge>
 						)}
-						{agent.isClaudeMode && !isTaskAgent && (
+						{isSwarmAgent && (
+							<Badge
+								variant="outline"
+								className="text-xs px-2 py-0.5 border-violet-500/50 text-violet-300 shrink-0"
+							>
+								<GitBranch className="h-3 w-3 mr-1" />
+								{t("pixelOffice:bubble.swarmBadge")}
+							</Badge>
+						)}
+						{agent.isClaudeMode && !isTaskAgent && !isSwarmAgent && (
 							<Badge
 								variant="outline"
 								className="text-xs px-2 py-0.5 border-orange-500/50 text-orange-400 shrink-0"
 							>
 								<Zap className="h-3 w-3 mr-1" />
-								Claude
+								{t("pixelOffice:bubble.claudeBadge")}
 							</Badge>
 						)}
 					</div>
@@ -898,9 +887,10 @@ export function AgentBubble({
 						<button
 							type="button"
 							onClick={onClose}
-							className="text-white/40 hover:text-white/80 transition-colors rounded-full w-7 h-7 flex items-center justify-center text-lg"
+							aria-label={t("pixelOffice:bubble.close")}
+							className="text-white/40 hover:text-white/80 transition-colors rounded-full w-7 h-7 flex items-center justify-center"
 						>
-							×
+							<X className="h-4 w-4" />
 						</button>
 					</div>
 				</div>
@@ -919,6 +909,7 @@ export function AddAgentButton({
 	readonly onClick: () => void;
 	readonly disabled?: boolean;
 }) {
+	const { t } = useTranslation(["pixelOffice"]);
 	return (
 		<Button
 			variant="outline"
@@ -928,7 +919,7 @@ export function AddAgentButton({
 			disabled={disabled}
 		>
 			<Plus className="h-3.5 w-3.5 mr-1.5" />
-			Nouveau terminal
+			{t("pixelOffice:toolbar.addAgent")}
 		</Button>
 	);
 }
