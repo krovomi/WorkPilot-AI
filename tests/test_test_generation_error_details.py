@@ -171,6 +171,23 @@ class TestCallLlmSurfacesTheRealReason:
         assert detail.code == FILE_NOT_FOUND
         assert detail.stage == "read"
         assert "/definitely/not/here.cs" in detail.message
+        # The reason comes from the read that already happened, not from a
+        # second filesystem probe of caller-supplied input (CodeQL flags that,
+        # rightly — and the exception is more precise than a stat() anyway).
+        assert "FileNotFoundError" in (detail.details or "")
+
+    def test_an_empty_source_file_reads_differently_from_an_unreadable_one(
+        self, tmp_path: Path
+    ) -> None:
+        # Both end the run, and the user's next move is not the same.
+        empty = tmp_path / "Empty.cs"
+        empty.write_text("", encoding="utf-8")
+
+        with pytest.raises(DetailedError) as excinfo:
+            self._agent().generate_unit_tests(str(empty))
+
+        assert "empty" in excinfo.value.detail.message.lower()
+        assert "FileNotFoundError" not in (excinfo.value.detail.details or "")
 
 
 class TestRunnerProtocol:

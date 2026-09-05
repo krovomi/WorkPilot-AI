@@ -697,27 +697,28 @@ class TestGeneratorAgent:
             logger.debug("test-gen on_event callback raised", exc_info=True)
 
     @staticmethod
-    def _unreadable_source(file_path: str) -> Exception:
-        """The failure for a source file that could not be read.
+    def _unreadable_source(file_path: str, reason: str | None) -> Exception:
+        """The failure for a source file the generator could not use.
 
-        ``_read_file`` swallows the underlying OSError and returns "", so the
-        reason (missing, unreadable, empty, not UTF-8) is gone by the time we get
-        here — hence the check that turns "cannot read" into the one thing the
-        user can act on.
+        ``reason`` comes from ``_read_file_or_reason`` — the exception that
+        stopped the read, or ``None`` when the file was readable and simply
+        empty. Both cases end the run, and the user's next move differs, so the
+        message says which one happened.
         """
         from core.error_details import FILE_NOT_FOUND, DetailedError, ErrorDetail
 
-        exists = os.path.exists(file_path)
-        if exists:
-            message = f"The source file is empty or could not be decoded as UTF-8: {file_path}"
+        if reason is None:
+            message = (
+                f"The source file is empty, so there is nothing to test: {file_path}"
+            )
         else:
-            message = f"The source file does not exist: {file_path}"
+            message = f"The source file could not be read: {file_path}"
         return DetailedError(
             ErrorDetail(
                 message=message,
                 code=FILE_NOT_FOUND,
                 stage="read",
-                details=f"path={file_path}\nexists={exists}",
+                details=reason or f"path={file_path}\n0 bytes",
             )
         )
 
@@ -743,9 +744,9 @@ class TestGeneratorAgent:
         self, file_path: str, existing_test_path: str | None, project_path: str | None
     ) -> list[CoverageGap]:
         framework_info = self._project_analyzer.detect(file_path, project_path)
-        source = self._read_file(file_path)
+        source, read_error = self._read_file_or_reason(file_path)
         if not source:
-            raise self._unreadable_source(file_path)
+            raise self._unreadable_source(file_path, read_error)
 
         existing = (
             self._read_file(existing_test_path)
@@ -788,9 +789,9 @@ class TestGeneratorAgent:
         )
 
         self._emit(on_event, {"type": "stage", "stage": "read"})
-        source = self._read_file(file_path)
+        source, read_error = self._read_file_or_reason(file_path)
         if not source:
-            raise self._unreadable_source(file_path)
+            raise self._unreadable_source(file_path, read_error)
 
         existing = (
             self._read_file(existing_test_path)
@@ -1469,12 +1470,29 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
     # ── Utilities ────────────────────────────────────────────────────
 
     def _read_file(self, path: str) -> str:
+        """Read ``path``, or "" when it cannot be read."""
+        return self._read_file_or_reason(path)[0]
+
+    @staticmethod
+    def _read_file_or_reason(path: str) -> tuple[str, str | None]:
+        """Read ``path``; return ``(contents, reason)``.
+
+        ``reason`` is the exception that stopped the read, or ``None`` when the
+        file was read fine (an empty file reads fine and returns ``("", None)``).
+
+        Callers that report a failure to the user need this: the plain reader
+        swallows the OSError, and "cannot read" covers a missing file, a
+        permission denial and a binary that is not UTF-8 — three problems with
+        three different fixes. Probing the path a second time to tell them apart
+        would be both slower and a fresh filesystem call on caller-supplied
+        input; the exception already says which one it was.
+        """
         try:
             with open(path, encoding="utf-8") as f:
-                return f.read()
-        except Exception as exc:
+                return f.read(), None
+        except Exception as exc:  # noqa: BLE001 — the reason is the return value
             logger.warning("Could not read %s: %s", path, exc)
-            return ""
+            return "", f"{type(exc).__name__}: {exc}"
 
     def _slugify(self, text: str) -> str:
         """Convert text to valid Python identifier."""
