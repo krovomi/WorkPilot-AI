@@ -1047,6 +1047,20 @@ export function registerMemoryHandlers(): void {
 					args.push("--base-url", baseUrl.trim());
 				}
 
+				// `cancel` is captured out of the executor rather than registered
+				// inside it: a Promise executor runs SYNCHRONOUSLY, during the
+				// `new Promise(...)` call, so the `promise` binding below is still
+				// in its temporal dead zone at that point. Registering the entry
+				// from in there threw "Cannot access 'promise' before
+				// initialization" on every single pull — the handler's own body,
+				// which the hook's unit tests never execute because they mock the
+				// preload bridge. Registration therefore happens after the
+				// constructor returns; every path that settles the promise is
+				// event-driven and so cannot run before that.
+				let killPull: () => void = () => {
+					/* replaced synchronously by the executor below */
+				};
+
 				const promise = new Promise<IPCResult<OllamaPullResult>>((resolve) => {
 					const proc = spawn(pythonExe, args, {
 						stdio: ["ignore", "pipe", "pipe"],
@@ -1081,13 +1095,10 @@ export function registerMemoryHandlers(): void {
 					};
 					armWatchdog();
 
-					activePulls.set(model, {
-						promise,
-						cancel: () => {
-							cancelled = true;
-							proc.kill();
-						},
-					});
+					killPull = () => {
+						cancelled = true;
+						proc.kill();
+					};
 
 					proc.stdout.on("data", (data) => {
 						stdout += data.toString("utf-8");
@@ -1214,6 +1225,17 @@ export function registerMemoryHandlers(): void {
 					proc.on("error", (err) => {
 						settle({ success: false, error: err.message });
 					});
+				});
+
+				const entry: ActivePull = { promise, cancel: () => killPull() };
+				activePulls.set(model, entry);
+				// `settle` clears the registry on every path that RESOLVES. A
+				// rejected promise — a synchronous `spawn` throw, say — reaches
+				// none of them, and an entry nobody removes silently blocks every
+				// later retry of that model. The identity check keeps this from
+				// evicting a newer pull that has since taken the slot.
+				void promise.catch(() => undefined).then(() => {
+					if (activePulls.get(model) === entry) activePulls.delete(model);
 				});
 
 				return promise;
