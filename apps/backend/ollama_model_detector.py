@@ -516,6 +516,103 @@ def cmd_get_recommended_models(args) -> None:
     )
 
 
+def model_is_installed(base_url: str, model_name: str) -> bool:
+    """Is `model_name` actually present on the server right now?
+
+    Ollama tags carry an explicit version (``llama3.3:latest``) while the name
+    a user picks usually does not, so a bare name matches its ``:latest`` tag.
+
+    This exists because "the pull command failed" and "the model is missing"
+    are not the same question, and only the second one matters to the caller.
+    """
+    result = fetch_ollama_api(base_url, "api/tags")
+    if not result:
+        return False
+    wanted = (model_name or "").strip().lower()
+    if not wanted:
+        return False
+    for model in result.get("models", []):
+        name = str(model.get("name", "")).strip().lower()
+        if name == wanted or name == f"{wanted}:latest":
+            return True
+        # `llama3.3` should also match a pull the user made as `llama3.3:70b`.
+        if wanted.count(":") == 0 and name.split(":", 1)[0] == wanted:
+            return True
+    return False
+
+
+def classify_pull_error(model_name: str, error_msg: str, version: str | None) -> str:
+    """Explain a pull error in terms the user can act on.
+
+    The classification is deliberately keyed on phrases that identify a CAUSE.
+    It used to match the bare substring ``"no such"``, which also appears in
+    ``no such file or directory`` — a local filesystem error — and so reported
+    a blob-cleanup failure as "this Hugging Face repo provides no GGUF build".
+    That message named the wrong subsystem, the wrong fix, and a repository the
+    user had never mentioned.
+    """
+    detail = " ".join((error_msg or "").split())
+    low = detail.lower()
+
+    if "newer version" in low:
+        return (
+            f"Model '{model_name}' requires a newer version of Ollama. "
+            f"Your version: {version or 'unknown'}. "
+            "Please upgrade: https://ollama.com/download"
+        )
+    # A repo Ollama can reach but cannot use: no GGUF conversion published.
+    if "gguf" in low:
+        return (
+            f"« {model_name} » ne fournit pas de version GGUF (requise par "
+            "Ollama). Choisissez un dépôt « -GGUF » (filtre « GGUF (Ollama) »). "
+            f"Détail : {detail}"
+        )
+    # A name the registry does not know: a typo, or a repo that does not exist.
+    if "manifest" in low or "file does not exist" in low or "not found" in low:
+        return (
+            f"« {model_name} » est introuvable dans la bibliothèque Ollama. "
+            "Vérifiez le nom (ollama.com/library), ou choisissez un modèle déjà "
+            f"installé. Détail : {detail}"
+        )
+    if "no space" in low or "disk" in low:
+        return (
+            f"Espace disque insuffisant pour télécharger « {model_name} ». "
+            f"Détail : {detail}"
+        )
+    if "connection" in low or "timeout" in low or "eof" in low:
+        return (
+            f"Connexion interrompue pendant le téléchargement de "
+            f"« {model_name} ». Relancez : Ollama reprend où il s'est arrêté. "
+            f"Détail : {detail}"
+        )
+    return detail or "erreur inconnue"
+
+
+def _fail_pull_unless_installed(
+    base_url: str, model_name: str, error_msg: str, version: str | None
+) -> None:
+    """Report a pull failure — unless the model is on the server regardless.
+
+    Every terminal path of a pull funnels through here so that a transport
+    error raised after the last layer landed cannot be reported as a failed
+    download of a model the user already has.
+    """
+    if model_is_installed(base_url, model_name):
+        output_json(
+            True,
+            data={
+                "model": model_name,
+                "status": "completed",
+                "output": [
+                    "Download completed successfully",
+                    f"Ollama reported a non-fatal error while finishing up: {error_msg}",
+                ],
+            },
+        )
+        return
+    output_error(classify_pull_error(model_name, error_msg, version))
+
+
 def cmd_pull_model(args) -> None:
     """Pull (download) an Ollama model using the HTTP API for progress tracking."""
     model_name = args.model
@@ -554,32 +651,34 @@ def cmd_pull_model(args) -> None:
                     # Check for error in the streaming response
                     # This handles cases like "requires newer version of Ollama"
                     if "error" in progress:
-                        error_msg = progress["error"]
-                        # Clean up the error message (remove extra whitespace/newlines)
-                        error_msg = " ".join(error_msg.split())
-                        # Check if it's a version-related error
-                        lowered = error_msg.lower()
-                        if "newer version" in lowered:
-                            error_msg = (
-                                f"Model '{model_name}' requires a newer version of Ollama. "
-                                f"Your version: {ollama_version or 'unknown'}. "
-                                f"Please upgrade: https://ollama.com/download"
+                        # The only question that matters is whether the model is
+                        # usable now. Ollama reports housekeeping failures the
+                        # same way it reports real ones — a pull that downloaded
+                        # every layer and then failed to unlink a `-partial`
+                        # blob ends with "no such file or directory" — and
+                        # calling that a failed download tells the user to redo
+                        # gigabytes of work that already landed.
+                        if model_is_installed(base_url, model_name):
+                            output_json(
+                                True,
+                                data={
+                                    "model": model_name,
+                                    "status": "completed",
+                                    "output": [
+                                        "Download completed successfully",
+                                        (
+                                            "Ollama reported a non-fatal error "
+                                            f"while finishing up: {progress['error']}"
+                                        ),
+                                    ],
+                                },
                             )
-                        # Most common failure when picking a Hugging Face repo:
-                        # it has no GGUF build, so Ollama can't pull it.
-                        elif (
-                            "gguf" in lowered
-                            or "no such" in lowered
-                            or "manifest" in lowered
-                            or "not found" in lowered
-                        ):
-                            error_msg = (
-                                f"Impossible de récupérer « {model_name} » : ce dépôt "
-                                "Hugging Face ne fournit pas de version GGUF (requise "
-                                "par Ollama). Choisissez un dépôt « -GGUF » (filtre "
-                                f"« GGUF (Ollama) »). Détail : {error_msg}"
+                            return
+                        output_error(
+                            classify_pull_error(
+                                model_name, progress["error"], ollama_version
                             )
-                        output_error(error_msg)
+                        )
                         return
 
                     # Emit progress as NDJSON to stderr for main process to parse
@@ -610,12 +709,27 @@ def cmd_pull_model(args) -> None:
             },
         )
 
-    except urllib.error.URLError as e:
-        output_error(f"Failed to connect to Ollama: {str(e)}")
     except urllib.error.HTTPError as e:
-        output_error(f"Ollama API error: {e.code} - {e.reason}")
-    except Exception as e:
-        output_error(f"Failed to pull model: {str(e)}")
+        _fail_pull_unless_installed(
+            base_url,
+            model_name,
+            f"Ollama API error: {e.code} - {e.reason}",
+            ollama_version,
+        )
+    except urllib.error.URLError as e:
+        # A dropped connection AFTER the last layer landed is indistinguishable
+        # here from one that dropped mid-transfer, so ask the server which it
+        # was instead of guessing.
+        _fail_pull_unless_installed(
+            base_url,
+            model_name,
+            f"Failed to connect to Ollama: {str(e)}",
+            ollama_version,
+        )
+    except Exception as e:  # noqa: BLE001 — reported, never raised at the CLI
+        _fail_pull_unless_installed(
+            base_url, model_name, f"Failed to pull model: {str(e)}", ollama_version
+        )
 
 
 def main():
