@@ -138,7 +138,9 @@ def test_generate_unit_emits_stages_and_streams_clean_code(tmp_path) -> None:
     }
     raw = json.dumps(payload)
 
-    async def fake_oneshot(prompt, system_prompt=None, project_dir=None, on_delta=None):
+    async def fake_oneshot(
+        prompt, system_prompt=None, project_dir=None, on_delta=None, **_kwargs
+    ):
         if on_delta is not None:  # stream in small chunks to exercise the extractor
             for i in range(0, len(raw), 16):
                 on_delta(raw[i : i + 16])

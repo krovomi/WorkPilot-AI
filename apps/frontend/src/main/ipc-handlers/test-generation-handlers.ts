@@ -17,7 +17,9 @@ export function setupTestGenerationHandlers(
 		}
 	});
 
-	testGenerationService.on("error", (error: string) => {
+	// Forwarded as-is: the service already produced the structured payload the
+	// renderer renders (message, code, stage, redacted details).
+	testGenerationService.on("error", (error: unknown) => {
 		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
 			mainWindow.webContents.send("test-generation:error", error);

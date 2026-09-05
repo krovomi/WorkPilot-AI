@@ -27,6 +27,7 @@ export * from "./roadmap";
 export * from "./settings";
 export * from "./smart-estimation";
 export * from "./task";
+export * from "./test-generation";
 export * from "./terminal";
 // Time Travel types (Temporal debugger for AI agents)
 export * from "./time-travel";

@@ -696,6 +696,32 @@ class TestGeneratorAgent:
         except Exception:  # noqa: BLE001 — progress reporting must never break generation
             logger.debug("test-gen on_event callback raised", exc_info=True)
 
+    @staticmethod
+    def _unreadable_source(file_path: str, reason: str | None) -> Exception:
+        """The failure for a source file the generator could not use.
+
+        ``reason`` comes from ``_read_file_or_reason`` — the exception that
+        stopped the read, or ``None`` when the file was readable and simply
+        empty. Both cases end the run, and the user's next move differs, so the
+        message says which one happened.
+        """
+        from core.error_details import FILE_NOT_FOUND, DetailedError, ErrorDetail
+
+        if reason is None:
+            message = (
+                f"The source file is empty, so there is nothing to test: {file_path}"
+            )
+        else:
+            message = f"The source file could not be read: {file_path}"
+        return DetailedError(
+            ErrorDetail(
+                message=message,
+                code=FILE_NOT_FOUND,
+                stage="read",
+                details=reason or f"path={file_path}\n0 bytes",
+            )
+        )
+
     async def _generate_with_events(
         self,
         prompt: str,
@@ -718,9 +744,9 @@ class TestGeneratorAgent:
         self, file_path: str, existing_test_path: str | None, project_path: str | None
     ) -> list[CoverageGap]:
         framework_info = self._project_analyzer.detect(file_path, project_path)
-        source = self._read_file(file_path)
+        source, read_error = self._read_file_or_reason(file_path)
         if not source:
-            raise FileNotFoundError(f"Cannot read source file: {file_path}")
+            raise self._unreadable_source(file_path, read_error)
 
         existing = (
             self._read_file(existing_test_path)
@@ -763,9 +789,9 @@ class TestGeneratorAgent:
         )
 
         self._emit(on_event, {"type": "stage", "stage": "read"})
-        source = self._read_file(file_path)
+        source, read_error = self._read_file_or_reason(file_path)
         if not source:
-            raise FileNotFoundError(f"Cannot read source file: {file_path}")
+            raise self._unreadable_source(file_path, read_error)
 
         existing = (
             self._read_file(existing_test_path)
@@ -778,7 +804,12 @@ class TestGeneratorAgent:
                 "type": "stage",
                 "stage": "read",
                 "status": "done",
-                "detail": f"{len(source.splitlines())} lignes",
+                # ``lines`` is the datum; ``detail`` is only the fallback for a
+                # consumer that cannot format it. The UI localises the count —
+                # this string used to be hardcoded French and read "105 lignes"
+                # to an English user.
+                "lines": len(source.splitlines()),
+                "detail": f"{len(source.splitlines())} lines",
             },
         )
 
@@ -932,8 +963,24 @@ class TestGeneratorAgent:
 
         Raises on failure (including an empty response) so the runner surfaces a
         clear error rather than the UI hanging on "Asking the model…".
+
+        ``oneshot_completion`` degrades to an empty string on *any* provider
+        failure, so "empty response" used to be the only thing the UI could say
+        about a 401, a rate limit and an unreachable endpoint alike. The
+        ``on_error`` hook captures the real (redacted) diagnostic, and it is
+        re-raised as a ``DetailedError`` the runner forwards verbatim.
         """
+        from core.error_details import (
+            EMPTY_RESPONSE,
+            DetailedError,
+            ErrorDetail,
+        )
         from core.oneshot import oneshot_completion
+
+        failure: dict[str, Any] = {}
+
+        def _capture(detail: dict[str, Any]) -> None:
+            failure.update(detail)
 
         kwargs: dict[str, Any] = {}
         if on_delta is not None:
@@ -942,12 +989,31 @@ class TestGeneratorAgent:
             prompt,
             system_prompt=_TEST_GEN_SYSTEM_PROMPT,
             project_dir=project_path,
+            on_error=_capture,
             **kwargs,
         )
         if not text or not text.strip():
-            raise RuntimeError(
-                "The LLM returned an empty response. Check that your AI provider "
-                "is selected and authenticated in Settings."
+            if failure:
+                raise DetailedError(
+                    ErrorDetail(
+                        message=failure.get("message")
+                        or "The AI provider could not complete the request.",
+                        code=failure.get("code") or EMPTY_RESPONSE,
+                        stage="generate",
+                        details=failure.get("details"),
+                        provider=failure.get("provider"),
+                        model=failure.get("model"),
+                    )
+                )
+            raise DetailedError(
+                ErrorDetail(
+                    message=(
+                        "The AI provider returned an empty response — it accepted "
+                        "the request but produced no text."
+                    ),
+                    code=EMPTY_RESPONSE,
+                    stage="generate",
+                )
             )
         return text
 
@@ -1404,12 +1470,29 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
     # ── Utilities ────────────────────────────────────────────────────
 
     def _read_file(self, path: str) -> str:
+        """Read ``path``, or "" when it cannot be read."""
+        return self._read_file_or_reason(path)[0]
+
+    @staticmethod
+    def _read_file_or_reason(path: str) -> tuple[str, str | None]:
+        """Read ``path``; return ``(contents, reason)``.
+
+        ``reason`` is the exception that stopped the read, or ``None`` when the
+        file was read fine (an empty file reads fine and returns ``("", None)``).
+
+        Callers that report a failure to the user need this: the plain reader
+        swallows the OSError, and "cannot read" covers a missing file, a
+        permission denial and a binary that is not UTF-8 — three problems with
+        three different fixes. Probing the path a second time to tell them apart
+        would be both slower and a fresh filesystem call on caller-supplied
+        input; the exception already says which one it was.
+        """
         try:
             with open(path, encoding="utf-8") as f:
-                return f.read()
-        except Exception as exc:
+                return f.read(), None
+        except Exception as exc:  # noqa: BLE001 — the reason is the return value
             logger.warning("Could not read %s: %s", path, exc)
-            return ""
+            return "", f"{type(exc).__name__}: {exc}"
 
     def _slugify(self, text: str) -> str:
         """Convert text to valid Python identifier."""

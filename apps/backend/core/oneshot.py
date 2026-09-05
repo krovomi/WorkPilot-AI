@@ -232,6 +232,7 @@ async def oneshot_completion(
     spec_dir: str | None = None,
     max_turns: int = 1,
     on_delta: Callable[[str], None] | None = None,
+    on_error: Callable[[dict], None] | None = None,
 ) -> str:
     """Run a single text completion against the active provider; return the text.
 
@@ -246,6 +247,13 @@ async def oneshot_completion(
     once. Callers that want a uniformly live UX buffer these and reveal them.
     Exceptions raised inside the callback are swallowed so a flaky consumer can
     never break the generation.
+
+    ``on_error`` — optional callback invoked with a **redacted** diagnostic dict
+    (``core.error_details.ErrorDetail.to_dict``) when the provider call fails.
+    The return value stays an empty string either way; this is how a caller that
+    wants to *explain* the failure gets something to explain, instead of having
+    to guess from "the model returned nothing". Nothing here re-raises: the
+    empty-string contract above is what every existing caller depends on.
     """
     from core.client import _get_active_provider
 
@@ -288,9 +296,26 @@ async def oneshot_completion(
                             "[oneshot] on_delta callback raised", exc_info=True
                         )
     except Exception as error:  # noqa: BLE001 — one-shot callers own degradation
-        # Do not echo provider diagnostics: they may contain credential material.
+        # Never echo a raw provider diagnostic: it may carry credential material.
+        # ``ErrorDetail`` redacts it, which is what makes it safe to hand to the
+        # caller (and, through it, to a copy-to-clipboard button in the UI).
         logger.warning(
             "[oneshot] provider completion failed (%s)", type(error).__name__
         )
+        if on_error is not None:
+            from core.error_details import ErrorDetail, classify
+
+            message = str(error).strip() or type(error).__name__
+            detail = ErrorDetail(
+                message=message,
+                code=classify(type(error).__name__, message),
+                details=f"{type(error).__name__}: {message}",
+                provider=resolved_provider,
+                model=resolved_model,
+            )
+            try:
+                on_error(detail.to_dict())
+            except Exception:  # noqa: BLE001 — reporting must not mask the failure
+                logger.debug("[oneshot] on_error callback raised", exc_info=True)
         return ""
     return text.strip()
