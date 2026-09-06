@@ -15,7 +15,9 @@ import {
 	type TestStrategy,
 } from "../../../shared/utils/test-strategy";
 import { cn } from "../../lib/utils";
+import { useTestDestinationPrompt } from "../../hooks/use-test-destination-prompt";
 import { useToast } from "../../hooks/use-toast";
+import { TestDestinationDialog } from "../test-generation/TestDestinationDialog";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -51,11 +53,20 @@ const STRATEGY_BADGE_CLASSES: Record<Exclude<TestStrategy, "skip">, string> = {
 	"desktop-ui": "bg-purple-500/10 text-purple-400",
 };
 
-/** Make the suggested test path relative to the worktree, normalized to "/". */
+/**
+ * Make the suggested test path relative to the worktree, normalized to "/".
+ *
+ * Returns null for a path outside the worktree. That is not hypothetical since
+ * the destination can be chosen: joining `/home/me/elsewhere/X.cs` onto the
+ * worktree passes the main process's traversal check and quietly creates
+ * `<worktree>/home/me/elsewhere/X.cs`, a junk tree in the diff. The caller
+ * reports it instead — the generator has already written the real file where
+ * the user asked.
+ */
 export function toWorktreeRelativePath(
 	suggestedPath: string,
 	worktreePath: string,
-): string {
+): string | null {
 	const normalizedSuggested = suggestedPath.replaceAll("\\", "/");
 	const normalizedWorktree = worktreePath.replaceAll("\\", "/").replace(/\/$/, "");
 	if (
@@ -65,7 +76,8 @@ export function toWorktreeRelativePath(
 	) {
 		return normalizedSuggested.slice(normalizedWorktree.length + 1);
 	}
-	return normalizedSuggested.replace(/^\//, "");
+	// A relative path is already worktree-relative; an absolute one is not ours.
+	return normalizedSuggested.startsWith("/") ? null : normalizedSuggested;
 }
 
 /**
@@ -85,6 +97,7 @@ export function TaskTestGenerator({
 	const [plans, setPlans] = useState<FilePlan[]>([]);
 	const [isGenerating, setIsGenerating] = useState(false);
 	const isMountedRef = useRef(true);
+	const destinationPrompt = useTestDestinationPrompt();
 
 	useEffect(() => {
 		isMountedRef.current = true;
@@ -139,7 +152,10 @@ export function TaskTestGenerator({
 	 * One-shot wrapper around the global test-generation events. The main
 	 * service runs a single generation at a time, so calls are sequential.
 	 */
-	const generateOne = (plan: FilePlan): Promise<GenerationOutput> => {
+	const generateOne = (
+		plan: FilePlan,
+		testDir?: string,
+	): Promise<GenerationOutput> => {
 		return new Promise<GenerationOutput>((resolve, reject) => {
 			const api = globalThis.electronAPI;
 			const cleanup = () => {
@@ -175,9 +191,15 @@ export function TaskTestGenerator({
 				const userStory = [task.title, task.description?.slice(0, 1500)]
 					.filter(Boolean)
 					.join("\n\n");
-				api.generateE2ETests(userStory, absolutePath, worktreePath);
+				api.generateE2ETests(userStory, absolutePath, worktreePath, testDir);
 			} else {
-				api.generateUnitTests(absolutePath, undefined, undefined, worktreePath);
+				api.generateUnitTests(
+					absolutePath,
+					undefined,
+					undefined,
+					worktreePath,
+					testDir,
+				);
 			}
 		});
 	};
@@ -186,15 +208,35 @@ export function TaskTestGenerator({
 		if (selectedPlans.length === 0 || isGenerating) return;
 		setIsGenerating(true);
 		let written = 0;
+		// Asked at most once for the whole batch: the answer is a property of
+		// the project, not of each file, and twenty modals for twenty changed
+		// files is not a question, it is a wall.
+		let chosenDir: string | undefined;
 		try {
 			for (const plan of selectedPlans) {
+				const absolutePath = `${worktreePath.replaceAll("\\", "/")}/${plan.path.replaceAll("\\", "/")}`;
+				const choice = await destinationPrompt.prompt(
+					absolutePath,
+					worktreePath,
+					{ remembered: chosenDir },
+				);
+				if (choice.cancelled) break;
+				chosenDir = choice.directory ?? chosenDir;
+
 				updatePlan(plan.path, { state: "generating", error: undefined });
 				try {
-					const result = await generateOne(plan);
+					const result = await generateOne(plan, choice.directory);
 					const relativeTestPath = toWorktreeRelativePath(
 						result.test_file_path,
 						worktreePath,
 					);
+					if (!relativeTestPath) {
+						throw new Error(
+							t("tasks:testGen.outsideWorktree", {
+								path: result.test_file_path,
+							}),
+						);
+					}
 					const writeResult = await globalThis.electronAPI.worktreeWriteFile(
 						worktreePath,
 						relativeTestPath,
@@ -229,6 +271,12 @@ export function TaskTestGenerator({
 
 	return (
 		<div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+			<TestDestinationDialog
+				destination={destinationPrompt.pending}
+				onConfirm={destinationPrompt.confirm}
+				onCancel={destinationPrompt.cancel}
+				note={t("tasks:testGen.destinationAppliesToBatch")}
+			/>
 			<div className="flex items-center justify-between gap-3">
 				<div className="flex items-center gap-2 min-w-0">
 					<FlaskConical className="h-4 w-4 shrink-0 text-primary" />
