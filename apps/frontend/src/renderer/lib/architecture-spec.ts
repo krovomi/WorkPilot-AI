@@ -236,6 +236,17 @@ function nodeName(node: DiagramNodeInput, s: SpecStrings): string {
 	return label && label.length > 0 ? label : s.componentFallback(node.id);
 }
 
+/**
+ * Whether the spec builder has a written role for this block type. The palette
+ * and this table have to agree: a type present in one and absent from the
+ * other reaches the coding agent as a capitalised identifier ("Messagebroker")
+ * instead of a role, and nothing in the build fails loudly enough to notice.
+ * `architecture-blocks.test.ts` pins the two together through this.
+ */
+export function hasRole(type: string): boolean {
+	return type in ROLE_BY_TYPE.en && type in ROLE_BY_TYPE.fr;
+}
+
 function roleFor(type: string | undefined, lang: Lang): string {
 	if (!type) return lang === "fr" ? "Composant" : "Component";
 	return (
