@@ -196,7 +196,7 @@ def test_go_tests_stay_next_to_their_source(tmp_path):
     destination = resolve_test_destination(str(source), project_root=str(tmp_path))
 
     assert destination.reason == "co_located_convention"
-    assert Path(destination.directory) == source.parent
+    assert Path(destination.directory) == source.parent.resolve()
     assert destination.file_name == "parse_test.go"
 
 

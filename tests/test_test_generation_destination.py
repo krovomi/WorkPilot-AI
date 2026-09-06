@@ -8,6 +8,7 @@ to be resolved against.
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -15,6 +16,23 @@ from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1] / "apps" / "backend"
 RUNNER = BACKEND / "runners" / "test_generation_runner.py"
+
+
+def _env_without_provider_credentials() -> dict[str, str]:
+    """The caller's environment minus anything that could reach a provider.
+
+    Stripping the environment down to PATH instead would break on Windows,
+    where a Python subprocess needs SYSTEMROOT to import half its own standard
+    library — a test that is really asserting "no credentials" should not also
+    be asserting "no operating system".
+    """
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("ANTHROPIC_", "CLAUDE_", "OPENAI_", "AWS_"))
+    }
+    env["PYTHONPATH"] = str(BACKEND)
+    return env
 
 
 def _load_runner():
@@ -38,6 +56,13 @@ class _Result:
 
 
 def _dotnet_project(root: Path, *, with_tests: bool) -> Path:
+    """Build the project and return its source file.
+
+    Every assertion below compares against ``root.resolve()``: the resolver
+    resolves the paths it is given, and macOS hands pytest a ``/var`` tmp_path
+    that resolves to ``/private/var``. Comparing the two forms is a test that
+    passes on Linux and fails on a Mac.
+    """
     (root / ".git").mkdir(parents=True)
     (root / "src").mkdir()
     (root / "src" / "App.csproj").write_text("<Project />", encoding="utf-8")
@@ -56,8 +81,9 @@ class TestWriteDestination:
 
         runner._write_test_file(result, str(tmp_path), str(source))
 
-        assert Path(result.test_file_path) == tmp_path / "tests" / "ProgramTests.cs"
-        assert (tmp_path / "tests" / "ProgramTests.cs").read_text() == "// tests"
+        expected = (tmp_path / "tests" / "ProgramTests.cs").resolve()
+        assert Path(result.test_file_path) == expected
+        assert expected.read_text() == "// tests"
         assert not (tmp_path / "ProgramTests.cs").exists()
 
     def test_the_chosen_directory_is_used_and_created(self, tmp_path: Path):
@@ -69,6 +95,7 @@ class TestWriteDestination:
         runner._write_test_file(result, str(tmp_path), str(source), str(chosen))
 
         assert Path(result.test_file_path) == chosen / "ProgramTests.cs"
+        assert chosen.is_dir()
         assert (chosen / "ProgramTests.cs").is_file()
 
     def test_without_a_choice_it_never_falls_back_to_the_project_root(
@@ -80,7 +107,10 @@ class TestWriteDestination:
 
         runner._write_test_file(result, str(tmp_path), str(source))
 
-        assert Path(result.test_file_path) == tmp_path / "tests" / "ProgramTests.cs"
+        assert (
+            Path(result.test_file_path)
+            == (tmp_path / "tests" / "ProgramTests.cs").resolve()
+        )
         assert not (tmp_path / "ProgramTests.cs").exists()
 
     def test_e2e_keeps_its_own_convention(self, tmp_path: Path):
@@ -137,7 +167,9 @@ class TestResolveDestinationAction:
         assert destination["file_name"] == "ProgramTests.cs"
         assert destination["language"] == "csharp"
         assert destination["candidates"][0]["exists"] is False
-        assert Path(destination["candidates"][0]["path"]) == tmp_path / "tests"
+        assert (
+            Path(destination["candidates"][0]["path"]) == (tmp_path / "tests").resolve()
+        )
 
     def test_it_answers_without_asking_when_the_directory_is_there(
         self, tmp_path: Path
@@ -155,7 +187,7 @@ class TestResolveDestinationAction:
 
         assert destination["status"] == "resolved"
         assert destination["reason"] == "existing_tests_dir"
-        assert Path(destination["directory"]) == tmp_path / "tests"
+        assert Path(destination["directory"]) == (tmp_path / "tests").resolve()
 
     def test_it_needs_no_provider(self, tmp_path: Path):
         """No API key, no network: the answer is path arithmetic."""
@@ -174,7 +206,7 @@ class TestResolveDestinationAction:
             capture_output=True,
             text=True,
             cwd=str(BACKEND),
-            env={"PATH": "/usr/bin:/bin", "PYTHONPATH": str(BACKEND)},
+            env=_env_without_provider_credentials(),
         )
         assert proc.returncode == 0
         assert "__TG_ERROR__" not in proc.stdout
