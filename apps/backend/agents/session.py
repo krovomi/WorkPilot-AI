@@ -554,6 +554,23 @@ def _response_text_indicates_prompt_too_long(response_text: str) -> bool:
     return is_prompt_too_long_error(RuntimeError(stripped))
 
 
+def _status_text_indicates_prompt_too_long(status_text: str) -> bool:
+    """Same question as ``_response_text_indicates_prompt_too_long``, asked of
+    the client's own status lines instead of the model's prose.
+
+    The response-text check is deliberately capped at 80 characters so a long
+    assistant turn that merely *mentions* the phrase never fires. A provider
+    status line is not prose — we wrote it, and it carries the raw API body
+    (``Ollama API error (400): {"error":"... exceeds the available context size
+    (4096 tokens)"}``), which is always longer than that gate. Applying the
+    gate to it meant the one signal that reliably identifies the failure was
+    the one signal we threw away.
+    """
+    if not status_text or not status_text.strip():
+        return False
+    return is_prompt_too_long_error(RuntimeError(status_text))
+
+
 def _response_text_indicates_model_unavailable(response_text: str) -> bool:
     """Return True when the LLM's response text signals the selected model is
     invalid or inaccessible.
@@ -608,6 +625,13 @@ def is_prompt_too_long_error(error: Exception) -> bool:
         "input too long",
         "request too large",
         "token limit",
+        # Ollama / llama.cpp wording. Ollama returns HTTP 400 with
+        # "request exceeds the available context size (4096 tokens)" — none of
+        # the patterns above match it, so a local build that overflowed num_ctx
+        # was classified as a normal turn and the phase retried the same
+        # oversized prompt until the user killed it.
+        "available context size",
+        "exceeds context",
     ]
     return any(p in error_str for p in patterns)
 
@@ -1846,6 +1870,15 @@ async def _run_agent_client_session(
         debug_success("session", "Query sent successfully")
 
         response_text = ""
+        # Status lines the CLIENT emits about itself — generation heartbeats,
+        # model-pull progress, provider errors — never model output. Every
+        # `MessageRole.SYSTEM` message in every AgentClient is one of these
+        # (see the yields in core/agent_client.py), so they are kept OUT of
+        # `response_text` and out of the conversation log: mixing them in made
+        # a slow local turn look like an assistant reply, defeated the short-
+        # response error classifiers below, and got replayed as context on the
+        # next session — where a local model's 8k window has no room for it.
+        status_text = ""
         _hot_swap_pending = False  # set when a live provider/model swap is detected
         debug("session", "Starting to receive response stream...")
 
@@ -1856,9 +1889,23 @@ async def _run_agent_client_session(
                 f"Received message #{message_count}",
                 msg_type=agent_msg.type_name,
             )
+            is_status_msg = agent_msg.role == MessageRole.SYSTEM
 
             for block in agent_msg.content:
                 if block.type == ContentBlockType.TEXT and block.text:
+                    if is_status_msg:
+                        # Shown in the task log as an INFO line (its own badge in
+                        # the Kanban), not as agent prose.
+                        status_text += block.text + "\n"
+                        print(block.text, flush=True)
+                        if task_logger and block.text.strip():
+                            task_logger.log(
+                                block.text,
+                                LogEntryType.INFO,
+                                phase,
+                                print_to_console=False,
+                            )
+                        continue
                     response_text += block.text
                     print(block.text, end="", flush=True)
                     if task_logger and block.text.strip():
@@ -2011,14 +2058,19 @@ async def _run_agent_client_session(
             # its blocks have been processed. This way the log mirrors what the
             # agent actually emitted (text + tool_use + tool_result), making it
             # safe to replay against a different provider after a pause.
-            _log_append_message(
-                spec_dir,
-                agent_msg,
-                phase=phase.value,
-                provider=provider,
-                model=log_model,
-                subtask_id=log_subtask_id,
-            )
+            # Client status lines are excluded: the log exists to be replayed as
+            # context, and "generating for 30 s…" is not context. Worse, replay
+            # keeps the NEWEST messages, so on a slow local model the heartbeats
+            # were exactly what survived truncation.
+            if not is_status_msg:
+                _log_append_message(
+                    spec_dir,
+                    agent_msg,
+                    phase=phase.value,
+                    provider=provider,
+                    model=log_model,
+                    subtask_id=log_subtask_id,
+                )
 
             # Hot LLM swap: if the user changed this phase's provider/model while
             # the session is streaming, stop cleanly at this message boundary so
@@ -2122,22 +2174,36 @@ async def _run_agent_client_session(
         # account can't use): the CLI returns it as a short text response, not an
         # error, so without this the coder loops forever and then advances the
         # phase with nothing done. Reclassify as a halting error.
-        if _response_text_indicates_model_unavailable(response_text):
+        if _response_text_indicates_model_unavailable(
+            response_text
+        ) or _response_text_indicates_model_unavailable(status_text):
+            _unavailable_text = (
+                response_text
+                if _response_text_indicates_model_unavailable(response_text)
+                else status_text
+            )
             debug_error(
                 "session",
                 "Reclassifying 'selected model unavailable' response as error (AgentClient)",
-                response_preview=response_text[:160],
+                response_preview=_unavailable_text[:160],
             )
             return (
                 "error",
-                response_text,
-                {"type": "model_unavailable", "message": response_text.strip()},
+                _unavailable_text,
+                {"type": "model_unavailable", "message": _unavailable_text.strip()},
             )
 
         # Same reclassification as in the SDK-direct runner — providers can
         # surface "Prompt is too long" as a plain text response. See the
         # corresponding block in run_agent_session() for the full rationale.
-        if _response_text_indicates_prompt_too_long(response_text):
+        # The status-line variant covers the providers that report it as an API
+        # error instead (Ollama's blown num_ctx, Copilot's
+        # context_length_exceeded), which used to end the stream as an ordinary
+        # "continue" and send the caller round the same oversized prompt again.
+        if _response_text_indicates_prompt_too_long(
+            response_text
+        ) or _status_text_indicates_prompt_too_long(status_text):
+            response_text = response_text or status_text.strip()
             debug_error(
                 "session",
                 "Reclassifying short prompt-too-long response as error (AgentClient)",
@@ -2177,7 +2243,10 @@ async def _run_agent_client_session(
             tool_count=tool_count,
             response_length=len(response_text),
         )
-        return "continue", response_text, {}
+        # A turn that produced nothing but status lines (a provider error the
+        # classifiers above did not recognise) still has to tell the caller
+        # what happened — returning "" would look like a silent, successful turn.
+        return "continue", response_text or status_text.strip(), {}
 
     except Exception as e:
         is_concurrency = is_tool_concurrency_error(e)
