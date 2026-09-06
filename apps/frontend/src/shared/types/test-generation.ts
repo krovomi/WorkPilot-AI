@@ -122,6 +122,179 @@ export function parseTestDestination(input: unknown): TestDestination | null {
 }
 
 /**
+ * Which test libraries the generated tests are written against.
+ *
+ * Resolved by the backend (`test_generation/libraries.py`) from the project's
+ * own manifests — a solution that references FluentAssertions and Moq gets
+ * tests written with them without anyone having to say so — and overridable by
+ * the user, whose choice is what a project with nothing installed needs.
+ */
+export type LibraryCategory =
+	| "framework"
+	| "assertions"
+	| "mocking"
+	| "data"
+	| "http"
+	| "ui"
+	| "snapshot"
+	| "coverage";
+
+export type PackageEcosystem = "nuget" | "npm" | "pypi" | "maven";
+
+export interface TestLibrary {
+	id: string;
+	name: string;
+	/** The package id as the ecosystem knows it (NuGet, npm, PyPI, Maven). */
+	package: string;
+	ecosystem: PackageEcosystem;
+	language: string;
+	category: LibraryCategory;
+	/** One line on how to write with it — what the model is told. */
+	usage: string;
+	/** Pre-checked when the project references nothing at all. */
+	recommended: boolean;
+	/** True when the project already declares this package. */
+	installed: boolean;
+}
+
+/** A chosen library the project does not reference yet. */
+export interface MissingPackage {
+	id: string;
+	name: string;
+	package: string;
+	ecosystem: PackageEcosystem;
+}
+
+export interface TestLibrarySelection {
+	language: string;
+	/** Ids that will be written against. */
+	selected: string[];
+	/** Ids the project already declares. */
+	installed: string[];
+	/** True when the ids came from the user rather than from the project. */
+	explicit: boolean;
+	/** Everything on offer for this language, in display order. */
+	libraries: TestLibrary[];
+	missing: MissingPackage[];
+	/** What would be run to add the missing ones, for display. */
+	installCommands: string[];
+}
+
+/** One package-manager command that ran, and what it did. */
+export interface PackageInstallStep {
+	command: string[];
+	ok: boolean;
+	output: string;
+}
+
+export interface PackageInstallReport {
+	ok: boolean;
+	/** Library ids that landed. */
+	installed: string[];
+	steps: PackageInstallStep[];
+	/** Ecosystems the app will not touch, as commands to run by hand. */
+	manualCommands: string[];
+	/** Why nothing ran, when nothing ran. */
+	reason: string;
+	/** The project file the packages were added to. */
+	target: string;
+}
+
+/** Read the runner's snake_case library payload into the UI's shape. */
+export function parseTestLibrarySelection(
+	input: unknown,
+): TestLibrarySelection | null {
+	if (!input || typeof input !== "object") return null;
+	const raw = input as Record<string, unknown>;
+	const asStrings = (value: unknown): string[] =>
+		Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+
+	const libraries: TestLibrary[] = Array.isArray(raw.libraries)
+		? raw.libraries.flatMap((entry) => {
+				if (!entry || typeof entry !== "object") return [];
+				const library = entry as Record<string, unknown>;
+				if (typeof library.id !== "string") return [];
+				return [
+					{
+						id: library.id,
+						name: typeof library.name === "string" ? library.name : library.id,
+						package:
+							typeof library.package === "string" ? library.package : library.id,
+						ecosystem: (library.ecosystem as PackageEcosystem) ?? "nuget",
+						language: typeof library.language === "string" ? library.language : "",
+						category: (library.category as LibraryCategory) ?? "framework",
+						usage: typeof library.usage === "string" ? library.usage : "",
+						recommended: library.recommended === true,
+						installed: library.installed === true,
+					},
+				];
+			})
+		: [];
+
+	const missing: MissingPackage[] = Array.isArray(raw.missing)
+		? raw.missing.flatMap((entry) => {
+				if (!entry || typeof entry !== "object") return [];
+				const item = entry as Record<string, unknown>;
+				if (typeof item.id !== "string") return [];
+				return [
+					{
+						id: item.id,
+						name: typeof item.name === "string" ? item.name : item.id,
+						package: typeof item.package === "string" ? item.package : item.id,
+						ecosystem: (item.ecosystem as PackageEcosystem) ?? "nuget",
+					},
+				];
+			})
+		: [];
+
+	return {
+		language: typeof raw.language === "string" ? raw.language : "unknown",
+		selected: asStrings(raw.selected),
+		installed: asStrings(raw.installed),
+		explicit: raw.explicit === true,
+		libraries,
+		missing,
+		installCommands: asStrings(raw.install_commands),
+	};
+}
+
+/** Read the runner's snake_case install report into the UI's shape. */
+export function parsePackageInstallReport(
+	input: unknown,
+): PackageInstallReport | null {
+	if (!input || typeof input !== "object") return null;
+	const raw = input as Record<string, unknown>;
+	const steps: PackageInstallStep[] = Array.isArray(raw.steps)
+		? raw.steps.flatMap((entry) => {
+				if (!entry || typeof entry !== "object") return [];
+				const step = entry as Record<string, unknown>;
+				return [
+					{
+						command: Array.isArray(step.command)
+							? step.command.filter((c): c is string => typeof c === "string")
+							: [],
+						ok: step.ok === true,
+						output: typeof step.output === "string" ? step.output : "",
+					},
+				];
+			})
+		: [];
+
+	return {
+		ok: raw.ok === true,
+		installed: Array.isArray(raw.installed)
+			? raw.installed.filter((v): v is string => typeof v === "string")
+			: [],
+		steps,
+		manualCommands: Array.isArray(raw.manual_commands)
+			? raw.manual_commands.filter((v): v is string => typeof v === "string")
+			: [],
+		reason: typeof raw.reason === "string" ? raw.reason : "",
+		target: typeof raw.target === "string" ? raw.target : "",
+	};
+}
+
+/**
  * What went wrong, in the terms the user can act on.
  *
  * `code` drives the title and the remediation hint shown in the UI, so it is a

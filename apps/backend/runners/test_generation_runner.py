@@ -22,10 +22,15 @@ Usage:
   python runners/test_generation_runner.py --action generate-e2e --user-story "..." --target-module mymodule --project-path /path/to/project
   python runners/test_generation_runner.py --action generate-tdd --description "..." --language typescript --snippet-type function --project-path /path/to/project
   python runners/test_generation_runner.py --action resolve-destination --file-path /path/to/file.cs --project-path /path/to/project
+  python runners/test_generation_runner.py --action resolve-libraries --file-path /path/to/file.cs --project-path /path/to/project
+  python runners/test_generation_runner.py --action add-packages --test-libraries fluentassertions,moq --project-path /path/to/project --test-dir /path/to/project/tests
 
 Where the generated file lands is decided by ``test_generation.layout``, not by
 the model: the ``tests`` directory beside the source root when there is one,
-and ``--test-dir`` (what the UI sends once it has asked) otherwise.
+and ``--test-dir`` (what the UI sends once it has asked) otherwise. What the
+tests are *written against* is decided the same way: the project's manifests,
+or ``--test-libraries`` when the user picked. Packages are only ever installed
+by the separate ``add-packages`` action.
 """
 
 import argparse
@@ -256,6 +261,7 @@ def _run_generate_unit(agent, args) -> None:
             max_tests_per_function=3,
             project_path=args.project_path,
             on_event=_emit_event,
+            test_libraries=_selected_library_ids(args),
         )
         _status(f"Generated {result.tests_generated} test(s)")
         _emit_event({"type": "stage", "stage": "write"})
@@ -295,6 +301,7 @@ def _run_generate_e2e(agent, args) -> None:
             args.target_module,
             project_path=args.project_path,
             on_event=_emit_event,
+            test_libraries=_selected_library_ids(args),
         )
         _status(f"Generated {result.tests_generated} E2E test(s)")
         _emit_event({"type": "stage", "stage": "write"})
@@ -342,7 +349,10 @@ def _run_generate_tdd(agent, args) -> None:
 
     try:
         result = agent.generate_tdd_tests(
-            spec, project_path=args.project_path, on_event=_emit_event
+            spec,
+            project_path=args.project_path,
+            on_event=_emit_event,
+            test_libraries=_selected_library_ids(args),
         )
         _status(f"Generated {result.tests_generated} TDD test(s)")
         _emit_event({"type": "stage", "stage": "write"})
@@ -359,6 +369,98 @@ def _run_generate_tdd(agent, args) -> None:
         _print_result({"success": True, "result": _serialize(result)})
     except Exception as exc:  # noqa: BLE001 — every failure is reported, not raised
         _fail(exc)
+
+
+def _selected_library_ids(args) -> list[str] | None:
+    """The `--test-libraries` selection, or None to let the project decide.
+
+    None and an empty list are different answers: nothing passed means "read
+    the project's manifests", while an explicit empty selection would mean
+    "write against nothing", which is not a request anyone makes.
+    """
+    from test_generation.libraries import parse_ids
+
+    ids = parse_ids(getattr(args, "test_libraries", None))
+    return ids or None
+
+
+def _resolve_language(args, source: str) -> str:
+    """The language of *source*, detected the same way the generator does."""
+    from agents.test_generator import ProjectAnalyzer
+
+    if source:
+        detected = ProjectAnalyzer().detect(source, args.project_path)
+        language = detected.get("language")
+        if language and language != "unknown":
+            return language
+    return args.language
+
+
+def _run_resolve_libraries(agent, args) -> None:  # noqa: ARG001 — no LLM needed
+    """Answer "what will these tests be written against?" before generating.
+
+    Catalogue, what the project already references, and the selection that
+    follows from it — filesystem only, so the UI can render the picker with the
+    project's own stack pre-checked without paying for a model call.
+    """
+    from test_generation.libraries import resolve_selection
+
+    project_path = args.project_path
+    source = args.file_path or args.target_module or ""
+    if not source and not project_path:
+        _print_error(
+            "No source file or project was provided, so no test libraries could be resolved.",
+            code="invalid_input",
+        )
+        sys.exit(1)
+
+    language = _resolve_language(args, source)
+    selection = resolve_selection(
+        project_path or Path(source).parent,
+        language,
+        _selected_library_ids(args),
+    )
+    _print_result({"success": True, "libraries": selection.to_dict()})
+
+
+def _run_add_packages(agent, args) -> None:  # noqa: ARG001 — no LLM needed
+    """Add the selected-but-absent packages to the project's test project.
+
+    Only ever reached from an explicit user action: a generation never installs
+    anything, because editing someone's .csproj is not a side effect a "write
+    me a test" request implies.
+    """
+    from test_generation.libraries import resolve_selection
+    from test_generation.package_install import install_missing
+
+    if not args.project_path:
+        _print_error(
+            "No project was provided, so there is nothing to add the packages to.",
+            code="invalid_input",
+        )
+        sys.exit(1)
+
+    selected = _selected_library_ids(args)
+    if not selected:
+        _print_error(
+            "No test libraries were selected, so there is nothing to add.",
+            code="invalid_input",
+        )
+        sys.exit(1)
+
+    language = _resolve_language(args, args.file_path or args.target_module or "")
+    selection = resolve_selection(args.project_path, language, selected)
+
+    _status(f"Adding {len(selection.selected)} package(s) to the test project...")
+    try:
+        report = install_missing(selection, args.project_path, args.test_dir)
+    except Exception as exc:  # noqa: BLE001 — every failure is reported, not raised
+        _fail(exc, stage="write")
+        return
+
+    for step in report.steps:
+        _status(f"{'ok' if step.ok else 'failed'}: {' '.join(step.command)}")
+    _print_result({"success": True, "install": report.to_dict()})
 
 
 def _run_resolve_destination(agent, args) -> None:  # noqa: ARG001 — no LLM needed
@@ -406,6 +508,8 @@ def _run_resolve_destination(agent, args) -> None:  # noqa: ARG001 — no LLM ne
 _ACTION_HANDLERS = {
     "analyze-coverage": _run_analyze_coverage,
     "resolve-destination": _run_resolve_destination,
+    "resolve-libraries": _run_resolve_libraries,
+    "add-packages": _run_add_packages,
     "generate-unit": _run_generate_unit,
     "generate-e2e": _run_generate_e2e,
     "generate-tdd": _run_generate_tdd,
@@ -444,6 +548,15 @@ def main() -> None:
     )
     parser.add_argument(
         "--snippet-type", default="function", help="Snippet type for TDD"
+    )
+    parser.add_argument(
+        "--test-libraries",
+        default=None,
+        help=(
+            "Comma-separated test library ids (see test_generation.libraries), "
+            "e.g. xunit,fluentassertions,moq. Omitted, the project's own "
+            "manifests decide."
+        ),
     )
     parser.add_argument(
         "--test-dir",

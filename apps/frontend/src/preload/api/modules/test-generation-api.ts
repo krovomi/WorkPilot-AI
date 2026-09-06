@@ -1,8 +1,10 @@
 import { type IpcRendererEvent, ipcRenderer } from "electron";
 import type {
+	PackageInstallReport,
 	TestDestination,
 	TestGenerationError,
 	TestGenStageEvent,
+	TestLibrarySelection,
 } from "../../../shared/types/test-generation";
 
 /**
@@ -11,7 +13,13 @@ import type {
  * Provides access to test generation functionality from the renderer process.
  */
 
-export type { TestDestination, TestGenerationError, TestGenStageEvent };
+export type {
+	PackageInstallReport,
+	TestDestination,
+	TestGenerationError,
+	TestGenStageEvent,
+	TestLibrarySelection,
+};
 
 export interface TestGenerationAPI {
 	analyzeTestCoverage: (
@@ -34,18 +42,47 @@ export interface TestGenerationAPI {
 		destination?: TestDestination | null;
 		error?: string;
 	}>;
+	/**
+	 * What the tests would be written against: the catalogue, what the project
+	 * already references, and the resulting selection. Filesystem only.
+	 */
+	resolveTestLibraries: (
+		filePath?: string,
+		projectPath?: string,
+		selected?: string[],
+	) => Promise<{
+		success: boolean;
+		libraries?: TestLibrarySelection | null;
+		error?: string;
+	}>;
+	/**
+	 * Add the chosen-but-absent packages to the project's test project. Never
+	 * called by a generation — only from an explicit user action.
+	 */
+	addTestPackages: (
+		selected: string[],
+		projectPath: string,
+		testDir?: string,
+		filePath?: string,
+	) => Promise<{
+		success: boolean;
+		report?: PackageInstallReport | null;
+		error?: string;
+	}>;
 	generateUnitTests: (
 		filePath: string,
 		existingTestPath?: string,
 		coverageTarget?: number,
 		projectPath?: string,
 		testDir?: string,
+		testLibraries?: string[],
 	) => Promise<{ success: boolean; error?: string }>;
 	generateE2ETests: (
 		userStory: string,
 		targetModule: string,
 		projectPath?: string,
 		testDir?: string,
+		testLibraries?: string[],
 	) => Promise<{ success: boolean; error?: string }>;
 	generateTDDTests: (
 		description: string,
@@ -53,6 +90,7 @@ export interface TestGenerationAPI {
 		snippetType: string,
 		projectPath?: string,
 		testDir?: string,
+		testLibraries?: string[],
 	) => Promise<{ success: boolean; error?: string }>;
 	cancelTestGeneration: () => Promise<{
 		success: boolean;
@@ -157,12 +195,47 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		});
 	},
 
+	resolveTestLibraries: async (
+		filePath?: string,
+		projectPath?: string,
+		selected?: string[],
+	): Promise<{
+		success: boolean;
+		libraries?: TestLibrarySelection | null;
+		error?: string;
+	}> => {
+		return await ipcRenderer.invoke("test-generation:resolve-libraries", {
+			filePath,
+			projectPath,
+			selected,
+		});
+	},
+
+	addTestPackages: async (
+		selected: string[],
+		projectPath: string,
+		testDir?: string,
+		filePath?: string,
+	): Promise<{
+		success: boolean;
+		report?: PackageInstallReport | null;
+		error?: string;
+	}> => {
+		return await ipcRenderer.invoke("test-generation:add-packages", {
+			selected,
+			projectPath,
+			testDir,
+			filePath,
+		});
+	},
+
 	generateUnitTests: async (
 		filePath: string,
 		existingTestPath?: string,
 		coverageTarget?: number,
 		projectPath?: string,
 		testDir?: string,
+		testLibraries?: string[],
 	): Promise<{ success: boolean; error?: string }> => {
 		return await ipcRenderer.invoke("test-generation:generate-unit", {
 			filePath,
@@ -170,6 +243,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 			coverageTarget,
 			projectPath,
 			testDir,
+			testLibraries,
 		});
 	},
 
@@ -178,12 +252,14 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		targetModule: string,
 		projectPath?: string,
 		testDir?: string,
+		testLibraries?: string[],
 	): Promise<{ success: boolean; error?: string }> => {
 		return await ipcRenderer.invoke("test-generation:generate-e2e", {
 			userStory,
 			targetModule,
 			projectPath,
 			testDir,
+			testLibraries,
 		});
 	},
 
@@ -193,6 +269,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		snippetType: string,
 		projectPath?: string,
 		testDir?: string,
+		testLibraries?: string[],
 	): Promise<{ success: boolean; error?: string }> => {
 		return await ipcRenderer.invoke("test-generation:generate-tdd", {
 			description,
@@ -200,6 +277,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 			snippetType,
 			projectPath,
 			testDir,
+			testLibraries,
 		});
 	},
 

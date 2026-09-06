@@ -646,12 +646,18 @@ class TestGeneratorAgent:
         max_tests_per_function: int = 3,
         project_path: str | None = None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         """Generate a complete unit test file for *file_path*.
 
         ``on_event`` — optional callback for live progress: pipeline ``stage``
         events and ``code`` chunks as the model streams the test file (see
         :data:`GenEvent`).
+
+        ``test_libraries`` — ids from ``test_generation.libraries``. Left out,
+        the project's own manifests decide; a project that references
+        FluentAssertions and Moq gets tests written with them without anyone
+        having to say so.
         """
         return asyncio.run(
             self._generate_unit_async(
@@ -660,6 +666,7 @@ class TestGeneratorAgent:
                 max_tests_per_function,
                 project_path,
                 on_event,
+                test_libraries,
             )
         )
 
@@ -669,10 +676,13 @@ class TestGeneratorAgent:
         target_module: str,
         project_path: str | None = None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         """Generate E2E tests from a user story."""
         return asyncio.run(
-            self._generate_e2e_async(user_story, target_module, project_path, on_event)
+            self._generate_e2e_async(
+                user_story, target_module, project_path, on_event, test_libraries
+            )
         )
 
     def generate_tdd_tests(
@@ -680,11 +690,43 @@ class TestGeneratorAgent:
         spec: dict[str, Any],
         project_path: str | None = None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         """Generate failing tests (TDD red phase) based on a spec."""
-        return asyncio.run(self._generate_tdd_async(spec, project_path, on_event))
+        return asyncio.run(
+            self._generate_tdd_async(spec, project_path, on_event, test_libraries)
+        )
 
     # ── Async implementations ────────────────────────────────────────
+
+    @staticmethod
+    def _libraries_section(
+        project_path: str | None,
+        framework_info: dict[str, str],
+        test_libraries: list[str] | None,
+    ) -> str:
+        """The prompt fragment naming what to write the tests against.
+
+        Never fatal: a project whose manifests cannot be read still gets a test
+        file, just one written in the language's default idiom. Losing a
+        generation over a missing csproj would be a worse trade than losing the
+        house assertion style.
+        """
+        try:
+            from test_generation.libraries import (
+                render_prompt_section,
+                resolve_selection,
+            )
+
+            selection = resolve_selection(
+                project_path or framework_info.get("project_root") or ".",
+                framework_info.get("language", "unknown"),
+                test_libraries,
+            )
+            return render_prompt_section(selection)
+        except Exception:  # noqa: BLE001 — a style hint is not worth a failure
+            logger.debug("could not resolve test libraries", exc_info=True)
+            return ""
 
     @staticmethod
     def _emit(on_event: Callable[[GenEvent], None] | None, event: GenEvent) -> None:
@@ -773,6 +815,7 @@ class TestGeneratorAgent:
         max_tests_per_function: int,
         project_path: str | None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         self._emit(on_event, {"type": "stage", "stage": "detect"})
         framework_info = self._project_analyzer.detect(file_path, project_path)
@@ -821,7 +864,12 @@ class TestGeneratorAgent:
 
         self._emit(on_event, {"type": "stage", "stage": "generate"})
         prompt = self._generate_unit_prompt(
-            source, file_path, framework_info, existing, max_tests_per_function
+            source,
+            file_path,
+            framework_info,
+            existing,
+            max_tests_per_function,
+            self._libraries_section(project_path, framework_info, test_libraries),
         )
         response = await self._generate_with_events(prompt, project_path, on_event)
         return self._parse_generation_result(
@@ -834,6 +882,7 @@ class TestGeneratorAgent:
         target_module: str,
         project_path: str | None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         self._emit(on_event, {"type": "stage", "stage": "detect"})
         # Try to detect framework from target module; fall back to project_path
@@ -869,7 +918,12 @@ class TestGeneratorAgent:
         print("Asking the model to generate E2E tests...", flush=True)
 
         self._emit(on_event, {"type": "stage", "stage": "generate"})
-        prompt = self._generate_e2e_prompt(user_story, target_module, framework_info)
+        prompt = self._generate_e2e_prompt(
+            user_story,
+            target_module,
+            framework_info,
+            self._libraries_section(project_path, framework_info, test_libraries),
+        )
         response = await self._generate_with_events(prompt, project_path, on_event)
         return self._parse_generation_result(
             response, target_module, "e2e", framework_info
@@ -880,6 +934,7 @@ class TestGeneratorAgent:
         spec: dict[str, Any],
         project_path: str | None,
         on_event: Callable[[GenEvent], None] | None = None,
+        test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         self._emit(on_event, {"type": "stage", "stage": "detect"})
         language = spec.get("language", "python")
@@ -932,7 +987,11 @@ class TestGeneratorAgent:
         )
 
         self._emit(on_event, {"type": "stage", "stage": "generate"})
-        prompt = self._generate_tdd_prompt(spec, framework_info)
+        prompt = self._generate_tdd_prompt(
+            spec,
+            framework_info,
+            self._libraries_section(project_path, framework_info, test_libraries),
+        )
         response = await self._generate_with_events(prompt, project_path, on_event)
         spec_name = spec.get("name", "feature")
         slug = re.sub(r"[^a-z0-9_]", "_", spec_name.lower())
@@ -1074,6 +1133,7 @@ Only include items NOT already covered by the existing test file."""
         framework_info: dict[str, str],
         existing: str,
         max_tests_per_function: int,
+        libraries_section: str = "",
     ) -> str:
         language = framework_info["language"]
         framework = framework_info["test_framework"]
@@ -1099,7 +1159,7 @@ Only include items NOT already covered by the existing test file."""
 
 Source file: {file_path}
 Test framework: {framework}
-Max tests per function: {max_tests_per_function}
+Max tests per function: {max_tests_per_function}{libraries_section}
 
 Source code:
 ```{language}
@@ -1133,6 +1193,7 @@ Return ONLY a raw JSON object (no markdown, no explanation) matching this schema
         user_story: str,
         target_module: str,
         framework_info: dict[str, str],
+        libraries_section: str = "",
     ) -> str:
         language = framework_info["language"]
         framework = framework_info["test_framework"]
@@ -1145,7 +1206,7 @@ User story:
 
 Target module/file: {target_module}
 Test framework: {framework}
-Language: {language}
+Language: {language}{libraries_section}
 
 Requirements:
 1. Map each acceptance criterion to one or more test scenarios.
@@ -1171,6 +1232,7 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
         self,
         spec: dict[str, Any],
         framework_info: dict[str, str],
+        libraries_section: str = "",
     ) -> str:
         language = framework_info["language"]
         framework = framework_info["test_framework"]
@@ -1185,7 +1247,7 @@ What needs to be implemented:
 
 Snippet type: {snippet_type}
 Language: {language}
-Test framework: {framework}
+Test framework: {framework}{libraries_section}
 
 Requirements:
 1. Tests MUST FAIL until the implementation exists — this is the TDD red phase.

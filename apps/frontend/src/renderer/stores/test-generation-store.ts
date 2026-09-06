@@ -181,11 +181,13 @@ interface TestGenerationState {
 		existingTestPath?: string,
 		coverageTarget?: number,
 		testDir?: string,
+		testLibraries?: string[],
 	) => Promise<TestGenerationResult>;
 	generateE2ETests: (
 		userStory: string,
 		targetModule: string,
 		testDir?: string,
+		testLibraries?: string[],
 	) => Promise<TestGenerationResult>;
 	generateTDDTests: (
 		spec: {
@@ -194,6 +196,7 @@ interface TestGenerationState {
 			snippet_type: string;
 		},
 		testDir?: string,
+		testLibraries?: string[],
 	) => Promise<TestGenerationResult>;
 	runPostBuildGeneration: (
 		projectPath: string,
@@ -477,6 +480,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			existingTestPath?: string,
 			coverageTarget?: number,
 			testDir?: string,
+			testLibraries?: string[],
 		) => {
 			const { setPhase, setStatus, setResult, resetLive } = get();
 			setPhase("generating");
@@ -489,6 +493,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 						existingTestPath,
 						coverageTarget,
 						testDir,
+						testLibraries,
 					),
 			});
 
@@ -536,6 +541,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					coverageTarget,
 					projectPath,
 					testDir,
+					testLibraries,
 				);
 			});
 		},
@@ -544,13 +550,20 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			userStory: string,
 			targetModule: string,
 			testDir?: string,
+			testLibraries?: string[],
 		) => {
 			const { setPhase, setStatus, setResult, resetLive } = get();
 			setPhase("generating");
 			setStatus("Generating E2E tests...");
 			resetLive();
 			set({
-				lastRun: () => get().generateE2ETests(userStory, targetModule, testDir),
+				lastRun: () =>
+					get().generateE2ETests(
+						userStory,
+						targetModule,
+						testDir,
+						testLibraries,
+					),
 			});
 
 			return new Promise<TestGenerationResult>((resolve, reject) => {
@@ -596,6 +609,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					targetModule,
 					projectPath,
 					testDir,
+					testLibraries,
 				);
 			});
 		},
@@ -607,12 +621,15 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				snippet_type: string;
 			},
 			testDir?: string,
+			testLibraries?: string[],
 		) => {
 			const { setPhase, setStatus, setResult, resetLive } = get();
 			setPhase("generating");
 			setStatus("Generating TDD tests...");
 			resetLive();
-			set({ lastRun: () => get().generateTDDTests(spec, testDir) });
+			set({
+				lastRun: () => get().generateTDDTests(spec, testDir, testLibraries),
+			});
 
 			return new Promise<TestGenerationResult>((resolve, reject) => {
 				const onStatus = (status: string) => setStatus(status);
@@ -658,6 +675,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					spec.snippet_type,
 					projectPath,
 					testDir,
+					testLibraries,
 				);
 			});
 		},

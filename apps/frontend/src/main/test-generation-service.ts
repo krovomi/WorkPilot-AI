@@ -4,14 +4,18 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import type {
+	PackageInstallReport,
 	TestDestination,
 	TestGenerationError,
 	TestGenErrorCode,
 	TestGenStageEvent,
+	TestLibrarySelection,
 } from "../shared/types/test-generation";
 import {
 	normalizeTestGenerationError,
+	parsePackageInstallReport,
 	parseTestDestination,
+	parseTestLibrarySelection,
 } from "../shared/types/test-generation";
 import { getRunnerEnv } from "./ipc-handlers/github/utils/runner-env";
 
@@ -72,7 +76,10 @@ function classifyProcessFailure(text: string): TestGenErrorCode {
 const RESULT_PREFIX = "__TEST_GENERATION_RESULT__:";
 
 /** A pre-flight that outlives this is broken, not slow. */
-const RESOLVE_DESTINATION_TIMEOUT_MS = 15_000;
+const RESOLVE_TIMEOUT_MS = 15_000;
+
+/** `dotnet add package` restores from the network; give it room. */
+const INSTALL_TIMEOUT_MS = 240_000;
 
 export class TestGenerationService extends EventEmitter {
 	private activeProcess: ChildProcess | null = null;
@@ -171,6 +178,7 @@ export class TestGenerationService extends EventEmitter {
 		coverageTarget?: number,
 		projectPath?: string,
 		testDir?: string,
+		testLibraries?: string[],
 	): Promise<void> {
 		const args = [
 			"--action",
@@ -189,6 +197,9 @@ export class TestGenerationService extends EventEmitter {
 		if (testDir) {
 			args.push("--test-dir", testDir);
 		}
+		if (testLibraries?.length) {
+			args.push("--test-libraries", testLibraries.join(","));
+		}
 		await this.spawnRunner(args, "complete");
 	}
 
@@ -200,6 +211,7 @@ export class TestGenerationService extends EventEmitter {
 		targetModule: string,
 		projectPath?: string,
 		testDir?: string,
+		testLibraries?: string[],
 	): Promise<void> {
 		const args = [
 			"--action",
@@ -215,6 +227,9 @@ export class TestGenerationService extends EventEmitter {
 		if (testDir) {
 			args.push("--test-dir", testDir);
 		}
+		if (testLibraries?.length) {
+			args.push("--test-libraries", testLibraries.join(","));
+		}
 		await this.spawnRunner(args, "complete");
 	}
 
@@ -227,6 +242,7 @@ export class TestGenerationService extends EventEmitter {
 		snippetType: string,
 		projectPath?: string,
 		testDir?: string,
+		testLibraries?: string[],
 	): Promise<void> {
 		const args = [
 			"--action",
@@ -243,6 +259,9 @@ export class TestGenerationService extends EventEmitter {
 		}
 		if (testDir) {
 			args.push("--test-dir", testDir);
+		}
+		if (testLibraries?.length) {
+			args.push("--test-libraries", testLibraries.join(","));
 		}
 		await this.spawnRunner(args, "complete");
 	}
@@ -265,6 +284,77 @@ export class TestGenerationService extends EventEmitter {
 		projectPath?: string,
 		existingTestPath?: string,
 	): Promise<TestDestination | null> {
+		const args = ["--action", "resolve-destination", "--file-path", filePath];
+		if (projectPath) args.push("--project-path", projectPath);
+		if (existingTestPath) args.push("--existing-test-path", existingTestPath);
+
+		const payload = await this.runQuietly(args, RESOLVE_TIMEOUT_MS);
+		return parseTestDestination(payload?.destination);
+	}
+
+	/**
+	 * Ask the backend what the tests for `filePath` would be written against.
+	 *
+	 * The catalogue, what the project's manifests already reference, and the
+	 * selection that follows — filesystem only, so the picker can open with the
+	 * project's own stack ticked without paying for a model call.
+	 */
+	async resolveLibraries(
+		filePath: string,
+		projectPath?: string,
+		selected?: string[],
+	): Promise<TestLibrarySelection | null> {
+		const args = ["--action", "resolve-libraries"];
+		if (filePath) args.push("--file-path", filePath);
+		if (projectPath) args.push("--project-path", projectPath);
+		if (selected?.length) args.push("--test-libraries", selected.join(","));
+
+		const payload = await this.runQuietly(args, RESOLVE_TIMEOUT_MS);
+		return parseTestLibrarySelection(payload?.libraries);
+	}
+
+	/**
+	 * Add the selected-but-absent packages to the project's test project.
+	 *
+	 * Separate from generation on purpose: writing a test file must not edit
+	 * someone's `.csproj`, so this only ever runs from a button the user
+	 * pressed after seeing which packages are missing. It can take a while —
+	 * `dotnet add package` restores — hence its own, longer timeout.
+	 */
+	async addPackages(
+		selected: string[],
+		projectPath: string,
+		testDir?: string,
+		filePath?: string,
+	): Promise<PackageInstallReport | null> {
+		const args = [
+			"--action",
+			"add-packages",
+			"--project-path",
+			projectPath,
+			"--test-libraries",
+			selected.join(","),
+		];
+		if (testDir) args.push("--test-dir", testDir);
+		if (filePath) args.push("--file-path", filePath);
+
+		const payload = await this.runQuietly(args, INSTALL_TIMEOUT_MS);
+		return parsePackageInstallReport(payload?.install);
+	}
+
+	/**
+	 * Run one runner action to completion and hand back its result payload.
+	 *
+	 * Deliberately not `spawnRunner`: that one cancels the active generation
+	 * and reports through the shared event stream, and a question asked before
+	 * (or beside) a generation must do neither. Resolves to null on any
+	 * failure — these are pre-flights, and a pre-flight that cannot answer must
+	 * not stop the run the user actually asked for.
+	 */
+	private async runQuietly(
+		args: string[],
+		timeoutMs: number,
+	): Promise<Record<string, unknown> | null> {
 		const backendSource = this.getBackendPath();
 		if (!backendSource) return null;
 
@@ -275,37 +365,24 @@ export class TestGenerationService extends EventEmitter {
 		);
 		if (!existsSync(runnerPath)) return null;
 
-		const args = [
-			runnerPath,
-			"--action",
-			"resolve-destination",
-			"--file-path",
-			filePath,
-		];
-		if (projectPath) args.push("--project-path", projectPath);
-		if (existingTestPath) args.push("--existing-test-path", existingTestPath);
-
 		const processEnv = await getRunnerEnv({ PYTHONPATH: backendSource });
 
-		return await new Promise<TestDestination | null>((resolve) => {
-			const proc = spawn(this.pythonPath, args, {
+		return await new Promise<Record<string, unknown> | null>((resolve) => {
+			const proc = spawn(this.pythonPath, [runnerPath, ...args], {
 				cwd: backendSource,
 				env: processEnv,
 			});
 			let stdout = "";
 			let settled = false;
-			const finish = (value: TestDestination | null) => {
+			const finish = (value: Record<string, unknown> | null) => {
 				if (settled) return;
 				settled = true;
 				resolve(value);
 			};
-			// The answer is path arithmetic; a run that takes seconds is a run
-			// that is stuck, and a stuck pre-flight must not hold up the
-			// generation the user asked for.
 			const timer = setTimeout(() => {
 				proc.kill();
 				finish(null);
-			}, RESOLVE_DESTINATION_TIMEOUT_MS);
+			}, timeoutMs);
 
 			proc.stdout?.on("data", (data: Buffer) => {
 				stdout += data.toString("utf-8");
@@ -321,8 +398,7 @@ export class TestGenerationService extends EventEmitter {
 					.find((entry) => entry.startsWith(RESULT_PREFIX));
 				if (!line) return finish(null);
 				try {
-					const payload = JSON.parse(line.slice(RESULT_PREFIX.length));
-					finish(parseTestDestination(payload?.destination));
+					finish(JSON.parse(line.slice(RESULT_PREFIX.length)));
 				} catch {
 					finish(null);
 				}

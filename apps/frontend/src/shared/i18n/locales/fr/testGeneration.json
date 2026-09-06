@@ -220,5 +220,31 @@
 			"projectRoot": "À la racine du projet",
 			"besideSource": "À côté du fichier source"
 		}
+	},
+	"libraries": {
+		"title": "Bibliothèques de test",
+		"description": "Ce contre quoi les tests générés sont écrits. Pré-rempli à partir des paquets déjà référencés par ce projet.",
+		"loading": "Lecture des paquets du projet…",
+		"installed": "installé",
+		"toAdd": "à ajouter",
+		"reset": "Défaut du projet",
+		"category": {
+			"framework": "Framework",
+			"assertions": "Assertions",
+			"mocking": "Mocking",
+			"data": "Données de test",
+			"http": "HTTP et intégration",
+			"ui": "UI",
+			"snapshot": "Snapshots",
+			"coverage": "Couverture"
+		},
+		"missingWarning_one": "{{count}} paquet n'est pas encore référencé ({{packages}}). Les tests générés ne compileront pas tant qu'il n'est pas ajouté.",
+		"missingWarning_other": "{{count}} paquets ne sont pas encore référencés ({{packages}}). Les tests générés ne compileront pas tant qu'ils ne sont pas ajoutés.",
+		"addPackages_one": "Ajouter {{count}} paquet",
+		"addPackages_other": "Ajouter {{count}} paquets",
+		"installDone_one": "{{count}} paquet ajouté à {{target}}.",
+		"installDone_other": "{{count}} paquets ajoutés à {{target}}.",
+		"installFailed": "Certains paquets n'ont pas pu être ajoutés.",
+		"runByHand": "À lancer vous-même :"
 	}
 }
