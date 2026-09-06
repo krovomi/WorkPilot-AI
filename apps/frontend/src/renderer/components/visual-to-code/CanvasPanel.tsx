@@ -1,10 +1,16 @@
 /**
  * CanvasPanel
  * Interactive visual programming canvas (no-code/low-code).
- * - Flowchart → Code
- * - Architecture diagrams → Implementation
- * - Mockup → Frontend code
- * - Reverse: Code → Visual representation
+ * - Draw an architecture → hand it to the agentic build pipeline
+ * - Draw an architecture → one-shot code preview
+ * - Reverse: a source file → the diagram it implies
+ *
+ * The canvas owns the diagram. Nodes and edges in state are *plain data* —
+ * no callbacks — and the versions handed to ReactFlow are derived, with the
+ * handlers injected at render. That split is what fixes the renames and edge
+ * labels that used to be shown but never saved: there is one owner of a
+ * label now, and it is the array that gets exported, persisted and turned
+ * into the build spec.
  */
 
 import {
@@ -14,21 +20,36 @@ import {
 	FilePlus2,
 	FolderOpen,
 	Loader2,
+	LayoutGrid,
+	MousePointerSquareDashed,
 	PanelLeftClose,
+	PanelLeftOpen,
 	Plus,
+	Redo2,
 	Rocket,
 	Save,
 	Sparkles,
+	Trash2,
+	Undo2,
 } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import ReactFlow, {
 	addEdge,
 	Background,
+	BackgroundVariant,
 	type Connection,
 	Controls,
 	type Edge,
+	MarkerType,
 	MiniMap,
+	type Node,
 	useEdgesState,
 	useNodesState,
 } from "reactflow";
@@ -41,6 +62,12 @@ import type {
 import { saveAs } from "file-saver";
 import { toast } from "@/hooks/use-toast";
 import {
+	blockAccent,
+	blockMeta,
+	FRAMEWORKS_BY_TYPE,
+	needsFramework,
+} from "../../lib/architecture-blocks";
+import {
 	canConnect,
 	connectionLabel,
 	type Lang,
@@ -49,6 +76,16 @@ import {
 	buildArchitectureSpec,
 	sanitizeEdges,
 } from "../../lib/architecture-spec";
+import {
+	canRedo,
+	canUndo,
+	commit as commitHistory,
+	initHistory,
+	redo as redoHistory,
+	signature,
+	undo as undoHistory,
+} from "../../lib/canvas-history";
+import { autoLayout } from "../../lib/canvas-layout";
 import {
 	addProject as registerProject,
 	useProjectStore,
@@ -66,9 +103,21 @@ import {
 	DialogFooter,
 	DialogTitle,
 } from "../ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "../ui/select";
 
 export type { DiagramType } from "../../stores/visual-to-code-store";
+
+const DIAGRAM_TYPES: DiagramType[] = ["architecture", "flowchart", "mockup"];
+
+/** What the Save-As dialog should do once the file is written. */
+type PendingAfterSave = "new-diagram" | null;
+
+// Collision-free node ids. The previous `(nodes.length + 1)` scheme reused ids
+// after a delete (e.g. delete "1" then add → "2" again), which left edges
+// pointing at the wrong / a now-missing node (the dangling `edge-1-6`). Module
+// scope so the callbacks that mint ids stay referentially stable.
+const genNodeId = () =>
+	globalThis.crypto?.randomUUID?.() ??
+	`n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const CanvasPanel: React.FC = () => {
 	const { t, i18n } = useTranslation("visualProgramming");
@@ -97,7 +146,7 @@ export const CanvasPanel: React.FC = () => {
 			: [
 					{
 						id: "1",
-						position: { x: 250, y: 5 },
+						position: { x: 120, y: 80 },
 						data: { label: t("newDiagram", "Nouveau diagramme") },
 						type: "editable",
 					},
@@ -113,54 +162,73 @@ export const CanvasPanel: React.FC = () => {
 		type: string;
 		position: { x: number; y: number };
 	} | null>(null);
-	const [selectedFramework, setSelectedFramework] = useState<string>("");
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
+	const [customFramework, setCustomFramework] = useState("");
+	// biome-ignore lint/suspicious/noExplicitAny: ReactFlow instance has no exported type in v11
 	const reactFlowRef = useRef<any>(null);
-	const [isJsonSaved, setIsJsonSaved] = useState(true);
 	const [showPalette, setShowPalette] = useState(true);
 	// MiniMap is collapsed to a small thumbnail and expands on hover.
 	const [miniMapExpanded, setMiniMapExpanded] = useState(false);
 	const [selectedFolder, setSelectedFolder] = useState<string>("");
 	const [showSaveAsDialog, setShowSaveAsDialog] = useState(false);
 	const [saveAsFileName, setSaveAsFileName] = useState("");
+	const [pendingAfterSave, setPendingAfterSave] =
+		useState<PendingAfterSave>(null);
 
-	// Frameworks par type
-	const FRAMEWORKS: Record<string, { value: string; labelKey: string }[]> = {
-		frontend: [
-			{ value: "React", labelKey: "React" },
-			{ value: "Angular", labelKey: "Angular" },
-			{ value: "Vue", labelKey: "Vue" },
-			{ value: "Svelte", labelKey: "Svelte" },
-		],
-		desktop: [
-			{ value: "WPF", labelKey: "WPF" },
-			{ value: "WinForms", labelKey: "WinForms" },
-			{ value: "WinUI", labelKey: "WinUI" },
-			{ value: "DotNetMaui", labelKey: "DotNetMaui" },
-			{ value: "Avalonia", labelKey: "Avalonia" },
-			{ value: "Electron", labelKey: "Electron" },
-			{ value: "Qt", labelKey: "Qt" },
-		],
-		backend: [
-			{ value: "NodeJs", labelKey: "NodeJs" },
-			{ value: "Python", labelKey: "Python" },
-			{ value: "DotNet", labelKey: ".Net" },
-			{ value: "Django", labelKey: "Django" },
-			{ value: "Flask", labelKey: "Flask" },
-			{ value: "Spring", labelKey: "Spring" },
-		],
-		database: [
-			{ value: "Postgres", labelKey: "Postgres" },
-			{ value: "MySql", labelKey: "MySql" },
-			{ value: "MongoDb", labelKey: "MongoDb" },
-			{ value: "Sqlite", labelKey: "Sqlite" },
-		],
-		api: [
-			{ value: "Rest", labelKey: "Rest" },
-			{ value: "Graphql", labelKey: "Graphql" },
-			{ value: "Grpc", labelKey: "Grpc" },
-		],
-	};
+	// ── Dirty tracking ──────────────────────────────────────────────────
+	// Derived from a content signature rather than flipped on every ReactFlow
+	// change: selecting a node used to mark the diagram unsaved, so the
+	// "unsaved" dot was on permanently and meant nothing.
+	const currentSignature = useMemo(
+		() => signature({ nodes, edges }),
+		[nodes, edges],
+	);
+	const [savedSignature, setSavedSignature] = useState(currentSignature);
+	const isDirty = currentSignature !== savedSignature;
+
+	// ── Undo / redo ─────────────────────────────────────────────────────
+	const historyRef = useRef(initHistory({ nodes, edges }));
+	const [historyTick, setHistoryTick] = useState(0);
+	useEffect(() => {
+		// Debounced: a drag emits a position change per frame, and committing
+		// each one would bury the previous real state under a hundred entries.
+		const timer = setTimeout(() => {
+			const next = commitHistory(historyRef.current, { nodes, edges });
+			if (next !== historyRef.current) {
+				historyRef.current = next;
+				setHistoryTick((v) => v + 1);
+			}
+		}, 350);
+		return () => clearTimeout(timer);
+	}, [nodes, edges]);
+
+	const applySnapshot = useCallback(
+		(snapshot: { nodes: Node[]; edges: Edge[] }) => {
+			setNodes(snapshot.nodes);
+			setEdges(snapshot.edges);
+		},
+		[setEdges, setNodes],
+	);
+
+	const handleUndo = useCallback(() => {
+		if (!canUndo(historyRef.current)) return;
+		historyRef.current = undoHistory(historyRef.current);
+		applySnapshot(historyRef.current.present);
+		setHistoryTick((v) => v + 1);
+	}, [applySnapshot]);
+
+	const handleRedo = useCallback(() => {
+		if (!canRedo(historyRef.current)) return;
+		historyRef.current = redoHistory(historyRef.current);
+		applySnapshot(historyRef.current.present);
+		setHistoryTick((v) => v + 1);
+	}, [applySnapshot]);
+
+	// Read during render, not memoised: the stack lives in a ref (it must not
+	// re-render the canvas on every commit), so `historyTick` is what schedules
+	// the render and these two just read the current value once it happens.
+	void historyTick;
+	const undoAvailable = canUndo(historyRef.current);
+	const redoAvailable = canRedo(historyRef.current);
 
 	// ── AI generation state ─────────────────────────────────────────────
 	const [isAiRunning, setIsAiRunning] = useState(false);
@@ -169,6 +237,92 @@ export const CanvasPanel: React.FC = () => {
 	const [codeResult, setCodeResult] = useState<GenerateCodeResult | null>(null);
 	const [selectedCodeFile, setSelectedCodeFile] = useState(0);
 	const codeToVisualInputRef = useRef<HTMLInputElement>(null);
+
+	// ── Node / edge mutation ────────────────────────────────────────────
+	const handleRenameNode = useCallback(
+		(id: string, newLabel: string) => {
+			setNodes((nds) =>
+				nds.map((n) =>
+					n.id === id ? { ...n, data: { ...n.data, label: newLabel } } : n,
+				),
+			);
+		},
+		[setNodes],
+	);
+
+	const handleDeleteNode = useCallback(
+		(id: string) => {
+			setNodes((nds) => nds.filter((n) => n.id !== id));
+			// Drop the edges that pointed at it in the same beat. Leaving them
+			// behind is what produced the dangling `edge-1-6` the spec builder
+			// had to defend against.
+			setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
+		},
+		[setEdges, setNodes],
+	);
+
+	const handleEdgeLabelChange = useCallback(
+		(id: string, newLabel: string) => {
+			setEdges((eds) =>
+				eds.map((e) =>
+					e.id === id ? { ...e, data: { ...e.data, label: newLabel } } : e,
+				),
+			);
+		},
+		[setEdges],
+	);
+
+	const handleDeleteEdge = useCallback(
+		(id: string) => setEdges((eds) => eds.filter((e) => e.id !== id)),
+		[setEdges],
+	);
+
+	const handleSetFramework = useCallback(
+		(id: string, framework: string) => {
+			setNodes((nds) =>
+				nds.map((n) =>
+					n.id === id ? { ...n, data: { ...n.data, framework } } : n,
+				),
+			);
+		},
+		[setNodes],
+	);
+
+	// The arrays ReactFlow actually renders: state data plus the handlers. Kept
+	// out of state so what we persist and export stays serialisable.
+	const renderNodes = useMemo(
+		() =>
+			nodes.map((n) => ({
+				...n,
+				data: {
+					...n.data,
+					onRename: handleRenameNode,
+					onDelete: handleDeleteNode,
+				},
+			})),
+		[nodes, handleRenameNode, handleDeleteNode],
+	);
+
+	const renderEdges = useMemo(
+		() =>
+			edges.map((e) => ({
+				...e,
+				markerEnd: e.markerEnd ?? {
+					type: MarkerType.ArrowClosed,
+					width: 18,
+					height: 18,
+				},
+				data: {
+					...e.data,
+					onEdgeLabelChange: handleEdgeLabelChange,
+					onDelete: handleDeleteEdge,
+				},
+			})),
+		[edges, handleEdgeLabelChange, handleDeleteEdge],
+	);
+
+	const selectedNodes = useMemo(() => nodes.filter((n) => n.selected), [nodes]);
+	const inspected = selectedNodes.length === 1 ? selectedNodes[0] : null;
 
 	// Extracted event handlers to reduce nesting
 	const handleVisualProgrammingStatus = useCallback((msg: string) => {
@@ -206,28 +360,45 @@ export const CanvasPanel: React.FC = () => {
 				});
 			} else if (payload.action === "code-to-visual") {
 				const result = payload.data as CodeToVisualResult;
-				const newNodes = result.nodes.map((n, i) => ({
-					id: n.id || `imported-${i}`,
-					position: { x: 120 + (i % 4) * 220, y: 80 + Math.floor(i / 4) * 120 },
-					data: {
-						label: n.label,
-						type: n.type,
-						framework: n.framework,
-					},
-					type: "editable" as const,
-				}));
-				const newEdges = result.edges.map((e, i) => ({
-					id: `imported-edge-${i}`,
-					source: e.source,
-					target: e.target,
-					data: { label: e.label || "" },
-				}));
-				setNodes(newNodes);
+				// The model's own node ids are the ones its edges reference. Minting
+				// a replacement id for a node that came back without one used to
+				// orphan every edge that named it, so the import produced a pile of
+				// disconnected boxes.
+				const idFor = new Map<number, string>();
+				const newNodes = result.nodes.map((n, i) => {
+					const id = n.id?.trim() || `imported-${i}`;
+					idFor.set(i, id);
+					return {
+						id,
+						position: { x: 0, y: 0 },
+						data: {
+							label: n.label,
+							type: n.type,
+							framework: n.framework,
+						},
+						type: "editable" as const,
+					};
+				});
+				const known = new Set(newNodes.map((n) => n.id));
+				const newEdges = result.edges
+					.filter((e) => known.has(e.source) && known.has(e.target))
+					.map((e, i) => ({
+						id: `imported-edge-${i}`,
+						source: e.source,
+						target: e.target,
+						data: { label: e.label || "" },
+					}));
+				// An imported diagram has no coordinates at all; laying it out is the
+				// difference between a readable result and a stack at the origin.
+				setNodes(autoLayout(newNodes, newEdges));
 				setEdges(newEdges);
-				setIsJsonSaved(false);
+				const dropped = result.edges.length - newEdges.length;
 				toast({
 					title: t("codeToVisualDone", "Diagramme généré !"),
-					description: result.summary,
+					description:
+						dropped > 0
+							? `${result.summary} — ${t("droppedEdges", "{{count}} connexion(s) ignorée(s)", { count: dropped })}`
+							: result.summary,
 				});
 			}
 		},
@@ -250,7 +421,6 @@ export const CanvasPanel: React.FC = () => {
 			offError?.();
 			offComplete?.();
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		handleVisualProgrammingComplete,
 		handleVisualProgrammingError,
@@ -279,7 +449,11 @@ export const CanvasPanel: React.FC = () => {
 		}
 		setIsAiRunning(true);
 		setAiStatus(t("starting", "Démarrage…"));
-		const diagramJson = JSON.stringify({ nodes, edges, diagramType });
+		const diagramJson = JSON.stringify({
+			nodes,
+			edges: sanitizeEdges(nodes, edges),
+			diagramType,
+		});
 		await globalThis.electronAPI.runVisualProgramming({
 			action: "generate-code",
 			diagramJson,
@@ -305,7 +479,7 @@ export const CanvasPanel: React.FC = () => {
 		setAiStatus(t("starting", "Démarrage…"));
 		await globalThis.electronAPI.runVisualProgramming({
 			action: "code-to-visual",
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
+			// biome-ignore lint/suspicious/noExplicitAny: Electron's File carries `path`
 			filePath: (file as any).path || file.name,
 		});
 	};
@@ -315,6 +489,22 @@ export const CanvasPanel: React.FC = () => {
 		const tgt = nodes.find((n) => n.id === params.target);
 		const srcType = src?.data?.type as string | undefined;
 		const tgtType = tgt?.data?.type as string | undefined;
+		// Drawing the same connection twice produced two overlapping edges, two
+		// labels stacked on each other, and a duplicated line in the spec.
+		if (
+			edges.some(
+				(e) => e.source === params.source && e.target === params.target,
+			)
+		) {
+			toast({
+				title: t("duplicateConnection", "Connexion déjà présente"),
+				description: t(
+					"duplicateConnectionDesc",
+					"Ces deux blocs sont déjà reliés dans ce sens.",
+				),
+			});
+			return;
+		}
 		// Only allow logical software-architecture edges (e.g. reject Worker →
 		// Database). Untyped/custom nodes stay permissive.
 		if (!canConnect(srcType, tgtType)) {
@@ -332,15 +522,7 @@ export const CanvasPanel: React.FC = () => {
 		// architecture (and the generated spec is precise).
 		const label = connectionLabel(srcType, tgtType, lang);
 		setEdges((eds) => addEdge({ ...params, data: { label } }, eds));
-		setIsJsonSaved(false);
 	};
-
-	// Collision-free node ids. The previous `(nodes.length + 1)` scheme reused
-	// ids after a delete (e.g. delete "1" then add → "2" again), which left
-	// edges pointing at the wrong / a now-missing node (the dangling `edge-1-6`).
-	const genNodeId = () =>
-		globalThis.crypto?.randomUUID?.() ??
-		`n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 	// ── Scaffold on demand ──────────────────────────────────────────────
 	// Hand the drawn architecture to WorkPilot's agentic build pipeline: the
@@ -498,38 +680,98 @@ export const CanvasPanel: React.FC = () => {
 		}
 	};
 
-	const handleAddNode = () => {
-		const newId = genNodeId();
-		setNodes((nds) => [
-			...nds,
-			{
-				id: newId,
-				position: { x: 100 + 50 * nodes.length, y: 100 + 30 * nodes.length },
-				data: {
-					label: t("newBlock", "Nouveau bloc"),
-					onRename: handleRenameNode,
+	const paneRef = useRef<HTMLDivElement>(null);
+
+	/** Centre of the visible canvas, in diagram coordinates. */
+	const viewportCenter = useCallback(() => {
+		const instance = reactFlowRef.current;
+		const pane = paneRef.current;
+		if (instance?.screenToFlowPosition && pane) {
+			const box = pane.getBoundingClientRect();
+			return instance.screenToFlowPosition({
+				x: box.left + box.width / 2,
+				y: box.top + box.height / 2,
+			});
+		}
+		return { x: 160 + 40 * nodes.length, y: 120 + 30 * nodes.length };
+	}, [nodes.length]);
+
+	const createNode = useCallback(
+		(type: string | undefined, position: { x: number; y: number }) => {
+			const id = genNodeId();
+			const label = type
+				? t(blockMeta(type)?.labelKey ?? type, type)
+				: t("newBlock", "Nouveau bloc");
+			setNodes((nds) => [
+				...nds,
+				{
+					id,
+					position,
+					data: { label, ...(type ? { type } : {}) },
+					type: "editable",
 				},
-				type: "editable",
-			},
-		]);
+			]);
+			return id;
+		},
+		[setNodes, t],
+	);
+
+	/**
+	 * Place a block. Types with a meaningful stack choice open the technology
+	 * dialog first; the rest (a Redis cache, a CDN) are created straight away —
+	 * asking "which framework?" about them had no useful answer.
+	 */
+	const placeBlock = useCallback(
+		(type: string, position: { x: number; y: number }) => {
+			if (needsFramework(type)) {
+				setPendingNode({ id: genNodeId(), type, position });
+				setCustomFramework("");
+				setShowFrameworkModal(true);
+				return;
+			}
+			createNode(type, position);
+		},
+		[createNode],
+	);
+
+	const handleAddBlockFromPalette = useCallback(
+		(type: string) => placeBlock(type, viewportCenter()),
+		[placeBlock, viewportCenter],
+	);
+
+	const handleAddNode = () => {
+		createNode(undefined, viewportCenter());
+	};
+
+	const handleAutoLayout = () => {
+		if (nodes.length === 0) return;
+		setNodes((nds) => autoLayout(nds, sanitizeEdges(nds, edges)));
+		globalThis.setTimeout(
+			() => reactFlowRef.current?.fitView?.({ padding: 0.2, duration: 300 }),
+			60,
+		);
 	};
 
 	const handleExportCode = () => {
 		const exportData = {
 			nodes,
-			edges,
+			edges: sanitizeEdges(nodes, edges),
 			diagramType,
 			exportedAt: new Date().toISOString(),
 		};
-		const now = new Date();
-		const pad = (n: number, l: number = 2) => n.toString().padStart(l, "0");
-		const fileName = `${diagramType}-export-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}.json`;
 		saveAs(
 			new Blob([JSON.stringify(exportData, null, 2)], {
 				type: "application/json",
 			}),
-			fileName,
+			getDefaultFileName(),
 		);
+	};
+
+	const getDiagramPrefix = (type: string) => {
+		if (type === "architecture") return "architectural";
+		if (type === "flowchart") return "organigramme";
+		if (type === "mockup") return "mockup";
+		return "diagram";
 	};
 
 	const getDefaultFileName = () => {
@@ -538,64 +780,132 @@ export const CanvasPanel: React.FC = () => {
 		return `${getDiagramPrefix(diagramType)}-export-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}.json`;
 	};
 
+	const newDiagram = useCallback(() => {
+		const fresh = [
+			{
+				id: genNodeId(),
+				position: { x: 120, y: 80 },
+				data: { label: t("newDiagram", "Nouveau diagramme") },
+				type: "editable" as const,
+				selected: false,
+			},
+		];
+		setNodes(fresh);
+		setEdges([]);
+		setShowFrameworkModal(false);
+		setPendingNode(null);
+		// A brand-new diagram has nothing worth saving yet; marking it dirty at
+		// birth made the save prompt fire on every second "New diagram".
+		setSavedSignature(signature({ nodes: fresh, edges: [] }));
+		historyRef.current = initHistory({ nodes: fresh, edges: [] });
+		setHistoryTick((v) => v + 1);
+	}, [setEdges, setNodes, t]);
+
+	const handleNewDiagram = () => {
+		if (isDirty) {
+			setPendingAfterSave("new-diagram");
+			setSaveAsFileName(getDefaultFileName());
+			setShowSaveAsDialog(true);
+			return;
+		}
+		newDiagram();
+	};
+
 	const confirmSaveAs = async () => {
 		const exportData = {
 			nodes,
-			edges,
+			edges: sanitizeEdges(nodes, edges),
 			diagramType,
 			exportedAt: new Date().toISOString(),
 		};
-		const fileName = saveAsFileName;
-		const folderPath = selectedFolder;
 		try {
-			if (globalThis.electronAPI?.saveJsonFile) {
-				const result = await globalThis.electronAPI.saveJsonFile(
-					folderPath,
-					fileName,
-					exportData,
-				);
-				if (result?.success) {
-					setIsJsonSaved(true);
-					setShowSaveAsDialog(false);
-					toast({
-						title: t("saveSuccess", "Sauvegarde réussie"),
-						description: `${t("fileSavedIn", "Fichier sauvegardé dans")} ${folderPath}`,
-					});
-				} else {
-					toast({
-						title: t("saveError", "Erreur lors de la sauvegarde"),
-						description: result?.error || "Erreur inconnue",
-					});
-				}
-			} else {
+			if (!globalThis.electronAPI?.saveJsonFile) {
 				toast({
-					title: t("saveError", "Electron API non disponible"),
-					description: "Impossible de sauvegarder le fichier côté client.",
+					title: t("saveError", "Erreur lors de la sauvegarde"),
+					description: "Electron API non disponible",
+					variant: "destructive",
 				});
+				return;
 			}
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		} catch (e: any) {
+			const result = await globalThis.electronAPI.saveJsonFile(
+				selectedFolder,
+				saveAsFileName,
+				exportData,
+			);
+			if (!result?.success) {
+				toast({
+					title: t("saveError", "Erreur lors de la sauvegarde"),
+					description: result?.error || "Erreur inconnue",
+					variant: "destructive",
+				});
+				return;
+			}
+			setSavedSignature(currentSignature);
+			setShowSaveAsDialog(false);
+			toast({
+				title: t("saveSuccess", "Sauvegarde réussie"),
+				description: `${t("fileSavedIn", "Fichier sauvegardé dans")} ${selectedFolder}`,
+			});
+			if (pendingAfterSave === "new-diagram") newDiagram();
+			setPendingAfterSave(null);
+		} catch (e) {
 			toast({
 				title: t("saveError", "Erreur lors de la sauvegarde"),
-				description: e.message,
+				description: e instanceof Error ? e.message : String(e),
+				variant: "destructive",
 			});
 		}
 	};
 
+	/** Leave the Save-As dialog without writing, and drop what it was gating. */
 	const cancelSaveAs = () => {
 		setShowSaveAsDialog(false);
-		setNextDiagramType(null);
+		setPendingAfterSave(null);
+	};
+
+	/** "Continue without saving" — only offered when something is waiting. */
+	const discardAndContinue = () => {
+		setShowSaveAsDialog(false);
+		if (pendingAfterSave === "new-diagram") newDiagram();
+		setPendingAfterSave(null);
 	};
 
 	const handleLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
 		if (!file) return;
+		event.target.value = "";
 		try {
-			const content = await file.text();
-			const data = JSON.parse(content);
-			setNodes(data.nodes || []);
-			setEdges(data.edges || []);
-			setDiagramType(data.diagramType || "flowchart");
+			const data = JSON.parse(await file.text());
+			if (!Array.isArray(data?.nodes)) throw new Error("no nodes");
+			const loadedNodes: Node[] = data.nodes.map(
+				(n: Node, i: number): Node => ({
+					...n,
+					id: String(n.id ?? `loaded-${i}`),
+					position: n.position ?? { x: 0, y: 0 },
+					type: "editable",
+					selected: false,
+				}),
+			);
+			const loadedEdges: Edge[] = sanitizeEdges(
+				loadedNodes,
+				Array.isArray(data.edges) ? data.edges : [],
+			);
+			setNodes(loadedNodes);
+			setEdges(loadedEdges);
+			if (DIAGRAM_TYPES.includes(data.diagramType)) {
+				setDiagramType(data.diagramType);
+			}
+			// A file just read from disk *is* the saved state.
+			setSavedSignature(signature({ nodes: loadedNodes, edges: loadedEdges }));
+			historyRef.current = initHistory({
+				nodes: loadedNodes,
+				edges: loadedEdges,
+			});
+			setHistoryTick((v) => v + 1);
+			globalThis.setTimeout(
+				() => reactFlowRef.current?.fitView?.({ padding: 0.2 }),
+				60,
+			);
 		} catch {
 			toast({
 				title: t("loadErrorTitle", "Erreur de chargement"),
@@ -609,14 +919,14 @@ export const CanvasPanel: React.FC = () => {
 		event.preventDefault();
 		const type = event.dataTransfer.getData("application/block-type");
 		if (!type) return;
-		const reactFlowInstance = reactFlowRef.current;
+		const instance = reactFlowRef.current;
 		// screenToFlowPosition maps the cursor's screen coords into the canvas'
 		// coordinate space, accounting for the current pan/zoom, so the block
 		// lands exactly under the drop point. Fall back to pane-relative coords
 		// if the instance isn't ready yet.
 		let position: { x: number; y: number };
-		if (reactFlowInstance?.screenToFlowPosition) {
-			position = reactFlowInstance.screenToFlowPosition({
+		if (instance?.screenToFlowPosition) {
+			position = instance.screenToFlowPosition({
 				x: event.clientX,
 				y: event.clientY,
 			});
@@ -627,216 +937,125 @@ export const CanvasPanel: React.FC = () => {
 				y: event.clientY - bounds.top,
 			};
 		}
-		if (FRAMEWORKS[type]) {
-			const newId = genNodeId();
-			setPendingNode({ id: newId, type, position });
-			setShowFrameworkModal(true);
-		} else {
-			const newId = genNodeId();
-			setNodes((nds) => [
-				...nds,
-				{
-					id: newId,
-					position,
-					data: {
-						label: type.charAt(0).toUpperCase() + type.slice(1),
-						type,
-						onRename: handleRenameNode,
-					},
-					type: "editable",
-				},
-			]);
-		}
+		placeBlock(type, position);
 	};
 
 	const handleDragOver = (event: React.DragEvent) => {
 		event.preventDefault();
+		event.dataTransfer.dropEffect = "copy";
 	};
 
 	const handleFrameworkSelect = (framework: string) => {
 		if (!pendingNode) return;
-
-		const pascalType =
-			pendingNode.type.charAt(0).toUpperCase() + pendingNode.type.slice(1);
-		let label = `${framework} (${pascalType})`;
-		if (pendingNode.type === "custom") {
-			const customName = globalThis.prompt(
-				t("customBlockPrompt", "Nom du bloc personnalisé?"),
-			);
-			if (customName) label = customName;
-		}
+		const meta = blockMeta(pendingNode.type);
+		const typeLabel = t(meta?.labelKey ?? pendingNode.type, pendingNode.type);
 		setNodes((nds) => [
 			...nds,
 			{
 				id: pendingNode.id,
 				position: pendingNode.position,
 				data: {
-					label,
+					label: `${typeLabel} ${framework}`.trim(),
 					type: pendingNode.type,
 					framework,
-					onRename: handleRenameNode,
 				},
 				type: "editable",
 			},
 		]);
 		setShowFrameworkModal(false);
 		setPendingNode(null);
-		setSelectedFramework("");
+		setCustomFramework("");
 	};
 
-	const handleRenameNode = (id: string, newLabel: string) => {
-		setNodes((nds) =>
-			nds.map((n) =>
-				n.id === id
-					? {
-							...n,
-							data: { ...n.data, label: newLabel, onRename: handleRenameNode },
-						}
-					: n,
-			),
-		);
-	};
-
-	const _handleEdgeLabelChange = (id: string, newLabel: string) => {
-		setEdges((eds) =>
-			eds.map((e) =>
-				e.id === id
-					? {
-							...e,
-							data: { ...e.data, label: newLabel },
-							onEdgeLabelChange: _handleEdgeLabelChange,
-						}
-					: e,
-			),
-		);
-	};
-
-	const [nextDiagramType, setNextDiagramType] = useState<DiagramType | null>(
-		null,
-	);
-
-	const handleNewDiagram = (type: DiagramType) => {
-		if (!isJsonSaved) {
-			setNextDiagramType(type);
-			setShowSaveAsDialog(true);
-			return;
-		}
-		setDiagramType(type);
-		setNodes([
-			{
-				id: "1",
-				position: { x: 250, y: 5 },
-				data: { label: getNodeLabel ? getNodeLabel(type) : "" },
-				type: "editable",
-				selected: false,
-			},
-		]);
-		setEdges([]);
+	/** Create the block with no stack chosen — the inspector can set one later. */
+	const skipFramework = () => {
+		if (!pendingNode) return;
+		createNode(pendingNode.type, pendingNode.position);
 		setShowFrameworkModal(false);
 		setPendingNode(null);
-		setSelectedFramework("");
-		setNextDiagramType(null);
-		setIsJsonSaved(false);
+		setCustomFramework("");
 	};
 
-	const getNodeLabel = (_type: DiagramType) =>
-		t("newDiagram", "Nouveau diagramme");
-
-	const getDiagramPrefix = (type: string) => {
-		if (type === "architecture") return "architectural";
-		if (type === "flowchart") return "organigramme";
-		if (type === "mockup") return "mockup";
-		return "diagram";
-	};
-
-	const reactFlowProps = {
-		multiSelectionKeyCode: ["Shift", "Meta", "Control"],
-	};
-
-	// Extracted keyboard handler to reduce nesting
-	const handleKeyDown = (e: KeyboardEvent) => {
-		if (e.key === "Delete" || e.key === "Backspace") {
-			deleteSelectedElements();
-		}
-	};
-
-	const deleteSelectedElements = () => {
+	const deleteSelectedElements = useCallback(() => {
+		const doomed = new Set(
+			nodes.filter((n) => n.selected).map((n) => n.id),
+		);
 		setNodes((nds) => nds.filter((n) => !n.selected));
-		setEdges((eds) => eds.filter((e) => !e.selected));
-	};
+		setEdges((eds) =>
+			eds.filter(
+				(e) => !e.selected && !doomed.has(e.source) && !doomed.has(e.target),
+			),
+		);
+	}, [nodes, setEdges, setNodes]);
 
-	React.useEffect(() => {
-		globalThis.addEventListener("keydown", handleKeyDown);
-		return () => globalThis.removeEventListener("keydown", handleKeyDown);
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [handleKeyDown]);
-
-	React.useEffect(() => {
-		if (!showSaveAsDialog && nextDiagramType !== null) {
-			handleNewDiagram(nextDiagramType);
-			setNextDiagramType(null);
-		}
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [showSaveAsDialog, nextDiagramType, handleNewDiagram]);
+	// ── Keyboard ────────────────────────────────────────────────────────
+	// This listener is on the window, so without the guard below every
+	// Backspace typed into the filename field, the project name, or a node
+	// being renamed silently deleted the current selection.
+	useEffect(() => {
+		const isTextEntry = (target: EventTarget | null) => {
+			const el = target as HTMLElement | null;
+			if (!el) return false;
+			const tag = el.tagName;
+			return (
+				tag === "INPUT" ||
+				tag === "TEXTAREA" ||
+				tag === "SELECT" ||
+				el.isContentEditable
+			);
+		};
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (isTextEntry(e.target)) return;
+			const mod = e.ctrlKey || e.metaKey;
+			if (mod && e.key.toLowerCase() === "z") {
+				e.preventDefault();
+				if (e.shiftKey) handleRedo();
+				else handleUndo();
+				return;
+			}
+			if (mod && e.key.toLowerCase() === "y") {
+				e.preventDefault();
+				handleRedo();
+				return;
+			}
+			if (e.key === "Delete" || e.key === "Backspace") {
+				e.preventDefault();
+				deleteSelectedElements();
+			}
+		};
+		globalThis.addEventListener("keydown", onKeyDown);
+		return () => globalThis.removeEventListener("keydown", onKeyDown);
+	}, [deleteSelectedElements, handleRedo, handleUndo]);
 
 	const handleSaveAs = () => {
+		setPendingAfterSave(null);
 		setSaveAsFileName(getDefaultFileName());
 		setShowSaveAsDialog(true);
 	};
 
-	// Sync canvas state to store so it survives page/tab navigation
-	React.useEffect(() => {
-		const serializableNodes = nodes.map((n) => {
-			const { onRename: _, ...data } = n.data as Record<string, unknown>;
-			return { ...n, data };
-		});
-		setCanvasNodes(serializableNodes);
+	// Sync canvas state to store so it survives page/tab navigation. No
+	// callback-stripping needed any more — state never held any.
+	useEffect(() => {
+		setCanvasNodes(nodes);
 	}, [nodes, setCanvasNodes]);
 
-	React.useEffect(() => {
+	useEffect(() => {
 		setCanvasEdges(edges);
 	}, [edges, setCanvasEdges]);
 
-	React.useEffect(() => {
+	useEffect(() => {
 		setCanvasDiagramType(diagramType);
 	}, [diagramType, setCanvasDiagramType]);
 
-	// Re-inject onRename into restored nodes (functions are not serializable)
-	const renameInjectedRef = useRef(false);
-	React.useEffect(() => {
-		if (!renameInjectedRef.current && storedNodes.length > 0) {
-			renameInjectedRef.current = true;
-			setNodes((nds) =>
-				nds.map((n) => ({
-					...n,
-					data: { ...n.data, onRename: handleRenameNode },
-				})),
-			);
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [handleRenameNode, setNodes, storedNodes.length]);
-
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	const handleNodesChange = (changes: any) => {
-		setIsJsonSaved(false);
-		onNodesChange(changes);
-	};
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	const handleEdgesChange = (changes: any) => {
-		setIsJsonSaved(false);
-		onEdgesChange(changes);
-	};
-
 	const getFallbackExplorerRoot = useCallback(() => {
-		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
+		// biome-ignore lint/suspicious/noExplicitAny: injected by the preload bridge
 		if ((globalThis as any).platform?.isWindows) return "C:\\";
 		return "/";
 	}, []);
 	const [explorerRoot, setExplorerRoot] = useState(getFallbackExplorerRoot());
 	const [explorerRootInput, setExplorerRootInput] = useState(explorerRoot);
 
-	React.useEffect(() => {
+	useEffect(() => {
 		let cancelled = false;
 		const api = globalThis.electronAPI?.getUserHome;
 		if (!api) return;
@@ -859,27 +1078,23 @@ export const CanvasPanel: React.FC = () => {
 		};
 	}, [getFallbackExplorerRoot]);
 
-	// Refresh the suggested filename ONLY when the dialog opens. Depending on
-	// getDefaultFileName (a new function every render, returning a millisecond
-	// timestamp) re-ran this on every render and wrote a new value each time —
-	// an infinite setState loop that surfaced as "Maximum update depth
-	// exceeded" through the Radix Dialog's Presence refs.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: only refresh on open
-	React.useEffect(() => {
-		if (showSaveAsDialog) {
-			setSaveAsFileName(getDefaultFileName());
-		}
-	}, [showSaveAsDialog]);
+	const frameworkOptions = pendingNode
+		? (FRAMEWORKS_BY_TYPE[pendingNode.type] ?? [])
+		: [];
+	const inspectedType = inspected?.data?.type as string | undefined;
+	const inspectorStacks = inspectedType
+		? (FRAMEWORKS_BY_TYPE[inspectedType] ?? [])
+		: [];
 
 	return (
 		<div className="flex flex-col h-full flex-1 relative">
 			{/* Toolbar */}
 			<div className="flex items-center gap-1 px-2 py-1.5 border-b bg-background shrink-0">
-				{/* Group 1 — New diagram */}
+				{/* Group 1 — Document */}
 				<Button
 					size="sm"
 					variant="ghost"
-					onClick={() => handleNewDiagram("architecture")}
+					onClick={handleNewDiagram}
 					className="gap-1.5 h-7 px-2 text-xs"
 					title={t("newDiagram", "Nouveau diagramme")}
 				>
@@ -888,6 +1103,19 @@ export const CanvasPanel: React.FC = () => {
 						{t("newDiagram", "Nouveau diagramme")}
 					</span>
 				</Button>
+				<select
+					value={diagramType}
+					onChange={(e) => setDiagramType(e.target.value as DiagramType)}
+					aria-label={t("diagramType", "Type de diagramme")}
+					title={t("diagramType", "Type de diagramme")}
+					className="h-7 rounded-md border bg-background px-1.5 text-xs text-foreground outline-none focus:border-primary"
+				>
+					{DIAGRAM_TYPES.map((type) => (
+						<option key={type} value={type}>
+							{t(`diagramType_${type}`, type)}
+						</option>
+					))}
+				</select>
 
 				<div className="h-5 w-px bg-border mx-0.5" />
 
@@ -899,7 +1127,11 @@ export const CanvasPanel: React.FC = () => {
 					className="gap-1.5 h-7 px-2 text-xs"
 					title={t("togglePalette", "Afficher/masquer la palette de blocs")}
 				>
-					<Blocks className="h-3.5 w-3.5" />
+					{showPalette ? (
+						<PanelLeftClose className="h-3.5 w-3.5" />
+					) : (
+						<Blocks className="h-3.5 w-3.5" />
+					)}
 					<span className="hidden md:inline">{t("palette", "Palette")}</span>
 				</Button>
 				<Button
@@ -911,6 +1143,39 @@ export const CanvasPanel: React.FC = () => {
 				>
 					<Plus className="h-3.5 w-3.5" />
 					<span className="hidden md:inline">{t("addBlock", "Bloc")}</span>
+				</Button>
+				<Button
+					size="sm"
+					variant="ghost"
+					onClick={handleUndo}
+					disabled={!undoAvailable}
+					className="h-7 w-7 p-0"
+					title={t("undo", "Annuler (Ctrl+Z)")}
+					aria-label={t("undo", "Annuler (Ctrl+Z)")}
+				>
+					<Undo2 className="h-3.5 w-3.5" />
+				</Button>
+				<Button
+					size="sm"
+					variant="ghost"
+					onClick={handleRedo}
+					disabled={!redoAvailable}
+					className="h-7 w-7 p-0"
+					title={t("redo", "Rétablir (Ctrl+Maj+Z)")}
+					aria-label={t("redo", "Rétablir (Ctrl+Maj+Z)")}
+				>
+					<Redo2 className="h-3.5 w-3.5" />
+				</Button>
+				<Button
+					size="sm"
+					variant="ghost"
+					onClick={handleAutoLayout}
+					disabled={nodes.length === 0}
+					className="h-7 w-7 p-0"
+					title={t("autoLayout", "Organiser automatiquement")}
+					aria-label={t("autoLayout", "Organiser automatiquement")}
+				>
+					<LayoutGrid className="h-3.5 w-3.5" />
 				</Button>
 				<input
 					type="file"
@@ -1004,7 +1269,7 @@ export const CanvasPanel: React.FC = () => {
 				>
 					<Save className="h-3.5 w-3.5" />
 					<span className="hidden lg:inline">{t("saveAs", "Enregistrer")}</span>
-					{!isJsonSaved && (
+					{isDirty && (
 						<span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
 					)}
 				</Button>
@@ -1028,38 +1293,47 @@ export const CanvasPanel: React.FC = () => {
 			</div>
 
 			<div className="flex flex-1 min-h-0">
-				{showPalette && (
-					<div className="relative shrink-0 border-r bg-background overflow-y-auto p-2">
-						<button
-							type="button"
-							onClick={() => setShowPalette(false)}
-							title={t("hidePalette", "Masquer la palette")}
-							className="absolute top-2 right-2 z-10 p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-						>
-							<PanelLeftClose className="h-4 w-4" />
-						</button>
-						<VisualProgrammingPalette />
+				{showPalette ? (
+					<div className="relative flex w-60 shrink-0 flex-col border-r bg-background p-2">
+						<VisualProgrammingPalette
+							onAddBlock={handleAddBlockFromPalette}
+						/>
 					</div>
+				) : (
+					<button
+						type="button"
+						onClick={() => setShowPalette(true)}
+						title={t("togglePalette", "Afficher/masquer la palette de blocs")}
+						className="flex w-8 shrink-0 items-start justify-center border-r bg-background pt-3 text-muted-foreground hover:text-foreground"
+					>
+						<PanelLeftOpen className="h-4 w-4" />
+					</button>
 				)}
-				<div className="flex-1 min-h-0 bg-muted/30 text-muted-foreground overflow-hidden relative">
+
+				<div
+					ref={paneRef}
+					className="relative flex-1 min-h-0 overflow-hidden bg-muted/30"
+				>
 					<ReactFlow
 						onInit={(instance) => {
 							reactFlowRef.current = instance;
 						}}
 						key={diagramType}
-						nodes={nodes}
-						edges={edges}
-						onNodesChange={handleNodesChange}
-						onEdgesChange={handleEdgesChange}
+						nodes={renderNodes}
+						edges={renderEdges}
+						onNodesChange={onNodesChange}
+						onEdgesChange={onEdgesChange}
 						onConnect={onConnect}
 						fitView={true}
 						edgeTypes={edgeTypes}
 						nodeTypes={nodeTypes}
-						{...reactFlowProps}
+						multiSelectionKeyCode={["Shift", "Meta", "Control"]}
+						deleteKeyCode={null}
+						proOptions={{ hideAttribution: true }}
 						onDrop={handleDrop}
 						onDragOver={handleDragOver}
 					>
-						<Controls />
+						<Controls showInteractive={false} />
 						{/* Collapsed to a small thumbnail; expands on hover. Pannable/
 						    zoomable so clicking-dragging it navigates the diagram. */}
 						{/* biome-ignore lint/a11y/noStaticElementInteractions: expands a preview on hover, carries no action of its own */}
@@ -1079,24 +1353,158 @@ export const CanvasPanel: React.FC = () => {
 							<MiniMap
 								pannable
 								zoomable
+								// Typed nodes carry their palette accent into the minimap, so
+								// the thumbnail is a map rather than a grey smear. The panel
+								// itself follows the theme instead of the hard-coded white it
+								// used to paint over every dark canvas.
+								nodeColor={(n) => blockAccent(n.data?.type as string)}
+								maskColor="color-mix(in srgb, var(--background) 65%, transparent)"
 								style={{
 									position: "relative",
 									margin: 0,
 									width: miniMapExpanded ? 200 : 52,
 									height: miniMapExpanded ? 140 : 40,
-									opacity: miniMapExpanded ? 1 : 0.55,
+									opacity: miniMapExpanded ? 1 : 0.6,
 									transition: "width 0.2s, height 0.2s, opacity 0.2s",
-									background: "rgba(255,255,255,0.92)",
+									background: "var(--card, #17171b)",
+									border: "1px solid var(--border, #33333a)",
 									borderRadius: 8,
-									boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
 								}}
 							/>
 						</div>
-						<Background />
+						<Background variant={BackgroundVariant.Dots} gap={18} size={1} />
 					</ReactFlow>
+
+					{/* Empty state — the canvas used to be an unexplained grid. */}
+					{nodes.length === 0 && (
+						<div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+							<div className="max-w-xs rounded-lg border border-dashed bg-background/80 px-6 py-5 text-center backdrop-blur-sm">
+								<MousePointerSquareDashed className="mx-auto mb-2 h-7 w-7 text-muted-foreground" />
+								<p className="text-sm font-medium text-foreground">
+									{t("emptyCanvasTitle", "Le canvas est vide")}
+								</p>
+								<p className="mt-1 text-xs text-muted-foreground">
+									{t(
+										"emptyCanvasHint",
+										"Glissez un bloc depuis la palette, ou cliquez-le, pour commencer votre architecture.",
+									)}
+								</p>
+							</div>
+						</div>
+					)}
 				</div>
+
+				{/* Inspector — the only place a block's stack can be changed after
+				    it is created. Before this, a wrong choice in the technology
+				    dialog meant deleting the block and drawing it again. */}
+				{inspected && (
+					<aside className="flex w-60 shrink-0 flex-col gap-3 overflow-y-auto border-l bg-background p-3">
+						<div className="flex items-center justify-between">
+							<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+								{t("inspector", "Bloc sélectionné")}
+							</span>
+							<button
+								type="button"
+								onClick={() => handleDeleteNode(inspected.id)}
+								title={t("deleteBlock", "Supprimer le bloc")}
+								aria-label={t("deleteBlock", "Supprimer le bloc")}
+								className="rounded p-1 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+							>
+								<Trash2 className="h-3.5 w-3.5" />
+							</button>
+						</div>
+
+						<div>
+							<label
+								htmlFor="inspector-name"
+								className="mb-1 block text-[11px] font-medium text-muted-foreground"
+							>
+								{t("blockName", "Nom")}
+							</label>
+							<input
+								id="inspector-name"
+								type="text"
+								value={String(inspected.data?.label ?? "")}
+								onChange={(e) =>
+									handleRenameNode(inspected.id, e.target.value)
+								}
+								className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+							/>
+						</div>
+
+						<div>
+							<span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+								{t("blockRole", "Rôle")}
+							</span>
+							<p className="flex items-center gap-1.5 text-xs text-foreground">
+								<span
+									className="inline-block h-2 w-2 rounded-full"
+									style={{ backgroundColor: blockAccent(inspectedType) }}
+								/>
+								{inspectedType
+									? t(blockMeta(inspectedType)?.labelKey ?? inspectedType)
+									: t("untyped", "Bloc libre")}
+							</p>
+						</div>
+
+						{inspectorStacks.length > 0 && (
+							<div>
+								<label
+									htmlFor="inspector-stack"
+									className="mb-1 block text-[11px] font-medium text-muted-foreground"
+								>
+									{t("blockStack", "Technologie")}
+								</label>
+								<select
+									id="inspector-stack"
+									value={String(inspected.data?.framework ?? "")}
+									onChange={(e) =>
+										handleSetFramework(inspected.id, e.target.value)
+									}
+									className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+								>
+									<option value="">{t("noStack", "Non précisée")}</option>
+									{inspectorStacks.map((fw) => (
+										<option key={fw} value={fw}>
+											{t(fw, fw)}
+										</option>
+									))}
+								</select>
+							</div>
+						)}
+
+						<p className="mt-auto text-[10px] leading-snug text-muted-foreground">
+							{t(
+								"inspectorHint",
+								"Double-cliquez un bloc pour le renommer sur le canvas, ou une connexion pour changer son libellé.",
+							)}
+						</p>
+					</aside>
+				)}
 			</div>
 
+			{/* Status bar */}
+			<div className="flex shrink-0 items-center gap-3 border-t bg-background px-3 py-1 text-[11px] text-muted-foreground">
+				<span className="tabular-nums">
+					{t("statusBlocks", "{{count}} blocs", { count: nodes.length })}
+				</span>
+				<span className="tabular-nums">
+					{t("statusConnections", "{{count}} connexions", {
+						count: edges.length,
+					})}
+				</span>
+				<span className="flex-1" />
+				{isDirty ? (
+					<span className="flex items-center gap-1 text-amber-500">
+						<span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+						{t("statusUnsaved", "Non enregistré")}
+					</span>
+				) : (
+					<span>{t("statusSaved", "Enregistré")}</span>
+				)}
+			</div>
+
+			{/* Technology chooser */}
 			<Dialog open={showFrameworkModal} onOpenChange={setShowFrameworkModal}>
 				<DialogContent>
 					<DialogTitle>{t("chooseFramework")}</DialogTitle>
@@ -1106,42 +1514,88 @@ export const CanvasPanel: React.FC = () => {
 							"Sélectionnez le framework ou la technologie pour ce bloc.",
 						)}
 					</DialogDescription>
-					{pendingNode && (
-						<Select
-							value={selectedFramework}
-							onValueChange={(fw) => {
-								setSelectedFramework(fw);
-								handleFrameworkSelect(fw);
+					<div className="mt-3 grid grid-cols-3 gap-1.5">
+						{frameworkOptions.map((fw) => (
+							<Button
+								key={fw}
+								variant="outline"
+								size="sm"
+								className="h-8 text-xs"
+								onClick={() => handleFrameworkSelect(fw)}
+							>
+								{t(fw, fw)}
+							</Button>
+						))}
+					</div>
+					<div className="mt-3">
+						<label
+							htmlFor="custom-framework"
+							className="mb-1 block text-xs font-medium text-muted-foreground"
+						>
+							{t("otherStack", "Autre technologie")}
+						</label>
+						<div className="flex gap-2">
+							<input
+								id="custom-framework"
+								type="text"
+								value={customFramework}
+								onChange={(e) => setCustomFramework(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && customFramework.trim()) {
+										handleFrameworkSelect(customFramework.trim());
+									}
+								}}
+								placeholder={t("otherStackPlaceholder", "ex. Quarkus")}
+								className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+							/>
+							<Button
+								size="sm"
+								variant="secondary"
+								disabled={!customFramework.trim()}
+								onClick={() => handleFrameworkSelect(customFramework.trim())}
+							>
+								{t("use", "Utiliser")}
+							</Button>
+						</div>
+					</div>
+					<DialogFooter className="mt-4">
+						<Button variant="ghost" onClick={skipFramework}>
+							{t("skipStack", "Sans technologie")}
+						</Button>
+						<Button
+							variant="ghost"
+							onClick={() => {
+								setShowFrameworkModal(false);
+								setPendingNode(null);
 							}}
 						>
-							<SelectTrigger>
-								{selectedFramework
-									? t(selectedFramework)
-									: t("chooseFramework")}
-							</SelectTrigger>
-							<SelectContent>
-								{FRAMEWORKS[pendingNode.type]?.map((fw) => (
-									<SelectItem key={fw.value} value={fw.value}>
-										{t(fw.labelKey)}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					)}
+							{t("cancel", "Annuler")}
+						</Button>
+					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 
-			<Dialog open={showSaveAsDialog} onOpenChange={setShowSaveAsDialog}>
+			<Dialog
+				open={showSaveAsDialog}
+				onOpenChange={(open) => {
+					if (!open) cancelSaveAs();
+				}}
+			>
 				<DialogContent>
 					<DialogTitle>
 						{t("chooseFileName", "Nom du fichier d'export")}
 					</DialogTitle>
 					<div className="mt-4">
 						<DialogDescription>
-							{t(
-								"chooseFileNameDesc",
-								"Vous pouvez modifier le nom du fichier avant l'enregistrement.",
-							)}
+							{pendingAfterSave
+								? t(
+										"saveBeforeNew",
+										"Ce diagramme a des modifications non enregistrées. Enregistrez-le avant d'en créer un nouveau.",
+									)
+								: t(
+										"chooseFileNameDesc",
+										"Vous pouvez modifier le nom du fichier avant l'enregistrement.",
+									)}
 						</DialogDescription>
 					</div>
 					<div className="mt-4">
@@ -1184,16 +1638,18 @@ export const CanvasPanel: React.FC = () => {
 						</div>
 					</div>
 					<div className="mt-4">
-						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-						<label className="block text-xs font-bold mb-1">
+						<label
+							htmlFor="save-as-filename"
+							className="block text-xs font-bold mb-1"
+						>
 							{t("fileNameLabel", "Nom du fichier :")}
 						</label>
 						<input
+							id="save-as-filename"
 							type="text"
 							value={saveAsFileName}
 							onChange={(e) => setSaveAsFileName(e.target.value)}
 							className="w-full mt-1 p-2 border rounded"
-							placeholder={getDefaultFileName()}
 						/>
 					</div>
 					<DialogFooter>
@@ -1208,6 +1664,11 @@ export const CanvasPanel: React.FC = () => {
 						>
 							{t("save", "Sauvegarder dans le dossier sélectionné")}
 						</Button>
+						{pendingAfterSave && (
+							<Button variant="ghost" onClick={discardAndContinue}>
+								{t("continueWithoutSaving", "Continuer sans enregistrer")}
+							</Button>
+						)}
 						<Button variant="ghost" onClick={cancelSaveAs}>
 							{t("cancel", "Annuler")}
 						</Button>
