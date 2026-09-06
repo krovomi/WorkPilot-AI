@@ -11,8 +11,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	canonicalLocalModelName,
+	dedupeLocalCatalog,
 	isHostedOnlyModel,
 	isLocalProvider,
+	isSameLocalModel,
 	resolveLocalModel,
 } from "../local-models";
 
@@ -110,5 +113,107 @@ describe("resolveLocalModel", () => {
 		// Nothing better to show. The backend's own fallback still applies at run
 		// time; the header must not invent a model that was never chosen.
 		expect(resolveLocalModel("claude-opus-4-6", "")).toBe("claude-opus-4-6");
+	});
+});
+
+describe("canonicalLocalModelName", () => {
+	it("treats a bare name and its :latest tag as one model", () => {
+		// Ollama's implicit tag. This is the whole reason `llama3.3` and
+		// `llama3.3:latest` appeared as two rows in the picker.
+		expect(canonicalLocalModelName("llama3.3:latest")).toBe("llama3.3");
+		expect(canonicalLocalModelName("llama3.3")).toBe("llama3.3");
+		expect(isSameLocalModel("llama3.3", "llama3.3:latest")).toBe(true);
+	});
+
+	it("keeps a non-latest tag distinct", () => {
+		// `llama3.3:70b` is a different artefact, and asking Ollama for the bare
+		// name when only :70b is on disk makes it pull :latest.
+		expect(isSameLocalModel("llama3.3", "llama3.3:70b")).toBe(false);
+		expect(isSameLocalModel("qwen3-embedding", "qwen3-embedding:8b")).toBe(
+			false,
+		);
+	});
+
+	it("ignores case and surrounding space", () => {
+		expect(isSameLocalModel(" Llama3.3 ", "llama3.3:LATEST")).toBe(true);
+	});
+
+	it("never matches an empty name", () => {
+		expect(isSameLocalModel("", "")).toBe(false);
+		expect(isSameLocalModel(undefined, null)).toBe(false);
+	});
+});
+
+describe("dedupeLocalCatalog", () => {
+	// What the picker actually receives: the live /api/tags listing first, then
+	// the curated static suggestions.
+	type Row = { value: string; label: string; installed?: boolean };
+	const catalog: Row[] = [
+		{ value: "llama3.3:latest", label: "llama3.3:latest" },
+		{ value: "qwen3-embedding:8b", label: "qwen3-embedding:8b" },
+		{ value: "llama3.3", label: "Llama 3.3" },
+		{ value: "llama3.2", label: "Llama 3.2" },
+	];
+
+	it("shows an installed model once, not twice", () => {
+		// The reported bug: after pulling Llama 3.3 the dropdown listed it twice
+		// — once as the installed tag, once as a suggestion offering to download
+		// the model the user had just downloaded.
+		const rows = dedupeLocalCatalog(catalog, [
+			"llama3.3:latest",
+			"qwen3-embedding:8b",
+		]);
+		expect(rows.filter((r) => isSameLocalModel(r.value, "llama3.3"))).toHaveLength(
+			1,
+		);
+		expect(rows).toHaveLength(3);
+	});
+
+	it("marks the surviving row installed", () => {
+		// The exact-string check missed this, so the one row that WAS on disk
+		// still rendered "↓ Télécharger".
+		const rows = dedupeLocalCatalog(catalog, ["llama3.3:latest"]);
+		const llama = rows.find((r) => isSameLocalModel(r.value, "llama3.3"));
+		expect(llama?.installed).toBe(true);
+	});
+
+	it("keeps the curated label and the tag the server reported", () => {
+		// The label is what the user recognises; the value is what Ollama will
+		// answer for.
+		const rows = dedupeLocalCatalog(catalog, ["llama3.3:latest"]);
+		const llama = rows.find((r) => isSameLocalModel(r.value, "llama3.3"));
+		expect(llama?.label).toBe("Llama 3.3");
+		expect(llama?.value).toBe("llama3.3:latest");
+	});
+
+	it("leaves a model that is not installed downloadable", () => {
+		const rows = dedupeLocalCatalog(catalog, ["llama3.3:latest"]);
+		expect(rows.find((r) => r.value === "llama3.2")?.installed).toBe(false);
+	});
+
+	it("does not merge different tags of one family", () => {
+		const rows = dedupeLocalCatalog<Row>(
+			[
+				{ value: "llama3.3:8b", label: "llama3.3:8b" },
+				{ value: "llama3.3:70b", label: "llama3.3:70b" },
+			],
+			["llama3.3:8b", "llama3.3:70b"],
+		);
+		expect(rows).toHaveLength(2);
+		expect(rows.every((r) => r.installed)).toBe(true);
+	});
+
+	it("preserves the catalog order", () => {
+		const rows = dedupeLocalCatalog(catalog, ["llama3.3:latest"]);
+		expect(rows.map((r) => r.label)).toEqual([
+			"Llama 3.3",
+			"qwen3-embedding:8b",
+			"Llama 3.2",
+		]);
+	});
+
+	it("drops entries with no name", () => {
+		const rows = dedupeLocalCatalog<Row>([{ value: "", label: "" }], []);
+		expect(rows).toHaveLength(0);
 	});
 });

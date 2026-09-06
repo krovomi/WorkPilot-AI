@@ -27,6 +27,7 @@ import {
 	getModelsForProvider,
 	sortClaudeCatalog,
 } from "../../shared/constants";
+import { dedupeLocalCatalog } from "../../shared/utils/local-models";
 
 export type CatalogSource = "live" | "cache" | "static";
 
@@ -195,14 +196,15 @@ export function useProviderModelCatalog(
 			provider === "local" ||
 			provider === "lmstudio";
 		if (!isLocal || liveModels.length === 0) return merged;
-		const installedValues = new Set(liveModels.map((m) => m.value));
 		return (
-			merged
+			dedupeLocalCatalog(
+				merged,
+				liveModels.map((m) => m.value),
+			)
 				// Hide local models the backend confirmed have NO native tool-calling
 				// — they can't drive WorkPilot's agentic phases. Unknown (undefined)
 				// stays, so this never over-filters.
 				.filter((m) => m.supports_tools !== false)
-				.map((m) => ({ ...m, installed: installedValues.has(m.value) }))
 		);
 	}, [liveModels, staticEntries, provider]);
 

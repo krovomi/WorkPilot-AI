@@ -533,10 +533,13 @@ def model_is_installed(base_url: str, model_name: str) -> bool:
         return False
     for model in result.get("models", []):
         name = str(model.get("name", "")).strip().lower()
+        # A bare name IS the `:latest` tag, and only that one. This used to also
+        # accept any other tag of the same family, which is wrong in the
+        # direction that matters: with only `llama3.3:70b` on disk, asking
+        # Ollama for `llama3.3` sends it to fetch `llama3.3:latest`. Reporting
+        # that as installed would have turned a pull that still had work to do
+        # into a false success.
         if name == wanted or name == f"{wanted}:latest":
-            return True
-        # `llama3.3` should also match a pull the user made as `llama3.3:70b`.
-        if wanted.count(":") == 0 and name.split(":", 1)[0] == wanted:
             return True
     return False
 
