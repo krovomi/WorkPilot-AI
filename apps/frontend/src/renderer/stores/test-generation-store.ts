@@ -171,20 +171,30 @@ interface TestGenerationState {
 		filePath: string,
 		existingTestPath?: string,
 	) => Promise<CoverageGap[]>;
+	/**
+	 * `testDir` is the directory the user picked when the project had no test
+	 * directory to point at (see `useTestDestinationPrompt`). Left out, the
+	 * backend resolves it from the project layout.
+	 */
 	generateUnitTests: (
 		filePath: string,
 		existingTestPath?: string,
 		coverageTarget?: number,
+		testDir?: string,
 	) => Promise<TestGenerationResult>;
 	generateE2ETests: (
 		userStory: string,
 		targetModule: string,
+		testDir?: string,
 	) => Promise<TestGenerationResult>;
-	generateTDDTests: (spec: {
-		description: string;
-		language: string;
-		snippet_type: string;
-	}) => Promise<TestGenerationResult>;
+	generateTDDTests: (
+		spec: {
+			description: string;
+			language: string;
+			snippet_type: string;
+		},
+		testDir?: string,
+	) => Promise<TestGenerationResult>;
 	runPostBuildGeneration: (
 		projectPath: string,
 		modifiedFiles: string[],
@@ -466,6 +476,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			filePath: string,
 			existingTestPath?: string,
 			coverageTarget?: number,
+			testDir?: string,
 		) => {
 			const { setPhase, setStatus, setResult, resetLive } = get();
 			setPhase("generating");
@@ -473,7 +484,12 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			resetLive();
 			set({
 				lastRun: () =>
-					get().generateUnitTests(filePath, existingTestPath, coverageTarget),
+					get().generateUnitTests(
+						filePath,
+						existingTestPath,
+						coverageTarget,
+						testDir,
+					),
 			});
 
 			return new Promise<TestGenerationResult>((resolve, reject) => {
@@ -519,17 +535,22 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					existingTestPath,
 					coverageTarget,
 					projectPath,
+					testDir,
 				);
 			});
 		},
 
-		generateE2ETests: async (userStory: string, targetModule: string) => {
+		generateE2ETests: async (
+			userStory: string,
+			targetModule: string,
+			testDir?: string,
+		) => {
 			const { setPhase, setStatus, setResult, resetLive } = get();
 			setPhase("generating");
 			setStatus("Generating E2E tests...");
 			resetLive();
 			set({
-				lastRun: () => get().generateE2ETests(userStory, targetModule),
+				lastRun: () => get().generateE2ETests(userStory, targetModule, testDir),
 			});
 
 			return new Promise<TestGenerationResult>((resolve, reject) => {
@@ -574,20 +595,24 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					userStory,
 					targetModule,
 					projectPath,
+					testDir,
 				);
 			});
 		},
 
-		generateTDDTests: async (spec: {
-			description: string;
-			language: string;
-			snippet_type: string;
-		}) => {
+		generateTDDTests: async (
+			spec: {
+				description: string;
+				language: string;
+				snippet_type: string;
+			},
+			testDir?: string,
+		) => {
 			const { setPhase, setStatus, setResult, resetLive } = get();
 			setPhase("generating");
 			setStatus("Generating TDD tests...");
 			resetLive();
-			set({ lastRun: () => get().generateTDDTests(spec) });
+			set({ lastRun: () => get().generateTDDTests(spec, testDir) });
 
 			return new Promise<TestGenerationResult>((resolve, reject) => {
 				const onStatus = (status: string) => setStatus(status);
@@ -632,6 +657,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					spec.language,
 					spec.snippet_type,
 					projectPath,
+					testDir,
 				);
 			});
 		},

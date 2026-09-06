@@ -1,5 +1,6 @@
 import { type IpcRendererEvent, ipcRenderer } from "electron";
 import type {
+	TestDestination,
 	TestGenerationError,
 	TestGenStageEvent,
 } from "../../../shared/types/test-generation";
@@ -10,7 +11,7 @@ import type {
  * Provides access to test generation functionality from the renderer process.
  */
 
-export type { TestGenerationError, TestGenStageEvent };
+export type { TestDestination, TestGenerationError, TestGenStageEvent };
 
 export interface TestGenerationAPI {
 	analyzeTestCoverage: (
@@ -18,22 +19,40 @@ export interface TestGenerationAPI {
 		existingTestPath?: string,
 		projectPath?: string,
 	) => Promise<{ success: boolean; error?: string }>;
+	/**
+	 * Where the tests for `filePath` would be written, resolved from the
+	 * project's layout before a generation starts. `destination.status ===
+	 * "needs_choice"` means the project has no test directory and the user
+	 * should be asked; the answer goes back as the `testDir` argument below.
+	 */
+	resolveTestDestination: (
+		filePath: string,
+		projectPath?: string,
+		existingTestPath?: string,
+	) => Promise<{
+		success: boolean;
+		destination?: TestDestination | null;
+		error?: string;
+	}>;
 	generateUnitTests: (
 		filePath: string,
 		existingTestPath?: string,
 		coverageTarget?: number,
 		projectPath?: string,
+		testDir?: string,
 	) => Promise<{ success: boolean; error?: string }>;
 	generateE2ETests: (
 		userStory: string,
 		targetModule: string,
 		projectPath?: string,
+		testDir?: string,
 	) => Promise<{ success: boolean; error?: string }>;
 	generateTDDTests: (
 		description: string,
 		language: string,
 		snippetType: string,
 		projectPath?: string,
+		testDir?: string,
 	) => Promise<{ success: boolean; error?: string }>;
 	cancelTestGeneration: () => Promise<{
 		success: boolean;
@@ -122,17 +141,35 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		});
 	},
 
+	resolveTestDestination: async (
+		filePath: string,
+		projectPath?: string,
+		existingTestPath?: string,
+	): Promise<{
+		success: boolean;
+		destination?: TestDestination | null;
+		error?: string;
+	}> => {
+		return await ipcRenderer.invoke("test-generation:resolve-destination", {
+			filePath,
+			projectPath,
+			existingTestPath,
+		});
+	},
+
 	generateUnitTests: async (
 		filePath: string,
 		existingTestPath?: string,
 		coverageTarget?: number,
 		projectPath?: string,
+		testDir?: string,
 	): Promise<{ success: boolean; error?: string }> => {
 		return await ipcRenderer.invoke("test-generation:generate-unit", {
 			filePath,
 			existingTestPath,
 			coverageTarget,
 			projectPath,
+			testDir,
 		});
 	},
 
@@ -140,11 +177,13 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		userStory: string,
 		targetModule: string,
 		projectPath?: string,
+		testDir?: string,
 	): Promise<{ success: boolean; error?: string }> => {
 		return await ipcRenderer.invoke("test-generation:generate-e2e", {
 			userStory,
 			targetModule,
 			projectPath,
+			testDir,
 		});
 	},
 
@@ -153,12 +192,14 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		language: string,
 		snippetType: string,
 		projectPath?: string,
+		testDir?: string,
 	): Promise<{ success: boolean; error?: string }> => {
 		return await ipcRenderer.invoke("test-generation:generate-tdd", {
 			description,
 			language,
 			snippetType,
 			projectPath,
+			testDir,
 		});
 	},
 

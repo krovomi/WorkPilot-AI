@@ -735,7 +735,9 @@
 		"emptyResult": "The generator produced no tests.",
 		"doneTitle": "Tests generated",
 		"doneDescription_one": "{{count}} test file written into the worktree.",
-		"doneDescription_other": "{{count}} test files written into the worktree."
+		"doneDescription_other": "{{count}} test files written into the worktree.",
+		"destinationAppliesToBatch": "This directory is used for every file in this run.",
+		"outsideWorktree": "The tests were written to {{path}}, outside this task's worktree, so they are not part of its diff."
 	},
 	"interview": {
 		"banner": "Clarify the spec before starting: the agent asks you 3-5 targeted questions.",

@@ -735,7 +735,9 @@
 		"emptyResult": "Le générateur n'a produit aucun test.",
 		"doneTitle": "Tests générés",
 		"doneDescription_one": "{{count}} fichier de test écrit dans le worktree.",
-		"doneDescription_other": "{{count}} fichiers de test écrits dans le worktree."
+		"doneDescription_other": "{{count}} fichiers de test écrits dans le worktree.",
+		"destinationAppliesToBatch": "Ce dossier sera utilisé pour tous les fichiers de cette génération.",
+		"outsideWorktree": "Les tests ont été écrits dans {{path}}, hors du worktree de cette tâche : ils ne font donc pas partie de son diff."
 	},
 	"interview": {
 		"banner": "Clarifiez la spec avant de lancer : l'agent vous pose 3-5 questions ciblées.",
