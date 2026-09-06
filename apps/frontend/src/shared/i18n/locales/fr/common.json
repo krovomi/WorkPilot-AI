@@ -1104,7 +1104,18 @@
 		"stopTask": "Arrêter la tâche",
 		"stopTaskDescription": "Arrêter la tâche et naviguer",
 		"pauseTask": "Mettre en pause",
-		"pauseTaskDescription": "Naviguer et reprendre plus tard"
+		"pauseTaskDescription": "Naviguer et reprendre plus tard",
+		"otherTasks_one": "et {{count}} autre tâche",
+		"otherTasks_other": "et {{count}} autres tâches",
+		"backgroundTask": "Continuer en arrière-plan",
+		"backgroundTaskDescription": "Laisser la tâche s'exécuter et naviguer librement",
+		"dontAskAgain": "Ne plus me demander pendant cette session"
+	},
+	"backgroundTasks": {
+		"running_one": "{{count}} tâche en arrière-plan",
+		"running_other": "{{count}} tâches en arrière-plan",
+		"openKanban": "Voir le Kanban",
+		"dismiss": "Masquer l'indicateur"
 	},
 	"testing": "Test en cours..."
 }

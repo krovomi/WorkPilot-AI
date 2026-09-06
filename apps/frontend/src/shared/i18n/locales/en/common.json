@@ -1104,7 +1104,18 @@
 		"stopTask": "Stop task",
 		"stopTaskDescription": "Stop the task and navigate",
 		"pauseTask": "Pause task",
-		"pauseTaskDescription": "Navigate away and resume later"
+		"pauseTaskDescription": "Navigate away and resume later",
+		"otherTasks_one": "and {{count}} more task",
+		"otherTasks_other": "and {{count}} more tasks",
+		"backgroundTask": "Continue in the background",
+		"backgroundTaskDescription": "Let the task run and browse other features",
+		"dontAskAgain": "Don't ask again during this session"
+	},
+	"backgroundTasks": {
+		"running_one": "{{count}} task in the background",
+		"running_other": "{{count}} tasks in the background",
+		"openKanban": "Open Kanban",
+		"dismiss": "Hide indicator"
 	},
 	"testing": "Testing..."
 }
