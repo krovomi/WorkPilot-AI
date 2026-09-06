@@ -16,8 +16,10 @@ import {
 } from "../../../shared/utils/test-strategy";
 import { cn } from "../../lib/utils";
 import { useTestDestinationPrompt } from "../../hooks/use-test-destination-prompt";
+import { useTestLibraries } from "../../hooks/use-test-libraries";
 import { useToast } from "../../hooks/use-toast";
 import { TestDestinationDialog } from "../test-generation/TestDestinationDialog";
+import { TestLibrariesPicker } from "../test-generation/TestLibrariesPicker";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -135,6 +137,16 @@ export function TaskTestGenerator({
 	);
 	const selectedPlans = generatablePlans.filter((plan) => plan.selected);
 
+	// The library choice is a property of the project, so one file is enough to
+	// detect its language — the answer is the same for the whole batch.
+	const languageProbe = generatablePlans[0]?.path ?? "";
+	const libraries = useTestLibraries(
+		languageProbe && worktreePath
+			? `${worktreePath.replaceAll("\\", "/")}/${languageProbe.replaceAll("\\", "/")}`
+			: "",
+		worktreePath,
+	);
+
 	if (!worktreePath || generatablePlans.length === 0) {
 		return null;
 	}
@@ -191,7 +203,13 @@ export function TaskTestGenerator({
 				const userStory = [task.title, task.description?.slice(0, 1500)]
 					.filter(Boolean)
 					.join("\n\n");
-				api.generateE2ETests(userStory, absolutePath, worktreePath, testDir);
+				api.generateE2ETests(
+					userStory,
+					absolutePath,
+					worktreePath,
+					testDir,
+					libraries.chosen,
+				);
 			} else {
 				api.generateUnitTests(
 					absolutePath,
@@ -199,6 +217,7 @@ export function TaskTestGenerator({
 					undefined,
 					worktreePath,
 					testDir,
+					libraries.chosen,
 				);
 			}
 		});
@@ -300,6 +319,20 @@ export function TaskTestGenerator({
 					{t("tasks:testGen.generate", { count: selectedPlans.length })}
 				</Button>
 			</div>
+
+			<TestLibrariesPicker
+				selection={libraries.selection}
+				chosen={libraries.chosen}
+				missing={libraries.missing}
+				loading={libraries.loading}
+				installing={libraries.installing}
+				report={libraries.report}
+				error={libraries.error}
+				onToggle={libraries.toggle}
+				onReset={libraries.resetToProject}
+				onAddPackages={() => void libraries.addMissingPackages()}
+				canInstall={Boolean(worktreePath)}
+			/>
 
 			<div className="space-y-1">
 				{generatablePlans.map((plan) => (

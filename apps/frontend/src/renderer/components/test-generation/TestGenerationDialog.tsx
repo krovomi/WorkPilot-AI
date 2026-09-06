@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useTestDestinationPrompt } from "../../hooks/use-test-destination-prompt";
+import { useTestLibraries } from "../../hooks/use-test-libraries";
 import { useProjectStore } from "../../stores/project-store";
 import {
 	type CoverageGap,
@@ -43,6 +44,7 @@ import { GenerationErrorPanel } from "./GenerationErrorPanel";
 import { LiveGenerationSurface } from "./LiveGenerationSurface";
 import { SmartFilePicker } from "./SmartFilePicker";
 import { TestDestinationDialog } from "./TestDestinationDialog";
+import { TestLibrariesPicker } from "./TestLibrariesPicker";
 
 const PRIORITY_COLORS = {
 	high: "bg-destructive/15 text-destructive",
@@ -89,6 +91,7 @@ export function TestGenerationDialog({
 	// Where the tests go is settled before the run starts: asking after a
 	// generation would mean holding a finished file hostage to a question.
 	const destinationPrompt = useTestDestinationPrompt();
+	const projectPath = useProjectStore((state) => state.getActiveProject()?.path);
 
 	const {
 		isOpen,
@@ -113,6 +116,11 @@ export function TestGenerationDialog({
 		generateTDDTests,
 	} = useTestGenerationStore();
 
+	// What the tests are written against — the project's own stack, unless the
+	// user says otherwise. Resolved from the manifests, so the common case
+	// needs no interaction.
+	const libraries = useTestLibraries(selectedFile, projectPath);
+
 	// Reset state when dialog closes
 	useEffect(() => {
 		if (!isOpen) {
@@ -136,7 +144,6 @@ export function TestGenerationDialog({
 
 	const handleGenerateUnitTests = useCallback(async () => {
 		if (!selectedFile) return;
-		const projectPath = useProjectStore.getState().getActiveProject()?.path;
 		const choice = await destinationPrompt.prompt(selectedFile, projectPath, {
 			existingTestPath: existingTestPath || undefined,
 		});
@@ -147,6 +154,7 @@ export function TestGenerationDialog({
 				existingTestPath || undefined,
 				coverageTarget,
 				choice.directory,
+				libraries.chosen,
 			);
 		} catch {
 			// Error is surfaced via the store's error state (rendered in the UI).
@@ -157,29 +165,41 @@ export function TestGenerationDialog({
 		coverageTarget,
 		generateUnitTests,
 		destinationPrompt,
+		projectPath,
+		libraries.chosen,
 	]);
 
 	const handleGenerateE2ETests = useCallback(async () => {
 		if (!userStory.trim() || !targetModule.trim()) return;
 		try {
-			await generateE2ETests(userStory, targetModule);
+			await generateE2ETests(userStory, targetModule, undefined, libraries.chosen);
 		} catch {
 			// Error is surfaced via the store's error state (rendered in the UI).
 		}
-	}, [userStory, targetModule, generateE2ETests]);
+	}, [userStory, targetModule, generateE2ETests, libraries.chosen]);
 
 	const handleGenerateTDDTests = useCallback(async () => {
 		if (!tddDescription.trim()) return;
 		try {
-			await generateTDDTests({
-				description: tddDescription,
-				language: tddLanguage,
-				snippet_type: tddSnippetType,
-			});
+			await generateTDDTests(
+				{
+					description: tddDescription,
+					language: tddLanguage,
+					snippet_type: tddSnippetType,
+				},
+				undefined,
+				libraries.chosen,
+			);
 		} catch {
 			// Error is surfaced via the store's error state (rendered in the UI).
 		}
-	}, [tddDescription, tddLanguage, tddSnippetType, generateTDDTests]);
+	}, [
+		tddDescription,
+		tddLanguage,
+		tddSnippetType,
+		generateTDDTests,
+		libraries.chosen,
+	]);
 	// TDD has no source file to resolve a layout from, so there is nothing to
 	// ask about: the backend falls back to the project's own test directory.
 
@@ -443,6 +463,20 @@ export function TestGenerationDialog({
 									className="mt-1"
 								/>
 							</div>
+
+							<TestLibrariesPicker
+								selection={libraries.selection}
+								chosen={libraries.chosen}
+								missing={libraries.missing}
+								loading={libraries.loading}
+								installing={libraries.installing}
+								report={libraries.report}
+								error={libraries.error}
+								onToggle={libraries.toggle}
+								onReset={libraries.resetToProject}
+								onAddPackages={() => void libraries.addMissingPackages()}
+								canInstall={Boolean(projectPath)}
+							/>
 
 							<Button
 								onClick={handleGenerateUnitTests}
