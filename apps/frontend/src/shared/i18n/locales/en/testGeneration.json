@@ -204,5 +204,21 @@
 				"hint": "Open the technical details below for the raw error. Trying again is safe — nothing has been written to your project."
 			}
 		}
+	},
+	"destination": {
+		"title": "Where should these tests go?",
+		"noTestsDir": "This project keeps its sources in {{sourceRoot}} but has no test directory beside it. Choose where to write the generated tests — the directory is created if it does not exist.",
+		"noSourceRoot": "No source or test directory could be found in this project. Choose where to write the generated tests — the directory is created if it does not exist.",
+		"willBeCreated": "will be created",
+		"custom": "Another directory",
+		"customPlaceholder": "e.g. tests/MyApp.UnitTests",
+		"browse": "Browse for a directory",
+		"confirm": "Write tests here",
+		"kind": {
+			"existingTestsDir": "Existing test directory",
+			"besideSourceRoot": "Beside the source directory",
+			"projectRoot": "At the project root",
+			"besideSource": "Next to the source file"
+		}
 	}
 }

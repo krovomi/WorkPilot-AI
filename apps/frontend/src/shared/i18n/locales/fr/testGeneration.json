@@ -204,5 +204,21 @@
 				"hint": "Ouvrez les détails techniques ci-dessous pour l'erreur brute. Réessayer est sans risque : rien n'a été écrit dans votre projet."
 			}
 		}
+	},
+	"destination": {
+		"title": "Où enregistrer ces tests ?",
+		"noTestsDir": "Ce projet range ses sources dans {{sourceRoot}} mais n'a aucun dossier de tests à côté. Choisissez où écrire les tests générés — le dossier est créé s'il n'existe pas.",
+		"noSourceRoot": "Aucun dossier de sources ou de tests n'a été trouvé dans ce projet. Choisissez où écrire les tests générés — le dossier est créé s'il n'existe pas.",
+		"willBeCreated": "sera créé",
+		"custom": "Un autre dossier",
+		"customPlaceholder": "ex. tests/MonApp.UnitTests",
+		"browse": "Parcourir les dossiers",
+		"confirm": "Écrire les tests ici",
+		"kind": {
+			"existingTestsDir": "Dossier de tests existant",
+			"besideSourceRoot": "À côté du dossier de sources",
+			"projectRoot": "À la racine du projet",
+			"besideSource": "À côté du fichier source"
+		}
 	}
 }

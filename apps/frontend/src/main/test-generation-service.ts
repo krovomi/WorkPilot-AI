@@ -4,11 +4,15 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import type {
+	TestDestination,
 	TestGenerationError,
 	TestGenErrorCode,
 	TestGenStageEvent,
 } from "../shared/types/test-generation";
-import { normalizeTestGenerationError } from "../shared/types/test-generation";
+import {
+	normalizeTestGenerationError,
+	parseTestDestination,
+} from "../shared/types/test-generation";
 import { getRunnerEnv } from "./ipc-handlers/github/utils/runner-env";
 
 /**
@@ -63,6 +67,12 @@ function classifyProcessFailure(text: string): TestGenErrorCode {
 	if (has("permissionerror", "read-only file system", "no space left")) return "write_failed";
 	return "runner_crashed";
 }
+
+/** stdout prefix carrying a runner success payload. */
+const RESULT_PREFIX = "__TEST_GENERATION_RESULT__:";
+
+/** A pre-flight that outlives this is broken, not slow. */
+const RESOLVE_DESTINATION_TIMEOUT_MS = 15_000;
 
 export class TestGenerationService extends EventEmitter {
 	private activeProcess: ChildProcess | null = null;
@@ -160,6 +170,7 @@ export class TestGenerationService extends EventEmitter {
 		existingTestPath?: string,
 		coverageTarget?: number,
 		projectPath?: string,
+		testDir?: string,
 	): Promise<void> {
 		const args = [
 			"--action",
@@ -175,6 +186,9 @@ export class TestGenerationService extends EventEmitter {
 		if (projectPath) {
 			args.push("--project-path", projectPath);
 		}
+		if (testDir) {
+			args.push("--test-dir", testDir);
+		}
 		await this.spawnRunner(args, "complete");
 	}
 
@@ -185,6 +199,7 @@ export class TestGenerationService extends EventEmitter {
 		userStory: string,
 		targetModule: string,
 		projectPath?: string,
+		testDir?: string,
 	): Promise<void> {
 		const args = [
 			"--action",
@@ -197,6 +212,9 @@ export class TestGenerationService extends EventEmitter {
 		if (projectPath) {
 			args.push("--project-path", projectPath);
 		}
+		if (testDir) {
+			args.push("--test-dir", testDir);
+		}
 		await this.spawnRunner(args, "complete");
 	}
 
@@ -208,6 +226,7 @@ export class TestGenerationService extends EventEmitter {
 		language: string,
 		snippetType: string,
 		projectPath?: string,
+		testDir?: string,
 	): Promise<void> {
 		const args = [
 			"--action",
@@ -222,7 +241,93 @@ export class TestGenerationService extends EventEmitter {
 		if (projectPath) {
 			args.push("--project-path", projectPath);
 		}
+		if (testDir) {
+			args.push("--test-dir", testDir);
+		}
 		await this.spawnRunner(args, "complete");
+	}
+
+	/**
+	 * Ask the backend where the tests for `filePath` would be written.
+	 *
+	 * Runs before a generation, so the question "which directory?" is settled
+	 * while it is still free to ask — no provider, no network, just the
+	 * project's layout on disk. Resolves to null when the runner could not
+	 * answer: the caller then generates without a chosen directory, which is
+	 * what it did before this existed.
+	 *
+	 * Deliberately not routed through `spawnRunner`: that one cancels the
+	 * active generation and reports through the shared event stream, and a
+	 * pre-flight question must do neither.
+	 */
+	async resolveDestination(
+		filePath: string,
+		projectPath?: string,
+		existingTestPath?: string,
+	): Promise<TestDestination | null> {
+		const backendSource = this.getBackendPath();
+		if (!backendSource) return null;
+
+		const runnerPath = path.join(
+			backendSource,
+			"runners",
+			"test_generation_runner.py",
+		);
+		if (!existsSync(runnerPath)) return null;
+
+		const args = [
+			runnerPath,
+			"--action",
+			"resolve-destination",
+			"--file-path",
+			filePath,
+		];
+		if (projectPath) args.push("--project-path", projectPath);
+		if (existingTestPath) args.push("--existing-test-path", existingTestPath);
+
+		const processEnv = await getRunnerEnv({ PYTHONPATH: backendSource });
+
+		return await new Promise<TestDestination | null>((resolve) => {
+			const proc = spawn(this.pythonPath, args, {
+				cwd: backendSource,
+				env: processEnv,
+			});
+			let stdout = "";
+			let settled = false;
+			const finish = (value: TestDestination | null) => {
+				if (settled) return;
+				settled = true;
+				resolve(value);
+			};
+			// The answer is path arithmetic; a run that takes seconds is a run
+			// that is stuck, and a stuck pre-flight must not hold up the
+			// generation the user asked for.
+			const timer = setTimeout(() => {
+				proc.kill();
+				finish(null);
+			}, RESOLVE_DESTINATION_TIMEOUT_MS);
+
+			proc.stdout?.on("data", (data: Buffer) => {
+				stdout += data.toString("utf-8");
+			});
+			proc.on("error", () => {
+				clearTimeout(timer);
+				finish(null);
+			});
+			proc.on("close", () => {
+				clearTimeout(timer);
+				const line = stdout
+					.split("\n")
+					.find((entry) => entry.startsWith(RESULT_PREFIX));
+				if (!line) return finish(null);
+				try {
+					const payload = JSON.parse(line.slice(RESULT_PREFIX.length));
+					finish(parseTestDestination(payload?.destination));
+				} catch {
+					finish(null);
+				}
+			});
+		});
 	}
 
 	/**
@@ -292,9 +397,9 @@ export class TestGenerationService extends EventEmitter {
 		let stdoutBuffer = "";
 
 		const handleLine = (line: string): void => {
-			if (line.startsWith("__TEST_GENERATION_RESULT__:")) {
+			if (line.startsWith(RESULT_PREFIX)) {
 				try {
-					const jsonStr = line.substring("__TEST_GENERATION_RESULT__:".length);
+					const jsonStr = line.substring(RESULT_PREFIX.length);
 					generationResult = JSON.parse(jsonStr);
 					this.emit("status", "Test generation complete");
 				} catch (parseErr) {

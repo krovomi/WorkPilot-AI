@@ -21,6 +21,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Memory System (Graphiti)](#memory-system-graphiti)
   - [Skills System](#skills-system)
   - [Memory Search (mem-search)](#memory-search-mem-search)
+  - [Where generated tests are written](#where-generated-tests-are-written)
   - [Library Documentation (libdocs)](#library-documentation-libdocs)
   - [Mobile applications (Android and Apple)](#mobile-applications-android-and-apple)
   - [Declarative Workflows](#declarative-workflows)
@@ -506,6 +507,41 @@ The agent-facing side is `skills/tooling/mem-search/`. `claude-mem` is declared 
 **optional** pack (`pnpm run skills:bootstrap --pack claude-mem`) rather than installed:
 its retrieval pattern is what was worth adopting, and taking the tool itself would add a
 fourth memory with its own worker and two more stores.
+
+### Where generated tests are written
+
+The test generator asks the model for a file *path*, and what comes back is a
+convention it remembers — `CalculatorTests.cs`, `tests/test_calculator.py` —
+which used to be resolved against the project root because there was nowhere
+else to resolve it. On a .NET solution whose sources live under `src/`, that put
+the unit tests at the top of the repository, beside the `.sln`.
+
+`test_generation/layout.py` is the single answer to "where does this file go?",
+and every writer goes through it: the runner (`--action generate-unit`), the
+post-build service, and the pre-flight the Kanban runs before a generation. It
+reads paths only — no model, no network — so the UI can ask the question before
+the run starts and pay nothing for it.
+
+| Situation | Answer |
+|---|---|
+| a `tests` directory beside the source root (`src`, `source`, `sources`) | that one |
+| a test file for this source already exists | its directory — the project decided |
+| a `__tests__` the project already uses, or a .NET `*.Tests` project | that one |
+| Go and Rust | next to the source; a `_test.go` elsewhere is a compile error, not a test suite |
+| **none of the above** | **`needs_choice`** — the UI asks |
+
+The last row is the point. A guess there is how the file ends up next to the
+solution file, so the resolution stops and `TestDestinationDialog` offers the
+candidates the project's layout suggests, plus a path the user types (created on
+write). A caller with nobody to ask — the CLI, the post-build hook — takes the
+first candidate and says so; the first candidate is a `tests` directory, never
+the project root, so the bad answer is no longer reachable.
+
+The model's **file name** is kept: it carries the extension and the framework's
+naming convention, and `sanitize_file_name` strips everything else, so a
+generated path cannot escape the chosen directory. E2E generation keeps its own
+`e2e/` convention — it covers a scenario, not a source file, so "beside the
+source root" answers a question it is not asking.
 
 ### Library Documentation (`libdocs`)
 

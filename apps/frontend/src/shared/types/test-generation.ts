@@ -28,6 +28,100 @@ export interface TestGenStageEvent {
 }
 
 /**
+ * Where a generated test file will be written.
+ *
+ * Resolved by the backend (`test_generation/layout.py`) from the project's real
+ * layout — the `tests` directory beside the source root — before a generation
+ * starts. `"needs_choice"` means no directory could be justified: the answer is
+ * the user's, not the model's, and `candidates` are what to offer them.
+ */
+export type TestDestinationStatus = "resolved" | "needs_choice";
+
+/** Why a directory is being offered, so the UI can label it. */
+export type DestinationCandidateKind =
+	| "existing_tests_dir"
+	| "sibling_of_source_root"
+	| "project_tests"
+	| "source_dir";
+
+/** Why the destination is what it is. Drives one line of localised copy. */
+export type TestDestinationReason =
+	| "explicit_directory"
+	| "existing_test_file"
+	| "existing_tests_dir"
+	| "co_located_convention"
+	| "no_tests_dir"
+	| "no_source_root";
+
+export interface DestinationCandidate {
+	/** Absolute directory path. */
+	path: string;
+	kind: DestinationCandidateKind;
+	/** False when picking it means creating the directory. */
+	exists: boolean;
+}
+
+export interface TestDestination {
+	/** Absolute directory. Filled in even when `status` is `needs_choice`: it
+	 * carries the best candidate, so a caller that cannot ask still has one. */
+	directory: string;
+	fileName: string;
+	/** `directory` + `fileName`, as the backend joined them. */
+	path: string;
+	status: TestDestinationStatus;
+	reason: TestDestinationReason;
+	projectRoot: string;
+	sourceRoot: string | null;
+	candidates: DestinationCandidate[];
+	language?: string;
+	testFramework?: string;
+}
+
+/**
+ * Read the runner's snake_case payload into the camelCase shape the UI uses.
+ *
+ * Returns null for anything that is not a destination: the caller then carries
+ * on without a chosen directory, which is the pre-change behaviour rather than
+ * a blocked generation.
+ */
+export function parseTestDestination(input: unknown): TestDestination | null {
+	if (!input || typeof input !== "object") return null;
+	const raw = input as Record<string, unknown>;
+	const directory = typeof raw.directory === "string" ? raw.directory : "";
+	const fileName = typeof raw.file_name === "string" ? raw.file_name : "";
+	if (!directory || !fileName) return null;
+
+	const candidates: DestinationCandidate[] = Array.isArray(raw.candidates)
+		? raw.candidates.flatMap((entry) => {
+				if (!entry || typeof entry !== "object") return [];
+				const candidate = entry as Record<string, unknown>;
+				if (typeof candidate.path !== "string" || !candidate.path) return [];
+				return [
+					{
+						path: candidate.path,
+						kind: (candidate.kind as DestinationCandidateKind) ?? "source_dir",
+						exists: candidate.exists === true,
+					},
+				];
+			})
+		: [];
+
+	return {
+		directory,
+		fileName,
+		path: typeof raw.path === "string" ? raw.path : `${directory}/${fileName}`,
+		status: raw.status === "needs_choice" ? "needs_choice" : "resolved",
+		reason: (raw.reason as TestDestinationReason) ?? "existing_tests_dir",
+		projectRoot: typeof raw.project_root === "string" ? raw.project_root : "",
+		sourceRoot: typeof raw.source_root === "string" ? raw.source_root : null,
+		candidates,
+		language: typeof raw.language === "string" ? raw.language : undefined,
+		testFramework:
+			typeof raw.test_framework === "string" ? raw.test_framework : undefined,
+	};
+}
+
+/**
  * What went wrong, in the terms the user can act on.
  *
  * `code` drives the title and the remediation hint shown in the UI, so it is a

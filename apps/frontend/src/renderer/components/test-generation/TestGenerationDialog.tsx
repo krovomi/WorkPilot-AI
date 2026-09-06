@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useTestDestinationPrompt } from "../../hooks/use-test-destination-prompt";
+import { useProjectStore } from "../../stores/project-store";
 import {
 	type CoverageGap,
 	type GeneratedTest,
@@ -40,6 +42,7 @@ import { Textarea } from "../ui/textarea";
 import { GenerationErrorPanel } from "./GenerationErrorPanel";
 import { LiveGenerationSurface } from "./LiveGenerationSurface";
 import { SmartFilePicker } from "./SmartFilePicker";
+import { TestDestinationDialog } from "./TestDestinationDialog";
 
 const PRIORITY_COLORS = {
 	high: "bg-destructive/15 text-destructive",
@@ -83,6 +86,9 @@ export function TestGenerationDialog({
 	const [userStory, setUserStory] = useState("");
 	const [targetModule, setTargetModule] = useState("");
 	const [tddDescription, setTddDescription] = useState("");
+	// Where the tests go is settled before the run starts: asking after a
+	// generation would mean holding a finished file hostage to a question.
+	const destinationPrompt = useTestDestinationPrompt();
 
 	const {
 		isOpen,
@@ -130,16 +136,28 @@ export function TestGenerationDialog({
 
 	const handleGenerateUnitTests = useCallback(async () => {
 		if (!selectedFile) return;
+		const projectPath = useProjectStore.getState().getActiveProject()?.path;
+		const choice = await destinationPrompt.prompt(selectedFile, projectPath, {
+			existingTestPath: existingTestPath || undefined,
+		});
+		if (choice.cancelled) return;
 		try {
 			await generateUnitTests(
 				selectedFile,
 				existingTestPath || undefined,
 				coverageTarget,
+				choice.directory,
 			);
 		} catch {
 			// Error is surfaced via the store's error state (rendered in the UI).
 		}
-	}, [selectedFile, existingTestPath, coverageTarget, generateUnitTests]);
+	}, [
+		selectedFile,
+		existingTestPath,
+		coverageTarget,
+		generateUnitTests,
+		destinationPrompt,
+	]);
 
 	const handleGenerateE2ETests = useCallback(async () => {
 		if (!userStory.trim() || !targetModule.trim()) return;
@@ -162,6 +180,8 @@ export function TestGenerationDialog({
 			// Error is surfaced via the store's error state (rendered in the UI).
 		}
 	}, [tddDescription, tddLanguage, tddSnippetType, generateTDDTests]);
+	// TDD has no source file to resolve a layout from, so there is nothing to
+	// ask about: the backend falls back to the project's own test directory.
 
 	const handleCopyToClipboard = useCallback((content: string) => {
 		navigator.clipboard.writeText(content);
@@ -255,6 +275,12 @@ export function TestGenerationDialog({
 	);
 
 	return (
+		<>
+		<TestDestinationDialog
+			destination={destinationPrompt.pending}
+			onConfirm={destinationPrompt.confirm}
+			onCancel={destinationPrompt.cancel}
+		/>
 		<Dialog open={isOpen} onOpenChange={closeDialog}>
 			<DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
 				<DialogHeader>
@@ -733,5 +759,6 @@ export function TestGenerationDialog({
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
+		</>
 	);
 }

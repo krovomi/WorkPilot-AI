@@ -84,6 +84,36 @@ export function setupTestGenerationHandlers(
 		},
 	);
 
+	// Where would the generated tests be written? Answered before a generation
+	// starts, so the UI can ask the user when the project has no test directory
+	// instead of dropping the file next to the solution file.
+	ipcMain.handle(
+		"test-generation:resolve-destination",
+		async (
+			_,
+			params: {
+				filePath: string;
+				projectPath?: string;
+				existingTestPath?: string;
+			},
+		) => {
+			try {
+				const destination = await testGenerationService.resolveDestination(
+					params.filePath,
+					params.projectPath,
+					params.existingTestPath,
+				);
+				return { success: true, destination };
+			} catch (error) {
+				console.error("[TestGeneration] resolve-destination error:", error);
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		},
+	);
+
 	// Generate unit tests
 	ipcMain.handle(
 		"test-generation:generate-unit",
@@ -94,6 +124,7 @@ export function setupTestGenerationHandlers(
 				existingTestPath?: string;
 				coverageTarget?: number;
 				projectPath?: string;
+				testDir?: string;
 			},
 		) => {
 			try {
@@ -102,6 +133,7 @@ export function setupTestGenerationHandlers(
 					params.existingTestPath,
 					params.coverageTarget,
 					params.projectPath,
+					params.testDir,
 				);
 				return { success: true };
 			} catch (error) {
@@ -119,13 +151,19 @@ export function setupTestGenerationHandlers(
 		"test-generation:generate-e2e",
 		async (
 			_,
-			params: { userStory: string; targetModule: string; projectPath?: string },
+			params: {
+				userStory: string;
+				targetModule: string;
+				projectPath?: string;
+				testDir?: string;
+			},
 		) => {
 			try {
 				await testGenerationService.generateE2ETests(
 					params.userStory,
 					params.targetModule,
 					params.projectPath,
+					params.testDir,
 				);
 				return { success: true };
 			} catch (error) {
@@ -148,6 +186,7 @@ export function setupTestGenerationHandlers(
 				language: string;
 				snippetType: string;
 				projectPath?: string;
+				testDir?: string;
 			},
 		) => {
 			try {
@@ -156,6 +195,7 @@ export function setupTestGenerationHandlers(
 					params.language,
 					params.snippetType,
 					params.projectPath,
+					params.testDir,
 				);
 				return { success: true };
 			} catch (error) {
@@ -189,6 +229,7 @@ export function setupTestGenerationHandlers(
  */
 export function cleanupTestGenerationHandlers(): void {
 	ipcMain.removeHandler("test-generation:analyze-coverage");
+	ipcMain.removeHandler("test-generation:resolve-destination");
 	ipcMain.removeHandler("test-generation:generate-unit");
 	ipcMain.removeHandler("test-generation:generate-e2e");
 	ipcMain.removeHandler("test-generation:generate-tdd");

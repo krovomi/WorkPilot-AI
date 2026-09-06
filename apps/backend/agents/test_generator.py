@@ -1088,11 +1088,11 @@ Only include items NOT already covered by the existing test file."""
             "python": f"tests/test_{stem}.py",
             "typescript": f"src/__tests__/{stem}.test.ts",
             "javascript": f"src/__tests__/{stem}.test.js",
-            "csharp": f"{stem}Tests.cs",
-            "java": f"{stem}Test.java",
+            "csharp": f"tests/{stem}Tests.cs",
+            "java": f"tests/{stem}Test.java",
             "go": f"{stem}_test.go",
             "ruby": f"spec/{stem}_spec.rb",
-            "kotlin": f"{stem}Test.kt",
+            "kotlin": f"tests/{stem}Test.kt",
         }.get(language, f"tests/{stem}_test")
 
         return f"""Generate a complete, production-quality test file for this {language} source file.
@@ -1446,27 +1446,6 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
         # defaults, and ``_parse_gaps`` treats it as the cue to fall back to AST.
         return {}
 
-    def _compute_test_file_path(
-        self, source_path: str, framework_info: dict[str, str]
-    ) -> str:
-        language = framework_info.get("language", "python")
-        stem = Path(source_path).stem
-        if language == "python":
-            return f"tests/test_{stem}.py"
-        if language in ("typescript",):
-            return f"src/__tests__/{stem}.test.ts"
-        if language in ("javascript",):
-            return f"src/__tests__/{stem}.test.js"
-        if language == "csharp":
-            return f"{stem}Tests.cs"
-        if language == "java":
-            return f"{stem}Test.java"
-        if language == "go":
-            return f"{stem}_test.go"
-        if language == "ruby":
-            return f"spec/{stem}_spec.rb"
-        return f"tests/test_{stem}"
-
     # ── Utilities ────────────────────────────────────────────────────
 
     def _read_file(self, path: str) -> str:
@@ -1509,7 +1488,24 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
     def _compute_test_file_path(
         self, source_path: str, framework_info: dict[str, str] | None = None
     ) -> str:
-        """Generate test file path from source path."""
+        """The conventional test path for *source_path*, relative to the project.
+
+        A fallback and a lookup key, not a decision: it answers "what would a
+        test file for this source be called, by convention?" — used when the
+        model returns no path, and to find an existing test file to extend.
+
+        Where the file is actually **written** is
+        ``test_generation.layout.resolve_test_destination``, which reads the
+        project's real layout and asks the user when it cannot justify an
+        answer. This method has no project root to read, so it can only state
+        the convention; two years of it stating it alone is how C# tests ended
+        up at the top of the repository.
+        """
+        from test_generation.layout import (
+            CO_LOCATED_LANGUAGES,
+            conventional_test_file_name,
+        )
+
         if framework_info:
             language = framework_info.get("language", "python")
         else:
@@ -1517,22 +1513,13 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
             ext = Path(source_path).suffix.lower()
             language = self._project_analyzer.EXTENSION_TO_LANGUAGE.get(ext, "python")
 
-        stem = Path(source_path).stem
-        if language == "python":
-            return f"tests/test_{stem}.py"
-        if language in ("typescript",):
-            return f"src/__tests__/{stem}.test.ts"
-        if language in ("javascript",):
-            return f"src/__tests__/{stem}.test.js"
-        if language == "csharp":
-            return f"{stem}Tests.cs"
-        if language == "java":
-            return f"{stem}Test.java"
-        if language == "go":
-            return f"{stem}_test.go"
-        if language == "ruby":
-            return f"spec/{stem}_spec.rb"
-        return f"tests/test_{stem}"
+        name = conventional_test_file_name(source_path, language)
+        if language in CO_LOCATED_LANGUAGES:
+            # A Go test file belongs to the package it tests; a "tests/" prefix
+            # here would name a path that cannot compile.
+            return name
+        directory = "spec" if language == "ruby" else "tests"
+        return f"{directory}/{name}"
 
     def _path_to_module(self, path: str) -> str:
         """Convert file path to module string."""

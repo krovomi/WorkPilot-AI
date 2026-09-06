@@ -21,6 +21,11 @@ Usage:
   python runners/test_generation_runner.py --action generate-unit --file-path /path/to/file.py --project-path /path/to/project
   python runners/test_generation_runner.py --action generate-e2e --user-story "..." --target-module mymodule --project-path /path/to/project
   python runners/test_generation_runner.py --action generate-tdd --description "..." --language typescript --snippet-type function --project-path /path/to/project
+  python runners/test_generation_runner.py --action resolve-destination --file-path /path/to/file.cs --project-path /path/to/project
+
+Where the generated file lands is decided by ``test_generation.layout``, not by
+the model: the ``tests`` directory beside the source root when there is one,
+and ``--test-dir`` (what the UI sends once it has asked) otherwise.
 """
 
 import argparse
@@ -135,23 +140,60 @@ def _emit_event(event: dict) -> None:
 
 
 def _write_test_file(
-    result, project_path: str | None, source_file_path: str | None = None
+    result,
+    project_path: str | None,
+    source_file_path: str | None = None,
+    test_dir: str | None = None,
+    use_layout: bool = True,
 ) -> None:
-    """Resolve and write the generated test file to disk. Updates result.test_file_path."""
+    """Resolve and write the generated test file to disk. Updates result.test_file_path.
+
+    For unit and TDD tests the directory comes from ``test_generation.layout``,
+    never from the model: what the model returns is a naming convention with no
+    idea of this project's layout, which is how C# tests ended up at the top of
+    the repository next to the solution file. Its file *name* is kept — that
+    part it gets right.
+
+    When the layout has no directory it can justify and the caller passed no
+    ``--test-dir``, the first candidate is used and said out loud. The UI asks
+    the user before it gets here; a CLI run has nobody to ask, and losing a
+    finished test file to a question nobody can answer helps no one.
+
+    ``use_layout=False`` keeps the model's own relative path, resolved against
+    the project root. E2E suites are the case: they cover a scenario rather
+    than a source file, so "beside the source root" answers a question they are
+    not asking, and their ``e2e/`` directory is the convention that does.
+    """
     content: str = getattr(result, "test_file_content", "")
     raw_path: str = getattr(result, "test_file_path", "")
 
-    if not content or not raw_path:
+    if not content or not (raw_path or source_file_path):
         return
 
-    resolved = Path(raw_path)
-    if not resolved.is_absolute():
-        if project_path:
-            resolved = Path(project_path) / raw_path
-        elif source_file_path:
-            resolved = Path(source_file_path).parent / raw_path
-        else:
-            resolved = resolved.resolve()
+    if use_layout:
+        from test_generation.layout import resolve_test_destination
+
+        destination = resolve_test_destination(
+            source_file_path or getattr(result, "source_file", "") or "",
+            project_root=project_path,
+            explicit_dir=test_dir,
+            proposed_path=raw_path,
+        )
+        if destination.status == "needs_choice" and not test_dir:
+            _status(
+                "No test directory found in this project — writing to "
+                f"{destination.directory}"
+            )
+        resolved = Path(destination.path)
+    else:
+        resolved = Path(raw_path)
+        if not resolved.is_absolute():
+            if project_path:
+                resolved = Path(project_path) / raw_path
+            elif source_file_path:
+                resolved = Path(source_file_path).parent / raw_path
+            else:
+                resolved = resolved.resolve()
 
     from core.error_details import WRITE_FAILED, DetailedError, ErrorDetail
 
@@ -217,7 +259,7 @@ def _run_generate_unit(agent, args) -> None:
         )
         _status(f"Generated {result.tests_generated} test(s)")
         _emit_event({"type": "stage", "stage": "write"})
-        _write_test_file(result, args.project_path, args.file_path)
+        _write_test_file(result, args.project_path, args.file_path, args.test_dir)
         _emit_event(
             {
                 "type": "stage",
@@ -256,7 +298,13 @@ def _run_generate_e2e(agent, args) -> None:
         )
         _status(f"Generated {result.tests_generated} E2E test(s)")
         _emit_event({"type": "stage", "stage": "write"})
-        _write_test_file(result, args.project_path, args.target_module or None)
+        _write_test_file(
+            result,
+            args.project_path,
+            args.target_module or None,
+            args.test_dir,
+            use_layout=bool(args.test_dir),
+        )
         _emit_event(
             {
                 "type": "stage",
@@ -298,7 +346,7 @@ def _run_generate_tdd(agent, args) -> None:
         )
         _status(f"Generated {result.tests_generated} TDD test(s)")
         _emit_event({"type": "stage", "stage": "write"})
-        _write_test_file(result, args.project_path)
+        _write_test_file(result, args.project_path, None, args.test_dir)
         _emit_event(
             {
                 "type": "stage",
@@ -313,10 +361,51 @@ def _run_generate_tdd(agent, args) -> None:
         _fail(exc)
 
 
+def _run_resolve_destination(agent, args) -> None:  # noqa: ARG001 — no LLM needed
+    """Answer "where would the test file go?" without generating anything.
+
+    The UI calls this before it starts a generation, so the question of where
+    the file lands is settled while it is still cheap to ask — and asked of the
+    person, not of the model. Pure path arithmetic: no provider, no network, no
+    source file read.
+    """
+    from agents.test_generator import ProjectAnalyzer
+    from test_generation.layout import resolve_test_destination
+
+    source = args.file_path or args.target_module or ""
+    if not source and not args.project_path:
+        _print_error(
+            "No source file or project was provided, so no test directory could be resolved.",
+            code="invalid_input",
+        )
+        sys.exit(1)
+
+    language = args.language
+    framework = None
+    if source:
+        detected = ProjectAnalyzer().detect(source, args.project_path)
+        language = detected.get("language") or language
+        framework = detected.get("test_framework")
+
+    destination = resolve_test_destination(
+        source,
+        project_root=args.project_path,
+        language=language,
+        explicit_dir=args.test_dir,
+        existing_test_path=args.existing_test_path,
+    )
+    payload = destination.to_dict()
+    payload["language"] = language
+    if framework:
+        payload["test_framework"] = framework
+    _print_result({"success": True, "destination": payload})
+
+
 # ── Entry point ──────────────────────────────────────────────────────
 
 _ACTION_HANDLERS = {
     "analyze-coverage": _run_analyze_coverage,
+    "resolve-destination": _run_resolve_destination,
     "generate-unit": _run_generate_unit,
     "generate-e2e": _run_generate_e2e,
     "generate-tdd": _run_generate_tdd,
@@ -355,6 +444,14 @@ def main() -> None:
     )
     parser.add_argument(
         "--snippet-type", default="function", help="Snippet type for TDD"
+    )
+    parser.add_argument(
+        "--test-dir",
+        default=None,
+        help=(
+            "Directory the generated test file is written to. Overrides the "
+            "layout convention; created when it does not exist."
+        ),
     )
     parser.add_argument(
         "--project-path",
