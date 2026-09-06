@@ -10,9 +10,13 @@ These are pure/offline checks — no local server is contacted.
 
 import pytest
 from core.agent_client import (
+    _LOCAL_STALL_SECONDS,
     LocalAgentClient,
+    _env_flag,
     _extract_text_tool_calls,
+    _format_generation_progress,
     _looks_like_waiting_for_human,
+    _merge_native_chunk,
     _next_no_tool_action,
     _normalize_local_base_url,
     _resolve_local_base_url,
@@ -482,3 +486,139 @@ class TestLooksLikeWaitingForHuman:
     )
     def test_ignores_normal_prose(self, text):
         assert _looks_like_waiting_for_human(text) is False
+
+
+class TestMergeNativeChunk:
+    """Folding Ollama /api/chat objects — streamed or not — into one turn."""
+
+    def test_streamed_content_is_concatenated(self):
+        acc = {}
+        for piece in ("Hello", " ", "world"):
+            _merge_native_chunk(acc, {"message": {"content": piece}})
+        assert acc["content"] == "Hello world"
+        # One content-bearing chunk ≈ one token: that is the heartbeat's counter.
+        assert acc["tokens"] == 3
+
+    def test_returns_added_characters(self):
+        acc = {}
+        assert _merge_native_chunk(acc, {"message": {"content": "abc"}}) == 3
+        # A keep-alive chunk carries no content and must not look like output.
+        assert _merge_native_chunk(acc, {"message": {"content": ""}}) == 0
+        assert acc["tokens"] == 1
+
+    def test_non_streamed_single_object_folds_identically(self):
+        acc = {}
+        _merge_native_chunk(
+            acc,
+            {
+                "message": {"content": "done", "tool_calls": [{"function": {}}]},
+                "done": True,
+                "prompt_eval_count": 120,
+                "eval_count": 7,
+            },
+        )
+        assert acc["content"] == "done"
+        assert len(acc["tool_calls"]) == 1
+        assert acc["done"] is True
+        assert (acc["prompt_eval_count"], acc["eval_count"]) == (120, 7)
+
+    def test_tool_calls_accumulate_across_chunks(self):
+        acc = {}
+        _merge_native_chunk(acc, {"message": {"tool_calls": [{"id": "a"}]}})
+        _merge_native_chunk(acc, {"message": {"tool_calls": [{"id": "b"}]}})
+        assert [tc["id"] for tc in acc["tool_calls"]] == ["a", "b"]
+
+    def test_mid_stream_error_is_captured(self):
+        acc = {}
+        _merge_native_chunk(acc, {"error": "model runner has terminated"})
+        assert acc["error"] == "model runner has terminated"
+
+
+class TestFormatGenerationProgress:
+    """The heartbeat has to say what changed, not that time passed."""
+
+    def _line(self, **overrides):
+        kwargs = {
+            "turn": 3,
+            "max_turns": 50,
+            "elapsed": 60,
+            "tokens": 0,
+            "silent_for": 0,
+        }
+        kwargs.update(overrides)
+        return _format_generation_progress("llama3.3", **kwargs)
+
+    def test_names_the_turn(self):
+        assert "tour 3/50" in self._line()
+
+    def test_prompt_evaluation_is_distinguished_from_generation(self):
+        # No token yet: the server is still reading the context.
+        assert "analyse le contexte" in self._line(tokens=0)
+        assert "génère" in self._line(tokens=200, elapsed=60)
+
+    def test_generation_reports_count_and_rate(self):
+        line = self._line(tokens=300, elapsed=60)
+        assert "300 tokens" in line
+        assert "5,0 tok/s" in line
+
+    def test_no_token_past_the_stall_threshold_warns_about_the_context(self):
+        line = self._line(tokens=0, elapsed=_LOCAL_STALL_SECONDS)
+        assert line.startswith("⚠️")
+        assert "OLLAMA_CONTEXT_LENGTH" in line
+
+    def test_output_that_stopped_is_reported_as_a_stall(self):
+        line = self._line(tokens=300, elapsed=900, silent_for=_LOCAL_STALL_SECONDS)
+        assert line.startswith("⚠️")
+        assert "plus rien" in line
+
+    def test_elapsed_is_human_readable(self):
+        assert "1 min 30 s" in self._line(tokens=10, elapsed=90)
+
+    def test_non_streamed_turn_does_not_read_silence_as_a_stall(self):
+        # The fallback path observes nothing until the turn ends, so zero
+        # tokens is not evidence of anything and must not be reported as such.
+        line = self._line(tokens=0, elapsed=_LOCAL_STALL_SECONDS, streaming=False)
+        assert "non streamée" in line
+        assert not line.startswith("⚠️")
+
+
+class TestLocalContextBudgets:
+    """Shared budgets are sized for a 200k window; a local model has 8k."""
+
+    def test_history_budget_fits_the_local_window(self, monkeypatch):
+        monkeypatch.delenv("OLLAMA_CONTEXT_LENGTH", raising=False)
+        client = LocalAgentClient(model="m")
+        # Half of 8192 tokens at ~3 chars/token — an order of magnitude below
+        # the 300k shared default, which never fired before the window blew.
+        assert client._local_history_budget() < 50_000
+
+    def test_tool_result_cap_fits_the_local_window(self, monkeypatch):
+        monkeypatch.delenv("OLLAMA_CONTEXT_LENGTH", raising=False)
+        client = LocalAgentClient(model="m")
+        assert client._local_tool_result_cap() < 10_000
+
+    def test_budgets_grow_with_the_window_but_never_past_the_shared_default(
+        self, monkeypatch
+    ):
+        monkeypatch.setenv("OLLAMA_CONTEXT_LENGTH", "262144")
+        client = LocalAgentClient(model="m")
+        assert client._local_history_budget() == 300_000
+        assert client._local_tool_result_cap() == 10_000
+
+
+class TestEnvFlag:
+    @pytest.mark.parametrize("raw", ["0", "false", "FALSE", "no", "off"])
+    def test_falsy_shapes(self, raw, monkeypatch):
+        monkeypatch.setenv("OLLAMA_STREAM", raw)
+        assert _env_flag("OLLAMA_STREAM", True) is False
+
+    @pytest.mark.parametrize("raw", ["1", "true", "yes", "on"])
+    def test_truthy_shapes(self, raw, monkeypatch):
+        monkeypatch.setenv("OLLAMA_STREAM", raw)
+        assert _env_flag("OLLAMA_STREAM", False) is True
+
+    def test_unset_and_garbage_keep_the_default(self, monkeypatch):
+        monkeypatch.delenv("OLLAMA_STREAM", raising=False)
+        assert _env_flag("OLLAMA_STREAM", True) is True
+        monkeypatch.setenv("OLLAMA_STREAM", "maybe")
+        assert _env_flag("OLLAMA_STREAM", True) is True

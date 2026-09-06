@@ -54,14 +54,36 @@ except ImportError:  # pragma: no cover - alternate package layout
 # multi-turn loop: head+tail tool-result truncation and over-budget history
 # compaction. The module is importable under both package layouts.
 try:
-    from core.llm_optimization import compact_messages, truncate_tool_result
+    from core.llm_optimization import (
+        compact_messages,
+        history_char_budget,
+        tool_result_max_chars,
+        truncate_tool_result,
+    )
 except ImportError:  # pragma: no cover - alternate package layout
     from apps.backend.core.llm_optimization import (
         compact_messages,
+        history_char_budget,
+        tool_result_max_chars,
         truncate_tool_result,
     )
 
 logger = logging.getLogger(__name__)
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    """Read a boolean tunable from the environment, falling back to ``default``.
+
+    Accepts the shapes users actually type (``0``/``1``, ``false``/``true``,
+    ``no``/``yes``, ``off``/``on``); anything else keeps the default rather
+    than silently reading as false.
+    """
+    raw = (os.environ.get(name) or "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return default
 
 
 def _env_float(name: str, default: float) -> float:
@@ -2693,6 +2715,107 @@ _LOCAL_CHAT_CONNECT_TIMEOUT = 20
 # How often to say "still generating" while a turn is in flight. Silence and a
 # hang look identical in a log; a heartbeat separates them.
 _LOCAL_HEARTBEAT_SECONDS = 30
+# How long the server may produce nothing before the heartbeat stops calling it
+# normal slowness. Below this a local model is simply slow; above it, something
+# is wrong (a context that does not fit, a swapping machine, a wedged runner)
+# and the line says so instead of counting minutes reassuringly.
+_LOCAL_STALL_SECONDS = 5 * 60
+
+
+def _format_duration_fr(seconds: int) -> str:
+    """`90` → "1 min 30 s". Used by the generation heartbeat."""
+    seconds = max(int(seconds), 0)
+    if seconds < 60:
+        return f"{seconds} s"
+    minutes, rest = divmod(seconds, 60)
+    return f"{minutes} min" if rest == 0 else f"{minutes} min {rest} s"
+
+
+def _merge_native_chunk(acc: dict[str, Any], chunk: dict[str, Any]) -> int:
+    """Fold one Ollama ``/api/chat`` object into an accumulator, in place.
+
+    Streaming sends one object per token batch (NDJSON) and non-streaming sends
+    a single object of the *same* shape, so both modes fold through here and the
+    turn's downstream handling never has to know which one ran.
+
+    Returns the number of content characters this chunk added, which is how the
+    caller tells "still producing" from "stopped sending".
+    """
+    message = chunk.get("message") or {}
+    text = message.get("content") or ""
+    if text:
+        acc["content"] = acc.get("content", "") + text
+        acc["tokens"] = acc.get("tokens", 0) + 1
+    tool_calls = message.get("tool_calls") or []
+    if tool_calls:
+        acc.setdefault("tool_calls", []).extend(tool_calls)
+    for key in ("prompt_eval_count", "eval_count"):
+        value = chunk.get(key)
+        if value:
+            acc[key] = int(value)
+    if chunk.get("done"):
+        acc["done"] = True
+    if chunk.get("error"):
+        acc["error"] = str(chunk["error"])
+    return len(text)
+
+
+def _format_generation_progress(
+    model: str,
+    *,
+    turn: int,
+    max_turns: int,
+    elapsed: int,
+    tokens: int,
+    silent_for: int,
+    streaming: bool = True,
+) -> str:
+    """The heartbeat line for a local turn that is still in flight.
+
+    A local turn has two silent phases that fail for different reasons and are
+    fixed differently: **prompt evaluation** (the server reading the whole
+    context before emitting anything — slow because the context is big) and
+    **generation** (slow because the model is big). "Thinking…" describes
+    neither, which is why a log full of it told the user nothing. Naming the
+    phase, the turn and the token count makes the same 30-second line carry the
+    one thing a heartbeat is for: whether anything moved since the last one.
+
+    On the non-streamed fallback there is genuinely nothing to observe until
+    the turn ends, so the line says that rather than reading zero tokens as
+    evidence of a stall.
+    """
+    where = f"tour {turn}/{max_turns}"
+    if not streaming:
+        return (
+            f"⏳ {where} — « {model} » travaille depuis "
+            f"{_format_duration_fr(elapsed)} (réponse non streamée : le serveur "
+            "n'envoie rien avant la fin du tour)."
+        )
+    if tokens <= 0:
+        if elapsed >= _LOCAL_STALL_SECONDS:
+            return (
+                f"⚠️ {where} — « {model} » : toujours aucun token après "
+                f"{_format_duration_fr(elapsed)}. Le contexte envoyé est "
+                "probablement trop grand pour cette machine (baissez l'effort "
+                "de la phase, ou OLLAMA_CONTEXT_LENGTH)."
+            )
+        return (
+            f"⏳ {where} — « {model} » analyse le contexte depuis "
+            f"{_format_duration_fr(elapsed)} (aucun token généré pour l'instant)."
+        )
+    if silent_for >= _LOCAL_STALL_SECONDS:
+        return (
+            f"⚠️ {where} — « {model} » : {tokens} tokens générés puis plus rien "
+            f"depuis {_format_duration_fr(silent_for)}. La requête sera "
+            f"abandonnée après {_format_duration_fr(_LOCAL_CHAT_SOCK_READ_TIMEOUT)} "
+            "de silence."
+        )
+    rate = tokens / elapsed if elapsed > 0 else 0.0
+    return (
+        f"⏳ {where} — « {model} » génère : {tokens} tokens en "
+        f"{_format_duration_fr(elapsed)} "
+        f"(~{f'{rate:.1f}'.replace('.', ',')} tok/s)."
+    )
 
 
 def _next_no_tool_action(
@@ -2879,13 +3002,44 @@ class LocalAgentClient(OpenAIAgentClient):
         except (TypeError, ValueError):
             return 8192
 
+    # Roughly how many characters one token of mixed code + prose costs. Used
+    # to express the token-denominated context window in the character budgets
+    # the shared history helpers work in.
+    _CHARS_PER_TOKEN = 3
+
+    def _local_history_budget(self) -> int:
+        """Char budget before stale tool results are elided, sized to num_ctx.
+
+        ``compact_messages`` defaults to ~300k chars (≈75k tokens) — chosen so a
+        hosted model with a 200k window never pays for compaction it does not
+        need. A local model runs in 8k. At the default the conversation blew
+        past ``num_ctx`` roughly ten times over before compaction so much as
+        looked at it, Ollama silently dropped the head of the prompt (the system
+        prompt and the task with it), and the model carried on answering a
+        question nobody had asked. Half the window, never above the shared
+        default.
+        """
+        return min(
+            history_char_budget(),
+            max(20_000, int(self._num_ctx() * 0.5) * self._CHARS_PER_TOKEN),
+        )
+
+    def _local_tool_result_cap(self) -> int:
+        """Max chars of one tool result kept in context, sized to num_ctx.
+
+        The shared cap is 10k chars — about 40 % of an 8k-token window for a
+        single file read, which is how three reads in a row ended a turn with no
+        room left for the answer.
+        """
+        return min(
+            tool_result_max_chars(),
+            max(2_000, int(self._num_ctx() * 0.2) * self._CHARS_PER_TOKEN),
+        )
+
     @staticmethod
     def _format_duration(seconds: int) -> str:
         """`90` → "1 min 30 s". Used by the generation heartbeat."""
-        if seconds < 60:
-            return f"{seconds} s"
-        minutes, rest = divmod(seconds, 60)
-        return f"{minutes} min" if rest == 0 else f"{minutes} min {rest} s"
+        return _format_duration_fr(seconds)
 
     @staticmethod
     def _format_bytes(n: float) -> str:
@@ -3121,6 +3275,9 @@ class LocalAgentClient(OpenAIAgentClient):
         # ONE explicit "call the tools" nudge before we declare it unable to act.
         any_tool_called = False
         tool_use_nudge_sent = False
+        # Stream the turn unless the server (or the user, via OLLAMA_STREAM=0)
+        # says otherwise. Cleared on the one documented failure mode below.
+        stream_chunks = _env_flag("OLLAMA_STREAM", True)
         # Transient-connection guard: a freshly auto-started or model-reloading
         # server can briefly refuse a connection. Retry a few times (reset on any
         # success) before declaring "Ollama ne répond pas".
@@ -3136,11 +3293,40 @@ class LocalAgentClient(OpenAIAgentClient):
             flush=True,
         )
 
+        # What the first request will cost, before it is sent. A prompt that
+        # does not fit is the single most common way a local build stalls, and
+        # the server's own answer to it — silently dropping the head of the
+        # context — leaves no trace anyone can act on. Say the number instead.
+        prompt_tokens_est = (
+            sum(len(str(m.get("content") or "")) for m in messages)
+            + len(_json.dumps(tools))
+        ) // self._CHARS_PER_TOKEN
+        yield _system_text(
+            f"📐 Contexte envoyé : ~{prompt_tokens_est} tokens estimés pour une "
+            f"fenêtre de {num_ctx} (modèle « {self.model} », {len(tools)} outils)."
+        )
+        if prompt_tokens_est > num_ctx:
+            logger.warning(
+                "[LocalAgentClient] Estimated prompt (~%d tokens) exceeds "
+                "num_ctx=%d — the server will truncate it.",
+                prompt_tokens_est,
+                num_ctx,
+            )
+            yield _system_text(
+                f"⚠️ Le prompt (~{prompt_tokens_est} tokens) dépasse la fenêtre "
+                f"de contexte ({num_ctx}) : le serveur en coupera le début, "
+                "consignes système comprises. Augmentez OLLAMA_CONTEXT_LENGTH "
+                "ou baissez l'effort de réflexion de cette phase."
+            )
+
         for turn in range(self.max_turns):
             payload: dict[str, Any] = {
                 "model": self.model,
                 "messages": messages,
-                "stream": False,
+                # Streamed so the heartbeat can report real output instead of
+                # elapsed time; see _format_generation_progress. Cleared below
+                # if the server turns out not to support streaming with tools.
+                "stream": stream_chunks,
                 "options": {"num_ctx": num_ctx},
             }
             if tools:
@@ -3148,16 +3334,29 @@ class LocalAgentClient(OpenAIAgentClient):
 
             try:
                 import asyncio as _asyncio
+                import time as _time
 
                 import aiohttp as _aiohttp
 
+                # Accumulator the reader task fills and the heartbeat reads.
+                acc: dict[str, Any] = {
+                    "content": "",
+                    "tool_calls": [],
+                    "tokens": 0,
+                    "status": None,
+                    "error_body": "",
+                    "last_output_at": _time.monotonic(),
+                }
+
                 async def _post_chat(
                     turn_payload: dict[str, Any] = payload,
-                ) -> tuple[int, str]:
-                    """One chat turn, body read inside the response context.
+                    sink: dict[str, Any] = acc,
+                ) -> None:
+                    """One chat turn, folded into `sink` as it arrives.
 
-                    `turn_payload` is a default argument so the coroutine binds
-                    THIS turn's payload rather than the loop variable.
+                    `turn_payload` and `sink` are default arguments so the
+                    coroutine binds THIS turn's objects rather than the loop
+                    variables.
                     """
                     async with session.post(
                         url,
@@ -3170,30 +3369,53 @@ class LocalAgentClient(OpenAIAgentClient):
                             sock_read=_LOCAL_CHAT_SOCK_READ_TIMEOUT,
                         ),
                     ) as resp:
-                        return resp.status, await resp.text()
+                        sink["status"] = resp.status
+                        if resp.status != 200:
+                            sink["error_body"] = await resp.text()
+                            return
+                        # Streaming sends NDJSON, one object per token batch;
+                        # non-streaming sends a single object of the same shape
+                        # on one line. Both fold through _merge_native_chunk.
+                        async for raw_line in resp.content:
+                            line = raw_line.strip()
+                            if not line:
+                                continue
+                            try:
+                                chunk = _json.loads(line)
+                            except ValueError:
+                                continue
+                            if _merge_native_chunk(sink, chunk):
+                                sink["last_output_at"] = _time.monotonic()
 
-                # A local model can think for minutes with nothing on the wire.
-                # Without a heartbeat the log's last line stays "Contexte LLM
-                # initial" and a working-but-slow run is indistinguishable from
-                # a frozen one — which is exactly how this was reported.
+                # A local model can work for minutes with nothing to show. The
+                # heartbeat reports what the reader has actually accumulated —
+                # which turn, how many tokens, how long since the last one — so
+                # a slow run and a wedged one no longer print the same line.
                 request = _asyncio.ensure_future(_post_chat())
-                waited = 0
+                started_at = _time.monotonic()
                 while True:
                     finished, _pending = await _asyncio.wait(
                         {request}, timeout=_LOCAL_HEARTBEAT_SECONDS
                     )
                     if finished:
                         break
-                    waited += _LOCAL_HEARTBEAT_SECONDS
+                    now = _time.monotonic()
                     yield _system_text(
-                        f"⏳ « {self.model} » génère depuis "
-                        f"{self._format_duration(waited)}… "
-                        "(un grand modèle local peut prendre plusieurs minutes)"
+                        _format_generation_progress(
+                            self.model,
+                            turn=turn + 1,
+                            max_turns=self.max_turns,
+                            elapsed=int(now - started_at),
+                            tokens=int(acc.get("tokens", 0)),
+                            silent_for=int(now - acc["last_output_at"]),
+                            streaming=stream_chunks,
+                        )
                     )
-                status, body = request.result()
+                request.result()  # re-raise transport failures below
 
+                status = acc.get("status") or 0
                 if status != 200:
-                    error_text = body
+                    error_text = acc.get("error_body", "")
                     # Model not installed → pull it once, then retry the turn.
                     if "not found" in error_text.lower() and not model_pull_attempted:
                         model_pull_attempted = True
@@ -3249,12 +3471,41 @@ class LocalAgentClient(OpenAIAgentClient):
                             f"« {self.model} » : {pull_err}"
                         )
                         return
+                    # Tool calling over a streamed response is recent in Ollama.
+                    # A server too old to do both refuses the request rather
+                    # than degrading, so fall back once to a single-shot turn
+                    # instead of failing the phase. Same code path either way —
+                    # only the heartbeat loses its token counter.
+                    if stream_chunks and "stream" in error_text.lower():
+                        stream_chunks = False
+                        logger.warning(
+                            "[LocalAgentClient] Server rejected a streamed "
+                            "tool-calling turn (%s) — retrying without streaming.",
+                            error_text[:200],
+                        )
+                        continue
                     logger.error(
                         f"[LocalAgentClient] API error ({status}): {error_text[:500]}"
                     )
                     yield _system_text(f"Ollama API error ({status}): {error_text}")
                     return
-                data = _json.loads(body)
+                # Ollama can also report a failure mid-stream, with HTTP 200
+                # already sent. Surface it the same way rather than treating the
+                # truncated content as a finished turn.
+                if acc.get("error"):
+                    logger.error(
+                        "[LocalAgentClient] Stream error: %s", acc["error"][:500]
+                    )
+                    yield _system_text(f"Ollama API error: {acc['error']}")
+                    return
+                data = {
+                    "message": {
+                        "content": acc.get("content", ""),
+                        "tool_calls": acc.get("tool_calls") or [],
+                    },
+                    "prompt_eval_count": acc.get("prompt_eval_count", 0),
+                    "eval_count": acc.get("eval_count", 0),
+                }
             except Exception as e:
                 # A connection failure can be transient — the server may be cold-
                 # starting (just auto-launched) or reloading a model. Retry a few
@@ -3485,11 +3736,15 @@ class LocalAgentClient(OpenAIAgentClient):
                     {
                         "role": "tool",
                         "tool_name": tool_name,
-                        "content": truncate_tool_result(result_text),
+                        "content": truncate_tool_result(
+                            result_text, limit=self._local_tool_result_cap()
+                        ),
                     }
                 )
 
-            compacted = compact_messages(messages)
+            compacted = compact_messages(
+                messages, char_budget=self._local_history_budget()
+            )
             if compacted:
                 logger.info(
                     f"[LocalAgentClient] History compaction: elided {compacted} "
