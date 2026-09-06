@@ -220,5 +220,31 @@
 			"projectRoot": "At the project root",
 			"besideSource": "Next to the source file"
 		}
+	},
+	"libraries": {
+		"title": "Test libraries",
+		"description": "What the generated tests are written against. Pre-filled from the packages this project already references.",
+		"loading": "Reading the project's packages…",
+		"installed": "installed",
+		"toAdd": "to add",
+		"reset": "Project default",
+		"category": {
+			"framework": "Framework",
+			"assertions": "Assertions",
+			"mocking": "Mocking",
+			"data": "Test data",
+			"http": "HTTP & integration",
+			"ui": "UI",
+			"snapshot": "Snapshots",
+			"coverage": "Coverage"
+		},
+		"missingWarning_one": "{{count}} package is not referenced yet ({{packages}}). The generated tests will not compile until it is added.",
+		"missingWarning_other": "{{count}} packages are not referenced yet ({{packages}}). The generated tests will not compile until they are added.",
+		"addPackages_one": "Add {{count}} package",
+		"addPackages_other": "Add {{count}} packages",
+		"installDone_one": "{{count}} package added to {{target}}.",
+		"installDone_other": "{{count}} packages added to {{target}}.",
+		"installFailed": "Some packages could not be added.",
+		"runByHand": "Run these yourself:"
 	}
 }
