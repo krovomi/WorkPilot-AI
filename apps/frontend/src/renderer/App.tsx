@@ -390,6 +390,7 @@ import { GitHubSetupModal } from "./components/GitHubSetupModal";
 import { GlobalDownloadIndicator } from "./components/GlobalDownloadIndicator";
 import { FormulaLab } from "./components/formula-lab/FormulaLab";
 import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay";
+import { BackgroundTasksIndicator } from "./components/BackgroundTasksIndicator";
 import { NavigationConfirmDialog } from "./components/NavigationConfirmDialog";
 import { NoProjectPage } from "./components/NoProjectPage";
 import { OnboardingWizard } from "./components/onboarding";
@@ -425,7 +426,12 @@ import {
 	useSettingsStore,
 } from "./stores/settings-store";
 import { useServerSessionStore } from "./stores/server-session-store";
-import { loadTasks, stopTask, useTaskStore } from "./stores/task-store";
+import {
+	loadTasks,
+	pauseTask,
+	stopTask,
+	useTaskStore,
+} from "./stores/task-store";
 import { useKanbanSettingsStore } from "./stores/kanban-settings-store";
 import {
 	getKanbanOrderedTasks,
@@ -587,6 +593,12 @@ export function App() {
 	const [pendingNavView, setPendingNavView] = useState<SidebarView | null>(
 		null,
 	);
+	// Set once the user picks "keep running in the background": the prompt then
+	// stops interrupting every navigation for the rest of the session. Session
+	// scoped on purpose — a persisted setting would silently swallow the choice
+	// on the day the user wants to stop a task instead.
+	const [skipNavPrompt, setSkipNavPrompt] = useState(false);
+	const [dontAskNavAgain, setDontAskNavAgain] = useState(false);
 	const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
 	const isSetupHubOpen = useSetupHubStore((s) => s.isOpen);
 	const setSetupHubOpen = useSetupHubStore((s) => s.setSetupHubOpen);
@@ -656,37 +668,62 @@ export function App() {
 	const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 	const [isShortcutsOverlayOpen, setIsShortcutsOverlayOpen] = useState(false);
 
+	// A paused task is still `in_progress`, but nothing is running: it must not
+	// raise the prompt, and it must not be counted as working in the background.
+	const backgroundTasks = getTasksByStatus("in_progress").filter(
+		(t) => !t.metadata?.paused?.enabled,
+	);
+
 	// Navigation guard: intercept view changes when a task is in progress
 	// force=true bypasses the guard (used by CLI badges that create a terminal and navigate)
 	const handleViewChange = (view: SidebarView, force?: boolean) => {
-		if (view === "kanban" || force) {
+		if (view === "kanban" || force || skipNavPrompt) {
 			setActiveView(view);
 			return;
 		}
-		const runningTasks = getTasksByStatus("in_progress");
-		if (runningTasks.length > 0) {
+		if (backgroundTasks.length > 0) {
 			setPendingNavView(view);
 		} else {
 			setActiveView(view);
 		}
 	};
 
-	const pendingNavTask = pendingNavView
-		? (getTasksByStatus("in_progress")[0] ?? null)
-		: null;
+	const pendingNavTask = pendingNavView ? (backgroundTasks[0] ?? null) : null;
 
 	const handleNavContinue = () => setPendingNavView(null);
 
 	const handleNavStop = () => {
-		const runningTasks = getTasksByStatus("in_progress");
-		for (const t of runningTasks) stopTask(t.id);
+		for (const t of backgroundTasks) stopTask(t.id);
 		if (pendingNavView) setActiveView(pendingNavView);
 		setPendingNavView(null);
 	};
 
-	const handleNavPause = () => {
+	// The agents live in the main process, so leaving the Kanban never
+	// interrupted them — this option makes that explicit and drops the prompt
+	// for the rest of the session when the user asks for it.
+	const handleNavBackground = () => {
+		if (dontAskNavAgain) setSkipNavPrompt(true);
 		if (pendingNavView) setActiveView(pendingNavView);
 		setPendingNavView(null);
+	};
+
+	// "Pause" used to only navigate, which is what "background" now means. Ask
+	// the backend to actually suspend the run so the label tells the truth.
+	const handleNavPause = () => {
+		for (const t of backgroundTasks) {
+			void pauseTask(t.id);
+		}
+		if (pendingNavView) setActiveView(pendingNavView);
+		setPendingNavView(null);
+	};
+
+	// Back to the Kanban from wherever the user went, optionally on one task.
+	const handleOpenBackgroundTask = (taskId?: string) => {
+		setActiveView("kanban");
+		if (taskId) {
+			const task = useTaskStore.getState().tasks.find((t) => t.id === taskId);
+			if (task) setSelectedTask(task);
+		}
 	};
 
 	// Global keyboard shortcuts (Feature 9.4)
@@ -2333,10 +2370,22 @@ export function App() {
 					<NavigationConfirmDialog
 						open={pendingNavView !== null}
 						runningTask={pendingNavTask}
+						runningCount={backgroundTasks.length}
+						onBackground={handleNavBackground}
 						onContinue={handleNavContinue}
 						onStop={handleNavStop}
 						onPause={handleNavPause}
+						dontAskAgain={dontAskNavAgain}
+						onDontAskAgainChange={setDontAskNavAgain}
 					/>
+
+					{/* Off the Kanban, the only sign the agents are still working */}
+					{activeView !== "kanban" && (
+						<BackgroundTasksIndicator
+							tasks={backgroundTasks}
+							onOpenTask={handleOpenBackgroundTask}
+						/>
+					)}
 				</CliStatusProvider>
 			</ViewStateProvider>
 		</ProviderContextProvider>
