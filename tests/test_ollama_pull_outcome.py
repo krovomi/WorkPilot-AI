@@ -118,9 +118,15 @@ class TestInstalledCheck:
         with self._with_tags(tags("llama3.3:latest")):
             assert det.model_is_installed("http://x", "llama3.3") is True
 
-    def test_a_bare_name_matches_an_explicit_size_tag(self):
+    def test_a_bare_name_does_not_match_a_non_latest_tag(self):
+        """Corrects an over-lenient rule shipped in #103.
+
+        `llama3.3` resolves to `llama3.3:latest`, so with only `llama3.3:70b`
+        on disk Ollama still has a model to fetch. Accepting it here turned a
+        pull with work left to do into a false success.
+        """
         with self._with_tags(tags("llama3.3:70b")):
-            assert det.model_is_installed("http://x", "llama3.3") is True
+            assert det.model_is_installed("http://x", "llama3.3") is False
 
     def test_an_exact_tag_matches(self):
         with self._with_tags(tags("qwen3-embedding:8b")):
@@ -232,6 +238,14 @@ class TestAgentClientParity:
         assert "async def _model_is_installed" in source
         # Both the in-stream error and the transport error consult it.
         assert source.count("if await self._model_is_installed():") >= 2
+
+    def test_the_two_installed_checks_agree_on_tags(self):
+        """A bare name is `:latest` on both sides, or a pull lies once."""
+        source = (
+            REPO_ROOT / "apps" / "backend" / "core" / "agent_client.py"
+        ).read_text(encoding="utf-8")
+        assert 'if name == wanted or name == f"{wanted}:latest":' in source
+        assert 'name.split(":", 1)[0] == wanted' not in source
 
     def test_the_partial_blob_case_is_explained(self):
         from core.agent_client import LocalAgentClient

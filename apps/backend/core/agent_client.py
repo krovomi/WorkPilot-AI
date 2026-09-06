@@ -2680,6 +2680,20 @@ def _looks_like_waiting_for_human(content: str) -> bool:
 # "Ollama ne répond pas" hint. Reset on any successful response.
 _LOCAL_MAX_CONNECT_RETRIES = 2
 
+# How long one local generation may take. aiohttp's default session timeout is
+# 5 minutes TOTAL, and a large model — llama3.3 is 70B — thinking at a high
+# effort routinely needs longer than that for a single turn on consumer
+# hardware. Inheriting the default meant the request was killed mid-generation
+# and the phase reported a transport error for a model that was working, just
+# slowly. `sock_read` is the meaningful guard: it fires when the server stops
+# sending, which is what "hung" actually means, while `total=None` refuses to
+# put a ceiling on honest slowness.
+_LOCAL_CHAT_SOCK_READ_TIMEOUT = 15 * 60
+_LOCAL_CHAT_CONNECT_TIMEOUT = 20
+# How often to say "still generating" while a turn is in flight. Silence and a
+# hang look identical in a log; a heartbeat separates them.
+_LOCAL_HEARTBEAT_SECONDS = 30
+
 
 def _next_no_tool_action(
     *,
@@ -2866,6 +2880,14 @@ class LocalAgentClient(OpenAIAgentClient):
             return 8192
 
     @staticmethod
+    def _format_duration(seconds: int) -> str:
+        """`90` → "1 min 30 s". Used by the generation heartbeat."""
+        if seconds < 60:
+            return f"{seconds} s"
+        minutes, rest = divmod(seconds, 60)
+        return f"{minutes} min" if rest == 0 else f"{minutes} min {rest} s"
+
+    @staticmethod
     def _format_bytes(n: float) -> str:
         """Human-readable byte count (Go/Mo), for pull-progress lines."""
         if n >= 1024**3:
@@ -2937,9 +2959,9 @@ class LocalAgentClient(OpenAIAgentClient):
             return False
         for entry in data.get("models") or []:
             name = str(entry.get("name", "")).strip().lower()
+            # Bare name ≡ `:latest`, and only that: with just `llama3.3:70b`
+            # on disk, `llama3.3` still sends Ollama to fetch `:latest`.
             if name == wanted or name == f"{wanted}:latest":
-                return True
-            if ":" not in wanted and name.split(":", 1)[0] == wanted:
                 return True
         return False
 
@@ -3057,6 +3079,13 @@ class LocalAgentClient(OpenAIAgentClient):
         # receive_response() on a reused client.
         self.tool_calling_unsupported = False
 
+        def _system_text(text: str) -> AgentMessage:
+            """A one-line status message for the task log."""
+            return AgentMessage(
+                role=MessageRole.SYSTEM,
+                content=[ContentBlock(type=ContentBlockType.TEXT, text=text)],
+            )
+
         messages: list[dict[str, Any]] = []
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
@@ -3118,92 +3147,114 @@ class LocalAgentClient(OpenAIAgentClient):
                 payload["tools"] = tools
 
             try:
-                async with session.post(url, json=payload) as resp:
-                    if resp.status != 200:
-                        error_text = await resp.text()
-                        # Model not installed → pull it once, then retry the turn.
-                        if (
-                            "not found" in error_text.lower()
-                            and not model_pull_attempted
-                        ):
-                            model_pull_attempted = True
+                import asyncio as _asyncio
 
-                            def _system_text(text: str) -> AgentMessage:
-                                return AgentMessage(
-                                    role=MessageRole.SYSTEM,
-                                    content=[
-                                        ContentBlock(
-                                            type=ContentBlockType.TEXT, text=text
-                                        )
-                                    ],
-                                )
+                import aiohttp as _aiohttp
 
-                            # A hosted-only id can never be pulled: asking the
-                            # Ollama registry for a Claude manifest is a round
-                            # trip whose only possible outcome is "file does not
-                            # exist". Say what is actually wrong instead.
-                            from phase_config import is_hosted_only_model
+                async def _post_chat(
+                    turn_payload: dict[str, Any] = payload,
+                ) -> tuple[int, str]:
+                    """One chat turn, body read inside the response context.
 
-                            if is_hosted_only_model(self.model):
-                                logger.error(
-                                    "[LocalAgentClient] %s is a hosted-only model; "
-                                    "refusing to pull it from the Ollama registry.",
-                                    self.model,
-                                )
-                                yield _system_text(
-                                    f"« {self.model} » est un modèle d'API "
-                                    "(Claude/GPT/Gemini) : il ne peut pas "
-                                    "s'exécuter sur un serveur local. Choisissez "
-                                    "un modèle Ollama dans le sélecteur de la "
-                                    "phase, ou changez le fournisseur de la tâche."
-                                )
-                                return
+                    `turn_payload` is a default argument so the coroutine binds
+                    THIS turn's payload rather than the loop variable.
+                    """
+                    async with session.post(
+                        url,
+                        json=turn_payload,
+                        # Overrides the session's 5-minute default; see
+                        # _LOCAL_CHAT_SOCK_READ_TIMEOUT.
+                        timeout=_aiohttp.ClientTimeout(
+                            total=None,
+                            sock_connect=_LOCAL_CHAT_CONNECT_TIMEOUT,
+                            sock_read=_LOCAL_CHAT_SOCK_READ_TIMEOUT,
+                        ),
+                    ) as resp:
+                        return resp.status, await resp.text()
 
-                            logger.warning(
-                                "[LocalAgentClient] Model %s not installed — "
-                                "pulling on demand.",
+                # A local model can think for minutes with nothing on the wire.
+                # Without a heartbeat the log's last line stays "Contexte LLM
+                # initial" and a working-but-slow run is indistinguishable from
+                # a frozen one — which is exactly how this was reported.
+                request = _asyncio.ensure_future(_post_chat())
+                waited = 0
+                while True:
+                    finished, _pending = await _asyncio.wait(
+                        {request}, timeout=_LOCAL_HEARTBEAT_SECONDS
+                    )
+                    if finished:
+                        break
+                    waited += _LOCAL_HEARTBEAT_SECONDS
+                    yield _system_text(
+                        f"⏳ « {self.model} » génère depuis "
+                        f"{self._format_duration(waited)}… "
+                        "(un grand modèle local peut prendre plusieurs minutes)"
+                    )
+                status, body = request.result()
+
+                if status != 200:
+                    error_text = body
+                    # Model not installed → pull it once, then retry the turn.
+                    if "not found" in error_text.lower() and not model_pull_attempted:
+                        model_pull_attempted = True
+
+                        # A hosted-only id can never be pulled: asking the
+                        # Ollama registry for a Claude manifest is a round
+                        # trip whose only possible outcome is "file does not
+                        # exist". Say what is actually wrong instead.
+                        from phase_config import is_hosted_only_model
+
+                        if is_hosted_only_model(self.model):
+                            logger.error(
+                                "[LocalAgentClient] %s is a hosted-only model; "
+                                "refusing to pull it from the Ollama registry.",
                                 self.model,
                             )
                             yield _system_text(
-                                f"📥 Modèle « {self.model} » non installé "
-                                "— téléchargement automatique en cours "
-                                "(cela peut prendre plusieurs minutes)…"
-                            )
-                            pulled = False
-                            pull_err = "téléchargement interrompu"
-                            async for kind, detail in self._pull_ollama_model_stream():
-                                if kind == "progress":
-                                    yield _system_text(detail)
-                                elif kind == "done":
-                                    pulled = True
-                                else:
-                                    pull_err = detail
-                            if pulled:
-                                yield _system_text(
-                                    f"✅ Modèle « {self.model} » téléchargé — "
-                                    "reprise de la phase."
-                                )
-                                continue  # retry the same turn now that it exists
-                            yield _system_text(
-                                f"Échec du téléchargement du modèle "
-                                f"« {self.model} » : {pull_err}"
+                                f"« {self.model} » est un modèle d'API "
+                                "(Claude/GPT/Gemini) : il ne peut pas "
+                                "s'exécuter sur un serveur local. Choisissez "
+                                "un modèle Ollama dans le sélecteur de la "
+                                "phase, ou changez le fournisseur de la tâche."
                             )
                             return
-                        logger.error(
-                            f"[LocalAgentClient] API error ({resp.status}): "
-                            f"{error_text[:500]}"
+
+                        logger.warning(
+                            "[LocalAgentClient] Model %s not installed — "
+                            "pulling on demand.",
+                            self.model,
                         )
-                        yield AgentMessage(
-                            role=MessageRole.SYSTEM,
-                            content=[
-                                ContentBlock(
-                                    type=ContentBlockType.TEXT,
-                                    text=f"Ollama API error ({resp.status}): {error_text}",
-                                )
-                            ],
+                        yield _system_text(
+                            f"📥 Modèle « {self.model} » non installé "
+                            "— téléchargement automatique en cours "
+                            "(cela peut prendre plusieurs minutes)…"
+                        )
+                        pulled = False
+                        pull_err = "téléchargement interrompu"
+                        async for kind, detail in self._pull_ollama_model_stream():
+                            if kind == "progress":
+                                yield _system_text(detail)
+                            elif kind == "done":
+                                pulled = True
+                            else:
+                                pull_err = detail
+                        if pulled:
+                            yield _system_text(
+                                f"✅ Modèle « {self.model} » téléchargé — "
+                                "reprise de la phase."
+                            )
+                            continue  # retry the same turn now that it exists
+                        yield _system_text(
+                            f"Échec du téléchargement du modèle "
+                            f"« {self.model} » : {pull_err}"
                         )
                         return
-                    data = await resp.json()
+                    logger.error(
+                        f"[LocalAgentClient] API error ({status}): {error_text[:500]}"
+                    )
+                    yield _system_text(f"Ollama API error ({status}): {error_text}")
+                    return
+                data = _json.loads(body)
             except Exception as e:
                 # A connection failure can be transient — the server may be cold-
                 # starting (just auto-launched) or reloading a model. Retry a few
