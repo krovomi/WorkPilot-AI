@@ -83,7 +83,7 @@ class TestWriteDestination:
 
         expected = (tmp_path / "tests" / "ProgramTests.cs").resolve()
         assert Path(result.test_file_path) == expected
-        assert expected.read_text() == "// tests"
+        assert expected.read_text(encoding="utf-8") == "// tests"
         assert not (tmp_path / "ProgramTests.cs").exists()
 
     def test_the_chosen_directory_is_used_and_created(self, tmp_path: Path):
