@@ -2741,6 +2741,70 @@ def _format_duration_fr(seconds: int) -> str:
     return f"{minutes} min" if rest == 0 else f"{minutes} min {rest} s"
 
 
+def _canonical_local_model(name: str | None) -> str:
+    """Ollama's implicit tag: the bare name IS ``:latest``.
+
+    Mirrors `canonicalLocalModelName` in
+    ``apps/frontend/src/shared/utils/local-models.ts``. Nothing else collapses:
+    ``llama3.3:70b`` is a genuinely different artefact.
+    """
+    model_id = (name or "").strip().lower()
+    return model_id[: -len(":latest")] if model_id.endswith(":latest") else model_id
+
+
+def _format_bytes_fr(n: float) -> str:
+    """Human-readable byte count (Go/Mo)."""
+    if n >= 1024**3:
+        return f"{n / 1024**3:.1f} Go"
+    if n >= 1024**2:
+        return f"{n / 1024**2:.0f} Mo"
+    return f"{max(int(n), 0)} o"
+
+
+def _format_placement_diagnosis(
+    model: str,
+    *,
+    size: int,
+    size_vram: int,
+    parameter_size: str | None,
+) -> str:
+    """Why a loaded model is producing nothing, from where Ollama put it.
+
+    A model that does not fit in VRAM is not refused — Ollama runs the layers
+    that fit on the GPU and the rest on the CPU, at a tenth of the speed or
+    worse. Nothing in the protocol says so: the request simply takes hours, and
+    every symptom above the driver looks like "it is thinking". This is the one
+    fact that separates *slow because the machine is small* from *slow because
+    the prompt is big*, and the two have opposite remedies — a smaller model
+    versus a smaller context.
+    """
+    who = f"« {model} »" + (f" ({parameter_size})" if parameter_size else "")
+    if size <= 0:
+        return f"🧠 {who} est chargé, mais Ollama ne rapporte pas sa répartition."
+    on_gpu = size_vram / size
+    if size_vram <= 0:
+        return (
+            f"🧠 {who} tourne **entièrement sur le CPU** "
+            f"({_format_bytes_fr(size)} en RAM, rien en VRAM). À cette taille, "
+            "un tour se compte en heures : prenez un modèle plus petit "
+            "(qwen2.5-coder:7b, llama3.2) ou une quantification plus légère."
+        )
+    if on_gpu < 0.95:
+        return (
+            f"🧠 {who} ne tient pas dans la VRAM : "
+            f"{_format_bytes_fr(size_vram)} sur {_format_bytes_fr(size)} "
+            f"({on_gpu:.0%}) sur le GPU, le reste sur le CPU. C'est ce qui rend "
+            "le tour interminable. Prenez un modèle plus petit, une "
+            "quantification plus légère, ou réduisez la fenêtre de contexte "
+            "(OLLAMA_CONTEXT_LENGTH) dont le cache occupe aussi de la VRAM."
+        )
+    return (
+        f"🧠 {who} est entièrement sur le GPU "
+        f"({_format_bytes_fr(size_vram)} en VRAM) : la lenteur vient de la "
+        "taille du modèle, pas d'un débordement mémoire."
+    )
+
+
 def _merge_native_chunk(acc: dict[str, Any], chunk: dict[str, Any]) -> int:
     """Fold one Ollama ``/api/chat`` object into an accumulator, in place.
 
@@ -2803,11 +2867,14 @@ def _format_generation_progress(
         )
     if tokens <= 0:
         if elapsed >= _LOCAL_STALL_SECONDS:
+            # No guess about the cause here: the window is now sized to fit the
+            # prompt by construction, so "the context is too big" was wrong
+            # exactly when this line mattered most. The cause is reported
+            # separately, once, from what Ollama says it actually loaded.
             return (
                 f"⚠️ {where} — « {model} » : toujours aucun token après "
-                f"{_format_duration_fr(elapsed)}. Le contexte envoyé est "
-                "probablement trop grand pour cette machine (baissez l'effort "
-                "de la phase, ou OLLAMA_CONTEXT_LENGTH)."
+                f"{_format_duration_fr(elapsed)}. Le serveur répond mais ne "
+                "produit rien — la ligne 🧠 en début de tour dit pourquoi."
             )
         return (
             f"⏳ {where} — « {model} » analyse le contexte depuis "
@@ -3080,6 +3147,43 @@ class LocalAgentClient(OpenAIAgentClient):
         self._resolved_num_ctx = min(max(size, self._num_ctx_floor()), ceiling)
         return self._resolved_num_ctx
 
+    def _loaded_model_placement(self) -> dict[str, Any] | None:
+        """Where Ollama actually put this model, via ``/api/ps``.
+
+        ``size`` is what the loaded model weighs, ``size_vram`` how much of it
+        is on the GPU. Ollama never refuses a model that does not fit — it runs
+        the layers that fit and leaves the rest on the CPU — so this difference
+        is the only place the difference between "fast" and "hours per turn"
+        is visible at all.
+
+        Returns ``{"size", "size_vram", "parameter_size"}`` or ``None`` when the
+        server cannot answer (older Ollama, LM Studio, nothing loaded yet).
+        """
+        try:
+            import json as _json
+            import urllib.request as _req
+
+            root = self._api_base.split("/v1/")[0] or self._api_base
+            with _req.urlopen(  # noqa: S310
+                f"{root.rstrip('/')}/api/ps", timeout=3
+            ) as response:
+                data = _json.loads(response.read().decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001 - advisory only
+            logger.debug("[LocalAgentClient] /api/ps unavailable: %s", exc)
+            return None
+
+        wanted = _canonical_local_model(self.model)
+        for entry in data.get("models") or []:
+            name = entry.get("model") or entry.get("name") or ""
+            if _canonical_local_model(name) != wanted:
+                continue
+            return {
+                "size": int(entry.get("size") or 0),
+                "size_vram": int(entry.get("size_vram") or 0),
+                "parameter_size": (entry.get("details") or {}).get("parameter_size"),
+            }
+        return None
+
     def _model_max_context(self) -> int | None:
         """The context length the model itself advertises, via ``/api/show``.
 
@@ -3160,11 +3264,7 @@ class LocalAgentClient(OpenAIAgentClient):
     @staticmethod
     def _format_bytes(n: float) -> str:
         """Human-readable byte count (Go/Mo), for pull-progress lines."""
-        if n >= 1024**3:
-            return f"{n / 1024**3:.1f} Go"
-        if n >= 1024**2:
-            return f"{n / 1024**2:.0f} Mo"
-        return f"{max(int(n), 0)} o"
+        return _format_bytes_fr(n)
 
     @staticmethod
     def _explain_pull_error(model: str, raw: str) -> str:
@@ -3400,6 +3500,8 @@ class LocalAgentClient(OpenAIAgentClient):
         # Stream the turn unless the server (or the user, via OLLAMA_STREAM=0)
         # says otherwise. Cleared on the one documented failure mode below.
         stream_chunks = _env_flag("OLLAMA_STREAM", True)
+        # One /api/ps diagnosis per session, on the first turn that stalls.
+        placement_reported = False
         # Transient-connection guard: a freshly auto-started or model-reloading
         # server can briefly refuse a connection. Retry a few times (reset on any
         # success) before declaring "Ollama ne répond pas".
@@ -3534,12 +3636,40 @@ class LocalAgentClient(OpenAIAgentClient):
                     if finished:
                         break
                     now = _time.monotonic()
+                    elapsed = int(now - started_at)
+                    # On the first heartbeat that has nothing to show, ask the
+                    # server where it put the model. At 30 seconds, not at five
+                    # minutes: a model running on the CPU is knowable as soon as
+                    # it is loaded, and the four wasted minutes were the point of
+                    # the complaint. Latched only once an answer comes back —
+                    # the model may still be loading on the first pass — and
+                    # never retried after that: it cannot change while the model
+                    # stays resident, and a heartbeat must not become a poller.
+                    if not placement_reported and not acc.get("tokens"):
+                        placement = self._loaded_model_placement()
+                        if placement:
+                            placement_reported = True
+                            logger.info(
+                                "[LocalAgentClient] %s loaded with "
+                                "%d/%d bytes in VRAM.",
+                                self.model,
+                                placement["size_vram"],
+                                placement["size"],
+                            )
+                            yield _system_text(
+                                _format_placement_diagnosis(
+                                    self.model,
+                                    size=placement["size"],
+                                    size_vram=placement["size_vram"],
+                                    parameter_size=placement["parameter_size"],
+                                )
+                            )
                     yield _system_text(
                         _format_generation_progress(
                             self.model,
                             turn=turn + 1,
                             max_turns=self.max_turns,
-                            elapsed=int(now - started_at),
+                            elapsed=elapsed,
                             tokens=int(acc.get("tokens", 0)),
                             silent_for=int(now - acc["last_output_at"]),
                             streaming=stream_chunks,
