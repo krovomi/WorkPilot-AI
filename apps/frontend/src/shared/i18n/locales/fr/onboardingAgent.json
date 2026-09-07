@@ -4,21 +4,113 @@
 	"duration": "~{{minutes}} min",
 	"step": "Étape",
 	"actions": {
-		"runScan": "Générer le guide",
+		"runScan": "Générer l'intégration",
 		"cancel": "Annuler",
-		"scanning": "Génération du guide d'intégration...",
-		"reset": "Réinitialiser"
+		"scanning": "Analyse du projet…",
+		"reset": "Réinitialiser",
+		"regenerate": "Régénérer",
+		"copy": "Copier la commande",
+		"previous": "Étape précédente",
+		"next": "Étape suivante",
+		"nextStep": "Étape suivante",
+		"markDone": "Marquer comme lue",
+		"markUndone": "Marquer comme non lue",
+		"retryQuiz": "Refaire le quiz"
 	},
 	"errors": {
 		"noProject": "Sélectionnez un projet pour générer son guide d'intégration.",
 		"failed": "Échec de la génération : {{error}}"
 	},
 	"packageTitle": "Visite d'intégration",
-	"packageIntro": "Générez une visite interactive avec quiz, premières tâches et glossaire pour ce projet.",
+	"packageIntro": "Analyse ce projet et construit un dossier d'intégration pour un nouvel arrivant — aucun appel LLM, tout est lu dans le code.",
+	"pitch": {
+		"overview": "Stack technique, fichiers clés, conventions et commandes à lancer",
+		"tour": "Une visite guidée de la documentation, des points d'entrée et des couches",
+		"quiz": "Un quiz de compréhension sur tout le projet, pas seulement les fichiers",
+		"tasks": "Premières tâches : TODO existants, modules sans test, points d'entrée non documentés",
+		"glossary": "Un glossaire du vocabulaire du projet et l'endroit où chaque terme vit"
+	},
 	"tabs": {
+		"overview": "Aperçu",
 		"tour": "Visite",
+		"architecture": "Architecture",
 		"quiz": "Quiz",
 		"firstTasks": "Premières tâches",
 		"glossary": "Glossaire"
-	}
+	},
+	"overview": {
+		"stack": "Stack technique",
+		"noStack": "Aucune technologie n'a pu être détectée dans ce projet.",
+		"stats": {
+			"code_files": "Fichiers source",
+			"test_files": "Fichiers de test",
+			"directories": "Répertoires",
+			"languages": "Langages"
+		},
+		"gettingStarted": "Démarrage",
+		"commands": "Commandes",
+		"entryPoints": "Points d'entrée",
+		"conventions": "Conventions",
+		"keyFiles": "Fichiers clés",
+		"startTour": "Commencer la visite",
+		"lines": "{{count}} lignes"
+	},
+	"commandCategories": {
+		"setup": "Installation",
+		"run": "Exécution",
+		"build": "Compilation",
+		"test": "Tests",
+		"lint": "Lint",
+		"other": "Autre"
+	},
+	"tourCategories": {
+		"doc": "Documentation",
+		"entrypoint": "Point d'entrée",
+		"directory": "Répertoire",
+		"file": "Fichier",
+		"command": "Commande"
+	},
+	"quizCategories": {
+		"stack": "Stack",
+		"files": "Fichiers",
+		"architecture": "Architecture",
+		"commands": "Commandes",
+		"conventions": "Conventions",
+		"general": "Général"
+	},
+	"taskCategories": {
+		"todo": "TODO",
+		"tests": "Tests",
+		"docs": "Documentation",
+		"explore": "Exploration"
+	},
+	"glossaryKinds": {
+		"directory": "Répertoire",
+		"type": "Type",
+		"module": "Module",
+		"identifier": "Identifiant"
+	},
+	"difficulty": {
+		"easy": "Facile",
+		"medium": "Moyen",
+		"hard": "Difficile"
+	},
+	"filters": {
+		"all": "Tout ({{count}})"
+	},
+	"stepOfTotal": "Étape {{current}} sur {{total}}",
+	"tourProgress": "{{done}} étapes lues sur {{total}}",
+	"suggestedQuestions": "Questions à se poser",
+	"quizScore": "Score : {{score}}/{{answered}} (sur {{total}})",
+	"quizComplete": "Quiz terminé — {{score}} bonnes réponses sur {{total}}.",
+	"architectureIntro": "Les répertoires du projet et le rôle déduit pour chacun.",
+	"architectureFiles": "{{count}} fichiers",
+	"firstTasksIntro": "Des changements courts et autonomes pour poser un premier commit.",
+	"glossarySearch": "Rechercher un terme…",
+	"glossaryNoMatch": "Aucun terme ne correspond à « {{query}} ».",
+	"emptyTour": "Aucune étape de visite n'a pu être générée pour ce projet.",
+	"emptyQuiz": "Aucune question de quiz n'a pu être générée pour ce projet.",
+	"emptyFirstTasks": "Aucune première tâche n'a pu être identifiée pour ce projet.",
+	"emptyGlossary": "Aucun terme de glossaire n'a pu être détecté.",
+	"emptyArchitecture": "Aucune structure de répertoires n'a pu être analysée."
 }
