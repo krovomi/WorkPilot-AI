@@ -15,6 +15,7 @@ from core.agent_client import (
     _env_flag,
     _extract_text_tool_calls,
     _format_generation_progress,
+    _format_not_loaded_diagnosis,
     _format_placement_diagnosis,
     _looks_like_waiting_for_human,
     _merge_native_chunk,
@@ -774,6 +775,25 @@ class TestPlacementDiagnosis:
         assert "entièrement sur le GPU" in line
         assert "pas d'un débordement mémoire" in line
 
+    def test_an_absent_model_names_the_server_it_asked(self):
+        # `ollama ps` in a terminal queries the CLI's server, not the one the
+        # app opened a socket to. Naming the URL is what separates "still
+        # loading" from "you are looking at a different daemon".
+        line = _format_not_loaded_diagnosis(
+            "llama3.3", server_root="http://127.0.0.1:11434", others=[]
+        )
+        assert "http://127.0.0.1:11434" in line
+        assert "aucun modèle chargé" in line
+        assert "lecture depuis le disque" in line
+
+    def test_an_absent_model_lists_what_is_loaded_instead(self):
+        line = _format_not_loaded_diagnosis(
+            "llama3.3",
+            server_root="http://127.0.0.1:11434",
+            others=["qwen2.5-coder:7b"],
+        )
+        assert "modèles chargés : qwen2.5-coder:7b" in line
+
     def test_a_server_that_reports_no_size_does_not_invent_one(self):
         line = _format_placement_diagnosis(
             "llama3.3", size=0, size_vram=0, parameter_size=None
@@ -810,6 +830,24 @@ class TestLoadedModelPlacement:
             "urllib.request.urlopen", lambda *a, **k: response, raising=True
         )
 
+    def test_an_absent_model_is_reported_not_swallowed(self, monkeypatch):
+        # The first version returned None here, so the log said nothing in
+        # exactly the situation the probe exists for: `ollama ps` empty while a
+        # request is in flight.
+        self._ps(
+            monkeypatch,
+            {"models": [{"model": "qwen2.5-coder:7b", "size": 5, "size_vram": 5}]},
+        )
+        placement = LocalAgentClient(model="llama3.3")._loaded_model_placement()
+        assert placement == {"loaded": False, "others": ["qwen2.5-coder:7b"]}
+
+    def test_nothing_loaded_at_all(self, monkeypatch):
+        self._ps(monkeypatch, {"models": []})
+        assert LocalAgentClient(model="llama3.3")._loaded_model_placement() == {
+            "loaded": False,
+            "others": [],
+        }
+
     def test_matches_the_bare_name_against_the_latest_tag(self, monkeypatch):
         # The phase stores "llama3.3"; /api/ps reports "llama3.3:latest".
         self._ps(
@@ -827,23 +865,11 @@ class TestLoadedModelPlacement:
         )
         placement = LocalAgentClient(model="llama3.3")._loaded_model_placement()
         assert placement == {
+            "loaded": True,
             "size": 40_000,
             "size_vram": 10_000,
             "parameter_size": "70.6B",
         }
-
-    def test_another_loaded_model_is_not_ours(self, monkeypatch):
-        self._ps(
-            monkeypatch,
-            {"models": [{"model": "qwen2.5-coder:7b", "size": 5, "size_vram": 5}]},
-        )
-        assert LocalAgentClient(model="llama3.3")._loaded_model_placement() is None
-
-    def test_nothing_loaded_yet(self, monkeypatch):
-        # The first heartbeat can land while the model is still loading; the
-        # caller must be free to ask again rather than latch on a None.
-        self._ps(monkeypatch, {"models": []})
-        assert LocalAgentClient(model="llama3.3")._loaded_model_placement() is None
 
     def test_a_server_without_api_ps_is_not_an_error(self, monkeypatch):
         def _boom(*_a, **_k):
