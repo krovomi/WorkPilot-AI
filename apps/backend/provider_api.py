@@ -1217,6 +1217,22 @@ def get_provider_models(provider: str, refresh: bool = False):
     }
 
 
+@app.get("/providers/ollama/library/search")
+def search_official_ollama_library(q: str = ""):
+    """Autocomplete only names and tags listed by the official Ollama library."""
+    import httpx
+    from official_ollama_catalog import search_models
+
+    try:
+        return {"models": search_models(q), "source": "https://ollama.com/library"}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid model search") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502, detail="Official Ollama library unavailable"
+        ) from exc
+
+
 @app.get("/providers/models/{provider}/catalog")
 def get_provider_models_catalog(provider: str, refresh: bool = False):
     """Returns the full model catalog for `provider` with provenance.
