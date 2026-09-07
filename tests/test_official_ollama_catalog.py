@@ -25,6 +25,14 @@ def test_family_search_uses_official_source(monkeypatch):
 
 def test_variants_are_real_local_tags(monkeypatch):
     def get(url, **kwargs):
+        assert kwargs["follow_redirects"] is False
+        if url == "https://ollama.com/library":
+            assert kwargs["params"] == {"q": "qwen3"}
+            return httpx.Response(
+                200,
+                text='<a href="/library/qwen3">Qwen3</a>',
+                request=httpx.Request("GET", url),
+            )
         assert url == "https://ollama.com/library/qwen3/tags"
         return httpx.Response(
             200,
@@ -53,3 +61,35 @@ def test_failure_does_not_invent_results(monkeypatch):
     )
     with pytest.raises(httpx.ConnectError):
         search_models("qwen")
+
+
+def test_unknown_family_never_becomes_a_request_path(monkeypatch):
+    calls = []
+
+    def get(url, **kwargs):
+        calls.append(url)
+        return httpx.Response(
+            200,
+            text='<a href="/library/qwen3">Qwen3</a>',
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx, "get", get)
+    assert search_models("invented:8b") == []
+    assert calls == ["https://ollama.com/library"]
+
+
+def test_external_library_link_cannot_authorize_a_variant_request(monkeypatch):
+    calls = []
+
+    def get(url, **kwargs):
+        calls.append(url)
+        return httpx.Response(
+            200,
+            text='<a href="https://evil.test/library/qwen3">Qwen3</a>',
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx, "get", get)
+    assert search_models("qwen3:8b") == []
+    assert calls == ["https://ollama.com/library"]

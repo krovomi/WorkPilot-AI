@@ -40,16 +40,31 @@ def search_models(query: str) -> list[dict[str, str]]:
     ):
         raise ValueError("Invalid model search")
     family, separator, _ = query.partition(":")
-    url = f"{ORIGIN}/library/{family}/tags" if separator else f"{ORIGIN}/library"
+    # User input is only a search parameter on this fixed endpoint.
     response = httpx.get(
-        url,
-        params=None if separator else {"q": query},
+        "https://ollama.com/library",
+        params={"q": family if separator else query},
         timeout=8.0,
         follow_redirects=False,
     )
     response.raise_for_status()
     parser = _LibraryLinks()
     parser.feed(response.text)
+    if separator:
+        # Resolve the family through an allowlist built from official links.
+        # The caller's string is only a lookup key, never a URL path segment.
+        tag_pages = {
+            name: f"{ORIGIN}/library/{name}/tags"
+            for name in parser.models
+            if ":" not in name
+        }
+        tag_url = tag_pages.get(family)
+        if tag_url is None:
+            return []
+        response = httpx.get(tag_url, timeout=8.0, follow_redirects=False)
+        response.raise_for_status()
+        parser = _LibraryLinks()
+        parser.feed(response.text)
     results = []
     for model in parser.models:
         if "cloud" in model.lower():
