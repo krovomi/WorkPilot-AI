@@ -297,3 +297,103 @@ async def test_mid_stream_error_is_surfaced_not_swallowed():
     status_lines = _texts(await _collect(client), MessageRole.SYSTEM)
 
     assert any("model runner has terminated" in line for line in status_lines)
+
+
+@pytest.mark.asyncio
+async def test_a_silent_turn_reports_where_the_model_is_loaded(monkeypatch):
+    """The heartbeat's first pass with nothing to show asks /api/ps.
+
+    At 30 seconds, not at five minutes: a model spilled onto the CPU is
+    knowable as soon as it is resident, and those four minutes were the whole
+    complaint.
+    """
+    monkeypatch.setattr(
+        "core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
+    )
+
+    class _SlowFirstChunk(_FakeResponse):
+        """A response whose first chunk arrives after a heartbeat has fired."""
+
+        @property
+        def content(self):
+            async def _iter():
+                import asyncio
+
+                await asyncio.sleep(0.05)
+                for line in self._lines:
+                    yield line.encode("utf-8")
+
+            return _iter()
+
+    session = _FakeSession(
+        [
+            _SlowFirstChunk(200, [_chunk("done", done=True)]),
+            _FakeResponse(200, [_chunk("", done=True)]),
+        ]
+    )
+    client = _client(session)
+    client._model_max_ctx = 131_072
+    monkeypatch.setattr(
+        LocalAgentClient,
+        "_loaded_model_placement",
+        lambda _self: {
+            "size": 40 * 1024**3,
+            "size_vram": 10 * 1024**3,
+            "parameter_size": "70.6B",
+        },
+        raising=True,
+    )
+
+    status_lines = _texts(await _collect(client), MessageRole.SYSTEM)
+
+    diagnoses = [line for line in status_lines if line.startswith("🧠")]
+    assert len(diagnoses) == 1, "one diagnosis per session, not one per heartbeat"
+    assert "ne tient pas dans la VRAM" in diagnoses[0]
+
+
+@pytest.mark.asyncio
+async def test_a_model_still_loading_is_asked_again(monkeypatch):
+    """`/api/ps` lists nothing while the model is still being read off disk.
+
+    Latching on that first empty answer would lose the diagnosis for the whole
+    session — exactly the sessions that need it most.
+    """
+    monkeypatch.setattr(
+        "core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
+    )
+
+    class _SlowFirstChunk(_FakeResponse):
+        @property
+        def content(self):
+            async def _iter():
+                import asyncio
+
+                await asyncio.sleep(0.08)
+                for line in self._lines:
+                    yield line.encode("utf-8")
+
+            return _iter()
+
+    answers = [None, None, {"size": 8, "size_vram": 8, "parameter_size": "7B"}]
+    calls = []
+
+    def _placement(_self):
+        calls.append(1)
+        return answers[min(len(calls) - 1, len(answers) - 1)]
+
+    session = _FakeSession(
+        [
+            _SlowFirstChunk(200, [_chunk("done", done=True)]),
+            _FakeResponse(200, [_chunk("", done=True)]),
+        ]
+    )
+    client = _client(session)
+    client._model_max_ctx = 131_072
+    monkeypatch.setattr(
+        LocalAgentClient, "_loaded_model_placement", _placement, raising=True
+    )
+
+    status_lines = _texts(await _collect(client), MessageRole.SYSTEM)
+
+    assert len(calls) >= 3, "the probe retries until the server can answer"
+    assert sum(line.startswith("🧠") for line in status_lines) == 1
