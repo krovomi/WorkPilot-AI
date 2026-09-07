@@ -209,7 +209,7 @@ describe("TaskLogs — bouton remonter au début", () => {
 });
 
 describe("local model log status icons", () => {
-	it.each(["⏳", "🧠", "📊", "⚠️"])("renders %s as SVG", (marker) => {
+	it.each(["⏳", "🧠", "📊", "📐", "⚠️"])("renders %s as SVG", (marker) => {
 		const logs = makePhaseLogs();
 		logs.phases.planning.entries = [
 			{
@@ -237,7 +237,7 @@ describe("local model log status icons", () => {
 	});
 });
 
-it("keeps custom input open when the select restores focus", async () => {
+it("opens official search outside the header when the select restores focus", async () => {
 	HTMLElement.prototype.scrollIntoView = vi.fn();
 	render(
 		<TaskLogs
@@ -265,6 +265,7 @@ it("keeps custom input open when the select restores focus", async () => {
 	const input = await screen.findByLabelText("tasks:logs.model.customAria");
 	fireEvent.blur(input);
 	expect(input).toBeInTheDocument();
+	expect(screen.getByRole("dialog")).toContainElement(input);
 	fireEvent.keyDown(input, { key: "Escape" });
 	expect(screen.queryByLabelText("tasks:logs.model.customAria")).toBeNull();
 });
