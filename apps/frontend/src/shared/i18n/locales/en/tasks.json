@@ -904,6 +904,8 @@
 			"smallWarn": "⚠ small — not advised for planning",
 			"smallWarnTip": "Small model ({{n}}B) — not advised for planning (prefer ≥24B or Claude); limited on complex tasks.",
 			"download": "Download",
+			"customOption": "Other (custom model)",
+			"customConfirm": "Confirm model",
 			"customPlaceholder": "Model name (e.g. qwen2.5-coder:7b)",
 			"customAria": "Enter the model name",
 			"downloadTip": "“{{model}}” is not installed on the local server. The download runs in the background — you can keep working and come back later.",

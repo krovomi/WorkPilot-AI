@@ -701,9 +701,58 @@ _META_MODELS = [
 # =============================================================================
 
 _OLLAMA_MODELS = [
+    ModelEntry(
+        "ollama", "qwen3-coder:30b", "Qwen3 Coder 30B", "local", supports_thinking=False
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen3-coder-next",
+        "Qwen3 Coder Next 80B",
+        "local",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "devstral-small-2:24b",
+        "Devstral Small 2 24B",
+        "local",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "ollama", "devstral-2:123b", "Devstral 2 123B", "local", supports_thinking=False
+    ),
+    ModelEntry("ollama", "gpt-oss:20b", "GPT-OSS 20B", "local", supports_thinking=True),
+    ModelEntry(
+        "ollama", "gpt-oss:120b", "GPT-OSS 120B", "local", supports_thinking=True
+    ),
+    ModelEntry("ollama", "qwen3:8b", "Qwen3 8B", "local", supports_thinking=True),
+    ModelEntry("ollama", "qwen3:14b", "Qwen3 14B", "local", supports_thinking=True),
+    ModelEntry("ollama", "qwen3:30b", "Qwen3 30B", "local", supports_thinking=True),
+    ModelEntry("ollama", "qwen3:32b", "Qwen3 32B", "local", supports_thinking=True),
+    ModelEntry(
+        "ollama",
+        "qwen2.5-coder:7b",
+        "Qwen 2.5 Coder 7B",
+        "local",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen2.5-coder:14b",
+        "Qwen 2.5 Coder 14B",
+        "local",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen2.5-coder:32b",
+        "Qwen 2.5 Coder 32B",
+        "local",
+        supports_thinking=False,
+    ),
     ModelEntry("ollama", "llama3.3", "Llama 3.3", "local", is_default=True),
     ModelEntry(
-        "ollama", "deepseek-coder-v3", "DeepSeek Coder V3", "local", is_default=False
+        "ollama", "deepseek-coder-v2", "DeepSeek Coder V2", "local", is_default=False
     ),
 ]
 

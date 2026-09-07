@@ -904,6 +904,8 @@
 			"smallWarn": "⚠ petit — déconseillé planif",
 			"smallWarnTip": "Petit modèle ({{n}}B) — déconseillé pour la planification (préférez ≥24B ou Claude) ; limité sur les tâches complexes.",
 			"download": "Télécharger",
+			"customOption": "Autre (saisie libre)",
+			"customConfirm": "Valider le modèle",
 			"customPlaceholder": "Nom du modèle (ex : qwen2.5-coder:7b)",
 			"customAria": "Saisir le nom du modèle",
 			"downloadTip": "« {{model}} » n'est pas installé sur le serveur local. Le téléchargement se fait en arrière-plan : vous pouvez continuer à travailler et revenir plus tard.",

@@ -423,6 +423,53 @@ export const PROVIDER_MODELS_MAP: Record<string, ProviderModel[]> = {
 
 	// ---- Ollama / LLM local ----
 	ollama: [
+		{ value: "qwen3-coder:30b", label: "Qwen3 Coder 30B", tier: "local" },
+		{ value: "qwen3-coder-next", label: "Qwen3 Coder Next 80B", tier: "local" },
+		{
+			value: "devstral-small-2:24b",
+			label: "Devstral Small 2 24B",
+			tier: "local",
+		},
+		{ value: "devstral-2:123b", label: "Devstral 2 123B", tier: "local" },
+		{
+			value: "gpt-oss:20b",
+			label: "GPT-OSS 20B",
+			tier: "local",
+			supportsThinking: true,
+		},
+		{
+			value: "gpt-oss:120b",
+			label: "GPT-OSS 120B",
+			tier: "local",
+			supportsThinking: true,
+		},
+		{
+			value: "qwen3:8b",
+			label: "Qwen3 8B",
+			tier: "local",
+			supportsThinking: true,
+		},
+		{
+			value: "qwen3:14b",
+			label: "Qwen3 14B",
+			tier: "local",
+			supportsThinking: true,
+		},
+		{
+			value: "qwen3:30b",
+			label: "Qwen3 30B",
+			tier: "local",
+			supportsThinking: true,
+		},
+		{
+			value: "qwen3:32b",
+			label: "Qwen3 32B",
+			tier: "local",
+			supportsThinking: true,
+		},
+		{ value: "qwen2.5-coder:7b", label: "Qwen 2.5 Coder 7B", tier: "local" },
+		{ value: "qwen2.5-coder:14b", label: "Qwen 2.5 Coder 14B", tier: "local" },
+		{ value: "qwen2.5-coder:32b", label: "Qwen 2.5 Coder 32B", tier: "local" },
 		{ value: "llama3.3", label: "Llama 3.3", tier: "local" },
 		{ value: "llama3.2", label: "Llama 3.2", tier: "local" },
 		{ value: "llama3.1", label: "Llama 3.1", tier: "local" },
@@ -796,9 +843,10 @@ const _CLAUDE_FAMILY_RANK: Record<string, number> = {
  * `minor` à un chiffre compte (`claude-opus-4-20250514` → 4.0, pas 4.20250514).
  */
 function claudeSortKey(value: string): { rank: number; version: number } {
-	const m = /^claude-(fable|mythos|opus|sonnet|haiku)-(\d+)(?:-(\d)(?!\d))?/.exec(
-		value,
-	);
+	const m =
+		/^claude-(fable|mythos|opus|sonnet|haiku)-(\d+)(?:-(\d)(?!\d))?/.exec(
+			value,
+		);
 	if (!m) return { rank: 99, version: 0 };
 	const rank = _CLAUDE_FAMILY_RANK[m[1]] ?? 90;
 	const version = Number(m[2]) + (m[3] ? Number(m[3]) / 10 : 0);
