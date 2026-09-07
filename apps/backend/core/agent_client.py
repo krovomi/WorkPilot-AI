@@ -2727,6 +2727,10 @@ _LOCAL_STALL_SECONDS = 5 * 60
 _LOCAL_NUM_CTX_DEFAULT_CAP = 32_768
 # Room kept above the first prompt for the reply and the turns that follow it.
 _LOCAL_NUM_CTX_REPLY_HEADROOM = 4_096
+# How long a model may legitimately be absent from /api/ps while its weights are
+# read off disk before the log says so. Two minutes covers a large model on a
+# slow disk; below that the line would fire on every cold start.
+_LOCAL_NOT_LOADED_GRACE = 120
 
 # Distinguishes "not looked up yet" from "looked up, and the server did not say".
 _UNSET = object()
@@ -2759,6 +2763,33 @@ def _format_bytes_fr(n: float) -> str:
     if n >= 1024**2:
         return f"{n / 1024**2:.0f} Mo"
     return f"{max(int(n), 0)} o"
+
+
+def _format_not_loaded_diagnosis(
+    model: str, *, server_root: str, others: list[str]
+) -> str:
+    """The server answered ``/api/ps`` and our model is not in it.
+
+    While a request is in flight this should be impossible, so it is worth a
+    line of its own. Two things produce it, and they are told apart by what
+    happens next: weights still being read off disk resolve on their own (a 70B
+    is tens of gigabytes), a client pointed at a different server never does.
+    That second case is invisible from a terminal — ``ollama ps`` there queries
+    the CLI's server, not the one the app opened a socket to — so the URL is
+    named rather than assumed.
+    """
+    loaded = (
+        "aucun modèle chargé"
+        if not others
+        else "modèles chargés : " + ", ".join(others)
+    )
+    return (
+        f"🧠 {server_root} répond mais ne rapporte pas « {model} » "
+        f"({loaded}), alors qu'une requête est en cours. Soit les poids sont "
+        "encore en cours de lecture depuis le disque — des dizaines de Go pour "
+        "un 70B —, soit l'application interroge un autre serveur que votre "
+        f"terminal : comparez avec « OLLAMA_HOST={server_root} ollama ps »."
+    )
 
 
 def _format_placement_diagnosis(
@@ -3156,16 +3187,26 @@ class LocalAgentClient(OpenAIAgentClient):
         is the only place the difference between "fast" and "hours per turn"
         is visible at all.
 
-        Returns ``{"size", "size_vram", "parameter_size"}`` or ``None`` when the
-        server cannot answer (older Ollama, LM Studio, nothing loaded yet).
+        Three outcomes, and the caller must tell them apart:
+
+        * ``{"loaded": True, "size", "size_vram", "parameter_size"}`` — the
+          model is resident, and the split says whether it fits.
+        * ``{"loaded": False, "others": [...]}`` — the server answered and our
+          model is NOT among the loaded ones. Surprising while a request is in
+          flight, and the single most informative thing the log can say: either
+          the weights are still being read off disk, or the app is talking to a
+          different server than the one the user's CLI shows.
+        * ``None`` — no answer at all (older Ollama, LM Studio, server down).
+
+        Returning ``None`` for the middle case is what made the first version of
+        this probe silent in exactly the situation that prompted it.
         """
         try:
             import json as _json
             import urllib.request as _req
 
-            root = self._api_base.split("/v1/")[0] or self._api_base
             with _req.urlopen(  # noqa: S310
-                f"{root.rstrip('/')}/api/ps", timeout=3
+                f"{self._server_root()}/api/ps", timeout=3
             ) as response:
                 data = _json.loads(response.read().decode("utf-8"))
         except Exception as exc:  # noqa: BLE001 - advisory only
@@ -3173,16 +3214,25 @@ class LocalAgentClient(OpenAIAgentClient):
             return None
 
         wanted = _canonical_local_model(self.model)
+        others: list[str] = []
         for entry in data.get("models") or []:
             name = entry.get("model") or entry.get("name") or ""
             if _canonical_local_model(name) != wanted:
+                if name:
+                    others.append(name)
                 continue
             return {
+                "loaded": True,
                 "size": int(entry.get("size") or 0),
                 "size_vram": int(entry.get("size_vram") or 0),
                 "parameter_size": (entry.get("details") or {}).get("parameter_size"),
             }
-        return None
+        return {"loaded": False, "others": others}
+
+    def _server_root(self) -> str:
+        """The server's root URL, without the OpenAI-compat path."""
+        root = self._api_base.split("/v1/")[0] or self._api_base
+        return root.rstrip("/")
 
     def _model_max_context(self) -> int | None:
         """The context length the model itself advertises, via ``/api/show``.
@@ -3201,9 +3251,8 @@ class LocalAgentClient(OpenAIAgentClient):
             import json as _json
             import urllib.request as _req
 
-            root = self._api_base.split("/v1/")[0] or self._api_base
             request = _req.Request(
-                f"{root.rstrip('/')}/api/show",
+                f"{self._server_root()}/api/show",
                 data=_json.dumps({"name": self.model}).encode("utf-8"),
                 headers={"Content-Type": CONTENT_TYPE_JSON},
                 method="POST",
@@ -3523,7 +3572,8 @@ class LocalAgentClient(OpenAIAgentClient):
         # context — leaves no trace anyone can act on. Say the number instead.
         yield _system_text(
             f"📐 Contexte envoyé : ~{prompt_tokens_est} tokens estimés pour une "
-            f"fenêtre de {num_ctx} (modèle « {self.model} », {len(tools)} outils)."
+            f"fenêtre de {num_ctx} (modèle « {self.model} », {len(tools)} outils, "
+            f"serveur {self._server_root()})."
         )
         if prompt_tokens_est + _LOCAL_NUM_CTX_REPLY_HEADROOM > num_ctx:
             model_max = self._model_max_context()
@@ -3647,7 +3697,7 @@ class LocalAgentClient(OpenAIAgentClient):
                     # stays resident, and a heartbeat must not become a poller.
                     if not placement_reported and not acc.get("tokens"):
                         placement = self._loaded_model_placement()
-                        if placement:
+                        if placement and placement["loaded"]:
                             placement_reported = True
                             logger.info(
                                 "[LocalAgentClient] %s loaded with "
@@ -3662,6 +3712,27 @@ class LocalAgentClient(OpenAIAgentClient):
                                     size=placement["size"],
                                     size_vram=placement["size_vram"],
                                     parameter_size=placement["parameter_size"],
+                                )
+                            )
+                        elif placement and elapsed >= _LOCAL_NOT_LOADED_GRACE:
+                            # Not resident yet. Said once, and only after a grace
+                            # period, because a model genuinely being read off
+                            # disk occupies this state for a while and a warning
+                            # on the first heartbeat would cry wolf every run.
+                            placement_reported = True
+                            logger.warning(
+                                "[LocalAgentClient] %s is not loaded on %s after "
+                                "%ds; loaded there: %s",
+                                self.model,
+                                self._server_root(),
+                                elapsed,
+                                placement["others"] or "none",
+                            )
+                            yield _system_text(
+                                _format_not_loaded_diagnosis(
+                                    self.model,
+                                    server_root=self._server_root(),
+                                    others=placement["others"],
                                 )
                             )
                     yield _system_text(

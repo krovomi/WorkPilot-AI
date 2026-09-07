@@ -337,6 +337,7 @@ async def test_a_silent_turn_reports_where_the_model_is_loaded(monkeypatch):
         LocalAgentClient,
         "_loaded_model_placement",
         lambda _self: {
+            "loaded": True,
             "size": 40 * 1024**3,
             "size_vram": 10 * 1024**3,
             "parameter_size": "70.6B",
@@ -374,7 +375,11 @@ async def test_a_model_still_loading_is_asked_again(monkeypatch):
 
             return _iter()
 
-    answers = [None, None, {"size": 8, "size_vram": 8, "parameter_size": "7B"}]
+    answers = [
+        None,
+        None,
+        {"loaded": True, "size": 8, "size_vram": 8, "parameter_size": "7B"},
+    ]
     calls = []
 
     def _placement(_self):
@@ -397,3 +402,106 @@ async def test_a_model_still_loading_is_asked_again(monkeypatch):
 
     assert len(calls) >= 3, "the probe retries until the server can answer"
     assert sum(line.startswith("🧠") for line in status_lines) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_model_absent_from_api_ps_is_reported(monkeypatch):
+    """`ollama ps` empty while a request is in flight is the surprising fact,
+    and the first version of the probe printed nothing for it."""
+    monkeypatch.setattr(
+        "core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
+    )
+    monkeypatch.setattr("core.agent_client._LOCAL_NOT_LOADED_GRACE", 0, raising=True)
+
+    class _SlowFirstChunk(_FakeResponse):
+        @property
+        def content(self):
+            async def _iter():
+                import asyncio
+
+                await asyncio.sleep(0.05)
+                for line in self._lines:
+                    yield line.encode("utf-8")
+
+            return _iter()
+
+    session = _FakeSession(
+        [
+            _SlowFirstChunk(200, [_chunk("done", done=True)]),
+            _FakeResponse(200, [_chunk("", done=True)]),
+        ]
+    )
+    client = _client(session)
+    client._model_max_ctx = 131_072
+    monkeypatch.setattr(
+        LocalAgentClient,
+        "_loaded_model_placement",
+        lambda _self: {"loaded": False, "others": ["qwen2.5-coder:7b"]},
+        raising=True,
+    )
+
+    status_lines = _texts(await _collect(client), MessageRole.SYSTEM)
+
+    absent = [line for line in status_lines if line.startswith("🧠")]
+    assert len(absent) == 1
+    assert "ne rapporte pas « llama3.3 »" in absent[0]
+    assert "qwen2.5-coder:7b" in absent[0]
+
+
+@pytest.mark.asyncio
+async def test_a_cold_start_is_not_flagged_before_the_grace_period(monkeypatch):
+    """A large model is legitimately absent from /api/ps while its weights are
+    read off disk. Warning on the first heartbeat would cry wolf every run."""
+    monkeypatch.setattr(
+        "core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
+    )
+
+    class _SlowFirstChunk(_FakeResponse):
+        @property
+        def content(self):
+            async def _iter():
+                import asyncio
+
+                await asyncio.sleep(0.05)
+                for line in self._lines:
+                    yield line.encode("utf-8")
+
+            return _iter()
+
+    session = _FakeSession(
+        [
+            _SlowFirstChunk(200, [_chunk("done", done=True)]),
+            _FakeResponse(200, [_chunk("", done=True)]),
+        ]
+    )
+    client = _client(session)
+    client._model_max_ctx = 131_072
+    monkeypatch.setattr(
+        LocalAgentClient,
+        "_loaded_model_placement",
+        lambda _self: {"loaded": False, "others": []},
+        raising=True,
+    )
+
+    status_lines = _texts(await _collect(client), MessageRole.SYSTEM)
+
+    assert not any(line.startswith("🧠") for line in status_lines)
+
+
+@pytest.mark.asyncio
+async def test_the_server_url_is_in_the_context_line(monkeypatch):
+    """Which daemon the app opened a socket to is invisible from a terminal,
+    and it is the one fact that ends a 'nothing is loaded' investigation."""
+    monkeypatch.delenv("OLLAMA_CONTEXT_LENGTH", raising=False)
+    session = _FakeSession(
+        [
+            _FakeResponse(200, [_chunk("done", done=True)]),
+            _FakeResponse(200, [_chunk("", done=True)]),
+        ]
+    )
+    client = _client(session)
+    client._model_max_ctx = 131_072
+
+    status_lines = _texts(await _collect(client), MessageRole.SYSTEM)
+
+    assert any("serveur http://127.0.0.1:11434" in line for line in status_lines)
