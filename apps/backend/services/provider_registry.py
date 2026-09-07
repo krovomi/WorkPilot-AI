@@ -423,6 +423,77 @@ class ProviderRegistry:
             requires_oauth=False,
             requires_cli=False,
             models=[
+                {
+                    "value": "qwen3-coder:30b",
+                    "label": "Qwen3 Coder 30B",
+                    "tier": "local",
+                },
+                {
+                    "value": "qwen3-coder-next",
+                    "label": "Qwen3 Coder Next 80B",
+                    "tier": "local",
+                },
+                {
+                    "value": "devstral-small-2:24b",
+                    "label": "Devstral Small 2 24B",
+                    "tier": "local",
+                },
+                {
+                    "value": "devstral-2:123b",
+                    "label": "Devstral 2 123B",
+                    "tier": "local",
+                },
+                {
+                    "value": "gpt-oss:20b",
+                    "label": "GPT-OSS 20B",
+                    "tier": "local",
+                    "supportsThinking": True,
+                },
+                {
+                    "value": "gpt-oss:120b",
+                    "label": "GPT-OSS 120B",
+                    "tier": "local",
+                    "supportsThinking": True,
+                },
+                {
+                    "value": "qwen3:8b",
+                    "label": "Qwen3 8B",
+                    "tier": "local",
+                    "supportsThinking": True,
+                },
+                {
+                    "value": "qwen3:14b",
+                    "label": "Qwen3 14B",
+                    "tier": "local",
+                    "supportsThinking": True,
+                },
+                {
+                    "value": "qwen3:30b",
+                    "label": "Qwen3 30B",
+                    "tier": "local",
+                    "supportsThinking": True,
+                },
+                {
+                    "value": "qwen3:32b",
+                    "label": "Qwen3 32B",
+                    "tier": "local",
+                    "supportsThinking": True,
+                },
+                {
+                    "value": "qwen2.5-coder:7b",
+                    "label": "Qwen 2.5 Coder 7B",
+                    "tier": "local",
+                },
+                {
+                    "value": "qwen2.5-coder:14b",
+                    "label": "Qwen 2.5 Coder 14B",
+                    "tier": "local",
+                },
+                {
+                    "value": "qwen2.5-coder:32b",
+                    "label": "Qwen 2.5 Coder 32B",
+                    "tier": "local",
+                },
                 {"value": "llama3.3", "label": "Llama 3.3", "tier": "local"},
                 {"value": "llama3.2", "label": "Llama 3.2", "tier": "local"},
                 {"value": "llama3.1", "label": "Llama 3.1", "tier": "local"},

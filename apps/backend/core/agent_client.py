@@ -2788,7 +2788,7 @@ def _format_not_loaded_diagnosis(
         f"({loaded}), alors qu'une requête est en cours. Soit les poids sont "
         "encore en cours de lecture depuis le disque — des dizaines de Go pour "
         "un 70B —, soit l'application interroge un autre serveur que votre "
-        f"terminal : comparez avec « OLLAMA_HOST={server_root} ollama ps »."
+        f"terminal : consultez {server_root}/api/ps sur ce même serveur."
     )
 
 
@@ -2848,6 +2848,9 @@ def _merge_native_chunk(acc: dict[str, Any], chunk: dict[str, Any]) -> int:
     """
     message = chunk.get("message") or {}
     text = message.get("content") or ""
+    thinking = message.get("thinking") or ""
+    if thinking:
+        acc["tokens"] = acc.get("tokens", 0) + 1
     if text:
         acc["content"] = acc.get("content", "") + text
         acc["tokens"] = acc.get("tokens", 0) + 1
@@ -2862,7 +2865,7 @@ def _merge_native_chunk(acc: dict[str, Any], chunk: dict[str, Any]) -> int:
         acc["done"] = True
     if chunk.get("error"):
         acc["error"] = str(chunk["error"])
-    return len(text)
+    return len(text) + len(thinking) + len(tool_calls)
 
 
 def _format_generation_progress(
@@ -2904,11 +2907,12 @@ def _format_generation_progress(
             # separately, once, from what Ollama says it actually loaded.
             return (
                 f"⚠️ {where} — « {model} » : toujours aucun token après "
-                f"{_format_duration_fr(elapsed)}. Le serveur répond mais ne "
-                "produit rien — la ligne 🧠 en début de tour dit pourquoi."
+                f"{_format_duration_fr(elapsed)}. Le serveur répond mais "
+                "n’a encore envoyé aucun token. Consultez le diagnostic de chargement ; "
+                "la cause ne peut pas être déduite de cette attente seule."
             )
         return (
-            f"⏳ {where} — « {model} » analyse le contexte depuis "
+            f"⏳ {where} — « {model} » attend le chargement ou le traitement du contexte depuis "
             f"{_format_duration_fr(elapsed)} (aucun token généré pour l'instant)."
         )
     if silent_for >= _LOCAL_STALL_SECONDS:

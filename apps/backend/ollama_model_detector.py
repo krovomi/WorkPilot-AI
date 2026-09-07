@@ -141,6 +141,7 @@ EMBEDDING_PATTERNS = [
 # of the picker. (Note: supporting tools ≠ being good at planning — a small 8B
 # may call tools yet still fail to produce a valid plan.)
 TOOL_CALLING_MODEL_PATTERNS = [
+    "gpt-oss",
     "llama3.1",
     "llama3.2",
     "llama3.3",

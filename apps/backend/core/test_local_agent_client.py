@@ -563,7 +563,7 @@ class TestFormatGenerationProgress:
 
     def test_prompt_evaluation_is_distinguished_from_generation(self):
         # No token yet: the server is still reading the context.
-        assert "analyse le contexte" in self._line(tokens=0)
+        assert "chargement ou le traitement du contexte" in self._line(tokens=0)
         assert "génère" in self._line(tokens=200, elapsed=60)
 
     def test_generation_reports_count_and_rate(self):
@@ -812,7 +812,7 @@ class TestPlacementDiagnosis:
             silent_for=_LOCAL_STALL_SECONDS,
         )
         assert "OLLAMA_CONTEXT_LENGTH" not in line
-        assert "🧠" in line
+        assert "diagnostic de chargement" in line
 
 
 class TestLoadedModelPlacement:

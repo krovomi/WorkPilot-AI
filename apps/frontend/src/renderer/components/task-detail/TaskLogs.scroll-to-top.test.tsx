@@ -16,7 +16,7 @@ import type { Task, TaskLogs as TaskLogsType } from "../../../shared/types";
 import { TaskLogs } from "./TaskLogs";
 
 vi.mock("react-i18next", () => ({
-	useTranslation: () => ({ t: (key: string) => key }),
+	useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 
 vi.mock("../../stores/settings-store", () => ({
@@ -33,7 +33,12 @@ vi.mock("../../hooks/use-toast", () => ({
 }));
 
 vi.mock("../../hooks/useProviderModelCatalog", () => ({
-	useProviderModelCatalog: () => ({ models: [] }),
+	useProviderModelCatalog: () => ({
+		models: [
+			{ value: "llama3.3", label: "Llama 3.3", installed: true },
+			{ value: "custom", label: "Custom" },
+		],
+	}),
 }));
 
 vi.mock("../../../shared/utils/providers", () => ({
@@ -201,4 +206,65 @@ describe("TaskLogs — bouton remonter au début", () => {
 			behavior: "smooth",
 		});
 	});
+});
+
+describe("local model log status icons", () => {
+	it.each(["⏳", "🧠", "📊", "⚠️"])("renders %s as SVG", (marker) => {
+		const logs = makePhaseLogs();
+		logs.phases.planning.entries = [
+			{
+				type: "info",
+				content: `${marker} Local status`,
+				timestamp: "2026-09-07T19:00:00Z",
+			} as never,
+		];
+		const { container } = render(
+			<TaskLogs
+				task={baseTask}
+				phaseLogs={logs}
+				isLoadingLogs={false}
+				expandedPhases={new Set(["planning"])}
+				isStuck={false}
+				logsEndRef={createRef<HTMLDivElement>()}
+				logsContainerRef={createRef<HTMLDivElement>()}
+				onLogsScroll={vi.fn()}
+				onTogglePhase={vi.fn()}
+			/>,
+		);
+		expect(container.textContent).toContain("Local status");
+		expect(container.textContent).not.toContain(marker);
+		expect(container.querySelector("svg.inline-block")).toBeTruthy();
+	});
+});
+
+it("keeps custom input open when the select restores focus", async () => {
+	HTMLElement.prototype.scrollIntoView = vi.fn();
+	render(
+		<TaskLogs
+			task={{
+				...baseTask,
+				metadata: { provider: "ollama", model: "llama3.3" },
+			}}
+			phaseLogs={makePhaseLogs()}
+			isLoadingLogs={false}
+			expandedPhases={new Set()}
+			isStuck={false}
+			logsEndRef={createRef<HTMLDivElement>()}
+			logsContainerRef={createRef<HTMLDivElement>()}
+			onLogsScroll={vi.fn()}
+			onTogglePhase={vi.fn()}
+		/>,
+	);
+	const select = screen.getAllByLabelText("tasks:logs.model.selectAria")[0];
+	fireEvent.keyDown(select, { key: "ArrowDown" });
+	const option = await screen.findByRole("option", {
+		name: "tasks:logs.model.customOption",
+	});
+	expect(option.textContent).not.toContain("tasks:logs.model.download");
+	fireEvent.keyDown(option, { key: "Enter" });
+	const input = await screen.findByLabelText("tasks:logs.model.customAria");
+	fireEvent.blur(input);
+	expect(input).toBeInTheDocument();
+	fireEvent.keyDown(input, { key: "Escape" });
+	expect(screen.queryByLabelText("tasks:logs.model.customAria")).toBeNull();
 });
