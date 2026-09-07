@@ -54,6 +54,7 @@ import {
 	resolvePhaseDefaults,
 } from "../../../shared/utils/task-thinking";
 import {
+	isCustomModelSentinel,
 	isLocalProvider,
 	resolveLocalModel,
 } from "../../../shared/utils/local-models";
@@ -69,6 +70,7 @@ import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { useOllamaModelDownload } from "../../hooks/useOllamaModelDownload";
 import { useDownloadStore } from "../../stores/download-store";
 import { Badge } from "../ui/badge";
+import { Input } from "../ui/input";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -1108,6 +1110,16 @@ function PhaseLogSection({
 	// tag) rather than the Anthropic-shaped one, which read `llama3.3` and
 	// `llama3.3:latest` as two different models and listed both.
 	const isLocal = isLocalProvider(phaseConfig?.provider);
+
+	// Free-text model entry, behind the "Autre (saisie libre)" row. Opens on
+	// demand — and on its own for a phase already saved with the sentinel, which
+	// is the state the earlier bug left behind and the only way out of it.
+	const [editingCustomModel, setEditingCustomModel] = useState(false);
+	const [customModelDraft, setCustomModelDraft] = useState("");
+	const stuckOnSentinel = isCustomModelSentinel(phaseConfig?.modelValue);
+	useEffect(() => {
+		if (stuckOnSentinel) setEditingCustomModel(true);
+	}, [stuckOnSentinel]);
 	const { options: modelOptions, value: modelSelectValue } = useMemo(
 		() =>
 			buildModelSelectOptions(
@@ -1231,6 +1243,15 @@ function PhaseLogSection({
 	// besides persisting to metadata, drop a HOT_SWAP marker (applied next turn).
 	// The parent gates on `status` via buildHotSwapRequest.
 	const handleModelChange = (value: string) => {
+		// "Autre (saisie libre)" is a placeholder row, not a model. Persisting it
+		// set the phase's model to the literal string "custom", and downloading it
+		// asked Ollama to pull an image by that name — "pull model manifest: file
+		// does not exist". Open the field the label promises instead.
+		if (isCustomModelSentinel(value)) {
+			setCustomModelDraft("");
+			setEditingCustomModel(true);
+			return;
+		}
 		onModelChange?.(phase, value);
 		onHotSwap?.(phase, status, { model: value });
 		if (!isLocal) return;
@@ -1241,6 +1262,21 @@ function PhaseLogSection({
 		// first, which is exactly what that case needs.
 		if (opt?.installed === true) return;
 		void downloadModel(value);
+	};
+
+	/** Commit a hand-typed model id, then treat it like any other selection. */
+	const commitCustomModel = () => {
+		const typed = customModelDraft.trim();
+		setEditingCustomModel(false);
+		if (!typed || isCustomModelSentinel(typed)) return;
+		onModelChange?.(phase, typed);
+		onHotSwap?.(phase, status, { model: typed });
+		if (!isLocal) return;
+		// Nothing in the catalogue vouches for a hand-typed tag, so it is treated
+		// as missing: `download()` is idempotent and a no-op once it is there.
+		const opt = modelOptions.find((o) => o.value === typed);
+		if (opt?.installed === true) return;
+		void downloadModel(typed);
 	};
 
 	// Table « entrée → libellé de sous-étape » pour cette phase : bornes
@@ -1443,7 +1479,11 @@ function PhaseLogSection({
 												// no way to be downloaded at all. `download()` is
 												// idempotent, so the pair never starts two pulls.
 												onPointerUp={() => {
-													if (isLocal && m.installed !== true) {
+													if (
+														isLocal &&
+														m.installed !== true &&
+														!isCustomModelSentinel(m.value)
+													) {
 														void downloadModel(m.value);
 													}
 												}}
@@ -1451,7 +1491,8 @@ function PhaseLogSection({
 													if (
 														(e.key === "Enter" || e.key === " ") &&
 														isLocal &&
-														m.installed !== true
+														m.installed !== true &&
+														!isCustomModelSentinel(m.value)
 													) {
 														void downloadModel(m.value);
 													}
@@ -1528,9 +1569,38 @@ function PhaseLogSection({
 									<span>{phaseConfig.model}</span>
 								</div>
 							)}
+							{/* Free-text entry for a tag the curated list does not carry
+							    (qwen2.5-coder:7b, hf.co/org/model). Committed on Enter or
+							    blur; Escape leaves the phase's model untouched. */}
+							{editingCustomModel && (
+								<Input
+									autoFocus
+									className="h-6 w-44 px-1.5 py-0 text-[11px]"
+									placeholder={t(
+										"tasks:logs.model.customPlaceholder",
+										"Nom du modèle (ex : qwen2.5-coder:7b)",
+									)}
+									aria-label={t(
+										"tasks:logs.model.customAria",
+										"Saisir le nom du modèle",
+									)}
+									value={customModelDraft}
+									onChange={(e) => setCustomModelDraft(e.target.value)}
+									onBlur={commitCustomModel}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											e.preventDefault();
+											commitCustomModel();
+										} else if (e.key === "Escape") {
+											e.preventDefault();
+											setEditingCustomModel(false);
+										}
+									}}
+								/>
+							)}
 							{/* Download state of the selected local model. Renders nothing
 							    when the model is installed or the provider is not local. */}
-							{isLocal && (
+							{isLocal && !isCustomModelSentinel(modelSelectValue) && (
 								<ModelDownloadChip
 									model={modelSelectValue}
 									installed={selectedModelInstalled}

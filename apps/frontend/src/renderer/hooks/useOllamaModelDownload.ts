@@ -25,6 +25,7 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "./use-toast";
 import { useDownloadStore } from "../stores/download-store";
+import { isCustomModelSentinel } from "../../shared/utils/local-models";
 import { useSettingsStore } from "../stores/settings-store";
 
 /** Sentinel the main process resolves with when the user aborted the pull. */
@@ -68,6 +69,12 @@ export function useOllamaModelDownload(options?: {
 		async (model: string): Promise<boolean> => {
 			const name = model.trim();
 			if (!name) return false;
+			// "Autre (saisie libre)" is a catalogue row, not a model. Pulling it
+			// asks Ollama for an image called "custom" and fails with "pull model
+			// manifest: file does not exist". Guarded here as well as at the call
+			// sites, because the global indicator's retry button replays whatever
+			// the store holds — including an entry queued before this guard.
+			if (isCustomModelSentinel(name)) return false;
 
 			// Read the live store rather than the render-time snapshot: two rapid
 			// clicks would both see the same stale `downloads` object.

@@ -79,6 +79,23 @@ export function isSameLocalModel(
 	return left.length > 0 && left === canonicalLocalModelName(b);
 }
 
+/**
+ * The catalogue row that is not a model.
+ *
+ * `{ value: "custom", label: "Autre (saisie libre)" }` sits in the Ollama
+ * catalogue as a sentinel: picking it is supposed to open a free-text field so
+ * the user can name a tag the curated list does not carry (`qwen2.5-coder:7b`,
+ * `hf.co/org/model`). It is NOT a model id, and any code that forwards it to a
+ * server asks Ollama to pull an image literally called "custom" — which fails
+ * with "pull model manifest: file does not exist".
+ */
+export const CUSTOM_MODEL_SENTINEL = "custom";
+
+/** True when `value` is the free-text placeholder rather than a model id. */
+export function isCustomModelSentinel(value: string | undefined | null): boolean {
+	return (value ?? "").trim().toLowerCase() === CUSTOM_MODEL_SENTINEL;
+}
+
 interface LocalCatalogEntry {
 	value: string;
 	label: string;

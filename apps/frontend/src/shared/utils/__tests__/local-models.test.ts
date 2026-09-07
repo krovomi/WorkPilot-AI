@@ -11,8 +11,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	CUSTOM_MODEL_SENTINEL,
 	canonicalLocalModelName,
 	dedupeLocalCatalog,
+	isCustomModelSentinel,
 	isHostedOnlyModel,
 	isLocalProvider,
 	isSameLocalModel,
@@ -215,5 +217,35 @@ describe("dedupeLocalCatalog", () => {
 	it("drops entries with no name", () => {
 		const rows = dedupeLocalCatalog<Row>([{ value: "", label: "" }], []);
 		expect(rows).toHaveLength(0);
+	});
+});
+
+describe("isCustomModelSentinel", () => {
+	// « Autre (saisie libre) » is a catalogue row that opens a text field, not a
+	// model. Forwarding it asked Ollama to pull an image called "custom", which
+	// is exactly the "pull model manifest: file does not exist" this file's
+	// header is about — one layer up.
+	it("recognises the placeholder row", () => {
+		expect(isCustomModelSentinel(CUSTOM_MODEL_SENTINEL)).toBe(true);
+		expect(isCustomModelSentinel("custom")).toBe(true);
+	});
+
+	it("tolerates the shapes a stored value can take", () => {
+		expect(isCustomModelSentinel(" Custom ")).toBe(true);
+		expect(isCustomModelSentinel("CUSTOM")).toBe(true);
+	});
+
+	it("does not swallow real models whose name contains it", () => {
+		// A tag a user may legitimately type; treating it as the placeholder
+		// would silently refuse to select their own model.
+		expect(isCustomModelSentinel("custom-llama:7b")).toBe(false);
+		expect(isCustomModelSentinel("hf.co/me/custom")).toBe(false);
+		expect(isCustomModelSentinel("qwen2.5-coder:7b")).toBe(false);
+	});
+
+	it("is false for nothing at all", () => {
+		expect(isCustomModelSentinel("")).toBe(false);
+		expect(isCustomModelSentinel(undefined)).toBe(false);
+		expect(isCustomModelSentinel(null)).toBe(false);
 	});
 });
