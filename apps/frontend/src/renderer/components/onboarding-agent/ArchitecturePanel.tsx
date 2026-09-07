@@ -3,11 +3,12 @@ import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
 import { Badge } from "../ui/badge";
-import { EmptyState } from "./shared";
+import { EmptyState, useGeneratedText } from "./shared";
 
 export function ArchitecturePanel(): React.ReactElement | null {
 	const { t } = useTranslation("onboardingAgent");
 	const pkg = useOnboardingAgentStore((s) => s.pkg);
+	const generated = useGeneratedText();
 
 	if (!pkg) return null;
 
@@ -38,7 +39,9 @@ export function ArchitecturePanel(): React.ReactElement | null {
 								{t("architectureFiles", { count: node.file_count })}
 							</span>
 						</div>
-						<p className="text-sm text-muted-foreground mt-1">{node.role}</p>
+						<p className="text-sm text-muted-foreground mt-1">
+							{generated(node.role_i18n, node.role)}
+						</p>
 						<div className="flex items-center gap-2 mt-2">
 							<div className="h-1.5 bg-muted rounded-full flex-1 overflow-hidden">
 								<div
