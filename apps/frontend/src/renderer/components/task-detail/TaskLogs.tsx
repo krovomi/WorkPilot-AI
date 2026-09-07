@@ -14,6 +14,8 @@ import {
 	FlaskConical,
 	FolderSearch,
 	Info,
+	Hourglass,
+	Ruler,
 	Loader2,
 	Pencil,
 	RotateCcw,
@@ -70,7 +72,7 @@ import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { useOllamaModelDownload } from "../../hooks/useOllamaModelDownload";
 import { useDownloadStore } from "../../stores/download-store";
 import { Badge } from "../ui/badge";
-import { Input } from "../ui/input";
+import { OfficialModelSearch } from "./OfficialModelSearch";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -1132,8 +1134,6 @@ function PhaseLogSection({
 	// demand — and on its own for a phase already saved with the sentinel, which
 	// is the state the earlier bug left behind and the only way out of it.
 	const [editingCustomModel, setEditingCustomModel] = useState(false);
-	const [customModelDraft, setCustomModelDraft] = useState("");
-	const customModelInputRef = useRef<HTMLInputElement>(null);
 	const stuckOnSentinel = isCustomModelSentinel(phaseConfig?.modelValue);
 	useEffect(() => {
 		if (stuckOnSentinel) setEditingCustomModel(true);
@@ -1266,7 +1266,6 @@ function PhaseLogSection({
 		// asked Ollama to pull an image by that name — "pull model manifest: file
 		// does not exist". Open the field the label promises instead.
 		if (isCustomModelSentinel(value)) {
-			setCustomModelDraft("");
 			setEditingCustomModel(true);
 			return;
 		}
@@ -1280,21 +1279,6 @@ function PhaseLogSection({
 		// first, which is exactly what that case needs.
 		if (opt?.installed === true) return;
 		void downloadModel(value);
-	};
-
-	/** Commit a hand-typed model id, then treat it like any other selection. */
-	const commitCustomModel = () => {
-		const typed = customModelDraft.trim();
-		setEditingCustomModel(false);
-		if (!typed || isCustomModelSentinel(typed)) return;
-		onModelChange?.(phase, typed);
-		onHotSwap?.(phase, status, { model: typed });
-		if (!isLocal) return;
-		// Nothing in the catalogue vouches for a hand-typed tag, so it is treated
-		// as missing: `download()` is idempotent and a no-op once it is there.
-		const opt = modelOptions.find((o) => o.value === typed);
-		if (opt?.installed === true) return;
-		void downloadModel(typed);
 	};
 
 	// Table « entrée → libellé de sous-étape » pour cette phase : bornes
@@ -1372,7 +1356,7 @@ function PhaseLogSection({
 		<Collapsible open={isSearching || isExpanded} onOpenChange={onToggle}>
 			<div
 				className={cn(
-					"w-full flex items-center justify-between p-3 rounded-lg border transition-colors",
+					"w-full flex flex-wrap items-center justify-between gap-x-3 gap-y-2 p-3 rounded-lg border transition-colors",
 					status === "active" && !isInterrupted && PHASE_COLORS[phase],
 					isInterrupted && "border-warning/30 bg-warning/5",
 					status === "completed" && "border-success/30 bg-success/5",
@@ -1383,7 +1367,7 @@ function PhaseLogSection({
 				<CollapsibleTrigger asChild>
 					<button
 						type="button"
-						className="flex items-center gap-2 flex-1 min-w-0 text-left rounded hover:bg-secondary/50 transition-colors"
+						className="flex items-center gap-2 shrink-0 text-left whitespace-nowrap rounded hover:bg-secondary/50 transition-colors"
 					>
 						{isExpanded ? (
 							<ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -1416,10 +1400,10 @@ function PhaseLogSection({
 						)}
 					</button>
 				</CollapsibleTrigger>
-				<div className="flex items-center gap-2">
+				<div className="flex flex-wrap min-w-0 max-w-full items-center gap-2">
 					{/* Provider / model / thinking selectors (per phase) */}
 					{phaseConfig && (
-						<div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+						<div className="contents text-[10px] text-muted-foreground">
 							{/* Provider selector */}
 							{onProviderChange ? (
 								<Select
@@ -1431,7 +1415,7 @@ function PhaseLogSection({
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-6 w-auto shrink-0 gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:line-clamp-none [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.provider.selectAria",
 											"Fournisseur pour cette phase",
@@ -1470,7 +1454,7 @@ function PhaseLogSection({
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-6 w-auto shrink-0 gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:line-clamp-none [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.model.selectAria",
 											"Modèle pour cette phase",
@@ -1481,13 +1465,16 @@ function PhaseLogSection({
 										)}
 									>
 										<Cpu className="h-3 w-3" />
-										<SelectValue />
+										<SelectValue>
+											{modelOptions.find(
+												(option) => option.value === modelSelectValue,
+											)?.label ?? phaseConfig.model}
+										</SelectValue>
 									</SelectTrigger>
 									<SelectContent
 										onCloseAutoFocus={(event) => {
 											if (editingCustomModel) {
 												event.preventDefault();
-												customModelInputRef.current?.focus();
 											}
 										}}
 									>
@@ -1598,44 +1585,14 @@ function PhaseLogSection({
 									<span>{phaseConfig.model}</span>
 								</div>
 							)}
-							{/* Free-text entry for a tag the curated list does not carry
-							    (qwen2.5-coder:7b, hf.co/org/model). Committed on Enter or
-							    the confirm button; Escape leaves the phase's model untouched. */}
 							{editingCustomModel && (
-								<div className="flex items-center gap-1">
-									<Input
-										ref={customModelInputRef}
-										autoFocus
-										className="h-6 w-44 px-1.5 py-0 text-[11px]"
-										placeholder={t(
-											"tasks:logs.model.customPlaceholder",
-											"Nom du modèle (ex : qwen2.5-coder:7b)",
-										)}
-										aria-label={t(
-											"tasks:logs.model.customAria",
-											"Saisir le nom du modèle",
-										)}
-										value={customModelDraft}
-										onChange={(e) => setCustomModelDraft(e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter") {
-												e.preventDefault();
-												commitCustomModel();
-											} else if (e.key === "Escape") {
-												e.preventDefault();
-												setEditingCustomModel(false);
-											}
-										}}
-									/>
-									<button
-										type="button"
-										onClick={commitCustomModel}
-										disabled={!customModelDraft.trim()}
-										aria-label={t("tasks:logs.model.customConfirm")}
-									>
-										<CheckCircle2 className="h-4 w-4" />
-									</button>
-								</div>
+								<OfficialModelSearch
+									onClose={() => setEditingCustomModel(false)}
+									onSelect={(value) => {
+										setEditingCustomModel(false);
+										handleModelChange(value);
+									}}
+								/>
 							)}
 							{/* Download state of the selected local model. Renders nothing
 							    when the model is installed or the provider is not local. */}
@@ -1661,7 +1618,7 @@ function PhaseLogSection({
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-6 w-auto shrink-0 gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:line-clamp-none [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.thinking.selectAria",
 											"Niveau de réflexion pour cette phase",
@@ -2169,15 +2126,17 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 	// hot-swap, context switch…) are emitted in stable English and localised here
 	// for display; anything else is shown as-is.
 	const translatedContent = translateLogMessage(t, entry.content);
-	const marker = /^(⏳|🧠|⚠️?|📊)\s*/u.exec(translatedContent);
+	const marker = /^(⏳|🧠|⚠️?|📊|📐)\s*/u.exec(translatedContent);
 	const StatusIcon =
 		marker?.[1] === "⏳"
-			? Loader2
+			? Hourglass
 			: marker?.[1] === "🧠"
 				? Brain
-				: marker?.[1] === "📊"
-					? Info
-					: AlertTriangle;
+				: marker?.[1] === "📐"
+					? Ruler
+					: marker?.[1] === "📊"
+						? Info
+						: AlertTriangle;
 	const content = (
 		<>
 			{marker && (
