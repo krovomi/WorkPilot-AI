@@ -4,21 +4,113 @@
 	"duration": "~{{minutes}} min",
 	"step": "Step",
 	"actions": {
-		"runScan": "Generate Guide",
+		"runScan": "Generate onboarding",
 		"cancel": "Cancel",
-		"scanning": "Generating onboarding guide...",
-		"reset": "Reset"
+		"scanning": "Analysing the project…",
+		"reset": "Reset",
+		"regenerate": "Regenerate",
+		"copy": "Copy the command",
+		"previous": "Previous step",
+		"next": "Next step",
+		"nextStep": "Next step",
+		"markDone": "Mark as read",
+		"markUndone": "Mark as unread",
+		"retryQuiz": "Retake the quiz"
 	},
 	"errors": {
 		"noProject": "Select a project to generate its onboarding guide.",
 		"failed": "Generation failed: {{error}}"
 	},
 	"packageTitle": "Onboarding Tour",
-	"packageIntro": "Generate an interactive tour with quiz, first tasks, and glossary for this project.",
+	"packageIntro": "Analyse this project and build an onboarding package for a newcomer — no LLM call, everything is read from the code.",
+	"pitch": {
+		"overview": "Tech stack, key files, conventions and the commands to run",
+		"tour": "A guided tour of the documentation, entry points and layers",
+		"quiz": "A comprehension quiz covering the whole project, not only the files",
+		"tasks": "First tasks: existing TODOs, untested modules, undocumented entry points",
+		"glossary": "A glossary of the project's vocabulary with where each term lives"
+	},
 	"tabs": {
+		"overview": "Overview",
 		"tour": "Tour",
+		"architecture": "Architecture",
 		"quiz": "Quiz",
 		"firstTasks": "First tasks",
 		"glossary": "Glossary"
-	}
+	},
+	"overview": {
+		"stack": "Tech stack",
+		"noStack": "No technology could be detected in this project.",
+		"stats": {
+			"code_files": "Source files",
+			"test_files": "Test files",
+			"directories": "Directories",
+			"languages": "Languages"
+		},
+		"gettingStarted": "Getting started",
+		"commands": "Commands",
+		"entryPoints": "Entry points",
+		"conventions": "Conventions",
+		"keyFiles": "Key files",
+		"startTour": "Start the tour",
+		"lines": "{{count}} lines"
+	},
+	"commandCategories": {
+		"setup": "Setup",
+		"run": "Run",
+		"build": "Build",
+		"test": "Test",
+		"lint": "Lint",
+		"other": "Other"
+	},
+	"tourCategories": {
+		"doc": "Documentation",
+		"entrypoint": "Entry point",
+		"directory": "Directory",
+		"file": "File",
+		"command": "Command"
+	},
+	"quizCategories": {
+		"stack": "Stack",
+		"files": "Files",
+		"architecture": "Architecture",
+		"commands": "Commands",
+		"conventions": "Conventions",
+		"general": "General"
+	},
+	"taskCategories": {
+		"todo": "TODO",
+		"tests": "Tests",
+		"docs": "Documentation",
+		"explore": "Exploration"
+	},
+	"glossaryKinds": {
+		"directory": "Directory",
+		"type": "Type",
+		"module": "Module",
+		"identifier": "Identifier"
+	},
+	"difficulty": {
+		"easy": "Easy",
+		"medium": "Medium",
+		"hard": "Hard"
+	},
+	"filters": {
+		"all": "All ({{count}})"
+	},
+	"stepOfTotal": "Step {{current}} of {{total}}",
+	"tourProgress": "{{done}} of {{total}} steps read",
+	"suggestedQuestions": "Questions to ask yourself",
+	"quizScore": "Score: {{score}}/{{answered}} (of {{total}})",
+	"quizComplete": "Quiz finished — {{score}} correct answers out of {{total}}.",
+	"architectureIntro": "The directories of the project and the role inferred for each.",
+	"architectureFiles": "{{count}} files",
+	"firstTasksIntro": "Small, self-contained changes to get a first commit in.",
+	"glossarySearch": "Search a term…",
+	"glossaryNoMatch": "No term matches \"{{query}}\".",
+	"emptyTour": "No tour step could be generated for this project.",
+	"emptyQuiz": "No quiz question could be generated for this project.",
+	"emptyFirstTasks": "No first task could be surfaced for this project.",
+	"emptyGlossary": "No glossary term could be detected.",
+	"emptyArchitecture": "No directory structure could be analysed."
 }

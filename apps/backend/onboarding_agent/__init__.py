@@ -2,15 +2,20 @@
 Onboarding Agent — Contextual onboarding for new team members.
 
 Analyses the codebase to produce architecture overviews, key-file maps,
-naming convention guides, and personalised learning paths.
+entry points, runnable commands, naming convention guides, an interactive
+tour, a quiz, first tasks and a glossary.
 """
 
 from .onboarding_engine import (
+    ArchitectureNode,
     Convention,
     KeyFile,
     OnboardingEngine,
     OnboardingGuide,
     OnboardingSection,
+    ProjectCommand,
+    ProjectScan,
+    scan_project,
 )
 from .tour_builder import (
     FirstTask,
@@ -32,6 +37,10 @@ __all__ = [
     "OnboardingSection",
     "KeyFile",
     "Convention",
+    "ProjectCommand",
+    "ArchitectureNode",
+    "ProjectScan",
+    "scan_project",
     "OnboardingPackage",
     "OnboardingPackageBuilder",
     "TourStep",

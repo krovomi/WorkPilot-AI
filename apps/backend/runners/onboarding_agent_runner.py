@@ -74,7 +74,21 @@ def _guide_to_dict(guide: OnboardingGuide) -> dict[str, Any]:
                 "section": "setup",
                 "title": "Getting started",
                 "content": getting_started,
-                "commands": _extract_commands(getting_started),
+                "commands": [c.command for c in guide.commands if c.category == "setup"]
+                or _extract_commands(getting_started),
+                "estimatedMinutes": 10,
+            }
+        )
+
+    # Architecture step
+    architecture = guide.sections.get("architecture", "")
+    if architecture:
+        steps.append(
+            {
+                "section": "architecture",
+                "title": "How the project is laid out",
+                "content": architecture,
+                "commands": [],
                 "estimatedMinutes": 10,
             }
         )
@@ -94,6 +108,45 @@ def _guide_to_dict(guide: OnboardingGuide) -> dict[str, Any]:
             }
         )
 
+    # Workflow step — the commands a newcomer runs every day
+    daily = [c for c in guide.commands if c.category in {"run", "build", "lint"}]
+    if daily:
+        steps.append(
+            {
+                "section": "workflows",
+                "title": "Day-to-day commands",
+                "content": "\n".join(f"- {c.label}: `{c.command}`" for c in daily),
+                "commands": [c.command for c in daily],
+                "estimatedMinutes": 5,
+            }
+        )
+
+    # Testing step
+    testing = guide.sections.get("testing", "")
+    if testing:
+        steps.append(
+            {
+                "section": "testing",
+                "title": "Running the tests",
+                "content": testing,
+                "commands": [c.command for c in guide.commands if c.category == "test"],
+                "estimatedMinutes": 5,
+            }
+        )
+
+    # Deployment step
+    deployment = guide.sections.get("deployment", "")
+    if deployment:
+        steps.append(
+            {
+                "section": "deployment",
+                "title": "How it ships",
+                "content": deployment,
+                "commands": [],
+                "estimatedMinutes": 5,
+            }
+        )
+
     total_minutes = (
         sum(int(step.get("estimatedMinutes", 0)) for step in steps)
         or guide.estimated_reading_time_min
@@ -101,7 +154,8 @@ def _guide_to_dict(guide: OnboardingGuide) -> dict[str, Any]:
 
     summary = (
         f"{guide.project_name}: {len(guide.tech_stack)} technologies, "
-        f"{len(guide.key_files)} key files, {len(guide.conventions)} conventions."
+        f"{len(guide.key_files)} key files, {len(guide.conventions)} conventions, "
+        f"{len(guide.commands)} commands."
     )
 
     return {
@@ -125,7 +179,8 @@ def run_scan(project_path: Path) -> dict[str, Any]:
             "status": (
                 f"Generated package with {len(package.tour)} tour step(s), "
                 f"{len(package.quiz)} quiz question(s), "
-                f"{len(package.first_tasks)} first task(s)"
+                f"{len(package.first_tasks)} first task(s), "
+                f"{len(package.glossary)} glossary term(s)"
             )
         },
     )
