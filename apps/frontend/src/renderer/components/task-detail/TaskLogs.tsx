@@ -301,7 +301,8 @@ export function TaskLogs({
 		return PHASE_ORDER.reduce((acc, phase) => {
 			const entries = phaseLogs.phases[phase]?.entries ?? [];
 			return (
-				acc + entries.filter((e) => entryMatchesQuery(e, normalizedQuery)).length
+				acc +
+				entries.filter((e) => entryMatchesQuery(e, normalizedQuery)).length
 			);
 		}, 0);
 	}, [isSearching, phaseLogs, normalizedQuery]);
@@ -324,7 +325,9 @@ export function TaskLogs({
 	// hidden in that case anyway).
 	const handleCompare = useCallback(
 		(phase: TaskLogPhase) => {
-			const models = mergeGroupsByModel(phaseLogs?.phases[phase]?.entries ?? []);
+			const models = mergeGroupsByModel(
+				phaseLogs?.phases[phase]?.entries ?? [],
+			);
 			if (models.length < 2) return;
 			setCompare({ phase, leftKey: models[0].key, rightKey: models[1].key });
 		},
@@ -340,10 +343,7 @@ export function TaskLogs({
 
 	useEffect(() => {
 		let cancelled = false;
-		getStaticProviders(
-			profiles,
-			settings as unknown as Record<string, unknown>,
-		)
+		getStaticProviders(profiles, settings as unknown as Record<string, unknown>)
 			.then((res) => {
 				if (cancelled) return;
 				setProviders(
@@ -387,7 +387,10 @@ export function TaskLogs({
 				toast({ title: updatedTitle, description: updatedDesc });
 			} catch (error) {
 				toast({
-					title: t("tasks:logs.thinking.updateFailed", "Échec de la mise à jour"),
+					title: t(
+						"tasks:logs.thinking.updateFailed",
+						"Échec de la mise à jour",
+					),
 					description: error instanceof Error ? error.message : String(error),
 					variant: "destructive",
 				});
@@ -402,7 +405,12 @@ export function TaskLogs({
 		(logPhase: TaskLogPhase, level: ThinkingLevel) =>
 			persistPhaseMetadata(
 				logPhase,
-				buildThinkingMetadataUpdate(task.metadata, logPhase, level, phaseDefaults),
+				buildThinkingMetadataUpdate(
+					task.metadata,
+					logPhase,
+					level,
+					phaseDefaults,
+				),
 				t("tasks:logs.thinking.updatedTitle", "Réflexion mise à jour"),
 				t(
 					"tasks:logs.thinking.updatedDesc",
@@ -555,9 +563,9 @@ export function TaskLogs({
 
 	// Refs to each rendered phase section so we can detect which phase is
 	// currently scrolled to the top of the viewport.
-	const phaseRefs = useRef<Partial<Record<TaskLogPhase, HTMLDivElement | null>>>(
-		{},
-	);
+	const phaseRefs = useRef<
+		Partial<Record<TaskLogPhase, HTMLDivElement | null>>
+	>({});
 
 	// Affiche les boutons flottants « remonter au début » / « descendre en bas »
 	// selon la position de défilement dans le conteneur de logs.
@@ -664,7 +672,8 @@ export function TaskLogs({
 		// validation : passe QA). Les bornes proviennent des entrées marquées
 		// `data-substep` (cf. getSubStepLabel).
 		const activePhase =
-			PHASE_ORDER.find((p) => phaseLogs?.phases[p]?.status === "active") ?? null;
+			PHASE_ORDER.find((p) => phaseLogs?.phases[p]?.status === "active") ??
+			null;
 		const displayPhase = current ?? activePhase;
 		let subStep: string | null = null;
 		if (displayPhase) {
@@ -693,8 +702,7 @@ export function TaskLogs({
 	const updateScrollButtons = useCallback(() => {
 		const el = logsContainerRef.current;
 		if (!el) return;
-		const distanceFromBottom =
-			el.scrollHeight - el.scrollTop - el.clientHeight;
+		const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
 		const isScrollable = el.scrollHeight - el.clientHeight > 16;
 		setShowScrollTop(el.scrollTop > 240);
 		setShowScrollBottom(isScrollable && distanceFromBottom > 240);
@@ -784,7 +792,10 @@ export function TaskLogs({
 								<button
 									type="button"
 									onClick={() => setSearchQuery("")}
-									aria-label={t("tasks:logs.search.clear", "Effacer la recherche")}
+									aria-label={t(
+										"tasks:logs.search.clear",
+										"Effacer la recherche",
+									)}
 									className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
 								>
 									<X className="h-3.5 w-3.5" />
@@ -853,9 +864,7 @@ export function TaskLogs({
 							{isSearching && matchCount === 0 && (
 								<div className="py-8 text-center text-sm text-muted-foreground">
 									<Search className="mx-auto mb-2 h-8 w-8 opacity-50" />
-									<p>
-										{t("tasks:logs.search.noResults", "Aucun résultat")}
-									</p>
+									<p>{t("tasks:logs.search.noResults", "Aucun résultat")}</p>
 									<p className="mt-1 text-xs">
 										{t(
 											"tasks:logs.search.noResultsHint",
@@ -869,9 +878,18 @@ export function TaskLogs({
 						</>
 					) : task.logs && task.logs.length > 0 ? (
 						// Fallback to legacy raw logs if no phase logs exist. When a search is
-							// active, keep only the matching lines.
+						// active, keep only the matching lines.
 						<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all">
-							{isSearching ? task.logs.join("").split("\n").filter((line) => line.toLowerCase().includes(normalizedQuery)).join("\n") || t("tasks:logs.search.noResults", "Aucun résultat") : task.logs.join("")}
+							{isSearching
+								? task.logs
+										.join("")
+										.split("\n")
+										.filter((line) =>
+											line.toLowerCase().includes(normalizedQuery),
+										)
+										.join("\n") ||
+									t("tasks:logs.search.noResults", "Aucun résultat")
+								: task.logs.join("")}
 							<div ref={logsEndRef} />
 						</pre>
 					) : (
@@ -1065,8 +1083,7 @@ function PhaseLogSection({
 		if (!selProvider || !selKey) return phaseLog;
 		const file = (perLlmLogs ?? []).find(
 			(f) =>
-				f.provider === selProvider &&
-				getCanonicalModelKey(f.model) === selKey,
+				f.provider === selProvider && getCanonicalModelKey(f.model) === selKey,
 		);
 		return file ? (file.logs.phases[phase] ?? null) : phaseLog;
 	}, [
@@ -1116,6 +1133,7 @@ function PhaseLogSection({
 	// is the state the earlier bug left behind and the only way out of it.
 	const [editingCustomModel, setEditingCustomModel] = useState(false);
 	const [customModelDraft, setCustomModelDraft] = useState("");
+	const customModelInputRef = useRef<HTMLInputElement>(null);
 	const stuckOnSentinel = isCustomModelSentinel(phaseConfig?.modelValue);
 	useEffect(() => {
 		if (stuckOnSentinel) setEditingCustomModel(true);
@@ -1465,7 +1483,14 @@ function PhaseLogSection({
 										<Cpu className="h-3 w-3" />
 										<SelectValue />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent
+										onCloseAutoFocus={(event) => {
+											if (editingCustomModel) {
+												event.preventDefault();
+												customModelInputRef.current?.focus();
+											}
+										}}
+									>
 										{sortedModelOptions.map((m) => (
 											<SelectItem
 												key={m.value}
@@ -1499,12 +1524,16 @@ function PhaseLogSection({
 												}}
 											>
 												<span className="flex items-center gap-1.5">
-													<span>{m.label}</span>
+													<span>
+														{isCustomModelSentinel(m.value)
+															? t("tasks:logs.model.customOption")
+															: m.label}
+													</span>
 													{m.installed ? (
 														<span className="text-[10px] text-success">
 															{t("tasks:logs.model.installed", "✓ installed")}
 														</span>
-													) : isLocal ? (
+													) : isLocal && !isCustomModelSentinel(m.value) ? (
 														// Reads as the action it is. Selecting this row
 														// starts the download (see the item handlers
 														// above), and the live percentage replaces the
@@ -1571,32 +1600,42 @@ function PhaseLogSection({
 							)}
 							{/* Free-text entry for a tag the curated list does not carry
 							    (qwen2.5-coder:7b, hf.co/org/model). Committed on Enter or
-							    blur; Escape leaves the phase's model untouched. */}
+							    the confirm button; Escape leaves the phase's model untouched. */}
 							{editingCustomModel && (
-								<Input
-									autoFocus
-									className="h-6 w-44 px-1.5 py-0 text-[11px]"
-									placeholder={t(
-										"tasks:logs.model.customPlaceholder",
-										"Nom du modèle (ex : qwen2.5-coder:7b)",
-									)}
-									aria-label={t(
-										"tasks:logs.model.customAria",
-										"Saisir le nom du modèle",
-									)}
-									value={customModelDraft}
-									onChange={(e) => setCustomModelDraft(e.target.value)}
-									onBlur={commitCustomModel}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault();
-											commitCustomModel();
-										} else if (e.key === "Escape") {
-											e.preventDefault();
-											setEditingCustomModel(false);
-										}
-									}}
-								/>
+								<div className="flex items-center gap-1">
+									<Input
+										ref={customModelInputRef}
+										autoFocus
+										className="h-6 w-44 px-1.5 py-0 text-[11px]"
+										placeholder={t(
+											"tasks:logs.model.customPlaceholder",
+											"Nom du modèle (ex : qwen2.5-coder:7b)",
+										)}
+										aria-label={t(
+											"tasks:logs.model.customAria",
+											"Saisir le nom du modèle",
+										)}
+										value={customModelDraft}
+										onChange={(e) => setCustomModelDraft(e.target.value)}
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												e.preventDefault();
+												commitCustomModel();
+											} else if (e.key === "Escape") {
+												e.preventDefault();
+												setEditingCustomModel(false);
+											}
+										}}
+									/>
+									<button
+										type="button"
+										onClick={commitCustomModel}
+										disabled={!customModelDraft.trim()}
+										aria-label={t("tasks:logs.model.customConfirm")}
+									>
+										<CheckCircle2 className="h-4 w-4" />
+									</button>
+								</div>
 							)}
 							{/* Download state of the selected local model. Renders nothing
 							    when the model is installed or the provider is not local. */}
@@ -1663,7 +1702,10 @@ function PhaseLogSection({
 						<button
 							type="button"
 							onClick={() => onCompare(phase)}
-							aria-label={t("tasks:logs.compare.openAria", "Comparer les modèles")}
+							aria-label={t(
+								"tasks:logs.compare.openAria",
+								"Comparer les modèles",
+							)}
 							title={t(
 								"tasks:logs.compare.openTooltip",
 								"Comparer les plans des modèles côte à côte",
@@ -1682,7 +1724,10 @@ function PhaseLogSection({
 							type="button"
 							onClick={() => onRerunPhase(phase)}
 							disabled={isRerunning}
-							aria-label={t("tasks:logs.rerun.buttonAria", "Refaire cette étape")}
+							aria-label={t(
+								"tasks:logs.rerun.buttonAria",
+								"Refaire cette étape",
+							)}
 							title={t(
 								"tasks:logs.rerun.buttonTooltip",
 								"Relancer cette étape (les étapes suivantes seront refaites)",
@@ -2123,11 +2168,31 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 	// per-type render branches below. Known backend status lines (QA verdicts,
 	// hot-swap, context switch…) are emitted in stable English and localised here
 	// for display; anything else is shown as-is.
+	const translatedContent = translateLogMessage(t, entry.content);
+	const marker = /^(⏳|🧠|⚠️?|📊)\s*/u.exec(translatedContent);
+	const StatusIcon =
+		marker?.[1] === "⏳"
+			? Loader2
+			: marker?.[1] === "🧠"
+				? Brain
+				: marker?.[1] === "📊"
+					? Info
+					: AlertTriangle;
 	const content = (
-		<HighlightedText
-			text={translateLogMessage(t, entry.content)}
-			query={query}
-		/>
+		<>
+			{marker && (
+				<StatusIcon
+					aria-hidden="true"
+					className="inline-block h-3.5 w-3.5 mr-1 align-text-bottom"
+				/>
+			)}
+			<HighlightedText
+				text={
+					marker ? translatedContent.slice(marker[0].length) : translatedContent
+				}
+				query={query}
+			/>
+		</>
 	);
 	const detail = entry.detail ? (
 		<HighlightedText text={entry.detail} query={query} />
