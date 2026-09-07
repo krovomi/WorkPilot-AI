@@ -8,12 +8,23 @@ import type { OnboardingGuide } from "../../shared/types/onboarding";
 
 export type OnboardingAgentPhase = "idle" | "scanning" | "complete" | "error";
 
+export type OnboardingAgentTab =
+	| "overview"
+	| "tour"
+	| "architecture"
+	| "quiz"
+	| "tasks"
+	| "glossary";
+
 interface OnboardingAgentState {
 	phase: OnboardingAgentPhase;
 	status: string;
 	guide: OnboardingGuide | null;
 	pkg: OnboardingPackage | null;
+	activeTab: OnboardingAgentTab;
 	currentTourStep: number;
+	/** Tour steps the reader ticked off, by ``order``. */
+	completedTourSteps: number[];
 	quizAnswers: Record<number, number>;
 	error: string | null;
 
@@ -22,8 +33,11 @@ interface OnboardingAgentState {
 	setStatus: (status: string) => void;
 	setResult: (result: OnboardingAgentResult) => void;
 	setError: (error: string) => void;
+	setActiveTab: (tab: OnboardingAgentTab) => void;
 	setCurrentTourStep: (idx: number) => void;
+	toggleTourStepDone: (order: number) => void;
 	answerQuiz: (qIdx: number, choice: number) => void;
+	resetQuiz: () => void;
 	reset: () => void;
 }
 
@@ -32,7 +46,9 @@ export const useOnboardingAgentStore = create<OnboardingAgentState>((set) => ({
 	status: "",
 	guide: null,
 	pkg: null,
+	activeTab: "overview",
 	currentTourStep: 0,
+	completedTourSteps: [],
 	quizAnswers: {},
 	error: null,
 
@@ -46,7 +62,9 @@ export const useOnboardingAgentStore = create<OnboardingAgentState>((set) => ({
 			status: "Starting scan...",
 			guide: null,
 			pkg: null,
+			activeTab: "overview",
 			currentTourStep: 0,
+			completedTourSteps: [],
 			quizAnswers: {},
 			error: null,
 		});
@@ -81,16 +99,26 @@ export const useOnboardingAgentStore = create<OnboardingAgentState>((set) => ({
 			phase: "complete",
 		}),
 	setError: (error) => set({ error, phase: "error" }),
+	setActiveTab: (tab) => set({ activeTab: tab }),
 	setCurrentTourStep: (idx) => set({ currentTourStep: idx }),
+	toggleTourStepDone: (order) =>
+		set((s) => ({
+			completedTourSteps: s.completedTourSteps.includes(order)
+				? s.completedTourSteps.filter((o) => o !== order)
+				: [...s.completedTourSteps, order],
+		})),
 	answerQuiz: (qIdx, choice) =>
 		set((s) => ({ quizAnswers: { ...s.quizAnswers, [qIdx]: choice } })),
+	resetQuiz: () => set({ quizAnswers: {} }),
 	reset: () =>
 		set({
 			phase: "idle",
 			status: "",
 			guide: null,
 			pkg: null,
+			activeTab: "overview",
 			currentTourStep: 0,
+			completedTourSteps: [],
 			quizAnswers: {},
 			error: null,
 		}),
