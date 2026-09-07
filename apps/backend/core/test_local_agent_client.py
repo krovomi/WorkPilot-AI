@@ -306,11 +306,19 @@ class TestLocalAgentClient:
         client = LocalAgentClient(model="m", base_url="http://localhost:1234/v1")
         assert client._native_chat_url() == "http://127.0.0.1:1234/api/chat"
 
-    def test_num_ctx_default_and_env(self, monkeypatch):
+    def test_num_ctx_reports_the_floor_until_a_prompt_sizes_it(self, monkeypatch):
+        # OLLAMA_CONTEXT_LENGTH is now the CEILING, not the window: until a
+        # prompt has been measured, the session reports the floor so the
+        # budgets derived from it are never sized for memory it may not get.
+        # See TestNumCtxSizing for the resolution itself.
         monkeypatch.delenv("OLLAMA_CONTEXT_LENGTH", raising=False)
         assert LocalAgentClient(model="m")._num_ctx() == 8192
         monkeypatch.setenv("OLLAMA_CONTEXT_LENGTH", "16384")
-        assert LocalAgentClient(model="m")._num_ctx() == 16384
+        client = LocalAgentClient(model="m")
+        assert client._num_ctx() == 8192
+        client._model_max_ctx = 131_072
+        assert client._resolve_num_ctx(500_000) == 16384
+        assert client._num_ctx() == 16384
 
     def test_connection_error_message_is_friendly(self):
         """A connection failure is rephrased into an actionable Ollama hint."""
@@ -602,8 +610,122 @@ class TestLocalContextBudgets:
     ):
         monkeypatch.setenv("OLLAMA_CONTEXT_LENGTH", "262144")
         client = LocalAgentClient(model="m")
+        client._model_max_ctx = 1_000_000
+        client._resolve_num_ctx(200_000)  # a window this wide really was asked for
         assert client._local_history_budget() == 300_000
         assert client._local_tool_result_cap() == 10_000
+
+
+class TestNumCtxSizing:
+    """The context window is sized to the prompt, inside a ceiling.
+
+    A constant is wrong in both directions: 8192 did not fit a single agent
+    phase (a complexity assessment with six tools measures ~8.2k tokens, and
+    Ollama answers an overflow by silently dropping the head of the prompt —
+    the system prompt with it), while raising the constant would make every
+    session allocate a KV cache it never uses.
+    """
+
+    def _client(self, monkeypatch, *, model_max=131072):
+        monkeypatch.delenv("OLLAMA_CONTEXT_LENGTH", raising=False)
+        client = LocalAgentClient(model="llama3.3")
+        # Never contact a server from a unit test.
+        client._model_max_ctx = model_max
+        return client
+
+    def test_a_prompt_that_fits_keeps_the_floor(self, monkeypatch):
+        client = self._client(monkeypatch)
+        assert client._resolve_num_ctx(2_000) == 8192
+
+    def test_the_reported_case_grows_the_window(self, monkeypatch):
+        # The user's own log: ~8227 tokens against a window of 8192.
+        client = self._client(monkeypatch)
+        assert client._resolve_num_ctx(8_227) == 16_384
+
+    def test_growth_is_bounded_by_the_default_cap(self, monkeypatch):
+        client = self._client(monkeypatch)
+        assert client._resolve_num_ctx(500_000) == 32_768
+
+    def test_a_model_with_a_small_window_caps_lower(self, monkeypatch):
+        # gemma-style 8k model: never ask for more than it can load.
+        client = self._client(monkeypatch, model_max=8_192)
+        assert client._resolve_num_ctx(30_000) == 8_192
+
+    def test_env_is_a_ceiling_not_a_target(self, monkeypatch):
+        monkeypatch.setenv("OLLAMA_CONTEXT_LENGTH", "16384")
+        client = LocalAgentClient(model="llama3.3")
+        client._model_max_ctx = 131_072
+        # Small prompt: we do NOT allocate the whole 16k the user allowed…
+        assert client._resolve_num_ctx(1_000) == 8_192
+        # …and we never exceed it either, so the setting can only reduce memory.
+        client._resolved_num_ctx = None
+        assert client._resolve_num_ctx(500_000) == 16_384
+
+    def test_a_garbage_env_value_falls_back_to_the_cap(self, monkeypatch):
+        monkeypatch.setenv("OLLAMA_CONTEXT_LENGTH", "beaucoup")
+        client = LocalAgentClient(model="llama3.3")
+        client._model_max_ctx = 131_072
+        assert client._resolve_num_ctx(500_000) == 32_768
+
+    def test_the_window_is_stable_across_turns(self, monkeypatch):
+        # Ollama keys the loaded model on its options, so a num_ctx that moves
+        # between turns evicts and reloads the weights — minutes, on a 70B.
+        client = self._client(monkeypatch)
+        first = client._resolve_num_ctx(8_227)
+        assert client._num_ctx() == first
+        assert client._num_ctx() == first
+
+    def test_budgets_follow_the_resolved_window(self, monkeypatch):
+        client = self._client(monkeypatch)
+        narrow = client._local_history_budget()  # floor, nothing resolved yet
+        client._resolve_num_ctx(8_227)
+        assert client._local_history_budget() > narrow
+
+
+class TestModelMaxContext:
+    """`/api/show` answers how wide the model can actually go."""
+
+    def _show(self, monkeypatch, payload):
+        import json as _json
+        from unittest.mock import MagicMock
+
+        response = MagicMock()
+        response.read.return_value = _json.dumps(payload).encode("utf-8")
+        response.__enter__ = lambda self: self
+        response.__exit__ = lambda *a: False
+        monkeypatch.setattr(
+            "urllib.request.urlopen", lambda *a, **k: response, raising=True
+        )
+
+    def test_reads_the_architecture_prefixed_key(self, monkeypatch):
+        self._show(monkeypatch, {"model_info": {"llama.context_length": 131072}})
+        assert LocalAgentClient(model="llama3.3")._model_max_context() == 131072
+
+    def test_any_architecture_works(self, monkeypatch):
+        self._show(monkeypatch, {"model_info": {"qwen2.context_length": 32768}})
+        assert LocalAgentClient(model="qwen2.5-coder")._model_max_context() == 32768
+
+    def test_a_server_that_cannot_answer_is_not_an_error(self, monkeypatch):
+        def _boom(*_a, **_k):
+            raise OSError("connection refused")
+
+        monkeypatch.setattr("urllib.request.urlopen", _boom, raising=True)
+        # LM Studio has no /api/show at all; the caller falls back to the cap.
+        assert LocalAgentClient(model="llama3.3")._model_max_context() is None
+
+    def test_the_lookup_happens_once(self, monkeypatch):
+        calls = []
+        self._show(monkeypatch, {"model_info": {"llama.context_length": 131072}})
+        real = __import__("urllib.request").request.urlopen
+        monkeypatch.setattr(
+            "urllib.request.urlopen",
+            lambda *a, **k: (calls.append(1), real(*a, **k))[1],
+            raising=True,
+        )
+        client = LocalAgentClient(model="llama3.3")
+        client._model_max_context()
+        client._model_max_context()
+        assert len(calls) == 1
 
 
 class TestEnvFlag:

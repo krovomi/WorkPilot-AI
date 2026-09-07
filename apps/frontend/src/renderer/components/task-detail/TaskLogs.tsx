@@ -1104,14 +1104,19 @@ function PhaseLogSection({
 	// persisted under an alternate spelling (e.g. dotted "claude-opus-4.8" left
 	// over from another provider) collapses onto its single canonical catalog
 	// entry instead of appearing twice.
+	// Local providers use Ollama's own identity (the bare name IS the `:latest`
+	// tag) rather than the Anthropic-shaped one, which read `llama3.3` and
+	// `llama3.3:latest` as two different models and listed both.
+	const isLocal = isLocalProvider(phaseConfig?.provider);
 	const { options: modelOptions, value: modelSelectValue } = useMemo(
 		() =>
 			buildModelSelectOptions(
 				catalogModels,
 				phaseConfig?.modelValue,
 				MODEL_SHORT_LABELS,
+				isLocal,
 			),
-		[catalogModels, phaseConfig?.modelValue],
+		[catalogModels, phaseConfig?.modelValue, isLocal],
 	);
 
 	// Filtered entries in chronological order (oldest first from append()); when
@@ -1182,10 +1187,6 @@ function PhaseLogSection({
 		() => mergeGroupsByModel(phaseLog?.entries || []).length >= 2,
 		[phaseLog?.entries],
 	);
-
-	// Local providers expose a static catalog of pullable models; flag it so the
-	// model dropdown can mark which entries are actually installed vs downloadable.
-	const isLocal = isLocalProvider(phaseConfig?.provider);
 
 	// For local providers, surface installed models first so the user's actual
 	// (downloaded) models sit at the top, above look-alike catalog suggestions.

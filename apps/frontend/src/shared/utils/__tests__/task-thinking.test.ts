@@ -396,4 +396,81 @@ describe("buildModelSelectOptions", () => {
 		expect(value).toBe("");
 		expect(options).toHaveLength(anthropicCatalog.length);
 	});
+
+	describe("fournisseur local (identité Ollama)", () => {
+		// Ce que `dedupeLocalCatalog` produit : une ligne par modèle, dont la
+		// `value` est le tag réellement listé par le serveur.
+		const ollamaCatalog = [
+			{ value: "llama3.3:latest", label: "Llama 3.3", installed: true },
+			{
+				value: "qwen3-embedding:8b",
+				label: "qwen3-embedding:8b",
+				installed: true,
+			},
+			{ value: "llama3.2", label: "Llama 3.2", installed: false },
+		];
+
+		it("ne dédouble pas un modèle persisté sans son tag :latest", () => {
+			// Le bug : « llama3.3 » persisté vs « llama3.3:latest » installé
+			// apparaissaient comme deux lignes, la sélectionnée étant marquée
+			// « à télécharger » alors que le modèle était sur le disque.
+			const { options, value } = buildModelSelectOptions(
+				ollamaCatalog,
+				"llama3.3",
+				{},
+				true,
+			);
+			expect(options).toHaveLength(ollamaCatalog.length);
+			expect(options.filter((o) => o.label === "Llama 3.3")).toHaveLength(1);
+			expect(options.some((o) => o.value === "llama3.3")).toBe(false);
+			// Le <Select> pointe sur le tag installé, donc `installed` est lisible.
+			expect(value).toBe("llama3.3:latest");
+			expect(options.find((o) => o.value === value)?.installed).toBe(true);
+		});
+
+		it("accepte aussi le tag complet persisté", () => {
+			const { options, value } = buildModelSelectOptions(
+				ollamaCatalog,
+				"llama3.3:latest",
+				{},
+				true,
+			);
+			expect(options).toHaveLength(ollamaCatalog.length);
+			expect(value).toBe("llama3.3:latest");
+		});
+
+		it("ne collapse pas deux tags réellement différents", () => {
+			// `llama3.3:70b` est un autre artefact : demander « llama3.3 » quand
+			// seul `:70b` est sur le disque déclenche un pull de `:latest`.
+			const { options, value } = buildModelSelectOptions(
+				[{ value: "llama3.3:70b", label: "llama3.3:70b", installed: true }],
+				"llama3.3",
+				{},
+				true,
+			);
+			expect(options).toHaveLength(2);
+			expect(value).toBe("llama3.3");
+		});
+
+		it("garde le filet de sécurité pour un modèle hors catalogue", () => {
+			const { options, value } = buildModelSelectOptions(
+				ollamaCatalog,
+				"deepseek-r1",
+				{},
+				true,
+			);
+			expect(options).toHaveLength(ollamaCatalog.length + 1);
+			expect(value).toBe("deepseek-r1");
+		});
+
+		it("n'applique pas l'identité Ollama à un fournisseur distant", () => {
+			// Sans le drapeau, « claude-opus-4.8 » doit toujours se replier sur
+			// l'entrée pointée du catalogue Anthropic.
+			const { value } = buildModelSelectOptions(
+				anthropicCatalog,
+				"claude-opus-4.8",
+			);
+			expect(value).toBe("claude-opus-4-8");
+		});
+	});
 });

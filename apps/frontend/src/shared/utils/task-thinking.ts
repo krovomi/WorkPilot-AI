@@ -6,6 +6,7 @@ import {
 	getCanonicalModelKey,
 	resolveCatalogModelValue,
 } from "../constants/models";
+import { canonicalLocalModelName } from "./local-models";
 import type {
 	AppSettings,
 	PhaseModelConfig,
@@ -302,12 +303,24 @@ interface ModelSelectOption {
  *    de sorte que l'étiquette correcte s'affiche sans doublon ;
  *  - sinon (modèle réellement absent, ex. autre fournisseur), on conserve le
  *    filet de sécurité : la valeur courante reste sélectionnable.
+ *
+ * **Fournisseurs locaux.** L'identité canonique d'Anthropic ne sait rien des
+ * tags Ollama : elle remplace les points par des tirets et ignore `:latest`,
+ * donc `llama3.3` (valeur persistée) et `llama3.3:latest` (tag réellement
+ * installé, retenu par `dedupeLocalCatalog`) lui paraissent être deux modèles.
+ * Le filet de sécurité injectait alors une seconde ligne — sans libellé curaté
+ * et sans le drapeau `installed` — si bien que le modèle sélectionné
+ * s'affichait « à télécharger » alors qu'il était sur le disque, et que le
+ * choisir relançait un `ollama pull` inutile. `isLocal` bascule sur l'identité
+ * d'Ollama, où le nom nu EST le tag `:latest`.
  */
 export function buildModelSelectOptions(
 	catalog: readonly ModelSelectOption[],
 	currentValue: string | undefined,
 	shortLabels: Record<string, string> = {},
+	isLocal = false,
 ): { options: ModelSelectOption[]; value: string } {
+	const keyOf = isLocal ? canonicalLocalModelName : getCanonicalModelKey;
 	const options: ModelSelectOption[] = catalog.map((m) => ({
 		value: m.value,
 		label: m.label,
@@ -317,12 +330,10 @@ export function buildModelSelectOptions(
 	const current = currentValue ?? "";
 	if (!current) return { options, value: current };
 
-	const currentKey = getCanonicalModelKey(current);
-	const inCatalog = options.some(
-		(m) => getCanonicalModelKey(m.value) === currentKey,
-	);
+	const currentKey = keyOf(current);
+	const match = options.find((m) => keyOf(m.value) === currentKey);
 
-	if (!inCatalog) {
+	if (!match) {
 		// Modèle non couvert par le catalogue : le rendre sélectionnable tel quel.
 		options.unshift({ value: current, label: shortLabels[current] || current });
 		return { options, value: current };
@@ -330,5 +341,8 @@ export function buildModelSelectOptions(
 
 	// Même version déjà présente : on aligne la sélection sur l'entrée du
 	// catalogue pour éviter un second élément au libellé brut.
-	return { options, value: resolveCatalogModelValue(current, options) };
+	return {
+		options,
+		value: isLocal ? match.value : resolveCatalogModelValue(current, options),
+	};
 }
