@@ -112,5 +112,319 @@
 	"emptyQuiz": "No quiz question could be generated for this project.",
 	"emptyFirstTasks": "No first task could be surfaced for this project.",
 	"emptyGlossary": "No glossary term could be detected.",
-	"emptyArchitecture": "No directory structure could be analysed."
+	"emptyArchitecture": "No directory structure could be analysed.",
+	"generated": {
+		"keyFile": {
+			"readme": "Project documentation entry point",
+			"contributing": "Contribution guidelines",
+			"architecture": "Architecture overview",
+			"agents": "Instructions for coding agents",
+			"claude": "Instructions for Claude Code",
+			"changelog": "Release history",
+			"security": "Security policy",
+			"codeOfConduct": "Community rules",
+			"license": "License terms",
+			"packageJson": "Node.js dependencies and scripts",
+			"pnpmWorkspace": "pnpm workspace layout",
+			"tsconfig": "TypeScript compiler configuration",
+			"pyproject": "Python project configuration",
+			"requirements": "Python dependencies",
+			"cargo": "Rust crate manifest",
+			"goMod": "Go module definition",
+			"pom": "Maven build definition",
+			"gradle": "Gradle build definition",
+			"gemfile": "Ruby dependencies",
+			"composer": "PHP dependencies",
+			"directoryPackages": "Centrally managed NuGet versions",
+			"globalJson": "Pinned .NET SDK version",
+			"appsettings": "Runtime application settings",
+			"envExample": "Environment variables template",
+			"dockerCompose": "Service orchestration",
+			"dockerfile": "Container image definition",
+			"makefile": "Task entry points",
+			"solution": "Solution grouping every .NET project",
+			"ciWorkflow": "Continuous integration pipeline",
+			"largestInDirectory": "Largest source file of `{{directory}}` ({{lines}} lines) — usually where that area's logic lives"
+		},
+		"entryPoint": {
+			"programCs": "Application entry point and host configuration",
+			"startupCs": "Service registration and HTTP pipeline configuration",
+			"pythonMain": "Python entry point",
+			"application": "Application entry point",
+			"djangoManage": "Django management entry point",
+			"runtime": "Runtime entry point",
+			"pythonModule": "Module executed with `python -m`",
+			"goMain": "Go entry point",
+			"rustMain": "Rust entry point",
+			"javaMain": "Java entry point",
+			"flutterMain": "Flutter entry point",
+			"module": "Module entry point",
+			"bootstrap": "Application bootstrap",
+			"uiBootstrap": "UI bootstrap",
+			"reactRoot": "Root React component",
+			"httpServer": "HTTP server bootstrap"
+		},
+		"role": {
+			"controllers": "HTTP entry points (controllers)",
+			"endpoints": "HTTP endpoints",
+			"infrastructure": "Infrastructure layer — persistence, external services",
+			"persistence": "Persistence layer",
+			"application": "Application layer — use cases and orchestration",
+			"domain": "Domain layer — entities and business rules",
+			"usecases": "Use cases",
+			"handlers": "Request/command handlers",
+			"repositories": "Data access repositories",
+			"migrations": "Database schema migrations",
+			"entities": "Domain entities",
+			"models": "Data models",
+			"dtos": "Data transfer objects",
+			"contracts": "Shared contracts and interfaces",
+			"interfaces": "Abstractions and interfaces",
+			"services": "Business services",
+			"components": "UI components",
+			"hooks": "Reusable UI hooks",
+			"stores": "Client-side state stores",
+			"pages": "Routed pages",
+			"views": "Views",
+			"routes": "Route definitions",
+			"middleware": "Request middleware",
+			"config": "Configuration",
+			"scripts": "Automation and build scripts",
+			"tools": "Developer tooling",
+			"docs": "Documentation",
+			"tests": "Automated tests",
+			"e2e": "End-to-end tests",
+			"fixtures": "Test fixtures",
+			"assets": "Static assets",
+			"public": "Publicly served static files",
+			"static": "Static files",
+			"locales": "Translations",
+			"api": "API surface",
+			"cli": "Command-line interface",
+			"core": "Core building blocks",
+			"shared": "Code shared across modules",
+			"utils": "Utilities",
+			"lib": "Library code",
+			"src": "Application source",
+			"app": "Application code",
+			"apps": "Applications of the monorepo",
+			"packages": "Packages of the monorepo",
+			"server": "Server-side code",
+			"client": "Client-side code",
+			"frontend": "Frontend application",
+			"backend": "Backend application",
+			"mobile": "Mobile application",
+			"infra": "Infrastructure as code",
+			"deploy": "Deployment manifests",
+			"ci": "CI/CD workflows and repository automation",
+			"unknown": "Project code"
+		},
+		"convention": {
+			"tool": {
+				"description": "{{purpose}} — configured via `{{file}}`"
+			},
+			"purpose": {
+				"eslint": "JavaScript/TypeScript linting",
+				"biome": "Formatting and linting",
+				"prettier": "Code formatting",
+				"ruff": "Python linting and formatting",
+				"flake8": "Python linting",
+				"setupCfg": "Python tooling configuration",
+				"mypy": "Python static typing",
+				"editorconfig": "Editor-level formatting rules",
+				"csharpier": "C# formatting",
+				"roslyn": "C# analyzer rules",
+				"stylecop": "C# style rules",
+				"golangci": "Go linting",
+				"rustfmt": "Rust formatting",
+				"clippy": "Rust linting",
+				"rubocop": "Ruby linting",
+				"preCommit": "Hooks run before each commit",
+				"commitlint": "Commit message convention",
+				"lefthook": "Git hooks"
+			},
+			"scriptedFormatting": {
+				"name": "Formatting is scripted",
+				"description": "Run the project's own script rather than your editor's defaults."
+			},
+			"fileNaming": {
+				"name": "File names use {{style}}",
+				"description": "{{count}} of {{total}} source files follow it — match it for new files."
+			},
+			"tests": {
+				"name": "Tests live as {{pattern}}",
+				"description": "{{count}} matching file(s) — put new tests where the existing ones are."
+			},
+			"testPattern": {
+				"directory": "tests/ directory",
+				"beside": "*.test.ts / *.spec.ts beside the code",
+				"python": "test_*.py",
+				"dotnet": "*Tests.cs",
+				"go": "*_test.go"
+			},
+			"indentation": {
+				"name": "Indentation: {{style}}",
+				"description": "Measured on the existing sources; the formatter enforces it.",
+				"tabs": "tabs",
+				"spaces": "4 spaces"
+			},
+			"pullRequest": {
+				"name": "Pull request template",
+				"description": "Every PR is expected to fill the repository's template."
+			}
+		},
+		"command": {
+			"installDependencies": "Install dependencies",
+			"createVenv": "Create the virtual environment",
+			"installProject": "Install the project",
+			"runTests": "Run the tests",
+			"restorePackages": "Restore packages",
+			"buildSolution": "Build the solution",
+			"build": "Build",
+			"runProject": "Run {{project}}",
+			"startServices": "Start the services"
+		},
+		"tour": {
+			"reason": {
+				"directory": "{{role}} — {{count}} files",
+				"directoryLanguages": "{{role}} — {{count}} files, mostly {{languages}}"
+			},
+			"question": {
+				"docPurpose": "What does {{path}} say the project is for?",
+				"docClaims": "Which claims in it does the code actually back up?",
+				"entryWiring": "What is wired up when {{path}} runs?",
+				"entryDependencies": "Which dependencies are registered here, and where are they used?",
+				"directoryBelongs": "What belongs in {{path}}/ and what does not?",
+				"directoryLayer": "Which layer does {{path}}/ depend on?",
+				"configBreakage": "What would break if {{path}} were wrong?",
+				"configEnvironments": "Which values here differ between environments?",
+				"sourceProblem": "What problem does {{path}} solve?",
+				"sourceDependents": "Which other files in {{project}} depend on {{path}}?",
+				"ciChecks": "Which checks must pass before a PR can merge?",
+				"ciLocal": "Can you run those same checks locally?"
+			}
+		},
+		"quiz": {
+			"primaryTech": {
+				"question": "What is the primary technology of {{project}}?",
+				"rationale": "Detected from the project files: {{stack}}"
+			},
+			"notInStack": {
+				"question": "Which of these is NOT part of this project's stack?",
+				"rationale": "The detected stack is: {{stack}}"
+			},
+			"entryPoint": {
+				"question": "Where does the application start executing?"
+			},
+			"filePurpose": {
+				"question": "Which file's purpose is: “{{reason}}”?",
+				"rationale": "`{{path}}` — {{reason}}"
+			},
+			"fileRole": {
+				"question": "What is the role of `{{path}}`?"
+			},
+			"directoryHolds": {
+				"question": "What does `{{path}}/` hold?",
+				"rationale": "`{{path}}/` — {{role}} ({{count}} files)"
+			},
+			"command": {
+				"test": "Which command runs the test suite?",
+				"setup": "Which command installs the project's dependencies?",
+				"build": "Which command builds the project?",
+				"lint": "Which command checks formatting and lint rules?",
+				"rationale": "`{{command}}` — from {{source}}",
+				"unknownSource": "the project manifest"
+			},
+			"convention": {
+				"question": "Which convention does {{project}} follow?",
+				"noLinter": "No linter is configured",
+				"perDeveloper": "Formatting is left to each developer",
+				"afterRelease": "Tests are written after release"
+			},
+			"testLocation": {
+				"question": "Where does a new test file belong?",
+				"rationale": "{{description}} e.g. {{examples}}",
+				"root": "Anywhere in the repository root",
+				"buildOutput": "Inside the build output directory",
+				"personalFolder": "In a personal folder outside the repository"
+			},
+			"tourRecall": {
+				"question": "During the tour, why does `{{path}}` matter?"
+			}
+		},
+		"firstTask": {
+			"todo": {
+				"title": "{{tag}}: {{note}}",
+				"why": "Left in the code by the team — a scoped, real change."
+			},
+			"tests": {
+				"title": "Add a first test for {{file}}",
+				"comment": "{{lines}} lines, no test file matching its name",
+				"why": "Reading a file closely enough to test it is the fastest way to learn it."
+			},
+			"docs": {
+				"title": "Document what {{file}} wires up",
+				"comment": "Entry point with no header comment",
+				"why": "Writing it down forces you to follow the startup path once."
+			},
+			"readme": {
+				"title": "Document how to run the project",
+				"comment": "No install/run/test command could be detected",
+				"why": "Nothing in the repository states how to start it."
+			},
+			"explore": {
+				"title": "Map the dependencies of {{path}}/",
+				"comment": "{{role}} — {{count}} files",
+				"why": "Draw what this directory imports and what imports it."
+			}
+		},
+		"glossary": {
+			"directory": "Directory of the project",
+			"type": "Type declared in `{{path}}`",
+			"typeGeneric": "Type declared in the codebase",
+			"module": "Appears in the name of {{count}} file(s)",
+			"moduleGeneric": "File name token",
+			"identifier": "Recurring identifier — likely domain vocabulary"
+		},
+		"step": {
+			"keyFiles": {
+				"title": "Key files to read first"
+			},
+			"gettingStarted": {
+				"title": "Getting started"
+			},
+			"architecture": {
+				"title": "How the project is laid out"
+			},
+			"conventions": {
+				"title": "Coding conventions"
+			},
+			"workflows": {
+				"title": "Day-to-day commands"
+			},
+			"testing": {
+				"title": "Running the tests"
+			},
+			"deployment": {
+				"title": "How it ships"
+			},
+			"line": {
+				"keyFile": "{{path}}: {{reason}}",
+				"command": "{{label}}: `{{command}}`",
+				"architecture": "`{{path}}/` — {{role}} ({{count}} files)",
+				"convention": "{{name}}: {{description}}",
+				"envExample": "Copy `.env.example` to `.env` and fill in the values",
+				"readmeFallback": "Check README.md for setup instructions",
+				"testCommand": "`{{command}}` ({{source}})",
+				"manifest": "`{{path}}`",
+				"deployment": "`{{path}}`",
+				"ciWorkflow": "`{{path}}` (CI/CD)"
+			}
+		},
+		"progress": {
+			"analyzing": "Analyzing project structure…",
+			"generated": "Generated {{tour}} tour step(s), {{quiz}} quiz question(s), {{tasks}} first task(s), {{glossary}} glossary term(s)"
+		},
+		"summary": "{{project}}: {{technologies}} technologies, {{keyFiles}} key files, {{conventions}} conventions, {{commands}} commands."
+	}
 }

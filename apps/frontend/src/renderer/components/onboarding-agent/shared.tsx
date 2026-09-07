@@ -1,4 +1,6 @@
 import type React from "react";
+import { useTranslation } from "react-i18next";
+import type { OnboardingText } from "../../../preload/api/modules/onboarding-agent-api";
 import { Badge } from "../ui/badge";
 
 /**
@@ -118,5 +120,45 @@ export function CommandLine({
 			<span className="text-muted-foreground select-none">$ </span>
 			{command}
 		</button>
+	);
+}
+
+
+/**
+ * Resolve a generated string produced by the backend.
+ *
+ * The onboarding package is written in Python, so its prose arrives as an i18n
+ * key plus parameters rather than as a translated sentence. A parameter can
+ * itself be a descriptor — a quiz question quoting the role of a directory —
+ * so resolution recurses before interpolating. An empty key marks a value that
+ * must not be translated (a path, a command, a tool name), and the English
+ * fallback covers a key a locale file has not caught up with yet.
+ */
+export function useGeneratedText(): (
+	value: OnboardingText | null | undefined,
+	plain?: string,
+) => string {
+	const { t } = useTranslation("onboardingAgent");
+
+	const resolve = (value: OnboardingText | null | undefined, plain = ""): string => {
+		if (!value) return plain;
+		if (!value.key) return value.fallback || plain;
+
+		const params: Record<string, unknown> = {};
+		for (const [name, param] of Object.entries(value.params ?? {})) {
+			params[name] = isDescriptor(param) ? resolve(param) : param;
+		}
+		return t(value.key, { ...params, defaultValue: value.fallback || plain });
+	};
+
+	return resolve;
+}
+
+function isDescriptor(value: unknown): value is OnboardingText {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"key" in value &&
+		"fallback" in value
 	);
 }

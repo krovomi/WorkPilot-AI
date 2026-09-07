@@ -30,6 +30,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .messages import Text, raw, text
 from .onboarding_engine import (
     ArchitectureNode,
     OnboardingEngine,
@@ -57,6 +58,8 @@ class TourStep:
     suggested_questions: list[str] = field(default_factory=list)
     category: str = "file"  # file | entrypoint | directory | command | doc
     snippet: str = ""
+    reason_i18n: Text | None = None
+    suggested_questions_i18n: list[Text] = field(default_factory=list)
 
 
 @dataclass
@@ -69,6 +72,12 @@ class QuizQuestion:
     rationale: str = ""
     category: str = "general"  # stack | files | architecture | commands | conventions
     difficulty: str = "easy"  # easy | medium | hard
+    question_i18n: Text | None = None
+    rationale_i18n: Text | None = None
+    # One descriptor per choice, in the same order: a question whose answers
+    # are roles or reasons has to translate them too, or the right answer is
+    # the one written in a different language.
+    choices_i18n: list[Text] = field(default_factory=list)
 
 
 @dataclass
@@ -82,6 +91,9 @@ class FirstTask:
     category: str = "todo"  # todo | tests | docs | explore
     difficulty: str = "easy"
     why: str = ""
+    title_i18n: Text | None = None
+    source_comment_i18n: Text | None = None
+    why_i18n: Text | None = None
 
 
 @dataclass
@@ -93,6 +105,11 @@ class GlossaryTerm:
     sources: list[str] = field(default_factory=list)
     kind: str = "identifier"  # directory | type | module | identifier
     definition: str = ""
+    definition_i18n: Text | None = None
+
+
+def _as_dict(value: Text | None) -> dict[str, Any] | None:
+    return value.to_dict() if value is not None else None
 
 
 @dataclass
@@ -110,20 +127,80 @@ class OnboardingPackage:
             "guide": {
                 "project_name": self.guide.project_name,
                 "tech_stack": self.guide.tech_stack,
-                "key_files": [asdict(kf) for kf in self.guide.key_files],
-                "entry_points": [asdict(kf) for kf in self.guide.entry_points],
-                "conventions": [asdict(c) for c in self.guide.conventions],
-                "commands": [asdict(c) for c in self.guide.commands],
-                "architecture": [asdict(a) for a in self.guide.architecture],
+                "key_files": [_key_file_dict(kf) for kf in self.guide.key_files],
+                "entry_points": [_key_file_dict(kf) for kf in self.guide.entry_points],
+                "conventions": [_convention_dict(c) for c in self.guide.conventions],
+                "commands": [_command_dict(c) for c in self.guide.commands],
+                "architecture": [_node_dict(a) for a in self.guide.architecture],
                 "sections": self.guide.sections,
+                "section_lines": {
+                    name: [line.to_dict() for line in lines]
+                    for name, lines in self.guide.section_lines.items()
+                },
                 "stats": self.guide.stats,
                 "estimated_reading_time_min": self.guide.estimated_reading_time_min,
             },
-            "tour": [asdict(s) for s in self.tour],
-            "quiz": [asdict(q) for q in self.quiz],
-            "first_tasks": [asdict(t) for t in self.first_tasks],
-            "glossary": [asdict(g) for g in self.glossary],
+            "tour": [_tour_dict(s) for s in self.tour],
+            "quiz": [_quiz_dict(q) for q in self.quiz],
+            "first_tasks": [_task_dict(t) for t in self.first_tasks],
+            "glossary": [_glossary_dict(g) for g in self.glossary],
         }
+
+
+def _key_file_dict(kf: Any) -> dict[str, Any]:
+    payload = asdict(kf)
+    payload["reason_i18n"] = _as_dict(kf.reason_i18n)
+    return payload
+
+
+def _convention_dict(convention: Any) -> dict[str, Any]:
+    payload = asdict(convention)
+    payload["name_i18n"] = _as_dict(convention.name_i18n)
+    payload["description_i18n"] = _as_dict(convention.description_i18n)
+    return payload
+
+
+def _command_dict(command: Any) -> dict[str, Any]:
+    payload = asdict(command)
+    payload["label_i18n"] = _as_dict(command.label_i18n)
+    return payload
+
+
+def _node_dict(node: Any) -> dict[str, Any]:
+    payload = asdict(node)
+    payload["role_i18n"] = _as_dict(node.role_i18n)
+    return payload
+
+
+def _tour_dict(step: TourStep) -> dict[str, Any]:
+    payload = asdict(step)
+    payload["reason_i18n"] = _as_dict(step.reason_i18n)
+    payload["suggested_questions_i18n"] = [
+        question.to_dict() for question in step.suggested_questions_i18n
+    ]
+    return payload
+
+
+def _quiz_dict(question: QuizQuestion) -> dict[str, Any]:
+    payload = asdict(question)
+    payload["question_i18n"] = _as_dict(question.question_i18n)
+    payload["rationale_i18n"] = _as_dict(question.rationale_i18n)
+    payload["choices_i18n"] = [choice.to_dict() for choice in question.choices_i18n]
+    return payload
+
+
+def _task_dict(task: FirstTask) -> dict[str, Any]:
+    payload = asdict(task)
+    payload["title_i18n"] = _as_dict(task.title_i18n)
+    payload["source_comment_i18n"] = _as_dict(task.source_comment_i18n)
+    payload["why_i18n"] = _as_dict(task.why_i18n)
+    return payload
+
+
+def _glossary_dict(term: GlossaryTerm) -> dict[str, Any]:
+    payload = asdict(term)
+    payload["definition_i18n"] = _as_dict(term.definition_i18n)
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -340,34 +417,42 @@ def _stable_shuffle(items: list[str], seed_text: str) -> list[str]:
 
 
 def _make_question(
-    question: str,
-    correct: str,
-    distractors: list[str],
+    question: Text,
+    correct: Text,
+    distractors: list[Text],
     *,
-    rationale: str = "",
+    rationale: Text | None = None,
     category: str = "general",
     difficulty: str = "easy",
-    fillers: list[str] | None = None,
+    fillers: list[Text] | None = None,
 ) -> QuizQuestion | None:
-    """Build one shuffled MCQ, or ``None`` when there is nothing to ask."""
-    pool: list[str] = []
-    for candidate in distractors:
-        if candidate and candidate != correct and candidate not in pool:
-            pool.append(candidate)
-    for candidate in fillers or []:
+    """Build one shuffled MCQ, or ``None`` when there is nothing to ask.
+
+    Everything in and out is a :class:`Text`: the question, every choice and
+    the rationale. Shuffling and de-duplication key on the English fallback, so
+    the same project always produces the same quiz whatever the UI language.
+    """
+    pool: list[Text] = []
+    seen = {correct.fallback}
+    for candidate in [*distractors, *(fillers or [])]:
         if len(pool) >= 3:
             break
-        if candidate and candidate != correct and candidate not in pool:
+        if candidate.fallback and candidate.fallback not in seen:
+            seen.add(candidate.fallback)
             pool.append(candidate)
     if len(pool) < 2:
         return None
 
-    choices = _stable_shuffle([correct, *pool[:3]], question)
+    by_fallback = {choice.fallback: choice for choice in [correct, *pool[:3]]}
+    ordered = _stable_shuffle(list(by_fallback), question.fallback)
     return QuizQuestion(
-        question=question,
-        choices=choices,
-        correct_index=choices.index(correct),
-        rationale=rationale,
+        question=question.fallback,
+        question_i18n=question,
+        choices=ordered,
+        choices_i18n=[by_fallback[value] for value in ordered],
+        correct_index=ordered.index(correct.fallback),
+        rationale=rationale.fallback if rationale else "",
+        rationale_i18n=rationale,
         category=category,
         difficulty=difficulty,
     )
@@ -402,7 +487,7 @@ def build_tour(guide: OnboardingGuide, root: Path) -> list[TourStep]:
     seen: set[str] = set()
 
     def push(
-        *, title: str, path: str, reason: str, category: str, questions: list[str]
+        *, title: str, path: str, reason: Text, category: str, questions: list[Text]
     ) -> None:
         if path in seen:
             return
@@ -412,23 +497,28 @@ def build_tour(guide: OnboardingGuide, root: Path) -> list[TourStep]:
                 order=len(steps) + 1,
                 title=title,
                 file_path=path,
-                reason=reason,
-                suggested_questions=questions,
+                reason=reason.fallback,
+                reason_i18n=reason,
+                suggested_questions=[q.fallback for q in questions],
+                suggested_questions_i18n=questions,
                 category=category,
             )
         )
 
     project = guide.project_name
 
+    def reason_of(kf: Any) -> Text:
+        return kf.reason_i18n or raw(kf.reason)
+
     for kf in [k for k in guide.key_files if k.category == "docs"][:3]:
         push(
             title=kf.path,
             path=kf.path,
-            reason=kf.reason,
+            reason=reason_of(kf),
             category="doc",
             questions=[
-                f"What does {kf.path} say the project is for?",
-                "Which claims in it does the code actually back up?",
+                text("tour.question.docPurpose", path=kf.path),
+                text("tour.question.docClaims"),
             ],
         )
 
@@ -436,24 +526,34 @@ def build_tour(guide: OnboardingGuide, root: Path) -> list[TourStep]:
         push(
             title=entry.path,
             path=entry.path,
-            reason=entry.reason,
+            reason=reason_of(entry),
             category="entrypoint",
             questions=[
-                f"What is wired up when {entry.path} runs?",
-                "Which dependencies are registered here, and where are they used?",
+                text("tour.question.entryWiring", path=entry.path),
+                text("tour.question.entryDependencies"),
             ],
         )
 
     for node in guide.architecture[:5]:
+        role = node.role_i18n or raw(node.role)
+        reason = (
+            text(
+                "tour.reason.directoryLanguages",
+                role=role,
+                count=node.file_count,
+                languages=", ".join(node.languages),
+            )
+            if node.languages
+            else text("tour.reason.directory", role=role, count=node.file_count)
+        )
         push(
             title=f"{node.path}/",
             path=node.path,
-            reason=f"{node.role} — {node.file_count} files"
-            + (f", mostly {', '.join(node.languages)}" if node.languages else ""),
+            reason=reason,
             category="directory",
             questions=[
-                f"What belongs in {node.path}/ and what does not?",
-                f"Which layer does {node.path}/ depend on?",
+                text("tour.question.directoryBelongs", path=node.path),
+                text("tour.question.directoryLayer", path=node.path),
             ],
         )
 
@@ -461,11 +561,11 @@ def build_tour(guide: OnboardingGuide, root: Path) -> list[TourStep]:
         push(
             title=kf.path,
             path=kf.path,
-            reason=kf.reason,
+            reason=reason_of(kf),
             category="file",
             questions=[
-                f"What would break if {kf.path} were wrong?",
-                "Which values here differ between environments?",
+                text("tour.question.configBreakage", path=kf.path),
+                text("tour.question.configEnvironments"),
             ],
         )
 
@@ -473,11 +573,11 @@ def build_tour(guide: OnboardingGuide, root: Path) -> list[TourStep]:
         push(
             title=kf.path,
             path=kf.path,
-            reason=kf.reason,
+            reason=reason_of(kf),
             category="file",
             questions=[
-                f"What problem does {kf.path} solve?",
-                f"Which other files in {project} depend on {kf.path}?",
+                text("tour.question.sourceProblem", path=kf.path),
+                text("tour.question.sourceDependents", project=project, path=kf.path),
             ],
         )
 
@@ -485,11 +585,11 @@ def build_tour(guide: OnboardingGuide, root: Path) -> list[TourStep]:
         push(
             title=kf.path,
             path=kf.path,
-            reason=kf.reason,
+            reason=reason_of(kf),
             category="file",
             questions=[
-                "Which checks must pass before a PR can merge?",
-                "Can you run those same checks locally?",
+                text("tour.question.ciChecks"),
+                text("tour.question.ciLocal"),
             ],
         )
 
@@ -509,42 +609,49 @@ def build_quiz(
         seen_questions.add(question.question)
         quiz.append(question)
 
+    def reason_of(item: Any) -> Text:
+        return item.reason_i18n or raw(item.reason)
+
     # --- stack ------------------------------------------------------------
+    # Technology names, paths and commands are values, not prose: they go
+    # through `raw` and read the same in every language.
     if guide.tech_stack:
-        primary = guide.tech_stack[0]
+        stack_label = ", ".join(guide.tech_stack[:6])
+        absent = [t for t in _STACK_DISTRACTORS if t not in guide.tech_stack]
         add(
             _make_question(
-                f"What is the primary technology of {guide.project_name}?",
-                primary,
-                [t for t in _STACK_DISTRACTORS if t not in guide.tech_stack],
-                rationale=f"Detected from the project files: {', '.join(guide.tech_stack[:6])}",
+                text("quiz.primaryTech.question", project=guide.project_name),
+                raw(guide.tech_stack[0]),
+                [raw(t) for t in absent],
+                rationale=text("quiz.primaryTech.rationale", stack=stack_label),
                 category="stack",
             )
         )
-        absent = [t for t in _STACK_DISTRACTORS if t not in guide.tech_stack]
         if absent and len(guide.tech_stack) >= 3:
             add(
                 _make_question(
-                    "Which of these is NOT part of this project's stack?",
-                    absent[0],
-                    guide.tech_stack[:6],
-                    rationale=f"The detected stack is: {', '.join(guide.tech_stack[:6])}",
+                    text("quiz.notInStack.question"),
+                    raw(absent[0]),
+                    [raw(t) for t in guide.tech_stack[:6]],
+                    rationale=text("quiz.notInStack.rationale", stack=stack_label),
                     category="stack",
                     difficulty="medium",
                 )
             )
+
+    fillers = [raw(path) for path in _FILLER_PATHS]
 
     # --- entry point ------------------------------------------------------
     if guide.entry_points:
         entry = guide.entry_points[0]
         add(
             _make_question(
-                "Where does the application start executing?",
-                entry.path,
-                [k.path for k in guide.key_files if k.path != entry.path],
-                rationale=entry.reason,
+                text("quiz.entryPoint.question"),
+                raw(entry.path),
+                [raw(k.path) for k in guide.key_files if k.path != entry.path],
+                rationale=reason_of(entry),
                 category="files",
-                fillers=_FILLER_PATHS,
+                fillers=fillers,
             )
         )
 
@@ -553,35 +660,50 @@ def build_quiz(
     for kf in described[:4]:
         add(
             _make_question(
-                f"Which file's purpose is: {kf.reason!r}?",
-                kf.path,
-                [other.path for other in described if other.path != kf.path],
-                rationale=f"`{kf.path}` — {kf.reason}",
+                text("quiz.filePurpose.question", reason=reason_of(kf)),
+                raw(kf.path),
+                [raw(other.path) for other in described if other.path != kf.path],
+                rationale=text(
+                    "quiz.filePurpose.rationale", path=kf.path, reason=reason_of(kf)
+                ),
                 category="files",
-                fillers=_FILLER_PATHS,
+                fillers=fillers,
             )
         )
     for kf in described[:3]:
         add(
             _make_question(
-                f"What is the role of `{kf.path}`?",
-                kf.reason,
-                [other.reason for other in described if other.reason != kf.reason],
-                rationale=f"`{kf.path}` — {kf.reason}",
+                text("quiz.fileRole.question", path=kf.path),
+                reason_of(kf),
+                [reason_of(other) for other in described if other.reason != kf.reason],
+                rationale=text(
+                    "quiz.filePurpose.rationale", path=kf.path, reason=reason_of(kf)
+                ),
                 category="files",
                 difficulty="medium",
             )
         )
 
     # --- architecture -----------------------------------------------------
-    roles = [node.role for node in guide.architecture]
+    def role_of(node: Any) -> Text:
+        return node.role_i18n or raw(node.role)
+
     for node in guide.architecture[:4]:
         add(
             _make_question(
-                f"What does `{node.path}/` hold?",
-                node.role,
-                [role for role in roles if role != node.role],
-                rationale=f"`{node.path}/` — {node.role} ({node.file_count} files)",
+                text("quiz.directoryHolds.question", path=node.path),
+                role_of(node),
+                [
+                    role_of(other)
+                    for other in guide.architecture
+                    if other.role != node.role
+                ],
+                rationale=text(
+                    "quiz.directoryHolds.rationale",
+                    path=node.path,
+                    role=role_of(node),
+                    count=node.file_count,
+                ),
                 category="architecture",
                 difficulty="medium",
             )
@@ -589,75 +711,88 @@ def build_quiz(
 
     # --- commands ---------------------------------------------------------
     commands = guide.commands
-    by_category = {
-        "test": "Which command runs the test suite?",
-        "setup": "Which command installs the project's dependencies?",
-        "build": "Which command builds the project?",
-        "lint": "Which command checks formatting and lint rules?",
-    }
-    for category, question in by_category.items():
+    for category in ("test", "setup", "build", "lint"):
         matching = [c for c in commands if c.category == category]
         if not matching:
             continue
         correct = matching[0]
         add(
             _make_question(
-                question,
-                correct.command,
-                [c.command for c in commands if c.category != category],
-                rationale=f"`{correct.command}` — from {correct.source or 'the project manifest'}",
+                text(f"quiz.command.{category}"),
+                raw(correct.command),
+                [raw(c.command) for c in commands if c.category != category],
+                rationale=text(
+                    "quiz.command.rationale",
+                    command=correct.command,
+                    source=correct.source or text("quiz.command.unknownSource"),
+                ),
                 category="commands",
             )
         )
 
     # --- conventions ------------------------------------------------------
-    for convention in guide.conventions[:3]:
+    def convention_name(convention: Any) -> Text:
+        return convention.name_i18n or raw(convention.name)
+
+    for convention in guide.conventions[:1]:
         add(
             _make_question(
-                f"Which convention does {guide.project_name} follow?",
-                convention.name,
+                text("quiz.convention.question", project=guide.project_name),
+                convention_name(convention),
                 [
-                    "No linter is configured",
-                    "Formatting is left to each developer",
-                    "Tests are written after release",
+                    text("quiz.convention.noLinter"),
+                    text("quiz.convention.perDeveloper"),
+                    text("quiz.convention.afterRelease"),
                 ],
-                rationale=convention.description,
+                rationale=convention.description_i18n or raw(convention.description),
                 category="conventions",
                 difficulty="medium",
             )
         )
-        break
 
     test_convention = next(
         (c for c in guide.conventions if c.name.startswith("Tests live as")), None
     )
     if test_convention and test_convention.examples:
+        # The pattern is a parameter of the convention's own message, so the
+        # answer reads exactly as the Conventions list does.
+        pattern = (
+            test_convention.name_i18n.params.get("pattern")
+            if test_convention.name_i18n
+            else None
+        )
         add(
             _make_question(
-                "Where does a new test file belong?",
-                test_convention.name.replace("Tests live as ", ""),
+                text("quiz.testLocation.question"),
+                pattern or raw(test_convention.name.replace("Tests live as ", "")),
                 [
-                    "Anywhere in the repository root",
-                    "Inside the build output directory",
-                    "In a personal folder outside the repository",
+                    text("quiz.testLocation.root"),
+                    text("quiz.testLocation.buildOutput"),
+                    text("quiz.testLocation.personalFolder"),
                 ],
-                rationale=test_convention.description
-                + " e.g. "
-                + ", ".join(f"`{e}`" for e in test_convention.examples[:2]),
+                rationale=text(
+                    "quiz.testLocation.rationale",
+                    description=test_convention.description_i18n
+                    or raw(test_convention.description),
+                    examples=", ".join(f"`{e}`" for e in test_convention.examples[:2]),
+                ),
                 category="conventions",
                 difficulty="medium",
             )
         )
 
     # --- tour recall ------------------------------------------------------
+    def step_reason(step: TourStep) -> Text:
+        return step.reason_i18n or raw(step.reason)
+
     directory_steps = [s for s in tour if s.category == "directory"]
     for step in directory_steps[:2]:
         add(
             _make_question(
-                f"During the tour, why does `{step.file_path}` matter?",
-                step.reason,
-                [other.reason for other in tour if other.reason != step.reason],
-                rationale=step.reason,
+                text("quiz.tourRecall.question", path=step.file_path),
+                step_reason(step),
+                [step_reason(other) for other in tour if other.reason != step.reason],
+                rationale=step_reason(step),
                 category="architecture",
                 difficulty="hard",
             )
@@ -723,15 +858,21 @@ def build_first_tasks(
             note = note.replace("\\n", " ").strip(" \"',;")
             if len(note) < 4:
                 continue
+            # The marker and the note are the team's own words: kept verbatim,
+            # only the surrounding sentence is translated.
+            title = text("firstTask.todo.title", tag=tag, note=note[:100])
+            why = text("firstTask.todo.why")
             tasks.append(
                 FirstTask(
-                    title=f"{tag}: {note[:100]}",
+                    title=title.fallback,
+                    title_i18n=title,
                     file_path=relative,
                     line=lineno,
                     source_comment=line.strip()[:200],
                     category="todo",
                     difficulty="medium" if tag in {"FIXME", "HACK", "XXX"} else "easy",
-                    why="Left in the code by the team — a scoped, real change.",
+                    why=why.fallback,
+                    why_i18n=why,
                 )
             )
             if len(tasks) >= limit:
@@ -741,6 +882,30 @@ def build_first_tasks(
         tasks.extend(_derive_first_tasks(guide, scan, budget=limit - len(tasks)))
 
     return tasks[:limit]
+
+
+def _derived_task(
+    *,
+    title: Text,
+    comment: Text,
+    why: Text,
+    file_path: str,
+    category: str,
+    difficulty: str,
+) -> FirstTask:
+    """A task whose every sentence is generated, so every one is translated."""
+    return FirstTask(
+        title=title.fallback,
+        title_i18n=title,
+        file_path=file_path,
+        line=1,
+        source_comment=comment.fallback,
+        source_comment_i18n=comment,
+        category=category,
+        difficulty=difficulty,
+        why=why.fallback,
+        why_i18n=why,
+    )
 
 
 def _derive_first_tasks(
@@ -772,45 +937,42 @@ def _derive_first_tasks(
         if Path(kf.path).stem in tested_stems:
             continue
         derived.append(
-            FirstTask(
-                title=f"Add a first test for {Path(kf.path).name}",
+            _derived_task(
+                title=text("firstTask.tests.title", file=Path(kf.path).name),
+                comment=text("firstTask.tests.comment", lines=kf.lines),
+                why=text("firstTask.tests.why"),
                 file_path=kf.path,
-                line=1,
-                source_comment=f"{kf.lines} lines, no test file matching its name",
                 category="tests",
                 difficulty="medium",
-                why="Reading a file closely enough to test it is the fastest way to learn it.",
             )
         )
 
     for entry in guide.entry_points:
         if len(derived) >= budget:
             break
-        text = scan.read(entry.path, max_chars=4000)
-        if not text or text.lstrip().startswith(("/**", '"""', "///", "//", "#")):
+        content = scan.read(entry.path, max_chars=4000)
+        if not content or content.lstrip().startswith(("/**", '"""', "///", "//", "#")):
             continue
         derived.append(
-            FirstTask(
-                title=f"Document what {Path(entry.path).name} wires up",
+            _derived_task(
+                title=text("firstTask.docs.title", file=Path(entry.path).name),
+                comment=text("firstTask.docs.comment"),
+                why=text("firstTask.docs.why"),
                 file_path=entry.path,
-                line=1,
-                source_comment="Entry point with no header comment",
                 category="docs",
                 difficulty="easy",
-                why="Writing it down forces you to follow the startup path once.",
             )
         )
 
     if not guide.commands and len(derived) < budget:
         derived.append(
-            FirstTask(
-                title="Document how to run the project",
+            _derived_task(
+                title=text("firstTask.readme.title"),
+                comment=text("firstTask.readme.comment"),
+                why=text("firstTask.readme.why"),
                 file_path="README.md",
-                line=1,
-                source_comment="No install/run/test command could be detected",
                 category="docs",
                 difficulty="easy",
-                why="Nothing in the repository states how to start it.",
             )
         )
 
@@ -820,14 +982,17 @@ def _derive_first_tasks(
         if node.file_count < 5 or node.path.startswith("."):
             continue
         derived.append(
-            FirstTask(
-                title=f"Map the dependencies of {node.path}/",
+            _derived_task(
+                title=text("firstTask.explore.title", path=node.path),
+                comment=text(
+                    "firstTask.explore.comment",
+                    role=node.role_i18n or raw(node.role),
+                    count=node.file_count,
+                ),
+                why=text("firstTask.explore.why"),
                 file_path=node.path,
-                line=1,
-                source_comment=f"{node.role} — {node.file_count} files",
                 category="explore",
                 difficulty="easy",
-                why="Draw what this directory imports and what imports it.",
             )
         )
 
@@ -857,8 +1022,9 @@ def build_glossary(
     labels: dict[str, str] = {}
     declarations: dict[str, str] = {}
 
-    directory_roles = {
-        node.path.rsplit("/", 1)[-1]: node.role for node in (architecture or [])
+    directory_roles: dict[str, Text] = {
+        node.path.rsplit("/", 1)[-1]: (node.role_i18n or raw(node.role))
+        for node in (architecture or [])
     }
 
     def record(term: str, label: str, source: str, kind: str) -> None:
@@ -911,15 +1077,17 @@ def build_glossary(
     for term, count in ordered:
         kind = kinds.get(term, "identifier")
         unique_sources = list(dict.fromkeys(sources.get(term, [])))
+        definition = _definition_for(
+            term, kind, directory_roles, declarations, unique_sources
+        )
         entries.append(
             GlossaryTerm(
                 term=labels.get(term, term),
                 occurrences=count,
                 sources=unique_sources[:3],
                 kind=kind,
-                definition=_definition_for(
-                    term, kind, directory_roles, declarations, unique_sources
-                ),
+                definition=definition.fallback,
+                definition_i18n=definition,
             )
         )
     return entries
@@ -928,29 +1096,30 @@ def build_glossary(
 def _definition_for(
     term: str,
     kind: str,
-    directory_roles: dict[str, str],
+    directory_roles: dict[str, Text],
     declarations: dict[str, str],
     sources: list[str],
-) -> str:
+) -> Text:
+    """A term's definition — the directory's own role when there is one."""
     if kind == "directory":
         for name, role in directory_roles.items():
             if name.lower() == term:
                 return role
-        return "Directory of the project"
+        return text("glossary.directory")
     if kind == "type":
         declared = declarations.get(term)
         return (
-            f"Type declared in `{declared}`"
+            text("glossary.type", path=declared)
             if declared
-            else "Type declared in the codebase"
+            else text("glossary.typeGeneric")
         )
     if kind == "module":
         return (
-            f"Appears in the name of {len(sources)} file(s)"
+            text("glossary.module", count=len(sources))
             if sources
-            else "File name token"
+            else text("glossary.moduleGeneric")
         )
-    return "Recurring identifier — likely domain vocabulary"
+    return text("glossary.identifier")
 
 
 # ---------------------------------------------------------------------------
