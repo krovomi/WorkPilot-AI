@@ -1,0 +1,20 @@
+{
+	"source": "NousResearch/hermes-agent",
+	"ref": "HEAD",
+	"commit": "f17f18cd11e0dc203e683ab2b77b6a5aafe5afa7",
+	"skills": 12,
+	"subdirs": [
+		"skills/autonomous-ai-agents",
+		"skills/devops",
+		"skills/software-development"
+	],
+	"excluded": [
+		"dogfood",
+		"hermes-agent",
+		"hermes-agent-skill-authoring",
+		"inspecting-hermes-desktop-dom",
+		"plan",
+		"requesting-code-review",
+		"test-driven-development"
+	]
+}
