@@ -17,13 +17,27 @@ export interface OnboardingTourStep {
 	file_path: string;
 	reason: string;
 	suggested_questions: string[];
+	category: "file" | "entrypoint" | "directory" | "command" | "doc";
+	snippet?: string;
 }
+
+export type OnboardingQuizCategory =
+	| "stack"
+	| "files"
+	| "architecture"
+	| "commands"
+	| "conventions"
+	| "general";
+
+export type OnboardingDifficulty = "easy" | "medium" | "hard";
 
 export interface OnboardingQuizQuestion {
 	question: string;
 	choices: string[];
 	correct_index: number;
 	rationale: string;
+	category: OnboardingQuizCategory;
+	difficulty: OnboardingDifficulty;
 }
 
 export interface OnboardingFirstTask {
@@ -31,21 +45,65 @@ export interface OnboardingFirstTask {
 	file_path: string;
 	line: number;
 	source_comment: string;
+	category: "todo" | "tests" | "docs" | "explore";
+	difficulty: OnboardingDifficulty;
+	why: string;
 }
 
 export interface OnboardingGlossaryTerm {
 	term: string;
 	occurrences: number;
 	sources: string[];
+	kind: "directory" | "type" | "module" | "identifier";
+	definition: string;
+}
+
+export interface OnboardingKeyFile {
+	path: string;
+	reason: string;
+	category: string;
+	lines: number;
+}
+
+export interface OnboardingConvention {
+	name: string;
+	description: string;
+	examples: string[];
+}
+
+export interface OnboardingCommand {
+	label: string;
+	command: string;
+	category: "setup" | "run" | "test" | "lint" | "build" | "other";
+	source: string;
+}
+
+export interface OnboardingArchitectureNode {
+	path: string;
+	role: string;
+	file_count: number;
+	languages: string[];
+}
+
+export interface OnboardingPackageStats {
+	files?: number;
+	code_files?: number;
+	test_files?: number;
+	directories?: number;
+	languages?: number;
 }
 
 export interface OnboardingPackage {
 	guide: {
 		project_name: string;
 		tech_stack: string[];
-		key_files: Array<{ path: string; reason: string }>;
-		conventions: Array<{ name: string; description: string }>;
+		key_files: OnboardingKeyFile[];
+		entry_points: OnboardingKeyFile[];
+		conventions: OnboardingConvention[];
+		commands: OnboardingCommand[];
+		architecture: OnboardingArchitectureNode[];
 		sections: Record<string, string>;
+		stats: OnboardingPackageStats;
 		estimated_reading_time_min: number;
 	};
 	tour: OnboardingTourStep[];
