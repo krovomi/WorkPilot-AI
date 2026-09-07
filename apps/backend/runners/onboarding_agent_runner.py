@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +26,7 @@ from onboarding_agent import (  # noqa: E402
     OnboardingGuide,
     OnboardingPackageBuilder,
 )
+from onboarding_agent.messages import Text, raw, text  # noqa: E402
 
 
 def _emit(prefix: str, payload: Any) -> None:
@@ -37,114 +37,137 @@ def _emit_event(event_type: str, data: dict[str, Any]) -> None:
     _emit("ONBOARDING_EVENT", {"type": event_type, "data": data})
 
 
-def _extract_commands(markdown: str) -> list[str]:
-    commands: list[str] = []
-    for line in markdown.splitlines():
-        stripped = line.strip()
-        # Strip leading list markers like "1." or "-" then look for backtick code
-        match = re.search(r"`([^`]+)`", stripped)
-        if match:
-            commands.append(match.group(1))
-    return commands
+def _emit_status(event_type: str, status: Text) -> None:
+    """Progress lines are read by a person too, so they are translated."""
+    _emit_event(event_type, {"status": status.fallback, "statusI18n": status.to_dict()})
+
+
+def _step(
+    *,
+    section: str,
+    title_key: str,
+    lines: list[Any],
+    commands: list[str],
+    minutes: int,
+) -> dict[str, Any]:
+    """One step of the guide, in both forms.
+
+    ``content`` is the English markdown the CLI and older clients read;
+    ``title_i18n`` and ``lines`` are what the UI translates.
+    """
+    title = text(title_key)
+    return {
+        "section": section,
+        "title": title.fallback,
+        "titleI18n": title.to_dict(),
+        "content": "\n".join(f"- {line.fallback}" for line in lines),
+        "lines": [line.to_dict() for line in lines],
+        "commands": commands,
+        "estimatedMinutes": minutes,
+    }
 
 
 def _guide_to_dict(guide: OnboardingGuide) -> dict[str, Any]:
     steps: list[dict[str, Any]] = []
+    section_lines = guide.section_lines
 
-    # Overview step from key files
     if guide.key_files:
-        overview_content = "\n".join(
-            f"- {kf.path}: {kf.reason}" for kf in guide.key_files
-        )
         steps.append(
-            {
-                "section": "overview",
-                "title": "Key files to read first",
-                "content": overview_content,
-                "commands": [],
-                "estimatedMinutes": max(5, len(guide.key_files) * 2),
-            }
+            _step(
+                section="overview",
+                title_key="step.keyFiles.title",
+                lines=[
+                    text(
+                        "step.line.keyFile",
+                        path=kf.path,
+                        reason=kf.reason_i18n or raw(kf.reason),
+                    )
+                    for kf in guide.key_files
+                ],
+                commands=[],
+                minutes=max(5, len(guide.key_files) * 2),
+            )
         )
 
-    # Setup step from getting_started
-    getting_started = guide.sections.get("getting_started", "")
-    if getting_started:
+    if section_lines.get("getting_started"):
         steps.append(
-            {
-                "section": "setup",
-                "title": "Getting started",
-                "content": getting_started,
-                "commands": [c.command for c in guide.commands if c.category == "setup"]
-                or _extract_commands(getting_started),
-                "estimatedMinutes": 10,
-            }
+            _step(
+                section="setup",
+                title_key="step.gettingStarted.title",
+                lines=section_lines["getting_started"],
+                commands=[c.command for c in guide.commands if c.category == "setup"],
+                minutes=10,
+            )
         )
 
-    # Architecture step
-    architecture = guide.sections.get("architecture", "")
-    if architecture:
+    if section_lines.get("architecture"):
         steps.append(
-            {
-                "section": "architecture",
-                "title": "How the project is laid out",
-                "content": architecture,
-                "commands": [],
-                "estimatedMinutes": 10,
-            }
+            _step(
+                section="architecture",
+                title_key="step.architecture.title",
+                lines=section_lines["architecture"],
+                commands=[],
+                minutes=10,
+            )
         )
 
-    # Conventions step
     if guide.conventions:
-        convention_content = "\n".join(
-            f"- **{c.name}**: {c.description}" for c in guide.conventions
-        )
         steps.append(
-            {
-                "section": "conventions",
-                "title": "Coding conventions",
-                "content": convention_content,
-                "commands": [],
-                "estimatedMinutes": 5,
-            }
+            _step(
+                section="conventions",
+                title_key="step.conventions.title",
+                lines=[
+                    text(
+                        "step.line.convention",
+                        name=c.name_i18n or raw(c.name),
+                        description=c.description_i18n or raw(c.description),
+                    )
+                    for c in guide.conventions
+                ],
+                commands=[],
+                minutes=5,
+            )
         )
 
-    # Workflow step — the commands a newcomer runs every day
     daily = [c for c in guide.commands if c.category in {"run", "build", "lint"}]
     if daily:
         steps.append(
-            {
-                "section": "workflows",
-                "title": "Day-to-day commands",
-                "content": "\n".join(f"- {c.label}: `{c.command}`" for c in daily),
-                "commands": [c.command for c in daily],
-                "estimatedMinutes": 5,
-            }
+            _step(
+                section="workflows",
+                title_key="step.workflows.title",
+                lines=[
+                    text(
+                        "step.line.command",
+                        label=c.label_i18n or raw(c.label),
+                        command=c.command,
+                    )
+                    for c in daily
+                ],
+                commands=[c.command for c in daily],
+                minutes=5,
+            )
         )
 
-    # Testing step
-    testing = guide.sections.get("testing", "")
-    if testing:
+    if section_lines.get("testing"):
         steps.append(
-            {
-                "section": "testing",
-                "title": "Running the tests",
-                "content": testing,
-                "commands": [c.command for c in guide.commands if c.category == "test"],
-                "estimatedMinutes": 5,
-            }
+            _step(
+                section="testing",
+                title_key="step.testing.title",
+                lines=section_lines["testing"],
+                commands=[c.command for c in guide.commands if c.category == "test"],
+                minutes=5,
+            )
         )
 
-    # Deployment step
-    deployment = guide.sections.get("deployment", "")
-    if deployment:
+    if section_lines.get("deployment"):
         steps.append(
-            {
-                "section": "deployment",
-                "title": "How it ships",
-                "content": deployment,
-                "commands": [],
-                "estimatedMinutes": 5,
-            }
+            _step(
+                section="deployment",
+                title_key="step.deployment.title",
+                lines=section_lines["deployment"],
+                commands=[],
+                minutes=5,
+            )
         )
 
     total_minutes = (
@@ -152,10 +175,13 @@ def _guide_to_dict(guide: OnboardingGuide) -> dict[str, Any]:
         or guide.estimated_reading_time_min
     )
 
-    summary = (
-        f"{guide.project_name}: {len(guide.tech_stack)} technologies, "
-        f"{len(guide.key_files)} key files, {len(guide.conventions)} conventions, "
-        f"{len(guide.commands)} commands."
+    summary = text(
+        "summary",
+        project=guide.project_name,
+        technologies=len(guide.tech_stack),
+        keyFiles=len(guide.key_files),
+        conventions=len(guide.conventions),
+        commands=len(guide.commands),
     )
 
     return {
@@ -164,25 +190,25 @@ def _guide_to_dict(guide: OnboardingGuide) -> dict[str, Any]:
         "steps": steps,
         "totalEstimatedMinutes": total_minutes,
         "generatedAt": datetime.now(tz=timezone.utc).isoformat(),
-        "summary": summary,
+        "summary": summary.fallback,
+        "summaryI18n": summary.to_dict(),
     }
 
 
 def run_scan(project_path: Path) -> dict[str, Any]:
-    _emit_event("start", {"status": "Analyzing project structure..."})
+    _emit_status("start", text("progress.analyzing"))
     builder = OnboardingPackageBuilder()
     package = builder.build(project_path)
     guide = package.guide
-    _emit_event(
+    _emit_status(
         "progress",
-        {
-            "status": (
-                f"Generated package with {len(package.tour)} tour step(s), "
-                f"{len(package.quiz)} quiz question(s), "
-                f"{len(package.first_tasks)} first task(s), "
-                f"{len(package.glossary)} glossary term(s)"
-            )
-        },
+        text(
+            "progress.generated",
+            tour=len(package.tour),
+            quiz=len(package.quiz),
+            tasks=len(package.first_tasks),
+            glossary=len(package.glossary),
+        ),
     )
     result = {
         "guide": _guide_to_dict(guide),

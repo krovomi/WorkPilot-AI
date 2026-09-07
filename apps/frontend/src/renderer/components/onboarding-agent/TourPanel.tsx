@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
 import { Button } from "../ui/button";
 import { Progress } from "../ui/progress";
-import { CategoryBadge, EmptyState } from "./shared";
+import { CategoryBadge, EmptyState, useGeneratedText } from "./shared";
 
 const STEP_ICONS: Record<string, React.ReactNode> = {
 	doc: <FileText className="w-4 h-4" />,
@@ -28,6 +28,7 @@ export function TourPanel(): React.ReactElement | null {
 	const setIdx = useOnboardingAgentStore((s) => s.setCurrentTourStep);
 	const completed = useOnboardingAgentStore((s) => s.completedTourSteps);
 	const toggleDone = useOnboardingAgentStore((s) => s.toggleTourStepDone);
+	const generated = useGeneratedText();
 
 	if (!pkg) return null;
 	if (pkg.tour.length === 0) {
@@ -128,7 +129,9 @@ export function TourPanel(): React.ReactElement | null {
 						/>
 					</div>
 
-					<p className="text-sm whitespace-pre-wrap">{step.reason}</p>
+					<p className="text-sm whitespace-pre-wrap">
+						{generated(step.reason_i18n, step.reason)}
+					</p>
 
 					{step.suggested_questions.length > 0 && (
 						<div>
@@ -136,8 +139,13 @@ export function TourPanel(): React.ReactElement | null {
 								{t("suggestedQuestions")}
 							</p>
 							<ul className="list-disc pl-5 space-y-1 text-sm">
-								{step.suggested_questions.map((question) => (
-									<li key={question}>{question}</li>
+								{step.suggested_questions.map((question, index) => (
+									<li key={question}>
+										{generated(
+											step.suggested_questions_i18n?.[index],
+											question,
+										)}
+									</li>
 								))}
 							</ul>
 						</div>

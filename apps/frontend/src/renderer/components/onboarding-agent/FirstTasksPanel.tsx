@@ -2,12 +2,18 @@ import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
-import { CategoryBadge, DifficultyBadge, EmptyState } from "./shared";
+import {
+	CategoryBadge,
+	DifficultyBadge,
+	EmptyState,
+	useGeneratedText,
+} from "./shared";
 
 export function FirstTasksPanel(): React.ReactElement | null {
 	const { t } = useTranslation("onboardingAgent");
 	const pkg = useOnboardingAgentStore((s) => s.pkg);
 	const [filter, setFilter] = useState<string>("all");
+	const generated = useGeneratedText();
 
 	if (!pkg) return null;
 	if (pkg.first_tasks.length === 0) {
@@ -56,7 +62,9 @@ export function FirstTasksPanel(): React.ReactElement | null {
 						className="border rounded-md p-3 bg-card"
 					>
 						<div className="flex items-start justify-between gap-3">
-							<p className="font-medium text-sm">{task.title}</p>
+							<p className="font-medium text-sm">
+								{generated(task.title_i18n, task.title)}
+							</p>
 							<div className="flex gap-1 shrink-0">
 								<CategoryBadge
 									category={task.category}
@@ -74,12 +82,12 @@ export function FirstTasksPanel(): React.ReactElement | null {
 						</p>
 						{task.source_comment && (
 							<p className="text-xs text-muted-foreground mt-1 break-all">
-								{task.source_comment}
+								{generated(task.source_comment_i18n, task.source_comment)}
 							</p>
 						)}
 						{task.why && (
 							<p className="text-xs italic text-muted-foreground mt-1">
-								{task.why}
+								{generated(task.why_i18n, task.why)}
 							</p>
 						)}
 					</div>

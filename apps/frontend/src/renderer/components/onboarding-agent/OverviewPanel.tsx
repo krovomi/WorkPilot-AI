@@ -13,7 +13,13 @@ import { useTranslation } from "react-i18next";
 import type { OnboardingCommand } from "../../../preload/api/modules/onboarding-agent-api";
 import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
 import { Badge } from "../ui/badge";
-import { CategoryBadge, CommandLine, EmptyState, SectionTitle } from "./shared";
+import {
+	CategoryBadge,
+	CommandLine,
+	EmptyState,
+	SectionTitle,
+	useGeneratedText,
+} from "./shared";
 
 const COMMAND_ORDER: OnboardingCommand["category"][] = [
 	"setup",
@@ -55,11 +61,13 @@ export function OverviewPanel(): React.ReactElement | null {
 	const { t } = useTranslation("onboardingAgent");
 	const pkg = useOnboardingAgentStore((s) => s.pkg);
 	const setActiveTab = useOnboardingAgentStore((s) => s.setActiveTab);
+	const generated = useGeneratedText();
 
 	if (!pkg) return null;
 
 	const guide = pkg.guide;
 	const stats = guide.stats ?? {};
+	const gettingStarted = guide.section_lines?.getting_started ?? [];
 	const commandsByCategory = COMMAND_ORDER.map((category) => ({
 		category,
 		commands: (guide.commands ?? []).filter((c) => c.category === category),
@@ -105,14 +113,18 @@ export function OverviewPanel(): React.ReactElement | null {
 				</section>
 			)}
 
-			{guide.sections?.getting_started && (
+			{gettingStarted.length > 0 && (
 				<section>
 					<SectionTitle icon={<Terminal className="w-4 h-4" />}>
 						{t("overview.gettingStarted")}
 					</SectionTitle>
-					<pre className="text-sm whitespace-pre-wrap font-sans border rounded-md p-3 bg-card">
-						{guide.sections.getting_started}
-					</pre>
+					<ol className="border rounded-md p-3 bg-card space-y-1 list-decimal list-inside text-sm">
+						{gettingStarted.map((line) => (
+							<li key={`${line.key}:${line.fallback}`}>
+								{generated(line)}
+							</li>
+						))}
+					</ol>
 				</section>
 			)}
 
@@ -139,7 +151,7 @@ export function OverviewPanel(): React.ReactElement | null {
 												onCopy={copy}
 											/>
 											<p className="text-xs text-muted-foreground mt-0.5 pl-3">
-												{command.label}
+												{generated(command.label_i18n, command.label)}
 												{command.source ? ` — ${command.source}` : ""}
 											</p>
 										</div>
@@ -160,7 +172,9 @@ export function OverviewPanel(): React.ReactElement | null {
 						{guide.entry_points.map((entry) => (
 							<li key={entry.path} className="border rounded-md p-2 bg-card">
 								<p className="text-sm font-mono">{entry.path}</p>
-								<p className="text-xs text-muted-foreground">{entry.reason}</p>
+								<p className="text-xs text-muted-foreground">
+									{generated(entry.reason_i18n, entry.reason)}
+								</p>
 							</li>
 						))}
 					</ul>
@@ -178,9 +192,14 @@ export function OverviewPanel(): React.ReactElement | null {
 								key={convention.name}
 								className="border rounded-md p-2 bg-card"
 							>
-								<p className="text-sm font-medium">{convention.name}</p>
+								<p className="text-sm font-medium">
+									{generated(convention.name_i18n, convention.name)}
+								</p>
 								<p className="text-xs text-muted-foreground">
-									{convention.description}
+									{generated(
+										convention.description_i18n,
+										convention.description,
+									)}
 								</p>
 								{convention.examples?.length > 0 && (
 									<p className="text-xs font-mono text-muted-foreground mt-1 truncate">
@@ -217,7 +236,9 @@ export function OverviewPanel(): React.ReactElement | null {
 							>
 								<div className="min-w-0">
 									<p className="text-sm font-mono truncate">{file.path}</p>
-									<p className="text-xs text-muted-foreground">{file.reason}</p>
+									<p className="text-xs text-muted-foreground">
+										{generated(file.reason_i18n, file.reason)}
+									</p>
 								</div>
 								{file.lines > 0 && (
 									<span className="text-xs text-muted-foreground whitespace-nowrap">

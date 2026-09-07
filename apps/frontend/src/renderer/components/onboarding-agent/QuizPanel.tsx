@@ -6,7 +6,12 @@ import type { OnboardingQuizQuestion } from "../../../preload/api/modules/onboar
 import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
 import { Button } from "../ui/button";
 import { Progress } from "../ui/progress";
-import { CategoryBadge, DifficultyBadge, EmptyState } from "./shared";
+import {
+	CategoryBadge,
+	DifficultyBadge,
+	EmptyState,
+	useGeneratedText,
+} from "./shared";
 
 function QuestionCard({
 	question,
@@ -20,13 +25,14 @@ function QuestionCard({
 	readonly onAnswer: (choice: number) => void;
 }): React.ReactElement {
 	const { t } = useTranslation("onboardingAgent");
+	const generated = useGeneratedText();
 	const hasAnswered = chosen !== undefined;
 
 	return (
 		<div className="border rounded-md p-3 space-y-2 bg-card">
 			<div className="flex items-start justify-between gap-3">
 				<p className="font-medium text-sm">
-					{index + 1}. {question.question}
+					{index + 1}. {generated(question.question_i18n, question.question)}
 				</p>
 				<div className="flex gap-1 shrink-0">
 					<CategoryBadge
@@ -63,14 +69,16 @@ function QuestionCard({
 							{hasAnswered && isChosen && !isCorrect && (
 								<CircleX className="w-4 h-4 text-red-600 shrink-0" />
 							)}
-							<span className="break-all">{choice}</span>
+							<span className="break-all">
+								{generated(question.choices_i18n?.[choiceIdx], choice)}
+							</span>
 						</button>
 					);
 				})}
 			</div>
 			{hasAnswered && question.rationale && (
 				<p className="text-xs text-muted-foreground italic">
-					{question.rationale}
+					{generated(question.rationale_i18n, question.rationale)}
 				</p>
 			)}
 		</div>

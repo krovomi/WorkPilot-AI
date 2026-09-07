@@ -17,6 +17,7 @@ import {
 } from "../../stores/onboarding-agent-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { useGeneratedText } from "./shared";
 import { ArchitecturePanel } from "./ArchitecturePanel";
 import { FirstTasksPanel } from "./FirstTasksPanel";
 import { GlossaryPanel } from "./GlossaryPanel";
@@ -36,7 +37,10 @@ export function OnboardingPackageView({
 	const pkg = useOnboardingAgentStore((s) => s.pkg);
 	const phase = useOnboardingAgentStore((s) => s.phase);
 	const status = useOnboardingAgentStore((s) => s.status);
+	const statusI18n = useOnboardingAgentStore((s) => s.statusI18n);
 	const error = useOnboardingAgentStore((s) => s.error);
+	const errorKey = useOnboardingAgentStore((s) => s.errorKey);
+	const generated = useGeneratedText();
 	const tab = useOnboardingAgentStore((s) => s.activeTab);
 	const setTab = useOnboardingAgentStore((s) => s.setActiveTab);
 	const startScan = useOnboardingAgentStore((s) => s.startScan);
@@ -85,7 +89,7 @@ export function OnboardingPackageView({
 		return (
 			<div className="p-6">
 				<p className="text-sm text-muted-foreground">
-					{status || t("onboardingAgent:actions.scanning")}
+					{generated(statusI18n, status) || t("onboardingAgent:actions.scanning")}
 				</p>
 			</div>
 		);
@@ -95,7 +99,9 @@ export function OnboardingPackageView({
 		return (
 			<div className="p-6 space-y-3">
 				<p className="text-sm text-destructive">
-					{t("onboardingAgent:errors.failed", { error: error ?? "" })}
+					{errorKey
+						? t(`onboardingAgent:${errorKey}`)
+						: t("onboardingAgent:errors.failed", { error: error ?? "" })}
 				</p>
 				<Button variant="outline" onClick={reset}>
 					{t("common:buttons.retry")}

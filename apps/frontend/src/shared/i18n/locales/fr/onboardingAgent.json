@@ -112,5 +112,319 @@
 	"emptyQuiz": "Aucune question de quiz n'a pu être générée pour ce projet.",
 	"emptyFirstTasks": "Aucune première tâche n'a pu être identifiée pour ce projet.",
 	"emptyGlossary": "Aucun terme de glossaire n'a pu être détecté.",
-	"emptyArchitecture": "Aucune structure de répertoires n'a pu être analysée."
+	"emptyArchitecture": "Aucune structure de répertoires n'a pu être analysée.",
+	"generated": {
+		"keyFile": {
+			"readme": "Point d'entrée de la documentation du projet",
+			"contributing": "Règles de contribution",
+			"architecture": "Vue d'ensemble de l'architecture",
+			"agents": "Instructions pour les agents de code",
+			"claude": "Instructions pour Claude Code",
+			"changelog": "Historique des versions",
+			"security": "Politique de sécurité",
+			"codeOfConduct": "Règles de la communauté",
+			"license": "Conditions de licence",
+			"packageJson": "Dépendances et scripts Node.js",
+			"pnpmWorkspace": "Organisation du workspace pnpm",
+			"tsconfig": "Configuration du compilateur TypeScript",
+			"pyproject": "Configuration du projet Python",
+			"requirements": "Dépendances Python",
+			"cargo": "Manifeste de la crate Rust",
+			"goMod": "Définition du module Go",
+			"pom": "Définition du build Maven",
+			"gradle": "Définition du build Gradle",
+			"gemfile": "Dépendances Ruby",
+			"composer": "Dépendances PHP",
+			"directoryPackages": "Versions NuGet gérées de façon centralisée",
+			"globalJson": "Version du SDK .NET épinglée",
+			"appsettings": "Paramètres applicatifs d'exécution",
+			"envExample": "Modèle de variables d'environnement",
+			"dockerCompose": "Orchestration des services",
+			"dockerfile": "Définition de l'image conteneur",
+			"makefile": "Points d'entrée des tâches",
+			"solution": "Solution regroupant tous les projets .NET",
+			"ciWorkflow": "Chaîne d'intégration continue",
+			"largestInDirectory": "Plus gros fichier source de `{{directory}}` ({{lines}} lignes) — c'est en général là que vit la logique de cette zone"
+		},
+		"entryPoint": {
+			"programCs": "Point d'entrée de l'application et configuration de l'hôte",
+			"startupCs": "Enregistrement des services et configuration du pipeline HTTP",
+			"pythonMain": "Point d'entrée Python",
+			"application": "Point d'entrée de l'application",
+			"djangoManage": "Point d'entrée des commandes Django",
+			"runtime": "Point d'entrée d'exécution",
+			"pythonModule": "Module exécuté avec `python -m`",
+			"goMain": "Point d'entrée Go",
+			"rustMain": "Point d'entrée Rust",
+			"javaMain": "Point d'entrée Java",
+			"flutterMain": "Point d'entrée Flutter",
+			"module": "Point d'entrée du module",
+			"bootstrap": "Amorçage de l'application",
+			"uiBootstrap": "Amorçage de l'interface",
+			"reactRoot": "Composant React racine",
+			"httpServer": "Amorçage du serveur HTTP"
+		},
+		"role": {
+			"controllers": "Points d'entrée HTTP (contrôleurs)",
+			"endpoints": "Endpoints HTTP",
+			"infrastructure": "Couche infrastructure — persistance, services externes",
+			"persistence": "Couche de persistance",
+			"application": "Couche application — cas d'usage et orchestration",
+			"domain": "Couche domaine — entités et règles métier",
+			"usecases": "Cas d'usage",
+			"handlers": "Handlers de requêtes et de commandes",
+			"repositories": "Dépôts d'accès aux données",
+			"migrations": "Migrations du schéma de base de données",
+			"entities": "Entités du domaine",
+			"models": "Modèles de données",
+			"dtos": "Objets de transfert de données",
+			"contracts": "Contrats et interfaces partagés",
+			"interfaces": "Abstractions et interfaces",
+			"services": "Services métier",
+			"components": "Composants d'interface",
+			"hooks": "Hooks d'interface réutilisables",
+			"stores": "Stores d'état côté client",
+			"pages": "Pages routées",
+			"views": "Vues",
+			"routes": "Définition des routes",
+			"middleware": "Middlewares de requête",
+			"config": "Configuration",
+			"scripts": "Scripts d'automatisation et de build",
+			"tools": "Outillage de développement",
+			"docs": "Documentation",
+			"tests": "Tests automatisés",
+			"e2e": "Tests de bout en bout",
+			"fixtures": "Fixtures de test",
+			"assets": "Ressources statiques",
+			"public": "Fichiers statiques servis publiquement",
+			"static": "Fichiers statiques",
+			"locales": "Traductions",
+			"api": "Surface d'API",
+			"cli": "Interface en ligne de commande",
+			"core": "Briques de base",
+			"shared": "Code partagé entre modules",
+			"utils": "Utilitaires",
+			"lib": "Code de bibliothèque",
+			"src": "Sources de l'application",
+			"app": "Code de l'application",
+			"apps": "Applications du monorepo",
+			"packages": "Paquets du monorepo",
+			"server": "Code côté serveur",
+			"client": "Code côté client",
+			"frontend": "Application frontend",
+			"backend": "Application backend",
+			"mobile": "Application mobile",
+			"infra": "Infrastructure as code",
+			"deploy": "Manifestes de déploiement",
+			"ci": "Workflows CI/CD et automatisation du dépôt",
+			"unknown": "Code du projet"
+		},
+		"convention": {
+			"tool": {
+				"description": "{{purpose}} — configuré via `{{file}}`"
+			},
+			"purpose": {
+				"eslint": "Lint JavaScript/TypeScript",
+				"biome": "Formatage et lint",
+				"prettier": "Formatage du code",
+				"ruff": "Lint et formatage Python",
+				"flake8": "Lint Python",
+				"setupCfg": "Configuration de l'outillage Python",
+				"mypy": "Typage statique Python",
+				"editorconfig": "Règles de formatage au niveau de l'éditeur",
+				"csharpier": "Formatage C#",
+				"roslyn": "Règles des analyseurs C#",
+				"stylecop": "Règles de style C#",
+				"golangci": "Lint Go",
+				"rustfmt": "Formatage Rust",
+				"clippy": "Lint Rust",
+				"rubocop": "Lint Ruby",
+				"preCommit": "Hooks exécutés avant chaque commit",
+				"commitlint": "Convention de message de commit",
+				"lefthook": "Hooks Git"
+			},
+			"scriptedFormatting": {
+				"name": "Le formatage passe par un script",
+				"description": "Lancez le script du projet plutôt que les réglages par défaut de votre éditeur."
+			},
+			"fileNaming": {
+				"name": "Les noms de fichiers sont en {{style}}",
+				"description": "{{count}} fichiers source sur {{total}} la suivent — respectez-la pour les nouveaux fichiers."
+			},
+			"tests": {
+				"name": "Les tests vivent en {{pattern}}",
+				"description": "{{count}} fichier(s) correspondant(s) — placez les nouveaux tests là où sont les autres."
+			},
+			"testPattern": {
+				"directory": "répertoire tests/",
+				"beside": "*.test.ts / *.spec.ts à côté du code",
+				"python": "test_*.py",
+				"dotnet": "*Tests.cs",
+				"go": "*_test.go"
+			},
+			"indentation": {
+				"name": "Indentation : {{style}}",
+				"description": "Mesurée sur les sources existantes ; le formateur l'impose.",
+				"tabs": "tabulations",
+				"spaces": "4 espaces"
+			},
+			"pullRequest": {
+				"name": "Modèle de pull request",
+				"description": "Chaque PR est censée remplir le modèle du dépôt."
+			}
+		},
+		"command": {
+			"installDependencies": "Installer les dépendances",
+			"createVenv": "Créer l'environnement virtuel",
+			"installProject": "Installer le projet",
+			"runTests": "Lancer les tests",
+			"restorePackages": "Restaurer les paquets",
+			"buildSolution": "Compiler la solution",
+			"build": "Compiler",
+			"runProject": "Lancer {{project}}",
+			"startServices": "Démarrer les services"
+		},
+		"tour": {
+			"reason": {
+				"directory": "{{role}} — {{count}} fichiers",
+				"directoryLanguages": "{{role}} — {{count}} fichiers, surtout {{languages}}"
+			},
+			"question": {
+				"docPurpose": "Que dit {{path}} sur la raison d'être du projet ?",
+				"docClaims": "Lesquelles de ces affirmations le code confirme-t-il vraiment ?",
+				"entryWiring": "Qu'est-ce qui est câblé au démarrage de {{path}} ?",
+				"entryDependencies": "Quelles dépendances sont enregistrées ici, et où sont-elles utilisées ?",
+				"directoryBelongs": "Qu'est-ce qui a sa place dans {{path}}/ et qu'est-ce qui n'en a pas ?",
+				"directoryLayer": "De quelle couche {{path}}/ dépend-il ?",
+				"configBreakage": "Qu'est-ce qui casserait si {{path}} était erroné ?",
+				"configEnvironments": "Quelles valeurs diffèrent ici d'un environnement à l'autre ?",
+				"sourceProblem": "Quel problème {{path}} résout-il ?",
+				"sourceDependents": "Quels autres fichiers de {{project}} dépendent de {{path}} ?",
+				"ciChecks": "Quelles vérifications doivent passer avant qu'une PR puisse être mergée ?",
+				"ciLocal": "Pouvez-vous lancer ces mêmes vérifications en local ?"
+			}
+		},
+		"quiz": {
+			"primaryTech": {
+				"question": "Quelle est la technologie principale de {{project}} ?",
+				"rationale": "Détectée à partir des fichiers du projet : {{stack}}"
+			},
+			"notInStack": {
+				"question": "Laquelle de ces technologies ne fait PAS partie de la stack du projet ?",
+				"rationale": "La stack détectée est : {{stack}}"
+			},
+			"entryPoint": {
+				"question": "Où l'exécution de l'application commence-t-elle ?"
+			},
+			"filePurpose": {
+				"question": "Quel fichier a pour rôle : « {{reason}} » ?",
+				"rationale": "`{{path}}` — {{reason}}"
+			},
+			"fileRole": {
+				"question": "Quel est le rôle de `{{path}}` ?"
+			},
+			"directoryHolds": {
+				"question": "Que contient `{{path}}/` ?",
+				"rationale": "`{{path}}/` — {{role}} ({{count}} fichiers)"
+			},
+			"command": {
+				"test": "Quelle commande lance la suite de tests ?",
+				"setup": "Quelle commande installe les dépendances du projet ?",
+				"build": "Quelle commande compile le projet ?",
+				"lint": "Quelle commande vérifie le formatage et les règles de lint ?",
+				"rationale": "`{{command}}` — d'après {{source}}",
+				"unknownSource": "le manifeste du projet"
+			},
+			"convention": {
+				"question": "Quelle convention {{project}} suit-il ?",
+				"noLinter": "Aucun linter n'est configuré",
+				"perDeveloper": "Le formatage est laissé à chaque développeur",
+				"afterRelease": "Les tests sont écrits après la mise en production"
+			},
+			"testLocation": {
+				"question": "Où un nouveau fichier de test doit-il aller ?",
+				"rationale": "{{description}} par ex. {{examples}}",
+				"root": "N'importe où à la racine du dépôt",
+				"buildOutput": "Dans le répertoire de sortie de compilation",
+				"personalFolder": "Dans un dossier personnel hors du dépôt"
+			},
+			"tourRecall": {
+				"question": "Pendant la visite, pourquoi `{{path}}` compte-t-il ?"
+			}
+		},
+		"firstTask": {
+			"todo": {
+				"title": "{{tag}} : {{note}}",
+				"why": "Laissé dans le code par l'équipe — un changement réel et délimité."
+			},
+			"tests": {
+				"title": "Écrire un premier test pour {{file}}",
+				"comment": "{{lines}} lignes, aucun fichier de test à son nom",
+				"why": "Lire un fichier d'assez près pour le tester est la façon la plus rapide de l'apprendre."
+			},
+			"docs": {
+				"title": "Documenter ce que {{file}} met en place",
+				"comment": "Point d'entrée sans commentaire d'en-tête",
+				"why": "L'écrire oblige à suivre une fois le chemin de démarrage."
+			},
+			"readme": {
+				"title": "Documenter comment lancer le projet",
+				"comment": "Aucune commande d'installation, d'exécution ou de test n'a été détectée",
+				"why": "Rien dans le dépôt n'indique comment le démarrer."
+			},
+			"explore": {
+				"title": "Cartographier les dépendances de {{path}}/",
+				"comment": "{{role}} — {{count}} fichiers",
+				"why": "Dessinez ce que ce répertoire importe et ce qui l'importe."
+			}
+		},
+		"glossary": {
+			"directory": "Répertoire du projet",
+			"type": "Type déclaré dans `{{path}}`",
+			"typeGeneric": "Type déclaré dans le code",
+			"module": "Apparaît dans le nom de {{count}} fichier(s)",
+			"moduleGeneric": "Fragment de nom de fichier",
+			"identifier": "Identifiant récurrent — probablement du vocabulaire métier"
+		},
+		"step": {
+			"keyFiles": {
+				"title": "Fichiers clés à lire en premier"
+			},
+			"gettingStarted": {
+				"title": "Démarrage"
+			},
+			"architecture": {
+				"title": "Comment le projet est organisé"
+			},
+			"conventions": {
+				"title": "Conventions de code"
+			},
+			"workflows": {
+				"title": "Commandes du quotidien"
+			},
+			"testing": {
+				"title": "Lancer les tests"
+			},
+			"deployment": {
+				"title": "Comment ça part en production"
+			},
+			"line": {
+				"keyFile": "{{path}} : {{reason}}",
+				"command": "{{label}} : `{{command}}`",
+				"architecture": "`{{path}}/` — {{role}} ({{count}} fichiers)",
+				"convention": "{{name}} : {{description}}",
+				"envExample": "Copiez `.env.example` en `.env` et renseignez les valeurs",
+				"manifest": "`{{path}}`",
+				"deployment": "`{{path}}`",
+				"ciWorkflow": "`{{path}}` (CI/CD)",
+				"readmeFallback": "Consultez README.md pour les instructions d'installation",
+				"testCommand": "`{{command}}` ({{source}})"
+			}
+		},
+		"progress": {
+			"analyzing": "Analyse de la structure du projet…",
+			"generated": "{{tour}} étape(s) de visite, {{quiz}} question(s) de quiz, {{tasks}} première(s) tâche(s), {{glossary}} terme(s) de glossaire"
+		},
+		"summary": "{{project}} : {{technologies}} technologies, {{keyFiles}} fichiers clés, {{conventions}} conventions, {{commands}} commandes."
+	}
 }

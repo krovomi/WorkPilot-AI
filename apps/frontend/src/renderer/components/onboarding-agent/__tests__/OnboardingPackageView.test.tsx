@@ -66,6 +66,11 @@ const PACKAGE: OnboardingPackage = {
 				role: "Domain layer",
 				file_count: 3,
 				languages: ["C#"],
+				role_i18n: {
+					key: "generated.role.domain",
+					params: {},
+					fallback: "Domain layer",
+				},
 			},
 		],
 		sections: { getting_started: "## Getting Started\n\n1. dotnet restore" },
@@ -98,6 +103,16 @@ const PACKAGE: OnboardingPackage = {
 			rationale: "Detected from the project files",
 			category: "stack",
 			difficulty: "easy",
+			question_i18n: {
+				key: "generated.quiz.primaryTech.question",
+				params: { project: "Shop" },
+				fallback: "What is the primary technology?",
+			},
+			choices_i18n: [
+				{ key: "", params: {}, fallback: "Rust" },
+				{ key: "", params: {}, fallback: "C# / .NET" },
+				{ key: "", params: {}, fallback: "Ruby" },
+			],
 		},
 		{
 			question: "Which command runs the test suite?",
@@ -228,12 +243,22 @@ describe("OnboardingPackageView", () => {
 		expect(useOnboardingAgentStore.getState().completedTourSteps).toEqual([1]);
 	});
 
-	it("renders the architecture roles", () => {
+	it("renders the architecture roles through i18n", () => {
 		renderWithPackage();
 		fireEvent.click(screen.getByText("onboardingAgent:tabs.architecture"));
 
 		expect(screen.getByText("src/Shop.Domain/")).toBeTruthy();
-		expect(screen.getByText("Domain layer")).toBeTruthy();
+		// The role reaches the page as a key, not as the English sentence.
+		expect(screen.getByText("onboardingAgent:generated.role.domain")).toBeTruthy();
+	});
+
+	it("renders a generated quiz question through i18n", () => {
+		renderWithPackage();
+		fireEvent.click(screen.getByText("onboardingAgent:tabs.quiz"));
+
+		expect(
+			screen.getByText(/onboardingAgent:generated\.quiz\.primaryTech\.question/),
+		).toBeTruthy();
 	});
 
 	it("filters the glossary on the search box", () => {

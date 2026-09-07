@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
+from .messages import Text, raw, text
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,12 +40,18 @@ class OnboardingSection(str, Enum):
 
 @dataclass
 class KeyFile:
-    """A file highlighted as important for onboarding."""
+    """A file highlighted as important for onboarding.
+
+    ``reason`` is the English prose the CLI renders; ``reason_i18n`` is the same
+    sentence as a key the UI translates. Both are emitted because the two
+    consumers are different: a markdown file has no locale, a page does.
+    """
 
     path: str
     reason: str
     category: str = ""
     lines: int = 0
+    reason_i18n: Text | None = None
 
 
 @dataclass
@@ -53,6 +61,8 @@ class Convention:
     name: str
     description: str
     examples: list[str] = field(default_factory=list)
+    name_i18n: Text | None = None
+    description_i18n: Text | None = None
 
 
 @dataclass
@@ -63,6 +73,7 @@ class ProjectCommand:
     command: str
     category: str = "run"  # setup | run | test | lint | build | other
     source: str = ""
+    label_i18n: Text | None = None
 
 
 @dataclass
@@ -73,6 +84,7 @@ class ArchitectureNode:
     role: str
     file_count: int
     languages: list[str] = field(default_factory=list)
+    role_i18n: Text | None = None
 
 
 @dataclass
@@ -88,6 +100,9 @@ class OnboardingGuide:
     commands: list[ProjectCommand] = field(default_factory=list)
     architecture: list[ArchitectureNode] = field(default_factory=list)
     stats: dict[str, int] = field(default_factory=dict)
+    # The prose of ``sections`` as translatable lines, for the UI. The markdown
+    # in ``sections`` stays English for the CLI.
+    section_lines: dict[str, list[Text]] = field(default_factory=dict)
     estimated_reading_time_min: int = 0
 
 
@@ -345,147 +360,147 @@ _NUGET_FRAMEWORKS: list[tuple[str, str]] = [
 
 # Entry-point candidates: relative path or glob → why it matters.
 _ENTRY_POINT_GLOBS: list[tuple[str, str]] = [
-    ("Program.cs", "Application entry point and host configuration"),
-    ("Startup.cs", "Service registration and HTTP pipeline configuration"),
-    ("main.py", "Python entry point"),
-    ("app.py", "Application entry point"),
-    ("manage.py", "Django management entry point"),
-    ("run.py", "Runtime entry point"),
-    ("__main__.py", "Module executed with `python -m`"),
-    ("main.go", "Go entry point"),
-    ("main.rs", "Rust entry point"),
-    ("Main.java", "Java entry point"),
-    ("main.dart", "Flutter entry point"),
-    ("index.ts", "Module entry point"),
-    ("index.js", "Module entry point"),
-    ("main.ts", "Application bootstrap"),
-    ("main.tsx", "UI bootstrap"),
-    ("App.tsx", "Root React component"),
-    ("server.ts", "HTTP server bootstrap"),
-    ("server.js", "HTTP server bootstrap"),
+    ("Program.cs", "entryPoint.programCs"),
+    ("Startup.cs", "entryPoint.startupCs"),
+    ("main.py", "entryPoint.pythonMain"),
+    ("app.py", "entryPoint.application"),
+    ("manage.py", "entryPoint.djangoManage"),
+    ("run.py", "entryPoint.runtime"),
+    ("__main__.py", "entryPoint.pythonModule"),
+    ("main.go", "entryPoint.goMain"),
+    ("main.rs", "entryPoint.rustMain"),
+    ("Main.java", "entryPoint.javaMain"),
+    ("main.dart", "entryPoint.flutterMain"),
+    ("index.ts", "entryPoint.module"),
+    ("index.js", "entryPoint.module"),
+    ("main.ts", "entryPoint.bootstrap"),
+    ("main.tsx", "entryPoint.uiBootstrap"),
+    ("App.tsx", "entryPoint.reactRoot"),
+    ("server.ts", "entryPoint.httpServer"),
+    ("server.js", "entryPoint.httpServer"),
 ]
 
 # Directory name → role. Longest, most specific names first.
 _DIRECTORY_ROLES: list[tuple[str, str]] = [
-    ("controllers", "HTTP entry points (controllers)"),
-    ("endpoints", "HTTP endpoints"),
-    ("infrastructure", "Infrastructure layer — persistence, external services"),
-    ("persistence", "Persistence layer"),
-    ("application", "Application layer — use cases and orchestration"),
-    ("domain", "Domain layer — entities and business rules"),
-    ("usecases", "Use cases"),
-    ("handlers", "Request/command handlers"),
-    ("repositories", "Data access repositories"),
-    ("migrations", "Database schema migrations"),
-    ("entities", "Domain entities"),
-    ("models", "Data models"),
-    ("dtos", "Data transfer objects"),
-    ("contracts", "Shared contracts and interfaces"),
-    ("interfaces", "Abstractions and interfaces"),
-    ("services", "Business services"),
-    ("components", "UI components"),
-    ("hooks", "Reusable UI hooks"),
-    ("stores", "Client-side state stores"),
-    ("pages", "Routed pages"),
-    ("views", "Views"),
-    ("routes", "Route definitions"),
-    ("middleware", "Request middleware"),
-    ("config", "Configuration"),
-    ("configuration", "Configuration"),
-    ("scripts", "Automation and build scripts"),
-    ("tools", "Developer tooling"),
-    ("docs", "Documentation"),
-    ("doc", "Documentation"),
-    ("tests", "Automated tests"),
-    ("test", "Automated tests"),
-    ("spec", "Automated tests"),
-    ("e2e", "End-to-end tests"),
-    ("fixtures", "Test fixtures"),
-    ("assets", "Static assets"),
-    ("public", "Publicly served static files"),
-    ("static", "Static files"),
-    ("locales", "Translations"),
-    ("i18n", "Translations"),
-    ("api", "API surface"),
-    ("cli", "Command-line interface"),
-    ("core", "Core building blocks"),
-    ("shared", "Code shared across modules"),
-    ("common", "Code shared across modules"),
-    ("utils", "Utilities"),
-    ("lib", "Library code"),
-    ("src", "Application source"),
-    ("app", "Application code"),
-    ("apps", "Applications of the monorepo"),
-    ("packages", "Packages of the monorepo"),
-    ("server", "Server-side code"),
-    ("client", "Client-side code"),
-    ("frontend", "Frontend application"),
-    ("backend", "Backend application"),
-    ("mobile", "Mobile application"),
-    ("infra", "Infrastructure as code"),
-    ("deploy", "Deployment manifests"),
-    (".github", "CI/CD workflows and repository automation"),
+    ("controllers", "role.controllers"),
+    ("endpoints", "role.endpoints"),
+    ("infrastructure", "role.infrastructure"),
+    ("persistence", "role.persistence"),
+    ("application", "role.application"),
+    ("domain", "role.domain"),
+    ("usecases", "role.usecases"),
+    ("handlers", "role.handlers"),
+    ("repositories", "role.repositories"),
+    ("migrations", "role.migrations"),
+    ("entities", "role.entities"),
+    ("models", "role.models"),
+    ("dtos", "role.dtos"),
+    ("contracts", "role.contracts"),
+    ("interfaces", "role.interfaces"),
+    ("services", "role.services"),
+    ("components", "role.components"),
+    ("hooks", "role.hooks"),
+    ("stores", "role.stores"),
+    ("pages", "role.pages"),
+    ("views", "role.views"),
+    ("routes", "role.routes"),
+    ("middleware", "role.middleware"),
+    ("config", "role.config"),
+    ("configuration", "role.config"),
+    ("scripts", "role.scripts"),
+    ("tools", "role.tools"),
+    ("docs", "role.docs"),
+    ("doc", "role.docs"),
+    ("tests", "role.tests"),
+    ("test", "role.tests"),
+    ("spec", "role.tests"),
+    ("e2e", "role.e2e"),
+    ("fixtures", "role.fixtures"),
+    ("assets", "role.assets"),
+    ("public", "role.public"),
+    ("static", "role.static"),
+    ("locales", "role.locales"),
+    ("i18n", "role.locales"),
+    ("api", "role.api"),
+    ("cli", "role.cli"),
+    ("core", "role.core"),
+    ("shared", "role.shared"),
+    ("common", "role.shared"),
+    ("utils", "role.utils"),
+    ("lib", "role.lib"),
+    ("src", "role.src"),
+    ("app", "role.app"),
+    ("apps", "role.apps"),
+    ("packages", "role.packages"),
+    ("server", "role.server"),
+    ("client", "role.client"),
+    ("frontend", "role.frontend"),
+    ("backend", "role.backend"),
+    ("mobile", "role.mobile"),
+    ("infra", "role.infra"),
+    ("deploy", "role.deploy"),
+    (".github", "role.ci"),
 ]
 
 _LINTER_CONFIGS: dict[str, tuple[str, str]] = {
-    ".eslintrc.js": ("ESLint", "JavaScript/TypeScript linting"),
-    ".eslintrc.json": ("ESLint", "JavaScript/TypeScript linting"),
-    "eslint.config.js": ("ESLint", "JavaScript/TypeScript linting"),
-    "biome.json": ("Biome", "Formatting and linting"),
-    "biome.jsonc": ("Biome", "Formatting and linting"),
-    ".prettierrc": ("Prettier", "Code formatting"),
-    ".prettierrc.json": ("Prettier", "Code formatting"),
-    "ruff.toml": ("Ruff", "Python linting and formatting"),
-    ".ruff.toml": ("Ruff", "Python linting and formatting"),
-    ".flake8": ("Flake8", "Python linting"),
-    "setup.cfg": ("setup.cfg", "Python tooling configuration"),
-    "mypy.ini": ("mypy", "Python static typing"),
-    ".editorconfig": ("EditorConfig", "Editor-level formatting rules"),
-    ".csharpierrc": ("CSharpier", "C# formatting"),
-    ".globalconfig": ("Roslyn analyzers", "C# analyzer rules"),
-    "stylecop.json": ("StyleCop", "C# style rules"),
-    ".golangci.yml": ("golangci-lint", "Go linting"),
-    "rustfmt.toml": ("rustfmt", "Rust formatting"),
-    "clippy.toml": ("Clippy", "Rust linting"),
-    ".rubocop.yml": ("RuboCop", "Ruby linting"),
-    ".pre-commit-config.yaml": ("pre-commit", "Hooks run before each commit"),
-    "commitlint.config.js": ("commitlint", "Commit message convention"),
-    "lefthook.yml": ("Lefthook", "Git hooks"),
+    ".eslintrc.js": ("ESLint", "convention.purpose.eslint"),
+    ".eslintrc.json": ("ESLint", "convention.purpose.eslint"),
+    "eslint.config.js": ("ESLint", "convention.purpose.eslint"),
+    "biome.json": ("Biome", "convention.purpose.biome"),
+    "biome.jsonc": ("Biome", "convention.purpose.biome"),
+    ".prettierrc": ("Prettier", "convention.purpose.prettier"),
+    ".prettierrc.json": ("Prettier", "convention.purpose.prettier"),
+    "ruff.toml": ("Ruff", "convention.purpose.ruff"),
+    ".ruff.toml": ("Ruff", "convention.purpose.ruff"),
+    ".flake8": ("Flake8", "convention.purpose.flake8"),
+    "setup.cfg": ("setup.cfg", "convention.purpose.setupCfg"),
+    "mypy.ini": ("mypy", "convention.purpose.mypy"),
+    ".editorconfig": ("EditorConfig", "convention.purpose.editorconfig"),
+    ".csharpierrc": ("CSharpier", "convention.purpose.csharpier"),
+    ".globalconfig": ("Roslyn analyzers", "convention.purpose.roslyn"),
+    "stylecop.json": ("StyleCop", "convention.purpose.stylecop"),
+    ".golangci.yml": ("golangci-lint", "convention.purpose.golangci"),
+    "rustfmt.toml": ("rustfmt", "convention.purpose.rustfmt"),
+    "clippy.toml": ("Clippy", "convention.purpose.clippy"),
+    ".rubocop.yml": ("RuboCop", "convention.purpose.rubocop"),
+    ".pre-commit-config.yaml": ("pre-commit", "convention.purpose.preCommit"),
+    "commitlint.config.js": ("commitlint", "convention.purpose.commitlint"),
+    "lefthook.yml": ("Lefthook", "convention.purpose.lefthook"),
 }
 
 _DOC_FILES: list[tuple[str, str, str]] = [
-    ("README.md", "Project documentation entry point", "docs"),
-    ("CONTRIBUTING.md", "Contribution guidelines", "docs"),
-    ("ARCHITECTURE.md", "Architecture overview", "docs"),
-    ("AGENTS.md", "Instructions for coding agents", "docs"),
-    ("CLAUDE.md", "Instructions for Claude Code", "docs"),
-    ("CHANGELOG.md", "Release history", "docs"),
-    ("SECURITY.md", "Security policy", "docs"),
-    ("CODE_OF_CONDUCT.md", "Community rules", "docs"),
-    ("LICENSE", "License terms", "docs"),
+    ("README.md", "keyFile.readme", "docs"),
+    ("CONTRIBUTING.md", "keyFile.contributing", "docs"),
+    ("ARCHITECTURE.md", "keyFile.architecture", "docs"),
+    ("AGENTS.md", "keyFile.agents", "docs"),
+    ("CLAUDE.md", "keyFile.claude", "docs"),
+    ("CHANGELOG.md", "keyFile.changelog", "docs"),
+    ("SECURITY.md", "keyFile.security", "docs"),
+    ("CODE_OF_CONDUCT.md", "keyFile.codeOfConduct", "docs"),
+    ("LICENSE", "keyFile.license", "docs"),
 ]
 
 _CONFIG_FILES: list[tuple[str, str, str]] = [
-    ("package.json", "Node.js dependencies and scripts", "config"),
-    ("pnpm-workspace.yaml", "pnpm workspace layout", "config"),
-    ("tsconfig.json", "TypeScript compiler configuration", "config"),
-    ("pyproject.toml", "Python project configuration", "config"),
-    ("requirements.txt", "Python dependencies", "config"),
-    ("Cargo.toml", "Rust crate manifest", "config"),
-    ("go.mod", "Go module definition", "config"),
-    ("pom.xml", "Maven build definition", "config"),
-    ("build.gradle", "Gradle build definition", "config"),
-    ("Gemfile", "Ruby dependencies", "config"),
-    ("composer.json", "PHP dependencies", "config"),
-    ("Directory.Packages.props", "Centrally managed NuGet versions", "config"),
-    ("global.json", "Pinned .NET SDK version", "config"),
-    ("appsettings.json", "Runtime application settings", "config"),
-    (".env.example", "Environment variables template", "config"),
-    (".env.sample", "Environment variables template", "config"),
-    ("docker-compose.yml", "Service orchestration", "infra"),
-    ("docker-compose.yaml", "Service orchestration", "infra"),
-    ("Dockerfile", "Container image definition", "infra"),
-    ("Makefile", "Task entry points", "infra"),
+    ("package.json", "keyFile.packageJson", "config"),
+    ("pnpm-workspace.yaml", "keyFile.pnpmWorkspace", "config"),
+    ("tsconfig.json", "keyFile.tsconfig", "config"),
+    ("pyproject.toml", "keyFile.pyproject", "config"),
+    ("requirements.txt", "keyFile.requirements", "config"),
+    ("Cargo.toml", "keyFile.cargo", "config"),
+    ("go.mod", "keyFile.goMod", "config"),
+    ("pom.xml", "keyFile.pom", "config"),
+    ("build.gradle", "keyFile.gradle", "config"),
+    ("Gemfile", "keyFile.gemfile", "config"),
+    ("composer.json", "keyFile.composer", "config"),
+    ("Directory.Packages.props", "keyFile.directoryPackages", "config"),
+    ("global.json", "keyFile.globalJson", "config"),
+    ("appsettings.json", "keyFile.appsettings", "config"),
+    (".env.example", "keyFile.envExample", "config"),
+    (".env.sample", "keyFile.envExample", "config"),
+    ("docker-compose.yml", "keyFile.dockerCompose", "infra"),
+    ("docker-compose.yaml", "keyFile.dockerCompose", "infra"),
+    ("Dockerfile", "keyFile.dockerfile", "infra"),
+    ("Makefile", "keyFile.makefile", "infra"),
 ]
 
 
@@ -534,6 +549,18 @@ class OnboardingEngine:
         deployment = self._deployment_text(scan)
         if deployment:
             guide.sections[OnboardingSection.DEPLOYMENT.value] = deployment
+
+        guide.section_lines = {
+            OnboardingSection.GETTING_STARTED.value: self._getting_started_lines(
+                scan, guide.commands
+            ),
+            OnboardingSection.ARCHITECTURE.value: self._architecture_lines(
+                guide.architecture
+            ),
+            OnboardingSection.TESTING.value: self._testing_lines(guide.commands),
+            OnboardingSection.DEPENDENCIES.value: self._dependencies_lines(scan),
+            OnboardingSection.DEPLOYMENT.value: self._deployment_lines(scan),
+        }
 
         guide.estimated_reading_time_min = max(
             5, len(guide.key_files) * 2 + len(guide.architecture)
@@ -653,10 +680,12 @@ class OnboardingEngine:
 
         nodes: list[ArchitectureNode] = []
         for node in sorted(selected):
+            role = self._role_for(node)
             nodes.append(
                 ArchitectureNode(
                     path=node,
-                    role=self._role_for(node),
+                    role=role.fallback,
+                    role_i18n=role,
                     file_count=counts[node],
                     languages=[
                         lang
@@ -666,20 +695,20 @@ class OnboardingEngine:
             )
         return nodes
 
-    def _role_for(self, path: str) -> str:
+    def _role_for(self, path: str) -> Text:
         name = path.rsplit("/", 1)[-1].lower()
-        for candidate, role in _DIRECTORY_ROLES:
+        for candidate, key in _DIRECTORY_ROLES:
             if name == candidate:
-                return role
+                return text(key)
         # Substring matching, but test markers win: `Shop.Domain.Tests` is a
         # test project, not the domain layer.
         for candidate in ("tests", "test", "spec", "e2e"):
             if candidate in re.split(r"[.\-_]", name):
-                return dict(_DIRECTORY_ROLES)[candidate]
-        for candidate, role in _DIRECTORY_ROLES:
+                return text(dict(_DIRECTORY_ROLES)[candidate])
+        for candidate, key in _DIRECTORY_ROLES:
             if candidate in name:
-                return role
-        return "Project code"
+                return text(key)
+        return text("role.unknown")
 
     @staticmethod
     def _is_hidden(relative: str) -> bool:
@@ -695,7 +724,8 @@ class OnboardingEngine:
     ) -> list[KeyFile]:
         found: list[KeyFile] = []
         seen: set[str] = set()
-        for name, reason in _ENTRY_POINT_GLOBS:
+        for name, key in _ENTRY_POINT_GLOBS:
+            reason = text(key)
             for rel in scan.find(name, limit=6):
                 depth = rel.count("/")
                 if depth > 4 or rel in seen or self._is_hidden(rel):
@@ -704,7 +734,8 @@ class OnboardingEngine:
                 found.append(
                     KeyFile(
                         path=rel,
-                        reason=reason,
+                        reason=reason.fallback,
+                        reason_i18n=reason,
                         category="entrypoint",
                         lines=self._line_count(scan, rel),
                     )
@@ -718,37 +749,38 @@ class OnboardingEngine:
         key_files: list[KeyFile] = []
         seen: set[str] = set()
 
-        def push(path: str, reason: str, category: str) -> None:
+        def push(path: str, reason: Text, category: str) -> None:
             if path in seen:
                 return
             seen.add(path)
             key_files.append(
                 KeyFile(
                     path=path,
-                    reason=reason,
+                    reason=reason.fallback,
+                    reason_i18n=reason,
                     category=category,
                     lines=self._line_count(scan, path),
                 )
             )
 
-        for filename, reason, category in _DOC_FILES:
+        for filename, key, category in _DOC_FILES:
             if scan.has(filename):
-                push(filename, reason, category)
+                push(filename, text(key), category)
 
-        for filename, reason, category in _CONFIG_FILES:
+        for filename, key, category in _CONFIG_FILES:
             if scan.has(filename):
-                push(filename, reason, category)
+                push(filename, text(key), category)
 
         for solution in scan.find("*.sln", limit=2):
-            push(solution, "Solution grouping every .NET project", "config")
+            push(solution, text("keyFile.solution"), "config")
 
         for workflow in [f for f in scan.files if f.startswith(".github/workflows/")][
             :3
         ]:
-            push(workflow, "Continuous integration pipeline", "ci")
+            push(workflow, text("keyFile.ciWorkflow"), "ci")
 
         for entry in entry_points:
-            push(entry.path, entry.reason, "entrypoint")
+            push(entry.path, entry.reason_i18n or raw(entry.reason), "entrypoint")
 
         for path, reason in self._central_source_files(scan):
             push(path, reason, "source")
@@ -757,7 +789,7 @@ class OnboardingEngine:
 
     def _central_source_files(
         self, scan: ProjectScan, *, limit: int = 6
-    ) -> list[tuple[str, str]]:
+    ) -> list[tuple[str, Text]]:
         """The biggest source file of each significant directory.
 
         Size is a crude proxy for importance, but it is the one signal available
@@ -786,13 +818,16 @@ class OnboardingEngine:
             ranked.append((lines, rel, directory))
 
         ranked.sort(reverse=True)
-        out: list[tuple[str, str]] = []
+        out: list[tuple[str, Text]] = []
         for lines, rel, directory in ranked[:limit]:
             out.append(
                 (
                     rel,
-                    f"Largest source file of `{directory}` ({lines} lines) — "
-                    "usually where that area's logic lives",
+                    text(
+                        "keyFile.largestInDirectory",
+                        directory=directory,
+                        lines=lines,
+                    ),
                 )
             )
         return out
@@ -812,13 +847,21 @@ class OnboardingEngine:
         conventions: list[Convention] = []
         seen: set[str] = set()
 
-        for filename, (name, description) in _LINTER_CONFIGS.items():
-            if scan.has(filename) and name not in seen:
-                seen.add(name)
+        for filename, (tool, purpose_key) in _LINTER_CONFIGS.items():
+            if scan.has(filename) and tool not in seen:
+                seen.add(tool)
+                # The tool's own name is not translated — `Biome` is `Biome`.
+                description = text(
+                    "convention.tool.description",
+                    purpose=text(purpose_key),
+                    file=filename,
+                )
                 conventions.append(
                     Convention(
-                        name=name,
-                        description=f"{description} — configured via `{filename}`",
+                        name=tool,
+                        name_i18n=raw(tool),
+                        description=description.fallback,
+                        description_i18n=description,
                         examples=[filename],
                     )
                 )
@@ -826,10 +869,14 @@ class OnboardingEngine:
         manifest = scan.read_json("package.json")
         scripts = manifest.get("scripts") if isinstance(manifest, dict) else None
         if isinstance(scripts, dict) and ("lint" in scripts or "format" in scripts):
+            name = text("convention.scriptedFormatting.name")
+            description = text("convention.scriptedFormatting.description")
             conventions.append(
                 Convention(
-                    name="Formatting is scripted",
-                    description="Run the project's own script rather than your editor's defaults.",
+                    name=name.fallback,
+                    name_i18n=name,
+                    description=description.fallback,
+                    description_i18n=description,
                     examples=[
                         f"{k}: {v}"
                         for k, v in scripts.items()
@@ -853,10 +900,14 @@ class OnboardingEngine:
         if scan.has(".github/PULL_REQUEST_TEMPLATE.md") or scan.has(
             ".github/pull_request_template.md"
         ):
+            name = text("convention.pullRequest.name")
+            description = text("convention.pullRequest.description")
             conventions.append(
                 Convention(
-                    name="Pull request template",
-                    description="Every PR is expected to fill the repository's template.",
+                    name=name.fallback,
+                    name_i18n=name,
+                    description=description.fallback,
+                    description_i18n=description,
                     examples=[".github/pull_request_template.md"],
                 )
             )
@@ -892,50 +943,74 @@ class OnboardingEngine:
         # counting them would only dilute the vote.
         if total < 5 or count / total < 0.5:
             return None
+        # The style label (`kebab-case`) is a term of art, not a phrase to
+        # translate — it goes in as a parameter.
+        name = text("convention.fileNaming.name", style=style)
+        description = text(
+            "convention.fileNaming.description", count=count, total=total
+        )
         return Convention(
-            name=f"File names use {style}",
-            description=f"{count} of {total} source files follow it — match it for new files.",
+            name=name.fallback,
+            name_i18n=name,
+            description=description.fallback,
+            description_i18n=description,
             examples=[examples[style]],
         )
 
     def _detect_test_convention(self, scan: ProjectScan) -> Convention | None:
         patterns = {
-            "tests/ directory": [
+            "convention.testPattern.directory": [
                 f for f in scan.files if f.startswith(("tests/", "test/"))
             ],
-            "*.test.ts / *.spec.ts beside the code": [
+            "convention.testPattern.beside": [
                 f for f in scan.files if re.search(r"\.(test|spec)\.[tj]sx?$", f)
             ],
-            "test_*.py": [
+            "convention.testPattern.python": [
                 f for f in scan.files if re.match(r"(.*/)?test_[^/]+\.py$", f)
             ],
-            "*Tests.cs": [f for f in scan.files if f.endswith("Tests.cs")],
-            "*_test.go": [f for f in scan.files if f.endswith("_test.go")],
+            "convention.testPattern.dotnet": [
+                f for f in scan.files if f.endswith("Tests.cs")
+            ],
+            "convention.testPattern.go": [
+                f for f in scan.files if f.endswith("_test.go")
+            ],
         }
-        best = max(patterns.items(), key=lambda item: len(item[1]))
-        if len(best[1]) < 2:
+        best_key, matches = max(patterns.items(), key=lambda item: len(item[1]))
+        if len(matches) < 2:
             return None
+        name = text("convention.tests.name", pattern=text(best_key))
+        description = text("convention.tests.description", count=len(matches))
         return Convention(
-            name=f"Tests live as {best[0]}",
-            description=f"{len(best[1])} matching file(s) — put new tests where the existing ones are.",
-            examples=sorted(best[1])[:3],
+            name=name.fallback,
+            name_i18n=name,
+            description=description.fallback,
+            description_i18n=description,
+            examples=sorted(matches)[:3],
         )
 
     def _detect_indentation(self, scan: ProjectScan) -> Convention | None:
         tabs = spaces = 0
         for rel in scan.code_files[:60]:
-            text = scan.read(rel, max_chars=20_000)
-            for line in text.splitlines()[:200]:
+            content = scan.read(rel, max_chars=20_000)
+            for line in content.splitlines()[:200]:
                 if line.startswith("\t"):
                     tabs += 1
                 elif line.startswith("    "):
                     spaces += 1
         if tabs + spaces < 30:
             return None
-        style = "tabs" if tabs > spaces else "4 spaces"
+        style = text(
+            "convention.indentation.tabs"
+            if tabs > spaces
+            else "convention.indentation.spaces"
+        )
+        name = text("convention.indentation.name", style=style)
+        description = text("convention.indentation.description")
         return Convention(
-            name=f"Indentation: {style}",
-            description="Measured on the existing sources; the formatter enforces it.",
+            name=name.fallback,
+            name_i18n=name,
+            description=description.fallback,
+            description_i18n=description,
         )
 
     # -- commands ----------------------------------------------------------
@@ -944,66 +1019,79 @@ class OnboardingEngine:
         commands: list[ProjectCommand] = []
         seen: set[str] = set()
 
-        def push(label: str, command: str, category: str, source: str) -> None:
+        def push(label: Text, command: str, category: str, source: str) -> None:
             if command in seen:
                 return
             seen.add(command)
             commands.append(
                 ProjectCommand(
-                    label=label, command=command, category=category, source=source
+                    label=label.fallback,
+                    label_i18n=label,
+                    command=command,
+                    category=category,
+                    source=source,
                 )
             )
+
+        install = text("command.installDependencies")
+        run_tests = text("command.runTests")
+        build = text("command.build")
 
         manifest = scan.read_json("package.json")
         runner = self._node_runner(scan)
         scripts = manifest.get("scripts") if isinstance(manifest, dict) else None
         if isinstance(scripts, dict):
-            push("Install dependencies", f"{runner} install", "setup", "package.json")
+            push(install, f"{runner} install", "setup", "package.json")
             for name in sorted(scripts):
                 category = self._script_category(name)
-                push(f"{name}", f"{runner} run {name}", category, "package.json")
+                # A script name is the project's own vocabulary: `dev`, `lint`,
+                # `test:e2e`. Translating it would rename the command.
+                push(raw(name), f"{runner} run {name}", category, "package.json")
 
         if scan.has("requirements.txt"):
             push(
-                "Create the virtual environment",
+                text("command.createVenv"),
                 "python -m venv .venv",
                 "setup",
                 "requirements.txt",
             )
             push(
-                "Install dependencies",
-                "pip install -r requirements.txt",
-                "setup",
-                "requirements.txt",
+                install, "pip install -r requirements.txt", "setup", "requirements.txt"
             )
         if scan.has("pyproject.toml"):
-            raw = scan.read("pyproject.toml", max_chars=40_000)
-            if "[tool.poetry]" in raw:
-                push(
-                    "Install dependencies", "poetry install", "setup", "pyproject.toml"
-                )
-            elif "[tool.uv]" in raw or scan.has("uv.lock"):
-                push("Install dependencies", "uv sync", "setup", "pyproject.toml")
+            pyproject = scan.read("pyproject.toml", max_chars=40_000)
+            if "[tool.poetry]" in pyproject:
+                push(install, "poetry install", "setup", "pyproject.toml")
+            elif "[tool.uv]" in pyproject or scan.has("uv.lock"):
+                push(install, "uv sync", "setup", "pyproject.toml")
             else:
                 push(
-                    "Install the project", "pip install -e .", "setup", "pyproject.toml"
+                    text("command.installProject"),
+                    "pip install -e .",
+                    "setup",
+                    "pyproject.toml",
                 )
-            if "pytest" in raw or scan.has("pytest.ini"):
-                push("Run the tests", "pytest -v", "test", "pyproject.toml")
+            if "pytest" in pyproject or scan.has("pytest.ini"):
+                push(run_tests, "pytest -v", "test", "pyproject.toml")
         if scan.has("requirements.txt") and any(
             f.startswith(("tests/", "test/")) for f in scan.files
         ):
-            push("Run the tests", "pytest -v", "test", "tests/")
+            push(run_tests, "pytest -v", "test", "tests/")
 
         if scan.find("*.sln", limit=1) or scan.find("*.csproj", limit=1):
-            push("Restore packages", "dotnet restore", "setup", ".NET project")
-            push("Build the solution", "dotnet build", "build", ".NET project")
-            push("Run the tests", "dotnet test", "test", ".NET project")
+            push(
+                text("command.restorePackages"),
+                "dotnet restore",
+                "setup",
+                ".NET project",
+            )
+            push(text("command.buildSolution"), "dotnet build", "build", ".NET project")
+            push(run_tests, "dotnet test", "test", ".NET project")
             for project in scan.find("*.csproj", limit=6):
-                text = scan.read(project, max_chars=20_000)
-                if "Microsoft.NET.Sdk.Web" in text or "AspNetCore" in text:
+                content = scan.read(project, max_chars=20_000)
+                if "Microsoft.NET.Sdk.Web" in content or "AspNetCore" in content:
                     push(
-                        f"Run {Path(project).stem}",
+                        text("command.runProject", project=Path(project).stem),
                         f"dotnet run --project {project}",
                         "run",
                         project,
@@ -1011,22 +1099,27 @@ class OnboardingEngine:
                     break
 
         if scan.has("Cargo.toml"):
-            push("Build", "cargo build", "build", "Cargo.toml")
-            push("Run the tests", "cargo test", "test", "Cargo.toml")
+            push(build, "cargo build", "build", "Cargo.toml")
+            push(run_tests, "cargo test", "test", "Cargo.toml")
         if scan.has("go.mod"):
-            push("Build", "go build ./...", "build", "go.mod")
-            push("Run the tests", "go test ./...", "test", "go.mod")
+            push(build, "go build ./...", "build", "go.mod")
+            push(run_tests, "go test ./...", "test", "go.mod")
         if scan.has("pom.xml"):
-            push("Build", "mvn package", "build", "pom.xml")
-            push("Run the tests", "mvn test", "test", "pom.xml")
+            push(build, "mvn package", "build", "pom.xml")
+            push(run_tests, "mvn test", "test", "pom.xml")
         if scan.has("Gemfile"):
-            push("Install dependencies", "bundle install", "setup", "Gemfile")
+            push(install, "bundle install", "setup", "Gemfile")
         if scan.has("docker-compose.yml") or scan.has("docker-compose.yaml"):
-            push("Start the services", "docker compose up -d", "run", "docker-compose")
+            push(
+                text("command.startServices"),
+                "docker compose up -d",
+                "run",
+                "docker-compose",
+            )
 
         for target in self._makefile_targets(scan):
             push(
-                f"make {target}",
+                raw(f"make {target}"),
                 f"make {target}",
                 self._script_category(target),
                 "Makefile",
@@ -1086,24 +1179,57 @@ class OnboardingEngine:
             "languages": len(self._language_counts(scan)),
         }
 
-    def _getting_started(
+    # The five sections exist twice over: as translatable lines for the UI and
+    # as English markdown for the CLI. The markdown is rendered *from* the
+    # lines, so the two cannot say different things.
+
+    def _markdown(self, title: str, lines: list[Text]) -> str:
+        if not lines:
+            return ""
+        return "\n".join([f"## {title}\n", *(f"- {line.fallback}" for line in lines)])
+
+    def _getting_started_lines(
         self, scan: ProjectScan, commands: list[ProjectCommand]
-    ) -> str:
-        steps: list[str] = ["## Getting Started\n"]
+    ) -> list[Text]:
         ordered = [c for c in commands if c.category == "setup"]
         ordered += [c for c in commands if c.category == "build"][:1]
         ordered += [c for c in commands if c.category == "run"][:2]
         ordered += [c for c in commands if c.category == "test"][:1]
         if not ordered:
-            steps.append("1. Check README.md for setup instructions")
-            return "\n".join(steps)
-        for index, command in enumerate(ordered[:8], start=1):
-            steps.append(f"{index}. {command.label} — `{command.command}`")
-        if scan.has(".env.example"):
-            steps.append(
-                f"{len(ordered[:8]) + 1}. Copy `.env.example` to `.env` and fill in the values"
+            return [text("step.line.readmeFallback")]
+
+        lines = [
+            text(
+                "step.line.command",
+                label=command.label_i18n or raw(command.label),
+                command=command.command,
             )
+            for command in ordered[:8]
+        ]
+        if scan.has(".env.example"):
+            lines.append(text("step.line.envExample"))
+        return lines
+
+    def _getting_started(
+        self, scan: ProjectScan, commands: list[ProjectCommand]
+    ) -> str:
+        lines = self._getting_started_lines(scan, commands)
+        steps = ["## Getting Started\n"]
+        steps += [
+            f"{index}. {line.fallback}" for index, line in enumerate(lines, start=1)
+        ]
         return "\n".join(steps)
+
+    def _architecture_lines(self, nodes: list[ArchitectureNode]) -> list[Text]:
+        return [
+            text(
+                "step.line.architecture",
+                path=node.path,
+                role=node.role_i18n or raw(node.role),
+                count=node.file_count,
+            )
+            for node in nodes
+        ]
 
     def _architecture_text(self, nodes: list[ArchitectureNode]) -> str:
         if not nodes:
@@ -1116,16 +1242,17 @@ class OnboardingEngine:
             )
         return "\n".join(lines)
 
-    def _testing_text(self, scan: ProjectScan, commands: list[ProjectCommand]) -> str:
-        test_commands = [c for c in commands if c.category == "test"]
-        if not test_commands:
-            return ""
-        lines = ["## Testing\n"]
-        for command in test_commands[:4]:
-            lines.append(f"- `{command.command}` ({command.source})")
-        return "\n".join(lines)
+    def _testing_lines(self, commands: list[ProjectCommand]) -> list[Text]:
+        return [
+            text("step.line.testCommand", command=c.command, source=c.source)
+            for c in commands
+            if c.category == "test"
+        ][:4]
 
-    def _dependencies_text(self, scan: ProjectScan) -> str:
+    def _testing_text(self, scan: ProjectScan, commands: list[ProjectCommand]) -> str:
+        return self._markdown("Testing", self._testing_lines(commands))
+
+    def _dependency_manifests(self, scan: ProjectScan) -> list[str]:
         manifests = [
             name
             for name in (
@@ -1141,15 +1268,18 @@ class OnboardingEngine:
             )
             if scan.has(name)
         ]
-        manifests += scan.find("*.csproj", limit=3)
-        if not manifests:
-            return ""
-        lines = ["## Dependencies\n"]
-        for manifest in manifests:
-            lines.append(f"- `{manifest}`")
-        return "\n".join(lines)
+        return manifests + scan.find("*.csproj", limit=3)
 
-    def _deployment_text(self, scan: ProjectScan) -> str:
+    def _dependencies_lines(self, scan: ProjectScan) -> list[Text]:
+        return [
+            text("step.line.manifest", path=manifest)
+            for manifest in self._dependency_manifests(scan)
+        ]
+
+    def _dependencies_text(self, scan: ProjectScan) -> str:
+        return self._markdown("Dependencies", self._dependencies_lines(scan))
+
+    def _deployment_lines(self, scan: ProjectScan) -> list[Text]:
         artefacts = [
             name
             for name in (
@@ -1168,11 +1298,9 @@ class OnboardingEngine:
             if scan.has(name)
         ]
         workflows = [f for f in scan.files if f.startswith(".github/workflows/")][:4]
-        if not artefacts and not workflows:
-            return ""
-        lines = ["## Deployment\n"]
-        for artefact in artefacts:
-            lines.append(f"- `{artefact}`")
-        for workflow in workflows:
-            lines.append(f"- `{workflow}` (CI/CD)")
-        return "\n".join(lines)
+        lines = [text("step.line.deployment", path=a) for a in artefacts]
+        lines += [text("step.line.ciWorkflow", path=w) for w in workflows]
+        return lines
+
+    def _deployment_text(self, scan: ProjectScan) -> str:
+        return self._markdown("Deployment", self._deployment_lines(scan))
