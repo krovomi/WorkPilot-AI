@@ -127,10 +127,10 @@ async def test_context_size_is_reported_before_the_first_request():
 
 
 @pytest.mark.asyncio
-async def test_oversized_prompt_is_flagged_rather_than_silently_truncated(
-    monkeypatch,
-):
-    monkeypatch.setenv("OLLAMA_CONTEXT_LENGTH", "2048")
+async def test_the_window_is_sized_to_the_prompt(monkeypatch):
+    """A prompt bigger than the 8192 floor raises the window instead of being
+    quietly beheaded by the server — the failure the user actually hit."""
+    monkeypatch.delenv("OLLAMA_CONTEXT_LENGTH", raising=False)
     session = _FakeSession(
         [
             _FakeResponse(200, [_chunk("done", done=True)]),
@@ -138,10 +138,53 @@ async def test_oversized_prompt_is_flagged_rather_than_silently_truncated(
         ]
     )
     client = _client(session)
+    client._model_max_ctx = 131_072
+
+    await _collect(client, "x" * 30_000)  # ~10k tokens
+
+    assert session.payloads[0]["options"]["num_ctx"] == 16_384
+    # Every turn asks for the SAME window: a num_ctx that moves between turns
+    # makes Ollama evict and reload the model.
+    assert session.payloads[1]["options"]["num_ctx"] == 16_384
+
+
+@pytest.mark.asyncio
+async def test_a_prompt_beyond_the_ceiling_is_flagged(monkeypatch):
+    monkeypatch.setenv("OLLAMA_CONTEXT_LENGTH", "8192")
+    session = _FakeSession(
+        [
+            _FakeResponse(200, [_chunk("done", done=True)]),
+            _FakeResponse(200, [_chunk("", done=True)]),
+        ]
+    )
+    client = _client(session)
+    client._model_max_ctx = 131_072
 
     status_lines = _texts(await _collect(client, "x" * 40_000), MessageRole.SYSTEM)
 
-    assert any("dépasse la fenêtre de contexte" in line for line in status_lines)
+    assert any("ne tient pas dans la fenêtre" in line for line in status_lines)
+    # The ceiling is ours, so the remedy named is the ceiling.
+    assert any("OLLAMA_CONTEXT_LENGTH" in line for line in status_lines)
+
+
+@pytest.mark.asyncio
+async def test_a_model_that_cannot_go_wider_says_so_instead(monkeypatch):
+    """Raising a ceiling the model cannot use is not a remedy — it is a wasted
+    hour. When the model's own limit is what binds, say to change the model."""
+    monkeypatch.delenv("OLLAMA_CONTEXT_LENGTH", raising=False)
+    session = _FakeSession(
+        [
+            _FakeResponse(200, [_chunk("done", done=True)]),
+            _FakeResponse(200, [_chunk("", done=True)]),
+        ]
+    )
+    client = _client(session)
+    client._model_max_ctx = 8_192
+
+    status_lines = _texts(await _collect(client, "x" * 40_000), MessageRole.SYSTEM)
+
+    assert any("ne gère pas plus de 8192 tokens" in line for line in status_lines)
+    assert not any("OLLAMA_CONTEXT_LENGTH" in line for line in status_lines)
 
 
 @pytest.mark.asyncio
