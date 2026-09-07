@@ -3,12 +3,13 @@ import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
-import { CategoryBadge, EmptyState } from "./shared";
+import { CategoryBadge, EmptyState, useGeneratedText } from "./shared";
 
 export function GlossaryPanel(): React.ReactElement | null {
 	const { t } = useTranslation("onboardingAgent");
 	const pkg = useOnboardingAgentStore((s) => s.pkg);
 	const [query, setQuery] = useState("");
+	const generated = useGeneratedText();
 
 	if (!pkg) return null;
 	if (pkg.glossary.length === 0) {
@@ -16,12 +17,18 @@ export function GlossaryPanel(): React.ReactElement | null {
 	}
 
 	const needle = query.trim().toLowerCase();
-	const visible = pkg.glossary.filter(
-		(term) =>
-			!needle ||
-			term.term.toLowerCase().includes(needle) ||
-			term.definition.toLowerCase().includes(needle),
-	);
+	// Search the definition the reader can see, not the English one underneath.
+	const visible = pkg.glossary
+		.map((term) => ({
+			term,
+			definition: generated(term.definition_i18n, term.definition),
+		}))
+		.filter(
+			({ term, definition }) =>
+				!needle ||
+				term.term.toLowerCase().includes(needle) ||
+				definition.toLowerCase().includes(needle),
+		);
 
 	return (
 		<div className="space-y-3">
@@ -40,7 +47,7 @@ export function GlossaryPanel(): React.ReactElement | null {
 				<EmptyState message={t("glossaryNoMatch", { query })} />
 			) : (
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-					{visible.map((term) => (
+					{visible.map(({ term, definition }) => (
 						<div key={term.term} className="border rounded-md p-3 bg-card">
 							<div className="flex items-center justify-between gap-2">
 								<p className="font-mono text-sm truncate">{term.term}</p>
@@ -54,9 +61,9 @@ export function GlossaryPanel(): React.ReactElement | null {
 									</span>
 								</div>
 							</div>
-							{term.definition && (
+							{definition && (
 								<p className="text-xs text-muted-foreground mt-1">
-									{term.definition}
+									{definition}
 								</p>
 							)}
 							{term.sources.length > 0 && (
