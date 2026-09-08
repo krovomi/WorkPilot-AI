@@ -2012,6 +2012,8 @@ class OpenAIAgentClient(AgentClient):
                 logger.warning(
                     f"[OpenAIAgentClient] Tool executor init failed (text-only mode): {e}"
                 )
+        if getattr(self, "_offline_only", False):
+            return self
         # Bridge configured MCP servers (best-effort) so their tools are exposed
         # alongside the built-in toolset. Never fail client setup on MCP errors.
         try:
@@ -2136,7 +2138,10 @@ class OpenAIAgentClient(AgentClient):
 
             try:
                 async with session.post(
-                    self._api_base, json=payload, headers=request_headers
+                    self._api_base,
+                    json=payload,
+                    headers=request_headers,
+                    allow_redirects=not getattr(self, "_offline_only", False),
                 ) as resp:
                     if resp.status != 200:
                         error_text = await resp.text()
@@ -2988,6 +2993,8 @@ class LocalAgentClient(OpenAIAgentClient):
         project_dir: str | None = None,
         agent_type: str = "coder",
         base_url: str | None = None,
+        api_format: str = "ollama",
+        offline_only: bool = False,
         reasoning_effort: str | None = None,  # accepted for parity; unused locally
         prompt_cache_key: str | None = None,  # accepted for parity; unused locally
     ):
@@ -3019,6 +3026,8 @@ class LocalAgentClient(OpenAIAgentClient):
             or "local"
         )
         self._api_base = _resolve_local_base_url(base_url)
+        self._api_format = api_format
+        self._offline_only = offline_only
         # A large local model in non-streaming mode can legitimately take
         # minutes to produce a full completion; the aiohttp default (5 min)
         # would cut healthy slow turns. Generous, env-overridable ceiling.
@@ -3409,6 +3418,10 @@ class LocalAgentClient(OpenAIAgentClient):
         automatique en cours" for the whole download with no way to tell a live
         pull from a hung one. Never raises.
         """
+        if self._offline_only:
+            yield "error", "Offline mode blocks automatic model downloads"
+            return
+
         import json as _json
         import time as _time
 
@@ -3499,6 +3512,11 @@ class LocalAgentClient(OpenAIAgentClient):
         objects, tool results use ``role: "tool"``), so multi-turn tool calling
         round-trips correctly.
         """
+        if self._api_format == "openai":
+            async for message in super().receive_response():
+                yield message
+            return
+
         import json as _json
 
         if not self._pending_query:
@@ -3659,6 +3677,7 @@ class LocalAgentClient(OpenAIAgentClient):
                     async with session.post(
                         url,
                         json=turn_payload,
+                        allow_redirects=False,
                         # Overrides the session's 5-minute default; see
                         # _LOCAL_CHAT_SOCK_READ_TIMEOUT.
                         timeout=_aiohttp.ClientTimeout(

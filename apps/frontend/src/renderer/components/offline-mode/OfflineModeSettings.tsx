@@ -9,15 +9,20 @@ import {
 	Wifi,
 	WifiOff,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+	canSaveOfflinePolicy,
+	LOCAL_PROVIDERS as LOCAL_PROVIDER_IDS,
+	modelsForProvider,
+} from "../../stores/offline-mode-routing";
 import { useOfflineModeStore } from "../../stores/offline-mode-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 
-const LOCAL_PROVIDERS = new Set(["ollama", "lm-studio", "llama-cpp"]);
+const LOCAL_PROVIDERS = new Set<string>(LOCAL_PROVIDER_IDS);
 
 function formatAge(seconds: number): string {
 	if (seconds < 60) return `${seconds}s`;
@@ -35,6 +40,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 	const {
 		status,
 		policy,
+		savedPolicy,
 		report,
 		catalog,
 		loading,
@@ -46,6 +52,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 		refreshStatus,
 		scan,
 		setAirgap,
+		setDefaultProvider,
 		setRouting,
 		addRoutingRow,
 		removeRoutingRow,
@@ -58,25 +65,20 @@ export function OfflineModeSettings({ projectPath }: Props) {
 		if (projectPath) void loadAll(projectPath);
 	}, [projectPath, loadAll]);
 
-	const providerOptions = useMemo(() => {
-		const base = catalog?.providers ?? {};
-		const names = new Set(Object.keys(base));
-		if (policy) {
-			for (const entry of Object.values(policy.routing)) names.add(entry.provider);
-			names.add(policy.defaultProvider);
-		}
-		return Array.from(names).sort();
-	}, [catalog, policy]);
-
-	const modelsByProvider = (provider: string): string[] => {
-		const list = catalog?.providers?.[provider] ?? [];
-		return [...list].sort();
-	};
+	const providerOptions = LOCAL_PROVIDER_IDS;
+	const modelsByProvider = (provider: string) =>
+		modelsForProvider(catalog, provider);
+	const validPolicy = policy
+		? canSaveOfflinePolicy(policy, catalog, savedPolicy)
+		: false;
 
 	if (!projectPath) {
 		return (
 			<div className="flex items-center justify-center h-full text-muted-foreground">
-				{t("offlineMode:noProject", "Select a project to configure offline mode.")}
+				{t(
+					"offlineMode:noProject",
+					"Select a project to configure offline mode.",
+				)}
 			</div>
 		);
 	}
@@ -111,13 +113,16 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						className={`gap-1 ${confidentialityStyle[confidentiality]}`}
 					>
 						{confidentialityIcon}
-						{t(`offlineMode:confidentiality.${confidentiality}`, confidentiality)}
+						{t(
+							`offlineMode:confidentiality.${confidentiality}`,
+							confidentiality,
+						)}
 					</Badge>
 					<Button
 						size="sm"
 						variant="outline"
 						onClick={() => refreshStatus(projectPath)}
-						disabled={loading}
+						disabled={loading || scanning}
 					>
 						<RefreshCw className="w-3 h-3 mr-1" />
 						{t("offlineMode:refresh", "Refresh")}
@@ -125,9 +130,13 @@ export function OfflineModeSettings({ projectPath }: Props) {
 				</div>
 			</div>
 
+			<p className="text-sm text-muted-foreground">
+				{t("offlineMode:description")}
+			</p>
+
 			{error && (
 				<p className="text-sm text-destructive" role="alert">
-					{error}
+					{t(error, { defaultValue: error })}
 				</p>
 			)}
 
@@ -192,7 +201,11 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						</Label>
 						<div className="flex flex-wrap gap-1 mt-1">
 							{status.localModels.map((m) => (
-								<Badge key={m} variant="secondary" className="text-xs font-mono">
+								<Badge
+									key={m}
+									variant="secondary"
+									className="text-xs font-mono"
+								>
 									{m}
 								</Badge>
 							))}
@@ -214,9 +227,48 @@ export function OfflineModeSettings({ projectPath }: Props) {
 								checked={policy.airgapStrict}
 								onChange={(e) => setAirgap(e.target.checked)}
 							/>
-							{t("offlineMode:airgapStrict", "Airgap strict (block all cloud calls)")}
+							{t(
+								"offlineMode:airgapStrict",
+								"Airgap strict (block all cloud calls)",
+							)}
 						</label>
 					</div>
+
+					<p className="text-xs text-muted-foreground">
+						{t(
+							policy.airgapStrict
+								? "offlineMode:strictDescription"
+								: "offlineMode:hybridDescription",
+						)}
+					</p>
+					<label className="flex items-center gap-2 text-sm">
+						{t("offlineMode:defaultProvider")}
+						<select
+							value={policy.defaultProvider}
+							onChange={(e) => setDefaultProvider(e.target.value)}
+							className="h-8 rounded-md border border-input bg-background px-2"
+						>
+							{!LOCAL_PROVIDERS.has(policy.defaultProvider) && (
+								<option value={policy.defaultProvider} disabled>
+									{policy.defaultProvider} —{" "}
+									{t("offlineMode:unavailableProvider")}
+								</option>
+							)}
+							{providerOptions.map((provider) => (
+								<option key={provider} value={provider}>
+									{provider}
+								</option>
+							))}
+						</select>
+					</label>
+					<p className="text-xs text-muted-foreground">
+						{t("offlineMode:defaultDescription")}
+					</p>
+					{!validPolicy && (
+						<p className="text-sm text-yellow-600" role="alert">
+							{t("offlineMode:invalidPolicy")}
+						</p>
+					)}
 
 					<table className="w-full text-sm">
 						<thead className="text-xs text-muted-foreground">
@@ -236,7 +288,8 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						<tbody>
 							{Object.entries(policy.routing).map(([task, entry]) => {
 								const models = modelsByProvider(entry.provider);
-								const modelMissing = !!entry.model && !models.includes(entry.model);
+								const modelMissing =
+									!!entry.model && !models.includes(entry.model);
 								const isLocal = LOCAL_PROVIDERS.has(entry.provider);
 								return (
 									<tr key={task} className="border-t">
@@ -257,18 +310,20 @@ export function OfflineModeSettings({ projectPath }: Props) {
 												onChange={(e) => {
 													const nextProvider = e.target.value;
 													const nextModels = modelsByProvider(nextProvider);
-													const nextModel =
-														nextModels.length > 0 ? nextModels[0] : entry.model;
+													const nextModel = nextModels[0] ?? "";
 													setRouting(task, nextProvider, nextModel);
 												}}
 												className="h-7 w-full rounded-md border border-input bg-background px-2 text-sm"
 											>
-												{providerOptions.length === 0 && (
-													<option value={entry.provider}>{entry.provider}</option>
+												{!LOCAL_PROVIDERS.has(entry.provider) && (
+													<option value={entry.provider} disabled>
+														{entry.provider} —{" "}
+														{t("offlineMode:unavailableProvider")}
+													</option>
 												)}
 												{providerOptions.map((p) => (
 													<option key={p} value={p}>
-														{LOCAL_PROVIDERS.has(p) ? `🏠 ${p}` : `☁ ${p}`}
+														{p}
 													</option>
 												))}
 											</select>
@@ -280,19 +335,20 @@ export function OfflineModeSettings({ projectPath }: Props) {
 													setRouting(task, entry.provider, e.target.value)
 												}
 												className={`h-7 w-full rounded-md border bg-background px-2 text-sm ${
-													modelMissing
-														? "border-yellow-500/60"
-														: "border-input"
+													modelMissing ? "border-yellow-500/60" : "border-input"
 												}`}
 											>
 												{modelMissing && (
-													<option value={entry.model}>
-														{entry.model} (not detected)
+													<option value={entry.model} disabled>
+														{entry.model} — {t("offlineMode:modelUnavailable")}
 													</option>
 												)}
-												{models.length === 0 && !modelMissing && (
-													<option value="">
-														{t("offlineMode:noModelsForProvider", "No models detected")}
+												{!entry.model && (
+													<option value="" disabled>
+														{t(
+															"offlineMode:noModelsForProvider",
+															"No models detected",
+														)}
 													</option>
 												)}
 												{models.map((m) => (
@@ -326,7 +382,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 							<Input
 								value={newTask}
 								onChange={(e) => setNewTask(e.target.value)}
-								placeholder="e.g. summary"
+								placeholder={t("offlineMode:taskPlaceholder")}
 								className="h-8"
 							/>
 						</div>
@@ -362,7 +418,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						<Button
 							size="sm"
 							onClick={() => save(projectPath)}
-							disabled={!dirty || saving}
+							disabled={!dirty || saving || scanning || !validPolicy}
 						>
 							<Save className="w-3 h-3 mr-1" />
 							{saving

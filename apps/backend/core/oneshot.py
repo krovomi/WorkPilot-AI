@@ -82,7 +82,7 @@ def _resolve_model(provider: str, explicit: str | None, spec_dir: Path | None) -
     # Local providers have no fixed cheap default — prefer a model the task
     # already uses, then an env override, then a sensible local default. Never
     # fall back to _FALLBACK_MODEL (a Claude model) for a local provider.
-    if provider in ("ollama", "local", "lmstudio"):
+    if provider in ("ollama", "local", "lmstudio", "lm-studio", "llama-cpp"):
         import os
 
         return (
@@ -130,6 +130,15 @@ def _build_client(
     max_turns: int,
 ):
     cwd = str(Path(project_dir).resolve()) if project_dir else None
+    from core.offline_policy import local_endpoint, resolve_offline_route
+
+    provider, model, offline_base_url = resolve_offline_route(
+        Path(cwd or Path.cwd()),
+        Path(spec_dir or cwd or Path.cwd()),
+        "commit_message",
+        provider,
+        model,
+    )
 
     if provider in ("claude", "anthropic"):
         return _claude_client(model, system_prompt, project_dir)
@@ -188,13 +197,23 @@ def _build_client(
             agent_type="commit_message",
         )
 
-    if provider in ("ollama", "local", "lmstudio"):
+    if provider in ("ollama", "local", "lmstudio", "lm-studio", "llama-cpp"):
         # Local OpenAI-compatible server — no project context required, so
         # context-free utilities (title, terminal name, …) run locally too.
         from core.agent_client import LocalAgentClient
 
         return LocalAgentClient(
             model=model,
+            base_url=offline_base_url
+            or (
+                local_endpoint(provider)
+                if provider in ("lmstudio", "lm-studio", "llama-cpp")
+                else None
+            ),
+            api_format="openai"
+            if provider in ("lmstudio", "lm-studio", "llama-cpp")
+            else "ollama",
+            offline_only=offline_base_url is not None,
             system_prompt=system_prompt,
             max_turns=max_turns,
             project_dir=cwd,

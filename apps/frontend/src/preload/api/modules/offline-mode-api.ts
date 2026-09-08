@@ -70,11 +70,13 @@ export interface OfflineModeAPI {
 		projectPath: string,
 		force?: boolean,
 	) => Promise<OfflineModelCatalog>;
-	getOfflinePolicy: (projectPath: string) => Promise<{ policy: OfflinePolicy }>;
+	getOfflinePolicy: (
+		projectPath: string,
+	) => Promise<{ policy: OfflinePolicy; persisted?: boolean }>;
 	setOfflinePolicy: (
 		projectPath: string,
 		policy: OfflinePolicy,
-	) => Promise<{ policy: OfflinePolicy }>;
+	) => Promise<{ policy: OfflinePolicy; persisted?: boolean }>;
 	getOfflineReport: (projectPath: string) => Promise<OfflineReport>;
 }
 
