@@ -5,11 +5,11 @@
 	"refresh": "Refresh",
 	"runtimes": "Local runtimes",
 	"available": "available",
-	"notFound": "not found",
+	"notFound": "server unreachable",
 	"modelsInstalled": "models installed",
-	"localModels": "Local models",
+	"localModels": "Local generation models",
 	"policy": "Routing policy",
-	"airgapStrict": "Airgap strict (block all cloud calls)",
+	"airgapStrict": "Strict mode (block cloud LLM clients)",
 	"task": "Task",
 	"providerCol": "Provider",
 	"modelCol": "Model",
@@ -30,5 +30,14 @@
 		"local": "local",
 		"mixed": "mixed",
 		"unknown": "unknown"
-	}
+	},
+	"description": "A local provider runs models on your computer. Only generation models detected on Ollama, LM Studio and llama.cpp are offered here.",
+	"strictDescription": "Once saved, strict mode rejects cloud LLM clients. Operations that still require a cloud client are blocked. This setting does not disable other application network access.",
+	"hybridDescription": "Strict mode is disabled: operations without a local route may still use the cloud.",
+	"defaultProvider": "Default runtime",
+	"unavailableProvider": "replace this non-local provider",
+	"invalidPolicy": "Choose a detected model for every task and configure at least one task for the default runtime in strict mode.",
+	"modelUnavailable": "unavailable model; select a replacement",
+	"taskPlaceholder": "e.g. summary",
+	"defaultDescription": "In strict mode, unlisted tasks use the first model configured in the table for this runtime."
 }
