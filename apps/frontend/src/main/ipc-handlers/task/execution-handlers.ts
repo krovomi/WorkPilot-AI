@@ -69,6 +69,7 @@ import { stripHtml } from "../shared/sanitize";
 import {
 	buildPhaseRerunPlanUpdate,
 	downstreamLogPhases,
+	rerunNeedsSpecCreation,
 	type RerunPhase,
 } from "./plan-rerun-utils";
 
@@ -146,7 +147,10 @@ function convertTaskMetadataToSpecCreation(metadata?: any): any {
 
 	return {
 		requireReviewBeforeCoding: metadata.requireReviewBeforeCoding,
-		provider: metadata.phaseProviders?.spec || metadata.provider,
+		provider:
+			metadata.phaseProviders?.planning ||
+			metadata.phaseProviders?.spec ||
+			metadata.provider,
 		isAutoProfile: metadata.isAutoProfile,
 		phaseModels: convertPhaseModelConfig(metadata.phaseModels),
 		phaseThinking: convertPhaseThinkingConfig(metadata.phaseThinking),
@@ -2233,7 +2237,7 @@ print(json.dumps(result))
 					atomicWriteFileSync(planFile, JSON.stringify(plan, null, 2));
 					planWritten = true;
 				}
-				if (!planWritten) {
+				if (!planWritten && phase !== "planning") {
 					return {
 						success: false,
 						error:
@@ -2255,6 +2259,7 @@ print(json.dumps(result))
 					"LOCAL_MODEL_NO_TOOLS_HALT",
 					"PAUSE",
 					"RESUME_WITH_PROVIDER",
+					"HOT_SWAP.json",
 				];
 				for (const dir of specDirs) {
 					for (const name of markerNames) {
@@ -2273,16 +2278,35 @@ print(json.dumps(result))
 				//    worktree if it was cleaned up.
 				const baseBranch =
 					task.metadata?.baseBranch || project.settings?.mainBranch;
-				await agentManager.startTaskExecution(
-					taskId,
-					project.path,
-					task.specId,
-					{
-						useWorktree: task.metadata?.useWorktree !== false,
+				const specDir = specPaths.specDir;
+				if (
+					rerunNeedsSpecCreation(
+						phase,
+						existsSync(path.join(specDir, AUTO_BUILD_PATHS.SPEC_FILE)),
+					)
+				) {
+					fileWatcher.watch(taskId, specDir);
+					await agentManager.startSpecCreation(
+						taskId,
+						project.path,
+						task.description || task.title,
+						specDir,
+						convertTaskMetadataToSpecCreation(task.metadata),
 						baseBranch,
-					},
-					project.id,
-				);
+						project.id,
+					);
+				} else {
+					await agentManager.startTaskExecution(
+						taskId,
+						project.path,
+						task.specId,
+						{
+							useWorktree: task.metadata?.useWorktree !== false,
+							baseBranch,
+						},
+						project.id,
+					);
+				}
 
 				appLog.info(
 					`[TASK_RERUN_PHASE] task=${taskId} phase=${phase} ` +

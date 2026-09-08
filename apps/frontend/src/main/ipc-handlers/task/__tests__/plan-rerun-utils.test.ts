@@ -10,6 +10,7 @@ import {
 	buildPhaseRerunPlanUpdate,
 	downstreamLogPhases,
 	rerunDiscardsWork,
+	rerunNeedsSpecCreation,
 } from "../plan-rerun-utils";
 
 function makePlan() {
@@ -61,8 +62,9 @@ describe("buildPhaseRerunPlanUpdate", () => {
 		const plan = makePlan();
 		buildPhaseRerunPlanUpdate(plan, "validation");
 
-		const subtasks = (plan.phases as Array<{ subtasks: Array<{ status: string }> }>)[0]
-			.subtasks;
+		const subtasks = (
+			plan.phases as Array<{ subtasks: Array<{ status: string }> }>
+		)[0].subtasks;
 		expect(subtasks[0].status).toBe("completed"); // untouched
 		expect(subtasks[1].status).toBe("blocked");
 		expect(plan.qa_signoff).toEqual({ status: "pending" });
@@ -110,8 +112,16 @@ describe("buildPhaseRerunPlanUpdate", () => {
 			phases: [{ chunks: [{ id: "c1", status: "completed" }] }],
 		} as Record<string, unknown>;
 		buildPhaseRerunPlanUpdate(plan, "coding");
-		const chunks = (plan.phases as Array<{ chunks: Array<{ status: string }> }>)[0]
-			.chunks;
+		const chunks = (
+			plan.phases as Array<{ chunks: Array<{ status: string }> }>
+		)[0].chunks;
 		expect(chunks[0].status).toBe("pending");
 	});
+});
+
+it("restarts incomplete planning through spec creation", () => {
+	expect(rerunNeedsSpecCreation("planning", false)).toBe(true);
+	expect(rerunNeedsSpecCreation("planning", true)).toBe(false);
+	expect(rerunNeedsSpecCreation("coding", false)).toBe(false);
+	expect(rerunNeedsSpecCreation("validation", false)).toBe(false);
 });
