@@ -429,7 +429,7 @@ class AgentRunner:
         Returns:
             (success, response_text) tuple
         """
-        from core.agent_client import ContentBlockType
+        from core.agent_client import ContentBlockType, LocalModelRuntimeError
 
         current_tool = None
         message_count = 0
@@ -538,6 +538,11 @@ class AgentRunner:
                     response_length=len(response_text),
                 )
                 return True, response_text
+
+        except LocalModelRuntimeError as e:
+            if self.task_logger:
+                self.task_logger.log_error(str(e), LogPhase.PLANNING)
+            raise
 
         except Exception as e:
             debug_error(

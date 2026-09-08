@@ -12,7 +12,12 @@ from __future__ import annotations
 import json
 
 import pytest
-from core.agent_client import ContentBlockType, LocalAgentClient, MessageRole
+from core.agent_client import (
+    ContentBlockType,
+    LocalAgentClient,
+    LocalModelRuntimeError,
+    MessageRole,
+)
 
 
 class _FakeResponse:
@@ -294,13 +299,15 @@ async def test_mid_stream_error_is_surfaced_not_swallowed():
     )
     client = _client(session)
 
-    status_lines = _texts(await _collect(client), MessageRole.SYSTEM)
-
-    assert any("model runner has terminated" in line for line in status_lines)
+    with pytest.raises(LocalModelRuntimeError, match="model runner has terminated"):
+        await _collect(client)
 
 
 @pytest.mark.asyncio
-async def test_a_silent_turn_reports_where_the_model_is_loaded(monkeypatch):
+@pytest.mark.parametrize("early_output", [False, True])
+async def test_a_silent_turn_reports_where_the_model_is_loaded(
+    monkeypatch, early_output
+):
     """The heartbeat's first pass with nothing to show asks /api/ps.
 
     At 30 seconds, not at five minutes: a model spilled onto the CPU is
@@ -319,6 +326,8 @@ async def test_a_silent_turn_reports_where_the_model_is_loaded(monkeypatch):
             async def _iter():
                 import asyncio
 
+                if early_output:
+                    yield _chunk("starting").encode("utf-8")
                 await asyncio.sleep(0.05)
                 for line in self._lines:
                     yield line.encode("utf-8")
@@ -505,3 +514,82 @@ async def test_the_server_url_is_in_the_context_line(monkeypatch):
     status_lines = _texts(await _collect(client), MessageRole.SYSTEM)
 
     assert any("serveur http://127.0.0.1:11434" in line for line in status_lines)
+
+
+@pytest.mark.asyncio
+async def test_stalled_stream_is_terminal_and_reader_is_cancelled(monkeypatch):
+    import asyncio
+
+    from core.agent_client import LocalModelRuntimeError
+
+    closed = asyncio.Event()
+
+    class Stalled(_FakeResponse):
+        @property
+        def content(self):
+            async def stream():
+                try:
+                    yield _chunk("partial").encode()
+                    await asyncio.Event().wait()
+                finally:
+                    closed.set()
+
+            return stream()
+
+    monkeypatch.setattr("core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.005)
+    client = _client(_FakeSession([Stalled(200, [])]))
+    client._model_max_ctx = 16384
+    client._generation_idle_timeout = 0.02
+    with pytest.raises(LocalModelRuntimeError, match="interrompue"):
+        await asyncio.wait_for(_collect(client), 1)
+    assert closed.is_set()
+
+
+@pytest.mark.asyncio
+async def test_truncated_stream_is_not_a_success():
+    from core.agent_client import LocalModelRuntimeError
+
+    client = _client(_FakeSession([_FakeResponse(200, [_chunk("partial")])]))
+    client._model_max_ctx = 16384
+    with pytest.raises(LocalModelRuntimeError):
+        await _collect(client)
+
+
+@pytest.mark.asyncio
+async def test_slow_but_continuous_stream_has_a_total_deadline(monkeypatch):
+    import asyncio
+
+    class Endless(_FakeResponse):
+        @property
+        def content(self):
+            async def stream():
+                while True:
+                    yield _chunk("x").encode()
+                    await asyncio.sleep(0.002)
+
+            return stream()
+
+    monkeypatch.setattr("core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.005)
+    client = _client(_FakeSession([Endless(200, [])]))
+    client._model_max_ctx = 16384
+    client._request_timeout = 0.02
+    with pytest.raises(LocalModelRuntimeError, match="interrompue"):
+        await asyncio.wait_for(_collect(client), 1)
+
+
+@pytest.mark.asyncio
+async def test_done_marker_completes_without_waiting_for_connection_close():
+    import asyncio
+
+    class OpenConnection(_FakeResponse):
+        @property
+        def content(self):
+            async def stream():
+                yield _chunk("", done=True).encode()
+                await asyncio.Event().wait()
+
+            return stream()
+
+    client = _client(_FakeSession([OpenConnection(200, [])]))
+    client._model_max_ctx = 16384
+    await asyncio.wait_for(_collect(client), 1)
