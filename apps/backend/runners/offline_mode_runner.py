@@ -165,6 +165,7 @@ def _scan_models(project_path: Path, force: bool = False) -> dict:
             TypeError,
             AttributeError,
         ):
+            # A missing or invalid cache is rebuilt from the running local services.
             pass
 
     ollama = _detect_ollama()
@@ -205,6 +206,7 @@ def _scan_models(project_path: Path, force: bool = False) -> dict:
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         cache_file.write_text(json.dumps(result, indent=2), encoding="utf-8")
     except OSError:
+        # Caching is optional: return the detected models even on read-only projects.
         pass
 
     return result
