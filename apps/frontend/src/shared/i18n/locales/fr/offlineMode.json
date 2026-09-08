@@ -5,11 +5,11 @@
 	"refresh": "Rafraîchir",
 	"runtimes": "Runtimes locaux",
 	"available": "disponible",
-	"notFound": "introuvable",
+	"notFound": "serveur inaccessible",
 	"modelsInstalled": "modèles installés",
-	"localModels": "Modèles locaux",
+	"localModels": "Modèles locaux de génération",
 	"policy": "Politique de routage",
-	"airgapStrict": "Airgap strict (bloque tous les appels cloud)",
+	"airgapStrict": "Mode strict (bloquer les clients LLM cloud)",
 	"task": "Tâche",
 	"providerCol": "Fournisseur",
 	"modelCol": "Modèle",
@@ -30,5 +30,14 @@
 		"local": "local",
 		"mixed": "mixte",
 		"unknown": "inconnu"
-	}
+	},
+	"description": "Un fournisseur local exécute les modèles sur votre ordinateur. Seuls les modèles de génération détectés sur Ollama, LM Studio et llama.cpp sont proposés ici.",
+	"strictDescription": "Après enregistrement, le mode strict refuse les clients LLM cloud. Les opérations qui exigent encore un client cloud sont bloquées. Ce réglage ne coupe pas les autres accès réseau de l’application.",
+	"hybridDescription": "Le mode strict est désactivé : les opérations sans route locale peuvent encore utiliser le cloud.",
+	"defaultProvider": "Moteur par défaut",
+	"unavailableProvider": "fournisseur non local à remplacer",
+	"invalidPolicy": "Choisissez un modèle détecté pour chaque tâche et configurez au moins une tâche pour le moteur par défaut en mode strict.",
+	"modelUnavailable": "modèle indisponible à remplacer",
+	"taskPlaceholder": "Ex. : summary",
+	"defaultDescription": "En mode strict, les tâches non listées utilisent le premier modèle configuré dans la table pour ce moteur."
 }

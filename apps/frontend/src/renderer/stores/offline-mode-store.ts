@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { canSaveOfflinePolicy, newLocalRoute } from "./offline-mode-routing";
 import type {
 	OfflineModelCatalog,
 	OfflinePolicy,
@@ -7,6 +8,8 @@ import type {
 } from "../../preload/api/modules/offline-mode-api";
 
 interface OfflineModeState {
+	savedPolicy: OfflinePolicy | null;
+	projectPath: string | null;
 	status: OfflineStatus | null;
 	policy: OfflinePolicy | null;
 	report: OfflineReport | null;
@@ -21,6 +24,7 @@ interface OfflineModeState {
 	refreshStatus: (projectPath: string) => Promise<void>;
 	scan: (projectPath: string, force?: boolean) => Promise<void>;
 	setAirgap: (value: boolean) => void;
+	setDefaultProvider: (provider: string) => void;
 	setRouting: (task: string, provider: string, model: string) => void;
 	addRoutingRow: (task: string) => void;
 	removeRoutingRow: (task: string) => void;
@@ -28,6 +32,8 @@ interface OfflineModeState {
 }
 
 export const useOfflineModeStore = create<OfflineModeState>((set, get) => ({
+	savedPolicy: null,
+	projectPath: null,
 	status: null,
 	policy: null,
 	report: null,
@@ -39,7 +45,19 @@ export const useOfflineModeStore = create<OfflineModeState>((set, get) => ({
 	dirty: false,
 
 	loadAll: async (projectPath) => {
-		set({ loading: true, error: null });
+		set({
+			projectPath,
+			status: null,
+			policy: null,
+			savedPolicy: null,
+			catalog: null,
+			report: null,
+			dirty: false,
+			saving: false,
+			scanning: false,
+			loading: true,
+			error: null,
+		});
 		try {
 			const [status, policyRes, report, catalog] = await Promise.all([
 				globalThis.electronAPI.getOfflineStatus(projectPath),
@@ -47,40 +65,52 @@ export const useOfflineModeStore = create<OfflineModeState>((set, get) => ({
 				globalThis.electronAPI.getOfflineReport(projectPath),
 				globalThis.electronAPI.scanOfflineModels(projectPath),
 			]);
+			if (get().projectPath !== projectPath) return;
 			set({
 				status,
 				policy: policyRes.policy,
+				savedPolicy: policyRes.persisted === false ? null : policyRes.policy,
 				report,
 				catalog,
 				loading: false,
-				dirty: false,
+				dirty: policyRes.persisted === false,
 			});
 		} catch (e) {
-			set({ error: String(e), loading: false });
+			if (get().projectPath === projectPath)
+				set({ error: String(e), loading: false });
 		}
 	},
 
-	refreshStatus: async (projectPath) => {
-		try {
-			const status = await globalThis.electronAPI.getOfflineStatus(projectPath);
-			set({ status });
-		} catch (e) {
-			set({ error: String(e) });
-		}
-	},
+	refreshStatus: async (projectPath) => get().scan(projectPath, true),
 
 	scan: async (projectPath, force) => {
+		if (get().projectPath !== projectPath) return;
 		set({ scanning: true, error: null });
 		try {
-			const catalog = await globalThis.electronAPI.scanOfflineModels(
-				projectPath,
-				force,
-			);
-			set({ catalog, scanning: false });
+			const [catalog, status] = await Promise.all([
+				globalThis.electronAPI.scanOfflineModels(projectPath, force),
+				globalThis.electronAPI.getOfflineStatus(projectPath),
+			]);
+			if (get().projectPath === projectPath)
+				set({ catalog, status, scanning: false });
 		} catch (e) {
-			set({ error: String(e), scanning: false });
+			if (get().projectPath === projectPath)
+				set({ error: String(e), scanning: false });
 		}
 	},
+
+	setDefaultProvider: (provider) =>
+		set((s) =>
+			s.policy
+				? {
+						policy: {
+							...s.policy,
+							defaultProvider: newLocalRoute(s.catalog, provider).provider,
+						},
+						dirty: true,
+					}
+				: s,
+		),
 
 	setAirgap: (value) =>
 		set((s) =>
@@ -111,10 +141,7 @@ export const useOfflineModeStore = create<OfflineModeState>((set, get) => ({
 					...s.policy,
 					routing: {
 						...s.policy.routing,
-						[task]: {
-							provider: s.policy.defaultProvider,
-							model: "claude-sonnet-4-6",
-						},
+						[task]: newLocalRoute(s.catalog, s.policy.defaultProvider),
 					},
 				},
 				dirty: true,
@@ -130,13 +157,23 @@ export const useOfflineModeStore = create<OfflineModeState>((set, get) => ({
 
 	save: async (projectPath) => {
 		const policy = get().policy;
-		if (!policy) return;
+		if (!policy || get().projectPath !== projectPath) return;
+		if (!canSaveOfflinePolicy(policy, get().catalog, get().savedPolicy)) {
+			set({ error: "offlineMode:invalidPolicy" });
+			return;
+		}
 		set({ saving: true, error: null });
 		try {
 			await globalThis.electronAPI.setOfflinePolicy(projectPath, policy);
-			set({ saving: false, dirty: false });
+			if (get().projectPath === projectPath)
+				set({
+					saving: false,
+					savedPolicy: policy,
+					dirty: get().policy !== policy,
+				});
 		} catch (e) {
-			set({ error: String(e), saving: false });
+			if (get().projectPath === projectPath)
+				set({ error: String(e), saving: false });
 		}
 	},
 }));
