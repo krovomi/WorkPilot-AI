@@ -904,6 +904,8 @@
 			"smallWarn": "⚠ small — not advised for planning",
 			"smallWarnTip": "Small model ({{n}}B) — not advised for planning (prefer ≥24B or Claude); limited on complex tasks.",
 			"download": "Download",
+			"runningNotice": "Running model: {{model}}. Selecting a model does not replace the current request. Use Rerun to restart with the new settings.",
+			"runtimeUnknown": "not reported yet",
 			"customOption": "Other (official catalog)",
 			"searchTitle": "Find an Ollama model",
 			"searchSource": "Source: official catalog at ollama.com/library",
@@ -956,9 +958,9 @@
 		},
 		"hotSwap": {
 			"title": "Hot swap requested",
-			"desc": "The change will apply on the next turn, keeping the context.",
+			"desc": "Change requested. The current request may continue; use Rerun to restart immediately.",
 			"pending": "Swapping…",
-			"pendingTip": "The LLM change will apply on the next turn."
+			"pendingTip": "Change requested. The current request may continue; use Rerun to restart immediately."
 		}
 	},
 	"modal": {

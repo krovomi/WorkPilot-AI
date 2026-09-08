@@ -129,7 +129,10 @@ function recordReviewVerdictForLearning(
 			);
 		}
 	} catch (err) {
-		console.warn("[TASK_UPDATE_STATUS] Learning outcome recording failed:", err);
+		console.warn(
+			"[TASK_UPDATE_STATUS] Learning outcome recording failed:",
+			err,
+		);
 	}
 }
 
@@ -143,7 +146,7 @@ function convertTaskMetadataToSpecCreation(metadata?: any): any {
 
 	return {
 		requireReviewBeforeCoding: metadata.requireReviewBeforeCoding,
-		provider: metadata.provider,
+		provider: metadata.phaseProviders?.spec || metadata.provider,
 		isAutoProfile: metadata.isAutoProfile,
 		phaseModels: convertPhaseModelConfig(metadata.phaseModels),
 		phaseThinking: convertPhaseThinkingConfig(metadata.phaseThinking),
@@ -817,7 +820,8 @@ export function registerTaskExecutionHandlers(
 			if (!existsSync(sessionFile)) {
 				return {
 					success: false,
-					error: "No persisted SDK session found for this task — run it once first.",
+					error:
+						"No persisted SDK session found for this task — run it once first.",
 				};
 			}
 
@@ -1324,8 +1328,7 @@ export function registerTaskExecutionHandlers(
 			if (status === "done") {
 				// If a PR already exists for this task, skip PR creation
 				// (e.g. task moved out of "done" column and back in)
-				const existingPrUrl =
-					task.prUrl || task.metadata?.prUrl;
+				const existingPrUrl = task.prUrl || task.metadata?.prUrl;
 				if (existingPrUrl) {
 					console.warn(
 						`[TASK_UPDATE_STATUS] PR already exists for task ${taskId}: ${existingPrUrl} — skipping creation`,
@@ -1648,7 +1651,10 @@ print(json.dumps(result))
 
 					// Check git status before auto-starting
 					const gitStatusCheckForQa = checkGitStatus(project.path);
-					if (!gitStatusCheckForQa.isGitRepo || !gitStatusCheckForQa.hasCommits) {
+					if (
+						!gitStatusCheckForQa.isGitRepo ||
+						!gitStatusCheckForQa.hasCommits
+					) {
 						console.warn(
 							"[TASK_UPDATE_STATUS] Git check failed, cannot start QA validation",
 						);
@@ -2290,8 +2296,7 @@ print(json.dumps(result))
 				);
 				return {
 					success: false,
-					error:
-						err instanceof Error ? err.message : "Failed to re-run phase",
+					error: err instanceof Error ? err.message : "Failed to re-run phase",
 				};
 			}
 		},
@@ -2348,7 +2353,10 @@ print(json.dumps(result))
 						atomicWriteFileSync(path.join(dir, "HOT_SWAP.json"), payload);
 						wrote = true;
 					} catch (err) {
-						appLog.warn(`[TASK_HOT_SWAP] Could not write marker in ${dir}:`, err);
+						appLog.warn(
+							`[TASK_HOT_SWAP] Could not write marker in ${dir}:`,
+							err,
+						);
 					}
 				}
 				if (!wrote) {
@@ -2451,7 +2459,11 @@ print(json.dumps(result))
 					"LOCAL_MODEL_NO_TOOLS_HALT",
 				);
 				let removed = 0;
-				for (const target of [conversationLog, haltMarker, localNoToolsMarker]) {
+				for (const target of [
+					conversationLog,
+					haltMarker,
+					localNoToolsMarker,
+				]) {
 					if (existsSync(target)) {
 						unlinkSync(target);
 						removed++;
@@ -3316,12 +3328,13 @@ print(json.dumps(result))
 			if (!updatedPlan) {
 				return {
 					success: false,
-					error:
-						"Failed to update plan - file may not exist or be corrupted",
+					error: "Failed to update plan - file may not exist or be corrupted",
 				};
 			}
 
-			appLog.info(`[TASK_UPDATE_PLAN] Successfully updated plan for task ${taskId}`);
+			appLog.info(
+				`[TASK_UPDATE_PLAN] Successfully updated plan for task ${taskId}`,
+			);
 			return { success: true };
 		},
 	);
@@ -3332,11 +3345,7 @@ print(json.dumps(result))
 	 */
 	ipcMain.handle(
 		"TASK_PAUSE",
-		async (
-			_,
-			taskId: string,
-			subtaskId?: string,
-		): Promise<IPCResult> => {
+		async (_, taskId: string, subtaskId?: string): Promise<IPCResult> => {
 			try {
 				const { task, project } = findTaskAndProject(taskId);
 				if (!task || !project) {
@@ -3452,7 +3461,8 @@ print(json.dumps(result))
 				appLog.info(`[TASK_RESUME] Task ${taskId} resumed`);
 
 				// Start execution from pause checkpoint
-				const baseBranch = task.metadata?.baseBranch || project.settings?.mainBranch;
+				const baseBranch =
+					task.metadata?.baseBranch || project.settings?.mainBranch;
 
 				agentManager.startTaskExecution(
 					taskId,

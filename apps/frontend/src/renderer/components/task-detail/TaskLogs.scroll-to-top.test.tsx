@@ -269,3 +269,38 @@ it("opens official search outside the header when the select restores focus", as
 	fireEvent.keyDown(input, { key: "Escape" });
 	expect(screen.queryByLabelText("tasks:logs.model.customAria")).toBeNull();
 });
+
+it("keeps the active execution visible after selecting another model", () => {
+	const logs = makePhaseLogs();
+	logs.phases.planning.status = "active";
+	logs.phases.planning.entries = [
+		{
+			timestamp: "2026-09-08T00:00:00Z",
+			type: "info",
+			content: "Active Llama request",
+			phase: "planning",
+			model: "llama3.3",
+			provider: "ollama",
+		},
+	];
+	render(
+		<TaskLogs
+			task={{
+				...baseTask,
+				metadata: { provider: "ollama", model: "qwen3:8b" },
+			}}
+			phaseLogs={logs}
+			isLoadingLogs={false}
+			expandedPhases={new Set(["planning"])}
+			isStuck={false}
+			logsEndRef={createRef<HTMLDivElement>()}
+			logsContainerRef={createRef<HTMLDivElement>()}
+			onLogsScroll={vi.fn()}
+			onTogglePhase={vi.fn()}
+		/>,
+	);
+	expect(
+		screen.getByText("tasks:logs.model.runningNotice"),
+	).toBeInTheDocument();
+	expect(screen.getByText("Active Llama request")).toBeInTheDocument();
+});
