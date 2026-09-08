@@ -92,7 +92,9 @@ export function isSameLocalModel(
 export const CUSTOM_MODEL_SENTINEL = "custom";
 
 /** True when `value` is the free-text placeholder rather than a model id. */
-export function isCustomModelSentinel(value: string | undefined | null): boolean {
+export function isCustomModelSentinel(
+	value: string | undefined | null,
+): boolean {
 	return (value ?? "").trim().toLowerCase() === CUSTOM_MODEL_SENTINEL;
 }
 
@@ -170,4 +172,9 @@ function pickInstalledValue(
 	if (listed.has(a.trim().toLowerCase())) return a;
 	if (listed.has(b.trim().toLowerCase())) return b;
 	return a;
+}
+
+/** Embedding models cannot generate plans or call agent tools. */
+export function isEmbeddingModel(name: string): boolean {
+	return /embed|bge-|e5-|minilm/i.test(name);
 }
