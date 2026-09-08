@@ -118,3 +118,11 @@ export function buildPhaseRerunPlanUpdate(plan: Plan, phase: RerunPhase): Plan {
 
 	return plan;
 }
+
+/** Planning starts with spec creation until its document exists. */
+export function rerunNeedsSpecCreation(
+	phase: RerunPhase,
+	hasSpec: boolean,
+): boolean {
+	return phase === "planning" && !hasSpec;
+}

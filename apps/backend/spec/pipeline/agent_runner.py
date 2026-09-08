@@ -125,6 +125,15 @@ class AgentRunner:
                 context_length=len(additional_context),
             )
 
+        # Determine which provider to use
+        from core.client import _get_active_provider
+
+        active_provider = _get_active_provider(self.spec_dir)
+        debug("agent_runner", f"Active provider resolved: {active_provider}")
+
+        if self.task_logger:
+            self.task_logger.set_llm(active_provider, self.model)
+
         # Create client with thinking budget
         # Log model/CWD prominently so issues are visible in task console
         debug(
@@ -146,12 +155,6 @@ class AgentRunner:
                 print_to_console=True,
             )
 
-        # Determine which provider to use
-        from core.client import _get_active_provider
-
-        active_provider = _get_active_provider(self.spec_dir)
-        debug("agent_runner", f"Active provider resolved: {active_provider}")
-
         if active_provider not in ("claude", "anthropic"):
             # Non-Claude providers (openai, windsurf, copilot, google, mistral,
             # deepseek, grok, meta, aws, ollama, etc.): use create_agent_client
@@ -169,6 +172,8 @@ class AgentRunner:
                 spec_dir=self.spec_dir,
                 model=self.model,
                 agent_type="spec_writer",
+                provider=active_provider,
+                max_thinking_tokens=thinking_budget,
             )
             return await self._run_with_agent_client(client, prompt)
 

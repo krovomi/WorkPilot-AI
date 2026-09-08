@@ -13,6 +13,7 @@ import { readSettingsFile } from "../settings-utils";
 import { AgentEvents } from "./agent-events";
 import { AgentProcessManager } from "./agent-process";
 import { AgentQueueManager } from "./agent-queue";
+import { buildSpecModelArgs } from "./spec-launch-config";
 import { AgentState } from "./agent-state";
 import { applyMobileTargets, applyTddOverride } from "./env-utils";
 import type {
@@ -325,28 +326,7 @@ export class AgentManager extends EventEmitter {
 			args.push("--auto-approve");
 		}
 
-		// Pass LLM provider if specified (enables provider-aware model defaults in backend)
-		if (metadata?.provider) {
-			args.push("--provider", metadata.provider);
-		}
-
-		// Pass model and thinking level configuration
-		// For auto profile, use phase-specific config; otherwise use single model/thinking
-		if (
-			metadata?.isAutoProfile &&
-			metadata.phaseModels &&
-			metadata.phaseThinking
-		) {
-			// Pass the spec phase model and thinking level to spec_runner
-			args.push("--model", metadata.phaseModels.spec);
-			args.push("--thinking-level", metadata.phaseThinking.spec);
-		} else if (metadata?.model) {
-			// Non-auto profile: use single model and thinking level
-			args.push("--model", metadata.model);
-			if (metadata.thinkingLevel) {
-				args.push("--thinking-level", metadata.thinkingLevel);
-			}
-		}
+		args.push(...buildSpecModelArgs(metadata));
 
 		// Workspace mode: --direct skips worktree isolation (default is isolated for safety)
 		if (metadata?.useWorktree === false) {
@@ -519,7 +499,10 @@ export class AgentManager extends EventEmitter {
 		// The Python side reads AUTO_CLAUDE_RESUME_SESSION_ID inside create_client()
 		// (apps/backend/core/client.py) and passes it to ClaudeAgentOptions(resume=...).
 		const spawnEnv = options.resumeSessionId
-			? { ...combinedEnv, AUTO_CLAUDE_RESUME_SESSION_ID: options.resumeSessionId }
+			? {
+					...combinedEnv,
+					AUTO_CLAUDE_RESUME_SESSION_ID: options.resumeSessionId,
+				}
 			: combinedEnv;
 
 		// Auto-start the local Ollama server if that's the active provider.
