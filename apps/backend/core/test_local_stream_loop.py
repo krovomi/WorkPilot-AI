@@ -45,9 +45,11 @@ class _FakeSession:
     def __init__(self, responses: list[_FakeResponse]):
         self._responses = list(responses)
         self.payloads: list[dict] = []
+        self.redirect_options: list[bool] = []
 
-    def post(self, url, json=None, timeout=None):  # noqa: A002 - aiohttp's name
+    def post(self, url, json=None, timeout=None, *, allow_redirects=True):  # noqa: A002 - aiohttp's name
         self.payloads.append(json)
+        self.redirect_options.append(allow_redirects)
         return self._responses.pop(0)
 
 
@@ -102,6 +104,7 @@ async def test_streamed_chunks_become_one_assistant_turn():
 
     assert "I read the file." in _texts(messages, MessageRole.ASSISTANT)
     assert session.payloads[0]["stream"] is True
+    assert session.redirect_options == [False] * len(session.payloads)
     assert client.last_usage == {
         "input_tokens": 900,
         "output_tokens": 12,
