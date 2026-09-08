@@ -737,6 +737,10 @@ def create_client(
     if isinstance(spec_dir, str):
         spec_dir = Path(spec_dir)
 
+    from core.offline_policy import guard_cloud_client
+
+    guard_cloud_client(project_dir, spec_dir)
+
     # Collect env vars to pass to SDK (ANTHROPIC_BASE_URL, CLAUDE_CONFIG_DIR, etc.)
     sdk_env = get_sdk_env_vars()
 
@@ -1967,6 +1971,12 @@ def create_agent_client(
     if provider is None:
         provider = _get_active_provider(spec_dir)
 
+    from core.offline_policy import local_endpoint, resolve_offline_route
+
+    provider, model, offline_base_url = resolve_offline_route(
+        project_dir, spec_dir, agent_type, provider, model
+    )
+
     # Anthropic rejects dotted Copilot-style ids (e.g. "claude-opus-4.8"); rewrite
     # to the dashed native form before it reaches the SDK or the context trace.
     # This is the guaranteed net — every phase (spec/planning/coding/qa) funnels
@@ -2194,7 +2204,7 @@ def create_agent_client(
             agent_type=agent_type,
         )
 
-    elif provider in ("ollama", "local", "lmstudio"):
+    elif provider in ("ollama", "local", "lmstudio", "lm-studio", "llama-cpp"):
         # Local LLM via any OpenAI-compatible server (Ollama, LM Studio,
         # llama.cpp, vLLM, LocalAI). Reuses the proven OpenAI tool-use loop
         # (LocalAgentClient subclasses OpenAIAgentClient) and only swaps the
@@ -2221,8 +2231,8 @@ def create_agent_client(
         # worse than the 404 it replaces.
         from phase_config import coerce_local_model, is_hosted_only_model
 
-        resolved_local_model = coerce_local_model(model)
-        if model and is_hosted_only_model(model):
+        resolved_local_model = model if offline_base_url else coerce_local_model(model)
+        if not offline_base_url and model and is_hosted_only_model(model):
             logger.warning(
                 "[create_agent_client] %r cannot run on a local server "
                 "(provider=%s) — using %r instead.",
@@ -2243,6 +2253,16 @@ def create_agent_client(
         )
         return LocalAgentClient(
             model=resolved_local_model,
+            base_url=offline_base_url
+            or (
+                local_endpoint(provider)
+                if provider in ("lmstudio", "lm-studio", "llama-cpp")
+                else None
+            ),
+            api_format="openai"
+            if provider in ("lmstudio", "lm-studio", "llama-cpp")
+            else "ollama",
+            offline_only=offline_base_url is not None,
             system_prompt=local_system_prompt,
             max_turns=50,
             project_dir=str(project_dir),
