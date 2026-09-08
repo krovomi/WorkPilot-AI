@@ -3789,6 +3789,8 @@ class LocalAgentClient(OpenAIAgentClient):
                         try:
                             await request
                         except _asyncio.CancelledError:
+                            # Expected after request.cancel(): await reader cleanup
+                            # without replacing the original failure or cancellation.
                             pass
 
                 status = acc.get("status") or 0
