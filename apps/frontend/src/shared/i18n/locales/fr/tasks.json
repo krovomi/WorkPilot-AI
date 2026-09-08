@@ -904,6 +904,8 @@
 			"smallWarn": "⚠ petit — déconseillé planif",
 			"smallWarnTip": "Petit modèle ({{n}}B) — déconseillé pour la planification (préférez ≥24B ou Claude) ; limité sur les tâches complexes.",
 			"download": "Télécharger",
+			"runningNotice": "Modèle en cours : {{model}}. La sélection ne remplace pas la requête en cours. Utilisez « Refaire » pour relancer avec les nouveaux réglages.",
+			"runtimeUnknown": "non encore rapporté",
 			"customOption": "Autre (catalogue officiel)",
 			"searchTitle": "Rechercher un modèle Ollama",
 			"searchSource": "Source : catalogue officiel ollama.com/library",
@@ -956,9 +958,9 @@
 		},
 		"hotSwap": {
 			"title": "Bascule à chaud demandée",
-			"desc": "Le changement sera appliqué au prochain tour, en conservant le contexte.",
+			"desc": "Changement demandé. La requête en cours peut continuer ; utilisez Refaire pour relancer immédiatement.",
 			"pending": "Bascule…",
-			"pendingTip": "Le changement de LLM sera appliqué au prochain tour."
+			"pendingTip": "Changement demandé. La requête en cours peut continuer ; utilisez Refaire pour relancer immédiatement."
 		}
 	},
 	"modal": {

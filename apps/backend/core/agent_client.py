@@ -2993,6 +2993,14 @@ class LocalAgentClient(OpenAIAgentClient):
     ):
         import os as _os
 
+        from ollama_model_detector import is_embedding_model
+
+        if is_embedding_model(model or ""):
+            raise ValueError(
+                f"Model {model!r} is an embedding model and cannot run agent tasks. "
+                "Select a text-generation model with tool support."
+            )
+
         super().__init__(
             model=model or "llama3.3",
             system_prompt=system_prompt,

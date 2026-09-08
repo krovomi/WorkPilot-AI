@@ -1078,6 +1078,8 @@ function PhaseLogSection({
 	// that file's entries — no other models, no untagged/legacy noise. Match by
 	// provider + canonical model id; fall back to the shared phaseLog otherwise.
 	const effectivePhaseLog = useMemo(() => {
+		// Keep the running feed visible when the configured model changes.
+		if (phaseLog?.status === "active") return phaseLog;
 		const selProvider = phaseConfig?.provider;
 		const selKey = phaseConfig?.modelValue
 			? getCanonicalModelKey(phaseConfig.modelValue)
@@ -1097,6 +1099,9 @@ function PhaseLogSection({
 	]);
 
 	const status = effectivePhaseLog?.status || "pending";
+	const runningModel = [...(phaseLog?.entries ?? [])]
+		.reverse()
+		.find((entry) => entry.model)?.model;
 	const isSearching = searchQuery.length > 0;
 
 	// Live model catalog for the phase's currently-selected provider. The hook
@@ -1468,7 +1473,10 @@ function PhaseLogSection({
 										<SelectValue>
 											{modelOptions.find(
 												(option) => option.value === modelSelectValue,
-											)?.label ?? phaseConfig.model}
+											)?.label ??
+												(modelSelectValue
+													? phaseConfig.model
+													: t("tasks:logs.model.selectAria"))}
 										</SelectValue>
 									</SelectTrigger>
 									<SelectContent
@@ -1717,6 +1725,13 @@ function PhaseLogSection({
 					{getStatusBadge()}
 				</div>
 			</div>
+			{status === "active" && (
+				<p className="px-4 pb-2 text-xs text-muted-foreground">
+					{t("tasks:logs.model.runningNotice", {
+						model: runningModel || t("tasks:logs.model.runtimeUnknown"),
+					})}
+				</p>
+			)}
 			<CollapsibleContent>
 				<div className="mt-1 ml-6 border-l-2 border-border pl-4 py-2 space-y-1">
 					{!hasEntries ? (

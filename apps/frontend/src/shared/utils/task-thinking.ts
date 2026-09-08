@@ -6,7 +6,7 @@ import {
 	getCanonicalModelKey,
 	resolveCatalogModelValue,
 } from "../constants/models";
-import { canonicalLocalModelName } from "./local-models";
+import { canonicalLocalModelName, isEmbeddingModel } from "./local-models";
 import type {
 	AppSettings,
 	PhaseModelConfig,
@@ -18,14 +18,8 @@ import type {
 /**
  * Correspondance phase de logs → clé de configuration.
  *
- * La phase de logs « planning » affichée dans l'onglet Logs est le
- * **planificateur d'implémentation** (backend `agent_type="planner"`, phase de
- * config `"planning"`) — PAS la création de spec (qui a lieu à la création de la
- * tâche, dans une autre UI). Elle doit donc piloter la config `planning`, sinon
- * la sélection modèle/effort/fournisseur de « Planification » n'atteint jamais
- * le planificateur (qui lit `phaseModels.planning`) : l'utilisateur choisissait
- * p.ex. Sonnet 4.5 mais le backend gardait le modèle de `planning`. La phase de
- * config `"spec"` se règle à la création de la tâche.
+ * La ligne planning regroupe la creation de spec et le planificateur.
+ * Ses changements explicites sont appliques aux deux configurations.
  */
 export const LOG_PHASE_TO_CONFIG_PHASE: Record<
 	TaskLogPhase,
@@ -192,7 +186,11 @@ export function buildThinkingMetadataUpdate(
 	return {
 		isAutoProfile: true,
 		phaseModels: { ...base.phaseModels },
-		phaseThinking: { ...base.phaseThinking, [configPhase]: level },
+		phaseThinking: {
+			...base.phaseThinking,
+			...(logPhase === "planning" ? { spec: level } : {}),
+			[configPhase]: level,
+		},
 	};
 }
 
@@ -212,7 +210,11 @@ export function buildModelMetadataUpdate(
 	const base = basePhaseConfig(metadata, defaults);
 	return {
 		isAutoProfile: true,
-		phaseModels: { ...base.phaseModels, [configPhase]: model },
+		phaseModels: {
+			...base.phaseModels,
+			...(logPhase === "planning" ? { spec: model } : {}),
+			[configPhase]: model,
+		},
 		phaseThinking: { ...base.phaseThinking },
 	};
 }
@@ -253,7 +255,11 @@ export function buildProviderMetadataUpdate(
 	const base = basePhaseProviders(metadata, defaults);
 	const configPhase = LOG_PHASE_TO_CONFIG_PHASE[logPhase];
 	const update: Partial<TaskMetadata> = {
-		phaseProviders: { ...base, [configPhase]: provider },
+		phaseProviders: {
+			...base,
+			...(logPhase === "planning" ? { spec: provider } : {}),
+			[configPhase]: provider,
+		},
 	};
 
 	// Changing a phase's provider invalidates its persisted model: a model from
@@ -269,6 +275,7 @@ export function buildProviderMetadataUpdate(
 		update.isAutoProfile = true;
 		update.phaseModels = {
 			...baseModels.phaseModels,
+			...(logPhase === "planning" ? { spec: newDefaultModel } : {}),
 			[configPhase]: newDefaultModel,
 		};
 	}
@@ -321,13 +328,16 @@ export function buildModelSelectOptions(
 	isLocal = false,
 ): { options: ModelSelectOption[]; value: string } {
 	const keyOf = isLocal ? canonicalLocalModelName : getCanonicalModelKey;
-	const options: ModelSelectOption[] = catalog.map((m) => ({
-		value: m.value,
-		label: m.label,
-		installed: m.installed,
-		param_b: m.param_b,
-	}));
-	const current = currentValue ?? "";
+	const options: ModelSelectOption[] = catalog
+		.filter((m) => !isLocal || !isEmbeddingModel(m.value))
+		.map((m) => ({
+			value: m.value,
+			label: m.label,
+			installed: m.installed,
+			param_b: m.param_b,
+		}));
+	const current =
+		isLocal && isEmbeddingModel(currentValue ?? "") ? "" : (currentValue ?? "");
 	if (!current) return { options, value: current };
 
 	const currentKey = keyOf(current);

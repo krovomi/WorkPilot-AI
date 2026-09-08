@@ -93,3 +93,16 @@ def test_external_library_link_cannot_authorize_a_variant_request(monkeypatch):
     monkeypatch.setattr(httpx, "get", get)
     assert search_models("qwen3:8b") == []
     assert calls == ["https://ollama.com/library"]
+
+
+def test_embedding_suggestions_are_excluded(monkeypatch):
+    monkeypatch.setattr(
+        httpx,
+        "get",
+        lambda url, **kw: httpx.Response(
+            200,
+            text='<a href="/library/qwen3-embedding">Embedding</a><a href="/library/qwen3">Chat</a>',
+            request=httpx.Request("GET", url),
+        ),
+    )
+    assert [m["value"] for m in search_models("qwen3")] == ["qwen3"]

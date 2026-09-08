@@ -12,6 +12,7 @@ from html.parser import HTMLParser
 from urllib.parse import unquote
 
 import httpx
+from ollama_model_detector import is_embedding_model
 
 ORIGIN = "https://ollama.com"
 MODEL_LINK = re.compile(
@@ -67,7 +68,7 @@ def search_models(query: str) -> list[dict[str, str]]:
         parser.feed(response.text)
     results = []
     for model in parser.models:
-        if "cloud" in model.lower():
+        if "cloud" in model.lower() or is_embedding_model(model):
             continue
         if separator:
             if not model.lower().startswith(query) or model.split(":")[0] != family:
