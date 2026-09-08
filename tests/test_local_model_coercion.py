@@ -180,13 +180,78 @@ class TestSpecRunnerResolution:
 
 
 class TestClientFactoryGuard:
-    def test_local_branch_coerces_the_model(self):
-        """`create_agent_client` is the choke point every local run passes."""
-        source = (REPO_ROOT / "apps" / "backend" / "core" / "client.py").read_text(
-            encoding="utf-8"
+    def test_local_branch_coerces_the_model(self, tmp_path, monkeypatch):
+        """A stale hosted id is replaced before constructing the local client."""
+        from unittest.mock import Mock
+
+        import core.agent_client
+        import core.client
+
+        factory = Mock()
+        monkeypatch.setenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
+        monkeypatch.setattr(core.agent_client, "LocalAgentClient", factory)
+        monkeypatch.setattr(core.client, "_log_llm_context_switch", Mock())
+
+        core.client.create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="claude-opus-4-5-20251101",
+            provider="ollama",
+            max_thinking_tokens=None,
+            system_prompt="Test",
         )
-        assert "resolved_local_model = coerce_local_model(model)" in source
-        assert 'resolved_local_model = model or "llama3.3"' not in source
+
+        assert factory.call_args.kwargs["model"] == "qwen2.5-coder:7b"
+        assert factory.call_args.kwargs["offline_only"] is False
+
+    def test_offline_branch_preserves_the_detected_model(self, tmp_path, monkeypatch):
+        """A server's verified model alias must not be replaced by a heuristic."""
+        import json
+        from unittest.mock import Mock
+
+        import core.agent_client
+        import core.client
+        import core.local_model_catalog
+
+        model = "claude-local-alias"
+        policy_path = tmp_path / ".workpilot" / "offline-mode.json"
+        policy_path.parent.mkdir()
+        policy_path.write_text(
+            json.dumps(
+                {
+                    "airgapStrict": True,
+                    "defaultProvider": "ollama",
+                    "routing": {"coder": {"provider": "ollama", "model": model}},
+                }
+            ),
+            encoding="utf-8",
+        )
+        factory = Mock()
+        monkeypatch.setenv("OLLAMA_MODEL", "different-model")
+        monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+        monkeypatch.setattr(core.agent_client, "LocalAgentClient", factory)
+        monkeypatch.setattr(core.client, "_log_llm_context_switch", Mock())
+        monkeypatch.setattr(
+            core.local_model_catalog,
+            "detect_runtime",
+            lambda _: {
+                "available": True,
+                "models": [{"name": model}],
+            },
+        )
+
+        core.client.create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="claude-sonnet-4-6",
+            provider="anthropic",
+            max_thinking_tokens=None,
+            system_prompt="Test",
+        )
+
+        assert factory.call_args.kwargs["model"] == model
+        assert factory.call_args.kwargs["base_url"] == "http://127.0.0.1:11434"
+        assert factory.call_args.kwargs["offline_only"] is True
 
 
 class TestAutoPullGuard:
