@@ -131,9 +131,6 @@ class AgentRunner:
         active_provider = _get_active_provider(self.spec_dir)
         debug("agent_runner", f"Active provider resolved: {active_provider}")
 
-        if self.task_logger:
-            self.task_logger.set_llm(active_provider, self.model)
-
         # Create client with thinking budget
         # Log model/CWD prominently so issues are visible in task console
         debug(
@@ -146,14 +143,6 @@ class AgentRunner:
             spec_dir=str(self.spec_dir),
             spec_dir_exists=self.spec_dir.exists(),
         )
-        if self.task_logger:
-            self.task_logger.log(
-                f"Agent config: model={self.model}, thinking={thinking_budget}, "
-                f"CWD exists={self.project_dir.exists()}",
-                LogEntryType.TEXT,
-                LogPhase.PLANNING,
-                print_to_console=True,
-            )
 
         if active_provider not in ("claude", "anthropic"):
             # Non-Claude providers (openai, windsurf, copilot, google, mistral,
@@ -175,7 +164,29 @@ class AgentRunner:
                 provider=active_provider,
                 max_thinking_tokens=thinking_budget,
             )
-            return await self._run_with_agent_client(client, prompt)
+            self._log_client_configuration(
+                client.provider_name(),
+                getattr(client, "model", self.model),
+                thinking_budget,
+            )
+            from core.agent_client import OpenAIAgentClient
+
+            working_directory = (
+                self.spec_dir
+                if prompt_file == "validation_fixer.md"
+                and isinstance(client, OpenAIAgentClient)
+                else None
+            )
+            if working_directory is not None:
+                prompt += (
+                    f"\nTool working directory: {working_directory.resolve()}\n"
+                    "Relative file paths and shell commands run in this spec directory. "
+                    "Use absolute paths for project source files. Modify the failed files "
+                    "with tools; describing commands does not execute them.\n"
+                )
+            return await self._run_with_agent_client(
+                client, prompt, working_directory=working_directory
+            )
 
         # Claude/Anthropic provider: use raw SDK client (create_client) for full
         # SDK message type compatibility (AssistantMessage, ToolUseBlock, etc.)
@@ -188,6 +199,8 @@ class AgentRunner:
             agent_type="spec_writer",  # Use spec_writer type for spec creation
             max_thinking_tokens=thinking_budget,
         )
+
+        self._log_client_configuration(active_provider, self.model, thinking_budget)
 
         # Debug: Check if input files exist for spec_writer
         if prompt_file == "spec_writer.md":
@@ -416,7 +429,20 @@ class AgentRunner:
                 self.task_logger.log_error(f"Agent error: {e}", LogPhase.PLANNING)
             return False, str(e)
 
-    async def _run_with_agent_client(self, client, prompt: str) -> tuple[bool, str]:
+    def _log_client_configuration(self, provider, model, thinking_budget):
+        if self.task_logger:
+            self.task_logger.set_llm(provider, model)
+            self.task_logger.log(
+                f"Agent config: model={model}, thinking={thinking_budget}, "
+                f"CWD exists={self.project_dir.exists()}",
+                LogEntryType.TEXT,
+                LogPhase.PLANNING,
+                print_to_console=True,
+            )
+
+    async def _run_with_agent_client(
+        self, client, prompt: str, working_directory: Path | None = None
+    ) -> tuple[bool, str]:
         """Run a spec creation agent session using an AgentClient (Windsurf/Copilot).
 
         This processes AgentMessage objects from create_agent_client() instead of
@@ -429,13 +455,19 @@ class AgentRunner:
         Returns:
             (success, response_text) tuple
         """
-        from core.agent_client import ContentBlockType, LocalModelRuntimeError
+        from core.agent_client import (
+            ContentBlockType,
+            LocalModelRuntimeError,
+            OpenAIAgentClient,
+        )
 
         current_tool = None
         message_count = 0
         tool_count = 0
 
         try:
+            if working_directory is not None and isinstance(client, OpenAIAgentClient):
+                client.set_tool_working_directory(str(working_directory.resolve()))
             async with client:
                 provider = client.provider_name()
                 debug("agent_runner", f"Sending query to {provider} agent client...")

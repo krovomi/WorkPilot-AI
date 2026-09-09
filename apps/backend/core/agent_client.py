@@ -1975,6 +1975,13 @@ class OpenAIAgentClient(AgentClient):
         # Usage accumulated across the session's turns
         self.last_usage: dict | None = None
 
+    def set_tool_working_directory(self, directory: str) -> None:
+        """Set relative tool paths without changing the project security boundary."""
+        from core.runtimes.tool_executor import ToolExecutor
+
+        executor = ToolExecutor(self._project_dir, directory)
+        self._tool_working_directory = str(executor.working_directory)
+
     def _get_http_client(self):
         """Lazy-init an aiohttp ClientSession."""
         if self._http_client is None:
@@ -2002,7 +2009,9 @@ class OpenAIAgentClient(AgentClient):
                     get_tool_definitions,
                 )
 
-                self._tool_executor = ToolExecutor(self._project_dir)
+                self._tool_executor = ToolExecutor(
+                    self._project_dir, getattr(self, "_tool_working_directory", None)
+                )
                 self._tool_definitions = get_tool_definitions(self._agent_type)
                 logger.info(
                     f"[OpenAIAgentClient] Tool execution enabled: "
