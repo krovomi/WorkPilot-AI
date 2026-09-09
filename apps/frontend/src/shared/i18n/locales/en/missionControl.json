@@ -1,4 +1,5 @@
 {
+	"launchError": "Unable to launch Mission Control: {{error}}",
 	"launchDescription": "Multi-Agent Orchestration Hub — Orchestrate multiple AI agents simultaneously with full visibility on reasoning, files, and token consumption.",
 	"featureMultiAgent": "Multi-Agent",
 	"featureModelMixing": "Model Mixing",

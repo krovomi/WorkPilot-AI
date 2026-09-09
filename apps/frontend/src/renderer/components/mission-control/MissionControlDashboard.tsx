@@ -151,6 +151,12 @@ export function MissionControlDashboard() {
 							<span>{t("missionControl:featureLiveView", "Live View")}</span>
 						</div>
 					</div>
+					{error && (
+						<div role="alert" className="flex items-center gap-2 bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-sm text-destructive">
+							<AlertTriangle className="h-4 w-4 shrink-0" />
+							<span>{t("missionControl:launchError", { error })}</span>
+						</div>
+					)}
 					<Button
 						size="lg"
 						onClick={() => startSession()}
