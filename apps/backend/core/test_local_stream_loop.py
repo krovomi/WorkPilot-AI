@@ -20,6 +20,19 @@ from core.agent_client import (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolate_ollama_metadata_probes(monkeypatch):
+    # The fake session replaces chat only; metadata probes use urllib instead.
+    # Do not let heartbeat timing depend on a real server or its DNS/socket wait.
+    # Tests of placement reporting override this stub with their own response.
+    monkeypatch.setattr(LocalAgentClient, "_loaded_model_placement", lambda self: None)
+
+    def unexpected_network(*args, **kwargs):
+        pytest.fail("Streaming unit tests must not contact a real Ollama server")
+
+    monkeypatch.setattr("urllib.request.urlopen", unexpected_network)
+
+
 class _FakeResponse:
     def __init__(self, status: int, lines: list[str], body: str = ""):
         self.status = status
@@ -65,6 +78,8 @@ def _chunk(content: str = "", **extra) -> str:
 def _client(session: _FakeSession) -> LocalAgentClient:
     client = LocalAgentClient(model="llama3.3")
     client._http_client = session
+    # Cache unknown capabilities so context sizing does not call /api/show.
+    client._model_max_ctx = None
     client._tool_definitions = [
         {"name": "read_file", "description": "read", "parameters": {}}
     ]
