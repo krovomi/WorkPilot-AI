@@ -77,8 +77,10 @@ def test_validation_tools_use_spec_directory_and_preserve_project_boundary(tmp_p
 
     spec_dir = tmp_path / ".workpilot" / "specs" / "002-namespace"
     spec_dir.mkdir(parents=True)
-    (spec_dir / "context.json").write_text('{"task_description":"namespace"}')
-    (tmp_path / "context.json").write_text("wrong project file")
+    (spec_dir / "context.json").write_text(
+        '{"task_description":"namespace"}', encoding="utf-8"
+    )
+    (tmp_path / "context.json").write_text("wrong project file", encoding="utf-8")
     client = LocalAgentClient(
         model="qwen2.5-coder:7b", project_dir=str(tmp_path), offline_only=True
     )
@@ -93,7 +95,7 @@ def test_validation_tools_use_spec_directory_and_preserve_project_boundary(tmp_p
         await executor.execute(
             "write_file", {"path": "spec.md", "content": "## Overview"}
         )
-        assert (spec_dir / "spec.md").read_text() == "## Overview"
+        assert (spec_dir / "spec.md").read_text(encoding="utf-8") == "## Overview"
         assert not (tmp_path / "spec.md").exists()
         import sys
 
@@ -131,7 +133,9 @@ def test_validation_tools_use_spec_directory_and_preserve_project_boundary(tmp_p
     assert asyncio.run(
         runner._run_with_agent_client(client, "fix", working_directory=spec_dir)
     )[0]
-    assert (tmp_path / "context.json").read_text() == "wrong project file"
+    assert (tmp_path / "context.json").read_text(
+        encoding="utf-8"
+    ) == "wrong project file"
 
 
 def test_validation_launch_configures_local_working_directory(tmp_path, monkeypatch):

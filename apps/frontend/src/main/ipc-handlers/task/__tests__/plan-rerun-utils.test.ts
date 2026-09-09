@@ -10,7 +10,7 @@ import {
 	buildPhaseRerunPlanUpdate,
 	downstreamLogPhases,
 	rerunDiscardsWork,
-	rerunNeedsSpecCreation,
+	startPhaseRerun,
 } from "../plan-rerun-utils";
 
 function makePlan() {
@@ -119,9 +119,55 @@ describe("buildPhaseRerunPlanUpdate", () => {
 	});
 });
 
-it("restarts incomplete planning through spec creation", () => {
-	expect(rerunNeedsSpecCreation("planning", false)).toBe(true);
-	expect(rerunNeedsSpecCreation("planning", true)).toBe(false);
-	expect(rerunNeedsSpecCreation("coding", false)).toBe(false);
-	expect(rerunNeedsSpecCreation("validation", false)).toBe(false);
+it("revalidates planning even when a spec file already exists", async () => {
+	const calls: string[] = [];
+	await startPhaseRerun("planning", {
+		spec: async () => {
+			calls.push("spec");
+		},
+		execution: async () => {
+			calls.push("execution");
+		},
+		isRunning: () => true,
+	});
+	expect(calls).toEqual(["spec"]);
+});
+
+it.each([
+	"coding",
+	"validation",
+] as const)("keeps %s on the execution pipeline", async (phase) => {
+	const calls: string[] = [];
+	await startPhaseRerun(phase, {
+		spec: async () => {
+			calls.push("spec");
+		},
+		execution: async () => {
+			calls.push("execution");
+		},
+		isRunning: () => true,
+	});
+	expect(calls).toEqual(["execution"]);
+});
+
+it("does not report success after an early launch return", async () => {
+	await expect(
+		startPhaseRerun("planning", {
+			spec: async () => undefined,
+			execution: async () => undefined,
+			isRunning: () => false,
+		}),
+	).rejects.toThrow("did not start");
+});
+
+it("propagates launch errors", async () => {
+	await expect(
+		startPhaseRerun("planning", {
+			spec: async () => {
+				throw new Error("Python unavailable");
+			},
+			execution: async () => undefined,
+			isRunning: () => false,
+		}),
+	).rejects.toThrow("Python unavailable");
 });
