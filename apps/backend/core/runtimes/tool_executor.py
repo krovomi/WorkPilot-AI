@@ -51,8 +51,13 @@ def _as_bool(value: Any) -> bool:
 class ToolExecutor:
     """Executes tools for agent sessions."""
 
-    def __init__(self, project_dir: str):
+    def __init__(self, project_dir: str, working_directory: str | None = None):
         self.project_dir = Path(project_dir).resolve()
+        self.working_directory = self.project_dir
+        if working_directory is not None:
+            self.working_directory = self._resolve_within_project(working_directory)
+            if not self.working_directory.is_dir():
+                raise ValueError("Tool working directory does not exist")
 
     def _resolve_within_project(self, path: str) -> Path:
         """Resolve a user-supplied path and reject anything outside project_dir.
@@ -61,7 +66,7 @@ class ToolExecutor:
         ('/etc/passwd'). Without this guard, Path / userpath happily escapes
         the sandbox, since Path('/safe') / Path('/etc/x') -> Path('/etc/x').
         """
-        candidate = (self.project_dir / path).resolve()
+        candidate = (self.working_directory / path).resolve()
         try:
             candidate.relative_to(self.project_dir)
         except ValueError:
@@ -194,7 +199,7 @@ class ToolExecutor:
         if not command:
             raise ValueError("Command is required for run_command")
 
-        work_dir = self._resolve_within_project(cwd) if cwd else self.project_dir
+        work_dir = self._resolve_within_project(cwd) if cwd else self.working_directory
 
         try:
             process = await asyncio.create_subprocess_shell(
