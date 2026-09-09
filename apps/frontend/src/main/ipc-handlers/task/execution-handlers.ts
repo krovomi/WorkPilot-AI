@@ -69,7 +69,7 @@ import { stripHtml } from "../shared/sanitize";
 import {
 	buildPhaseRerunPlanUpdate,
 	downstreamLogPhases,
-	rerunNeedsSpecCreation,
+	startPhaseRerun,
 	type RerunPhase,
 } from "./plan-rerun-utils";
 
@@ -2279,34 +2279,33 @@ print(json.dumps(result))
 				const baseBranch =
 					task.metadata?.baseBranch || project.settings?.mainBranch;
 				const specDir = specPaths.specDir;
-				if (
-					rerunNeedsSpecCreation(
-						phase,
-						existsSync(path.join(specDir, AUTO_BUILD_PATHS.SPEC_FILE)),
-					)
-				) {
-					fileWatcher.watch(taskId, specDir);
-					await agentManager.startSpecCreation(
-						taskId,
-						project.path,
-						task.description || task.title,
-						specDir,
-						convertTaskMetadataToSpecCreation(task.metadata),
-						baseBranch,
-						project.id,
-					);
-				} else {
-					await agentManager.startTaskExecution(
-						taskId,
-						project.path,
-						task.specId,
-						{
-							useWorktree: task.metadata?.useWorktree !== false,
+				await startPhaseRerun(phase, {
+					spec: async () => {
+						fileWatcher.watch(taskId, specDir);
+						await agentManager.startSpecCreation(
+							taskId,
+							project.path,
+							task.description || task.title,
+							specDir,
+							convertTaskMetadataToSpecCreation(task.metadata),
 							baseBranch,
-						},
-						project.id,
-					);
-				}
+							project.id,
+						);
+					},
+					execution: async () => {
+						await agentManager.startTaskExecution(
+							taskId,
+							project.path,
+							task.specId,
+							{
+								useWorktree: task.metadata?.useWorktree !== false,
+								baseBranch,
+							},
+							project.id,
+						);
+					},
+					isRunning: () => agentManager.isRunning(taskId),
+				});
 
 				appLog.info(
 					`[TASK_RERUN_PHASE] task=${taskId} phase=${phase} ` +
@@ -2314,6 +2313,17 @@ print(json.dumps(result))
 				);
 				return { success: true };
 			} catch (err) {
+				fileWatcher.unwatch(taskId);
+				const failedPaths = getPlanPaths(getSpecPaths(task, project), project);
+				for (const planFile of failedPaths.all) {
+					await persistPlanStatus(planFile, "human_review", project.id);
+				}
+				getMainWindow()?.webContents.send(
+					IPC_CHANNELS.TASK_STATUS_CHANGE,
+					taskId,
+					"human_review",
+					project.id,
+				);
 				appLog.error(
 					`[TASK_RERUN_PHASE] Failed for task ${taskId} phase ${phase}:`,
 					err,

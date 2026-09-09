@@ -8,9 +8,9 @@
  *   - Validation runs when subtasks are done and qa_signoff is not "approved"
  *     (qa.criteria.should_run_qa)
  *
- * So re-running a phase just means rewinding the plan to the state *before* that
- * phase and restarting the task — the backend then naturally re-enters at the
- * right phase. Re-running an earlier phase cascade-invalidates the later ones
+ * Re-running a phase rewinds the plan to the state *before* that phase.
+ * Planning first re-enters spec creation so failed document validation is repaired;
+ * coding and QA restart execution from the rewound plan. Re-running an earlier phase cascade-invalidates the later ones
  * (planning ⊃ coding ⊃ validation), matching the product decision.
  *
  * This module is pure (no fs / no Electron) so the cascade logic is unit-tested
@@ -119,10 +119,20 @@ export function buildPhaseRerunPlanUpdate(plan: Plan, phase: RerunPhase): Plan {
 	return plan;
 }
 
-/** Planning starts with spec creation until its document exists. */
-export function rerunNeedsSpecCreation(
+/** Planning must revalidate an existing spec before execution can resume. */
+export async function startPhaseRerun(
 	phase: RerunPhase,
-	hasSpec: boolean,
-): boolean {
-	return phase === "planning" && !hasSpec;
+	launch: {
+		spec: () => Promise<void>;
+		execution: () => Promise<void>;
+		isRunning: () => boolean;
+	},
+): Promise<void> {
+	if (phase === "planning") await launch.spec();
+	else await launch.execution();
+	if (!launch.isRunning()) {
+		throw new Error(
+			"The task process did not start. Check the task error and application logs.",
+		);
+	}
 }
