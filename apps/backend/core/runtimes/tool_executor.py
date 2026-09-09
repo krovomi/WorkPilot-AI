@@ -6,6 +6,8 @@ Handles execution of tools during agent sessions.
 """
 
 import asyncio
+import os
+import signal
 from pathlib import Path
 from typing import Any
 
@@ -52,6 +54,7 @@ class ToolExecutor:
     """Executes tools for agent sessions."""
 
     def __init__(self, project_dir: str, working_directory: str | None = None):
+        self.command_timeout = float(os.environ.get("LOCAL_COMMAND_TIMEOUT", "120"))
         self.project_dir = Path(project_dir).resolve()
         self.working_directory = self.project_dir
         if working_directory is not None:
@@ -205,11 +208,25 @@ class ToolExecutor:
             process = await asyncio.create_subprocess_shell(
                 command,
                 cwd=str(work_dir),
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                start_new_session=os.name != "nt",
             )
 
-            stdout_bytes, stderr_bytes = await process.communicate()
+            try:
+                stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    process.communicate(), timeout=self.command_timeout
+                )
+            except (TimeoutError, asyncio.CancelledError) as error:
+                await self._stop_command(process)
+                if isinstance(error, asyncio.CancelledError):
+                    raise
+                raise RuntimeError(
+                    f"Command exceeded {self.command_timeout:g}s and was terminated. "
+                    "Commands must be non-interactive; quote paths containing spaces "
+                    "or use read_file for file reads."
+                ) from error
             stdout = (
                 stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
             )
@@ -240,6 +257,28 @@ class ToolExecutor:
         except Exception as e:
             raise RuntimeError(f"Error running command {command}: {e}")
 
+    async def _stop_command(self, process) -> None:
+        """Reap the shell and its children when a command times out or is cancelled."""
+        if os.name == "nt":
+            killer = await asyncio.create_subprocess_exec(
+                "taskkill",
+                "/PID",
+                str(process.pid),
+                "/T",
+                "/F",
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await killer.wait()
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                # The command may have exited immediately before cleanup.
+                pass
+        await process.wait()
+
 
 def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
     """
@@ -255,7 +294,7 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
     base_tools = [
         {
             "name": "read_file",
-            "description": "Read the contents of a file",
+            "description": "Read a file directly, including paths with spaces. Prefer this over shell cat.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -301,7 +340,7 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
         },
         {
             "name": "run_command",
-            "description": "Run a shell command",
+            "description": "Run a non-interactive shell command with a time limit. Quote paths containing spaces. Use read_file to read files.",
             "parameters": {
                 "type": "object",
                 "properties": {
