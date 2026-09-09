@@ -6,6 +6,7 @@ Handles execution of tools during agent sessions.
 """
 
 import asyncio
+import json
 import os
 import signal
 from pathlib import Path
@@ -145,6 +146,22 @@ class ToolExecutor:
             raise ValueError("Path is required for write_file")
 
         file_path = self._resolve_within_project(path)
+        if file_path.name == "implementation_plan.json":
+            # Validate before touching the existing plan. The tool error is fed
+            # back to the model so it can correct escaping in the same session.
+            try:
+                plan = json.loads("" if empty_file else content or "")
+            except json.JSONDecodeError as error:
+                raise ValueError(
+                    f"Invalid implementation_plan.json: {error}. "
+                    "The existing file was not changed. Escape quotes inside JSON strings."
+                ) from error
+            if not isinstance(plan, dict):
+                raise ValueError("implementation_plan.json must contain a JSON object")
+            from core.file_utils import write_json_atomic
+
+            write_json_atomic(file_path, plan)
+            return f"Successfully wrote to {path}"
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
