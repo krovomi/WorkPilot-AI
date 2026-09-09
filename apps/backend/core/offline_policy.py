@@ -97,7 +97,19 @@ def resolve_offline_route(
             ),
             None,
         )
-    if route:
+    from phase_config import is_hosted_only_model
+
+    # Offline routes are defaults for callers that have no local selection.
+    # A phase's local provider/model pair is more specific than the project
+    # default, including the fallback borrowed from another phase in strict mode.
+    # Keep invalid local choices too: validation below must reject them rather
+    # than silently running a different model.
+    selected_local_model = (
+        _ALIASES.get(provider, provider) in LOCAL_PROVIDERS
+        and bool(model)
+        and not is_hosted_only_model(model)
+    )
+    if route and not selected_local_model:
         provider, model = route["provider"], route["model"]
     if not strict and not route:
         return provider, model, None
