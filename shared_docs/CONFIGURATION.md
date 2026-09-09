@@ -251,3 +251,17 @@ is taken so the user knows the output is not live data:
 - **Analytics API** ([apps/backend/analytics/api_minimal.py](../apps/backend/analytics/api_minimal.py))
   currently returns empty/mock payloads for every endpoint. Treat it as a
   scaffold until a real database-backed implementation lands.
+
+## Local generation deadlines
+
+Ollama native chat requests have independent limits, in seconds, configured in the backend process environment:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `LOCAL_LLM_REQUEST_TIMEOUT` | 600 | Maximum duration of one chat request, including continuous slow output. |
+| `LOCAL_LLM_INITIAL_OUTPUT_TIMEOUT` | 300 | Maximum wait before any output; also applies to the non-streaming fallback. |
+| `LOCAL_LLM_GENERATION_IDLE_TIMEOUT` | 120 | Maximum silence after streamed output begins. |
+
+The heartbeat checks silence every 30 seconds. On a deadline, transport error or truncated response, the request is cancelled and spec creation fails explicitly without retrying the same failing generation. Connection-establishment retries remain bounded. These limits do not make an oversized model faster: use a model that fits the available hardware. Raise them only deliberately for a known slow workload.
+
+In-flight progress counts received **fragments**, not tokenizer tokens. Exact output token usage comes from Ollama's final `eval_count`; a fragment may contain multiple tokens, and tool arguments can be buffered by the server.

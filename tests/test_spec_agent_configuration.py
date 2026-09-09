@@ -23,3 +23,44 @@ def test_spec_logs_and_factory_use_the_same_configuration(tmp_path, monkeypatch)
     assert factory.call_args.kwargs["max_thinking_tokens"] == 1024
     assert logger.mock_calls[0].args == ("ollama", "qwen3-coder:30b")
     assert logger.mock_calls[0][0] == "set_llm"
+
+
+def test_local_runtime_error_cannot_be_reported_as_spec_success(tmp_path):
+    import pytest
+    from core.agent_client import (
+        AgentMessage,
+        ContentBlock,
+        ContentBlockType,
+        LocalModelRuntimeError,
+        MessageRole,
+    )
+    from spec.pipeline.agent_runner import AgentRunner
+
+    class FailedClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        def provider_name(self):
+            return "ollama"
+
+        async def query(self, prompt):
+            pass
+
+        async def receive_response(self):
+            yield AgentMessage(
+                role=MessageRole.SYSTEM,
+                content=[
+                    ContentBlock(
+                        type=ContentBlockType.TEXT,
+                        text="Progress heartbeat that is long enough to pass the former empty-session check.",
+                    )
+                ],
+            )
+            raise LocalModelRuntimeError("generation stalled")
+
+    runner = AgentRunner(tmp_path, tmp_path, "qwen3-coder:30b", Mock())
+    with pytest.raises(LocalModelRuntimeError, match="generation stalled"):
+        asyncio.run(runner._run_with_agent_client(FailedClient(), "namespace"))
