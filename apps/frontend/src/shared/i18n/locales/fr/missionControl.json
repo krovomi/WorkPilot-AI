@@ -1,4 +1,5 @@
 {
+	"launchError": "Impossible de lancer Mission Control : {{error}}",
 	"launchDescription": "Hub d'orchestration multi-agents — Orchestrez plusieurs agents IA simultanément avec une visibilité complète sur le raisonnement, les fichiers et la consommation de tokens.",
 	"featureMultiAgent": "Multi-Agent",
 	"featureModelMixing": "Mixage de modèles",
