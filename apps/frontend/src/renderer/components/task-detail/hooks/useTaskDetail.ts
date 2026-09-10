@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
 	GitConflictInfo,
 	ImageAttachment,
@@ -161,10 +161,6 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const logsEndRef = useRef<HTMLDivElement>(null);
 	const logsContainerRef = useRef<HTMLDivElement>(null);
 	const prevStatusRef = useRef<string | undefined>(task.status);
-	// Last phase we auto-focused, so a phase *change* (esp. a regression like
-	// validation → planning) can pull the viewport onto the now-active phase
-	// even if the user had scrolled away — distinct from the per-entry follow.
-	const prevActivePhaseRef = useRef<TaskLogPhase | null>(null);
 
 	// Merge preview state
 	const [mergePreview, setMergePreview] = useState<{
@@ -315,59 +311,28 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		setIsUserScrolledUp(!isAtAnchor);
 	};
 
-	// Auto-scroll logs to the running phase. Anchors on the ACTIVE phase section
-	// (not the document end) so that when a task regresses to an earlier phase
-	// — e.g. validation → planning — the viewport jumps to the now-active phase
-	// instead of staying on the stale logs of a later, already-finished phase.
-	//
-	// Two modes share this effect:
-	//   • Phase change → FORCE focus on the new phase (block:"start"), even if
-	//     the user had scrolled away. This is the user-visible "refocus on the
-	//     current phase" behavior.
-	//   • Same phase, new entries → only FOLLOW (track the phase tail) when the
-	//     user is still anchored.
-	useEffect(() => {
+	// Follow every log update before paint, without a debounce or smooth-scroll
+	// animation that can fall behind a busy stream. Scroll only this viewport.
+	// Keep the active phase as the anchor when execution returns to an earlier
+	// phase, so newer planning output stays visible above old validation logs.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: these values change the rendered log layout
+	useLayoutEffect(() => {
 		if (activeTab !== "logs") return;
-		const isReverseOrder = logOrder === "reverse-chronological";
-
-		const active = getActiveLogPhase(phaseLogs);
-		const phaseChanged = active !== null && active !== prevActivePhaseRef.current;
-		if (active !== null) prevActivePhaseRef.current = active;
-
-		// Without a phase change, respect a user who scrolled away from the tail.
-		if (!phaseChanged && isUserScrolledUp) return;
-
-		// Small timeout to ensure the DOM has rendered (tab switch or new entry).
-		const timer = setTimeout(() => {
-			const container = logsContainerRef.current;
-			if (!container) return;
-			const anchorEl = active
-				? container.querySelector<HTMLElement>(
-						`[data-phase-section="${active}"]`,
-					)
-				: null;
-
-			if (anchorEl) {
-				// On a transition, show the phase from its start so the user sees
-				// "we're now in <phase>"; otherwise track its newest entries.
-				const block: ScrollLogicalPosition = phaseChanged
-					? "start"
-					: isReverseOrder
-						? "start"
-						: "end";
-				anchorEl.scrollIntoView({ behavior: "smooth", block });
-			} else if (isReverseOrder) {
-				container.scrollTo({ top: 0, behavior: "smooth" });
-			} else if (logsEndRef.current) {
-				logsEndRef.current.scrollIntoView({ behavior: "smooth" });
-			}
-
-			// A forced focus re-anchors the user on the new phase.
-			if (phaseChanged) setIsUserScrolledUp(false);
-		}, 60);
-
-		return () => clearTimeout(timer);
-	}, [activeTab, isUserScrolledUp, logOrder, phaseLogs]);
+		const container = logsContainerRef.current;
+		if (!container) return;
+		const reverse = logOrder === "reverse-chronological";
+		const anchor = getActivePhaseEl();
+		let top = reverse ? 0 : container.scrollHeight;
+		if (anchor) {
+			const viewport = container.getBoundingClientRect();
+			const section = anchor.getBoundingClientRect();
+			top = container.scrollTop + (reverse
+				? section.top - viewport.top
+				: section.bottom - viewport.bottom);
+		}
+		container.scrollTo({ top: Math.max(0, top), behavior: "instant" });
+		setIsUserScrolledUp(false);
+	}, [activeTab, logOrder, getActivePhaseEl, phaseLogs, perLlmLogs, task.logs, expandedPhases, isLoadingLogs]);
 
 	// Reset scroll state when switching to logs tab
 	useEffect(() => {
