@@ -311,28 +311,16 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		setIsUserScrolledUp(!isAtAnchor);
 	};
 
-	// Follow every log update before paint, without a debounce or smooth-scroll
-	// animation that can fall behind a busy stream. Scroll only this viewport.
-	// Keep the active phase as the anchor when execution returns to an earlier
-	// phase, so newer planning output stays visible above old validation logs.
+	// Follow the actual frame end on new data. TaskLogs also observes content
+	// size to follow layout changes after this parent update has committed.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: these values change the rendered log layout
 	useLayoutEffect(() => {
 		if (activeTab !== "logs") return;
 		const container = logsContainerRef.current;
 		if (!container) return;
-		const reverse = logOrder === "reverse-chronological";
-		const anchor = getActivePhaseEl();
-		let top = reverse ? 0 : container.scrollHeight;
-		if (anchor) {
-			const viewport = container.getBoundingClientRect();
-			const section = anchor.getBoundingClientRect();
-			top = container.scrollTop + (reverse
-				? section.top - viewport.top
-				: section.bottom - viewport.bottom);
-		}
-		container.scrollTo({ top: Math.max(0, top), behavior: "instant" });
+		container.scrollTo({ top: logOrder === "reverse-chronological" ? 0 : container.scrollHeight, behavior: "instant" });
 		setIsUserScrolledUp(false);
-	}, [activeTab, logOrder, getActivePhaseEl, phaseLogs, perLlmLogs, task.logs, expandedPhases, isLoadingLogs]);
+	}, [activeTab, logOrder, phaseLogs, perLlmLogs, task.logs, expandedPhases, isLoadingLogs]);
 
 	// Reset scroll state when switching to logs tab
 	useEffect(() => {

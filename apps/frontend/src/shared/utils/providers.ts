@@ -37,6 +37,15 @@ export async function getStaticProviders(
 	profiles: APIProfile[] = [],
 	settings?: Record<string, unknown>,
 ): Promise<ProvidersResponse> {
+	// Authentication is checked centrally so task and global pickers agree.
+	const checkOAuth = async (check?: () => Promise<{ isAuthenticated: boolean }>) => {
+		try { return (await check?.())?.isAuthenticated === true; }
+		catch { return false; }
+	};
+	const [claudeOAuth, codexOAuth] = await Promise.all([
+		checkOAuth(globalThis.electronAPI?.checkClaudeOAuth),
+		checkOAuth(globalThis.electronAPI?.checkOpenAICodexOAuth),
+	]);
 	const allProviders = providerRegistry
 		.getAllProviders()
 		.filter((p) => p.name !== "claude" && p.name !== "custom");
@@ -113,7 +122,9 @@ export async function getStaticProviders(
 					String(settings.globalOpenAICodexOAuthToken).trim()
 				);
 
-			status[p.name] = hasProfile || hasGlobalKey || hasOAuth || hasCodexOAuth;
+			status[p.name] = hasProfile || hasGlobalKey || hasOAuth || hasCodexOAuth ||
+				(p.name === "anthropic" && claudeOAuth) ||
+				(p.name === "openai" && codexOAuth);
 		}
 	}
 

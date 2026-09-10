@@ -302,6 +302,8 @@
 		"close": "Close"
 	},
 	"providerSelector": {
+		"updateFailed": "Unable to change provider",
+		"taskUpdateFailed": "Updating {{count}} task(s) failed. Select the provider again to retry.",
 		"label": "AI Provider",
 		"placeholder": "-- Choose a provider --",
 		"status": {
