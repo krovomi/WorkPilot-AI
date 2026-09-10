@@ -54,7 +54,7 @@ jobs:
             echo "PAT_TOKEN absent: release.yml will be started by dispatch."
           fi
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN || github.token }}
