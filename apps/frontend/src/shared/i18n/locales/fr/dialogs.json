@@ -302,6 +302,8 @@
 		"close": "Fermer"
 	},
 	"providerSelector": {
+		"updateFailed": "Impossible de changer de fournisseur",
+		"taskUpdateFailed": "La mise à jour a échoué pour {{count}} tâche(s). Réessayez la sélection du fournisseur.",
 		"label": "Fournisseur IA",
 		"placeholder": "-- Choisir un fournisseur --",
 		"status": {

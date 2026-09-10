@@ -15,6 +15,14 @@ import "@testing-library/jest-dom";
 import type { Task, TaskLogs as TaskLogsType } from "../../../shared/types";
 import { TaskLogs } from "./TaskLogs";
 
+beforeEach(() => {
+ HTMLElement.prototype.scrollTo = vi.fn();
+ vi.stubGlobal("ResizeObserver", class {
+  observe() { /* Layout is simulated in jsdom. */ }
+  disconnect() { /* No browser observation to release. */ }
+ });
+});
+
 vi.mock("react-i18next", () => ({
 	useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
@@ -303,4 +311,28 @@ it("keeps the active execution visible after selecting another model", () => {
 		screen.getByText("tasks:logs.model.runningNotice"),
 	).toBeInTheDocument();
 	expect(screen.getByText("Active Llama request")).toBeInTheDocument();
+});
+
+it("follows content height changes after render inside the log frame", () => {
+ let notify: ResizeObserverCallback | undefined;
+ const disconnect = vi.fn();
+ vi.stubGlobal("ResizeObserver", class {
+  constructor(callback: ResizeObserverCallback) { notify = callback; }
+  observe() { /* Test explicitly triggers layout notifications. */ }
+  disconnect = disconnect;
+ });
+ const ref = createRef<HTMLDivElement>();
+ const view = renderLogs(ref);
+ const container = ref.current as HTMLDivElement;
+ container.scrollTo = vi.fn();
+ Object.defineProperty(container, "scrollHeight", { value: 2400, configurable: true });
+ expect(notify).toBeDefined();
+ notify?.([], {} as ResizeObserver);
+ expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 2400, behavior: "instant" });
+ Object.defineProperty(container, "scrollHeight", { value: 2800, configurable: true });
+ notify?.([], {} as ResizeObserver);
+ expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 2800, behavior: "instant" });
+ view.unmount();
+ expect(disconnect).toHaveBeenCalled();
+ vi.unstubAllGlobals();
 });

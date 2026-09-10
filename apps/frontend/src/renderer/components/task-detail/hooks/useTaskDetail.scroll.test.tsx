@@ -41,13 +41,14 @@ it("follows legacy logs when the task receives another entry", () => {
   expect(container.scrollTo).toHaveBeenCalledWith({ top: 1500, behavior: "instant" });
 });
 
-it("keeps the active phase tail visible when execution returns to planning", () => {
+it("keeps the frame at the bottom even when an earlier phase is active", () => {
   const { result } = renderHook(() => useTaskDetail({ task }));
   const container = document.createElement("div");
   const section = document.createElement("div");
   section.dataset.phaseSection = "planning";
   container.append(section);
   container.scrollTop = 100;
+  Object.defineProperty(container, "scrollHeight", { value: 1200 });
   container.scrollTo = vi.fn();
   container.getBoundingClientRect = () => ({ top: 0, bottom: 400 }) as DOMRect;
   section.getBoundingClientRect = () => ({ top: 20, bottom: 650 }) as DOMRect;
@@ -56,7 +57,7 @@ it("keeps the active phase tail visible when execution returns to planning", () 
     result.current.setActiveTab("logs");
     result.current.setPhaseLogs({ phases: { planning: { status: "active", entries: [] } } } as unknown as TaskLogs);
   });
-  expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 350, behavior: "instant" });
+  expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 1200, behavior: "instant" });
 });
 
 it("follows the top edge in reverse order", () => {

@@ -1746,6 +1746,7 @@ export function App() {
 									</div>
 									<div className="shrink-0">
 										<ProviderSelector
+											applyToExistingTasks
 											selected={selectedProvider}
 											setSelected={setSelectedProvider}
 											onOpenAccountsSettings={() => {
