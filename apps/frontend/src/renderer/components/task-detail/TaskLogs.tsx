@@ -1,3 +1,4 @@
+import { followLogViewport } from "../../lib/follow-log-viewport";
 import {
 	AlertTriangle,
 	ArrowDown,
@@ -26,7 +27,7 @@ import {
 	X,
 	XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
 	Task,
@@ -50,6 +51,7 @@ import {
 	buildModelMetadataUpdate,
 	buildModelSelectOptions,
 	buildProviderMetadataUpdate,
+	buildGlobalProviderMetadataUpdate,
 	buildThinkingMetadataUpdate,
 	LOG_PHASE_TO_CONFIG_PHASE,
 	type PhaseDefaults,
@@ -446,7 +448,7 @@ export function TaskLogs({
 					task.metadata,
 					logPhase,
 					provider,
-					resolvePhaseDefaults(settings, provider),
+					{ ...resolvePhaseDefaults(settings, provider), phaseModels: buildGlobalProviderMetadataUpdate(provider, settings).phaseModels },
 				),
 				t("tasks:logs.provider.updatedTitle", "Fournisseur mis à jour"),
 				t(
@@ -582,6 +584,14 @@ export function TaskLogs({
 	// défilement (dernière borne « phase N: NOM » passée sous le haut du
 	// viewport). Mise à jour par computeVisiblePhase.
 	const [visibleSubStep, setVisibleSubStep] = useState<string | null>(null);
+
+	// Own following here, where the actual viewport is mounted (including
+	// Radix's deferred tab mount). ResizeObserver catches later layout changes.
+	useLayoutEffect(() => {
+		const container = logsContainerRef.current;
+		if (!container) return;
+		return followLogViewport(container, settings.logOrder === "reverse-chronological");
+	}, [logsContainerRef, settings.logOrder]);
 
 	const scrollToTop = useCallback(() => {
 		logsContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });

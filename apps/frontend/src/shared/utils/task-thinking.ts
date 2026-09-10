@@ -1,6 +1,7 @@
 import type { TaskLogPhase, TaskMetadata } from "../types";
 import {
 	DEFAULT_AGENT_PROFILES,
+	getModelsForProvider,
 	DEFAULT_PHASE_MODELS,
 	DEFAULT_PHASE_THINKING,
 	getCanonicalModelKey,
@@ -355,4 +356,27 @@ export function buildModelSelectOptions(
 		options,
 		value: isLocal ? match.value : resolveCatalogModelValue(current, options),
 	};
+}
+
+/** Replace the full task configuration when the global provider changes. */
+export function buildGlobalProviderMetadataUpdate(
+ provider: string,
+ settings: PhaseDefaultsSettings | undefined,
+): { provider: string; model: string; isAutoProfile: boolean; phaseProviders: PhaseProviderConfig; phaseModels: PhaseModelConfig; phaseThinking: PhaseThinkingConfig; thinkingLevel: ThinkingLevel } {
+ const defaults = resolvePhaseDefaults(settings, provider);
+ const catalog = getModelsForProvider(provider).filter(m => m.value !== "custom");
+ const local = ["ollama", "local", "lmstudio"].includes(provider);
+ const phaseModels = { ...defaults.phaseModels };
+ for (const phase of ["spec", "planning", "coding", "qa"] as const) {
+  const configured = settings?.providerPhaseModels?.[provider]?.[phase];
+  const model = phaseModels[phase];
+  const match = catalog.find(m => getCanonicalModelKey(m.value) === getCanonicalModelKey(model));
+  phaseModels[phase] = configured || (local ? settings?.globalOllamaModel?.trim() || match?.value || catalog[0]?.value || model : match?.value || catalog[0]?.value || model);
+ }
+ return {
+  provider, model: phaseModels.coding, isAutoProfile: true,
+  phaseProviders: { spec: provider, planning: provider, coding: provider, qa: provider },
+  phaseModels, phaseThinking: { ...defaults.phaseThinking },
+  thinkingLevel: defaults.phaseThinking.coding,
+ };
 }
