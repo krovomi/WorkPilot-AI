@@ -75,7 +75,7 @@ httpx[http2]>=0.28.1
 # (core/agent_client.py) and by the Graphiti validators + team sync. It was
 # never declared, so those code paths raised ModuleNotFoundError at runtime on
 # any environment that did not happen to pull aiohttp in transitively.
-aiohttp>=3.10.0
+aiohttp>=3.14.3
 h2>=4.4.1  # HTTP/2 support for Windsurf gRPC proxy
 sqlalchemy>=2.0.52
 psutil>=7.2.2
