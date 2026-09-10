@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
 	GitConflictInfo,
 	ImageAttachment,
@@ -311,16 +311,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		setIsUserScrolledUp(!isAtAnchor);
 	};
 
-	// Follow the actual frame end on new data. TaskLogs also observes content
-	// size to follow layout changes after this parent update has committed.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: these values change the rendered log layout
-	useLayoutEffect(() => {
-		if (activeTab !== "logs") return;
-		const container = logsContainerRef.current;
-		if (!container) return;
-		container.scrollTo({ top: logOrder === "reverse-chronological" ? 0 : container.scrollHeight, behavior: "instant" });
-		setIsUserScrolledUp(false);
-	}, [activeTab, logOrder, phaseLogs, perLlmLogs, task.logs, expandedPhases, isLoadingLogs]);
+	// TaskLogs owns scroll following and pauses it during reader navigation.
 
 	// Reset scroll state when switching to logs tab
 	useEffect(() => {
