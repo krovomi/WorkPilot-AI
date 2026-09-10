@@ -26,7 +26,7 @@ secretstorage>=3.5.0; sys_platform == "linux"
 # Memory Integration - LadybugDB (embedded graph database)
 # Requires Python 3.12+ (no Docker required); wheels available for 3.14 since 0.15.x
 real_ladybug>=0.15.3; python_version >= "3.12"
-graphiti-core>=0.5.0; python_version >= "3.12"
+graphiti-core>=0.30.1; python_version >= "3.12"
 # pandas is required by real_ladybug for get_as_df() method
 # pandas 2.2.0+ required for pre-built wheels on Python 3.12
 pandas>=3.0.5; python_version >= "3.12"
@@ -62,7 +62,7 @@ uvicorn[standard]>=0.50.2
 slowapi>=0.1.10
 
 # Multi-user server mode (central deployment)
-alembic>=1.19.1          # DB schema migrations
+alembic>=1.19.2          # DB schema migrations
 asyncpg>=0.31.0          # PostgreSQL async driver (server mode)
 aiosqlite>=0.22.1        # SQLite async driver (dev/tests fallback)
 argon2-cffi>=25.1.0      # Password hashing for local accounts
@@ -75,7 +75,7 @@ httpx[http2]>=0.28.1
 # (core/agent_client.py) and by the Graphiti validators + team sync. It was
 # never declared, so those code paths raised ModuleNotFoundError at runtime on
 # any environment that did not happen to pull aiohttp in transitively.
-aiohttp>=3.10.0
+aiohttp>=3.14.3
 h2>=4.4.1  # HTTP/2 support for Windsurf gRPC proxy
 sqlalchemy>=2.0.52
 psutil>=7.2.2
