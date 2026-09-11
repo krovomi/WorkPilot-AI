@@ -41,11 +41,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import re
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from hermes.home import hermes_home
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +56,24 @@ __all__ = [
     "discover_authored_skills",
     "ingest_hermes_skills",
     "MAX_CANDIDATES_PER_RUN",
+    "DEFAULT_SURFACE",
 ]
 
 # A first run against a well-used hermes install could otherwise open several
 # hundred candidates at once, which is not a review queue, it is a denial of
 # one. The remainder is reported and picked up next time.
 MAX_CANDIDATES_PER_RUN = 25
+
+# Which feature opened the cycle. Recorded on the candidate so a reviewer
+# reading the queue weeks later can tell a build's observation from a person
+# pressing a button in the Kanban. `hermes.loop.SURFACES` owns the vocabulary;
+# this is only the fallback for a caller that names none.
+#
+# It names the surface that *first* proposed the candidate, not the last one to
+# look: a candidate whose content has not changed is left alone, so a second
+# cycle from another surface rewrites nothing. That is the same rule that keeps
+# the queue from filling with one copy per build.
+DEFAULT_SURFACE = "build"
 
 _PREFIX = "hermes"
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -75,21 +87,9 @@ def _slug(text: str) -> str:
     return _SLUG_RE.sub("-", text.lower()).strip("-")
 
 
-def hermes_home() -> Path:
-    """Where hermes keeps its state, following its own resolution order.
-
-    ``HERMES_HOME``, else the platform default — ``%LOCALAPPDATA%\\hermes`` on
-    Windows, ``~/.hermes`` elsewhere. Mirrored from hermes_constants.py rather
-    than guessed, so a user who moved their home is still found.
-    """
-    override = os.environ.get("HERMES_HOME", "").strip()
-    if override:
-        return Path(override).expanduser()
-    if sys.platform == "win32":
-        local = os.environ.get("LOCALAPPDATA", "").strip()
-        base = Path(local) if local else Path.home() / "AppData" / "Local"
-        return base / "hermes"
-    return Path.home() / ".hermes"
+# Re-exported, not redefined. `hermes.home` is the one resolution of
+# ``HERMES_HOME``; this module had its own copy back when it was the only
+# reader, and two copies is two answers for a user who moved their home.
 
 
 def _bundled_names(skills_root: Path) -> set[str]:
@@ -243,7 +243,7 @@ def _existing_digest(path: Path) -> str | None:
     return match.group(1) if match else None
 
 
-def _render(candidate: HermesCandidate) -> str:
+def _render(candidate: HermesCandidate, surface: str = DEFAULT_SURFACE) -> str:
     origin = "pending approval in hermes" if candidate.staged else "active in hermes"
     return f"""---
 name: {_slug(candidate.name)}
@@ -255,6 +255,7 @@ metadata:
       skill: {candidate.name}
       category: {candidate.category or "uncategorised"}
       state: {origin}
+      surface: {surface}
       digest: {candidate.digest}
 ---
 
@@ -289,6 +290,7 @@ def ingest_hermes_skills(
     home: Path | None = None,
     write: bool = True,
     limit: int = MAX_CANDIDATES_PER_RUN,
+    surface: str = DEFAULT_SURFACE,
 ) -> HermesIngestReport:
     """File hermes-authored skills as candidates. Never raises.
 
@@ -325,7 +327,7 @@ def ingest_hermes_skills(
                 report.deferred += 1
                 continue
             if write:
-                path.write_text(_render(candidate), encoding="utf-8")
+                path.write_text(_render(candidate, surface), encoding="utf-8")
             report.written.append(path)
     except Exception as exc:  # noqa: BLE001 - observation never fails a build
         logger.warning("hermes ingest skipped: %s", exc)

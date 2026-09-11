@@ -1,0 +1,39 @@
+{
+	"title": "Boucle d'apprentissage Hermes",
+	"subtitle": "Les skills qu'hermes-agent a écrits depuis sa propre expérience, déposés ici pour revue",
+	"expand": "Détails",
+	"collapse": "Masquer",
+	"empty": "Tout est en place et la file de revue est vide.",
+	"state": {
+		"ready": "prêt",
+		"degraded": "partiellement configuré",
+		"absent": "non installé"
+	},
+	"badge": {
+		"pending": "{{count}} candidat en attente",
+		"pending_other": "{{count}} candidats en attente"
+	},
+	"cycle": {
+		"run": "Lancer maintenant",
+		"running": "En cours…",
+		"result": "{{found}} skill(s) vus · {{proposed}} proposés · {{unchanged}} déjà en attente"
+	},
+	"checks": {
+		"title": "Conditions",
+		"install": "Installation",
+		"soul": "Persona",
+		"trust": "Confiance",
+		"skills": "Skills",
+		"agents": "Contexte projet"
+	},
+	"soul": {
+		"title": "Persona (SOUL.md)",
+		"description": "Hermes lit SOUL.md depuis son propre répertoire et l'injecte comme identité de chaque session. Ce dépôt en propose un ; l'installer est une copie réversible — la persona remplacée est conservée horodatée.",
+		"install": "Installer SOUL.md",
+		"replace": "Remplacer la persona installée"
+	},
+	"pending": {
+		"title": "En attente de revue",
+		"description": "Uniquement des candidats. Rien ici n'est actif et rien n'est promu seul : un skill écrit par hermes ne porte aucune preuve issue d'un build qui s'en serait servi."
+	}
+}

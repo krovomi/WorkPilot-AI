@@ -1,0 +1,39 @@
+{
+	"title": "Hermes learning loop",
+	"subtitle": "Skills hermes-agent wrote from its own experience, filed for review here",
+	"expand": "Details",
+	"collapse": "Hide",
+	"empty": "Everything is in place and the review queue is empty.",
+	"state": {
+		"ready": "ready",
+		"degraded": "partly configured",
+		"absent": "not installed"
+	},
+	"badge": {
+		"pending": "{{count}} candidate pending",
+		"pending_other": "{{count}} candidates pending"
+	},
+	"cycle": {
+		"run": "Run now",
+		"running": "Running…",
+		"result": "{{found}} authored skill(s) seen · {{proposed}} proposed · {{unchanged}} already pending"
+	},
+	"checks": {
+		"title": "Conditions",
+		"install": "Install",
+		"soul": "Persona",
+		"trust": "Trust",
+		"skills": "Skills",
+		"agents": "Project context"
+	},
+	"soul": {
+		"title": "Persona (SOUL.md)",
+		"description": "Hermes reads SOUL.md from its own home and injects it as the identity of every session. This repository offers one; installing it is a copy you can undo — the persona it replaces is kept with a timestamp.",
+		"install": "Install SOUL.md",
+		"replace": "Replace the installed persona"
+	},
+	"pending": {
+		"title": "Waiting for review",
+		"description": "Candidates only. Nothing here is active, and nothing is promoted on its own: a hermes-authored skill carries no evidence from a build that used it."
+	}
+}

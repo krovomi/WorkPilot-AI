@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .hermes_ingest import HermesIngestReport, ingest_hermes_skills
+from .hermes_ingest import HermesIngestReport
 from .replay import (
     DISCRIMINATOR,
     ReplayResult,
@@ -102,8 +102,13 @@ class ObserveReport:
     proposals_written: list[Path] = field(default_factory=list)
     rejected: list[tuple[str, RejectionReason]] = field(default_factory=list)
     replay: ReplayResult | None = None
-    hermes: HermesIngestReport | None = None
-    """What hermes-agent had authored since the last look, if it is installed."""
+    hermes: Any = None
+    """One turn of the hermes cycle (`hermes.loop.CycleReport`), if it ran.
+
+    Typed loosely rather than imported: `hermes.loop` reads
+    `learning_loop.hermes_ingest`, so naming `CycleReport` here would close the
+    cycle between the two modules. Both sides import the other lazily, inside
+    the one function that needs it."""
 
     def describe(self) -> str:
         hermes_summary = self.hermes.describe() if self.hermes else ""
@@ -166,6 +171,22 @@ def _agents_for(pattern: Any) -> list[str]:
     return phase_agents.get(getattr(pattern, "agent_phase", ""), [])
 
 
+def _hermes_cycle(repo_root: Path, *, write: bool):
+    """One turn of the hermes learning cycle, or None. Never raises.
+
+    Imported lazily: `hermes` is an optional capability, and a learning loop
+    that refused to run because an optional package moved would fail the one
+    thing it exists to protect against.
+    """
+    try:
+        from hermes.loop import run_cycle
+
+        return run_cycle(repo_root, surface="build", write=write)
+    except Exception as exc:  # noqa: BLE001 - observation never fails a build
+        logger.warning("hermes cycle unavailable: %s", exc)
+        return None
+
+
 def run_observe(
     repo_root: Path,
     outcome: BuildOutcome,
@@ -187,13 +208,19 @@ def run_observe(
     """
     report = ObserveReport(spec_id=outcome.spec_id)
     try:
-        # Hermes-authored skills, if hermes is installed on this machine. Read
-        # before the early return below, because it does not depend on what
-        # *this* build verified: hermes learned it somewhere WorkPilot was not
-        # watching, and a build with no external signals of its own is not a
-        # reason to ignore that. It arrives as a candidate with no
-        # corroboration and is promoted by nothing — see hermes_ingest.
-        report.hermes = ingest_hermes_skills(repo_root, write=write)
+        # One turn of the hermes cycle, if hermes is installed on this
+        # machine. Run before the early return below, because it does not
+        # depend on what *this* build verified: hermes learned it somewhere
+        # WorkPilot was not watching, and a build with no external signals of
+        # its own is not a reason to ignore that. It arrives as a candidate
+        # with no corroboration and is promoted by nothing — see hermes_ingest.
+        #
+        # Through `hermes.loop` rather than the ingest directly, so the build
+        # log reports an unmet condition (an untrusted checkout, a missing
+        # persona) instead of an empty result that reads like "nothing to
+        # learn". That is the same cycle the Kanban opens, with a different
+        # surface name.
+        report.hermes = _hermes_cycle(repo_root, write=write)
 
         report.signals = signals_from_outcome(outcome)
         report.replay = replay

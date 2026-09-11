@@ -1996,6 +1996,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import workflow_profile router: {e}")
 
+# --- Hermes API (hermes-agent readiness, persona, and the learning cycle) ---
+try:
+    from hermes.api import router as hermes_router
+
+    _mount(hermes_router, "hermes")
+except ImportError as e:
+    print(f"Warning: Could not import hermes router: {e}")
+
 # --- Spec Traceability API (open questions + requirement coverage for a spec) ---
 try:
     from spec.api import router as spec_traceability_router

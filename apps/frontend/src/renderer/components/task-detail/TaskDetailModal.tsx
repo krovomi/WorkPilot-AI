@@ -93,6 +93,7 @@ import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
+import { HermesLearningCard } from "./HermesLearningCard";
 import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
 import { WorkflowProfileCard } from "./WorkflowProfileCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
@@ -1271,6 +1272,11 @@ function TaskDetailModalContent({
 													taskProject?.path ?? activeProject?.path
 												}
 											/>
+
+											{/* La boucle d'apprentissage hermes : ce qu'il a
+											    appris ailleurs, déposé dans la file de revue.
+											    Ne s'affiche pas quand hermes n'est pas installé. */}
+											<HermesLearningCard />
 
 											{/* Metadata */}
 											<TaskMetadataComponent task={task} />

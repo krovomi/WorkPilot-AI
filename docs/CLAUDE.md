@@ -472,11 +472,78 @@ Code, Codex and OpenCode.
 experience, on surfaces WorkPilot never sees — Telegram, Discord, a cron job on a VPS.
 Two closed loops writing skills is one too many, so there is no second loop here:
 `learning_loop/hermes_ingest.py` files each authored skill as a *candidate* under
-`skills/_proposed/`, and the `observe` phase runs it when hermes is installed.
+`skills/_proposed/`.
 
 ```bash
 python3 scripts/skills_cli.py hermes-ingest --dry-run
+python3 runners/hermes_runner.py --action status
+python3 runners/hermes_runner.py --action cycle --surface kanban
 ```
+
+#### The cycle, and who may open it
+
+`apps/backend/hermes/` is the capability; the ingest above stays in `learning_loop/`
+because that is where the review queue and its rules live.
+
+| Module | Answers |
+|---|---|
+| `home.py` | where hermes keeps its state, and what the user configured there |
+| `soul.py` | the persona this repository offers, and whether it is installed |
+| `readiness.py` | whether the loop can run in this checkout, and what is missing |
+| `loop.py` | the cycle itself, opened by a named feature surface |
+| `api.py` | `GET /api/hermes/status`, `POST /api/hermes/cycle`, `POST /api/hermes/soul/install` |
+
+The three steps that always go together — *can this run here*, *what did hermes
+author*, *who asked* — are one function, and a **surface** is a name rather than a code
+path: `build` (the `observe` phase), `kanban` (the task panel), `cli`, `self-healing`,
+`github`. `SURFACES` is a closed set on purpose, because the surface is written into a
+file a person reviews and a free-text field would fill with whatever string each caller
+happened to pass. The next feature to want the loop adds a line there, not a second
+ingest.
+
+The surface is recorded on the candidate, which is what lets a reviewer reading
+`skills/_proposed/` six weeks later tell a build's observation from a person pressing a
+button. That is the difference between a queue and a pile.
+
+**The doctor runs before the phase, not after the empty result.** Five conditions —
+`install`, `soul`, `trust`, `skills`, `agents` — all answerable from files on disk in
+milliseconds, which is why the Kanban can ask on every panel open. Only `install` is a
+blocker; the rest degrade, because a candidate hermes authored *elsewhere* is exactly
+the experience from outside this repository that makes the integration worth having.
+The failure this exists to prevent is the silent one: `trust` is unset on every fresh
+clone, hermes then loads no project skills, nothing appears, and the conclusion drawn
+six weeks later is "hermes doesn't work here".
+
+**There is no endpoint that grants trust.** `status` reports whether this checkout is
+listed in `skills.trusted_project_dirs` and returns the exact command that fixes it, and
+that is where it stops. Trusting a checkout makes every `SKILL.md` in it a procedure
+hermes will follow in every session on the machine — the prompt-injection vector the
+gate was built to close. Software that grants itself the trust has removed the gate.
+
+**In the Kanban.** `HermesLearningCard` in the task panel shows the five conditions with
+their remedies, the candidates already waiting, and a button that turns the cycle now.
+It renders nothing when hermes is not installed: a permanent card reading "feature not in
+use" is a card nobody reads. Like `workflows/api.py`, the router is refused in server
+mode — every answer is about `$HERMES_HOME` on the machine running the backend, which on
+a shared deployment belongs to the server and not to the tenant asking.
+
+#### `SOUL.md`
+
+`SOUL.md` at the root of this repository is the persona WorkPilot offers, and it is
+**not a project context file**. `agent/prompt_builder.load_soul_md` reads exactly one
+path — `<HERMES_HOME>/SOUL.md` — and injects it as identity slot #1 of every hermes
+session on every surface. Project context is a different chain entirely (`.hermes.md` /
+`HERMES.md` → `AGENTS.md` → `CLAUDE.md` → `.cursorrules`, first found wins), and this
+repository is already answered by its committed `AGENTS.md`.
+
+Shipping one anyway is right for the reason hermes ships one at the root of its own
+repository: it is the persona a person installs, and a persona nobody can see is a
+persona nobody adopts. The file is the offer; the install is a separate, explicit act —
+from the card's button or `--action install-soul`, never from a build. That home belongs
+to the user's own agent, in conversations WorkPilot will never see; a pipeline that
+silently overwrote it would be rewriting a personality that is not ours. A *different*
+persona already in place is left alone unless the caller says otherwise, and the one it
+replaces is kept beside it with a timestamp.
 
 A candidate carries **no external verification signal**, and that is not a gap to close
 later. Hermes's approval gate is a person saying yes to a text; it is not an observation
