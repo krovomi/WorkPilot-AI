@@ -572,3 +572,94 @@ export async function fetchWorkflowProfile(
 		signal,
 	);
 }
+
+/* -------------------------------------------------------------------------
+ * Hermes — readiness, persona, and the learning cycle
+ *
+ *   GET  /api/hermes/status
+ *   POST /api/hermes/cycle
+ *   POST /api/hermes/soul/install
+ *
+ * All three are refused in server mode: every answer is about $HERMES_HOME on
+ * the machine running the backend, which on a shared deployment belongs to the
+ * server and not to the tenant asking. The caller renders `reason === "server-mode"`
+ * as "not available here" rather than as a failure.
+ * ---------------------------------------------------------------------- */
+
+export interface HermesCheck {
+	readonly name: string;
+	readonly ok: boolean;
+	readonly detail: string;
+	readonly remedy: string;
+	readonly required: boolean;
+}
+
+export interface HermesReadiness {
+	readonly state: "absent" | "ready" | "degraded";
+	readonly installed: boolean;
+	readonly ready: boolean;
+	readonly degraded: boolean;
+	readonly home: string;
+	readonly checks: readonly HermesCheck[];
+}
+
+export interface HermesSoul {
+	readonly state: "installed" | "diverged" | "not-installed" | "unavailable";
+	readonly offered: boolean;
+	readonly installed: boolean;
+	readonly matches: boolean;
+	readonly installedPath: string;
+	readonly repoPath: string;
+}
+
+export interface HermesStatus {
+	readonly readiness: HermesReadiness;
+	readonly soul: HermesSoul;
+	readonly pending: readonly string[];
+	readonly surfaces: readonly { readonly id: string; readonly description: string }[];
+}
+
+export interface HermesCycle {
+	readonly surface: string;
+	readonly surfaceDescription: string;
+	readonly readiness: HermesReadiness;
+	readonly ran: boolean;
+	readonly proposed: number;
+	readonly pending: readonly string[];
+	readonly ingest: {
+		readonly found: number;
+		readonly proposed: number;
+		readonly files: readonly string[];
+		readonly unchanged: number;
+		readonly deferred: number;
+		readonly reason: string;
+	} | null;
+}
+
+export async function fetchHermesStatus(
+	signal?: AbortSignal,
+): Promise<ApiResult<{ status: HermesStatus }>> {
+	return _get<{ status: HermesStatus }>("/api/hermes/status", {}, signal);
+}
+
+export async function runHermesCycle(
+	surface: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ cycle: HermesCycle }>> {
+	return _post<{ cycle: HermesCycle }>(
+		"/api/hermes/cycle",
+		{ surface, dryRun: false },
+		signal,
+	);
+}
+
+export async function installHermesSoul(
+	overwrite: boolean,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ changed: boolean; message: string; soul: HermesSoul }>> {
+	return _post<{ changed: boolean; message: string; soul: HermesSoul }>(
+		"/api/hermes/soul/install",
+		{ overwrite },
+		signal,
+	);
+}
