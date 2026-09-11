@@ -142,3 +142,12 @@ phases:
       Watches for corrections the user made, work no skill covered, and its own
       blind spots. Writes candidates to skills/_proposed/ and never edits a
       skill directly. Near-free, so it runs at every effort level.
+
+      This is also where the hermes-agent cycle turns (`hermes.loop`, surface
+      `build`): what hermes authored from its own experience — on Telegram, on
+      a cron job, in a terminal WorkPilot never saw — is filed in the same
+      review queue, carrying no external signal and promoted by nothing. It
+      stays inside this phase rather than declaring one of its own because the
+      question it answers is this phase's question, and because a phase
+      declared where no window opens is resolved, printed, and run by nobody.
+      When hermes is not installed, the cycle reports that and costs nothing.
