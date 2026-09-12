@@ -685,6 +685,7 @@ def create_client(
     agents: dict | None = None,
     resume: str | None = None,
     use_subagents: bool = True,
+    roster: str | None = None,
 ) -> ClaudeSDKClient:
     """
     Create a Claude Agent SDK client with multi-layered security.
@@ -710,6 +711,9 @@ def create_client(
                       Use {"type": "json_schema", "schema": Model.model_json_schema()}
                       See: https://platform.claude.com/docs/en/agent-sdk/structured-outputs
         use_subagents: Whether this call may compose a subagent roster at all.
+        roster: Which subagent roster to compose, when it is not the one
+            agent_type implies. A workflow phase sets this; see
+            `agents.subagents.phases.phase_specs`.
                       False is the workflow engine's `sequential-reset`: same
                       isolation, no parallel dispatch. Defaults to True, which
                       is the behaviour every existing caller already had.
@@ -1349,6 +1353,7 @@ def create_client(
             project_dir=project_dir,
             user_agents=agents,
             provider=_get_active_provider(spec_dir),
+            roster_name=roster,
         )
     except _NoSubagents:
         logger.debug(
@@ -1910,6 +1915,7 @@ def create_agent_client(
     resume: str | None = None,
     system_prompt: str | None = None,
     use_subagents: bool = True,
+    roster: str | None = None,
 ) -> "AgentClient":  # noqa: F821
     """
     Create a provider-agnostic agent client for Kanban task execution.
@@ -1935,6 +1941,11 @@ def create_agent_client(
         use_subagents: Whether this call may compose a subagent roster at all.
                  False suppresses it entirely — the workflow engine's
                  `sequential-reset` dispatch. Defaults to True.
+        roster: Which roster to compose, when it is not the one agent_type
+                 implies. Separate from `agent_type` on purpose: that decides
+                 the tool allowlist and whether the phase may write, this
+                 decides which specialists it may dispatch to. See
+                 `agents.subagents.phases.phase_specs`.
         system_prompt: Optional system-prompt override. When provided, it
                  replaces the default coding base prompt for the
                  copilot/openai/windsurf clients (used by utilities that need
@@ -2068,6 +2079,7 @@ def create_agent_client(
             agents=agents,
             resume=resume,
             use_subagents=use_subagents,
+            roster=roster,
         )
         return ClaudeAgentClient(sdk_client)
 
