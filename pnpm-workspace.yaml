@@ -11,6 +11,17 @@ onlyBuiltDependencies:
 
 overrides:
   '@babel/core': ^7.29.6
+  # Radix keeps the "which layer owns the focus trap" stack in a module-level
+  # singleton. Two copies of that module means two stacks, so neither pauses
+  # the other: a Select opened inside a Dialog gives both scopes an active
+  # trap, each answers the other's focusout by focusing back, and the pair
+  # recurses until the stack is exhausted. Dependabot moved react-select and
+  # react-dropdown-menu on to focus-scope 1.1.16 while react-dialog,
+  # react-popover, react-toast and react-tooltip stayed on 1.1.7, which is
+  # exactly that split. Deduping restores the single stack the design assumes.
+  '@radix-ui/react-focus-scope': 1.1.16
+  '@radix-ui/react-dismissable-layer': 1.1.19
+  '@radix-ui/react-focus-guards': 1.1.6
   '@electron/rebuild': 4.0.3
   '@hono/node-server': '>= 1.19.15'
   '@opentelemetry/core': '>= 2.8.0'
