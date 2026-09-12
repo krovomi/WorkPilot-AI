@@ -69,7 +69,9 @@ def baseline_dir(project_dir: Path) -> Path:
 # --------------------------------------------------------------------------- #
 
 
-def _make_session(project_dir: Path, spec_dir: Path, model: str | None, thinking: str | None):
+def _make_session(
+    project_dir: Path, spec_dir: Path, model: str | None, thinking: str | None
+):
     """A `(prompt) -> response` callable backed by the configured provider.
 
     Built here rather than inside `authoring` so the loop stays testable without
@@ -190,7 +192,7 @@ async def action_delta(
                 ),
             ),
         )
-        return {"status": "success", "action": "delta", **status.to_dict()}
+        return {"status": "success", "action": "delta", "delta": status.to_dict()}
 
     if not force:
         significance = assess(changed_files, baseline_path)
@@ -203,7 +205,7 @@ async def action_delta(
                 ),
             )
             say(f"No architectural change: {significance.reason}")
-            return {"status": "success", "action": "delta", **status.to_dict()}
+            return {"status": "success", "action": "delta", "delta": status.to_dict()}
         say(f"Mapping this task: {significance.reason}")
 
     head_path = delta_module.directory(spec_dir) / delta_module.HEAD_SPEC
@@ -233,8 +235,9 @@ async def action_delta(
         return {
             "status": "error",
             "action": "delta",
+            "error": authored.error,
             "diagnostics": authored.diagnostics,
-            **status.to_dict(),
+            "delta": status.to_dict(),
         }
 
     say("Comparing against the baseline…")
@@ -242,7 +245,8 @@ async def action_delta(
     return {
         "status": "success" if status.status == delta_module.STATUS_MAPPED else "error",
         "action": "delta",
-        **status.to_dict(),
+        "error": "" if status.status == delta_module.STATUS_MAPPED else status.reason,
+        "delta": status.to_dict(),
     }
 
 
@@ -262,7 +266,9 @@ def main() -> int:
         "--changed-files",
         help="Newline- or comma-separated repository-relative paths (delta only)",
     )
-    parser.add_argument("--task-summary", default="", help="What the task set out to do")
+    parser.add_argument(
+        "--task-summary", default="", help="What the task set out to do"
+    )
     parser.add_argument(
         "--force",
         action="store_true",
@@ -278,7 +284,9 @@ def main() -> int:
 
     project_dir = Path(args.project_dir).expanduser().resolve()
     if not project_dir.is_dir():
-        emit({"status": "error", "error": f"project directory not found: {project_dir}"})
+        emit(
+            {"status": "error", "error": f"project directory not found: {project_dir}"}
+        )
         return 1
 
     try:
@@ -301,12 +309,19 @@ def main() -> int:
             return 1
 
         if args.action == "map":
-            payload = asyncio.run(action_map(project_dir, args.model, args.thinking_level))
+            payload = asyncio.run(
+                action_map(project_dir, args.model, args.thinking_level)
+            )
             emit(payload)
             return 0 if payload["status"] == "success" else 1
 
         if not args.spec_dir:
-            emit({"status": "error", "error": "--spec-dir is required for --action delta"})
+            emit(
+                {
+                    "status": "error",
+                    "error": "--spec-dir is required for --action delta",
+                }
+            )
             return 1
         spec_dir = Path(args.spec_dir).expanduser().resolve()
 
@@ -330,7 +345,9 @@ def main() -> int:
         return 0 if payload["status"] == "success" else 1
 
     except ArchifyUnavailable as exc:
-        emit({"status": "error", "error": str(exc), "readiness": exc.readiness.to_dict()})
+        emit(
+            {"status": "error", "error": str(exc), "readiness": exc.readiness.to_dict()}
+        )
         return 1
     except KeyboardInterrupt:
         emit({"status": "cancelled"})

@@ -69,11 +69,17 @@ KEEP_DIRS = (
     "scripts",
 )
 
-KEEP_FILES = (
-    "SKILL.md",
-    "LICENSE",
+# Files that must be there. Vendoring third-party code without its licence is
+# not something to do quietly, so a missing one fails the script rather than
+# being skipped like the rest.
+REQUIRED_FILES = ("SKILL.md", "LICENSE", "package.json")
+
+# Taken when present. `THIRD_PARTY_NOTICES.md` only appears in some upstream
+# releases; which of these were absent is recorded in VENDOR.json rather than
+# passed over in silence, because "attribution quietly stopped being copied" is
+# exactly the failure this list would otherwise hide.
+OPTIONAL_FILES = (
     "THIRD_PARTY_NOTICES.md",
-    "package.json",
     "package-lock.json",
     "skill-release.json",
 )
@@ -101,16 +107,29 @@ def _clone(ref: str, into: Path) -> str:
     return _run(["git", "rev-parse", "HEAD"], cwd=into)
 
 
-def _stage(src: Path, staging: Path) -> None:
+def _stage(src: Path, staging: Path) -> list[str]:
+    """Copy the kept tree into `staging`; return the optional files not found."""
     staging.mkdir(parents=True)
     for name in KEEP_DIRS:
         source = src / name
         if source.is_dir():
             shutil.copytree(source, staging / name)
-    for name in KEEP_FILES:
+
+    missing_required = [n for n in REQUIRED_FILES if not (src / n).is_file()]
+    if missing_required:
+        raise FileNotFoundError(
+            "upstream is missing required file(s): " + ", ".join(missing_required)
+        )
+    for name in REQUIRED_FILES:
+        shutil.copy2(src / name, staging / name)
+
+    absent: list[str] = []
+    for name in OPTIONAL_FILES:
         source = src / name
         if source.is_file():
             shutil.copy2(source, staging / name)
+        else:
+            absent.append(name)
 
     # Examples: the JSON sources only. SKILL.md reads one for field shape.
     examples = src / "examples"
@@ -124,8 +143,10 @@ def _stage(src: Path, staging: Path) -> None:
         if target.exists():
             target.unlink()
 
+    return absent
 
-def _receipt(ref: str, commit: str) -> dict[str, object]:
+
+def _receipt(ref: str, commit: str, absent: list[str]) -> dict[str, object]:
     return {
         "source": SOURCE,
         "subdir": SKILL_SUBDIR,
@@ -135,6 +156,7 @@ def _receipt(ref: str, commit: str) -> dict[str, object]:
         "vendored_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "vendored_by": "scripts/vendor_archify.py",
         "excluded": list(EXCLUDED),
+        "absent_upstream": absent,
         "note": (
             "Committed rather than bootstrapped: this is a runtime dependency of "
             "the Architecture page and the Kanban architecture delta, not a skill "
@@ -181,9 +203,13 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         staging = Path(tmp) / "staged"
-        _stage(src, staging)
+        try:
+            absent = _stage(src, staging)
+        except FileNotFoundError as exc:
+            print(f"vendor_archify: {exc}", file=sys.stderr)
+            return 1
         (staging / "VENDOR.json").write_text(
-            json.dumps(_receipt(args.ref, commit), indent="\t") + "\n",
+            json.dumps(_receipt(args.ref, commit, absent), indent="\t") + "\n",
             encoding="utf-8",
         )
 

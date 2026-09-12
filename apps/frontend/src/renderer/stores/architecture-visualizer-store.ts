@@ -1,43 +1,35 @@
 import { create } from "zustand";
-import type { ArchitectureVisualizerResult } from "../../main/architecture-visualizer-service";
+import type {
+	ArchifyReadiness,
+	ArchitectureBaseline,
+	ArchitectureVisualizerResult,
+} from "../../main/architecture-visualizer-service";
 
 export type ArchitectureVisualizerPhase =
 	| "idle"
+	| "checking"
 	| "generating"
 	| "complete"
 	| "error";
-
-export const DIAGRAM_TYPES = [
-	"module_dependencies",
-	"component_hierarchy",
-	"data_flow",
-	"database_schema",
-] as const;
-
-export type DiagramType = (typeof DIAGRAM_TYPES)[number];
 
 interface ArchitectureVisualizerState {
 	phase: ArchitectureVisualizerPhase;
 	status: string;
 	streamingOutput: string;
-	result: ArchitectureVisualizerResult | null;
+	/** Whether archify can run here, and what is missing when it cannot. */
+	readiness: ArchifyReadiness | null;
+	/** The model already on disk. Read at open, so the page is never blank. */
+	baseline: ArchitectureBaseline | null;
+	/** `file://` URL of the rendered artifact, resolved once it exists. */
+	artifactUrl: string | null;
 	error: string | null;
-	isOpen: boolean;
-	selectedDiagramTypes: DiagramType[];
-	selectedDiagramView: DiagramType | null;
 	model?: string;
 	thinkingLevel?: string;
 
-	openDashboard: () => void;
-	closeDashboard: () => void;
 	setPhase: (phase: ArchitectureVisualizerPhase) => void;
 	setStatus: (status: string) => void;
 	appendStreamingOutput: (chunk: string) => void;
-	setResult: (result: ArchitectureVisualizerResult) => void;
 	setError: (error: string) => void;
-	setSelectedDiagramTypes: (types: DiagramType[]) => void;
-	toggleDiagramType: (type: DiagramType) => void;
-	setSelectedDiagramView: (type: DiagramType | null) => void;
 	setModel: (model?: string) => void;
 	setThinkingLevel: (level?: string) => void;
 	reset: () => void;
@@ -47,11 +39,10 @@ const initialState = {
 	phase: "idle" as ArchitectureVisualizerPhase,
 	status: "",
 	streamingOutput: "",
-	result: null,
+	readiness: null,
+	baseline: null,
+	artifactUrl: null,
 	error: null,
-	isOpen: false,
-	selectedDiagramTypes: [...DIAGRAM_TYPES] as DiagramType[],
-	selectedDiagramView: null,
 	model: undefined,
 	thinkingLevel: undefined,
 };
@@ -60,91 +51,110 @@ export const useArchitectureVisualizerStore =
 	create<ArchitectureVisualizerState>((set) => ({
 		...initialState,
 
-		openDashboard: () => set({ isOpen: true }),
-		closeDashboard: () =>
-			set({
-				isOpen: false,
-				phase: "idle",
-				status: "",
-				streamingOutput: "",
-				result: null,
-				error: null,
-			}),
 		setPhase: (phase) => set({ phase }),
 		setStatus: (status) => set({ status }),
 		appendStreamingOutput: (chunk) =>
 			set((s) => ({ streamingOutput: s.streamingOutput + chunk })),
-		setResult: (result) => set({ result, phase: "complete" }),
 		setError: (error) => set({ error, phase: "error" }),
-		setSelectedDiagramTypes: (selectedDiagramTypes) =>
-			set({ selectedDiagramTypes }),
-		toggleDiagramType: (type) =>
-			set((s) => ({
-				selectedDiagramTypes: s.selectedDiagramTypes.includes(type)
-					? s.selectedDiagramTypes.filter((t) => t !== type)
-					: [...s.selectedDiagramTypes, type],
-			})),
-		setSelectedDiagramView: (selectedDiagramView) =>
-			set({ selectedDiagramView }),
 		setModel: (model) => set({ model }),
 		setThinkingLevel: (thinkingLevel) => set({ thinkingLevel }),
 		reset: () => set(initialState),
 	}));
 
-export function generateArchitectureDiagrams(projectDir: string): void {
-	const store = useArchitectureVisualizerStore.getState();
-	store.setPhase("generating");
+/**
+ * Read what is already on disk: the doctor, and the baseline if there is one.
+ *
+ * The page used to start empty on every open and clear its result on close, so
+ * a model generated five minutes earlier was invisible until it was generated
+ * again. Nothing read the files back.
+ */
+export async function loadArchitectureState(projectDir: string): Promise<void> {
+	useArchitectureVisualizerStore.setState({ phase: "checking", error: null });
+	const result = await window.electronAPI.checkArchifyReadiness(projectDir);
+	if (!result.success || !result.data) {
+		useArchitectureVisualizerStore.setState({
+			phase: "error",
+			error: result.error ?? "could not check the archify runtime",
+		});
+		return;
+	}
+
+	const { readiness = null, baseline = null } = result.data;
 	useArchitectureVisualizerStore.setState({
-		streamingOutput: "",
-		error: null,
-		result: null,
+		readiness,
+		baseline,
+		phase: "idle",
 	});
 
-	window.electronAPI.generateArchitectureDiagrams({
+	if (baseline?.artifact) {
+		await resolveArtifact(baseline.artifact);
+	}
+}
+
+async function resolveArtifact(artifactPath: string): Promise<void> {
+	const resolved =
+		await window.electronAPI.resolveArchitectureArtifact(artifactPath);
+	useArchitectureVisualizerStore.setState({
+		artifactUrl: resolved.success ? (resolved.data?.url ?? null) : null,
+	});
+}
+
+export function generateArchitectureMap(projectDir: string): void {
+	const store = useArchitectureVisualizerStore.getState();
+	useArchitectureVisualizerStore.setState({
+		phase: "generating",
+		streamingOutput: "",
+		error: null,
+	});
+
+	void window.electronAPI.generateArchitectureMap({
 		projectDir,
-		diagramTypes: store.selectedDiagramTypes,
 		model: store.model,
 		thinkingLevel: store.thinkingLevel,
 	});
 }
 
 export function cancelArchitectureVisualization(): void {
-	window.electronAPI.cancelArchitectureVisualization();
+	void window.electronAPI.cancelArchitectureVisualization();
 	useArchitectureVisualizerStore.getState().setPhase("idle");
 }
 
+/**
+ * Subscribe to the service's events.
+ *
+ * Call this from a `useEffect` in the page and keep the returned teardown.
+ * It existed before and was called by nothing, so the renderer never received
+ * a status, a result or an error: the UI sat on its spinner for ever.
+ */
 export function setupArchitectureVisualizerListeners(): () => void {
 	const store = () => useArchitectureVisualizerStore.getState();
 
 	const unsubChunk = window.electronAPI.onArchitectureVisualizerStreamChunk(
-		(chunk: string) => {
-			store().appendStreamingOutput(chunk);
-		},
+		(chunk: string) => store().appendStreamingOutput(chunk),
 	);
 
 	const unsubStatus = window.electronAPI.onArchitectureVisualizerStatus(
-		(status: string) => {
-			store().setStatus(status);
-			if (status.includes("complete") || status.includes("Analysis")) {
-				store().setPhase("generating");
-			}
-		},
+		(status: string) => store().setStatus(status),
 	);
 
 	const unsubError = window.electronAPI.onArchitectureVisualizerError(
-		(error: string) => {
-			store().setError(error);
-		},
+		(error: string) => store().setError(error),
 	);
 
 	const unsubComplete = window.electronAPI.onArchitectureVisualizerComplete(
 		(result: ArchitectureVisualizerResult) => {
-			store().setResult(result);
-			// Default to first available diagram type
-			const firstType = result.diagram_types_analyzed?.[0] as
-				| DiagramType
-				| undefined;
-			if (firstType) store().setSelectedDiagramView(firstType);
+			if (result.action !== "map") return;
+			useArchitectureVisualizerStore.setState({
+				phase: "complete",
+				baseline: {
+					path: result.specPath ?? "",
+					artifact: result.artifactPath ?? undefined,
+					title: result.title,
+					components: result.components,
+					connections: result.connections,
+				},
+			});
+			if (result.artifactPath) void resolveArtifact(result.artifactPath);
 		},
 	);
 
