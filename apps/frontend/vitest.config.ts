@@ -45,8 +45,7 @@ export default defineConfig({
 		},
 		// Setup files for test environment - use setupFiles to avoid vitest import issues
 		setupFiles: ["./src/__tests__/testSetup.ts"],
-		// Suppress internal worker state errors from vitest 2.x
-		dangerouslyIgnoreUnhandledErrors: true,
+
 		// Prevent vitest import issues
 		testTimeout: 30000,
 		hookTimeout: 30000,

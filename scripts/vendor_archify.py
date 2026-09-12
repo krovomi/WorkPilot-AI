@@ -95,9 +95,7 @@ EXCLUDED = (
 
 
 def _run(cmd: list[str], cwd: Path | None = None) -> str:
-    result = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, check=True
-    )
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
     return result.stdout.strip()
 
 
@@ -219,7 +217,9 @@ def main(argv: list[str] | None = None) -> int:
 
     files = sum(1 for p in DEST.rglob("*") if p.is_file())
     size = sum(p.stat().st_size for p in DEST.rglob("*") if p.is_file())
-    print(f"vendor_archify: {args.ref} ({commit[:12]}) -> {DEST.relative_to(REPO_ROOT)}")
+    print(
+        f"vendor_archify: {args.ref} ({commit[:12]}) -> {DEST.relative_to(REPO_ROOT)}"
+    )
     print(f"vendor_archify: {files} files, {size / 1024 / 1024:.1f} MB")
     return 0
 

@@ -256,3 +256,8 @@ skills/claude-mem/*
 local.properties
 *.apk
 *.aab
+
+# Proposed Hermes' skills
+skills/_proposed/*.md
+
+.gitignore

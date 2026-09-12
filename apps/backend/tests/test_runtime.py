@@ -1,7 +1,5 @@
 """Tests for runtime environment checks and configuration."""
 
-import pytest
-
 from architecture_visualizer.archify import runtime
 
 
@@ -18,7 +16,7 @@ class TestRuntimeChecks:
         """Test when Node.js is not available."""
         monkeypatch.setattr(runtime, "find_executable", lambda _name: None)
         readiness = runtime.check()
-        assert not readiness.ready
+        assert not readiness.ok
         assert any("node" in b.name for b in readiness.blockers)
 
     def test_incompatible_node_version(self, monkeypatch):
@@ -26,7 +24,7 @@ class TestRuntimeChecks:
         monkeypatch.setattr(runtime, "find_executable", lambda _name: "/usr/bin/node")
         monkeypatch.setattr(runtime, "_node_version", lambda _n: (False, "v12.0.0"))
         readiness = runtime.check()
-        assert not readiness.ready
+        assert not readiness.ok
 
     def test_an_unparseable_node_version_is_not_a_refusal(self, monkeypatch):
         """The renderer states its own requirement far better than a regex here."""

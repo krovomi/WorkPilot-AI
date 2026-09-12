@@ -76,11 +76,15 @@ class ArchitectureDiagram:
                 {
                     "source": edge.source_id,
                     "target": edge.target_id,
-                    **({
-                        "label": edge.label,
-                        "type": edge.edge_type,
-                        **(edge.properties or {}),
-                    } if edge.label or edge.edge_type else {}),
+                    **(
+                        {
+                            "label": edge.label,
+                            "type": edge.edge_type,
+                            **(edge.properties or {}),
+                        }
+                        if edge.label or edge.edge_type
+                        else {}
+                    ),
                 }
                 for edge in self.edges
             ],
@@ -130,9 +134,7 @@ class Analyzer:
         # Filter to top-level dependencies only
         top_ids = {n.id for n in nodes if n.properties.get("path", "").count("/") <= 2}
         nodes = [n for n in nodes if n.id in top_ids]
-        edges = [
-            e for e in edges if e.source_id in top_ids and e.target_id in top_ids
-        ]
+        edges = [e for e in edges if e.source_id in top_ids and e.target_id in top_ids]
 
         diagram = ArchitectureDiagram(
             diagram_type=DiagramType.MODULE_DEPENDENCIES,

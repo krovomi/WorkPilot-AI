@@ -4,12 +4,22 @@ These tests verify that the archify subprocess behaves correctly when called
 with various inputs and configurations.
 """
 
-import json
 from pathlib import Path
 
 import pytest
-
 from architecture_visualizer.archify import cli
+
+
+@pytest.fixture
+def examples(tmp_path: Path) -> Path:
+    """Génère le dossier d'exemples et le fichier d'architecture requis par le contrat."""
+    examples_dir = tmp_path / "examples"
+    examples_dir.mkdir(exist_ok=True)
+
+    blueprint = examples_dir / "web-app.architecture.json"
+    blueprint.write_text('{"version": "1.0", "components": []}', encoding="utf-8")
+
+    return examples_dir
 
 
 class TestReceiptParsing:
@@ -83,7 +93,9 @@ class TestValidate:
         receipt = cli.Receipt(
             ok=False,
             command="validate",
-            payload={"diagnostics": [{"code": f"x/{i}", "message": "m"} for i in range(5)]},
+            payload={
+                "diagnostics": [{"code": f"x/{i}", "message": "m"} for i in range(5)]
+            },
         )
         assert receipt.error_count >= 1
         assert receipt.summary() != ""
