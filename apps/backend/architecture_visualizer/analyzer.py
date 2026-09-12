@@ -402,6 +402,11 @@ class ArchitectureAnalyzer:
                         rel = str(candidate.relative_to(self.project_dir))
                         return self._path_to_id(rel)
             except Exception:
+                # A relative import that will not resolve to a file on disk is
+                # the ordinary case here, not an error: the target may live in
+                # a package this walk never indexed, or be a namespace with no
+                # `__init__.py`. The empty id below means "no edge", and the
+                # graph is evidence rather than a claim of completeness.
                 pass
             return ""
         # Absolute/package import — try to find in project
