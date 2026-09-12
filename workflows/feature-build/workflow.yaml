@@ -42,6 +42,7 @@ phases:
     impl: tooling/spec-analyze
     min_effort: medium
     dispatch: fresh-context
+    roster: planner
     description: >-
       Read `spec.md` and `implementation_plan.json` together, once, before any
       code is written. `traceability.json` has already answered the mechanical
@@ -50,6 +51,14 @@ phases:
       other, a plan that violates the project's own conventions, an acceptance
       criterion nothing can verify. The gap costs a sentence here and a fix
       cycle after QA. Fresh context because the reader must not be the planner.
+
+      `roster: planner` because the specialists this needs are the planner's:
+      `architecture-analyst` is the one that answers "does this plan break the
+      project's own conventions", and `dependency-tracer` answers what a
+      subtask's blast radius really is. It ran under the read-only
+      `spec_validation` config with no roster mapping, so it fell through to
+      the Kanban default and was handed a `test-runner` — before a line of
+      code exists. The roster is context billed on every turn.
 
   - id: mobile-design
     impl: mobile/mobile-design-review
@@ -106,6 +115,7 @@ phases:
     impl: bmad/bmad-bmm-check-implementation-readiness
     min_effort: ultrathink
     dispatch: fresh-context
+    roster: qa
     description: >-
       The second of the two ultrathink readings, and a different question from
       the one above: not "is this good code" but "is this the thing that was
@@ -113,7 +123,14 @@ phases:
       about the acceptance criteria nobody wrote a test for. The
       `qa-acceptance-checker` subagent does this inside the QA loop; this is
       the same audit run against the finished branch with nothing else in
-      context.
+      context — so `roster: qa` hands it that subagent, which this description
+      has named since the phase was written and the phase was not getting.
+
+      Declared as `roster:` rather than `agent: qa_reviewer`, because the two
+      are different questions. `spec_validation` is in `create_client`'s
+      read-only set and `qa_reviewer` is not: switching the agent to reach the
+      right specialists would have given a read-only audit the right to edit
+      the code it is auditing.
 
   - id: store-readiness
     impl: mobile/mobile-store-readiness
