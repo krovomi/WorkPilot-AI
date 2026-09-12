@@ -1,0 +1,11 @@
+{
+	"package": "bmad-method",
+	"version": "6.12.0",
+	"registry": "https://registry.npmjs.org",
+	"upstream": "https://github.com/bmad-code-org/bmad-method",
+	"license": "MIT",
+	"skills": 50,
+	"runtime_gate": "_bmad/scripts/resolve_customization.py",
+	"vendored_by": "scripts/vendor_bmad.py",
+	"note": "Skills only. The _bmad/ runtime they read is installed per project by the bootstrap command in pack.json."
+}
