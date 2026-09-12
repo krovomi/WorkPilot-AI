@@ -145,6 +145,34 @@ phases:
       Un rejet coûte des jours ; le même constat posé ici coûte une ligne. En
       lecture seule — le correctif appartient à la phase de codage.
 
+  - id: architecture-map
+    impl: tooling/architecture-map
+    min_effort: medium
+    when: touches("**/*.py,**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.mjs,**/*.go,**/*.rs,**/*.java,**/*.cs,**/*.kt,**/*.rb,**/*.php,**/*.swift,**/Dockerfile,**/docker-compose*.yml,**/docker-compose*.yaml,**/*.tf,**/*.csproj,**/pyproject.toml,**/package.json,**/go.mod,**/pom.xml")
+    dispatch: fresh-context
+    description: >-
+      Ce que la tâche a changé dans la topologie du système, et pas seulement
+      dans ses fichiers. Un diff dit quelles lignes ont bougé ; il ne dit pas
+      qu'un composant est apparu, qu'une frontière de confiance s'est déplacée,
+      ou qu'un service parle maintenant directement à une base qu'il atteignait
+      par une file.
+
+      Après la QA, parce que la carte doit décrire le code corrigé et non celui
+      qui a été écrit. En contexte frais : le modèle « après » part du modèle de
+      référence et doit en conserver les identifiants — le comparateur apparie
+      les composants par `id`, et un modèle écrit de zéro ressort en tout
+      supprimé et tout ajouté.
+
+      Deux filtres, et il en faut deux. Le glob ci-dessus écarte gratuitement
+      les tâches purement documentaires. Mais « a touché un .ts » ne veut pas
+      dire « a changé l'architecture », alors une passe déterministe
+      (`architecture_visualizer.archify.significance`) tranche à l'intérieur de
+      la phase, avant tout appel API : les fichiers modifiés recoupent-ils les
+      sources d'un composant modélisé, ou dessinent-ils une zone que le modèle
+      ne décrit pas encore ? Sous le seuil, la phase écrit « aucun changement
+      architectural » et rend la main pour zéro jeton — comme `docs` avec sa
+      préflight.
+
   - id: verify
     impl: superpowers/verification-before-completion
     hard_gate: tests-pass

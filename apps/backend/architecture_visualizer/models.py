@@ -60,7 +60,6 @@ class ArchitectureDiagram:
     title: str
     nodes: list[ModuleNode] = field(default_factory=list)
     edges: list[DependencyEdge] = field(default_factory=list)
-    mermaid_code: str = ""
     metadata: dict = field(default_factory=dict)
     generated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -89,7 +88,6 @@ class ArchitectureDiagram:
                 }
                 for e in self.edges
             ],
-            "mermaid_code": self.mermaid_code,
             "metadata": self.metadata,
             "generated_at": self.generated_at,
         }
