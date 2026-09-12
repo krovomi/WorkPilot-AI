@@ -475,6 +475,22 @@ Two closed loops writing skills is one too many, so there is no second loop here
 `learning_loop/hermes_ingest.py` files each authored skill as a *candidate* under
 `skills/_proposed/`.
 
+**Only what hermes says it authored.** `skill_manage` writes `created_by: agent` into
+`~/.hermes/skills/.usage.json` for a skill the agent wrote, and nothing of the sort for
+one that was shipped or downloaded — so that record is the rule, and the shipped
+(`.bundled_manifest`) and hub (`.hub/lock.json`) lists subtract on top of it. The
+approval queue `pending/skills/` is admitted unfiltered: a skill is in it only because
+the agent just wrote it, and its record is written on approval.
+
+It started the other way round — everything except `.bundled_manifest` — and that shape
+fails open twice over. It is a denylist against a catalogue upstream keeps growing, and
+the manifest is `name:hash` per line, not JSON, so reading it with `json.loads` raised on
+every line, the exception was swallowed, and the exclusion matched nothing. One build
+proposed sixty upstream skills, `airtable` and `imessage` among them. The test that was
+supposed to catch it wrote the manifest as JSON: it encoded our idea of the format
+instead of the format. A denylist that fails open floods the queue; an allowlist that
+fails closed proposes nothing, which a person notices and nothing is harmed by.
+
 ```bash
 python3 scripts/skills_cli.py hermes-ingest --dry-run
 python3 runners/hermes_runner.py --action status
@@ -496,8 +512,11 @@ because that is where the review queue and its rules live.
 
 The three steps that always go together — *can this run here*, *what did hermes
 author*, *who asked* — are one function, and a **surface** is a name rather than a code
-path: `build` (the `observe` phase), `kanban` (the task panel), `cli`, `self-healing`,
-`github`. `SURFACES` is a closed set on purpose, because the surface is written into a
+path: `build` (the `observe` phase), `kanban` (the task panel), `cli`, `self-healing`
+(the end of an incident cycle, in `incident_responder/orchestrator.py`'s healing
+pipeline — in a `finally`, because a pipeline that failed is not a reason to skip the
+question, and reporting a step only when it filed something, since a "0 proposed" row on
+every incident is a row nobody reads), `github`. `SURFACES` is a closed set on purpose, because the surface is written into a
 file a person reviews and a free-text field would fill with whatever string each caller
 happened to pass. The next feature to want the loop adds a line there, not a second
 ingest.
@@ -527,6 +546,28 @@ It renders nothing when hermes is not installed: a permanent card reading "featu
 use" is a card nobody reads. Like `workflows/api.py`, the router is refused in server
 mode — every answer is about `$HERMES_HOME` on the machine running the backend, which on
 a shared deployment belongs to the server and not to the tenant asking.
+
+#### Portability of a candidate
+
+The cycle itself runs on any provider — every answer comes from files on disk, and
+`TestProviderIndependence` fails the build if `hermes/` ever names `create_client`,
+`anthropic` or `claude_agent_sdk`. What is *not* portable is the candidate's prose.
+
+Hermes's authoring standard requires a skill to say `read_file` and not cat,
+`search_files` and not grep, `patch` and not sed. That is right for hermes and wrong
+everywhere else: `skills/<pack>/` is emitted to Claude Code, Copilot, Codex, Cursor and
+Gemini alike, none of which have those tools. So each candidate carries a **Portability**
+section naming the hermes tools it uses and their equivalents here, and the body is left
+exactly as hermes wrote it — a find-and-replace would leave the surrounding sentence
+("invoke through the `terminal` tool") describing a tool it no longer names. Adopting a
+candidate is a rewrite, and the candidate says so rather than letting whoever runs the
+adopted skill first discover it.
+
+The same vocabulary is recorded in `capabilities/harnesses.yaml` under `hermes.tools`.
+Nothing reads it today — `agents_path` is null, and `translate_tools` fires only when an
+agent definition is emitted — but an empty map claimed "nothing to translate", which was
+wrong in the one direction that matters: the day hermes gets an agents path, an empty map
+emits Claude's names verbatim.
 
 #### `SOUL.md`
 
@@ -860,6 +901,31 @@ prompt rather than pasting ten kilobytes of it into every subtask session.
 Builtins are recognised by **phase id**, never by their impl string — keying on
 the impl would mean swapping the methodology in YAML silently demotes `coding`
 to a one-shot session and loses the coder loop.
+
+**`roster:` — which specialists a phase gets.** Separate from `agent:` on purpose. The
+`agent:` value is an `AGENT_CONFIGS` entry, and it decides two unrelated things at once:
+the tool allowlist (with `create_client` putting the read-only entries in permission mode
+`plan`) *and*, through `PHASE_ALIASES`, which subagent roster is composed. Binding them
+meant a read-only audit could only reach the right specialists by being handed write
+access.
+
+Three phases were falling through `PHASE_ALIASES` to the Kanban default, which is
+`code-reviewer` + `test-runner`:
+
+| Phase | Ran under | Got | Should get |
+|---|---|---|---|
+| `brainstorm` | `spec_critic` | a `test-runner`, before any code exists | `spec` — `prior-art-finder`, `constraint-collector` |
+| `analyze` | `spec_validation` | a `test-runner`, before any code exists | `planner` — `architecture-analyst` answers "does this plan break the project's conventions" |
+| `spec-conformance` | `spec_validation` | not `qa-acceptance-checker` | `qa` — the subagent its own description in `workflow.yaml` had named since the phase was written |
+
+`spec_critic` now maps in `PHASE_ALIASES`; `spec_validation` cannot, because `analyze`
+reads a plan before any code exists and `spec-conformance` audits a finished branch, and
+the alias table has one key per agent_type. Those two declare `roster:` in the workflow
+file instead. An unknown roster name logs and falls back rather than raising: a typo in a
+workflow file should cost the right specialists, not the build.
+
+This matters beyond tidiness — the roster is context the parent pays for on **every
+turn**, so a mismatched roster is not merely unhelpful, it is billed.
 
 Two rules the resolver enforces and that are easy to break:
 

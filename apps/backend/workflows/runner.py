@@ -457,6 +457,7 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
             agent_type=agent_type,
             max_thinking_tokens=get_phase_thinking_budget(ctx.spec_dir, config_phase),
             use_subagents=subagents_allowed(resolved.dispatch),
+            roster=phase.roster,
         )
         prompt = _build_prompt(resolved, body, ctx)
         async with client:

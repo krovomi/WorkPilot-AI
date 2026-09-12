@@ -34,8 +34,23 @@ from skills_registry.packs import load_pack  # noqa: E402
 
 
 def write_skill(
-    root: Path, category: str, name: str, body: str, description: str = "d"
+    root: Path,
+    category: str,
+    name: str,
+    body: str,
+    description: str = "d",
+    *,
+    authored: bool = True,
 ) -> Path:
+    """A skill in a hermes tree.
+
+    ``authored`` writes the ``.usage.json`` record `skill_manage` leaves when
+    the agent creates one. It defaults to true because these fixtures are all
+    about what hermes learned — but it is now a *decision*, because that record
+    is what admits a skill to the review queue. See
+    `TestOnlyWhatHermesLearned` in test_hermes_agent.py for the flood that
+    made it the rule.
+    """
     path = root / category / name / "SKILL.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -43,7 +58,19 @@ def write_skill(
         f"metadata:\n  hermes:\n    category: {category}\n---\n\n{body}\n",
         encoding="utf-8",
     )
+    if authored and root.name == "skills" and root.parent.name != "pending":
+        record_authorship(root, name)
     return path
+
+
+def record_authorship(skills_root: Path, *names: str) -> None:
+    """What hermes writes into ``<home>/skills/.usage.json`` for its own work."""
+    usage = skills_root / ".usage.json"
+    data = json.loads(usage.read_text(encoding="utf-8")) if usage.is_file() else {}
+    for name in names:
+        data[name] = {"created_by": "agent"}
+    usage.parent.mkdir(parents=True, exist_ok=True)
+    usage.write_text(json.dumps(data), encoding="utf-8")
 
 
 @pytest.fixture
@@ -127,11 +154,18 @@ class TestDiscovery:
         assert [c.staged for c in found] == [True]
 
     def test_bundled_skills_are_not_experience(self, home):
-        """They are what hermes shipped with, not what it learned."""
+        """They are what hermes shipped with, not what it learned.
+
+        This test used to write the manifest as JSON, which is not the format
+        hermes uses — so it agreed with the parser's bug instead of catching
+        it, and a real install proposed the whole upstream catalogue. The
+        format is ``name:hash`` per line; see
+        `tools/skill_usage._read_bundled_manifest_names` upstream.
+        """
         write_skill(home / "skills", "devops", "shipped", "Upstream body.")
         write_skill(home / "skills", "devops", "learned", "Learned body.")
         (home / "skills" / ".bundled_manifest").write_text(
-            json.dumps({"devops/shipped": "abc123"}), encoding="utf-8"
+            "shipped:abc123\n", encoding="utf-8"
         )
         assert [c.name for c in discover_authored_skills(home)] == ["learned"]
 

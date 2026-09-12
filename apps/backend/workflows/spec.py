@@ -24,6 +24,12 @@ Phase fields
                 default for its id is not the right one. Data rather than a
                 branch in the runner, for the same reason ``gate`` and
                 ``bootstrap`` are declared by their pack.
+``roster``      which subagent roster the phase gets, when it is not the one
+                its ``agent`` implies. The two are separate questions —
+                ``agent`` decides the tool allowlist and whether the phase may
+                write, ``roster`` decides which specialists it may dispatch to
+                — and binding them meant a read-only audit could only get the
+                right specialists by being handed write access.
 """
 
 from __future__ import annotations
@@ -78,6 +84,7 @@ class Phase:
     when_globs: tuple[str, ...] = ()
     gate: str | None = None
     agent: str | None = None
+    roster: str | None = None
     description: str = ""
 
     @property
@@ -155,6 +162,7 @@ def _parse_phase(raw: Any, index: int) -> Phase:
         when_globs=_parse_when(raw.get("when"), str(phase_id)),
         gate=gate,
         agent=(str(raw["agent"]) if raw.get("agent") else None),
+        roster=(str(raw["roster"]) if raw.get("roster") else None),
         description=str(raw.get("description", "")),
     )
 
