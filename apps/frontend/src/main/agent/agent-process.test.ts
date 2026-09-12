@@ -40,6 +40,11 @@ function createMockProcess() {
 	};
 }
 
+// Spawned mock processes, in order. Tests that need to drive the child's
+// stdout (rather than only inspect the spawn arguments) pull the registered
+// "data" handler off the last entry.
+const mockProcesses: ReturnType<typeof createMockProcess>[] = [];
+
 // Mock child_process - must be BEFORE imports of modules that use it
 const spawnCalls: Array<{
 	command: string;
@@ -64,7 +69,9 @@ vi.mock("node:child_process", () => {
 		) => {
 			// Record the call for test assertions
 			spawnCalls.push({ command, args, options });
-			return createMockProcess();
+			const child = createMockProcess();
+			mockProcesses.push(child);
+			return child;
 		},
 	);
 
@@ -280,6 +287,7 @@ describe("AgentProcessManager - API Profile Env Injection (Story 2.3)", () => {
 		// Reset all mocks and spawn calls
 		vi.clearAllMocks();
 		spawnCalls.length = 0;
+		mockProcesses.length = 0;
 
 		// Clear environment variables that could interfere with tests
 		delete process.env.ANTHROPIC_AUTH_TOKEN;
@@ -1105,6 +1113,63 @@ describe("AgentProcessManager - API Profile Env Injection (Story 2.3)", () => {
 			expect(envArg.GITHUB_CLI_PATH).toBe("/opt/homebrew/bin/gh");
 		});
 	});
+	describe("task log output", () => {
+		/**
+		 * The backend writes its banner and status lines with terminal colours.
+		 * The task log view is a DOM node, not a terminal: an unstripped
+		 * `\x1b[1m` renders as an invisible control character followed by a
+		 * literal "[1m", which is what users were reading in their logs.
+		 */
+		async function emitStdout(chunk: string): Promise<string[]> {
+			const lines: string[] = [];
+			emitter.on("log", (_taskId: string, line: string) => {
+				lines.push(line);
+			});
+
+			await processManager.spawnProcess(
+				"task-ansi",
+				"/fake/cwd",
+				["run.py"],
+				{},
+				"task-execution",
+			);
+
+			const child = mockProcesses.at(-1);
+			const onData = vi
+				.mocked(child?.stdout.on)
+				?.mock.calls.find((call) => call[0] === "data")?.[1] as
+				| ((data: Buffer) => void)
+				| undefined;
+			expect(onData).toBeDefined();
+			onData?.(Buffer.from(chunk, "utf-8"));
+
+			return lines;
+		}
+
+		it("strips terminal colouring from the lines it emits", async () => {
+			const lines = await emitStdout(
+				"\u001b[1m⚡ AUTO-BUILD FRAMEWORK\u001b[0m\n",
+			);
+
+			expect(lines.join("")).toContain("⚡ AUTO-BUILD FRAMEWORK");
+			expect(lines.join("")).not.toContain("[1m");
+			expect(lines.join("")).not.toContain("\u001b");
+		});
+
+		it("keeps the text itself, box drawing and accents included", async () => {
+			const lines = await emitStdout(
+				"\u001b[90m║ Réflexion terminée — 3 sous-tâches ║\u001b[0m\n",
+			);
+
+			expect(lines.join("")).toContain("║ Réflexion terminée — 3 sous-tâches ║");
+		});
+
+		it("leaves a line that carries no escape codes untouched", async () => {
+			const lines = await emitStdout("Project directory: /home/user/app\n");
+
+			expect(lines.join("")).toContain("Project directory: /home/user/app");
+		});
+	});
 });
 
 describe("resolveExitFailure - backend exit without terminal phase", () => {
@@ -1144,4 +1209,5 @@ describe("resolveExitFailure - backend exit without terminal phase", () => {
 	it("ne signale pas d'échec pour une phase en pause (auth)", () => {
 		expect(resolveExitFailure(1, "auth_failure_paused")).toBeNull();
 	});
+
 });

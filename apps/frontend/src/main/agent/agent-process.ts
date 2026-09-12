@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 import type { EventEmitter } from "node:events";
 import type { CompletablePhase } from "../../shared/constants/phase-protocol";
 import { isPausePhase } from "../../shared/constants/phase-protocol";
+import { stripAnsiCodes } from "../../shared/utils/ansi-sanitizer";
 import type { AppSettings } from "../../shared/types/settings";
 import { appLog } from "../app-logger";
 import { clearKeychainCache } from "../claude-profile/credential-utils";
@@ -1155,7 +1156,19 @@ export class AgentProcessManager {
 			}
 		};
 
-		const processLine = (line: string): void => {
+		const processLine = (rawLine: string): void => {
+			// Strip the terminal colouring the backend writes for a TTY, once, at
+			// the boundary where raw output becomes a line. The log view is a DOM
+			// node, not a terminal: an unstripped `\x1b[1m` renders as an invisible
+			// control character followed by a literal "[1m", which is what users
+			// were reading in the task logs.
+			//
+			// The same stripped string feeds the parsers below. The protocol
+			// markers carry no colour so nothing changes for them, and the
+			// fallback text matching stops having to see through escape codes —
+			// a coloured line that should have matched previously did not.
+			const line = stripAnsiCodes(rawLine);
+
 			// Detect the start of a hook_0 Stream-closed error block and suppress it.
 			// Pattern: "Error in hook callback hook_0:" kicks off a multi-line Bun
 			// error dump (source snippet + "error: Stream closed" + stack frames).
@@ -1227,13 +1240,18 @@ export class AgentProcessManager {
 				);
 			}
 
+			// Same treatment for the unterminated tail flushed at exit — it is the
+			// last thing shown for a crashed run, so it is the line most worth
+			// being readable.
 			if (stdoutBuffer.trim()) {
-				this.emitter.emit("log", taskId, `${stdoutBuffer}\n`, projectId);
-				processLog(stdoutBuffer);
+				const tail = stripAnsiCodes(stdoutBuffer);
+				this.emitter.emit("log", taskId, `${tail}\n`, projectId);
+				processLog(tail);
 			}
 			if (stderrBuffer.trim()) {
-				this.emitter.emit("log", taskId, `${stderrBuffer}\n`, projectId);
-				processLog(stderrBuffer);
+				const tail = stripAnsiCodes(stderrBuffer);
+				this.emitter.emit("log", taskId, `${tail}\n`, projectId);
+				processLog(tail);
 			}
 
 			this.state.deleteProcess(taskId);
