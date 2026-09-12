@@ -459,17 +459,15 @@ class TestOutcomeReporting:
 # ---------------------------------------------------------------------------
 
 
-def _write_skill(root: Path, name: str, body: str, *, runtime: str | None = None) -> None:
+def _write_skill(
+    root: Path, name: str, body: str, *, runtime: str | None = None
+) -> None:
     path = root / ".agents" / "skills" / name / "SKILL.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     gate = (
         ""
         if runtime is None
-        else (
-            "metadata:\n"
-            "  workpilot:\n"
-            f'    requires: {{ runtime: "{runtime}" }}\n'
-        )
+        else (f'metadata:\n  workpilot:\n    requires: {{ runtime: "{runtime}" }}\n')
     )
     path.write_text(
         f"---\nname: {name}\ndescription: d\n{gate}---\n\n{body}\n",
@@ -649,9 +647,7 @@ class TestRuntimeGateAtRunTime:
 
         assert outcome.succeeded is None
 
-    def test_a_satisfied_runtime_runs_normally(
-        self, workflow, tmp_path, monkeypatch
-    ):
+    def test_a_satisfied_runtime_runs_normally(self, workflow, tmp_path, monkeypatch):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
         _write_skill(tmp_path, "code-review", "Read it.", runtime="_rt/engine.py")
@@ -665,9 +661,7 @@ class TestRuntimeGateAtRunTime:
 
         assert outcome.succeeded is True
 
-    def test_every_bmad_phase_the_workflow_declares_exists_in_the_pack(
-        self, workflow
-    ):
+    def test_every_bmad_phase_the_workflow_declares_exists_in_the_pack(self, workflow):
         """A phase naming a skill nobody ships is a phase that cannot run.
 
         This is what went unnoticed: the three BMAD phases named v6.0 wrapper

@@ -230,7 +230,9 @@ def _write_pack_json(version: str, count: int) -> None:
             "checkout, which is why it is not committed."
         ),
     }
-    path.write_text(json.dumps(pack, indent="\t") + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(pack, indent="\t", ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     _write_vendor_record(version, count)
 
 
@@ -252,6 +254,7 @@ def _write_vendor_record(version: str, count: int) -> None:
                 ),
             },
             indent="\t",
+            ensure_ascii=False,
         )
         + "\n",
         encoding="utf-8",

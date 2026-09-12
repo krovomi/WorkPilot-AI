@@ -168,6 +168,7 @@ def execution_phase_for(phase_id: str) -> str | None:
         CONFIG_PHASE.get(phase_id, _DEFAULT_CONFIG_PHASE)
     )
 
+
 # The AGENT_CONFIGS entry a skill phase runs under, which decides its tool
 # allowlist and whether it is read-only. Reviewers get `pr_reviewer`, which
 # `create_client` puts in permission_mode "plan" — a reviewer that can edit the
