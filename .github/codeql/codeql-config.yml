@@ -1,0 +1,42 @@
+name: WorkPilot AI
+
+# Third-party code we vendor but do not own.
+#
+# `apps/backend/vendor/archify` is a pinned copy of tt-a1i/archify at a tagged
+# release, written by `scripts/vendor_archify.py` and attested by a
+# `tree_sha256` in its `VENDOR.json`. Scanning it does not make it safer, and
+# it made it worse once: three autofix commits edited that tree in place, which
+# broke the pin the receipt claims. Re-running the vendoring script — the
+# documented way to move the pin — silently reverted all three, so the next
+# update would have re-raised the same alerts and invited the same fix. A loop
+# with no exit.
+#
+# What the three alerts were, checked one by one before excluding them:
+#
+#   renderers/sequence/render-sequence.mjs      unused import `isFinitePoint`
+#   renderers/architecture/render-architecture.mjs  unused import `polylinePath`
+#   delta/architecture-delta.mjs                "incomplete multi-character
+#                                               sanitization" — a false positive
+#
+# The third is the only HIGH and the only one worth arguing about. The line is
+#
+#     const deltaShell = html.replace(/<iframe\b[^>]*><\/iframe>/g, '');
+#
+# and it sanitizes nothing: it removes the iframe regions from archify's own
+# generated HTML before that HTML is checked for forbidden marketing claims
+# ("SAFE", "LOW RISK") that may legitimately appear inside an escaped srcdoc.
+# There is no untrusted input on this path — the input is the renderer's own
+# output — and the iframes it strips carry their content in a `srcdoc`
+# attribute, with no children to nest. The suggested fixpoint loop can never
+# run twice.
+#
+# This does not make archify unreviewed. It stays pinned to a signed tag, moves
+# only through a script and a readable diff, ships its licence and notices, and
+# `vendor_archify.py --check` fails CI the moment the tree stops matching the
+# commit it names. What this file says is narrower: the scanner that guards
+# *our* code must not propose commits inside code we cannot hold.
+#
+# Genuine vulnerabilities in archify are reported upstream and fixed by moving
+# the pin, never by patching this tree.
+paths-ignore:
+  - apps/backend/vendor/**

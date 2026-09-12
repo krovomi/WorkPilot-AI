@@ -51,6 +51,16 @@ SKILL_SUBDIR = "archify"
 DEFAULT_REF = "v2.16.0"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# `tree_digest` lives in the backend package: the script writes the manifest and
+# the doctor and the contract test read it, so the definition has to be one.
+sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
+from architecture_visualizer.archify.runtime import (  # noqa: E402
+    RECEIPT_NAME,
+    file_digests,
+    tree_digest,
+)
+
 DEST = REPO_ROOT / "apps" / "backend" / "vendor" / "archify"
 
 # Directories taken whole. `delta/` is the architecture comparator, `recipes/`
@@ -95,9 +105,7 @@ EXCLUDED = (
 
 
 def _run(cmd: list[str], cwd: Path | None = None) -> str:
-    result = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, check=True
-    )
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
     return result.stdout.strip()
 
 
@@ -146,13 +154,45 @@ def _stage(src: Path, staging: Path) -> list[str]:
     return absent
 
 
-def _receipt(ref: str, commit: str, absent: list[str]) -> dict[str, object]:
+def _drifted(root: Path) -> list[str]:
+    """Which files differ from the last vendoring, once the digest disagrees.
+
+    One extra pass, and it turns "the tree changed" into "these three files
+    changed" — the difference between a CI failure someone can act on and one
+    they have to reproduce locally first.
+    """
+    try:
+        recorded = json.loads((root / RECEIPT_NAME).read_text(encoding="utf-8")).get(
+            "files"
+        )
+    except (OSError, json.JSONDecodeError):
+        recorded = None
+    if not isinstance(recorded, dict):
+        # A tree vendored before this field existed. The digest already said
+        # they differ; naming nothing is more honest than guessing.
+        return []
+
+    actual = file_digests(root)
+    changed = [
+        f"{name} ({'added' if name not in recorded else 'modified'})"
+        for name, digest in actual.items()
+        if recorded.get(name) != digest
+    ]
+    changed.extend(f"{name} (removed)" for name in sorted(set(recorded) - set(actual)))
+    return sorted(changed)
+
+
+def _receipt(
+    ref: str, commit: str, absent: list[str], staging: Path
+) -> dict[str, object]:
     return {
         "source": SOURCE,
         "subdir": SKILL_SUBDIR,
         "ref": ref,
         "commit": commit,
         "license": "MIT",
+        "tree_sha256": tree_digest(staging),
+        "files": file_digests(staging),
         "vendored_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "vendored_by": "scripts/vendor_archify.py",
         "excluded": list(EXCLUDED),
@@ -175,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    receipt_path = DEST / "VENDOR.json"
+    receipt_path = DEST / RECEIPT_NAME
     if args.check:
         if not receipt_path.is_file():
             print(f"vendor_archify: {receipt_path} is missing", file=sys.stderr)
@@ -188,7 +228,42 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
-        print(f"vendor_archify: {args.ref} ({current.get('commit', '')[:12]})")
+
+        # The pin matching is not the same as the tree matching. Three files in
+        # here were once edited in place by an autofix bot, and re-running this
+        # script silently reverted them, because nothing compared the bytes to
+        # the commit the receipt names.
+        expected = current.get("tree_sha256")
+        if not expected:
+            print(
+                "vendor_archify: this tree predates the integrity manifest — "
+                "re-run `python3 scripts/vendor_archify.py` to record it",
+                file=sys.stderr,
+            )
+            return 1
+        actual = tree_digest(DEST)
+        if actual != expected:
+            print(
+                f"vendor_archify: the vendored tree does not match {args.ref}.\n"
+                f"  expected tree_sha256 {expected[:16]}\n"
+                f"  actual   tree_sha256 {actual[:16]}",
+                file=sys.stderr,
+            )
+            for entry in _drifted(DEST):
+                print(f"  {entry}", file=sys.stderr)
+            print(
+                "\nThis tree is a pinned copy of third-party code. Do not edit it "
+                "in place: a re-vendoring reverts the edit without saying so. Fix "
+                "it upstream, or restore it with "
+                "`python3 scripts/vendor_archify.py`.",
+                file=sys.stderr,
+            )
+            return 1
+
+        print(
+            f"vendor_archify: {args.ref} ({current.get('commit', '')[:12]}) "
+            f"tree {actual[:12]}"
+        )
         return 0
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -208,8 +283,8 @@ def main(argv: list[str] | None = None) -> int:
         except FileNotFoundError as exc:
             print(f"vendor_archify: {exc}", file=sys.stderr)
             return 1
-        (staging / "VENDOR.json").write_text(
-            json.dumps(_receipt(args.ref, commit, absent), indent="\t") + "\n",
+        (staging / RECEIPT_NAME).write_text(
+            json.dumps(_receipt(args.ref, commit, absent, staging), indent="\t") + "\n",
             encoding="utf-8",
         )
 
@@ -219,7 +294,9 @@ def main(argv: list[str] | None = None) -> int:
 
     files = sum(1 for p in DEST.rglob("*") if p.is_file())
     size = sum(p.stat().st_size for p in DEST.rglob("*") if p.is_file())
-    print(f"vendor_archify: {args.ref} ({commit[:12]}) -> {DEST.relative_to(REPO_ROOT)}")
+    print(
+        f"vendor_archify: {args.ref} ({commit[:12]}) -> {DEST.relative_to(REPO_ROOT)}"
+    )
     print(f"vendor_archify: {files} files, {size / 1024 / 1024:.1f} MB")
     return 0
 
