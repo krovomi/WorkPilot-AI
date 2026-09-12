@@ -22,7 +22,7 @@ import pytest
 from architecture_visualizer.archify import cli
 from architecture_visualizer.archify import delta as delta_module
 from architecture_visualizer.archify import ir as ir_module
-from architecture_visualizer.archify.runtime import archify_root, check
+from architecture_visualizer.archify.runtime import archify_root, check, tree_digest
 
 pytestmark = pytest.mark.skipif(
     not check().ok, reason="archify cannot run here (see the doctor)"
@@ -75,6 +75,53 @@ class TestDoctor:
             assert not (root / name).is_file()
         if not (root / "THIRD_PARTY_NOTICES.md").is_file():
             assert "THIRD_PARTY_NOTICES.md" in vendor.get("absent_upstream", [])
+
+    def test_the_tree_matches_the_commit_its_receipt_names(self):
+        """A receipt naming a commit the tree is not at is worse than none.
+
+        The regression this exists for: three files in here were edited in
+        place by an autofix bot after the pin was written, and nothing noticed.
+        `VENDOR.json` still said `v2.16.0`, because the only thing anyone
+        checked was the `ref` field — a string the edits never touched. Running
+        the vendoring script then reverted all three silently, so the next
+        update would raise the same alerts and invite the same fix.
+
+        Hashing the bytes is the only assertion that can tell those two states
+        apart.
+        """
+        root = archify_root()
+        assert root is not None
+
+        vendor = json.loads((root / "VENDOR.json").read_text(encoding="utf-8"))
+        recorded = vendor.get("tree_sha256")
+        assert recorded, "VENDOR.json carries no integrity manifest"
+        assert tree_digest(root) == recorded, (
+            "the vendored tree no longer matches the commit VENDOR.json names. "
+            "Do not edit this tree in place — fix it upstream and move the pin, "
+            "or restore it with `python3 scripts/vendor_archify.py`."
+        )
+
+    def test_the_per_file_record_covers_every_vendored_file(self):
+        """The digest says *that* something moved; this says *what*.
+
+        A single hash is enough to fail the build and not enough to act on it,
+        so the receipt also carries one entry per file. If the two ever
+        disagree about which files exist, the named-file report would quietly
+        skip the drift it was added to name.
+        """
+        root = archify_root()
+        assert root is not None
+
+        vendor = json.loads((root / "VENDOR.json").read_text(encoding="utf-8"))
+        recorded = vendor.get("files")
+        assert isinstance(recorded, dict) and recorded
+
+        on_disk = {
+            p.relative_to(root).as_posix()
+            for p in root.rglob("*")
+            if p.is_file() and p.name != "VENDOR.json"
+        }
+        assert set(recorded) == on_disk
 
 
 class TestValidate:
