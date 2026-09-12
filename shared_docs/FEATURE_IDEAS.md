@@ -3075,7 +3075,9 @@ from agents.decision_logger import create_decision_logger
 
 logger = create_decision_logger(spec_dir, agent_type="coder")
 logger.log_tool_call("Read", {"file_path": "src/app.py"}, outcome="success")
-logger.log_decision("Use PostgreSQL", alternatives=["SQLite", "MySQL"], selected="PostgreSQL")
+logger.log_decision(
+    "Use PostgreSQL", alternatives=["SQLite", "MySQL"], selected="PostgreSQL"
+)
 ```
 
 </details>
@@ -4009,27 +4011,31 @@ from apps.backend.services.context_cache_integration import get_workflow_integra
 integrator = get_workflow_integrator(Path("/path/to/project"))
 
 # Utilisation dans les agents
-context_response = integrator.get_agent_context('analysis', {
-    'target_files': ['src/main.py'],
-    'frameworks': ['flask'],
-    'patterns': ['mvc'],
-    'use_cache': True
-})
+context_response = integrator.get_agent_context(
+    "analysis",
+    {
+        "target_files": ["src/main.py"],
+        "frameworks": ["flask"],
+        "patterns": ["mvc"],
+        "use_cache": True,
+    },
+)
 ```
 
 **Décorateur Automatique :**
 ```python
 from apps.backend.services.context_cache_integration import cached_context
 
-@cached_context('analysis')
+
+@cached_context("analysis")
 def analyze_project(project_path, **kwargs):
     # Le contexte est automatiquement caché/récupéré
-    cached_context = kwargs['cached_context']
-    cache_metadata = kwargs['cache_metadata']
-    
-    if cache_metadata['cache_hit']:
+    cached_context = kwargs["cached_context"]
+    cache_metadata = kwargs["cache_metadata"]
+
+    if cache_metadata["cache_hit"]:
         print(f"Saved {cache_metadata['time_saved']:.2f}s!")
-    
+
     return perform_analysis(cached_context)
 ```
 
@@ -4053,7 +4059,7 @@ config = CacheConfig(
     max_cache_size=100,
     freshness_threshold=0.7,
     similarity_threshold=0.8,
-    enable_semantic_matching=True
+    enable_semantic_matching=True,
 )
 
 integrator = ContextCacheIntegrator(project_path, config)

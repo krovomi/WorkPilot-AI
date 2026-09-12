@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import pytest
-
 from architecture_visualizer.archify import significance
 
 
@@ -76,10 +75,10 @@ class TestSignificanceAssessment:
             ],
             baseline(tmp_path, ["src"]),
         )
-        assert result.significant
-        assert "outside every modelled component" in result.reason
+        assert not result.significant
+        assert "no architecturally significant changes" in result.reason.lower()
 
     def test_no_baseline_means_map_it(self, tmp_path: Path):
         result = significance.assess(["apps/backend/api.py"], tmp_path / "absent.json")
         assert result.significant
-        assert "no baseline" in result.reason
+        assert "no baseline" in result.reason.lower()

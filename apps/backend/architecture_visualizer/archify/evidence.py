@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -47,12 +46,7 @@ class EvidenceCollector:
                 data = {}
             raw = (data.get("project") or {}).get("dependencies") or []
             names = [
-                str(d)
-                .split("[")[0]
-                .split("=")[0]
-                .split(">")[0]
-                .split("<")[0]
-                .strip()
+                str(d).split("[")[0].split("=")[0].split(">")[0].split("<")[0].strip()
                 for d in raw
                 if isinstance(d, str)
             ]

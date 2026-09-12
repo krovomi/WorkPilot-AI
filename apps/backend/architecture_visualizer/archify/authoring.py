@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from architecture_visualizer.archify import cli, ir_module
+from . import cli
 
 logger = logging.getLogger(__name__)
 

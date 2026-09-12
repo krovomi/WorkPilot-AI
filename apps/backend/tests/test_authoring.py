@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from architecture_visualizer.archify import authoring, cli
 
 
@@ -36,16 +35,21 @@ def receipt(ok: bool, count: int = 0) -> cli.Receipt:
 @pytest.fixture
 def patched(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(authoring, "build_prompt", lambda **_kwargs: "author the model")
-    monkeypatch.setattr(
-        authoring.ir_module, "pin_repository", lambda ir, *_a, **_k: (ir, None)
-    )
+
+    from architecture_visualizer.archify import ir
+
+    monkeypatch.setattr(ir, "pin_repository", lambda ir_obj, *_a, **_k: (ir_obj, None))
+
+    spec_md = tmp_path / "spec.md"
+    spec_md.write_text("# Test Specification", encoding="utf-8")
+
     return tmp_path
 
 
 class TestAuthoring:
     """Tests for the authoring process."""
 
-    def test_successful_authoring(
+    async def test_successful_authoring(
         self,
         patched: Path,
         monkeypatch,
@@ -63,12 +67,11 @@ class TestAuthoring:
         )
         assert result["success"] is True
 
-    def test_authoring_with_validation_errors(
+    async def test_authoring_with_validation_errors(
         self,
         patched: Path,
         monkeypatch,
     ):
-        # Create multiple validation attempts
         counts = iter([1, 2, 0])
         spec = patched / "m.json"
         monkeypatch.setattr(
@@ -79,16 +82,15 @@ class TestAuthoring:
         monkeypatch.setattr(authoring.cli, "deliver", lambda *_a, **_k: receipt(True))
         session = Recorder(spec)
 
-        result = await authoring.author(
-            session=session,
-            project_dir=patched,
-            spec_dir=patched,
-            model="test",
-        )
-        # Handle validation errors appropriately
-        pass
+        with pytest.raises(authoring.AuthoringError):
+            await authoring.author(
+                session=session,
+                project_dir=patched,
+                spec_dir=patched,
+                model="test",
+            )
 
-    def test_authoring_with_delivery_errors(
+    async def test_authoring_with_delivery_errors(
         self,
         patched: Path,
         monkeypatch,
@@ -100,16 +102,15 @@ class TestAuthoring:
         monkeypatch.setattr(authoring.cli, "deliver", lambda *_a, **_k: receipt(True))
         session = Recorder(spec)
 
-        result = await authoring.author(
-            session=session,
-            project_dir=patched,
-            spec_dir=patched,
-            model="test",
-        )
-        # Handle delivery errors appropriately
-        pass
+        with pytest.raises(authoring.AuthoringError):
+            await authoring.author(
+                session=session,
+                project_dir=patched,
+                spec_dir=patched,
+                model="test",
+            )
 
-    def test_authoring_with_session_error(
+    async def test_authoring_with_session_error(
         self,
         patched: Path,
         monkeypatch,
@@ -134,17 +135,11 @@ class TestAuthoring:
                 model="test",
             )
 
-    def test_authoring_respects_effort_level(
+    async def test_authoring_respects_effort_level(
         self,
         patched: Path,
         monkeypatch,
     ):
-        def get_effort(effort: str):
-            def capture_prompt(**_kw):
-                return f"effort: {effort}"
-
-            return capture_prompt
-
         spec = patched / "m.json"
         monkeypatch.setattr(
             authoring, "build_prompt", lambda **_kw: _kw.get("effort", "medium")
@@ -159,4 +154,4 @@ class TestAuthoring:
             model="test",
             effort="high",
         )
-        pass
+        assert result is not None

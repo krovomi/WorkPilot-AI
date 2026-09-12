@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from architecture_visualizer.archify import ir_module
+from . import ir as ir_module
 
 # File patterns that typically affect system architecture
 _STRUCTURAL_GLOBS = [
@@ -75,9 +75,7 @@ def _components_touching(baseline: dict[str, Any], changed: set[str]) -> list[st
     touched = []
     for component in baseline.get("components", []):
         for source in component.get("sources", []):
-            if any(
-                c == source or c.startswith(f"{source}/") for c in changed
-            ):
+            if any(c == source or c.startswith(f"{source}/") for c in changed):
                 touched.append(component["id"])
                 break
     return touched

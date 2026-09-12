@@ -38,8 +38,7 @@ class NotReadyError(Exception):
     def __init__(self, readiness: Readiness):
         self.readiness = readiness
         blockers = (
-            "; ".join(f"{c.name}: {c.detail}" for c in readiness.blockers)
-            or "unknown"
+            "; ".join(f"{c.name}: {c.detail}" for c in readiness.blockers) or "unknown"
         )
         super().__init__(f"archify is unavailable ({blockers})")
 

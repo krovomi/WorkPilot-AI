@@ -21,10 +21,10 @@ import logging
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="[WorkPilot Merge] %(levelname)s: %(message)s"
+    level=logging.INFO, format="[WorkPilot Merge] %(levelname)s: %(message)s"
 )
 logger = logging.getLogger(__name__)
+
 
 class WorkPilotMergeWrapper:
     def __init__(self, repo_path: str = "."):
@@ -40,7 +40,7 @@ class WorkPilotMergeWrapper:
                 cwd=str(self.repo_path),
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=300,
             )
             return result.returncode, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
@@ -62,10 +62,7 @@ class WorkPilotMergeWrapper:
 
         logger.info(f"Backing up .workpilot before merge...")
         code, stdout, stderr = self.run_command(
-            "python3",
-            str(self.manager_script),
-            "prepare",
-            target_branch
+            "python3", str(self.manager_script), "prepare", target_branch
         )
 
         if code != 0:
@@ -82,9 +79,7 @@ class WorkPilotMergeWrapper:
 
         logger.info(f"Restoring and merging .workpilot files...")
         code, stdout, stderr = self.run_command(
-            "python3",
-            str(self.manager_script),
-            "complete"
+            "python3", str(self.manager_script), "complete"
         )
 
         if code != 0:
@@ -174,7 +169,9 @@ class WorkPilotMergeWrapper:
     def main(self, argv: list) -> int:
         """Main entry point."""
         if len(argv) < 2:
-            print("Usage: workpilot-merge-wrapper.py <merge|rebase|pull> <branch> [options]")
+            print(
+                "Usage: workpilot-merge-wrapper.py <merge|rebase|pull> <branch> [options]"
+            )
             return 1
 
         operation = argv[0]
