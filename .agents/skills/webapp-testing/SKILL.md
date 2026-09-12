@@ -10,7 +10,7 @@ metadata:
       - python
     pack: tooling
     version: 1.0.0
-    content_sha256: 835130a46f1285452587b2c5f55d22767c32ef0977a5428823c0cedc647895d6
+    content_sha256: 510e6f1a03848e7016ec859c1e848d99be4da54403df863dcc9caab0b8c9eac9
 ---
 
 # Test d'Applications Web (Playwright)
