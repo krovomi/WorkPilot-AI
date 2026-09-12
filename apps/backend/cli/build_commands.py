@@ -71,6 +71,8 @@ def _emit_fatal_error(spec_dir: Path, error: BaseException) -> None:
             },
         )
     except Exception:
+        # Le build a déjà planté : un flux d'événements inutilisable n'est pas
+        # un second échec à signaler, et lever ici masquerait le premier.
         pass
 
 

@@ -54,6 +54,9 @@ def read_pause_state(spec_dir: Path) -> dict[str, Any]:
         if isinstance(state, dict):
             return state
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        # Fichier absent, illisible ou à moitié écrit : on retombe sur l'ancien
+        # emplacement, puis sur « pas en pause ». Une pause qu'on ne peut pas
+        # lire n'est pas une pause dont il faut faire échouer le build.
         pass
     return _read_legacy(spec_dir) or {}
 

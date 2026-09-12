@@ -507,6 +507,8 @@ class SpecOrchestrator:
                 {"error": message, "recoverable": True},
             )
         except Exception:
+            # Le pipeline a déjà échoué ; un flux d'événements inutilisable
+            # n'est pas une seconde panne à remonter.
             pass
 
     async def _create_linear_task_if_enabled(self) -> None:
