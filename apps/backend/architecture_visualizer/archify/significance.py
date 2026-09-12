@@ -1,140 +1,187 @@
-"""Determines the architectural significance of code changes.
+"""Did this task change the architecture, or only files?
 
-This module analyzes what parts of an architecture model are affected by
-code changes, helping determine if the architecture model needs updates.
+The workflow's `when: touches(...)` is a glob and nothing more — it can say
+"a `.ts` changed", which is most tasks. It cannot say "a component moved". That
+second question needs the baseline model, and answering it here, from paths
+alone, is what keeps the phase from spending an API call on a rename.
+
+The shape is deliberately the one `libdocs.run_preflight` uses: read files,
+decide, and let the phase return without a model when there is nothing to map.
+A phase that always runs and usually reports "no change" is a phase people
+learn to ignore.
 """
 
 from __future__ import annotations
 
-import fnmatch
-import json
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, field
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
-from architecture_visualizer.archify import ir_module
+from . import ir as ir_module
 
-# File patterns that typically affect system architecture
-_STRUCTURAL_GLOBS = [
-    "*/architecture.json",
-    "*/structure.yaml",
-    "src/**/component.ts",
-    "src/**/component.tsx",
-    "**/package.json",
-    "**/pyproject.toml",
-    "**/go.mod",
-    "**/pom.xml",
-    "**/Dockerfile",
-    "docker-compose.yml",
-    "docker-compose.yaml",
-]
+logger = logging.getLogger(__name__)
 
+#: Extensions that can carry a component. A `.md` or a `.json` fixture cannot
+#: move a boundary; a Dockerfile or a Terraform file very much can.
+_STRUCTURAL_GLOBS = (
+    "*.py",
+    "*.ts",
+    "*.tsx",
+    "*.js",
+    "*.jsx",
+    "*.mjs",
+    "*.go",
+    "*.rs",
+    "*.java",
+    "*.cs",
+    "*.kt",
+    "*.rb",
+    "*.php",
+    "*.swift",
+    "Dockerfile",
+    "docker-compose*.yml",
+    "docker-compose*.yaml",
+    "*.tf",
+    "*.csproj",
+    "pyproject.toml",
+    "package.json",
+    "go.mod",
+    "pom.xml",
+    "requirements*.txt",
+)
+
+#: Directories whose contents describe the build, not the system.
+_IGNORED_PARTS = frozenset(
+    {
+        "node_modules",
+        ".git",
+        "__pycache__",
+        ".venv",
+        "venv",
+        "dist",
+        "build",
+        "out",
+        ".workpilot",
+    }
+)
+
+#: A task that only edits tests changes the evidence about the architecture, not
+#: the architecture. Matched on path segments, not on file names, so
+#: `src/tester.py` is not mistaken for a test.
+_TEST_PARTS = frozenset({"tests", "test", "__tests__", "spec", "e2e"})
+
+#: How many structural files a task must touch outside the model before the
+#: change is worth mapping on the strength of new files alone. One new helper
+#: module is not a topology change; a new package usually is.
 NEW_AREA_THRESHOLD = 3
-"""Threshold for number of changes in unmapped areas to trigger remapping."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class Significance:
-    """Assessment of whether code changes affect the architecture."""
+    """Whether to author a model for this task, and the reason either way."""
 
     significant: bool
-    """True if the changes are architecturally significant."""
-
-    matched_components: list[str]
-    """Components whose modeled sources include changed files."""
-
     reason: str
-    """Human-readable explanation of the assessment."""
+    matched_components: list[str] = field(default_factory=list)
+    structural_files: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "significant": self.significant,
+            "reason": self.reason,
+            "matchedComponents": self.matched_components,
+            "structuralFiles": self.structural_files[:50],
+        }
 
 
-def _is_structural_file(name: str) -> bool:
-    """Check if a file name matches structural change patterns.
+def _normalise(path: str) -> str:
+    return path.replace("\\", "/").lstrip("./")
 
-    Args:
-        name: The file name to check.
 
-    Returns:
-        True if the file is considered a structural change.
-    """
-    return any(fnmatch.fnmatch(name, glob) for glob in _STRUCTURAL_GLOBS)
+def is_structural(path: str) -> bool:
+    """Whether this file can carry a component at all."""
+    normalised = _normalise(path)
+    parts = set(Path(normalised).parts)
+    if parts & _IGNORED_PARTS:
+        return False
+    if parts & _TEST_PARTS:
+        return False
+    name = Path(normalised).name
+    return any(fnmatch(name, glob) for glob in _STRUCTURAL_GLOBS)
 
 
 def _components_touching(baseline: dict[str, Any], changed: set[str]) -> list[str]:
     """Components whose cited sources include a changed file.
 
     A source may name a directory prefix as well as a file, so a changed path
-    matches if it equals the source or starts with the source as a directory prefix.
-
-    Args:
-        baseline: The baseline architecture model.
-        changed: Set of changed file paths.
-
-    Returns:
-        List of component IDs that touch changed files.
+    under a cited path counts — otherwise a component declared against
+    `apps/backend/agents` would never match any of its own files.
     """
-    touched = []
+    matched: list[str] = []
     for component in baseline.get("components", []):
-        for source in component.get("sources", []):
-            if any(
-                c == source or c.startswith(f"{source}/") for c in changed
-            ):
-                touched.append(component["id"])
+        if not isinstance(component, dict) or not component.get("id"):
+            continue
+        for source in component.get("sources", []) or []:
+            if not isinstance(source, dict) or not source.get("path"):
+                continue
+            cited = _normalise(str(source["path"]))
+            if any(c == cited or c.startswith(f"{cited}/") for c in changed):
+                matched.append(str(component["id"]))
                 break
-    return touched
+    return matched
 
 
 def assess(
-    changed_files: list[str],
-    baseline_path: Path | str,
+    changed_files: list[str] | None,
+    baseline_path: Path | None = None,
 ) -> Significance:
-    """Assess the architectural significance of changed files.
+    """Decide, from paths only, whether this task is worth mapping.
 
-    Args:
-        changed_files: List of file paths that were changed.
-        baseline_path: Path to the baseline architecture model JSON.
-
-    Returns:
-        A Significance object describing the impact.
+    An unknown change set runs the phase: refusing on absent evidence would
+    make every provider that cannot report a diff unmappable, which is the same
+    reflex that keeps a hard gate from blocking on no signal.
     """
-    baseline_path = Path(baseline_path)
-    changed = set(changed_files)
-
-    # No baseline means everything is new
-    if not baseline_path.exists():
+    if changed_files is None:
         return Significance(
             significant=True,
-            matched_components=[],
-            reason="No baseline architecture model found — mapping the entire project",
+            reason="the set of changed files is unknown, so the task is mapped",
         )
 
-    try:
-        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
-    except Exception as exc:
+    structural = sorted({_normalise(p) for p in changed_files if is_structural(p)})
+    if not structural:
+        return Significance(
+            significant=False,
+            reason="no file that can carry a component was changed",
+        )
+
+    baseline: dict[str, Any] | None = None
+    if baseline_path is not None and baseline_path.is_file():
+        try:
+            baseline = ir_module.load(baseline_path)
+        except ir_module.IRError as exc:
+            logger.debug("baseline unusable for significance: %s", exc)
+
+    if baseline is None:
         return Significance(
             significant=True,
-            matched_components=[],
-            reason=f"Could not read baseline model: {exc}",
+            reason=(
+                f"{len(structural)} structural file(s) changed and there is no "
+                "baseline model to compare against"
+            ),
+            structural_files=structural,
         )
 
-    # Check for structural changes
-    structural = [f for f in changed if _is_structural_file(f)]
-    if structural:
-        return Significance(
-            significant=True,
-            matched_components=_components_touching(baseline, changed),
-            reason=f"Structural files changed: {', '.join(structural[:3])}",
-        )
-
-    # Check which components are touched
-    matched = _components_touching(baseline, changed)
+    matched = _components_touching(baseline, set(structural))
     if matched:
         return Significance(
             significant=True,
-            matched_components=matched,
-            reason=f"Changes in modeled components: {', '.join(matched)}",
+            reason=f"{len(matched)} modelled component(s) own a changed file",
+            matched_components=sorted(set(matched)),
+            structural_files=structural,
         )
 
-    # Check for changes outside every modelled component
     known = ir_module.source_paths(baseline)
     outside = [
         p for p in structural if not any(p == k or p.startswith(f"{k}/") for k in known)
@@ -142,12 +189,18 @@ def assess(
     if len(outside) >= NEW_AREA_THRESHOLD:
         return Significance(
             significant=True,
-            matched_components=[],
-            reason="Changes outside every modelled component — may indicate new architecture areas",
+            reason=(
+                f"{len(outside)} structural file(s) sit outside every modelled "
+                "component, which the model does not describe yet"
+            ),
+            structural_files=structural,
         )
 
     return Significance(
         significant=False,
-        matched_components=[],
-        reason="No architecturally significant changes detected",
+        reason=(
+            "the changed files belong to no modelled component and are too few "
+            "to be a new one"
+        ),
+        structural_files=structural,
     )
