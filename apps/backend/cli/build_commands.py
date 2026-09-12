@@ -16,6 +16,7 @@ if str(_PARENT_DIR) not in sys.path:
 
 # Import only what we need at module level
 # Heavy imports are lazy-loaded in functions to avoid import errors
+from core.build_signals import BuildHalted, BuildPaused
 from progress import print_paused_banner
 from review import ReviewState
 from ui import (
@@ -47,6 +48,32 @@ from .input_handlers import (
     read_from_file,
     read_multiline_input,
 )
+
+
+def _emit_fatal_error(spec_dir: Path, error: BaseException) -> None:
+    """Name an unhandled crash on the card instead of only in the traceback.
+
+    Without this the process exits non-zero, the frontend synthesises
+    PROCESS_EXITED, and the task lands in review labelled "Has Errors" with the
+    one useful sentence — the exception — left in a terminal the user never
+    opened. Best-effort by construction: this runs on a build that has already
+    crashed.
+    """
+    try:
+        from core.task_event import TaskEventEmitter
+
+        TaskEventEmitter.from_spec_dir(spec_dir).emit(
+            "CODING_FAILED",
+            {
+                "subtaskId": "",
+                "attemptCount": 0,
+                "error": f"{type(error).__name__}: {error}",
+            },
+        )
+    except Exception:
+        # Le build a déjà planté : un flux d'événements inutilisable n'est pas
+        # un second échec à signaler, et lever ici masquerait le premier.
+        pass
 
 
 def _changed_files(worktree_manager, spec_name: str) -> list[str] | None:
@@ -863,6 +890,38 @@ def handle_build_command(
                 choice, project_dir, spec_dir.name, worktree_manager
             )
 
+    except BuildPaused as paused:
+        # The user pressed Pause. Everything below the raise — QA, the hard
+        # gates, the observe phase, `finalize_workspace` — is deliberately not
+        # run: a paused build has not finished, and finalizing one would merge
+        # or discard a worktree the user just asked to stop touching. The pause
+        # flag stays on disk, so `TASK_RESUME` picks the build back up from the
+        # phase named here.
+        print()
+        print_paused_banner(
+            spec_dir, spec_dir.name, has_worktree=bool(worktree_manager)
+        )
+        print(f"Paused during: {paused.phase}")
+        if paused.subtask_id:
+            print(f"Paused on subtask: {paused.subtask_id}")
+        print(
+            "\nNothing was finalized. Resume from the Kanban, or:\n"
+            f"  python workpilot/run.py --spec {spec_dir.name}\n"
+        )
+        StatusManager(project_dir).update(state=BuildState.PAUSED)
+        return
+    except BuildHalted as halted:
+        # A phase established it cannot produce its output. The frontend has
+        # already been told which one and why (the phase emitted
+        # PLANNING_FAILED / CODING_FAILED before raising), so the card carries
+        # the reason rather than a bare "Has Errors" badge. Exiting non-zero
+        # here only makes the CLI honest — the kanban state is already settled.
+        print()
+        print("=" * 70)
+        print(f"  ✗ BUILD HALTED — phase: {halted.phase}")
+        print("=" * 70)
+        print(f"\n{halted.message}\n")
+        sys.exit(1)
     except KeyboardInterrupt:
         _handle_build_interrupt(
             spec_dir=spec_dir,
@@ -879,6 +938,7 @@ def handle_build_command(
 
         print(f"\nFatal error: {e}")
         traceback.print_exc()
+        _emit_fatal_error(spec_dir, e)
         sys.exit(1)
 
 

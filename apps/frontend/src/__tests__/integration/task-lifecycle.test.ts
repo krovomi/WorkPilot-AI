@@ -252,11 +252,14 @@ describe("Task Lifecycle Integration", () => {
 				eventHandler({}, "task-001", "spec_complete", undefined, undefined);
 			}
 
-			// Verify callback was invoked with correct parameters (taskId, status, projectId, reviewReason)
-			// Note: projectId/reviewReason are optional and undefined when not provided
+			// Verify callback was invoked with correct parameters (taskId, status,
+			// projectId, reviewReason, errorMessage). All but the first two are
+			// optional and undefined when not provided — errorMessage carries the
+			// failure detail when the status change is a failure.
 			expect(callback).toHaveBeenCalledWith(
 				"task-001",
 				"spec_complete",
+				undefined,
 				undefined,
 				undefined,
 			);

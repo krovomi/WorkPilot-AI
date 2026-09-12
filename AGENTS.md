@@ -30,6 +30,8 @@ Pipeline : **spec → planner → coder → QA reviewer → QA fixer → revue h
 apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   agents/              planner, coder, QA + définitions de sous-agents SDK
   core/client.py       LA fabrique de clients LLM — tout passe par là
+  core/pause_state.py  LE drapeau de pause coopérative — lu par coder, QA et spec
+  core/build_signals.py BuildPaused / BuildHalted : remontent jusqu'à handle_build_command
   cli/build_commands.py enchaînement des phases d'un build
   phase_config.py      modèle + budget de réflexion par phase et par provider
   model_router/        classification de tâche → tier qualité → modèle

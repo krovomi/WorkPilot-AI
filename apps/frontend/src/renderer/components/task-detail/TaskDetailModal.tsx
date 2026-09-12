@@ -89,6 +89,7 @@ import { TaskStatusMoveBadge } from "./TaskStatusMoveBadge";
 import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
+import { TaskFailureBanner } from "./TaskFailureBanner";
 import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
@@ -1185,6 +1186,12 @@ function TaskDetailModalContent({
 								</div>
 							)}
 						</div>
+
+						{/* Why the task failed — above the tabs, because a user who
+						    finds a card in review with a red badge is looking for
+						    this sentence before anything else. Renders nothing when
+						    the task did not fail. */}
+						<TaskFailureBanner task={task} />
 
 						{/* Body - Single Column with Tabs */}
 						<div className="flex-1 min-h-0 overflow-hidden">

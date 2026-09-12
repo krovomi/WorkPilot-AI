@@ -1120,5 +1120,24 @@
 		"deleteFile": "Delete file",
 		"contentPlaceholder": "File content...",
 		"selectFile": "Select a file to edit"
+	},
+	"failure": {
+		"title": "This task failed",
+		"unknown": "The build stopped without reporting a reason. Open the Logs tab for the last output.",
+		"hint": "Fix the cause, then relaunch the task. Planning failures on a local model usually mean switching that phase to a more capable model.",
+		"copy": "Copy",
+		"copied": "Copied"
+	},
+	"pauseState": {
+		"pausedDuring": "Paused during {{phase}}",
+		"resumesFrom": "Resumes from {{phase}}",
+		"phase": {
+			"spec": "spec creation",
+			"planning": "planning",
+			"coding": "coding",
+			"qa_review": "QA review",
+			"qa_fixing": "QA fixes",
+			"unknown": "the last checkpoint"
+		}
 	}
 }

@@ -111,7 +111,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -122,7 +122,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -148,7 +148,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -161,9 +161,12 @@ export const taskMachine = createMachine(
 					},
 					QA_MAX_ITERATIONS: {
 						target: "error",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
-					QA_AGENT_ERROR: { target: "error", actions: "setReviewReasonErrors" },
+					QA_AGENT_ERROR: {
+						target: "error",
+						actions: ["setReviewReasonErrors", "setError"],
+					},
 					USER_STOPPED: {
 						target: "human_review",
 						actions: "setReviewReasonStopped",
@@ -171,7 +174,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -188,9 +191,12 @@ export const taskMachine = createMachine(
 					},
 					QA_MAX_ITERATIONS: {
 						target: "error",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
-					QA_AGENT_ERROR: { target: "error", actions: "setReviewReasonErrors" },
+					QA_AGENT_ERROR: {
+						target: "error",
+						actions: ["setReviewReasonErrors", "setError"],
+					},
 					USER_STOPPED: {
 						target: "human_review",
 						actions: "setReviewReasonStopped",
@@ -198,7 +204,7 @@ export const taskMachine = createMachine(
 					PROCESS_EXITED: {
 						target: "error",
 						guard: "unexpectedExit",
-						actions: "setReviewReasonErrors",
+						actions: ["setReviewReasonErrors", "setError"],
 					},
 				},
 			},
@@ -266,15 +272,35 @@ export const taskMachine = createMachine(
 				reviewReason: () => undefined,
 				error: () => undefined,
 			}),
+			// Every event that lands the task in `error` names the failure.
+			//
+			// Before, only PLANNING_FAILED and CODING_FAILED did — and those two
+			// were the paths the backend never emitted. Every real failure
+			// arrived as PROCESS_EXITED, QA_MAX_ITERATIONS or QA_AGENT_ERROR,
+			// which set no message at all, so the card showed "Has Errors" and
+			// the user had no way to learn what had gone wrong short of opening
+			// the logs.
 			setError: assign({
 				error: ({ event }) => {
-					if (event.type === "PLANNING_FAILED") {
-						return event.error;
+					switch (event.type) {
+						case "PLANNING_FAILED":
+						case "CODING_FAILED":
+							return event.error;
+						case "QA_MAX_ITERATIONS":
+							return `QA gave up after ${event.maxIterations} review passes without approving the build.`;
+						case "QA_AGENT_ERROR":
+							return `The QA agent failed ${event.consecutiveErrors} time(s) in a row on review pass ${event.iteration}.`;
+						case "PROCESS_EXITED":
+							// The last resort: the backend stopped without saying
+							// why. Naming the exit code is still strictly better
+							// than an empty badge — it is what the user quotes when
+							// asking for help.
+							return `The build process exited unexpectedly with code ${event.exitCode}${
+								event.signal ? ` (signal ${event.signal})` : ""
+							}. See the task logs for the last output.`;
+						default:
+							return undefined;
 					}
-					if (event.type === "CODING_FAILED") {
-						return event.error;
-					}
-					return undefined;
 				},
 			}),
 		},

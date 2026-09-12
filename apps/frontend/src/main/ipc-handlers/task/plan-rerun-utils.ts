@@ -103,13 +103,20 @@ export function buildPhaseRerunPlanUpdate(plan: Plan, phase: RerunPhase): Plan {
 	}
 	// validation: nothing else — subtasks remain completed, only qa_signoff reset.
 
-	// Clear any cooperative-pause so the restarted backend doesn't immediately
-	// re-pause, and mark the plan in-progress again.
+	// Clear the legacy in-plan pause flag so a task paused before
+	// `pause_state.json` existed does not re-pause on the restart. The live
+	// store is cleared by the handler through `clearPauseState`; this stays
+	// because the rewound plan is written wholesale and would otherwise carry
+	// the old block forward.
 	plan.paused = {
 		enabled: false,
 		paused_at: null,
 		paused_subtask_id: null,
 	};
+	// A re-run starts a phase again; it does not inherit the previous run's
+	// failure. Leaving it set would show the old error beside a task that is
+	// visibly running.
+	plan.errorMessage = undefined;
 	plan.status = "in_progress";
 	plan.planStatus = "in_progress";
 	plan.executionPhase = phase;

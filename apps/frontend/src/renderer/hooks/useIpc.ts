@@ -24,6 +24,8 @@ import { useTaskStore } from "../stores/task-store";
 interface BatchedUpdate {
 	status?: TaskStatus;
 	reviewReason?: import("../../shared/types").ReviewReason;
+	/** Why the task failed, when this status change is a failure. */
+	errorMessage?: string;
 	progress?: ExecutionProgress;
 	plan?: ImplementationPlan;
 	logs?: string[]; // Batched log lines
@@ -38,6 +40,7 @@ interface StoreActions {
 		taskId: string,
 		status: TaskStatus,
 		reviewReason?: import("../../shared/types").ReviewReason,
+		errorMessage?: string,
 	) => void;
 	updateExecutionProgress: (
 		taskId: string,
@@ -77,7 +80,12 @@ function flushBatch(): void {
 				actions.updateTaskFromPlan(taskId, updates.plan);
 			}
 			if (updates.status) {
-				actions.updateTaskStatus(taskId, updates.status, updates.reviewReason);
+				actions.updateTaskStatus(
+					taskId,
+					updates.status,
+					updates.reviewReason,
+					updates.errorMessage,
+				);
 			}
 			if (updates.progress) {
 				actions.updateExecutionProgress(taskId, updates.progress);
@@ -218,10 +226,11 @@ export function useIpcListeners(): void {
 				status: TaskStatus,
 				projectId?: string,
 				reviewReason?: import("../../shared/types").ReviewReason,
+				errorMessage?: string,
 			) => {
 				// Filter by project to prevent multi-project interference
 				if (!isTaskForCurrentProject(projectId)) return;
-				queueUpdate(taskId, { status, reviewReason });
+				queueUpdate(taskId, { status, reviewReason, errorMessage });
 			},
 		);
 

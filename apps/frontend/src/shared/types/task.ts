@@ -418,9 +418,16 @@ export interface TaskMetadata {
 	paused?: {
 		enabled: boolean;
 		paused_at: string | null;
+		/**
+		 * Where the build stopped: "spec" | "planning" | "coding" | "qa_review"
+		 * | "qa_fixing". Recorded so the UI can say what a resume will pick back
+		 * up, instead of assuming coding — which is all the pause could do when
+		 * its flag lived inside the implementation plan.
+		 */
+		paused_phase?: string | null;
 		paused_subtask_id: string | null;
-		provider?: string;
-		model?: string;
+		provider?: string | null;
+		model?: string | null;
 	};
 
 	// Abandon status — the task was set aside (e.g. the product owner no longer
@@ -444,6 +451,14 @@ export interface Task {
 	description: string;
 	status: TaskStatus;
 	reviewReason?: ReviewReason; // Why task needs human review (only set when status is 'human_review')
+	/**
+	 * What actually went wrong, when the task landed in review because it
+	 * failed. `reviewReason: "errors"` says a failure happened; this says which
+	 * one — the phase that gave up and the message it reported. Without it the
+	 * board shows a red badge and the explanation stays in a log file, which is
+	 * the state the user has to open a terminal to get out of.
+	 */
+	errorMessage?: string;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -474,6 +489,8 @@ export interface ImplementationPlan {
 	status?: TaskStatus;
 	planStatus?: string;
 	reviewReason?: ReviewReason;
+	/** Failure detail persisted alongside the status that needs explaining. */
+	errorMessage?: string;
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;
@@ -483,15 +500,25 @@ export interface ImplementationPlan {
 	};
 	recoveryNote?: string;
 	description?: string;
-	// Pause/Resume state. Written by the TASK_PAUSE handler and read back by the
-	// backend coder loop (cooperative stop) and the task scanner (so the UI's
-	// paused controls survive task-list reloads).
+	// Pause/Resume state, LEGACY. The live store is `pause_state.json` (see
+	// AUTO_BUILD_PATHS.PAUSE_STATE and core/pause_state.py): it lives beside the
+	// spec, which exists from the moment the task does, so a pause also works
+	// during spec creation and planning — the phases where this file does not
+	// exist yet. This block is still read so a task paused before the move does
+	// not silently un-pause on upgrade; nothing writes it any more.
 	paused?: {
 		enabled: boolean;
 		paused_at: string | null;
+		/**
+		 * Where the build stopped: "spec" | "planning" | "coding" | "qa_review"
+		 * | "qa_fixing". Recorded so the UI can say what a resume will pick back
+		 * up, instead of assuming coding — which is all the pause could do when
+		 * its flag lived inside the implementation plan.
+		 */
+		paused_phase?: string | null;
 		paused_subtask_id: string | null;
-		provider?: string;
-		model?: string;
+		provider?: string | null;
+		model?: string | null;
 	};
 }
 
