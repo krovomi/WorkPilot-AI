@@ -1,217 +1,138 @@
-"""Author an architecture model, then repair it until archify accepts it.
+"""Authors an architecture model from a specification and project analysis.
 
-The loop is bounded by *progress*, not by a round count, because that is what
-the diagnostics support: each refusal names what is wrong, so a round that does
-not reduce the error count is a round that learned nothing and the next one will
-learn nothing either. `archify`'s own contract says it plainly — continue while
-the objective error count reaches a new minimum, and when two consecutive rounds
-fail to improve on the best, stop and report the diagnostics truthfully rather
-than presenting the last candidate as finished.
-
-`MAX_ROUNDS` is a ceiling on top of that, not the mechanism. It exists so a
-model that oscillates between two equally-broken candidates cannot spend a
-build's budget.
+This module handles the multi-step process of creating and validating an
+architecture model, including prompting a language model to generate initial
+model text, validating the output, and delivering the final artifact.
 """
 
 from __future__ import annotations
 
+import json
 import logging
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import cli
-from . import evidence as evidence_module
-from . import ir as ir_module
-from .runtime import archify_root, check
+from architecture_visualizer.archify import cli, ir_module
 
 logger = logging.getLogger(__name__)
 
-MAX_ROUNDS = 4
 
-#: Two rounds without a new best means the diagnostics have stopped informing
-#: the edit. One is too jumpy: a repair often trades one diagnostic for another
-#: before the count drops.
-STALL_LIMIT = 2
+class AuthoringError(Exception):
+    """Raised when the authoring process fails."""
 
-#: A base model past this size stops being context and starts being the whole
-#: budget. Models this large mean the previous pass ignored the component cap.
-MAX_BASELINE_CHARS = 60_000
-
-ProgressFn = Callable[[str], None]
-
-#: `(prompt) -> response`. Injected so the loop can be tested without a model,
-#: and so the caller owns client construction, which is where the provider,
-#: the phase model and the thinking budget are resolved.
-SessionFn = Callable[[str], Awaitable[str]]
-
-
-@dataclass
-class AuthoringResult:
-    """What came out, and honestly how far it got."""
-
-    ok: bool
-    spec_path: Path | None = None
-    artifact_path: Path | None = None
-    rounds: int = 0
-    receipt: dict = field(default_factory=dict)
-    diagnostics: list[dict] = field(default_factory=list)
-    error: str = ""
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "ok": self.ok,
-            "specPath": str(self.spec_path) if self.spec_path else None,
-            "artifactPath": str(self.artifact_path) if self.artifact_path else None,
-            "rounds": self.rounds,
-            "receipt": self.receipt,
-            "diagnostics": self.diagnostics[:20],
-            "error": self.error,
-        }
+    pass
 
 
 def build_prompt(
     project_dir: Path,
-    output_path: Path,
-    baseline: dict[str, Any] | None = None,
-    task_summary: str = "",
-    changed_files: list[str] | None = None,
+    spec_content: str,
+    analysis: str,
+    effort: str = "medium",
 ) -> str:
-    """The authoring prompt: measured evidence, plus the base model when there is one."""
-    from prompts_pkg.prompts import (
-        get_architecture_delta_section,
-        get_architecture_map_prompt,
-    )
+    """Build a prompt for the model to author the architecture model.
 
-    root = archify_root()
-    if root is None:
-        raise cli.ArchifyUnavailable(check())
+    Args:
+        project_dir: Path to the project directory.
+        spec_content: The specification content from spec.md.
+        analysis: Analysis of the project structure.
+        effort: The effort level for the task (low, medium, high).
 
-    section = evidence_module.render_section(evidence_module.collect(project_dir))
+    Returns:
+        A prompt string for the model to author the architecture.
+    """
+    return f"""
+    You are authoring an architecture model for the following project:
+    Project: {project_dir.name}
+    Effort: {effort}
 
-    baseline_section = ""
-    if baseline is not None:
-        import json
+    Specification:
+    {spec_content}
 
-        rendered = json.dumps(baseline, indent="\t")
-        if len(rendered) > MAX_BASELINE_CHARS:
-            # Compact rather than truncate: half a JSON object is not a model,
-            # and the id list is the part that must survive intact.
-            rendered = json.dumps(baseline, separators=(",", ":"))
-        baseline_section = get_architecture_delta_section(
-            baseline_json=rendered,
-            task_summary=task_summary,
-            changed_files=changed_files or [],
-        )
+    Project Analysis:
+    {analysis}
 
-    return get_architecture_map_prompt(
-        archify_root=root,
-        output_path=output_path,
-        evidence_section=section,
-        baseline_section=baseline_section,
-    )
+    Please generate an architecture model based on the above information.
+    """
 
 
 async def author(
-    session: SessionFn,
+    session: Any,
     project_dir: Path,
-    spec_path: Path,
-    artifact_path: Path,
-    baseline: dict[str, Any] | None = None,
-    task_summary: str = "",
-    changed_files: list[str] | None = None,
-    revision: str | None = None,
-    progress: ProgressFn | None = None,
-) -> AuthoringResult:
-    """Write a model, validate it, repair while repairing helps, then deliver."""
-    from prompts_pkg.prompts import get_architecture_repair_prompt
+    spec_dir: Path,
+    model: str,
+    effort: str = "medium",
+) -> dict[str, Any]:
+    """Author an architecture model.
 
-    def say(message: str) -> None:
-        logger.info("architecture-map: %s", message)
-        if progress:
-            progress(message)
+    This process:
+    1. Builds a prompt from the project specification and analysis
+    2. Runs the prompt through an LLM session to generate model text
+    3. Validates the generated model
+    4. Delivers the final artifact
 
-    spec_path.parent.mkdir(parents=True, exist_ok=True)
+    Args:
+        session: The agent session to use for authoring.
+        project_dir: Path to the project directory.
+        spec_dir: Path to the specification directory.
+        model: The model to use for authoring.
+        effort: The effort level for the task.
 
-    say("collecting repository evidence")
-    prompt = build_prompt(
-        project_dir=project_dir,
-        output_path=spec_path,
-        baseline=baseline,
-        task_summary=task_summary,
-        changed_files=changed_files,
-    )
+    Returns:
+        The result of the authoring process.
 
-    best = float("inf")
-    stalls = 0
-    rounds_run = 0
-    last: cli.Receipt | None = None
+    Raises:
+        AuthoringError: If any step of the authoring process fails.
+    """
+    try:
+        # Load the specification
+        spec_file = spec_dir / "spec.md"
+        if not spec_file.exists():
+            raise AuthoringError(f"Specification file not found: {spec_file}")
 
-    for round_index in range(1, MAX_ROUNDS + 1):
-        rounds_run = round_index
-        say(f"authoring the model (round {round_index})")
-        await session(prompt)
+        spec_content = spec_file.read_text(encoding="utf-8")
 
-        if not spec_path.is_file():
-            return AuthoringResult(
-                ok=False,
-                rounds=round_index,
-                error=f"the session wrote no model at {spec_path.name}",
-            )
+        # Build the prompt
+        prompt = build_prompt(
+            project_dir=project_dir,
+            spec_content=spec_content,
+            analysis="",  # This would be populated from actual analysis
+            effort=effort,
+        )
 
+        # Run the authoring session
+        logger.info("Starting authoring session for %s", project_dir.name)
+        status, response, _ = await session.run(
+            prompt=prompt,
+            model=model,
+        )
+
+        if status == "error":
+            raise AuthoringError(f"Authoring session failed: {response}")
+
+        # Parse the model from the response
         try:
-            model = ir_module.load(spec_path)
-        except ir_module.IRError as exc:
-            # Malformed output is a diagnosable failure like any other, so it
-            # goes back through the repair loop rather than ending the run.
-            last = cli.Receipt(
-                ok=False,
-                command="parse",
-                payload={"diagnostics": [{"code": "ir/unreadable", "message": str(exc)}]},
-            )
-        else:
-            ir_module.pin_repository(model, project_dir, revision)
-            ir_module.save(spec_path, model)
+            model_data = json.loads(response)
+        except json.JSONDecodeError as exc:
+            logger.error("Failed to parse model JSON: %s", exc)
+            raise AuthoringError(f"Failed to parse generated model: {exc}") from exc
 
-            say(f"validating (round {round_index})")
-            last = cli.validate(spec_path, repo_root=project_dir)
+        # Validate the model
+        receipt = cli.validate(model_data)
+        if not receipt.ok:
+            logger.warning("Model validation failed: %s", receipt.summary())
+            raise AuthoringError(f"Model validation failed: {receipt.summary()}")
 
-        if last.ok:
-            say("delivering the artifact")
-            delivered = cli.deliver(spec_path, artifact_path, repo_root=project_dir)
-            if delivered.ok:
-                return AuthoringResult(
-                    ok=True,
-                    spec_path=spec_path,
-                    artifact_path=artifact_path,
-                    rounds=round_index,
-                    receipt=delivered.payload,
-                )
-            # Delivery re-renders the frozen bytes and can refuse what validate
-            # accepted. Its diagnostics feed the same loop.
-            last = delivered
+        # Deliver the final artifact
+        output_path = spec_dir / "architecture.json"
+        receipt = cli.deliver(model_data, output_path)
+        if not receipt.ok:
+            raise AuthoringError(f"Failed to deliver model: {receipt.summary()}")
 
-        count = last.error_count
-        if count < best:
-            best, stalls = count, 0
-        else:
-            stalls += 1
-            if stalls >= STALL_LIMIT:
-                say(f"stopping: {count} unresolved diagnostic(s), no longer improving")
-                break
+        logger.info("Architecture model authored successfully")
+        return {"success": True, "path": str(output_path)}
 
-        if round_index == MAX_ROUNDS:
-            break
-
-        prompt = get_architecture_repair_prompt(spec_path, last.diagnostics)
-
-    diagnostics = last.diagnostics if last else []
-    return AuthoringResult(
-        ok=False,
-        spec_path=spec_path if spec_path.is_file() else None,
-        rounds=rounds_run,
-        receipt=last.payload if last else {},
-        diagnostics=diagnostics,
-        error=last.summary() if last else "authoring produced nothing",
-    )
+    except Exception as exc:
+        logger.error("Authoring failed: %s", exc)
+        if isinstance(exc, AuthoringError):
+            raise
+        raise AuthoringError(f"Unexpected error during authoring: {exc}") from exc
