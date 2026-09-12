@@ -1,0 +1,15 @@
+{
+	"source": "https://github.com/tt-a1i/archify",
+	"subdir": "archify",
+	"ref": "v2.16.0",
+	"commit": "c826e6c3a7abad19c0f3cd1ca57207d54b1ad8de",
+	"license": "MIT",
+	"vendored_at": "2026-09-12T07:26:29Z",
+	"vendored_by": "scripts/vendor_archify.py",
+	"excluded": [
+		"test/",
+		"examples/*.html",
+		"scripts/check-update.mjs"
+	],
+	"note": "Committed rather than bootstrapped: this is a runtime dependency of the Architecture page and the Kanban architecture delta, not a skill pack. Re-run the script to move the pin; never hand-edit this tree."
+}
