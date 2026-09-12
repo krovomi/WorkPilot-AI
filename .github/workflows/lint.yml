@@ -91,8 +91,8 @@ jobs:
       # as the code they generate from.
       - name: Run ruff on the skills scripts
         run: |
-          ruff check scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py --output-format=github
-          ruff format scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py --check --diff
+          ruff check scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_bmad.py --output-format=github
+          ruff format scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_bmad.py --check --diff
 
   # TypeScript/JavaScript linting (Biome) - 15-25x faster than ESLint
   typescript:
