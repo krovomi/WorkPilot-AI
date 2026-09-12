@@ -29,6 +29,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +132,17 @@ def _tracked_at(project_dir: Path, revision: str, paths: set[str]) -> set[str]:
 
 def _link_mode(url: str) -> str | None:
     """`web` for the two forges archify can build links for, else local-only."""
-    lowered = url.lower()
-    if "github.com" in lowered or "gitee.com" in lowered:
+    host = urlparse(url).hostname
+
+    # Support SCP-like Git remotes (for example: git@github.com:org/repo.git)
+    if host is None and "@" in url and ":" in url:
+        after_at = url.rsplit("@", 1)[1]
+        host = after_at.split(":", 1)[0]
+
+    lowered_host = host.lower() if host else ""
+    if lowered_host in {"github.com", "gitee.com"} or lowered_host.endswith(
+        (".github.com", ".gitee.com")
+    ):
         return None  # `web` is the default; saying so adds nothing
     return "local-only"
 
