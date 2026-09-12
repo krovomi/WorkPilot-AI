@@ -19,7 +19,11 @@ _PROJECT_ROOT = _PARENT_DIR.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from core.auth import get_auth_token, get_auth_token_source
+from core.auth import (
+    get_auth_token,
+    get_auth_token_source,
+    provider_requires_claude_oauth,
+)
 from core.dependency_validator import validate_platform_dependencies
 
 
@@ -160,9 +164,43 @@ def find_spec(project_dir: Path, spec_identifier: str) -> Path | None:
     return None
 
 
-def validate_environment(spec_dir: Path) -> bool:
+def _active_provider(spec_dir: Path) -> str:
+    """Which provider this build would run on, resolved without side effects.
+
+    `peek_active_provider` is the repository's read-only resolver: the normal
+    one deletes the single-shot RESUME_WITH_PROVIDER marker on read, and a
+    function called `validate_environment` must not eat the "resume with X"
+    choice the session it is validating was about to honour.
+
+    Falls back to the environment signal the frontend's credential manager
+    sets. That fallback only matters if `core.client` cannot be imported at
+    all, in which case the build is doomed whatever this returns — but
+    answering "claude" there would blame the wrong thing.
+    """
+    try:
+        from core.client import peek_active_provider
+
+        return peek_active_provider(spec_dir)
+    except Exception:  # noqa: BLE001 - resolution must never be what fails
+        return (
+            os.environ.get("SELECTED_LLM_PROVIDER")
+            or os.environ.get("AUTO_CLAUDE_PROVIDER")
+            or "claude"
+        )
+
+
+def validate_environment(spec_dir: Path, problems: list[str] | None = None) -> bool:
     """
     Validate that the environment is set up correctly.
+
+    Args:
+        spec_dir: The spec directory this build is about to run.
+        problems: Optional list the blocking reasons are appended to, in the
+            order they were found. The caller needs them to *name* the failure
+            on the kanban card — printing them here reaches a terminal the user
+            does not have open. Kept as an out-parameter rather than a richer
+            return type so the four existing call sites, and the tests that
+            stub this function with `return_value=True`, keep working.
 
     Returns:
         True if valid, False otherwise (with error messages printed)
@@ -172,14 +210,32 @@ def validate_environment(spec_dir: Path) -> bool:
 
     valid = True
 
-    # Check for OAuth token (API keys are not supported)
-    if not get_auth_token():
+    def fail(reason: str) -> None:
+        nonlocal valid
+        valid = False
+        if problems is not None:
+            problems.append(reason)
+
+    # The Claude Code OAuth token is only this build's business when the build
+    # runs on Claude. Demanding it for every provider is what made a task
+    # configured for Ollama — accepted by the frontend, which asks the same
+    # question and answers it correctly — die one second later against a
+    # service it never talks to.
+    provider = _active_provider(spec_dir)
+    if not provider_requires_claude_oauth(provider):
+        print(f"Auth: not required for provider '{provider}'")
+    elif not get_auth_token():
         print("Error: No OAuth token found")
         print("\nWorkPilot AI requires Claude Code OAuth authentication.")
         print("Direct API keys (ANTHROPIC_API_KEY) are not supported.")
         print("\nTo authenticate, run:")
         print("  claude setup-token")
-        valid = False
+        fail(
+            "Aucun token OAuth Claude Code n'a été trouvé, et cette tâche est "
+            f"configurée pour le provider « {provider} », qui en a besoin. "
+            "Authentifiez-vous avec `claude setup-token`, ou choisissez un "
+            "autre provider pour cette tâche."
+        )
     else:
         # Show which auth source is being used
         source = get_auth_token_source()
@@ -195,7 +251,7 @@ def validate_environment(spec_dir: Path) -> bool:
     spec_file = spec_dir / "spec.md"
     if not spec_file.exists():
         print(f"\nError: spec.md not found in {spec_dir}")
-        valid = False
+        fail(f"Le fichier spec.md est introuvable dans {spec_dir}.")
 
     # Check Linear integration (optional but show status)
     if is_linear_enabled():

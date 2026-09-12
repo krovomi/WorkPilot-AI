@@ -158,7 +158,29 @@ hermes:
     it as a provider would claim WorkPilot can drive a task on it. It cannot,
     and a second entry in the wrong matrix is exactly the sort of half-truth
     that file was created to end.
-  tools: {}   # reads the agnostic output; nothing to translate
+
+    The tool map below is not currently exercised: `agents_path` is null, and
+    `translate_tools` is read only when an agent definition is emitted. It is
+    written down anyway because hermes's vocabulary is the one place this
+    integration is genuinely not portable — a skill hermes authored says
+    `read_file` and `terminal`, which no other harness has. Leaving the map
+    empty said "nothing to translate", and that was wrong in the one direction
+    that matters: the day someone gives hermes an agents path, an empty map
+    emits Claude's names verbatim and hermes ignores every one of them.
+    `learning_loop/hermes_ingest` reports the same names on each ingested
+    candidate, for the same reason and from the same list.
+  tools:
+    # From hermes's own authoring standard (agent/learn_prompt.py upstream),
+    # which requires skills to name these and not the shell equivalents.
+    Bash: terminal
+    Read: read_file
+    Write: write_file
+    Edit: patch
+    Grep: search_files
+    Glob: search_files
+    WebFetch: web_extract
+    WebSearch: web_search
+    Task: delegate_task
 
 opencode:
   skills_path: .agents/skills

@@ -50,6 +50,32 @@ from .input_handlers import (
 )
 
 
+def _emit_startup_failure(spec_dir: Path, problems: list[str]) -> None:
+    """Name a prerequisite the build could not satisfy.
+
+    Emitted as PLANNING_FAILED: a build stopped at its own front door never
+    reached a phase, and planning is the first one the user is watching for.
+    Best-effort, like every other emitter here — a build that cannot start is
+    not made worse by an unwritable event stream.
+    """
+    if not problems:
+        return
+    message = "Le build n'a pas pu démarrer :\n" + "\n".join(
+        f"- {problem}" for problem in problems
+    )
+    try:
+        from core.task_event import TaskEventEmitter
+
+        TaskEventEmitter.from_spec_dir(spec_dir).emit(
+            "PLANNING_FAILED",
+            {"error": message, "recoverable": True},
+        )
+    except Exception:
+        # Même raison que ci-dessous : le build est déjà perdu, un flux
+        # d'événements illisible n'est pas une seconde panne à remonter.
+        pass
+
+
 def _emit_fatal_error(spec_dir: Path, error: BaseException) -> None:
     """Name an unhandled crash on the card instead of only in the traceback.
 
@@ -566,8 +592,14 @@ def handle_build_command(
 
     print()
 
-    # Validate environment
-    if not validate_environment(spec_dir):
+    # Validate environment. A build that cannot start is a build that failed,
+    # and it has to say why: `sys.exit(1)` raises SystemExit, which the
+    # `except Exception` further down never sees, so nothing emitted an event
+    # and the card showed "exited unexpectedly with code 1" over a cause that
+    # was known in full one line earlier.
+    startup_problems: list[str] = []
+    if not validate_environment(spec_dir, problems=startup_problems):
+        _emit_startup_failure(spec_dir, startup_problems)
         sys.exit(1)
 
     # Check human review approval
