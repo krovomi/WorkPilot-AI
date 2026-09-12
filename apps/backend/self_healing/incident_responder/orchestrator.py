@@ -353,6 +353,47 @@ class IncidentResponderOrchestrator:
             incident.status = HealingStatus.FAILED
             incident.error_message = str(e)
             operation.finalize(success=False)
+        finally:
+            # An incident cycle has ended, whichever way it ended. That is the
+            # same kind of moment the build pipeline's `observe` phase marks,
+            # so the hermes learning cycle turns here too — under its own
+            # surface, so a reviewer reading `skills/_proposed/` can tell an
+            # incident's candidate from a build's.
+            #
+            # In `finally` rather than on the success path: a pipeline that
+            # failed is not a reason to skip it. What hermes authored, it
+            # authored on Telegram or a cron job somewhere WorkPilot was not
+            # watching, and this incident's outcome says nothing about it.
+            self._observe_with_hermes(operation)
+
+    def _observe_with_hermes(self, operation: HealingOperation) -> None:
+        """Turn the hermes learning cycle, and record what it filed.
+
+        Never raises and never changes the operation's verdict — the healing
+        result was decided before this ran. A missing hermes is not a failure
+        and not a warning: it is "this feature is not in use on this machine",
+        and it costs one `is_dir()` to find out.
+        """
+        try:
+            from hermes.loop import run_cycle
+
+            result = run_cycle(self.project_dir, surface="self-healing")
+        except Exception as exc:  # noqa: BLE001 - observation never fails healing
+            logger.debug("hermes cycle unavailable: %s", exc)
+            return
+
+        if not result.ran:
+            return
+        # A step only when there is something to report. A "0 proposed" row on
+        # every incident is a row nobody reads, and the dashboard renders every
+        # step it is given.
+        if result.proposed:
+            step = operation.add_step("Filing what hermes learned")
+            operation.complete_step(
+                step,
+                "completed",
+                f"{result.proposed} candidate(s) in skills/_proposed/ for review",
+            )
 
     def _create_operation(self, incident: Incident) -> HealingOperation:
         """Create a new healing operation for an incident."""
