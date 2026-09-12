@@ -100,6 +100,14 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 
 **Authorization is the server's job** — In server mode every route carries a permission (`server/authz/`), and the UI only *masks* what the user cannot do. Never treat a hidden button as a control. A client-supplied filesystem path (`project_dir`, `spec_dir`, `file_path`…) is refused outright: identify a project by `project_id` and let the server resolve its own checkout.
 
+**Auth belongs to the provider that needs it** — the Claude Code OAuth token gates
+Claude builds only. Ask `core.auth.provider_requires_claude_oauth(provider)` before
+demanding it, and resolve the provider with `core.client.peek_active_provider` (never
+`_get_active_provider`, which consumes the single-shot RESUME_WITH_PROVIDER marker).
+A blanket `if not get_auth_token()` is how a task configured for Ollama got accepted by
+the frontend — which asks the same question and answers it correctly — and refused by
+the backend one second later, over a service it never talks to.
+
 **PR target** — Always target the `develop` branch for PRs to krovomi/WorkPilot-AI, NOT `main`.
 
 ## Project Structure
@@ -953,7 +961,11 @@ for Review", because the status is the same one a finished build gets.
 
 Now each halt emits the event with its message (`_emit_phase_failure` in
 `coder.py`, `_emit_planning_failed` in the spec orchestrator, `_emit_fatal_error`
-for an unhandled crash), `setError` covers every event that can reach the `error`
+for an unhandled crash, `_emit_startup_failure` for a prerequisite the build
+could not satisfy — that last one because `validate_environment` ends in
+`sys.exit(1)`, and SystemExit is not an `Exception`, so the crash emitter never
+saw it and a cause known in full went to the card as "exited unexpectedly with
+code 1"), `setError` covers every event that can reach the `error`
 state — including `PROCESS_EXITED`, whose message names the exit code because
 that is still better than nothing — and the message is persisted beside the
 status it explains (`plan.errorMessage`) so it survives a reload.
