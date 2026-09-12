@@ -267,7 +267,7 @@ def render_section(evidence: Evidence) -> str:
     if evidence.modules:
         lines += [
             "**Most connected modules.** Ranked by import degree; the count is "
-            "how many project files import it and how many it imports.",
+            + "how many project files import it and how many it imports.",
             "",
             "| path | lang | lines | imported by | imports |",
             "|---|---|---|---|---|",
