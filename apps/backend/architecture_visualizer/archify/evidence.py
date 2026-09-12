@@ -282,8 +282,8 @@ def render_section(evidence: Evidence) -> str:
     if evidence.edges:
         lines += [
             "**Import edges between those modules.** A real edge in the source, "
-            "not a guess about runtime causality — a call at startup and a call "
-            "on every request look identical here.",
+            + "not a guess about runtime causality — a call at startup and a call "
+            + "on every request look identical here.",
             "",
         ]
         lines += [f"- `{a}` → `{b}`" for a, b in evidence.edges]
