@@ -95,6 +95,12 @@ import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { HermesLearningCard } from "./HermesLearningCard";
+import {
+	setupArchitectureDeltaListeners,
+	shouldShowArchitectureDelta,
+	useArchitectureDelta,
+} from "../../stores/architecture-delta-store";
+import { TaskArchitectureDelta } from "./TaskArchitectureDelta";
 import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
 import { WorkflowProfileCard } from "./WorkflowProfileCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
@@ -536,6 +542,15 @@ function TaskDetailModalContent({
 	const allProjects = useProjectStore((s) => s.projects);
 	const taskProject = allProjects.find((p) => p.id === task.projectId);
 	const showFilesTab = isFilesTabEnabled();
+
+	// Subscribed at the modal rather than the tab: a regeneration keeps running
+	// while the user switches tabs, and its result must still land.
+	useEffect(() => setupArchitectureDeltaListeners(), []);
+	// Loaded here for the same reason the trigger is gated here — the record is
+	// what decides the tab exists at all. A task whose change was not
+	// architectural, or whose comparison found nothing, gets no trigger.
+	const architectureDelta = useArchitectureDelta(task.id, task.specsPath);
+	const showArchitectureTab = shouldShowArchitectureDelta(architectureDelta);
 	const progressPercent = calculateProgress(task.subtasks);
 	// "Done" = completed or blocked (a blocked subtask, e.g. a manual e2e test,
 	// is handled by the build and counts toward completion — matches the backend).
@@ -1247,6 +1262,14 @@ function TaskDetailModalContent({
 									>
 										{t("mobile:preview.tab")}
 									</TabsTrigger>
+									{showArchitectureTab && (
+										<TabsTrigger
+											value="architecture"
+											className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+										>
+											{t("architectureVisualizer:delta.tab")}
+										</TabsTrigger>
+									)}
 								</TabsList>
 
 								{/* Overview Tab */}
@@ -1413,6 +1436,24 @@ function TaskDetailModalContent({
 										worktreePath={state.worktreeStatus?.worktreePath}
 									/>
 								</TabsContent>
+
+								{/* What this task changed in the system's topology. The
+								    trigger is hidden when the delta has nothing to say, so
+								    the panel is never an empty tab someone opened once. */}
+								{showArchitectureTab && (
+									<TabsContent
+										value="architecture"
+										className="flex-1 min-h-0 overflow-hidden mt-0"
+									>
+										<TaskArchitectureDelta
+											task={task}
+											entry={architectureDelta}
+											projectPath={
+												taskProject?.path ?? activeProject?.path
+											}
+										/>
+									</TabsContent>
+								)}
 							</Tabs>
 						</div>
 

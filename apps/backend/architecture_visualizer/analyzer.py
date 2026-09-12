@@ -128,7 +128,6 @@ class ArchitectureAnalyzer:
                 e for e in edges if e.source_id in top_ids and e.target_id in top_ids
             ]
 
-        from .diagram_generator import DiagramGenerator
 
         diagram = ArchitectureDiagram(
             diagram_type=DiagramType.MODULE_DEPENDENCIES,
@@ -137,8 +136,6 @@ class ArchitectureAnalyzer:
             edges=edges,
             metadata={"total_files": len(source_files)},
         )
-        gen = DiagramGenerator()
-        diagram.mermaid_code = gen.generate_mermaid(diagram)
         return diagram
 
     def analyze_component_hierarchy(self) -> ArchitectureDiagram:
@@ -200,7 +197,6 @@ class ArchitectureAnalyzer:
                                     )
                                 )
 
-        from .diagram_generator import DiagramGenerator
 
         diagram = ArchitectureDiagram(
             diagram_type=DiagramType.COMPONENT_HIERARCHY,
@@ -209,8 +205,6 @@ class ArchitectureAnalyzer:
             edges=edges[:100],
             metadata={"react_files": len(react_files)},
         )
-        gen = DiagramGenerator()
-        diagram.mermaid_code = gen.generate_mermaid(diagram)
         return diagram
 
     def analyze_data_flow(self) -> ArchitectureDiagram:
@@ -273,7 +267,6 @@ class ArchitectureAnalyzer:
                         )
                     )
 
-        from .diagram_generator import DiagramGenerator
 
         diagram = ArchitectureDiagram(
             diagram_type=DiagramType.DATA_FLOW,
@@ -281,8 +274,6 @@ class ArchitectureAnalyzer:
             nodes=list(nodes.values())[:40],
             edges=edges[:80],
         )
-        gen = DiagramGenerator()
-        diagram.mermaid_code = gen.generate_mermaid(diagram)
         return diagram
 
     def analyze_database_schema(self) -> ArchitectureDiagram:
@@ -340,7 +331,6 @@ class ArchitectureAnalyzer:
                             )
                         )
 
-        from .diagram_generator import DiagramGenerator
 
         diagram = ArchitectureDiagram(
             diagram_type=DiagramType.DATABASE_SCHEMA,
@@ -348,8 +338,6 @@ class ArchitectureAnalyzer:
             nodes=list(nodes.values()),
             edges=edges,
         )
-        gen = DiagramGenerator()
-        diagram.mermaid_code = gen.generate_mermaid(diagram)
         return diagram
 
     def _get_source_files(self, extensions: list[str]) -> list[Path]:

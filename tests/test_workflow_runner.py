@@ -74,6 +74,7 @@ class TestPhaseWindows:
             "adversarial-review",
             "spec-conformance",
             "store-readiness",
+            "architecture-map",
             "verify",
         ]
 
@@ -135,6 +136,7 @@ class TestPhaseWindows:
             "adversarial-review",
             "spec-conformance",
             "store-readiness",
+            "architecture-map",
             "verify",
         ]
 

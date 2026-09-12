@@ -1,36 +1,75 @@
 {
-	"title": "Architecture Visualizer",
-	"subtitle": "Generate interactive architecture diagrams from your codebase",
+	"title": "Architecture",
+	"subtitle": "An interactive map of this system, authored from the code and pinned to it",
 	"actions": {
-		"generate": "Generate Diagrams",
+		"generate": "Generate map",
 		"regenerate": "Regenerate",
-		"cancel": "Cancel"
+		"cancel": "Cancel",
+		"createBaseline": "Create the baseline"
 	},
-	"diagramTypes": {
-		"heading": "Diagram Types",
-		"module_dependencies": "Module Dependencies",
-		"component_hierarchy": "Component Hierarchy",
-		"data_flow": "Data Flow",
-		"database_schema": "Database Schema"
+	"model": {
+		"components_one": "{{count}} component",
+		"components_other": "{{count}} components",
+		"connections_one": "{{count}} connection",
+		"connections_other": "{{count}} connections",
+		"revision": "Pinned to {{revision}}"
 	},
-	"view": {
-		"heading": "View Diagram"
+	"progress": {
+		"heading": "Progress",
+		"checking": "Checking the renderer…"
 	},
-	"summary": {
-		"heading": "Summary",
-		"diagrams_one": "{{count}} diagram",
-		"diagrams_other": "{{count}} diagrams",
-		"nodes_one": "{{count}} node",
-		"nodes_other": "{{count}} nodes",
-		"edges_one": "{{count}} edge",
-		"edges_other": "{{count}} edges"
-	},
-	"diagram": {
-		"counts": "{{nodes}} nodes • {{edges}} edges",
-		"copyHint": "Copy the Mermaid code above and paste it into <0>mermaid.live</0> to view the interactive diagram."
+	"readiness": {
+		"heading": "Archify cannot run here",
+		"body": "The renderer behind this page needs the following before it can produce a diagram.",
+		"nodeName": "Node.js",
+		"runtimeName": "Renderer"
 	},
 	"empty": {
-		"title": "Architecture Visualizer",
-		"body": "Select diagram types and click “Generate Diagrams” to automatically analyze your codebase and generate architecture diagrams."
+		"title": "No architecture map yet",
+		"body": "Generating one reads this project's entry points, import graph, manifests and deployment files, then draws the components, what talks to what, and where the trust boundaries are. Each component links back to the files it is."
+	},
+	"error": {
+		"heading": "Mapping failed"
+	},
+	"delta": {
+		"tab": "Architecture",
+		"title": "What this task changed",
+		"subtitle": "Compared with the architecture recorded at {{revision}}",
+		"subtitleNoRevision": "Compared with the recorded baseline",
+		"actions": {
+			"regenerate": "Regenerate",
+			"running": "Comparing…"
+		},
+		"counts": {
+			"componentsAdded_one": "{{count}} component added",
+			"componentsAdded_other": "{{count}} components added",
+			"componentsRemoved_one": "{{count}} component removed",
+			"componentsRemoved_other": "{{count}} components removed",
+			"componentsChanged_one": "{{count}} component changed",
+			"componentsChanged_other": "{{count}} components changed",
+			"connectionsAdded_one": "{{count}} connection added",
+			"connectionsAdded_other": "{{count}} connections added",
+			"connectionsRemoved_one": "{{count}} connection removed",
+			"connectionsRemoved_other": "{{count}} connections removed",
+			"connectionsChanged_one": "{{count}} connection changed",
+			"connectionsChanged_other": "{{count}} connections changed",
+			"boundariesChanged_one": "{{count}} boundary changed",
+			"boundariesChanged_other": "{{count}} boundaries changed"
+		},
+		"noBaseline": {
+			"title": "This project has no architecture map yet",
+			"body": "A comparison needs something to compare against. Generate the project's map from the Architecture page, then regenerate here."
+		},
+		"unreliable": {
+			"title": "This comparison would not be trustworthy",
+			"body": "The new model kept only {{kept}} of {{total}} component identifiers, so a comparison would report renames as removals. Regenerating usually fixes it.",
+			"lost": "Identifiers no longer present"
+		},
+		"runtimeMissing": {
+			"title": "The renderer is unavailable"
+		},
+		"failed": {
+			"title": "The comparison failed"
+		}
 	}
 }

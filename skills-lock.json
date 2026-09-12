@@ -18,6 +18,14 @@
 		}
 	},
 	"skills": {
+		"architecture-map": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/architecture-map/SKILL.md",
+			"contentSha256": "b872d6cae60852b7d9a93f0f74fa291f267113592a860fad9285b9ca743957b3",
+			"targets": {}
+		},
 		"brand-guidelines": {
 			"kind": "skill",
 			"pack": "comms",
@@ -88,6 +96,7 @@
 		".agents/agents/spec-explorer.md",
 		".agents/agents/test-coverage-auditor.md",
 		".agents/agents/test-runner.md",
+		".agents/skills/architecture-map/SKILL.md",
 		".agents/skills/brand-guidelines/SKILL.md",
 		".agents/skills/brand-guidelines/examples/business-report-template.md",
 		".agents/skills/business-comms/SKILL.md",
@@ -99,6 +108,7 @@
 		".agents/skills/webapp-testing/SKILL.md",
 		".agents/skills/webapp-testing/scripts/with_server.py",
 		".claude-plugin/marketplace.json",
+		".gemini/commands/architecture-map.toml",
 		".gemini/commands/brand-guidelines.toml",
 		".gemini/commands/business-comms.toml",
 		".gemini/commands/mcp-builder.toml",

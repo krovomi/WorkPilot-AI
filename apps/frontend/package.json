@@ -207,6 +207,7 @@
 					"!**/venv",
 					"!**/.env",
 					"!**/tests",
+					"!**/vendor/archify/test",
 					"!**/*.egg-info"
 				]
 			}

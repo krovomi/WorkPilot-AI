@@ -315,6 +315,17 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "low",
     },
+    # Authors the archify JSON model of a project's architecture. Reads the
+    # codebase and writes one JSON file; the renderer, the validator and the
+    # comparator are run by Python around the session, not by the agent, so it
+    # gets `Write` without `Bash`. A model that could shell out would be one
+    # `deliver` away from reporting an artifact nobody validated.
+    "architecture_visualizer": {
+        "tools": BASE_READ_TOOLS + ["Write"],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "high",
+    },
     "merge_resolver": {
         "tools": [],  # Text-only analysis
         "mcp_servers": [],
