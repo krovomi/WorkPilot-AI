@@ -1205,12 +1205,7 @@ export function validateArchitectureDeltaHtml(html, receipt) {
   // Before/After embed the complete existing explorer runtime. Validate claims
   // made by the Delta shell itself, not implementation vocabulary inside an
   // escaped srcdoc script (for example, "safe scale" in image export code).
-  let deltaShell = html;
-  let previousDeltaShell;
-  do {
-    previousDeltaShell = deltaShell;
-    deltaShell = deltaShell.replace(/<iframe\b[^>]*><\/iframe>/g, '');
-  } while (deltaShell !== previousDeltaShell);
+  const deltaShell = html.replace(/<iframe\b[^>]*><\/iframe>/g, '');
   if (/\b(?:SAFE|LOW RISK|MERGEABLE|NO IMPACT|VERIFIED PR)\b/i.test(deltaShell)) failures.push('contains a forbidden risk or mergeability claim');
   if (/\b(?:NaN|Infinity)\b/.test(html)) failures.push('contains non-finite output');
   if (receipt.completeness !== 'complete') failures.push('receipt is not complete');

@@ -14,6 +14,7 @@ tree, and the remedy is one command.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
 from dataclasses import dataclass, field
@@ -166,3 +167,46 @@ def check() -> Readiness:
 
     ok = bool(node) and version_ok and root is not None
     return Readiness(ok=ok, node=node, archify_root=root, conditions=conditions)
+
+
+# --------------------------------------------------------------------------- #
+# Integrity of the vendored tree
+# --------------------------------------------------------------------------- #
+
+#: The receipt names itself, so it cannot be part of what it attests to.
+RECEIPT_NAME = "VENDOR.json"
+
+
+def file_digests(root: Path) -> dict[str, str]:
+    """Every vendored file, by repository-relative path, with its sha256.
+
+    Ordered by the **posix path string**, never by sorting `Path` objects.
+    `PurePath` comparison goes through `_str_normcase`, which is lowercased on
+    Windows, so `sorted(root.rglob("*"))` yields one order on Linux and another
+    on Windows — and a digest folded over that order then disagrees with itself
+    across platforms while every file is byte-identical. That is exactly how
+    this failed: the Linux receipt said `570ef3c6…` and the Windows runner
+    computed `827c274b…` from the same bytes.
+    """
+    digests = {
+        p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in root.rglob("*")
+        if p.is_file() and p.name != RECEIPT_NAME
+    }
+    return {relative: digests[relative] for relative in sorted(digests)}
+
+
+def tree_digest(root: Path) -> str:
+    """One hash over every vendored file's path and contents.
+
+    Defined here rather than in `scripts/vendor_archify.py` because two places
+    computing a digest is two answers to "is this tree the one it claims to
+    be". The script writes it; the doctor and the contract test read it.
+
+    Path and content both go in, so a renamed file with identical bytes still
+    changes the digest. The receipt itself is excluded — it carries the result.
+    """
+    summary = hashlib.sha256()
+    for relative, digest in file_digests(root).items():
+        summary.update(f"{digest}  {relative}\n".encode())
+    return summary.hexdigest()
