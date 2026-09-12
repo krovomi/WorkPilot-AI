@@ -1007,16 +1007,17 @@ export class ProjectStore {
 		plan: (ImplementationPlan & { paused?: unknown }) | null,
 	): TaskMetadata["paused"] | undefined {
 		const statePath = path.join(specPath, AUTO_BUILD_PATHS.PAUSE_STATE);
-		if (existsSync(statePath)) {
-			try {
-				const parsed = JSON.parse(readFileSync(statePath, "utf-8"));
-				if (parsed && typeof parsed === "object") {
-					return parsed as TaskMetadata["paused"];
-				}
-			} catch {
-				// Un fichier illisible se lit comme « pas en pause » : la boucle
-				// backend fait la même lecture et prendrait la même décision.
+		try {
+			// Read without an existsSync guard first: the file is written by a
+			// live agent subprocess, so checking then reading opens a window in
+			// which the answer changes. An absent or unreadable file reads as
+			// "not paused" — the same decision the backend's own reader makes.
+			const parsed = JSON.parse(readFileSync(statePath, "utf-8"));
+			if (parsed && typeof parsed === "object") {
+				return parsed as TaskMetadata["paused"];
 			}
+		} catch {
+			// fall through to the legacy in-plan flag
 		}
 		return plan?.paused as TaskMetadata["paused"] | undefined;
 	}

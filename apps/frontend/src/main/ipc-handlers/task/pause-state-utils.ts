@@ -27,10 +27,30 @@ export interface PauseStateRecord {
 	model?: string | null;
 }
 
+/**
+ * Read and parse a JSON file, or `null` when it is not there or not readable.
+ *
+ * Deliberately no `existsSync` first: between the check and the read the file
+ * can be created, replaced or removed — the worktree these paths point into is
+ * written by a live agent subprocess — so the guard buys nothing and opens a
+ * race. The read itself is the check.
+ */
+function readJson<T>(filePath: string): T | null {
+	try {
+		return JSON.parse(readFileSync(filePath, "utf-8")) as T;
+	} catch {
+		return null;
+	}
+}
+
 /** Spec directory copies that may hold a backend-visible pause flag. */
 export function existingSpecDirs(dirs: (string | null | undefined)[]): string[] {
 	const seen: string[] = [];
 	for (const dir of dirs) {
+		// A directory test, not a check-then-read of a file's contents: it keeps
+		// a removed worktree's spec directory from being recreated by the write
+		// that follows. The writes themselves tolerate a directory that vanishes
+		// in between.
 		if (!dir || seen.includes(dir) || !existsSync(dir)) continue;
 		seen.push(dir);
 	}
@@ -71,16 +91,10 @@ export function clearPauseState(
 ): void {
 	for (const specDir of specDirs) {
 		const statePath = path.join(specDir, AUTO_BUILD_PATHS.PAUSE_STATE);
-		let previousPhase: string | null = null;
-		if (existsSync(statePath)) {
-			try {
-				previousPhase =
-					(JSON.parse(readFileSync(statePath, "utf-8")) as PauseStateRecord)
-						.paused_phase ?? null;
-			} catch {
-				// Un fichier illisible se lit comme « pas de phase connue ».
-			}
-		}
+		// An absent or unreadable file reads as "no phase recorded" — the same
+		// answer the backend's own reader would give.
+		const previousPhase =
+			readJson<PauseStateRecord>(statePath)?.paused_phase ?? null;
 		writePauseState([specDir], {
 			enabled: false,
 			paused_at: null,
@@ -94,13 +108,11 @@ export function clearPauseState(
 	}
 
 	for (const planFile of planPaths) {
-		if (!existsSync(planFile)) continue;
+		const plan = readJson<{ paused?: { enabled?: boolean } }>(planFile);
+		if (!plan?.paused?.enabled) continue;
 		try {
-			const plan = JSON.parse(readFileSync(planFile, "utf-8"));
-			if (plan?.paused?.enabled) {
-				plan.paused = { ...plan.paused, enabled: false };
-				writeFileSync(planFile, JSON.stringify(plan, null, 2), "utf-8");
-			}
+			plan.paused = { ...plan.paused, enabled: false };
+			writeFileSync(planFile, JSON.stringify(plan, null, 2), "utf-8");
 		} catch (err) {
 			appLog.warn(
 				`[pause-state] Could not clear legacy pause flag in ${planFile}:`,
