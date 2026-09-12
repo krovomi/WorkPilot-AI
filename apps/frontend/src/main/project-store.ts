@@ -728,13 +728,16 @@ export class ProjectStore {
 
 			const description = this.extractDescription(specPath, plan, hasJsonError);
 			const loadedMetadata = this.loadTaskMetadata(specPath);
-			// The pause flag lives in implementation_plan.json (the backend reads
-			// it there), not task_metadata.json. Surface it on task.metadata so the
-			// paused controls survive task-list reloads — otherwise the only source
-			// is the optimistic store update, which every rescan wipes.
+			// The pause flag lives in pause_state.json, which exists as soon as
+			// the spec does — the implementation plan does not, which is why
+			// pausing used to be impossible during planning. Surfaced on
+			// task.metadata so the paused controls survive task-list reloads:
+			// otherwise the only source is the optimistic store update, which
+			// every rescan wipes.
+			const pauseState = this.loadPauseState(specPath, plan);
 			const metadata =
-				plan?.paused !== undefined
-					? { ...(loadedMetadata ?? {}), paused: plan.paused }
+				pauseState !== undefined
+					? { ...(loadedMetadata ?? {}), paused: pauseState }
 					: loadedMetadata;
 			const { status: finalStatus, reviewReason: finalReviewReason } =
 				this.determineFinalStatus(plan, hasJsonError);
@@ -769,6 +772,13 @@ export class ProjectStore {
 				...(correctedReviewReason !== undefined && {
 					reviewReason: correctedReviewReason,
 				}),
+				// Persisted by the state manager next to the status it explains,
+				// so a failure the user was not watching live is still named when
+				// they come back to the board.
+				...(typeof plan?.errorMessage === "string" &&
+					plan.errorMessage.length > 0 && {
+						errorMessage: plan.errorMessage,
+					}),
 				...(executionProgress && { executionProgress }),
 				stagedInMainProject,
 				stagedAt,
@@ -982,6 +992,33 @@ export class ProjectStore {
 		} catch {
 			return "";
 		}
+	}
+
+	/**
+	 * The cooperative pause, read from its one store.
+	 *
+	 * `pause_state.json` is written by the TASK_PAUSE handler and read by the
+	 * backend's coder loop, QA loop and spec pipeline. The `paused` block that
+	 * used to live inside `implementation_plan.json` is still honoured so a task
+	 * paused before this change does not silently un-pause on upgrade.
+	 */
+	private loadPauseState(
+		specPath: string,
+		plan: (ImplementationPlan & { paused?: unknown }) | null,
+	): TaskMetadata["paused"] | undefined {
+		const statePath = path.join(specPath, AUTO_BUILD_PATHS.PAUSE_STATE);
+		if (existsSync(statePath)) {
+			try {
+				const parsed = JSON.parse(readFileSync(statePath, "utf-8"));
+				if (parsed && typeof parsed === "object") {
+					return parsed as TaskMetadata["paused"];
+				}
+			} catch {
+				// Un fichier illisible se lit comme « pas en pause » : la boucle
+				// backend fait la même lecture et prendrait la même décision.
+			}
+		}
+		return plan?.paused as TaskMetadata["paused"] | undefined;
 	}
 
 	/**

@@ -1009,12 +1009,17 @@ describe("IPC Handlers", { timeout: 30000 }, () => {
 				// Now emit exit event - this should trigger transition to error state
 				mockAgentManager.emit("exit", task.id, 1, "task-execution", projectId);
 
+				// The status change now carries WHY the task failed. A card that
+				// says "Has Errors" with nothing behind it is the defect this
+				// argument exists to close: the backend had already exited, so the
+				// exit code is the last thing anyone can be told.
 				expect(mockMainWindow.webContents.send).toHaveBeenCalledWith(
 					"task:statusChange",
 					task.id,
 					"human_review",
 					projectId,
 					"errors",
+					expect.stringContaining("exited unexpectedly with code 1"),
 				);
 			}
 		});

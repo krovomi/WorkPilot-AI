@@ -1120,5 +1120,24 @@
 		"deleteFile": "Supprimer le fichier",
 		"contentPlaceholder": "Contenu du fichier...",
 		"selectFile": "Sélectionnez un fichier à modifier"
+	},
+	"failure": {
+		"title": "Cette tâche a échoué",
+		"unknown": "Le build s'est arrêté sans indiquer de raison. Ouvrez l'onglet Journaux pour voir les dernières sorties.",
+		"hint": "Corrigez la cause puis relancez la tâche. Un échec de planification sur un modèle local se règle le plus souvent en confiant cette phase à un modèle plus capable.",
+		"copy": "Copier",
+		"copied": "Copié"
+	},
+	"pauseState": {
+		"pausedDuring": "En pause pendant {{phase}}",
+		"resumesFrom": "Reprend à {{phase}}",
+		"phase": {
+			"spec": "la création du spec",
+			"planning": "la planification",
+			"coding": "le codage",
+			"qa_review": "la revue QA",
+			"qa_fixing": "les correctifs QA",
+			"unknown": "le dernier point de contrôle"
+		}
 	}
 }

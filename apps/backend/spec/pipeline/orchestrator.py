@@ -10,6 +10,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from analysis.analyzers import analyze_project
+from core.build_signals import BuildPaused
+from core.pause_state import is_paused
 from core.task_event import TaskEventEmitter
 from core.workspace.models import SpecNumberLock
 from phase_config import get_thinking_budget
@@ -412,6 +414,14 @@ class SpecOrchestrator:
                 print_status(f"Unknown phase: {phase_name}, skipping", "warning")
                 continue
 
+            # Cooperative pause, between phases. Spec creation is the phase a
+            # user is most likely to interrupt — it runs before any code exists
+            # — and it was the one phase with no checkpoint at all.
+            if is_paused(self.spec_dir):
+                print()
+                print_status("SPEC CREATION PAUSED", "warning")
+                raise BuildPaused("spec")
+
             result = await run_phase(phase_name, all_phases[phase_name])
             results.append(result)
             phases_executed.append(phase_name)
@@ -442,6 +452,10 @@ class SpecOrchestrator:
                     success=False,
                     message=f"Phase {phase_name} failed",
                 )
+                # Say which phase failed and what it reported. Returning False
+                # alone left the frontend to infer a failure from the exit code
+                # and label the card "Has Errors" with nothing behind it.
+                self._emit_planning_failed(phase_name, result.errors)
                 return False
 
         # Summary
@@ -476,6 +490,24 @@ class SpecOrchestrator:
 
         # === HUMAN REVIEW CHECKPOINT ===
         return self._run_review_checkpoint(auto_approve)
+
+    def _emit_planning_failed(self, phase_name: str, errors: list[str]) -> None:
+        """Report a failed spec phase to the frontend, with its own errors.
+
+        Best-effort: the pipeline has already failed, and an unwritable event
+        stream is not a second failure to report.
+        """
+        detail = "\n".join(f"- {err}" for err in (errors or [])[:5])
+        message = f"La phase « {phase_name} » de la création du spec a échoué."
+        if detail:
+            message = f"{message}\n{detail}"
+        try:
+            TaskEventEmitter.from_spec_dir(self.spec_dir).emit(
+                "PLANNING_FAILED",
+                {"error": message, "recoverable": True},
+            )
+        except Exception:
+            pass
 
     async def _create_linear_task_if_enabled(self) -> None:
         """Create a Linear task if Linear integration is enabled."""

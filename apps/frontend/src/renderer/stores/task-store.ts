@@ -41,6 +41,7 @@ interface TaskState {
 		taskId: string,
 		status: TaskStatus,
 		reviewReason?: ReviewReason,
+		errorMessage?: string,
 	) => void;
 	updateTaskFromPlan: (taskId: string, plan: ImplementationPlan) => void;
 	updateExecutionProgress: (
@@ -340,7 +341,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 			};
 		}),
 
-	updateTaskStatus: (taskId, status, reviewReason) => {
+	updateTaskStatus: (taskId, status, reviewReason, errorMessage) => {
 		// Record activity for stuck detection — status changes prove the task is alive
 		recordTaskActivity(taskId);
 
@@ -354,10 +355,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 		const oldTask = state.tasks[index];
 		const oldStatus = oldTask.status;
 
-		// Skip if status AND reviewReason are the same
-		if (oldStatus === status && oldTask.reviewReason === reviewReason) {
+		// Skip only when nothing changed. errorMessage is part of that: the
+		// backend can re-report the same human_review/errors pair with a reason
+		// attached, and dropping it here is how the card kept saying "Has
+		// Errors" with nothing behind it.
+		if (
+			oldStatus === status &&
+			oldTask.reviewReason === reviewReason &&
+			oldTask.errorMessage === errorMessage
+		) {
 			debugLog(
-				"[updateTaskStatus] Status and reviewReason unchanged, skipping:",
+				"[updateTaskStatus] Status, reviewReason and error unchanged, skipping:",
 				{ taskId, status, reviewReason },
 			);
 			return;
@@ -415,6 +423,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 						...t,
 						status,
 						reviewReason,
+						// Undefined clears it, which is what leaving the error
+						// state has to do — a stale failure next to a green badge
+						// is worse than no message.
+						errorMessage,
 						executionProgress,
 						updatedAt: new Date(),
 					};

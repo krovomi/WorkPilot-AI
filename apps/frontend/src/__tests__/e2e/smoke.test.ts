@@ -421,9 +421,12 @@ describe("E2E Smoke Tests", { timeout: 30000 }, () => {
 				statusHandler({}, "task-001", "in_progress");
 			}
 
+			// (taskId, status, projectId, reviewReason, errorMessage) — the last
+			// three are undefined unless the main process sends them.
 			expect(statusCallback).toHaveBeenCalledWith(
 				"task-001",
 				"in_progress",
+				undefined,
 				undefined,
 				undefined,
 			);
@@ -715,6 +718,7 @@ describe("E2E Smoke Tests", { timeout: 30000 }, () => {
 					index + 1,
 					"task-001",
 					status,
+					undefined,
 					undefined,
 					undefined,
 				);
