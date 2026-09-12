@@ -113,6 +113,8 @@ CONFIG_PHASE = {
     "spec-conformance": "qa",
     "store-readiness": "qa",
     "verify": "qa",
+    # Architecture mapping runs after QA and describes the system topology changes.
+    "architecture-map": "qa",
 }
 _DEFAULT_CONFIG_PHASE = "coding"
 
