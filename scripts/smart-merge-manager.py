@@ -9,16 +9,13 @@ Preserves local modifications during merge/rebase operations by:
 4. Restoring/merging files after the operation
 """
 
-import os
 import sys
 import json
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-import difflib
 
 __all__ = ["SmartMergeManager"]
 
@@ -85,16 +82,9 @@ class SmartMergeManager:
             return stdout.strip()
         return None
 
-    def merge_json_files(
-        self, base_file: Path, local_file: Path, remote_file: Path
-    ) -> Dict:
+    def merge_json_files(self, local_file: Path, remote_file: Path) -> Dict:
         """Intelligently merge JSON files."""
         try:
-            base_data = (
-                json.loads(base_file.read_text(encoding="utf-8"))
-                if base_file.exists()
-                else {}
-            )
             local_data = (
                 json.loads(local_file.read_text(encoding="utf-8"))
                 if local_file.exists()
@@ -238,7 +228,6 @@ class SmartMergeManager:
 
                 rel_path = backup_file.relative_to(backup_path)
                 current_file = self.workpilot_dir / rel_path
-                repo_file = self.repo_path / ".workpilot" / rel_path
 
                 # For JSON files, do intelligent merge
                 if backup_file.suffix == ".json":

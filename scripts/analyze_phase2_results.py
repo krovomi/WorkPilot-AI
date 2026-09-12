@@ -86,8 +86,7 @@ class Phase2ResultsAnalyzer:
 
     def _analyze_full_evaluation(self):
         """Analyze full evaluation results."""
-        baseline = self.results["baseline_results"]
-        optimized = self.results["optimized_results"]
+
         analysis = self.results["analysis_results"]
 
         print("\n📊 Full Evaluation Analysis")
