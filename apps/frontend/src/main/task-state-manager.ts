@@ -329,6 +329,11 @@ export class TaskStateManager {
 			// Map XState state to execution phase for persistence
 			const executionPhase = this.mapStateToExecutionPhase(stateValue);
 
+			// The message the machine recorded for this state. Carried alongside
+			// status and reviewReason from here on: a card that says "Has Errors"
+			// without it is a dead end for whoever is reading the board.
+			const errorMessage = snapshot.context.error;
+
 			this.persistStatus(
 				task,
 				project,
@@ -336,8 +341,9 @@ export class TaskStateManager {
 				reviewReason,
 				stateValue,
 				executionPhase,
+				errorMessage,
 			);
-			this.emitStatus(taskId, status, reviewReason, project.id);
+			this.emitStatus(taskId, status, reviewReason, project.id, errorMessage);
 
 			// Also emit execution progress to sync phase display with column
 			// This ensures crisp transitions - phase and column update together
@@ -356,6 +362,7 @@ export class TaskStateManager {
 		reviewReason?: ReviewReason,
 		xstateState?: string,
 		executionPhase?: string,
+		errorMessage?: string,
 	): void {
 		const mainPlanPath = getPlanPath(project, task);
 		persistPlanStatusAndReasonSync(
@@ -365,6 +372,7 @@ export class TaskStateManager {
 			project.id,
 			xstateState,
 			executionPhase,
+			errorMessage,
 		);
 
 		const worktreePath = findTaskWorktree(project.path, task.specId);
@@ -385,6 +393,7 @@ export class TaskStateManager {
 				project.id,
 				xstateState,
 				executionPhase,
+				errorMessage,
 			);
 		}
 	}
@@ -401,6 +410,7 @@ export class TaskStateManager {
 		status: TaskStatus,
 		reviewReason: ReviewReason | undefined,
 		projectId?: string,
+		errorMessage?: string,
 	): void {
 		if (!this.getMainWindow) {
 			console.warn(
@@ -415,6 +425,7 @@ export class TaskStateManager {
 			status,
 			projectId,
 			reviewReason,
+			errorMessage,
 		);
 	}
 

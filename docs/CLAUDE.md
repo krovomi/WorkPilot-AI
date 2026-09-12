@@ -27,6 +27,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Mobile applications (Android and Apple)](#mobile-applications-android-and-apple)
   - [Declarative Workflows](#declarative-workflows)
   - [Workflow Logger](#workflow-logger)
+  - [Pause, resume, and how a phase reports failure](#pause-resume-and-how-a-phase-reports-failure)
 - [Frontend Development](#frontend-development)
   - [Tech Stack](#tech-stack)
   - [Path Aliases](#path-aliases)
@@ -895,6 +896,69 @@ The endpoint resolves the provider through `get_phase_provider`, never
 `_get_active_provider` — the latter consumes the single-shot
 RESUME_WITH_PROVIDER marker, and an endpoint the UI may poll must not eat a
 choice the next build was meant to honour.
+
+### Pause, resume, and how a phase reports failure
+
+A build is a stack — `handle_build_command` → the coder loop → a session → a
+phase — and two things can happen deep inside it that the current frame has no
+business resolving: the user pressed Pause, or a phase established it cannot
+produce its output. Both used to be a bare `return`, which unwinds exactly one
+frame. The caller could not tell "finished" from "gave up", so a build whose
+planning had failed went on to run QA, the hard gates and `finalize_workspace`
+over a worktree with no implementation plan in it.
+
+`core/build_signals.py` holds the two exceptions that unwind to the entry point:
+`BuildPaused` (not a failure — nothing is finalized, the card keeps its column)
+and `BuildHalted` (which carries the sentence the user will read).
+
+**The pause has one store.** `core/pause_state.py` owns `pause_state.json`,
+which lives in the spec directory. That is the whole point: the flag used to
+live inside `implementation_plan.json`, a file that does not exist during spec
+creation or planning, so pressing Pause on a task that was visibly running
+answered "Implementation plan not found". The spec directory exists from the
+moment the task does.
+
+| Reader | Checkpoint |
+|---|---|
+| `agents/coder.py` | top of the session loop — the same place for a planning iteration and a coding one |
+| `qa/loop.py` | between review passes, so a pause does not wait out a long one |
+| `spec/pipeline/orchestrator.py` | between spec phases |
+
+The Electron side writes it through one helper too
+(`ipc-handlers/task/pause-state-utils.ts`): four call sites used to clear
+`plan.paused` by hand, and one missed copy means the restarted backend re-pauses
+at its first checkpoint and the resume looks like it did nothing. The legacy
+in-plan block is still *read* so a task paused before this change does not
+silently un-pause on upgrade; nothing writes it any more.
+
+**Resuming re-reads the disk rather than being told a phase.** `TASK_RESUME`
+clears the flag and restarts `run.py`; phase entry is state-driven
+(`is_first_run`, `get_next_subtask`, `should_run_qa`), so no plan means planning
+runs again, an incomplete plan resumes at the first unfinished subtask, and a
+complete one goes to QA — which itself continues from its persisted iteration
+count. Naming a phase in the resume would be a second opinion about a question
+the spec directory already answers, and the two would drift. The same property
+is what makes switching provider mid-task cheap: `TASK_RESUME_WITH_PROVIDER`
+rewrites the model configuration and lifts the pause, and touches nothing else —
+completed subtasks, the spec and the QA sign-off stay as they are. Only an
+explicit "re-run this phase" discards work, and only downstream of the phase
+asked for (`plan-rerun-utils.ts`).
+
+**A phase that gives up says so.** `PLANNING_FAILED` and `CODING_FAILED` were in
+the XState machine from the start and emitted by nobody: every real failure
+reached the frontend as a process exit, and the machine's `setError` did not
+handle that event. The result was a card in Human Review with a red *Has Errors*
+badge and no reason anywhere in the UI — the toast even announced it as "Ready
+for Review", because the status is the same one a finished build gets.
+
+Now each halt emits the event with its message (`_emit_phase_failure` in
+`coder.py`, `_emit_planning_failed` in the spec orchestrator, `_emit_fatal_error`
+for an unhandled crash), `setError` covers every event that can reach the `error`
+state — including `PROCESS_EXITED`, whose message names the exit code because
+that is still better than nothing — and the message is persisted beside the
+status it explains (`plan.errorMessage`) so it survives a reload.
+`TaskFailureBanner` renders it at the top of the task panel, and the toast reads
+`reviewReason` rather than the column before choosing its wording.
 
 ### Workflow Logger
 

@@ -106,6 +106,7 @@ from core.sentry import capture_exception, init_sentry
 
 init_sentry(component="spec-runner")
 
+from core.build_signals import BuildPaused
 from core.platform import is_windows
 from debug import debug, debug_error, debug_section, debug_success
 from phase_config import resolve_model_id
@@ -485,6 +486,16 @@ Examples:
 
         sys.exit(0)
 
+    except BuildPaused:
+        # The user paused during spec creation. Nothing failed, so this must not
+        # exit non-zero: the frontend reads a non-zero exit as an unexpected
+        # crash and moves the card out of its column, which is exactly what a
+        # pause has to avoid. The pause flag stays on disk for the resume.
+        print("\n\n⏸  Spec creation paused — resume from the Kanban, or:")
+        print(
+            f"   python auto-claude/spec_runner.py --continue {orchestrator.spec_dir.name}"
+        )
+        sys.exit(0)
     except KeyboardInterrupt:
         debug_error("spec_runner", "Spec creation interrupted by user")
         print("\n\nSpec creation interrupted.")

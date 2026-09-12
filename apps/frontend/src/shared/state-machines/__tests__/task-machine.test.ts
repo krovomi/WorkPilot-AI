@@ -609,6 +609,96 @@ describe("taskMachine", () => {
 		});
 	});
 
+	describe("a failed task always says why", () => {
+		/**
+		 * The bug this pins: the card landed in review with a red "Has Errors"
+		 * badge and nothing behind it. `setError` was wired to PLANNING_FAILED
+		 * and CODING_FAILED only — and those were exactly the two events the
+		 * backend never emitted. Every real failure arrived as PROCESS_EXITED,
+		 * QA_MAX_ITERATIONS or QA_AGENT_ERROR and carried no message at all.
+		 */
+		const failures: { from: string; event: TaskEvent }[] = [
+			{
+				from: "planning",
+				event: {
+					type: "PLANNING_FAILED",
+					error: "The model produced no valid implementation_plan.json.",
+					recoverable: true,
+				},
+			},
+			{
+				from: "coding",
+				event: {
+					type: "CODING_FAILED",
+					subtaskId: "subtask-1-1",
+					error: "The local model never called a tool.",
+					attemptCount: 3,
+				},
+			},
+			{
+				from: "planning",
+				event: { type: "PROCESS_EXITED", exitCode: 1, unexpected: true },
+			},
+			{
+				from: "coding",
+				event: { type: "PROCESS_EXITED", exitCode: 137, unexpected: true },
+			},
+			{
+				from: "qa_review",
+				event: { type: "QA_MAX_ITERATIONS", iteration: 50, maxIterations: 50 },
+			},
+			{
+				from: "qa_fixing",
+				event: { type: "QA_AGENT_ERROR", iteration: 3, consecutiveErrors: 3 },
+			},
+		];
+
+		for (const { from, event } of failures) {
+			it(`sets a message for ${event.type} from ${from}`, () => {
+				const snapshot = runEvents([event], from);
+
+				expect(snapshot.value).toBe("error");
+				expect(snapshot.context.reviewReason).toBe("errors");
+				expect(snapshot.context.error?.trim()).toBeTruthy();
+			});
+		}
+
+		it("quotes the backend's own message rather than paraphrasing it", () => {
+			const snapshot = runEvents(
+				[
+					{
+						type: "PLANNING_FAILED",
+						error: "Planning failed: switch the Planning phase to a cloud model.",
+						recoverable: true,
+					},
+				],
+				"planning",
+			);
+
+			expect(snapshot.context.error).toBe(
+				"Planning failed: switch the Planning phase to a cloud model.",
+			);
+		});
+
+		it("clears the message when the user relaunches", () => {
+			const snapshot = runEvents(
+				[
+					{
+						type: "CODING_FAILED",
+						subtaskId: "subtask-1-1",
+						error: "boom",
+						attemptCount: 1,
+					},
+					{ type: "USER_RESUMED" },
+				],
+				"coding",
+			);
+
+			expect(snapshot.value).toBe("coding");
+			expect(snapshot.context.error).toBeUndefined();
+		});
+	});
+
 	describe("state restoration from task", () => {
 		it("should restore to correct state from existing task status", () => {
 			// Test restoring to different states

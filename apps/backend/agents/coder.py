@@ -20,8 +20,10 @@ from agents.feature_wiring import (
     load_domain_addendum,
     suggest_routed_model,
 )
+from core.build_signals import BuildHalted, BuildPaused
 from core.client import create_agent_client
 from core.llm_optimization import should_inline_file_context
+from core.pause_state import is_paused, read_pause_state
 from core.task_event import TaskEventEmitter
 from core.workflow_logger import workflow_logger
 from qa.criteria import save_implementation_plan
@@ -572,6 +574,38 @@ def _clear_planning_failures(spec_dir: Path) -> None:
         pass
 
 
+def _emit_phase_failure(
+    spec_dir: Path,
+    phase: str,
+    message: str,
+    *,
+    recoverable: bool = True,
+    subtask_id: str | None = None,
+) -> None:
+    """Tell the frontend which phase gave up, and why.
+
+    A phase that halted used to leave the process to exit on its own. The
+    frontend then had nothing but the exit code: its state machine synthesised
+    PROCESS_EXITED, moved the card to review with reason "errors", and the
+    sentence explaining what happened stayed in a log nobody had open. The
+    `error` payload of these two events is what puts it on the card.
+
+    Best-effort: a build that has already failed is not made worse by an
+    unwritable event stream.
+    """
+    event = "PLANNING_FAILED" if phase == "planning" else "CODING_FAILED"
+    payload: dict = {"error": message}
+    if event == "PLANNING_FAILED":
+        payload["recoverable"] = recoverable
+    else:
+        payload["subtaskId"] = subtask_id or ""
+        payload["attemptCount"] = 0
+    try:
+        TaskEventEmitter.from_spec_dir(spec_dir).emit(event, payload)
+    except Exception:
+        logger.debug("Failed to emit %s event", event, exc_info=True)
+
+
 def _docs_section(spec_dir: Path, subtask: dict | None = None) -> str:
     """Pointers to the documentation the preflight staged for this build.
 
@@ -1092,15 +1126,21 @@ async def run_autonomous_agent(
         except Exception as exc:
             logger.debug(f"Loop detection check skipped: {exc}")
 
-        # Check for pause state in implementation plan
-        from .utils import get_pause_state, is_paused
-
-        plan = load_implementation_plan(spec_dir)
-        if plan and is_paused(plan):
-            pause_state = get_pause_state(plan)
+        # Cooperative pause. Read from `pause_state.json`, which exists as soon
+        # as the spec does — the flag used to live in the implementation plan,
+        # so pausing was impossible during planning, the one phase where the
+        # plan has not been written yet. This checkpoint sits at the top of the
+        # loop, which is the same place for a planning iteration and a coding
+        # one, so both honour it.
+        if is_paused(spec_dir):
+            pause_state = read_pause_state(spec_dir)
+            paused_phase = pause_state.get("paused_phase") or (
+                "planning" if is_planning_phase else "coding"
+            )
             print()
             print_status("TASK PAUSED", "warning")
             print(muted(f"Paused at: {pause_state.get('paused_at')}"))
+            print(muted(f"Paused phase: {paused_phase}"))
             if pause_state.get("paused_subtask_id"):
                 print(muted(f"Paused subtask: {pause_state.get('paused_subtask_id')}"))
             if pause_state.get("provider"):
@@ -1109,17 +1149,22 @@ async def run_autonomous_agent(
                         f"Provider: {pause_state.get('provider')} ({pause_state.get('model')})"
                     )
                 )
-
-            # Check if provider has changed since pause
-            if pause_state.get("provider") and pause_state.get("provider") != model:
-                model = pause_state.get("provider")
-                print_status(f"Provider updated to {model}", "success")
-
-            # Resume from paused subtask if specified
-            if pause_state.get("paused_subtask_id"):
-                print_status("Resuming from paused subtask", "success")
-
-            return
+            status_manager.update(state=BuildState.PAUSED)
+            if task_logger:
+                task_logger.end_phase(
+                    current_log_phase,
+                    success=True,
+                    message=f"Paused by user during {paused_phase}",
+                )
+            # A provider switch made while paused is applied by the
+            # RESUME_WITH_PROVIDER marker that `core.client` consumes on the
+            # next session, not here: this branch stops the build, so anything
+            # it assigned to `model` was read by nobody.
+            #
+            # Unwinds to handle_build_command, which skips QA and finalization.
+            # A bare `return` here let the build carry on to QA and finalize a
+            # worktree the user had just asked to stop touching.
+            raise BuildPaused(paused_phase, pause_state.get("paused_subtask_id"))
 
         # Check for human intervention (PAUSE file)
         pause_file = spec_dir / HUMAN_INTERVENTION_FILE
@@ -1136,7 +1181,8 @@ async def run_autonomous_agent(
             print(f"  rm {pause_file}")
             print("\nThen run again:")
             print(f"  python workpilot/run.py --spec {spec_dir.name}")
-            return
+            status_manager.update(state=BuildState.PAUSED)
+            raise BuildPaused("planning" if is_planning_phase else "coding")
 
         # Check max iterations
         if max_iterations and iteration > max_iterations:
@@ -1708,7 +1754,8 @@ async def run_autonomous_agent(
                 summary=f"{_phase_tag} halted: local model did not call tools",
                 payload={"model": phase_model, "reason": "local_model_no_tools"},
             )
-            return
+            _emit_phase_failure(spec_dir, _phase_tag, halt_msg, recoverable=True)
+            raise BuildHalted(_phase_tag, halt_msg)
 
         plan_validated = False
         if is_planning_phase and status != "error":
@@ -1777,7 +1824,17 @@ async def run_autonomous_agent(
                     # halting immediately.
                     _clear_planning_failures(spec_dir)
                     status_manager.update(state=BuildState.ERROR)
-                    return
+                    # The detail belongs on the card, not only in this log: the
+                    # user sees a task land in review and has to be told which
+                    # schema the model failed to produce, not just that it did.
+                    detail = "\n".join(f"- {err}" for err in errors[:5])
+                    _emit_phase_failure(
+                        spec_dir,
+                        "planning",
+                        fail_msg + (f"\n{detail}" if detail else ""),
+                        recoverable=True,
+                    )
+                    raise BuildHalted("planning", fail_msg)
 
                 print_status(
                     "implementation_plan.json invalid - retrying planner"
@@ -2260,6 +2317,10 @@ async def run_autonomous_agent(
                     repeated_generic_error_count = 1
 
                 if repeated_generic_error_count >= MAX_REPEATED_GENERIC_ERRORS:
+                    halt_msg = (
+                        f"La même erreur s'est répétée {repeated_generic_error_count} "
+                        f"fois, la phase est arrêtée : {current_signature[:300]}"
+                    )
                     print_status(
                         f"Same error repeated {repeated_generic_error_count} times — halting "
                         "instead of growing the conversation summary further.",
@@ -2270,6 +2331,16 @@ async def run_autonomous_agent(
                         "Repeated error (retry would not change outcome)",
                     )
                     status_manager.update(state=BuildState.ERROR)
+                    # Carries the repeated error itself, not "something went
+                    # wrong": it is the only thing that tells the user whether
+                    # to change the model, the credentials or the spec.
+                    _emit_phase_failure(
+                        spec_dir,
+                        "planning" if is_planning_phase else "coding",
+                        halt_msg,
+                        recoverable=False,
+                        subtask_id=subtask_id,
+                    )
                     break
 
                 print_status("Session encountered an error", "error")

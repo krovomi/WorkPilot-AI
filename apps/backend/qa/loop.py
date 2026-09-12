@@ -11,7 +11,9 @@ import subprocess
 import time as time_module
 from pathlib import Path
 
+from core.build_signals import BuildPaused
 from core.client import create_agent_client
+from core.pause_state import is_paused, read_pause_state
 from core.task_event import TaskEventEmitter
 from debug import debug, debug_error, debug_section, debug_success, debug_warning
 from linear_updater import (
@@ -494,6 +496,18 @@ async def run_qa_validation_loop(
     max_iterations_emitted = False
 
     while qa_iteration < MAX_QA_ITERATIONS:
+        # Cooperative pause, checked between passes. QA is a loop of long
+        # sessions, so "pause" without a checkpoint here meant the user waited
+        # for the current pass to end and then watched the next one start.
+        if is_paused(spec_dir):
+            pause_state = read_pause_state(spec_dir)
+            print("\n⏸  QA PAUSED — reprise possible à tout moment")
+            print(f"   Paused at: {pause_state.get('paused_at')}")
+            raise BuildPaused(
+                pause_state.get("paused_phase") or "qa_review",
+                pause_state.get("paused_subtask_id"),
+            )
+
         qa_iteration += 1
         iteration_start = time_module.time()
 
