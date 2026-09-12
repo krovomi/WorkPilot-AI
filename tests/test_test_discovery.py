@@ -28,7 +28,7 @@ BACKEND = REPO_ROOT / "apps" / "backend"
 
 #: Répertoires sans code de test à nous.
 EXCLUDED = {
-    "venv",       # MODIFICATION : Ajout du dossier venv local
+    "venv",  # MODIFICATION : Ajout du dossier venv local
     ".venv",
     "__pycache__",
     "node_modules",
