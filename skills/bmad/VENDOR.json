@@ -6,6 +6,9 @@
 	"license": "MIT",
 	"skills": 50,
 	"runtime_gate": "_bmad/scripts/resolve_customization.py",
+	"excluded": {
+		"scripts/tests/": "upstream's own suite for the helper scripts; run by upstream's CI, payload here — and a finding in it cannot be fixed without failing --check"
+	},
 	"vendored_by": "scripts/vendor_bmad.py",
 	"note": "Skills only. The _bmad/ runtime they read is installed per project by the bootstrap command in pack.json."
 }

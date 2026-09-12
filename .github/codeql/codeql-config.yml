@@ -1,0 +1,25 @@
+# CodeQL configuration for WorkPilot AI.
+#
+# Only `paths-ignore` is set: the query suites stay at the workflow's defaults,
+# so this narrows *what* is analysed and never *how*.
+
+name: "WorkPilot AI"
+
+paths-ignore:
+  # Vendored third-party trees. Their content is pinned byte for byte —
+  # `scripts/vendor_bmad.py --check` re-downloads the release and compares —
+  # so a finding here has no fix available: editing the file is what breaks the
+  # check that proves the tree is what upstream published. Upstream's own test
+  # suites are not carried at all (see SKIP_DIRS in that script); what remains
+  # is the helper scripts a skill cannot run without, and those are reported to
+  # upstream rather than patched in place.
+  - skills/bmad
+  - apps/backend/vendor
+  # Bootstrapped packs: gitignored, so this only matters on a checkout where
+  # someone has run `skills:bootstrap`. Same reasoning.
+  - skills/superpowers
+  - skills/mattpocock
+  - skills/impeccable
+  - skills/task-observer
+  - skills/claude-mem
+  - skills/hermes

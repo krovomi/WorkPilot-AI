@@ -87,6 +87,18 @@ REQUIRES_COMMENT = (
 # Files upstream ships beside a skill that are of no use to a consumer here.
 SKIP_NAMES = {".DS_Store", "__pycache__"}
 
+# Upstream's own test suite for the helper scripts, dropped for the same reason
+# `vendor_archify.py` drops archify's `test/`: it is upstream's, it is run by
+# upstream's CI, and here it is only payload. Keeping it was not free — it put
+# eleven third-party `test_*.py` in front of this repo's own collection guard,
+# and put five CodeQL findings about `chmod` in third-party fixtures on every
+# pull request. A finding in vendored code cannot be fixed without failing
+# `--check`, so the honest move is not to carry the file.
+#
+# The scripts themselves stay: a skill that says "run `scripts/brain.py`" is not
+# a skill without it.
+SKIP_DIRS = {"tests"}
+
 
 def _fetch_metadata() -> dict:
     with urllib.request.urlopen(f"{REGISTRY}/{PACKAGE}", timeout=60) as response:  # noqa: S310
@@ -193,7 +205,15 @@ def _copy_skill(source: Path, dest: Path) -> None:
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
     for item in sorted(source.rglob("*")):
-        if any(part in SKIP_NAMES for part in item.relative_to(source).parts):
+        parts = item.relative_to(source).parts
+        if any(part in SKIP_NAMES for part in parts):
+            continue
+        # `scripts/tests/`, not any directory called "tests": a skill is free to
+        # ship guidance under that name, and dropping it would be a silent edit
+        # to the procedure rather than a trim of upstream's own suite.
+        if "scripts" in parts and any(
+            part in SKIP_DIRS for part in parts[parts.index("scripts") + 1 :]
+        ):
             continue
         target = dest / item.relative_to(source)
         if item.is_dir():
@@ -247,6 +267,13 @@ def _write_vendor_record(version: str, count: int) -> None:
                 "license": "MIT",
                 "skills": count,
                 "runtime_gate": RUNTIME_GATE,
+                "excluded": {
+                    "scripts/tests/": (
+                        "upstream's own suite for the helper scripts; run by "
+                        "upstream's CI, payload here — and a finding in it "
+                        "cannot be fixed without failing --check"
+                    )
+                },
                 "vendored_by": "scripts/vendor_bmad.py",
                 "note": (
                     "Skills only. The _bmad/ runtime they read is installed "
