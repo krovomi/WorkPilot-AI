@@ -61,6 +61,8 @@ __all__ = [
     "replay_ab",
     "load_episodes",
     "table_grader",
+    "discriminator_grader",
+    "DISCRIMINATOR",
     "BASELINE",
     "CANDIDATE",
 ]
@@ -100,7 +102,9 @@ class Episode:
     def baseline_passed(self) -> bool:
         return bool(self.baseline_signals)
 
-    def matches(self, agent_id: str, language: str = "", workflow: str = "") -> bool:
+    def matches(
+        self, agent_id: str, language: str = "", workflow: str = ""
+    ) -> bool:
         """Whether this episode is evidence about that agent in that context.
 
         An empty field on either side means "any": a golden case recorded
@@ -132,7 +136,8 @@ class ArmResult:
 class Grader(Protocol):
     """Runs one arm on one episode and reports what the verifiers found."""
 
-    def __call__(self, episode: Episode, arm: str, instruction: str) -> ArmResult: ...
+    def __call__(self, episode: Episode, arm: str, instruction: str) -> ArmResult:
+        ...
 
 
 @dataclass(frozen=True)
@@ -166,6 +171,13 @@ class EpisodeComparison:
 class ReplayResult:
     agent_id: str
     comparisons: list[EpisodeComparison] = field(default_factory=list)
+    method: str = ""
+    """How the arms were graded, so a proposal can say what was measured.
+
+    A replay that checked instruction text and a replay that re-ran the agent
+    against real verifiers are both "a replay", and reporting them with the
+    same words would let the cheaper one borrow the authority of the other.
+    """
 
     @property
     def regressions(self) -> list[EpisodeComparison]:
@@ -189,10 +201,29 @@ class ReplayResult:
         """
         return self.ran and not self.regressions
 
+    @property
+    def significant(self) -> bool:
+        """Whether the replay result is significant (has baseline to measure
+        against).
+        """
+        return self.ran
+
+    @property
+    def reason(self) -> str:
+        """Human-readable reason describing the replay result."""
+        if not self.ran:
+            return "no baseline"
+        if self.regressions:
+            return (
+                f"regressed {len(self.regressions)} episode(s)"
+            )
+        return "clean replay"
+
     def apply_to(self, evidence: Evidence) -> Evidence:
         """Record this replay on the evidence `skill_proposer.evaluate` reads."""
         evidence.replay_ran = self.ran
         evidence.replay_regressions = len(self.regressions)
+        evidence.replay_method = self.method
         return evidence
 
     def describe(self) -> str:
@@ -202,7 +233,9 @@ class ReplayResult:
             f"{self.agent_id}: {len(self.comparisons)} episode(s), "
             f"{len(self.improvements)} improved, {len(self.regressions)} regressed"
         )
-        return "\n".join([head, *(f"  {c.describe()}" for c in self.comparisons)])
+        return "\n".join(
+            [head, *(f"  {c.describe()}" for c in self.comparisons)]
+        )
 
 
 @dataclass
@@ -264,13 +297,16 @@ def replay_ab(
         candidate = grader(episode, CANDIDATE, candidate_instruction)
         budget.charge(cost)
         result.comparisons.append(
-            EpisodeComparison(episode=episode, baseline=baseline, candidate=candidate)
+            EpisodeComparison(
+                episode=episode, baseline=baseline, candidate=candidate
+            )
         )
 
     return result
 
 
-# ── the golden corpus ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# the golden corpus
 
 
 def load_episodes(root: Path, *, agent_id: str = "") -> list[Episode]:
@@ -289,7 +325,9 @@ def load_episodes(root: Path, *, agent_id: str = "") -> list[Episode]:
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            raise ValueError(f"{path}: invalid episode JSON — {exc}") from exc
+            raise ValueError(
+                f"{path}: invalid episode JSON — {exc}"
+            ) from exc
         episode = _episode_from_dict(raw, path)
         if agent_id and episode.agent_id != agent_id:
             continue
@@ -302,7 +340,9 @@ def _episode_from_dict(raw: dict[str, Any], path: Path) -> Episode:
     if missing:
         raise ValueError(f"{path}: episode is missing {', '.join(missing)}")
     try:
-        signals = tuple(ExternalSignal(s) for s in (raw.get("baseline_signals") or []))
+        signals = tuple(
+            ExternalSignal(s) for s in (raw.get("baseline_signals") or [])
+        )
     except ValueError as exc:
         # A typo'd signal name would silently become "this episode failed",
         # which turns a passing candidate into a false improvement.
@@ -316,6 +356,81 @@ def _episode_from_dict(raw: dict[str, Any], path: Path) -> Episode:
         baseline_signals=signals,
         context=raw.get("context") or {},
     )
+
+
+DISCRIMINATOR = "discriminator"
+
+
+def discriminator_grader() -> Grader:
+    """Grade an arm on whether its instruction still carries what the episode
+    is about.
+
+    What this measures, precisely
+    -----------------------------
+    Each episode names the thing that makes the difference — `context.requires`
+    is what an instruction has to say for that case to go well, `context.forbids`
+    what it must not say. This grader checks the candidate instruction against
+    those, and nothing else.
+
+    That is **weaker than re-running the agent**, and the distinction is worth
+    keeping sharp: an instruction can mention `--filter` and still be a worse
+    instruction. What this catches is the regression the corpus was built to
+    catch — a candidate that quietly drops the guidance the case exists for.
+    It is a floor, not a verdict, and `ReplayResult.method` says so, so a
+    proposal cannot claim more than was actually measured.
+
+    Why it is worth having as it stands
+    ----------------------------------
+    `evaluate` uses a replay as a **veto only** — it can block a promotion and
+    can never create one. A cheap check that vetoes correctly is therefore
+    strictly better than no check, and it costs no API call, so it can run on
+    every candidate at every effort level.
+
+    An episode carrying no discriminator grades as unchanged on both arms: it
+    contributes no regression and no improvement, which is the honest answer
+    when a case cannot say what would distinguish two instructions.
+    """
+
+    def grade(episode: Episode, arm: str, instruction: str) -> ArmResult:
+        requires = [str(r) for r in (episode.context.get("requires") or [])]
+        forbids = [str(f) for f in (episode.context.get("forbids") or [])]
+        if not requires and not forbids:
+            # Nothing to discriminate on. Both arms get the same verdict, so
+            # the episode can neither regress nor improve.
+            return ArmResult(
+                episode_id=episode.episode_id,
+                arm=arm,
+                signals=(ExternalSignal.DETECTOR_CLEAN,),
+                note="no discriminator — not measured",
+            )
+
+        text = (instruction or "").lower()
+        missing = [r for r in requires if r.lower() not in text]
+        present = [f for f in forbids if f.lower() in text]
+
+        if missing or present:
+            parts = []
+            if missing:
+                parts.append("missing " + ", ".join(repr(m) for m in missing))
+            if present:
+                parts.append("says " + ", ".join(repr(f) for f in present))
+            return ArmResult(
+                episode_id=episode.episode_id,
+                arm=arm,
+                signals=(),
+                note="; ".join(parts),
+            )
+
+        return ArmResult(
+            episode_id=episode.episode_id,
+            arm=arm,
+            # A deterministic check came back clean, which is exactly what
+            # DETECTOR_CLEAN means everywhere else in the loop.
+            signals=(ExternalSignal.DETECTOR_CLEAN,),
+            note="carries every discriminator",
+        )
+
+    return grade
 
 
 def table_grader(
@@ -336,7 +451,8 @@ def table_grader(
         if key in outcomes:
             raw = outcomes[key]
             signals = tuple(
-                s if isinstance(s, ExternalSignal) else ExternalSignal(s) for s in raw
+                s if isinstance(s, ExternalSignal) else ExternalSignal(s)
+                for s in raw
             )
             return ArmResult(episode.episode_id, arm, signals, note="recorded")
         if arm == BASELINE and default_to_baseline:
