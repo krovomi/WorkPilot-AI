@@ -63,8 +63,11 @@ __all__ = [
     "PhaseRun",
     "BUILTIN_EXECUTORS",
     "CONFIG_PHASE",
+    "log_phase_for",
+    "execution_phase_for",
     "SKILL_PHASE_AGENTS",
     "find_skill_body",
+    "skill_requires",
     "phases_between",
     "run_skill_phase",
     "run_skill_phases",
@@ -117,6 +120,53 @@ CONFIG_PHASE = {
     "architecture-map": "qa",
 }
 _DEFAULT_CONFIG_PHASE = "coding"
+
+# The two vocabularies the rest of the application uses to say *where in the
+# build we are*, keyed off the config phase above so there is one table to
+# keep in step rather than three.
+#
+# `LogPhase` is what the task log viewer groups its entries by, and
+# `ExecutionPhase` is what the Kanban card's badge reads. Every skill phase
+# used to report `LogPhase.CODING` and to emit no execution phase at all, and
+# both halves of that were visible to the user: the `spec` phase — which runs
+# *before* planning — filed its output under "coding", and the card fell
+# through `buildSnapshotFromTask`'s default, which is also "coding". So a build
+# appeared to start by coding and to plan afterwards, in that order, in the
+# logs. The phases ran in the declared order the whole time; only their labels
+# were wrong.
+#
+# `LogPhase` has three values and `phase_config` four, so `spec` and `planning`
+# both land on PLANNING: a document written before any code exists is planning
+# work whichever budget pays for it.
+_LOG_PHASE_BY_CONFIG = {
+    "spec": "PLANNING",
+    "planning": "PLANNING",
+    "coding": "CODING",
+    "qa": "VALIDATION",
+}
+
+# Only the phases that run before the coder loop need to announce themselves:
+# after `coding` the card is already past the point this would describe, and
+# emitting a phase there would drag the badge backwards — which
+# `wouldPhaseRegress` would refuse anyway.
+_EXECUTION_PHASE_BY_CONFIG = {
+    "spec": "PLANNING",
+    "planning": "PLANNING",
+}
+
+
+def log_phase_for(phase_id: str) -> str:
+    """The `LogPhase` member name a phase's entries belong under."""
+    return _LOG_PHASE_BY_CONFIG.get(
+        CONFIG_PHASE.get(phase_id, _DEFAULT_CONFIG_PHASE), "CODING"
+    )
+
+
+def execution_phase_for(phase_id: str) -> str | None:
+    """The `ExecutionPhase` a phase announces to the Kanban, or None."""
+    return _EXECUTION_PHASE_BY_CONFIG.get(
+        CONFIG_PHASE.get(phase_id, _DEFAULT_CONFIG_PHASE)
+    )
 
 # The AGENT_CONFIGS entry a skill phase runs under, which decides its tool
 # allowlist and whether it is read-only. Reviewers get `pr_reviewer`, which
@@ -270,14 +320,26 @@ def phases_between(profile, *, after: str | None, before: str | None) -> list:
     return out
 
 
-def find_skill_body(repo_root: Path, pack: str, skill: str) -> tuple[str, Path] | None:
-    """The procedure text of a skill, and where it was read from.
+def find_skill_body(
+    repo_root: Path, pack: str, skill: str
+) -> tuple[str, Path, dict] | None:
+    """The procedure text of a skill, where it was read from, and its `requires`.
 
     The built output is preferred over the source. `.agents/skills/` is what
     `skills-cli build` emits after resolving variants and dropping skills whose
-    `requires` are not satisfied — so reading it means a phase never runs a
-    procedure the resolver already decided this checkout cannot support. The
-    source tree is the fallback for a checkout that has not been built.
+    `requires` are not satisfied. The source tree is the fallback for a
+    checkout that has not been built — and it is *not* gated, which is why the
+    `requires` block comes back with the body instead of being discarded here.
+
+    It has to come back, because the two trees answer different questions. The
+    build gated `.agents/skills/` against **this** repository; a phase runs
+    against the **project being built**, which is a different directory on a
+    different machine, and for BMAD the runtime it needs (`_bmad/`) is
+    installed per project. So `skills/bmad/…` — committed, therefore always
+    found by the fallback — handed the `spec` phase a procedure whose every
+    step reads a file under `_bmad/`, and the session spent itself searching
+    for a tree that was never there. `skill_requires` is what lets the caller
+    ask the question the build could not ask on its behalf.
     """
     from skills_registry.frontmatter import parse_frontmatter
 
@@ -289,13 +351,48 @@ def find_skill_body(repo_root: Path, pack: str, skill: str) -> tuple[str, Path] 
         try:
             if not path.is_file():
                 continue
-            _meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
+            meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             logger.debug("could not read %s: %s", path, exc)
             continue
         if body.strip():
-            return body, path
+            return body, path, _requires_of(meta)
     return None
+
+
+def _requires_of(meta: dict) -> dict:
+    """The `metadata.workpilot.requires` block, or an empty one.
+
+    Read defensively rather than with `packs.py`'s parser: a malformed block in
+    a vendored SKILL.md must cost the phase its runtime check, not the build.
+    """
+    try:
+        workpilot = (meta.get("metadata") or {}).get("workpilot") or {}
+        requires = workpilot.get("requires") or {}
+        return requires if isinstance(requires, dict) else {}
+    except AttributeError:
+        return {}
+
+
+def skill_requires(requires: dict, project_dir: Path) -> tuple[bool, str]:
+    """Whether this project satisfies a skill's runtime prerequisites.
+
+    Delegates to the resolver's `check_requires` so the gate a phase applies at
+    run time is the same one the build applies at emit time — two readings of
+    `requires` would eventually disagree, and the disagreement would show up as
+    a skill that builds and cannot run.
+
+    Unsatisfiable **here** means unsatisfiable, not unknown: an import failure
+    is reported as a reason rather than swallowed into a pass, because passing
+    on absent evidence is exactly how the BMAD wrappers reached a session.
+    """
+    if not requires:
+        return True, ""
+    try:
+        from skills_registry.resolver import check_requires
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return False, f"cannot verify the runtime requirement: {exc}"
+    return check_requires(requires, project_dir)
 
 
 def _constitution(project_dir: Path) -> str:
@@ -409,6 +506,29 @@ def _write_output(ctx: PhaseContext, phase_id: str, text: str) -> Path | None:
         return None
 
 
+def _announce(phase_id: str) -> None:
+    """Tell the Kanban which phase of the build this is, when it has a name.
+
+    Without this the pre-planning window was silent, and silence is not
+    neutral: `buildSnapshotFromTask` turns an `in_progress` task with no
+    reported phase into the *coding* column, so a build spent its `docs`,
+    `brainstorm` and `spec` phases displayed as coding and then moved back to
+    planning when the planner finally emitted one. The phases were in order;
+    the badge was reading a default.
+
+    Never raises. This describes a build, it is not part of one.
+    """
+    name = execution_phase_for(phase_id)
+    if name is None:
+        return
+    try:
+        from phase_event import ExecutionPhase, emit_phase
+
+        emit_phase(getattr(ExecutionPhase, name), f"Running the {phase_id} phase")
+    except Exception as exc:  # noqa: BLE001 - a badge never fails a phase
+        logger.debug("could not announce phase %s: %s", phase_id, exc)
+
+
 async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     """Run one skill-backed phase. Never raises."""
     phase = resolved.phase
@@ -426,8 +546,26 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
                 f"`pnpm run skills:bootstrap --pack {phase.pack}`"
             ),
         )
-    body, source = found
+    body, source, requires = found
     logger.debug("phase %s: procedure from %s", phase.id, source)
+
+    # The procedure exists; can it run *here*? A skill whose runtime is absent
+    # is not a skill that fails, it is a skill that cannot start — and saying
+    # so costs nothing, where starting it costs a full session that ends with
+    # the model reporting it could not find the files it was told to read.
+    satisfied, why = skill_requires(requires, ctx.project_dir)
+    if not satisfied:
+        return PhaseOutcome(
+            phase.id,
+            impl,
+            resolved.dispatch,
+            None,
+            detail=(
+                f"{why} — {impl} needs it in {ctx.project_dir}; "
+                f"install it there (`skills:bootstrap --pack {phase.pack}`) "
+                f"or point this phase at another implementation"
+            ),
+        )
 
     try:
         from agents.session import run_agent_session
@@ -438,6 +576,9 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
         return PhaseOutcome(
             phase.id, impl, resolved.dispatch, None, detail=f"unavailable: {exc}"
         )
+
+    log_phase = getattr(LogPhase, log_phase_for(phase.id), LogPhase.CODING)
+    _announce(phase.id)
 
     config_phase = CONFIG_PHASE.get(phase.id, _DEFAULT_CONFIG_PHASE)
     agent_type = phase.agent or SKILL_PHASE_AGENTS.get(phase.id, _DEFAULT_AGENT)
@@ -468,7 +609,7 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
                 prompt,
                 ctx.spec_dir,
                 ctx.verbose,
-                phase=LogPhase.CODING,
+                phase=log_phase,
             )
     except Exception as exc:  # noqa: BLE001 - a phase reports, it does not abort
         logger.warning("phase %s failed to run: %s", phase.id, exc)
