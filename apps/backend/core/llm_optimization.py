@@ -105,7 +105,31 @@ def build_base_system_prompt(
     )
     if tool_use_hint:
         prompt += _TOOL_USE_HINT
+    prompt += _rtk_awareness()
     return prompt
+
+
+def _rtk_awareness() -> str:
+    """The "your command output is condensed" paragraph, when rtk is in play.
+
+    It belongs in the shared prompt rather than in one provider branch because
+    both places a command can be run from — the Claude SDK's Bash tool and the
+    generic tool executor every other provider uses — rewrite through rtk. A
+    model told about it on one path and not the other would doubt perfectly
+    good output on the other.
+
+    It is byte-stable in the sense this function's caller requires: the text
+    carries no version, path or count, so the prefix is identical on every
+    build of a machine that has rtk, and identical on every build of one that
+    does not. It changes once, when the user installs or removes rtk — which
+    costs exactly one cache miss.
+    """
+    try:
+        from rtk import awareness_section
+
+        return awareness_section()
+    except Exception:  # noqa: BLE001 - an optional binary never breaks a prompt
+        return ""
 
 
 # ---------------------------------------------------------------------------

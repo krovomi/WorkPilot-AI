@@ -2004,6 +2004,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import hermes router: {e}")
 
+# --- rtk API (is the output-condensing proxy working here, and what it saved) ---
+try:
+    from rtk.api import router as rtk_router
+
+    _mount(rtk_router, "rtk")
+except ImportError as e:
+    print(f"Warning: Could not import rtk router: {e}")
+
 # --- Spec Traceability API (open questions + requirement coverage for a spec) ---
 try:
     from spec.api import router as spec_traceability_router

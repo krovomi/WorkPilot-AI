@@ -12,6 +12,8 @@ import signal
 from pathlib import Path
 from typing import Any
 
+from rtk import rewrite_command as rtk_rewrite
+
 
 def _pick_arg(arguments: dict[str, Any], *names: str, default: Any = None) -> Any:
     """First non-empty value among alias ``names`` (case-insensitive).
@@ -218,6 +220,14 @@ class ToolExecutor:
         """
         if not command:
             raise ValueError("Command is required for run_command")
+
+        # rtk — the non-Claude half of the same optimisation the SDK gets from
+        # `rtk.hook`. Copilot, Windsurf, OpenAI and the local runtimes all
+        # execute their shell commands here, and they pay for the output the
+        # same way. The rewrite preserves behaviour and exit code; when rtk is
+        # absent or has no filter for this command, `command` comes back
+        # unchanged.
+        command = rtk_rewrite(command).command
 
         work_dir = self._resolve_within_project(cwd) if cwd else self.working_directory
 

@@ -57,6 +57,7 @@ import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
 import { CustomMcpDialog } from "./CustomMcpDialog";
 import { McpServerSettingsDialog } from "./McpServerSettingsDialog";
+import { TokenSavingsSettings } from "./settings/TokenSavingsSettings";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -1177,6 +1178,39 @@ export function AgentTools() {
 		[selectedProjectId, envConfig],
 	);
 
+	// rtk — same shape as updateMcpServer, separate key. rtk is not an MCP
+	// server: it is a binary on the machine, and folding it into mcpServers
+	// would have the backend look for a server that does not exist.
+	const updateTokenSavings = useCallback(
+		async (
+			key: keyof NonNullable<ProjectEnvConfig["tokenSavings"]>,
+			value: boolean,
+		) => {
+			if (!selectedProjectId || !envConfig) return;
+
+			const newTokenSavings = {
+				...envConfig.tokenSavings,
+				[key]: value,
+			};
+
+			setEnvConfig((prev) =>
+				prev ? { ...prev, tokenSavings: newTokenSavings } : null,
+			);
+
+			try {
+				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
+					tokenSavings: newTokenSavings,
+				});
+			} catch (error) {
+				console.error("Failed to update rtk config:", error);
+				setEnvConfig((prev) =>
+					prev ? { ...prev, tokenSavings: envConfig.tokenSavings } : null,
+				);
+			}
+		},
+		[selectedProjectId, envConfig],
+	);
+
 	// Handle adding an MCP to an agent
 	const handleAddMcp = useCallback(
 		async (agentId: string, mcpId: string) => {
@@ -1814,6 +1848,14 @@ export function AgentTools() {
 									</div>
 									<Switch checked={true} disabled />
 								</div>
+
+								{/* rtk — la condensation de sortie. Toujours visible :
+								    c'est ici qu'on découvre qu'elle existe. */}
+								<TokenSavingsSettings
+									tokenSavings={envConfig?.tokenSavings}
+									projectPath={selectedProject?.path}
+									onUpdate={updateTokenSavings}
+								/>
 
 								{/* Custom MCP Servers Section */}
 								<div className="pt-4 border-t border-border">

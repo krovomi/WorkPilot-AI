@@ -39,6 +39,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   hermes/              hermes-agent : doctor, persona SOUL.md, cycle d'apprentissage par surface
   mem_search/          lecture de la mémoire par paliers (skill mem-search)
   libdocs/             docs des bibliothèques que le dépôt n'illustre pas, avant le build
+  rtk/                 proxy rtk : la sortie des commandes condensée avant qu'un modèle la lise
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt
   architecture_visualizer/ carte d'architecture archify du projet, et son delta par tâche
   vendor/archify/      le renderer archify vendorisé et épinglé (scripts/vendor_archify.py)
