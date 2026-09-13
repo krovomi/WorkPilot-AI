@@ -12,7 +12,6 @@ import { useTranslation } from "react-i18next";
 import type { AppEmulatorConfig } from "../../../main/app-emulator-service";
 import type { Project } from "../../../shared/types";
 import {
-	setupAppEmulatorListeners,
 	startAppEmulator,
 	stopAppEmulator,
 	useAppEmulatorStore,
@@ -58,8 +57,6 @@ export function TaskEmulator({ taskId, project, worktreePath }: TaskEmulatorProp
 	const setConfig = useAppEmulatorStore((state) => state.setConfig);
 	const setUrl = useAppEmulatorStore((state) => state.setUrl);
 	const setStatus = useAppEmulatorStore((state) => state.setStatus);
-
-	useEffect(() => setupAppEmulatorListeners(), []);
 
 	useEffect(() => {
 		setResolvedWorktreePath(worktreePath ?? null);

@@ -205,5 +205,19 @@
 		"notInstalledDescription": "Codex CLI is not installed. Click \"Install\" to install it in the background:",
 		"installing": "Installing, please wait...",
 		"viewDocs": "View Codex CLI documentation"
+	},
+	"activity": {
+		"badge": {
+			"running_one": "{{count}} job running",
+			"running_other": "{{count}} jobs running",
+			"success_one": "{{count}} job finished",
+			"success_other": "{{count}} jobs finished",
+			"error_one": "{{count}} job failed",
+			"error_other": "{{count}} jobs failed"
+		},
+		"kinds": {
+			"build": "Build",
+			"ideation": "Ideation"
+		}
 	}
 }

@@ -32,7 +32,6 @@ import {
 	type PairStatus,
 	type StartSessionParams,
 	sendPairMessage,
-	setupPairProgrammingListeners,
 	startPairSession,
 	stopPairSession,
 	usePairProgrammingStore,
@@ -275,12 +274,6 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 
 	const chatEndRef = useRef<HTMLDivElement>(null);
 	const streamEndRef = useRef<HTMLDivElement>(null);
-
-	// Setup IPC listeners
-	useEffect(() => {
-		const cleanup = setupPairProgrammingListeners(projectId);
-		return cleanup;
-	}, [projectId]);
 
 	// Auto-scroll chat
 	useEffect(() => {

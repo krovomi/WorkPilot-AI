@@ -1,8 +1,7 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	setupAccessibilityListeners,
 	useAccessibilityStore,
 	type WcagTargetLevel,
 } from "../../stores/accessibility-store";
@@ -35,11 +34,6 @@ export function A11yReportView({
 	projectPath,
 }: A11yReportViewProps): React.ReactElement {
 	const { t } = useTranslation("accessibility");
-
-	useEffect(() => {
-		const cleanup = setupAccessibilityListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useAccessibilityStore((s) => s.phase);
 	const status = useAccessibilityStore((s) => s.status);

@@ -22,7 +22,6 @@ import React, {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	setupAppEmulatorListeners,
 	startAppEmulator,
 	stopAppEmulator,
 	useAppEmulatorStore,
@@ -220,12 +219,6 @@ export function AppEmulatorDialog() {
 			.filter((line) => line.toLowerCase().includes(q))
 			.join("\n");
 	}, [filteredOutput, searchQuery]);
-
-	// Setup IPC listeners
-	useEffect(() => {
-		const cleanup = setupAppEmulatorListeners();
-		return cleanup;
-	}, []);
 
 	// Auto-scroll output (only when the log panel is visible and not actively searching)
 	useEffect(() => {

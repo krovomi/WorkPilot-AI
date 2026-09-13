@@ -118,6 +118,12 @@ import {
 import { useAnyPermission } from "@/stores/permissions-store";
 // Stores
 import { useProjectStore } from "@/stores/project-store";
+import {
+	selectGroupBadge,
+	selectViewBadge,
+	useActivityStore,
+	useAttentionView,
+} from "@/stores/activity-store";
 import { openPromptOptimizerDialog } from "@/stores/prompt-optimizer-store";
 import { useServerSessionStore } from "@/stores/server-session-store";
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
@@ -163,6 +169,7 @@ import {
 	SortableWrapper,
 	type SortableKind,
 } from "./sidebar/sortable-primitives";
+import { ActivityBadge } from "./sidebar/ActivityBadge";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { VoiceControlDialog } from "./voice-control/VoiceControlDialog";
 
@@ -863,6 +870,24 @@ export function Sidebar({
 	const settings = useSettingsStore((state) => state.settings);
 	const openSetupHub = useSetupHubStore((state) => state.openSetupHub);
 
+	// Read once for the whole sidebar: one subscription feeds every badge,
+	// instead of one hook per menu entry over ~80 entries.
+	const activities = useActivityStore((state) => state.activities);
+	const attentionView = useAttentionView();
+	const badgeFor = useCallback(
+		(view: SidebarView) => selectViewBadge(activities, view, selectedProjectId),
+		[activities, selectedProjectId],
+	);
+	const groupBadgeFor = useCallback(
+		(items: NavItem[]) =>
+			selectGroupBadge(
+				activities,
+				items.map((item) => item.id),
+				selectedProjectId,
+			),
+		[activities, selectedProjectId],
+	);
+
 	const [showAddProjectModal, setShowAddProjectModal] = useState(false);
 	const [showGitSetupModal, setShowGitSetupModal] = useState(false);
 	const gitSetupSkippedForProjectRef = useRef<string | null>(null);
@@ -1527,6 +1552,8 @@ export function Sidebar({
 		const isActive = activeView === item.id;
 		const Icon = item.icon;
 		const isPinned = pinnedItemsSet.has(item.id);
+		const badge = badgeFor(item.id);
+		const hasAttention = attentionView === item.id;
 
 		// Determine CSS classes based on collapsed state and sub-item status
 		const getLayoutClasses = () => {
@@ -1603,6 +1630,7 @@ export function Sidebar({
 							<span className="flex-1 text-left truncate">
 								{t(item.labelKey)}
 							</span>
+							<ActivityBadge badge={badge} attention={hasAttention} />
 							{item.shortcut && (
 								<kbd
 									className={cn(
@@ -1619,6 +1647,13 @@ export function Sidebar({
 					)}
 				</button>
 				{starButton}
+				{isCollapsed && (
+					<ActivityBadge
+						badge={badge}
+						attention={hasAttention}
+						variant="corner"
+					/>
+				)}
 			</div>
 		);
 
@@ -1658,6 +1693,7 @@ export function Sidebar({
 
 	const renderTooltipSubGroupItem = (item: NavItem) => {
 		const isActive = activeView === item.id;
+		const badge = badgeFor(item.id);
 		return (
 			<button
 				key={item.id}
@@ -1674,6 +1710,7 @@ export function Sidebar({
 			>
 				<item.icon className="h-3 w-3 shrink-0" />
 				<span className="flex-1 truncate">{t(item.labelKey)}</span>
+				<ActivityBadge badge={badge} />
 				{item.shortcut && (
 					<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[9px]">
 						{item.shortcut}
@@ -1840,14 +1877,20 @@ export function Sidebar({
 	const renderCollapsedGroup = (group: NavGroup, hasActiveItem: boolean) => {
 		const GroupIcon = group.icon;
 		const isFavorites = group.id === "__favorites__";
-		
+		// On the rail there is no room for a row, so the group icon carries the
+		// rollup of everything folded behind it.
+		const groupBadge = groupBadgeFor(group.items);
+		const groupAttention = group.items.some(
+			(item) => attentionView === item.id,
+		);
+
 		return (
 			<Tooltip key={group.id}>
 				<TooltipTrigger asChild>
 					<div className="flex flex-col items-center gap-1 py-2">
 						<div
 							className={cn(
-								"flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 hover:scale-105",
+								"relative flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 hover:scale-105",
 								hasActiveItem
 									? "bg-accent text-accent-foreground shadow-sm"
 									: "hover:bg-accent hover:text-accent-foreground",
@@ -1859,6 +1902,11 @@ export function Sidebar({
 									"h-4 w-4",
 									isFavorites && "fill-amber-400 text-amber-400",
 								)}
+							/>
+							<ActivityBadge
+								badge={groupBadge}
+								attention={groupAttention}
+								variant="corner"
 							/>
 						</div>
 					</div>
@@ -1962,6 +2010,12 @@ export function Sidebar({
 	const renderGroupButton = (group: NavGroup, isExpanded: boolean, hasActiveItem: boolean) => {
 		const isFavorites = group.id === "__favorites__";
 		const GroupIcon = group.icon;
+		// A collapsed group hides its entries, so it carries the worst state
+		// among them — otherwise work in a folded group is invisible.
+		const groupBadge = isExpanded ? null : groupBadgeFor(group.items);
+		const groupAttention = group.items.some(
+			(item) => attentionView === item.id,
+		);
 		
 		const toggleExpand = () => {
 			if (isFavorites) {
@@ -2005,6 +2059,10 @@ export function Sidebar({
 						"transition-opacity duration-200 group-hover/group-header:opacity-0",
 					)}
 				>
+					<ActivityBadge
+						badge={groupBadge}
+						attention={groupAttention && !isExpanded}
+					/>
 					<span
 						className={cn(
 							"text-xs px-1.5 py-0.5 rounded-full",

@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupConsensusArbiterListeners,
-	useConsensusArbiterStore,
-} from "../../stores/consensus-arbiter-store";
+import { useConsensusArbiterStore } from "../../stores/consensus-arbiter-store";
 import type {
 	ConflictSeverity,
 	ConsensusResult,
@@ -112,11 +108,6 @@ export function ConsensusView({
 	projectPath,
 }: ConsensusViewProps): React.ReactElement {
 	const { t } = useTranslation("consensusArbiter");
-
-	useEffect(() => {
-		const cleanup = setupConsensusArbiterListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useConsensusArbiterStore((s) => s.phase);
 	const status = useConsensusArbiterStore((s) => s.status);

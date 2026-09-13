@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupSandboxListeners,
-	useSandboxStore,
-} from "../../stores/sandbox-store";
+import { useSandboxStore } from "../../stores/sandbox-store";
 import type {
 	SimulationResult,
 	StepStatus,
@@ -168,11 +164,6 @@ export function SimulationReport({
 	projectPath,
 }: SimulationReportProps): React.ReactElement {
 	const { t } = useTranslation("sandbox");
-
-	useEffect(() => {
-		const cleanup = setupSandboxListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useSandboxStore((s) => s.phase);
 	const status = useSandboxStore((s) => s.status);

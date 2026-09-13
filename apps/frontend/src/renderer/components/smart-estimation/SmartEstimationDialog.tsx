@@ -18,7 +18,6 @@ import { useProjectStore } from "../../stores/project-store";
 import { persistUpdateTask } from "../../stores/task-store";
 import type { SmartEstimationResult } from "../../stores/smart-estimation-store";
 import {
-	setupSmartEstimationListeners,
 	startSmartEstimation,
 	useSmartEstimationStore,
 } from "../../stores/smart-estimation-store";
@@ -73,12 +72,6 @@ export function SmartEstimationDialog() {
 
 	const [editableTaskDescription, setEditableTaskDescription] = useState("");
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
-
-	// Setup IPC listeners once
-	useEffect(() => {
-		const cleanup = setupSmartEstimationListeners();
-		return cleanup;
-	}, []);
 
 	// Sync editable task description when dialog opens
 	useEffect(() => {

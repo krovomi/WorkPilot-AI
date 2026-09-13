@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupGitSurgeonListeners,
-	useGitSurgeonStore,
-} from "../../stores/git-surgeon-store";
+import { useGitSurgeonStore } from "../../stores/git-surgeon-store";
 import type { SurgeryPlan } from "../../../shared/types/git-surgeon";
 
 interface GitSurgeonDashboardProps {
@@ -15,11 +11,6 @@ export function GitSurgeonDashboard({
 	projectPath,
 }: GitSurgeonDashboardProps): React.ReactElement {
 	const { t } = useTranslation("gitSurgeon");
-
-	useEffect(() => {
-		const cleanup = setupGitSurgeonListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useGitSurgeonStore((s) => s.phase);
 	const status = useGitSurgeonStore((s) => s.status);

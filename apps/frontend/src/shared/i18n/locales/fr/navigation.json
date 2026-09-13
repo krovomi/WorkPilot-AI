@@ -205,5 +205,19 @@
 		"notInstalledDescription": "Codex CLI n'est pas installé. Cliquez sur « Installer » pour l'installer en arrière-plan :",
 		"installing": "Installation en cours, merci de patienter...",
 		"viewDocs": "Voir la documentation Codex CLI"
+	},
+	"activity": {
+		"badge": {
+			"running_one": "{{count}} traitement en cours",
+			"running_other": "{{count}} traitements en cours",
+			"success_one": "{{count}} traitement terminé",
+			"success_other": "{{count}} traitements terminés",
+			"error_one": "{{count}} traitement en échec",
+			"error_other": "{{count}} traitements en échec"
+		},
+		"kinds": {
+			"build": "Build",
+			"ideation": "Idéation"
+		}
 	}
 }

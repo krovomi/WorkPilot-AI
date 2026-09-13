@@ -11,7 +11,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	executeGitCommand,
-	setupNaturalLanguageGitListeners,
 	useNaturalLanguageGitStore,
 } from "@/stores/natural-language-git-store";
 import { useProjectStore } from "../../stores/project-store";
@@ -56,12 +55,6 @@ export function NaturalLanguageGitDialog() {
 	} = useNaturalLanguageGitStore();
 
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
-
-	// Setup IPC listeners once
-	useEffect(() => {
-		const cleanup = setupNaturalLanguageGitListeners();
-		return cleanup;
-	}, []);
 
 	// Auto-scroll streaming output
 	useEffect(() => {

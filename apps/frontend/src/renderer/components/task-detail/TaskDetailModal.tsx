@@ -96,7 +96,6 @@ import { pauseTask } from "../../stores/task-store";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { HermesLearningCard } from "./HermesLearningCard";
 import {
-	setupArchitectureDeltaListeners,
 	shouldShowArchitectureDelta,
 	useArchitectureDelta,
 } from "../../stores/architecture-delta-store";
@@ -162,7 +161,6 @@ function preventCloseOnTaskNav(
 		event.preventDefault();
 	}
 }
-
 
 const renderTaskStatusBadges = (
 	task: Task,
@@ -545,7 +543,6 @@ function TaskDetailModalContent({
 
 	// Subscribed at the modal rather than the tab: a regeneration keeps running
 	// while the user switches tabs, and its result must still land.
-	useEffect(() => setupArchitectureDeltaListeners(), []);
 	// Loaded here for the same reason the trigger is gated here — the record is
 	// what decides the tab exists at all. A task whose change was not
 	// architectural, or whose comparison found nothing, gets no trigger.
