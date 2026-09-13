@@ -5,6 +5,7 @@ import {
 	finishActivity,
 	startActivity,
 } from "./activity-store";
+import { useProjectStore } from "./project-store";
 
 /**
  * What a feature store says about its own work, in the only four words the
@@ -18,8 +19,11 @@ export type FeaturePhase = "idle" | "running" | "success" | "error";
 interface BridgeOptions<T> {
 	/** The menu entry this store's work belongs to. */
 	view: SidebarView;
-	/** i18n key naming the kind of work, e.g. `navigation:activity.kinds.ideation`. */
-	labelKey: string;
+	/**
+	 * i18n key naming the kind of work. A function when the store's own phase
+	 * is what names it (`scanning`, `analyzing`…), read when the work starts.
+	 */
+	labelKey: string | ((state: T) => string);
 	/** Where the store keeps the project its current work belongs to. */
 	projectId: (state: T) => string | null;
 	phase: (state: T) => FeaturePhase;
@@ -52,7 +56,12 @@ export function bridgeActivity<T>(
 			if (currentId) return;
 			const project = projectId(state);
 			currentId = `${view}:${project ?? "global"}`;
-			startActivity({ id: currentId, view, projectId: project, labelKey });
+			startActivity({
+				id: currentId,
+				view,
+				projectId: project,
+				labelKey: typeof labelKey === "function" ? labelKey(state) : labelKey,
+			});
 			return;
 		}
 
@@ -71,4 +80,42 @@ export function bridgeActivity<T>(
 
 	apply(store.getState());
 	return store.subscribe(apply);
+}
+
+/**
+ * The phase vocabulary nineteen feature stores already share:
+ * `idle | <one verb> | complete | error`. They were written independently and
+ * converged on it, which is what makes one bridge enough for all of them.
+ */
+const TERMINAL_PHASES: Record<string, FeaturePhase> = {
+	idle: "idle",
+	complete: "success",
+	// `code-playground` says `ready` where the others say `complete`.
+	ready: "success",
+	error: "error",
+};
+
+/**
+ * Bridges a store shaped like `{ phase, error }` without asking it to know
+ * anything about the sidebar.
+ *
+ * The label comes from the running phase itself — `scanning`, `analyzing`,
+ * `generating`, `optimizing` — rather than from the feature's name: the badge
+ * already sits on the menu entry that names the feature, so "Doc Drift — Doc
+ * Drift" was the alternative.
+ *
+ * The project is read from the project store, because none of these stores
+ * keeps one: they take a path as an argument to their start action and forget
+ * it.
+ */
+export function bridgePhaseActivity<
+	T extends { phase: string; error?: string | null },
+>(store: StoreApi<T>, view: SidebarView): () => void {
+	return bridgeActivity(store, {
+		view,
+		labelKey: (state) => `navigation:activity.kinds.${state.phase}`,
+		projectId: () => useProjectStore.getState().selectedProjectId,
+		phase: (state) => TERMINAL_PHASES[state.phase] ?? "running",
+		detail: (state) => state.error ?? undefined,
+	});
 }

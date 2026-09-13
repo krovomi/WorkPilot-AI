@@ -390,7 +390,7 @@ import { GitHubSetupModal } from "./components/GitHubSetupModal";
 import { GlobalDownloadIndicator } from "./components/GlobalDownloadIndicator";
 import { FormulaLab } from "./components/formula-lab/FormulaLab";
 import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay";
-import { BackgroundTasksIndicator } from "./components/BackgroundTasksIndicator";
+import { ActivityCentre } from "./components/ActivityCentre";
 import { NavigationConfirmDialog } from "./components/NavigationConfirmDialog";
 import { NoProjectPage } from "./components/NoProjectPage";
 import { OnboardingWizard } from "./components/onboarding";
@@ -403,8 +403,10 @@ import { ViewStateProvider } from "./contexts/ViewStateContext";
 import { useGlobalTerminalListeners } from "./hooks/useGlobalTerminalListeners";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useReauthNotifications } from "./hooks/use-reauth-notifications";
+import { useActivityNotifications } from "./hooks/useActivityNotifications";
 import { useTaskActivityBridge } from "./hooks/useTaskActivityBridge";
 import { useTaskNotifications } from "./hooks/useTaskNotifications";
+import type { Activity } from "./stores/activity-store";
 import { setActivityActiveView } from "./stores/activity-store";
 import { setupGlobalListeners } from "./stores/global-listeners";
 import {
@@ -654,6 +656,10 @@ export function App() {
 	// feeds the sidebar badges.
 	useTaskActivityBridge();
 
+	// Everything else that ends while the user is on another page. Kanban
+	// builds are excluded there: useTaskNotifications already speaks for them.
+	useActivityNotifications({ onNavigate: (view) => setActiveView(view) });
+
 	// Which page is on screen decides whether a result needs a badge at all.
 	useEffect(() => {
 		setActivityActiveView(activeView);
@@ -734,13 +740,18 @@ export function App() {
 		setPendingNavView(null);
 	};
 
-	// Back to the Kanban from wherever the user went, optionally on one task.
-	const handleOpenBackgroundTask = (taskId?: string) => {
-		setActiveView("kanban");
-		if (taskId) {
-			const task = useTaskStore.getState().tasks.find((t) => t.id === taskId);
-			if (task) setSelectedTask(task);
-		}
+	// Go to wherever an activity is happening, and spotlight it when the page
+	// knows how to (only the Kanban does, today).
+	const handleOpenActivity = (activity: Activity) => {
+		setActiveView(activity.view);
+
+		const taskId = activity.id.startsWith("task:")
+			? activity.id.slice("task:".length)
+			: null;
+		if (!taskId) return;
+
+		const task = useTaskStore.getState().tasks.find((t) => t.id === taskId);
+		if (task) setSelectedTask(task);
 	};
 
 	// Global keyboard shortcuts (Feature 9.4)
@@ -2397,13 +2408,11 @@ export function App() {
 						onDontAskAgainChange={setDontAskNavAgain}
 					/>
 
-					{/* Off the Kanban, the only sign the agents are still working */}
-					{activeView !== "kanban" && (
-						<BackgroundTasksIndicator
-							tasks={backgroundTasks}
-							onOpenTask={handleOpenBackgroundTask}
-						/>
-					)}
+					{/* What is still working, wherever the user happens to be */}
+					<ActivityCentre
+						activeView={activeView}
+						onOpen={handleOpenActivity}
+					/>
 				</CliStatusProvider>
 			</ViewStateProvider>
 		</ProviderContextProvider>

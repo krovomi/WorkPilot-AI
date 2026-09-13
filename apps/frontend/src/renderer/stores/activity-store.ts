@@ -269,6 +269,17 @@ export function selectRunning(activities: Activity[]): Activity[] {
 		.sort((a, b) => b.startedAt - a.startedAt);
 }
 
+/**
+ * Results the user has not been to see yet, newest first. The same "unread"
+ * rule the badges use, so the pill and the sidebar never disagree about what
+ * is still owed an answer.
+ */
+export function selectUnseenFinished(activities: Activity[]): Activity[] {
+	return activities
+		.filter((a) => a.status !== "running" && !a.seen)
+		.sort((a, b) => (b.endedAt ?? b.startedAt) - (a.endedAt ?? a.startedAt));
+}
+
 // Imperative helpers, so a store that is not a React component can report its
 // own work without importing the hook.
 export const startActivity = (
