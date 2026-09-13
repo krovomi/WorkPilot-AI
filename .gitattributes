@@ -30,3 +30,8 @@
 *.woff2 binary
 *.ttf binary
 *.eot binary
+
+# Vendored third-party trees are stored byte-for-byte: `scripts/vendor_bmad.py
+# --check` re-downloads the pinned release and compares files, so a line ending
+# git normalised on checkout would report as drift on every machine.
+skills/bmad/** -text

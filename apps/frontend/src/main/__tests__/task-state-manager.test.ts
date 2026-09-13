@@ -659,6 +659,47 @@ describe("TaskStateManager", () => {
 			// Should transition from plan_review to coding without error
 		});
 
+		it("restores a running task that has reported no phase yet as planning", () => {
+			// A build spends its first phases — `docs`, `brainstorm`, `spec` —
+			// before the planner emits anything, so `executionProgress` is
+			// absent while the task is genuinely `in_progress`. That used to
+			// fall through to the `coding` default below, which is why a task
+			// appeared to start by coding and then move *back* to planning.
+			const taskJustStarted = createMockTask({ status: "in_progress" });
+
+			// An event the machine has no transition for: it creates the actor
+			// from the task and leaves it exactly where the restoration put it,
+			// which is the thing under test.
+			manager.handleUiEvent(
+				taskJustStarted.id,
+				{ type: "__PROBE__" } as never,
+				taskJustStarted,
+				mockProject,
+			);
+
+			expect(manager.getCurrentState(taskJustStarted.id)).toBe("planning");
+		});
+
+		it("still restores a task that reported coding as coding", () => {
+			const taskCoding = createMockTask({
+				status: "in_progress",
+				executionProgress: {
+					phase: "coding",
+					phaseProgress: 50,
+					overallProgress: 50,
+				},
+			});
+
+			manager.handleUiEvent(
+				taskCoding.id,
+				{ type: "__PROBE__" } as never,
+				taskCoding,
+				mockProject,
+			);
+
+			expect(manager.getCurrentState(taskCoding.id)).toBe("coding");
+		});
+
 		it("should restore actor state from task with error status", () => {
 			const taskInError = createMockTask({
 				status: "error",

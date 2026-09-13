@@ -201,7 +201,7 @@ def plan_add(
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     # Never for a pack that is already declared: `skills/bmad/` is committed on
-    # purpose (76 wrappers live there), and an ignore block would untrack them.
+    # purpose (the vendored BMAD skills live there), and an ignore block would untrack them.
     ignored = already or f"skills/{pack}/*" in _gitignore_text(repo_root)
     return AddPlan(
         pack=pack,
