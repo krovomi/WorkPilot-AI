@@ -1111,11 +1111,21 @@
 		"backgroundTaskDescription": "Laisser la tâche s'exécuter et naviguer librement",
 		"dontAskAgain": "Ne plus me demander pendant cette session"
 	},
-	"backgroundTasks": {
-		"running_one": "{{count}} tâche en arrière-plan",
-		"running_other": "{{count}} tâches en arrière-plan",
-		"openKanban": "Voir le Kanban",
-		"dismiss": "Masquer l'indicateur"
-	},
-	"testing": "Test en cours..."
+	"testing": "Test en cours...",
+	"activityCentre": {
+		"running_one": "{{count}} traitement en cours",
+		"running_other": "{{count}} traitements en cours",
+		"finished_one": "{{count}} traitement terminé",
+		"finished_other": "{{count}} traitements terminés",
+		"failed_one": "{{count}} traitement en échec",
+		"failed_other": "{{count}} traitements en échec",
+		"dismiss": "Masquer",
+		"toast": {
+			"finishedOne": "{{name}} terminé",
+			"finishedMany": "{{count}} traitements terminés",
+			"failedOne": "{{name}} en échec",
+			"failedMany": "{{count}} traitements en échec",
+			"open": "Voir"
+		}
+	}
 }
