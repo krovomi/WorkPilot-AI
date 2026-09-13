@@ -1,4 +1,5 @@
 import type { ElectronAPI } from "@shared/types/ipc";
+import { resolvePageLlm } from "@shared/utils/page-llm";
 import { create } from "zustand";
 import { useProjectStore } from "./project-store";
 
@@ -214,15 +215,21 @@ export async function executeGitCommand(projectId: string) {
 			throw new Error("Project path not found");
 		}
 
-		// Get settings for model configuration
+		// Provider × LLM × effort : ce que la page a choisi, sinon les réglages.
+		// Une seule résolution (shared/utils/page-llm), la même que celle que le
+		// main applique quand le renderer n'impose rien.
 		const settings = await globalThis.electronAPI?.getSettings();
+		const resolved = resolvePageLlm(
+			settings?.data,
+			"natural-language-git",
+		);
 
 		// Call the main process to execute the command
 		await globalThis.electronAPI?.executeNaturalLanguageGit({
 			projectPath,
 			command: naturalLanguageCommand,
-			model: settings?.data?.featureModels?.["natural-language-git"],
-			thinkingLevel: settings?.data?.featureThinking?.["natural-language-git"],
+			model: resolved.model,
+			thinkingLevel: resolved.thinking,
 		});
 	} catch (error) {
 		store.setError(error instanceof Error ? error.message : "Unknown error");

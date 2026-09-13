@@ -1,6 +1,7 @@
 import { debugWarn } from "../../shared/utils/debug-logger";
 
 import { setupAccessibilityListeners } from "./accessibility-store";
+import { setupActivityBridges } from "./activity-bridges";
 import { setupAgentCoachListeners } from "./agent-coach-store";
 import { setupApiWatcherListeners } from "./api-watcher-store";
 import { setupAppEmulatorListeners } from "./app-emulator-store";
@@ -65,6 +66,9 @@ type ListenerSetup = () => unknown;
 /** Named so a failing entry can be reported without a stack trace. */
 const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["Accessibility", setupAccessibilityListeners],
+	// Not an IPC listener: the feature stores mirrored into the activity
+	// registry. Same lifetime, same reason — a page must not own it.
+	["ActivityBridges", setupActivityBridges],
 	["AgentCoach", setupAgentCoachListeners],
 	["ApiWatcher", setupApiWatcherListeners],
 	["AppEmulator", setupAppEmulatorListeners],

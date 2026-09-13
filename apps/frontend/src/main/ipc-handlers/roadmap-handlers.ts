@@ -8,17 +8,13 @@ import {
 } from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
-import { app, ipcMain } from "electron";
+import { ipcMain } from "electron";
 import {
 	AUTO_BUILD_PATHS,
-	DEFAULT_APP_SETTINGS,
-	DEFAULT_FEATURE_MODELS,
-	DEFAULT_FEATURE_THINKING,
 	getSpecsDir,
 	IPC_CHANNELS,
 } from "../../shared/constants";
 import type {
-	AppSettings,
 	CompetitorAnalysis,
 	IPCResult,
 	PersistedRoadmapProgress,
@@ -33,42 +29,8 @@ import { debugError, debugLog } from "../../shared/utils/debug-logger";
 import type { AgentManager } from "../agent";
 import type { RoadmapConfig } from "../agent/types";
 import { projectStore } from "../project-store";
+import { getPageFeatureSettings } from "../services/page-llm-config";
 import { safeSendToRenderer } from "./utils";
-
-/**
- * Read feature settings from the settings file
- */
-function getFeatureSettings(): { model?: string; thinkingLevel?: string } {
-	const settingsPath = path.join(app.getPath("userData"), "settings.json");
-
-	try {
-		const content = readFileSync(settingsPath, "utf-8");
-		const settings: AppSettings = {
-			...DEFAULT_APP_SETTINGS,
-			...JSON.parse(content),
-		};
-
-		// Get roadmap-specific settings
-		const featureModels = settings.featureModels || DEFAULT_FEATURE_MODELS;
-		const featureThinking =
-			settings.featureThinking || DEFAULT_FEATURE_THINKING;
-
-		return {
-			model: featureModels.roadmap,
-			thinkingLevel: featureThinking.roadmap,
-		};
-	} catch (error) {
-		// Return defaults if settings file doesn't exist (ENOENT) or fails to parse
-		if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-			debugError("[Roadmap Handler] Failed to read feature settings:", error);
-		}
-	}
-
-	return {
-		model: DEFAULT_FEATURE_MODELS.roadmap,
-		thinkingLevel: DEFAULT_FEATURE_THINKING.roadmap,
-	};
-}
 
 /**
  * Register all roadmap-related IPC handlers
@@ -276,7 +238,7 @@ export function registerRoadmapHandlers(
 			refreshCompetitorAnalysis?: boolean,
 		) => {
 			// Get feature settings for roadmap
-			const featureSettings = getFeatureSettings();
+			const featureSettings = getPageFeatureSettings("roadmap");
 			const config: RoadmapConfig = {
 				model: featureSettings.model,
 				thinkingLevel: featureSettings.thinkingLevel,
@@ -343,7 +305,7 @@ export function registerRoadmapHandlers(
 			refreshCompetitorAnalysis?: boolean,
 		) => {
 			// Get feature settings for roadmap
-			const featureSettings = getFeatureSettings();
+			const featureSettings = getPageFeatureSettings("roadmap");
 			const config: RoadmapConfig = {
 				model: featureSettings.model,
 				thinkingLevel: featureSettings.thinkingLevel,

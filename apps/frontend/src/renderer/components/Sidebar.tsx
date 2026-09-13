@@ -858,6 +858,26 @@ const gitlabNavItems: NavItem[] = [
 	},
 ];
 
+/**
+ * How a menu entry is named, for anything outside the sidebar that has to say
+ * which page it is talking about — the activity centre, its toasts.
+ *
+ * Built from the same arrays the sidebar renders, so a page renamed here is
+ * renamed there too; a second hand-written table is how the two start
+ * disagreeing.
+ */
+const NAV_LABEL_KEYS: Partial<Record<SidebarView, string>> = Object.fromEntries(
+	[
+		...navGroups.flatMap((group) => group.items),
+		...githubNavItems,
+		...gitlabNavItems,
+	].map((item) => [item.id, item.labelKey]),
+);
+
+export function navItemLabelKey(view: SidebarView): string | undefined {
+	return NAV_LABEL_KEYS[view];
+}
+
 export function Sidebar({
 	onSettingsClick,
 	onNewTaskClick,

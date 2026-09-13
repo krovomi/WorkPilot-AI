@@ -1111,11 +1111,21 @@
 		"backgroundTaskDescription": "Let the task run and browse other features",
 		"dontAskAgain": "Don't ask again during this session"
 	},
-	"backgroundTasks": {
-		"running_one": "{{count}} task in the background",
-		"running_other": "{{count}} tasks in the background",
-		"openKanban": "Open Kanban",
-		"dismiss": "Hide indicator"
-	},
-	"testing": "Testing..."
+	"testing": "Testing...",
+	"activityCentre": {
+		"running_one": "{{count}} job running",
+		"running_other": "{{count}} jobs running",
+		"finished_one": "{{count}} job finished",
+		"finished_other": "{{count}} jobs finished",
+		"failed_one": "{{count}} job failed",
+		"failed_other": "{{count}} jobs failed",
+		"dismiss": "Hide",
+		"toast": {
+			"finishedOne": "{{name}} finished",
+			"finishedMany": "{{count}} jobs finished",
+			"failedOne": "{{name}} failed",
+			"failedMany": "{{count}} jobs failed",
+			"open": "View"
+		}
+	}
 }
