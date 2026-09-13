@@ -12,7 +12,12 @@ from typing import Any
 
 from project_analyzer import BASE_COMMANDS, SecurityProfile, is_command_allowed
 
-from .parser import extract_commands, get_command_for_validation, split_command_segments
+from .parser import (
+    extract_commands,
+    get_command_for_validation,
+    split_command_segments,
+    unwrap_rtk_prefixes,
+)
 from .profile import get_security_profile
 from .validator import VALIDATORS
 
@@ -134,7 +139,10 @@ async def bash_security_hook(
         if cmd in VALIDATORS:
             cmd_segment = get_command_for_validation(cmd, segments)
             if not cmd_segment:
-                cmd_segment = command
+                # Unwrapped for the same reason the segment is: a validator
+                # reads the first token to decide whether the command is its
+                # business, and `rtk` is nobody's business.
+                cmd_segment = unwrap_rtk_prefixes(command)
 
             validator = VALIDATORS[cmd]
             allowed, reason = validator(cmd_segment)

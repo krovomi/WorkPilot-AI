@@ -663,3 +663,62 @@ export async function installHermesSoul(
 		signal,
 	);
 }
+
+/* ------------------------------------------------------------------ */
+/* rtk — command output condensed before an agent reads it            */
+/*                                                                    */
+/* GET /api/rtk/status                                                */
+/*                                                                    */
+/* Read-only, and there is no companion action on purpose: the one    */
+/* command a user might want a button for is `rtk init -g`, which     */
+/* writes a hook into their own Claude Code settings for every        */
+/* session on the machine — not only the ones WorkPilot drives. The   */
+/* panel prints the command; the person types it.                     */
+/* ------------------------------------------------------------------ */
+
+export interface RtkCheck {
+	readonly name: string;
+	readonly ok: boolean;
+	readonly detail: string;
+	readonly remedy: string;
+}
+
+export interface RtkReadiness {
+	readonly installed: boolean;
+	readonly enabled: boolean;
+	readonly version: string;
+	readonly binary: string;
+	/** "absent" | "disabled" | "degraded" | "active" */
+	readonly state: string;
+	readonly checks: readonly RtkCheck[];
+}
+
+export interface RtkSavings {
+	readonly available: boolean;
+	readonly commands: number;
+	readonly inputBytes: number;
+	readonly outputBytes: number;
+	readonly savedBytes: number;
+	/** rtk's own estimate: bytes / 4. Neither side ships a tokenizer. */
+	readonly savedTokens: number;
+	readonly averagePct: number;
+	readonly reason: string;
+}
+
+export interface RtkStatus {
+	readonly readiness: RtkReadiness;
+	readonly savings: RtkSavings;
+}
+
+export async function fetchRtkStatus(
+	projectDir?: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ status: RtkStatus }>> {
+	// `_get` builds the query string itself — a `?` in the path would give
+	// the request two of them.
+	return _get<{ status: RtkStatus }>(
+		"/api/rtk/status",
+		projectDir ? { project_dir: projectDir } : {},
+		signal,
+	);
+}

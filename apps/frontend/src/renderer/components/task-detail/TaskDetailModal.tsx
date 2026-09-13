@@ -95,6 +95,7 @@ import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { HermesLearningCard } from "./HermesLearningCard";
+import { RtkSavingsCard } from "./RtkSavingsCard";
 import {
 	shouldShowArchitectureDelta,
 	useArchitectureDelta,
@@ -1304,6 +1305,16 @@ function TaskDetailModalContent({
 											    appris ailleurs, déposé dans la file de revue.
 											    Ne s'affiche pas quand hermes n'est pas installé. */}
 											<HermesLearningCard />
+
+											{/* rtk : ce que la condensation de sortie a
+											    économisé sur ce projet. Ne s'affiche pas
+											    quand rtk n'est pas installé — la découverte
+											    se fait dans les Réglages. */}
+											<RtkSavingsCard
+												projectPath={
+													taskProject?.path ?? activeProject?.path
+												}
+											/>
 
 											{/* Metadata */}
 											<TaskMetadataComponent task={task} />

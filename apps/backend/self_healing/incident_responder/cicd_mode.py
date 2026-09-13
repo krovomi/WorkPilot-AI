@@ -21,6 +21,8 @@ import logging
 import subprocess
 from pathlib import Path
 
+from rtk import capture_for_model
+
 from .models import (
     CICDIncidentData,
     HealingStatus,
@@ -231,15 +233,18 @@ class CICDMode:
             )
             stat = result.stdout
 
-            result = subprocess.run(
+            # The full diff is read by the analyzer agent and by nothing else,
+            # so it goes through rtk: the `diff --git` / `index` / `---` / `+++`
+            # header block is four lines per file that carry no information the
+            # hunks do not. The `--stat` above deliberately does not — it is
+            # short already, and it is the half a person reads in the report.
+            capture = capture_for_model(
                 ["git", "diff", f"{commit_sha}~1..{commit_sha}"],
-                cwd=str(self.project_dir),
-                capture_output=True,
-                text=True,
+                cwd=self.project_dir,
                 timeout=30,
             )
             # Limit diff size to avoid context overflow
-            diff = result.stdout
+            diff = capture.text
             if len(diff) > 50000:
                 diff = diff[:50000] + "\n... [diff truncated at 50KB]"
 

@@ -418,6 +418,24 @@ export interface ProjectEnvConfig {
 		chromeDevtoolsEnabled?: boolean;
 	};
 
+	// Token savings (rtk) — the CLI proxy that condenses command output before
+	// an agent reads it. Not an MCP server: it is a binary on the machine, and
+	// a project that does not have it simply behaves as it always did.
+	tokenSavings?: {
+		/**
+		 * Route agent shell commands through rtk - default: true.
+		 * Costs nothing when rtk is not installed.
+		 */
+		rtkEnabled?: boolean;
+		/**
+		 * Also condense the captures WorkPilot itself puts in a prompt
+		 * (a diff handed to a reviewer, for instance) - default: true.
+		 * Separate from the switch above because it changes what a WorkPilot
+		 * code path receives, not only what a model reads.
+		 */
+		rtkModelFacing?: boolean;
+	};
+
 	// Channel Notifications (task done → PR ready announcement)
 	// Microsoft Teams
 	teamsNotificationsEnabled?: boolean;

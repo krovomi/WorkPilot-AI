@@ -1,0 +1,41 @@
+{
+	"title": "Token savings (rtk)",
+	"subtitle": "Command output is condensed before an agent reads it — same behaviour, same exit codes, a fraction of the bytes.",
+	"state": {
+		"absent": "not installed",
+		"disabled": "off",
+		"degraded": "partial",
+		"active": "active"
+	},
+	"refresh": "Refresh",
+	"expand": "Details",
+	"collapse": "Hide",
+	"allGood": "Everything rtk needs is in place.",
+	"checks": {
+		"title": "Conditions",
+		"install": "rtk binary",
+		"version": "version",
+		"enabled": "enabled for this project",
+		"terminal-hook": "your own terminals"
+	},
+	"savings": {
+		"title": "What was measured",
+		"summary": "{{commands}} commands condensed, {{percent}}% smaller on average — about {{tokens}} tokens not sent.",
+		"none": "No command has gone through rtk on this project yet.",
+		"detail": "{{input}} bytes of output became {{output}} bytes.",
+		"caveat": "An estimate: rtk ships no tokenizer and counts bytes / 4. Shell output is one input among several, and inputs are one half of a bill.",
+		"unavailable": "rtk has no figures to report here."
+	},
+	"settings": {
+		"title": "Token savings (rtk)",
+		"description": "rtk is a CLI proxy that filters noise out of command output before an agent reads it. It is a binary on your machine: with it installed, WorkPilot routes the commands its agents run through it and tells them the output is condensed. Without it, nothing changes.",
+		"enabled": "Route agent commands through rtk",
+		"enabledHint": "Covers every agent: planner, coder, QA, spec, GitHub, self-healing and the rest. Costs nothing when rtk is not installed.",
+		"modelFacing": "Also condense WorkPilot's own captures",
+		"modelFacingHint": "The diffs and logs WorkPilot puts into a prompt itself. Never applied to output WorkPilot parses.",
+		"notInstalled": "rtk is not installed on this machine.",
+		"install": "Install rtk",
+		"terminalHook": "Your own Claude Code sessions are not covered until you run this once:",
+		"learnMore": "rtk on GitHub"
+	}
+}

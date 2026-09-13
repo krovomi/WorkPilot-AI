@@ -241,6 +241,8 @@ except ImportError:
 
 from linear_updater import is_linear_enabled
 from prompts_pkg.project_context import detect_project_capabilities, load_project_index
+from rtk import rtk_rewrite_hook
+from rtk import settings as rtk_settings
 from security import bash_security_hook
 from security.guardrails import guardrails_hook as _raw_guardrails_hook
 
@@ -744,6 +746,13 @@ def create_client(
     from core.offline_policy import guard_cloud_client
 
     guard_cloud_client(project_dir, spec_dir)
+
+    # rtk settings a project carries in `.workpilot/.env` — the file the
+    # Electron settings screen writes. Applied here rather than read at each
+    # call site so the hook, the awareness paragraph and WorkPilot's own
+    # captures all answer from the same switch. An exported variable wins: a
+    # CLI user who said something on the command line said it later than a file.
+    rtk_settings.apply_project_env(project_dir)
 
     # Collect env vars to pass to SDK (ANTHROPIC_BASE_URL, CLAUDE_CONFIG_DIR, etc.)
     sdk_env = get_sdk_env_vars()
@@ -1276,6 +1285,13 @@ def create_client(
                     matcher="Bash",
                     hooks=[_make_guardrails_hook(project_dir)],
                 ),
+                # rtk — condense what the command prints before the model reads
+                # it. Registered after the two hooks that decide whether the
+                # command may run at all, and returning only `updatedInput`:
+                # this one changes the output, never the permission. A machine
+                # without rtk answers in a cached `shutil.which` and the
+                # command runs exactly as written.
+                HookMatcher(matcher="Bash", hooks=[rtk_rewrite_hook]),
                 HookMatcher(
                     matcher="Write",
                     hooks=[_make_guardrails_hook(project_dir)],
