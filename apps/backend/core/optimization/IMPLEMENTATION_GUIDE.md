@@ -75,31 +75,27 @@ Create a configuration file for token budgets:
 from typing import Dict, Optional
 
 # Default token budgets
-DEFAULT_BUDGETS = {
-    'copilot_runtime': 2000,
-    'copilot_client': 3000,
-    'global': 10000
-}
+DEFAULT_BUDGETS = {"copilot_runtime": 2000, "copilot_client": 3000, "global": 10000}
 
 # Agent-specific settings
 AGENT_SETTINGS = {
-    'copilot_runtime': {
-        'auto_decompose': True,
-        'max_tokens_per_task': 1000,
-        'complexity_threshold': 0.7
+    "copilot_runtime": {
+        "auto_decompose": True,
+        "max_tokens_per_task": 1000,
+        "complexity_threshold": 0.7,
     },
-    'copilot_client': {
-        'auto_optimize_prompts': True,
-        'optimize_subagents': True,
-        'context_level': 'standard'
-    }
+    "copilot_client": {
+        "auto_optimize_prompts": True,
+        "optimize_subagents": True,
+        "context_level": "standard",
+    },
 }
 
 # Optimization levels
 OPTIMIZATION_LEVELS = {
-    'minimal': {'max_tokens': 300, 'context_level': 'minimal'},
-    'standard': {'max_tokens': 800, 'context_level': 'standard'},
-    'comprehensive': {'max_tokens': 1500, 'context_level': 'comprehensive'}
+    "minimal": {"max_tokens": 300, "context_level": "minimal"},
+    "standard": {"max_tokens": 800, "context_level": "standard"},
+    "comprehensive": {"max_tokens": 1500, "context_level": "comprehensive"},
 }
 ```
 
@@ -128,20 +124,33 @@ Modify `apps/backend/services/provider_registry.py` to include optimized Copilot
 # Add to the _initialize_providers method in ProviderRegistry
 
 # --- GitHub Copilot (Optimized) ---
-self._providers['copilot_optimized'] = Provider(
-    name='copilot_optimized',
-    label='GitHub Copilot (Optimized)',
-    description='GitHub Copilot CLI models with token optimization',
-    category='special',
+self._providers["copilot_optimized"] = Provider(
+    name="copilot_optimized",
+    label="GitHub Copilot (Optimized)",
+    description="GitHub Copilot CLI models with token optimization",
+    category="special",
     requires_api_key=False,
     requires_oauth=False,
     requires_cli=True,
     models=[
-        {'value': 'gpt-4o', 'label': 'GPT-4o (Copilot Optimized)', 'tier': 'flagship'},
-        {'value': 'claude-3.5-sonnet', 'label': 'Claude 3.5 Sonnet (Copilot Optimized)', 'tier': 'standard'},
-        {'value': 'o3-mini', 'label': 'o3-mini (Copilot Optimized)', 'tier': 'standard', 'supportsThinking': True},
-        {'value': 'gpt-4o-mini', 'label': 'GPT-4o mini (Copilot Optimized)', 'tier': 'fast'},
-    ]
+        {"value": "gpt-4o", "label": "GPT-4o (Copilot Optimized)", "tier": "flagship"},
+        {
+            "value": "claude-3.5-sonnet",
+            "label": "Claude 3.5 Sonnet (Copilot Optimized)",
+            "tier": "standard",
+        },
+        {
+            "value": "o3-mini",
+            "label": "o3-mini (Copilot Optimized)",
+            "tier": "standard",
+            "supportsThinking": True,
+        },
+        {
+            "value": "gpt-4o-mini",
+            "label": "GPT-4o mini (Copilot Optimized)",
+            "tier": "fast",
+        },
+    ],
 )
 ```
 
@@ -159,51 +168,48 @@ from ..runtimes.optimized_copilot_runtime import OptimizedCopilotRuntime
 from ..agent_client.optimized_copilot_agent_client import OptimizedCopilotAgentClient
 from .config import DEFAULT_BUDGETS, AGENT_SETTINGS
 
+
 class OptimizedCopilotFactory:
     """Factory for creating optimized GitHub Copilot components."""
-    
+
     @staticmethod
     def create_runtime(*args, **kwargs) -> OptimizedCopilotRuntime:
         """Create an optimized Copilot runtime."""
         # Extract token budget from kwargs or use default
-        token_budget = kwargs.pop('token_budget', DEFAULT_BUDGETS['copilot_runtime'])
-        
-        return OptimizedCopilotRuntime(
-            *args,
-            token_budget=token_budget,
-            **kwargs
-        )
-    
+        token_budget = kwargs.pop("token_budget", DEFAULT_BUDGETS["copilot_runtime"])
+
+        return OptimizedCopilotRuntime(*args, token_budget=token_budget, **kwargs)
+
     @staticmethod
     def create_agent_client(*args, **kwargs) -> OptimizedCopilotAgentClient:
         """Create an optimized Copilot agent client."""
         # Extract token budget from kwargs or use default
-        token_budget = kwargs.pop('token_budget', DEFAULT_BUDGETS['copilot_client'])
-        
-        return OptimizedCopilotAgentClient(
-            *args,
-            token_budget=token_budget,
-            **kwargs
-        )
-    
+        token_budget = kwargs.pop("token_budget", DEFAULT_BUDGETS["copilot_client"])
+
+        return OptimizedCopilotAgentClient(*args, token_budget=token_budget, **kwargs)
+
     @staticmethod
-    def create_runtime_with_config(config: dict, *args, **kwargs) -> OptimizedCopilotRuntime:
+    def create_runtime_with_config(
+        config: dict, *args, **kwargs
+    ) -> OptimizedCopilotRuntime:
         """Create runtime with configuration."""
-        settings = AGENT_SETTINGS.get('copilot_runtime', {})
-        
+        settings = AGENT_SETTINGS.get("copilot_runtime", {})
+
         # Merge config with settings
         merged_kwargs = {**settings, **config, **kwargs}
-        
+
         return OptimizedCopilotFactory.create_runtime(*args, **merged_kwargs)
-    
+
     @staticmethod
-    def create_client_with_config(config: dict, *args, **kwargs) -> OptimizedCopilotAgentClient:
+    def create_client_with_config(
+        config: dict, *args, **kwargs
+    ) -> OptimizedCopilotAgentClient:
         """Create client with configuration."""
-        settings = AGENT_SETTINGS.get('copilot_client', {})
-        
+        settings = AGENT_SETTINGS.get("copilot_client", {})
+
         # Merge config with settings
         merged_kwargs = {**settings, **config, **kwargs}
-        
+
         return OptimizedCopilotFactory.create_agent_client(*args, **merged_kwargs)
 ```
 
@@ -215,18 +221,22 @@ Modify the runtime factory in `apps/backend/core/__init__.py`:
 # Add to the runtime factory function
 def create_agent_runtime(provider: str, **kwargs) -> AgentRuntime:
     """Factory function for creating agent runtimes."""
-    
+
     if provider == "copilot":
         # Check if optimization is enabled
-        optimization_enabled = os.getenv("COPILOT_OPTIMIZATION_ENABLED", "false").lower() == "true"
-        
+        optimization_enabled = (
+            os.getenv("COPILOT_OPTIMIZATION_ENABLED", "false").lower() == "true"
+        )
+
         if optimization_enabled:
             from .optimization.factory import OptimizedCopilotFactory
+
             return OptimizedCopilotFactory.create_runtime_with_config(kwargs)
         else:
             from .runtimes.copilot_runtime import CopilotRuntime
+
             return CopilotRuntime(**kwargs)
-    
+
     # ... existing provider logic ...
 ```
 
@@ -238,18 +248,22 @@ Modify the agent client factory in `apps/backend/core/__init__.py`:
 # Add to the agent client factory function
 def create_agent_client(provider: str, **kwargs) -> AgentClient:
     """Factory function for creating agent clients."""
-    
+
     if provider == "copilot":
         # Check if optimization is enabled
-        optimization_enabled = os.getenv("COPILOT_OPTIMIZATION_ENABLED", "false").lower() == "true"
-        
+        optimization_enabled = (
+            os.getenv("COPILOT_OPTIMIZATION_ENABLED", "false").lower() == "true"
+        )
+
         if optimization_enabled:
             from .optimization.factory import OptimizedCopilotFactory
+
             return OptimizedCopilotFactory.create_client_with_config(kwargs)
         else:
             from .agent_client.copilot_agent_client import CopilotAgentClient
+
             return CopilotAgentClient(**kwargs)
-    
+
     # ... existing provider logic ...
 ```
 
@@ -265,18 +279,21 @@ def _check_copilot_optimized_auth(self) -> bool:
         regular_auth = self._check_copilot_auth()
         if not regular_auth:
             return False
-        
+
         # Check if optimization module is available
         try:
             from ..core.optimization import TokenTracker
+
             tracker = TokenTracker()
             # Test token tracking functionality
             tracker.record_usage("test", "test", "input", 1)
             return True
         except ImportError:
-            logger.warning("Optimization module not available, falling back to regular Copilot")
+            logger.warning(
+                "Optimization module not available, falling back to regular Copilot"
+            )
             return False
-            
+
     except Exception as e:
         logger.error(f"Error checking optimized Copilot auth: {e}")
         return False
@@ -325,93 +342,97 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+
 async def test_optimized_runtime():
     """Test the optimized Copilot runtime."""
     print("Testing Optimized Copilot Runtime...")
-    
+
     try:
         from apps.backend.core.optimization.factory import OptimizedCopilotFactory
-        
+
         # Create optimized runtime
         runtime = OptimizedCopilotFactory.create_runtime(
             spec_dir="test/specs",
             phase="test",
             project_dir="test/project",
             agent_type="test",
-            token_budget=1000
+            token_budget=1000,
         )
-        
+
         print(f"✅ Optimized runtime created with budget: {runtime.token_budget}")
-        
+
         # Test performance stats
         stats = runtime.get_optimization_stats()
         print(f"✅ Performance stats: {stats}")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Error testing optimized runtime: {e}")
         return False
 
+
 async def test_optimized_client():
     """Test the optimized Copilot agent client."""
     print("Testing Optimized Copilot Agent Client...")
-    
+
     try:
         from apps.backend.core.optimization.factory import OptimizedCopilotFactory
-        
+
         # Create optimized client
         client = OptimizedCopilotFactory.create_agent_client(
-            model="gpt-4o",
-            token_budget=1500
+            model="gpt-4o", token_budget=1500
         )
-        
+
         print(f"✅ Optimized client created with budget: {client.token_budget}")
-        
+
         # Test performance stats
         stats = client.get_optimization_stats()
         print(f"✅ Performance stats: {stats}")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Error testing optimized client: {e}")
         return False
+
 
 async def main():
     """Run all tests."""
     print("🚀 GitHub Copilot Phase 1 Optimization Tests")
     print("=" * 50)
-    
+
     # Check environment
-    optimization_enabled = os.getenv("COPILOT_OPTIMIZATION_ENABLED", "false").lower() == "true"
+    optimization_enabled = (
+        os.getenv("COPILOT_OPTIMIZATION_ENABLED", "false").lower() == "true"
+    )
     print(f"Optimization enabled: {optimization_enabled}")
-    
+
     if not optimization_enabled:
-        print("❌ Optimization not enabled. Set COPILOT_OPTIMIZATION_ENABLED=true in .env")
+        print(
+            "❌ Optimization not enabled. Set COPILOT_OPTIMIZATION_ENABLED=true in .env"
+        )
         return
-    
+
     # Run tests
-    tests = [
-        test_optimized_runtime,
-        test_optimized_client
-    ]
-    
+    tests = [test_optimized_runtime, test_optimized_client]
+
     results = []
     for test in tests:
         result = await test()
         results.append(result)
-    
+
     # Summary
     print("\n" + "=" * 50)
     print("Test Results:")
     print(f"✅ Passed: {sum(results)}/{len(results)}")
     print(f"❌ Failed: {len(results) - sum(results)}/{len(results)}")
-    
+
     if all(results):
         print("🎉 All tests passed! Phase 1 implementation is ready.")
     else:
         print("⚠️  Some tests failed. Check the logs above.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -439,84 +460,98 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+
 def monitor_tokens():
     """Monitor token usage for GitHub Copilot components."""
     print("📊 GitHub Copilot Token Usage Monitor")
     print("=" * 50)
-    
+
     try:
         from apps.backend.core.optimization import TokenTracker
-        
+
         # Create tracker
         tracker = TokenTracker()
-        
+
         # Set budgets from environment
         global_budget = int(os.getenv("COPILOT_GLOBAL_BUDGET", "10000"))
         runtime_budget = int(os.getenv("COPILOT_TOKEN_BUDGET", "2000"))
         client_budget = int(os.getenv("COPILOT_CLIENT_BUDGET", "3000"))
-        
+
         tracker.set_global_budget(global_budget)
         tracker.set_budget("copilot_runtime", runtime_budget)
         tracker.set_budget("copilot_client", client_budget)
-        
+
         print(f"Global budget: {global_budget}")
         print(f"Runtime budget: {runtime_budget}")
         print(f"Client budget: {client_budget}")
-        
+
         # Monitor loop
         while True:
             try:
                 global_stats = tracker.get_global_stats()
                 runtime_stats = tracker.get_agent_stats("copilot_runtime")
                 client_stats = tracker.get_agent_stats("copilot_client")
-                
+
                 print("\n" + "=" * 50)
                 print(f"📊 Token Usage Report - {time.strftime('%Y-%m-%d %H:%M:%S')}")
                 print("-" * 50)
-                
+
                 print(f"Global:")
                 print(f"  Total tokens: {global_stats.total_tokens}")
-                print(f"  Success rate: {global_stats.successful_tasks / max(global_stats.successful_tasks + global_stats.failed_tasks, 1):.2%}")
+                print(
+                    f"  Success rate: {global_stats.successful_tasks / max(global_stats.successful_tasks + global_stats.failed_tasks, 1):.2%}"
+                )
                 print(f"  Average per task: {global_stats.average_tokens_per_task:.1f}")
-                
+
                 print(f"Runtime:")
                 print(f"  Tokens used: {runtime_stats.total_tokens}")
-                print(f"  Success rate: {runtime_stats.successful_tasks / max(runtime_stats.successful_tasks + runtime_stats.failed_tasks, 1):.2%}")
-                print(f"  Average per task: {runtime_stats.average_tokens_per_task:.1f}")
-                print(f"  Budget remaining: {runtime_budget - runtime_stats.total_tokens}")
-                
+                print(
+                    f"  Success rate: {runtime_stats.successful_tasks / max(runtime_stats.successful_tasks + runtime_stats.failed_tasks, 1):.2%}"
+                )
+                print(
+                    f"  Average per task: {runtime_stats.average_tokens_per_task:.1f}"
+                )
+                print(
+                    f"  Budget remaining: {runtime_budget - runtime_stats.total_tokens}"
+                )
+
                 print(f"Client:")
                 print(f"  Tokens used: {client_stats.total_tokens}")
-                print(f"  Success rate: {client_stats.successful_tasks / max(client_stats.successful_tasks + client_stats.failed_tasks, 1):.2%}")
+                print(
+                    f"  Success rate: {client_stats.successful_tasks / max(client_stats.successful_tasks + client_stats.failed_tasks, 1):.2%}"
+                )
                 print(f"  Average per task: {client_stats.average_tokens_per_task:.1f}")
-                print(f"  Budget remaining: {client_budget - client_stats.total_tokens}")
-                
+                print(
+                    f"  Budget remaining: {client_budget - client_stats.total_tokens}"
+                )
+
                 # Check efficiency scores
                 runtime_efficiency = tracker.get_efficiency_score("copilot_runtime")
                 client_efficiency = tracker.get_efficiency_score("copilot_client")
-                
+
                 print(f"Efficiency Scores:")
                 print(f"  Runtime: {runtime_efficiency:.3f}")
                 print(f"  Client: {client_efficiency:.3f}")
-                
+
                 # Check if any budgets are exceeded
                 if runtime_stats.total_tokens > runtime_budget * 0.9:
                     print("⚠️  Runtime budget warning!")
-                
+
                 if client_stats.total_tokens > client_budget * 0.9:
                     print("⚠️  Client budget warning!")
-                
+
                 time.sleep(30)  # Wait 30 seconds
-                
+
             except KeyboardInterrupt:
                 print("\n👋 Monitoring stopped by user")
                 break
             except Exception as e:
                 print(f"❌ Error in monitoring: {e}")
                 time.sleep(30)
-                
+
     except Exception as e:
         print(f"❌ Error setting up monitoring: {e}")
+
 
 if __name__ == "__main__":
     monitor_tokens()
@@ -541,55 +576,63 @@ from datetime import datetime
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+
 def generate_dashboard():
     """Generate a performance dashboard."""
-    
+
     try:
         from apps.backend.core.optimization import TokenTracker
-        
+
         tracker = TokenTracker()
-        
+
         # Collect data
         global_stats = tracker.get_global_stats()
         runtime_stats = tracker.get_agent_stats("copilot_runtime")
         client_stats = tracker.get_agent_stats("copilot_client")
-        
+
         # Create dashboard data
         dashboard = {
             "timestamp": datetime.now().isoformat(),
             "global": {
                 "total_tokens": global_stats.total_tokens,
-                "success_rate": global_stats.successful_tasks / max(global_stats.successful_tasks + global_stats.failed_tasks, 1),
+                "success_rate": global_stats.successful_tasks
+                / max(global_stats.successful_tasks + global_stats.failed_tasks, 1),
                 "average_tokens_per_task": global_stats.average_tokens_per_task,
-                "budget_usage": global_stats.total_tokens / int(os.getenv("COPILOT_GLOBAL_BUDGET", "10000"))
+                "budget_usage": global_stats.total_tokens
+                / int(os.getenv("COPILOT_GLOBAL_BUDGET", "10000")),
             },
             "runtime": {
                 "total_tokens": runtime_stats.total_tokens,
-                "success_rate": runtime_stats.successful_tasks / max(runtime_stats.successful_tasks + runtime_stats.failed_tasks, 1),
+                "success_rate": runtime_stats.successful_tasks
+                / max(runtime_stats.successful_tasks + runtime_stats.failed_tasks, 1),
                 "average_tokens_per_task": runtime_stats.average_tokens_per_task,
-                "budget_usage": runtime_stats.total_tokens / int(os.getenv("COPILOT_TOKEN_BUDGET", "2000")),
-                "efficiency_score": tracker.get_efficiency_score("copilot_runtime")
+                "budget_usage": runtime_stats.total_tokens
+                / int(os.getenv("COPILOT_TOKEN_BUDGET", "2000")),
+                "efficiency_score": tracker.get_efficiency_score("copilot_runtime"),
             },
             "client": {
                 "total_tokens": client_stats.total_tokens,
-                "success_rate": client_stats.successful_tasks / max(client_stats.successful_tasks + client_stats.failed_tasks, 1),
+                "success_rate": client_stats.successful_tasks
+                / max(client_stats.successful_tasks + client_stats.failed_tasks, 1),
                 "average_tokens_per_task": client_stats.average_tokens_per_task,
-                "budget_usage": client_stats.total_tokens / int(os.getenv("COPILOT_CLIENT_BUDGET", "3000")),
-                "efficiency_score": tracker.get_efficiency_score("copilot_client")
-            }
+                "budget_usage": client_stats.total_tokens
+                / int(os.getenv("COPILOT_CLIENT_BUDGET", "3000")),
+                "efficiency_score": tracker.get_efficiency_score("copilot_client"),
+            },
         }
-        
+
         # Save dashboard
         dashboard_path = project_root / "copilot_dashboard.json"
-        with open(dashboard_path, 'w') as f:
+        with open(dashboard_path, "w") as f:
             json.dump(dashboard, f, indent=2)
-        
+
         print(f"📊 Dashboard saved to {dashboard_path}")
         return dashboard_path
-        
+
     except Exception as e:
         print(f"❌ Error generating dashboard: {e}")
         return None
+
 
 if __name__ == "__main__":
     dashboard_path = generate_dashboard()
@@ -647,7 +690,7 @@ import os
 logging.basicConfig(level=logging.DEBUG)
 
 # Enable optimization debug logging
-os.environ['COPILOT_OPTIMIZATION_DEBUG'] = 'true'
+os.environ["COPILOT_OPTIMIZATION_DEBUG"] = "true"
 ```
 
 ### Validation Commands

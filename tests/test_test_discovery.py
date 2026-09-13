@@ -28,6 +28,7 @@ BACKEND = REPO_ROOT / "apps" / "backend"
 
 #: Répertoires sans code de test à nous.
 EXCLUDED = {
+    "venv",  # MODIFICATION : Ajout du dossier venv local
     ".venv",
     "__pycache__",
     "node_modules",
@@ -49,12 +50,32 @@ def _testpaths() -> list[Path]:
     return [(BACKEND / entry).resolve() for entry in raw.split() if entry.strip()]
 
 
+#: Arbres tiers vendorisés. Leurs tests sont ceux de l'amont, lancés par
+#: l'amont : BMAD livre des scripts Python à côté de ses skills, et
+#: `scripts/vendor_bmad.py --check` les tient octet pour octet. Les collecter
+#: ici reviendrait à exécuter — puis, au premier échec, à corriger — le code de
+#: quelqu'un d'autre, et une correction ferait échouer la vérification du
+#: vendoring. Un préfixe de chemin plutôt qu'un nom de répertoire : `EXCLUDED`
+#: compare des *segments*, et « bmad » en est un trop courant pour ça.
+VENDORED = (
+    REPO_ROOT / "skills" / "bmad",
+    REPO_ROOT / "apps" / "backend" / "vendor",
+)
+
+
+def _is_vendored(path: Path) -> bool:
+    return any(path.is_relative_to(root) for root in VENDORED)
+
+
 def _test_files() -> list[Path]:
     files: list[Path] = []
     for path in REPO_ROOT.rglob("test_*.py"):
         if EXCLUDED & set(path.parts):
             continue
-        files.append(path.resolve())
+        resolved = path.resolve()
+        if _is_vendored(resolved):
+            continue
+        files.append(resolved)
     return files
 
 

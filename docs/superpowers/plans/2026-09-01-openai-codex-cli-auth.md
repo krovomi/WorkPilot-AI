@@ -119,15 +119,29 @@ def test_new_turn_uses_safe_workspace_write_arguments(tmp_path):
         thread_id=None,
     )
     assert args == [
-        "codex", "exec", "--json", "--sandbox", "workspace-write",
-        "--cd", str(tmp_path), "--model", "gpt-5.6-sol",
-        "-c", 'model_reasoning_effort="high"', "fix $(unsafe)",
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "workspace-write",
+        "--cd",
+        str(tmp_path),
+        "--model",
+        "gpt-5.6-sol",
+        "-c",
+        'model_reasoning_effort="high"',
+        "fix $(unsafe)",
     ]
+
 
 def test_resume_targets_exact_thread_id(tmp_path):
     args = build_codex_exec_args(
-        executable="codex", project_dir=tmp_path, model=None,
-        reasoning_effort=None, prompt="continue", thread_id="thread-123",
+        executable="codex",
+        project_dir=tmp_path,
+        model=None,
+        reasoning_effort=None,
+        prompt="continue",
+        thread_id="thread-123",
     )
     assert args[:5] == ["codex", "exec", "resume", "thread-123", "--json"]
 ```
@@ -153,15 +167,23 @@ EVENTS = [
     '{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":2,"output_tokens":3,"reasoning_output_tokens":1}}',
 ]
 
+
 @pytest.mark.asyncio
 async def test_stream_translates_final_message_usage_and_thread(fake_process, tmp_path):
     fake_process.stdout.feed_lines(EVENTS)
-    client = CodexCliAgentClient(project_dir=str(tmp_path), process_factory=fake_process.factory)
+    client = CodexCliAgentClient(
+        project_dir=str(tmp_path), process_factory=fake_process.factory
+    )
     await client.query("work")
     messages = [message async for message in client.receive_response()]
     assert messages[-1].text == "done"
     assert client.thread_id == "thread-123"
-    assert client.last_usage == {"input_tokens": 10, "cached_input_tokens": 2, "output_tokens": 3, "reasoning_output_tokens": 1}
+    assert client.last_usage == {
+        "input_tokens": 10,
+        "cached_input_tokens": 2,
+        "output_tokens": 3,
+        "reasoning_output_tokens": 1,
+    }
 ```
 
 Add separate cases for `turn.failed`, an `error` event, malformed progress JSON, malformed terminal JSON, non-zero exit, no final agent message, and cancellation cleanup.
@@ -218,12 +240,17 @@ git commit -m "feat: add Codex CLI agent client"
 ```python
 def test_openai_codex_mode_returns_codex_cli_client(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
-    client = create_agent_client(provider="openai", project_dir=tmp_path, model="gpt-5.6-sol")
+    client = create_agent_client(
+        provider="openai", project_dir=tmp_path, model="gpt-5.6-sol"
+    )
     assert isinstance(client, CodexCliAgentClient)
+
 
 def test_openai_api_mode_returns_rest_client(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_AUTH_MODE", "api-key")
-    client = create_agent_client(provider="openai", project_dir=tmp_path, model="gpt-5.6-sol")
+    client = create_agent_client(
+        provider="openai", project_dir=tmp_path, model="gpt-5.6-sol"
+    )
     assert isinstance(client, OpenAIAgentClient)
 ```
 

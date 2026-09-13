@@ -26,9 +26,16 @@ phases:
       Expensive in turns, so it earns its place only at high effort.
 
   - id: spec
-    impl: bmad/bmad-bmm-create-prd
+    impl: bmad/bmad-prd
     min_effort: medium
-    description: Product artefact — what we are building and why.
+    description: >-
+      Product artefact — what we are building and why. `bmad-prd` is the skill
+      BMAD v6 consolidated `create-prd`, `edit-prd` and `validate-prd` into; it
+      reads the intent from the conversation. The name this phase used to
+      declare, `bmad-bmm-create-prd`, was a v6.0 wrapper pointing at
+      `_bmad/bmm/workflows/…/workflow-create-prd.md` — a path no version of the
+      installer writes any more, so the phase spent a full session looking for
+      a file that was never going to be there.
 
   - id: planning
     impl: workpilot/planner
@@ -101,7 +108,7 @@ phases:
     description: The existing QA reviewer/fixer loop.
 
   - id: adversarial-review
-    impl: bmad/bmad-review-adversarial-general
+    impl: bmad/bmad-review
     min_effort: ultrathink
     dispatch: fresh-context
     description: >-
@@ -111,8 +118,16 @@ phases:
       first one. Runs in a fresh context so it inherits none of the reasoning
       it is supposed to attack.
 
+      `bmad-review` rather than the `bmad-review-adversarial-general` this
+      declared before: BMAD v6 folded the adversarial critique into a lens of
+      one review skill, and kept the old name only as a shim that forwards to
+      it. Naming the shim would buy a deprecation notice and an extra hop for
+      the same pass. The adversarial lens is the one whose contract is that an
+      empty finding list is a signal to look again, which is exactly the
+      posture this phase is paying for.
+
   - id: spec-conformance
-    impl: bmad/bmad-bmm-check-implementation-readiness
+    impl: bmad/bmad-walkthrough
     min_effort: ultrathink
     dispatch: fresh-context
     roster: qa
@@ -125,6 +140,13 @@ phases:
       the same audit run against the finished branch with nothing else in
       context — so `roster: qa` hands it that subagent, which this description
       has named since the phase was written and the phase was not getting.
+
+      `bmad-walkthrough` is the nearest thing BMAD v6 still ships: it reads a
+      finished change and asks what it is for, what deserves a close look and
+      how to test it. The `bmad-bmm-check-implementation-readiness` this named
+      before does not exist upstream any more — and had not been runnable for
+      as long as the wrapper it pointed at was stale, which was the whole
+      time.
 
       Declared as `roster:` rather than `agent: qa_reviewer`, because the two
       are different questions. `spec_validation` is in `create_client`'s

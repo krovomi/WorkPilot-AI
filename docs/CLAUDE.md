@@ -241,7 +241,7 @@ client = create_client(
     project_dir=project_dir,
     spec_dir=spec_dir,
     model=phase_model,
-    agent_type="coder",          # planner | coder | qa_reviewer | qa_fixer
+    agent_type="coder",  # planner | coder | qa_reviewer | qa_fixer
     max_thinking_tokens=phase_thinking,
 )
 
@@ -614,8 +614,8 @@ from mem_search import search_for
 
 memory = search_for(project_dir)
 index = memory.index("flaky timeout in the integration suite")  # ~100 tokens, always
-memory.timeline(index.ids()[:3])                                # a couple of lines each
-memory.detail("task:042-add-widget")                            # the full record, by id
+memory.timeline(index.ids()[:3])  # a couple of lines each
+memory.detail("task:042-add-widget")  # the full record, by id
 ```
 
 The index is held to a token budget by dropping entries and reporting the count, never
@@ -1153,12 +1153,20 @@ Centralized logging system for tracking all AI agents, skills, hooks and workflo
 from core.workflow_logger import workflow_logger
 
 # Log agent execution
-trace_id = workflow_logger.log_agent_start("Claude Code", "refactor_task", {"file": "app.py"})
-workflow_logger.log_agent_end("Claude Code", "success", {"changes": 5}, trace_id=trace_id)
+trace_id = workflow_logger.log_agent_start(
+    "Claude Code", "refactor_task", {"file": "app.py"}
+)
+workflow_logger.log_agent_end(
+    "Claude Code", "success", {"changes": 5}, trace_id=trace_id
+)
 
 # Log skill execution
-skill_trace = workflow_logger.log_skill_start("framework-migration", "analyze", {"framework": "react"})
-workflow_logger.log_skill_end("framework-migration", "success", {"migrations_found": 3}, trace_id=skill_trace)
+skill_trace = workflow_logger.log_skill_start(
+    "framework-migration", "analyze", {"framework": "react"}
+)
+workflow_logger.log_skill_end(
+    "framework-migration", "success", {"migrations_found": 3}, trace_id=skill_trace
+)
 
 # Monitor active traces
 active = workflow_logger.get_active_traces()

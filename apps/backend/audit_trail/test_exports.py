@@ -19,6 +19,8 @@ from audit_trail.exports import SOC2_COLUMNS
 
 
 def _seed_trail(tmp_path: Path) -> AuditTrail:
+    import time
+
     trail = AuditTrail(storage_dir=tmp_path, name="t1")
     trail.append(
         kind="agent_invoked",
@@ -27,6 +29,8 @@ def _seed_trail(tmp_path: Path) -> AuditTrail:
         summary="planner started",
         payload={"model": "opus"},
     )
+    time.sleep(0.01)
+
     trail.append(
         kind="agent_invoked",
         actor="coder",
@@ -34,6 +38,8 @@ def _seed_trail(tmp_path: Path) -> AuditTrail:
         summary="coder started",
         payload={"model": "opus", "iter": 1},
     )
+    time.sleep(0.01)
+
     trail.append(
         kind="agent_completed",
         actor="coder",

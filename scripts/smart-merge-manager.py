@@ -9,18 +9,16 @@ Preserves local modifications during merge/rebase operations by:
 4. Restoring/merging files after the operation
 """
 
-import os
 import sys
 import json
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-import difflib
 
 __all__ = ["SmartMergeManager"]
+
 
 class SmartMergeManager:
     def __init__(self, repo_path: str = "."):
@@ -84,12 +82,19 @@ class SmartMergeManager:
             return stdout.strip()
         return None
 
-    def merge_json_files(self, base_file: Path, local_file: Path, remote_file: Path) -> Dict:
+    def merge_json_files(self, local_file: Path, remote_file: Path) -> Dict:
         """Intelligently merge JSON files."""
         try:
-            base_data = json.loads(base_file.read_text(encoding="utf-8")) if base_file.exists() else {}
-            local_data = json.loads(local_file.read_text(encoding="utf-8")) if local_file.exists() else {}
-            remote_data = json.loads(remote_file.read_text(encoding="utf-8")) if remote_file.exists() else {}
+            local_data = (
+                json.loads(local_file.read_text(encoding="utf-8"))
+                if local_file.exists()
+                else {}
+            )
+            remote_data = (
+                json.loads(remote_file.read_text(encoding="utf-8"))
+                if remote_file.exists()
+                else {}
+            )
         except json.JSONDecodeError as e:
             return {"error": f"JSON decode error: {e}", "strategy": "keep_local"}
 
@@ -111,7 +116,9 @@ class SmartMergeManager:
         # Default: keep local
         return {"merged": local_data, "strategy": "keep_local"}
 
-    def merge_jsonl_files(self, base_file: Path, local_file: Path, remote_file: Path) -> Tuple[List, str]:
+    def merge_jsonl_files(
+        self, base_file: Path, local_file: Path, remote_file: Path
+    ) -> Tuple[List, str]:
         """Merge JSONL files (line-delimited JSON) by deduplicating entries."""
         try:
             base_lines = set()
@@ -186,7 +193,9 @@ class SmartMergeManager:
                 # Simple glob pattern handling
                 for file in self.workpilot_dir.rglob("*"):
                     if file.is_file():
-                        merge_state["workpilot_files"].append(str(file.relative_to(self.repo_path)))
+                        merge_state["workpilot_files"].append(
+                            str(file.relative_to(self.repo_path))
+                        )
 
         self.merge_state_file.write_text(json.dumps(merge_state, indent=2))
         return merge_state
@@ -203,7 +212,9 @@ class SmartMergeManager:
         print("[Smart Merge] Completing merge/rebase...")
 
         # Get current branch for comparison
-        code, current_branch, _ = self.run_git_command("rev-parse", "--abbrev-ref", "HEAD")
+        code, current_branch, _ = self.run_git_command(
+            "rev-parse", "--abbrev-ref", "HEAD"
+        )
         current_branch = current_branch.strip()
 
         merged_files = {}
@@ -217,7 +228,6 @@ class SmartMergeManager:
 
                 rel_path = backup_file.relative_to(backup_path)
                 current_file = self.workpilot_dir / rel_path
-                repo_file = self.repo_path / ".workpilot" / rel_path
 
                 # For JSON files, do intelligent merge
                 if backup_file.suffix == ".json":
@@ -227,21 +237,26 @@ class SmartMergeManager:
                     merge_result = self.merge_json_files(
                         base_file or backup_file,
                         backup_file,
-                        current_file if current_file.exists() else backup_file
+                        current_file if current_file.exists() else backup_file,
                     )
 
                     if "merged" in merge_result:
                         merged_files[str(rel_path)] = merge_result["strategy"]
                         # Write merged content
                         current_file.parent.mkdir(parents=True, exist_ok=True)
-                        current_file.write_text(json.dumps(merge_result["merged"], indent=2), encoding="utf-8")
+                        current_file.write_text(
+                            json.dumps(merge_result["merged"], indent=2),
+                            encoding="utf-8",
+                        )
 
                 # For JSONL files, deduplicate
-                elif backup_file.suffix == ".jsonl" or "conversation" in backup_file.name:
+                elif (
+                    backup_file.suffix == ".jsonl" or "conversation" in backup_file.name
+                ):
                     merged_lines, strategy = self.merge_jsonl_files(
                         backup_file,
                         backup_file,
-                        current_file if current_file.exists() else backup_file
+                        current_file if current_file.exists() else backup_file,
                     )
 
                     if strategy.startswith("error"):
@@ -249,7 +264,9 @@ class SmartMergeManager:
                     else:
                         merged_files[str(rel_path)] = strategy
                         current_file.parent.mkdir(parents=True, exist_ok=True)
-                        current_file.write_text("\n".join(merged_lines), encoding="utf-8")
+                        current_file.write_text(
+                            "\n".join(merged_lines), encoding="utf-8"
+                        )
 
                 # For other files, keep current (newer)
                 else:
@@ -278,11 +295,18 @@ class SmartMergeManager:
         if self.backup_dir.exists():
             for backup in sorted(self.backup_dir.iterdir(), reverse=True)[:10]:
                 if backup.is_dir():
-                    backups.append({
-                        "name": backup.name,
-                        "path": str(backup),
-                        "size_mb": sum(f.stat().st_size for f in backup.rglob("*") if f.is_file()) / (1024 * 1024),
-                    })
+                    backups.append(
+                        {
+                            "name": backup.name,
+                            "path": str(backup),
+                            "size_mb": sum(
+                                f.stat().st_size
+                                for f in backup.rglob("*")
+                                if f.is_file()
+                            )
+                            / (1024 * 1024),
+                        }
+                    )
         return backups
 
     def restore_from_backup(self, backup_name: str) -> Dict:

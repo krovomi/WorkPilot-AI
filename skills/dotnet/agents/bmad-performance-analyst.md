@@ -161,25 +161,28 @@ class EBPMadPerformanceMemory:
             "benchmark_results": [],
             "bottleneck_patterns": [],
             "workflow_history": [],
-            "quality_scores": {}
+            "quality_scores": {},
         }
-    
+
     def store_optimization_pattern(self, pattern, context, results, score):
         """Stocke patterns optimisation avec contexte hybride"""
-        self.performance_memory["optimization_patterns"].append({
-            "timestamp": datetime.now(),
-            "pattern": pattern,
-            "ebp_analysis": context["ebp_autonomous_detection"],
-            "bmm_workflow": context["bmm_structured_optimization"],
-            "results": results,
-            "quality_score": score,
-            "applicable_scenarios": context["scenarios"]
-        })
-    
+        self.performance_memory["optimization_patterns"].append(
+            {
+                "timestamp": datetime.now(),
+                "pattern": pattern,
+                "ebp_analysis": context["ebp_autonomous_detection"],
+                "bmm_workflow": context["bmm_structured_optimization"],
+                "results": results,
+                "quality_score": score,
+                "applicable_scenarios": context["scenarios"],
+            }
+        )
+
     def get_similar_optimizations(self, current_pattern):
         """Retrouve optimisations similaires via memory"""
         return [
-            pattern for pattern in self.performance_memory["optimization_patterns"]
+            pattern
+            for pattern in self.performance_memory["optimization_patterns"]
             if self.pattern_similarity(pattern["pattern"], current_pattern) > 0.8
         ]
 ```

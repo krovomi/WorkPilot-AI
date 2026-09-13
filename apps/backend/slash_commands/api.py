@@ -151,7 +151,7 @@ def _runtime_is_present(meta: dict[str, Any], project_dir: Path) -> bool:
     The build already refuses to emit a skill whose runtime is missing, so on a
     freshly generated tree this changes nothing. It matters because
     `.agents/skills/` is **committed**: a developer who bootstrapped BMAD
-    locally emits its 76 wrappers and commits them, and the next clone has the
+    locally emits its skills and commits them, and the next clone has the
     files without `_bmad/`. That is exactly the original failure — a palette
     listing 76 commands that all fail on invocation — arriving by a different
     route, so the gate is enforced at read time too.

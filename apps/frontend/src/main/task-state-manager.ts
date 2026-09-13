@@ -483,8 +483,18 @@ export class TaskStateManager {
 					stateValue = "qa_review";
 				} else if (executionPhase === "qa_fixing") {
 					stateValue = "qa_fixing";
+				} else if (!executionPhase || executionPhase === "idle") {
+					// A build that is running and has not reported a phase yet is
+					// at the start of the pipeline, not in the middle of it. This
+					// branch used to fall through to 'coding' below, so every task
+					// showed as coding for as long as the workflow phases that run
+					// before planning took — and then moved *back* to planning when
+					// the planner emitted its first event. The phases were in the
+					// declared order the whole time; the card was reading a default.
+					stateValue = "planning";
 				} else {
-					// Default to coding for 'coding', 'complete', or unknown phases
+					// Default to coding for 'coding', 'complete', and the pause
+					// phases, all of which happen at or after implementation.
 					stateValue = "coding";
 				}
 				break;

@@ -28,30 +28,35 @@ def run_command(cmd, description):
 def main():
     """Install pre-commit hooks."""
     print("🚀 Setting up pre-commit hooks for automatic code formatting...")
-    
+
     # Check if we're in the right directory
     if not Path(".pre-commit-config.yaml").exists():
         print("❌ Error: .pre-commit-config.yaml not found in current directory")
         print("Please run this script from the project root directory")
         sys.exit(1)
-    
+
     # Install pre-commit if not available
     try:
         subprocess.run(["pre-commit", "--version"], capture_output=True, check=True)
         print("✅ pre-commit is already installed")
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("📦 Installing pre-commit...")
-        if not run_command([sys.executable, "-m", "pip", "install", "pre-commit"], "Installing pre-commit"):
+        if not run_command(
+            [sys.executable, "-m", "pip", "install", "pre-commit"],
+            "Installing pre-commit",
+        ):
             sys.exit(1)
-    
+
     # Install the hooks
     if not run_command("pre-commit install", "Installing pre-commit hooks"):
         sys.exit(1)
-    
+
     # Install pre-commit commit-msg hook (optional)
-    if not run_command("pre-commit install --hook-type commit-msg", "Installing commit-msg hook"):
+    if not run_command(
+        "pre-commit install --hook-type commit-msg", "Installing commit-msg hook"
+    ):
         print("⚠️  Warning: Could not install commit-msg hook (this is optional)")
-    
+
     print("\n🎉 Pre-commit hooks installed successfully!")
     print("\n📋 What's been set up:")
     print("   • Automatic ruff linting and fixing for backend code")

@@ -72,15 +72,12 @@ from agents import (
     # Main functions
     run_autonomous_agent,
     run_followup_planner,
-
     # Memory functions
     save_session_memory,
     get_graphiti_context,
-
     # Session management
     run_agent_session,
     post_session_processing,
-
     # Utilities
     get_latest_commit,
     load_implementation_plan,

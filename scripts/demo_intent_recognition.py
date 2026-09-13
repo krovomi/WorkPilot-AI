@@ -68,23 +68,18 @@ def main():
         # Bug fixes
         "The login page returns 500 error when password has special characters",
         "Users can't upload files larger than 10MB - getting timeout errors",
-        
         # Features
         "Add OAuth2 authentication with Google and GitHub",
         "Implement real-time notifications using WebSockets",
-        
         # Performance
         "Dashboard is loading very slowly for users",
         "API response times are too high, need to optimize",
-        
         # Refactoring
         "Migrate from REST to GraphQL for better flexibility",
         "Convert class components to functional components with hooks",
-        
         # Security
         "Fix XSS vulnerability in comment rendering",
         "Update authentication to use JWT instead of sessions",
-        
         # Data
         "Migrate user data from MongoDB to PostgreSQL",
         "Import historical data from CSV files into the database",
@@ -103,10 +98,9 @@ def main():
     console.print(
         "\n[bold green]✓ Demo complete![/bold green]\n\n"
         "Try it yourself:\n"
-        "  [cyan]python -m intent analyze \"Your task description\"[/cyan]\n"
+        '  [cyan]python -m intent analyze "Your task description"[/cyan]\n'
     )
 
 
 if __name__ == "__main__":
     main()
-

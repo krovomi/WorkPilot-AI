@@ -149,7 +149,7 @@ attempt = {
     "timestamp": datetime.now().isoformat(),
     "approach": approach,
     "success": False,
-    "error": error_message
+    "error": error_message,
 }
 
 history["subtasks"][subtask_id]["attempts"].append(attempt)
@@ -203,7 +203,7 @@ attempt = {
     "timestamp": datetime.now().isoformat(),
     "approach": approach,
     "success": True,
-    "error": None
+    "error": None,
 }
 
 history["subtasks"][subtask_id]["attempts"].append(attempt)
@@ -224,11 +224,13 @@ if commits_file.exists():
 else:
     commits = {"commits": [], "last_good_commit": None, "metadata": {}}
 
-commits["commits"].append({
-    "hash": commit_hash,
-    "subtask_id": subtask_id,
-    "timestamp": datetime.now().isoformat()
-})
+commits["commits"].append(
+    {
+        "hash": commit_hash,
+        "subtask_id": subtask_id,
+        "timestamp": datetime.now().isoformat(),
+    }
+)
 commits["last_good_commit"] = commit_hash
 commits["metadata"]["last_updated"] = datetime.now().isoformat()
 
@@ -277,7 +279,7 @@ stuck_entry = {
     "subtask_id": subtask_id,
     "reason": reason,
     "escalated_at": datetime.now().isoformat(),
-    "attempt_count": len(history["subtasks"][subtask_id]["attempts"])
+    "attempt_count": len(history["subtasks"][subtask_id]["attempts"]),
 }
 
 history["stuck_subtasks"].append(stuck_entry)

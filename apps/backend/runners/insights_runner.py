@@ -259,17 +259,17 @@ async def run_with_agent_client(
                                 expected_outcome="Find relevant information",
                             )
                             if explanation:
+                                # Correction : On pré-calcule le JSON pour éviter le saut de ligne interdit dans la f-string
+                                explanation_json = json.dumps(
+                                    {
+                                        "category": explanation.category,
+                                        "title": explanation.title,
+                                        "explanation": explanation.explanation,
+                                        "difficulty": explanation.difficulty.value,
+                                    }
+                                )
                                 print(
-                                    f"__EXPLANATION__:{
-                                        json.dumps(
-                                            {
-                                                'category': explanation.category,
-                                                'title': explanation.title,
-                                                'explanation': explanation.explanation,
-                                                'difficulty': explanation.difficulty.value,
-                                            }
-                                        )
-                                    }",
+                                    f"__EXPLANATION__:{explanation_json}",
                                     flush=True,
                                 )
                         except Exception as e:
@@ -504,19 +504,20 @@ Current question: {message}"""
                                         expected_outcome="Find relevant information",
                                     )
                                     if explanation:
+                                        # Extrayez le JSON dans une variable dédiée
+                                        explanation_json = json.dumps(
+                                            {
+                                                "category": explanation.category,
+                                                "title": explanation.title,
+                                                "explanation": explanation.explanation,
+                                                "difficulty": explanation.difficulty.value,
+                                            }
+                                        )
                                         print(
-                                            f"__EXPLANATION__:{
-                                                json.dumps(
-                                                    {
-                                                        'category': explanation.category,
-                                                        'title': explanation.title,
-                                                        'explanation': explanation.explanation,
-                                                        'difficulty': explanation.difficulty.value,
-                                                    }
-                                                )
-                                            }",
+                                            f"__EXPLANATION__:{explanation_json}",
                                             flush=True,
                                         )
+
                                 except Exception as e:
                                     debug_error(
                                         "insights_runner",

@@ -20,8 +20,13 @@ author: "WorkPilot AI Team"
 
 ```python
 analysis = skill.execute_script("analyze_angular_project.py", {"project_root": "/path"})
-skill.execute_script("upgrade_angular_version.py", {"project_root": "/path", "target_version": "19.0.0"})
-skill.execute_script("generate_component.py", {"name": "UserProfile", "standalone": True, "project_root": "/path"})
+skill.execute_script(
+    "upgrade_angular_version.py", {"project_root": "/path", "target_version": "19.0.0"}
+)
+skill.execute_script(
+    "generate_component.py",
+    {"name": "UserProfile", "standalone": True, "project_root": "/path"},
+)
 ```
 
 ## Version migrations
