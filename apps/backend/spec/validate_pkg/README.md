@@ -173,6 +173,7 @@ To add a new checkpoint validator:
 from pathlib import Path
 from ..models import ValidationResult
 
+
 class NewCheckpointValidator:
     def __init__(self, spec_dir: Path):
         self.spec_dir = Path(spec_dir)
@@ -185,6 +186,7 @@ class NewCheckpointValidator:
 2. Add to `validators/__init__.py`:
 ```python
 from .new_checkpoint_validator import NewCheckpointValidator
+
 __all__ = [..., "NewCheckpointValidator"]
 ```
 

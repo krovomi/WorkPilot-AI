@@ -362,10 +362,12 @@ Example (auto-collaboration):
 from apps.backend.teams import ClaudeTeam, TeamMode
 
 team = ClaudeTeam(mode=TeamMode.COLLABORATIVE)
-debate_result = team.orchestrate({
-    "task": f"Plan migration from {source.framework} to {target.framework}",
-    "context": context.to_dict(),
-})
+debate_result = team.orchestrate(
+    {
+        "task": f"Plan migration from {source.framework} to {target.framework}",
+        "context": context.to_dict(),
+    }
+)
 ```
 
 ### Integration with Auto-Fix Loop

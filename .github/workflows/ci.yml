@@ -104,10 +104,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
         with:
-          file: ./apps/backend/coverage.xml
+          files: ./apps/backend/coverage.xml
           fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # --------------------------------------------------------------------------
   # Frontend Tests - All Platforms
@@ -132,15 +130,15 @@ jobs:
 
       - name: Run TypeScript type check
         working-directory: apps/frontend
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Run unit tests
         working-directory: apps/frontend
-        run: npm run test
+        run: pnpm run test
 
       - name: Build application
         working-directory: apps/frontend
-        run: npm run build
+        run: pnpm run build
 
   # --------------------------------------------------------------------------
   # Gate Job - Single check for branch protection
