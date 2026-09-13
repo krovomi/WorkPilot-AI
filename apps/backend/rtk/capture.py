@@ -56,8 +56,27 @@ class Capture:
         return self.returncode == 0 and not self.timed_out
 
 
+#: Anything a shell would interpret. rtk's rewrites are plain command lines —
+#: `git diff HEAD` becomes `rtk git diff HEAD` — so one of these characters in
+#: a rewrite means the string is not the argv it looks like, and running it
+#: would need a shell. The answer is to run the original command instead of
+#: reaching for one.
+_SHELL_METACHARACTERS = set("|&;<>()$`\\\"'\n*?[#~")
+
+
+def _as_argv(rewritten: str) -> list[str] | None:
+    """rtk's rewrite as an argv list, or None when it cannot be one safely."""
+    if any(char in rewritten for char in _SHELL_METACHARACTERS):
+        return None
+    try:
+        tokens = shlex.split(rewritten)
+    except ValueError:
+        return None
+    return tokens or None
+
+
 def capture_for_model(
-    argv: list[str] | str,
+    argv: list[str],
     *,
     cwd: Path | str | None = None,
     timeout: float = 60.0,
@@ -65,29 +84,32 @@ def capture_for_model(
 ) -> Capture:
     """Run a command through rtk when it helps, and return what a model should read.
 
-    `argv` may be a list (the normal case — no shell, no quoting surprises) or
-    a string for a command that genuinely needs a pipeline. Either way rtk is
-    asked about the whole command line, because its table matches on prefixes
-    like `uv run pytest` that a single token cannot express.
+    `argv` is a list and there is no string form, because there is no shell
+    here. rtk is asked about the whole command line — its table matches on
+    prefixes like `uv run pytest` that a single token cannot express — but what
+    comes back is split into an argv again and executed directly. A rewrite
+    that cannot be split that way is discarded and the original command runs:
+    the condensing is worth a few hundred bytes, and it is not worth handing a
+    shell a string that a proxy composed.
     """
-    as_string = argv if isinstance(argv, str) else shlex.join(argv)
-
+    command = shlex.join(argv)
+    resolved = list(argv)
     condensed = False
-    command = as_string
-    if model_facing_enabled(env):
-        outcome = rewrite_command(as_string, env)
-        command = outcome.command
-        condensed = outcome.changed
 
-    # A list that rtk left alone runs as a list: no shell, no quoting to get
-    # wrong. The shell is only used where the command is genuinely a command
-    # line — a caller that asked for a pipeline, or rtk's own rewrite, which
-    # comes back as text and can carry a prefix such as `uv run`.
-    needs_shell = condensed or isinstance(argv, str)
+    if model_facing_enabled(env):
+        outcome = rewrite_command(command, env)
+        if outcome.changed:
+            rewritten_argv = _as_argv(outcome.command)
+            if rewritten_argv is not None:
+                resolved = rewritten_argv
+                command = outcome.command
+                condensed = True
+            else:
+                logger.debug("rtk rewrite not runnable as argv: %s", outcome.command)
+
     try:
-        proc = subprocess.run(  # noqa: S602 - shell only for a command line; see above
-            command if needs_shell else list(argv),
-            shell=needs_shell,
+        proc = subprocess.run(  # noqa: S603 - argv list, no shell
+            resolved,
             cwd=str(cwd) if cwd else None,
             capture_output=True,
             text=True,

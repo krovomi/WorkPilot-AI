@@ -108,6 +108,44 @@ def test_a_missing_program_is_reported_rather_than_raised(monkeypatch):
     assert not result.ok
 
 
+def test_a_rewrite_that_needs_a_shell_is_discarded(tmp_path, monkeypatch):
+    """There is no shell here, and a rewrite is not a reason to start one.
+
+    rtk composes the rewritten string, so running it through a shell would be
+    handing shell syntax to a proxy's output. A rewrite that is not a plain
+    argv is dropped and the original command runs: the condensing is worth a
+    few hundred bytes and it is not worth that.
+    """
+    script = tmp_path / "rtk"
+    script.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [ "$1" = "--version" ]; then echo "rtk 0.48.0"; exit 0; fi\n'
+        'if [ "$1" = "rewrite" ]; then echo "rtk ls | head -1"; exit 0; fi\n'
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("WORKPILOT_RTK_PATH", str(script))
+    rtk_runtime.reset_cache()
+
+    result = capture_for_model(["echo", "verbose"])
+    assert not result.condensed
+    assert result.text.strip() == "verbose"
+
+
+def test_the_capture_never_runs_through_a_shell():
+    """A guard on the implementation, because the failure mode is silent.
+
+    `shell=True` here would take a command line composed by an external binary
+    and hand it to a shell. Bandit flags it HIGH, and a reviewer should not
+    have to rely on that.
+    """
+    import rtk.capture as capture_module
+
+    source = Path(capture_module.__file__).read_text(encoding="utf-8")
+    assert "shell=True" not in source
+
+
 def test_self_review_only_condenses_the_excerpt_a_model_reads(fake_rtk, tmp_path):
     """`--name-only` and `--numstat` feed a parser and must stay raw.
 
