@@ -266,6 +266,13 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "progress_indicator": "task",
         "qa_promotion": "qa",
         "hermes": "agent",
+        # rtk reports whether the output-condensing proxy works on this machine
+        # and what it has saved. Both are facts about the agent tooling this
+        # deployment is configured with, which is what the `settings` domain
+        # covers — the router is desktop-only and refuses server mode outright,
+        # but a mounted router without a permission is what this map exists to
+        # make impossible, not something to argue is harmless case by case.
+        "rtk": "settings",
         "spec_traceability": "task",
         "workflow_profile": "task",
         "slash_commands": "agent",
