@@ -13,12 +13,10 @@ import path from "node:path";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import {
-	DEFAULT_FEATURE_MODELS,
-	DEFAULT_FEATURE_THINKING,
 	IPC_CHANNELS,
 	MODEL_ID_MAP,
 } from "../../../shared/constants";
-import type { AppSettings, Project } from "../../../shared/types";
+import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
 import { getAugmentedEnv } from "../../env-utils";
 import { getDefaultDbPath, getMemoryService } from "../../memory-service";
@@ -27,6 +25,7 @@ import { getGitHubConfig, githubFetch, normalizeRepoReference } from "./utils";
 import { createIPCCommunicators } from "./utils/ipc-communicator";
 import { createContextLogger } from "./utils/logger";
 import { withProjectOrNull } from "./utils/project-middleware";
+import { getPageFeatureSettings } from "../../services/page-llm-config";
 import { getRunnerEnv } from "./utils/runner-env";
 import {
 	buildRunnerArgs,
@@ -1323,21 +1322,14 @@ function getReviewResult(
  * Get GitHub PR model and thinking settings from app settings
  */
 function getGitHubPRSettings(): { model: string; thinkingLevel: string } {
-	const rawSettings = readSettingsFile() as Partial<AppSettings> | undefined;
-
-	// Get feature models/thinking with defaults
-	const featureModels = rawSettings?.featureModels ?? DEFAULT_FEATURE_MODELS;
-	const featureThinking =
-		rawSettings?.featureThinking ?? DEFAULT_FEATURE_THINKING;
-
-	// Get PR-specific settings (with fallback to defaults)
-	const modelShort =
-		featureModels.githubPrs ?? DEFAULT_FEATURE_MODELS.githubPrs;
-	const thinkingLevel =
-		featureThinking.githubPrs ?? DEFAULT_FEATURE_THINKING.githubPrs;
+	// Provider × LLM × effort : ce que la page a choisi, sinon les réglages.
+	// Une seule lecture, dans `services/page-llm-config`.
+	const { model: modelShort, thinkingLevel } = getPageFeatureSettings(
+		"github-prs",
+	);
 
 	// Convert model short name to full model ID
-	const model = MODEL_ID_MAP[modelShort] ?? MODEL_ID_MAP.opus;
+	const model = MODEL_ID_MAP[modelShort] ?? modelShort;
 
 	debugLog("GitHub PR settings", { modelShort, model, thinkingLevel });
 
@@ -1394,7 +1386,9 @@ async function runPRReview(
 	const logCollector = new PRLogCollector(project, prNumber, repo, false);
 
 	// Build environment with project settings
-	const subprocessEnv = await getRunnerEnv(getClaudeMdEnv(project));
+	const subprocessEnv = await getRunnerEnv(getClaudeMdEnv(project), {
+		page: "github-prs",
+	});
 
 	// Create operation ID for this review
 	const reviewKey = getReviewKey(project.id, prNumber);
@@ -3039,7 +3033,10 @@ export function registerPRHandlers(
 						);
 
 						// Build environment with project settings
-						const followupEnv = await getRunnerEnv(getClaudeMdEnv(project));
+						const followupEnv = await getRunnerEnv(
+							getClaudeMdEnv(project),
+							{ page: "github-prs" },
+						);
 
 						const { process: childProcess, promise } =
 							runPythonSubprocess<PRReviewResult>({

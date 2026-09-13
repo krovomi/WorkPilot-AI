@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
+import { getPageProviderEnv } from "./services/page-llm-config";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -179,6 +180,11 @@ export class NaturalLanguageGitService extends EventEmitter {
 		} catch {
 			// Ignore settings read errors
 		}
+
+		// Le fournisseur de la page (son choix propre, sinon celui de la liste
+		// « Fournisseur IA ») et la clé qui va avec : sans SELECTED_LLM_PROVIDER
+		// le runner repartait sur Claude quel que soit le choix affiché.
+		Object.assign(processEnv, getPageProviderEnv("natural-language-git"));
 
 		// Spawn Python process
 		const proc = spawn(this.pythonPath, args, {

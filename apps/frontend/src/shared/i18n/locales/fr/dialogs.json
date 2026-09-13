@@ -323,5 +323,28 @@
 		},
 		"loading": "Chargement...",
 		"noProvidersAvailable": "Aucun provider disponible"
+	},
+	"pageLlm": {
+		"title": "Le moteur de cette page",
+		"description": "Fournisseur, modèle et effort pour cette page. Laissés sur « comme les réglages », la page suit la liste « Fournisseur IA » en haut à droite et les modèles définis dans les réglages.",
+		"summary": "{{provider}} · {{model}} · {{effort}}",
+		"tooltip": "Choisir le fournisseur, le modèle et l'effort de cette page",
+		"pageBadge": "page",
+		"providerUnset": "Fournisseur par défaut",
+		"model": "Modèle",
+		"effortLabel": "Effort",
+		"inheritProvider": "Comme les réglages ({{provider}})",
+		"inheritModel": "Comme les réglages ({{model}})",
+		"inheritEffort": "Comme les réglages ({{effort}})",
+		"originPage": "Cette page surcharge le choix global.",
+		"originSettings": "Cette page suit le choix global.",
+		"reset": "Réinitialiser",
+		"effort": {
+			"none": "Aucun",
+			"low": "Faible",
+			"medium": "Moyen",
+			"high": "Élevé",
+			"ultrathink": "Ultra Think"
+		}
 	}
 }

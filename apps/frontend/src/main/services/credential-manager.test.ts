@@ -117,3 +117,41 @@ describe("CredentialManager Codex CLI status", () => {
 		});
 	});
 });
+
+describe("CredentialManager provider override (per-page choice)", () => {
+	it("routes to the page's provider rather than the global one", () => {
+		vi.mocked(readSettingsFile).mockReturnValue({
+			selectedProvider: "openai",
+			globalMistralApiKey: "mistral-key",
+			globalOpenAIApiKey: "sk-real-key",
+		});
+
+		const env = new CredentialManager().getEnvironmentVariables("mistral");
+
+		expect(env.SELECTED_LLM_PROVIDER).toBe("mistral");
+		expect(env.MISTRAL_API_KEY).toBe("mistral-key");
+		expect(env.OPENAI_API_KEY).toBeUndefined();
+	});
+
+	it("canonicalises anthropic to claude so the backend routes to the SDK", () => {
+		vi.mocked(readSettingsFile).mockReturnValue({
+			selectedProvider: "openai",
+			globalOpenAIApiKey: "sk-real-key",
+		});
+
+		const env = new CredentialManager().getEnvironmentVariables("anthropic");
+
+		expect(env.SELECTED_LLM_PROVIDER).toBe("claude");
+	});
+
+	it("leaves the global choice alone when no page override is given", () => {
+		vi.mocked(readSettingsFile).mockReturnValue({
+			selectedProvider: "openai",
+			globalOpenAIApiKey: "sk-real-key",
+		});
+
+		const env = new CredentialManager().getEnvironmentVariables();
+
+		expect(env.SELECTED_LLM_PROVIDER).toBe("openai");
+	});
+});
