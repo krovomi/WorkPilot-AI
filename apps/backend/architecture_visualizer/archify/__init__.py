@@ -7,13 +7,14 @@ decides whether a task is worth mapping at all; `delta` compares two models and
 records the six states the Kanban can be in.
 """
 
-from .cli import Receipt, deliver, validate
+from .cli import ArchifyUnavailable, Receipt, compare, deliver, doctor, validate
 from .delta import DeltaStatus, compare_models, read_status
 from .ir import Continuity, IRError, check_id_continuity, pin_repository
 from .runtime import Readiness, archify_root, check, node_executable
 from .significance import Significance, assess
 
 __all__ = [
+    "ArchifyUnavailable",
     "Continuity",
     "DeltaStatus",
     "IRError",
@@ -24,8 +25,10 @@ __all__ = [
     "assess",
     "check",
     "check_id_continuity",
+    "compare",
     "compare_models",
     "deliver",
+    "doctor",
     "node_executable",
     "pin_repository",
     "read_status",

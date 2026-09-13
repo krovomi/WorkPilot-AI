@@ -7,7 +7,7 @@ good enough for. The renderer, the model and the per-task delta all live in
 `archify/`.
 """
 
-from .analyzer import Analyzer
+from .analyzer import ArchitectureAnalyzer
 from .models import ArchitectureDiagram, DependencyEdge, DiagramType, ModuleNode
 
 __all__ = [
