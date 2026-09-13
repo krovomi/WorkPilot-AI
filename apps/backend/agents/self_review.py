@@ -38,6 +38,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+from rtk import capture_for_model
+
 logger = logging.getLogger(__name__)
 
 SELF_REVIEW_ENV_VAR = "WORKPILOT_SELF_REVIEW_ENABLED"
@@ -137,10 +139,14 @@ def compute_diff_summary(spec_dir: Path, project_dir: Path) -> DiffSummary:
                 # "-" for binary files; skip.
                 continue
 
-    # Excerpt of the actual diff.
-    rc, diff_out, _ = _git(["diff", "HEAD"], project_dir)
-    if rc != 0:
-        diff_out = ""
+    # Excerpt of the actual diff — the one capture in this function that a
+    # model reads, so the one that goes through rtk. The two above must not:
+    # `--name-only` feeds a list and `--numstat` feeds a counter, and nothing
+    # either of them prints is ever sent anywhere. Condensing output that no
+    # model will read saves nothing and breaks the caller.
+    capture = capture_for_model(["git", "diff", "HEAD"], cwd=project_dir, timeout=15)
+    rc = capture.returncode
+    diff_out = capture.text if capture.ok else ""
 
     truncated = False
     if len(diff_out) > _MAX_DIFF_CHARS:

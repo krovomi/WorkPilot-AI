@@ -102,6 +102,12 @@ BASE_COMMANDS: set[str] = {
     # Git (always needed)
     "git",
     "gh",
+    # rtk — the output-condensing proxy. Only its own meta commands
+    # (`rtk gain`, `rtk discover`) ever reach the allowlist under this name:
+    # `security.parser` unwraps `rtk <command>` to `<command>` first, so a
+    # proxied command is judged as itself and this entry cannot become a way
+    # in for anything else. See docs/CLAUDE.md, "Token savings (rtk)".
+    "rtk",
     # Process management (with validation in security.py)
     "ps",
     "pgrep",
