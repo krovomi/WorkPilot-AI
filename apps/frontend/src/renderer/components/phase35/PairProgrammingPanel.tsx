@@ -7,10 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupPairRealtimeListeners,
-	usePairRealtimeStore,
-} from "../../stores/phase35-stores";
+import { usePairRealtimeStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
@@ -48,11 +45,6 @@ export function PairProgrammingPanel() {
 	const [chatText, setChatText] = useState("");
 	const [chatError, setChatError] = useState<string | null>(null);
 	const opsScrollRef = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		const teardown = setupPairRealtimeListeners();
-		return teardown;
-	}, []);
 
 	useEffect(() => {
 		if (currentRoom && !isStreaming) {

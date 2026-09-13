@@ -73,18 +73,19 @@ beforeEach(() => {
 });
 
 describe("ArchitectureVisualizer", () => {
-	it("subscribes on mount and unsubscribes on unmount", async () => {
+	it("leaves the subscription to the session, not to its own mount", async () => {
+		// Registering here meant a map still being generated went unheard as
+		// soon as the user opened another page; the listeners now live in
+		// stores/global-listeners.ts for the life of the window.
 		const api = stubApi();
 		const { unmount } = render(<ArchitectureVisualizer />);
 
-		expect(api.onArchitectureVisualizerStatus).toHaveBeenCalledTimes(1);
-		expect(api.onArchitectureVisualizerStreamChunk).toHaveBeenCalledTimes(1);
-		expect(api.onArchitectureVisualizerError).toHaveBeenCalledTimes(1);
-		expect(api.onArchitectureVisualizerComplete).toHaveBeenCalledTimes(1);
+		expect(api.onArchitectureVisualizerStatus).not.toHaveBeenCalled();
+		expect(api.onArchitectureVisualizerComplete).not.toHaveBeenCalled();
 
 		unmount();
-		expect(unsubscribes.status).toHaveBeenCalledTimes(1);
-		expect(unsubscribes.complete).toHaveBeenCalledTimes(1);
+		expect(unsubscribes.status).not.toHaveBeenCalled();
+		expect(unsubscribes.complete).not.toHaveBeenCalled();
 	});
 
 	it("reads what is already on disk rather than starting empty", async () => {

@@ -6,7 +6,6 @@ import {
 	cancelArchitectureVisualization,
 	generateArchitectureMap,
 	loadArchitectureState,
-	setupArchitectureVisualizerListeners,
 	useArchitectureVisualizerStore,
 } from "../../stores/architecture-visualizer-store";
 import { useProjectStore } from "../../stores/project-store";
@@ -29,7 +28,6 @@ export function ArchitectureVisualizer(): React.ReactElement {
 
 	// The listeners existed and were installed by nobody, so every generation
 	// ended on a spinner that never resolved. Mounting is what subscribes.
-	useEffect(() => setupArchitectureVisualizerListeners(), []);
 
 	// Read what is already on disk, so reopening the page shows the map rather
 	// than an empty state that invites a second, identical generation.

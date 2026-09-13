@@ -36,7 +36,6 @@ import {
 } from "../../stores/api-explorer-store";
 import {
 	openAppEmulatorDialog,
-	setupAppEmulatorListeners,
 	useAppEmulatorStore,
 } from "../../stores/app-emulator-store";
 import { useProjectStore } from "../../stores/project-store";
@@ -3211,11 +3210,6 @@ export function ApiExplorer() {
 			{ environmentToken: activeEnv?.token ?? "" },
 		);
 	}, [environmentSecretScope, activeEnv?.token]);
-
-	// Set up IPC listeners for emulator events
-	useEffect(() => {
-		return setupAppEmulatorListeners();
-	}, []);
 
 	// When emulator becomes running, auto-sync active environment base URL
 	const prevEmulatorPhase = useRef(emulatorPhase);

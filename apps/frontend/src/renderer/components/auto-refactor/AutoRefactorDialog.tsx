@@ -13,7 +13,6 @@ import { useTranslation } from "react-i18next";
 import type { AutoRefactorResult } from "../../stores/auto-refactor-store";
 import {
 	cancelAutoRefactor,
-	setupAutoRefactorListeners,
 	startAutoRefactor,
 	useAutoRefactorStore,
 } from "../../stores/auto-refactor-store";
@@ -89,12 +88,6 @@ export function AutoRefactorDialog() {
 	} = useAutoRefactorStore();
 
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
-
-	// Setup IPC listeners once
-	useEffect(() => {
-		const cleanup = setupAutoRefactorListeners();
-		return cleanup;
-	}, []);
 
 	// Auto-scroll streaming output
 	useEffect(() => {

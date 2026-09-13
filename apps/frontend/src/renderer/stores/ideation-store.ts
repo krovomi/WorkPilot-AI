@@ -9,6 +9,7 @@ import type {
 	IdeationSummary,
 	IdeationType,
 } from "../../shared/types";
+import { bridgeActivity } from "./activity-bridge";
 
 const GENERATION_TIMEOUT_MS = 5 * 60 * 1000;
 /** Maximum number of log entries to retain in memory for debugging */
@@ -852,11 +853,32 @@ export function setupIdeationListeners(): () => void {
 		store().addLog("Ideation generation stopped");
 	});
 
+	// The sidebar's own view of this feature: derived from the phase the store
+	// already publishes, so every way a generation can end is covered once.
+	const unsubActivity = bridgeActivity(useIdeationStore, {
+		view: "ideation",
+		labelKey: "navigation:activity.kinds.ideation",
+		projectId: (state) => state.currentProjectId,
+		phase: (state) => {
+			if (state.isGenerating) return "running";
+			switch (state.generationStatus.phase) {
+				case "complete":
+					return "success";
+				case "error":
+					return "error";
+				default:
+					return "idle";
+			}
+		},
+		detail: (state) => state.generationStatus.error,
+	});
+
 	return () => {
 		for (const [projectId] of generationTimeoutIds) {
 			clearGenerationTimeout(projectId);
 		}
 
+		unsubActivity();
 		unsubProgress();
 		unsubLog();
 		unsubTypeComplete();
