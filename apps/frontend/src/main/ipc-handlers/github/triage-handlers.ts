@@ -12,19 +12,17 @@ import path from "node:path";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import {
-	DEFAULT_FEATURE_MODELS,
-	DEFAULT_FEATURE_THINKING,
 	IPC_CHANNELS,
 	MODEL_ID_MAP,
 } from "../../../shared/constants";
-import type { AppSettings, Project } from "../../../shared/types";
+import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
 import { getAugmentedEnv } from "../../env-utils";
-import { readSettingsFile } from "../../settings-utils";
 import { getGitHubConfig } from "./utils";
 import { createIPCCommunicators } from "./utils/ipc-communicator";
 import { createContextLogger } from "./utils/logger";
 import { withProjectOrNull } from "./utils/project-middleware";
+import { getPageFeatureSettings } from "../../services/page-llm-config";
 import { getRunnerEnv } from "./utils/runner-env";
 import {
 	buildRunnerArgs,
@@ -208,21 +206,14 @@ function getTriageResults(project: Project): TriageResult[] {
  * Get GitHub Issues model and thinking settings from app settings
  */
 function getGitHubIssuesSettings(): { model: string; thinkingLevel: string } {
-	const rawSettings = readSettingsFile() as Partial<AppSettings> | undefined;
-
-	// Get feature models/thinking with defaults
-	const featureModels = rawSettings?.featureModels ?? DEFAULT_FEATURE_MODELS;
-	const featureThinking =
-		rawSettings?.featureThinking ?? DEFAULT_FEATURE_THINKING;
-
-	// Get Issues-specific settings (with fallback to defaults)
-	const modelShort =
-		featureModels.githubIssues ?? DEFAULT_FEATURE_MODELS.githubIssues;
-	const thinkingLevel =
-		featureThinking.githubIssues ?? DEFAULT_FEATURE_THINKING.githubIssues;
+	// Provider × LLM × effort : ce que la page a choisi, sinon les réglages.
+	// Une seule lecture, dans `services/page-llm-config`.
+	const { model: modelShort, thinkingLevel } = getPageFeatureSettings(
+		"github-issues",
+	);
 
 	// Convert model short name to full model ID
-	const model = MODEL_ID_MAP[modelShort] ?? MODEL_ID_MAP.opus;
+	const model = MODEL_ID_MAP[modelShort] ?? modelShort;
 
 	debugLog("GitHub Issues settings", { modelShort, model, thinkingLevel });
 
@@ -281,7 +272,9 @@ async function runTriage(
 
 	debugLog("Spawning triage process", { args, model, thinkingLevel });
 
-	const subprocessEnv = await getRunnerEnv();
+	const subprocessEnv = await getRunnerEnv(undefined, {
+		page: "github-issues",
+	});
 
 	const { promise } = runPythonSubprocess<TriageResult[]>({
 		pythonPath: getPythonPath(backendPath),

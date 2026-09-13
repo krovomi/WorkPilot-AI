@@ -36,6 +36,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Styling](#styling)
   - [IPC Communication](#ipc-communication)
   - [Background work and the sidebar](#background-work-and-the-sidebar-storesactivity-storets)
+  - [Provider × LLM × effort, par page](#provider--llm--effort-par-page-sharedutilspage-llmts)
   - [Agent Management](#agent-management)
   - [Claude Profile System](#claude-profile-system)
   - [Terminal System](#terminal-system)
@@ -1311,6 +1312,66 @@ instead; collecting them stays true as the number of pages grows. Kanban builds
 are excluded there — `useTaskNotifications` already announces those, with the
 task title and the distinction between a finished build and one that landed in
 review because it failed.
+
+### Provider × LLM × effort, par page (`shared/utils/page-llm.ts`)
+
+Une page qui lance un agent posait la question deux fois et n'en gardait qu'une
+moitié : le modèle et l'effort venaient de `featureModels` / `featureThinking`,
+et le fournisseur ne venait de *nulle part*. La liste « Fournisseur IA » en haut
+à droite ne servait qu'aux builds du Kanban, si bien qu'une revue de PR repartait
+sur Claude alors que l'utilisateur avait choisi Copilot une seconde plus tôt —
+`getRunnerEnv()` n'injectait aucun `SELECTED_LLM_PROVIDER`.
+
+`shared/utils/page-llm.ts` est l'unique réponse à « avec quoi cette page
+tourne-t-elle ? », et l'ordre est celui déjà établi, une source par cran :
+
+| Ce qui décide | Fournisseur | Modèle | Effort |
+|---|---|---|---|
+| 1. la page (`pageLlmOverrides[page]`) | ✔ | ✔ | ✔ |
+| 2. les réglages (`selectedProvider`, `featureModels`, `featureThinking`) | ✔ | ✔ | ✔ |
+| 3. les défauts du dépôt (`DEFAULT_FEATURE_*`) | — | ✔ | ✔ |
+
+Un cran vide n'en consomme pas un autre : une page qui ne nomme que le
+fournisseur garde le modèle et l'effort des réglages, et une page qui ne nomme
+rien se comporte comme avant. Le champ absent est **retiré** de
+`pageLlmOverrides` plutôt que stocké vide — c'est ce qui garde « aucun choix » et
+« le même choix que les réglages » distincts, et qui fait qu'un changement de
+fournisseur global bouge bien les pages qui n'ont rien demandé.
+
+Quand la page choisit un **fournisseur** sans choisir de modèle, le modèle des
+réglages est ramené au catalogue de ce fournisseur
+(`resolveModelForProviderCatalog`) : il avait été choisi pour le fournisseur
+global, et demander `claude-opus-4-6` à Ollama échoue à l'appel, avec un message
+qui parle d'un modèle inconnu plutôt que du choix.
+
+**Le jeu de pages est fermé** (`PAGE_LLM_FEATURES`). Une page y entre le jour où
+son runner lit la réponse ; un sélecteur qui promet ce que le runner ignore est
+pire que pas de sélecteur. Aujourd'hui : `insights`, `ideation`, `roadmap`,
+`github-issues`, `github-prs`, `gitlab-merge-requests`, `prompt-optimizer`,
+`natural-language-git`. Les fonctionnalités qui ont un réglage de modèle mais
+aucun lecteur (`testGenerator`, `codeReview`, `voiceControl`, `utility`) n'en
+font pas partie — le Kanban, lui, a déjà sa formule *par tâche*.
+
+| Qui lit | Où |
+|---|---|
+| le renderer, pour afficher ce que la page va faire | `resolvePageLlm` (`PageLlmSelector`, `natural-language-git-store`) |
+| le main, pour `--model` / `--thinking-level` | `getPageFeatureSettings` (`main/services/page-llm-config.ts`) |
+| le main, pour `SELECTED_LLM_PROVIDER` + la clé | `getPageProviderEnv`, puis `credentialManager.getEnvironmentVariables(provider)` |
+
+Les sept `getXxxFeatureSettings()` qui recopiaient la même lecture de
+`settings.json` dans autant de handlers sont ce module ; `getRunnerEnv` prend
+désormais `{ page }` et ajoute l'environnement du fournisseur de la page. Le
+backend n'a rien à apprendre : `core.client._get_active_provider` honore déjà
+`SELECTED_LLM_PROVIDER`.
+
+**Le fournisseur reste vide quand personne n'en a choisi** — et non « Claude ».
+Le backend a sa propre chaîne de résolution, et y écrire un nom la
+court-circuiterait avec une valeur que personne n'a demandée.
+
+Dans l'UI, `PageLlmSelector` vit à gauche de la barre sticky, à côté de la liste
+« Fournisseur IA », et n'en est pas un doublon : cette liste dit avec quoi
+l'application travaille, celui-ci dit avec quoi *cette page* travaille. Il
+n'affiche rien sur une page hors du jeu fermé.
 
 ### Agent Management (`src/main/agent/`)
 

@@ -339,6 +339,14 @@ export interface AppSettings {
 	// Feature-specific configuration (insights, ideation, roadmap)
 	featureModels?: FeatureModelConfig;
 	featureThinking?: FeatureThinkingConfig;
+	// Per-page override of « provider × LLM × effort ».
+	// Keyed by page id (a SidebarView, see shared/utils/page-llm.ts). A page
+	// names only what it overrides: an absent field falls back to
+	// selectedProvider / featureModels / featureThinking, in that order.
+	pageLlmOverrides?: Record<
+		string,
+		import("../utils/page-llm").PageLlmOverride
+	>;
 	// Changelog preferences
 	changelogFormat?: ChangelogFormat;
 	changelogAudience?: ChangelogAudience;

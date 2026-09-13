@@ -5,6 +5,7 @@ import path from "node:path";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
 import type { AppSettings } from "../shared/types";
+import { getPageProviderEnv } from "./services/page-llm-config";
 
 /**
  * Result of prompt optimization
@@ -163,6 +164,11 @@ export class PromptOptimizerService extends EventEmitter {
 		} catch {
 			// Ignore settings read errors
 		}
+
+		// Le fournisseur de la page (son choix propre, sinon celui de la liste
+		// « Fournisseur IA ») et la clé qui va avec : sans SELECTED_LLM_PROVIDER
+		// le runner repartait sur Claude quel que soit le choix affiché.
+		Object.assign(processEnv, getPageProviderEnv("prompt-optimizer"));
 
 		// Spawn Python process
 		const proc = spawn(this.pythonPath, args, {

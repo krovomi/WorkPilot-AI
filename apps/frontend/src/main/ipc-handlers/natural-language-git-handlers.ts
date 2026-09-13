@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from "electron";
 import type { NaturalLanguageGitRequest } from "../natural-language-git-service";
 import { naturalLanguageGitService } from "../natural-language-git-service";
+import { getPageFeatureSettings } from "../services/page-llm-config";
 
 /**
  * Set up IPC handlers for natural language Git functionality
@@ -11,7 +12,14 @@ export function setupNaturalLanguageGitHandlers(): void {
 		"execute-natural-language-git",
 		async (event, request: NaturalLanguageGitRequest) => {
 			try {
-				await naturalLanguageGitService.execute(request);
+				// Le renderer peut ne rien imposer : la page décide, sinon les
+				// réglages — une seule lecture, côté main.
+				const page = getPageFeatureSettings("natural-language-git");
+				await naturalLanguageGitService.execute({
+					...request,
+					model: request.model || page.model,
+					thinkingLevel: request.thinkingLevel || page.thinkingLevel,
+				});
 			} catch (error) {
 				console.error("[NaturalLanguageGit] Error executing command:", error);
 				const win = BrowserWindow.fromWebContents(event.sender);
