@@ -38,5 +38,27 @@ name: WorkPilot AI
 #
 # Genuine vulnerabilities in archify are reported upstream and fixed by moving
 # the pin, never by patching this tree.
+#
+# `skills/bmad` is the same shape with a different installer. BMAD ships Python
+# beside its skills — the helper scripts a procedure shells out to — and
+# `scripts/vendor_bmad.py --check` re-downloads the pinned npm release and
+# compares byte for byte. Editing a file there to clear an alert is precisely
+# what that check exists to catch, so the two levers pull against each other
+# exactly as they did for archify. Upstream's own test suite is not carried at
+# all (`SKIP_DIRS` in that script), which removed the five HIGH findings about
+# `chmod` in third-party fixtures; what is left is three notes about empty
+# `except` clauses in scripts a skill cannot run without, reported upstream
+# rather than patched here.
+#
+# The remaining entries are packs `skills:bootstrap` fetches on demand. They
+# are gitignored, so they only exist on a developer's checkout — but when they
+# do, they are third-party trees on the same terms.
 paths-ignore:
   - apps/backend/vendor/**
+  - skills/bmad/**
+  - skills/superpowers/**
+  - skills/mattpocock/**
+  - skills/impeccable/**
+  - skills/task-observer/**
+  - skills/claude-mem/**
+  - skills/hermes/**

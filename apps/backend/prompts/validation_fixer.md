@@ -157,13 +157,13 @@ Make the minimal change needed to fix the validation error.
 ```python
 import json
 
-with open('[file]', 'r') as f:
+with open("[file]", "r") as f:
     data = json.load(f)
 
 # Apply fix
-data['missing_field'] = 'value'
+data["missing_field"] = "value"
 
-with open('[file]', 'w') as f:
+with open("[file]", "w") as f:
     json.dump(data, f, indent=2)
 ```
 

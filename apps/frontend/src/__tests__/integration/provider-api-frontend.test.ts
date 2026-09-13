@@ -22,19 +22,23 @@ const mockTestConnection = vi.fn();
 const mockDiscoverModels = vi.fn();
 const mockGetClaudeCodeOnboardingStatus = vi.fn();
 
-vi.stubGlobal("globalThis", {
-	electronAPI: {
-		getSettings: mockGetSettings,
-		saveSettings: mockSaveSettings,
-		getAPIProfiles: mockGetAPIProfiles,
-		saveAPIProfile: mockSaveAPIProfile,
-		updateAPIProfile: mockUpdateAPIProfile,
-		deleteAPIProfile: mockDeleteAPIProfile,
-		setActiveAPIProfile: mockSetActiveAPIProfile,
-		testConnection: mockTestConnection,
-		discoverModels: mockDiscoverModels,
-		getClaudeCodeOnboardingStatus: mockGetClaudeCodeOnboardingStatus,
-	},
+// `electronAPI`, not `globalThis`. Stubbing the name "globalThis" replaces the
+// global object's self-reference with this plain object, and vitest keeps its
+// own per-worker state on that object — so the worker lost it mid-collection
+// and the whole run failed with "Vitest failed to access its internal state",
+// with no test failure to point at the cause. The store reads
+// `window.electronAPI`, which in jsdom is this same global.
+vi.stubGlobal("electronAPI", {
+	getSettings: mockGetSettings,
+	saveSettings: mockSaveSettings,
+	getAPIProfiles: mockGetAPIProfiles,
+	saveAPIProfile: mockSaveAPIProfile,
+	updateAPIProfile: mockUpdateAPIProfile,
+	deleteAPIProfile: mockDeleteAPIProfile,
+	setActiveAPIProfile: mockSetActiveAPIProfile,
+	testConnection: mockTestConnection,
+	discoverModels: mockDiscoverModels,
+	getClaudeCodeOnboardingStatus: mockGetClaudeCodeOnboardingStatus,
 });
 
 // Mock toast

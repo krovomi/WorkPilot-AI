@@ -6,7 +6,7 @@ invocation because `_bmad/` is generated and gitignored.
 
 The build gate fixes it at the source — a skill whose runtime is missing is not
 emitted. That is not sufficient on its own, because `.agents/skills/` is
-**committed**. A developer who bootstraps BMAD locally emits the 76 wrappers and
+**committed**. A developer who bootstraps BMAD locally emits its skills and
 commits them; the next clone then has the files and not the runtime, and the
 palette is broken again by a different route. So the gate is enforced twice, and
 this file pins down the second one.
