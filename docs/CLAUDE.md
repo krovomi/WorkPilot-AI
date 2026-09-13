@@ -1276,6 +1276,42 @@ is currently watching never badges itself.
 Animation is capped by the global `prefers-reduced-motion` block in
 `globals.css`, so nothing new has to opt in.
 
+**Who reports, and where that is decided.** `stores/activity-bridges.ts` is the
+single table: it maps a feature store to the menu entry its work belongs to.
+The mapping lives there rather than in each store, so a feature store never
+imports the sidebar — it publishes a phase, and one file decides what that
+phase means to a menu entry.
+
+Nineteen stores independently converged on `idle | <one verb> | complete |
+error`, which is what makes `bridgePhaseActivity` enough for all of them: the
+running verb (`scanning`, `analyzing`, `generating`, `optimizing`) also names
+the job, because the badge already sits on the entry that names the feature —
+"Doc Drift — Doc Drift" was the alternative. Roadmap, ideation and the Kanban
+keep their phase elsewhere and get an explicit bridge.
+
+Two absences are deliberate. **self-healing** has no phase, only `isLoading`:
+badging a menu entry for a list refresh is the noise this design exists to
+avoid. **smart-estimation** and the other dialogs have no `SidebarView`, and a
+badge needs an entry to sit on.
+
+**The activity centre** (`components/ActivityCentre.tsx`) answers *what* is
+running, where the badges answer *where*. It lists work on every page except
+the one on screen — that page shows its own work in full — and keeps a finished
+job listed until its page has been visited, on the same unread rule the badges
+use. It replaced the Kanban-only running-tasks pill: agents were never the only
+thing that kept working after the user left a page, only the only thing that
+said so.
+
+**Toasts are coalesced, not stacked.** `use-toast` keeps a single slot
+(`TOAST_LIMIT = 1`), so three pages finishing together used to mean two
+announcements nobody saw. `useActivityNotifications` collects finishes for
+~1.2s and raises one toast for the batch, with a failure in it deciding the
+wording and the variant. Raising the limit would stack three cards over the app
+instead; collecting them stays true as the number of pages grows. Kanban builds
+are excluded there — `useTaskNotifications` already announces those, with the
+task title and the distinction between a finished build and one that landed in
+review because it failed.
+
 ### Agent Management (`src/main/agent/`)
 
 The frontend manages agent lifecycle end-to-end:

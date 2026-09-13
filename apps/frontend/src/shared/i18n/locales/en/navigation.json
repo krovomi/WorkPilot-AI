@@ -216,6 +216,11 @@
 			"error_other": "{{count}} jobs failed"
 		},
 		"kinds": {
+			"scanning": "Scan",
+			"analyzing": "Analysis",
+			"generating": "Generation",
+			"optimizing": "Optimisation",
+			"discovering": "Discovery",
 			"build": "Build",
 			"ideation": "Ideation"
 		}
