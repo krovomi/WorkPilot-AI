@@ -21,7 +21,7 @@ import logging
 import os
 from pathlib import Path
 
-from core.api_safety import server_mode_roots
+from core.api_safety import safe_error, server_mode_roots, validated_dir
 from fastapi import APIRouter
 
 from .runtime import doctor
@@ -45,15 +45,29 @@ def rtk_status(project_dir: str | None = None):
     if server_mode_roots() is not None:
         return _DESKTOP_ONLY
     try:
+        # A path from a client is never opened as it arrives. `validated_dir`
+        # is the house answer: it refuses `..`, refuses what is outside the
+        # allowed roots, and requires the directory to exist. The endpoint is
+        # already desktop-only, but "the caller cannot reach this endpoint" and
+        # "this endpoint cannot be pointed at an arbitrary path" are two
+        # different guarantees, and only the second one survives a refactor.
+        resolved: Path | None = None
+        if project_dir:
+            try:
+                resolved = validated_dir(project_dir, "project_dir")
+            except ValueError as exc:
+                return {
+                    "success": False,
+                    "error": safe_error(exc, logger, "rtk_status"),
+                }
+
         # The project's file first, the process environment over it — the
         # same precedence `settings.apply_project_env` gives a build, so the
         # panel reports what a build on this project would actually do rather
         # than a third opinion.
-        env: dict[str, str] = {}
-        if project_dir:
-            env = project_env(Path(project_dir))
+        env = project_env(resolved) if resolved else {}
         report = doctor({**env, **os.environ})
-        savings = read_savings(project_dir) if project_dir else read_savings()
+        savings = read_savings(resolved) if resolved else read_savings()
         return {
             "success": True,
             "status": {

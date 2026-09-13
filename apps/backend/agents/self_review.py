@@ -83,8 +83,25 @@ class DiffSummary:
         }
 
 
-def _git(args: list[str], cwd: Path) -> tuple[int, str, str]:
-    """Run a git command, return (returncode, stdout, stderr). Never raises."""
+def _git(
+    args: list[str], cwd: Path, *, for_model: bool = False
+) -> tuple[int, str, str]:
+    """Run a git command, return (returncode, stdout, stderr). Never raises.
+
+    `for_model` says the output is going into a prompt and nowhere else, which
+    is what lets it go through rtk and come back condensed. It is off by
+    default because most calls here are parsed rather than read: `--name-only`
+    feeds a file list and `--numstat` feeds a counter, and condensing either
+    saves nothing — none of it is ever sent to a model — while breaking the
+    caller.
+
+    The flag lives on this wrapper rather than at the call site so the module
+    keeps one place where git is executed. A second execution path would be
+    invisible to anything that stands in for this function.
+    """
+    if for_model:
+        capture = capture_for_model(["git", *args], cwd=cwd, timeout=15)
+        return capture.returncode, capture.text, ""
     try:
         proc = subprocess.run(
             ["git", *args],
@@ -139,14 +156,11 @@ def compute_diff_summary(spec_dir: Path, project_dir: Path) -> DiffSummary:
                 # "-" for binary files; skip.
                 continue
 
-    # Excerpt of the actual diff — the one capture in this function that a
-    # model reads, so the one that goes through rtk. The two above must not:
-    # `--name-only` feeds a list and `--numstat` feeds a counter, and nothing
-    # either of them prints is ever sent anywhere. Condensing output that no
-    # model will read saves nothing and breaks the caller.
-    capture = capture_for_model(["git", "diff", "HEAD"], cwd=project_dir, timeout=15)
-    rc = capture.returncode
-    diff_out = capture.text if capture.ok else ""
+    # Excerpt of the actual diff — the one capture in this function a model
+    # reads, so the one that asks for rtk. The two above deliberately do not.
+    rc, diff_out, _ = _git(["diff", "HEAD"], project_dir, for_model=True)
+    if rc != 0:
+        diff_out = ""
 
     truncated = False
     if len(diff_out) > _MAX_DIFF_CHARS:

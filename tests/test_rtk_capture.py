@@ -155,10 +155,15 @@ def test_self_review_only_condenses_the_excerpt_a_model_reads(fake_rtk, tmp_path
     import agents.self_review as self_review
 
     source = Path(self_review.__file__).read_text(encoding="utf-8")
-    assert "capture_for_model(" in source
+
+    # One opt-in, on the one call whose output reaches a prompt.
+    assert source.count("for_model=True") == 1
+    excerpt_call = '_git(["diff", "HEAD"], project_dir, for_model=True)'
+    assert excerpt_call in source
+
+    # And the two calls that feed a parser ask for nothing.
     for parsed in ('"--name-only"', '"--numstat"'):
-        index = source.index(parsed)
-        window = source[max(0, index - 400) : index]
-        assert "capture_for_model" not in window, (
+        line = next(line for line in source.splitlines() if parsed in line)
+        assert "for_model" not in line, (
             f"{parsed} is parsed by this module; it must not go through rtk"
         )
