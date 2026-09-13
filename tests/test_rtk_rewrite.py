@@ -27,7 +27,7 @@ from rtk import hook as rtk_hook  # noqa: E402
 from rtk import rewrite as rtk_rewrite  # noqa: E402
 from rtk import runtime as rtk_runtime  # noqa: E402
 
-from tests.rtk_fake import IDENTITY, PREFIX, write_fake_rtk  # noqa: E402
+from tests.rtk_fake import IDENTITY, write_fake_rtk  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
