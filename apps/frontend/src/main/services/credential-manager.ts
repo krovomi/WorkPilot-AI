@@ -1452,9 +1452,53 @@ export class CredentialManager extends EventEmitter {
 	}
 
 	/**
-	 * Obtenir les variables d'environnement pour le processus Python
+	 * Obtenir les variables d'environnement pour le processus Python.
+	 *
+	 * @param providerOverride fournisseur choisi *sur la page* qui lance le
+	 *   processus (cf. `shared/utils/page-llm.ts`). Il prime sur
+	 *   `settings.selectedProvider` et sur le credential actif : une page qui
+	 *   nomme son fournisseur ne doit pas se retrouver routée vers celui du
+	 *   dernier profil chargé. Absent, le comportement est inchangé.
 	 */
-	getEnvironmentVariables(): Record<string, string> {
+	getEnvironmentVariables(providerOverride?: string): Record<string, string> {
+		const env = this.buildEnvironmentVariables(providerOverride);
+
+		const requested = (providerOverride ?? "").trim().toLowerCase();
+		if (!requested) return env;
+
+		// `anthropic` et `claude` sont le même fournisseur pour le backend.
+		const canonical = requested === "anthropic" ? "claude" : requested;
+
+		// Le choix de la page est la réponse. La construction ci-dessus a pu
+		// retomber sur le credential actif (un profil OpenAI, un SSO Windsurf…)
+		// dont le nom n'a rien à voir avec ce qui a été demandé.
+		env.SELECTED_LLM_PROVIDER = canonical;
+
+		// Windsurf sans credential actif : la clé globale existe peut-être dans
+		// les réglages, et sans elle le backend n'a rien à présenter.
+		if (canonical === "windsurf" && !env.WINDSURF_API_KEY) {
+			try {
+				const settings = readSettingsFile();
+				const key = settings?.globalWindsurfApiKey as string | undefined;
+				if (key?.trim()) env.WINDSURF_API_KEY = key.trim();
+			} catch {
+				/* settings file not available */
+			}
+		}
+
+		return Object.fromEntries(
+			Object.entries(env).filter(([_, value]) => value.trim() !== ""),
+		);
+	}
+
+	/**
+	 * La construction proprement dite. `selectedProviderOverride` remplace la
+	 * valeur lue dans `settings.json` : tout le reste de la chaîne (clés,
+	 * base URLs, modes d'auth) est déjà écrit en fonction de ce nom.
+	 */
+	private buildEnvironmentVariables(
+		selectedProviderOverride?: string,
+	): Record<string, string> {
 		const env: Record<string, string> = {};
 
 		// Priority check: if the user explicitly selected a non-Claude provider in settings,
@@ -1465,7 +1509,8 @@ export class CredentialManager extends EventEmitter {
 		try {
 			const settings = readSettingsFile();
 			const selectedProvider = (
-				settings?.selectedProvider as string | undefined
+				selectedProviderOverride ??
+				(settings?.selectedProvider as string | undefined)
 			)?.toLowerCase();
 			const nonClaudeProviders = [
 				"copilot",
@@ -1665,9 +1710,8 @@ export class CredentialManager extends EventEmitter {
 				const windsurfKey = settings?.globalWindsurfApiKey as
 					| string
 					| undefined;
-				const explicitProvider = settings?.selectedProvider as
-					| string
-					| undefined;
+				const explicitProvider = (selectedProviderOverride ??
+					settings?.selectedProvider) as string | undefined;
 				// Do NOT inject windsurf if the user explicitly chose Claude Code or Anthropic.
 				// The globalWindsurfApiKey may exist from a previous configuration but should
 				// not override the user's current provider choice.

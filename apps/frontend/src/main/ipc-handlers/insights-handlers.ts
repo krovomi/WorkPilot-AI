@@ -2,23 +2,18 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
-	readFileSync,
 	writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
-import { app, ipcMain } from "electron";
+import { ipcMain } from "electron";
 import {
 	AUTO_BUILD_PATHS,
-	DEFAULT_APP_SETTINGS,
-	DEFAULT_FEATURE_MODELS,
-	DEFAULT_FEATURE_THINKING,
 	getSpecsDir,
 	IPC_CHANNELS,
 } from "../../shared/constants";
 import { MODEL_ID_MAP } from "../../shared/constants/models";
 import type {
-	AppSettings,
 	InsightsModelConfig,
 	InsightsSession,
 	InsightsSessionSummary,
@@ -27,9 +22,9 @@ import type {
 	TaskMetadata,
 } from "../../shared/types";
 import { slugifySpecTitle } from "../../shared/utils/spec-slug";
-import { debugError } from "../../shared/utils/debug-logger";
 import { insightsService } from "../insights-service";
 import { projectStore } from "../project-store";
+import { getPageFeatureSettings } from "../services/page-llm-config";
 import { safeSendToRenderer } from "./utils";
 
 /**
@@ -46,43 +41,17 @@ function getModelTypeFromModelId(modelId: string): "haiku" | "sonnet" | "opus" {
 }
 
 /**
- * Read insights feature settings from the settings file
+ * Read insights feature settings.
+ *
+ * Le modèle et l'effort viennent de la page Insights si elle les surcharge,
+ * sinon des réglages — une seule lecture, dans `services/page-llm-config`.
  */
 function getInsightsFeatureSettings(): InsightsModelConfig {
-	const settingsPath = path.join(app.getPath("userData"), "settings.json");
-
-	try {
-		if (existsSync(settingsPath)) {
-			const content = readFileSync(settingsPath, "utf-8");
-			const settings: AppSettings = {
-				...DEFAULT_APP_SETTINGS,
-				...JSON.parse(content),
-			};
-
-			// Get insights-specific settings from Agent Settings
-			// Use nullish coalescing at property level to handle partial settings objects
-			const featureModels = settings.featureModels ?? DEFAULT_FEATURE_MODELS;
-			const featureThinking =
-				settings.featureThinking ?? DEFAULT_FEATURE_THINKING;
-
-			return {
-				profileId: "balanced", // Default profile for settings-based config
-				model: getModelTypeFromModelId(
-					featureModels.insights ?? DEFAULT_FEATURE_MODELS.insights,
-				),
-				thinkingLevel:
-					featureThinking.insights ?? DEFAULT_FEATURE_THINKING.insights,
-			};
-		}
-	} catch (error) {
-		debugError("[Insights Handler] Failed to read feature settings:", error);
-	}
-
-	// Return defaults if settings file doesn't exist or fails to parse
+	const { model, thinkingLevel } = getPageFeatureSettings("insights");
 	return {
 		profileId: "balanced", // Default profile for settings-based config
-		model: getModelTypeFromModelId(DEFAULT_FEATURE_MODELS.insights),
-		thinkingLevel: DEFAULT_FEATURE_THINKING.insights,
+		model: getModelTypeFromModelId(model),
+		thinkingLevel: thinkingLevel as InsightsModelConfig["thinkingLevel"],
 	};
 }
 
