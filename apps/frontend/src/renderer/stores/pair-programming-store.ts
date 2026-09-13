@@ -10,6 +10,7 @@
  */
 
 import { create } from "zustand";
+import { useProjectStore } from "./project-store";
 import type {
 	AiAction,
 	PairMessage,
@@ -224,15 +225,22 @@ export async function loadPairSession(projectId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// IPC listener setup — call once on component mount, cleanup on unmount
+// IPC listener setup — registered once for the session by
+// stores/global-listeners.ts, never by the page
 // ---------------------------------------------------------------------------
 
-export function setupPairProgrammingListeners(projectId: string): () => void {
+export function setupPairProgrammingListeners(): () => void {
 	const store = usePairProgrammingStore.getState;
+
+	// The project is read at event time rather than captured when the listener
+	// is registered: the subscription now outlives both the page and the
+	// project selection, and the store holds one project's session at a time.
+	const isCurrentProject = (pid: string): boolean =>
+		pid === useProjectStore.getState().selectedProjectId;
 
 	const unsubChunk = globalThis.electronAPI.onPairStreamChunk(
 		(pid: string, chunk: PairStreamChunk) => {
-			if (pid !== projectId) return;
+			if (!isCurrentProject(pid)) return;
 			switch (chunk.type) {
 				case "stream":
 					if (chunk.content) store().appendStreamContent(chunk.content);
@@ -264,35 +272,35 @@ export function setupPairProgrammingListeners(projectId: string): () => void {
 
 	const unsubStatus = globalThis.electronAPI.onPairStatus(
 		(pid: string, status: string, message: string) => {
-			if (pid !== projectId) return;
+			if (!isCurrentProject(pid)) return;
 			store().setStatus(status as PairStatus, message);
 		},
 	);
 
 	const unsubAction = globalThis.electronAPI.onPairAiAction(
 		(pid: string, action: AiAction) => {
-			if (pid !== projectId) return;
+			if (!isCurrentProject(pid)) return;
 			store().addAiAction(action);
 		},
 	);
 
 	const unsubConflict = globalThis.electronAPI.onPairConflict(
 		(pid: string, filePath: string, message: string) => {
-			if (pid !== projectId) return;
+			if (!isCurrentProject(pid)) return;
 			store().addConflict(filePath, message);
 		},
 	);
 
 	const unsubError = globalThis.electronAPI.onPairError(
 		(pid: string, error: string) => {
-			if (pid !== projectId) return;
+			if (!isCurrentProject(pid)) return;
 			store().setStatus("error", error);
 		},
 	);
 
 	const unsubComplete = globalThis.electronAPI.onPairComplete(
 		(pid: string, summary: string) => {
-			if (pid !== projectId) return;
+			if (!isCurrentProject(pid)) return;
 			store().finalizeAiMessage();
 			store().setStatus("completed", summary);
 		},

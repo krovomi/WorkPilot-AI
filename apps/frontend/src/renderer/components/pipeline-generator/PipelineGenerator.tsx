@@ -1,5 +1,4 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	CI_PLATFORMS,
@@ -8,7 +7,6 @@ import {
 	generatePipelines,
 	PLATFORM_ICONS,
 	PLATFORM_LABELS,
-	setupPipelineGeneratorListeners,
 	usePipelineGeneratorStore,
 } from "../../stores/pipeline-generator-store";
 import { useProjectStore } from "../../stores/project-store";
@@ -33,11 +31,6 @@ export function PipelineGenerator(): React.ReactElement {
 
 	const isRunning = phase === "generating";
 	const isComplete = phase === "complete";
-
-	useEffect(() => {
-		const cleanup = setupPipelineGeneratorListeners();
-		return cleanup;
-	}, []);
 
 	function handleGenerate() {
 		if (!activeProject?.path) return;

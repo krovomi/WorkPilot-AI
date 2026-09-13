@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupOnboardingAgentListeners,
-	useOnboardingAgentStore,
-} from "../../stores/onboarding-agent-store";
+import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
 import type { OnboardingGuide } from "../../../shared/types/onboarding";
 import { useGeneratedText } from "./shared";
 
@@ -101,11 +97,6 @@ export function OnboardingGuideView({
 	projectPath,
 }: OnboardingGuideViewProps): React.ReactElement {
 	const { t } = useTranslation("onboardingAgent");
-
-	useEffect(() => {
-		const cleanup = setupOnboardingAgentListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useOnboardingAgentStore((s) => s.phase);
 	const status = useOnboardingAgentStore((s) => s.status);

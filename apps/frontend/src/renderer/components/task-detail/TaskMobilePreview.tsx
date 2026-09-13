@@ -16,7 +16,6 @@ import {
 	detectMobileProject,
 	launchMobileApp,
 	refreshMobileScreenshot,
-	setupMobileListeners,
 	stopMobileSession,
 	useMobileStore,
 } from "../../stores/mobile-store";
@@ -67,8 +66,6 @@ export function TaskMobilePreview({
 	const error = useMobileStore((state) => state.error);
 	const selectPlatform = useMobileStore((state) => state.selectPlatform);
 	const selectDevice = useMobileStore((state) => state.selectDevice);
-
-	useEffect(() => setupMobileListeners(), []);
 
 	useEffect(() => {
 		setResolvedWorktreePath(worktreePath ?? null);

@@ -403,7 +403,10 @@ import { ViewStateProvider } from "./contexts/ViewStateContext";
 import { useGlobalTerminalListeners } from "./hooks/useGlobalTerminalListeners";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useReauthNotifications } from "./hooks/use-reauth-notifications";
+import { useTaskActivityBridge } from "./hooks/useTaskActivityBridge";
 import { useTaskNotifications } from "./hooks/useTaskNotifications";
+import { setActivityActiveView } from "./stores/activity-store";
+import { setupGlobalListeners } from "./stores/global-listeners";
 import {
 	loadClaudeProfiles,
 	useClaudeProfileStore,
@@ -512,6 +515,11 @@ export function App() {
 	// Load global terminal output listeners to buffer output across project switches
 	// This ensures terminal output is captured even when the terminal component is not rendered
 	useGlobalTerminalListeners();
+
+	// Same reasoning, for every other feature: the IPC listeners of a page must
+	// outlive the page, or work that finishes while the user is elsewhere is
+	// never heard of again.
+	useEffect(() => setupGlobalListeners(), []);
 
 	// Handle terminal profile change events (recreate terminals on profile switch)
 	useTerminalProfileChange();
@@ -641,6 +649,15 @@ export function App() {
 
 	// Task completion toast notifications (human_review, done, pr_created, error)
 	useTaskNotifications({ onNavigate: (view) => setActiveView(view) });
+
+	// The Kanban's running builds, mirrored into the activity registry that
+	// feeds the sidebar badges.
+	useTaskActivityBridge();
+
+	// Which page is on screen decides whether a result needs a badge at all.
+	useEffect(() => {
+		setActivityActiveView(activeView);
+	}, [activeView]);
 
 	// Programmatic main-view navigation (e.g. the visual canvas jumps to the
 	// Kanban after queuing a scaffold task).

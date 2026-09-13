@@ -35,6 +35,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [State Management (Zustand)](#state-management-zustand)
   - [Styling](#styling)
   - [IPC Communication](#ipc-communication)
+  - [Background work and the sidebar](#background-work-and-the-sidebar-storesactivity-storets)
   - [Agent Management](#agent-management)
   - [Claude Profile System](#claude-profile-system)
   - [Terminal System](#terminal-system)
@@ -1230,6 +1231,50 @@ Main ↔ Renderer communication via Electron IPC:
 - **Handlers:** `src/main/ipc-handlers/` — organized by domain (github, gitlab, ideation, context, etc.)
 - **Preload:** `src/preload/` — exposes safe APIs to renderer
 - Pattern: renderer calls via `window.electronAPI.*`, main handles in IPC handler modules
+
+**A page never owns its subscription.** Every `setup<X>Listeners()` is registered
+once for the life of the window by `stores/global-listeners.ts`, called from
+`App.tsx`. It used to be called by the page component, in a `useEffect` whose
+cleanup ran on unmount — and `App.tsx` unmounts a view the moment the user
+navigates away. The work itself never stopped (it runs in the main process), but
+nobody was listening: progress events fell on the floor, the store stayed on
+`isGenerating: true` for ever, and coming back to the page showed a run that had
+finished ten minutes earlier. Thirty-seven features had the same bug, because
+they all copied the same shape.
+
+Registering twice is worse than registering never — the stores that append
+(ideas, log lines, findings) would double their content — so the bootstrap is
+idempotent and the invariant test in
+`stores/__tests__/global-listeners.test.ts` ("no page component registers IPC
+listeners of its own") fails the build if a page takes the
+subscription back. A listener that needs a project reads it at event time
+(`useProjectStore.getState().selectedProjectId`) rather than capturing it, which
+is what makes the session scope possible at all.
+
+### Background work and the sidebar (`stores/activity-store.ts`)
+
+Work that outlives the page needs somewhere to be *seen*. `activity-store` is
+the one registry: a feature reports `running → success | error`, and the sidebar,
+the toasts and the background indicator all read that instead of each feature
+inventing its own signal. `stores/activity-bridge.ts` derives it from a store's
+own phase, so the four ways a generation can end (complete, error, timeout,
+stopped) are covered once rather than hooked one by one.
+
+The model is unread mail, not notification. A finished job leaves a silent mark
+that survives navigation and clears when the page is visited; the page the user
+is currently watching never badges itself.
+
+| Rule | Why |
+|---|---|
+| running is a static hollow ring, never an animation | eight active pages must stay readable; motion is for what *changed* |
+| at most one entry animates, three pulses, then still | two pages finishing together is one animation and one silent badge — the difference between a signal and a light show |
+| a failure keeps the slot a later success would have taken | the eye is spent on the thing worth acting on |
+| shape carries the state, colour only doubles it | seven themes, and colour-blind users |
+| a folded group carries the worst state of its entries | `navGroups` are collapsed by default, so work behind one would be invisible |
+| the badge is `role="img"`, not a live region | a live region on ~80 entries announces the whole sidebar on every change |
+
+Animation is capped by the global `prefers-reduced-motion` block in
+`globals.css`, so nothing new has to opt in.
 
 ### Agent Management (`src/main/agent/`)
 

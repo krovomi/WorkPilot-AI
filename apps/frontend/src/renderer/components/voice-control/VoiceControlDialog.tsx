@@ -14,7 +14,6 @@ import { useTranslation } from "react-i18next";
 import { useProjectStore } from "../../stores/project-store";
 import type { VoiceControlResult } from "../../stores/voice-control-store";
 import {
-	setupVoiceControlListeners,
 	startRecording,
 	stopRecording,
 	useVoiceControlStore,
@@ -69,12 +68,6 @@ export function VoiceControlDialog({
 	} = useVoiceControlStore();
 
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
-
-	// Setup IPC listeners once
-	useEffect(() => {
-		const cleanup = setupVoiceControlListeners();
-		return cleanup;
-	}, []);
 
 	// Auto-scroll streaming output
 	useEffect(() => {
