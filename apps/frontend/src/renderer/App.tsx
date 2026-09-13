@@ -396,6 +396,7 @@ import { NoProjectPage } from "./components/NoProjectPage";
 import { OnboardingWizard } from "./components/onboarding";
 import { ProjectTabBar } from "./components/ProjectTabBar";
 import { ProviderContextProvider } from "./components/ProviderContext";
+import { PageLlmSelector } from "./components/PageLlmSelector";
 import { ProviderSelector } from "./components/ProviderSelector";
 import { VersionWarningModal } from "./components/VersionWarningModal";
 import { VoiceControlDialog } from "./components/voice-control";
@@ -1770,7 +1771,10 @@ export function App() {
 								{/* Ligne sticky avec ProviderSelector et bouton "Claude Code" placée juste sous les tabs projets */}
 								<div className="flex items-center justify-between gap-3 px-2.5 py-2 border-b border-border bg-background sticky top-0 z-30">
 									<div className="flex items-center flex-1 min-w-0">
-										{/* Espace réservé pour alignement, ou autre contenu si besoin */}
+										{/* Le choix propre à la page : il prime sur la liste à
+										    droite, et n'apparaît que sur une page qui sait
+										    l'exécuter. */}
+										<PageLlmSelector page={activeView} />
 									</div>
 									<div className="shrink-0">
 										<ProviderSelector
