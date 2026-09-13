@@ -51,6 +51,12 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: +security-extended,security-and-quality
+          # The same exclusion `codeql.yml` uses. Two workflows run CodeQL on
+          # every PR, each with its own `init`, so a scope set on one of them
+          # is not set at all — which is how the vendored tree kept raising
+          # alerts after being excluded. The config file is shared so the two
+          # cannot drift into scanning different things.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4

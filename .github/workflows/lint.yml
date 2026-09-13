@@ -91,8 +91,28 @@ jobs:
       # as the code they generate from.
       - name: Run ruff on the skills scripts
         run: |
-          ruff check scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_bmad.py --output-format=github
-          ruff format scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_bmad.py --check --diff
+          ruff check scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py --output-format=github
+          ruff format scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py --check --diff
+
+      # `apps/backend/vendor/archify` is a pinned copy of third-party code, and
+      # a pin nobody verifies is a comment. This compares the bytes on disk to
+      # the digest `VENDOR.json` records, and fails naming the files that moved.
+      #
+      # It exists because three files in that tree were once edited in place by
+      # an autofix bot: the receipt still said v2.16.0, because the only thing
+      # anyone checked was that string. Re-running the vendoring script then
+      # reverted the edits without saying so. Reads the disk, hits no network.
+      - name: Check the vendored archify tree matches its pin
+        run: python3 scripts/vendor_archify.py --check
+
+      # `skills/bmad` is the same guarantee for the BMAD pack, and the reason
+      # it is worth a second step rather than a footnote: CodeQL and ruff are
+      # both told to leave that tree alone, so this is the only thing standing
+      # between "vendored at 6.12.0" and whatever the tree actually holds.
+      # Unlike the archify check it re-downloads the pinned npm release, so it
+      # needs the network — a registry outage fails this step and nothing else.
+      - name: Check the vendored BMAD tree matches its pin
+        run: python3 scripts/vendor_bmad.py --check
 
   # TypeScript/JavaScript linting (Biome) - 15-25x faster than ESLint
   typescript:
