@@ -9,16 +9,18 @@ where the output is going.
 
 from __future__ import annotations
 
-import stat
 import sys
 from pathlib import Path
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "backend"))
 
 from rtk import capture_for_model  # noqa: E402
 from rtk import runtime as rtk_runtime  # noqa: E402
+
+from tests.rtk_fake import write_fake_rtk  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -38,15 +40,7 @@ def _clean_env(monkeypatch):
 @pytest.fixture
 def fake_rtk(tmp_path, monkeypatch):
     """An rtk that turns any command into `echo condensed`."""
-    script = tmp_path / "rtk"
-    script.write_text(
-        "#!/usr/bin/env bash\n"
-        'if [ "$1" = "--version" ]; then echo "rtk 0.48.0"; exit 0; fi\n'
-        'if [ "$1" = "rewrite" ]; then echo "echo condensed"; exit 0; fi\n'
-        "exit 1\n",
-        encoding="utf-8",
-    )
-    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    script = write_fake_rtk(tmp_path, rewrite="echo condensed")
     monkeypatch.setenv("WORKPILOT_RTK_PATH", str(script))
     rtk_runtime.reset_cache()
     return script
@@ -116,15 +110,7 @@ def test_a_rewrite_that_needs_a_shell_is_discarded(tmp_path, monkeypatch):
     argv is dropped and the original command runs: the condensing is worth a
     few hundred bytes and it is not worth that.
     """
-    script = tmp_path / "rtk"
-    script.write_text(
-        "#!/usr/bin/env bash\n"
-        'if [ "$1" = "--version" ]; then echo "rtk 0.48.0"; exit 0; fi\n'
-        'if [ "$1" = "rewrite" ]; then echo "rtk ls | head -1"; exit 0; fi\n'
-        "exit 1\n",
-        encoding="utf-8",
-    )
-    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    script = write_fake_rtk(tmp_path, rewrite="rtk ls | head -1")
     monkeypatch.setenv("WORKPILOT_RTK_PATH", str(script))
     rtk_runtime.reset_cache()
 
