@@ -32,13 +32,16 @@ RESULT_MARKER = "__HERMES_RESULT__:"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-def _pending(repo_root: Path) -> list[str]:
-    try:
-        from learning_loop.skill_proposer import proposal_dir
+def _pending(repo_root: Path) -> tuple[list[str], int]:
+    """The queue as a person sees it: what is left to read, and what is stale.
 
-        return sorted(p.name for p in proposal_dir(repo_root).glob("hermes--*.md"))
-    except Exception:  # noqa: BLE001 - an unreadable queue is not an outage
-        return []
+    One reader for both surfaces — `hermes/api.py` calls the same function.
+    Candidates this repository has since decided against are counted, not
+    listed, and the next cycle withdraws them.
+    """
+    from learning_loop.hermes_ingest import queue_state
+
+    return queue_state(repo_root)
 
 
 def _doctor(repo_root: Path) -> dict:
@@ -46,11 +49,13 @@ def _doctor(repo_root: Path) -> dict:
 
 
 def _status(repo_root: Path) -> dict:
+    pending, stale = _pending(repo_root)
     return {
         "success": True,
         "readiness": doctor(repo_root).to_dict(),
         "soul": soul_status(repo_root).to_dict(),
-        "pending": _pending(repo_root),
+        "pending": pending,
+        "stale": stale,
         "surfaces": [{"id": k, "description": v} for k, v in SURFACES.items()],
     }
 
@@ -58,7 +63,7 @@ def _status(repo_root: Path) -> dict:
 def _cycle(repo_root: Path, surface: str, dry_run: bool) -> dict:
     result = run_cycle(repo_root, surface=surface, write=not dry_run)
     payload = result.to_dict()
-    payload["pending"] = _pending(repo_root)
+    payload["pending"], payload["stale"] = _pending(repo_root)
     return {"success": True, "cycle": payload}
 
 
@@ -81,10 +86,20 @@ def _summary(payload: dict, repo_root: Path) -> str:
     cycle = payload.get("cycle")
     if cycle and cycle.get("ran"):
         ingest = cycle.get("ingest") or {}
-        return (
+        line = (
             f"hermes [{cycle['surface']}]: {ingest.get('found', 0)} authored skill(s) seen, "
             f"{ingest.get('proposed', 0)} proposed, {ingest.get('unchanged', 0)} already pending"
         )
+        # What the cycle settled by itself belongs on the same line as what it
+        # filed: a run that proposed nothing because it turned sixty away and a
+        # run that proposed nothing because hermes wrote nothing are different
+        # answers, and the difference is the whole point of the triage.
+        settled = []
+        if ingest.get("droppedTotal"):
+            settled.append(f"{ingest['droppedTotal']} out of scope")
+        if ingest.get("pruned"):
+            settled.append(f"{ingest['pruned']} withdrawn")
+        return line + (f", {', '.join(settled)}" if settled else "")
     if "soul" in payload and "readiness" not in payload:
         return f"hermes SOUL.md: {payload.get('message', '')}"
     readiness = (cycle or payload).get("readiness") or {}

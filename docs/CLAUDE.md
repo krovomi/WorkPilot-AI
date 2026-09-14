@@ -504,6 +504,62 @@ supposed to catch it wrote the manifest as JSON: it encoded our idea of the form
 instead of the format. A denylist that fails open floods the queue; an allowlist that
 fails closed proposes nothing, which a person notices and nothing is harmed by.
 
+**And only what this repository has a use for.** The rule above reads files
+*upstream* owns, which is right for the question it answers — what did hermes
+write? — and is the one property that keeps failing. It failed by parsing
+`.bundled_manifest` as JSON; it failed again on an install whose `.usage.json`
+claims authorship over the shipped catalogue and which ships no manifest to
+subtract. Both times the symptom was identical: sixty-one candidates, `airtable`
+and `imessage` among them, and a person asked to delete them one by one. A third
+fix to the reading of upstream's files would be the third version of the same
+mistake.
+
+`learning_loop/hermes_triage.py` is a **second authority**, and its inputs are
+facts this repository owns:
+
+| Read from | Answers |
+|---|---|
+| `skills/hermes/pack.json` (`--subdir`) | which of hermes's categories this project tracks |
+| the same file (`--exclude`) | which names it looked at and turned down |
+| `skills/<pack>/`, `skills-lock.json`, `.agents/skills/` | which skills it already provides |
+
+The two authorities fail in opposite directions — hermes's bookkeeping fails
+open, because an absent file excludes nothing; the scope fails closed, because an
+unreadable `pack.json` leaves the declared default and an unknown category is out
+of scope — so a flood now needs both to fail at once, and the second one cannot
+fail by upstream shipping a release. Four reasons, all reported rather than
+merely applied (`DROP_REASONS`): `already-provided`, `declined-here`,
+`out-of-scope`, `upstream-catalogue`.
+
+The last one is the rule for a hermes home kept flat, where there is no category
+directory to compare against — which is the shape the sixty-one arrived in. It
+reads the frontmatter: hermes's own authoring standard requires `author` and
+`license` of a skill contributed to its repository, and requires neither of a
+skill `skill_manage(action='create')` writes from a session's experience. A
+locally authored skill carrying both is turned away, and that is the error worth
+making — one skill nobody had yet, against sixty files nobody wanted. The
+exception is hermes's approval queue: a skill is in `pending/skills/` only
+because the agent just wrote it, so the fingerprint is not asked of it. That is
+the one input whose provenance is not a record that can fail open, and silencing
+it would cost the loop its best source.
+
+**A rule that changed reaches the files the old rule produced.** Every cycle
+withdraws the queued candidates a fresh verdict turns away, before it looks at
+what hermes has — sixty files filed under a broken rule are one bug, not sixty
+decisions somebody took, and the alternative is charging their owner for it. Only
+files the ingest itself wrote are eligible (`recorded_facts` returns nothing for
+anything else, so the learning loop's own evidence-carrying proposals are never
+touched), and a legacy candidate that recorded neither its category nor its shape
+is re-derived from the source path it does record. `GET /api/hermes/status` and
+the Kanban card therefore report *what is left to read*, not what is on disk:
+stale candidates are a number, not sixty rows, and the read does not delete them
+— the next cycle does.
+
+What triage does **not** move is the gate. A candidate that passes it still
+carries no evidence from a build that used it, so it is filed and promoted by
+nothing; `skill_proposer.evaluate` still refuses to invent corroboration. The
+autonomy added here is over the chore, not over the decision.
+
 ```bash
 python3 scripts/skills_cli.py hermes-ingest --dry-run
 python3 runners/hermes_runner.py --action status

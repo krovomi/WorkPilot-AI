@@ -16,7 +16,8 @@
 	"cycle": {
 		"run": "Lancer maintenant",
 		"running": "En cours…",
-		"result": "{{found}} skill(s) vus · {{proposed}} proposés · {{unchanged}} déjà en attente"
+		"result": "{{found}} skill(s) vus · {{proposed}} proposés · {{unchanged}} déjà en attente",
+		"triage": "{{dropped}} écarté(s) par le périmètre du dépôt · {{pruned}} retiré(s) de la file"
 	},
 	"checks": {
 		"title": "Conditions",
@@ -35,5 +36,17 @@
 	"pending": {
 		"title": "En attente de revue",
 		"description": "Uniquement des candidats. Rien ici n'est actif et rien n'est promu seul : un skill écrit par hermes ne porte aucune preuve issue d'un build qui s'en serait servi."
+	},
+	"triage": {
+		"title": "Décidé sans vous",
+		"description": "Hermes embarque un catalogue de plusieurs centaines de skills. Ce que ce dépôt a déjà décidé à son sujet — les catégories suivies par le pack hermes, les noms qu'il exclut, les skills que les packs fournissent déjà — s'applique ici : ces candidats ne sont jamais déposés, et ceux qu'une ancienne règle avait déposés sont retirés.",
+		"stale_one": "{{count}} candidat issu d'une ancienne règle sera retiré au prochain cycle",
+		"stale_other": "{{count}} candidats issus d'une ancienne règle seront retirés au prochain cycle",
+		"reason": {
+			"already-provided": "déjà fourni ici",
+			"declined-here": "exclu par le pack hermes",
+			"out-of-scope": "catégorie hermes non suivie par ce dépôt",
+			"upstream-catalogue": "livré avec hermes, pas appris"
+		}
 	}
 }
