@@ -32,6 +32,14 @@ tooling = "^1"
 #                `skills:bootstrap --pack bmad` installs
 #   superpowers, mattpocock, impeccable, task-observer, claude-mem
 #                upstream packs, available to any project that lists them
+#   hermes-learned
+#                written by the learning loop, not by a person: skills
+#                hermes-agent authored from its own experience, adopted
+#                verbatim. Its absence here is the feature — the resolver
+#                rejects every skill in it at the `pack-pin` gate, so nothing
+#                in it reaches any harness. Listing it is the decision that
+#                those drafts belong in an agent's palette, and the moment to
+#                do the portability rewrite each one describes.
 # Add one and run `pnpm run skills:build` to pull it into this repo's palette.
 
 # Harnesses to materialise. Omit to use the defaults from

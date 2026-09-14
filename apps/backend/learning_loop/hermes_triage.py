@@ -144,7 +144,18 @@ def _provided_names(repo_root: Path) -> set[str]:
     * ``skills-lock.json`` — what the last ``skills:build`` owned.
     * ``.agents/skills/<name>/`` — what is actually emitted, which is the set a
       harness can load today.
+
+    The one pack left out is `hermes_adopt.ADOPTED_PACK`, and for the reason
+    the others are in: those are decisions a person took about a name, and that
+    one is this loop's own output. Counting it would make the loop mask its own
+    inputs a build later — the candidate would stop being reported as
+    "unchanged, already pending" and start being reported as "this repository
+    already provides it", which is true of nothing a person did. What keeps an
+    adopted name from being adopted twice is the ledger, next door, which also
+    remembers the ones somebody deleted.
     """
+    from .hermes_adopt import ADOPTED_PACK
+
     root = Path(repo_root)
     names: set[str] = set()
 
@@ -152,6 +163,8 @@ def _provided_names(repo_root: Path) -> set[str]:
     if skills_root.is_dir():
         for pack in skills_root.iterdir():
             if not pack.is_dir() or pack.name.startswith("_"):
+                continue
+            if pack.name == ADOPTED_PACK:
                 continue
             names.update(
                 skill.parent.name

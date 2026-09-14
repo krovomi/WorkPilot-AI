@@ -93,6 +93,8 @@ def hermes_status():
     if _is_server_mode():
         return _DESKTOP_ONLY
     try:
+        from learning_loop.hermes_adopt import ADOPTED_PACK, adopted_names
+
         report = doctor(_REPO_ROOT)
         pending, stale = _pending(_REPO_ROOT)
         return {
@@ -102,6 +104,8 @@ def hermes_status():
                 "soul": soul_status(_REPO_ROOT).to_dict(),
                 "pending": pending,
                 "stale": stale,
+                "adopted": adopted_names(_REPO_ROOT),
+                "adoptedPack": ADOPTED_PACK,
                 "surfaces": [
                     {"id": key, "description": text} for key, text in SURFACES.items()
                 ],

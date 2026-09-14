@@ -622,6 +622,10 @@ export interface HermesStatus {
 	 * travail pour personne, le prochain cycle les retire.
 	 */
 	readonly stale: number;
+	/** Skills adoptés dans `skills/<adoptedPack>/`, encore présents. */
+	readonly adopted: readonly string[];
+	/** Le pack d'adoption — non listé dans `.workpilot/skills.toml`, donc émis nulle part. */
+	readonly adoptedPack: string;
 	readonly surfaces: readonly { readonly id: string; readonly description: string }[];
 }
 
@@ -644,6 +648,10 @@ export interface HermesCycle {
 		readonly droppedTotal: number;
 		/** Candidats déjà en file que ce cycle a retirés. */
 		readonly pruned: number;
+		/** Ce que ce cycle a adopté, par nom de skill. */
+		readonly adopted: readonly string[];
+		/** Noms que le registre d'adoption avait déjà tranchés. */
+		readonly alreadyAdopted: number;
 		readonly reason: string;
 	} | null;
 }

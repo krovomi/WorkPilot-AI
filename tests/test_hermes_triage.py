@@ -25,6 +25,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 from hermes import run_cycle  # noqa: E402
+from learning_loop.hermes_adopt import (  # noqa: E402
+    ADOPTED_PACK,
+    adoption_enabled,
+    ledger_names,
+)
 from learning_loop.hermes_ingest import (  # noqa: E402
     ingest_hermes_skills,
     queue_state,
@@ -99,10 +104,18 @@ def _skill(home: Path, category: str, name: str, frontmatter: str = "") -> Path:
 
 
 def _claim_authorship(home: Path, *names: str) -> None:
-    """`.usage.json` saying the agent wrote them — the record that fails open."""
-    (home / "skills" / ".usage.json").write_text(
-        json.dumps({name: {"created_by": "agent"} for name in names}), encoding="utf-8"
-    )
+    """`.usage.json` saying the agent wrote them — the record that fails open.
+
+    Merges rather than replaces: hermes appends to this file, and a helper that
+    overwrote it made "five authored skills" silently mean one.
+    """
+    usage = home / "skills" / ".usage.json"
+    data = {}
+    if usage.is_file():
+        data = json.loads(usage.read_text(encoding="utf-8"))
+    for name in names:
+        data[name] = {"created_by": "agent"}
+    usage.write_text(json.dumps(data), encoding="utf-8")
 
 
 class TestScope:
@@ -221,7 +234,7 @@ class TestTheFloodWithHermesBookkeepingGone:
 
         report = ingest_hermes_skills(repo, home=home)
 
-        assert [p.name for p in report.written] == ["hermes--diagnose-the-flake.md"]
+        assert [p.parent.name for p in report.adopted] == ["diagnose-the-flake"]
         assert report.dropped_total == len(self.CATALOGUE_NAMES)
 
     def test_the_approval_queue_is_triaged_too(self, repo, home):
@@ -247,15 +260,15 @@ class TestTheFloodWithHermesBookkeepingGone:
             encoding="utf-8",
         )
         report = ingest_hermes_skills(repo, home=home)
-        assert [p.name for p in report.written] == ["hermes--diagnose-the-flake.md"]
+        assert [p.parent.name for p in report.adopted] == ["diagnose-the-flake"]
 
     def test_a_run_that_filed_nothing_says_which_kind_of_nothing(self, repo, home):
         for name in self.CATALOGUE_NAMES:
             _skill(home, "productivity", name, CATALOGUE)
         _claim_authorship(home, *self.CATALOGUE_NAMES)
         report = ingest_hermes_skills(repo, home=home)
-        assert "out of scope" in report.reason
-        assert "out of scope" in report.describe()
+        assert "out of this repository's scope" in report.reason
+        assert "does not track" in report.describe()
 
 
 class TestTheQueueCleansItself:
@@ -348,7 +361,7 @@ class TestQueueState:
         ingest_hermes_skills(repo, home=home)
 
         pending, stale = queue_state(repo)
-        assert pending == ["hermes--diagnose-the-flake.md"]
+        assert pending == []
         assert stale == 0
 
     def test_reading_the_queue_deletes_nothing(self, repo, home):
@@ -371,3 +384,172 @@ class TestTheCycleReportsWhatItSettled:
         assert payload["ingest"]["droppedTotal"] == 2
         assert payload["ingest"]["dropped"] == {"out-of-scope": 2}
         assert payload["ingest"]["pruned"] == 0
+
+
+class TestAdoption:
+    """What the loop keeps, it files in the repository — and in no palette.
+
+    The step this replaces was pure transcription: open the candidate, copy the
+    body into `skills/<pack>/`, delete the candidate. The reason it is safe to
+    automate is not that the prose is trusted — it is that
+    `.workpilot/skills.toml` is a want-list, so a pack nobody listed is
+    rejected at the `pack-pin` gate and reaches no harness. The tests below are
+    about that boundary and about the two things a person does afterwards that
+    the loop must never undo.
+    """
+
+    def _learned(self, repo: Path, name: str) -> Path:
+        return repo / "skills" / ADOPTED_PACK / name / "SKILL.md"
+
+    def _authored(
+        self, home: Path, name: str, body: str = "Open the log with `read_file`."
+    ) -> None:
+        _skill(home, "", name)
+        path = home / "skills" / name / "SKILL.md"
+        path.write_text(
+            f"---\nname: {name}\ndescription: A learned procedure.\n---\n\n{body}\n",
+            encoding="utf-8",
+        )
+        _claim_authorship(home, name)
+
+    def test_a_triaged_candidate_is_written_into_the_pack(self, repo, home):
+        self._authored(home, "diagnose-the-flake")
+        report = ingest_hermes_skills(repo, home=home, surface="build")
+
+        assert [p.parent.name for p in report.adopted] == ["diagnose-the-flake"]
+        assert self._learned(repo, "diagnose-the-flake").is_file()
+        # The queue keeps its copy, and that is deliberate: it is the live
+        # mirror of what hermes has on this machine, refreshed when hermes
+        # edits its own skill, while the adopted file is the snapshot this
+        # project took and never rewrites.
+        assert [p.name for p in report.written] == ["hermes--diagnose-the-flake.md"]
+
+    def test_the_pack_manifest_is_valid_or_every_build_breaks(self, repo, home):
+        """`packs.load_pack` raises `PackError` on a malformed manifest, and
+        that is fatal to the whole registry — not only to this pack."""
+        from skills_registry.packs import load_pack
+
+        self._authored(home, "diagnose-the-flake")
+        ingest_hermes_skills(repo, home=home)
+
+        pack = load_pack(repo / "skills" / ADOPTED_PACK)
+        assert pack.name == ADOPTED_PACK
+        assert [s.name for s in pack.skills()] == ["diagnose-the-flake"]
+
+    def test_the_pack_reaches_no_harness_until_a_project_lists_it(self, repo, home):
+        """The whole safety argument, asserted against the real resolver."""
+        from skills_registry.packs import load_pack
+        from skills_registry.project import ProjectConfig
+        from skills_registry.resolver import resolve
+
+        self._authored(home, "diagnose-the-flake")
+        ingest_hermes_skills(repo, home=home)
+        pack = load_pack(repo / "skills" / ADOPTED_PACK)
+
+        # A project that lists other packs, as this repository does.
+        listed = resolve([pack], ProjectConfig(project_dir=repo, packs={"comms": "^1"}))
+        assert listed.selected == []
+        assert [r.gate for r in listed.rejected] == ["pack-pin"]
+
+        # And what changes when somebody decides otherwise: one line.
+        opted_in = resolve(
+            [pack], ProjectConfig(project_dir=repo, packs={ADOPTED_PACK: "latest"})
+        )
+        assert [s.name for s in opted_in.selected] == ["diagnose-the-flake"]
+
+    def test_the_adopted_file_says_it_was_not_rewritten(self, repo, home):
+        """Adopting properly is a rewrite; a loop cannot do one. It says so."""
+        self._authored(home, "diagnose-the-flake")
+        ingest_hermes_skills(repo, home=home)
+
+        text = self._learned(repo, "diagnose-the-flake").read_text(encoding="utf-8")
+        assert "adopted: verbatim" in text
+        assert "## Portability" in text
+        assert "| `read_file` | Read |" in text
+
+    def test_a_hand_rewritten_adoption_survives_every_later_build(self, repo, home):
+        """The portability pass is the point of adopting. A refresh from hermes
+        would throw it away on the next build."""
+        self._authored(home, "diagnose-the-flake")
+        ingest_hermes_skills(repo, home=home)
+
+        mine = self._learned(repo, "diagnose-the-flake")
+        mine.write_text(
+            "---\nname: diagnose-the-flake\ndescription: Rewritten by hand.\n---\n\n"
+            "Run it ten times before reading anything.\n",
+            encoding="utf-8",
+        )
+        ingest_hermes_skills(repo, home=home)
+        assert "Rewritten by hand." in mine.read_text(encoding="utf-8")
+
+    def test_deleting_an_adoption_is_how_you_say_no(self, repo, home):
+        """Without a ledger the next build re-adopts it, and the person deletes
+        it again, for ever."""
+        import shutil
+
+        self._authored(home, "diagnose-the-flake")
+        ingest_hermes_skills(repo, home=home)
+        shutil.rmtree(self._learned(repo, "diagnose-the-flake").parent)
+
+        report = ingest_hermes_skills(repo, home=home)
+
+        assert not self._learned(repo, "diagnose-the-flake").exists()
+        assert report.adopted == []
+        assert report.already_adopted == 1
+        assert "diagnose-the-flake" in ledger_names(repo)
+
+    def test_an_adopted_name_stops_being_work_to_read(self, repo, home):
+        """The queue file stays — it is the mirror — but nobody is asked about
+        it again. A list that keeps showing settled names is the chore this
+        exists to remove."""
+        self._authored(home, "diagnose-the-flake")
+        ingest_hermes_skills(repo, home=home)
+
+        queued = repo / "skills" / "_proposed" / "hermes--diagnose-the-flake.md"
+        assert queued.is_file()
+        assert queue_state(repo) == ([], 0)
+
+    def test_the_switch_falls_back_to_the_queue(self, repo, home, monkeypatch):
+        monkeypatch.setenv("HERMES_AUTO_ADOPT", "0")
+        self._authored(home, "diagnose-the-flake")
+        report = ingest_hermes_skills(repo, home=home)
+
+        assert report.adopted == []
+        assert [p.name for p in report.written] == ["hermes--diagnose-the-flake.md"]
+        assert not (repo / "skills" / ADOPTED_PACK).exists()
+
+    def test_the_loops_own_pack_is_not_a_decision_about_a_name(self, repo, home):
+        """Counting `hermes-learned` as provided would make the loop mask its
+        own inputs: the candidate stops being reported as "already pending" and
+        starts being reported as something a person decided, which nobody did.
+        The ledger is what stops a second adoption."""
+        self._authored(home, "diagnose-the-flake")
+        ingest_hermes_skills(repo, home=home)
+
+        assert "diagnose-the-flake" not in read_scope(repo).provided
+        second = ingest_hermes_skills(repo, home=home)
+        assert second.dropped == {}
+        assert second.unchanged == 1
+        assert second.already_adopted == 1
+
+    def test_only_an_explicit_off_turns_it_off(self):
+        """A typo must not silently disable a feature the user believes is on."""
+        assert adoption_enabled({})
+        assert adoption_enabled({"HERMES_AUTO_ADOPT": "yes"})
+        assert adoption_enabled({"HERMES_AUTO_ADOPT": "maybe"})
+        assert not adoption_enabled({"HERMES_AUTO_ADOPT": "off"})
+
+    def test_a_dry_run_adopts_nothing(self, repo, home):
+        self._authored(home, "diagnose-the-flake")
+        report = ingest_hermes_skills(repo, home=home, write=False)
+        assert len(report.adopted) == 1
+        assert not (repo / "skills" / ADOPTED_PACK).exists()
+
+    def test_the_cap_counts_adoptions_too(self, repo, home):
+        """A pull request of two hundred files is the flood in another
+        directory."""
+        for i in range(5):
+            self._authored(home, f"learned-{i}")
+        report = ingest_hermes_skills(repo, home=home, limit=2)
+        assert len(report.adopted) == 2
+        assert report.deferred == 3
