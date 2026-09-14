@@ -1,5 +1,5 @@
 name: 'Setup Node.js Frontend'
-description: 'Set up Node.js with npm and cached dependencies for the frontend'
+description: 'Set up Node.js with pnpm and cached dependencies for the frontend'
 
 inputs:
   node-version:
@@ -7,88 +7,50 @@ inputs:
     required: false
     default: '22'
   ignore-scripts:
-    description: 'Whether to use --ignore-scripts flag during npm ci'
+    description: 'Whether to use --ignore-scripts flag during pnpm install'
     required: false
     default: 'false'
 
 outputs:
   cache-hit:
-    description: 'Whether npm cache was hit'
-    value: ${{ steps.cache.outputs.cache-hit }}
+    description: 'Whether pnpm cache was hit'
+    value: ${{ steps.cache-pnpm.outputs.cache-hit }}
 
 runs:
   using: 'composite'
   steps:
+    # 1. Installer pnpm de façon autonome (évite l'utilisation cassée de npm -g)
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.27.0
+        run_install: false
+
+    # 2. Configurer Node.js en activant la gestion native du cache pnpm
     - name: Setup Node.js ${{ inputs.node-version }}
+      id: cache-pnpm
       uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.node-version }}
+        cache: 'pnpm'
 
-    - name: Install pnpm
-      shell: bash
-      # Pin pnpm to match the version that generated pnpm-lock.yaml.
-      # pnpm 11 serializes the overrides section differently and triggers
-      # ERR_PNPM_LOCKFILE_CONFIG_MISMATCH against a lockfile written by pnpm 10.
-      #
-      # Installing it is not enough on its own: the macOS and Windows runner
-      # images ship a pnpm of their own (a shim under ~/Library/pnpm, and
-      # %LOCALAPPDATA%\pnpm) that sits ahead of npm's global bin on PATH. That
-      # shim activates a version it manages itself -- 12.4.1 when this broke --
-      # out of a tools directory the image does not always populate, and dies
-      # with ENOEXEC. `pnpm store path` then printed nothing, actions/cache was
-      # handed an empty `path`, and the job failed at setup with "Input required
-      # and not supplied: path" before a single test had run. Both frontend jobs
-      # went red on every branch, develop included.
-      #
-      # So npm's global bin goes first, and `pnpm` is the version pinned above.
-      run: |
-        npm cache clean --force
-        npm install -g pnpm@10.27.0
-
-        prefix="$(npm prefix -g)"
-        # Unix keeps binaries in <prefix>/bin; on Windows they sit in <prefix>
-        # itself. A `&&` one-liner would exit the step here under `set -e` on
-        # whichever of the two lacks the directory.
-        if [ -d "$prefix/bin" ]; then
-          prefix="$prefix/bin"
-        fi
-        echo "$prefix" >> "$GITHUB_PATH"
-
-    - name: Get pnpm cache directory
-      id: pnpm-cache-dir
-      shell: bash
-      # Which pnpm won is the first thing to know when this breaks again.
-      run: |
-        pnpm --version
-        if ! dir="$(pnpm store path)"; then
-          echo "::error::'pnpm store path' failed; see the line above for why."
-          exit 1
-        fi
-        if [ -z "$dir" ]; then
-          echo "::error::'pnpm store path' printed nothing. Refusing to hand actions/cache an empty path, which reports itself as 'Input required and not supplied: path' three steps later."
-          exit 1
-        fi
-        echo "dir=$dir" >> "$GITHUB_OUTPUT"
-
-    - name: Cache pnpm dependencies
-      id: cache
-      uses: actions/cache@v5
-      with:
-        path: ${{ steps.pnpm-cache-dir.outputs.dir }}
-        key: ${{ runner.os }}-pnpm-migrate-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('package.json') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-migrate-
-
+    # 3. Installer les dépendances du frontend avec pnpm
     - name: Install frontend dependencies with pnpm
       shell: bash
-      # Use pnpm to install dependencies since the project uses pnpm workspaces
-      # Ignore scripts to avoid electron-rebuild issues in CI
       run: |
-        # Remove any existing node_modules to avoid conflicts
+        # Nettoyage préventif des anciens modules
         rm -rf apps/frontend/node_modules
         rm -rf node_modules
-        cd apps/frontend && pnpm install --ignore-scripts
+        
+        # Installation respectant l'input de script
+        cd apps/frontend
+        if [ "${{ inputs.ignore-scripts }}" = "true" ]; then
+          pnpm install --ignore-scripts
+        else
+          pnpm install
+        fi
 
+    # 4. Vérification de l'installation
     - name: Verify pnpm installation
       shell: bash
       run: |
@@ -98,8 +60,9 @@ runs:
         fi
         echo "Frontend node_modules present ($(ls apps/frontend/node_modules | wc -l) entries)"
 
+    # 5. Injection propre d'electron-vite
     - name: Install electron-vite build tool
       shell: bash
-      # electron-vite bin link is not reliably created by npm ci for workspace devDependencies.
-      # Install it explicitly at root so node_modules/.bin/electron-vite is always present.
-      run: cd apps/frontend && pnpm add electron-vite@5.0.0 --save-dev --ignore-scripts
+      run: |
+        cd apps/frontend
+        pnpm add electron-vite@5.0.0 --save-dev --ignore-scripts
