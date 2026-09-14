@@ -141,6 +141,7 @@ import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+import { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 import {
 	registerVoiceControlHandlers,
 	setupVoiceControlEvents,
@@ -259,6 +260,7 @@ export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+export { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 export { registerVoiceControlHandlers } from "./voice-control-handlers";
 
 /**
@@ -488,6 +490,7 @@ export function setupIpcHandlers(
 	// Visual Programming handlers (diagram → code, code → diagram)
 	registerVisualProgrammingHandlers(getMainWindow);
 	setupVisualProgrammingEventForwarding(getMainWindow);
+	registerVisualToCodeHistoryHandlers();
 
 	// Design-to-Code handlers (design image → generated code)
 	registerDesignToCodeHandlers();

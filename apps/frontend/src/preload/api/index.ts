@@ -199,6 +199,8 @@ import type { DesignToCodeAPI } from "./modules/design-to-code-api";
 import { createDesignToCodeAPI } from "./modules/design-to-code-api";
 import type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 import { createVisualProgrammingAPI } from "./modules/visual-programming-api";
+import type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
+import { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 import {
 	createVoiceControlAPI,
 	type VoiceControlAPI,
@@ -294,6 +296,7 @@ export interface ElectronAPI
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
+		VisualToCodeHistoryAPI,
 		AutoRefactorAPI,
 		GenericIpcAPI,
 		DesignToCodeAPI {
@@ -434,6 +437,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
+		...createVisualToCodeHistoryAPI(),
 		...createDesignToCodeAPI(),
 		...createAutoRefactorAPI(),
 		...createGenericIpcAPI(),
@@ -562,6 +566,8 @@ export type { DesignToCodeAPI } from "./modules/design-to-code-api";
 export { createDesignToCodeAPI } from "./modules/design-to-code-api";
 export type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 export { createVisualProgrammingAPI } from "./modules/visual-programming-api";
+export type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
+export { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 export type { VoiceControlAPI } from "./modules/voice-control-api";
 export { createVoiceControlAPI } from "./modules/voice-control-api";
 export type { NaturalLanguageGitAPI } from "./natural-language-git-api";
