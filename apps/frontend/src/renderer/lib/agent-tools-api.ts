@@ -616,6 +616,12 @@ export interface HermesStatus {
 	readonly readiness: HermesReadiness;
 	readonly soul: HermesSoul;
 	readonly pending: readonly string[];
+	/**
+	 * Candidats encore dans la file mais que ce dépôt a déjà écartés — filés
+	 * avant que le triage existe. Un nombre, pas une liste : ce n'est plus du
+	 * travail pour personne, le prochain cycle les retire.
+	 */
+	readonly stale: number;
 	readonly surfaces: readonly { readonly id: string; readonly description: string }[];
 }
 
@@ -626,12 +632,18 @@ export interface HermesCycle {
 	readonly ran: boolean;
 	readonly proposed: number;
 	readonly pending: readonly string[];
+	readonly stale: number;
 	readonly ingest: {
 		readonly found: number;
 		readonly proposed: number;
 		readonly files: readonly string[];
 		readonly unchanged: number;
 		readonly deferred: number;
+		/** Ce que le triage a écarté à l'entrée, par motif (`hermes_triage`). */
+		readonly dropped: Readonly<Record<string, number>>;
+		readonly droppedTotal: number;
+		/** Candidats déjà en file que ce cycle a retirés. */
+		readonly pruned: number;
 		readonly reason: string;
 	} | null;
 }

@@ -17,6 +17,13 @@ emphatically not autonomous in the half that must not be: a candidate lands in
 refuses to invent corroboration, and counting hermes's own approval as
 corroboration is precisely inventing it.
 
+Between those two halves sits the work a person should never have been doing by
+hand: deciding that `airtable` is not a skill a build pipeline needs. That is
+`learning_loop.hermes_triage`. It reads decisions this repository already wrote
+down, and it applies them to the queue as well as to the intake — so a rule
+that changes reaches the files the old rule produced, and nobody deletes sixty
+files to pay for a bug.
+
 Why a cycle rather than a call
 ------------------------------
 `learning_loop/observe.py` called the ingest directly, which was right when the
@@ -83,6 +90,16 @@ class CycleReport:
         written = getattr(self.ingest, "written", None)
         return len(written) if written else 0
 
+    @property
+    def dropped(self) -> dict:
+        """What the run decided on its own, by reason. See `hermes_triage`."""
+        return dict(getattr(self.ingest, "dropped", {}) or {})
+
+    @property
+    def pruned(self) -> int:
+        withdrawn = getattr(self.ingest, "pruned", None)
+        return len(withdrawn) if withdrawn else 0
+
     def to_dict(self) -> dict:
         ingest = self.ingest
         return {
@@ -99,6 +116,13 @@ class CycleReport:
                 "files": [Path(p).name for p in getattr(ingest, "written", [])],
                 "unchanged": getattr(ingest, "unchanged", 0),
                 "deferred": getattr(ingest, "deferred", 0),
+                # What the loop settled without anyone: turned away on the way
+                # in, and withdrawn from a queue an older rule had filled.
+                # Reported rather than merely done — a filter nobody can see is
+                # indistinguishable from a feature that stopped working.
+                "dropped": self.dropped,
+                "droppedTotal": sum(self.dropped.values()),
+                "pruned": self.pruned,
                 "reason": getattr(ingest, "reason", ""),
             }
             if ingest is not None

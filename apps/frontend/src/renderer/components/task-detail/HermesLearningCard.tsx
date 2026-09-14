@@ -14,6 +14,15 @@ import { Button } from "../ui/button";
  * peut fonctionner sur cette machine, ce qui manque quand ce n'est pas le cas,
  * et elle dépose ce qu'il a appris dans la file de revue `skills/_proposed/`.
  *
+ * Elle montre aussi ce que la boucle a tranché toute seule : hermes livre un
+ * catalogue de plusieurs centaines de skills, et ce dépôt a déjà écrit quelque
+ * part ce qu'il en suit (`skills/hermes/pack.json`) et ce qu'il fournit déjà.
+ * `learning_loop/hermes_triage.py` applique ces décisions, à l'entrée comme à
+ * la file — parce que soixante fichiers déposés sous une règle périmée sont un
+ * bug, pas soixante décisions que quelqu'un a prises. Ce que la carte affiche
+ * en « en attente de revue » est donc ce qu'il reste à lire, pas ce qu'il y a
+ * sur le disque.
+ *
  * Deux choses qu'elle ne fait délibérément pas :
  *
  * - **promouvoir**. Un candidat issu d'hermes ne porte aucun signal externe :
@@ -51,6 +60,11 @@ export function HermesLearningCard() {
 	const { readiness, soul, pending } = status;
 	const unmet = readiness.checks.filter((c) => !c.ok);
 	const soulMissing = soul.offered && !soul.installed;
+	const stale = status.stale ?? 0;
+	const dropped = Object.entries(lastCycle?.ingest?.dropped ?? {}).sort(
+		([a], [b]) => a.localeCompare(b),
+	);
+	const settled = dropped.length > 0 || (lastCycle?.ingest?.pruned ?? 0) > 0;
 
 	return (
 		<div className="rounded-lg border border-violet-500/40 bg-violet-500/5">
@@ -81,6 +95,19 @@ export function HermesLearningCard() {
 								proposed: lastCycle.ingest.proposed,
 								unchanged: lastCycle.ingest.unchanged,
 							})}
+						</p>
+					)}
+					{settled && lastCycle?.ingest && (
+						<p className="mt-1 text-xs text-muted-foreground">
+							{t("hermes:cycle.triage", {
+								dropped: lastCycle.ingest.droppedTotal ?? 0,
+								pruned: lastCycle.ingest.pruned ?? 0,
+							})}
+						</p>
+					)}
+					{stale > 0 && (
+						<p className="mt-1 text-xs text-muted-foreground">
+							{t("hermes:triage.stale", { count: stale })}
 						</p>
 					)}
 					{error && (
@@ -165,6 +192,27 @@ export function HermesLearningCard() {
 						</section>
 					)}
 
+					{settled && (
+						<section>
+							<h4 className="text-xs font-medium">
+								{t("hermes:triage.title")}
+							</h4>
+							<p className="mt-1 text-xs text-muted-foreground">
+								{t("hermes:triage.description")}
+							</p>
+							<ul className="mt-1 space-y-0.5">
+								{dropped.map(([reason, count]) => (
+									<li
+										key={reason}
+										className="text-xs text-muted-foreground"
+									>
+										{count} × {t(`hermes:triage.reason.${reason}`, reason)}
+									</li>
+								))}
+							</ul>
+						</section>
+					)}
+
 					{pending.length > 0 && (
 						<section>
 							<h4 className="text-xs font-medium">
@@ -186,7 +234,7 @@ export function HermesLearningCard() {
 						</section>
 					)}
 
-					{unmet.length === 0 && pending.length === 0 && (
+					{unmet.length === 0 && pending.length === 0 && !settled && (
 						<p className="text-xs text-muted-foreground">
 							{t("hermes:empty")}
 						</p>

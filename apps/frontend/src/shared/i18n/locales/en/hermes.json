@@ -16,7 +16,8 @@
 	"cycle": {
 		"run": "Run now",
 		"running": "Running…",
-		"result": "{{found}} authored skill(s) seen · {{proposed}} proposed · {{unchanged}} already pending"
+		"result": "{{found}} authored skill(s) seen · {{proposed}} proposed · {{unchanged}} already pending",
+		"triage": "{{dropped}} turned away by this repository's own scope · {{pruned}} withdrawn from the queue"
 	},
 	"checks": {
 		"title": "Conditions",
@@ -35,5 +36,17 @@
 	"pending": {
 		"title": "Waiting for review",
 		"description": "Candidates only. Nothing here is active, and nothing is promoted on its own: a hermes-authored skill carries no evidence from a build that used it."
+	},
+	"triage": {
+		"title": "Decided without you",
+		"description": "Hermes ships a catalogue of hundreds. What this repository already decided about it — the categories the hermes pack tracks, the names it excluded, the skills the packs provide — is applied here, so those candidates are never filed and the ones an older rule filed are withdrawn.",
+		"stale_one": "{{count}} candidate from an older rule will be withdrawn on the next cycle",
+		"stale_other": "{{count}} candidates from an older rule will be withdrawn on the next cycle",
+		"reason": {
+			"already-provided": "already provided here",
+			"declined-here": "excluded by the hermes pack",
+			"out-of-scope": "hermes category this repository does not track",
+			"upstream-catalogue": "shipped with hermes, not learned"
+		}
 	}
 }

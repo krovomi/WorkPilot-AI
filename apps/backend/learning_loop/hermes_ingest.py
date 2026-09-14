@@ -10,7 +10,19 @@ not hypothetical — it is the same one the whole learning-loop design exists to
 avoid, with the extra twist that neither loop can see the other's evidence. So
 this module does not run a second loop. It does one thing:
 
-    a skill hermes authored becomes a **candidate** under ``skills/_proposed/``.
+    a skill hermes authored **and this repository has a use for** becomes a
+    candidate under ``skills/_proposed/``.
+
+The second half of that sentence is `hermes_triage`, and it is what makes the
+loop autonomous rather than a source of chores. Hermes ships a catalogue of
+hundreds — Airtable, iMessage, Apple Notes, songwriting — and every rule that
+told those apart from experience read a file upstream owns, so every one of
+them has failed open at least once. Triage asks the same question of files
+*this* repository owns instead: the categories ``skills/hermes/pack.json``
+tracks, the names it excluded on purpose, the skills the packs already provide.
+A candidate turned away there is not filed, and one already in the queue that a
+fresh reading turns away is withdrawn — because sixty files filed under an old
+rule are one bug, not sixty decisions somebody took.
 
 Why that is worth doing rather than ignoring
 --------------------------------------------
@@ -47,6 +59,14 @@ from pathlib import Path
 
 from hermes.home import hermes_home
 
+from .hermes_triage import (
+    DROP_REASONS,
+    RepoScope,
+    is_catalogue_frontmatter,
+    read_scope,
+    verdict_for,
+)
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -55,6 +75,9 @@ __all__ = [
     "hermes_home",
     "discover_authored_skills",
     "ingest_hermes_skills",
+    "prune_queue",
+    "queue_state",
+    "recorded_facts",
     "MAX_CANDIDATES_PER_RUN",
     "DEFAULT_SURFACE",
     "hermes_tools_used",
@@ -258,6 +281,16 @@ class HermesCandidate:
     staged: bool
     """True when it was still awaiting approval inside hermes."""
     category: str = ""
+    """The directory hermes keeps it under — its own catalogue's category name.
+
+    Read from the path rather than the frontmatter, because upstream's skills
+    do not declare one: ``~/.hermes/skills/<maybe-category>/<name>/SKILL.md`` is
+    hermes's own layout, and the segment above the skill is the category it was
+    shipped in. Empty for a skill sitting flat in the home, which is what
+    ``skill_manage(action='create')`` writes.
+    """
+    catalogue: bool = False
+    """True when the frontmatter is hermes's shipped-contribution shape."""
 
     @property
     def digest(self) -> str:
@@ -274,14 +307,24 @@ class HermesIngestReport:
     unchanged: int = 0
     deferred: int = 0
     """Candidates left for the next run because of the per-run cap."""
+    dropped: dict[str, int] = field(default_factory=dict)
+    """How many candidates triage turned away, by reason. See `DROP_REASONS`."""
+    pruned: list[Path] = field(default_factory=list)
+    """Candidates already in the queue that this run withdrew, for the same reasons."""
     reason: str = ""
     """Why nothing happened, when nothing happened."""
 
+    @property
+    def dropped_total(self) -> int:
+        return sum(self.dropped.values())
+
     def describe(self) -> str:
+        lines = self._triage_lines()
         if self.reason:
-            return f"hermes: {self.reason}"
+            lines.insert(0, f"hermes: {self.reason}")
+            return "\n".join(lines)
         if not self.found:
-            return ""
+            return "\n".join(lines)
         parts = [f"hermes: {self.found} authored skill(s) seen"]
         for path in self.written:
             parts.append(f"  proposed  skills/_proposed/{path.name}")
@@ -289,7 +332,25 @@ class HermesIngestReport:
             parts.append(f"  unchanged {self.unchanged} already pending review")
         if self.deferred:
             parts.append(f"  deferred  {self.deferred} until the next run")
-        return "\n".join(parts)
+        return "\n".join(parts + lines)
+
+    def _triage_lines(self) -> list[str]:
+        """What the loop decided on its own, spelled out.
+
+        A filter nobody can see is indistinguishable from a feature that
+        stopped working, so the counts are printed even when the run proposed
+        nothing — that is precisely the run where a reader wants to know
+        whether hermes wrote nothing or whether this repository turned it all
+        away.
+        """
+        lines = []
+        for reason, count in sorted(self.dropped.items()):
+            lines.append(f"  skipped   {count} × {DROP_REASONS.get(reason, reason)}")
+        if self.pruned:
+            lines.append(
+                f"  withdrew  {len(self.pruned)} candidate(s) already in the queue"
+            )
+        return lines
 
 
 def discover_authored_skills(home: Path | None = None) -> list[HermesCandidate]:
@@ -330,13 +391,21 @@ def discover_authored_skills(home: Path | None = None) -> list[HermesCandidate]:
             name = skill_file.parent.name
             if not staged and (name not in authored or name in not_learned):
                 continue
-            candidate = _read(skill_file, name, staged)
+            # `<category>/<name>/SKILL.md` is hermes's own layout and the only
+            # place the category is written down — the frontmatter of an
+            # upstream skill does not carry one. A flat `<name>/SKILL.md` has
+            # no category, which is exactly what a locally authored skill looks
+            # like, so the absence is information too.
+            category = rel.parts[-3] if len(rel.parts) >= 3 else ""
+            candidate = _read(skill_file, name, staged, category=category)
             if candidate is not None:
                 found.append(candidate)
     return found
 
 
-def _read(path: Path, name: str, staged: bool) -> HermesCandidate | None:
+def _read(
+    path: Path, name: str, staged: bool, *, category: str = ""
+) -> HermesCandidate | None:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
@@ -351,10 +420,10 @@ def _read(path: Path, name: str, staged: bool) -> HermesCandidate | None:
         return None
     if not body.strip():
         return None
-    category = ""
     hermes_meta = (meta.get("metadata") or {}).get("hermes") or {}
-    if isinstance(hermes_meta, dict):
-        category = str(hermes_meta.get("category") or "")
+    if isinstance(hermes_meta, dict) and hermes_meta.get("category"):
+        # Declared rather than inferred, on the rare skill that says so.
+        category = str(hermes_meta.get("category") or "") or category
     return HermesCandidate(
         name=str(meta.get("name") or name),
         path=path,
@@ -362,6 +431,7 @@ def _read(path: Path, name: str, staged: bool) -> HermesCandidate | None:
         description=str(meta.get("description") or "").strip(),
         staged=staged,
         category=category,
+        catalogue=is_catalogue_frontmatter(meta),
     )
 
 
@@ -385,9 +455,10 @@ metadata:
     proposal:
       origin: hermes-agent
       skill: {candidate.name}
-      category: {candidate.category or "uncategorised"}
       state: {origin}
       surface: {surface}
+      category: {candidate.category or "uncategorised"}
+      catalogue: {"true" if candidate.catalogue else "false"}
       digest: {candidate.digest}
 ---
 
@@ -419,6 +490,142 @@ hermes home, and this file is the only thing it writes here.
 """
 
 
+def recorded_facts(path: Path) -> tuple[str, str, bool] | None:
+    """The triage facts a queued candidate recorded about itself.
+
+    A candidate in the queue outlives the hermes home it came from — the source
+    may have been renamed, approved into another directory, or be on a machine
+    this checkout is no longer attached to. So the file carries what deciding
+    it again requires, and re-deciding reads the file rather than the home.
+
+    Returns ``None`` for anything this module did not write. That check is the
+    whole safety of `prune_queue`: the queue also holds proposals from the
+    learning loop's own gates, and those are somebody's evidence.
+    """
+    try:
+        head = path.read_text(encoding="utf-8", errors="replace")[:2000]
+    except OSError:
+        return None
+    if not re.search(r"^\s*origin:\s*hermes-agent\s*$", head, re.M):
+        return None
+    skill = re.search(r"^\s*skill:\s*(.+?)\s*$", head, re.M)
+    if not skill:
+        return None
+    category = re.search(r"^\s*category:\s*(.+?)\s*$", head, re.M)
+    catalogue = re.search(r"^\s*catalogue:\s*(true|false)\s*$", head, re.M)
+    known = category.group(1) if category else ""
+    known = "" if known == "uncategorised" else known
+    if catalogue is not None:
+        return skill.group(1), known, catalogue.group(1) == "true"
+
+    # Written before triage existed, so it recorded neither fact — and those
+    # are precisely the files a first run has to judge, because they are the
+    # flood. Both are still recoverable from the source path the candidate
+    # names in its Provenance section: the directory above the skill is
+    # hermes's category, and the file itself, when it is still there, says
+    # whether it is a contributed skill.
+    return (skill.group(1), *_facts_from_source(head, known))
+
+
+def _facts_from_source(head: str, known: str) -> tuple[str, bool]:
+    """Category and catalogue shape, re-derived from a legacy candidate's source."""
+    match = re.search(r"Read from `([^`]+)`", head)
+    if not match:
+        return known, False
+    source = Path(match.group(1))
+    parts = source.parts
+    # `<home>/skills/<category>/<name>/SKILL.md` — anything else, including the
+    # flat `<home>/skills/<name>/SKILL.md` a locally authored skill gets and
+    # the `pending/skills/` queue, leaves the category empty.
+    category = parts[-3] if len(parts) >= 3 and parts[-3] != "skills" else known
+    catalogue = False
+    try:
+        if source.is_file():
+            from skills_registry.frontmatter import parse_frontmatter
+
+            meta, _ = parse_frontmatter(
+                source.read_text(encoding="utf-8", errors="replace")
+            )
+            catalogue = is_catalogue_frontmatter(meta)
+    except Exception as exc:  # noqa: BLE001 - a vanished source is not an error
+        logger.debug("could not re-read %s: %s", source, exc)
+    return category, catalogue
+
+
+def queue_state(repo_root: Path) -> tuple[list[str], int]:
+    """What the review queue still asks of a person, and what it no longer does.
+
+    Read-only, and the single reader: `hermes/api.py` and `runners/hermes_runner.py`
+    both answer "what is pending?" to their own caller, and two readings of one
+    directory is two answers to one question — the second of which would list
+    the files the first had already written off.
+
+    Returns the candidates still in scope, by file name, and the count of those
+    a fresh verdict turns away. The stale ones are counted rather than listed
+    because they are not work: the next cycle withdraws them. Nothing is
+    deleted here — a read that removes files is a surprise nobody asked for,
+    and the panel polls this.
+    """
+    try:
+        from .skill_proposer import proposal_dir
+
+        scope = read_scope(repo_root)
+        keep: list[str] = []
+        stale = 0
+        for path in sorted(proposal_dir(repo_root).glob(f"{_PREFIX}--*.md")):
+            facts = recorded_facts(path)
+            if facts is not None:
+                name, category, catalogue = facts
+                if not verdict_for(
+                    name, category=category, catalogue=catalogue, scope=scope
+                ).keep:
+                    stale += 1
+                    continue
+            keep.append(path.name)
+        return keep, stale
+    except Exception as exc:  # noqa: BLE001 - an unreadable queue is not an outage
+        logger.debug("could not read the proposal queue: %s", exc)
+        return [], 0
+
+
+def prune_queue(
+    target_dir: Path, scope: RepoScope, *, write: bool = True
+) -> list[Path]:
+    """Withdraw queued candidates this repository has since decided against.
+
+    The reason this exists rather than being left to a person: the queue is the
+    output of a rule, and a rule that changes has to be applied to what it
+    already produced. Sixty files filed before triage existed are not sixty
+    decisions somebody took — they are one bug, and asking their owner to
+    delete them one by one is asking them to pay for it.
+
+    Only files this module wrote are considered (`recorded_facts` returns
+    ``None`` for anything else), and only the ones a fresh verdict turns away.
+    A candidate still in scope is never touched, however old.
+    """
+    withdrawn: list[Path] = []
+    try:
+        if not target_dir.is_dir():
+            return withdrawn
+        for path in sorted(target_dir.glob(f"{_PREFIX}--*.md")):
+            facts = recorded_facts(path)
+            if facts is None:
+                continue
+            name, category, catalogue = facts
+            verdict = verdict_for(
+                name, category=category, catalogue=catalogue, scope=scope
+            )
+            if verdict.keep:
+                continue
+            if write:
+                path.unlink(missing_ok=True)
+            withdrawn.append(path)
+            logger.info("withdrew %s: %s", path.name, verdict.explanation)
+    except Exception as exc:  # noqa: BLE001 - housekeeping never fails a build
+        logger.debug("could not prune the hermes queue: %s", exc)
+    return withdrawn
+
+
 def ingest_hermes_skills(
     repo_root: Path,
     *,
@@ -429,13 +636,33 @@ def ingest_hermes_skills(
 ) -> HermesIngestReport:
     """File hermes-authored skills as candidates. Never raises.
 
-    Returns what happened. A candidate already in the queue with the same
-    content is left alone — re-proposing the same thing on every build turns
-    the review queue into noise, which is the failure mode the rest of the
-    learning loop already guards against.
+    Three steps, and the first two are the loop doing its own housekeeping:
+
+    1. **withdraw** what this repository has since decided against, so a rule
+       change reaches the files the old rule produced;
+    2. **triage** what hermes offers against the scope this repository already
+       declared in ``skills/hermes/pack.json``, and count what is turned away
+       rather than filing it;
+    3. **file** what survives, unless an identical candidate is already
+       pending — re-proposing the same thing on every build turns the review
+       queue into noise, which is the failure mode the rest of the learning
+       loop already guards against.
+
+    Nothing is promoted by any of it. A candidate that passes triage still
+    carries no evidence from a build that used it, and `skill_proposer.evaluate`
+    still refuses to invent any.
     """
     report = HermesIngestReport()
     try:
+        from .skill_proposer import proposal_dir
+
+        target_dir = proposal_dir(repo_root)
+        scope = read_scope(repo_root)
+
+        # Before anything hermes has to say: the queue is this repository's,
+        # and it is cleaned whether or not hermes is installed on this machine.
+        report.pruned = prune_queue(target_dir, scope, write=write)
+
         root = home or hermes_home()
         if not root.is_dir():
             report.reason = "not installed here (no hermes home)"
@@ -447,13 +674,38 @@ def ingest_hermes_skills(
             report.reason = "no authored skills to propose"
             return report
 
-        from .skill_proposer import proposal_dir
+        keep: list[HermesCandidate] = []
+        for candidate in candidates:
+            verdict = verdict_for(
+                candidate.name,
+                category=candidate.category,
+                # A skill in hermes's approval queue is authored by definition:
+                # it is there because the agent just wrote it and is waiting to
+                # be told yes. Whatever frontmatter it copied from a shipped
+                # peer says nothing about where it came from, and this is the
+                # one input whose provenance is not a record that can fail open
+                # — so the catalogue fingerprint is not asked of it.
+                catalogue=candidate.catalogue and not candidate.staged,
+                scope=scope,
+            )
+            if verdict.keep:
+                keep.append(candidate)
+                continue
+            report.dropped[verdict.reason] = report.dropped.get(verdict.reason, 0) + 1
+            logger.debug("hermes triage: %s — %s", candidate.name, verdict.detail)
 
-        target_dir = proposal_dir(repo_root)
+        if not keep:
+            report.reason = (
+                "no authored skills to propose"
+                if not report.dropped
+                else f"{report.dropped_total} candidate(s) out of scope for this repository"
+            )
+            return report
+
         if write:
             target_dir.mkdir(parents=True, exist_ok=True)
 
-        for candidate in candidates:
+        for candidate in keep:
             path = target_dir / candidate.filename()
             if path.exists() and _existing_digest(path) == candidate.digest:
                 report.unchanged += 1

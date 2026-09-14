@@ -106,6 +106,10 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 						...state.status,
 						readiness: cycle.readiness,
 						pending: cycle.pending,
+						// Le cycle vient de retirer les candidats obsolètes ; sans
+						// cette ligne la carte continuerait d'annoncer un ménage
+						// déjà fait.
+						stale: cycle.stale,
 					}
 				: state.status,
 		}));

@@ -6,6 +6,13 @@ Three questions the task panel asks, and one action it may take:
     POST /api/hermes/cycle         run one turn now, from a named surface
     POST /api/hermes/soul/install  install this repository's persona
 
+What `status` reports as pending is what a person still has to read, which is
+not the same as what is on disk: `learning_loop.hermes_triage` has standing
+answers about hermes's catalogue, and a queue filled before those existed holds
+files this repository has already decided against. Those are counted, not
+listed, and the next cycle withdraws them. Sixty rows nobody should read is how
+a review queue turns into a pile.
+
 Why the trust gate has no button
 --------------------------------
 `status` reports whether this checkout is listed in hermes's
@@ -67,20 +74,17 @@ class SoulRequest(BaseModel):
     overwrite: bool = False
 
 
-def _pending(repo_root: Path) -> list[str]:
-    """Candidates from hermes already waiting in the review queue.
+def _pending(repo_root: Path) -> tuple[list[str], int]:
+    """Candidates from hermes waiting in the review queue, and the stale ones.
 
-    Names only. The queue is a directory in this repository and the caller is
-    looking at the same checkout, so a file name is what opens it and a full
-    path is a detail an error message has no business carrying.
+    Delegated to `learning_loop.hermes_ingest.queue_state`, which is also what
+    `runners/hermes_runner.py` calls: the queue is one directory, and two
+    readings of it would disagree the moment one of them learned about triage
+    and the other did not.
     """
-    try:
-        from learning_loop.skill_proposer import proposal_dir
+    from learning_loop.hermes_ingest import queue_state
 
-        return sorted(p.name for p in proposal_dir(repo_root).glob("hermes--*.md"))
-    except Exception as exc:  # noqa: BLE001 - an unreadable queue is not an outage
-        logger.debug("could not read the proposal queue: %s", exc)
-        return []
+    return queue_state(repo_root)
 
 
 @router.get("/status")
@@ -90,12 +94,14 @@ def hermes_status():
         return _DESKTOP_ONLY
     try:
         report = doctor(_REPO_ROOT)
+        pending, stale = _pending(_REPO_ROOT)
         return {
             "success": True,
             "status": {
                 "readiness": report.to_dict(),
                 "soul": soul_status(_REPO_ROOT).to_dict(),
-                "pending": _pending(_REPO_ROOT),
+                "pending": pending,
+                "stale": stale,
                 "surfaces": [
                     {"id": key, "description": text} for key, text in SURFACES.items()
                 ],
@@ -119,7 +125,9 @@ def hermes_cycle(body: CycleRequest):
     try:
         result = run_cycle(_REPO_ROOT, surface=body.surface, write=not body.dryRun)
         payload = result.to_dict()
-        payload["pending"] = _pending(_REPO_ROOT)
+        pending, stale = _pending(_REPO_ROOT)
+        payload["pending"] = pending
+        payload["stale"] = stale
         return {"success": True, "cycle": payload}
     except Exception:  # noqa: BLE001
         logger.exception("hermes cycle failed")
