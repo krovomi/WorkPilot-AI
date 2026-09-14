@@ -245,6 +245,9 @@ from rtk import rtk_rewrite_hook
 from rtk import settings as rtk_settings
 from security import bash_security_hook
 from security.guardrails import guardrails_hook as _raw_guardrails_hook
+from watermarks import CLEANED_TOOLS as WATERMARK_CLEANED_TOOLS
+from watermarks import make_watermarks_hook
+from watermarks import settings as watermarks_settings
 
 
 def _make_guardrails_hook(project_dir: Path):
@@ -753,6 +756,11 @@ def create_client(
     # captures all answer from the same switch. An exported variable wins: a
     # CLI user who said something on the command line said it later than a file.
     rtk_settings.apply_project_env(project_dir)
+
+    # The same treatment for the watermark switches, and for the same
+    # reason: the hook below, the tool executor the other providers run on
+    # and the status endpoint must all read one answer about this project.
+    watermarks_settings.apply_project_env(project_dir)
 
     # Collect env vars to pass to SDK (ANTHROPIC_BASE_URL, CLAUDE_CONFIG_DIR, etc.)
     sdk_env = get_sdk_env_vars()
@@ -1272,6 +1280,11 @@ def create_client(
     except Exception:
         logger.debug("Agent debugger wiring skipped", exc_info=True)
 
+    # One hook instance for the four write tools rather than four: the
+    # factory closes over the spec directory so the ledger has somewhere to
+    # go, and nothing else about it varies per tool.
+    _watermarks_hook = make_watermarks_hook(spec_dir)
+
     # Build options dict, conditionally including output_format
     options_kwargs: dict[str, Any] = {
         "model": model,
@@ -1299,6 +1312,19 @@ def create_client(
                 HookMatcher(
                     matcher="Edit",
                     hooks=[_make_guardrails_hook(project_dir)],
+                ),
+                # watermarks — strip the invisible codepoints a model leaves in
+                # what it writes, before the bytes reach the disk. Registered
+                # after the guardrails hook for the same reason rtk is
+                # registered after bash_security_hook: that one decides whether
+                # the write happens, this one only decides what it contains.
+                # `Pre`, not `Post`, so the dirty bytes never exist on disk and
+                # no file watcher sees two writes. A checkout without the
+                # vendored table answers in one `str.isascii()` and the content
+                # is written exactly as the model produced it.
+                *(
+                    HookMatcher(matcher=tool, hooks=[_watermarks_hook])
+                    for tool in WATERMARK_CLEANED_TOOLS
                 ),
                 # Debugger breakpoints (any tool). Empty unless this run opted in.
                 *_debugger_hooks,

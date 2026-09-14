@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from rtk import rewrite_command as rtk_rewrite
+from watermarks import clean_generated
+from watermarks import record as watermarks_record
 
 
 def _pick_arg(arguments: dict[str, Any], *names: str, default: Any = None) -> Any:
@@ -56,9 +58,19 @@ def _as_bool(value: Any) -> bool:
 class ToolExecutor:
     """Executes tools for agent sessions."""
 
-    def __init__(self, project_dir: str, working_directory: str | None = None):
+    def __init__(
+        self,
+        project_dir: str,
+        working_directory: str | None = None,
+        spec_dir: str | Path | None = None,
+    ):
         self.command_timeout = float(os.environ.get("LOCAL_COMMAND_TIMEOUT", "120"))
         self.project_dir = Path(project_dir).resolve()
+        # Only for the watermark ledger, and optional because only a build has
+        # one: the terminal and the insights runtimes construct an executor from
+        # a project directory alone. Without it the content is still cleaned —
+        # what is lost is the record of it, not the cleaning.
+        self.spec_dir = Path(spec_dir) if spec_dir else None
         self.working_directory = self.project_dir
         if working_directory is not None:
             self.working_directory = self._resolve_within_project(working_directory)
@@ -148,6 +160,25 @@ class ToolExecutor:
             raise ValueError("Path is required for write_file")
 
         file_path = self._resolve_within_project(path)
+
+        # The other half of the product. Providers that do not use the Claude
+        # SDK never reach `create_client`'s PreToolUse hooks, so the same
+        # cleaning is applied at the one place their writes go through —
+        # exactly as `rtk_rewrite` is applied to their shell commands a few
+        # lines below. Before the JSON branch, not after: an invisible
+        # character inside a string value survives `json.loads` and would be
+        # written straight back out by `write_json_atomic`.
+        if isinstance(content, str) and content:
+            cleaning = clean_generated(content)
+            if cleaning.changed:
+                content = cleaning.text
+                watermarks_record(
+                    self.spec_dir,
+                    file_path=path,
+                    tool="write_file",
+                    cleaning=cleaning,
+                )
+
         if file_path.name == "implementation_plan.json":
             # Validate before touching the existing plan. The tool error is fed
             # back to the model so it can correct escaping in the same session.

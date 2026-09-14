@@ -50,6 +50,13 @@ name: WorkPilot AI
 # `except` clauses in scripts a skill cannot run without, reported upstream
 # rather than patched here.
 #
+# `apps/backend/vendor/watermarks` joined that directory later, on the same
+# terms and with the same lever: one pinned Python file from
+# guillaumemeyer/watermarks-remover, attested by its own `tree_sha256` and
+# verified by `scripts/vendor_watermarks.py --check`. The glob above already
+# covered it; this paragraph is so that the exclusion still names what it
+# excludes.
+#
 # The remaining entries are packs `skills:bootstrap` fetches on demand. They
 # are gitignored, so they only exist on a developer's checkout — but when they
 # do, they are third-party trees on the same terms.
