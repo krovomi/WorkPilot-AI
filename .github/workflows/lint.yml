@@ -91,8 +91,8 @@ jobs:
       # as the code they generate from.
       - name: Run ruff on the skills scripts
         run: |
-          ruff check scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py --output-format=github
-          ruff format scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py --check --diff
+          ruff check scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py scripts/vendor_watermarks.py --output-format=github
+          ruff format scripts/skills_cli.py scripts/skills_sync.py scripts/vendor_pack.py scripts/vendor_archify.py scripts/vendor_bmad.py scripts/vendor_watermarks.py --check --diff
 
       # `apps/backend/vendor/archify` is a pinned copy of third-party code, and
       # a pin nobody verifies is a comment. This compares the bytes on disk to
@@ -104,6 +104,14 @@ jobs:
       # reverted the edits without saying so. Reads the disk, hits no network.
       - name: Check the vendored archify tree matches its pin
         run: python3 scripts/vendor_archify.py --check
+
+      # The same guarantee for the Layer A cleaner, and it needs it more: that
+      # tree is one Python file, so it is the one a formatter or an autofix bot
+      # would happily "improve" on its way past. Reads the disk, hits no
+      # network. `__pycache__` is excluded from the digest — it is a property
+      # of whichever interpreter imported the module, not of the pin.
+      - name: Check the vendored watermarks tree matches its pin
+        run: python3 scripts/vendor_watermarks.py --check
 
       # `skills/bmad` is the same guarantee for the BMAD pack, and the reason
       # it is worth a second step rather than a footnote: CodeQL and ruff are

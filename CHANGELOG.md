@@ -9,6 +9,27 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### ✨ Nouveautés
+
+- **Les fichiers générés sortent propres.** Espaces de largeur nulle, espaces
+  exotiques, contrôles bidirectionnels, caractères de balise : c'est ainsi qu'une
+  marque de provenance voyage dans la sortie d'un modèle, et elle survit à chaque
+  copier-coller vers un dépôt. Dans de la prose, c'est invisible et sans
+  conséquence ; dans un fichier source, c'est une `SyntaxError` que personne ne
+  voit, un identifiant qui ne s'égale pas lui-même, un `grep` qui ne trouve rien.
+  La table de décision Unicode de
+  [watermarks-remover](https://github.com/guillaumemeyer/watermarks-remover)
+  (MIT) est vendorisée et épinglée, et chaque `Write`, `Edit`, `MultiEdit` et
+  `NotebookEdit` d'un agent y passe **avant** que les octets touchent le disque —
+  côté SDK Claude comme côté fournisseurs qui ne l'utilisent pas. Ce qui est
+  retiré est consigné dans `<spec_dir>/watermarks.jsonl` : c'est le seul endroit
+  du produit où WorkPilot modifie silencieusement ce qu'un modèle a écrit, et une
+  modification invisible se doit d'être traçable. Rien ne peut faire échouer une
+  build : le coût sur un fichier propre est un `str.isascii()`. Réglages :
+  `WATERMARKS_ENABLED`, `WATERMARKS_NORMALIZE_SPACES` (désactivé — l'espace
+  insécable est porteur de sens en typographie française), `WATERMARKS_STRIP_BIDI`
+  (durcissement Trojan Source), `WATERMARKS_MAX_BYTES`.
+
 ---
 
 ## 1.2.1 - La build macOS Intel, et la chaîne de release qui la publie
