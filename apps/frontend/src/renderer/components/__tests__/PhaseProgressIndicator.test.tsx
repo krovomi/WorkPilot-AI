@@ -113,4 +113,41 @@ describe("PhaseProgressIndicator — progression en mode tile", () => {
 		expect(screen.getByText("25%")).toBeInTheDocument();
 		expect(screen.queryByText("60%")).not.toBeInTheDocument();
 	});
+
+	it("affiche le pourcentage global, pas la progression interne à la phase", () => {
+		// Bug signalé : la carte lisait 15% (progression DANS la planification)
+		// pendant que la pop-in lisait 3% (15% de la bande 0-20) pour la même
+		// tâche au même instant. Une seule des deux répond à « où en est la
+		// tâche ? », et c'est celle-là.
+		render(
+			<PhaseProgressIndicator
+				phase="planning"
+				subtasks={[]}
+				phaseProgress={15}
+				overallProgress={3}
+				isRunning={true}
+				hasActiveExecution={true}
+			/>,
+		);
+
+		expect(screen.getByText("3%")).toBeInTheDocument();
+		expect(screen.queryByText("15%")).not.toBeInTheDocument();
+	});
+
+	it("reconstitue le pourcentage global quand le backend n'a émis que la phase", () => {
+		// Snapshot restauré / enregistrement ancien : sans overallProgress, la
+		// carte doit convertir la progression de phase, pas l'afficher brute.
+		render(
+			<PhaseProgressIndicator
+				phase="planning"
+				subtasks={[]}
+				phaseProgress={50}
+				isRunning={true}
+				hasActiveExecution={true}
+			/>,
+		);
+
+		expect(screen.getByText("10%")).toBeInTheDocument();
+		expect(screen.queryByText("50%")).not.toBeInTheDocument();
+	});
 });
