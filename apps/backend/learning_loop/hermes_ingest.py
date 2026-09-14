@@ -311,6 +311,13 @@ class HermesIngestReport:
     """How many candidates triage turned away, by reason. See `DROP_REASONS`."""
     pruned: list[Path] = field(default_factory=list)
     """Candidates already in the queue that this run withdrew, for the same reasons."""
+    adopted: list[Path] = field(default_factory=list)
+    """Candidates written straight into `skills/hermes-learned/` (`hermes_adopt`)."""
+    already_adopted: int = 0
+    """Names the adoption ledger had already settled — adopted once, or deleted
+    since, which is how a person says no. Counted apart from `unchanged`
+    because "still waiting to be read" and "already answered" are different
+    news, and reporting the second as the first is how a loop looks stuck."""
     reason: str = ""
     """Why nothing happened, when nothing happened."""
 
@@ -326,10 +333,18 @@ class HermesIngestReport:
         if not self.found:
             return "\n".join(lines)
         parts = [f"hermes: {self.found} authored skill(s) seen"]
+        for path in self.adopted:
+            parts.append(
+                f"  adopted   skills/{path.parent.parent.name}/{path.parent.name}/"
+            )
         for path in self.written:
             parts.append(f"  proposed  skills/_proposed/{path.name}")
         if self.unchanged:
             parts.append(f"  unchanged {self.unchanged} already pending review")
+        if self.already_adopted:
+            parts.append(
+                f"  settled   {self.already_adopted} already adopted or declined here"
+            )
         if self.deferred:
             parts.append(f"  deferred  {self.deferred} until the next run")
         return "\n".join(parts + lines)
@@ -344,6 +359,10 @@ class HermesIngestReport:
         away.
         """
         lines = []
+        if self.adopted:
+            lines.append(
+                "  note      adopted into a pack no project lists yet — emitted nowhere"
+            )
         for reason, count in sorted(self.dropped.items()):
             lines.append(f"  skipped   {count} × {DROP_REASONS.get(reason, reason)}")
         if self.pruned:
@@ -552,6 +571,27 @@ def _facts_from_source(head: str, known: str) -> tuple[str, bool]:
     return category, catalogue
 
 
+def _adopt_one(
+    repo_root: Path, candidate: HermesCandidate, surface: str, *, write: bool
+):
+    """Adopt one candidate, reusing this module's portability rendering.
+
+    `hermes_adopt` does not re-derive the tool table: the mapping and the
+    sentence that goes with it are here, next to the vocabulary they describe,
+    and a second copy over there would be a second answer to "what does a
+    reviewer have to change".
+    """
+    from .hermes_adopt import adopt
+
+    return adopt(
+        repo_root,
+        candidate,
+        portability=_portability_section(candidate.body),
+        surface=surface,
+        write=write,
+    )
+
+
 def queue_state(repo_root: Path) -> tuple[list[str], int]:
     """What the review queue still asks of a person, and what it no longer does.
 
@@ -565,17 +605,27 @@ def queue_state(repo_root: Path) -> tuple[list[str], int]:
     because they are not work: the next cycle withdraws them. Nothing is
     deleted here — a read that removes files is a surprise nobody asked for,
     and the panel polls this.
+
+    A candidate whose skill the adoption ledger has already settled is left out
+    of both numbers. Its file stays on disk as the live mirror of what hermes
+    has — refreshed when hermes edits its own copy — but the question this
+    answers is "what is left for a person to read", and that name was answered
+    the moment it was adopted or deleted.
     """
     try:
+        from .hermes_adopt import ledger_names
         from .skill_proposer import proposal_dir
 
         scope = read_scope(repo_root)
+        settled = ledger_names(repo_root)
         keep: list[str] = []
         stale = 0
         for path in sorted(proposal_dir(repo_root).glob(f"{_PREFIX}--*.md")):
             facts = recorded_facts(path)
             if facts is not None:
                 name, category, catalogue = facts
+                if name in settled:
+                    continue
                 if not verdict_for(
                     name, category=category, catalogue=catalogue, scope=scope
                 ).keep:
@@ -643,14 +693,17 @@ def ingest_hermes_skills(
     2. **triage** what hermes offers against the scope this repository already
        declared in ``skills/hermes/pack.json``, and count what is turned away
        rather than filing it;
-    3. **file** what survives, unless an identical candidate is already
-       pending — re-proposing the same thing on every build turns the review
-       queue into noise, which is the failure mode the rest of the learning
-       loop already guards against.
+    3. **adopt** what survives into ``skills/hermes-learned/`` (`hermes_adopt`),
+       or **file** it in the review queue when adoption is switched off. Either
+       way an identical one already there is left alone — re-proposing the same
+       thing on every build turns the queue into noise, and rewriting the same
+       file puts a diff in every pull request for nothing.
 
-    Nothing is promoted by any of it. A candidate that passes triage still
-    carries no evidence from a build that used it, and `skill_proposer.evaluate`
-    still refuses to invent any.
+    Nothing is promoted by any of it, and adoption is not promotion: the pack
+    is not listed in ``.workpilot/skills.toml``, so the resolver rejects every
+    skill in it at the ``pack-pin`` gate and no harness ever sees one. A
+    candidate that passes triage still carries no evidence from a build that
+    used it, and `skill_proposer.evaluate` still refuses to invent any.
     """
     report = HermesIngestReport()
     try:
@@ -698,24 +751,49 @@ def ingest_hermes_skills(
             report.reason = (
                 "no authored skills to propose"
                 if not report.dropped
-                else f"{report.dropped_total} candidate(s) out of scope for this repository"
+                else (
+                    f"{report.dropped_total} candidate(s) already covered here "
+                    "or out of this repository's scope"
+                )
             )
             return report
 
+        from .hermes_adopt import adoption_enabled
+
+        adopting = adoption_enabled()
         if write:
             target_dir.mkdir(parents=True, exist_ok=True)
 
         for candidate in keep:
+            # The queue and the pack answer different questions, so a kept
+            # candidate reaches both. `skills/_proposed/hermes--x.md` is a live
+            # mirror of what hermes has on *this* machine — gitignored, and
+            # refreshed when hermes edits its own skill. The adopted file is
+            # the snapshot this project took, committed, and never rewritten
+            # afterwards. Folding them into one artifact would mean choosing
+            # which of those two properties to lose.
             path = target_dir / candidate.filename()
-            if path.exists() and _existing_digest(path) == candidate.digest:
-                report.unchanged += 1
-                continue
-            if len(report.written) >= limit:
+            fresh = not (path.exists() and _existing_digest(path) == candidate.digest)
+
+            if fresh and len(report.written) >= limit:
                 report.deferred += 1
                 continue
-            if write:
-                path.write_text(_render(candidate, surface), encoding="utf-8")
-            report.written.append(path)
+            if fresh:
+                if write:
+                    path.write_text(_render(candidate, surface), encoding="utf-8")
+                report.written.append(path)
+            else:
+                report.unchanged += 1
+
+            if not adopting:
+                continue
+            adoption = _adopt_one(repo_root, candidate, surface, write=write)
+            if adoption is None:
+                continue
+            if adoption.written:
+                report.adopted.append(adoption.path)
+            else:
+                report.already_adopted += 1
     except Exception as exc:  # noqa: BLE001 - observation never fails a build
         logger.warning("hermes ingest skipped: %s", exc)
         report.reason = f"skipped: {exc}"

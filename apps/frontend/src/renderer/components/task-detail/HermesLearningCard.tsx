@@ -23,6 +23,12 @@ import { Button } from "../ui/button";
  * en « en attente de revue » est donc ce qu'il reste à lire, pas ce qu'il y a
  * sur le disque.
  *
+ * Ce qu'elle garde, la boucle l'écrit elle-même dans `skills/hermes-learned/`
+ * — un pack que `.workpilot/skills.toml` ne liste pas, donc dont le résolveur
+ * rejette chaque skill à la porte `pack-pin`. Le fichier existe, aucun agent ne
+ * peut le charger, et la ligne à ajouter pour que ça change est prise une fois,
+ * par une personne, devant le pack entier.
+ *
  * Deux choses qu'elle ne fait délibérément pas :
  *
  * - **promouvoir**. Un candidat issu d'hermes ne porte aucun signal externe :
@@ -65,6 +71,9 @@ export function HermesLearningCard() {
 		([a], [b]) => a.localeCompare(b),
 	);
 	const settled = dropped.length > 0 || (lastCycle?.ingest?.pruned ?? 0) > 0;
+	const adopted = status.adopted ?? [];
+	const adoptedPack = status.adoptedPack || "hermes-learned";
+	const justAdopted = lastCycle?.ingest?.adopted?.length ?? 0;
 
 	return (
 		<div className="rounded-lg border border-violet-500/40 bg-violet-500/5">
@@ -102,6 +111,14 @@ export function HermesLearningCard() {
 							{t("hermes:cycle.triage", {
 								dropped: lastCycle.ingest.droppedTotal ?? 0,
 								pruned: lastCycle.ingest.pruned ?? 0,
+							})}
+						</p>
+					)}
+					{justAdopted > 0 && (
+						<p className="mt-1 text-xs text-muted-foreground">
+							{t("hermes:cycle.adopted", {
+								count: justAdopted,
+								pack: adoptedPack,
 							})}
 						</p>
 					)}
@@ -192,6 +209,27 @@ export function HermesLearningCard() {
 						</section>
 					)}
 
+					{adopted.length > 0 && (
+						<section>
+							<h4 className="text-xs font-medium">
+								{t("hermes:adopted.title")}
+							</h4>
+							<p className="mt-1 text-xs text-muted-foreground">
+								{t("hermes:adopted.description", { pack: adoptedPack })}
+							</p>
+							<ul className="mt-1 space-y-0.5">
+								{adopted.map((name) => (
+									<li
+										key={name}
+										className="truncate font-mono text-[10px] text-muted-foreground"
+									>
+										skills/{adoptedPack}/{name}/
+									</li>
+								))}
+							</ul>
+						</section>
+					)}
+
 					{settled && (
 						<section>
 							<h4 className="text-xs font-medium">
@@ -234,11 +272,14 @@ export function HermesLearningCard() {
 						</section>
 					)}
 
-					{unmet.length === 0 && pending.length === 0 && !settled && (
-						<p className="text-xs text-muted-foreground">
-							{t("hermes:empty")}
-						</p>
-					)}
+					{unmet.length === 0 &&
+						pending.length === 0 &&
+						adopted.length === 0 &&
+						!settled && (
+							<p className="text-xs text-muted-foreground">
+								{t("hermes:empty")}
+							</p>
+						)}
 				</div>
 			)}
 		</div>

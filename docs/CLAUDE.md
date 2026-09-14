@@ -560,6 +560,47 @@ carries no evidence from a build that used it, so it is filed and promoted by
 nothing; `skill_proposer.evaluate` still refuses to invent corroboration. The
 autonomy added here is over the chore, not over the decision.
 
+**And the last chore goes too: `learning_loop/hermes_adopt.py` writes what
+survives triage into `skills/hermes-learned/`.** The step it replaces was pure
+transcription — open the candidate, copy the body into `skills/<pack>/`, delete
+the candidate — and a queue whose only exit is a copy-paste is a queue that
+fills up.
+
+What makes that safe is not that the prose is trusted. `.workpilot/skills.toml`
+is a want-list: `resolver.resolve` rejects every skill of a pack the project has
+not listed, at the `pack-pin` gate. That pack is deliberately **not** listed, so
+nothing in it is emitted to `.agents/skills/` or to any harness, and no agent can
+load one. Auto-adoption writes agent-authored prose into the repository; it does
+not make any agent follow it. The act that would — one line in `[packs]` — stays
+with a person, is taken once rather than per skill, with the whole pack in front
+of them, and is the moment to do the portability rewrite each file describes
+(`adopted: verbatim` and the tool table say so in the file). Until then the
+adopted file is an ordinary diff in the pull request of the task that adopted it,
+reviewed like everything else here rather than in a queue that exists on one
+machine — which is also why it is committed while `skills/_proposed/hermes--*.md`
+is ignored.
+
+**Adoption is one-way, and once.** Nothing deletes from the pack and nothing
+rewrites a file already there, because the two things a person does with one are
+the two things a loop must not undo: rewriting it (the portability pass — a
+refresh from hermes would throw that away on the next build) and deleting it,
+which is how you say no. `ADOPTED.json` records every name ever adopted, so a
+deleted one is never re-adopted; without it the person deletes it again on every
+build, for ever.
+
+The queue keeps its copy, and that is deliberate: `skills/_proposed/hermes--x.md`
+is the live mirror of what hermes has on *this* machine, refreshed when hermes
+edits its own skill, while the adopted file is the snapshot the project took.
+`queue_state` leaves a settled name out of what it reports, so nobody is asked
+about it twice. And `hermes-learned` is the one pack `hermes_triage` does not
+count as "already provided" — the others are decisions a person took about a
+name, that one is the loop's own output, and counting it would have the loop mask
+its own inputs one build later.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `HERMES_AUTO_ADOPT` | `true` | Adopt what survives triage. Off leaves the review queue as the only destination. On by default because the pack reaches no harness: the cost of being wrong is one file in one diff |
+
 ```bash
 python3 scripts/skills_cli.py hermes-ingest --dry-run
 python3 runners/hermes_runner.py --action status

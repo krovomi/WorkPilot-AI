@@ -49,9 +49,13 @@ def _doctor(repo_root: Path) -> dict:
 
 
 def _status(repo_root: Path) -> dict:
+    from learning_loop.hermes_adopt import ADOPTED_PACK, adopted_names
+
     pending, stale = _pending(repo_root)
     return {
         "success": True,
+        "adopted": adopted_names(repo_root),
+        "adoptedPack": ADOPTED_PACK,
         "readiness": doctor(repo_root).to_dict(),
         "soul": soul_status(repo_root).to_dict(),
         "pending": pending,
@@ -95,6 +99,8 @@ def _summary(payload: dict, repo_root: Path) -> str:
         # run that proposed nothing because hermes wrote nothing are different
         # answers, and the difference is the whole point of the triage.
         settled = []
+        if ingest.get("adopted"):
+            settled.append(f"{len(ingest['adopted'])} adopted (emitted nowhere)")
         if ingest.get("droppedTotal"):
             settled.append(f"{ingest['droppedTotal']} out of scope")
         if ingest.get("pruned"):
