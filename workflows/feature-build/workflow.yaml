@@ -80,6 +80,29 @@ phases:
       parce qu'un écran mal découpé se corrige en une phrase à ce moment-là et
       en un cycle complet après la QA.
 
+  - id: frontend-design
+    impl: impeccable/impeccable
+    min_effort: medium
+    when: &frontend_surface touches("**/*.tsx,**/*.jsx,**/*.css,**/*.scss,**/*.vue,**/*.svelte,**/*.astro,**/*.html,**/*.less,**/*.sass")
+    dispatch: fresh-context
+    description: >-
+      Interfaces web, et avant le codage pour exactement la raison que
+      `mobile-design` donne au-dessus : une hiérarchie visuelle bancale, un
+      écran dont personne n'a dessiné les états vide et erreur, un libellé qui
+      ment — tout cela se corrige en une phrase ici et en un cycle complet
+      après la QA.
+
+      C'est la moitié manquante d'impeccable. `design-check`, plus bas, est son
+      détecteur : 59 règles locales qui notent le code une fois écrit. Aucune
+      d'elles ne juge une mise en page que personne n'a pensée, et un détecteur
+      ne parle jamais à celui qui écrit — il parle au relecteur. Le pack porte
+      aussi 23 commandes de conception, `shape` en tête, et rien ne les lisait :
+      une skill déclarée par une phase que le runner sautait parce que son pack
+      était marqué « exécuté ailleurs ».
+
+      Contexte neuf : la direction artistique d'un écran n'est pas une relecture
+      du plan qui vient d'être écrit.
+
   - id: coding
     impl: superpowers/test-driven-development
     dispatch: subagent-per-task
@@ -89,10 +112,17 @@ phases:
 
   - id: design-check
     impl: impeccable/impeccable
-    when: touches("**/*.tsx,**/*.jsx,**/*.css,**/*.scss,**/*.vue")
+    when: *frontend_surface
     description: >-
       Frontend only. impeccable's 59 detector rules run locally with no API
       call, so this is never pruned by effort — skipping it would save nothing.
+
+      The other half of the same pack runs before `coding`, as
+      `frontend-design`. This one grades the code once it exists; that one
+      tells the writer what to aim for. Both are conditional on the same glob
+      list, declared once above and aliased here: two copies of "what counts
+      as frontend" is how a surface ends up reviewed before coding and
+      ungraded after it.
 
   - id: review
     impl: mattpocock/code-review

@@ -66,6 +66,21 @@ def test_a_frontend_change_runs_the_gate(tmp_path: Path):
     assert run.all_clean is True
 
 
+def test_the_packs_guidance_phase_does_not_run_the_detector_again(tmp_path: Path):
+    """impeccable implements two phases; only one of them is a gate.
+
+    While determinism was keyed by pack, `frontend-design` matched here too:
+    the detector ran twice on the same tree and reported the same verdict under
+    two phase ids — two answers to one question, and one of them attributed to
+    a phase that never ran a check.
+    """
+    profile = _profile(["src/App.tsx"], effort="ultrathink")
+    assert profile.will_run("frontend-design"), "fixture no longer covers the case"
+
+    run = run_deterministic_gates(profile, tmp_path, _packs(_exit_command(0)))
+    assert [v.phase_id for v in run.verdicts] == ["design-check"]
+
+
 def test_a_backend_change_runs_no_frontend_gate(tmp_path: Path):
     run = run_deterministic_gates(
         _profile(["apps/backend/core/client.py"]), tmp_path, _packs(_exit_command(0))

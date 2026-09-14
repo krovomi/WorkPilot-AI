@@ -40,16 +40,24 @@ __all__ = [
     "MissingImpl",
     "resolve_profile",
     "validate_impls",
-    "DETERMINISTIC_PACKS",
+    "DETERMINISTIC_PHASES",
     "BUILTIN_PACKS",
 ]
 
 # Phases implemented by WorkPilot's own Python, not by a skill pack.
 BUILTIN_PACKS = frozenset({"workpilot"})
 
-# Packs whose phases run without an API call. Pruning them by effort saves
-# nothing, so they run at every level.
-DETERMINISTIC_PACKS = frozenset({"impeccable"})
+# Phases that run without an API call. Pruning them by effort saves nothing,
+# so they run at every level.
+#
+# Keyed by phase id, not by pack, and that distinction is load-bearing: a pack
+# is not deterministic, a *check* is. impeccable ships both — 59 local detector
+# rules (`design-check`) and 23 design commands a model has to read
+# (`frontend-design`) — so while this was `{"impeccable"}` the second one was
+# exempted from effort pruning it should obey, and handed to
+# `run_deterministic_gates`, which would have run the detector twice and
+# reported the same verdict under two phase ids.
+DETERMINISTIC_PHASES = frozenset({"design-check"})
 
 _SKIP_EFFORT = "effort"
 _SKIP_UNTOUCHED = "untouched"
@@ -191,7 +199,7 @@ def resolve_profile(
     )
 
     for phase in workflow.phases:
-        deterministic = phase.pack in DETERMINISTIC_PACKS
+        deterministic = phase.id in DETERMINISTIC_PHASES
 
         if phase.prunable and not deterministic:
             if not effort_at_least(effort, phase.min_effort):

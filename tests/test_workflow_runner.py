@@ -52,6 +52,10 @@ def workflow():
     return load_workflow(WORKFLOW_PATH)
 
 
+def workflow_phase_ids(workflow):
+    return [p.id for p in workflow.phases]
+
+
 def profile_at(workflow, effort: str, **kwargs):
     return resolve_profile(workflow, effort, **kwargs)
 
@@ -66,11 +70,18 @@ class TestPhaseWindows:
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
 
-        # `mobile-design` and `store-readiness` are conditional on mobile files
-        # being touched, and an unknown change set runs a conditional phase —
-        # erring towards running is the safe direction the engine documents.
+        # `mobile-design`, `frontend-design` and `store-readiness` are
+        # conditional on their files being touched, and an unknown change set
+        # runs a conditional phase — erring towards running is the safe
+        # direction the engine documents.
         assert [r.id for r in pre] == ["brainstorm", "spec"]
-        assert [r.id for r in planned] == ["analyze", "mobile-design"]
+        assert [r.id for r in planned] == [
+            "analyze",
+            "mobile-design",
+            "frontend-design",
+        ]
+        # `design-check` sits between `coding` and `qa` in the file and is
+        # absent here on purpose: `gates.run_deterministic_gates` runs it.
         assert [r.id for r in mid] == ["review"]
         assert [r.id for r in post] == [
             "adversarial-review",
@@ -79,6 +90,39 @@ class TestPhaseWindows:
             "architecture-map",
             "verify",
         ]
+
+    def test_a_pack_with_two_phases_is_split_by_phase_not_by_pack(self, workflow):
+        """impeccable ships guidance *and* a detector, and they run elsewhere.
+
+        `_ELSEWHERE` used to hold pack names, so marking the detector as
+        "executed by the gate runner" silently marked every other phase the
+        same pack implements. `frontend-design` would have been resolved,
+        printed in the profile the user is shown, and executed by nobody.
+        """
+        profile = profile_at(workflow, "ultrathink")
+        impeccable = [r.id for r in profile.run if r.phase.pack == "impeccable"]
+        assert impeccable == ["frontend-design", "design-check"]
+
+        planned = phases_between(profile, after="planning", before="coding")
+        assert "frontend-design" in [r.id for r in planned]
+
+        everywhere = [
+            r.id
+            for window in (
+                phases_between(profile, after=None, before="planning"),
+                planned,
+                phases_between(profile, after="coding", before="qa"),
+                phases_between(profile, after="qa", before=None),
+            )
+            for r in window
+        ]
+        assert "design-check" not in everywhere
+
+    def test_the_design_guidance_runs_before_the_code_it_judges(self, workflow):
+        """A detector that only grades finished code cannot shape it."""
+        declared = list(workflow_phase_ids(workflow))
+        assert declared.index("frontend-design") < declared.index("coding")
+        assert declared.index("coding") < declared.index("design-check")
 
     def test_every_skill_phase_belongs_to_a_window(self, workflow):
         """No phase is declared, resolved, printed — and then run by nobody.
