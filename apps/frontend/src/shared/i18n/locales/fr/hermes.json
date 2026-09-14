@@ -17,7 +17,9 @@
 		"run": "Lancer maintenant",
 		"running": "En cours…",
 		"result": "{{found}} skill(s) vus · {{proposed}} proposés · {{unchanged}} déjà en attente",
-		"triage": "{{dropped}} écarté(s) par le périmètre du dépôt · {{pruned}} retiré(s) de la file"
+		"triage": "{{dropped}} écarté(s) par le périmètre du dépôt · {{pruned}} retiré(s) de la file",
+		"adopted": "{{count}} adopté dans skills/{{pack}}/ — émis vers aucun harness",
+		"adopted_other": "{{count}} adoptés dans skills/{{pack}}/ — émis vers aucun harness"
 	},
 	"checks": {
 		"title": "Conditions",
@@ -48,5 +50,9 @@
 			"out-of-scope": "catégorie hermes non suivie par ce dépôt",
 			"upstream-catalogue": "livré avec hermes, pas appris"
 		}
+	},
+	"adopted": {
+		"title": "Adoptés tout seuls",
+		"description": "La boucle écrit ce qu'elle garde directement dans skills/{{pack}}/. Ce pack n'est pas listé dans .workpilot/skills.toml, donc chacun de ses skills est rejeté à la porte pack-pin : rien ici n'atteint Claude Code, Copilot, Codex, Cursor ou Gemini, et aucun agent ne peut le charger. Chaque fichier est la prose d'hermes, adoptée telle quelle, avec les noms d'outils qu'il faudrait réécrire. Lister le pack, c'est décider que ces brouillons ont leur place dans la palette d'un agent — et le moment de faire cette réécriture. En supprimer un, c'est dire non : il n'est jamais ré-adopté."
 	}
 }

@@ -100,6 +100,11 @@ class CycleReport:
         withdrawn = getattr(self.ingest, "pruned", None)
         return len(withdrawn) if withdrawn else 0
 
+    @property
+    def adopted(self) -> int:
+        taken = getattr(self.ingest, "adopted", None)
+        return len(taken) if taken else 0
+
     def to_dict(self) -> dict:
         ingest = self.ingest
         return {
@@ -123,6 +128,15 @@ class CycleReport:
                 "dropped": self.dropped,
                 "droppedTotal": sum(self.dropped.values()),
                 "pruned": self.pruned,
+                # Adopted straight into `skills/hermes-learned/` — a pack no
+                # project lists, so the resolver rejects every skill in it and
+                # no harness sees one. The panel says that in as many words:
+                # a file in the repository reads like an activation, and this
+                # one is not.
+                "adopted": [
+                    Path(p).parent.name for p in getattr(ingest, "adopted", [])
+                ],
+                "alreadyAdopted": getattr(ingest, "already_adopted", 0),
                 "reason": getattr(ingest, "reason", ""),
             }
             if ingest is not None

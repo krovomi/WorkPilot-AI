@@ -110,6 +110,14 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 						// cette ligne la carte continuerait d'annoncer un ménage
 						// déjà fait.
 						stale: cycle.stale,
+						// Idem pour ce qu'il vient d'adopter : le statut a été lu
+						// avant le cycle.
+						adopted: [
+							...state.status.adopted,
+							...cycle.ingest?.adopted.filter(
+								(name) => !state.status?.adopted.includes(name),
+							) ?? [],
+						],
 					}
 				: state.status,
 		}));

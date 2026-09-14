@@ -17,7 +17,9 @@
 		"run": "Run now",
 		"running": "Running…",
 		"result": "{{found}} authored skill(s) seen · {{proposed}} proposed · {{unchanged}} already pending",
-		"triage": "{{dropped}} turned away by this repository's own scope · {{pruned}} withdrawn from the queue"
+		"triage": "{{dropped}} turned away by this repository's own scope · {{pruned}} withdrawn from the queue",
+		"adopted": "{{count}} adopted into skills/{{pack}}/ — emitted to no harness",
+		"adopted_other": "{{count}} adopted into skills/{{pack}}/ — emitted to no harness"
 	},
 	"checks": {
 		"title": "Conditions",
@@ -48,5 +50,9 @@
 			"out-of-scope": "hermes category this repository does not track",
 			"upstream-catalogue": "shipped with hermes, not learned"
 		}
+	},
+	"adopted": {
+		"title": "Adopted on their own",
+		"description": "The loop writes what it keeps straight into skills/{{pack}}/. That pack is not listed in .workpilot/skills.toml, so every skill in it is rejected at the pack-pin gate: nothing here reaches Claude Code, Copilot, Codex, Cursor or Gemini, and no agent can load it. Each file is hermes's own prose, adopted verbatim, with the tool names it would need rewritten. Listing the pack is the decision that these belong in an agent's palette — and the moment to do that rewrite. Deleting one is how you say no: it is never adopted again."
 	}
 }
