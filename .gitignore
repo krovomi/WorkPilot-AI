@@ -257,7 +257,13 @@ local.properties
 *.apk
 *.aab
 
-# Proposed Hermes' skills
-skills/_proposed/*.md
+# Candidats issus d'hermes-agent : ils décrivent ce que hermes a écrit dans le
+# `~/.hermes` de CETTE machine, donc ils ne veulent rien dire dans le dépôt de
+# quelqu'un d'autre — contrairement aux propositions de la boucle
+# d'apprentissage plus haut, qui portent les signaux externes d'un build de ce
+# dépôt et sont justement le diff que l'on relit. La règle ne vise donc que le
+# préfixe `hermes--` : écrite `skills/_proposed/*.md`, elle rendait aussi
+# invisibles les propositions que `skill_proposer` existe pour produire.
+skills/_proposed/hermes--*.md
 
 .gitignore
