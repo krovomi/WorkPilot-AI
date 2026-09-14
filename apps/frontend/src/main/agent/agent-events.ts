@@ -5,7 +5,9 @@ import {
 	isValidExecutionPhase,
 	wouldPhaseRegress,
 } from "../../shared/constants/phase-protocol";
-import { EXECUTION_PHASE_WEIGHTS } from "../../shared/constants/task";
+import {
+	calculateOverallProgress as weightedOverallProgress,
+} from "../../shared/progress";
 import { parsePhaseEvent } from "./phase-event-parser";
 import type { ExecutionProgressData } from "./types";
 
@@ -206,19 +208,23 @@ export class AgentEvents {
 		return null;
 	}
 
+	/**
+	 * Overall task percentage for a phase-local progress value. The weighting
+	 * itself lives in `shared/progress.ts` so the renderer reconstructs the exact
+	 * same number from a record that carries only `phaseProgress`.
+	 */
 	calculateOverallProgress(
 		phase: ExecutionProgressData["phase"],
 		phaseProgress: number,
 	): number {
-		const phaseWeight = EXECUTION_PHASE_WEIGHTS[phase];
-		if (!phaseWeight) {
+		const overall = weightedOverallProgress(phase, phaseProgress);
+		if (overall === null) {
 			console.warn(
 				`[AgentEvents] Unknown phase "${phase}" in calculateOverallProgress - defaulting to 0%`,
 			);
 			return 0;
 		}
-		const phaseRange = phaseWeight.end - phaseWeight.start;
-		return Math.round(phaseWeight.start + (phaseRange * phaseProgress) / 100);
+		return overall;
 	}
 
 	/**
