@@ -38,6 +38,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Styling](#styling)
   - [IPC Communication](#ipc-communication)
   - [Background work and the sidebar](#background-work-and-the-sidebar-storesactivity-storets)
+  - [Le pourcentage d'une tâche](#le-pourcentage-dune-tâche-sharedprogressts)
   - [Provider × LLM × effort, par page](#provider--llm--effort-par-page-sharedutilspage-llmts)
   - [Agent Management](#agent-management)
   - [Claude Profile System](#claude-profile-system)
@@ -1686,6 +1687,39 @@ instead; collecting them stays true as the number of pages grows. Kanban builds
 are excluded there — `useTaskNotifications` already announces those, with the
 task title and the distinction between a finished build and one that landed in
 review because it failed.
+
+### Le pourcentage d'une tâche (`shared/progress.ts`)
+
+Une exécution produit **deux** nombres, et un seul répond à « où en est cette
+tâche ? » :
+
+| Champ | Échelle | Exemple |
+|---|---|---|
+| `phaseProgress` | 0-100 **à l'intérieur** de la phase courante | 15 = 15% de la planification |
+| `overallProgress` | 0-100 sur **toute** la tâche, pondéré par `EXECUTION_PHASE_WEIGHTS` (planification 0-20, codage 20-80, QA 80-95) | 3 = 15% × la bande 0-20 |
+
+Les deux étaient affichés côte à côte comme s'ils étaient comparables : la carte
+du Kanban imprimait `phaseProgress` brut (« Planification 15% ») pendant que la
+pop-in de détail imprimait `overallProgress` (« 3% »), pour la même tâche au même
+instant. Le second est le bon, et c'est le seul qu'on montre désormais —
+`resolveOverallProgress` le reconstitue depuis la phase quand l'enregistrement ne
+le porte pas (plan persisté, snapshot XState), pour qu'aucune surface ne retombe
+sur l'échelle locale à la phase.
+
+La pondération elle-même vit dans `shared/progress.ts::calculateOverallProgress`
+et **nulle part ailleurs** : `agent-events` l'appelle pour émettre, le renderer
+l'appelle pour reconstituer. Deux copies de la formule, c'est deux réponses à une
+question — exactement ce que 3% contre 15% donnait à lire.
+
+La restauration d'une tâche depuis le disque suit la même règle : elle sait
+quelle phase était en cours, pas où elle en était, donc elle suppose le milieu de
+phase (`phaseProgress: 50`) et **pondère** — une tâche en planification revient à
+10%, pas au 50% qui y était écrit en dur quelle que soit la phase.
+
+Au-dessus de tout cela, `getDisplayProgress` garde ses deux priorités : dès qu'il
+existe des sous-tâches, leur part terminée EST l'avancement réel (la pondération
+par phase gonflerait à ~94% dès le démarrage de la QA), et un état terminal vaut
+100% quel que soit un comptage en retard.
 
 ### Provider × LLM × effort, par page (`shared/utils/page-llm.ts`)
 
