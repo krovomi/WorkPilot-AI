@@ -43,9 +43,24 @@ _VENDORED = _BACKEND_ROOT / "vendor" / "watermarks"
 
 _MODULE_NAME = "workpilot_vendor_watermarks_text_unicode"
 
+
+class _Unloaded:
+    """The "not attempted yet" state, which ``None`` cannot express.
+
+    ``None`` is a real answer here — the vendored tree was looked for and could
+    not be loaded — and caching *that* is the point: a checkout without
+    `vendor/` would otherwise pay an `is_file()` and a traceback on every tool
+    call an agent makes. Holding the two states as a value plus a boolean
+    beside it was two pieces of state that had to agree, and keeping them in
+    step was work nobody was doing on purpose. One sentinel says both.
+    """
+
+    __slots__ = ()
+
+
+_UNLOADED = _Unloaded()
 _lock = threading.Lock()
-_engine: ModuleType | None = None
-_engine_loaded = False
+_engine: ModuleType | _Unloaded | None = _UNLOADED
 
 
 def vendored_root() -> Path:
@@ -60,15 +75,15 @@ def engine() -> ModuleType | None:
     no `vendor/` would otherwise pay an `is_file()` and a traceback on every
     single tool call an agent makes.
     """
-    global _engine, _engine_loaded
-    if _engine_loaded:
-        return _engine
-    with _lock:
-        if _engine_loaded:
-            return _engine
-        _engine = _load()
-        _engine_loaded = True
-    return _engine
+    global _engine
+    if isinstance(_engine, _Unloaded):
+        with _lock:
+            # Checked again under the lock: two threads reaching the first test
+            # together must still load once.
+            if isinstance(_engine, _Unloaded):
+                _engine = _load()
+    cached = _engine
+    return None if isinstance(cached, _Unloaded) else cached
 
 
 def _load() -> ModuleType | None:
@@ -88,11 +103,18 @@ def _load() -> ModuleType | None:
         # from inside the standard library, which reads like anything but the
         # missing registration it is.
         sys.modules[_MODULE_NAME] = module
+        executed = False
         try:
             spec.loader.exec_module(module)
-        except BaseException:
-            sys.modules.pop(_MODULE_NAME, None)
-            raise
+            executed = True
+        finally:
+            # Registering before execution is required, as above; leaving a
+            # half-executed module behind under that name is not. `finally`
+            # rather than `except BaseException`: the cleanup has to run for a
+            # KeyboardInterrupt too, and naming that base class in order to
+            # re-raise it is a wider catch than the job needs.
+            if not executed:
+                sys.modules.pop(_MODULE_NAME, None)
     except Exception:  # noqa: BLE001 - a cosmetic pass never fails a build
         logger.debug("watermarks: vendored cleaner failed to load", exc_info=True)
         return None
@@ -107,10 +129,9 @@ def _load() -> ModuleType | None:
 
 def reset_cache() -> None:
     """Forget the loaded module. For tests that move the vendored tree."""
-    global _engine, _engine_loaded
+    global _engine
     with _lock:
-        _engine = None
-        _engine_loaded = False
+        _engine = _UNLOADED
 
 
 def pin() -> dict[str, str]:

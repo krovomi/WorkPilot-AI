@@ -17,6 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 from watermarks import clean as wm_clean  # noqa: E402
+from watermarks import runtime as wm_runtime  # noqa: E402
 from watermarks import settings as wm_settings  # noqa: E402
 from watermarks.clean import clean_generated  # noqa: E402
 
@@ -143,3 +144,76 @@ def test_an_exported_variable_wins_over_the_project_file(tmp_path, monkeypatch):
     applied = wm_settings.apply_project_env(tmp_path)
     assert applied == {}
     assert wm_settings.is_enabled() is True
+
+
+# --------------------------------------------------------------------------- #
+# Loading the vendored table, and remembering that it could not be loaded
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def fresh_engine():
+    """Give the test a cold cache, and leave one behind for everyone else."""
+    wm_runtime.reset_cache()
+    yield
+    wm_runtime.reset_cache()
+
+
+def test_a_failed_load_is_remembered_rather_than_retried(monkeypatch, fresh_engine):
+    """The point of caching the failure: a checkout with no `vendor/` would
+    otherwise pay a stat and a traceback on every tool call an agent makes.
+
+    `None` is a real answer, so "not attempted yet" cannot be spelled `None` —
+    which is what the sentinel exists for.
+    """
+    attempts = []
+
+    def _failing_load():
+        attempts.append(1)
+        return None
+
+    monkeypatch.setattr(wm_runtime, "_load", _failing_load)
+    assert wm_runtime.engine() is None
+    assert wm_runtime.engine() is None
+    assert wm_runtime.engine() is None
+    assert len(attempts) == 1
+
+
+def test_reset_cache_makes_it_look_again(monkeypatch, fresh_engine):
+    attempts = []
+    monkeypatch.setattr(wm_runtime, "_load", lambda: attempts.append(1))
+    wm_runtime.engine()
+    wm_runtime.reset_cache()
+    wm_runtime.engine()
+    assert len(attempts) == 2
+
+
+def test_a_module_that_raises_while_executing_leaves_nothing_behind(
+    monkeypatch, tmp_path, fresh_engine
+):
+    """The vendored module must be in `sys.modules` before it executes, because
+    `dataclasses` resolves annotations through it. A half-executed module left
+    under that name afterwards would be found by the next import."""
+    broken = tmp_path / "text_unicode.py"
+    broken.write_text("raise RuntimeError('upstream is broken')\n", encoding="utf-8")
+    monkeypatch.setattr(wm_runtime, "_VENDORED", tmp_path)
+
+    assert wm_runtime.engine() is None
+    assert wm_runtime._MODULE_NAME not in sys.modules
+
+
+def test_a_module_missing_the_api_is_not_handed_out(
+    monkeypatch, tmp_path, fresh_engine
+):
+    """Loaded is not the same as usable."""
+    partial = tmp_path / "text_unicode.py"
+    partial.write_text("def clean_text():\n    pass\n", encoding="utf-8")
+    monkeypatch.setattr(wm_runtime, "_VENDORED", tmp_path)
+
+    assert wm_runtime.engine() is None
+
+
+def test_the_real_tree_loads_and_is_cached(fresh_engine):
+    first = wm_runtime.engine()
+    assert first is not None
+    assert wm_runtime.engine() is first
