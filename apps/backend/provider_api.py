@@ -2012,6 +2012,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import rtk router: {e}")
 
+# --- Watermarks API (is the generated-file cleaner working, and what it stripped) ---
+try:
+    from watermarks.api import router as watermarks_router
+
+    _mount(watermarks_router, "watermarks")
+except ImportError as e:
+    print(f"Warning: Could not import watermarks router: {e}")
+
 # --- Spec Traceability API (open questions + requirement coverage for a spec) ---
 try:
     from spec.api import router as spec_traceability_router
