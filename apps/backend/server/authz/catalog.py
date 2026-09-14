@@ -273,6 +273,10 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # but a mounted router without a permission is what this map exists to
         # make impossible, not something to argue is harmless case by case.
         "rtk": "settings",
+        # Same reasoning as rtk, and the same desktop-only router: whether the
+        # generated-file cleaner is wired up here, and what it has stripped,
+        # are facts about how this deployment's agent tooling is configured.
+        "watermarks": "settings",
         "spec_traceability": "task",
         "workflow_profile": "task",
         "slash_commands": "agent",
