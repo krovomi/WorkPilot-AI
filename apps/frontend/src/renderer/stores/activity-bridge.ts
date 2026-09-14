@@ -92,6 +92,10 @@ const TERMINAL_PHASES: Record<string, FeaturePhase> = {
 	complete: "success",
 	// `code-playground` says `ready` where the others say `complete`.
 	ready: "success",
+	// `architecture-visualizer` runs a readiness probe on every page open and
+	// calls it `checking`. It is not work the user started, and badging the menu
+	// for it would put a spinner on the entry every time the page is opened.
+	checking: "idle",
 	error: "error",
 };
 

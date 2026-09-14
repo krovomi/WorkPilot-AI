@@ -88,6 +88,72 @@ describe("ArchitectureVisualizer", () => {
 		expect(unsubscribes.complete).not.toHaveBeenCalled();
 	});
 
+	it("keeps showing a generation the user navigated away from", async () => {
+		// The reported bug: start a map, go to another page, come back — the
+		// page ran its readiness check on mount and set the phase to idle, so it
+		// showed an empty state with a Generate button while the map was still
+		// being built in the main process.
+		const api = stubApi();
+		const first = render(<ArchitectureVisualizer />);
+		await waitFor(() =>
+			expect(api.checkArchifyReadiness).toHaveBeenCalledTimes(1),
+		);
+
+		useArchitectureVisualizerStore.setState({ phase: "generating" });
+		first.unmount();
+
+		render(<ArchitectureVisualizer />);
+		await waitFor(() =>
+			expect(api.checkArchifyReadiness).toHaveBeenCalledTimes(2),
+		);
+
+		expect(useArchitectureVisualizerStore.getState().phase).toBe("generating");
+		expect(screen.getByText("Cancel")).toBeInTheDocument();
+	});
+
+	it("recovers a generation the service is still running after a reload", async () => {
+		// A window reload empties the store, so the local phase says nothing.
+		// The service is the one that knows, and it answers in the same call.
+		stubApi({
+			checkArchifyReadiness: vi.fn(async () => ({
+				success: true,
+				data: {
+					status: "success",
+					action: "doctor",
+					readiness: { ok: true, node: "n", archifyRoot: "r", conditions: [] },
+					baseline: null,
+					running: true,
+				},
+			})),
+		});
+
+		render(<ArchitectureVisualizer />);
+
+		await waitFor(() =>
+			expect(useArchitectureVisualizerStore.getState().phase).toBe(
+				"generating",
+			),
+		);
+	});
+
+	it("does not turn a failed readiness check into a failed generation", async () => {
+		stubApi({
+			checkArchifyReadiness: vi.fn(async () => ({
+				success: false,
+				error: "node not found",
+			})),
+		});
+		useArchitectureVisualizerStore.setState({ phase: "generating" });
+
+		render(<ArchitectureVisualizer />);
+
+		await waitFor(() =>
+			expect(window.electronAPI.checkArchifyReadiness).toHaveBeenCalled(),
+		);
+		// The doctor could not run; that says nothing about the map in flight.
+		expect(useArchitectureVisualizerStore.getState().phase).toBe("generating");
+	});
+
 	it("reads what is already on disk rather than starting empty", async () => {
 		// The page used to clear its result on close and never read the files
 		// back, so a model generated minutes earlier was invisible.
