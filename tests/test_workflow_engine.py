@@ -181,6 +181,23 @@ class TestEffortPruning:
         profile = resolve_profile(workflow, effort, changed_files=["src/App.tsx"])
         assert profile.will_run("design-check"), f"pruned at effort {effort!r}"
 
+    @pytest.mark.parametrize("effort", EFFORT_ORDER)
+    def test_the_detector_is_never_pruned_but_the_guidance_is(self, workflow, effort):
+        """The same pack ships one phase that costs nothing and one that does.
+
+        `design-check` runs 59 local rules, so no effort level saves anything
+        by skipping it. `frontend-design` is a model reading design procedure
+        and obeys `min_effort` like every other skill phase — which it could
+        not while determinism was keyed by the pack they share.
+        """
+        profile = resolve_profile(workflow, effort, changed_files=["src/App.tsx"])
+        assert profile.will_run("design-check"), f"detector pruned at {effort!r}"
+
+        # Asked of the engine's own comparator rather than a hardcoded list,
+        # so raising the phase's `min_effort` moves the test with it.
+        bought = effort_at_least(effort, "medium")
+        assert profile.will_run("frontend-design") is bought
+
     def test_skips_carry_a_reason(self, workflow):
         profile = resolve_profile(workflow, "low", changed_files=[])
         assert ("brainstorm", "effort") in [(p.id, why) for p, why in profile.skipped]

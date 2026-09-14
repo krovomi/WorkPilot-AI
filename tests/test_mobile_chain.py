@@ -240,7 +240,7 @@ class TestTheWorkflowPhases:
         from workflows.runner import _ELSEWHERE, BUILTIN_EXECUTORS, CONFIG_PHASE
 
         for phase in workflow.phases:
-            if phase.id in BUILTIN_EXECUTORS or phase.pack in _ELSEWHERE:
+            if phase.id in BUILTIN_EXECUTORS or phase.id in _ELSEWHERE:
                 continue
             assert phase.id in CONFIG_PHASE, f"{phase.id} has no model/effort column"
 

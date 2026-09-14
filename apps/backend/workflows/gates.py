@@ -125,12 +125,12 @@ def run_deterministic_gates(
     Never raises. A gate is a signal, and a build that produced working code
     must not fail because a linter could not start.
     """
-    from .engine import DETERMINISTIC_PACKS
+    from .engine import DETERMINISTIC_PHASES
 
     run = GateRun()
     for resolved in profile.run:
         phase = resolved.phase
-        if phase.pack not in DETERMINISTIC_PACKS:
+        if phase.id not in DETERMINISTIC_PHASES:
             continue
         pack = packs.get(phase.pack)
         gate = getattr(pack, "gate", None) or {}
