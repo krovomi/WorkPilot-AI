@@ -29,14 +29,46 @@ runs:
       # Pin pnpm to match the version that generated pnpm-lock.yaml.
       # pnpm 11 serializes the overrides section differently and triggers
       # ERR_PNPM_LOCKFILE_CONFIG_MISMATCH against a lockfile written by pnpm 10.
+      #
+      # Installing it is not enough on its own: the macOS and Windows runner
+      # images ship a pnpm of their own (a shim under ~/Library/pnpm, and
+      # %LOCALAPPDATA%\pnpm) that sits ahead of npm's global bin on PATH. That
+      # shim activates a version it manages itself -- 12.4.1 when this broke --
+      # out of a tools directory the image does not always populate, and dies
+      # with ENOEXEC. `pnpm store path` then printed nothing, actions/cache was
+      # handed an empty `path`, and the job failed at setup with "Input required
+      # and not supplied: path" before a single test had run. Both frontend jobs
+      # went red on every branch, develop included.
+      #
+      # So npm's global bin goes first, and `pnpm` is the version pinned above.
       run: |
         npm cache clean --force
         npm install -g pnpm@10.27.0
 
+        prefix="$(npm prefix -g)"
+        # Unix keeps binaries in <prefix>/bin; on Windows they sit in <prefix>
+        # itself. A `&&` one-liner would exit the step here under `set -e` on
+        # whichever of the two lacks the directory.
+        if [ -d "$prefix/bin" ]; then
+          prefix="$prefix/bin"
+        fi
+        echo "$prefix" >> "$GITHUB_PATH"
+
     - name: Get pnpm cache directory
       id: pnpm-cache-dir
       shell: bash
-      run: echo "dir=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      # Which pnpm won is the first thing to know when this breaks again.
+      run: |
+        pnpm --version
+        if ! dir="$(pnpm store path)"; then
+          echo "::error::'pnpm store path' failed; see the line above for why."
+          exit 1
+        fi
+        if [ -z "$dir" ]; then
+          echo "::error::'pnpm store path' printed nothing. Refusing to hand actions/cache an empty path, which reports itself as 'Input required and not supplied: path' three steps later."
+          exit 1
+        fi
+        echo "dir=$dir" >> "$GITHUB_OUTPUT"
 
     - name: Cache pnpm dependencies
       id: cache
