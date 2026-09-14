@@ -67,23 +67,45 @@ export const useArchitectureVisualizerStore =
  * The page used to start empty on every open and clear its result on close, so
  * a model generated five minutes earlier was invisible until it was generated
  * again. Nothing read the files back.
+ *
+ * It runs on every mount, and `App.tsx` mounts the page afresh each time the
+ * user navigates back to it — so it must never answer "not running" about a
+ * generation that is. It used to set `checking` and then `idle` unconditionally,
+ * which is how leaving the page mid-generation and coming back showed an empty
+ * page with a Generate button, while the map was still being built in the main
+ * process. The service is the authority on that, and it answers in the same
+ * round trip.
  */
 export async function loadArchitectureState(projectDir: string): Promise<void> {
-	useArchitectureVisualizerStore.setState({ phase: "checking", error: null });
+	const wasGenerating =
+		useArchitectureVisualizerStore.getState().phase === "generating";
+
+	if (!wasGenerating) {
+		useArchitectureVisualizerStore.setState({
+			phase: "checking",
+			error: null,
+		});
+	}
+
 	const result = await window.electronAPI.checkArchifyReadiness(projectDir);
 	if (!result.success || !result.data) {
-		useArchitectureVisualizerStore.setState({
-			phase: "error",
-			error: result.error ?? "could not check the archify runtime",
-		});
+		// A doctor that could not run says nothing about a generation in flight.
+		if (!wasGenerating) {
+			useArchitectureVisualizerStore.setState({
+				phase: "error",
+				error: result.error ?? "could not check the archify runtime",
+			});
+		}
 		return;
 	}
 
-	const { readiness = null, baseline = null } = result.data;
+	const { readiness = null, baseline = null, running = false } = result.data;
+	// `running` also recovers a generation across a window reload, where the
+	// store starts empty and only the service remembers.
 	useArchitectureVisualizerStore.setState({
 		readiness,
 		baseline,
-		phase: "idle",
+		phase: running || wasGenerating ? "generating" : "idle",
 	});
 
 	if (baseline?.artifact) {
@@ -122,9 +144,9 @@ export function cancelArchitectureVisualization(): void {
 /**
  * Subscribe to the service's events.
  *
- * Call this from a `useEffect` in the page and keep the returned teardown.
- * It existed before and was called by nothing, so the renderer never received
- * a status, a result or an error: the UI sat on its spinner for ever.
+ * Registered once for the session by `stores/global-listeners.ts`, never by
+ * the page: a generation outlives the view that started it, and a listener
+ * torn down on unmount would drop the events it emits in between.
  */
 export function setupArchitectureVisualizerListeners(): () => void {
 	const store = () => useArchitectureVisualizerStore.getState();

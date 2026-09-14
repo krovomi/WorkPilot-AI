@@ -1496,6 +1496,19 @@ use. It replaced the Kanban-only running-tasks pill: agents were never the only
 thing that kept working after the user left a page, only the only thing that
 said so.
 
+**Re-hydrating on mount must not answer for work in flight.** A page that reads
+its state from disk when it opens runs that code again every time the user
+navigates back, and `App.tsx` remounts the view each time. `loadArchitectureState`
+used to set `checking` and then `idle` unconditionally, so leaving the
+Architecture page mid-generation and coming back showed an empty page with a
+Generate button — while the map was still being built in the main process, and
+the sidebar badge was dropped along with the phase. The service is the authority
+on whether it is still busy, and `checkArchifyReadiness` returns `running`
+alongside the doctor's verdict: one round trip, at the moment the decision is
+made. `loadRoadmap` had the same shape from the start (`getRoadmapStatus`) and
+`loadIdeation` bails out while `isGenerating`; those two and this one are the
+only mount-time re-hydrations that write a not-running state.
+
 **Toasts are coalesced, not stacked.** `use-toast` keeps a single slot
 (`TOAST_LIMIT = 1`), so three pages finishing together used to mean two
 announcements nobody saw. `useActivityNotifications` collects finishes for
