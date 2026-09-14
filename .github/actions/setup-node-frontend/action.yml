@@ -19,14 +19,13 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    # 1. Installer pnpm de façon autonome (évite l'utilisation cassée de npm -g)
+    # 1. Détection automatique de la version de pnpm depuis le package.json (évite les conflits)
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
       with:
-        version: 10.27.0
         run_install: false
 
-    # 2. Configurer Node.js en activant la gestion native du cache pnpm
+    # 2. Configuration de Node.js et activation du cache pnpm natif
     - name: Setup Node.js ${{ inputs.node-version }}
       id: cache-pnpm
       uses: actions/setup-node@v6
@@ -34,15 +33,14 @@ runs:
         node-version: ${{ inputs.node-version }}
         cache: 'pnpm'
 
-    # 3. Installer les dépendances du frontend avec pnpm
+    # 3. Nettoyage et installation des dépendances du frontend
     - name: Install frontend dependencies with pnpm
       shell: bash
       run: |
-        # Nettoyage préventif des anciens modules
+        # Suppression des anciens dossiers pour éviter les conflits de shims/binaires
         rm -rf apps/frontend/node_modules
         rm -rf node_modules
         
-        # Installation respectant l'input de script
         cd apps/frontend
         if [ "${{ inputs.ignore-scripts }}" = "true" ]; then
           pnpm install --ignore-scripts
@@ -50,7 +48,7 @@ runs:
           pnpm install
         fi
 
-    # 4. Vérification de l'installation
+    # 4. Vérification de la bonne création du dossier node_modules
     - name: Verify pnpm installation
       shell: bash
       run: |
@@ -60,7 +58,7 @@ runs:
         fi
         echo "Frontend node_modules present ($(ls apps/frontend/node_modules | wc -l) entries)"
 
-    # 5. Injection propre d'electron-vite
+    # 5. Installation isolée de l'outil de build electron-vite
     - name: Install electron-vite build tool
       shell: bash
       run: |
