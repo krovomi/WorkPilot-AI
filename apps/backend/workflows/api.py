@@ -116,7 +116,7 @@ def _phase_payload(phase, *, resolved=None, skip_reason: str | None = None) -> d
 
 
 def _serialise(workflow, profile, *, missing: list | None = None) -> dict:
-    from .engine import DETERMINISTIC_PACKS
+    from .engine import DETERMINISTIC_PHASES
 
     by_id = {r.id: r for r in profile.run}
     skipped = {p.id: reason for p, reason in profile.skipped}
@@ -128,7 +128,7 @@ def _serialise(workflow, profile, *, missing: list | None = None) -> dict:
             resolved=by_id.get(phase.id),
             skip_reason=skipped.get(phase.id),
         )
-        payload["deterministic"] = phase.pack in DETERMINISTIC_PACKS
+        payload["deterministic"] = phase.id in DETERMINISTIC_PHASES
         phases.append(payload)
 
     return {

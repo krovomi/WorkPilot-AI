@@ -13,8 +13,9 @@ Une phase de relecture, pas de correction : elle produit un rapport, elle ne
 modifie rien. Elle se place avant le codage parce qu'un écran mal découpé se
 corrige en une phrase à ce moment-là et en un cycle complet après la QA.
 
-`design-check` (impeccable) couvre déjà le web. Ce qu'il ne couvre pas, et qui
-est ici :
+Le web a ses deux phases à lui : `frontend-design` (impeccable) avant le
+codage, `design-check` (son détecteur) après. Ce qu'aucune des deux ne couvre,
+et qui est ici :
 
 ## Ce qui se vérifie
 

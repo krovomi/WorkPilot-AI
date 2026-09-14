@@ -91,9 +91,17 @@ __all__ = [
 # methodology they name is handed to that executor rather than replacing it.
 BUILTIN_EXECUTORS = frozenset({"docs", "planning", "coding", "qa"})
 
-# Packs whose phases are executed by another part of the engine: impeccable by
-# `gates.run_deterministic_gates`, task-observer by `learning_loop.observe`.
-_ELSEWHERE = frozenset({"impeccable", "task-observer"})
+# Phases executed by another part of the engine: `design-check` by
+# `gates.run_deterministic_gates`, `observe` by `learning_loop.observe`.
+#
+# Keyed by phase id, not by pack — the same correction as `DETERMINISTIC_PHASES`
+# in `engine.py`, and here it was the whole bug. A pack does not run elsewhere;
+# one of its phases does. While this read `{"impeccable", …}`, every phase that
+# pack implemented was stepped over, so `frontend-design` would have been
+# resolved, printed in the profile the user is shown, and run by nobody — the
+# exact failure `test_every_skill_phase_belongs_to_a_window` exists to catch,
+# reached through the one door that test does not watch.
+_ELSEWHERE = frozenset({"design-check", "observe"})
 
 # A workflow phase id -> the phase_config vocabulary it resolves model and
 # effort under. `phase_config` knows four phases; the workflow declares eleven.
@@ -109,6 +117,7 @@ CONFIG_PHASE = {
     # A design review before the code exists is a planning cost, not a QA one:
     # nothing has been built yet for it to judge.
     "mobile-design": "planning",
+    "frontend-design": "planning",
     "coding": "coding",
     "review": "qa",
     "qa": "qa",
@@ -178,6 +187,7 @@ SKILL_PHASE_AGENTS = {
     "spec": "spec_writer",
     "analyze": "spec_validation",
     "mobile-design": "pr_reviewer",
+    "frontend-design": "pr_reviewer",
     "store-readiness": "pr_reviewer",
     "review": "pr_reviewer",
     "adversarial-review": "pr_reviewer",
@@ -315,7 +325,7 @@ def phases_between(profile, *, after: str | None, before: str | None) -> list:
             continue
         if resolved.id in BUILTIN_EXECUTORS:
             continue
-        if resolved.phase.pack in _ELSEWHERE:
+        if resolved.id in _ELSEWHERE:
             continue
         out.append(resolved)
     return out

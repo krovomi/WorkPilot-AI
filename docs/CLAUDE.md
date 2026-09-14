@@ -1335,9 +1335,10 @@ little else.
 
 | Phase | Who runs it |
 |---|---|
-| `brainstorm`, `spec`, `analyze`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
+| `brainstorm`, `spec`, `analyze`, `frontend-design`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
 | `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
+| `mobile-design` and `store-readiness` | the engine (`workflows/runner.py`), when the task touches mobile files |
 | the `tests-pass` hard gate | the engine (`workflows/hard_gates.py`) |
 | `qa` | `qa_loop`, which the profile can switch off |
 | `observe` | the engine (`learning_loop/observe.py`) |
@@ -1347,6 +1348,24 @@ A skill phase runs where the workflow file declares it. The window is looked up
 by phase id in the **declared** order, so inserting a phase into
 `workflow.yaml` between two existing ones needs no Python change — and pruning
 a phase that bounds a window does not hand its work to the neighbouring one.
+
+**A pack is not a phase.** impeccable ships two things — 23 design commands a
+model reads, and 59 detector rules that run locally — and the workflow declares
+one phase for each: `frontend-design` before `coding`, `design-check` after it.
+Both the engine's `DETERMINISTIC_PHASES` and the runner's `_ELSEWHERE` used to
+be keyed on the *pack*, which made "this check costs no tokens" and "the gate
+runner owns this phase" true of everything impeccable implements. The second
+phase would have been resolved, printed in the profile the user is shown, and
+executed by nobody — `test_every_skill_phase_belongs_to_a_window` watches the
+declaration, not that door. Both sets are keyed by phase id, and the pack still
+owns the gate *command* (`pack.json` → `gate`), which is a different question.
+
+The order is the point, and it is the same argument `mobile-design` makes one
+row above: a detector grades code that exists, and by then a layout nobody
+designed costs a full fix cycle rather than a sentence. Both phases read the
+same glob list, declared once in `workflow.yaml` as a YAML anchor and aliased
+by the second — two copies of "what counts as frontend" is how a surface ends
+up designed before coding and ungraded after it.
 
 There are **four** windows: before `planning`, between `planning` and `coding`,
 between `coding` and `qa`, and after `qa`. The second one is opened from inside
