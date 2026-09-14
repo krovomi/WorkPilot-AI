@@ -16,9 +16,10 @@
 import {
 	ArrowLeftRight,
 	Blocks,
+	Copy,
 	FileJson,
-	FilePlus2,
 	FolderOpen,
+	History,
 	Loader2,
 	LayoutGrid,
 	MousePointerSquareDashed,
@@ -77,9 +78,12 @@ import {
 	canRedo,
 	canUndo,
 	commit as commitHistory,
+	describeChange,
 	initHistory,
+	isEmptyChange,
 	redo as redoHistory,
 	signature,
+	structuralSignature,
 	undo as undoHistory,
 } from "../../lib/canvas-history";
 import { autoLayout } from "../../lib/canvas-layout";
@@ -89,8 +93,18 @@ import {
 } from "../../stores/project-store";
 import { createTask } from "../../stores/task-store";
 import type { DiagramType } from "../../stores/visual-to-code-store";
-import { useVisualToCodeStore } from "../../stores/visual-to-code-store";
+import {
+	captureVersion,
+	deleteVersion,
+	labelVersion,
+	loadHistory,
+	restoreVersion,
+	selectActiveArchitecture,
+	useVisualToCodeStore,
+} from "../../stores/visual-to-code-store";
 import { FileTree } from "../FileTree";
+import { ArchitectureHistoryDock } from "./ArchitectureHistoryDock";
+import { ArchitectureTabs } from "./ArchitectureTabs";
 import { GeneratedCodeDock } from "./GeneratedCodeDock";
 import { VisualProgrammingPalette } from "../VisualProgrammingPalette";
 import { edgeTypes, nodeTypes } from "../reactflowTypes";
@@ -107,12 +121,29 @@ export type { DiagramType } from "../../stores/visual-to-code-store";
 const DIAGRAM_TYPES: DiagramType[] = ["architecture", "flowchart", "mockup"];
 
 /** What the Save-As dialog should do once the file is written. */
-type PendingAfterSave = "new-diagram" | null;
 
 // Collision-free node ids. The previous `(nodes.length + 1)` scheme reused ids
 // after a delete (e.g. delete "1" then add → "2" again), which left edges
 // pointing at the wrong / a now-missing node (the dangling `edge-1-6`). Module
 // scope so the callbacks that mint ids stay referentially stable.
+/**
+ * How long editing has to settle before a construction step is recorded.
+ *
+ * Well past the 350 ms the undo stack uses, and deliberately: undo is about
+ * the last gesture, the timeline is about the shape of an afternoon's work.
+ * Dropping four blocks in a row is one step worth one row, not four.
+ */
+const HISTORY_CAPTURE_DEBOUNCE_MS = 1500;
+
+/**
+ * How long canvas edits are coalesced before reaching the store.
+ *
+ * Short enough to be invisible, long enough to turn a drag's sixty writes per
+ * second into one. Every path that could cut the window short flushes first,
+ * so this delays a write and never loses one.
+ */
+const MIRROR_DEBOUNCE_MS = 250;
+
 const genNodeId = () =>
 	globalThis.crypto?.randomUUID?.() ??
 	`n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -138,15 +169,37 @@ export const CanvasPanel: React.FC = () => {
 	// The run itself belongs to the window, not to this component: it is still
 	// going when the page is closed, and its result has to be here when the
 	// page comes back. See `setupVisualToCodeListeners`.
-	const storedNodes = useVisualToCodeStore((state) => state.canvasNodes);
-	const storedEdges = useVisualToCodeStore((state) => state.canvasEdges);
-	const storedDiagramType = useVisualToCodeStore(
-		(state) => state.canvasDiagramType,
+	const architectures = useVisualToCodeStore((state) => state.architectures);
+	const activeArchitectureId = useVisualToCodeStore(
+		(state) => state.activeArchitectureId,
 	);
-	const setCanvasNodes = useVisualToCodeStore((state) => state.setCanvasNodes);
-	const setCanvasEdges = useVisualToCodeStore((state) => state.setCanvasEdges);
-	const setCanvasDiagramType = useVisualToCodeStore(
-		(state) => state.setCanvasDiagramType,
+	const activeArchitecture = useVisualToCodeStore(selectActiveArchitecture);
+	const createArchitecture = useVisualToCodeStore(
+		(state) => state.createArchitecture,
+	);
+	const duplicateArchitecture = useVisualToCodeStore(
+		(state) => state.duplicateArchitecture,
+	);
+	const renameArchitecture = useVisualToCodeStore(
+		(state) => state.renameArchitecture,
+	);
+	const deleteArchitecture = useVisualToCodeStore(
+		(state) => state.deleteArchitecture,
+	);
+	const setActiveArchitecture = useVisualToCodeStore(
+		(state) => state.setActiveArchitecture,
+	);
+	const updateArchitecture = useVisualToCodeStore(
+		(state) => state.updateArchitecture,
+	);
+	const historyOpen = useVisualToCodeStore((state) => state.historyOpen);
+	const setHistoryOpen = useVisualToCodeStore((state) => state.setHistoryOpen);
+	const versions = useVisualToCodeStore((state) => state.versions);
+	const historyLoading = useVisualToCodeStore((state) => state.historyLoading);
+	const historyError = useVisualToCodeStore((state) => state.historyError);
+	const pendingRestore = useVisualToCodeStore((state) => state.pendingRestore);
+	const consumePendingRestore = useVisualToCodeStore(
+		(state) => state.consumePendingRestore,
 	);
 	const aiPhase = useVisualToCodeStore((state) => state.phase);
 	const pendingDiagram = useVisualToCodeStore((state) => state.pendingDiagram);
@@ -166,10 +219,26 @@ export const CanvasPanel: React.FC = () => {
 	// before any real architecture could be drawn — while making the empty-state
 	// hint below unreachable, so the one thing that says what to do next was
 	// never shown.
-	const [nodes, setNodes, onNodesChange] = useNodesState(storedNodes);
-	const [edges, setEdges, onEdgesChange] = useEdgesState(storedEdges);
-	const [diagramType, setDiagramType] =
-		useState<DiagramType>(storedDiagramType);
+	//
+	// What it opens *on* is decided by the loader effect below, not here: the
+	// store rehydrates asynchronously, so the active architecture is usually
+	// not known yet on this first render.
+	const [nodes, setNodes, onNodesChange] = useNodesState<Node["data"]>([]);
+	const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+	const [diagramType, setDiagramType] = useState<DiagramType>("architecture");
+	/**
+	 * Which architecture the `nodes` above actually belong to.
+	 *
+	 * State rather than a ref, and that is the whole correctness argument: on
+	 * the render where the active id changes, the mirror effect runs with the
+	 * *new* id and the *old* nodes. A ref set by the loader in the same commit
+	 * would already read as up to date and the mirror would write one
+	 * document's blocks into another. This stays behind until the loader's
+	 * `setNodes` lands, so the mirror simply skips that pass.
+	 */
+	const [loadedArchitectureId, setLoadedArchitectureId] = useState<
+		string | null
+	>(null);
 	const loadInputRef = useRef<HTMLInputElement>(null);
 	const [showFrameworkModal, setShowFrameworkModal] = useState(false);
 	const [pendingNode, setPendingNode] = useState<{
@@ -186,8 +255,6 @@ export const CanvasPanel: React.FC = () => {
 	const [selectedFolder, setSelectedFolder] = useState<string>("");
 	const [showSaveAsDialog, setShowSaveAsDialog] = useState(false);
 	const [saveAsFileName, setSaveAsFileName] = useState("");
-	const [pendingAfterSave, setPendingAfterSave] =
-		useState<PendingAfterSave>(null);
 
 	// ── Dirty tracking ──────────────────────────────────────────────────
 	// Derived from a content signature rather than flipped on every ReactFlow
@@ -728,27 +795,26 @@ export const CanvasPanel: React.FC = () => {
 		return `${getDiagramPrefix(diagramType)}-export-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}.json`;
 	};
 
-	const newDiagram = useCallback(() => {
-		const fresh: Node[] = [];
-		setNodes(fresh);
-		setEdges([]);
+	/**
+	 * Start a new architecture beside the current one.
+	 *
+	 * This used to *clear* the canvas, which is why it had to stop and offer to
+	 * export first — the diagram on screen was the only copy and the button
+	 * destroyed it. Documents are independent now, so there is nothing to lose
+	 * and nothing to ask: the loader effect swaps the canvas onto the new one,
+	 * and the previous architecture is one tab away.
+	 */
+	const handleNewArchitecture = () => {
 		setShowFrameworkModal(false);
 		setPendingNode(null);
-		// A brand-new diagram has nothing worth saving yet; marking it dirty at
-		// birth made the save prompt fire on every second "New diagram".
-		setSavedSignature(signature({ nodes: fresh, edges: [] }));
-		historyRef.current = initHistory({ nodes: fresh, edges: [] });
-		setHistoryTick((v) => v + 1);
-	}, [setEdges, setNodes]);
+		createArchitecture();
+	};
 
-	const handleNewDiagram = () => {
-		if (isDirty) {
-			setPendingAfterSave("new-diagram");
-			setSaveAsFileName(getDefaultFileName());
-			setShowSaveAsDialog(true);
-			return;
-		}
-		newDiagram();
+	const handleDuplicateArchitecture = () => {
+		if (!activeArchitectureId) return;
+		setShowFrameworkModal(false);
+		setPendingNode(null);
+		duplicateArchitecture(activeArchitectureId);
 	};
 
 	const confirmSaveAs = async () => {
@@ -786,8 +852,6 @@ export const CanvasPanel: React.FC = () => {
 				title: t("saveSuccess", "Sauvegarde réussie"),
 				description: `${t("fileSavedIn", "Fichier sauvegardé dans")} ${selectedFolder}`,
 			});
-			if (pendingAfterSave === "new-diagram") newDiagram();
-			setPendingAfterSave(null);
 		} catch (e) {
 			toast({
 				title: t("saveError", "Erreur lors de la sauvegarde"),
@@ -797,17 +861,9 @@ export const CanvasPanel: React.FC = () => {
 		}
 	};
 
-	/** Leave the Save-As dialog without writing, and drop what it was gating. */
+	/** Leave the Save-As dialog without writing. */
 	const cancelSaveAs = () => {
 		setShowSaveAsDialog(false);
-		setPendingAfterSave(null);
-	};
-
-	/** "Continue without saving" — only offered when something is waiting. */
-	const discardAndContinue = () => {
-		setShowSaveAsDialog(false);
-		if (pendingAfterSave === "new-diagram") newDiagram();
-		setPendingAfterSave(null);
 	};
 
 	const handleLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -968,24 +1024,211 @@ export const CanvasPanel: React.FC = () => {
 	}, [deleteSelectedElements, handleRedo, handleUndo]);
 
 	const handleSaveAs = () => {
-		setPendingAfterSave(null);
 		setSaveAsFileName(getDefaultFileName());
 		setShowSaveAsDialog(true);
 	};
 
-	// Sync canvas state to store so it survives page/tab navigation. No
-	// callback-stripping needed any more — state never held any.
-	useEffect(() => {
-		setCanvasNodes(nodes);
-	}, [nodes, setCanvasNodes]);
+	// ── The construction timeline ───────────────────────────────────────
+	// The structure as it stood when the last step was recorded: the signature
+	// decides *whether* something happened, the snapshot is what the new step
+	// is described against.
+	const structuralRef = useRef<string>("");
+	const capturedSnapshotRef = useRef<{ nodes: Node[]; edges: Edge[] }>({
+		nodes: [],
+		edges: [],
+	});
 
-	useEffect(() => {
-		setCanvasEdges(edges);
-	}, [edges, setCanvasEdges]);
+	/**
+	 * The canvas state that has not been mirrored into its document yet.
+	 *
+	 * A drag emits a change per animation frame, and the mirror used to write
+	 * every one of them straight into the store — which now also re-renders the
+	 * tab strip. Coalescing costs nothing while the canvas is mounted, because
+	 * the canvas *is* the truth until then; the store copy exists so the work
+	 * survives navigation and a restart.
+	 *
+	 * Which is exactly why it must be flushed rather than dropped: see
+	 * `flushMirror`, and the two places that call it.
+	 */
+	const pendingMirrorRef = useRef<{
+		id: string;
+		nodes: Node[];
+		edges: Edge[];
+		diagramType: DiagramType;
+	} | null>(null);
 
+	/** Write what is pending, now. Safe to call with nothing pending. */
+	const flushMirror = useCallback(() => {
+		const pending = pendingMirrorRef.current;
+		if (!pending) return;
+		pendingMirrorRef.current = null;
+		updateArchitecture(pending.id, {
+			nodes: pending.nodes,
+			edges: pending.edges,
+			diagramType: pending.diagramType,
+		});
+	}, [updateArchitecture]);
+
+	/**
+	 * Put the active architecture on the canvas.
+	 *
+	 * Runs on the first render that knows which document is active, and again
+	 * on every tab switch. It reads the store once, imperatively: subscribing
+	 * to the architecture's own nodes would make this fire on every edit the
+	 * mirror below writes back, and the two would loop.
+	 */
 	useEffect(() => {
-		setCanvasDiagramType(diagramType);
-	}, [diagramType, setCanvasDiagramType]);
+		if (!activeArchitectureId) return;
+		if (loadedArchitectureId === activeArchitectureId) return;
+		// Whatever the outgoing document had not written yet is written now.
+		// Without this, switching tab within the coalescing window would lose
+		// the last edits made to the document being left.
+		flushMirror();
+		const architecture = useVisualToCodeStore
+			.getState()
+			.architectures.find((a) => a.id === activeArchitectureId);
+		if (!architecture) return;
+
+		setNodes(architecture.nodes);
+		setEdges(architecture.edges);
+		setDiagramType(architecture.diagramType);
+		setLoadedArchitectureId(architecture.id);
+		// Undo history and the unsaved dot belong to a document, not to the
+		// canvas: carrying them across a tab switch would let Ctrl+Z on one
+		// architecture paste another one's blocks.
+		const snapshot = { nodes: architecture.nodes, edges: architecture.edges };
+		setSavedSignature(signature(snapshot));
+		historyRef.current = initHistory(snapshot);
+		structuralRef.current = structuralSignature(snapshot);
+		capturedSnapshotRef.current = snapshot;
+		setHistoryTick((v) => v + 1);
+	}, [activeArchitectureId, loadedArchitectureId, flushMirror, setEdges, setNodes]);
+
+	// Mirror the canvas back into the document it came from, so it survives
+	// navigation and a restart. Skipped while `loadedArchitectureId` is behind
+	// — see the note on that state.
+	useEffect(() => {
+		if (!activeArchitectureId) return;
+		if (loadedArchitectureId !== activeArchitectureId) return;
+		pendingMirrorRef.current = {
+			id: activeArchitectureId,
+			nodes,
+			edges,
+			diagramType,
+		};
+		const timer = setTimeout(flushMirror, MIRROR_DEBOUNCE_MS);
+		return () => clearTimeout(timer);
+	}, [
+		nodes,
+		edges,
+		diagramType,
+		activeArchitectureId,
+		loadedArchitectureId,
+		flushMirror,
+	]);
+
+	// Leaving the page is the other way the coalescing window can be cut short.
+	// `flushMirror` is stable, so this cleanup runs on unmount and nowhere else.
+	useEffect(() => flushMirror, [flushMirror]);
+
+	/**
+	 * Record a construction step.
+	 *
+	 * Debounced well past the undo stack's 350 ms: undo is about the last
+	 * gesture, this is about the shape of an afternoon's work, and one row per
+	 * block dropped during a burst of editing is a timeline nobody reads.
+	 *
+	 * Keyed on the *structural* signature, so dragging blocks around produces
+	 * no rows at all — the positions of the moment still ride along inside
+	 * whatever step comes next.
+	 */
+	useEffect(() => {
+		if (!activeArchitectureId) return;
+		if (loadedArchitectureId !== activeArchitectureId) return;
+		const next = structuralSignature({ nodes, edges });
+		if (next === structuralRef.current) return;
+
+		const timer = setTimeout(() => {
+			const snapshot = { nodes, edges };
+			const summary = describeChange(capturedSnapshotRef.current, snapshot);
+			if (isEmptyChange(summary)) return;
+			structuralRef.current = next;
+			capturedSnapshotRef.current = snapshot;
+			void captureVersion(activeArchitectureId, {
+				diagramType,
+				nodes,
+				edges,
+				summary,
+			});
+		}, HISTORY_CAPTURE_DEBOUNCE_MS);
+		return () => clearTimeout(timer);
+	}, [
+		nodes,
+		edges,
+		diagramType,
+		activeArchitectureId,
+		loadedArchitectureId,
+	]);
+
+	// The timeline is read when it is looked at. A disk round trip on every tab
+	// switch would be paid by everyone, including the people who never open it.
+	useEffect(() => {
+		if (!historyOpen || !activeArchitectureId) return;
+		void loadHistory(activeArchitectureId);
+	}, [historyOpen, activeArchitectureId]);
+
+	/**
+	 * Take a restored version onto the canvas.
+	 *
+	 * Parked in the store rather than written straight here for the same reason
+	 * as `pendingDiagram`: ReactFlow owns the nodes, so anything written around
+	 * this component is overwritten by the next mirror.
+	 *
+	 * The restore is then recorded as a step of its own — which is what makes
+	 * it undoable by the same mechanism, and what stops the auto-capture above
+	 * filing it a second time as an anonymous edit.
+	 */
+	useEffect(() => {
+		if (!pendingRestore || pendingRestore.architectureId !== activeArchitectureId) {
+			return;
+		}
+		const restored = consumePendingRestore();
+		if (!restored) return;
+
+		const snapshot = { nodes: restored.nodes, edges: restored.edges };
+		setNodes(restored.nodes);
+		setEdges(restored.edges);
+		setDiagramType(restored.diagramType);
+		const summary = describeChange(capturedSnapshotRef.current, snapshot);
+		structuralRef.current = structuralSignature(snapshot);
+		capturedSnapshotRef.current = snapshot;
+		historyRef.current = initHistory(snapshot);
+		setHistoryTick((v) => v + 1);
+
+		if (!isEmptyChange(summary)) {
+			void captureVersion(restored.architectureId, {
+				diagramType: restored.diagramType,
+				nodes: restored.nodes,
+				edges: restored.edges,
+				summary,
+				restoredFrom: restored.versionId,
+			});
+		}
+		toast({
+			title: t("historyRestored", "Étape restaurée"),
+			description: t(
+				"historyRestoredDesc",
+				"Les étapes suivantes sont conservées dans l'historique.",
+			),
+		});
+	}, [
+		pendingRestore,
+		activeArchitectureId,
+		consumePendingRestore,
+		setNodes,
+		setEdges,
+		t,
+	]);
 
 	const getFallbackExplorerRoot = useCallback(() => {
 		// biome-ignore lint/suspicious/noExplicitAny: injected by the preload bridge
@@ -1028,20 +1271,29 @@ export const CanvasPanel: React.FC = () => {
 
 	return (
 		<div className="flex flex-col h-full flex-1 relative">
+			{/* The documents. Each one carries its own canvas and its own
+			    construction history; nothing here is shared between them. */}
+			<ArchitectureTabs
+				architectures={architectures}
+				activeId={activeArchitectureId}
+				onSelect={setActiveArchitecture}
+				onCreate={handleNewArchitecture}
+				onRename={renameArchitecture}
+				onDelete={deleteArchitecture}
+			/>
+
 			{/* Toolbar */}
 			<div className="flex items-center gap-1 px-2 py-1.5 border-b bg-background shrink-0">
 				{/* Group 1 — Document */}
 				<Button
 					size="sm"
 					variant="ghost"
-					onClick={handleNewDiagram}
-					className="gap-1.5 h-7 px-2 text-xs"
-					title={t("newDiagram", "Nouveau diagramme")}
+					onClick={handleDuplicateArchitecture}
+					className="h-7 w-7 p-0"
+					title={t("duplicateArchitecture", "Dupliquer l'architecture")}
+					aria-label={t("duplicateArchitecture", "Dupliquer l'architecture")}
 				>
-					<FilePlus2 className="h-3.5 w-3.5" />
-					<span className="hidden md:inline">
-						{t("newDiagram", "Nouveau diagramme")}
-					</span>
+					<Copy className="h-3.5 w-3.5" />
 				</Button>
 				<select
 					value={diagramType}
@@ -1217,6 +1469,21 @@ export const CanvasPanel: React.FC = () => {
 				>
 					<FileJson className="h-3.5 w-3.5" />
 					<span className="hidden lg:inline">{t("export", "Exporter")}</span>
+				</Button>
+				<Button
+					size="sm"
+					variant={historyOpen ? "secondary" : "ghost"}
+					onClick={() => setHistoryOpen(!historyOpen)}
+					className="gap-1.5 h-7 px-2 text-xs"
+					title={t(
+						"historyTooltip",
+						"Historique de construction : revenir à une étape précédente",
+					)}
+				>
+					<History className="h-3.5 w-3.5" />
+					<span className="hidden lg:inline">
+						{t("historyShort", "Historique")}
+					</span>
 				</Button>
 				<Button
 					size="sm"
@@ -1442,6 +1709,32 @@ export const CanvasPanel: React.FC = () => {
 
 				{/* The generation, while it is happening — see GeneratedCodeDock. */}
 				<GeneratedCodeDock />
+
+				{/* The construction steps of this architecture. Mutually exclusive
+				    with the dock above: see `setHistoryOpen` in the store. */}
+				<ArchitectureHistoryDock
+					open={historyOpen}
+					architectureName={activeArchitecture?.name ?? ""}
+					versions={versions}
+					loading={historyLoading}
+					error={historyError}
+					onClose={() => setHistoryOpen(false)}
+					onRestore={(versionId) => {
+						if (activeArchitectureId) {
+							void restoreVersion(activeArchitectureId, versionId);
+						}
+					}}
+					onLabel={(versionId, label) => {
+						if (activeArchitectureId) {
+							void labelVersion(activeArchitectureId, versionId, label);
+						}
+					}}
+					onDelete={(versionId) => {
+						if (activeArchitectureId) {
+							void deleteVersion(activeArchitectureId, versionId);
+						}
+					}}
+				/>
 			</div>
 
 			{/* Status bar */}
@@ -1548,15 +1841,10 @@ export const CanvasPanel: React.FC = () => {
 					</DialogTitle>
 					<div className="mt-4">
 						<DialogDescription>
-							{pendingAfterSave
-								? t(
-										"saveBeforeNew",
-										"Ce diagramme a des modifications non enregistrées. Enregistrez-le avant d'en créer un nouveau.",
-									)
-								: t(
-										"chooseFileNameDesc",
-										"Vous pouvez modifier le nom du fichier avant l'enregistrement.",
-									)}
+							{t(
+								"chooseFileNameDesc",
+								"Vous pouvez modifier le nom du fichier avant l'enregistrement.",
+							)}
 						</DialogDescription>
 					</div>
 					<div className="mt-4">
@@ -1625,11 +1913,6 @@ export const CanvasPanel: React.FC = () => {
 						>
 							{t("save", "Sauvegarder dans le dossier sélectionné")}
 						</Button>
-						{pendingAfterSave && (
-							<Button variant="ghost" onClick={discardAndContinue}>
-								{t("continueWithoutSaving", "Continuer sans enregistrer")}
-							</Button>
-						)}
 						<Button variant="ghost" onClick={cancelSaveAs}>
 							{t("cancel", "Annuler")}
 						</Button>

@@ -15,6 +15,8 @@ export * from "./integrations";
 // IPC types (must be last to use types from other modules)
 export * from "./ipc";
 export * from "./kanban";
+// Visual-to-Code documents and their construction history
+export * from "./visual-to-code-history";
 // Live Companion types (Real-time pair programming)
 export * from "./live-companion";
 // MCP Marketplace types
