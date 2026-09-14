@@ -29,6 +29,8 @@ const __dirname = path.dirname(__filename);
 
 /** Marker the runner prints before the raw model output (see runner docstring). */
 const RESULT_MARKER = "__ONESHOT_RESULT__:";
+/** Marker the runner prints before each JSON-encoded chunk, when streaming. */
+const DELTA_MARKER = "__ONESHOT_DELTA__:";
 const ONESHOT_RUNNER = "oneshot_completion_runner.py";
 const DEFAULT_TIMEOUT_MS = 60000;
 
@@ -53,6 +55,17 @@ export interface OneShotLLMOptions {
 	onRateLimit?: (info: SDKRateLimitInfo) => void;
 	/** Short label for log messages. */
 	debugLabel?: string;
+	/**
+	 * Called with each chunk of model text as it arrives, when the provider
+	 * streams. Passing it is what turns streaming on in the runner.
+	 *
+	 * How live this actually is depends on the provider: Copilot / OpenAI /
+	 * local models yield many small chunks, while the Claude one-shot client
+	 * yields the whole text in a single final message, so this fires once. A
+	 * caller must therefore treat it as *earlier* output, never as a promise of
+	 * a steady feed — and must still handle everything arriving at the end.
+	 */
+	onDelta?: (chunk: string) => void;
 }
 
 /**
@@ -169,6 +182,7 @@ export async function runOneShotLLM(
 	}
 
 	const payload: Record<string, unknown> = { prompt: options.prompt };
+	if (options.onDelta) payload.stream = true;
 	if (options.systemPrompt) payload.system_prompt = options.systemPrompt;
 	if (options.projectDir) payload.project_dir = options.projectDir;
 	if (options.specDir) payload.spec_dir = options.specDir;
@@ -199,13 +213,40 @@ export async function runOneShotLLM(
 
 		let output = "";
 		let errorOutput = "";
+		// Deltas arrive line by line, and a read can split a line anywhere —
+		// including in the middle of the JSON that carries a chunk. Anything
+		// after the last newline is held back until the rest of it shows up.
+		let pendingLine = "";
+
+		const consumeDeltas = (chunk: string) => {
+			if (!options.onDelta) return;
+			pendingLine += chunk;
+			const lines = pendingLine.split("\n");
+			pendingLine = lines.pop() ?? "";
+			for (const line of lines) {
+				const markerIndex = line.indexOf(DELTA_MARKER);
+				if (markerIndex === -1) continue;
+				try {
+					const text = JSON.parse(
+						line.slice(markerIndex + DELTA_MARKER.length),
+					);
+					if (typeof text === "string" && text) options.onDelta(text);
+				} catch {
+					// A line the runner did not write, or one truncated by a kill.
+					// The final result is what the caller is graded on; a chunk
+					// nobody can parse is not worth failing the run over.
+				}
+			}
+		};
 		const timeout = setTimeout(() => {
 			logger.warn(`[${label}] Generation timed out`);
 			child.kill();
 		}, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
 		child.stdout?.on("data", (data: Buffer) => {
-			output += data.toString("utf-8");
+			const text = data.toString("utf-8");
+			output += text;
+			consumeDeltas(text);
 		});
 		child.stderr?.on("data", (data: Buffer) => {
 			errorOutput += data.toString("utf-8");

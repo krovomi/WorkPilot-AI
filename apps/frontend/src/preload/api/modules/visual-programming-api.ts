@@ -21,6 +21,8 @@ export interface GenerateCodeResult {
 	files: GeneratedFile[];
 	summary: string;
 	instructions: string;
+	/** The run ended early; these are the files that were already complete. */
+	truncated?: boolean;
 }
 
 export interface DiagramNode {
@@ -52,6 +54,14 @@ export interface VisualProgrammingAPI {
 		error?: string;
 	}>;
 	onVisualProgrammingStatus: (callback: (msg: string) => void) => () => void;
+	/** A generated file, as soon as its JSON object closes mid-stream. */
+	onVisualProgrammingFile: (
+		callback: (file: GeneratedFile) => void,
+	) => () => void;
+	/** The file the model is writing right now, before it is complete. */
+	onVisualProgrammingWriting: (
+		callback: (filename: string) => void,
+	) => () => void;
 	onVisualProgrammingError: (callback: (err: string) => void) => () => void;
 	onVisualProgrammingComplete: (
 		callback: (result: {
@@ -74,6 +84,20 @@ export function createVisualProgrammingAPI(): VisualProgrammingAPI {
 			ipcRenderer.on("visualProgramming:status", listener);
 			return () =>
 				ipcRenderer.removeListener("visualProgramming:status", listener);
+		},
+
+		onVisualProgrammingFile: (callback) => {
+			const listener = (_: unknown, file: GeneratedFile) => callback(file);
+			ipcRenderer.on("visualProgramming:file", listener);
+			return () =>
+				ipcRenderer.removeListener("visualProgramming:file", listener);
+		},
+
+		onVisualProgrammingWriting: (callback) => {
+			const listener = (_: unknown, filename: string) => callback(filename);
+			ipcRenderer.on("visualProgramming:writing", listener);
+			return () =>
+				ipcRenderer.removeListener("visualProgramming:writing", listener);
 		},
 
 		onVisualProgrammingError: (callback) => {

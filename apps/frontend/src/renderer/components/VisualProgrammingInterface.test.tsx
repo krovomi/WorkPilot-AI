@@ -31,6 +31,11 @@ vi.mock("react-i18next", () => ({
 				statusSaved: "Saved",
 				emptyCanvasTitle: "The canvas is empty",
 				searchBlocks: "Search a block…",
+				generatedCodeTitle: "AI-generated code",
+				showGeneratedCode: "Generated code",
+				dockWriting: "Writing {{file}}…",
+				dockWaiting: "Waiting for the first files…",
+				generating: "Generating…",
 			};
 			const opts =
 				typeof fallback === "object" && fallback !== null ? fallback : options;
@@ -76,39 +81,93 @@ vi.mock("reactflow", async (importOriginal) => {
 
 vi.mock("file-saver", () => ({ saveAs: vi.fn() }));
 
-vi.mock("@/stores/visual-to-code-store", () => ({
-	useVisualToCodeStore: () => ({
-		canvasNodes: [
-			{
-				id: "1",
-				position: { x: 250, y: 5 },
-				data: { label: "New diagram" },
-				type: "editable",
-			},
-		],
+// CodeMirror does not initialise under jsdom (its extension set resolves
+// through a module graph pnpm gives us twice). What the dock is asked here is
+// which file it shows, not how it highlights it.
+vi.mock("./ui/code-editor", () => ({
+	CodeEditor: ({ value, filename }: { value: string; filename?: string }) => (
+		<pre data-testid="code-editor" data-filename={filename}>
+			{value}
+		</pre>
+	),
+}));
+
+/**
+ * The store double, kept in the shape the real store has: the panel reads its
+ * run state from there now, and a double that answers an object to a selector
+ * call would make every one of these tests pass against a component that could
+ * not render in the app.
+ */
+const SAVED_BLOCK = {
+	id: "1",
+	position: { x: 250, y: 5 },
+	data: { label: "Saved block" },
+	type: "editable",
+};
+
+const storeState = {
+	canvasNodes: [SAVED_BLOCK],
+	canvasEdges: [] as unknown[],
+	canvasDiagramType: "architecture",
+	setCanvasNodes: vi.fn(),
+	setCanvasEdges: vi.fn(),
+	setCanvasDiagramType: vi.fn(),
+	phase: "idle" as string,
+	error: null as string | null,
+	status: "",
+	streamedFiles: [] as { filename: string; language: string; content: string }[],
+	writingFile: null as string | null,
+	codeResult: null as { summary?: string } | null,
+	pendingDiagram: null as unknown,
+	consumePendingDiagram: vi.fn(() => null),
+	dockOpen: false,
+	selectedFile: 0,
+	setDockOpen: vi.fn(),
+	selectFile: vi.fn(),
+	startRun: vi.fn(),
+	clearRun: vi.fn(),
+};
+
+function resetStoreState(overrides: Partial<typeof storeState> = {}) {
+	Object.assign(storeState, {
+		canvasNodes: [SAVED_BLOCK],
 		canvasEdges: [],
 		canvasDiagramType: "architecture",
-		setCanvasNodes: () => {
-			// Mock function for testing
-		},
-		setCanvasEdges: () => {
-			// Mock function for testing
-		},
-		setCanvasDiagramType: () => {
-			// Mock function for testing
-		},
-	}),
+		phase: "idle",
+		error: null,
+		status: "",
+		streamedFiles: [],
+		writingFile: null,
+		codeResult: null,
+		pendingDiagram: null,
+		dockOpen: false,
+		selectedFile: 0,
+		...overrides,
+	});
+}
+
+vi.mock("@/stores/visual-to-code-store", () => ({
+	// Zustand stores are called both ways: bare for the whole state, and with a
+	// selector. The panel does both.
+	useVisualToCodeStore: (selector?: (state: typeof storeState) => unknown) =>
+		selector ? selector(storeState) : storeState,
 }));
 
 import { CanvasPanel } from "./visual-to-code/CanvasPanel";
 
 describe("CanvasPanel", () => {
 	beforeEach(() => {
+		resetStoreState();
 		// biome-ignore lint/suspicious/noExplicitAny: test double for the preload bridge
 		(globalThis as any).electronAPI = {
 			// biome-ignore lint/suspicious/noExplicitAny: test double for the preload bridge
 			...(globalThis as any).electronAPI,
+			// The panel no longer subscribes to any of these — the window does,
+			// in `setupVisualToCodeListeners`. They stay on the double because
+			// the bootstrap is what a real window would have called.
 			onVisualProgrammingStatus: vi.fn(() => vi.fn()),
+			onVisualProgrammingFile: vi.fn(() => vi.fn()),
+			onVisualProgrammingWriting: vi.fn(() => vi.fn()),
 			onVisualProgrammingError: vi.fn(() => vi.fn()),
 			onVisualProgrammingComplete: vi.fn(() => vi.fn()),
 			runVisualProgramming: vi.fn().mockResolvedValue({ success: true }),
@@ -136,6 +195,63 @@ describe("CanvasPanel", () => {
 		expect(screen.getByText("Export JSON")).toBeInTheDocument();
 		expect(screen.getByText("Save as…")).toBeInTheDocument();
 		expect(screen.getByText("Load")).toBeInTheDocument();
+	});
+
+
+	it("opens empty when nothing is stored, and says what to do next", () => {
+		// The canvas used to be seeded with a "New diagram" block: a node that
+		// named nothing, had to be deleted before any real architecture could be
+		// drawn, and made the empty-state hint below unreachable.
+		resetStoreState({ canvasNodes: [] });
+		render(<CanvasPanel />);
+
+		expect(screen.getByText("0 blocks")).toBeInTheDocument();
+		expect(screen.getByText("The canvas is empty")).toBeInTheDocument();
+	});
+
+	it("leaves a brand-new diagram empty too", async () => {
+		render(<CanvasPanel />);
+
+		fireEvent.click(screen.getByRole("button", { name: "New diagram" }));
+
+		expect(await screen.findByText("0 blocks")).toBeInTheDocument();
+	});
+
+	it("shows the generation in the dock while it runs, not a dialog at the end", () => {
+		resetStoreState({
+			phase: "generating",
+			dockOpen: true,
+			writingFile: "src/App.tsx",
+			streamedFiles: [
+				{ filename: "api/Program.cs", language: "csharp", content: "// x" },
+			],
+		});
+		render(<CanvasPanel />);
+
+		// The file already produced, and the one being written right now.
+		expect(screen.getByText("Program.cs")).toBeInTheDocument();
+		expect(screen.getByText("Writing App.tsx…")).toBeInTheDocument();
+	});
+
+	it("offers a way back to a dock the user closed, and none when it is empty", () => {
+		resetStoreState({ dockOpen: false });
+		const { unmount } = render(<CanvasPanel />);
+		expect(
+			screen.queryByRole("button", { name: "Generated code" }),
+		).not.toBeInTheDocument();
+		unmount();
+
+		resetStoreState({
+			dockOpen: false,
+			phase: "complete",
+			streamedFiles: [
+				{ filename: "api/Program.cs", language: "csharp", content: "// x" },
+			],
+		});
+		render(<CanvasPanel />);
+		expect(
+			screen.getByRole("button", { name: "Generated code" }),
+		).toBeInTheDocument();
 	});
 
 	it("renders the ReactFlow canvas", () => {
