@@ -43,6 +43,7 @@ import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
 import { setupSandboxListeners } from "./sandbox-store";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
 import { setupSpecRefinementListeners } from "./spec-refinement-store";
+import { setupVisualToCodeListeners } from "./visual-to-code-store";
 import { setupVoiceControlListeners } from "./voice-control-store";
 
 /**
@@ -104,6 +105,7 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["Sandbox", setupSandboxListeners],
 	["SmartEstimation", setupSmartEstimationListeners],
 	["SpecRefinement", setupSpecRefinementListeners],
+	["VisualToCode", setupVisualToCodeListeners],
 	["VoiceControl", setupVoiceControlListeners],
 ];
 
