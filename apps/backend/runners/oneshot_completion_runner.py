@@ -15,9 +15,17 @@ Input: a JSON file passed via ``--input <path>`` with keys:
     provider      (str, optional)  override; else resolved from env/task metadata
     model         (str, optional)  override; else a cheap per-provider default
     max_turns     (int, optional)  default 1
+    stream        (bool, optional) also emit each chunk as it arrives
 
 Output: ``__ONESHOT_RESULT__:<raw model text>`` on stdout (exit 0). Any failure
 exits non-zero with a short reason on stderr so the caller can degrade.
+
+With ``stream`` set, every chunk is additionally printed, as it arrives, on its
+own line as ``__ONESHOT_DELTA__:<json-encoded chunk>``. JSON-encoded because a
+chunk carries newlines of its own and a caller reading stdout line by line
+would otherwise have no way to tell a chunk boundary from a line break inside
+one. The final ``__ONESHOT_RESULT__`` line is emitted either way, so a caller
+that ignores the deltas sees exactly what it saw before.
 """
 
 import argparse
@@ -30,6 +38,23 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 RESULT_MARKER = "__ONESHOT_RESULT__:"
+DELTA_MARKER = "__ONESHOT_DELTA__:"
+
+
+def _make_delta_emitter():
+    """Print each chunk on its own line, flushed, as the model produces it.
+
+    Flushed per chunk on purpose: the point of streaming is that the caller
+    sees the text before the process exits, and Python buffers stdout when it
+    is a pipe — which is exactly what the caller is reading.
+    """
+
+    def emit(chunk: str) -> None:
+        if not chunk:
+            return
+        print(DELTA_MARKER + json.dumps(chunk), flush=True)
+
+    return emit
 
 
 def main() -> int:
@@ -50,6 +75,8 @@ def main() -> int:
         print("Missing required 'prompt' field", file=sys.stderr)
         return 1
 
+    on_delta = _make_delta_emitter() if payload.get("stream") else None
+
     try:
         from core.oneshot import oneshot_completion
 
@@ -62,6 +89,7 @@ def main() -> int:
                 project_dir=payload.get("project_dir"),
                 spec_dir=payload.get("spec_dir"),
                 max_turns=int(payload.get("max_turns", 1)),
+                on_delta=on_delta,
             )
         )
     except Exception as exc:  # noqa: BLE001

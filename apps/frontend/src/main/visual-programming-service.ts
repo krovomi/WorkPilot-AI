@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
 import { runOneShotLLM } from "./oneshot-llm";
+import { GeneratedFileStream } from "./visual-programming-stream";
 
 export interface GeneratedFile {
 	filename: string;
@@ -12,6 +13,12 @@ export interface GenerateCodeResult {
 	files: GeneratedFile[];
 	summary: string;
 	instructions: string;
+	/**
+	 * The run ended without a parseable answer, and these are the files that
+	 * were already complete when it did. Set on a timeout or a truncated
+	 * response; the UI says so rather than presenting them as the whole answer.
+	 */
+	truncated?: boolean;
 }
 
 export interface DiagramNode {
@@ -43,6 +50,9 @@ export interface VisualProgrammingRequest {
 	projectPath?: string;
 }
 
+/** Long enough for a multi-file answer; see the call site for why. */
+const GENERATE_CODE_TIMEOUT_MS = 300_000;
+
 interface RawNode {
 	id?: string;
 	data?: { label?: string; type?: string; framework?: string };
@@ -63,8 +73,16 @@ interface RawEdge {
  *
  * Events:
  * - 'status'  (msg: string)  — progress update
+ * - 'file'    (file)          — a generated file, the moment its JSON closes
+ * - 'writing' (filename)      — the file the model is currently writing
  * - 'error'   (err: string)  — error message
  * - 'complete' ({ action, data }) — done
+ *
+ * `file` and `writing` exist because the answer is one JSON object that is
+ * only parseable once its last brace arrives: without them a generation is a
+ * spinner for as long as it runs, however much has already been produced. They
+ * are a *view* onto the run, never the result — `complete` still carries the
+ * parsed answer, and a caller may ignore both and lose nothing but the wait.
  */
 export class VisualProgrammingService extends EventEmitter {
 	private pythonPath: string | undefined;
@@ -120,31 +138,65 @@ export class VisualProgrammingService extends EventEmitter {
 		const prompt = buildGenerateCodePrompt(diagram, request.framework ?? "");
 		this.emit("status", "Generating code...");
 
+		const stream = new GeneratedFileStream();
+		const collected: GeneratedFile[] = [];
 		const text = await runOneShotLLM({
 			prompt,
 			systemPrompt:
 				"You are an expert software architect that converts visual diagrams into production-ready source code. Always respond with valid JSON only.",
 			pythonPath: this.pythonPath,
 			autoBuildSourcePath: this.sourcePath,
-			timeoutMs: 120000,
+			// A whole project's worth of files is minutes of output, not the
+			// seconds a one-shot utility needs. At two minutes a real answer was
+			// being killed mid-file and reported as "the model returned no
+			// output", which reads as a credentials problem.
+			timeoutMs: GENERATE_CODE_TIMEOUT_MS,
 			debugLabel: "VisualProgramming",
+			onDelta: (chunk) => {
+				// A cancelled run stops *reporting* here; the child process is
+				// still finishing, and emitting into a UI that has moved on is
+				// how a cancelled generation repopulates itself.
+				if (this.cancelled) return;
+				const { files, writing } = stream.push(chunk);
+				for (const file of files) {
+					collected.push(file);
+					this.emit("file", file);
+				}
+				if (writing) this.emit("writing", writing);
+			},
 		});
 		if (this.cancelled) return;
-		if (!text) {
-			this.emit(
-				"error",
-				"The model returned no output (check the selected provider's credentials).",
-			);
+
+		this.emit("status", "Parsing response...");
+		const result = text ? parseJsonLoose<GenerateCodeResult>(text) : null;
+		if (result) {
+			this.emit("complete", { action: "generate-code", data: result });
 			return;
 		}
 
-		this.emit("status", "Parsing response...");
-		const result = parseJsonLoose<GenerateCodeResult>(text);
-		if (!result) {
-			this.emit("error", "Could not parse the model response as JSON.");
+		// No parseable answer. What the stream already read is still true — the
+		// files it reported are the ones whose own JSON closed — so a run killed
+		// by the timeout hands back everything it finished instead of throwing
+		// away ten minutes of output over its last, half-written file.
+		if (collected.length > 0) {
+			this.emit("complete", {
+				action: "generate-code",
+				data: {
+					files: collected,
+					summary: "",
+					instructions: "",
+					truncated: true,
+				} satisfies GenerateCodeResult,
+			});
 			return;
 		}
-		this.emit("complete", { action: "generate-code", data: result });
+
+		this.emit(
+			"error",
+			text
+				? "Could not parse the model response as JSON."
+				: "The model returned no output (check the selected provider's credentials, or that the request did not time out).",
+		);
 	}
 
 	// ── code-to-visual ──────────────────────────────────────────────────

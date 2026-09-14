@@ -24,6 +24,7 @@ import {
 	MousePointerSquareDashed,
 	PanelLeftClose,
 	PanelLeftOpen,
+	PanelRightOpen,
 	Plus,
 	Redo2,
 	Rocket,
@@ -55,10 +56,6 @@ import ReactFlow, {
 } from "reactflow";
 import { Button } from "../ui/button";
 import "reactflow/dist/style.css";
-import type {
-	CodeToVisualResult,
-	GenerateCodeResult,
-} from "@preload/api/modules/visual-programming-api";
 import { saveAs } from "file-saver";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -94,6 +91,7 @@ import { createTask } from "../../stores/task-store";
 import type { DiagramType } from "../../stores/visual-to-code-store";
 import { useVisualToCodeStore } from "../../stores/visual-to-code-store";
 import { FileTree } from "../FileTree";
+import { GeneratedCodeDock } from "./GeneratedCodeDock";
 import { VisualProgrammingPalette } from "../VisualProgrammingPalette";
 import { edgeTypes, nodeTypes } from "../reactflowTypes";
 import {
@@ -131,27 +129,44 @@ export const CanvasPanel: React.FC = () => {
 		id: string;
 		name: string;
 	} | null>(null);
-	const {
-		canvasNodes: storedNodes,
-		canvasEdges: storedEdges,
-		canvasDiagramType: storedDiagramType,
-		setCanvasNodes,
-		setCanvasEdges,
-		setCanvasDiagramType,
-	} = useVisualToCodeStore();
-
-	const [nodes, setNodes, onNodesChange] = useNodesState(
-		storedNodes.length > 0
-			? storedNodes
-			: [
-					{
-						id: "1",
-						position: { x: 120, y: 80 },
-						data: { label: t("newDiagram", "Nouveau diagramme") },
-						type: "editable",
-					},
-				],
+	// Read field by field rather than as one object. The whole-state form
+	// re-renders on every `set`, and the store is now written to on every file
+	// a generation streams in — which would re-render the ReactFlow canvas
+	// dozens of times during a run, for state it does not display. Only the
+	// dock shows those, and only the dock subscribes to them.
+	//
+	// The run itself belongs to the window, not to this component: it is still
+	// going when the page is closed, and its result has to be here when the
+	// page comes back. See `setupVisualToCodeListeners`.
+	const storedNodes = useVisualToCodeStore((state) => state.canvasNodes);
+	const storedEdges = useVisualToCodeStore((state) => state.canvasEdges);
+	const storedDiagramType = useVisualToCodeStore(
+		(state) => state.canvasDiagramType,
 	);
+	const setCanvasNodes = useVisualToCodeStore((state) => state.setCanvasNodes);
+	const setCanvasEdges = useVisualToCodeStore((state) => state.setCanvasEdges);
+	const setCanvasDiagramType = useVisualToCodeStore(
+		(state) => state.setCanvasDiagramType,
+	);
+	const aiPhase = useVisualToCodeStore((state) => state.phase);
+	const pendingDiagram = useVisualToCodeStore((state) => state.pendingDiagram);
+	const consumePendingDiagram = useVisualToCodeStore(
+		(state) => state.consumePendingDiagram,
+	);
+	const startRun = useVisualToCodeStore((state) => state.startRun);
+	const setDockOpen = useVisualToCodeStore((state) => state.setDockOpen);
+	const dockOpen = useVisualToCodeStore((state) => state.dockOpen);
+	const hasGeneratedFiles = useVisualToCodeStore(
+		(state) => state.streamedFiles.length > 0,
+	);
+	const isAiRunning = aiPhase === "generating";
+
+	// A canvas opens empty. It used to be seeded with a "Nouveau diagramme"
+	// block, which named nothing, belonged to no stack, and had to be deleted
+	// before any real architecture could be drawn — while making the empty-state
+	// hint below unreachable, so the one thing that says what to do next was
+	// never shown.
+	const [nodes, setNodes, onNodesChange] = useNodesState(storedNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(storedEdges);
 	const [diagramType, setDiagramType] =
 		useState<DiagramType>(storedDiagramType);
@@ -230,12 +245,6 @@ export const CanvasPanel: React.FC = () => {
 	const undoAvailable = canUndo(historyRef.current);
 	const redoAvailable = canRedo(historyRef.current);
 
-	// ── AI generation state ─────────────────────────────────────────────
-	const [isAiRunning, setIsAiRunning] = useState(false);
-	const [aiStatus, setAiStatus] = useState("");
-	const [showCodeResult, setShowCodeResult] = useState(false);
-	const [codeResult, setCodeResult] = useState<GenerateCodeResult | null>(null);
-	const [selectedCodeFile, setSelectedCodeFile] = useState(0);
 	const codeToVisualInputRef = useRef<HTMLInputElement>(null);
 
 	// ── Node / edge mutation ────────────────────────────────────────────
@@ -324,108 +333,49 @@ export const CanvasPanel: React.FC = () => {
 	const selectedNodes = useMemo(() => nodes.filter((n) => n.selected), [nodes]);
 	const inspected = selectedNodes.length === 1 ? selectedNodes[0] : null;
 
-	// Extracted event handlers to reduce nesting
-	const handleVisualProgrammingStatus = useCallback((msg: string) => {
-		setAiStatus(msg);
-	}, []);
-
-	const handleVisualProgrammingError = useCallback(
-		(err: string) => {
-			setIsAiRunning(false);
-			setAiStatus("");
-			toast({
-				title: t("aiError", "Erreur IA"),
-				description: err,
-				variant: "destructive",
-			});
-		},
-		[t],
-	);
-
-	const handleVisualProgrammingComplete = useCallback(
-		(payload: {
-			action: string;
-			data: GenerateCodeResult | CodeToVisualResult;
-		}) => {
-			setIsAiRunning(false);
-			setAiStatus("");
-			if (payload.action === "generate-code") {
-				const result = payload.data as GenerateCodeResult;
-				setCodeResult(result);
-				setSelectedCodeFile(0);
-				setShowCodeResult(true);
-				toast({
-					title: t("codeGenerated", "Code généré !"),
-					description: result.summary,
-				});
-			} else if (payload.action === "code-to-visual") {
-				const result = payload.data as CodeToVisualResult;
-				// The model's own node ids are the ones its edges reference. Minting
-				// a replacement id for a node that came back without one used to
-				// orphan every edge that named it, so the import produced a pile of
-				// disconnected boxes.
-				const idFor = new Map<number, string>();
-				const newNodes = result.nodes.map((n, i) => {
-					const id = n.id?.trim() || `imported-${i}`;
-					idFor.set(i, id);
-					return {
-						id,
-						position: { x: 0, y: 0 },
-						data: {
-							label: n.label,
-							type: n.type,
-							framework: n.framework,
-						},
-						type: "editable" as const,
-					};
-				});
-				const known = new Set(newNodes.map((n) => n.id));
-				const newEdges = result.edges
-					.filter((e) => known.has(e.source) && known.has(e.target))
-					.map((e, i) => ({
-						id: `imported-edge-${i}`,
-						source: e.source,
-						target: e.target,
-						data: { label: e.label || "" },
-					}));
-				// An imported diagram has no coordinates at all; laying it out is the
-				// difference between a readable result and a stack at the origin.
-				setNodes(autoLayout(newNodes, newEdges));
-				setEdges(newEdges);
-				const dropped = result.edges.length - newEdges.length;
-				toast({
-					title: t("codeToVisualDone", "Diagramme généré !"),
-					description:
-						dropped > 0
-							? `${result.summary} — ${t("droppedEdges", "{{count}} connexion(s) ignorée(s)", { count: dropped })}`
-							: result.summary,
-				});
-			}
-		},
-		[t, setEdges, setNodes],
-	);
-
-	// Subscribe to backend events once on mount
+	// A reverse run (Code → Visuel) answers with a diagram, and the canvas is
+	// what it answers *into*. The listener that received it runs for the life of
+	// the window, so the answer can arrive while this component is unmounted:
+	// it is parked in the store and applied here, on whichever render comes
+	// next. That is what makes the reverse run survive a detour through another
+	// page as well as the forward one does.
 	useEffect(() => {
-		const offStatus = globalThis.electronAPI?.onVisualProgrammingStatus?.(
-			handleVisualProgrammingStatus,
-		);
-		const offError = globalThis.electronAPI?.onVisualProgrammingError?.(
-			handleVisualProgrammingError,
-		);
-		const offComplete = globalThis.electronAPI?.onVisualProgrammingComplete?.(
-			handleVisualProgrammingComplete,
-		);
-		return () => {
-			offStatus?.();
-			offError?.();
-			offComplete?.();
-		};
-	}, [
-		handleVisualProgrammingComplete,
-		handleVisualProgrammingError,
-		handleVisualProgrammingStatus,
-	]);
+		if (!pendingDiagram) return;
+		const result = consumePendingDiagram();
+		if (!result) return;
+
+		// The model's own node ids are the ones its edges reference. Minting a
+		// replacement id for a node that came back without one used to orphan
+		// every edge that named it, so the import produced a pile of
+		// disconnected boxes.
+		const newNodes = result.nodes.map((n, i) => ({
+			id: n.id?.trim() || `imported-${i}`,
+			position: { x: 0, y: 0 },
+			data: { label: n.label, type: n.type, framework: n.framework },
+			type: "editable" as const,
+		}));
+		const known = new Set(newNodes.map((n) => n.id));
+		const newEdges = result.edges
+			.filter((e) => known.has(e.source) && known.has(e.target))
+			.map((e, i) => ({
+				id: `imported-edge-${i}`,
+				source: e.source,
+				target: e.target,
+				data: { label: e.label || "" },
+			}));
+		// An imported diagram has no coordinates at all; laying it out is the
+		// difference between a readable result and a stack at the origin.
+		setNodes(autoLayout(newNodes, newEdges));
+		setEdges(newEdges);
+		const dropped = result.edges.length - newEdges.length;
+		toast({
+			title: t("codeToVisualDone", "Diagramme généré !"),
+			description:
+				dropped > 0
+					? `${result.summary} — ${t("droppedEdges", "{{count}} connexion(s) ignorée(s)", { count: dropped })}`
+					: result.summary,
+		});
+	}, [pendingDiagram, consumePendingDiagram, setEdges, setNodes, t]);
 
 	const handleGenerateCode = async () => {
 		if (!globalThis.electronAPI?.runVisualProgramming) {
@@ -447,8 +397,7 @@ export const CanvasPanel: React.FC = () => {
 			});
 			return;
 		}
-		setIsAiRunning(true);
-		setAiStatus(t("starting", "Démarrage…"));
+		startRun("generate-code");
 		const diagramJson = JSON.stringify({
 			nodes,
 			edges: sanitizeEdges(nodes, edges),
@@ -475,8 +424,7 @@ export const CanvasPanel: React.FC = () => {
 			});
 			return;
 		}
-		setIsAiRunning(true);
-		setAiStatus(t("starting", "Démarrage…"));
+		startRun("code-to-visual");
 		await globalThis.electronAPI.runVisualProgramming({
 			action: "code-to-visual",
 			// biome-ignore lint/suspicious/noExplicitAny: Electron's File carries `path`
@@ -781,15 +729,7 @@ export const CanvasPanel: React.FC = () => {
 	};
 
 	const newDiagram = useCallback(() => {
-		const fresh = [
-			{
-				id: genNodeId(),
-				position: { x: 120, y: 80 },
-				data: { label: t("newDiagram", "Nouveau diagramme") },
-				type: "editable" as const,
-				selected: false,
-			},
-		];
+		const fresh: Node[] = [];
 		setNodes(fresh);
 		setEdges([]);
 		setShowFrameworkModal(false);
@@ -799,7 +739,7 @@ export const CanvasPanel: React.FC = () => {
 		setSavedSignature(signature({ nodes: fresh, edges: [] }));
 		historyRef.current = initHistory({ nodes: fresh, edges: [] });
 		setHistoryTick((v) => v + 1);
-	}, [setEdges, setNodes, t]);
+	}, [setEdges, setNodes]);
 
 	const handleNewDiagram = () => {
 		if (isDirty) {
@@ -1242,9 +1182,27 @@ export const CanvasPanel: React.FC = () => {
 						<Sparkles className="h-3.5 w-3.5" />
 					)}
 					{isAiRunning
-						? aiStatus || t("generating", "Génération…")
+						? t("generating", "Génération…")
 						: t("codePreview", "Aperçu du code")}
 				</Button>
+
+				{/* Reopening a dock the user closed. Shown only when there is
+				    something behind it, so the toolbar does not carry a button
+				    that opens an empty panel. */}
+				{!dockOpen && (hasGeneratedFiles || isAiRunning) && (
+					<Button
+						size="sm"
+						variant="ghost"
+						onClick={() => setDockOpen(true)}
+						className="gap-1.5 h-7 px-2 text-xs"
+						title={t("generatedCodeTitle", "Code généré par IA")}
+					>
+						<PanelRightOpen className="h-3.5 w-3.5" />
+						<span className="hidden lg:inline">
+							{t("showGeneratedCode", "Code généré")}
+						</span>
+					</Button>
+				)}
 
 				{/* Spacer */}
 				<div className="flex-1" />
@@ -1481,6 +1439,9 @@ export const CanvasPanel: React.FC = () => {
 						</p>
 					</aside>
 				)}
+
+				{/* The generation, while it is happening — see GeneratedCodeDock. */}
+				<GeneratedCodeDock />
 			</div>
 
 			{/* Status bar */}
@@ -1801,91 +1762,6 @@ export const CanvasPanel: React.FC = () => {
 				</DialogContent>
 			</Dialog>
 
-			{/* Generated Code Dialog */}
-			<Dialog open={showCodeResult} onOpenChange={setShowCodeResult}>
-				<DialogContent
-					style={{ maxWidth: "80vw", maxHeight: "90vh", overflowY: "auto" }}
-				>
-					<DialogTitle>
-						{t("generatedCodeTitle", "Code généré par IA")}
-					</DialogTitle>
-					{codeResult && (
-						<>
-							<DialogDescription>{codeResult.summary}</DialogDescription>
-							{codeResult.files.length > 1 && (
-								<div className="flex gap-1 flex-wrap mt-2">
-									{codeResult.files.map((f, i) => (
-										<Button
-											key={f.filename}
-											variant={i === selectedCodeFile ? "default" : "outline"}
-											size="sm"
-											onClick={() => setSelectedCodeFile(i)}
-										>
-											{f.filename}
-										</Button>
-									))}
-								</div>
-							)}
-							{codeResult.files[selectedCodeFile] && (
-								<div className="mt-3">
-									<p className="text-xs font-mono text-muted-foreground mb-1">
-										{codeResult.files[selectedCodeFile].filename}
-									</p>
-									<pre
-										className="text-xs bg-muted rounded p-3 overflow-auto"
-										style={{
-											maxHeight: "50vh",
-											whiteSpace: "pre-wrap",
-											wordBreak: "break-all",
-										}}
-									>
-										{codeResult.files[selectedCodeFile].content}
-									</pre>
-								</div>
-							)}
-							{codeResult.instructions && (
-								<p className="mt-2 text-sm text-muted-foreground">
-									{codeResult.instructions}
-								</p>
-							)}
-							<DialogFooter className="mt-4">
-								<Button
-									variant="outline"
-									onClick={() => {
-										const file = codeResult.files[selectedCodeFile];
-										if (!file) return;
-										saveAs(
-											new Blob([file.content], { type: "text/plain" }),
-											file.filename.split("/").pop() || "generated.txt",
-										);
-									}}
-								>
-									{t("downloadFile", "Télécharger ce fichier")}
-								</Button>
-								<Button
-									variant="outline"
-									onClick={() => {
-										codeResult.files.forEach((f) => {
-											saveAs(
-												new Blob([f.content], { type: "text/plain" }),
-												f.filename.split("/").pop() || "generated.txt",
-											);
-										});
-									}}
-								>
-									{t("downloadAll", "Tout télécharger")}
-								</Button>
-								<Button
-									variant="ghost"
-									onClick={() => setShowCodeResult(false)}
-								>
-									{t("close", "Fermer")}
-								</Button>
-							</DialogFooter>
-						</>
-					)}
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 };

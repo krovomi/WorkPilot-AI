@@ -19,6 +19,7 @@ import { usePromptOptimizerStore } from "./prompt-optimizer-store";
 import { useRoadmapStore } from "./roadmap-store";
 import { useSpecRefinementStore } from "./spec-refinement-store";
 import { useTestGenerationStore } from "./test-generation-store";
+import { useVisualToCodeStore } from "./visual-to-code-store";
 
 /**
  * Which feature reports to the activity registry, and under which menu entry.
@@ -57,6 +58,7 @@ export function setupActivityBridges(): () => void {
 		bridgePhaseActivity(usePromptOptimizerStore, "prompt-optimizer"),
 		bridgePhaseActivity(useSpecRefinementStore, "spec-refinement"),
 		bridgePhaseActivity(useTestGenerationStore, "test-generation"),
+		bridgePhaseActivity(useVisualToCodeStore, "visual-to-code"),
 
 		// The three that keep their phase somewhere of their own.
 		bridgeActivity(useRoadmapStore, {
