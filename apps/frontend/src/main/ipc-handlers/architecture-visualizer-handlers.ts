@@ -43,7 +43,15 @@ export function registerArchitectureVisualizerHandlers(): void {
 		IPC_CHANNELS.ARCHITECTURE_VISUALIZER_DOCTOR,
 		async (_event, projectDir: string) => {
 			try {
-				return { success: true, data: await architectureVisualizerService.doctor(projectDir) };
+				// The page calls this on every open, which is also the moment it
+				// has to decide whether a generation it started earlier is still
+				// running. Answering both in one round trip is why `running`
+				// rides along here instead of on a channel of its own.
+				const result = await architectureVisualizerService.doctor(projectDir);
+				return {
+					success: true,
+					data: { ...result, running: architectureVisualizerService.busy },
+				};
 			} catch (error) {
 				return failure(error);
 			}
