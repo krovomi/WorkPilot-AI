@@ -36,6 +36,7 @@ import {
 import {
 	isSubtaskDone,
 	isTaskEffectivelyComplete,
+	resolveOverallProgress,
 } from "../../../shared/progress";
 import { needsExecutionFormula } from "../../../shared/utils/task-execution-config";
 import { useFormulaMatrixStore } from "../../stores/formula-matrix-store";
@@ -569,7 +570,7 @@ function TaskDetailModalContent({
 	// progression de phase.
 	const headerProgressPercent = getDisplayProgress(
 		progressPercent,
-		task.executionProgress?.overallProgress,
+		resolveOverallProgress(task.executionProgress),
 		!!state.hasActiveExecution,
 		totalSubtasks > 0,
 		isTaskEffectivelyComplete(task.status, task.reviewReason),

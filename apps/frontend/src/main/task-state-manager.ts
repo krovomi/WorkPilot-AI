@@ -8,6 +8,7 @@ import {
 	getSpecsDir,
 	IPC_CHANNELS,
 } from "../shared/constants";
+import { calculateOverallProgress } from "../shared/progress";
 import {
 	mapStateToLegacy,
 	type TaskEvent,
@@ -441,6 +442,8 @@ export class TaskStateManager {
 		if (!this.getMainWindow) return;
 
 		const phase = XSTATE_TO_PHASE[xstateState] || "idle";
+		// On connaît la phase, pas l'avancement à l'intérieur : milieu de phase.
+		const phaseProgress = phase === "complete" ? 100 : 50;
 
 		// Emit execution progress with the phase derived from XState
 		safeSendToRenderer(
@@ -449,8 +452,10 @@ export class TaskStateManager {
 			taskId,
 			{
 				phase,
-				phaseProgress: phase === "complete" ? 100 : 50,
-				overallProgress: phase === "complete" ? 100 : 50,
+				phaseProgress,
+				// Pondéré par la bande de la phase : une tâche en planification
+				// vaut 10% de la tâche, pas 50%. Voir calculateOverallProgress.
+				overallProgress: calculateOverallProgress(phase, phaseProgress) ?? 0,
 				message: `State: ${xstateState}`,
 				sequenceNumber: Date.now(), // Use timestamp as sequence to ensure it's newer
 			},

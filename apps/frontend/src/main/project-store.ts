@@ -31,7 +31,7 @@ import type {
 	TaskMetadata,
 	TaskStatus,
 } from "../shared/types";
-import { isSubtaskDone } from "../shared/progress";
+import { calculateOverallProgress, isSubtaskDone } from "../shared/progress";
 import { stripAcceptanceCriteriaSection } from "../shared/utils/acceptance-criteria";
 import { extractSubtaskFiles } from "../shared/utils/subtask-files";
 import { isMeaningfulFeatureTitle } from "../shared/utils/task-title";
@@ -58,6 +58,25 @@ interface StoreData {
 interface TasksCacheEntry {
 	tasks: Task[];
 	timestamp: number;
+}
+
+/**
+ * Progression supposée à l'intérieur d'une phase quand on restaure une tâche
+ * depuis le disque : on sait quelle phase était en cours, pas où elle en était.
+ */
+const MID_PHASE_PROGRESS = 50;
+
+/**
+ * Pourcentage **global** d'une tâche restaurée, pondéré par la bande de sa
+ * phase. Cette valeur était écrite à 50 quelle que soit la phase, ce qui faisait
+ * réapparaître une tâche en planification à 50% après un redémarrage alors que
+ * la planification plafonne à 20% du travail. Voir calculateOverallProgress.
+ */
+function overallProgressForPhase(
+	phase: ExecutionPhase,
+	phaseProgress: number = MID_PHASE_PROGRESS,
+): number {
+	return calculateOverallProgress(phase, phaseProgress) ?? 0;
 }
 
 /**
@@ -1332,7 +1351,11 @@ export class ProjectStore {
 		const xstateState = (plan as { xstateState?: string } | null)?.xstateState;
 
 		if (persistedPhase) {
-			return { phase: persistedPhase, phaseProgress: 50, overallProgress: 50 };
+			return {
+				phase: persistedPhase,
+				phaseProgress: MID_PHASE_PROGRESS,
+				overallProgress: overallProgressForPhase(persistedPhase),
+			};
 		}
 
 		if (xstateState) {
@@ -1528,8 +1551,8 @@ export class ProjectStore {
 
 		return {
 			phase,
-			phaseProgress: 50,
-			overallProgress: 50,
+			phaseProgress: MID_PHASE_PROGRESS,
+			overallProgress: overallProgressForPhase(phase),
 		};
 	}
 
@@ -1560,10 +1583,11 @@ export class ProjectStore {
 		const phase = phaseMap[xstateState];
 		if (!phase) return undefined;
 
+		const phaseProgress = phase === "complete" ? 100 : MID_PHASE_PROGRESS;
 		return {
 			phase,
-			phaseProgress: phase === "complete" ? 100 : 50,
-			overallProgress: phase === "complete" ? 100 : 50,
+			phaseProgress,
+			overallProgress: overallProgressForPhase(phase, phaseProgress),
 		};
 	}
 

@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { type MouseEvent, memo, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { resolveOverallProgress } from "../../shared/progress";
 import type { ExecutionPhase, Subtask, TaskLogs } from "../../shared/types";
 import { calculateProgress, cn, getDisplayProgress } from "../lib/utils";
 
@@ -8,7 +9,14 @@ interface PhaseProgressIndicatorProps {
 	phase?: ExecutionPhase;
 	subtasks: Subtask[];
 	phaseLogs?: TaskLogs | null;
-	/** Fallback progress percentage (0-100) when phaseLogs unavailable */
+	/**
+	 * Progression **interne à la phase** (0-100) émise par le backend : 15 veut
+	 * dire « 15% de la phase de planification », PAS 15% de la tâche. Elle ne
+	 * s'affiche jamais telle quelle — c'est ce qui faisait lire 15% sur la
+	 * carte et 3% dans la pop-in pour la même tâche au même instant. Elle sert
+	 * uniquement de repli pour reconstituer la progression globale quand le
+	 * backend n'en a pas émis. Voir resolveOverallProgress.
+	 */
 	phaseProgress?: number;
 	/**
 	 * Progression temps réel pondérée par phase (0-100) émise par le backend.
@@ -125,9 +133,16 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 	// avec la pop-in) ; sans sous-tâches (spec/planning), repli sur la
 	// progression de phase. Voir getDisplayProgress.
 	const isExecutionActive = hasActiveExecution ?? isRunning;
+	// Un seul pourcentage, pondéré par phase, partagé avec la pop-in de détail :
+	// `phaseProgress` ne sert que de repli, converti dans la même échelle.
+	const resolvedOverallProgress = resolveOverallProgress({
+		phase: rawPhase,
+		phaseProgress,
+		overallProgress,
+	});
 	const displayProgress = getDisplayProgress(
 		subtaskProgress,
-		overallProgress,
+		resolvedOverallProgress,
 		isExecutionActive && !isStuck,
 		totalSubtasks > 0,
 		isComplete,
@@ -208,9 +223,10 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 								? t("execution.labels.entry")
 								: t("execution.labels.entries")}
 						</span>
-					) : isRunning && isIndeterminatePhase && (phaseProgress ?? 0) > 0 ? (
-						// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-						`${Math.round(Math.min(phaseProgress!, 100))}%`
+					) : isRunning && isIndeterminatePhase && displayProgress > 0 ? (
+						// Progression globale de la tâche (planification = bande 0-20%),
+						// jamais la progression interne à la phase.
+						`${displayProgress}%`
 					) : (
 						"—"
 					)}

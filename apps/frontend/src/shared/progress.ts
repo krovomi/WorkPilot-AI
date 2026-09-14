@@ -2,6 +2,7 @@
  * Shared progress calculation utilities
  * Used by both main and renderer processes
  */
+import { EXECUTION_PHASE_WEIGHTS } from "./constants/task";
 import type { Subtask, SubtaskStatus } from "./types";
 
 /**
@@ -125,4 +126,60 @@ export function estimateRemainingTime(
 	const remaining = estimatedTotal - elapsed;
 
 	return Math.max(0, Math.round(remaining));
+}
+
+/**
+ * Convert a progress value that is **internal to a phase** (0-100 within the
+ * current phase) into the task's **overall** percentage, using that phase's
+ * band in `EXECUTION_PHASE_WEIGHTS` (planning 0-20, coding 20-80, QA 80-95…).
+ *
+ * The two numbers are not interchangeable and used to be shown side by side as
+ * if they were: the Kanban card printed the raw `phaseProgress` (15 — "15% of
+ * the planning phase") while the detail modal printed `overallProgress` (3 —
+ * "3% of the task"), for the same task at the same instant. Only the second one
+ * answers "how far along is this task?", so it is the one every surface shows.
+ *
+ * @returns the overall percentage, or `null` for an unknown phase — the caller
+ *   decides whether that is worth reporting.
+ */
+export function calculateOverallProgress(
+	phase: string,
+	phaseProgress: number,
+): number | null {
+	const weight = EXECUTION_PHASE_WEIGHTS[phase];
+	if (!weight) return null;
+
+	const clamped = Math.min(100, Math.max(0, phaseProgress));
+	const range = weight.end - weight.start;
+	return Math.round(weight.start + (range * clamped) / 100);
+}
+
+/**
+ * The overall percentage carried by an execution-progress record, whatever it
+ * actually carries: `overallProgress` when the emitter computed one, otherwise
+ * derived from the phase and its internal progress.
+ *
+ * The fallback is what keeps the card and the modal on the same number when a
+ * record predates `overallProgress` (a persisted plan, an older snapshot):
+ * without it one surface would read a phase-local number and the other 0%.
+ *
+ * @returns `undefined` when nothing quantitative is known — distinct from 0%,
+ *   which is a real answer ("nothing done yet").
+ */
+export function resolveOverallProgress(progress?: {
+	phase?: string;
+	phaseProgress?: number;
+	overallProgress?: number;
+}): number | undefined {
+	if (!progress) return undefined;
+	if (typeof progress.overallProgress === "number") {
+		return progress.overallProgress;
+	}
+	if (progress.phase && typeof progress.phaseProgress === "number") {
+		return (
+			calculateOverallProgress(progress.phase, progress.phaseProgress) ??
+			undefined
+		);
+	}
+	return undefined;
 }
