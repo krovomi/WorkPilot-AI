@@ -84,6 +84,12 @@ export interface ArchitectureVisualizerResult {
 	error?: string;
 	readiness?: ArchifyReadiness;
 	baseline?: ArchitectureBaseline | null;
+	/**
+	 * `doctor` only, and filled by the IPC handler rather than by the runner:
+	 * whether THIS service still has a generation in flight. The runner is a
+	 * separate process and cannot know.
+	 */
+	running?: boolean;
 	archify?: string[];
 	/** `map` only. */
 	specPath?: string | null;
