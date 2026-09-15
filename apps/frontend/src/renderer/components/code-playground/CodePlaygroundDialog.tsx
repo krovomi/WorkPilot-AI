@@ -15,7 +15,6 @@ import {
 	type PlaygroundResult,
 	type PlaygroundType,
 	type SandboxType,
-	setupCodePlaygroundListeners,
 	startPlayground,
 	useCodePlaygroundStore,
 } from "@/stores/code-playground-store";
@@ -100,12 +99,6 @@ export function CodePlaygroundDialog({
 	// Use store's openDialog sets the initialIdea; we mirror it locally for editing
 	const [editableIdea, setEditableIdea] = useState("");
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
-
-	// Setup IPC listeners once
-	useEffect(() => {
-		const cleanup = setupCodePlaygroundListeners();
-		return cleanup;
-	}, []);
 
 	// Sync editable idea when dialog opens
 	useEffect(() => {

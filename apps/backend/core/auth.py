@@ -693,6 +693,31 @@ def _get_token_from_config_dir(config_dir: str) -> str | None:
     return None
 
 
+#: Providers whose sessions are authenticated by the Claude Code OAuth token
+#: this module fetches. Everything else — Ollama and the other local servers,
+#: OpenAI, Google, Mistral, Copilot, Windsurf… — carries its own credential,
+#: supplied by the frontend's credential manager or by the local server needing
+#: none at all.
+CLAUDE_OAUTH_PROVIDERS = frozenset({"claude", "anthropic"})
+
+
+def provider_requires_claude_oauth(provider: str | None) -> bool:
+    """Whether a build on `provider` needs the Claude Code OAuth token.
+
+    The CLI used to demand that token before every build, whatever the task was
+    configured to run on. A user who had picked Ollama in the UI got the task
+    accepted by the frontend — which asks this same question and answers it
+    correctly — and then refused by the backend a second later, with a message
+    telling them to authenticate against a service their build never touches.
+
+    An unset provider means the default, and the default is Claude.
+    """
+    normalized = (provider or "").strip().lower()
+    if not normalized:
+        return True
+    return normalized in CLAUDE_OAUTH_PROVIDERS
+
+
 def get_auth_token(config_dir: str | None = None) -> str | None:
     """
     Get authentication token from environment variables or credential store.

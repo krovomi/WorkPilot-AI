@@ -100,33 +100,34 @@ import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+
 def setup_optimization_logging():
     """Setup logging for optimization components."""
-    
+
     # Create logs directory
     logs_dir = Path(__file__).parent / "logs"
     logs_dir.mkdir(exist_ok=True)
-    
+
     # Configure logger
-    logger = logging.getLogger('core.optimization')
+    logger = logging.getLogger("core.optimization")
     logger.setLevel(logging.INFO)
-    
+
     # Create file handler
     handler = RotatingFileHandler(
         logs_dir / "optimization.log",
-        maxBytes=10*1024*1024,  # 10MB
-        backupCount=5
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5,
     )
-    handler.setFormatter(logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    ))
-    
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
+
     logger.addHandler(handler)
-    
+
     # Set debug level if enabled
-    if os.getenv('COPILOT_OPTIMIZATION_DEBUG', 'false').lower() == 'true':
+    if os.getenv("COPILOT_OPTIMIZATION_DEBUG", "false").lower() == "true":
         logger.setLevel(logging.DEBUG)
-    
+
     return logger
 ```
 
@@ -147,42 +148,42 @@ from typing import Dict, Any
 
 # Production token budgets (conservative)
 PRODUCTION_BUDGETS = {
-    'copilot_runtime': 1500,  # Reduced for production
-    'copilot_client': 2500,  # Reduced for production
-    'global': 8000      # Reduced for production
+    "copilot_runtime": 1500,  # Reduced for production
+    "copilot_client": 2500,  # Reduced for production
+    "global": 8000,  # Reduced for production
 }
 
 # Production agent settings (conservative)
 PRODUCTION_AGENT_SETTINGS = {
-    'copilot_runtime': {
-        'auto_decompose': True,
-        'max_tokens_per_task': 800,  # Reduced for production
-        'complexity_threshold': 0.6,  # Lower threshold
-        'max_turns': 8  # Reduced turns
+    "copilot_runtime": {
+        "auto_decompose": True,
+        "max_tokens_per_task": 800,  # Reduced for production
+        "complexity_threshold": 0.6,  # Lower threshold
+        "max_turns": 8,  # Reduced turns
     },
-    'copilot_client': {
-        'auto_optimize_prompts': True,
-        'optimize_subagents': True,
-        'context_level': 'standard',  # Use standard level
-        'max_turns': 8,  # Reduced turns
-        'timeout': 45  # Reduced timeout
-    }
+    "copilot_client": {
+        "auto_optimize_prompts": True,
+        "optimize_subagents": True,
+        "context_level": "standard",  # Use standard level
+        "max_turns": 8,  # Reduced turns
+        "timeout": 45,  # Reduced timeout
+    },
 }
 
 # Production optimization levels
 PRODUCTION_OPTIMIZATION_LEVELS = {
-    'minimal': {'max_tokens': 200, 'context_level': 'minimal'},
-    'standard': {'max_tokens': 600, 'context_level': 'standard'},
-    'comprehensive': {'max_tokens': 1200, 'context_level': 'comprehensive'}
+    "minimal": {"max_tokens": 200, "context_level": "minimal"},
+    "standard": {"max_tokens": 600, "context_level": "standard"},
+    "comprehensive": {"max_tokens": 1200, "context_level": "comprehensive"},
 }
 
 # Performance settings
 PRODUCTION_PERFORMANCE = {
-    'cache_ttl': 300,      # 5 minutes
-    'cache_max_size': 1000,  # Max cache entries
-    'predictive_cache_enabled': True,
-    'token_pooling_enabled': True,
-    'batch_processing': True
+    "cache_ttl": 300,  # 5 minutes
+    "cache_max_size": 1000,  # Max cache entries
+    "predictive_cache_enabled": True,
+    "token_pooling_enabled": True,
+    "batch_processing": True,
 }
 ```
 
@@ -198,51 +199,60 @@ Environment-specific configuration for GitHub Copilot optimization.
 import os
 from .config_production import PRODUCTION_BUDGETS, PRODUCTION_AGENT_SETTINGS
 
+
 def get_token_budgets() -> Dict[str, int]:
     """Get token budgets for current environment."""
     budgets = PRODUCTION_BUDGETS.copy()
-    
+
     # Override with environment variables if set
-    if 'COPILOT_TOKEN_BUDGET' in os.environ:
-        budgets['copilot_runtime'] = int(os.environ['COPILOT_TOKEN_BUDGET'])
-    
-    if 'COPILOT_CLIENT_BUDGET' in os.environ:
-        budgets['copilot_client'] = int(os.environ['COPILOT_CLIENT_BUDGET'])
-    
-    if 'COPILOT_GLOBAL_BUDGET' in os.environ:
-        budgets['global'] = int(os.environ['COPILOT_BUILT_IN_BUDGET'])
-    
+    if "COPILOT_TOKEN_BUDGET" in os.environ:
+        budgets["copilot_runtime"] = int(os.environ["COPILOT_TOKEN_BUDGET"])
+
+    if "COPILOT_CLIENT_BUDGET" in os.environ:
+        budgets["copilot_client"] = int(os.environ["COPILOT_CLIENT_BUDGET"])
+
+    if "COPILOT_GLOBAL_BUDGET" in os.environ:
+        budgets["global"] = int(os.environ["COPILOT_BUILT_IN_BUDGET"])
+
     return budgets
+
 
 def get_agent_settings() -> Dict[str, Any]:
     """Get agent settings for current environment."""
     settings = PRODUCTION_AGENT_SETTINGS.copy()
-    
+
     # Override with environment variables if set
-    if 'COPILOT_AUTO_DECOMPOSE' in os.environ:
-        settings['copilot_runtime']['auto_decompose'] = os.getenv('COPILOT_AUTO_DECOMPOSE').lower() == 'true'
-    
-    if 'COPILOT_PROMPT_LEVEL' in os.environ:
-        level = os.getenv('COPILOT_PROMPT_LEVEL').lower()
-        if level in ['minimal', 'standard', 'comprehensive']:
-            settings['copilot_client']['context_level'] = level
-    
+    if "COPILOT_AUTO_DECOMPOSE" in os.environ:
+        settings["copilot_runtime"]["auto_decompose"] = (
+            os.getenv("COPILOT_AUTO_DECOMPOSE").lower() == "true"
+        )
+
+    if "COPILOT_PROMPT_LEVEL" in os.environ:
+        level = os.getenv("COPILOT_PROMPT_LEVEL").lower()
+        if level in ["minimal", "standard", "comprehensive"]:
+            settings["copilot_client"]["context_level"] = level
+
     return settings
+
 
 def get_optimization_settings() -> Dict[str, Any]:
     """Get optimization settings for current environment."""
     settings = PRODUCTION_PERFORMANCE.copy()
-    
+
     # Override with environment variables if set
-    if 'COPILOT_CACHE_ENABLED' in os.environ:
-        settings['cache_enabled'] = os.getenv('COPILOT_CACHE_ENABLED').lower() == 'true'
-    
-    if 'COPILOT_PREDICTIVE_CACHE' in os.environ:
-        settings['predictive_cache_enabled'] = os.getenv('COPILOT_PREDICTIVE_CACHE').lower() == 'true'
-    
-    if 'COPILOT_TOKEN_POOLING' in os.environ:
-        settings['token_pooling_enabled'] = os.getenv('COPILOT_TOKEN_POOLING').lower() == 'true'
-    
+    if "COPILOT_CACHE_ENABLED" in os.environ:
+        settings["cache_enabled"] = os.getenv("COPILOT_CACHE_ENABLED").lower() == "true"
+
+    if "COPILOT_PREDICTIVE_CACHE" in os.environ:
+        settings["predictive_cache_enabled"] = (
+            os.getenv("COPILOT_PREDICTIVE_CACHE").lower() == "true"
+        )
+
+    if "COPILOT_TOKEN_POOLING" in os.environ:
+        settings["token_pooling_enabled"] = (
+            os.getenv("COPILOT_TOKEN_POOLING").lower() == "true"
+        )
+
     return settings
 ```
 
@@ -377,30 +387,35 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+
 def verify_deployment():
     """Verify that Phase 1 deployment is working correctly."""
     print("🔍 Verifying Phase 1 GitHub Copilot Optimization Deployment")
     print("=" * 60)
-    
+
     checks = []
-    
+
     # Check environment variables
-    optimization_enabled = os.getenv("COPILOT_OPTIMIZATION_ENABLED", "false").lower() == "true"
+    optimization_enabled = (
+        os.getenv("COPILOT_OPTIMIZATION_ENABLED", "false").lower() == "true"
+    )
     checks.append(("Environment Variables", optimization_enabled))
-    
+
     # Check module imports
     try:
         from apps.backend.core.optimization import TokenTracker
+
         checks.append(("TokenTracker Import", True))
     except ImportError:
         checks.append(("TokenTracker Import", False))
-    
+
     try:
         from apps.backend.core.optimization.factory import OptimizedCopilotFactory
+
         checks.append(("OptimizedCopilotFactory Import", True))
     except ImportError:
         checks.append(("OptimizedCopilotFactory Import", False))
-    
+
     # Test token tracking
     try:
         tracker = TokenTracker()
@@ -408,7 +423,7 @@ def verify_deployment():
         checks.append(("Token Tracking", True))
     except Exception as e:
         checks.append(("Token Tracking", False))
-    
+
     # Test factory methods
     try:
         factory = OptimizedCopilotFactory
@@ -417,39 +432,37 @@ def verify_deployment():
             phase="test",
             project_dir="test",
             agent_type="test",
-            token_budget=1000
+            token_budget=1000,
         )
         checks.append(("Runtime Creation", True))
     except Exception as e:
         checks.append(("Runtime Creation", False))
-    
+
     # Test client creation
     try:
-        client = factory.create_agent_client(
-            model="gpt-4o",
-            token_budget=1000
-        )
+        client = factory.create_agent_client(model="gpt-4o", token_budget=1000)
         checks.append(("Client Creation", True))
     except Exception as e:
         checks.append(("Client Creation", False))
-    
+
     # Print results
     print("\n" + "=" * 60)
     print("Verification Results:")
     print("-" * 60)
-    
+
     for check_name, check_result in checks:
         status = "✅" if check_result else "❌"
         print(f"{status} {check_name}")
-    
+
     all_passed = all(result for _, result in checks)
-    
+
     if all_passed:
         print("\n🎉 All checks passed! Phase 1 deployment is ready.")
         return True
     else:
         print(f"\n⚠️  {len(checks) - sum(checks)} checks failed.")
         return False
+
 
 if __name__ == "__main__":
     verify_deployment()
@@ -616,42 +629,42 @@ Based on initial monitoring data:
 
 ```python
 # Conservative budgets for production
-COPILOT_TOKEN_BUDGET=1500  # Reduced from 2000
-COPILOT_CLIENT_BUDGET=2500  # Reduced from 3000
-COPILOT_GLOBAL_BUDGET=8000   # Reduced from 10000
+COPILOT_TOKEN_BUDGET = 1500  # Reduced from 2000
+COPILOT_CLIENT_BUDGET = 2500  # Reduced from 3000
+COPILOT_GLOBAL_BUDGET = 8000  # Reduced from 10000
 ```
 
 ### 2. Optimization Level Adjustment
 
 ```python
 # For high-throughput scenarios
-COPILOT_PROMPT_LEVEL=minimal
+COPILOT_PROMPT_LEVEL = minimal
 
 # For quality-focused scenarios
-COPILOT_PROMPT_LEVEL=comprehensive
+COPILOT_PROMPT_LEVEL = comprehensive
 ```
 
 ### 3. Cache Configuration
 
 ```python
 # For frequent similar tasks
-COPILOT_CACHE_ENABLED=true
-COPILOT_PREDICTIVE_CACHE=true
+COPILOT_CACHE_ENABLED = true
+COPILOT_PREDICTIVE_CACHE = true
 
 # For varied tasks
-COPILOT_CACHE_ENABLED=false
-COPILOT_PREDICTIVE_CACHE=false
+COPILOT_CACHE_ENABLED = false
+COPILOT_PREDICTIVE_CACHE = false
 ```
 
 ### 4. Task Decomposition Settings
 
 ```python
 # For simple tasks
-COPILOT_AUTO_DECOMPOSE=false
+COPILOT_AUTO_DECOMPOSE = false
 
 # For complex tasks
-COPILOT_AUTO_DECOMPOSE=true
-COPILOT_COMPLEXITY_THRESHOLD=0.8
+COPILOT_AUTO_DECOMPOSE = true
+COPILOT_COMPLEXITY_THRESHOLD = 0.8
 ```
 
 ---

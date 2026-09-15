@@ -6,8 +6,15 @@ Handles execution of tools during agent sessions.
 """
 
 import asyncio
+import json
+import os
+import signal
 from pathlib import Path
 from typing import Any
+
+from rtk import rewrite_command as rtk_rewrite
+from watermarks import clean_generated
+from watermarks import record as watermarks_record
 
 
 def _pick_arg(arguments: dict[str, Any], *names: str, default: Any = None) -> Any:
@@ -51,8 +58,24 @@ def _as_bool(value: Any) -> bool:
 class ToolExecutor:
     """Executes tools for agent sessions."""
 
-    def __init__(self, project_dir: str):
+    def __init__(
+        self,
+        project_dir: str,
+        working_directory: str | None = None,
+        spec_dir: str | Path | None = None,
+    ):
+        self.command_timeout = float(os.environ.get("LOCAL_COMMAND_TIMEOUT", "120"))
         self.project_dir = Path(project_dir).resolve()
+        # Only for the watermark ledger, and optional because only a build has
+        # one: the terminal and the insights runtimes construct an executor from
+        # a project directory alone. Without it the content is still cleaned —
+        # what is lost is the record of it, not the cleaning.
+        self.spec_dir = Path(spec_dir) if spec_dir else None
+        self.working_directory = self.project_dir
+        if working_directory is not None:
+            self.working_directory = self._resolve_within_project(working_directory)
+            if not self.working_directory.is_dir():
+                raise ValueError("Tool working directory does not exist")
 
     def _resolve_within_project(self, path: str) -> Path:
         """Resolve a user-supplied path and reject anything outside project_dir.
@@ -61,7 +84,7 @@ class ToolExecutor:
         ('/etc/passwd'). Without this guard, Path / userpath happily escapes
         the sandbox, since Path('/safe') / Path('/etc/x') -> Path('/etc/x').
         """
-        candidate = (self.project_dir / path).resolve()
+        candidate = (self.working_directory / path).resolve()
         try:
             candidate.relative_to(self.project_dir)
         except ValueError:
@@ -137,6 +160,41 @@ class ToolExecutor:
             raise ValueError("Path is required for write_file")
 
         file_path = self._resolve_within_project(path)
+
+        # The other half of the product. Providers that do not use the Claude
+        # SDK never reach `create_client`'s PreToolUse hooks, so the same
+        # cleaning is applied at the one place their writes go through —
+        # exactly as `rtk_rewrite` is applied to their shell commands a few
+        # lines below. Before the JSON branch, not after: an invisible
+        # character inside a string value survives `json.loads` and would be
+        # written straight back out by `write_json_atomic`.
+        if isinstance(content, str) and content:
+            cleaning = clean_generated(content)
+            if cleaning.changed:
+                content = cleaning.text
+                watermarks_record(
+                    self.spec_dir,
+                    file_path=path,
+                    tool="write_file",
+                    cleaning=cleaning,
+                )
+
+        if file_path.name == "implementation_plan.json":
+            # Validate before touching the existing plan. The tool error is fed
+            # back to the model so it can correct escaping in the same session.
+            try:
+                plan = json.loads("" if empty_file else content or "")
+            except json.JSONDecodeError as error:
+                raise ValueError(
+                    f"Invalid implementation_plan.json: {error}. "
+                    "The existing file was not changed. Escape quotes inside JSON strings."
+                ) from error
+            if not isinstance(plan, dict):
+                raise ValueError("implementation_plan.json must contain a JSON object")
+            from core.file_utils import write_json_atomic
+
+            write_json_atomic(file_path, plan)
+            return f"Successfully wrote to {path}"
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -194,17 +252,39 @@ class ToolExecutor:
         if not command:
             raise ValueError("Command is required for run_command")
 
-        work_dir = self._resolve_within_project(cwd) if cwd else self.project_dir
+        # rtk — the non-Claude half of the same optimisation the SDK gets from
+        # `rtk.hook`. Copilot, Windsurf, OpenAI and the local runtimes all
+        # execute their shell commands here, and they pay for the output the
+        # same way. The rewrite preserves behaviour and exit code; when rtk is
+        # absent or has no filter for this command, `command` comes back
+        # unchanged.
+        command = rtk_rewrite(command).command
+
+        work_dir = self._resolve_within_project(cwd) if cwd else self.working_directory
 
         try:
             process = await asyncio.create_subprocess_shell(
                 command,
                 cwd=str(work_dir),
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                start_new_session=os.name != "nt",
             )
 
-            stdout_bytes, stderr_bytes = await process.communicate()
+            try:
+                stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    process.communicate(), timeout=self.command_timeout
+                )
+            except (TimeoutError, asyncio.CancelledError) as error:
+                await self._stop_command(process)
+                if isinstance(error, asyncio.CancelledError):
+                    raise
+                raise RuntimeError(
+                    f"Command exceeded {self.command_timeout:g}s and was terminated. "
+                    "Commands must be non-interactive; quote paths containing spaces "
+                    "or use read_file for file reads."
+                ) from error
             stdout = (
                 stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
             )
@@ -235,6 +315,28 @@ class ToolExecutor:
         except Exception as e:
             raise RuntimeError(f"Error running command {command}: {e}")
 
+    async def _stop_command(self, process) -> None:
+        """Reap the shell and its children when a command times out or is cancelled."""
+        if os.name == "nt":
+            killer = await asyncio.create_subprocess_exec(
+                "taskkill",
+                "/PID",
+                str(process.pid),
+                "/T",
+                "/F",
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await killer.wait()
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                # The command may have exited immediately before cleanup.
+                pass
+        await process.wait()
+
 
 def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
     """
@@ -250,7 +352,7 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
     base_tools = [
         {
             "name": "read_file",
-            "description": "Read the contents of a file",
+            "description": "Read a file directly, including paths with spaces. Prefer this over shell cat.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -296,7 +398,7 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
         },
         {
             "name": "run_command",
-            "description": "Run a shell command",
+            "description": "Run a non-interactive shell command with a time limit. Quote paths containing spaces. Use read_file to read files.",
             "parameters": {
                 "type": "object",
                 "properties": {

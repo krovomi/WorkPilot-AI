@@ -106,9 +106,15 @@ PHASE_ALIASES: dict[str, str] = {
     "context_mesh_analyzer": "research",
     "learning_analyzer": "research",
     "live_companion_analyzer": "research",
-    # Writing the spec, while there is still no code to point at.
+    # Writing or questioning the spec, while there is still no code to point at.
     "spec_writer": "spec",
     "spec_gatherer": "spec",
+    "spec_critic": "spec",
+    # Reading a spec and a plan against each other. Unmapped, this fell through
+    # to "kanban" and was handed a `test-runner` by a phase that runs before a
+    # line of code exists. A workflow phase that wants another roster says so
+    # with `roster:` — see `phase_specs`.
+    "spec_validation": "spec",
     # Single-purpose calls that will never delegate. An empty roster is the
     # honest answer; handing them three specialists is context billed per turn
     # and spent on nothing.
@@ -450,13 +456,30 @@ _BUILDERS = {
 }
 
 
-def phase_specs(agent_type: str) -> dict[str, AgentSpec]:
+def phase_specs(agent_type: str, roster: str | None = None) -> dict[str, AgentSpec]:
     """The generic roster for ``agent_type``, as data.
 
     Available with or without the SDK, which is what the build needs: emitting
     `.github/agents/` must not depend on a Python package the harness in
     question has nothing to do with.
+
+    ``roster`` names one of `_BUILDERS` directly, for a caller that knows better
+    than the alias table. A workflow phase is that caller: `analyze` and
+    `spec-conformance` both run under the read-only `spec_validation` config —
+    they must, since neither may write — but one reads a plan before any code
+    exists and the other audits a finished branch, and the alias table has one
+    key per agent_type and so cannot answer both. An unknown name falls back
+    rather than raising: a typo in a workflow file should cost the right roster,
+    not the build.
     """
+    if roster and roster in _BUILDERS:
+        return _BUILDERS[roster]()
+    if roster:
+        logger.warning(
+            "unknown subagent roster %r; falling back to the default for %s",
+            roster,
+            agent_type,
+        )
     phase = PHASE_ALIASES.get(agent_type, "kanban")
     return _BUILDERS[phase]()
 
@@ -466,10 +489,11 @@ def all_specs() -> dict[str, dict[str, AgentSpec]]:
     return {phase: builder() for phase, builder in _BUILDERS.items()}
 
 
-def phase_defaults(agent_type: str) -> dict[str, Any]:
+def phase_defaults(agent_type: str, roster: str | None = None) -> dict[str, Any]:
     """The generic roster for ``agent_type``. Empty when the SDK is absent."""
     if not sdk_available():
         return {}
     return {
-        name: spec.to_definition() for name, spec in phase_specs(agent_type).items()
+        name: spec.to_definition()
+        for name, spec in phase_specs(agent_type, roster).items()
     }

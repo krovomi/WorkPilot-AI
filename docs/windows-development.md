@@ -167,9 +167,11 @@ platforms.
    ```python
    # Instead of shell commands
    import shutil
+
    shutil.copy("source.txt", "dest.txt")  # Instead of cp
 
    import os
+
    os.remove("file.txt")  # Instead of rm
    ```
 
@@ -301,6 +303,7 @@ Add tests for Windows compatibility when relevant:
 ```python
 import sys
 import pytest
+
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
 def test_windows_encoding():

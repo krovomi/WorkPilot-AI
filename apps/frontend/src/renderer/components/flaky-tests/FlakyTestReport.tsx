@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupFlakyTestsListeners,
-	useFlakyTestsStore,
-} from "../../stores/flaky-tests-store";
+import { useFlakyTestsStore } from "../../stores/flaky-tests-store";
 import type {
 	FlakyConfidence,
 	FlakyReport,
@@ -24,11 +20,6 @@ export function FlakyTestReport({
 	projectPath,
 }: FlakyTestReportProps): React.ReactElement {
 	const { t } = useTranslation("flakyTests");
-
-	useEffect(() => {
-		const cleanup = setupFlakyTestsListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useFlakyTestsStore((s) => s.phase);
 	const status = useFlakyTestsStore((s) => s.status);

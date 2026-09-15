@@ -4,7 +4,9 @@
 try:
     import grepai
 except ImportError:
-    print("grepai n'est pas installé. Veuillez l'ajouter à requirements.txt et installer les dépendances.")
+    print(
+        "grepai n'est pas installé. Veuillez l'ajouter à requirements.txt et installer les dépendances."
+    )
     exit(1)
 
 # Exemple d'utilisation basique (à adapter selon vos besoins)

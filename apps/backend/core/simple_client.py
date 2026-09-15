@@ -101,6 +101,10 @@ def create_simple_client(
     Raises:
         ValueError: If agent_type is not found in AGENT_CONFIGS
     """
+    from core.offline_policy import guard_cloud_client
+
+    guard_cloud_client(cwd or Path.cwd(), os.environ.get("AUTO_CLAUDE_PROJECT_DIR"))
+
     # Get environment variables for SDK (including CLAUDE_CONFIG_DIR if set)
     sdk_env = get_sdk_env_vars()
 

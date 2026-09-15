@@ -157,7 +157,7 @@ export interface MissionControlState {
 // ---------------------------------------------------------------------------
 
 const getBackendUrl = () => {
-	return import.meta?.env?.VITE_BACKEND_URL || "";
+	return (import.meta.env.VITE_BACKEND_URL || "http://localhost:9000").replace(/\/+$/, "");
 };
 
 async function mcFetch<T = Record<string, unknown>>(

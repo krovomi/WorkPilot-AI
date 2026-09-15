@@ -44,13 +44,19 @@ jobs:
         language: [python, javascript-typescript]
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           queries: +security-extended,security-and-quality
+          # The same exclusion `codeql.yml` uses. Two workflows run CodeQL on
+          # every PR, each with its own `init`, so a scope set on one of them
+          # is not set at all — which is how the vendored tree kept raising
+          # alerts after being excluded. The config file is shared so the two
+          # cannot drift into scanning different things.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4
@@ -67,10 +73,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: '3.12'
 

@@ -36,7 +36,6 @@ import {
 	newSession,
 	renameSession,
 	sendMessage,
-	setupInsightsListeners,
 	switchSession,
 	updateModelConfig,
 	useInsightsStore,
@@ -156,11 +155,10 @@ export function Insights({ projectId }: InsightsProps) {
 		return () => viewport.removeEventListener("scroll", onScroll);
 	}, [checkIfAtBottom]);
 
-	// Load session and set up listeners on mount
+	// Listeners are registered for the whole session in
+	// stores/global-listeners.ts — this only loads the session.
 	useEffect(() => {
 		loadInsightsSession(projectId);
-		const cleanup = setupInsightsListeners();
-		return cleanup;
 	}, [projectId]);
 
 	// Smart auto-scroll: only scroll if user is already at bottom

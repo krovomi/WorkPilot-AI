@@ -372,6 +372,8 @@ class QualityScorer:
 '''
 
 # Write the corrected content to the file
-file_path = Path(__file__).parent.parent / "apps" / "backend" / "review" / "quality_scorer.py"
+file_path = (
+    Path(__file__).parent.parent / "apps" / "backend" / "review" / "quality_scorer.py"
+)
 file_path.write_text(corrected_content, encoding="utf-8")
 print(f"✓ Fixed {file_path}")

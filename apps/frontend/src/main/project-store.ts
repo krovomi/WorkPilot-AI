@@ -31,7 +31,7 @@ import type {
 	TaskMetadata,
 	TaskStatus,
 } from "../shared/types";
-import { isSubtaskDone } from "../shared/progress";
+import { calculateOverallProgress, isSubtaskDone } from "../shared/progress";
 import { stripAcceptanceCriteriaSection } from "../shared/utils/acceptance-criteria";
 import { extractSubtaskFiles } from "../shared/utils/subtask-files";
 import { isMeaningfulFeatureTitle } from "../shared/utils/task-title";
@@ -58,6 +58,25 @@ interface StoreData {
 interface TasksCacheEntry {
 	tasks: Task[];
 	timestamp: number;
+}
+
+/**
+ * Progression supposée à l'intérieur d'une phase quand on restaure une tâche
+ * depuis le disque : on sait quelle phase était en cours, pas où elle en était.
+ */
+const MID_PHASE_PROGRESS = 50;
+
+/**
+ * Pourcentage **global** d'une tâche restaurée, pondéré par la bande de sa
+ * phase. Cette valeur était écrite à 50 quelle que soit la phase, ce qui faisait
+ * réapparaître une tâche en planification à 50% après un redémarrage alors que
+ * la planification plafonne à 20% du travail. Voir calculateOverallProgress.
+ */
+function overallProgressForPhase(
+	phase: ExecutionPhase,
+	phaseProgress: number = MID_PHASE_PROGRESS,
+): number {
+	return calculateOverallProgress(phase, phaseProgress) ?? 0;
 }
 
 /**
@@ -728,13 +747,16 @@ export class ProjectStore {
 
 			const description = this.extractDescription(specPath, plan, hasJsonError);
 			const loadedMetadata = this.loadTaskMetadata(specPath);
-			// The pause flag lives in implementation_plan.json (the backend reads
-			// it there), not task_metadata.json. Surface it on task.metadata so the
-			// paused controls survive task-list reloads — otherwise the only source
-			// is the optimistic store update, which every rescan wipes.
+			// The pause flag lives in pause_state.json, which exists as soon as
+			// the spec does — the implementation plan does not, which is why
+			// pausing used to be impossible during planning. Surfaced on
+			// task.metadata so the paused controls survive task-list reloads:
+			// otherwise the only source is the optimistic store update, which
+			// every rescan wipes.
+			const pauseState = this.loadPauseState(specPath, plan);
 			const metadata =
-				plan?.paused !== undefined
-					? { ...(loadedMetadata ?? {}), paused: plan.paused }
+				pauseState !== undefined
+					? { ...(loadedMetadata ?? {}), paused: pauseState }
 					: loadedMetadata;
 			const { status: finalStatus, reviewReason: finalReviewReason } =
 				this.determineFinalStatus(plan, hasJsonError);
@@ -769,6 +791,13 @@ export class ProjectStore {
 				...(correctedReviewReason !== undefined && {
 					reviewReason: correctedReviewReason,
 				}),
+				// Persisted by the state manager next to the status it explains,
+				// so a failure the user was not watching live is still named when
+				// they come back to the board.
+				...(typeof plan?.errorMessage === "string" &&
+					plan.errorMessage.length > 0 && {
+						errorMessage: plan.errorMessage,
+					}),
 				...(executionProgress && { executionProgress }),
 				stagedInMainProject,
 				stagedAt,
@@ -982,6 +1011,34 @@ export class ProjectStore {
 		} catch {
 			return "";
 		}
+	}
+
+	/**
+	 * The cooperative pause, read from its one store.
+	 *
+	 * `pause_state.json` is written by the TASK_PAUSE handler and read by the
+	 * backend's coder loop, QA loop and spec pipeline. The `paused` block that
+	 * used to live inside `implementation_plan.json` is still honoured so a task
+	 * paused before this change does not silently un-pause on upgrade.
+	 */
+	private loadPauseState(
+		specPath: string,
+		plan: (ImplementationPlan & { paused?: unknown }) | null,
+	): TaskMetadata["paused"] | undefined {
+		const statePath = path.join(specPath, AUTO_BUILD_PATHS.PAUSE_STATE);
+		try {
+			// Read without an existsSync guard first: the file is written by a
+			// live agent subprocess, so checking then reading opens a window in
+			// which the answer changes. An absent or unreadable file reads as
+			// "not paused" — the same decision the backend's own reader makes.
+			const parsed = JSON.parse(readFileSync(statePath, "utf-8"));
+			if (parsed && typeof parsed === "object") {
+				return parsed as TaskMetadata["paused"];
+			}
+		} catch {
+			// fall through to the legacy in-plan flag
+		}
+		return plan?.paused as TaskMetadata["paused"] | undefined;
 	}
 
 	/**
@@ -1294,7 +1351,11 @@ export class ProjectStore {
 		const xstateState = (plan as { xstateState?: string } | null)?.xstateState;
 
 		if (persistedPhase) {
-			return { phase: persistedPhase, phaseProgress: 50, overallProgress: 50 };
+			return {
+				phase: persistedPhase,
+				phaseProgress: MID_PHASE_PROGRESS,
+				overallProgress: overallProgressForPhase(persistedPhase),
+			};
 		}
 
 		if (xstateState) {
@@ -1490,8 +1551,8 @@ export class ProjectStore {
 
 		return {
 			phase,
-			phaseProgress: 50,
-			overallProgress: 50,
+			phaseProgress: MID_PHASE_PROGRESS,
+			overallProgress: overallProgressForPhase(phase),
 		};
 	}
 
@@ -1522,10 +1583,11 @@ export class ProjectStore {
 		const phase = phaseMap[xstateState];
 		if (!phase) return undefined;
 
+		const phaseProgress = phase === "complete" ? 100 : MID_PHASE_PROGRESS;
 		return {
 			phase,
-			phaseProgress: phase === "complete" ? 100 : 50,
-			overallProgress: phase === "complete" ? 100 : 50,
+			phaseProgress,
+			overallProgress: overallProgressForPhase(phase, phaseProgress),
 		};
 	}
 

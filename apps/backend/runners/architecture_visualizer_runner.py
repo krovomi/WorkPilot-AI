@@ -1,172 +1,361 @@
 #!/usr/bin/env python3
-"""
-Architecture Visualizer Runner
+"""Architecture Visualizer — the archify model of a project, and its per-task delta.
 
-Analyzes the codebase and generates interactive architecture diagrams:
-module dependencies, data flow, component hierarchy, and database schema.
-Auto-updates on each build.
+Three actions, one code path each:
+
+``--action map``
+    Author (or re-author) the project's baseline architecture model and render
+    it. This is what the Architecture page runs.
+``--action delta``
+    Author the "after" model for one task, starting from the baseline so the
+    component ids survive, and compare the two. This is what the workflow phase
+    and the Kanban's regenerate button run.
+``--action doctor``
+    Whether archify can run here, and what is missing. Costs no API call and no
+    subprocess beyond `node --version`, so the UI can ask on every panel open.
+
+``--model`` and ``--thinking-level`` are honoured here rather than parsed and
+dropped: authoring is a real agent session, resolved through
+`phase_config.get_phase_model` like every other phase.
+
+Every action prints a `__ARCH_VIZ_RESULT__:<json>` sentinel on stdout, which is
+what the Electron service parses. The human-readable lines above it are for the
+log pane.
 """
+
+from __future__ import annotations
 
 import argparse
+import asyncio
 import json
-import os
 import sys
 from pathlib import Path
 
-# Add the apps/backend directory to the Python path
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from architecture_visualizer import ArchitectureAnalyzer
+from architecture_visualizer.archify import (  # noqa: E402
+    ArchifyUnavailable,
+    assess,
+    authoring,
+    check,
+    compare_models,
+    doctor,
+)
+from architecture_visualizer.archify import delta as delta_module  # noqa: E402
+from architecture_visualizer.archify import ir as ir_module  # noqa: E402
+
+SENTINEL = "__ARCH_VIZ_RESULT__:"
+
+#: Under `<project>/.workpilot/architecture/`.
+BASELINE_SPEC = "baseline.arch.json"
+BASELINE_HTML = "baseline.html"
 
 
-class ArchitectureVisualizerRunner:
-    """Runner for the Architecture Visualizer feature."""
+def emit(payload: dict) -> None:
+    print(SENTINEL + json.dumps(payload, default=str), flush=True)
 
-    def __init__(
-        self,
-        project_dir: str,
-        output_dir: str | None = None,
-        diagram_types: list[str] | None = None,
-        model: str | None = None,
-        thinking_level: str | None = None,
-    ):
-        self.project_dir = Path(project_dir)
-        self.output_dir = (
-            Path(output_dir)
-            if output_dir
-            else self.project_dir / ".workpilot" / "architecture"
+
+def say(message: str) -> None:
+    print(message, flush=True)
+
+
+def baseline_dir(project_dir: Path) -> Path:
+    return project_dir / ".workpilot" / "architecture"
+
+
+# --------------------------------------------------------------------------- #
+# The agent session
+# --------------------------------------------------------------------------- #
+
+
+def _make_session(
+    project_dir: Path, spec_dir: Path, model: str | None, thinking: str | None
+):
+    """A `(prompt) -> response` callable backed by the configured provider.
+
+    Built here rather than inside `authoring` so the loop stays testable without
+    a model, and so provider, phase model and thinking budget are resolved in
+    one place — through `create_agent_client`, never `anthropic.Anthropic()`.
+    """
+    from core.client import create_agent_client
+    from phase_config import get_phase_model, get_phase_thinking_budget
+
+    # The map is a reading-and-writing pass over a finished codebase, which is
+    # the `qa` phase's budget shape rather than `coding`'s.
+    resolved_model = get_phase_model(spec_dir, "qa", cli_model=model)
+    budget = get_phase_thinking_budget(spec_dir, "qa", cli_thinking=thinking)
+
+    async def session(prompt: str) -> str:
+        from agents.session import run_agent_session
+        from task_logger import LogPhase
+
+        client = create_agent_client(
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            model=resolved_model,
+            agent_type="architecture_visualizer",
+            max_thinking_tokens=budget,
         )
-        self.diagram_types = diagram_types or [
-            "module_dependencies",
-            "component_hierarchy",
-            "data_flow",
-            "database_schema",
-        ]
-        self.model = model
-        self.thinking_level = thinking_level or "medium"
-        self.analyzer: ArchitectureAnalyzer | None = None
-
-    def setup(self):
-        """Initialize the analyzer."""
-        print("🏗️  Initializing Architecture Visualizer...")
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.analyzer = ArchitectureAnalyzer(str(self.project_dir))
-        print(f"📁 Project: {self.project_dir}")
-        print(f"📊 Diagram types: {', '.join(self.diagram_types)}")
-
-    def run_analysis(self) -> dict:
-        """Run the architecture analysis and return structured results."""
-        if not self.analyzer:
-            self.setup()
-
-        print("🔍 Analyzing project architecture...")
-        all_diagrams = self.analyzer.analyze_all()
-
-        results = {}
-        for diagram_type, diagram in all_diagrams.items():
-            if diagram_type not in self.diagram_types:
-                continue
-            print(
-                f"✅ {diagram.title}: {len(diagram.nodes)} nodes, {len(diagram.edges)} edges"
+        async with client:
+            _status, response, _metadata = await run_agent_session(
+                client, prompt, spec_dir, phase=LogPhase.VALIDATION
             )
-            results[diagram_type] = diagram.to_dict()
+        return response
 
+    return session
+
+
+# --------------------------------------------------------------------------- #
+# Actions
+# --------------------------------------------------------------------------- #
+
+
+def action_doctor(project_dir: Path) -> dict:
+    readiness = check()
+    payload: dict = {
+        "status": "success",
+        "action": "doctor",
+        "readiness": readiness.to_dict(),
+        "baseline": None,
+    }
+    spec = baseline_dir(project_dir) / BASELINE_SPEC
+    if spec.is_file():
+        try:
+            model = ir_module.load(spec)
+        except ir_module.IRError as exc:
+            payload["baseline"] = {"path": str(spec), "error": str(exc)}
+        else:
+            repository = (model.get("meta") or {}).get("repository") or {}
+            payload["baseline"] = {
+                "path": str(spec),
+                "artifact": str(baseline_dir(project_dir) / BASELINE_HTML),
+                "title": (model.get("meta") or {}).get("title", ""),
+                "components": len(model.get("components", [])),
+                "connections": len(model.get("connections", [])),
+                "revision": repository.get("revision"),
+            }
+    if readiness.ok:
+        payload["archify"] = doctor().stdout.strip().splitlines()[-1:] or []
+    return payload
+
+
+async def action_map(
+    project_dir: Path, model: str | None, thinking: str | None
+) -> dict:
+    out = baseline_dir(project_dir)
+    spec_path = out / BASELINE_SPEC
+    artifact_path = out / BASELINE_HTML
+
+    say("Collecting repository evidence…")
+    session = _make_session(project_dir, out, model, thinking)
+    result = await authoring.author(
+        session=session,
+        project_dir=project_dir,
+        spec_path=spec_path,
+        artifact_path=artifact_path,
+        progress=say,
+    )
+
+    payload = {
+        "status": "success" if result.ok else "error",
+        "action": "map",
+        "projectDir": str(project_dir),
+        **result.to_dict(),
+    }
+    if result.ok:
+        model_json = ir_module.load(spec_path)
+        payload["components"] = len(model_json.get("components", []))
+        payload["connections"] = len(model_json.get("connections", []))
+        payload["title"] = (model_json.get("meta") or {}).get("title", "")
+    return payload
+
+
+async def action_delta(
+    project_dir: Path,
+    spec_dir: Path,
+    changed_files: list[str] | None,
+    task_summary: str,
+    model: str | None,
+    thinking: str | None,
+    force: bool,
+) -> dict:
+    baseline_path = baseline_dir(project_dir) / BASELINE_SPEC
+    if not baseline_path.is_file():
+        status = delta_module.write_status(
+            spec_dir,
+            delta_module.DeltaStatus(
+                status=delta_module.STATUS_NO_BASELINE,
+                reason=(
+                    "this project has no architecture model yet — generate one "
+                    "from the Architecture page to compare against"
+                ),
+            ),
+        )
+        return {"status": "success", "action": "delta", "delta": status.to_dict()}
+
+    if not force:
+        significance = assess(changed_files, baseline_path)
+        if not significance.significant:
+            status = delta_module.write_status(
+                spec_dir,
+                delta_module.DeltaStatus(
+                    status=delta_module.STATUS_NOT_SIGNIFICANT,
+                    reason=significance.reason,
+                ),
+            )
+            say(f"No architectural change: {significance.reason}")
+            return {"status": "success", "action": "delta", "delta": status.to_dict()}
+        say(f"Mapping this task: {significance.reason}")
+
+    head_path = delta_module.directory(spec_dir) / delta_module.HEAD_SPEC
+    baseline = ir_module.load(baseline_path)
+
+    session = _make_session(project_dir, spec_dir, model, thinking)
+    authored = await authoring.author(
+        session=session,
+        project_dir=project_dir,
+        spec_path=head_path,
+        # The head model's own artifact is a by-product: what the card shows is
+        # the comparison. Rendering it anyway is what proves the model is sound
+        # before it is compared against anything.
+        artifact_path=delta_module.directory(spec_dir) / "head.html",
+        baseline=baseline,
+        task_summary=task_summary,
+        changed_files=changed_files,
+        progress=say,
+    )
+    if not authored.ok:
+        status = delta_module.write_status(
+            spec_dir,
+            delta_module.DeltaStatus(
+                status=delta_module.STATUS_FAILED, reason=authored.error
+            ),
+        )
         return {
-            "status": "success",
-            "diagrams": results,
-            "project_dir": str(self.project_dir),
-            "diagram_types_analyzed": list(results.keys()),
-            "summary": self._generate_summary(results),
+            "status": "error",
+            "action": "delta",
+            "error": authored.error,
+            "diagnostics": authored.diagnostics,
+            "delta": status.to_dict(),
         }
 
-    def save_diagrams(self, result: dict) -> str:
-        """Save diagrams to .workpilot/architecture/ and return output path."""
-        diagrams = result.get("diagrams", {})
-        for diagram_type, diagram_data in diagrams.items():
-            mermaid_code = diagram_data.get("mermaid_code", "")
-            if mermaid_code:
-                output_file = self.output_dir / f"{diagram_type}.md"
-                title = diagram_data.get("title", diagram_type)
-                content = f"# {title}\n\n```mermaid\n{mermaid_code}\n```\n\n"
-                content += f"*Generated at: {diagram_data.get('generated_at', '')}*\n"
-                content += f"*Nodes: {len(diagram_data.get('nodes', []))}, Edges: {len(diagram_data.get('edges', []))}*\n"
-                output_file.write_text(content, encoding="utf-8")
-                print(f"💾 Saved: {output_file}")
-
-        # Save JSON data
-        json_file = self.output_dir / "architecture.json"
-        json_file.write_text(json.dumps(result, indent=2), encoding="utf-8")
-        return str(self.output_dir)
-
-    def _generate_summary(self, diagrams: dict) -> dict:
-        """Generate a summary of the architecture analysis."""
-        total_nodes = sum(len(d.get("nodes", [])) for d in diagrams.values())
-        total_edges = sum(len(d.get("edges", [])) for d in diagrams.values())
-        return {
-            "total_diagrams": len(diagrams),
-            "total_nodes": total_nodes,
-            "total_edges": total_edges,
-            "diagram_types": list(diagrams.keys()),
-        }
+    say("Comparing against the baseline…")
+    status = compare_models(spec_dir, baseline_path, head_path, project_dir)
+    return {
+        "status": "success" if status.status == delta_module.STATUS_MAPPED else "error",
+        "action": "delta",
+        "error": "" if status.status == delta_module.STATUS_MAPPED else status.reason,
+        "delta": status.to_dict(),
+    }
 
 
-def main():
-    """Main CLI entry point."""
+# --------------------------------------------------------------------------- #
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Architecture Visualizer — Generate architecture diagrams from code"
+        description="Architecture Visualizer — archify models and per-task deltas"
+    )
+    parser.add_argument("--action", default="map", choices=["map", "delta", "doctor"])
+    parser.add_argument("--project-dir", required=True)
+    parser.add_argument(
+        "--spec-dir", help="Spec directory of the task being mapped (delta only)"
     )
     parser.add_argument(
-        "--project-dir",
-        required=True,
-        help="Project directory to analyze",
+        "--changed-files",
+        help="Newline- or comma-separated repository-relative paths (delta only)",
     )
     parser.add_argument(
-        "--output-dir",
-        help="Output directory for diagram files (default: .workpilot/architecture/)",
+        "--task-summary", default="", help="What the task set out to do"
     )
     parser.add_argument(
-        "--diagram-types",
-        help="Comma-separated diagram types: module_dependencies,component_hierarchy,data_flow,database_schema",
-        default="module_dependencies,component_hierarchy,data_flow,database_schema",
+        "--force",
+        action="store_true",
+        help="Map the task even when the change looks architecturally inert",
     )
-    parser.add_argument("--model", help="AI model to use")
+    parser.add_argument("--model", help="Override the phase model")
     parser.add_argument(
         "--thinking-level",
-        default="medium",
         choices=["none", "low", "medium", "high", "ultrathink"],
+        help="Override the phase thinking budget",
     )
-
     args = parser.parse_args()
 
-    if not os.path.exists(args.project_dir):
-        print(f"❌ Project directory not found: {args.project_dir}")
-        sys.exit(1)
-
-    diagram_types = [t.strip() for t in args.diagram_types.split(",") if t.strip()]
+    project_dir = Path(args.project_dir).expanduser().resolve()
+    if not project_dir.is_dir():
+        emit(
+            {"status": "error", "error": f"project directory not found: {project_dir}"}
+        )
+        return 1
 
     try:
-        runner = ArchitectureVisualizerRunner(
-            project_dir=args.project_dir,
-            output_dir=args.output_dir,
-            diagram_types=diagram_types,
-            model=args.model,
-            thinking_level=args.thinking_level,
-        )
-        runner.setup()
-        result = runner.run_analysis()
-        output_path = runner.save_diagrams(result)
-        result["output_dir"] = output_path
+        if args.action == "doctor":
+            emit(action_doctor(project_dir))
+            return 0
 
-        print("__ARCH_VIZ_RESULT__:" + json.dumps(result))
-        print(f"\n✅ Architecture diagrams saved to: {output_path}")
+        readiness = check()
+        if not readiness.ok:
+            emit(
+                {
+                    "status": "error",
+                    "action": args.action,
+                    "error": "; ".join(
+                        c.remedy or c.detail for c in readiness.blockers
+                    ),
+                    "readiness": readiness.to_dict(),
+                }
+            )
+            return 1
+
+        if args.action == "map":
+            payload = asyncio.run(
+                action_map(project_dir, args.model, args.thinking_level)
+            )
+            emit(payload)
+            return 0 if payload["status"] == "success" else 1
+
+        if not args.spec_dir:
+            emit(
+                {
+                    "status": "error",
+                    "error": "--spec-dir is required for --action delta",
+                }
+            )
+            return 1
+        spec_dir = Path(args.spec_dir).expanduser().resolve()
+
+        changed: list[str] | None = None
+        if args.changed_files:
+            raw = args.changed_files.replace(",", "\n").splitlines()
+            changed = [line.strip() for line in raw if line.strip()]
+
+        payload = asyncio.run(
+            action_delta(
+                project_dir=project_dir,
+                spec_dir=spec_dir,
+                changed_files=changed,
+                task_summary=args.task_summary,
+                model=args.model,
+                thinking=args.thinking_level,
+                force=args.force,
+            )
+        )
+        emit(payload)
+        return 0 if payload["status"] == "success" else 1
+
+    except ArchifyUnavailable as exc:
+        emit(
+            {"status": "error", "error": str(exc), "readiness": exc.readiness.to_dict()}
+        )
+        return 1
     except KeyboardInterrupt:
-        print("\n⚠️ Architecture visualization interrupted.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"❌ Fatal error: {e}")
-        sys.exit(1)
+        emit({"status": "cancelled"})
+        return 1
+    except Exception as exc:  # noqa: BLE001 - the sentinel must always be emitted
+        emit({"status": "error", "error": str(exc)})
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

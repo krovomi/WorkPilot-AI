@@ -30,13 +30,21 @@ Pipeline : **spec → planner → coder → QA reviewer → QA fixer → revue h
 apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   agents/              planner, coder, QA + définitions de sous-agents SDK
   core/client.py       LA fabrique de clients LLM — tout passe par là
+  core/pause_state.py  LE drapeau de pause coopérative — lu par coder, QA et spec
+  core/build_signals.py BuildPaused / BuildHalted : remontent jusqu'à handle_build_command
   cli/build_commands.py enchaînement des phases d'un build
   phase_config.py      modèle + budget de réflexion par phase et par provider
   model_router/        classification de tâche → tier qualité → modèle
   learning_loop/       patterns depuis les builds, phase observe, replay A/B des promotions
+  hermes/              hermes-agent : doctor, persona SOUL.md, cycle d'apprentissage par surface
   mem_search/          lecture de la mémoire par paliers (skill mem-search)
   libdocs/             docs des bibliothèques que le dépôt n'illustre pas, avant le build
+  rtk/                 proxy rtk : la sortie des commandes condensée avant qu'un modèle la lise
+  watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt
+  architecture_visualizer/ carte d'architecture archify du projet, et son delta par tâche
+  vendor/archify/      le renderer archify vendorisé et épinglé (scripts/vendor_archify.py)
+  vendor/watermarks/   la table Unicode Layer A vendorisée (scripts/vendor_watermarks.py)
   slash_commands/      sert .agents/skills/ à la barre de commandes du Kanban
   skills_registry/     parseur de frontmatter partagé (source unique)
   prompts/             les prompts système réels des agents

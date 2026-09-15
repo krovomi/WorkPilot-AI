@@ -241,8 +241,13 @@ except ImportError:
 
 from linear_updater import is_linear_enabled
 from prompts_pkg.project_context import detect_project_capabilities, load_project_index
+from rtk import rtk_rewrite_hook
+from rtk import settings as rtk_settings
 from security import bash_security_hook
 from security.guardrails import guardrails_hook as _raw_guardrails_hook
+from watermarks import CLEANED_TOOLS as WATERMARK_CLEANED_TOOLS
+from watermarks import make_watermarks_hook
+from watermarks import settings as watermarks_settings
 
 
 def _make_guardrails_hook(project_dir: Path):
@@ -685,6 +690,7 @@ def create_client(
     agents: dict | None = None,
     resume: str | None = None,
     use_subagents: bool = True,
+    roster: str | None = None,
 ) -> ClaudeSDKClient:
     """
     Create a Claude Agent SDK client with multi-layered security.
@@ -710,6 +716,9 @@ def create_client(
                       Use {"type": "json_schema", "schema": Model.model_json_schema()}
                       See: https://platform.claude.com/docs/en/agent-sdk/structured-outputs
         use_subagents: Whether this call may compose a subagent roster at all.
+        roster: Which subagent roster to compose, when it is not the one
+            agent_type implies. A workflow phase sets this; see
+            `agents.subagents.phases.phase_specs`.
                       False is the workflow engine's `sequential-reset`: same
                       isolation, no parallel dispatch. Defaults to True, which
                       is the behaviour every existing caller already had.
@@ -736,6 +745,22 @@ def create_client(
         project_dir = Path(project_dir)
     if isinstance(spec_dir, str):
         spec_dir = Path(spec_dir)
+
+    from core.offline_policy import guard_cloud_client
+
+    guard_cloud_client(project_dir, spec_dir)
+
+    # rtk settings a project carries in `.workpilot/.env` — the file the
+    # Electron settings screen writes. Applied here rather than read at each
+    # call site so the hook, the awareness paragraph and WorkPilot's own
+    # captures all answer from the same switch. An exported variable wins: a
+    # CLI user who said something on the command line said it later than a file.
+    rtk_settings.apply_project_env(project_dir)
+
+    # The same treatment for the watermark switches, and for the same
+    # reason: the hook below, the tool executor the other providers run on
+    # and the status endpoint must all read one answer about this project.
+    watermarks_settings.apply_project_env(project_dir)
 
     # Collect env vars to pass to SDK (ANTHROPIC_BASE_URL, CLAUDE_CONFIG_DIR, etc.)
     sdk_env = get_sdk_env_vars()
@@ -1255,6 +1280,11 @@ def create_client(
     except Exception:
         logger.debug("Agent debugger wiring skipped", exc_info=True)
 
+    # One hook instance for the four write tools rather than four: the
+    # factory closes over the spec directory so the ledger has somewhere to
+    # go, and nothing else about it varies per tool.
+    _watermarks_hook = make_watermarks_hook(spec_dir)
+
     # Build options dict, conditionally including output_format
     options_kwargs: dict[str, Any] = {
         "model": model,
@@ -1268,6 +1298,13 @@ def create_client(
                     matcher="Bash",
                     hooks=[_make_guardrails_hook(project_dir)],
                 ),
+                # rtk — condense what the command prints before the model reads
+                # it. Registered after the two hooks that decide whether the
+                # command may run at all, and returning only `updatedInput`:
+                # this one changes the output, never the permission. A machine
+                # without rtk answers in a cached `shutil.which` and the
+                # command runs exactly as written.
+                HookMatcher(matcher="Bash", hooks=[rtk_rewrite_hook]),
                 HookMatcher(
                     matcher="Write",
                     hooks=[_make_guardrails_hook(project_dir)],
@@ -1275,6 +1312,19 @@ def create_client(
                 HookMatcher(
                     matcher="Edit",
                     hooks=[_make_guardrails_hook(project_dir)],
+                ),
+                # watermarks — strip the invisible codepoints a model leaves in
+                # what it writes, before the bytes reach the disk. Registered
+                # after the guardrails hook for the same reason rtk is
+                # registered after bash_security_hook: that one decides whether
+                # the write happens, this one only decides what it contains.
+                # `Pre`, not `Post`, so the dirty bytes never exist on disk and
+                # no file watcher sees two writes. A checkout without the
+                # vendored table answers in one `str.isascii()` and the content
+                # is written exactly as the model produced it.
+                *(
+                    HookMatcher(matcher=tool, hooks=[_watermarks_hook])
+                    for tool in WATERMARK_CLEANED_TOOLS
                 ),
                 # Debugger breakpoints (any tool). Empty unless this run opted in.
                 *_debugger_hooks,
@@ -1345,6 +1395,7 @@ def create_client(
             project_dir=project_dir,
             user_agents=agents,
             provider=_get_active_provider(spec_dir),
+            roster_name=roster,
         )
     except _NoSubagents:
         logger.debug(
@@ -1906,6 +1957,7 @@ def create_agent_client(
     resume: str | None = None,
     system_prompt: str | None = None,
     use_subagents: bool = True,
+    roster: str | None = None,
 ) -> "AgentClient":  # noqa: F821
     """
     Create a provider-agnostic agent client for Kanban task execution.
@@ -1931,6 +1983,11 @@ def create_agent_client(
         use_subagents: Whether this call may compose a subagent roster at all.
                  False suppresses it entirely — the workflow engine's
                  `sequential-reset` dispatch. Defaults to True.
+        roster: Which roster to compose, when it is not the one agent_type
+                 implies. Separate from `agent_type` on purpose: that decides
+                 the tool allowlist and whether the phase may write, this
+                 decides which specialists it may dispatch to. See
+                 `agents.subagents.phases.phase_specs`.
         system_prompt: Optional system-prompt override. When provided, it
                  replaces the default coding base prompt for the
                  copilot/openai/windsurf clients (used by utilities that need
@@ -1966,6 +2023,12 @@ def create_agent_client(
     # Resolve provider
     if provider is None:
         provider = _get_active_provider(spec_dir)
+
+    from core.offline_policy import local_endpoint, resolve_offline_route
+
+    provider, model, offline_base_url = resolve_offline_route(
+        project_dir, spec_dir, agent_type, provider, model
+    )
 
     # Anthropic rejects dotted Copilot-style ids (e.g. "claude-opus-4.8"); rewrite
     # to the dashed native form before it reaches the SDK or the context trace.
@@ -2058,6 +2121,7 @@ def create_agent_client(
             agents=agents,
             resume=resume,
             use_subagents=use_subagents,
+            roster=roster,
         )
         return ClaudeAgentClient(sdk_client)
 
@@ -2194,7 +2258,7 @@ def create_agent_client(
             agent_type=agent_type,
         )
 
-    elif provider in ("ollama", "local", "lmstudio"):
+    elif provider in ("ollama", "local", "lmstudio", "lm-studio", "llama-cpp"):
         # Local LLM via any OpenAI-compatible server (Ollama, LM Studio,
         # llama.cpp, vLLM, LocalAI). Reuses the proven OpenAI tool-use loop
         # (LocalAgentClient subclasses OpenAIAgentClient) and only swaps the
@@ -2221,8 +2285,8 @@ def create_agent_client(
         # worse than the 404 it replaces.
         from phase_config import coerce_local_model, is_hosted_only_model
 
-        resolved_local_model = coerce_local_model(model)
-        if model and is_hosted_only_model(model):
+        resolved_local_model = model if offline_base_url else coerce_local_model(model)
+        if not offline_base_url and model and is_hosted_only_model(model):
             logger.warning(
                 "[create_agent_client] %r cannot run on a local server "
                 "(provider=%s) — using %r instead.",
@@ -2243,6 +2307,16 @@ def create_agent_client(
         )
         return LocalAgentClient(
             model=resolved_local_model,
+            base_url=offline_base_url
+            or (
+                local_endpoint(provider)
+                if provider in ("lmstudio", "lm-studio", "llama-cpp")
+                else None
+            ),
+            api_format="openai"
+            if provider in ("lmstudio", "lm-studio", "llama-cpp")
+            else "ollama",
+            offline_only=offline_base_url is not None,
             system_prompt=local_system_prompt,
             max_turns=50,
             project_dir=str(project_dir),

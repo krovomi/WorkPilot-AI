@@ -77,9 +77,9 @@ describe("buildHotSwapRequest", () => {
 			buildHotSwapRequest("validation", "active", { provider: "copilot" }),
 		).toEqual({ configPhase: "qa", change: { provider: "copilot" } });
 		// effort-only change
-		expect(
-			buildHotSwapRequest("coding", "active", { effort: "high" }),
-		).toEqual({ configPhase: "coding", change: { effort: "high" } });
+		expect(buildHotSwapRequest("coding", "active", { effort: "high" })).toEqual(
+			{ configPhase: "coding", change: { effort: "high" } },
+		);
 	});
 });
 
@@ -172,7 +172,11 @@ describe("buildThinkingMetadataUpdate", () => {
 	});
 
 	it("mappe la phase de logs 'planning' vers la clé 'planning'", () => {
-		const update = buildThinkingMetadataUpdate(perPhaseMeta, "planning", "none");
+		const update = buildThinkingMetadataUpdate(
+			perPhaseMeta,
+			"planning",
+			"none",
+		);
 		expect(update.phaseThinking?.planning).toBe("none");
 	});
 
@@ -221,7 +225,11 @@ describe("buildModelMetadataUpdate", () => {
 	});
 
 	it("mappe 'validation' vers la clé 'qa'", () => {
-		const update = buildModelMetadataUpdate(perPhaseMeta, "validation", "haiku");
+		const update = buildModelMetadataUpdate(
+			perPhaseMeta,
+			"validation",
+			"haiku",
+		);
 		expect(update.phaseModels?.qa).toBe("haiku");
 		expect(update.phaseModels?.coding).toBe("opus");
 	});
@@ -237,7 +245,11 @@ describe("buildModelMetadataUpdate", () => {
 
 describe("buildProviderMetadataUpdate", () => {
 	it("met à jour uniquement le provider de la phase ciblée (profil par phase)", () => {
-		const update = buildProviderMetadataUpdate(perPhaseMeta, "coding", "copilot");
+		const update = buildProviderMetadataUpdate(
+			perPhaseMeta,
+			"coding",
+			"copilot",
+		);
 		expect(update.phaseProviders).toEqual({
 			spec: "anthropic",
 			planning: "anthropic",
@@ -310,9 +322,9 @@ describe("buildProviderMetadataUpdate", () => {
 			localDefaults,
 		);
 		expect(update.phaseProviders?.planning).toBe("ollama");
-		// Seul le modèle de la phase ciblée est réinitialisé ; les autres restent.
+		// La planification inclut la spec ; coding et QA restent inchanges.
 		expect(update.phaseModels).toEqual({
-			spec: "opus",
+			spec: "llama3.1",
 			planning: "llama3.1",
 			coding: "opus",
 			qa: "opus",
@@ -321,7 +333,11 @@ describe("buildProviderMetadataUpdate", () => {
 	});
 
 	it("ne réinitialise pas le modèle quand aucun défaut n'est fourni (legacy)", () => {
-		const update = buildProviderMetadataUpdate(perPhaseMeta, "coding", "copilot");
+		const update = buildProviderMetadataUpdate(
+			perPhaseMeta,
+			"coding",
+			"copilot",
+		);
 		expect(update.phaseModels).toBeUndefined();
 		expect(update.isAutoProfile).toBeUndefined();
 	});
@@ -356,7 +372,10 @@ describe("buildModelSelectOptions", () => {
 	});
 
 	it("aligne un alias court persisté sur l'entrée du catalogue", () => {
-		const { options, value } = buildModelSelectOptions(anthropicCatalog, "opus");
+		const { options, value } = buildModelSelectOptions(
+			anthropicCatalog,
+			"opus",
+		);
 		expect(options).toHaveLength(anthropicCatalog.length);
 		// "opus" → claude-opus-4-6 (cf. MODEL_ID_MAP), déjà présent.
 		expect(value).toBe("claude-opus-4-6");
@@ -384,7 +403,10 @@ describe("buildModelSelectOptions", () => {
 	});
 
 	it("utilise l'id brut comme libellé quand aucun libellé court n'est fourni", () => {
-		const { options } = buildModelSelectOptions(anthropicCatalog, "mystery-model");
+		const { options } = buildModelSelectOptions(
+			anthropicCatalog,
+			"mystery-model",
+		);
 		expect(options[0]).toEqual({
 			value: "mystery-model",
 			label: "mystery-model",
@@ -420,7 +442,7 @@ describe("buildModelSelectOptions", () => {
 				{},
 				true,
 			);
-			expect(options).toHaveLength(ollamaCatalog.length);
+			expect(options).toHaveLength(ollamaCatalog.length - 1);
 			expect(options.filter((o) => o.label === "Llama 3.3")).toHaveLength(1);
 			expect(options.some((o) => o.value === "llama3.3")).toBe(false);
 			// Le <Select> pointe sur le tag installé, donc `installed` est lisible.
@@ -435,7 +457,7 @@ describe("buildModelSelectOptions", () => {
 				{},
 				true,
 			);
-			expect(options).toHaveLength(ollamaCatalog.length);
+			expect(options).toHaveLength(ollamaCatalog.length - 1);
 			expect(value).toBe("llama3.3:latest");
 		});
 
@@ -459,7 +481,7 @@ describe("buildModelSelectOptions", () => {
 				{},
 				true,
 			);
-			expect(options).toHaveLength(ollamaCatalog.length + 1);
+			expect(options).toHaveLength(ollamaCatalog.length);
 			expect(value).toBe("deepseek-r1");
 		});
 
@@ -473,4 +495,33 @@ describe("buildModelSelectOptions", () => {
 			expect(value).toBe("claude-opus-4-8");
 		});
 	});
+});
+
+it("applies a Kanban planning model to spec creation too", () => {
+	const update = buildModelMetadataUpdate(perPhaseMeta, "planning", "qwen3:8b");
+	expect(update.phaseModels?.spec).toBe("qwen3:8b");
+	expect(update.phaseModels?.planning).toBe("qwen3:8b");
+	expect(update.phaseModels?.coding).toBe("opus");
+});
+it("applies the planning effort to spec creation too", () => {
+	expect(
+		buildThinkingMetadataUpdate(perPhaseMeta, "planning", "low").phaseThinking
+			?.spec,
+	).toBe("low");
+});
+it("applies the planning provider to spec creation too", () => {
+	expect(
+		buildProviderMetadataUpdate(perPhaseMeta, "planning", "ollama")
+			.phaseProviders?.spec,
+	).toBe("ollama");
+});
+it("does not reinsert a persisted embedding model into agent options", () => {
+	const result = buildModelSelectOptions(
+		[{ value: "qwen3:8b", label: "Qwen3" }],
+		"qwen3-embedding:8b",
+		{},
+		true,
+	);
+	expect(result.options.map((m) => m.value)).toEqual(["qwen3:8b"]);
+	expect(result.value).toBe("");
 });

@@ -16,17 +16,15 @@ import path from "node:path";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import {
-	DEFAULT_FEATURE_MODELS,
-	DEFAULT_FEATURE_THINKING,
 	IPC_CHANNELS,
 	MODEL_ID_MAP,
 } from "../../../shared/constants";
-import type { AppSettings, Project } from "../../../shared/types";
+import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
-import { readSettingsFile } from "../../settings-utils";
 import { createIPCCommunicators } from "../github/utils/ipc-communicator";
 import { createContextLogger } from "../github/utils/logger";
 import { withProjectOrNull } from "../github/utils/project-middleware";
+import { getPageFeatureSettings } from "../../services/page-llm-config";
 import { getRunnerEnv } from "../github/utils/runner-env";
 import {
 	buildRunnerArgs,
@@ -161,21 +159,14 @@ function getReviewResult(
  * Get GitLab MR model and thinking settings from app settings
  */
 function getGitLabMRSettings(): { model: string; thinkingLevel: string } {
-	const rawSettings = readSettingsFile() as Partial<AppSettings> | undefined;
-
-	// Get feature models/thinking with defaults
-	const featureModels = rawSettings?.featureModels ?? DEFAULT_FEATURE_MODELS;
-	const featureThinking =
-		rawSettings?.featureThinking ?? DEFAULT_FEATURE_THINKING;
-
-	// Use GitHub PRs settings as fallback (GitLab MRs not yet in settings)
-	const modelShort =
-		featureModels.githubPrs ?? DEFAULT_FEATURE_MODELS.githubPrs;
-	const thinkingLevel =
-		featureThinking.githubPrs ?? DEFAULT_FEATURE_THINKING.githubPrs;
+	// Provider × LLM × effort : ce que la page a choisi, sinon les réglages.
+	// Une seule lecture, dans `services/page-llm-config`.
+	const { model: modelShort, thinkingLevel } = getPageFeatureSettings(
+		"gitlab-merge-requests",
+	);
 
 	// Convert model short name to full model ID
-	const model = MODEL_ID_MAP[modelShort] ?? MODEL_ID_MAP.opus;
+	const model = MODEL_ID_MAP[modelShort] ?? modelShort;
 
 	debugLog("GitLab MR settings", { modelShort, model, thinkingLevel });
 
@@ -252,7 +243,9 @@ async function runMRReview(
 	debugLog("Spawning MR review process", { args, model, thinkingLevel });
 
 	// Get runner environment with PYTHONPATH for bundled packages (fixes #139)
-	const subprocessEnv = await getRunnerEnv();
+	const subprocessEnv = await getRunnerEnv(undefined, {
+		page: "gitlab-merge-requests",
+	});
 
 	const { process: childProcess, promise } =
 		runPythonSubprocess<MRReviewResult>({
@@ -1009,7 +1002,9 @@ export function registerMRReviewHandlers(
 					});
 
 					// Get runner environment with PYTHONPATH for bundled packages (fixes #139)
-					const followupSubprocessEnv = await getRunnerEnv();
+					const followupSubprocessEnv = await getRunnerEnv(undefined, {
+						page: "gitlab-merge-requests",
+					});
 
 					const { process: childProcess, promise } =
 						runPythonSubprocess<MRReviewResult>({

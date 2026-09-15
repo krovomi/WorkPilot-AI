@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupSpecRefinementListeners,
-	useSpecRefinementStore,
-} from "../../stores/spec-refinement-store";
+import { useSpecRefinementStore } from "../../stores/spec-refinement-store";
 import type { RefinementHistory } from "../../../shared/types/spec-refinement";
 
 interface RefinementHistoryViewProps {
@@ -104,11 +100,6 @@ export function RefinementHistoryView({
 	projectPath,
 }: RefinementHistoryViewProps): React.ReactElement {
 	const { t } = useTranslation("specRefinement");
-
-	useEffect(() => {
-		const cleanup = setupSpecRefinementListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useSpecRefinementStore((s) => s.phase);
 	const status = useSpecRefinementStore((s) => s.status);

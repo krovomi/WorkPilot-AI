@@ -24,15 +24,23 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Where generated tests are written](#where-generated-tests-are-written)
   - [What generated tests are written against](#what-generated-tests-are-written-against)
   - [Library Documentation (libdocs)](#library-documentation-libdocs)
+  - [Token savings (rtk)](#token-savings-rtk)
+  - [Clean generated files (watermarks)](#clean-generated-files-watermarks)
+  - [Architecture diagrams (archify)](#architecture-diagrams-archify)
   - [Mobile applications (Android and Apple)](#mobile-applications-android-and-apple)
   - [Declarative Workflows](#declarative-workflows)
   - [Workflow Logger](#workflow-logger)
+  - [Pause, resume, and how a phase reports failure](#pause-resume-and-how-a-phase-reports-failure)
 - [Frontend Development](#frontend-development)
   - [Tech Stack](#tech-stack)
   - [Path Aliases](#path-aliases)
   - [State Management (Zustand)](#state-management-zustand)
   - [Styling](#styling)
   - [IPC Communication](#ipc-communication)
+  - [Background work and the sidebar](#background-work-and-the-sidebar-storesactivity-storets)
+  - [Le pourcentage d'une tâche](#le-pourcentage-dune-tâche-sharedprogressts)
+  - [Architectures et historique de construction](#architectures-et-historique-de-construction-visual-to-code)
+  - [Provider × LLM × effort, par page](#provider--llm--effort-par-page-sharedutilspage-llmts)
   - [Agent Management](#agent-management)
   - [Claude Profile System](#claude-profile-system)
   - [Terminal System](#terminal-system)
@@ -98,6 +106,14 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 **No time estimates** — Never provide duration predictions. Use priority-based ordering instead.
 
 **Authorization is the server's job** — In server mode every route carries a permission (`server/authz/`), and the UI only *masks* what the user cannot do. Never treat a hidden button as a control. A client-supplied filesystem path (`project_dir`, `spec_dir`, `file_path`…) is refused outright: identify a project by `project_id` and let the server resolve its own checkout.
+
+**Auth belongs to the provider that needs it** — the Claude Code OAuth token gates
+Claude builds only. Ask `core.auth.provider_requires_claude_oauth(provider)` before
+demanding it, and resolve the provider with `core.client.peek_active_provider` (never
+`_get_active_provider`, which consumes the single-shot RESUME_WITH_PROVIDER marker).
+A blanket `if not get_auth_token()` is how a task configured for Ollama got accepted by
+the frontend — which asks the same question and answers it correctly — and refused by
+the backend one second later, over a service it never talks to.
 
 **PR target** — Always target the `develop` branch for PRs to krovomi/WorkPilot-AI, NOT `main`.
 
@@ -231,7 +247,7 @@ client = create_client(
     project_dir=project_dir,
     spec_dir=spec_dir,
     model=phase_model,
-    agent_type="coder",          # planner | coder | qa_reviewer | qa_fixer
+    agent_type="coder",  # planner | coder | qa_reviewer | qa_fixer
     max_thinking_tokens=phase_thinking,
 )
 
@@ -472,11 +488,216 @@ Code, Codex and OpenCode.
 experience, on surfaces WorkPilot never sees — Telegram, Discord, a cron job on a VPS.
 Two closed loops writing skills is one too many, so there is no second loop here:
 `learning_loop/hermes_ingest.py` files each authored skill as a *candidate* under
-`skills/_proposed/`, and the `observe` phase runs it when hermes is installed.
+`skills/_proposed/`.
+
+**Only what hermes says it authored.** `skill_manage` writes `created_by: agent` into
+`~/.hermes/skills/.usage.json` for a skill the agent wrote, and nothing of the sort for
+one that was shipped or downloaded — so that record is the rule, and the shipped
+(`.bundled_manifest`) and hub (`.hub/lock.json`) lists subtract on top of it. The
+approval queue `pending/skills/` is admitted unfiltered: a skill is in it only because
+the agent just wrote it, and its record is written on approval.
+
+It started the other way round — everything except `.bundled_manifest` — and that shape
+fails open twice over. It is a denylist against a catalogue upstream keeps growing, and
+the manifest is `name:hash` per line, not JSON, so reading it with `json.loads` raised on
+every line, the exception was swallowed, and the exclusion matched nothing. One build
+proposed sixty upstream skills, `airtable` and `imessage` among them. The test that was
+supposed to catch it wrote the manifest as JSON: it encoded our idea of the format
+instead of the format. A denylist that fails open floods the queue; an allowlist that
+fails closed proposes nothing, which a person notices and nothing is harmed by.
+
+**And only what this repository has a use for.** The rule above reads files
+*upstream* owns, which is right for the question it answers — what did hermes
+write? — and is the one property that keeps failing. It failed by parsing
+`.bundled_manifest` as JSON; it failed again on an install whose `.usage.json`
+claims authorship over the shipped catalogue and which ships no manifest to
+subtract. Both times the symptom was identical: sixty-one candidates, `airtable`
+and `imessage` among them, and a person asked to delete them one by one. A third
+fix to the reading of upstream's files would be the third version of the same
+mistake.
+
+`learning_loop/hermes_triage.py` is a **second authority**, and its inputs are
+facts this repository owns:
+
+| Read from | Answers |
+|---|---|
+| `skills/hermes/pack.json` (`--subdir`) | which of hermes's categories this project tracks |
+| the same file (`--exclude`) | which names it looked at and turned down |
+| `skills/<pack>/`, `skills-lock.json`, `.agents/skills/` | which skills it already provides |
+
+The two authorities fail in opposite directions — hermes's bookkeeping fails
+open, because an absent file excludes nothing; the scope fails closed, because an
+unreadable `pack.json` leaves the declared default and an unknown category is out
+of scope — so a flood now needs both to fail at once, and the second one cannot
+fail by upstream shipping a release. Four reasons, all reported rather than
+merely applied (`DROP_REASONS`): `already-provided`, `declined-here`,
+`out-of-scope`, `upstream-catalogue`.
+
+The last one is the rule for a hermes home kept flat, where there is no category
+directory to compare against — which is the shape the sixty-one arrived in. It
+reads the frontmatter: hermes's own authoring standard requires `author` and
+`license` of a skill contributed to its repository, and requires neither of a
+skill `skill_manage(action='create')` writes from a session's experience. A
+locally authored skill carrying both is turned away, and that is the error worth
+making — one skill nobody had yet, against sixty files nobody wanted. The
+exception is hermes's approval queue: a skill is in `pending/skills/` only
+because the agent just wrote it, so the fingerprint is not asked of it. That is
+the one input whose provenance is not a record that can fail open, and silencing
+it would cost the loop its best source.
+
+**A rule that changed reaches the files the old rule produced.** Every cycle
+withdraws the queued candidates a fresh verdict turns away, before it looks at
+what hermes has — sixty files filed under a broken rule are one bug, not sixty
+decisions somebody took, and the alternative is charging their owner for it. Only
+files the ingest itself wrote are eligible (`recorded_facts` returns nothing for
+anything else, so the learning loop's own evidence-carrying proposals are never
+touched), and a legacy candidate that recorded neither its category nor its shape
+is re-derived from the source path it does record. `GET /api/hermes/status` and
+the Kanban card therefore report *what is left to read*, not what is on disk:
+stale candidates are a number, not sixty rows, and the read does not delete them
+— the next cycle does.
+
+What triage does **not** move is the gate. A candidate that passes it still
+carries no evidence from a build that used it, so it is filed and promoted by
+nothing; `skill_proposer.evaluate` still refuses to invent corroboration. The
+autonomy added here is over the chore, not over the decision.
+
+**And the last chore goes too: `learning_loop/hermes_adopt.py` writes what
+survives triage into `skills/hermes-learned/`.** The step it replaces was pure
+transcription — open the candidate, copy the body into `skills/<pack>/`, delete
+the candidate — and a queue whose only exit is a copy-paste is a queue that
+fills up.
+
+What makes that safe is not that the prose is trusted. `.workpilot/skills.toml`
+is a want-list: `resolver.resolve` rejects every skill of a pack the project has
+not listed, at the `pack-pin` gate. That pack is deliberately **not** listed, so
+nothing in it is emitted to `.agents/skills/` or to any harness, and no agent can
+load one. Auto-adoption writes agent-authored prose into the repository; it does
+not make any agent follow it. The act that would — one line in `[packs]` — stays
+with a person, is taken once rather than per skill, with the whole pack in front
+of them, and is the moment to do the portability rewrite each file describes
+(`adopted: verbatim` and the tool table say so in the file). Until then the
+adopted file is an ordinary diff in the pull request of the task that adopted it,
+reviewed like everything else here rather than in a queue that exists on one
+machine — which is also why it is committed while `skills/_proposed/hermes--*.md`
+is ignored.
+
+**Adoption is one-way, and once.** Nothing deletes from the pack and nothing
+rewrites a file already there, because the two things a person does with one are
+the two things a loop must not undo: rewriting it (the portability pass — a
+refresh from hermes would throw that away on the next build) and deleting it,
+which is how you say no. `ADOPTED.json` records every name ever adopted, so a
+deleted one is never re-adopted; without it the person deletes it again on every
+build, for ever.
+
+The queue keeps its copy, and that is deliberate: `skills/_proposed/hermes--x.md`
+is the live mirror of what hermes has on *this* machine, refreshed when hermes
+edits its own skill, while the adopted file is the snapshot the project took.
+`queue_state` leaves a settled name out of what it reports, so nobody is asked
+about it twice. And `hermes-learned` is the one pack `hermes_triage` does not
+count as "already provided" — the others are decisions a person took about a
+name, that one is the loop's own output, and counting it would have the loop mask
+its own inputs one build later.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `HERMES_AUTO_ADOPT` | `true` | Adopt what survives triage. Off leaves the review queue as the only destination. On by default because the pack reaches no harness: the cost of being wrong is one file in one diff |
 
 ```bash
 python3 scripts/skills_cli.py hermes-ingest --dry-run
+python3 runners/hermes_runner.py --action status
+python3 runners/hermes_runner.py --action cycle --surface kanban
 ```
+
+#### The cycle, and who may open it
+
+`apps/backend/hermes/` is the capability; the ingest above stays in `learning_loop/`
+because that is where the review queue and its rules live.
+
+| Module | Answers |
+|---|---|
+| `home.py` | where hermes keeps its state, and what the user configured there |
+| `soul.py` | the persona this repository offers, and whether it is installed |
+| `readiness.py` | whether the loop can run in this checkout, and what is missing |
+| `loop.py` | the cycle itself, opened by a named feature surface |
+| `api.py` | `GET /api/hermes/status`, `POST /api/hermes/cycle`, `POST /api/hermes/soul/install` |
+
+The three steps that always go together — *can this run here*, *what did hermes
+author*, *who asked* — are one function, and a **surface** is a name rather than a code
+path: `build` (the `observe` phase), `kanban` (the task panel), `cli`, `self-healing`
+(the end of an incident cycle, in `incident_responder/orchestrator.py`'s healing
+pipeline — in a `finally`, because a pipeline that failed is not a reason to skip the
+question, and reporting a step only when it filed something, since a "0 proposed" row on
+every incident is a row nobody reads), `github`. `SURFACES` is a closed set on purpose, because the surface is written into a
+file a person reviews and a free-text field would fill with whatever string each caller
+happened to pass. The next feature to want the loop adds a line there, not a second
+ingest.
+
+The surface is recorded on the candidate, which is what lets a reviewer reading
+`skills/_proposed/` six weeks later tell a build's observation from a person pressing a
+button. That is the difference between a queue and a pile.
+
+**The doctor runs before the phase, not after the empty result.** Five conditions —
+`install`, `soul`, `trust`, `skills`, `agents` — all answerable from files on disk in
+milliseconds, which is why the Kanban can ask on every panel open. Only `install` is a
+blocker; the rest degrade, because a candidate hermes authored *elsewhere* is exactly
+the experience from outside this repository that makes the integration worth having.
+The failure this exists to prevent is the silent one: `trust` is unset on every fresh
+clone, hermes then loads no project skills, nothing appears, and the conclusion drawn
+six weeks later is "hermes doesn't work here".
+
+**There is no endpoint that grants trust.** `status` reports whether this checkout is
+listed in `skills.trusted_project_dirs` and returns the exact command that fixes it, and
+that is where it stops. Trusting a checkout makes every `SKILL.md` in it a procedure
+hermes will follow in every session on the machine — the prompt-injection vector the
+gate was built to close. Software that grants itself the trust has removed the gate.
+
+**In the Kanban.** `HermesLearningCard` in the task panel shows the five conditions with
+their remedies, the candidates already waiting, and a button that turns the cycle now.
+It renders nothing when hermes is not installed: a permanent card reading "feature not in
+use" is a card nobody reads. Like `workflows/api.py`, the router is refused in server
+mode — every answer is about `$HERMES_HOME` on the machine running the backend, which on
+a shared deployment belongs to the server and not to the tenant asking.
+
+#### Portability of a candidate
+
+The cycle itself runs on any provider — every answer comes from files on disk, and
+`TestProviderIndependence` fails the build if `hermes/` ever names `create_client`,
+`anthropic` or `claude_agent_sdk`. What is *not* portable is the candidate's prose.
+
+Hermes's authoring standard requires a skill to say `read_file` and not cat,
+`search_files` and not grep, `patch` and not sed. That is right for hermes and wrong
+everywhere else: `skills/<pack>/` is emitted to Claude Code, Copilot, Codex, Cursor and
+Gemini alike, none of which have those tools. So each candidate carries a **Portability**
+section naming the hermes tools it uses and their equivalents here, and the body is left
+exactly as hermes wrote it — a find-and-replace would leave the surrounding sentence
+("invoke through the `terminal` tool") describing a tool it no longer names. Adopting a
+candidate is a rewrite, and the candidate says so rather than letting whoever runs the
+adopted skill first discover it.
+
+The same vocabulary is recorded in `capabilities/harnesses.yaml` under `hermes.tools`.
+Nothing reads it today — `agents_path` is null, and `translate_tools` fires only when an
+agent definition is emitted — but an empty map claimed "nothing to translate", which was
+wrong in the one direction that matters: the day hermes gets an agents path, an empty map
+emits Claude's names verbatim.
+
+#### `SOUL.md`
+
+`SOUL.md` at the root of this repository is the persona WorkPilot offers, and it is
+**not a project context file**. `agent/prompt_builder.load_soul_md` reads exactly one
+path — `<HERMES_HOME>/SOUL.md` — and injects it as identity slot #1 of every hermes
+session on every surface. Project context is a different chain entirely (`.hermes.md` /
+`HERMES.md` → `AGENTS.md` → `CLAUDE.md` → `.cursorrules`, first found wins), and this
+repository is already answered by its committed `AGENTS.md`.
+
+Shipping one anyway is right for the reason hermes ships one at the root of its own
+repository: it is the persona a person installs, and a persona nobody can see is a
+persona nobody adopts. The file is the offer; the install is a separate, explicit act —
+from the card's button or `--action install-soul`, never from a build. That home belongs
+to the user's own agent, in conversations WorkPilot will never see; a pipeline that
+silently overwrote it would be rewriting a personality that is not ours. A *different*
+persona already in place is left alone unless the caller says otherwise, and the one it
+replaces is kept beside it with a timestamp.
 
 A candidate carries **no external verification signal**, and that is not a gap to close
 later. Hermes's approval gate is a person saying yes to a text; it is not an observation
@@ -496,8 +717,8 @@ from mem_search import search_for
 
 memory = search_for(project_dir)
 index = memory.index("flaky timeout in the integration suite")  # ~100 tokens, always
-memory.timeline(index.ids()[:3])                                # a couple of lines each
-memory.detail("task:042-add-widget")                            # the full record, by id
+memory.timeline(index.ids()[:3])  # a couple of lines each
+memory.detail("task:042-add-widget")  # the full record, by id
 ```
 
 The index is held to a token budget by dropping entries and reporting the count, never
@@ -636,6 +857,367 @@ MCP server. Real environment variables win over the file.
 unpinned, so both names are allowlisted — an entry for a tool the running server does
 not expose is inert, a missing entry for the one it does expose is silent failure.
 
+### Token savings (rtk)
+
+[rtk](https://github.com/rtk-ai/rtk) (rtk-ai, Apache-2.0) is a CLI proxy: it
+runs the command it was given and prints a filtered version of its output.
+Same behaviour, same exit code, a fraction of the bytes — 9 879 bytes of
+`ls -la apps/backend` become 1 059 in this checkout, and `git status` 232 into
+66.
+
+That is worth wiring in because of where WorkPilot's input budget actually
+goes. The prompts are written once and cached; what is paid for on every turn
+of every phase is the *output of the commands the agents run* — a test suite,
+a build log, a directory listing, a diff. Nothing in this repository was
+looking at that number.
+
+```
+apps/backend/rtk/
+  runtime.py    is there an rtk here, is it new enough, what is missing
+  settings.py   RTK_ENABLED / RTK_MODEL_FACING, environment and .workpilot/.env
+  rewrite.py    what rtk would run instead — delegated to `rtk rewrite`
+  hook.py       the PreToolUse hook every agent Bash call passes through
+  prompt.py     the paragraph that stops a model re-running condensed output
+  capture.py    WorkPilot's own commands, when their output goes into a prompt
+  stats.py      what rtk has actually saved, from rtk's own ledger
+  api.py        GET /api/rtk/status
+```
+
+**One change reaches every feature.** Planner, coder, QA reviewer and fixer,
+the spec pipeline, ideation, the GitHub runners, the self-healing responder,
+the architecture map, the mobile phases — none of them run a command of their
+own. They all go through `core.client.create_client`, so registering
+`rtk_rewrite_hook` there covers the lot, and a phase added next month is
+covered by having been written the normal way. The providers that do not use
+the Claude SDK execute their shell commands in
+`core/runtimes/tool_executor.py`, which is the same rewrite in the other
+half of the product.
+
+**The rewrite table is not reimplemented.** `rtk rewrite <command>` is the
+same registry rtk's own shell hooks consult, and it answers through its exit
+code — 0 rewrite, 1 no equivalent, 2 denied, 3 rewrite behind an "ask" rule.
+It is a hundred commands deep and it moves with every release; owning a second
+copy of it in Python would mean two answers to one question, drifting apart
+silently. One subprocess per Bash tool call is the price, against a tool call
+that is about to run a test suite.
+
+**The hook never decides permissions.** rtk's own shell hook returns
+`permissionDecision: "allow"` next to the rewrite, which is right for a person
+at a terminal and wrong here twice over: WorkPilot already grants `Bash(*)` in
+its settings file and gates the real decision on `bash_security_hook` and the
+guardrails. A third hook voting "allow" while only knowing about bytes is a
+second opinion on a settled question. So the hook returns `updatedInput` and
+nothing else — it changes what a command prints, never whether it runs. rtk's
+own deny rules are treated the same way: the command is left alone and
+WorkPilot's allowlist decides.
+
+**The allowlist never sees the word `rtk`.** This is the one place the feature
+could have weakened something. rtk falls back to raw execution for anything
+its table does not cover (`run_fallback` in its `main.rs`), so `rtk <anything>`
+runs `<anything>` — and a validator reading the command name as "rtk" and
+stopping there would have turned one allowlisted word into a door to every
+binary on the machine. `security/parser.unwrap_rtk_prefixes` rewrites each
+segment back to what rtk will run before anything is judged, and
+`get_command_for_validation` hands the deep validators the unwrapped segment
+for the same reason: every one of them opens with `tokens[0] != "git"`, so
+`rtk git commit` would have reached the repository without its secret scan.
+`rtk` stays in the base command registry only for its own meta commands
+(`rtk gain`, `rtk discover`), which proxy nothing.
+
+**A model that is not told will re-run the command.** Given forty lines where
+it expected four hundred, the reasonable thing for an agent to do is doubt the
+result and try again — and two extra turns cost more than the filtering saved.
+`rtk.prompt.awareness_section` is appended by `build_base_system_prompt`, so
+every provider branch gets it, and it is empty on a machine without rtk: an
+agent told its output is condensed when it is not will second-guess perfectly
+complete results. The text carries no version, path or count, because it sits
+in the cacheable prompt prefix.
+
+**rtk is for output a model reads, never for output code parses.** That is why
+`core.git_executable.run_git` is deliberately untouched and there is no global
+switch: `git status --porcelain` feeds a parser, `git diff --numstat` feeds a
+counter, and condensing either saves nothing — none of it is ever sent to a
+model — while breaking the caller. A call site opts in by calling
+`rtk.capture_for_model`, which is a statement about where its output is going.
+`agents/self_review.py` is the example to copy: three git calls, and only the
+`git diff HEAD` excerpt that reaches the model goes through rtk. The test
+runners in `qa/auto_fix_loop.py` and `self_healing/incident_responder/
+cicd_mode.py` are the counter-example and stay raw, because their output feeds
+`_parse_test_counts` and `_parse_failing_tests` before it feeds a prompt.
+
+**Nothing here can fail a build.** rtk absent, too old, turned off, timing
+out, crashing, printing something unexpected: the command runs exactly as
+written. The worst the integration can do is cost a session two seconds.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `RTK_ENABLED` | `true` | The master switch. "On" costs nothing without rtk — every entry point answers in a cached `shutil.which` |
+| `RTK_MODEL_FACING` | `true` | Whether WorkPilot's *own* captures are condensed too. Separate because it changes what a code path receives, not only what a model reads |
+| `WORKPILOT_RTK_PATH` | — | A specific binary, for a build that is not on PATH and for tests |
+| `RTK_DISABLED` | — | rtk's own escape hatch, honoured rather than rewritten into a no-op |
+
+Both switches are read from `.workpilot/.env` as well as the environment, so
+Settings → Agent Tools → Token savings reaches the hook, the awareness
+paragraph and the captures from one place. Real environment variables win.
+
+**In the UI.** `RtkSavingsCard` in the task panel reports the conditions and
+what rtk has recorded for this project, and renders nothing at all when rtk is
+not installed — a permanent card reading "feature not in use" is a card nobody
+reads. Discovery happens in Settings instead, which is where one goes to look
+for what could be switched on. Neither surface has an install button:
+`rtk init -g` writes a hook into the user's own Claude Code settings, for every
+session on the machine and not only the ones WorkPilot drives, so — like the
+hermes trust gate — the panel prints the command and the person types it.
+
+The savings figure is reported as what was measured and nothing more. rtk
+ships no tokenizer and estimates tokens as bytes / 4; shell output is one input
+among prompts, history and system instructions, which are themselves the input
+half of a bill that also pays for output. The extrapolation is made by nobody.
+
+**How it is verified.** The layers split by what they need, the same way the
+mobile toolchain does:
+
+| Layer | Proven by | Where |
+|---|---|---|
+| the exit-code protocol, the hook, the failure paths | a fake rtk that answers a chosen code | `tests/test_rtk_rewrite.py` |
+| the allowlist seeing through the proxy | the real parser and the real validators | `tests/test_rtk_security.py` |
+| the capture rule, and self-review honouring it | a fake rtk, and the module's own source | `tests/test_rtk_capture.py` |
+| that rtk still behaves the way this integration assumes | whatever rtk is really installed | `tests/test_rtk_contract.py` |
+
+The last row exists because every assertion in the first three is fed a string
+somebody here wrote: they test our idea of rtk. The contract tests assert what
+must hold *whatever* version is installed — that `rtk rewrite` answers with one
+of its four codes, that a rewrite is a command line, that the exit code
+survives, and that a command rtk rewrote still names itself to the allowlist —
+and never that a particular command is condensable, because rtk's table grows
+and shrinks and a test pinning one entry of it gets disabled within a month.
+They skip when rtk is not installed.
+
+### Clean generated files (watermarks)
+
+[watermarks-remover](https://github.com/guillaumemeyer/watermarks-remover)
+(Guillaume Meyer, MIT) removes provenance marks from content you own. Most of it
+is about images, PDFs and audio; one part of it is about text, and that part
+answers a question this repository had never asked: **what invisible characters
+are in the files the agents write?**
+
+Zero-width spaces, exotic spaces, bidirectional controls and tag characters are
+how a statistical or vendor watermark rides in model output. In prose they are
+harmless and invisible. In a source file they are a `SyntaxError` nobody can
+see, an identifier that does not match itself, a `grep` that finds nothing, and
+a diff full of changes no one made — and they survive every copy-paste into a
+repository. Generated code is the case where the cost is highest and the
+detection is hardest.
+
+```
+apps/backend/vendor/watermarks/  the pinned upstream table (scripts/vendor_watermarks.py)
+apps/backend/watermarks/
+  runtime.py   is the vendored table loadable, and is the tree its receipt's one
+  settings.py  has the user turned it on, and how aggressive may it be
+  clean.py     text on its way to disk -> clean text, and what changed
+  hook.py      the PreToolUse hook every agent Write and Edit passes through
+  ledger.py    <spec_dir>/watermarks.jsonl — the record of every silent edit
+  api.py       GET /api/watermarks/status
+```
+
+**One file is vendored, not fifty.** `service/scripts/text_unicode.py` is Layer
+A: the decision table that says which invisible codepoint is a carrier and which
+is load-bearing — a ZWJ inside an emoji sequence, a joiner between two Arabic
+letters, a filler after a Hangul jamo. 25 KB, stdlib-only, importing nothing
+from its siblings, which `test_watermarks_vendor.py` asserts by parsing it
+rather than importing it. The rest of upstream has no consumer here: the image
+and container metadata strippers are for files a coding agent does not write,
+and Layer B removes statistical marks by **paraphrasing** — a build that
+silently reworded the code it just wrote would be a different product.
+
+Committed rather than bootstrapped like the packs under `skills/`, for the same
+reason as archify and a sharper one: this runs on every file of every build, so
+a cleaner that works only where somebody ran an install command produces output
+nobody can rely on. And the table is **never reimplemented** — same rule as
+`rtk.rewrite` delegating to `rtk rewrite`. Two copies of a Unicode policy is two
+answers to one question, and this one is subtle enough that the second copy gets
+the preservation rules wrong long before anyone notices.
+
+**One change reaches every feature.** Planner, coder, QA fixer, the spec
+pipeline, the GitHub runners, the mobile phases — none of them write a file of
+their own, they all go through `core.client.create_client`, so the hook is
+registered there once. The providers that do not use the Claude SDK execute
+their writes in `core/runtimes/tool_executor.py`, which is the same cleaning in
+the other half of the product, exactly where `rtk_rewrite` already sits.
+
+**`Pre`, not `Post`, and that is the whole design.** A PostToolUse hook would
+read the file back, rewrite it, and leave a second mtime behind: a dev server
+reloading twice, a watcher firing twice, and a window where the dirty bytes are
+on disk and a test runner can read them. Rewriting `updatedInput` means those
+bytes never exist.
+
+**`old_string` is never touched.** `Edit` finds its target by matching that
+field against the file *as it is on disk*, and a file that already carries an
+invisible character carries it in the match too. Cleaning the needle is how a
+working edit turns into "string not found" — and nothing is lost by leaving it
+alone, because `new_string` is what lands.
+
+**It never decides whether the write happens.** Like `rtk_rewrite_hook`, it
+returns `updatedInput` and nothing else. The guardrails hook registered on the
+same tools answers the permission question; a second hook that only knows about
+invisible codepoints must not get a vote on it.
+
+**Two of upstream's defaults are inverted, and two of its knobs are unreachable.**
+
+| Option | Here | Why |
+|---|---|---|
+| `normalize_spaces` | **off** (upstream: on) | U+00A0 is load-bearing in the two languages this product ships: French typography puts one before `?`, `!`, `:`, and `fr/*.json` is full of them. Rewriting those loses a decision a translator made |
+| `strip_bidi` | **off**, switchable | A paired RLE/PDF run is how Arabic and Hebrew are written. Turning it on is the Trojan Source hardening (CVE-2021-42574), where the attack *is* a well-formed embedding — worth having, worth being a decision. Unpaired and out-of-context controls go either way |
+| `nfkc` | **not offered** | Folds `ﬁ` to `fi` and `４` to `4`. In a paragraph that is tidying; in a string literal, a regex class or a test fixture it is a silent behaviour change, and the file still compiles |
+| `aggressive_homoglyphs` | **not offered** | Rewrites Cyrillic `а` to Latin `a`. A homoglyph in an identifier is worth catching — that is `injection_guard`'s catch, with a finding somebody reads — not something to fix by editing a Russian translation into nonsense on the way to disk |
+
+**The model is not told, and that is not the same as nobody being told.** rtk
+gets an awareness paragraph because a model handed forty lines where it expected
+four hundred will doubt the result and run the command again. Here the change is
+invisible by definition: a warning would describe something the model cannot
+observe, and the only thing it could do with one is second-guess correct output.
+But this is the one place in a build where WorkPilot edits bytes a model wrote
+without saying so, so every change appends a line to
+`<spec_dir>/watermarks.jsonl` — the file, the tool, the codepoints by name. A
+reviewer asking why a line differs from what the transcript shows has the answer
+next to the plan and the QA report.
+
+**Nothing here can fail a build.** No vendored tree, a switch turned off,
+content above the cap, upstream raising: the content is written exactly as the
+model produced it and the reason is recorded rather than hidden. The cost on a
+file with nothing to strip is a single `str.isascii()` — every codepoint the
+table can touch is non-ASCII, and
+`test_watermarks_vendor.py::test_no_ascii_codepoint_is_ever_touched` checks all
+128 of them, because that is upstream's property to keep and not ours to assume.
+The day a release breaks it, the fast path would skip exactly the files that
+needed the work, silently, on every build.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `WATERMARKS_ENABLED` | `true` | The master switch. The only way to turn the feature off |
+| `WATERMARKS_NORMALIZE_SPACES` | `false` | Rewrite U+00A0 and its fifteen siblings to a plain space |
+| `WATERMARKS_STRIP_BIDI` | `false` | Strip well-formed bidi embeddings too — the Trojan Source hardening |
+| `WATERMARKS_MAX_BYTES` | `1048576` | Above this the content is passed through and the skip is reported. A nonsense value falls back to the default rather than disabling anything through a knob documented as a size |
+
+All of them are read from `.workpilot/.env` as well as the environment, so what
+Settings writes reaches the hook, the tool executor and the status endpoint from
+one place. Real environment variables win.
+
+**How it is verified.** The layers split by what they need, the same way rtk's
+do:
+
+| Layer | Proven by | Where |
+|---|---|---|
+| the settings, the skips, the cap, the failure paths | our own wrapper | `tests/test_watermarks_clean.py` |
+| what the hook rewrites, and the `old_string` it refuses to | fabricated tool calls | `tests/test_watermarks_hook.py` |
+| that the table still behaves the way this integration assumes | the vendored tree itself | `tests/test_watermarks_vendor.py` |
+
+The last row is the one that matters when somebody moves the pin
+(`python3 scripts/vendor_watermarks.py --ref …`). It asserts what must hold of
+*any* version — self-contained, the API driven here, no ASCII codepoint touched,
+a ZWSP removed and the joiners kept — and never that one exotic codepoint has
+one particular fate, because upstream's table grows with every release and a
+test pinning one entry of it gets deleted within a month.
+
+### Architecture diagrams (archify)
+
+[archify](https://github.com/tt-a1i/archify) (tt-a1i, MIT) renders a small typed
+JSON model into a self-contained interactive HTML diagram, and compares two
+models into a Before / Delta / After. It is **vendored and committed** at
+`apps/backend/vendor/archify` — 74 files, 2.2 MB, pinned by
+`scripts/vendor_archify.py` and recorded in `VENDOR.json`.
+
+Committed rather than bootstrapped like the packs under `skills/`, and the
+difference is the consumer rather than a change of heart: a pack is read by an
+agent working in someone's project, this is a runtime dependency of two features
+of the desktop app. Optional would mean a user installs the `.dmg`, opens the
+Architecture page and reads "not installed, run this command". `extraResources`
+already copies `apps/backend`, so packaging is nothing extra.
+
+The trim is the interesting part of the vendoring script: upstream's own `test/`
+(2.0 MB) and its **rendered** `examples/*.html` (3.9 MB) are dropped, the JSON
+examples the `SKILL.md` tells an author to read are kept, and
+`scripts/check-update.mjs` is dropped because an app that queries a third party
+mid-build is not a decision to take silently. The licence is a *required* file —
+absent, the script fails rather than skipping it — and any optional file
+upstream did not ship is recorded in `VENDOR.json` under `absent_upstream`,
+because "attribution quietly stopped being copied" is the failure a silent skip
+would hide.
+
+**The analyzer changed jobs.** `architecture_visualizer/analyzer.py` used to
+render Mermaid into a `<pre>` and call it the answer, and its heuristics were bad
+at that: "every imported identifier starting with a capital is a child
+component" collects icons, types and `Button`. As **evidence handed to an
+author** the import graph is the strongest material available — it is measured
+rather than recalled — and deciding that twelve modules under `agents/` are one
+component is the judgement a model can make and a regex cannot. So
+`diagram_generator.py` is gone (two diagram generators are two answers to one
+question) and `archify/evidence.py` ranks the graph by import degree into a
+bounded prompt section.
+
+```
+apps/backend/architecture_visualizer/archify/
+  runtime.py       where bin/archify.mjs and node are; the doctor
+  cli.py           validate / deliver / compare / doctor -> a typed Receipt
+  evidence.py      what the codebase says, without a model
+  ir.py            load, pin to real code, check id continuity
+  authoring.py     write a model, repair while repairing helps
+  significance.py  is this task worth mapping? (paths only, no API call)
+  delta.py         compare two models; the six states the UI can be in
+  ../../runners/architecture_visualizer_runner.py   --action map | delta | doctor
+```
+
+**Id continuity is the constraint everything else rests on.** `archify compare`
+matches components by `id` and by nothing else, so an "after" model authored
+from scratch reports every component as removed and re-added — noise wearing the
+costume of a finding. The head model is always written *from* the base one under
+a keep-every-id contract (`prompts/architecture_map_delta.md`), and
+`ir.check_id_continuity` verifies mechanically that it did. Below the threshold
+the delta is recorded `unreliable-ids` and the UI says so rather than showing it:
+the same reflex as coverage reporting *not applicable* rather than 0%.
+
+**Evidence is optional, deliberately.** archify verifies `components[].sources[]`
+by reading git blobs at the pinned revision, not the working tree — so a file the
+build has not committed would refuse the entire render. `ir.pin_repository` drops
+any source with no blob at that commit, and drops `meta.repository` wholesale
+rather than leaving it half-pinned. A diagram without evidence is still true; a
+diagram that will not render is nothing. `link_mode: "local-only"` covers forges
+other than GitHub and Gitee, whose revision links archify cannot build.
+
+**The repair loop is bounded by progress, not by a round count.** Every refusal
+names a stable `code`, the exact `subject`, the measured `evidence` and
+`supportedFixes`, so a round that does not lower the error count learned nothing
+and the next one will not either. Two such rounds and `authoring.author` stops
+and reports the diagnostics truthfully instead of presenting the last candidate
+as finished. `MAX_ROUNDS` is a ceiling on top of that, not the mechanism.
+
+The authoring agent (`architecture_visualizer` in `AGENT_CONFIGS`) gets `Write`
+and **not** `Bash`: the model writes the JSON, Python runs the renderer. An agent
+that could shell out is one `deliver` away from reporting an artifact nobody
+validated.
+
+**In the Kanban.** The `architecture-map` phase runs after `qa` — the map must
+describe the code QA corrected, not the code that was written — in a fresh
+context, at `min_effort: medium`. Two filters gate it, and it needs both:
+`when: touches(...)` is a glob and can only say "a `.ts` changed", which is most
+tasks, so `significance.assess` decides inside the phase, from paths alone and
+before any API call, whether the changed files touch a modelled component's
+sources or draw an area the model does not describe yet. Under the threshold the
+phase records "no architectural change" and returns for zero tokens — the same
+shape as `docs` and its libdocs preflight.
+
+The record lands in `<spec_dir>/architecture/` — the spec directory, not the
+worktree, because the worktree is removed at merge and "what did this task
+change" is asked after the merge. `TaskArchitectureDelta` renders the counts and
+the Before/Delta/After, and **renders nothing at all** for `not-significant` or a
+mapped delta whose counters are zero; `shouldShowArchitectureDelta` gates the tab
+trigger on the same predicate, so those states never produce a tab. A tab that
+reads "no change" on most tasks is a tab people stop opening.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `WORKPILOT_ARCHIFY_HOME` | — | Point at a clone instead of the vendored tree, for moving the pin without touching `vendor/` |
+
 ### Mobile applications (Android and Apple)
 
 A phone application breaks the assumption every other part of this repository
@@ -753,9 +1335,10 @@ little else.
 
 | Phase | Who runs it |
 |---|---|
-| `brainstorm`, `spec`, `analyze`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
+| `brainstorm`, `spec`, `analyze`, `frontend-design`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
 | `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
+| `mobile-design` and `store-readiness` | the engine (`workflows/runner.py`), when the task touches mobile files |
 | the `tests-pass` hard gate | the engine (`workflows/hard_gates.py`) |
 | `qa` | `qa_loop`, which the profile can switch off |
 | `observe` | the engine (`learning_loop/observe.py`) |
@@ -765,6 +1348,24 @@ A skill phase runs where the workflow file declares it. The window is looked up
 by phase id in the **declared** order, so inserting a phase into
 `workflow.yaml` between two existing ones needs no Python change — and pruning
 a phase that bounds a window does not hand its work to the neighbouring one.
+
+**A pack is not a phase.** impeccable ships two things — 23 design commands a
+model reads, and 59 detector rules that run locally — and the workflow declares
+one phase for each: `frontend-design` before `coding`, `design-check` after it.
+Both the engine's `DETERMINISTIC_PHASES` and the runner's `_ELSEWHERE` used to
+be keyed on the *pack*, which made "this check costs no tokens" and "the gate
+runner owns this phase" true of everything impeccable implements. The second
+phase would have been resolved, printed in the profile the user is shown, and
+executed by nobody — `test_every_skill_phase_belongs_to_a_window` watches the
+declaration, not that door. Both sets are keyed by phase id, and the pack still
+owns the gate *command* (`pack.json` → `gate`), which is a different question.
+
+The order is the point, and it is the same argument `mobile-design` makes one
+row above: a detector grades code that exists, and by then a layout nobody
+designed costs a full fix cycle rather than a sentence. Both phases read the
+same glob list, declared once in `workflow.yaml` as a YAML anchor and aliased
+by the second — two copies of "what counts as frontend" is how a surface ends
+up designed before coding and ungraded after it.
 
 There are **four** windows: before `planning`, between `planning` and `coding`,
 between `coding` and `qa`, and after `qa`. The second one is opened from inside
@@ -792,6 +1393,31 @@ prompt rather than pasting ten kilobytes of it into every subtask session.
 Builtins are recognised by **phase id**, never by their impl string — keying on
 the impl would mean swapping the methodology in YAML silently demotes `coding`
 to a one-shot session and loses the coder loop.
+
+**`roster:` — which specialists a phase gets.** Separate from `agent:` on purpose. The
+`agent:` value is an `AGENT_CONFIGS` entry, and it decides two unrelated things at once:
+the tool allowlist (with `create_client` putting the read-only entries in permission mode
+`plan`) *and*, through `PHASE_ALIASES`, which subagent roster is composed. Binding them
+meant a read-only audit could only reach the right specialists by being handed write
+access.
+
+Three phases were falling through `PHASE_ALIASES` to the Kanban default, which is
+`code-reviewer` + `test-runner`:
+
+| Phase | Ran under | Got | Should get |
+|---|---|---|---|
+| `brainstorm` | `spec_critic` | a `test-runner`, before any code exists | `spec` — `prior-art-finder`, `constraint-collector` |
+| `analyze` | `spec_validation` | a `test-runner`, before any code exists | `planner` — `architecture-analyst` answers "does this plan break the project's conventions" |
+| `spec-conformance` | `spec_validation` | not `qa-acceptance-checker` | `qa` — the subagent its own description in `workflow.yaml` had named since the phase was written |
+
+`spec_critic` now maps in `PHASE_ALIASES`; `spec_validation` cannot, because `analyze`
+reads a plan before any code exists and `spec-conformance` audits a finished branch, and
+the alias table has one key per agent_type. Those two declare `roster:` in the workflow
+file instead. An unknown roster name logs and falls back rather than raising: a typo in a
+workflow file should cost the right specialists, not the build.
+
+This matters beyond tidiness — the roster is context the parent pays for on **every
+turn**, so a mismatched roster is not merely unhelpful, it is billed.
 
 Two rules the resolver enforces and that are easy to break:
 
@@ -829,6 +1455,73 @@ The endpoint resolves the provider through `get_phase_provider`, never
 RESUME_WITH_PROVIDER marker, and an endpoint the UI may poll must not eat a
 choice the next build was meant to honour.
 
+### Pause, resume, and how a phase reports failure
+
+A build is a stack — `handle_build_command` → the coder loop → a session → a
+phase — and two things can happen deep inside it that the current frame has no
+business resolving: the user pressed Pause, or a phase established it cannot
+produce its output. Both used to be a bare `return`, which unwinds exactly one
+frame. The caller could not tell "finished" from "gave up", so a build whose
+planning had failed went on to run QA, the hard gates and `finalize_workspace`
+over a worktree with no implementation plan in it.
+
+`core/build_signals.py` holds the two exceptions that unwind to the entry point:
+`BuildPaused` (not a failure — nothing is finalized, the card keeps its column)
+and `BuildHalted` (which carries the sentence the user will read).
+
+**The pause has one store.** `core/pause_state.py` owns `pause_state.json`,
+which lives in the spec directory. That is the whole point: the flag used to
+live inside `implementation_plan.json`, a file that does not exist during spec
+creation or planning, so pressing Pause on a task that was visibly running
+answered "Implementation plan not found". The spec directory exists from the
+moment the task does.
+
+| Reader | Checkpoint |
+|---|---|
+| `agents/coder.py` | top of the session loop — the same place for a planning iteration and a coding one |
+| `qa/loop.py` | between review passes, so a pause does not wait out a long one |
+| `spec/pipeline/orchestrator.py` | between spec phases |
+
+The Electron side writes it through one helper too
+(`ipc-handlers/task/pause-state-utils.ts`): four call sites used to clear
+`plan.paused` by hand, and one missed copy means the restarted backend re-pauses
+at its first checkpoint and the resume looks like it did nothing. The legacy
+in-plan block is still *read* so a task paused before this change does not
+silently un-pause on upgrade; nothing writes it any more.
+
+**Resuming re-reads the disk rather than being told a phase.** `TASK_RESUME`
+clears the flag and restarts `run.py`; phase entry is state-driven
+(`is_first_run`, `get_next_subtask`, `should_run_qa`), so no plan means planning
+runs again, an incomplete plan resumes at the first unfinished subtask, and a
+complete one goes to QA — which itself continues from its persisted iteration
+count. Naming a phase in the resume would be a second opinion about a question
+the spec directory already answers, and the two would drift. The same property
+is what makes switching provider mid-task cheap: `TASK_RESUME_WITH_PROVIDER`
+rewrites the model configuration and lifts the pause, and touches nothing else —
+completed subtasks, the spec and the QA sign-off stay as they are. Only an
+explicit "re-run this phase" discards work, and only downstream of the phase
+asked for (`plan-rerun-utils.ts`).
+
+**A phase that gives up says so.** `PLANNING_FAILED` and `CODING_FAILED` were in
+the XState machine from the start and emitted by nobody: every real failure
+reached the frontend as a process exit, and the machine's `setError` did not
+handle that event. The result was a card in Human Review with a red *Has Errors*
+badge and no reason anywhere in the UI — the toast even announced it as "Ready
+for Review", because the status is the same one a finished build gets.
+
+Now each halt emits the event with its message (`_emit_phase_failure` in
+`coder.py`, `_emit_planning_failed` in the spec orchestrator, `_emit_fatal_error`
+for an unhandled crash, `_emit_startup_failure` for a prerequisite the build
+could not satisfy — that last one because `validate_environment` ends in
+`sys.exit(1)`, and SystemExit is not an `Exception`, so the crash emitter never
+saw it and a cause known in full went to the card as "exited unexpectedly with
+code 1"), `setError` covers every event that can reach the `error`
+state — including `PROCESS_EXITED`, whose message names the exit code because
+that is still better than nothing — and the message is persisted beside the
+status it explains (`plan.errorMessage`) so it survives a reload.
+`TaskFailureBanner` renders it at the top of the task panel, and the toast reads
+`reviewReason` rather than the column before choosing its wording.
+
 ### Workflow Logger
 
 Centralized logging system for tracking all AI agents, skills, hooks and workflows:
@@ -844,12 +1537,20 @@ Centralized logging system for tracking all AI agents, skills, hooks and workflo
 from core.workflow_logger import workflow_logger
 
 # Log agent execution
-trace_id = workflow_logger.log_agent_start("Claude Code", "refactor_task", {"file": "app.py"})
-workflow_logger.log_agent_end("Claude Code", "success", {"changes": 5}, trace_id=trace_id)
+trace_id = workflow_logger.log_agent_start(
+    "Claude Code", "refactor_task", {"file": "app.py"}
+)
+workflow_logger.log_agent_end(
+    "Claude Code", "success", {"changes": 5}, trace_id=trace_id
+)
 
 # Log skill execution
-skill_trace = workflow_logger.log_skill_start("framework-migration", "analyze", {"framework": "react"})
-workflow_logger.log_skill_end("framework-migration", "success", {"migrations_found": 3}, trace_id=skill_trace)
+skill_trace = workflow_logger.log_skill_start(
+    "framework-migration", "analyze", {"framework": "react"}
+)
+workflow_logger.log_skill_end(
+    "framework-migration", "success", {"migrations_found": 3}, trace_id=skill_trace
+)
 
 # Monitor active traces
 active = workflow_logger.get_active_traces()
@@ -913,6 +1614,266 @@ Main ↔ Renderer communication via Electron IPC:
 - **Handlers:** `src/main/ipc-handlers/` — organized by domain (github, gitlab, ideation, context, etc.)
 - **Preload:** `src/preload/` — exposes safe APIs to renderer
 - Pattern: renderer calls via `window.electronAPI.*`, main handles in IPC handler modules
+
+**A page never owns its subscription.** Every `setup<X>Listeners()` is registered
+once for the life of the window by `stores/global-listeners.ts`, called from
+`App.tsx`. It used to be called by the page component, in a `useEffect` whose
+cleanup ran on unmount — and `App.tsx` unmounts a view the moment the user
+navigates away. The work itself never stopped (it runs in the main process), but
+nobody was listening: progress events fell on the floor, the store stayed on
+`isGenerating: true` for ever, and coming back to the page showed a run that had
+finished ten minutes earlier. Thirty-seven features had the same bug, because
+they all copied the same shape.
+
+Registering twice is worse than registering never — the stores that append
+(ideas, log lines, findings) would double their content — so the bootstrap is
+idempotent and the invariant test in
+`stores/__tests__/global-listeners.test.ts` ("no page component registers IPC
+listeners of its own") fails the build if a page takes the
+subscription back. A listener that needs a project reads it at event time
+(`useProjectStore.getState().selectedProjectId`) rather than capturing it, which
+is what makes the session scope possible at all.
+
+### Background work and the sidebar (`stores/activity-store.ts`)
+
+Work that outlives the page needs somewhere to be *seen*. `activity-store` is
+the one registry: a feature reports `running → success | error`, and the sidebar,
+the toasts and the background indicator all read that instead of each feature
+inventing its own signal. `stores/activity-bridge.ts` derives it from a store's
+own phase, so the four ways a generation can end (complete, error, timeout,
+stopped) are covered once rather than hooked one by one.
+
+The model is unread mail, not notification. A finished job leaves a silent mark
+that survives navigation and clears when the page is visited; the page the user
+is currently watching never badges itself.
+
+| Rule | Why |
+|---|---|
+| running is a static hollow ring, never an animation | eight active pages must stay readable; motion is for what *changed* |
+| at most one entry animates, three pulses, then still | two pages finishing together is one animation and one silent badge — the difference between a signal and a light show |
+| a failure keeps the slot a later success would have taken | the eye is spent on the thing worth acting on |
+| shape carries the state, colour only doubles it | seven themes, and colour-blind users |
+| a folded group carries the worst state of its entries | `navGroups` are collapsed by default, so work behind one would be invisible |
+| the badge is `role="img"`, not a live region | a live region on ~80 entries announces the whole sidebar on every change |
+
+Animation is capped by the global `prefers-reduced-motion` block in
+`globals.css`, so nothing new has to opt in.
+
+**Who reports, and where that is decided.** `stores/activity-bridges.ts` is the
+single table: it maps a feature store to the menu entry its work belongs to.
+The mapping lives there rather than in each store, so a feature store never
+imports the sidebar — it publishes a phase, and one file decides what that
+phase means to a menu entry.
+
+Nineteen stores independently converged on `idle | <one verb> | complete |
+error`, which is what makes `bridgePhaseActivity` enough for all of them: the
+running verb (`scanning`, `analyzing`, `generating`, `optimizing`) also names
+the job, because the badge already sits on the entry that names the feature —
+"Doc Drift — Doc Drift" was the alternative. Roadmap, ideation and the Kanban
+keep their phase elsewhere and get an explicit bridge.
+
+Two absences are deliberate. **self-healing** has no phase, only `isLoading`:
+badging a menu entry for a list refresh is the noise this design exists to
+avoid. **smart-estimation** and the other dialogs have no `SidebarView`, and a
+badge needs an entry to sit on.
+
+**The activity centre** (`components/ActivityCentre.tsx`) answers *what* is
+running, where the badges answer *where*. It lists work on every page except
+the one on screen — that page shows its own work in full — and keeps a finished
+job listed until its page has been visited, on the same unread rule the badges
+use. It replaced the Kanban-only running-tasks pill: agents were never the only
+thing that kept working after the user left a page, only the only thing that
+said so.
+
+**Re-hydrating on mount must not answer for work in flight.** A page that reads
+its state from disk when it opens runs that code again every time the user
+navigates back, and `App.tsx` remounts the view each time. `loadArchitectureState`
+used to set `checking` and then `idle` unconditionally, so leaving the
+Architecture page mid-generation and coming back showed an empty page with a
+Generate button — while the map was still being built in the main process, and
+the sidebar badge was dropped along with the phase. The service is the authority
+on whether it is still busy, and `checkArchifyReadiness` returns `running`
+alongside the doctor's verdict: one round trip, at the moment the decision is
+made. `loadRoadmap` had the same shape from the start (`getRoadmapStatus`) and
+`loadIdeation` bails out while `isGenerating`; those two and this one are the
+only mount-time re-hydrations that write a not-running state.
+
+**Toasts are coalesced, not stacked.** `use-toast` keeps a single slot
+(`TOAST_LIMIT = 1`), so three pages finishing together used to mean two
+announcements nobody saw. `useActivityNotifications` collects finishes for
+~1.2s and raises one toast for the batch, with a failure in it deciding the
+wording and the variant. Raising the limit would stack three cards over the app
+instead; collecting them stays true as the number of pages grows. Kanban builds
+are excluded there — `useTaskNotifications` already announces those, with the
+task title and the distinction between a finished build and one that landed in
+review because it failed.
+
+### Le pourcentage d'une tâche (`shared/progress.ts`)
+
+Une exécution produit **deux** nombres, et un seul répond à « où en est cette
+tâche ? » :
+
+| Champ | Échelle | Exemple |
+|---|---|---|
+| `phaseProgress` | 0-100 **à l'intérieur** de la phase courante | 15 = 15% de la planification |
+| `overallProgress` | 0-100 sur **toute** la tâche, pondéré par `EXECUTION_PHASE_WEIGHTS` (planification 0-20, codage 20-80, QA 80-95) | 3 = 15% × la bande 0-20 |
+
+Les deux étaient affichés côte à côte comme s'ils étaient comparables : la carte
+du Kanban imprimait `phaseProgress` brut (« Planification 15% ») pendant que la
+pop-in de détail imprimait `overallProgress` (« 3% »), pour la même tâche au même
+instant. Le second est le bon, et c'est le seul qu'on montre désormais —
+`resolveOverallProgress` le reconstitue depuis la phase quand l'enregistrement ne
+le porte pas (plan persisté, snapshot XState), pour qu'aucune surface ne retombe
+sur l'échelle locale à la phase.
+
+La pondération elle-même vit dans `shared/progress.ts::calculateOverallProgress`
+et **nulle part ailleurs** : `agent-events` l'appelle pour émettre, le renderer
+l'appelle pour reconstituer. Deux copies de la formule, c'est deux réponses à une
+question — exactement ce que 3% contre 15% donnait à lire.
+
+La restauration d'une tâche depuis le disque suit la même règle : elle sait
+quelle phase était en cours, pas où elle en était, donc elle suppose le milieu de
+phase (`phaseProgress: 50`) et **pondère** — une tâche en planification revient à
+10%, pas au 50% qui y était écrit en dur quelle que soit la phase.
+
+Au-dessus de tout cela, `getDisplayProgress` garde ses deux priorités : dès qu'il
+existe des sous-tâches, leur part terminée EST l'avancement réel (la pondération
+par phase gonflerait à ~94% dès le démarrage de la QA), et un état terminal vaut
+100% quel que soit un comptage en retard.
+
+### Architectures et historique de construction (`visual-to-code/`)
+
+Le canvas ne tenait qu'**un** diagramme, dans trois champs libres du store
+(`canvasNodes`, `canvasEdges`, `canvasDiagramType`). En commencer un deuxième
+détruisait le premier : « Nouveau diagramme » vidait le canvas, et la seule
+façon de garder le travail était d'avoir pensé à exporter un JSON avant.
+
+Une **architecture** est désormais un document — un id, un nom, ses blocs, ses
+connexions — et les documents sont indépendants. L'id est ce sous quoi
+l'historique est classé sur disque, ce qui est la raison pour laquelle il
+survit à un renommage.
+
+| Où | Quoi |
+|---|---|
+| `stores/visual-to-code-store.ts` | les documents, le document actif, et les actions d'historique |
+| `components/visual-to-code/ArchitectureTabs.tsx` | la barre d'onglets ; c'est là que se crée un document |
+| `components/visual-to-code/ArchitectureHistoryDock.tsx` | la frise des étapes, et le retour à l'une d'elles |
+| `main/visual-to-code-history.ts` | le stockage : un fichier par architecture |
+| `shared/types/visual-to-code-history.ts` | les types que les trois processus partagent |
+
+**La migration n'est pas optionnelle.** Le store persiste en `version: 2` avec
+un `migrate` qui transforme l'ancien diagramme unique en une première
+architecture nommée. Quelqu'un qui avait un diagramme ouvert au moment de la
+mise à jour doit le retrouver là où il l'a laissé — découvrir la fonctionnalité
+en perdant son travail n'est pas une migration.
+
+**L'historique est sur disque, pas dans `localStorage`.** Soixante instantanés
+d'une architecture de quarante blocs, multipliés par le nombre de documents
+ouverts, c'est des mégaoctets contre un quota d'environ 5 Mo que toute
+l'application se partage — et un quota qui déborde lève à l'écriture, en
+perdant silencieusement exactement le travail que la fonctionnalité existe pour
+protéger. Un fichier par architecture sous
+`userData/visual-to-code/history/<id>.json` : un instantané ne réécrit que le
+document concerné, et supprimer une architecture supprime un fichier au lieu de
+réécrire celui de tout le monde. Le fichier porte les corps, mais
+`listVersions` ne renvoie que les métadonnées : le panneau dessine soixante
+lignes, il n'a pas à recevoir soixante diagrammes pour ça.
+
+**Une étape n'est pas une modification.** `signature` compte les positions —
+déplacer un bloc est une édition, et l'annulation doit la reprendre.
+`structuralSignature` les ignore, et c'est lui qui déclenche la capture : une
+frise dont quarante lignes disent « bloc déplacé » est une frise que personne
+ne parcourt. Les positions du moment voyagent quand même dans l'instantané de
+l'étape suivante, donc rien n'est perdu. La capture est temporisée à 1,5 s,
+bien au-delà des 350 ms de la pile d'annulation : celle-ci parle du dernier
+geste, la frise parle de la forme d'un après-midi de travail.
+
+**Restaurer ajoute, ne rembobine pas.** Les étapes postérieures à celle qu'on
+restaure restent exactement où elles sont, et la restauration devient elle-même
+la plus récente. Revenir voir mardi ne doit pas être le geste qui supprime
+mercredi — et l'annulation d'une restauration n'est alors qu'une autre
+restauration.
+
+**Nommer une étape, c'est la conserver.** Le plafond de 60 ne compte que les
+étapes anonymes ; une étape nommée est une décision, et un plafond n'a pas à
+supprimer une décision. Les deux gestes sont un seul dans l'UI, parce que
+demander les deux séparément reviendrait à regarder des étapes nommées tomber
+du bas de la pile.
+
+**Le miroir vers le store est regroupé (250 ms).** Un déplacement émet un
+changement par frame, et le miroir écrivait chacun d'eux — ce qui re-rend
+maintenant aussi la barre d'onglets. Tant que le canvas est monté, c'est *lui*
+la vérité ; la copie du store existe pour survivre à la navigation et au
+redémarrage. Ce qui rend le regroupement gratuit, c'est que les deux chemins
+qui peuvent écourter la fenêtre — changer d'onglet, quitter la page — vident
+d'abord (`flushMirror`). Un regroupement qui ne viderait pas serait une perte
+de données déguisée en optimisation.
+
+**`loadedArchitectureId` est un état, pas une ref**, et c'est tout l'argument de
+correction : sur le rendu où le document actif change, le miroir s'exécute avec
+le *nouvel* id et les *anciens* blocs. Une ref posée par le chargeur dans le
+même commit se lirait déjà à jour, et le miroir écrirait les blocs d'un
+document dans un autre.
+
+### Provider × LLM × effort, par page (`shared/utils/page-llm.ts`)
+
+Une page qui lance un agent posait la question deux fois et n'en gardait qu'une
+moitié : le modèle et l'effort venaient de `featureModels` / `featureThinking`,
+et le fournisseur ne venait de *nulle part*. La liste « Fournisseur IA » en haut
+à droite ne servait qu'aux builds du Kanban, si bien qu'une revue de PR repartait
+sur Claude alors que l'utilisateur avait choisi Copilot une seconde plus tôt —
+`getRunnerEnv()` n'injectait aucun `SELECTED_LLM_PROVIDER`.
+
+`shared/utils/page-llm.ts` est l'unique réponse à « avec quoi cette page
+tourne-t-elle ? », et l'ordre est celui déjà établi, une source par cran :
+
+| Ce qui décide | Fournisseur | Modèle | Effort |
+|---|---|---|---|
+| 1. la page (`pageLlmOverrides[page]`) | ✔ | ✔ | ✔ |
+| 2. les réglages (`selectedProvider`, `featureModels`, `featureThinking`) | ✔ | ✔ | ✔ |
+| 3. les défauts du dépôt (`DEFAULT_FEATURE_*`) | — | ✔ | ✔ |
+
+Un cran vide n'en consomme pas un autre : une page qui ne nomme que le
+fournisseur garde le modèle et l'effort des réglages, et une page qui ne nomme
+rien se comporte comme avant. Le champ absent est **retiré** de
+`pageLlmOverrides` plutôt que stocké vide — c'est ce qui garde « aucun choix » et
+« le même choix que les réglages » distincts, et qui fait qu'un changement de
+fournisseur global bouge bien les pages qui n'ont rien demandé.
+
+Quand la page choisit un **fournisseur** sans choisir de modèle, le modèle des
+réglages est ramené au catalogue de ce fournisseur
+(`resolveModelForProviderCatalog`) : il avait été choisi pour le fournisseur
+global, et demander `claude-opus-4-6` à Ollama échoue à l'appel, avec un message
+qui parle d'un modèle inconnu plutôt que du choix.
+
+**Le jeu de pages est fermé** (`PAGE_LLM_FEATURES`). Une page y entre le jour où
+son runner lit la réponse ; un sélecteur qui promet ce que le runner ignore est
+pire que pas de sélecteur. Aujourd'hui : `insights`, `ideation`, `roadmap`,
+`github-issues`, `github-prs`, `gitlab-merge-requests`, `prompt-optimizer`,
+`natural-language-git`. Les fonctionnalités qui ont un réglage de modèle mais
+aucun lecteur (`testGenerator`, `codeReview`, `voiceControl`, `utility`) n'en
+font pas partie — le Kanban, lui, a déjà sa formule *par tâche*.
+
+| Qui lit | Où |
+|---|---|
+| le renderer, pour afficher ce que la page va faire | `resolvePageLlm` (`PageLlmSelector`, `natural-language-git-store`) |
+| le main, pour `--model` / `--thinking-level` | `getPageFeatureSettings` (`main/services/page-llm-config.ts`) |
+| le main, pour `SELECTED_LLM_PROVIDER` + la clé | `getPageProviderEnv`, puis `credentialManager.getEnvironmentVariables(provider)` |
+
+Les sept `getXxxFeatureSettings()` qui recopiaient la même lecture de
+`settings.json` dans autant de handlers sont ce module ; `getRunnerEnv` prend
+désormais `{ page }` et ajoute l'environnement du fournisseur de la page. Le
+backend n'a rien à apprendre : `core.client._get_active_provider` honore déjà
+`SELECTED_LLM_PROVIDER`.
+
+**Le fournisseur reste vide quand personne n'en a choisi** — et non « Claude ».
+Le backend a sa propre chaîne de résolution, et y écrire un nom la
+court-circuiterait avec une valeur que personne n'a demandée.
+
+Dans l'UI, `PageLlmSelector` vit à gauche de la barre sticky, à côté de la liste
+« Fournisseur IA », et n'en est pas un doublon : cette liste dit avec quoi
+l'application travaille, celui-ci dit avec quoi *cette page* travaille. Il
+n'affiche rien sur une page hors du jeu fermé.
 
 ### Agent Management (`src/main/agent/`)
 

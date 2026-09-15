@@ -11,7 +11,6 @@ import { useTranslation } from "react-i18next";
 import { useProjectStore } from "../../stores/project-store";
 import type { PromptOptimizerResult } from "../../stores/prompt-optimizer-store";
 import {
-	setupPromptOptimizerListeners,
 	startOptimization,
 	usePromptOptimizerStore,
 } from "../../stores/prompt-optimizer-store";
@@ -75,12 +74,6 @@ export function PromptOptimizerDialog({
 	// Use store's openDialog sets the initialPrompt; we mirror it locally for editing
 	const [editablePrompt, setEditablePrompt] = useState("");
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
-
-	// Setup IPC listeners once
-	useEffect(() => {
-		const cleanup = setupPromptOptimizerListeners();
-		return cleanup;
-	}, []);
 
 	// Sync editable prompt when dialog opens
 	useEffect(() => {

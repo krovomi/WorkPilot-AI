@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupDocDriftListeners,
-	useDocDriftStore,
-} from "../../stores/doc-drift-store";
+import { useDocDriftStore } from "../../stores/doc-drift-store";
 import type { DriftReport, DriftSeverity } from "../../../shared/types/doc-drift";
 
 const SEVERITY_STYLES: Record<DriftSeverity, string> = {
@@ -21,11 +17,6 @@ export function DocDriftReport({
 	projectPath,
 }: DocDriftReportProps): React.ReactElement {
 	const { t } = useTranslation("docDrift");
-
-	useEffect(() => {
-		const cleanup = setupDocDriftListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useDocDriftStore((s) => s.phase);
 	const status = useDocDriftStore((s) => s.status);

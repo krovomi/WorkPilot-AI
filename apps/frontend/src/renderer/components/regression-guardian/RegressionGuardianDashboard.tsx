@@ -1,8 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	setupRegressionGuardianListeners,
 	useRegressionGuardianStore,
 } from "../../stores/regression-guardian-store";
 import type {
@@ -96,11 +94,6 @@ export function RegressionGuardianDashboard({
 	onViewTest,
 }: RegressionGuardianDashboardProps): React.ReactElement {
 	const { t } = useTranslation("regressionGuardian");
-
-	useEffect(() => {
-		const cleanup = setupRegressionGuardianListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useRegressionGuardianStore((s) => s.phase);
 	const status = useRegressionGuardianStore((s) => s.status);

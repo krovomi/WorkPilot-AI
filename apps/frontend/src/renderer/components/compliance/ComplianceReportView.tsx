@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupComplianceListeners,
-	useComplianceStore,
-} from "../../stores/compliance-store";
+import { useComplianceStore } from "../../stores/compliance-store";
 import type {
 	ComplianceFramework,
 	ComplianceReport,
@@ -35,11 +31,6 @@ export function ComplianceReportView({
 	projectPath,
 }: ComplianceReportViewProps): React.ReactElement {
 	const { t } = useTranslation("compliance");
-
-	useEffect(() => {
-		const cleanup = setupComplianceListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useComplianceStore((s) => s.phase);
 	const status = useComplianceStore((s) => s.status);

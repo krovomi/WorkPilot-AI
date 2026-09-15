@@ -25,8 +25,7 @@ from pathlib import Path
 from datetime import datetime
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="[WorkPilot Auto-Merge] %(levelname)s: %(message)s"
+    level=logging.INFO, format="[WorkPilot Auto-Merge] %(levelname)s: %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,9 @@ class WorkPilotAutoMergeHook:
         self.operation = os.environ.get("WORKPILOT_OPERATION", "merge")
         self.target_branch = os.environ.get("WORKPILOT_TARGET_BRANCH", "unknown")
         self.task_id = os.environ.get("WORKPILOT_TASK_ID", "unknown")
-        self.auto_merge = os.environ.get("WORKPILOT_AUTO_MERGE", "false").lower() == "true"
+        self.auto_merge = (
+            os.environ.get("WORKPILOT_AUTO_MERGE", "false").lower() == "true"
+        )
 
         self.wrapper_script = self.repo_path / "scripts" / "workpilot-merge-wrapper.py"
         self.workpilot_dir = self.repo_path / ".workpilot"
@@ -52,7 +53,7 @@ class WorkPilotAutoMergeHook:
             "target_branch": self.target_branch,
             "status": status,
             "workpilot_files_preserved": self.workpilot_dir.exists(),
-            "details": details or {}
+            "details": details or {},
         }
 
         try:
@@ -66,7 +67,9 @@ class WorkPilotAutoMergeHook:
         """Execute merge/rebase using the wrapper script."""
         if not self.wrapper_script.exists():
             logger.error(f"Wrapper script not found: {self.wrapper_script}")
-            logger.info("Falling back to standard git command (no .workpilot preservation)")
+            logger.info(
+                "Falling back to standard git command (no .workpilot preservation)"
+            )
             return 1
 
         try:
@@ -74,7 +77,7 @@ class WorkPilotAutoMergeHook:
                 "python3",
                 str(self.wrapper_script),
                 self.operation,
-                self.target_branch
+                self.target_branch,
             ]
 
             logger.info(f"Executing: {' '.join(cmd)}")
@@ -93,7 +96,7 @@ class WorkPilotAutoMergeHook:
         code = subprocess.run(
             ["git", "rev-parse", "--git-dir"],
             cwd=str(self.repo_path),
-            capture_output=True
+            capture_output=True,
         ).returncode
 
         if code != 0:
@@ -105,7 +108,7 @@ class WorkPilotAutoMergeHook:
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             cwd=str(self.repo_path),
             capture_output=True,
-            text=True
+            text=True,
         )
 
         if result.returncode != 0:
@@ -121,7 +124,7 @@ class WorkPilotAutoMergeHook:
             ["git", "status", "--porcelain"],
             cwd=str(self.repo_path),
             capture_output=True,
-            text=True
+            text=True,
         )
 
         if result.stdout.strip():
@@ -157,7 +160,9 @@ class WorkPilotAutoMergeHook:
             logger.info(f"✓ .workpilot files preserved and merged")
             self.log_status("success")
         else:
-            logger.error(f"✗ {self.operation.capitalize()} failed with exit code {exit_code}")
+            logger.error(
+                f"✗ {self.operation.capitalize()} failed with exit code {exit_code}"
+            )
             self.log_status("failed", {"exit_code": exit_code})
 
         logger.info("=" * 60)

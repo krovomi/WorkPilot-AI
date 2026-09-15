@@ -91,6 +91,8 @@ To change models, edit the constants at the top of `update_narrative.py`.
 2. Add a renderer to `generate_inventories.py`:
    ```python
    def render_mysection(repo: Path, lang: str) -> str: ...
+
+
    RENDERERS["MYSECTION"] = render_mysection
    ```
 3. Push — the inventory workflow will fill it in on the next relevant push.

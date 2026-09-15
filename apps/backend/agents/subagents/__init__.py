@@ -141,8 +141,16 @@ def resolve(
     project_dir: Path | str | None = None,
     user_agents: dict[str, Any] | None = None,
     provider: str | None = None,
+    roster_name: str | None = None,
 ) -> dict[str, Any] | None:
-    """The subagent roster for one run, or ``None`` when there should be none."""
+    """The subagent roster for one run, or ``None`` when there should be none.
+
+    ``roster_name`` overrides the phase the alias table would pick. It exists so a
+    workflow phase can choose its specialists independently of the AGENT_CONFIGS
+    entry that decides its permissions — the two answer different questions, and
+    binding them together meant a read-only audit could only get the right
+    subagents by being given write access.
+    """
     if provider:
         try:
             from skills_registry.providers import get_provider_capabilities
@@ -158,7 +166,7 @@ def resolve(
         # that passed its own dict still means it.
         return user_agents or None
 
-    roster: dict[str, Any] = phase_defaults(agent_type)
+    roster: dict[str, Any] = phase_defaults(agent_type, roster_name)
 
     overlays = overlays_for(detect_languages(project_dir))
     mobile = mobile_overlay_for(project_dir)

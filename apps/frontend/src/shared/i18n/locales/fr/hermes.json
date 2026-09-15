@@ -1,0 +1,58 @@
+{
+	"title": "Boucle d'apprentissage Hermes",
+	"subtitle": "Les skills qu'hermes-agent a écrits depuis sa propre expérience, déposés ici pour revue",
+	"expand": "Détails",
+	"collapse": "Masquer",
+	"empty": "Tout est en place et la file de revue est vide.",
+	"state": {
+		"ready": "prêt",
+		"degraded": "partiellement configuré",
+		"absent": "non installé"
+	},
+	"badge": {
+		"pending": "{{count}} candidat en attente",
+		"pending_other": "{{count}} candidats en attente"
+	},
+	"cycle": {
+		"run": "Lancer maintenant",
+		"running": "En cours…",
+		"result": "{{found}} skill(s) vus · {{proposed}} proposés · {{unchanged}} déjà en attente",
+		"triage": "{{dropped}} écarté(s) par le périmètre du dépôt · {{pruned}} retiré(s) de la file",
+		"adopted": "{{count}} adopté dans skills/{{pack}}/ — émis vers aucun harness",
+		"adopted_other": "{{count}} adoptés dans skills/{{pack}}/ — émis vers aucun harness"
+	},
+	"checks": {
+		"title": "Conditions",
+		"install": "Installation",
+		"soul": "Persona",
+		"trust": "Confiance",
+		"skills": "Skills",
+		"agents": "Contexte projet"
+	},
+	"soul": {
+		"title": "Persona (SOUL.md)",
+		"description": "Hermes lit SOUL.md depuis son propre répertoire et l'injecte comme identité de chaque session. Ce dépôt en propose un ; l'installer est une copie réversible — la persona remplacée est conservée horodatée.",
+		"install": "Installer SOUL.md",
+		"replace": "Remplacer la persona installée"
+	},
+	"pending": {
+		"title": "En attente de revue",
+		"description": "Uniquement des candidats. Rien ici n'est actif et rien n'est promu seul : un skill écrit par hermes ne porte aucune preuve issue d'un build qui s'en serait servi."
+	},
+	"triage": {
+		"title": "Décidé sans vous",
+		"description": "Hermes embarque un catalogue de plusieurs centaines de skills. Ce que ce dépôt a déjà décidé à son sujet — les catégories suivies par le pack hermes, les noms qu'il exclut, les skills que les packs fournissent déjà — s'applique ici : ces candidats ne sont jamais déposés, et ceux qu'une ancienne règle avait déposés sont retirés.",
+		"stale_one": "{{count}} candidat issu d'une ancienne règle sera retiré au prochain cycle",
+		"stale_other": "{{count}} candidats issus d'une ancienne règle seront retirés au prochain cycle",
+		"reason": {
+			"already-provided": "déjà fourni ici",
+			"declined-here": "exclu par le pack hermes",
+			"out-of-scope": "catégorie hermes non suivie par ce dépôt",
+			"upstream-catalogue": "livré avec hermes, pas appris"
+		}
+	},
+	"adopted": {
+		"title": "Adoptés tout seuls",
+		"description": "La boucle écrit ce qu'elle garde directement dans skills/{{pack}}/. Ce pack n'est pas listé dans .workpilot/skills.toml, donc chacun de ses skills est rejeté à la porte pack-pin : rien ici n'atteint Claude Code, Copilot, Codex, Cursor ou Gemini, et aucun agent ne peut le charger. Chaque fichier est la prose d'hermes, adoptée telle quelle, avec les noms d'outils qu'il faudrait réécrire. Lister le pack, c'est décider que ces brouillons ont leur place dans la palette d'un agent — et le moment de faire cette réécriture. En supprimer un, c'est dire non : il n'est jamais ré-adopté."
+	}
+}

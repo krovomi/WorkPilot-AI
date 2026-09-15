@@ -59,13 +59,15 @@ python apps/backend/run.py --replay-recording FILE [--speed 2.0]
 import asyncio
 from streaming import create_streaming_wrapper
 
+
 async def my_task():
     wrapper = create_streaming_wrapper("task-123")
-    
+
     await wrapper.start_session({"task": "example"})
     await wrapper.emit_progress(50, "Working...")
     await wrapper.emit_file_change("test.py", "update", "code")
     await wrapper.end_session()
+
 
 asyncio.run(my_task())
 ```
@@ -158,16 +160,17 @@ See `integration_example.py` for a complete example of how to integrate streamin
 ```python
 from streaming import create_streaming_wrapper
 
+
 class MyAgent:
     def __init__(self, enable_streaming=False):
-        self.streaming = create_streaming_wrapper(
-            session_id="task-id"
-        ) if enable_streaming else None
-    
+        self.streaming = (
+            create_streaming_wrapper(session_id="task-id") if enable_streaming else None
+        )
+
     async def run(self):
         if self.streaming:
             await self.streaming.start_session({...})
-        
+
         try:
             # Your agent code here
             if self.streaming:

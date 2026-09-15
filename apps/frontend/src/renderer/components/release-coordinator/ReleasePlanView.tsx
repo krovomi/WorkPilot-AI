@@ -1,8 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	setupReleaseCoordinatorListeners,
 	useReleaseCoordinatorStore,
 } from "../../stores/release-coordinator-store";
 import type {
@@ -25,11 +23,6 @@ export function ReleasePlanView({
 	projectPath,
 }: ReleasePlanViewProps): React.ReactElement {
 	const { t } = useTranslation("releaseCoordinator");
-
-	useEffect(() => {
-		const cleanup = setupReleaseCoordinatorListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useReleaseCoordinatorStore((s) => s.phase);
 	const status = useReleaseCoordinatorStore((s) => s.status);

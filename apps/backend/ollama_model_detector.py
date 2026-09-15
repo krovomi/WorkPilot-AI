@@ -141,6 +141,7 @@ EMBEDDING_PATTERNS = [
 # of the picker. (Note: supporting tools ≠ being good at planning — a small 8B
 # may call tools yet still fail to produce a valid plan.)
 TOOL_CALLING_MODEL_PATTERNS = [
+    "gpt-oss",
     "llama3.1",
     "llama3.2",
     "llama3.3",
@@ -200,7 +201,9 @@ def model_meta(base_url: str, model_name: str) -> dict[str, Any]:
         pass
     name_lower = model_name.lower()
     if supports is None:
-        supports = any(pattern in name_lower for pattern in TOOL_CALLING_MODEL_PATTERNS)
+        supports = not is_embedding_model(model_name) and any(
+            pattern in name_lower for pattern in TOOL_CALLING_MODEL_PATTERNS
+        )
     if param_b is None:
         param_b = _parse_param_billions(name_lower)
     return {"supports_tools": supports, "param_b": param_b}

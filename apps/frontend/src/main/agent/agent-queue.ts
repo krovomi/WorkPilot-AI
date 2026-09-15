@@ -30,6 +30,7 @@ import {
 	getBestAvailableProfileEnv,
 } from "../rate-limit-detector";
 import { getAPIProfileEnv } from "../services/profile";
+import { getPageProviderEnv } from "../services/page-llm-config";
 import type { AgentEvents } from "./agent-events";
 import type { AgentProcessManager } from "./agent-process";
 import type { AgentState } from "./agent-state";
@@ -466,6 +467,11 @@ export class AgentQueueManager {
 		// 5. profileEnv (Electron app OAuth token)
 		// 6. apiProfileEnv (Active API profile config - highest priority for ANTHROPIC_* vars)
 		// 7. Our specific overrides
+		// 7bis. providerEnv — le fournisseur de la page (son choix propre, sinon
+		// celui de la liste « Fournisseur IA ») et la clé qui va avec. Sans
+		// cela le runner repartait sur Claude quel que soit le choix affiché.
+		const providerEnv = getPageProviderEnv("ideation");
+
 		const finalEnv = {
 			...process.env,
 			...pythonEnv,
@@ -473,6 +479,7 @@ export class AgentQueueManager {
 			...oauthModeClearVars,
 			...profileEnv,
 			...apiProfileEnv,
+			...providerEnv,
 			PYTHONPATH: combinedPythonPath,
 			PYTHONUNBUFFERED: "1",
 			PYTHONUTF8: "1",
@@ -881,6 +888,11 @@ export class AgentQueueManager {
 		// 5. profileEnv (Electron app OAuth token)
 		// 6. apiProfileEnv (Active API profile config - highest priority for ANTHROPIC_* vars)
 		// 7. Our specific overrides
+		// 7bis. providerEnv — le fournisseur de la page (son choix propre, sinon
+		// celui de la liste « Fournisseur IA ») et la clé qui va avec. Sans
+		// cela le runner repartait sur Claude quel que soit le choix affiché.
+		const providerEnv = getPageProviderEnv("roadmap");
+
 		const finalEnv = {
 			...process.env,
 			...pythonEnv,
@@ -888,6 +900,7 @@ export class AgentQueueManager {
 			...oauthModeClearVars,
 			...profileEnv,
 			...apiProfileEnv,
+			...providerEnv,
 			PYTHONPATH: combinedPythonPath,
 			PYTHONUNBUFFERED: "1",
 			PYTHONUTF8: "1",

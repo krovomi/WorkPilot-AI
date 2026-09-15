@@ -85,9 +85,7 @@ resolver = create_claude_resolver()
 
 # Resolve a conflict
 result = resolver.resolve_conflict(
-    conflict=conflict_region,
-    baseline_code=original_code,
-    task_snapshots=snapshots
+    conflict=conflict_region, baseline_code=original_code, task_snapshots=snapshots
 )
 ```
 
@@ -96,9 +94,11 @@ result = resolver.resolve_conflict(
 ```python
 from merge.ai_resolver import AIResolver
 
+
 def my_ai_function(system: str, user: str) -> str:
     # Your AI integration here
     return ai_response
+
 
 resolver = AIResolver(ai_call_fn=my_ai_function)
 ```
@@ -111,7 +111,7 @@ results = resolver.resolve_multiple_conflicts(
     conflicts=conflict_list,
     baseline_codes=baseline_dict,
     task_snapshots=all_snapshots,
-    batch=True  # Enable batching for efficiency
+    batch=True,  # Enable batching for efficiency
 )
 ```
 

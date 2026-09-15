@@ -563,20 +563,20 @@ class TestFormatGenerationProgress:
 
     def test_prompt_evaluation_is_distinguished_from_generation(self):
         # No token yet: the server is still reading the context.
-        assert "analyse le contexte" in self._line(tokens=0)
+        assert "chargement ou le traitement du contexte" in self._line(tokens=0)
         assert "génère" in self._line(tokens=200, elapsed=60)
 
     def test_generation_reports_count_and_rate(self):
         line = self._line(tokens=300, elapsed=60)
-        assert "300 tokens" in line
-        assert "5,0 tok/s" in line
+        assert "300 fragments" in line
+        assert "5,0 fragments/s" in line
 
     def test_no_token_past_the_stall_threshold_is_a_warning(self):
         # What it must NOT do is guess the cause — see
         # TestPlacementDiagnosis.test_the_stall_line_no_longer_blames_the_context.
         line = self._line(tokens=0, elapsed=_LOCAL_STALL_SECONDS)
         assert line.startswith("⚠️")
-        assert "aucun token" in line
+        assert "aucun fragment" in line
 
     def test_output_that_stopped_is_reported_as_a_stall(self):
         line = self._line(tokens=300, elapsed=900, silent_for=_LOCAL_STALL_SECONDS)
@@ -812,7 +812,7 @@ class TestPlacementDiagnosis:
             silent_for=_LOCAL_STALL_SECONDS,
         )
         assert "OLLAMA_CONTEXT_LENGTH" not in line
-        assert "🧠" in line
+        assert "diagnostic de chargement" in line
 
 
 class TestLoadedModelPlacement:

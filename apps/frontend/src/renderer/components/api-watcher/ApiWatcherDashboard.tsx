@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupApiWatcherListeners,
-	useApiWatcherStore,
-} from "../../stores/api-watcher-store";
+import { useApiWatcherStore } from "../../stores/api-watcher-store";
 import type {
 	ContractChange,
 	ContractDiff,
@@ -27,11 +23,6 @@ export function ApiWatcherDashboard({
 	projectPath,
 }: ApiWatcherDashboardProps): React.ReactElement {
 	const { t } = useTranslation("apiWatcher");
-
-	useEffect(() => {
-		const cleanup = setupApiWatcherListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useApiWatcherStore((s) => s.phase);
 	const status = useApiWatcherStore((s) => s.status);

@@ -1975,6 +1975,13 @@ class OpenAIAgentClient(AgentClient):
         # Usage accumulated across the session's turns
         self.last_usage: dict | None = None
 
+    def set_tool_working_directory(self, directory: str) -> None:
+        """Set relative tool paths without changing the project security boundary."""
+        from core.runtimes.tool_executor import ToolExecutor
+
+        executor = ToolExecutor(self._project_dir, directory)
+        self._tool_working_directory = str(executor.working_directory)
+
     def _get_http_client(self):
         """Lazy-init an aiohttp ClientSession."""
         if self._http_client is None:
@@ -2002,7 +2009,9 @@ class OpenAIAgentClient(AgentClient):
                     get_tool_definitions,
                 )
 
-                self._tool_executor = ToolExecutor(self._project_dir)
+                self._tool_executor = ToolExecutor(
+                    self._project_dir, getattr(self, "_tool_working_directory", None)
+                )
                 self._tool_definitions = get_tool_definitions(self._agent_type)
                 logger.info(
                     f"[OpenAIAgentClient] Tool execution enabled: "
@@ -2012,6 +2021,8 @@ class OpenAIAgentClient(AgentClient):
                 logger.warning(
                     f"[OpenAIAgentClient] Tool executor init failed (text-only mode): {e}"
                 )
+        if getattr(self, "_offline_only", False):
+            return self
         # Bridge configured MCP servers (best-effort) so their tools are exposed
         # alongside the built-in toolset. Never fail client setup on MCP errors.
         try:
@@ -2136,7 +2147,10 @@ class OpenAIAgentClient(AgentClient):
 
             try:
                 async with session.post(
-                    self._api_base, json=payload, headers=request_headers
+                    self._api_base,
+                    json=payload,
+                    headers=request_headers,
+                    allow_redirects=not getattr(self, "_offline_only", False),
                 ) as resp:
                     if resp.status != 200:
                         error_text = await resp.text()
@@ -2704,12 +2718,8 @@ _LOCAL_MAX_CONNECT_RETRIES = 2
 
 # How long one local generation may take. aiohttp's default session timeout is
 # 5 minutes TOTAL, and a large model — llama3.3 is 70B — thinking at a high
-# effort routinely needs longer than that for a single turn on consumer
-# hardware. Inheriting the default meant the request was killed mid-generation
-# and the phase reported a transport error for a model that was working, just
-# slowly. `sock_read` is the meaningful guard: it fires when the server stops
-# sending, which is what "hung" actually means, while `total=None` refuses to
-# put a ceiling on honest slowness.
+# Per-request total, initial-output and generation-idle guards below bound
+# slow/stalled local calls. Socket timeout remains a final transport backstop.
 _LOCAL_CHAT_SOCK_READ_TIMEOUT = 15 * 60
 _LOCAL_CHAT_CONNECT_TIMEOUT = 20
 # How often to say "still generating" while a turn is in flight. Silence and a
@@ -2788,7 +2798,7 @@ def _format_not_loaded_diagnosis(
         f"({loaded}), alors qu'une requête est en cours. Soit les poids sont "
         "encore en cours de lecture depuis le disque — des dizaines de Go pour "
         "un 70B —, soit l'application interroge un autre serveur que votre "
-        f"terminal : comparez avec « OLLAMA_HOST={server_root} ollama ps »."
+        f"terminal : consultez {server_root}/api/ps sur ce même serveur."
     )
 
 
@@ -2848,12 +2858,16 @@ def _merge_native_chunk(acc: dict[str, Any], chunk: dict[str, Any]) -> int:
     """
     message = chunk.get("message") or {}
     text = message.get("content") or ""
+    thinking = message.get("thinking") or ""
     if text:
         acc["content"] = acc.get("content", "") + text
-        acc["tokens"] = acc.get("tokens", 0) + 1
     tool_calls = message.get("tool_calls") or []
     if tool_calls:
         acc.setdefault("tool_calls", []).extend(tool_calls)
+    if text or thinking or tool_calls:
+        # In flight this counts received fragments, not tokenizer tokens.
+        # Exact token usage is reported by eval_count in the final chunk.
+        acc["tokens"] = acc.get("tokens", 0) + 1
     for key in ("prompt_eval_count", "eval_count"):
         value = chunk.get(key)
         if value:
@@ -2862,7 +2876,7 @@ def _merge_native_chunk(acc: dict[str, Any], chunk: dict[str, Any]) -> int:
         acc["done"] = True
     if chunk.get("error"):
         acc["error"] = str(chunk["error"])
-    return len(text)
+    return len(text) + len(thinking) + len(tool_calls)
 
 
 def _format_generation_progress(
@@ -2903,26 +2917,26 @@ def _format_generation_progress(
             # exactly when this line mattered most. The cause is reported
             # separately, once, from what Ollama says it actually loaded.
             return (
-                f"⚠️ {where} — « {model} » : toujours aucun token après "
-                f"{_format_duration_fr(elapsed)}. Le serveur répond mais ne "
-                "produit rien — la ligne 🧠 en début de tour dit pourquoi."
+                f"⚠️ {where} — « {model} » : toujours aucun fragment après "
+                f"{_format_duration_fr(elapsed)}. Le serveur répond mais "
+                "n’a encore envoyé aucun fragment. Consultez le diagnostic de chargement ; "
+                "la cause ne peut pas être déduite de cette attente seule."
             )
         return (
-            f"⏳ {where} — « {model} » analyse le contexte depuis "
-            f"{_format_duration_fr(elapsed)} (aucun token généré pour l'instant)."
+            f"⏳ {where} — « {model} » attend le chargement ou le traitement du contexte depuis "
+            f"{_format_duration_fr(elapsed)} (aucun fragment reçu pour l'instant)."
         )
     if silent_for >= _LOCAL_STALL_SECONDS:
         return (
-            f"⚠️ {where} — « {model} » : {tokens} tokens générés puis plus rien "
+            f"⚠️ {where} — « {model} » : {tokens} fragments générés puis plus rien "
             f"depuis {_format_duration_fr(silent_for)}. La requête sera "
-            f"abandonnée après {_format_duration_fr(_LOCAL_CHAT_SOCK_READ_TIMEOUT)} "
-            "de silence."
+            "interrompue si la limite de silence configurée est atteinte."
         )
     rate = tokens / elapsed if elapsed > 0 else 0.0
     return (
-        f"⏳ {where} — « {model} » génère : {tokens} tokens en "
+        f"⏳ {where} — « {model} » génère : {tokens} fragments en "
         f"{_format_duration_fr(elapsed)} "
-        f"(~{f'{rate:.1f}'.replace('.', ',')} tok/s)."
+        f"(~{f'{rate:.1f}'.replace('.', ',')} fragments/s)."
     )
 
 
@@ -2962,6 +2976,10 @@ def _next_no_tool_action(
     return "give_up"
 
 
+class LocalModelRuntimeError(RuntimeError):
+    """Terminal local generation failure: changing configuration is required."""
+
+
 class LocalAgentClient(OpenAIAgentClient):
     """Agent client for any OpenAI-compatible **local** LLM server.
 
@@ -2984,10 +3002,20 @@ class LocalAgentClient(OpenAIAgentClient):
         project_dir: str | None = None,
         agent_type: str = "coder",
         base_url: str | None = None,
+        api_format: str = "ollama",
+        offline_only: bool = False,
         reasoning_effort: str | None = None,  # accepted for parity; unused locally
         prompt_cache_key: str | None = None,  # accepted for parity; unused locally
     ):
         import os as _os
+
+        from ollama_model_detector import is_embedding_model
+
+        if is_embedding_model(model or ""):
+            raise ValueError(
+                f"Model {model!r} is an embedding model and cannot run agent tasks. "
+                "Select a text-generation model with tool support."
+            )
 
         super().__init__(
             model=model or "llama3.3",
@@ -3007,10 +3035,18 @@ class LocalAgentClient(OpenAIAgentClient):
             or "local"
         )
         self._api_base = _resolve_local_base_url(base_url)
+        self._api_format = api_format
+        self._offline_only = offline_only
         # A large local model in non-streaming mode can legitimately take
         # minutes to produce a full completion; the aiohttp default (5 min)
         # would cut healthy slow turns. Generous, env-overridable ceiling.
         self._request_timeout = _env_float("LOCAL_LLM_REQUEST_TIMEOUT", 600.0)
+        self._initial_output_timeout = _env_float(
+            "LOCAL_LLM_INITIAL_OUTPUT_TIMEOUT", 300.0
+        )
+        self._generation_idle_timeout = _env_float(
+            "LOCAL_LLM_GENERATION_IDLE_TIMEOUT", 120.0
+        )
         # Context window, resolved once per session from the real prompt size
         # (see _resolve_num_ctx) and then held stable: Ollama reloads the model
         # whenever num_ctx changes, so varying it per turn costs a full reload.
@@ -3397,6 +3433,10 @@ class LocalAgentClient(OpenAIAgentClient):
         automatique en cours" for the whole download with no way to tell a live
         pull from a hung one. Never raises.
         """
+        if self._offline_only:
+            yield "error", "Offline mode blocks automatic model downloads"
+            return
+
         import json as _json
         import time as _time
 
@@ -3487,6 +3527,11 @@ class LocalAgentClient(OpenAIAgentClient):
         objects, tool results use ``role: "tool"``), so multi-turn tool calling
         round-trips correctly.
         """
+        if self._api_format == "openai":
+            async for message in super().receive_response():
+                yield message
+            return
+
         import json as _json
 
         if not self._pending_query:
@@ -3647,10 +3692,11 @@ class LocalAgentClient(OpenAIAgentClient):
                     async with session.post(
                         url,
                         json=turn_payload,
+                        allow_redirects=False,
                         # Overrides the session's 5-minute default; see
                         # _LOCAL_CHAT_SOCK_READ_TIMEOUT.
                         timeout=_aiohttp.ClientTimeout(
-                            total=None,
+                            total=self._request_timeout,
                             sock_connect=_LOCAL_CHAT_CONNECT_TIMEOUT,
                             sock_read=_LOCAL_CHAT_SOCK_READ_TIMEOUT,
                         ),
@@ -3672,6 +3718,8 @@ class LocalAgentClient(OpenAIAgentClient):
                                 continue
                             if _merge_native_chunk(sink, chunk):
                                 sink["last_output_at"] = _time.monotonic()
+                            if sink.get("done") or sink.get("error"):
+                                break
 
                 # A local model can work for minutes with nothing to show. The
                 # heartbeat reports what the reader has actually accumulated —
@@ -3679,74 +3727,99 @@ class LocalAgentClient(OpenAIAgentClient):
                 # a slow run and a wedged one no longer print the same line.
                 request = _asyncio.ensure_future(_post_chat())
                 started_at = _time.monotonic()
-                while True:
-                    finished, _pending = await _asyncio.wait(
-                        {request}, timeout=_LOCAL_HEARTBEAT_SECONDS
-                    )
-                    if finished:
-                        break
-                    now = _time.monotonic()
-                    elapsed = int(now - started_at)
-                    # On the first heartbeat that has nothing to show, ask the
-                    # server where it put the model. At 30 seconds, not at five
-                    # minutes: a model running on the CPU is knowable as soon as
-                    # it is loaded, and the four wasted minutes were the point of
-                    # the complaint. Latched only once an answer comes back —
-                    # the model may still be loading on the first pass — and
-                    # never retried after that: it cannot change while the model
-                    # stays resident, and a heartbeat must not become a poller.
-                    if not placement_reported and not acc.get("tokens"):
-                        placement = self._loaded_model_placement()
-                        if placement and placement["loaded"]:
-                            placement_reported = True
-                            logger.info(
-                                "[LocalAgentClient] %s loaded with "
-                                "%d/%d bytes in VRAM.",
-                                self.model,
-                                placement["size_vram"],
-                                placement["size"],
-                            )
-                            yield _system_text(
-                                _format_placement_diagnosis(
-                                    self.model,
-                                    size=placement["size"],
-                                    size_vram=placement["size_vram"],
-                                    parameter_size=placement["parameter_size"],
-                                )
-                            )
-                        elif placement and elapsed >= _LOCAL_NOT_LOADED_GRACE:
-                            # Not resident yet. Said once, and only after a grace
-                            # period, because a model genuinely being read off
-                            # disk occupies this state for a while and a warning
-                            # on the first heartbeat would cry wolf every run.
-                            placement_reported = True
-                            logger.warning(
-                                "[LocalAgentClient] %s is not loaded on %s after "
-                                "%ds; loaded there: %s",
-                                self.model,
-                                self._server_root(),
-                                elapsed,
-                                placement["others"] or "none",
-                            )
-                            yield _system_text(
-                                _format_not_loaded_diagnosis(
-                                    self.model,
-                                    server_root=self._server_root(),
-                                    others=placement["others"],
-                                )
-                            )
-                    yield _system_text(
-                        _format_generation_progress(
-                            self.model,
-                            turn=turn + 1,
-                            max_turns=self.max_turns,
-                            elapsed=elapsed,
-                            tokens=int(acc.get("tokens", 0)),
-                            silent_for=int(now - acc["last_output_at"]),
-                            streaming=stream_chunks,
+                try:
+                    while True:
+                        finished, _pending = await _asyncio.wait(
+                            {request}, timeout=_LOCAL_HEARTBEAT_SECONDS
                         )
-                    )
-                request.result()  # re-raise transport failures below
+                        if finished:
+                            break
+                        now = _time.monotonic()
+                        elapsed = int(now - started_at)
+                        has_output = bool(acc.get("tokens") or acc.get("tool_calls"))
+                        silence_limit = (
+                            self._generation_idle_timeout
+                            if has_output and stream_chunks
+                            else self._initial_output_timeout
+                        )
+                        if (
+                            now - started_at >= self._request_timeout
+                            or now - acc["last_output_at"] >= silence_limit
+                        ):
+                            raise LocalModelRuntimeError(
+                                f"Génération locale interrompue pour « {self.model} » : délai dépassé "
+                                f"({int(now - started_at)} s, {int(now - acc['last_output_at'])} s sans sortie). "
+                                "Choisissez un modèle plus petit ou vérifiez les ressources du serveur, puis relancez."
+                            )
+                        # On the first heartbeat that has nothing to show, ask the
+                        # server where it put the model. At 30 seconds, not at five
+                        # minutes: a model running on the CPU is knowable as soon as
+                        # it is loaded, and the four wasted minutes were the point of
+                        # the complaint. Latched only once an answer comes back —
+                        # the model may still be loading on the first pass — and
+                        # never retried after that: it cannot change while the model
+                        # stays resident, and a heartbeat must not become a poller.
+                        if not placement_reported:
+                            placement = self._loaded_model_placement()
+                            if placement and placement["loaded"]:
+                                placement_reported = True
+                                logger.info(
+                                    "[LocalAgentClient] %s loaded with "
+                                    "%d/%d bytes in VRAM.",
+                                    self.model,
+                                    placement["size_vram"],
+                                    placement["size"],
+                                )
+                                yield _system_text(
+                                    _format_placement_diagnosis(
+                                        self.model,
+                                        size=placement["size"],
+                                        size_vram=placement["size_vram"],
+                                        parameter_size=placement["parameter_size"],
+                                    )
+                                )
+                            elif placement and elapsed >= _LOCAL_NOT_LOADED_GRACE:
+                                # Not resident yet. Said once, and only after a grace
+                                # period, because a model genuinely being read off
+                                # disk occupies this state for a while and a warning
+                                # on the first heartbeat would cry wolf every run.
+                                placement_reported = True
+                                logger.warning(
+                                    "[LocalAgentClient] %s is not loaded on %s after "
+                                    "%ds; loaded there: %s",
+                                    self.model,
+                                    self._server_root(),
+                                    elapsed,
+                                    placement["others"] or "none",
+                                )
+                                yield _system_text(
+                                    _format_not_loaded_diagnosis(
+                                        self.model,
+                                        server_root=self._server_root(),
+                                        others=placement["others"],
+                                    )
+                                )
+                        yield _system_text(
+                            _format_generation_progress(
+                                self.model,
+                                turn=turn + 1,
+                                max_turns=self.max_turns,
+                                elapsed=elapsed,
+                                tokens=int(acc.get("tokens", 0)),
+                                silent_for=int(now - acc["last_output_at"]),
+                                streaming=stream_chunks,
+                            )
+                        )
+                    request.result()  # re-raise transport failures below
+                finally:
+                    if not request.done():
+                        request.cancel()
+                        try:
+                            await request
+                        except _asyncio.CancelledError:
+                            # Expected after request.cancel(): await reader cleanup
+                            # without replacing the original failure or cancellation.
+                            pass
 
                 status = acc.get("status") or 0
                 if status != 200:
@@ -3822,8 +3895,9 @@ class LocalAgentClient(OpenAIAgentClient):
                     logger.error(
                         f"[LocalAgentClient] API error ({status}): {error_text[:500]}"
                     )
-                    yield _system_text(f"Ollama API error ({status}): {error_text}")
-                    return
+                    raise LocalModelRuntimeError(
+                        f"Ollama API error ({status}): {error_text}"
+                    )
                 # Ollama can also report a failure mid-stream, with HTTP 200
                 # already sent. Surface it the same way rather than treating the
                 # truncated content as a finished turn.
@@ -3831,8 +3905,11 @@ class LocalAgentClient(OpenAIAgentClient):
                     logger.error(
                         "[LocalAgentClient] Stream error: %s", acc["error"][:500]
                     )
-                    yield _system_text(f"Ollama API error: {acc['error']}")
-                    return
+                    raise LocalModelRuntimeError(f"Ollama API error: {acc['error']}")
+                if not acc.get("done"):
+                    raise LocalModelRuntimeError(
+                        "Ollama a fermé le flux avant la fin de la réponse."
+                    )
                 data = {
                     "message": {
                         "content": acc.get("content", ""),
@@ -3847,7 +3924,8 @@ class LocalAgentClient(OpenAIAgentClient):
                 # times with backoff before declaring it down, so a healthy but
                 # momentarily-unavailable Ollama doesn't surface "ne répond pas".
                 if (
-                    self._is_connection_error(e)
+                    not isinstance(e, (TimeoutError, LocalModelRuntimeError))
+                    and self._is_connection_error(e)
                     and connect_retries < _LOCAL_MAX_CONNECT_RETRIES
                 ):
                     import asyncio as _asyncio
@@ -3864,16 +3942,14 @@ class LocalAgentClient(OpenAIAgentClient):
                     await _asyncio.sleep(1.5 * connect_retries)
                     continue
                 logger.error(f"[LocalAgentClient] Request failed: {e}")
-                yield AgentMessage(
-                    role=MessageRole.SYSTEM,
-                    content=[
-                        ContentBlock(
-                            type=ContentBlockType.TEXT,
-                            text=self._describe_request_error(e),
-                        )
-                    ],
+                if isinstance(e, LocalModelRuntimeError):
+                    raise
+                detail = (
+                    self._describe_request_error(e) or "délai de génération dépassé"
                 )
-                return
+                raise LocalModelRuntimeError(
+                    f"Génération locale interrompue : {detail}"
+                ) from e
 
             # Reached the server this turn — clear the transient-failure counter.
             connect_retries = 0

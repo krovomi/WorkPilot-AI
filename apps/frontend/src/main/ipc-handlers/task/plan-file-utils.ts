@@ -269,6 +269,7 @@ export function persistPlanStatusAndReasonSync(
 	projectId?: string,
 	xstateState?: string,
 	executionPhase?: string,
+	errorMessage?: string,
 ): boolean {
 	try {
 		let plan: Record<string, unknown>;
@@ -301,6 +302,11 @@ export function persistPlanStatusAndReasonSync(
 		if (executionPhase) {
 			plan.executionPhase = executionPhase;
 		}
+		// The failure message follows the status it explains. Written on every
+		// call — including as `undefined`, which clears it — so a task that
+		// leaves the error state does not keep showing the previous run's
+		// failure next to a green badge.
+		plan.errorMessage = errorMessage;
 		plan.updated_at = new Date().toISOString();
 
 		writeFileSync(planPath, JSON.stringify(plan, null, 2), "utf-8");

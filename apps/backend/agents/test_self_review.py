@@ -95,7 +95,10 @@ class TestComputeDiffSummary:
         # Force a huge fake diff via monkeypatching the git wrapper.
         from agents import self_review as sr
 
-        def fake_git(args, cwd):
+        # `for_model` is the opt-in that routes an excerpt through rtk; the
+        # stub accepts it because it stands in for the one wrapper, whichever
+        # way a caller asks for the output.
+        def fake_git(args, cwd, *, for_model=False):
             if args == ["rev-parse", "--is-inside-work-tree"]:
                 return 0, "true\n", ""
             if args == ["diff", "HEAD", "--name-only"]:

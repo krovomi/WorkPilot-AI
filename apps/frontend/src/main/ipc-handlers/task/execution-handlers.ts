@@ -63,12 +63,19 @@ import {
 	buildChangeRequestSubtask,
 	addChangeRequestSubtaskToPlan,
 } from "./plan-file-utils";
+import {
+	clearPauseState,
+	existingSpecDirs,
+	type PauseStateRecord,
+	writePauseState,
+} from "./pause-state-utils";
 import { findTaskAndProject } from "./shared";
 import { extractPrCreationError } from "./pr-error-utils";
 import { stripHtml } from "../shared/sanitize";
 import {
 	buildPhaseRerunPlanUpdate,
 	downstreamLogPhases,
+	startPhaseRerun,
 	type RerunPhase,
 } from "./plan-rerun-utils";
 
@@ -129,7 +136,10 @@ function recordReviewVerdictForLearning(
 			);
 		}
 	} catch (err) {
-		console.warn("[TASK_UPDATE_STATUS] Learning outcome recording failed:", err);
+		console.warn(
+			"[TASK_UPDATE_STATUS] Learning outcome recording failed:",
+			err,
+		);
 	}
 }
 
@@ -143,7 +153,10 @@ function convertTaskMetadataToSpecCreation(metadata?: any): any {
 
 	return {
 		requireReviewBeforeCoding: metadata.requireReviewBeforeCoding,
-		provider: metadata.provider,
+		provider:
+			metadata.phaseProviders?.planning ||
+			metadata.phaseProviders?.spec ||
+			metadata.provider,
 		isAutoProfile: metadata.isAutoProfile,
 		phaseModels: convertPhaseModelConfig(metadata.phaseModels),
 		phaseThinking: convertPhaseThinkingConfig(metadata.phaseThinking),
@@ -817,7 +830,8 @@ export function registerTaskExecutionHandlers(
 			if (!existsSync(sessionFile)) {
 				return {
 					success: false,
-					error: "No persisted SDK session found for this task — run it once first.",
+					error:
+						"No persisted SDK session found for this task — run it once first.",
 				};
 			}
 
@@ -885,20 +899,11 @@ export function registerTaskExecutionHandlers(
 		// Clear any cooperative-pause flag so a stopped task isn't left looking
 		// "paused" after it transitions out (e.g. to human_review).
 		try {
-			const planPaths = getPlanPaths(getSpecPaths(task, project), project);
-			for (const planFile of planPaths.all) {
-				if (!existsSync(planFile)) continue;
-				const plan = JSON.parse(readFileSync(planFile, "utf-8"));
-				if (plan.paused?.enabled) {
-					plan.paused = {
-						...plan.paused,
-						enabled: false,
-						paused_at: null,
-						paused_subtask_id: null,
-					};
-					writeFileSync(planFile, JSON.stringify(plan, null, 2));
-				}
-			}
+			const specPaths = getSpecPaths(task, project);
+			clearPauseState(
+				allSpecDirs(specPaths),
+				getPlanPaths(specPaths, project).all,
+			);
 		} catch (err) {
 			appLog.warn(`[TASK_STOP] Could not clear pause flag for ${taskId}:`, err);
 		}
@@ -1324,8 +1329,7 @@ export function registerTaskExecutionHandlers(
 			if (status === "done") {
 				// If a PR already exists for this task, skip PR creation
 				// (e.g. task moved out of "done" column and back in)
-				const existingPrUrl =
-					task.prUrl || task.metadata?.prUrl;
+				const existingPrUrl = task.prUrl || task.metadata?.prUrl;
 				if (existingPrUrl) {
 					console.warn(
 						`[TASK_UPDATE_STATUS] PR already exists for task ${taskId}: ${existingPrUrl} — skipping creation`,
@@ -1648,7 +1652,10 @@ print(json.dumps(result))
 
 					// Check git status before auto-starting
 					const gitStatusCheckForQa = checkGitStatus(project.path);
-					if (!gitStatusCheckForQa.isGitRepo || !gitStatusCheckForQa.hasCommits) {
+					if (
+						!gitStatusCheckForQa.isGitRepo ||
+						!gitStatusCheckForQa.hasCommits
+					) {
 						console.warn(
 							"[TASK_UPDATE_STATUS] Git check failed, cannot start QA validation",
 						);
@@ -1998,38 +2005,19 @@ print(json.dumps(result))
 			const specPaths = getSpecPaths(task, project);
 
 			// Distinct spec dirs (worktree + main) that may hold a backend copy.
-			const specDirs = [
-				specPaths.specDir,
-				specPaths.mainSpecDir,
-				specPaths.worktreeSpecDir,
-			].filter(
-				(d, i, arr): d is string =>
-					!!d && existsSync(d) && arr.indexOf(d) === i,
-			);
+			const specDirs = allSpecDirs(specPaths);
 
 			try {
-				// 1. Clear the pause flag on every plan copy so the restarted
-				//    backend doesn't immediately re-pause at the next iteration.
+				// 1. Lift the pause so the restarted backend doesn't immediately
+				//    re-pause at its next checkpoint. Nothing else about the build
+				//    is reset: the completed subtasks, the spec and the QA sign-off
+				//    stay exactly as they are, so switching provider resumes the
+				//    work instead of paying for it twice.
 				const planPaths = getPlanPaths(specPaths, project);
-				for (const planFile of planPaths.all) {
-					if (!existsSync(planFile)) continue;
-					try {
-						const plan = JSON.parse(readFileSync(planFile, "utf-8"));
-						plan.paused = {
-							enabled: false,
-							paused_at: null,
-							paused_subtask_id: null,
-							provider,
-							...(chosenModel ? { model: chosenModel } : {}),
-						};
-						writeFileSync(planFile, JSON.stringify(plan, null, 2));
-					} catch (err) {
-						appLog.warn(
-							`[TASK_RESUME_WITH_PROVIDER] Could not clear pause in ${planFile}:`,
-							err,
-						);
-					}
-				}
+				clearPauseState(specDirs, planPaths.all, {
+					provider,
+					model: chosenModel ?? null,
+				});
 
 				// 2. Persist provider + model to task_metadata.json so the backend
 				//    resolves the chosen model (phase_config._resolve_single_model
@@ -2202,14 +2190,7 @@ print(json.dumps(result))
 				await new Promise<void>((resolve) => setTimeout(resolve, 500));
 
 				const specPaths = getSpecPaths(task, project);
-				const specDirs = [
-					specPaths.specDir,
-					specPaths.mainSpecDir,
-					specPaths.worktreeSpecDir,
-				].filter(
-					(d, i, arr): d is string =>
-						!!d && existsSync(d) && arr.indexOf(d) === i,
-				);
+				const specDirs = allSpecDirs(specPaths);
 
 				// 2. Rewind the plan (every copy) to before `phase`.
 				const planPaths = getPlanPaths(specPaths, project);
@@ -2227,7 +2208,7 @@ print(json.dumps(result))
 					atomicWriteFileSync(planFile, JSON.stringify(plan, null, 2));
 					planWritten = true;
 				}
-				if (!planWritten) {
+				if (!planWritten && phase !== "planning") {
 					return {
 						success: false,
 						error:
@@ -2249,6 +2230,7 @@ print(json.dumps(result))
 					"LOCAL_MODEL_NO_TOOLS_HALT",
 					"PAUSE",
 					"RESUME_WITH_PROVIDER",
+					"HOT_SWAP.json",
 				];
 				for (const dir of specDirs) {
 					for (const name of markerNames) {
@@ -2260,6 +2242,15 @@ print(json.dumps(result))
 					}
 				}
 
+				// The cooperative pause lives in pause_state.json, not in the plan,
+				// so rewinding the plan does not lift it. Left set, the restarted
+				// build stops again at its first checkpoint and the re-run looks
+				// like it did nothing.
+				clearPauseState(specDirs, planPaths.all, {
+					provider: task.metadata?.provider ?? null,
+					model: task.metadata?.model ?? null,
+				});
+
 				projectStore.invalidateTasksCache(project.id);
 				if (task.metadata?.paused) task.metadata.paused.enabled = false;
 
@@ -2267,16 +2258,34 @@ print(json.dumps(result))
 				//    worktree if it was cleaned up.
 				const baseBranch =
 					task.metadata?.baseBranch || project.settings?.mainBranch;
-				await agentManager.startTaskExecution(
-					taskId,
-					project.path,
-					task.specId,
-					{
-						useWorktree: task.metadata?.useWorktree !== false,
-						baseBranch,
+				const specDir = specPaths.specDir;
+				await startPhaseRerun(phase, {
+					spec: async () => {
+						fileWatcher.watch(taskId, specDir);
+						await agentManager.startSpecCreation(
+							taskId,
+							project.path,
+							task.description || task.title,
+							specDir,
+							convertTaskMetadataToSpecCreation(task.metadata),
+							baseBranch,
+							project.id,
+						);
 					},
-					project.id,
-				);
+					execution: async () => {
+						await agentManager.startTaskExecution(
+							taskId,
+							project.path,
+							task.specId,
+							{
+								useWorktree: task.metadata?.useWorktree !== false,
+								baseBranch,
+							},
+							project.id,
+						);
+					},
+					isRunning: () => agentManager.isRunning(taskId),
+				});
 
 				appLog.info(
 					`[TASK_RERUN_PHASE] task=${taskId} phase=${phase} ` +
@@ -2284,14 +2293,24 @@ print(json.dumps(result))
 				);
 				return { success: true };
 			} catch (err) {
+				fileWatcher.unwatch(taskId);
+				const failedPaths = getPlanPaths(getSpecPaths(task, project), project);
+				for (const planFile of failedPaths.all) {
+					await persistPlanStatus(planFile, "human_review", project.id);
+				}
+				getMainWindow()?.webContents.send(
+					IPC_CHANNELS.TASK_STATUS_CHANGE,
+					taskId,
+					"human_review",
+					project.id,
+				);
 				appLog.error(
 					`[TASK_RERUN_PHASE] Failed for task ${taskId} phase ${phase}:`,
 					err,
 				);
 				return {
 					success: false,
-					error:
-						err instanceof Error ? err.message : "Failed to re-run phase",
+					error: err instanceof Error ? err.message : "Failed to re-run phase",
 				};
 			}
 		},
@@ -2348,7 +2367,10 @@ print(json.dumps(result))
 						atomicWriteFileSync(path.join(dir, "HOT_SWAP.json"), payload);
 						wrote = true;
 					} catch (err) {
-						appLog.warn(`[TASK_HOT_SWAP] Could not write marker in ${dir}:`, err);
+						appLog.warn(
+							`[TASK_HOT_SWAP] Could not write marker in ${dir}:`,
+							err,
+						);
 					}
 				}
 				if (!wrote) {
@@ -2451,7 +2473,11 @@ print(json.dumps(result))
 					"LOCAL_MODEL_NO_TOOLS_HALT",
 				);
 				let removed = 0;
-				for (const target of [conversationLog, haltMarker, localNoToolsMarker]) {
+				for (const target of [
+					conversationLog,
+					haltMarker,
+					localNoToolsMarker,
+				]) {
 					if (existsSync(target)) {
 						unlinkSync(target);
 						removed++;
@@ -3316,90 +3342,122 @@ print(json.dumps(result))
 			if (!updatedPlan) {
 				return {
 					success: false,
-					error:
-						"Failed to update plan - file may not exist or be corrupted",
+					error: "Failed to update plan - file may not exist or be corrupted",
 				};
 			}
 
-			appLog.info(`[TASK_UPDATE_PLAN] Successfully updated plan for task ${taskId}`);
+			appLog.info(
+				`[TASK_UPDATE_PLAN] Successfully updated plan for task ${taskId}`,
+			);
 			return { success: true };
 		},
 	);
 
 	/**
-	 * Pause task execution
-	 * Saves current state so execution can resume later
+	 * The phase a running task is in, as the backend would name it.
+	 *
+	 * Recorded on the pause so the resume can say where it will pick up, and so
+	 * the backend's checkpoint prints the phase the user actually paused rather
+	 * than guessing from whichever loop noticed the flag first.
+	 */
+	function currentPausePhase(
+		task: Task,
+		specPaths: ReturnType<typeof getSpecPaths>,
+	): string {
+		switch (task.executionProgress?.phase) {
+			case "planning":
+				// "planning" covers two different backends: the spec pipeline,
+				// which runs before any plan exists, and the planner agent, which
+				// writes one. The plan file is what tells them apart.
+				return existsSync(
+					path.join(specPaths.specDir, AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN),
+				)
+					? "planning"
+					: "spec";
+			case "qa_review":
+				return "qa_review";
+			case "qa_fixing":
+				return "qa_fixing";
+			default:
+				return task.status === "ai_review" ? "qa_review" : "coding";
+		}
+	}
+
+	/**
+	 * Every spec directory copy of this task — main project and worktree.
+	 *
+	 * The running backend reads the pause flag from its *own* copy, which for a
+	 * worktree build is the one inside the worktree. Writing only the main one
+	 * is how a pause could be requested and never noticed.
+	 */
+	function allSpecDirs(specPaths: ReturnType<typeof getSpecPaths>): string[] {
+		return existingSpecDirs([
+			specPaths.specDir,
+			specPaths.mainSpecDir,
+			specPaths.worktreeSpecDir,
+		]);
+	}
+
+	/**
+	 * Pause task execution, at whatever phase it is in.
+	 *
+	 * The flag goes to `pause_state.json`, not into `implementation_plan.json`:
+	 * that file does not exist during spec creation or planning, so the previous
+	 * version answered "Implementation plan not found" for a task the user could
+	 * see running. The backend reads the same file from its coder loop, its QA
+	 * loop and its spec pipeline, so one Pause click stops all three.
 	 */
 	ipcMain.handle(
 		"TASK_PAUSE",
-		async (
-			_,
-			taskId: string,
-			subtaskId?: string,
-		): Promise<IPCResult> => {
+		async (_, taskId: string, subtaskId?: string): Promise<IPCResult> => {
 			try {
 				const { task, project } = findTaskAndProject(taskId);
 				if (!task || !project) {
 					return { success: false, error: "Task not found" };
 				}
 
-				// The running backend reads the pause flag from its own plan copy.
-				// For worktree tasks that's the worktree's implementation_plan.json,
-				// NOT the main repo's — so we must write the flag to every existing
-				// copy or the cooperative stop in the coder loop never fires.
 				const specPaths = getSpecPaths(task, project);
-				const planPaths = getPlanPaths(specPaths, project);
+				const specDirs = allSpecDirs(specPaths);
+				if (specDirs.length === 0) {
+					return { success: false, error: "Spec directory not found" };
+				}
 
-				const pausedState = {
+				const phase = currentPausePhase(task, specPaths);
+				const pausedState: PauseStateRecord = {
 					enabled: true,
 					paused_at: new Date().toISOString(),
-					paused_subtask_id: subtaskId || null,
-					provider: task.metadata?.provider || "anthropic",
-					model: task.metadata?.model || "claude-opus-4-7",
+					paused_phase: phase,
+					paused_subtask_id:
+						subtaskId ?? task.executionProgress?.currentSubtask ?? null,
+					provider: task.metadata?.provider ?? null,
+					model: task.metadata?.model ?? null,
 				};
 
-				let written = 0;
-				for (const planFile of planPaths.all) {
-					if (!existsSync(planFile)) continue;
-					try {
-						const plan = JSON.parse(readFileSync(planFile, "utf-8"));
-						plan.paused = pausedState;
-						writeFileSync(planFile, JSON.stringify(plan, null, 2));
-						written++;
-					} catch (err) {
-						appLog.warn(
-							`[TASK_PAUSE] Could not update plan copy ${planFile}:`,
-							err,
-						);
-					}
-				}
+				const written = writePauseState(specDirs, pausedState);
 
 				if (written === 0) {
-					return {
-						success: false,
-						error: "Implementation plan not found",
-					};
+					return { success: false, error: "Could not write pause state" };
 				}
 
-				// Re-scan so the scanner surfaces plan.paused on task.metadata; the
+				// Re-scan so the scanner surfaces the pause on task.metadata; the
 				// UI uses that to switch the controls into the paused state.
 				projectStore.invalidateTasksCache(project.id);
 
-				// Immediate pause: stop the running subprocess NOW rather than waiting
-				// for the backend to reach the next cooperative checkpoint (end of the
-				// current step). haltTask marks the spawn as killed (its exit handler
-				// returns early WITHOUT emitting "exit" — no PROCESS_EXITED/USER_STOPPED,
-				// so the card keeps its current column) AND unregisters the task from the
-				// OperationRegistry so the proactive profile-swap / usage monitor can't
-				// resurrect the paused process when a token limit is hit. The paused flag
-				// written above drives the UI and a clean resume (the in-flight step
-				// re-runs, re-registering the task).
+				// Immediate pause: stop the running subprocess NOW rather than
+				// waiting for the backend to reach its next cooperative checkpoint
+				// (which, mid-session, can be a long way off). haltTask marks the
+				// spawn as killed (its exit handler returns early WITHOUT emitting
+				// "exit" — no PROCESS_EXITED/USER_STOPPED, so the card keeps its
+				// current column) AND unregisters the task from the
+				// OperationRegistry so the proactive profile-swap / usage monitor
+				// cannot resurrect the paused process when a token limit is hit.
+				// The flag written above drives the UI and a clean resume.
 				const wasRunning = agentManager.haltTask(taskId);
 
 				appLog.info(
-					`[TASK_PAUSE] Task ${taskId} paused immediately at subtask ` +
-						`${subtaskId || "none"} (${written} plan cop[y/ies]); ` +
-						`subprocess ${wasRunning ? "killed" : "was not running"}.`,
+					`[TASK_PAUSE] Task ${taskId} paused during ${phase} at subtask ` +
+						`${pausedState.paused_subtask_id ?? "none"} (${written} spec ` +
+						`dir(s)); subprocess ${wasRunning ? "killed" : "was not running"}.`,
 				);
 
 				return {
@@ -3408,7 +3466,8 @@ print(json.dumps(result))
 						taskId,
 						paused: true,
 						pausedAt: pausedState.paused_at,
-						planCopies: written,
+						pausedPhase: phase,
+						specDirs: written,
 					},
 				};
 			} catch (error) {
@@ -3419,8 +3478,13 @@ print(json.dumps(result))
 	);
 
 	/**
-	 * Resume task execution
-	 * Continues from the paused checkpoint
+	 * Resume a paused task from where it stopped.
+	 *
+	 * Clearing the flag is all the phase routing this needs: `run.py` re-enters
+	 * the pipeline and reads what is on disk — no plan means planning runs
+	 * again, an incomplete plan means coding resumes at the first unfinished
+	 * subtask, a complete one means QA. Naming a phase here would be a second
+	 * opinion about a question the spec directory already answers.
 	 */
 	ipcMain.handle(
 		"TASK_RESUME",
@@ -3431,28 +3495,22 @@ print(json.dumps(result))
 					return { success: false, error: "Task not found" };
 				}
 
-				const planPath = getPlanPath(project, task);
-				if (!existsSync(planPath)) {
-					return { success: false, error: "Implementation plan not found" };
+				const specPaths = getSpecPaths(task, project);
+				const specDirs = allSpecDirs(specPaths);
+				if (specDirs.length === 0) {
+					return { success: false, error: "Spec directory not found" };
 				}
 
-				const planContent = readFileSync(planPath, "utf-8");
-				const plan = JSON.parse(planContent);
+				const pausedPhase = task.metadata?.paused?.paused_phase;
+				clearPauseState(specDirs, getPlanPaths(specPaths, project).all, {
+					provider: task.metadata?.provider ?? null,
+					model: task.metadata?.model ?? null,
+				});
 
-				// Clear pause state
-				plan.paused = {
-					enabled: false,
-					paused_at: null,
-					paused_subtask_id: null,
-					provider: plan.paused?.provider || "anthropic",
-					model: plan.paused?.model || "claude-opus-4-7",
-				};
+				projectStore.invalidateTasksCache(project.id);
 
-				writeFileSync(planPath, JSON.stringify(plan, null, 2));
-				appLog.info(`[TASK_RESUME] Task ${taskId} resumed`);
-
-				// Start execution from pause checkpoint
-				const baseBranch = task.metadata?.baseBranch || project.settings?.mainBranch;
+				const baseBranch =
+					task.metadata?.baseBranch || project.settings?.mainBranch;
 
 				agentManager.startTaskExecution(
 					taskId,
@@ -3468,9 +3526,13 @@ print(json.dumps(result))
 					project.id,
 				);
 
+				appLog.info(
+					`[TASK_RESUME] Task ${taskId} resumed (paused during ${pausedPhase ?? "unknown phase"})`,
+				);
+
 				return {
 					success: true,
-					data: { taskId, resumed: true },
+					data: { taskId, resumed: true, resumedPhase: pausedPhase ?? null },
 				};
 			} catch (error) {
 				appLog.error("[TASK_RESUME] Error:", error);

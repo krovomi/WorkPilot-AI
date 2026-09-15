@@ -715,6 +715,7 @@ export const createTaskAPI = (): TaskAPI => ({
 			status: TaskStatus,
 			projectId?: string,
 			reviewReason?: ReviewReason,
+			errorMessage?: string,
 		) => void,
 	): (() => void) => {
 		const handler = (
@@ -723,8 +724,9 @@ export const createTaskAPI = (): TaskAPI => ({
 			status: TaskStatus,
 			projectId?: string,
 			reviewReason?: ReviewReason,
+			errorMessage?: string,
 		): void => {
-			callback(taskId, status, projectId, reviewReason);
+			callback(taskId, status, projectId, reviewReason, errorMessage);
 		};
 		ipcRenderer.on(IPC_CHANNELS.TASK_STATUS_CHANGE, handler);
 		return () => {

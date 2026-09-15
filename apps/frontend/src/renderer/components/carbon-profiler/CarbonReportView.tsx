@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupCarbonProfilerListeners,
-	useCarbonProfilerStore,
-} from "../../stores/carbon-profiler-store";
+import { useCarbonProfilerStore } from "../../stores/carbon-profiler-store";
 import type { CarbonReport } from "../../../shared/types/carbon-profiler";
 
 interface CarbonReportViewProps {
@@ -15,11 +11,6 @@ export function CarbonReportView({
 	projectPath,
 }: CarbonReportViewProps): React.ReactElement {
 	const { t } = useTranslation("carbonProfiler");
-
-	useEffect(() => {
-		const cleanup = setupCarbonProfilerListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useCarbonProfilerStore((s) => s.phase);
 	const status = useCarbonProfilerStore((s) => s.status);

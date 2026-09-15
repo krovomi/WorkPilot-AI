@@ -4,12 +4,14 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	calculateOverallProgress,
 	calculateProgress,
 	countSubtasksByStatus,
 	determineOverallStatus,
 	estimateRemainingTime,
 	formatProgressString,
 	isTaskEffectivelyComplete,
+	resolveOverallProgress,
 } from "../progress";
 import type { Subtask, SubtaskStatus } from "../types";
 
@@ -314,5 +316,54 @@ describe("estimateRemainingTime", () => {
 
 		// Should be a small positive number or 0, not negative
 		expect(remaining).toBeGreaterThanOrEqual(0);
+	});
+});
+
+describe("calculateOverallProgress", () => {
+	it("ramène une progression de phase dans la bande de cette phase", () => {
+		// Le bug signalé : 15% de la phase de planification (bande 0-20) est
+		// 3% de la tâche — pas 15%.
+		expect(calculateOverallProgress("planning", 15)).toBe(3);
+		expect(calculateOverallProgress("planning", 100)).toBe(20);
+		expect(calculateOverallProgress("coding", 50)).toBe(50); // 20 + 60*0.5
+		expect(calculateOverallProgress("qa_review", 100)).toBe(95);
+		expect(calculateOverallProgress("complete", 0)).toBe(100);
+	});
+
+	it("borne la progression de phase à 0-100", () => {
+		expect(calculateOverallProgress("coding", 150)).toBe(80);
+		expect(calculateOverallProgress("coding", -10)).toBe(20);
+	});
+
+	it("renvoie null sur une phase inconnue plutôt que d'inventer 0%", () => {
+		expect(calculateOverallProgress("hallucinated_phase", 50)).toBeNull();
+	});
+});
+
+describe("resolveOverallProgress", () => {
+	it("utilise overallProgress quand le backend en a émis un", () => {
+		expect(
+			resolveOverallProgress({
+				phase: "planning",
+				phaseProgress: 15,
+				overallProgress: 3,
+			}),
+		).toBe(3);
+	});
+
+	it("reconstitue le pourcentage global depuis la phase à défaut", () => {
+		// Un enregistrement sans overallProgress ne doit jamais faire afficher la
+		// progression interne à la phase (15%) comme progression de tâche.
+		expect(resolveOverallProgress({ phase: "planning", phaseProgress: 15 })).toBe(
+			3,
+		);
+	});
+
+	it("garde 0 distinct de « rien de connu »", () => {
+		expect(
+			resolveOverallProgress({ phase: "planning", overallProgress: 0 }),
+		).toBe(0);
+		expect(resolveOverallProgress({ phase: "planning" })).toBeUndefined();
+		expect(resolveOverallProgress(undefined)).toBeUndefined();
 	});
 });

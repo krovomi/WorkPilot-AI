@@ -1,5 +1,15 @@
 # Ruff configuration for WorkPilot AI
 
+# Vendored third-party trees. BMAD ships Python beside its skills, and
+# `scripts/vendor_bmad.py --check` re-downloads the pinned release and compares
+# it byte for byte — so anything the formatter "improves" here is reported as
+# drift on the next check, on every machine. These files are evidence of what
+# upstream published, not code this repository maintains.
+extend-exclude = [
+    "skills/bmad",
+    "apps/backend/vendor",
+]
+
 [lint]
 # Enable common rule sets
 select = [

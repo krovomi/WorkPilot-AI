@@ -293,9 +293,9 @@ def get_next_chunk(spec_dir: Path) -> dict | None:
     """
     ...
 
+
 # Avoid
-def gnc(sd):
-    ...
+def gnc(sd): ...
 ```
 
 ### TypeScript/React
@@ -348,11 +348,13 @@ with open(path, "w", encoding="utf-8") as f:
 
 # Path methods
 from pathlib import Path
+
 content = Path(file).read_text(encoding="utf-8")
 Path(file).write_text(content, encoding="utf-8")
 
 # JSON files - reading
 import json
+
 with open(path, encoding="utf-8") as f:
     data = json.load(f)
 

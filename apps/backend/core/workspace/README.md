@@ -114,6 +114,7 @@ from workspace.finalization import review_existing_build
 ```python
 # merge_existing_build is in the parent workspace.py module
 import workspace
+
 workspace.merge_existing_build(project_dir, spec_name)
 ```
 

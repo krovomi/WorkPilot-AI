@@ -234,37 +234,30 @@ from apps.backend.self_healing.config import HealingConfig, HealingMode
 config = HealingConfig(
     # Operation mode
     mode=HealingMode.ACTIVE,
-    
     # Monitoring
     frequency=MonitoringFrequency.DAILY,
     monitoring_enabled=True,
-    
     # Auto-healing
     auto_fix_enabled=True,
     auto_refactor_enabled=True,
     create_prs_for_fixes=True,
     max_fixes_per_run=5,
-    
     # Thresholds
     min_health_score=70.0,
     critical_threshold=50.0,
-    
     # Priorities
     priorities=[
         HealingPriority.CRITICAL,
         HealingPriority.HIGH,
     ],
-    
     # Alerts
     alert_channels=[AlertChannel.CONSOLE, AlertChannel.SLACK],
     alert_on_degradation=True,
     alert_threshold_change=10.0,
-    
     # Scheduling
     schedule_night_runs=True,
     night_start_hour=22,  # 10 PM
-    night_end_hour=6,     # 6 AM
-    
+    night_end_hour=6,  # 6 AM
     # Git
     create_branch_per_fix=True,
     branch_prefix="self-healing/",

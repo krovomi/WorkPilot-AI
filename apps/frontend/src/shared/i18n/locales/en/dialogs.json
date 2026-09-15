@@ -302,6 +302,8 @@
 		"close": "Close"
 	},
 	"providerSelector": {
+		"updateFailed": "Unable to change provider",
+		"taskUpdateFailed": "Updating {{count}} task(s) failed. Select the provider again to retry.",
 		"label": "AI Provider",
 		"placeholder": "-- Choose a provider --",
 		"status": {
@@ -321,5 +323,28 @@
 		},
 		"loading": "Loading...",
 		"noProvidersAvailable": "No providers available"
+	},
+	"pageLlm": {
+		"title": "This page's engine",
+		"description": "Provider, model and effort for this page. Left on \"as in settings\", the page follows the AI Provider list at the top right and the models configured in Settings.",
+		"summary": "{{provider}} · {{model}} · {{effort}}",
+		"tooltip": "Choose the provider, model and effort for this page",
+		"pageBadge": "page",
+		"providerUnset": "Default provider",
+		"model": "Model",
+		"effortLabel": "Effort",
+		"inheritProvider": "As in settings ({{provider}})",
+		"inheritModel": "As in settings ({{model}})",
+		"inheritEffort": "As in settings ({{effort}})",
+		"originPage": "This page overrides the global choice.",
+		"originSettings": "This page follows the global choice.",
+		"reset": "Reset",
+		"effort": {
+			"none": "None",
+			"low": "Low",
+			"medium": "Medium",
+			"high": "High",
+			"ultrathink": "Ultra Think"
+		}
 	}
 }

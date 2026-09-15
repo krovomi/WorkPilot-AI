@@ -51,6 +51,16 @@ export function TaskRunControls({
 	const pauseState = derivePauseUiState(isPaused, pauseProcessAlive);
 	const disabled = busy !== null;
 
+	// Where the build stopped, so "Reprendre" says what it will pick back up.
+	// A pause can now happen during spec creation, planning, coding or QA, and
+	// a control that always implied coding would be wrong three times out of
+	// four.
+	const pausedPhaseKey = task.metadata?.paused?.paused_phase ?? "unknown";
+	const pausedPhaseLabel = t(
+		`tasks:pauseState.phase.${pausedPhaseKey}`,
+		t("tasks:pauseState.phase.unknown"),
+	);
+
 	const handlePause = async () => {
 		setBusy("pause");
 		try {
@@ -134,23 +144,27 @@ export function TaskRunControls({
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>
-						{t(
-							"tasks:modal.actions.resumeTooltip",
-							"Reprendre l'exécution depuis le point de pause",
-						)}
+						{t("tasks:pauseState.resumesFrom", { phase: pausedPhaseLabel })}
 					</TooltipContent>
 				</Tooltip>
 			) : pauseState === "pausing" ? (
-				<Button
-					variant="warning"
-					size="sm"
-					disabled
-					className="gap-1.5"
-					aria-live="polite"
-				>
-					<Loader2 className="h-4 w-4 animate-spin" />
-					{t("tasks:modal.actions.pausingShort", "Pause en cours…")}
-				</Button>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							variant="warning"
+							size="sm"
+							disabled
+							className="gap-1.5"
+							aria-live="polite"
+						>
+							<Loader2 className="h-4 w-4 animate-spin" />
+							{t("tasks:modal.actions.pausingShort", "Pause en cours…")}
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent>
+						{t("tasks:pauseState.pausedDuring", { phase: pausedPhaseLabel })}
+					</TooltipContent>
+				</Tooltip>
 			) : (
 				<Tooltip>
 					<TooltipTrigger asChild>

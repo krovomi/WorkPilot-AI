@@ -8,6 +8,7 @@ import {
 	getSpecsDir,
 	IPC_CHANNELS,
 } from "../shared/constants";
+import { calculateOverallProgress } from "../shared/progress";
 import {
 	mapStateToLegacy,
 	type TaskEvent,
@@ -329,6 +330,11 @@ export class TaskStateManager {
 			// Map XState state to execution phase for persistence
 			const executionPhase = this.mapStateToExecutionPhase(stateValue);
 
+			// The message the machine recorded for this state. Carried alongside
+			// status and reviewReason from here on: a card that says "Has Errors"
+			// without it is a dead end for whoever is reading the board.
+			const errorMessage = snapshot.context.error;
+
 			this.persistStatus(
 				task,
 				project,
@@ -336,8 +342,9 @@ export class TaskStateManager {
 				reviewReason,
 				stateValue,
 				executionPhase,
+				errorMessage,
 			);
-			this.emitStatus(taskId, status, reviewReason, project.id);
+			this.emitStatus(taskId, status, reviewReason, project.id, errorMessage);
 
 			// Also emit execution progress to sync phase display with column
 			// This ensures crisp transitions - phase and column update together
@@ -356,6 +363,7 @@ export class TaskStateManager {
 		reviewReason?: ReviewReason,
 		xstateState?: string,
 		executionPhase?: string,
+		errorMessage?: string,
 	): void {
 		const mainPlanPath = getPlanPath(project, task);
 		persistPlanStatusAndReasonSync(
@@ -365,6 +373,7 @@ export class TaskStateManager {
 			project.id,
 			xstateState,
 			executionPhase,
+			errorMessage,
 		);
 
 		const worktreePath = findTaskWorktree(project.path, task.specId);
@@ -385,6 +394,7 @@ export class TaskStateManager {
 				project.id,
 				xstateState,
 				executionPhase,
+				errorMessage,
 			);
 		}
 	}
@@ -401,6 +411,7 @@ export class TaskStateManager {
 		status: TaskStatus,
 		reviewReason: ReviewReason | undefined,
 		projectId?: string,
+		errorMessage?: string,
 	): void {
 		if (!this.getMainWindow) {
 			console.warn(
@@ -415,6 +426,7 @@ export class TaskStateManager {
 			status,
 			projectId,
 			reviewReason,
+			errorMessage,
 		);
 	}
 
@@ -430,6 +442,8 @@ export class TaskStateManager {
 		if (!this.getMainWindow) return;
 
 		const phase = XSTATE_TO_PHASE[xstateState] || "idle";
+		// On connaît la phase, pas l'avancement à l'intérieur : milieu de phase.
+		const phaseProgress = phase === "complete" ? 100 : 50;
 
 		// Emit execution progress with the phase derived from XState
 		safeSendToRenderer(
@@ -438,8 +452,10 @@ export class TaskStateManager {
 			taskId,
 			{
 				phase,
-				phaseProgress: phase === "complete" ? 100 : 50,
-				overallProgress: phase === "complete" ? 100 : 50,
+				phaseProgress,
+				// Pondéré par la bande de la phase : une tâche en planification
+				// vaut 10% de la tâche, pas 50%. Voir calculateOverallProgress.
+				overallProgress: calculateOverallProgress(phase, phaseProgress) ?? 0,
 				message: `State: ${xstateState}`,
 				sequenceNumber: Date.now(), // Use timestamp as sequence to ensure it's newer
 			},
@@ -472,8 +488,18 @@ export class TaskStateManager {
 					stateValue = "qa_review";
 				} else if (executionPhase === "qa_fixing") {
 					stateValue = "qa_fixing";
+				} else if (!executionPhase || executionPhase === "idle") {
+					// A build that is running and has not reported a phase yet is
+					// at the start of the pipeline, not in the middle of it. This
+					// branch used to fall through to 'coding' below, so every task
+					// showed as coding for as long as the workflow phases that run
+					// before planning took — and then moved *back* to planning when
+					// the planner emitted its first event. The phases were in the
+					// declared order the whole time; the card was reading a default.
+					stateValue = "planning";
 				} else {
-					// Default to coding for 'coding', 'complete', or unknown phases
+					// Default to coding for 'coding', 'complete', and the pause
+					// phases, all of which happen at or after implementation.
 					stateValue = "coding";
 				}
 				break;

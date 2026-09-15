@@ -1,36 +1,75 @@
 {
-	"title": "Visualiseur d'architecture",
-	"subtitle": "Générer des diagrammes d'architecture interactifs depuis votre code",
+	"title": "Architecture",
+	"subtitle": "Une carte interactive de ce système, écrite à partir du code et épinglée dessus",
 	"actions": {
-		"generate": "Générer les diagrammes",
-		"regenerate": "Regénérer",
-		"cancel": "Annuler"
+		"generate": "Générer la carte",
+		"regenerate": "Régénérer",
+		"cancel": "Annuler",
+		"createBaseline": "Créer la référence"
 	},
-	"diagramTypes": {
-		"heading": "Types de diagramme",
-		"module_dependencies": "Dépendances entre modules",
-		"component_hierarchy": "Hiérarchie des composants",
-		"data_flow": "Flux de données",
-		"database_schema": "Schéma de base de données"
+	"model": {
+		"components_one": "{{count}} composant",
+		"components_other": "{{count}} composants",
+		"connections_one": "{{count}} connexion",
+		"connections_other": "{{count}} connexions",
+		"revision": "Épinglée sur {{revision}}"
 	},
-	"view": {
-		"heading": "Afficher le diagramme"
+	"progress": {
+		"heading": "Progression",
+		"checking": "Vérification du moteur de rendu…"
 	},
-	"summary": {
-		"heading": "Résumé",
-		"diagrams_one": "{{count}} diagramme",
-		"diagrams_other": "{{count}} diagrammes",
-		"nodes_one": "{{count}} nœud",
-		"nodes_other": "{{count}} nœuds",
-		"edges_one": "{{count}} arête",
-		"edges_other": "{{count}} arêtes"
-	},
-	"diagram": {
-		"counts": "{{nodes}} nœuds • {{edges}} arêtes",
-		"copyHint": "Copiez le code Mermaid ci-dessus et collez-le dans <0>mermaid.live</0> pour afficher le diagramme interactif."
+	"readiness": {
+		"heading": "Archify ne peut pas s'exécuter ici",
+		"body": "Le moteur de rendu de cette page a besoin de ce qui suit avant de pouvoir produire un diagramme.",
+		"nodeName": "Node.js",
+		"runtimeName": "Moteur de rendu"
 	},
 	"empty": {
-		"title": "Visualiseur d'architecture",
-		"body": "Sélectionnez des types de diagramme puis cliquez sur « Générer les diagrammes » pour analyser votre code et produire les diagrammes d'architecture."
+		"title": "Pas encore de carte d'architecture",
+		"body": "La générer lit les points d'entrée du projet, son graphe d'imports, ses manifestes et ses fichiers de déploiement, puis dessine les composants, ce qui parle à quoi, et où passent les frontières de confiance. Chaque composant renvoie aux fichiers qui le constituent."
+	},
+	"error": {
+		"heading": "Échec de la génération"
+	},
+	"delta": {
+		"tab": "Architecture",
+		"title": "Ce que cette tâche a changé",
+		"subtitle": "Comparé à l'architecture enregistrée en {{revision}}",
+		"subtitleNoRevision": "Comparé à la référence enregistrée",
+		"actions": {
+			"regenerate": "Régénérer",
+			"running": "Comparaison en cours…"
+		},
+		"counts": {
+			"componentsAdded_one": "{{count}} composant ajouté",
+			"componentsAdded_other": "{{count}} composants ajoutés",
+			"componentsRemoved_one": "{{count}} composant supprimé",
+			"componentsRemoved_other": "{{count}} composants supprimés",
+			"componentsChanged_one": "{{count}} composant modifié",
+			"componentsChanged_other": "{{count}} composants modifiés",
+			"connectionsAdded_one": "{{count}} connexion ajoutée",
+			"connectionsAdded_other": "{{count}} connexions ajoutées",
+			"connectionsRemoved_one": "{{count}} connexion supprimée",
+			"connectionsRemoved_other": "{{count}} connexions supprimées",
+			"connectionsChanged_one": "{{count}} connexion modifiée",
+			"connectionsChanged_other": "{{count}} connexions modifiées",
+			"boundariesChanged_one": "{{count}} frontière modifiée",
+			"boundariesChanged_other": "{{count}} frontières modifiées"
+		},
+		"noBaseline": {
+			"title": "Ce projet n'a pas encore de carte d'architecture",
+			"body": "Une comparaison a besoin de quelque chose à quoi se comparer. Générez la carte du projet depuis la page Architecture, puis régénérez ici."
+		},
+		"unreliable": {
+			"title": "Cette comparaison ne serait pas fiable",
+			"body": "Le nouveau modèle n'a conservé que {{kept}} identifiants de composants sur {{total}} : une comparaison présenterait des renommages comme des suppressions. Régénérer suffit généralement.",
+			"lost": "Identifiants disparus"
+		},
+		"runtimeMissing": {
+			"title": "Le moteur de rendu est indisponible"
+		},
+		"failed": {
+			"title": "La comparaison a échoué"
+		}
 	}
 }

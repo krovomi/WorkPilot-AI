@@ -29,6 +29,8 @@ import enInjectionGuard from "./locales/en/injectionGuard.json";
 import enApiWatcher from "./locales/en/api-watcher.json";
 import enAgentTools from "./locales/en/agentTools.json";
 import enWorkflowProfile from "./locales/en/workflowProfile.json";
+import enHermes from "./locales/en/hermes.json";
+import enRtk from "./locales/en/rtk.json";
 import enTraceability from "./locales/en/traceability.json";
 
 // Import English translation resources
@@ -124,6 +126,8 @@ import frInjectionGuard from "./locales/fr/injectionGuard.json";
 import frApiWatcher from "./locales/fr/api-watcher.json";
 import frAgentTools from "./locales/fr/agentTools.json";
 import frWorkflowProfile from "./locales/fr/workflowProfile.json";
+import frHermes from "./locales/fr/hermes.json";
+import frRtk from "./locales/fr/rtk.json";
 import frTraceability from "./locales/fr/traceability.json";
 
 // Import French translation resources
@@ -227,6 +231,8 @@ export const resources = {
 		apiWatcher: enApiWatcher,
 		agentTools: enAgentTools,
 		workflowProfile: enWorkflowProfile,
+		hermes: enHermes,
+		rtk: enRtk,
 		traceability: enTraceability,
 		changelog: enChangelog,
 		codePlayground: enCodePlayground,
@@ -322,6 +328,8 @@ export const resources = {
 		apiWatcher: frApiWatcher,
 		agentTools: frAgentTools,
 		workflowProfile: frWorkflowProfile,
+		hermes: frHermes,
+		rtk: frRtk,
 		traceability: frTraceability,
 		changelog: frChangelog,
 		codePlayground: frCodePlayground,
@@ -424,6 +432,8 @@ i18n.use(initReactI18next).init({
 		"apiWatcher",
 		"agentTools",
 		"workflowProfile",
+		"hermes",
+		"rtk",
 		"traceability",
 		"changelog",
 		"codePlayground",

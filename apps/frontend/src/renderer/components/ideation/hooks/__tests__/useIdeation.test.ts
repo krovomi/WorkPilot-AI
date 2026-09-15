@@ -80,17 +80,21 @@ describe("useIdeation", () => {
 		vi.clearAllMocks();
 	});
 
-	it("should set up and clean up listeners on unmount", () => {
+	it("loads the session without taking ownership of the IPC listeners", () => {
 		const cleanupFn = vi.fn();
 		mockSetupListeners.mockReturnValueOnce(cleanupFn);
 
 		const { unmount } = renderHook(() => useIdeation("project-1"));
 
 		expect(mockLoadIdeation).toHaveBeenCalledWith("project-1");
+		// The listeners belong to the session (stores/global-listeners.ts): a
+		// page that registered its own would stop hearing about a generation
+		// the moment the user navigated away from it.
+		expect(mockSetupListeners).not.toHaveBeenCalled();
 
 		unmount();
 
-		expect(cleanupFn).toHaveBeenCalled();
+		expect(cleanupFn).not.toHaveBeenCalled();
 	});
 
 	it("should prompt for env config when token is missing", () => {

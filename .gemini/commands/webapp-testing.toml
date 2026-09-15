@@ -41,10 +41,12 @@ Le script d'automation ne contient que la logique Playwright (les serveurs sont 
 from playwright.sync_api import sync_playwright
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)   # toujours headless
+    browser = p.chromium.launch(headless=True)  # toujours headless
     page = browser.new_page()
-    page.goto('http://localhost:5173')
-    page.wait_for_load_state('networkidle')        # CRITIQUE: attendre le JS avant d'inspecter
+    page.goto("http://localhost:5173")
+    page.wait_for_load_state(
+        "networkidle"
+    )  # CRITIQUE: attendre le JS avant d'inspecter
     # ... actions
     browser.close()
 ```

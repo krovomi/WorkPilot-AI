@@ -36,6 +36,7 @@ import {
 import {
 	isSubtaskDone,
 	isTaskEffectivelyComplete,
+	resolveOverallProgress,
 } from "../../../shared/progress";
 import { needsExecutionFormula } from "../../../shared/utils/task-execution-config";
 import { useFormulaMatrixStore } from "../../stores/formula-matrix-store";
@@ -89,10 +90,18 @@ import { TaskStatusMoveBadge } from "./TaskStatusMoveBadge";
 import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
+import { TaskFailureBanner } from "./TaskFailureBanner";
 import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask } from "../../stores/task-store";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
+import { HermesLearningCard } from "./HermesLearningCard";
+import { RtkSavingsCard } from "./RtkSavingsCard";
+import {
+	shouldShowArchitectureDelta,
+	useArchitectureDelta,
+} from "../../stores/architecture-delta-store";
+import { TaskArchitectureDelta } from "./TaskArchitectureDelta";
 import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
 import { WorkflowProfileCard } from "./WorkflowProfileCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
@@ -154,7 +163,6 @@ function preventCloseOnTaskNav(
 		event.preventDefault();
 	}
 }
-
 
 const renderTaskStatusBadges = (
 	task: Task,
@@ -534,6 +542,14 @@ function TaskDetailModalContent({
 	const allProjects = useProjectStore((s) => s.projects);
 	const taskProject = allProjects.find((p) => p.id === task.projectId);
 	const showFilesTab = isFilesTabEnabled();
+
+	// Subscribed at the modal rather than the tab: a regeneration keeps running
+	// while the user switches tabs, and its result must still land.
+	// Loaded here for the same reason the trigger is gated here — the record is
+	// what decides the tab exists at all. A task whose change was not
+	// architectural, or whose comparison found nothing, gets no trigger.
+	const architectureDelta = useArchitectureDelta(task.id, task.specsPath);
+	const showArchitectureTab = shouldShowArchitectureDelta(architectureDelta);
 	const progressPercent = calculateProgress(task.subtasks);
 	// "Done" = completed or blocked (a blocked subtask, e.g. a manual e2e test,
 	// is handled by the build and counts toward completion — matches the backend).
@@ -554,7 +570,7 @@ function TaskDetailModalContent({
 	// progression de phase.
 	const headerProgressPercent = getDisplayProgress(
 		progressPercent,
-		task.executionProgress?.overallProgress,
+		resolveOverallProgress(task.executionProgress),
 		!!state.hasActiveExecution,
 		totalSubtasks > 0,
 		isTaskEffectivelyComplete(task.status, task.reviewReason),
@@ -1185,6 +1201,12 @@ function TaskDetailModalContent({
 							)}
 						</div>
 
+						{/* Why the task failed — above the tabs, because a user who
+						    finds a card in review with a red badge is looking for
+						    this sentence before anything else. Renders nothing when
+						    the task did not fail. */}
+						<TaskFailureBanner task={task} />
+
 						{/* Body - Single Column with Tabs */}
 						<div className="flex-1 min-h-0 overflow-hidden">
 							<Tabs
@@ -1239,6 +1261,14 @@ function TaskDetailModalContent({
 									>
 										{t("mobile:preview.tab")}
 									</TabsTrigger>
+									{showArchitectureTab && (
+										<TabsTrigger
+											value="architecture"
+											className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+										>
+											{t("architectureVisualizer:delta.tab")}
+										</TabsTrigger>
+									)}
 								</TabsList>
 
 								{/* Overview Tab */}
@@ -1267,6 +1297,21 @@ function TaskDetailModalContent({
 											    neither. */}
 											<SpecTraceabilityCard
 												task={task}
+												projectPath={
+													taskProject?.path ?? activeProject?.path
+												}
+											/>
+
+											{/* La boucle d'apprentissage hermes : ce qu'il a
+											    appris ailleurs, déposé dans la file de revue.
+											    Ne s'affiche pas quand hermes n'est pas installé. */}
+											<HermesLearningCard />
+
+											{/* rtk : ce que la condensation de sortie a
+											    économisé sur ce projet. Ne s'affiche pas
+											    quand rtk n'est pas installé — la découverte
+											    se fait dans les Réglages. */}
+											<RtkSavingsCard
 												projectPath={
 													taskProject?.path ?? activeProject?.path
 												}
@@ -1400,6 +1445,24 @@ function TaskDetailModalContent({
 										worktreePath={state.worktreeStatus?.worktreePath}
 									/>
 								</TabsContent>
+
+								{/* What this task changed in the system's topology. The
+								    trigger is hidden when the delta has nothing to say, so
+								    the panel is never an empty tab someone opened once. */}
+								{showArchitectureTab && (
+									<TabsContent
+										value="architecture"
+										className="flex-1 min-h-0 overflow-hidden mt-0"
+									>
+										<TaskArchitectureDelta
+											task={task}
+											entry={architectureDelta}
+											projectPath={
+												taskProject?.path ?? activeProject?.path
+											}
+										/>
+									</TabsContent>
+								)}
 							</Tabs>
 						</div>
 

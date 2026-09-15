@@ -10,7 +10,8 @@ venv/
 env/
 
 # Python cache
-__pycache__/
+.pytest_cache/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -58,9 +59,6 @@ Thumbs.db
 # Claude Code settings (project-specific)
 .claude_settings.json
 .auto-build-security.json
-
-# Tests (development only)
-tests/
 
 # WorkPilot AI data directory
 .workpilot/

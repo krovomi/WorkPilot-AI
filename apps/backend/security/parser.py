@@ -179,6 +179,48 @@ def _contains_windows_path(command_string: str) -> bool:
     return bool(re.search(r"[A-Za-z]:\\|\\[A-Za-z][A-Za-z0-9_\\/]", command_string))
 
 
+def unwrap_rtk_prefixes(command_string: str) -> str:
+    """Replace every `rtk <command>` in a command line by `<command>`.
+
+    rtk is a proxy: it runs the command it was given and filters the output.
+    When its table has no entry for that command it runs it anyway
+    (`run_fallback` in rtk's own `main.rs`), so `rtk <anything>` executes
+    `<anything>` — and a validator that read the command name as "rtk" and
+    stopped would be treating one allowlisted word as a door to every binary
+    on the machine.
+
+    So the allowlist never sees `rtk`: it sees what rtk will run. The rewrite
+    is applied segment by segment, because a command line is `rtk pytest &&
+    rtk ruff check` as often as it is one command, and because rtk's own meta
+    commands (`rtk gain`, `rtk discover`) proxy nothing and must stay spelled
+    `rtk`.
+    """
+    if "rtk" not in command_string:
+        return command_string
+    try:
+        from rtk.rewrite import unwrap_rtk
+    except Exception:  # noqa: BLE001 - validation must not depend on an optional module
+        return command_string
+
+    # Split on the operators that separate commands, keeping the separators
+    # (the odd-indexed parts) so the line goes back together exactly as it was.
+    parts = re.split(r"(\s*(?:\|\||&&|\||;)\s*)", command_string)
+    rebuilt: list[str] = []
+    for index, part in enumerate(parts):
+        if index % 2:
+            rebuilt.append(part)
+            continue
+        stripped = part.strip()
+        if not stripped:
+            rebuilt.append(part)
+            continue
+        start = part.index(stripped[0])
+        rebuilt.append(
+            part[:start] + unwrap_rtk(stripped) + part[start + len(stripped) :]
+        )
+    return "".join(rebuilt)
+
+
 def extract_commands(command_string: str) -> list[str]:
     """
     Extract command names from a shell command string.
@@ -186,10 +228,14 @@ def extract_commands(command_string: str) -> list[str]:
     Handles pipes, command chaining (&&, ||, ;), and subshells.
     Returns the base command names (without paths).
 
+    Commands wrapped by rtk are validated as the command rtk will run, never
+    as "rtk" — see `unwrap_rtk_prefixes`.
+
     On Windows or when commands contain malformed quoting (common with
     Windows paths in bash-style commands), falls back to regex-based
     extraction to ensure security validation can proceed.
     """
+    command_string = unwrap_rtk_prefixes(command_string)
     # If command contains Windows paths, use fallback parser directly
     # because shlex.split() interprets backslashes as escape characters
     if _contains_windows_path(command_string):
@@ -281,9 +327,16 @@ def extract_commands(command_string: str) -> list[str]:
 def get_command_for_validation(cmd: str, segments: list[str]) -> str:
     """
     Find the specific command segment that contains the given command.
+
+    The segment is returned **unwrapped**: the deep validators parse it
+    themselves, and every one of them starts by checking that the first token
+    is the tool it guards (`tokens[0] != "git"` → nothing to say). Handed
+    `rtk git commit`, they would all answer "not mine" and the commit would
+    reach the repository without its secret scan. The command rtk runs is the
+    command that has to be judged.
     """
     for segment in segments:
         segment_commands = extract_commands(segment)
         if cmd in segment_commands:
-            return segment
+            return unwrap_rtk_prefixes(segment)
     return ""

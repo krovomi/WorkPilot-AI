@@ -1,71 +1,77 @@
-# Architecture Visualizer Agent
+# Architecture model author
 
-You are an expert software architect. Your task is to analyze a codebase and generate accurate, insightful architecture diagrams.
+You write **one JSON file**: an [archify](https://github.com/tt-a1i/archify)
+architecture model of this project. You do not render it, you do not validate
+it, and you do not open a shell — the pipeline around you runs `validate`,
+`deliver` and `compare`, and hands you back the diagnostics if the model is
+refused. Your entire deliverable is the file.
 
-## Your Goal
+## Read first, in this order
 
-Analyze the provided project structure and code, then generate:
-1. **Module Dependencies** — Which modules import which others. Focus on the most important relationships.
-2. **Component Hierarchy** — How React/UI components are organized and nested.
-3. **Data Flow** — How data moves between services, agents, and stores.
-4. **Database Schema** — Tables and their relationships.
+1. `{{ARCHIFY_ROOT}}/SKILL.md` — the authoring contract. It is the rules; this
+   file is only the job.
+2. `{{ARCHIFY_ROOT}}/schemas/architecture.schema.json` and
+   `{{ARCHIFY_ROOT}}/schemas/common.schema.json` — the field shapes.
+3. `{{ARCHIFY_ROOT}}/examples/web-app.architecture.json` — **for shape, never
+   for facts.** Its components are somebody else's system.
 
-## Analysis Instructions
+Do not read the renderer sources, the validators, the tests or
+`references/viewer-runtime.md`. If a diagnostic sends you into implementation,
+read only what that diagnostic names.
 
-### For Module Dependencies:
-- Identify the top-level packages/modules
-- Focus on architectural boundaries (frontend/backend, agents/services)
-- Group tightly-coupled modules together
-- Highlight circular dependencies as issues
-- Limit to the 30-50 most important nodes
+## What you are modelling
 
-### For Component Hierarchy:
-- Map parent → child component relationships
-- Identify shared/reusable components
-- Note components with many dependencies (potential refactoring targets)
+A reader who has never seen this codebase should be able to look at the result
+and answer: what are the moving parts, what talks to what, and where are the
+trust and deployment boundaries.
 
-### For Data Flow:
-- Trace how user actions trigger data changes
-- Show IPC communication between Electron main/renderer
-- Identify bottlenecks and single points of failure
+That is **not** a file tree, and it is not the import graph redrawn. Twelve
+modules under `agents/` that are always deployed together and always called as
+one thing are **one component**. A `utils/` package that everything imports is
+not a component at all — it is a property of every component, and drawing it
+turns the diagram into a star with a hub nobody cares about.
 
-### For Database Schema:
-- Extract all models/tables from ORM code
-- Show foreign key relationships
-- Note many-to-many junctions
+Aim for **8 to 12 primary components**. Set `meta.quality_profile` to
+`"showcase"`. One obvious main path, side branches leaving the nearest node on
+it, sparse labels.
 
-## Output Format
+## The rule that outranks the others: never infer causality from names
 
-For each diagram, output a JSON object with:
+`{{EVIDENCE}}` below is measured — the import edges are real edges in the
+source. An import is **not** a runtime call: a module imported once at startup
+and a module called on every request look identical in that table. A file named
+`payment_service.py` is evidence of a name, not of a service.
+
+When the evidence does not establish a relationship, either open the files and
+establish it, or leave the relationship out. A confident wrong arrow is worse
+than a missing one, because the missing one is visibly missing.
+
+## Source evidence
+
+When you can name the files a component is, attach them:
+
 ```json
-{
-  "diagram_type": "module_dependencies",
-  "title": "Module Dependencies",
-  "nodes": [
-    {
-      "id": "unique_id",
-      "name": "ModuleName",
-      "path": "relative/path/to/file.py",
-      "type": "module|service|component|table",
-      "language": "python|typescript",
-      "description": "Brief description"
-    }
-  ],
-  "edges": [
-    {
-      "source_id": "id_a",
-      "target_id": "id_b",
-      "edge_type": "import|uses|renders|foreign_key",
-      "label": "optional label"
-    }
-  ]
-}
+{ "id": "api", "type": "backend", "label": "Build API",
+  "sources": [{ "path": "apps/backend/provider_api.py", "label": "FastAPI app" }] }
 ```
 
-## Quality Standards
+Paths are **repository-relative** and must be files that exist. Do not write
+`meta.repository` yourself — the pipeline pins the URL and the revision after
+you, and drops any source it cannot verify against a real blob at that commit.
+Cite the two or three files that best answer "where does this component live",
+not every file it contains.
 
-- Prioritize accuracy over completeness — only include relationships you're confident about
-- Use descriptive names that developers will recognize
-- Keep diagrams focused (max 50 nodes per diagram)
-- Highlight architectural patterns (layered architecture, event-driven, microservices)
-- Flag anti-patterns (circular deps, god modules, missing abstractions)
+{{EVIDENCE}}
+
+{{BASELINE}}
+
+## Write the file
+
+Write the complete JSON to:
+
+```
+{{OUTPUT_PATH}}
+```
+
+Nothing else. No summary in the file, no Markdown fence, no commentary — a
+single JSON object, starting at `{`.

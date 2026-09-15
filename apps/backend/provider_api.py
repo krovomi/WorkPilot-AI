@@ -1217,6 +1217,22 @@ def get_provider_models(provider: str, refresh: bool = False):
     }
 
 
+@app.get("/providers/ollama/library/search")
+def search_official_ollama_library(q: str = ""):
+    """Autocomplete only names and tags listed by the official Ollama library."""
+    import httpx
+    from official_ollama_catalog import search_models
+
+    try:
+        return {"models": search_models(q), "source": "https://ollama.com/library"}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid model search") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502, detail="Official Ollama library unavailable"
+        ) from exc
+
+
 @app.get("/providers/models/{provider}/catalog")
 def get_provider_models_catalog(provider: str, refresh: bool = False):
     """Returns the full model catalog for `provider` with provenance.
@@ -1979,6 +1995,30 @@ try:
     _mount(workflow_profile_router, "workflow_profile")
 except ImportError as e:
     print(f"Warning: Could not import workflow_profile router: {e}")
+
+# --- Hermes API (hermes-agent readiness, persona, and the learning cycle) ---
+try:
+    from hermes.api import router as hermes_router
+
+    _mount(hermes_router, "hermes")
+except ImportError as e:
+    print(f"Warning: Could not import hermes router: {e}")
+
+# --- rtk API (is the output-condensing proxy working here, and what it saved) ---
+try:
+    from rtk.api import router as rtk_router
+
+    _mount(rtk_router, "rtk")
+except ImportError as e:
+    print(f"Warning: Could not import rtk router: {e}")
+
+# --- Watermarks API (is the generated-file cleaner working, and what it stripped) ---
+try:
+    from watermarks.api import router as watermarks_router
+
+    _mount(watermarks_router, "watermarks")
+except ImportError as e:
+    print(f"Warning: Could not import watermarks router: {e}")
 
 # --- Spec Traceability API (open questions + requirement coverage for a spec) ---
 try:

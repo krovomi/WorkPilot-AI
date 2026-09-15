@@ -51,9 +51,7 @@ runner.print_summary(insights)
 ```python
 # Run only specific analyzers
 selected = ["security", "performance"]
-insights = asyncio.run(
-    runner.run_full_analysis(selected_analyzers=selected)
-)
+insights = asyncio.run(runner.run_full_analysis(selected_analyzers=selected))
 
 # Access specific results
 security_score = insights["security"]["score"]
@@ -122,11 +120,7 @@ print(result)
 ### Using Individual Analyzers
 
 ```python
-from ai_analyzer.analyzers import (
-    AnalyzerFactory,
-    SecurityAnalyzer,
-    PerformanceAnalyzer
-)
+from ai_analyzer.analyzers import AnalyzerFactory, SecurityAnalyzer, PerformanceAnalyzer
 from ai_analyzer.claude_client import ClaudeAnalysisClient
 from ai_analyzer.result_parser import ResultParser
 
@@ -157,6 +151,7 @@ print(f"Vulnerabilities: {len(result['vulnerabilities'])}")
 from typing import Any
 from ai_analyzer.analyzers import BaseAnalyzer, AnalyzerFactory
 
+
 class CustomAnalyzer(BaseAnalyzer):
     """Custom analyzer for specific analysis needs."""
 
@@ -182,11 +177,8 @@ class CustomAnalyzer(BaseAnalyzer):
 
     def get_default_result(self) -> dict[str, Any]:
         """Get default result structure."""
-        return {
-            "score": 0,
-            "versioning_strategy": "unknown",
-            "versions_found": []
-        }
+        return {"score": 0, "versioning_strategy": "unknown", "versions_found": []}
+
 
 # Register custom analyzer
 AnalyzerFactory.ANALYZER_CLASSES["api_versioning"] = CustomAnalyzer
@@ -195,9 +187,7 @@ AnalyzerFactory.ANALYZER_CLASSES["api_versioning"] = CustomAnalyzer
 from ai_analyzer import AIAnalyzerRunner
 
 runner = AIAnalyzerRunner(project_dir, project_index)
-insights = asyncio.run(
-    runner.run_full_analysis(selected_analyzers=["api_versioning"])
-)
+insights = asyncio.run(runner.run_full_analysis(selected_analyzers=["api_versioning"]))
 ```
 
 ### Batch Analysis
@@ -232,6 +222,7 @@ for name, score in sorted(results.items(), key=lambda x: x[1], reverse=True):
 ```python
 from ai_analyzer.summary_printer import SummaryPrinter
 
+
 class CustomPrinter(SummaryPrinter):
     """Custom summary printer with JSON output."""
 
@@ -239,7 +230,9 @@ class CustomPrinter(SummaryPrinter):
     def print_summary(insights: dict) -> None:
         """Print as formatted JSON."""
         import json
+
         print(json.dumps(insights, indent=2))
+
 
 # Use custom printer
 runner = AIAnalyzerRunner(project_dir, project_index)
@@ -291,6 +284,7 @@ import json
 from pathlib import Path
 from ai_analyzer import AIAnalyzerRunner
 
+
 def main():
     project_dir = Path.cwd()
     index_file = project_dir / "comprehensive_analysis.json"
@@ -302,9 +296,7 @@ def main():
     runner = AIAnalyzerRunner(project_dir, project_index)
 
     # Run security analysis only
-    insights = asyncio.run(
-        runner.run_full_analysis(selected_analyzers=["security"])
-    )
+    insights = asyncio.run(runner.run_full_analysis(selected_analyzers=["security"]))
 
     # Check for critical vulnerabilities
     vulns = insights.get("security", {}).get("vulnerabilities", [])
@@ -317,6 +309,7 @@ def main():
         return 1
 
     return 0
+
 
 if __name__ == "__main__":
     exit(main())
@@ -331,6 +324,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from ai_analyzer import AIAnalyzerRunner
+
 
 async def generate_report(project_dir: Path):
     """Generate analysis report."""
@@ -356,6 +350,7 @@ async def generate_report(project_dir: Path):
     if insights["overall_score"] < 70:
         send_alert(f"Code quality alert: Score {insights['overall_score']}/100")
 
+
 # Run daily at 2 AM
 if __name__ == "__main__":
     asyncio.run(generate_report(Path.cwd()))
@@ -374,6 +369,7 @@ if not CLAUDE_SDK_AVAILABLE:
 
 # Handle missing OAuth token
 import os
+
 if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
     print("Please set CLAUDE_CODE_OAUTH_TOKEN")
     print("Run: claude setup-token")

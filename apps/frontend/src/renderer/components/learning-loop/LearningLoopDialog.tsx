@@ -22,7 +22,6 @@ import {
 	deleteLearningPattern,
 	loadLearningPatterns,
 	loadLearningSummary,
-	setupLearningLoopListeners,
 	startLearningAnalysis,
 	toggleLearningPattern,
 	useLearningLoopStore,
@@ -83,12 +82,6 @@ export function LearningLoopDialog() {
 	const selectedProject = useProjectStore((s) =>
 		s.projects.find((p) => p.id === s.selectedProjectId),
 	);
-
-	// Setup IPC listeners once
-	useEffect(() => {
-		const cleanup = setupLearningLoopListeners();
-		return cleanup;
-	}, []);
 
 	// Load data when dialog opens
 	useEffect(() => {

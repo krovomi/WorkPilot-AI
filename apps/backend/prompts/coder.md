@@ -411,6 +411,7 @@ for phase in plan.get("phases", []):
 # Generate checklist
 if current_subtask:
     import sys
+
     sys.path.insert(0, str(Path.cwd().parent))
     from prediction import generate_subtask_checklist
 
@@ -960,10 +961,8 @@ session_num = len(existing_sessions) + 1
 insights = {
     "session_number": session_num,
     "timestamp": datetime.now(timezone.utc).isoformat(),
-
     # What subtasks did you complete?
     "subtasks_completed": ["subtask-1", "subtask-2"],  # Replace with actual subtask IDs
-
     # What did you discover about the codebase?
     "discoveries": {
         "files_understood": {
@@ -979,29 +978,26 @@ insights = {
             "Database connections must be closed explicitly",
             "API rate limit is 100 req/min",
             # Add pitfalls you encountered
-        ]
+        ],
     },
-
     # What approaches worked well?
     "what_worked": [
         "Starting with unit tests helped catch edge cases early",
         "Following existing pattern from auth.py made integration smooth",
         # Add successful approaches
     ],
-
     # What approaches didn't work?
     "what_failed": [
         "Tried inline validation - should use middleware instead",
         "Direct database access caused connection leaks",
         # Add things that didn't work
     ],
-
     # What should the next session focus on?
     "recommendations_for_next_session": [
         "Focus on integration tests between services",
         "Review error handling in worker service",
         # Add recommendations
-    ]
+    ],
 }
 
 # Save insights
@@ -1029,7 +1025,9 @@ if insights["discoveries"]["files_understood"]:
     if "_metadata" not in codebase_map:
         codebase_map["_metadata"] = {}
     codebase_map["_metadata"]["last_updated"] = datetime.now(timezone.utc).isoformat()
-    codebase_map["_metadata"]["total_files"] = len([k for k in codebase_map if k != "_metadata"])
+    codebase_map["_metadata"]["total_files"] = len(
+        [k for k in codebase_map if k != "_metadata"]
+    )
 
     # Save
     with open(map_file, "w") as f:

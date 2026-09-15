@@ -572,3 +572,173 @@ export async function fetchWorkflowProfile(
 		signal,
 	);
 }
+
+/* -------------------------------------------------------------------------
+ * Hermes — readiness, persona, and the learning cycle
+ *
+ *   GET  /api/hermes/status
+ *   POST /api/hermes/cycle
+ *   POST /api/hermes/soul/install
+ *
+ * All three are refused in server mode: every answer is about $HERMES_HOME on
+ * the machine running the backend, which on a shared deployment belongs to the
+ * server and not to the tenant asking. The caller renders `reason === "server-mode"`
+ * as "not available here" rather than as a failure.
+ * ---------------------------------------------------------------------- */
+
+export interface HermesCheck {
+	readonly name: string;
+	readonly ok: boolean;
+	readonly detail: string;
+	readonly remedy: string;
+	readonly required: boolean;
+}
+
+export interface HermesReadiness {
+	readonly state: "absent" | "ready" | "degraded";
+	readonly installed: boolean;
+	readonly ready: boolean;
+	readonly degraded: boolean;
+	readonly home: string;
+	readonly checks: readonly HermesCheck[];
+}
+
+export interface HermesSoul {
+	readonly state: "installed" | "diverged" | "not-installed" | "unavailable";
+	readonly offered: boolean;
+	readonly installed: boolean;
+	readonly matches: boolean;
+	readonly installedPath: string;
+	readonly repoPath: string;
+}
+
+export interface HermesStatus {
+	readonly readiness: HermesReadiness;
+	readonly soul: HermesSoul;
+	readonly pending: readonly string[];
+	/**
+	 * Candidats encore dans la file mais que ce dépôt a déjà écartés — filés
+	 * avant que le triage existe. Un nombre, pas une liste : ce n'est plus du
+	 * travail pour personne, le prochain cycle les retire.
+	 */
+	readonly stale: number;
+	/** Skills adoptés dans `skills/<adoptedPack>/`, encore présents. */
+	readonly adopted: readonly string[];
+	/** Le pack d'adoption — non listé dans `.workpilot/skills.toml`, donc émis nulle part. */
+	readonly adoptedPack: string;
+	readonly surfaces: readonly { readonly id: string; readonly description: string }[];
+}
+
+export interface HermesCycle {
+	readonly surface: string;
+	readonly surfaceDescription: string;
+	readonly readiness: HermesReadiness;
+	readonly ran: boolean;
+	readonly proposed: number;
+	readonly pending: readonly string[];
+	readonly stale: number;
+	readonly ingest: {
+		readonly found: number;
+		readonly proposed: number;
+		readonly files: readonly string[];
+		readonly unchanged: number;
+		readonly deferred: number;
+		/** Ce que le triage a écarté à l'entrée, par motif (`hermes_triage`). */
+		readonly dropped: Readonly<Record<string, number>>;
+		readonly droppedTotal: number;
+		/** Candidats déjà en file que ce cycle a retirés. */
+		readonly pruned: number;
+		/** Ce que ce cycle a adopté, par nom de skill. */
+		readonly adopted: readonly string[];
+		/** Noms que le registre d'adoption avait déjà tranchés. */
+		readonly alreadyAdopted: number;
+		readonly reason: string;
+	} | null;
+}
+
+export async function fetchHermesStatus(
+	signal?: AbortSignal,
+): Promise<ApiResult<{ status: HermesStatus }>> {
+	return _get<{ status: HermesStatus }>("/api/hermes/status", {}, signal);
+}
+
+export async function runHermesCycle(
+	surface: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ cycle: HermesCycle }>> {
+	return _post<{ cycle: HermesCycle }>(
+		"/api/hermes/cycle",
+		{ surface, dryRun: false },
+		signal,
+	);
+}
+
+export async function installHermesSoul(
+	overwrite: boolean,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ changed: boolean; message: string; soul: HermesSoul }>> {
+	return _post<{ changed: boolean; message: string; soul: HermesSoul }>(
+		"/api/hermes/soul/install",
+		{ overwrite },
+		signal,
+	);
+}
+
+/* ------------------------------------------------------------------ */
+/* rtk — command output condensed before an agent reads it            */
+/*                                                                    */
+/* GET /api/rtk/status                                                */
+/*                                                                    */
+/* Read-only, and there is no companion action on purpose: the one    */
+/* command a user might want a button for is `rtk init -g`, which     */
+/* writes a hook into their own Claude Code settings for every        */
+/* session on the machine — not only the ones WorkPilot drives. The   */
+/* panel prints the command; the person types it.                     */
+/* ------------------------------------------------------------------ */
+
+export interface RtkCheck {
+	readonly name: string;
+	readonly ok: boolean;
+	readonly detail: string;
+	readonly remedy: string;
+}
+
+export interface RtkReadiness {
+	readonly installed: boolean;
+	readonly enabled: boolean;
+	readonly version: string;
+	readonly binary: string;
+	/** "absent" | "disabled" | "degraded" | "active" */
+	readonly state: string;
+	readonly checks: readonly RtkCheck[];
+}
+
+export interface RtkSavings {
+	readonly available: boolean;
+	readonly commands: number;
+	readonly inputBytes: number;
+	readonly outputBytes: number;
+	readonly savedBytes: number;
+	/** rtk's own estimate: bytes / 4. Neither side ships a tokenizer. */
+	readonly savedTokens: number;
+	readonly averagePct: number;
+	readonly reason: string;
+}
+
+export interface RtkStatus {
+	readonly readiness: RtkReadiness;
+	readonly savings: RtkSavings;
+}
+
+export async function fetchRtkStatus(
+	projectDir?: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ status: RtkStatus }>> {
+	// `_get` builds the query string itself — a `?` in the path would give
+	// the request two of them.
+	return _get<{ status: RtkStatus }>(
+		"/api/rtk/status",
+		projectDir ? { project_dir: projectDir } : {},
+		signal,
+	);
+}

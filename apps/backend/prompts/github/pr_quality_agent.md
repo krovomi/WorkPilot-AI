@@ -348,12 +348,14 @@ def process_file(path):
     data = f.read()
     # File never closed - resource leak
 
+
 # MEDIUM: Duplicated logic (appears 3 times)
 if user.role == "admin" and user.active and not user.banned:
     allow_access()
 
 # MEDIUM: Magic number
 time.sleep(86400)  # What is 86400?
+
 
 # LOW: Mutable default argument
 def add_item(item, items=[]):  # Bug: shared list

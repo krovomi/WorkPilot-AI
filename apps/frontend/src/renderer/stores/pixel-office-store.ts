@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import {
 	calculateProgress,
 	isTaskEffectivelyComplete,
+	resolveOverallProgress,
 } from "../../shared/progress";
 import type {
 	SubtaskNode,
@@ -327,7 +328,7 @@ function buildTaskAgent(
 		phase: executionPhase,
 		progress: getDisplayProgress(
 			calculateProgress(task.subtasks),
-			task.executionProgress?.overallProgress,
+			resolveOverallProgress(task.executionProgress),
 			hasActiveExecution,
 			task.subtasks.length > 0,
 			isTaskEffectivelyComplete(task.status, task.reviewReason),

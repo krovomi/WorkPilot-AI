@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import type { ContextAwareSnippetResult } from "../../stores/context-aware-snippets-store";
 import {
 	cancelSnippetGeneration,
-	setupContextAwareSnippetsListeners,
 	startSnippetGeneration,
 	useContextAwareSnippetsStore,
 } from "../../stores/context-aware-snippets-store";
@@ -94,12 +93,6 @@ export function ContextAwareSnippetsDialog({
 	} = useContextAwareSnippetsStore();
 
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
-
-	// Setup IPC listeners once
-	useEffect(() => {
-		const cleanup = setupContextAwareSnippetsListeners();
-		return cleanup;
-	}, []);
 
 	// Auto-scroll streaming output
 	useEffect(() => {

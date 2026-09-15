@@ -13,7 +13,6 @@ import {
 	getIdeationSummary,
 	loadIdeation,
 	refreshIdeation,
-	setupIdeationListeners,
 	stopIdeation,
 	useIdeationStore,
 } from "../../../stores/ideation-store";
@@ -65,11 +64,11 @@ export function useIdeation(
 
 	const { hasToken, isLoading: isCheckingToken, checkAuth } = useIdeationAuth();
 
-	// Set up IPC listeners and load ideation on mount
+	// The IPC listeners are registered once for the session (see
+	// stores/global-listeners.ts), so a generation keeps reporting while the
+	// user is on another page.
 	useEffect(() => {
-		const cleanup = setupIdeationListeners();
 		loadIdeation(projectId);
-		return cleanup;
 	}, [projectId]);
 
 	const handleGenerate = async () => {

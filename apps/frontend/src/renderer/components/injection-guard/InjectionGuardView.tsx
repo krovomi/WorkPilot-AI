@@ -1,10 +1,6 @@
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	setupInjectionGuardListeners,
-	useInjectionGuardStore,
-} from "../../stores/injection-guard-store";
+import { useInjectionGuardStore } from "../../stores/injection-guard-store";
 import type {
 	InjectionScanResult,
 	ScanFinding,
@@ -83,11 +79,6 @@ export function InjectionGuardView({
 	projectPath,
 }: InjectionGuardViewProps): React.ReactElement {
 	const { t } = useTranslation("injectionGuard");
-
-	useEffect(() => {
-		const cleanup = setupInjectionGuardListeners();
-		return cleanup;
-	}, []);
 
 	const phase = useInjectionGuardStore((s) => s.phase);
 	const status = useInjectionGuardStore((s) => s.status);

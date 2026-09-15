@@ -538,6 +538,22 @@ export function registerEnvHandlers(
 			// Note: graphitiEnabled is already handled via GRAPHITI_ENABLED above
 		}
 
+		// Token savings (rtk). Written to the same .workpilot/.env the backend
+		// reads, so the toggle reaches the agent hook, the awareness paragraph
+		// and WorkPilot's own captures from one place.
+		if (config.tokenSavings) {
+			if (config.tokenSavings.rtkEnabled !== undefined) {
+				existingVars.RTK_ENABLED = config.tokenSavings.rtkEnabled
+					? "true"
+					: "false";
+			}
+			if (config.tokenSavings.rtkModelFacing !== undefined) {
+				existingVars.RTK_MODEL_FACING = config.tokenSavings.rtkModelFacing
+					? "true"
+					: "false";
+			}
+		}
+
 		// Per-agent MCP overrides (add/remove MCPs from specific agents)
 		if (config.agentMcpOverrides) {
 			// First, clear any existing AGENT_MCP_* entries
@@ -1069,6 +1085,14 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 				puppeteerEnabled: vars.PUPPETEER_MCP_ENABLED?.toLowerCase() === "true", // default false
 				chromeDevtoolsEnabled:
 					vars.CHROME_DEVTOOLS_MCP_ENABLED?.toLowerCase() === "true", // default false
+			};
+
+			// Token savings (rtk) — both default true, because "on" costs
+			// nothing on a machine without rtk: every backend entry point
+			// answers "not installed" before doing any work.
+			config.tokenSavings = {
+				rtkEnabled: vars.RTK_ENABLED?.toLowerCase() !== "false",
+				rtkModelFacing: vars.RTK_MODEL_FACING?.toLowerCase() !== "false",
 			};
 
 			// Parse per-agent MCP overrides (AGENT_MCP_<agent>_ADD/REMOVE)

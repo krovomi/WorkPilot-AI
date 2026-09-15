@@ -8,13 +8,9 @@ import {
 	RotateCcw,
 } from "lucide-react";
 import type React from "react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { OnboardingAgentTab } from "../../stores/onboarding-agent-store";
-import {
-	setupOnboardingAgentListeners,
-	useOnboardingAgentStore,
-} from "../../stores/onboarding-agent-store";
+import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { useGeneratedText } from "./shared";
@@ -45,11 +41,6 @@ export function OnboardingPackageView({
 	const setTab = useOnboardingAgentStore((s) => s.setActiveTab);
 	const startScan = useOnboardingAgentStore((s) => s.startScan);
 	const reset = useOnboardingAgentStore((s) => s.reset);
-
-	useEffect(() => {
-		const cleanup = setupOnboardingAgentListeners();
-		return cleanup;
-	}, []);
 
 	const isScanning = phase === "scanning";
 

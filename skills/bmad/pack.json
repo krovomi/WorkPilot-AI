@@ -1,19 +1,19 @@
 {
 	"name": "bmad",
-	"version": "6.0.0",
-	"description": "BMAD Method v6 — product artefacts (PRD, architecture, epics, stories, sprint), the builder module, the creative-intelligence suite and the test architect.",
+	"version": "6.12.0",
+	"description": "BMAD Method v6.12.0 — the planning, shipping, review and agent skills, vendored from the npm package and pinned by scripts/vendor_bmad.py.",
 	"targets": {},
-	"source": "bmad-code-org/BMAD-METHOD",
+	"source": "bmad-code-org/bmad-method",
 	"maintainer": "BMAD (vendored)",
 	"bootstrap": {
 		"command": [
 			"npx",
 			"--yes",
-			"bmad-method@6",
+			"bmad-method@6.12.0",
 			"install",
 			"--full"
 		],
-		"produces": "_bmad",
-		"note": "Generates the _bmad/ runtime the 76 wrappers point at. Gitignored: it is a large generated tree, and its version is pinned here rather than committed."
+		"produces": "_bmad/scripts/resolve_customization.py",
+		"note": "Writes the _bmad/ runtime into the project being built: its config, its custom/ overrides and the scripts every skill resolves its customization through. Per project, not per checkout, which is why it is not committed."
 	}
 }

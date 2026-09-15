@@ -904,6 +904,19 @@
 			"smallWarn": "⚠ small — not advised for planning",
 			"smallWarnTip": "Small model ({{n}}B) — not advised for planning (prefer ≥24B or Claude); limited on complex tasks.",
 			"download": "Download",
+			"runningNotice": "Running model: {{model}}. Selecting a model does not replace the current request. Use Rerun to restart with the new settings.",
+			"runtimeUnknown": "not reported yet",
+			"customOption": "Other (official catalog)",
+			"searchTitle": "Find an Ollama model",
+			"searchSource": "Source: official catalog at ollama.com/library",
+			"searchPlaceholder": "Search for a model or variant…",
+			"searchHint": "Example: qwen3, then qwen3: for its variants. Select a result to confirm.",
+			"searchLoading": "Searching the official catalog…",
+			"searchError": "Official catalog unavailable. Edit the search to retry. Unverified names will not be used.",
+			"searchEmpty": "No matching model in the official catalog.",
+			"customConfirm": "Confirm model",
+			"customPlaceholder": "Model name (e.g. qwen2.5-coder:7b)",
+			"customAria": "Enter the model name",
 			"downloadTip": "“{{model}}” is not installed on the local server. The download runs in the background — you can keep working and come back later.",
 			"downloadingTip": "Downloading “{{model}}”",
 			"downloadQueued": "queued…",
@@ -945,9 +958,9 @@
 		},
 		"hotSwap": {
 			"title": "Hot swap requested",
-			"desc": "The change will apply on the next turn, keeping the context.",
+			"desc": "Change requested. The current request may continue; use Rerun to restart immediately.",
 			"pending": "Swapping…",
-			"pendingTip": "The LLM change will apply on the next turn."
+			"pendingTip": "Change requested. The current request may continue; use Rerun to restart immediately."
 		}
 	},
 	"modal": {
@@ -1107,5 +1120,24 @@
 		"deleteFile": "Delete file",
 		"contentPlaceholder": "File content...",
 		"selectFile": "Select a file to edit"
+	},
+	"failure": {
+		"title": "This task failed",
+		"unknown": "The build stopped without reporting a reason. Open the Logs tab for the last output.",
+		"hint": "Fix the cause, then relaunch the task. Planning failures on a local model usually mean switching that phase to a more capable model.",
+		"copy": "Copy",
+		"copied": "Copied"
+	},
+	"pauseState": {
+		"pausedDuring": "Paused during {{phase}}",
+		"resumesFrom": "Resumes from {{phase}}",
+		"phase": {
+			"spec": "spec creation",
+			"planning": "planning",
+			"coding": "coding",
+			"qa_review": "QA review",
+			"qa_fixing": "QA fixes",
+			"unknown": "the last checkpoint"
+		}
 	}
 }

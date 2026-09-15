@@ -128,8 +128,6 @@ class ArchitectureAnalyzer:
                 e for e in edges if e.source_id in top_ids and e.target_id in top_ids
             ]
 
-        from .diagram_generator import DiagramGenerator
-
         diagram = ArchitectureDiagram(
             diagram_type=DiagramType.MODULE_DEPENDENCIES,
             title="Module Dependencies",
@@ -137,8 +135,6 @@ class ArchitectureAnalyzer:
             edges=edges,
             metadata={"total_files": len(source_files)},
         )
-        gen = DiagramGenerator()
-        diagram.mermaid_code = gen.generate_mermaid(diagram)
         return diagram
 
     def analyze_component_hierarchy(self) -> ArchitectureDiagram:
@@ -200,8 +196,6 @@ class ArchitectureAnalyzer:
                                     )
                                 )
 
-        from .diagram_generator import DiagramGenerator
-
         diagram = ArchitectureDiagram(
             diagram_type=DiagramType.COMPONENT_HIERARCHY,
             title="Component Hierarchy",
@@ -209,8 +203,6 @@ class ArchitectureAnalyzer:
             edges=edges[:100],
             metadata={"react_files": len(react_files)},
         )
-        gen = DiagramGenerator()
-        diagram.mermaid_code = gen.generate_mermaid(diagram)
         return diagram
 
     def analyze_data_flow(self) -> ArchitectureDiagram:
@@ -273,16 +265,12 @@ class ArchitectureAnalyzer:
                         )
                     )
 
-        from .diagram_generator import DiagramGenerator
-
         diagram = ArchitectureDiagram(
             diagram_type=DiagramType.DATA_FLOW,
             title="Data Flow",
             nodes=list(nodes.values())[:40],
             edges=edges[:80],
         )
-        gen = DiagramGenerator()
-        diagram.mermaid_code = gen.generate_mermaid(diagram)
         return diagram
 
     def analyze_database_schema(self) -> ArchitectureDiagram:
@@ -340,16 +328,12 @@ class ArchitectureAnalyzer:
                             )
                         )
 
-        from .diagram_generator import DiagramGenerator
-
         diagram = ArchitectureDiagram(
             diagram_type=DiagramType.DATABASE_SCHEMA,
             title="Database Schema",
             nodes=list(nodes.values()),
             edges=edges,
         )
-        gen = DiagramGenerator()
-        diagram.mermaid_code = gen.generate_mermaid(diagram)
         return diagram
 
     def _get_source_files(self, extensions: list[str]) -> list[Path]:
@@ -418,6 +402,11 @@ class ArchitectureAnalyzer:
                         rel = str(candidate.relative_to(self.project_dir))
                         return self._path_to_id(rel)
             except Exception:
+                # A relative import that will not resolve to a file on disk is
+                # the ordinary case here, not an error: the target may live in
+                # a package this walk never indexed, or be a namespace with no
+                # `__init__.py`. The empty id below means "no edge", and the
+                # graph is evidence rather than a claim of completeness.
                 pass
             return ""
         # Absolute/package import — try to find in project

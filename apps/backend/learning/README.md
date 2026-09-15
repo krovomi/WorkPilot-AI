@@ -38,7 +38,7 @@ config = LearningModeConfig(
     explanation_level=ExplanationLevel.INTERMEDIATE,
     explain_tools=True,
     explain_decisions=True,
-    prefer_examples=True
+    prefer_examples=True,
 )
 
 learning_mode = LearningMode(config)
@@ -48,7 +48,7 @@ explanation = learning_mode.explain_tool_use(
     tool_name="Read",
     tool_input={"file_path": "auth.py"},
     reason="Analyzing authentication system",
-    expected_outcome="Understanding OAuth flow"
+    expected_outcome="Understanding OAuth flow",
 )
 
 print(explanation.explanation)
@@ -80,14 +80,12 @@ doc_gen = DocumentationGenerator(Path("/path/to/project"))
 await doc_gen.generate_readme(
     project_name="Mon Projet",
     description="Une super application",
-    features=["Auth OAuth", "API REST", "Dashboard"]
+    features=["Auth OAuth", "API REST", "Dashboard"],
 )
 
 # Générer documentation API
 await doc_gen.generate_api_documentation(
-    api_name="Mon API",
-    endpoints=[...],
-    auth_required=True
+    api_name="Mon API", endpoints=[...], auth_required=True
 )
 ```
 
@@ -115,17 +113,20 @@ tutorial_gen = TutorialGenerator(Path("/path/to/project"))
 tutorial = await tutorial_gen.generate_tutorial(
     topic=TutorialTopic.API_USAGE,
     code_context={"endpoints": [...]},
-    target_audience="intermediate"
+    target_audience="intermediate",
 )
 
 # Ajouter des étapes
-tutorial_gen.add_step(tutorial, TutorialStep(
-    step_number=1,
-    title="Installation",
-    description="Installer les dépendances",
-    code_example="npm install",
-    tips=["Use Node 18+"]
-))
+tutorial_gen.add_step(
+    tutorial,
+    TutorialStep(
+        step_number=1,
+        title="Installation",
+        description="Installer les dépendances",
+        code_example="npm install",
+        tips=["Use Node 18+"],
+    ),
+)
 ```
 
 ### 4. `onboarding_assistant.py`
@@ -151,8 +152,7 @@ assistant = OnboardingAssistant(Path("/path/to/project"))
 
 # Démarrer l'onboarding
 progress = await assistant.start_onboarding(
-    developer_name="Alice",
-    experience_level="intermediate"
+    developer_name="Alice", experience_level="intermediate"
 )
 
 # Obtenir l'étape suivante
@@ -162,7 +162,7 @@ next_step = await assistant.get_next_step("Alice")
 await assistant.complete_step(
     developer_name="Alice",
     step=OnboardingStep.SETUP_ENVIRONMENT,
-    notes="Environment setup successful"
+    notes="Environment setup successful",
 )
 ```
 
@@ -175,27 +175,27 @@ await assistant.complete_step(
 class LearningModeConfig:
     enabled: bool = True
     explanation_level: ExplanationLevel = ExplanationLevel.INTERMEDIATE
-    explain_tools: bool = True              # Expliquer les outils
-    explain_decisions: bool = True          # Expliquer les décisions
-    explain_code: bool = True               # Expliquer le code
-    explain_patterns: bool = True           # Expliquer les patterns
-    explain_best_practices: bool = True     # Expliquer les best practices
-    generate_inline_comments: bool = True   # Ajouter des commentaires
-    generate_summary: bool = True           # Générer un résumé
-    save_learnings: bool = True             # Sauvegarder les explications
-    prefer_visual_diagrams: bool = False    # Générer des diagrammes Mermaid
-    prefer_examples: bool = True            # Inclure des exemples
-    prefer_comparisons: bool = True         # Comparer avec alternatives
+    explain_tools: bool = True  # Expliquer les outils
+    explain_decisions: bool = True  # Expliquer les décisions
+    explain_code: bool = True  # Expliquer le code
+    explain_patterns: bool = True  # Expliquer les patterns
+    explain_best_practices: bool = True  # Expliquer les best practices
+    generate_inline_comments: bool = True  # Ajouter des commentaires
+    generate_summary: bool = True  # Générer un résumé
+    save_learnings: bool = True  # Sauvegarder les explications
+    prefer_visual_diagrams: bool = False  # Générer des diagrammes Mermaid
+    prefer_examples: bool = True  # Inclure des exemples
+    prefer_comparisons: bool = True  # Comparer avec alternatives
 ```
 
 ### ExplanationLevel (Enum)
 
 ```python
 class ExplanationLevel(str, Enum):
-    BEGINNER = "beginner"           # Très détaillé
-    INTERMEDIATE = "intermediate"   # Équilibré
-    ADVANCED = "advanced"           # Concis
-    EXPERT = "expert"               # Minimal
+    BEGINNER = "beginner"  # Très détaillé
+    INTERMEDIATE = "intermediate"  # Équilibré
+    ADVANCED = "advanced"  # Concis
+    EXPERT = "expert"  # Minimal
 ```
 
 ## 📊 Modèles de données
@@ -273,7 +273,7 @@ config = LearningModeConfig(
     explanation_level=ExplanationLevel.ADVANCED,
     explain_tools=True,
     explain_decisions=True,
-    prefer_visual_diagrams=True
+    prefer_visual_diagrams=True,
 )
 
 learning_mode = LearningMode(config)
@@ -306,15 +306,10 @@ Les sessions Learning Mode collectent automatiquement :
 {
     "session_duration_seconds": 125.5,
     "total_explanations": 15,
-    "explanations_by_category": {
-        "tool_use": 8,
-        "decision": 4,
-        "code": 2,
-        "pattern": 1
-    },
+    "explanations_by_category": {"tool_use": 8, "decision": 4, "code": 2, "pattern": 1},
     "tools_used": ["Read", "Grep", "Glob"],
     "patterns_used": ["Factory Pattern", "Singleton"],
-    "explanation_level": "intermediate"
+    "explanation_level": "intermediate",
 }
 ```
 

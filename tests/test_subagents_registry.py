@@ -169,7 +169,10 @@ class TestCallerPrecedence:
     def test_no_defaults_and_no_caller_agents_yields_none(self, tmp_path, monkeypatch):
         import agents.subagents as mod
 
-        monkeypatch.setattr(mod, "phase_defaults", lambda _t: {})
+        # Two parameters: `resolve` passes the roster override through, so a
+        # stub that takes only the agent_type stops matching the function it
+        # replaces and fails with a TypeError that says nothing about rosters.
+        monkeypatch.setattr(mod, "phase_defaults", lambda _t, _roster=None: {})
         assert resolve("coder", project_dir=tmp_path) is None
 
 

@@ -788,11 +788,17 @@ export const IPC_CHANNELS = {
 	ARCHITECTURE_VISUALIZER_GENERATE: "architectureVisualizer:generate",
 	ARCHITECTURE_VISUALIZER_CANCEL: "architectureVisualizer:cancel",
 	ARCHITECTURE_VISUALIZER_CONFIGURE: "architectureVisualizer:configure",
+	ARCHITECTURE_VISUALIZER_DOCTOR: "architectureVisualizer:doctor",
+	// Per-task architecture delta
+	ARCHITECTURE_DELTA_READ: "architectureVisualizer:delta",
+	ARCHITECTURE_DELTA_REGENERATE: "architectureVisualizer:regenerateDelta",
+	ARCHITECTURE_ARTIFACT_READ: "architectureVisualizer:readArtifact",
 	// Architecture Visualizer events (main -> renderer)
 	ARCHITECTURE_VISUALIZER_STATUS: "architectureVisualizer:status",
 	ARCHITECTURE_VISUALIZER_STREAM_CHUNK: "architectureVisualizer:streamChunk",
 	ARCHITECTURE_VISUALIZER_ERROR: "architectureVisualizer:error",
 	ARCHITECTURE_VISUALIZER_COMPLETE: "architectureVisualizer:complete",
+	ARCHITECTURE_DELTA_STATUS: "architectureVisualizer:deltaStatus",
 
 	// Code Migration Agent
 	CODE_MIGRATION_START: "codeMigration:start",

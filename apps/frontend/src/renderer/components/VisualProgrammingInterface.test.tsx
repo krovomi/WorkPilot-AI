@@ -10,7 +10,14 @@ vi.mock("react-i18next", () => ({
 			options?: Record<string, unknown>,
 		) => {
 			const translations: Record<string, string> = {
-				newDiagram: "New diagram",
+				newArchitecture: "New architecture",
+				duplicateArchitecture: "Duplicate architecture",
+				architectures: "Architectures",
+				closeArchitecture: "Close architecture",
+				historyShort: "History",
+				historyTitle: "Construction history",
+				historyEmpty: "No step recorded yet.",
+				deleteArchitectureTitle: "Delete this architecture?",
 				addBlock: "Add block",
 				reverse: "Reverse: Code → Visual",
 				scaffold: "Generate project",
@@ -31,6 +38,11 @@ vi.mock("react-i18next", () => ({
 				statusSaved: "Saved",
 				emptyCanvasTitle: "The canvas is empty",
 				searchBlocks: "Search a block…",
+				generatedCodeTitle: "AI-generated code",
+				showGeneratedCode: "Generated code",
+				dockWriting: "Writing {{file}}…",
+				dockWaiting: "Waiting for the first files…",
+				generating: "Generating…",
 			};
 			const opts =
 				typeof fallback === "object" && fallback !== null ? fallback : options;
@@ -76,39 +88,135 @@ vi.mock("reactflow", async (importOriginal) => {
 
 vi.mock("file-saver", () => ({ saveAs: vi.fn() }));
 
-vi.mock("@/stores/visual-to-code-store", () => ({
-	useVisualToCodeStore: () => ({
-		canvasNodes: [
-			{
-				id: "1",
-				position: { x: 250, y: 5 },
-				data: { label: "New diagram" },
-				type: "editable",
-			},
-		],
-		canvasEdges: [],
-		canvasDiagramType: "architecture",
-		setCanvasNodes: () => {
-			// Mock function for testing
-		},
-		setCanvasEdges: () => {
-			// Mock function for testing
-		},
-		setCanvasDiagramType: () => {
-			// Mock function for testing
-		},
-	}),
+// CodeMirror does not initialise under jsdom (its extension set resolves
+// through a module graph pnpm gives us twice). What the dock is asked here is
+// which file it shows, not how it highlights it.
+vi.mock("./ui/code-editor", () => ({
+	CodeEditor: ({ value, filename }: { value: string; filename?: string }) => (
+		<pre data-testid="code-editor" data-filename={filename}>
+			{value}
+		</pre>
+	),
 }));
+
+/**
+ * The store double, kept in the shape the real store has.
+ *
+ * The panel reads its documents *and* its run state from there now, and it
+ * calls the store both ways — bare for the whole state, with a selector for a
+ * single field. A double that answered an object to a selector call would make
+ * every test here pass against a component that cannot render in the app.
+ *
+ * `getState` is part of that shape too: the loader effect reads the active
+ * architecture imperatively, precisely so that it does not re-run on every
+ * edit the mirror writes back.
+ */
+const SAVED_BLOCK = {
+	id: "1",
+	position: { x: 250, y: 5 },
+	data: { label: "Saved block" },
+	type: "editable",
+};
+
+const ARCHITECTURE = {
+	id: "arch-1",
+	name: "Architecture 1",
+	diagramType: "architecture",
+	nodes: [SAVED_BLOCK] as unknown[],
+	edges: [] as unknown[],
+	createdAt: "2026-01-01T00:00:00.000Z",
+	updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+const storeState = {
+	architectures: [ARCHITECTURE] as (typeof ARCHITECTURE)[],
+	activeArchitectureId: "arch-1" as string | null,
+	createArchitecture: vi.fn(),
+	duplicateArchitecture: vi.fn(),
+	renameArchitecture: vi.fn(),
+	deleteArchitecture: vi.fn(),
+	setActiveArchitecture: vi.fn(),
+	updateArchitecture: vi.fn(),
+	historyOpen: false,
+	setHistoryOpen: vi.fn(),
+	versions: [] as unknown[],
+	historyLoading: false,
+	historyError: null as string | null,
+	pendingRestore: null as unknown,
+	consumePendingRestore: vi.fn(() => null),
+	phase: "idle" as string,
+	error: null as string | null,
+	status: "",
+	streamedFiles: [] as { filename: string; language: string; content: string }[],
+	writingFile: null as string | null,
+	codeResult: null as { summary?: string } | null,
+	pendingDiagram: null as unknown,
+	consumePendingDiagram: vi.fn(() => null),
+	dockOpen: false,
+	selectedFile: 0,
+	setDockOpen: vi.fn(),
+	selectFile: vi.fn(),
+	startRun: vi.fn(),
+	clearRun: vi.fn(),
+};
+
+function resetStoreState(overrides: Partial<typeof storeState> = {}) {
+	Object.assign(storeState, {
+		architectures: [{ ...ARCHITECTURE, nodes: [SAVED_BLOCK], edges: [] }],
+		activeArchitectureId: "arch-1",
+		historyOpen: false,
+		versions: [],
+		historyLoading: false,
+		historyError: null,
+		pendingRestore: null,
+		phase: "idle",
+		error: null,
+		status: "",
+		streamedFiles: [],
+		writingFile: null,
+		codeResult: null,
+		pendingDiagram: null,
+		dockOpen: false,
+		selectedFile: 0,
+		...overrides,
+	});
+}
+
+vi.mock("@/stores/visual-to-code-store", () => {
+	const useVisualToCodeStore = (
+		selector?: (state: typeof storeState) => unknown,
+	) => (selector ? selector(storeState) : storeState);
+	useVisualToCodeStore.getState = () => storeState;
+	return {
+		useVisualToCodeStore,
+		selectActiveArchitecture: (state: typeof storeState) =>
+			state.architectures.find((a) => a.id === state.activeArchitectureId) ??
+			null,
+		// The timeline talks to the main process; these tests are about the
+		// panel, so they answer without one.
+		captureVersion: vi.fn(async () => true),
+		loadHistory: vi.fn(async () => undefined),
+		restoreVersion: vi.fn(async () => true),
+		labelVersion: vi.fn(async () => undefined),
+		deleteVersion: vi.fn(async () => undefined),
+	};
+});
 
 import { CanvasPanel } from "./visual-to-code/CanvasPanel";
 
 describe("CanvasPanel", () => {
 	beforeEach(() => {
+		resetStoreState();
 		// biome-ignore lint/suspicious/noExplicitAny: test double for the preload bridge
 		(globalThis as any).electronAPI = {
 			// biome-ignore lint/suspicious/noExplicitAny: test double for the preload bridge
 			...(globalThis as any).electronAPI,
+			// The panel no longer subscribes to any of these — the window does,
+			// in `setupVisualToCodeListeners`. They stay on the double because
+			// the bootstrap is what a real window would have called.
 			onVisualProgrammingStatus: vi.fn(() => vi.fn()),
+			onVisualProgrammingFile: vi.fn(() => vi.fn()),
+			onVisualProgrammingWriting: vi.fn(() => vi.fn()),
 			onVisualProgrammingError: vi.fn(() => vi.fn()),
 			onVisualProgrammingComplete: vi.fn(() => vi.fn()),
 			runVisualProgramming: vi.fn().mockResolvedValue({ success: true }),
@@ -119,15 +227,122 @@ describe("CanvasPanel", () => {
 		(globalThis as any).platform = { isWindows: false };
 	});
 
-	it("renders a single 'New diagram' button (consolidated types)", () => {
+	it("opens a new architecture beside the current one, destroying nothing", () => {
 		render(<CanvasPanel />);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "New architecture" }),
+		);
+
+		// It used to clear the canvas, which is why it had to stop and offer an
+		// export first. Documents are independent now: there is nothing to lose
+		// and nothing to ask.
+		expect(storeState.createArchitecture).toHaveBeenCalled();
 		expect(
-			screen.getByRole("button", { name: "New diagram" }),
+			screen.queryByText("Export file name"),
+		).not.toBeInTheDocument();
+	});
+
+	it("lists every architecture as a tab, and marks the active one", () => {
+		resetStoreState({
+			architectures: [
+				{ ...ARCHITECTURE, nodes: [SAVED_BLOCK], edges: [] },
+				{ ...ARCHITECTURE, id: "arch-2", name: "Mobile", nodes: [], edges: [] },
+			],
+		});
+		render(<CanvasPanel />);
+
+		const tabs = screen.getAllByRole("tab");
+		expect(tabs.map((tab) => tab.textContent)).toEqual([
+			"Architecture 1",
+			"Mobile",
+		]);
+		expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+		expect(tabs[1]).toHaveAttribute("aria-selected", "false");
+	});
+
+	it("switches document when another tab is clicked", () => {
+		resetStoreState({
+			architectures: [
+				{ ...ARCHITECTURE, nodes: [SAVED_BLOCK], edges: [] },
+				{ ...ARCHITECTURE, id: "arch-2", name: "Mobile", nodes: [], edges: [] },
+			],
+		});
+		render(<CanvasPanel />);
+
+		fireEvent.click(screen.getByRole("tab", { name: "Mobile" }));
+
+		expect(storeState.setActiveArchitecture).toHaveBeenCalledWith("arch-2");
+	});
+
+	it("closes an empty architecture outright, and asks about one with work in it", () => {
+		resetStoreState({
+			architectures: [
+				{ ...ARCHITECTURE, nodes: [SAVED_BLOCK], edges: [] },
+				{ ...ARCHITECTURE, id: "arch-2", name: "Empty", nodes: [], edges: [] },
+			],
+		});
+		render(<CanvasPanel />);
+
+		// Nothing on it: closing loses nothing, so it just closes.
+		fireEvent.click(
+			screen.getByRole("button", { name: "Close architecture — Empty" }),
+		);
+		expect(storeState.deleteArchitecture).toHaveBeenCalledWith("arch-2");
+
+		// One with blocks on it takes its history with it. That is worth a question.
+		storeState.deleteArchitecture.mockClear();
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Close architecture — Architecture 1",
+			}),
+		);
+		expect(storeState.deleteArchitecture).not.toHaveBeenCalled();
+		expect(
+			screen.getByText("Delete this architecture?"),
 		).toBeInTheDocument();
+	});
+
+	it("writes pending edits into the document when the page is left", async () => {
+		const { unmount } = render(<CanvasPanel />);
+		storeState.updateArchitecture.mockClear();
+
+		fireEvent.click(screen.getByRole("button", { name: "Add block" }));
+		await screen.findByText("2 blocks");
+
+		// Edits are coalesced before reaching the store — a drag emits one per
+		// frame — so leaving the page inside that window has to flush rather
+		// than drop. This is the property that keeps the coalescing free.
+		unmount();
+
+		const writes = storeState.updateArchitecture.mock.calls;
+		expect(writes.length).toBeGreaterThan(0);
+		const [id, patch] = writes[writes.length - 1];
+		expect(id).toBe("arch-1");
+		expect((patch as { nodes: unknown[] }).nodes).toHaveLength(2);
+	});
+
+	it("shows the construction timeline when it is opened", () => {
+		resetStoreState({ historyOpen: true });
+		render(<CanvasPanel />);
+
+		expect(screen.getByText("Construction history")).toBeInTheDocument();
+		expect(screen.getByText("No step recorded yet.")).toBeInTheDocument();
+	});
+
+	it("keeps the timeline shut until it is asked for", () => {
+		render(<CanvasPanel />);
+
+		expect(screen.queryByText("Construction history")).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "History" }));
+		expect(storeState.setHistoryOpen).toHaveBeenCalledWith(true);
 	});
 
 	it("renders action buttons", () => {
 		render(<CanvasPanel />);
+		expect(
+			screen.getByRole("button", { name: "New architecture" }),
+		).toBeInTheDocument();
 		expect(screen.getByText("Add block")).toBeInTheDocument();
 		expect(screen.getByText("Reverse: Code → Visual")).toBeInTheDocument();
 		// Primary action: full agentic scaffold; secondary: one-shot code preview
@@ -136,6 +351,57 @@ describe("CanvasPanel", () => {
 		expect(screen.getByText("Export JSON")).toBeInTheDocument();
 		expect(screen.getByText("Save as…")).toBeInTheDocument();
 		expect(screen.getByText("Load")).toBeInTheDocument();
+	});
+
+
+	it("opens empty when nothing is stored, and says what to do next", () => {
+		// The canvas used to be seeded with a "New diagram" block: a node that
+		// named nothing, had to be deleted before any real architecture could be
+		// drawn, and made the empty-state hint below unreachable.
+		resetStoreState({
+			architectures: [{ ...ARCHITECTURE, nodes: [], edges: [] }],
+		});
+		render(<CanvasPanel />);
+
+		expect(screen.getByText("0 blocks")).toBeInTheDocument();
+		expect(screen.getByText("The canvas is empty")).toBeInTheDocument();
+	});
+
+	it("shows the generation in the dock while it runs, not a dialog at the end", () => {
+		resetStoreState({
+			phase: "generating",
+			dockOpen: true,
+			writingFile: "src/App.tsx",
+			streamedFiles: [
+				{ filename: "api/Program.cs", language: "csharp", content: "// x" },
+			],
+		});
+		render(<CanvasPanel />);
+
+		// The file already produced, and the one being written right now.
+		expect(screen.getByText("Program.cs")).toBeInTheDocument();
+		expect(screen.getByText("Writing App.tsx…")).toBeInTheDocument();
+	});
+
+	it("offers a way back to a dock the user closed, and none when it is empty", () => {
+		resetStoreState({ dockOpen: false });
+		const { unmount } = render(<CanvasPanel />);
+		expect(
+			screen.queryByRole("button", { name: "Generated code" }),
+		).not.toBeInTheDocument();
+		unmount();
+
+		resetStoreState({
+			dockOpen: false,
+			phase: "complete",
+			streamedFiles: [
+				{ filename: "api/Program.cs", language: "csharp", content: "// x" },
+			],
+		});
+		render(<CanvasPanel />);
+		expect(
+			screen.getByRole("button", { name: "Generated code" }),
+		).toBeInTheDocument();
 	});
 
 	it("renders the ReactFlow canvas", () => {

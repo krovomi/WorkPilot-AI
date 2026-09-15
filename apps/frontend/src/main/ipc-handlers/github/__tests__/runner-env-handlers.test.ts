@@ -207,7 +207,12 @@ describe("GitHub runner env usage", () => {
 			123,
 		);
 
-		expect(mockGetRunnerEnv).toHaveBeenCalledWith({ USE_CLAUDE_MD: "true" });
+		// Le second argument nomme la page : c'est lui qui fait suivre à la revue
+		// le fournisseur choisi pour « GitHub PRs » plutôt que Claude par défaut.
+		expect(mockGetRunnerEnv).toHaveBeenCalledWith(
+			{ USE_CLAUDE_MD: "true" },
+			{ page: "github-prs" },
+		);
 		expect(mockRunPythonSubprocess).toHaveBeenCalledWith(
 			expect.objectContaining({
 				env: { ANTHROPIC_AUTH_TOKEN: "token" },
@@ -249,10 +254,13 @@ describe("GitHub runner env usage", () => {
 			124,
 		);
 
-		expect(mockGetRunnerEnv).toHaveBeenCalledWith({
-			USE_CLAUDE_MD: "true",
-			TDD_MODE: "true",
-		});
+		expect(mockGetRunnerEnv).toHaveBeenCalledWith(
+			{
+				USE_CLAUDE_MD: "true",
+				TDD_MODE: "true",
+			},
+			{ page: "github-prs" },
+		);
 	});
 
 	it("passes runner env to triage subprocess", async () => {
@@ -275,7 +283,9 @@ describe("GitHub runner env usage", () => {
 			projectRef.current?.id,
 		);
 
-		expect(mockGetRunnerEnv).toHaveBeenCalledWith();
+		expect(mockGetRunnerEnv).toHaveBeenCalledWith(undefined, {
+			page: "github-issues",
+		});
 		expect(mockRunPythonSubprocess).toHaveBeenCalledWith(
 			expect.objectContaining({
 				env: { ANTHROPIC_AUTH_TOKEN: "token" },
