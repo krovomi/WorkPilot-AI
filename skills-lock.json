@@ -558,14 +558,6 @@
 			"contentSha256": "2f43a9787b129887cec1b7c138121303775bb8b98e32f93df306450fac63f897",
 			"targets": {}
 		},
-		"convert-documents-to-markdown": {
-			"kind": "skill",
-			"pack": "tooling",
-			"packVersion": "1.0.0",
-			"source": "skills/tooling/convert-documents-to-markdown/SKILL.md",
-			"contentSha256": "c2bc3558ece96d4ff8e30cf2ce7a15ab6b2eb6b897743065fb52aecd7874f52c",
-			"targets": {}
-		},
 		"claude-code": {
 			"kind": "skill",
 			"pack": "hermes",
@@ -596,6 +588,14 @@
 			"packVersion": "0.0.1",
 			"source": "skills/hermes/computer-use/SKILL.md",
 			"contentSha256": "ae9a1ee749ce5acbda34b1317c4b3b44a69c20fda8c569fbb42dfe331af4d4f2",
+			"targets": {}
+		},
+		"convert-documents-to-markdown": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/convert-documents-to-markdown/SKILL.md",
+			"contentSha256": "c2bc3558ece96d4ff8e30cf2ce7a15ab6b2eb6b897743065fb52aecd7874f52c",
 			"targets": {}
 		},
 		"cross-platform-mobile": {
@@ -1108,12 +1108,12 @@
 		".agents/skills/brand-guidelines/examples/business-report-template.md",
 		".agents/skills/business-comms/SKILL.md",
 		".agents/skills/business-comms/examples/project-reports.md",
-		".agents/skills/convert-documents-to-markdown/LICENSE",
-		".agents/skills/convert-documents-to-markdown/SKILL.md",
 		".agents/skills/claude-code/SKILL.md",
 		".agents/skills/codebase-inspection/SKILL.md",
 		".agents/skills/codex/SKILL.md",
 		".agents/skills/computer-use/SKILL.md",
+		".agents/skills/convert-documents-to-markdown/LICENSE",
+		".agents/skills/convert-documents-to-markdown/SKILL.md",
 		".agents/skills/cross-platform-mobile/SKILL.md",
 		".agents/skills/github/SKILL.md",
 		".agents/skills/github/references/auth.md",
@@ -1221,11 +1221,11 @@
 		".gemini/commands/bmad-walkthrough.toml",
 		".gemini/commands/brand-guidelines.toml",
 		".gemini/commands/business-comms.toml",
-		".gemini/commands/convert-documents-to-markdown.toml",
 		".gemini/commands/claude-code.toml",
 		".gemini/commands/codebase-inspection.toml",
 		".gemini/commands/codex.toml",
 		".gemini/commands/computer-use.toml",
+		".gemini/commands/convert-documents-to-markdown.toml",
 		".gemini/commands/cross-platform-mobile.toml",
 		".gemini/commands/github.toml",
 		".gemini/commands/ios-developer.toml",
