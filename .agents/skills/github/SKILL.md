@@ -28,7 +28,7 @@ metadata:
   workpilot:
     pack: hermes
     version: 0.0.1
-    content_sha256: d8ded7c3ff006f084571e6cefb8496cd4200aeab49cae0b41580305bcb8b641b
+    content_sha256: 024e2ddd893111fa45275f01b7bb8472f2653131acfc687f88b1f3e30226773e
 ---
 
 # GitHub

@@ -24,7 +24,7 @@ metadata:
   workpilot:
     pack: hermes
     version: 0.0.1
-    content_sha256: 9c2fcdcbda3f8cf3d5544638079f15deaf6120e3de4e41c093faeb946eed1aed
+    content_sha256: 9879a67fefdfb47022c92eabf3dfca80868c54d78bb1d6bd27d56742d0f65ea4
 ---
 
 # Python Debugger (pdb + debugpy)

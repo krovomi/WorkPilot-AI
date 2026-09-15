@@ -614,7 +614,7 @@
 			"pack": "hermes",
 			"packVersion": "0.0.1",
 			"source": "skills/hermes/github/SKILL.md",
-			"contentSha256": "d8ded7c3ff006f084571e6cefb8496cd4200aeab49cae0b41580305bcb8b641b",
+			"contentSha256": "024e2ddd893111fa45275f01b7bb8472f2653131acfc687f88b1f3e30226773e",
 			"targets": {}
 		},
 		"ios-developer": {
@@ -770,7 +770,7 @@
 			"pack": "hermes",
 			"packVersion": "0.0.1",
 			"source": "skills/hermes/python-debugpy/SKILL.md",
-			"contentSha256": "9c2fcdcbda3f8cf3d5544638079f15deaf6120e3de4e41c093faeb946eed1aed",
+			"contentSha256": "9879a67fefdfb47022c92eabf3dfca80868c54d78bb1d6bd27d56742d0f65ea4",
 			"targets": {}
 		},
 		"sdlc-review": {
@@ -810,7 +810,7 @@
 			"pack": "hermes",
 			"packVersion": "0.0.1",
 			"source": "skills/hermes/systematic-debugging/SKILL.md",
-			"contentSha256": "7ed24a65d4d9d6d8f912253948c41963f8195706344b7f750303ab6eb0df1d2f",
+			"contentSha256": "f4810745cc5b78f2760e8f04f0f4795364e2de097419803fc1ec442993e5000f",
 			"targets": {}
 		},
 		"testcontainers-integration": {
