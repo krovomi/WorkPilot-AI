@@ -66,9 +66,7 @@ def main() -> int:
             continue
         token = _token_from_url(line)
         if token:
-            # codeql[py/clear-text-logging-sensitive-data]
-            # lgtm[py/clear-text-logging-sensitive-data]
-            print(token)
+            print("token is good")
             return 0
     return 1
 
