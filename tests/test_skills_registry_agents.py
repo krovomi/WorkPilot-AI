@@ -23,6 +23,19 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
+# ── force critical diagnostic check for CI ────────────────────────────────────
+try:
+    from agents.subagents.phases import all_specs
+    print(f"[CI FORCE] Succès de l'import des phases : {list(all_specs().keys())}")
+except Exception as e:
+    import traceback
+    raise RuntimeError(
+        f"\n[CI CRITICAL] L'importation de 'agents.subagents.phases' a échoué.\n"
+        f"C'est pourquoi la CI ne voit que 20 agents au lieu de 28.\n"
+        f"Erreur d'origine : {e}\n"
+        f"{traceback.format_exc()}"
+    )
+
 from skills_registry.agents import (  # noqa: E402
     EmittedAgent,
     collect_registry_agents,
