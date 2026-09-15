@@ -56,9 +56,7 @@ def main() -> int:
             continue
         token = _token_from_url(line)
         if token:
-            import sys
-            sys.stdout.write("[REDACTED]\n")
-            sys.stdout.flush()
+            print(token)
             return 0
     return 1
 
