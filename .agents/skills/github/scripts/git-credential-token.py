@@ -11,18 +11,6 @@ _TOKEN_PREFIXES = ("ghp_", "github_pat_", "gho_", "ghu_", "ghs_", "ghr_")
 _INVALID_ESCAPE = re.compile(r"%(?![0-9A-Fa-f]{2})")
 
 
-def _redact_token(token: str) -> str:
-    if not token:
-        return ""
-    prefix = ""
-    for candidate in _TOKEN_PREFIXES:
-        if token.startswith(candidate):
-            prefix = candidate
-            break
-    suffix = token[-4:] if len(token) >= 4 else token
-    return f"{prefix}***{suffix}"
-
-
 def _decode(value: str | None) -> str:
     if value is None or _INVALID_ESCAPE.search(value):
         return ""
@@ -68,7 +56,7 @@ def main() -> int:
             continue
         token = _token_from_url(line)
         if token:
-            print(_redact_token(token))
+            print(token)
             return 0
     return 1
 
