@@ -7,6 +7,7 @@ Exposes two endpoints used by the Kanban Quick-Command bar:
        - <project_dir>/.agents/skills/*/SKILL.md  (agnostic, primary source)
        - <project_dir>/.claude/commands/*.md       (Claude mirror, fallback)
        - ~/.claude/commands/*.md                   (user-scoped fallback)
+       - bundled product skills                   (last fallback)
        Commands already covered by the agnostic source are not duplicated.
        Each entry carries the parsed YAML frontmatter so the UI can render
        a description tooltip without an extra round-trip.
@@ -41,6 +42,7 @@ from typing import Annotated, Any
 
 from core.api_safety import validated_dir
 from fastapi import APIRouter, Body, HTTPException, Query
+from skills_registry.bundled import BUNDLED_SKILLS, load_bundled_skill
 from skills_registry.frontmatter import parse_frontmatter, workpilot_meta
 from skills_registry.resolver import check_requires
 
@@ -183,6 +185,7 @@ def _resolve_command_body(proj: Path, command: str) -> str | None:
       1. <proj>/.agents/skills/<command>/SKILL.md   (agnostic, preferred)
       2. <proj>/.claude/commands/<command>.md       (Claude mirror, fallback)
       3. ~/.claude/commands/<command>.md            (user-scoped fallback)
+      4. bundled product skills                    (consumer projects)
 
     The frontmatter is stripped so the returned text is the raw instructions
     any provider can execute. Returns None when no definition is found (the
@@ -204,7 +207,8 @@ def _resolve_command_body(proj: Path, command: str) -> str | None:
                     return body
         except OSError:
             continue
-    return None
+    bundled = load_bundled_skill(command)
+    return bundled[1] if bundled is not None else None
 
 
 # Built-in slash commands the SDK / CLI recognises AND that make sense in
@@ -230,7 +234,7 @@ def list_slash_commands(project_dir: Annotated[str, Query()]):
     """List discovered slash commands for a project.
 
     Order: agnostic project skills first, then any Claude-only mirror commands,
-    then user commands, then built-ins. Commands already provided by the
+    then user commands, then bundled skills and built-ins. Commands provided by the
     agnostic `.agents/skills/` source are not repeated from `.claude/commands`
     (the Claude mirror is a fallback for non-skill commands only).
     """
@@ -252,13 +256,28 @@ def list_slash_commands(project_dir: Annotated[str, Query()]):
         for c in _scan_commands_dir(Path.home() / ".claude" / "commands", "user")
         if c["name"] not in seen
     ]
+    seen.update(c["name"] for c in user_cmds)
+    bundled_cmds = []
+    for name in BUNDLED_SKILLS:
+        if name in seen:
+            continue
+        skill = load_bundled_skill(name)
+        if skill is not None:
+            bundled_cmds.append(
+                {
+                    "name": name,
+                    "description": skill[0].get("description", ""),
+                    "source": "built-in",
+                    "path": "",
+                }
+            )
     built_ins = [
         {**cmd, "source": "built-in", "path": ""} for cmd in _BUILT_IN_COMMANDS
     ]
 
     return {
         "success": True,
-        "commands": skill_cmds + project_cmds + user_cmds + built_ins,
+        "commands": skill_cmds + project_cmds + user_cmds + bundled_cmds + built_ins,
     }
 
 

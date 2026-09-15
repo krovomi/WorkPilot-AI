@@ -42,6 +42,14 @@
 			"contentSha256": "2f43a9787b129887cec1b7c138121303775bb8b98e32f93df306450fac63f897",
 			"targets": {}
 		},
+		"convert-documents-to-markdown": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/convert-documents-to-markdown/SKILL.md",
+			"contentSha256": "c2bc3558ece96d4ff8e30cf2ce7a15ab6b2eb6b897743065fb52aecd7874f52c",
+			"targets": {}
+		},
 		"mcp-builder": {
 			"kind": "skill",
 			"pack": "tooling",
@@ -101,6 +109,8 @@
 		".agents/skills/brand-guidelines/examples/business-report-template.md",
 		".agents/skills/business-comms/SKILL.md",
 		".agents/skills/business-comms/examples/project-reports.md",
+		".agents/skills/convert-documents-to-markdown/LICENSE",
+		".agents/skills/convert-documents-to-markdown/SKILL.md",
 		".agents/skills/mcp-builder/SKILL.md",
 		".agents/skills/mem-search/SKILL.md",
 		".agents/skills/mem-search/scripts/mem_search.py",
@@ -111,6 +121,7 @@
 		".gemini/commands/architecture-map.toml",
 		".gemini/commands/brand-guidelines.toml",
 		".gemini/commands/business-comms.toml",
+		".gemini/commands/convert-documents-to-markdown.toml",
 		".gemini/commands/mcp-builder.toml",
 		".gemini/commands/mem-search.toml",
 		".gemini/commands/spec-analyze.toml",

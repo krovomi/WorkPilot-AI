@@ -95,8 +95,12 @@ def content_hash(src: SkillSource) -> str:
     if src.kind == "agent":
         h.update(src.path.read_bytes())
         return h.hexdigest()
-    for f in sorted(p for p in src.dir.rglob("*") if p.is_file()):
-        h.update(str(f.relative_to(src.dir)).encode("utf-8"))
+    # Path ordering and separators differ on Windows; hashes must not.
+    for f in sorted(
+        (p for p in src.dir.rglob("*") if p.is_file()),
+        key=lambda p: p.relative_to(src.dir).as_posix(),
+    ):
+        h.update(f.relative_to(src.dir).as_posix().encode("utf-8"))
         h.update(_sha256_file(f).encode("ascii"))
     return h.hexdigest()
 
