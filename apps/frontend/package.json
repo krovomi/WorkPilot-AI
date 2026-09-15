@@ -187,6 +187,10 @@
 		],
 		"extraResources": [
 			{
+				"from": "../../.agents/skills/convert-documents-to-markdown",
+				"to": "backend/skills_registry/bundled/convert-documents-to-markdown"
+			},
+			{
 				"from": "resources/icon.ico",
 				"to": "icon.ico"
 			},
