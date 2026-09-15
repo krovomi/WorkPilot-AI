@@ -23,7 +23,7 @@ metadata:
   workpilot:
     pack: hermes
     version: 0.0.1
-    content_sha256: 7ed24a65d4d9d6d8f912253948c41963f8195706344b7f750303ab6eb0df1d2f
+    content_sha256: f4810745cc5b78f2760e8f04f0f4795364e2de097419803fc1ec442993e5000f
 ---
 
 # Systematic Debugging
@@ -403,7 +403,7 @@ delegate_task(
     File: [path to failing code]
     Test command: [exact command]
     """,
-    toolsets=['terminal', 'file']
+    toolsets=["terminal", "file"],
 )
 ```
 

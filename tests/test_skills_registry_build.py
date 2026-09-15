@@ -571,3 +571,24 @@ def test_the_registry_agents_are_part_of_the_build(source, tmp_path):
     emitted = {p.stem for p in (out / ".agents" / "agents").glob("*.md")}
     assert "test-runner" in emitted, "the Python roster did not reach the output"
     assert "greeter" in emitted, "the pack's own agent was dropped"
+
+
+def test_resource_hash_uses_portable_paths(source):
+    import hashlib
+
+    packs = load_packs(source / "skills")
+    resolution = resolve(packs, ProjectConfig(project_dir=source))
+    skill = next(s for s in resolution.selected if s.name == "hello")
+    nested = skill.dir / "scripts" / "helper.py"
+    nested.parent.mkdir(exist_ok=True)
+    nested.write_bytes(b"print(1)\n")
+    expected = hashlib.sha256()
+    for resource in sorted(
+        (p for p in skill.dir.rglob("*") if p.is_file()),
+        key=lambda p: p.relative_to(skill.dir).as_posix(),
+    ):
+        expected.update(resource.relative_to(skill.dir).as_posix().encode("utf-8"))
+        expected.update(
+            hashlib.sha256(resource.read_bytes()).hexdigest().encode("ascii")
+        )
+    assert content_hash(skill) == expected.hexdigest()

@@ -143,9 +143,7 @@ def scan_skills(
             # both. Emit one entry per surface so the caller can group cleanly.
             surfaces_found = [k for k in SURFACE_KEYS if k in data]
             if not surfaces_found:
-                errors.append(
-                    f"no [agent] or [workflow] block in {customize_toml}"
-                )
+                errors.append(f"no [agent] or [workflow] block in {customize_toml}")
                 continue
             for surface in surfaces_found:
                 entry = dict(entry_base)

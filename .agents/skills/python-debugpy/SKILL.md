@@ -24,7 +24,7 @@ metadata:
   workpilot:
     pack: hermes
     version: 0.0.1
-    content_sha256: 9c2fcdcbda3f8cf3d5544638079f15deaf6120e3de4e41c093faeb946eed1aed
+    content_sha256: 9879a67fefdfb47022c92eabf3dfca80868c54d78bb1d6bd27d56742d0f65ea4
 ---
 
 # Python Debugger (pdb + debugpy)
@@ -88,7 +88,7 @@ Easiest. Edit the file:
 ```python
 def compute(x, y):
     result = some_helper(x)
-    breakpoint()           # <-- drops into pdb here
+    breakpoint()  # <-- drops into pdb here
     return result + y
 ```
 
@@ -136,6 +136,7 @@ This bypasses the hermetic-env guarantees — fine for debugging, but re-run und
 
 ```python
 import pdb, sys
+
 try:
     run_the_thing()
 except Exception:
@@ -153,8 +154,14 @@ Or set a global hook in a repl/jupyter:
 
 ```python
 import sys
+
+
 def excepthook(etype, value, tb):
-    import pdb; pdb.post_mortem(tb)
+    import pdb
+
+    pdb.post_mortem(tb)
+
+
 sys.excepthook = excepthook
 ```
 
@@ -175,10 +182,11 @@ Add near the top of the entry point (or inside the function you want to debug):
 
 ```python
 import debugpy
+
 debugpy.listen(("127.0.0.1", 5678))
 print("debugpy listening on 5678, waiting for client...", flush=True)
 debugpy.wait_for_client()
-debugpy.breakpoint()       # optional: pause immediately once attached
+debugpy.breakpoint()  # optional: pause immediately once attached
 ```
 
 Start the process; it blocks on `wait_for_client()`.
@@ -223,10 +231,12 @@ HOST, PORT = "127.0.0.1", 5678
 s = socket.create_connection((HOST, PORT))
 seq = itertools.count(1)
 
+
 def send(msg):
     msg["seq"] = next(seq)
     body = json.dumps(msg).encode()
     s.sendall(f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
+
 
 def recv():
     header = b""
@@ -238,13 +248,21 @@ def recv():
         body += s.recv(length - len(body))
     return json.loads(body)
 
+
 send({"type": "request", "command": "initialize", "arguments": {"adapterID": "python"}})
 print(recv())
 send({"type": "request", "command": "attach", "arguments": {}})
 print(recv())
-send({"type": "request", "command": "setBreakpoints",
-      "arguments": {"source": {"path": sys.argv[1]},
-                    "breakpoints": [{"line": int(sys.argv[2])}]}})
+send(
+    {
+        "type": "request",
+        "command": "setBreakpoints",
+        "arguments": {
+            "source": {"path": sys.argv[1]},
+            "breakpoints": [{"line": int(sys.argv[2])}],
+        },
+    }
+)
 print(recv())
 send({"type": "request", "command": "configurationDone"})
 # ... loop reading events and sending continue/stepIn/etc.
@@ -276,7 +294,8 @@ pip install remote-pdb
 In your code:
 ```python
 from remote_pdb import set_trace
-set_trace(host="127.0.0.1", port=4444)   # blocks until connection
+
+set_trace(host="127.0.0.1", port=4444)  # blocks until connection
 ```
 
 Then from the terminal:
@@ -302,6 +321,7 @@ The gateway runs as a child of the Node TUI. Options:
 ```python
 # tui_gateway/server.py near the top of serve()
 import debugpy
+
 debugpy.listen(("127.0.0.1", 5678))
 debugpy.wait_for_client()
 ```
@@ -310,7 +330,8 @@ Start `hermes --tui`. The TUI will appear frozen (its backend is waiting). Attac
 **B. Use `remote-pdb` at a specific handler:**
 ```python
 from remote_pdb import set_trace
-set_trace(host="127.0.0.1", port=4444)   # in the RPC handler you want to trap
+
+set_trace(host="127.0.0.1", port=4444)  # in the RPC handler you want to trap
 ```
 Trigger the matching slash command from the TUI, then `nc 127.0.0.1 4444` in another terminal.
 
@@ -378,7 +399,9 @@ python -m pytest tests/ -x --pdb
 **"My async handler deadlocks."**
 ```python
 # Add at handler entry
-import remote_pdb; remote_pdb.set_trace(host="127.0.0.1", port=4444)
+import remote_pdb
+
+remote_pdb.set_trace(host="127.0.0.1", port=4444)
 ```
 Trigger the handler. `nc 127.0.0.1 4444`, then `w` to see the suspended frame, `!import asyncio; asyncio.all_tasks()` to see what else is pending.
 

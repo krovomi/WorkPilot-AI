@@ -15,7 +15,9 @@ def _decode(value: str | None) -> str:
     if value is None or _INVALID_ESCAPE.search(value):
         return ""
     decoded = unquote(value)
-    if not decoded or any(ord(char) <= 0x1F or 0x7F <= ord(char) <= 0x9F for char in decoded):
+    if not decoded or any(
+        ord(char) <= 0x1F or 0x7F <= ord(char) <= 0x9F for char in decoded
+    ):
         return ""
     return decoded
 
@@ -28,7 +30,11 @@ def _token_from_url(line: str) -> str:
         port = credential.port
     except ValueError:
         return ""
-    if credential.scheme != "https" or credential.hostname != "github.com" or port not in (None, 443):
+    if (
+        credential.scheme != "https"
+        or credential.hostname != "github.com"
+        or port not in (None, 443)
+    ):
         return ""
 
     username = _decode(credential.username)
@@ -43,7 +49,11 @@ def _token_from_url(line: str) -> str:
 
 
 def main() -> int:
-    path = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else Path.home() / ".git-credentials"
+    path = (
+        Path(sys.argv[1]).expanduser()
+        if len(sys.argv) > 1
+        else Path.home() / ".git-credentials"
+    )
     try:
         lines = path.read_bytes().split(b"\n")
     except OSError:
