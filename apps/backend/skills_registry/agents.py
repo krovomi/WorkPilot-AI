@@ -83,6 +83,8 @@ def collect_registry_agents() -> list[EmittedAgent]:
     registry away should still be able to build its skills.
     """
     found: list[EmittedAgent] = []
+    import sys
+
     try:
         from agents.subagents.phases import all_specs
 
@@ -100,6 +102,13 @@ def collect_registry_agents() -> list[EmittedAgent]:
             )
     except Exception as exc:  # noqa: BLE001
         logger.debug("phase specs unavailable: %s", exc)
+        if "pytest" in sys.modules:
+            import traceback
+
+            print(
+                f"\n[CI DEBUG] Échec import phases:\n{traceback.format_exc()}",
+                file=sys.stderr,
+            )
 
     try:
         from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
@@ -123,8 +132,15 @@ def collect_registry_agents() -> list[EmittedAgent]:
             )
             for spec in PR_REVIEW_SPECIALISTS
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("pr-review specs unavailable: %s", exc)
+        if "pytest" in sys.modules:
+            import traceback
+
+            print(
+                f"\n[CI DEBUG] Échec import pr_review:\n{traceback.format_exc()}",
+                file=sys.stderr,
+            )
 
     # Deduplicate by name, first roster wins, so a phase agent is not shadowed
     # by a later one with the same name.
