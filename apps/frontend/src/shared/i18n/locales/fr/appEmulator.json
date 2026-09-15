@@ -56,5 +56,27 @@
 		"portInUse": "Le port {{port}} est déjà utilisé. Veuillez d'abord arrêter l'autre serveur.",
 		"processExited": "Le processus serveur s'est terminé avec le code {{code}}",
 		"generic": "Une erreur inattendue s'est produite. Veuillez réessayer."
+	},
+	"preview": {
+		"format": "Format d’écran",
+		"fluid": "Espace disponible",
+		"phone": "Smartphone",
+		"phoneSmall": "Petit smartphone",
+		"phoneLarge": "Grand smartphone",
+		"tablet": "Tablette",
+		"desktop": "Ordinateur",
+		"breakpoint": "Breakpoint {{width}} px",
+		"custom": "Personnalisé",
+		"width": "Largeur",
+		"height": "Hauteur",
+		"rotate": "Pivoter",
+		"zoom": "Zoom",
+		"loading": "Chargement de l’aperçu…",
+		"failed": "Impossible de charger l’aperçu.",
+		"timeout": "Le chargement de l’aperçu n’a pas abouti. Consultez les logs du serveur puis réessayez.",
+		"crashed": "Le moteur de l’aperçu s’est arrêté. Réessayez pour le recharger.",
+		"browserFailed": "Impossible d’ouvrir le navigateur externe. Vous pouvez ouvrir {{url}} manuellement.",
+		"notFound": "HTTP 404 : aucune page à cette adresse. Ce serveur peut exposer une API sans interface web.",
+		"httpError": "Le serveur de l’aperçu a répondu HTTP {{code}}. Consultez les logs du serveur."
 	}
 }

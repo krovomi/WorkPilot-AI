@@ -56,5 +56,27 @@
 		"portInUse": "Port {{port}} is already in use. Please stop the other server first.",
 		"processExited": "Server process exited with code {{code}}",
 		"generic": "An unexpected error occurred. Please try again."
+	},
+	"preview": {
+		"format": "Screen format",
+		"fluid": "Available space",
+		"phone": "Smartphone",
+		"phoneSmall": "Small smartphone",
+		"phoneLarge": "Large smartphone",
+		"tablet": "Tablet",
+		"desktop": "Desktop",
+		"breakpoint": "Breakpoint {{width}} px",
+		"custom": "Custom",
+		"width": "Width",
+		"height": "Height",
+		"rotate": "Rotate",
+		"zoom": "Zoom",
+		"loading": "Loading preview…",
+		"failed": "Unable to load the preview.",
+		"timeout": "The preview did not finish loading. Check the server logs and retry.",
+		"crashed": "The preview renderer stopped. Retry to reload it.",
+		"browserFailed": "Unable to open the external browser. You can open {{url}} manually.",
+		"notFound": "HTTP 404: no page exists at this address. This server may expose an API without a web interface.",
+		"httpError": "The preview server returned HTTP {{code}}. Check the server output."
 	}
 }

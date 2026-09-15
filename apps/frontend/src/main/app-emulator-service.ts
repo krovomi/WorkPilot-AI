@@ -2534,11 +2534,8 @@ exit $launched.ExitCode
 						return;
 				}
 
-				// After TCP is up, wait for the server to actually serve HTTP (e.g. Angular
-				// dev-server binds the port immediately but compiles for 30-60 s before
-				// responding with 2xx).  We poll for up to 90 s; if still not 2xx we emit
-				// 'ready' anyway so the user at least sees the terminal output.
-				await this.waitForHttpSuccess(config.port, 90000);
+				// A listening process is not sufficient: require an HTTP response before ready.
+				if (!(await this.waitForHttpSuccess(config.port, 90000))) return;
 
 				if (this.activeServerProcess && !this.activeServerProcess.killed) {
 					this.serverUrl = `http://localhost:${config.port}`;
@@ -2756,9 +2753,9 @@ exit $launched.ExitCode
 			].includes(s.framework),
 		);
 		if (frontendSvc) {
-			await this.waitForHttpSuccess(frontendSvc.port, 120000);
+			if (!(await this.waitForHttpSuccess(frontendSvc.port, 120000))) return;
 		} else {
-			await this.waitForHttpSuccess(primary.port, 120000);
+			if (!(await this.waitForHttpSuccess(primary.port, 120000))) return;
 		}
 
 		if (this.activeServerProcess && !this.activeServerProcess.killed) {
@@ -2889,49 +2886,67 @@ exit $launched.ExitCode
 	}
 
 	/**
-	 * Poll the server with an HTTP GET until it responds with a 2xx status code
-	 * (meaning the app is compiled and actually serving content), or until
-	 * `timeout` ms elapses, whichever comes first.
+	 * Poll for a reachable HTTP response (including authentication/redirects).
+	 * Reject on timeout instead of presenting an unreachable server as ready.
 	 */
-	private waitForHttpSuccess(port: number, timeout: number): Promise<void> {
-		return new Promise((resolve) => {
-			const startTime = Date.now();
-
-			const tryGet = () => {
-				// Stop polling if the process died
-				if (!this.activeServerProcess || this.activeServerProcess.killed) {
-					resolve();
+	private waitForHttpSuccess(port: number, timeout: number): Promise<boolean> {
+		const process = this.activeServerProcess;
+		return new Promise((resolve, reject) => {
+			let settled = false;
+			let retryTimer: ReturnType<typeof setTimeout> | undefined;
+			let request: ReturnType<typeof http.get> | undefined;
+			const finish = (error?: Error) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(deadline);
+				clearTimeout(retryTimer);
+				request?.destroy();
+				if (!process || process.killed || this.activeServerProcess !== process)
+					resolve(false);
+				else if (error) reject(error);
+				else resolve(true);
+			};
+			const deadline = setTimeout(
+				() =>
+					finish(
+						new Error(
+							`HTTP server on port ${port} did not become ready before the timeout. Check the server output.`,
+						),
+					),
+				timeout,
+			);
+			const retry = () => {
+				if (!settled && !retryTimer)
+					retryTimer = setTimeout(() => {
+						retryTimer = undefined;
+						probe();
+					}, 1000);
+			};
+			const probe = () => {
+				if (settled) return;
+				if (
+					!process ||
+					process.killed ||
+					this.activeServerProcess !== process
+				) {
+					finish();
 					return;
 				}
-
-				if (Date.now() - startTime > timeout) {
-					// Timed out — emit ready anyway so the user can see what's happening
-					resolve();
-					return;
-				}
-
-				const req = http.get(
+				request = http.get(
 					{ hostname: "127.0.0.1", port, path: "/", timeout: 3000 },
-					(res) => {
-						res.resume(); // drain the response body
-						if (res.statusCode !== undefined && res.statusCode < 500) {
-							// Any non-5xx response (including 401/403) means the server is up and reachable
-							resolve();
-						} else {
-							// 5xx or no status — server not ready yet (e.g. still compiling)
-							setTimeout(tryGet, 2000);
-						}
+					(response) => {
+						response.resume();
+						if (response.statusCode !== undefined && response.statusCode < 500)
+							finish();
+						else retry();
 					},
 				);
-
-				req.on("error", () => setTimeout(tryGet, 1000));
-				req.on("timeout", () => {
-					req.destroy();
-					setTimeout(tryGet, 1000);
-				});
+				request.on("error", retry);
+				request.on("timeout", () =>
+					request?.destroy(new Error("HTTP request timed out")),
+				);
 			};
-
-			tryGet();
+			probe();
 		});
 	}
 
