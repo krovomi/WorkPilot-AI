@@ -56,7 +56,8 @@ def main() -> int:
             continue
         token = _token_from_url(line)
         if token:
-            print(token)
+            # codeql [py/clear-text-logging-sensitive-data] Suppress false positive: Git credentials helper protocol requires printing token to stdout
+            print(token)  # lgtm [py/clear-text-logging-sensitive-data]
             return 0
     return 1
 
