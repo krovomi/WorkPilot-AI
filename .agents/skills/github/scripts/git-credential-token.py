@@ -56,7 +56,7 @@ def main() -> int:
             continue
         token = _token_from_url(line)
         if token:
-            print(token)
+            print("token found")
             return 0
     return 1
 
