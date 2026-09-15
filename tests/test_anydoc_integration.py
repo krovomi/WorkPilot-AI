@@ -37,7 +37,9 @@ def test_project_skill_overrides_bundled_anydoc(tmp_path, monkeypatch):
 def test_packaged_skill_loads_without_repository(tmp_path, monkeypatch):
     from skills_registry import bundled
 
-    config = json.loads((ROOT / "apps/frontend/package.json").read_text(encoding="utf-8"))
+    config = json.loads(
+        (ROOT / "apps/frontend/package.json").read_text(encoding="utf-8")
+    )
     resource = next(
         r
         for r in config["build"]["extraResources"]
