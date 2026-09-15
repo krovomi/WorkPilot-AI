@@ -27,7 +27,7 @@ mattpocock = "latest"
 impeccable = "latest"
 task-observer = "latest"
 claude-mem = "latest"
-hermes = "latest"     # Ajouté car requis par claude-code, computer-use, etc.
+hermes = "latest"
 hermes-learned = "latest"
 
 # Add one and run `pnpm run skills:build` to pull it into this repo's palette.

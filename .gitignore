@@ -267,3 +267,4 @@ local.properties
 skills/_proposed/hermes--*.md
 
 .gitignore
+!_bmad/scripts/resolve_customization.py
