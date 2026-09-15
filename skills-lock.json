@@ -6,10 +6,55 @@
 		"gemini"
 	],
 	"packs": {
+		"bmad": {
+			"version": "6.12.0",
+			"source": "bmad-code-org/bmad-method",
+			"path": "skills/bmad"
+		},
+		"claude-mem": {
+			"version": "0.0.1",
+			"source": "thedotmack/claude-mem",
+			"path": "skills/claude-mem"
+		},
 		"comms": {
 			"version": "1.0.0",
 			"source": "local",
 			"path": "skills/comms"
+		},
+		"dotnet": {
+			"version": "1.0.0",
+			"source": "local",
+			"path": "skills/dotnet"
+		},
+		"hermes": {
+			"version": "0.0.1",
+			"source": "NousResearch/hermes-agent",
+			"path": "skills/hermes"
+		},
+		"impeccable": {
+			"version": "0.0.1",
+			"source": "pbakaus/impeccable",
+			"path": "skills/impeccable"
+		},
+		"mattpocock": {
+			"version": "0.0.1",
+			"source": "mattpocock/skills",
+			"path": "skills/mattpocock"
+		},
+		"mobile": {
+			"version": "1.0.0",
+			"source": "local",
+			"path": "skills/mobile"
+		},
+		"superpowers": {
+			"version": "0.0.1",
+			"source": "obra/superpowers",
+			"path": "skills/superpowers"
+		},
+		"task-observer": {
+			"version": "0.0.1",
+			"source": "rebelytics/one-skill-to-rule-them-all",
+			"path": "skills/task-observer"
 		},
 		"tooling": {
 			"version": "1.0.0",
@@ -18,12 +63,483 @@
 		}
 	},
 	"skills": {
+		"akka-net-patterns": {
+			"kind": "skill",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/akka-net-patterns/SKILL.md",
+			"contentSha256": "d7dce158a9f448cf2a9d5eae88304374626729699b83670c4c2a00bfb92df5a1",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
+		},
+		"android-developer": {
+			"kind": "skill",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/android-developer/SKILL.md",
+			"contentSha256": "0785b38093d3500a64fb726089cf7667bb5fcc308a47fdd60aceb55c3fd4ece8",
+			"targets": {
+				"android": ">=8.0"
+			}
+		},
+		"android-engineer": {
+			"kind": "agent",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/agents/android-engineer.md",
+			"contentSha256": "b27290fc5fe1f19893d94cb89fdb9ae7904d05902fb2f43e4cc0efb7526695e1",
+			"targets": {
+				"android": ">=8.0",
+				"ios": ">=16.0"
+			}
+		},
 		"architecture-map": {
 			"kind": "skill",
 			"pack": "tooling",
 			"packVersion": "1.0.0",
 			"source": "skills/tooling/architecture-map/SKILL.md",
 			"contentSha256": "b872d6cae60852b7d9a93f0f74fa291f267113592a860fad9285b9ca743957b3",
+			"targets": {}
+		},
+		"aspire-orchestration": {
+			"kind": "skill",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/aspire-orchestration/SKILL.md",
+			"contentSha256": "2aea56583ce5834574ea8e6279ca80050d666063fe0662d145d83f389fa4d2e5",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
+		},
+		"benchmark-dotnet": {
+			"kind": "skill",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/benchmark-dotnet/SKILL.md",
+			"contentSha256": "d1befa51ea86eea0a0522ec779046c5157a50e8559970b65b737c2267bfa8045",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
+		},
+		"bmad-advanced-elicitation": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-advanced-elicitation/SKILL.md",
+			"contentSha256": "e52a992fc5cda7dc208991d75785dc4032dc69fff68ef3a769499d58a4328b5b",
+			"targets": {}
+		},
+		"bmad-agent-analyst": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-agent-analyst/SKILL.md",
+			"contentSha256": "a5aff9c9ed05f7cb6fc40ff31d7f0c3c33c40330b74ee0fff2edf7caf8cb14e1",
+			"targets": {}
+		},
+		"bmad-agent-architect": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-agent-architect/SKILL.md",
+			"contentSha256": "232a8d6e82cacffcc4b2c9d91be883b905b070f0c29284bc6beecae69d610aa7",
+			"targets": {}
+		},
+		"bmad-agent-dev": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-agent-dev/SKILL.md",
+			"contentSha256": "0d78b2c98c0d81b213f9de6cb2e571cbc151e0ea1fe136e7ef55f0335199ef19",
+			"targets": {}
+		},
+		"bmad-agent-pm": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-agent-pm/SKILL.md",
+			"contentSha256": "c47b1b0185258add7b747e91c20646e3ac3789497bfed0b2a49668111ca7702f",
+			"targets": {}
+		},
+		"bmad-agent-ux-designer": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-agent-ux-designer/SKILL.md",
+			"contentSha256": "76016faa7bee867df65053056e8ab617a2b8b4a0feb1b2a3089c97c3873c6f89",
+			"targets": {}
+		},
+		"bmad-architecture": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-architecture/SKILL.md",
+			"contentSha256": "0491964c2f0ab4cc7da92dc1abfed69a1edcf2a37a1ab7b08bbe1bfc3f352a35",
+			"targets": {}
+		},
+		"bmad-brainstorming": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-brainstorming/SKILL.md",
+			"contentSha256": "f2d5c6ae02fab924d54a1d3fa98042c656250d5a84beaaf6c0f6c87e626c5875",
+			"targets": {}
+		},
+		"bmad-build": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-build/SKILL.md",
+			"contentSha256": "552b800904b7d8a6b5b2e2972eb5b1d0146e34af139f6037a7508f40ca3137ea",
+			"targets": {}
+		},
+		"bmad-build-auto": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-build-auto/SKILL.md",
+			"contentSha256": "8d8fb56d6f927a69a84c4310245ee9a9a148dd71c67eed8fa51ecf782ca63e7c",
+			"targets": {}
+		},
+		"bmad-checkpoint-preview": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-checkpoint-preview/SKILL.md",
+			"contentSha256": "01a10cebb4a2a01b717119197c761d3ffac392d790b664c0a324eb7e36e93b4e",
+			"targets": {}
+		},
+		"bmad-code-review": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-code-review/SKILL.md",
+			"contentSha256": "895875d7c9322684701b7490642d6a71d18101b366fda30c64532ed2cc3de7da",
+			"targets": {}
+		},
+		"bmad-correct-course": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-correct-course/SKILL.md",
+			"contentSha256": "c55fbb84605bd353a2714d32b1fbe9b84eef5ce26dfdfdb8d123ac3d571efb76",
+			"targets": {}
+		},
+		"bmad-create-architecture": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-create-architecture/SKILL.md",
+			"contentSha256": "a39cfff292df9bca96aa4ae87a6c766f2db5e875f75ddc21098b3f5bb08efbfe",
+			"targets": {}
+		},
+		"bmad-create-epics-and-stories": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-create-epics-and-stories/SKILL.md",
+			"contentSha256": "8d5e9bd7be88eed0ccf3972aff4bfcd7e9912ea3cb59a6cfd703bab712369ac1",
+			"targets": {}
+		},
+		"bmad-create-prd": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-create-prd/SKILL.md",
+			"contentSha256": "b30eda21575c4108801f59dfb3039fd24b14802da0f9ae2cbc200176f012b079",
+			"targets": {}
+		},
+		"bmad-create-story": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-create-story/SKILL.md",
+			"contentSha256": "b2d1d38b3522d53ab84829539bc4518161826dcd88cbc1e328cbe5ca1b5509d6",
+			"targets": {}
+		},
+		"bmad-customize": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-customize/SKILL.md",
+			"contentSha256": "b3998dda499d304bdb0f75f859a7349ea01bfb3616b8265ab559e9ae9821668c",
+			"targets": {}
+		},
+		"bmad-deep-recon": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-deep-recon/SKILL.md",
+			"contentSha256": "370edde7f5fc4c195a10f0d431d9c3fb7608c3ea648e574efb019c3a09b667ab",
+			"targets": {}
+		},
+		"bmad-dev-auto": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-dev-auto/SKILL.md",
+			"contentSha256": "28678cdaaddf4d816e3e68af4fce201fcc37039969b599c904908c2a7219e7a7",
+			"targets": {}
+		},
+		"bmad-dev-story": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-dev-story/SKILL.md",
+			"contentSha256": "20ee9ba4b7cc86170ab5eca687907f79e849709ae7da898158392aa06bf8de74",
+			"targets": {}
+		},
+		"bmad-document-project": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-document-project/SKILL.md",
+			"contentSha256": "a3b142449e911a22d46cd22193e4b47469df3fff7efe0bfbae66f7988c6347f2",
+			"targets": {}
+		},
+		"bmad-domain-research": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-domain-research/SKILL.md",
+			"contentSha256": "d2845fcb23e56584296980958a41e3d10286ebedca1705c4d37de6812668b339",
+			"targets": {}
+		},
+		"bmad-edit-prd": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-edit-prd/SKILL.md",
+			"contentSha256": "709efb9089bd15f39ff375122693a48b666a390479a8e5d4a86ca292f87a7398",
+			"targets": {}
+		},
+		"bmad-editorial-review": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-editorial-review/SKILL.md",
+			"contentSha256": "9dbdec2cac0cec740a9f5aca6105b7e89d1293aadfaa73db8321f25f54ad48ab",
+			"targets": {}
+		},
+		"bmad-editorial-review-prose": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-editorial-review-prose/SKILL.md",
+			"contentSha256": "7fb9fb51384b789413fcefae15f22cde53059a9ea17564170e12333dd94d7ee2",
+			"targets": {}
+		},
+		"bmad-editorial-review-structure": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-editorial-review-structure/SKILL.md",
+			"contentSha256": "022df15bb5aef49660d9093a4407e030f39b42ad00c1ea79bf23d89e14943aaf",
+			"targets": {}
+		},
+		"bmad-forge-idea": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-forge-idea/SKILL.md",
+			"contentSha256": "fe94759d57dac34fb07b4b7805c41dd10e7ff814a4fa04efbe9af07edb0a614d",
+			"targets": {}
+		},
+		"bmad-generate-project-context": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-generate-project-context/SKILL.md",
+			"contentSha256": "e9fec21e0e955f82d6c1902db14efb916cb1cb6a823b241fcaa4cce9c97f029c",
+			"targets": {}
+		},
+		"bmad-help": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-help/SKILL.md",
+			"contentSha256": "3ece9cb41a73c06948e9b8e51ba386c2b1e3675b4e8fec3538cce2dc294d575e",
+			"targets": {}
+		},
+		"bmad-market-research": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-market-research/SKILL.md",
+			"contentSha256": "ba461f1eada3372601ad7e76491b44fdd32e492bd7b915730c218076ef678857",
+			"targets": {}
+		},
+		"bmad-net-architect": {
+			"kind": "agent",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/agents/bmad-net-architect.md",
+			"contentSha256": "ab589f80ed759b912b88cc2b72e38a062085abd83c4be60e889d98db68746307",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
+		},
+		"bmad-party-mode": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-party-mode/SKILL.md",
+			"contentSha256": "ed0871ed93b6d8dffa41bb84baf7bbc3dc8c1f7d86bb680aa82e87a7f475b875",
+			"targets": {}
+		},
+		"bmad-performance-analyst": {
+			"kind": "agent",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/agents/bmad-performance-analyst.md",
+			"contentSha256": "3c78ac19ff989eb7fef61755d7741b464f2e887e462a886373bc7ecaac6b0202",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
+		},
+		"bmad-prd": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-prd/SKILL.md",
+			"contentSha256": "8fe53c022cb5c2fe0d84149a48b5cdafdde2917b72ee9ca255617edcfea75ec8",
+			"targets": {}
+		},
+		"bmad-prfaq": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-prfaq/SKILL.md",
+			"contentSha256": "a1097c6637149fe759195b7d7ecfe7460c6bd189c41ac8293d57a42d9b07d894",
+			"targets": {}
+		},
+		"bmad-product-brief": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-product-brief/SKILL.md",
+			"contentSha256": "d52909b1dbee8e33af3cccd7507c0f44cebf1edb0c9c17af66c9ef3511893490",
+			"targets": {}
+		},
+		"bmad-project-context": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-project-context/SKILL.md",
+			"contentSha256": "d7dc31678de21eb0533eab388ab32a9b9946fdbc74a992d36fcd3af05dd7b4f8",
+			"targets": {}
+		},
+		"bmad-qa-generate-e2e-tests": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-qa-generate-e2e-tests/SKILL.md",
+			"contentSha256": "95b23e6cb9d5a0955085412bdf291bee915b20d1f8ddda00ba616aae07f7c52a",
+			"targets": {}
+		},
+		"bmad-quick-dev": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-quick-dev/SKILL.md",
+			"contentSha256": "d15dcc3df28c9a7b9075641045173aa6939524975d1a0e3f3a0617bf27a1eb36",
+			"targets": {}
+		},
+		"bmad-retrospective": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-retrospective/SKILL.md",
+			"contentSha256": "b8d9a03a9c09ea49efae20882ed75048bb695ec8edf7e24823aa63ef9af8e274",
+			"targets": {}
+		},
+		"bmad-review": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-review/SKILL.md",
+			"contentSha256": "ce618511d8c1b263fe141a5c4e4587f773c885a7027e1ecb71cc6075c8f9a912",
+			"targets": {}
+		},
+		"bmad-review-adversarial-general": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-review-adversarial-general/SKILL.md",
+			"contentSha256": "9783d4d224576daa95f918e69a24b8cd30bed7395b356c85c5354b514a7acd78",
+			"targets": {}
+		},
+		"bmad-review-edge-case-hunter": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-review-edge-case-hunter/SKILL.md",
+			"contentSha256": "66881221a607fa3889c021c09142fc6b3a0a74517b51e89d408afd4cd3f6cb99",
+			"targets": {}
+		},
+		"bmad-review-verification-gap": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-review-verification-gap/SKILL.md",
+			"contentSha256": "c321f6a0511690714b594f4298ace4e35626cabf6bac3b8b45c813c967c64ab7",
+			"targets": {}
+		},
+		"bmad-spec": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-spec/SKILL.md",
+			"contentSha256": "c7f6f6f9a39c0bc09c3e7520545c56a83218dc241024c7250db5ed6663aa85f9",
+			"targets": {}
+		},
+		"bmad-sprint-planning": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-sprint-planning/SKILL.md",
+			"contentSha256": "b036b24fbb88b6a477ab17486311773c41547604fc2926a9d26955efeb304f8d",
+			"targets": {}
+		},
+		"bmad-sprint-status": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-sprint-status/SKILL.md",
+			"contentSha256": "b296a6cb0f6687ccbf02460366e647657db9b2b54fcb90d3099dd1438827ebd8",
+			"targets": {}
+		},
+		"bmad-technical-research": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-technical-research/SKILL.md",
+			"contentSha256": "21b7440f0ea7784d14b2e82ca8a37af1cc6bab3d79157ce578de3db918ea9668",
+			"targets": {}
+		},
+		"bmad-ux": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-ux/SKILL.md",
+			"contentSha256": "24d41a71e4dd5b3c7b455ef526c35d87520feed07590a36604bbafe04b83bf44",
+			"targets": {}
+		},
+		"bmad-validate-prd": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-validate-prd/SKILL.md",
+			"contentSha256": "d96945f7f6bb7016438ff4b498b26d4e7b2f30ef90d47a78905a4b02a40b03c6",
+			"targets": {}
+		},
+		"bmad-walkthrough": {
+			"kind": "skill",
+			"pack": "bmad",
+			"packVersion": "6.12.0",
+			"source": "skills/bmad/bmad-walkthrough/SKILL.md",
+			"contentSha256": "416839340cfc48e6d1c7d4fc017a27bcd81652eb619c8993ccba3f30850b1d94",
 			"targets": {}
 		},
 		"brand-guidelines": {
@@ -42,6 +558,78 @@
 			"contentSha256": "2f43a9787b129887cec1b7c138121303775bb8b98e32f93df306450fac63f897",
 			"targets": {}
 		},
+		"claude-code": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/claude-code/SKILL.md",
+			"contentSha256": "f16fd7fd1f1167ef3a4dc0ef410e80df153973af44bd747feb6a46efd10176de",
+			"targets": {}
+		},
+		"codebase-inspection": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/codebase-inspection/SKILL.md",
+			"contentSha256": "8d9b465c5c579b00247f06e4699d5b9b61146319ee454311f21d15405db1dfad",
+			"targets": {}
+		},
+		"codex": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/codex/SKILL.md",
+			"contentSha256": "987cb4f26abe19c3205da3488494cad352ce095fe8fcd471abb898d501efd159",
+			"targets": {}
+		},
+		"computer-use": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/computer-use/SKILL.md",
+			"contentSha256": "ae9a1ee749ce5acbda34b1317c4b3b44a69c20fda8c569fbb42dfe331af4d4f2",
+			"targets": {}
+		},
+		"cross-platform-mobile": {
+			"kind": "skill",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/cross-platform-mobile/SKILL.md",
+			"contentSha256": "3a0709efd7583424f3fddb64c5ca3e566a75c1f9efbc944868b40962559cbac4",
+			"targets": {
+				"android": ">=8.0",
+				"ios": ">=16.0"
+			}
+		},
+		"github": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/github/SKILL.md",
+			"contentSha256": "d8ded7c3ff006f084571e6cefb8496cd4200aeab49cae0b41580305bcb8b641b",
+			"targets": {}
+		},
+		"ios-developer": {
+			"kind": "skill",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/ios-developer/SKILL.md",
+			"contentSha256": "730df6a461e7ce37d3db57bf385cde6e78af2c6bf5def31dc8e1ffacec5aa17d",
+			"targets": {
+				"ios": ">=16.0"
+			}
+		},
+		"ios-engineer": {
+			"kind": "agent",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/agents/ios-engineer.md",
+			"contentSha256": "7ef9df48e34f3ac82bb6d072b873d9a33c9dced718c6a7ff2ef7738567c1a138",
+			"targets": {
+				"android": ">=8.0",
+				"ios": ">=16.0"
+			}
+		},
 		"mcp-builder": {
 			"kind": "skill",
 			"pack": "tooling",
@@ -58,6 +646,141 @@
 			"contentSha256": "c3ac1b28906d63849cb56be3eaedc231642287913ec4cdcc6349b6016cf0318c",
 			"targets": {}
 		},
+		"mobile-architect": {
+			"kind": "agent",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/agents/mobile-architect.md",
+			"contentSha256": "940d608c45700c7d1dc9210d956ecf23c0c325ed9e339a6cb77c8ad57e7a4eda",
+			"targets": {
+				"android": ">=8.0",
+				"ios": ">=16.0"
+			}
+		},
+		"mobile-design-review": {
+			"kind": "skill",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/mobile-design-review/SKILL.md",
+			"contentSha256": "db3a175bdb33b9d81b5bf9ad275a2303a98d4a1ddbf65edf541ce7caae946509",
+			"targets": {
+				"android": ">=8.0",
+				"ios": ">=16.0"
+			}
+		},
+		"mobile-device-testing": {
+			"kind": "skill",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/mobile-device-testing/SKILL.md",
+			"contentSha256": "c0b42666d4e1d5a87a6b82a47e7a4cf17c3a0580050dcc43230f2004d46c7919",
+			"targets": {
+				"android": ">=8.0",
+				"ios": ">=16.0"
+			}
+		},
+		"mobile-release-manager": {
+			"kind": "agent",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/agents/mobile-release-manager.md",
+			"contentSha256": "7557ea0275571da64e7cc9f2fb79bfb61122e22e473155ad0f1b0bf940aeec36",
+			"targets": {
+				"android": ">=8.0",
+				"ios": ">=16.0"
+			}
+		},
+		"mobile-store-readiness": {
+			"kind": "skill",
+			"pack": "mobile",
+			"packVersion": "1.0.0",
+			"source": "skills/mobile/mobile-store-readiness/SKILL.md",
+			"contentSha256": "49542383796b1242cb61e698c87dc705c9eeb5784c498eb5c48711ce5a083ebf",
+			"targets": {
+				"android": ">=8.0",
+				"ios": ">=16.0"
+			}
+		},
+		"net-advanced": {
+			"kind": "skill",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/net-advanced/SKILL.md",
+			"contentSha256": "3e65ceb9d29b6a5272cc5ee33f2e5b7375a2562b61be830cc4b843de9e30eac3",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
+		},
+		"net-architect": {
+			"kind": "agent",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/agents/net-architect.md",
+			"contentSha256": "ea1d268fa757a0648ff633a987bb76ce704c589384d49bcbf0aa9aa319c66dc3",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
+		},
+		"net-developer": {
+			"kind": "skill",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/net-developer/SKILL.md",
+			"contentSha256": "5a02491af54e8b7480c2a068d818710fa37b03d0ed4af67c9d4b9f9d980883c3",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
+		},
+		"node-inspect-debugger": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/node-inspect-debugger/SKILL.md",
+			"contentSha256": "94d8e01c5d810236988100cb8563056c6118473c7b87218e5f4c44e1e54e68b1",
+			"targets": {}
+		},
+		"opencode": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/opencode/SKILL.md",
+			"contentSha256": "9285a272a5ece6e03cc25d3d4a81a2f6e33415e04f15587a47ef1a8f8990b1ac",
+			"targets": {}
+		},
+		"performance-analyst": {
+			"kind": "agent",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/agents/performance-analyst.md",
+			"contentSha256": "6206d4fda34f4a9181d3ef54ac1f42977213711a04c581ca5bbdd3c2c9074e3a",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
+		},
+		"python-debugpy": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/python-debugpy/SKILL.md",
+			"contentSha256": "9c2fcdcbda3f8cf3d5544638079f15deaf6120e3de4e41c093faeb946eed1aed",
+			"targets": {}
+		},
+		"sdlc-review": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/sdlc-review/SKILL.md",
+			"contentSha256": "66ca6680e7be89739eaba6773072d185b70b504738278a444ff17eddaf0318db",
+			"targets": {}
+		},
+		"simplify-code": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/simplify-code/SKILL.md",
+			"contentSha256": "a5961afd328e8e44128e9d00a37796c1a9008717e5ac72e4faeacff2265c2d0a",
+			"targets": {}
+		},
 		"spec-analyze": {
 			"kind": "skill",
 			"pack": "tooling",
@@ -65,6 +788,32 @@
 			"source": "skills/tooling/spec-analyze/SKILL.md",
 			"contentSha256": "52123e8ba3c45cb2ea80eaa49c779ee811db4c1f4b86fa215fbe843733ae01ea",
 			"targets": {}
+		},
+		"spike": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/spike/SKILL.md",
+			"contentSha256": "4473123d3dadc62b1b247c2a4c32694c39b3b02e342d76584035e887a0e78b74",
+			"targets": {}
+		},
+		"systematic-debugging": {
+			"kind": "skill",
+			"pack": "hermes",
+			"packVersion": "0.0.1",
+			"source": "skills/hermes/systematic-debugging/SKILL.md",
+			"contentSha256": "7ed24a65d4d9d6d8f912253948c41963f8195706344b7f750303ab6eb0df1d2f",
+			"targets": {}
+		},
+		"testcontainers-integration": {
+			"kind": "skill",
+			"pack": "dotnet",
+			"packVersion": "1.0.0",
+			"source": "skills/dotnet/testcontainers-integration/SKILL.md",
+			"contentSha256": "2d5efbbc81bf7edb3c3fcac867e5978e6ad42a4dda7c7fdca43260bf7059bbb9",
+			"targets": {
+				"dotnet": ">=10.0"
+			}
 		},
 		"webapp-testing": {
 			"kind": "skill",
@@ -77,7 +826,10 @@
 	},
 	"emitted": [
 		".agents/agents/ai-triage-reviewer.md",
+		".agents/agents/android-engineer.md",
 		".agents/agents/architecture-analyst.md",
+		".agents/agents/bmad-net-architect.md",
+		".agents/agents/bmad-performance-analyst.md",
 		".agents/agents/code-reviewer.md",
 		".agents/agents/codebase-fit-reviewer.md",
 		".agents/agents/codebase-surveyor.md",
@@ -85,7 +837,12 @@
 		".agents/agents/dependency-tracer.md",
 		".agents/agents/evidence-collector.md",
 		".agents/agents/finding-validator.md",
+		".agents/agents/ios-engineer.md",
 		".agents/agents/logic-reviewer.md",
+		".agents/agents/mobile-architect.md",
+		".agents/agents/mobile-release-manager.md",
+		".agents/agents/net-architect.md",
+		".agents/agents/performance-analyst.md",
 		".agents/agents/prior-art-finder.md",
 		".agents/agents/qa-acceptance-checker.md",
 		".agents/agents/qa-test-evidence.md",
@@ -96,24 +853,392 @@
 		".agents/agents/spec-explorer.md",
 		".agents/agents/test-coverage-auditor.md",
 		".agents/agents/test-runner.md",
+		".agents/skills/akka-net-patterns/SKILL.md",
+		".agents/skills/akka-net-patterns/reference.md",
+		".agents/skills/android-developer/SKILL.md",
 		".agents/skills/architecture-map/SKILL.md",
+		".agents/skills/aspire-orchestration/SKILL.md",
+		".agents/skills/aspire-orchestration/reference.md",
+		".agents/skills/benchmark-dotnet/SKILL.md",
+		".agents/skills/benchmark-dotnet/reference.md",
+		".agents/skills/bmad-advanced-elicitation/SKILL.md",
+		".agents/skills/bmad-advanced-elicitation/assets/methods.csv",
+		".agents/skills/bmad-advanced-elicitation/customize.toml",
+		".agents/skills/bmad-advanced-elicitation/scripts/pick_methods.py",
+		".agents/skills/bmad-agent-analyst/SKILL.md",
+		".agents/skills/bmad-agent-analyst/customize.toml",
+		".agents/skills/bmad-agent-architect/SKILL.md",
+		".agents/skills/bmad-agent-architect/customize.toml",
+		".agents/skills/bmad-agent-dev/SKILL.md",
+		".agents/skills/bmad-agent-dev/customize.toml",
+		".agents/skills/bmad-agent-pm/SKILL.md",
+		".agents/skills/bmad-agent-pm/customize.toml",
+		".agents/skills/bmad-agent-ux-designer/SKILL.md",
+		".agents/skills/bmad-agent-ux-designer/customize.toml",
+		".agents/skills/bmad-architecture/SKILL.md",
+		".agents/skills/bmad-architecture/assets/spine-template.md",
+		".agents/skills/bmad-architecture/customize.toml",
+		".agents/skills/bmad-architecture/references/headless.md",
+		".agents/skills/bmad-architecture/references/reviewer-gate.md",
+		".agents/skills/bmad-architecture/scripts/lint_spine.py",
+		".agents/skills/bmad-brainstorming/SKILL.md",
+		".agents/skills/bmad-brainstorming/assets/brain-icons.json",
+		".agents/skills/bmad-brainstorming/assets/brain-methods.csv",
+		".agents/skills/bmad-brainstorming/assets/brain-selector.html",
+		".agents/skills/bmad-brainstorming/customize.toml",
+		".agents/skills/bmad-brainstorming/references/converge.md",
+		".agents/skills/bmad-brainstorming/references/finalize.md",
+		".agents/skills/bmad-brainstorming/references/headless.md",
+		".agents/skills/bmad-brainstorming/references/in-chat-techniques.md",
+		".agents/skills/bmad-brainstorming/references/mode-autonomous.md",
+		".agents/skills/bmad-brainstorming/references/mode-facilitator.md",
+		".agents/skills/bmad-brainstorming/references/mode-partner.md",
+		".agents/skills/bmad-brainstorming/references/resume.md",
+		".agents/skills/bmad-brainstorming/scripts/brain.py",
+		".agents/skills/bmad-build-auto/SKILL.md",
+		".agents/skills/bmad-build-auto/compile-epic-context.md",
+		".agents/skills/bmad-build-auto/customize.toml",
+		".agents/skills/bmad-build-auto/references/claims-check.md",
+		".agents/skills/bmad-build-auto/references/deletion-check.md",
+		".agents/skills/bmad-build-auto/review-prompts/edge-case-hunter.md",
+		".agents/skills/bmad-build-auto/review-prompts/verification-gap.md",
+		".agents/skills/bmad-build-auto/spec-template.md",
+		".agents/skills/bmad-build-auto/step-01-clarify-and-route.md",
+		".agents/skills/bmad-build-auto/step-02-plan.md",
+		".agents/skills/bmad-build-auto/step-03-implement.md",
+		".agents/skills/bmad-build-auto/step-04-review.md",
+		".agents/skills/bmad-build-auto/workflow.md",
+		".agents/skills/bmad-build/SKILL.md",
+		".agents/skills/bmad-build/compile-epic-context.md",
+		".agents/skills/bmad-build/customize.toml",
+		".agents/skills/bmad-build/references/claims-check.md",
+		".agents/skills/bmad-build/references/deletion-check.md",
+		".agents/skills/bmad-build/review-prompts/edge-case-hunter.md",
+		".agents/skills/bmad-build/review-prompts/verification-gap.md",
+		".agents/skills/bmad-build/spec-template.md",
+		".agents/skills/bmad-build/step-01-clarify-and-route.md",
+		".agents/skills/bmad-build/step-02-plan.md",
+		".agents/skills/bmad-build/step-03-implement.md",
+		".agents/skills/bmad-build/step-04-review.md",
+		".agents/skills/bmad-build/step-05-present.md",
+		".agents/skills/bmad-build/step-oneshot.md",
+		".agents/skills/bmad-build/sync-sprint-status.md",
+		".agents/skills/bmad-build/workflow.md",
+		".agents/skills/bmad-checkpoint-preview/SKILL.md",
+		".agents/skills/bmad-code-review/SKILL.md",
+		".agents/skills/bmad-code-review/customize.toml",
+		".agents/skills/bmad-code-review/references/claims-check.md",
+		".agents/skills/bmad-code-review/references/deletion-check.md",
+		".agents/skills/bmad-code-review/review-prompts/edge-case-hunter.md",
+		".agents/skills/bmad-code-review/review-prompts/verification-gap.md",
+		".agents/skills/bmad-code-review/steps/step-01-gather-context.md",
+		".agents/skills/bmad-code-review/steps/step-02-review.md",
+		".agents/skills/bmad-code-review/steps/step-03-triage.md",
+		".agents/skills/bmad-code-review/steps/step-04-present.md",
+		".agents/skills/bmad-correct-course/SKILL.md",
+		".agents/skills/bmad-correct-course/checklist.md",
+		".agents/skills/bmad-correct-course/customize.toml",
+		".agents/skills/bmad-create-architecture/SKILL.md",
+		".agents/skills/bmad-create-architecture/customize.toml",
+		".agents/skills/bmad-create-epics-and-stories/SKILL.md",
+		".agents/skills/bmad-create-epics-and-stories/customize.toml",
+		".agents/skills/bmad-create-epics-and-stories/steps/step-01-validate-prerequisites.md",
+		".agents/skills/bmad-create-epics-and-stories/steps/step-02-design-epics.md",
+		".agents/skills/bmad-create-epics-and-stories/steps/step-03-create-stories.md",
+		".agents/skills/bmad-create-epics-and-stories/steps/step-04-final-validation.md",
+		".agents/skills/bmad-create-epics-and-stories/templates/epics-template.md",
+		".agents/skills/bmad-create-prd/SKILL.md",
+		".agents/skills/bmad-create-prd/customize.toml",
+		".agents/skills/bmad-create-story/SKILL.md",
+		".agents/skills/bmad-create-story/checklist.md",
+		".agents/skills/bmad-create-story/customize.toml",
+		".agents/skills/bmad-create-story/discover-inputs.md",
+		".agents/skills/bmad-create-story/template.md",
+		".agents/skills/bmad-customize/SKILL.md",
+		".agents/skills/bmad-customize/scripts/list_customizable_skills.py",
+		".agents/skills/bmad-deep-recon/SKILL.md",
+		".agents/skills/bmad-deep-recon/assets/research.template.md",
+		".agents/skills/bmad-deep-recon/customize.toml",
+		".agents/skills/bmad-deep-recon/references/draft.md",
+		".agents/skills/bmad-deep-recon/references/finalize.md",
+		".agents/skills/bmad-deep-recon/references/html-briefing.md",
+		".agents/skills/bmad-deep-recon/references/lifecycle.md",
+		".agents/skills/bmad-deep-recon/references/process.md",
+		".agents/skills/bmad-deep-recon/references/run.md",
+		".agents/skills/bmad-deep-recon/references/selection.md",
+		".agents/skills/bmad-deep-recon/references/synthesis.md",
+		".agents/skills/bmad-deep-recon/references/verification.md",
+		".agents/skills/bmad-deep-recon/scripts/recon_kit.py",
+		".agents/skills/bmad-deep-recon/types/academic-lit.md",
+		".agents/skills/bmad-deep-recon/types/competitive.md",
+		".agents/skills/bmad-deep-recon/types/domain.md",
+		".agents/skills/bmad-deep-recon/types/market.md",
+		".agents/skills/bmad-deep-recon/types/technical.md",
+		".agents/skills/bmad-deep-recon/types/user-voice.md",
+		".agents/skills/bmad-dev-auto/SKILL.md",
+		".agents/skills/bmad-dev-story/SKILL.md",
+		".agents/skills/bmad-dev-story/checklist.md",
+		".agents/skills/bmad-dev-story/customize.toml",
+		".agents/skills/bmad-document-project/SKILL.md",
+		".agents/skills/bmad-domain-research/SKILL.md",
+		".agents/skills/bmad-edit-prd/SKILL.md",
+		".agents/skills/bmad-edit-prd/customize.toml",
+		".agents/skills/bmad-editorial-review-prose/SKILL.md",
+		".agents/skills/bmad-editorial-review-structure/SKILL.md",
+		".agents/skills/bmad-editorial-review/SKILL.md",
+		".agents/skills/bmad-editorial-review/customize.toml",
+		".agents/skills/bmad-forge-idea/SKILL.md",
+		".agents/skills/bmad-forge-idea/customize.toml",
+		".agents/skills/bmad-forge-idea/scripts/resolve_personas.py",
+		".agents/skills/bmad-generate-project-context/SKILL.md",
+		".agents/skills/bmad-help/SKILL.md",
+		".agents/skills/bmad-market-research/SKILL.md",
+		".agents/skills/bmad-party-mode/SKILL.md",
+		".agents/skills/bmad-party-mode/customize.toml",
+		".agents/skills/bmad-party-mode/references/create-party.md",
+		".agents/skills/bmad-party-mode/references/mode-agent-team.md",
+		".agents/skills/bmad-party-mode/references/mode-auto.md",
+		".agents/skills/bmad-party-mode/references/mode-subagent.md",
+		".agents/skills/bmad-party-mode/references/party-memory.md",
+		".agents/skills/bmad-party-mode/scripts/resolve_party.py",
+		".agents/skills/bmad-prd/SKILL.md",
+		".agents/skills/bmad-prd/assets/headless-schemas.md",
+		".agents/skills/bmad-prd/assets/prd-template.md",
+		".agents/skills/bmad-prd/assets/prd-validation-checklist.md",
+		".agents/skills/bmad-prd/assets/validation-report-template.html",
+		".agents/skills/bmad-prd/customize.toml",
+		".agents/skills/bmad-prd/references/headless.md",
+		".agents/skills/bmad-prd/references/validate.md",
+		".agents/skills/bmad-prfaq/SKILL.md",
+		".agents/skills/bmad-prfaq/agents/artifact-analyzer.md",
+		".agents/skills/bmad-prfaq/agents/web-researcher.md",
+		".agents/skills/bmad-prfaq/assets/prfaq-template.md",
+		".agents/skills/bmad-prfaq/bmad-manifest.json",
+		".agents/skills/bmad-prfaq/customize.toml",
+		".agents/skills/bmad-prfaq/references/customer-faq.md",
+		".agents/skills/bmad-prfaq/references/internal-faq.md",
+		".agents/skills/bmad-prfaq/references/press-release.md",
+		".agents/skills/bmad-prfaq/references/verdict.md",
+		".agents/skills/bmad-product-brief/SKILL.md",
+		".agents/skills/bmad-product-brief/assets/brief-template.md",
+		".agents/skills/bmad-product-brief/customize.toml",
+		".agents/skills/bmad-project-context/SKILL.md",
+		".agents/skills/bmad-project-context/customize.toml",
+		".agents/skills/bmad-project-context/references/best-practices.md",
+		".agents/skills/bmad-project-context/references/template.md",
+		".agents/skills/bmad-qa-generate-e2e-tests/SKILL.md",
+		".agents/skills/bmad-qa-generate-e2e-tests/checklist.md",
+		".agents/skills/bmad-qa-generate-e2e-tests/customize.toml",
+		".agents/skills/bmad-quick-dev/SKILL.md",
+		".agents/skills/bmad-retrospective/SKILL.md",
+		".agents/skills/bmad-retrospective/customize.toml",
+		".agents/skills/bmad-retrospective/references/acceptance-verdict.md",
+		".agents/skills/bmad-retrospective/references/aggregate-views.md",
+		".agents/skills/bmad-retrospective/references/evidence-gathering.md",
+		".agents/skills/bmad-retrospective/references/retro-document.md",
+		".agents/skills/bmad-retrospective/references/team-discussion.md",
+		".agents/skills/bmad-retrospective/scripts/git_evidence.py",
+		".agents/skills/bmad-retrospective/scripts/sprint_status.py",
+		".agents/skills/bmad-review-adversarial-general/SKILL.md",
+		".agents/skills/bmad-review-edge-case-hunter/SKILL.md",
+		".agents/skills/bmad-review-verification-gap/SKILL.md",
+		".agents/skills/bmad-review/SKILL.md",
+		".agents/skills/bmad-review/customize.toml",
+		".agents/skills/bmad-review/references/editorial-common.md",
+		".agents/skills/bmad-review/references/lens-adversarial.md",
+		".agents/skills/bmad-review/references/lens-edge-case-hunter.md",
+		".agents/skills/bmad-review/references/lens-prose.md",
+		".agents/skills/bmad-review/references/lens-structure.md",
+		".agents/skills/bmad-review/references/lens-verification-gap.md",
+		".agents/skills/bmad-review/references/structure-models.md",
+		".agents/skills/bmad-review/scripts/word_metrics.py",
+		".agents/skills/bmad-spec/SKILL.md",
+		".agents/skills/bmad-spec/assets/headless-schemas.md",
+		".agents/skills/bmad-spec/assets/spec-template.md",
+		".agents/skills/bmad-spec/assets/stories-schema.md",
+		".agents/skills/bmad-spec/customize.toml",
+		".agents/skills/bmad-sprint-planning/SKILL.md",
+		".agents/skills/bmad-sprint-planning/customize.toml",
+		".agents/skills/bmad-sprint-planning/references/fix-sprint-status.md",
+		".agents/skills/bmad-sprint-planning/references/generate-tracking.md",
+		".agents/skills/bmad-sprint-planning/references/readiness-gate.md",
+		".agents/skills/bmad-sprint-planning/references/status-view.md",
+		".agents/skills/bmad-sprint-planning/references/validate.md",
+		".agents/skills/bmad-sprint-planning/scripts/sprint_plan.py",
+		".agents/skills/bmad-sprint-planning/sprint-status-template.yaml",
+		".agents/skills/bmad-sprint-status/SKILL.md",
+		".agents/skills/bmad-sprint-status/customize.toml",
+		".agents/skills/bmad-technical-research/SKILL.md",
+		".agents/skills/bmad-ux/SKILL.md",
+		".agents/skills/bmad-ux/assets/color-themes.md",
+		".agents/skills/bmad-ux/assets/design-directions.md",
+		".agents/skills/bmad-ux/assets/design-example-editorial.md",
+		".agents/skills/bmad-ux/assets/design-example-mobile.md",
+		".agents/skills/bmad-ux/assets/design-example-shadcn.md",
+		".agents/skills/bmad-ux/assets/excalidraw-wireframe.md",
+		".agents/skills/bmad-ux/assets/experience-example-mobile.md",
+		".agents/skills/bmad-ux/assets/experience-example-shadcn.md",
+		".agents/skills/bmad-ux/assets/headless-schemas.md",
+		".agents/skills/bmad-ux/assets/key-screens.md",
+		".agents/skills/bmad-ux/assets/validation-report-template.html",
+		".agents/skills/bmad-ux/customize.toml",
+		".agents/skills/bmad-ux/references/creative-tools.md",
+		".agents/skills/bmad-ux/references/design-md-spec.md",
+		".agents/skills/bmad-ux/references/headless.md",
+		".agents/skills/bmad-ux/references/validate.md",
+		".agents/skills/bmad-validate-prd/SKILL.md",
+		".agents/skills/bmad-validate-prd/customize.toml",
+		".agents/skills/bmad-walkthrough/SKILL.md",
+		".agents/skills/bmad-walkthrough/customize.toml",
+		".agents/skills/bmad-walkthrough/generate-trail.md",
+		".agents/skills/bmad-walkthrough/step-01-orientation.md",
+		".agents/skills/bmad-walkthrough/step-02-walkthrough.md",
+		".agents/skills/bmad-walkthrough/step-03-detail-pass.md",
+		".agents/skills/bmad-walkthrough/step-04-testing.md",
+		".agents/skills/bmad-walkthrough/step-05-wrapup.md",
 		".agents/skills/brand-guidelines/SKILL.md",
 		".agents/skills/brand-guidelines/examples/business-report-template.md",
 		".agents/skills/business-comms/SKILL.md",
 		".agents/skills/business-comms/examples/project-reports.md",
+		".agents/skills/claude-code/SKILL.md",
+		".agents/skills/codebase-inspection/SKILL.md",
+		".agents/skills/codex/SKILL.md",
+		".agents/skills/computer-use/SKILL.md",
+		".agents/skills/cross-platform-mobile/SKILL.md",
+		".agents/skills/github/SKILL.md",
+		".agents/skills/github/references/auth.md",
+		".agents/skills/github/references/ci-troubleshooting.md",
+		".agents/skills/github/references/code-review.md",
+		".agents/skills/github/references/conventional-commits.md",
+		".agents/skills/github/references/github-api-cheatsheet.md",
+		".agents/skills/github/references/issue-to-pr.md",
+		".agents/skills/github/references/issues.md",
+		".agents/skills/github/references/pr-workflow.md",
+		".agents/skills/github/references/repo-management.md",
+		".agents/skills/github/references/review-output-template.md",
+		".agents/skills/github/scripts/gh-env.sh",
+		".agents/skills/github/scripts/git-credential-token.py",
+		".agents/skills/github/templates/bug-report.md",
+		".agents/skills/github/templates/feature-request.md",
+		".agents/skills/github/templates/pr-body-bugfix.md",
+		".agents/skills/github/templates/pr-body-feature.md",
+		".agents/skills/ios-developer/SKILL.md",
 		".agents/skills/mcp-builder/SKILL.md",
 		".agents/skills/mem-search/SKILL.md",
 		".agents/skills/mem-search/scripts/mem_search.py",
+		".agents/skills/mobile-design-review/SKILL.md",
+		".agents/skills/mobile-device-testing/SKILL.md",
+		".agents/skills/mobile-store-readiness/SKILL.md",
+		".agents/skills/net-advanced/SKILL.md",
+		".agents/skills/net-developer/SKILL.md",
+		".agents/skills/net-developer/examples/dockerfile",
+		".agents/skills/net-developer/examples/entity-template.cs",
+		".agents/skills/net-developer/examples/github-actions.yml",
+		".agents/skills/net-developer/examples/test-template.cs",
+		".agents/skills/net-developer/examples/webapi-template.cs",
+		".agents/skills/net-developer/scripts/add_entity.py",
+		".agents/skills/net-developer/scripts/create_project.py",
+		".agents/skills/node-inspect-debugger/SKILL.md",
+		".agents/skills/opencode/SKILL.md",
+		".agents/skills/python-debugpy/SKILL.md",
+		".agents/skills/sdlc-review/SKILL.md",
+		".agents/skills/simplify-code/SKILL.md",
 		".agents/skills/spec-analyze/SKILL.md",
+		".agents/skills/spike/SKILL.md",
+		".agents/skills/systematic-debugging/SKILL.md",
+		".agents/skills/testcontainers-integration/SKILL.md",
+		".agents/skills/testcontainers-integration/reference.md",
 		".agents/skills/webapp-testing/SKILL.md",
 		".agents/skills/webapp-testing/scripts/with_server.py",
 		".claude-plugin/marketplace.json",
+		".gemini/commands/akka-net-patterns.toml",
+		".gemini/commands/android-developer.toml",
+		".gemini/commands/android-engineer.toml",
 		".gemini/commands/architecture-map.toml",
+		".gemini/commands/aspire-orchestration.toml",
+		".gemini/commands/benchmark-dotnet.toml",
+		".gemini/commands/bmad-advanced-elicitation.toml",
+		".gemini/commands/bmad-agent-analyst.toml",
+		".gemini/commands/bmad-agent-architect.toml",
+		".gemini/commands/bmad-agent-dev.toml",
+		".gemini/commands/bmad-agent-pm.toml",
+		".gemini/commands/bmad-agent-ux-designer.toml",
+		".gemini/commands/bmad-architecture.toml",
+		".gemini/commands/bmad-brainstorming.toml",
+		".gemini/commands/bmad-build-auto.toml",
+		".gemini/commands/bmad-build.toml",
+		".gemini/commands/bmad-checkpoint-preview.toml",
+		".gemini/commands/bmad-code-review.toml",
+		".gemini/commands/bmad-correct-course.toml",
+		".gemini/commands/bmad-create-architecture.toml",
+		".gemini/commands/bmad-create-epics-and-stories.toml",
+		".gemini/commands/bmad-create-prd.toml",
+		".gemini/commands/bmad-create-story.toml",
+		".gemini/commands/bmad-customize.toml",
+		".gemini/commands/bmad-deep-recon.toml",
+		".gemini/commands/bmad-dev-auto.toml",
+		".gemini/commands/bmad-dev-story.toml",
+		".gemini/commands/bmad-document-project.toml",
+		".gemini/commands/bmad-domain-research.toml",
+		".gemini/commands/bmad-edit-prd.toml",
+		".gemini/commands/bmad-editorial-review-prose.toml",
+		".gemini/commands/bmad-editorial-review-structure.toml",
+		".gemini/commands/bmad-editorial-review.toml",
+		".gemini/commands/bmad-forge-idea.toml",
+		".gemini/commands/bmad-generate-project-context.toml",
+		".gemini/commands/bmad-help.toml",
+		".gemini/commands/bmad-market-research.toml",
+		".gemini/commands/bmad-net-architect.toml",
+		".gemini/commands/bmad-party-mode.toml",
+		".gemini/commands/bmad-performance-analyst.toml",
+		".gemini/commands/bmad-prd.toml",
+		".gemini/commands/bmad-prfaq.toml",
+		".gemini/commands/bmad-product-brief.toml",
+		".gemini/commands/bmad-project-context.toml",
+		".gemini/commands/bmad-qa-generate-e2e-tests.toml",
+		".gemini/commands/bmad-quick-dev.toml",
+		".gemini/commands/bmad-retrospective.toml",
+		".gemini/commands/bmad-review-adversarial-general.toml",
+		".gemini/commands/bmad-review-edge-case-hunter.toml",
+		".gemini/commands/bmad-review-verification-gap.toml",
+		".gemini/commands/bmad-review.toml",
+		".gemini/commands/bmad-spec.toml",
+		".gemini/commands/bmad-sprint-planning.toml",
+		".gemini/commands/bmad-sprint-status.toml",
+		".gemini/commands/bmad-technical-research.toml",
+		".gemini/commands/bmad-ux.toml",
+		".gemini/commands/bmad-validate-prd.toml",
+		".gemini/commands/bmad-walkthrough.toml",
 		".gemini/commands/brand-guidelines.toml",
 		".gemini/commands/business-comms.toml",
+		".gemini/commands/claude-code.toml",
+		".gemini/commands/codebase-inspection.toml",
+		".gemini/commands/codex.toml",
+		".gemini/commands/computer-use.toml",
+		".gemini/commands/cross-platform-mobile.toml",
+		".gemini/commands/github.toml",
+		".gemini/commands/ios-developer.toml",
+		".gemini/commands/ios-engineer.toml",
 		".gemini/commands/mcp-builder.toml",
 		".gemini/commands/mem-search.toml",
+		".gemini/commands/mobile-architect.toml",
+		".gemini/commands/mobile-design-review.toml",
+		".gemini/commands/mobile-device-testing.toml",
+		".gemini/commands/mobile-release-manager.toml",
+		".gemini/commands/mobile-store-readiness.toml",
+		".gemini/commands/net-advanced.toml",
+		".gemini/commands/net-architect.toml",
+		".gemini/commands/net-developer.toml",
+		".gemini/commands/node-inspect-debugger.toml",
+		".gemini/commands/opencode.toml",
+		".gemini/commands/performance-analyst.toml",
+		".gemini/commands/python-debugpy.toml",
+		".gemini/commands/sdlc-review.toml",
+		".gemini/commands/simplify-code.toml",
 		".gemini/commands/spec-analyze.toml",
+		".gemini/commands/spike.toml",
+		".gemini/commands/systematic-debugging.toml",
+		".gemini/commands/testcontainers-integration.toml",
 		".gemini/commands/webapp-testing.toml"
 	]
 }
