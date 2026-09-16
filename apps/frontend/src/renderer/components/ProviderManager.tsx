@@ -1,3 +1,4 @@
+import { useProviderModelCatalog } from "../hooks/useProviderModelCatalog";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,11 +29,12 @@ export const ProviderManager: React.FC<{ selected: string }> = ({
 	const [_claudeProfiles, setClaudeProfiles] = useState<any[]>([]);
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 	const [activeClaudeProfile, setActiveClaudeProfile] = useState<any>(null);
-	const [claudeModels, setClaudeModels] = useState<string[]>([]);
+	const catalog = useProviderModelCatalog(selected);
+	const claudeModels = catalog.models.map((m) => m.value);
 	const [claudeAuthChecked, setClaudeAuthChecked] = useState(false);
 
 	// Ajout d'un état pour l'erreur
-	const [claudeModelsError, setClaudeModelsError] = useState<string>("");
+	const claudeModelsError = catalog.error || "";
 	const [_providersError, setProvidersError] = useState<string>("");
 
 	// Loading states
@@ -41,7 +43,7 @@ export const ProviderManager: React.FC<{ selected: string }> = ({
 	const [isLoadingConfigs, setIsLoadingConfigs] = useState(false);
 	const [isLoadingCapabilities, setIsLoadingCapabilities] = useState(false);
 	const [isLoadingSchema, setIsLoadingSchema] = useState(false);
-	const [isLoadingModels, setIsLoadingModels] = useState(false);
+	const isLoadingModels = catalog.loading;
 	const [isSavingConfig, setIsSavingConfig] = useState(false);
 	const [isDeletingConfig, setIsDeletingConfig] = useState(false);
 	const [isTestingProvider, setIsTestingProvider] = useState(false);
@@ -53,15 +55,7 @@ export const ProviderManager: React.FC<{ selected: string }> = ({
 		setIsLoadingConfigs(true);
 
 		Promise.all([
-			fetch(`${API_BASE}/providers`, { signal: controller.signal }).then((res) => {
-				if (!res.ok) throw new Error(`HTTP ${res.status}`);
-				const contentType = res.headers.get("content-type");
-				if (!contentType?.includes("application/json")) {
-					throw new Error("Response is not JSON");
-				}
-				return res.json();
-			}),
-			fetch(`${API_BASE}/providers/configs`, { signal: controller.signal }).then(
+			fetch(`${API_BASE}/providers`, { signal: controller.signal }).then(
 				(res) => {
 					if (!res.ok) throw new Error(`HTTP ${res.status}`);
 					const contentType = res.headers.get("content-type");
@@ -71,6 +65,16 @@ export const ProviderManager: React.FC<{ selected: string }> = ({
 					return res.json();
 				},
 			),
+			fetch(`${API_BASE}/providers/configs`, {
+				signal: controller.signal,
+			}).then((res) => {
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const contentType = res.headers.get("content-type");
+				if (!contentType?.includes("application/json")) {
+					throw new Error("Response is not JSON");
+				}
+				return res.json();
+			}),
 		])
 			.then(([providersData, configsData]) => {
 				setProviders(providersData.providers || []);
@@ -201,51 +205,6 @@ export const ProviderManager: React.FC<{ selected: string }> = ({
 			setClaudeAuthChecked(true);
 		}
 	}, []);
-
-	useEffect(() => {
-		if (!selected) {
-			setClaudeModels([]);
-			setClaudeModelsError("");
-			setIsLoadingModels(false);
-			return;
-		}
-		const controller = new AbortController();
-		setIsLoadingModels(true);
-		fetch(`${API_BASE}/providers/models/${selected}`, {
-			signal: controller.signal,
-		})
-			.then((res) => {
-				if (!res.ok) throw new Error(`HTTP ${res.status}`);
-				const contentType = res.headers.get("content-type");
-				if (!contentType?.includes("application/json")) {
-					throw new Error("Response is not JSON");
-				}
-				return res.json();
-			})
-			.then((data) => {
-				setClaudeModels(data.models || []);
-				if (data.error) {
-					setClaudeModelsError(data.error);
-				} else {
-					setClaudeModelsError(
-						data.models?.length === 0
-							? `Aucun modèle disponible pour le provider «${selected}».`
-							: "",
-					);
-				}
-			})
-			.catch((err) => {
-				if (err?.name === "AbortError") return;
-				console.error("Failed to fetch provider models:", err);
-				setClaudeModels([]);
-				setClaudeModelsError(`Failed to fetch models: ${err.message}`);
-			})
-			.finally(() => {
-				if (controller.signal.aborted) return;
-				setIsLoadingModels(false);
-			});
-		return () => controller.abort();
-	}, [selected]);
 
 	const handleConfigChange = (k: string, v: string) => {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly

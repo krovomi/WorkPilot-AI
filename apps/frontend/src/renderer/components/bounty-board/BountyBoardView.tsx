@@ -1,3 +1,6 @@
+import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
+import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
+import { isLocalProvider } from "../../../shared/utils/local-models";
 import { Plus, Swords, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,6 +27,38 @@ const PROVIDERS = Object.keys(PROVIDER_MODELS_MAP).sort((a, b) =>
 function firstModelFor(provider: string): string {
 	const list = PROVIDER_MODELS_MAP[provider];
 	return list && list.length > 0 ? list[0].value : "";
+}
+
+function ContestantModelSelect({
+	provider,
+	value,
+	onChange,
+}: {
+	provider: string;
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	const { models } = useProviderModelCatalog(provider);
+	const selection = buildModelSelectOptions(
+		models,
+		value,
+		{},
+		isLocalProvider(provider),
+	);
+	return (
+		<Select value={selection.value} onValueChange={onChange}>
+			<SelectTrigger>
+				<SelectValue />
+			</SelectTrigger>
+			<SelectContent>
+				{selection.options.map((m) => (
+					<SelectItem key={m.value} value={m.value}>
+						{m.label}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
 }
 
 interface Props {
@@ -226,23 +261,11 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 								<Label className="text-[10px]">
 									{t("bountyBoard:field.model", "Model")}
 								</Label>
-								<Select
+								<ContestantModelSelect
+									provider={c.provider}
 									value={c.model}
-									onValueChange={(model) =>
-										updateContestant(idx, { model })
-									}
-								>
-									<SelectTrigger>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{(PROVIDER_MODELS_MAP[c.provider] ?? []).map((m) => (
-											<SelectItem key={m.value} value={m.value}>
-												{m.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+									onChange={(model) => updateContestant(idx, { model })}
+								/>
 							</div>
 							<div className="col-span-3">
 								<Label className="text-[10px]">
@@ -334,7 +357,10 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 			)}
 
 			{current && verdictOpen && (
-				<JudgeVerdictModal result={current} onClose={() => setVerdictOpen(false)} />
+				<JudgeVerdictModal
+					result={current}
+					onClose={() => setVerdictOpen(false)}
+				/>
 			)}
 		</div>
 	);

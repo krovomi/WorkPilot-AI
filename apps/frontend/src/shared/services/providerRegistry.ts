@@ -167,16 +167,7 @@ class ProviderRegistry {
 			requiresApiKey: true,
 			requiresOAuth: false,
 			requiresCLI: false,
-			models: [
-				{
-					value: "grok-2",
-					label: "Grok 2",
-					tier: "flagship",
-					supportsThinking: true,
-				},
-				{ value: "grok-2-mini", label: "Grok 2 Mini", tier: "standard" },
-				{ value: "grok-beta", label: "Grok Beta", tier: "fast" },
-			],
+			models: PROVIDER_MODELS_MAP.grok || [],
 		});
 
 		// --- Custom/Enterprise ---
@@ -200,30 +191,7 @@ class ProviderRegistry {
 			requiresApiKey: true,
 			requiresOAuth: false,
 			requiresCLI: false,
-			models: [
-				{
-					value: "windsurf-default",
-					label: "Windsurf Default",
-					tier: "standard",
-				},
-				{
-					value: "windsurf-premier",
-					label: "Windsurf Premier",
-					tier: "flagship",
-				},
-				{
-					value: "windsurf-cascade",
-					label: "Windsurf Cascade",
-					tier: "flagship",
-					supportsThinking: true,
-				},
-				{ value: "gpt-4o", label: "GPT-4o", tier: "flagship" },
-				{
-					value: "claude-3.5-sonnet",
-					label: "Claude 3.5 Sonnet",
-					tier: "flagship",
-				},
-			],
+			models: PROVIDER_MODELS_MAP.windsurf || [],
 		});
 
 		// --- Cursor ---
@@ -235,18 +203,7 @@ class ProviderRegistry {
 			requiresApiKey: true,
 			requiresOAuth: false,
 			requiresCLI: false,
-			models: [
-				{ value: "cursor-default", label: "Cursor Default", tier: "standard" },
-				{ value: "cursor-pro", label: "Cursor Pro", tier: "flagship" },
-				{ value: "gpt-4o", label: "GPT-4o", tier: "flagship" },
-				{ value: "gpt-4-turbo", label: "GPT-4 Turbo", tier: "standard" },
-				{
-					value: "claude-3.5-sonnet",
-					label: "Claude 3.5 Sonnet",
-					tier: "flagship",
-				},
-				{ value: "claude-3-opus", label: "Claude 3 Opus", tier: "flagship" },
-			],
+			models: PROVIDER_MODELS_MAP.cursor || [],
 		});
 
 		// --- Ollama (Local) ---
@@ -452,6 +409,5 @@ export function getProvider(name: string): Provider | undefined {
 }
 
 export function getModelsForProvider(providerName: string): Provider["models"] {
-	const provider = providerRegistry.getProvider(providerName);
-	return provider?.models || [];
+	return PROVIDER_MODELS_MAP[providerName] || [];
 }

@@ -1,5 +1,6 @@
+import { useProviderModelCatalog } from "../../../hooks/useProviderModelCatalog";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../ui/button";
 import { Card, CardContent } from "../../ui/card";
@@ -272,25 +273,9 @@ const getFieldsForProvider = (provider: string) => {
 
 const AccountForm: React.FC<Props> = ({ provider, onSave, onCancel }) => {
 	const { t } = useTranslation(["settings"]);
-	const [models, setModels] = useState<string[]>([]);
+	const { models: catalogModels } = useProviderModelCatalog(provider);
+	const models = catalogModels.map((m) => m.value);
 	const [formState, setFormState] = useState<Record<string, string>>({});
-
-	useEffect(() => {
-		const controller = new AbortController();
-		fetch(`/providers/models/${provider}`, { signal: controller.signal })
-			.then((res) => {
-				if (!res.ok) throw new Error(`HTTP ${res.status}`);
-				return res.json();
-			})
-			.then((data) => setModels(data.models || []))
-			.catch((err) => {
-				if ((err as { name?: string })?.name === "AbortError") return;
-				console.error("Failed to fetch provider models:", err);
-				setModels([]);
-			});
-		setFormState({}); // reset form on provider change
-		return () => controller.abort();
-	}, [provider]);
 
 	const fields = getFieldsForProvider(provider);
 

@@ -1,32 +1,13 @@
-/**
- * Fetches the live model catalog for a given AI provider from the backend
- * and unions it with the local static catalog so the dropdown always
- * exposes both:
- *
- *  - The freshest live entries from the provider's /v1/models response
- *    (so a brand-new model like "claude-opus-4-7" or "gpt-5.5" appears
- *    automatically the day the provider lists it).
- *  - The local static entries (legacy short aliases like "opus"/"sonnet"
- *    used by preset agent profiles, plus curated additions in
- *    PROVIDER_MODELS_MAP). These are kept so existing tasks persisted
- *    with these values keep working.
- *
- * Backed by `GET /providers/models/{provider}/catalog`, which has a 24h
- * disk cache and falls back to a static catalog when the provider's API
- * is unreachable or no API key is configured.
- *
- * The hook serves static entries instantly so the UI never shows an empty
- * dropdown, then upgrades the union as the live response arrives.
- * `refresh()` bypasses the backend cache.
+/** Shared provider catalog. Every selector subscribes to the same snapshot.
+ * Live discovery is refreshed while in use and on window focus. Static entries
+ * are generated from the backend registry and are only an offline fallback.
  */
-
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import {
-	AVAILABLE_MODELS,
 	dedupeModelCatalog,
 	getModelsForProvider,
 	sortClaudeCatalog,
-} from "../../shared/constants";
+} from "../../shared/constants/models";
 import { dedupeLocalCatalog } from "../../shared/utils/local-models";
 
 export type CatalogSource = "live" | "cache" | "static";
@@ -71,142 +52,174 @@ interface CatalogResponse {
 	error: string | null;
 }
 
-/** Local static entries shown for `provider` regardless of what the live
- * API returns (legacy aliases, curated additions). */
-function localStaticEntries(provider: string): readonly CatalogModel[] {
-	const isClaude =
-		!provider || provider === "anthropic" || provider === "claude";
-	if (isClaude) {
-		// AVAILABLE_MODELS holds the short aliases (opus/sonnet/haiku/…) used
-		// by preset agent profiles. We also surface the modern PROVIDER_MODELS
-		// curated list for Anthropic so anything the live API hides (e.g.
-		// when the key cannot list a model the user is still authorised to
-		// call) remains selectable.
-		return [...AVAILABLE_MODELS, ...getModelsForProvider("anthropic")];
-	}
-	return getModelsForProvider(provider);
+interface CatalogState {
+	snapshot: Omit<ProviderModelCatalog, "refresh">;
+	listeners: Set<() => void>;
+	pending?: Promise<void>;
+	refreshAfterPending?: boolean;
+	checkedAt: number;
+	timer?: ReturnType<typeof setInterval>;
 }
+const catalogs = new Map<string, CatalogState>();
+const isLocal = (provider: string) =>
+	["ollama", "local", "lm-studio", "llama-cpp"].includes(provider);
+const normalize = (provider: string) =>
+	({
+		local: "ollama",
+		claude: "anthropic",
+		gemini: "google",
+		lmstudio: "lm-studio",
+		llamacpp: "llama-cpp",
+	})[provider] ?? provider;
+const ttl = (provider: string) => (isLocal(provider) ? 30_000 : 15 * 60_000);
 
-/** Merge two model lists, deduplicating by `value`. Items from `primary`
- * win over `secondary` (so live entries override stale static ones). */
-function mergeCatalogs(
-	primary: readonly CatalogModel[],
-	secondary: readonly CatalogModel[],
+function prepareModels(
+	provider: string,
+	live: readonly CatalogModel[],
+	source: CatalogSource,
 ): CatalogModel[] {
-	const seen = new Set<string>();
-	const out: CatalogModel[] = [];
-	for (const m of primary) {
-		if (m.value && !seen.has(m.value)) {
-			seen.add(m.value);
-			out.push(m);
-		}
+	const fallback = getModelsForProvider(provider);
+	const merged = dedupeModelCatalog<CatalogModel>([...live, ...fallback]);
+	if (provider === "anthropic") return sortClaudeCatalog(merged);
+	if (isLocal(provider)) {
+		return dedupeLocalCatalog(
+			merged,
+			source === "static" ? [] : live.map((m) => m.value),
+		).filter((m) => m.supports_tools !== false);
 	}
-	for (const m of secondary) {
-		if (m.value && !seen.has(m.value)) {
-			seen.add(m.value);
-			out.push(m);
-		}
-	}
-	return out;
+	return merged;
 }
 
+function stateFor(provider: string): CatalogState {
+	let state = catalogs.get(provider);
+	if (!state) {
+		state = {
+			snapshot: {
+				models: prepareModels(provider, [], "static"),
+				source: "static",
+				fetchedAt: null,
+				error: null,
+				loading: false,
+			},
+			listeners: new Set(),
+			checkedAt: 0,
+		};
+		catalogs.set(provider, state);
+	}
+	return state;
+}
+function publish(
+	state: CatalogState,
+	patch: Partial<CatalogState["snapshot"]>,
+) {
+	state.snapshot = { ...state.snapshot, ...patch };
+	for (const listener of state.listeners) listener();
+}
+async function load(provider: string, force = false): Promise<void> {
+	const state = stateFor(provider);
+	if (!provider) return;
+	if (state.pending) {
+		if (force) state.refreshAfterPending = true;
+		return state.pending;
+	}
+	if (!force && Date.now() - state.checkedAt < ttl(provider)) return;
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), 20_000);
+	publish(state, { loading: true });
+	state.pending = (async () => {
+		try {
+			const baseUrl = import.meta.env?.VITE_BACKEND_URL || "";
+			const res = await fetch(
+				`${baseUrl}/providers/models/${encodeURIComponent(provider)}/catalog${force ? "?refresh=true" : ""}`,
+				{ signal: controller.signal },
+			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			if (!res.headers.get("content-type")?.includes("application/json"))
+				throw new Error("non-json");
+			const data = (await res.json()) as CatalogResponse;
+			if (controller.signal.aborted) return;
+			if (
+				!Array.isArray(data.models) ||
+				data.models.some(
+					(m) =>
+						!m ||
+						typeof m.value !== "string" ||
+						!m.value ||
+						typeof m.label !== "string",
+				)
+			)
+				throw new Error("invalid-catalog");
+			publish(state, {
+				models: prepareModels(provider, data.models, data.source),
+				source: data.source,
+				fetchedAt: data.fetchedAt ?? null,
+				error: data.error ?? null,
+			});
+		} catch (err) {
+			publish(state, {
+				error: err instanceof Error ? err.message : "fetch_failed",
+				...(isLocal(provider)
+					? {
+							models: prepareModels(provider, [], "static"),
+							source: "static" as const,
+							fetchedAt: null,
+						}
+					: {}),
+			});
+		} finally {
+			clearTimeout(timeout);
+			state.checkedAt = Date.now();
+			state.pending = undefined;
+			publish(state, { loading: false });
+			if (state.refreshAfterPending) {
+				state.refreshAfterPending = false;
+				queueMicrotask(() => {
+					void load(provider, true);
+				});
+			}
+		}
+	})();
+	return state.pending;
+}
+function subscribe(provider: string, listener: () => void) {
+	const state = stateFor(provider);
+	state.listeners.add(listener);
+	const onFocus = () => {
+		void load(provider);
+	};
+	window.addEventListener("focus", onFocus);
+	if (state.listeners.size === 1) {
+		state.timer = setInterval(onFocus, ttl(provider));
+	}
+	void load(provider);
+	return () => {
+		state.listeners.delete(listener);
+		// Remove the exact callback registered by this subscription, even if another
+		// screen is still subscribed. Each active screen also revalidates on focus.
+		window.removeEventListener("focus", onFocus);
+		if (!state.listeners.size) {
+			clearInterval(state.timer);
+		}
+	};
+}
 export function useProviderModelCatalog(
 	provider: string,
 ): ProviderModelCatalog {
-	const staticEntries = useMemo(() => localStaticEntries(provider), [provider]);
+	const key = normalize(provider.trim().toLowerCase());
+	const snapshot = useSyncExternalStore(
+		useCallback((listener) => subscribe(key, listener), [key]),
+		useCallback(() => stateFor(key).snapshot, [key]),
+	);
+	const refresh = useCallback(() => {
+		void load(key, true);
+	}, [key]);
+	return { ...snapshot, refresh };
+}
 
-	// `liveModels` holds whatever the backend last returned for this provider
-	// (empty until the first response). The exposed catalog is always the
-	// union staticEntries ∪ liveModels.
-	const [liveModels, setLiveModels] = useState<readonly CatalogModel[]>([]);
-	const [source, setSource] = useState<CatalogSource>("static");
-	const [fetchedAt, setFetchedAt] = useState<number | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const [loading, setLoading] = useState(false);
-	const [bumpToken, setBumpToken] = useState(0);
-	const lastProviderRef = useRef<string>("");
-
-	const refresh = useCallback(() => setBumpToken((n) => n + 1), []);
-
-	useEffect(() => {
-		// Reset live data whenever the provider changes; static entries are
-		// already provider-correct via useMemo above.
-		if (lastProviderRef.current !== provider) {
-			lastProviderRef.current = provider;
-			setLiveModels([]);
-			setSource("static");
-			setFetchedAt(null);
-			setError(null);
-		}
-
-		if (!provider) return;
-
-		const controller = new AbortController();
-		const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-		const url = `${backendUrl}/providers/models/${encodeURIComponent(
-			provider,
-		)}/catalog${bumpToken > 0 ? "?refresh=true" : ""}`;
-
-		setLoading(true);
-		fetch(url, { signal: controller.signal })
-			.then((res) => {
-				if (!res.ok) throw new Error(`HTTP ${res.status}`);
-				const contentType = res.headers.get("content-type") || "";
-				if (!contentType.includes("application/json")) {
-					throw new Error("non-json");
-				}
-				return res.json() as Promise<CatalogResponse>;
-			})
-			.then((data) => {
-				const models = Array.isArray(data?.models) ? data.models : [];
-				setLiveModels(models);
-				setSource(data?.source ?? "static");
-				setFetchedAt(data?.fetchedAt ?? null);
-				setError(data?.error ?? null);
-			})
-			.catch((err) => {
-				if (err?.name === "AbortError") return;
-				setError(err?.message ?? "fetch_failed");
-			})
-			.finally(() => setLoading(false));
-
-		return () => controller.abort();
-	}, [provider, bumpToken]);
-
-	// Live first → static second so a freshly listed model (e.g. Opus 4.7
-	// returned by /v1/models) shows above its statically-curated peer.
-	// `dedupeModelCatalog` then collapses every alternate spelling of the same
-	// version (short alias / dotted-vs-dashed / dated snapshot) into a single
-	// entry, keeping the explicit versioned id so the dropdown never shows the
-	// same model twice for one provider.
-	const models = useMemo(() => {
-		let merged = dedupeModelCatalog(mergeCatalogs(liveModels, staticEntries));
-		// Claude catalog: present it grouped by family (Fable → Opus → Sonnet →
-		// Haiku), newest version first (Opus 4.8 before 4.7…), independent of the
-		// order the backend/static sources happened to use.
-		const isClaude =
-			!provider || provider === "anthropic" || provider === "claude";
-		if (isClaude) merged = sortClaudeCatalog(merged);
-		// For local providers the live list IS the set of installed models, so we
-		// can flag which dropdown entries are actually on disk vs. catalog-only
-		// suggestions (downloaded on demand). For cloud providers "live" means
-		// "listed by the API", not "installed", so we don't tag those.
-		const isLocal =
-			provider === "ollama" ||
-			provider === "local" ||
-			provider === "lmstudio";
-		if (!isLocal || liveModels.length === 0) return merged;
-		return (
-			dedupeLocalCatalog(
-				merged,
-				liveModels.map((m) => m.value),
-			)
-				// Hide local models the backend confirmed have NO native tool-calling
-				// — they can't drive WorkPilot's agentic phases. Unknown (undefined)
-				// stays, so this never over-filters.
-				.filter((m) => m.supports_tools !== false)
-		);
-	}, [liveModels, staticEntries, provider]);
-
-	return { models, source, fetchedAt, error, loading, refresh };
+/** Invalidate after a provider configuration or local inventory changes. */
+export function refreshProviderModelCatalog(provider: string): void {
+	const key = normalize(provider.trim().toLowerCase());
+	const state = stateFor(key);
+	state.checkedAt = 0;
+	if (state.listeners.size) void load(key, true);
 }

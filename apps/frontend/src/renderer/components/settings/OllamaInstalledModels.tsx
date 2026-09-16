@@ -1,3 +1,4 @@
+import { refreshProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 /**
  * OllamaInstalledModels
  * =====================
@@ -96,6 +97,7 @@ export function OllamaInstalledModels({
 				);
 				if (res?.success) {
 					setModels((prev) => prev.filter((m) => m.name !== name));
+					refreshProviderModelCatalog("ollama");
 				} else {
 					setError(
 						res?.error ||
@@ -184,42 +186,42 @@ export function OllamaInstalledModels({
 							}
 						: {};
 					return (
-					<div
-						key={m.name}
-						className={cn(
-							"flex items-center justify-between gap-3 p-2 rounded-md border border-border",
-							onSelectModel &&
-								"cursor-pointer hover:bg-accent hover:border-accent-foreground/20 transition-colors",
-						)}
-						{...selectProps}
-					>
-						<div className="min-w-0">
-							<p className="text-sm text-foreground truncate">{m.name}</p>
-							<p className="text-xs text-muted-foreground">
-								{formatSize(m.size_gb)}
-							</p>
-						</div>
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={(e) => {
-								e.stopPropagation();
-								handleDelete(m.name);
-							}}
-							disabled={deleting === m.name}
-							title={t("sections.accounts.localModels.deleteTooltip", {
-								name: m.name,
-							})}
-							className="text-destructive hover:text-destructive"
-						>
-							{deleting === m.name ? (
-								<Loader2 className="h-4 w-4 animate-spin" />
-							) : (
-								<Trash2 className="h-4 w-4" />
+						<div
+							key={m.name}
+							className={cn(
+								"flex items-center justify-between gap-3 p-2 rounded-md border border-border",
+								onSelectModel &&
+									"cursor-pointer hover:bg-accent hover:border-accent-foreground/20 transition-colors",
 							)}
-						</Button>
-					</div>
+							{...selectProps}
+						>
+							<div className="min-w-0">
+								<p className="text-sm text-foreground truncate">{m.name}</p>
+								<p className="text-xs text-muted-foreground">
+									{formatSize(m.size_gb)}
+								</p>
+							</div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={(e) => {
+									e.stopPropagation();
+									handleDelete(m.name);
+								}}
+								disabled={deleting === m.name}
+								title={t("sections.accounts.localModels.deleteTooltip", {
+									name: m.name,
+								})}
+								className="text-destructive hover:text-destructive"
+							>
+								{deleting === m.name ? (
+									<Loader2 className="h-4 w-4 animate-spin" />
+								) : (
+									<Trash2 className="h-4 w-4" />
+								)}
+							</Button>
+						</div>
 					);
 				})}
 			</div>

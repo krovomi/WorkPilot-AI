@@ -1,10 +1,10 @@
+import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	DEFAULT_FEATURE_MODELS,
 	DEFAULT_FEATURE_THINKING,
 	FEATURE_LABELS,
-	getModelsForProvider,
 	providerSupportsThinking,
 	THINKING_LEVELS,
 } from "../../../shared/constants";
@@ -151,10 +151,7 @@ export function GeneralSettings({
 					const detectedPath = result.data.claude?.found
 						? result.data.claude.path
 						: undefined;
-					if (
-						detectedPath &&
-						detectedPath !== settingsRef.current.claudePath
-					) {
+					if (detectedPath && detectedPath !== settingsRef.current.claudePath) {
 						onSettingsChangeRef.current({
 							...settingsRef.current,
 							claudePath: detectedPath,
@@ -176,7 +173,7 @@ export function GeneralSettings({
 	// Lit le provider actif depuis le contexte pour filtrer les modèles disponibles
 	const { selectedProvider } = useProviderContext();
 	const activeProvider = selectedProvider || "anthropic";
-	const providerModels = getModelsForProvider(activeProvider);
+	const { models: providerModels } = useProviderModelCatalog(activeProvider);
 	const supportsThinking = providerSupportsThinking(activeProvider);
 
 	if (section === "agent") {

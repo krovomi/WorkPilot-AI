@@ -180,7 +180,8 @@ def model_meta(base_url: str, model_name: str) -> dict[str, Any]:
     falls back to a name allowlist / name size token when those are absent (older
     Ollama, or LM Studio which has no /api/show).
 
-    Returns ``{"supports_tools": bool, "param_b": float | None}``.
+    Returns tool support, its provenance (``tools_known``), and parameter size.
+    Unknown capability is kept distinct from confirmed lack of native tools.
     """
     supports: bool | None = None
     param_b: float | None = None
@@ -199,6 +200,7 @@ def model_meta(base_url: str, model_name: str) -> dict[str, Any]:
         )
     except Exception:
         pass
+    tools_known = supports is not None or is_embedding_model(model_name)
     name_lower = model_name.lower()
     if supports is None:
         supports = not is_embedding_model(model_name) and any(
@@ -206,7 +208,11 @@ def model_meta(base_url: str, model_name: str) -> dict[str, Any]:
         )
     if param_b is None:
         param_b = _parse_param_billions(name_lower)
-    return {"supports_tools": supports, "param_b": param_b}
+    return {
+        "supports_tools": supports,
+        "tools_known": tools_known or supports,
+        "param_b": param_b,
+    }
 
 
 def model_supports_tools(base_url: str, model_name: str) -> bool:

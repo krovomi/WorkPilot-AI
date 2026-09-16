@@ -1,3 +1,5 @@
+import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
+import { providerRegistry } from "../../../shared/services/providerRegistry";
 /**
  * AddAgentDialog — Dialog for creating a new agent slot in Mission Control.
  *
@@ -52,63 +54,9 @@ const ROLES = [
 	{ value: "custom", label: "⚙️ Custom", desc: "Custom role" },
 ];
 
-const PROVIDERS = [
-	{
-		value: "anthropic",
-		label: "Anthropic",
-		models: [
-			{ value: "claude-opus-4-6", label: "Claude Opus 4.6", tier: "flagship" },
-			{
-				value: "claude-sonnet-4-6",
-				label: "Claude Sonnet 4.6",
-				tier: "standard",
-			},
-			{ value: "claude-haiku-4-6", label: "Claude Haiku 4.6", tier: "fast" },
-		],
-	},
-	{
-		value: "openai",
-		label: "OpenAI",
-		models: [
-			{ value: "gpt-5-turbo", label: "GPT-5 Turbo", tier: "flagship" },
-			{ value: "gpt-4.1", label: "GPT-4.1", tier: "standard" },
-			{ value: "gpt-4.1-mini", label: "GPT-4.1 Mini", tier: "fast" },
-		],
-	},
-	{
-		value: "google",
-		label: "Google",
-		models: [
-			{ value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", tier: "flagship" },
-			{ value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", tier: "fast" },
-		],
-	},
-	{
-		value: "grok",
-		label: "Grok (xAI)",
-		models: [
-			{ value: "grok-3", label: "Grok 3", tier: "flagship" },
-			{ value: "grok-3-mini", label: "Grok 3 Mini", tier: "fast" },
-		],
-	},
-	{
-		value: "ollama",
-		label: "Ollama (Local)",
-		models: [
-			{ value: "llama3", label: "Llama 3", tier: "standard" },
-			{ value: "codellama", label: "Code Llama", tier: "standard" },
-			{ value: "mistral", label: "Mistral", tier: "standard" },
-		],
-	},
-	{
-		value: "copilot",
-		label: "GitHub Copilot",
-		models: [
-			{ value: "copilot-claude", label: "Copilot Claude", tier: "standard" },
-			{ value: "copilot-gpt", label: "Copilot GPT", tier: "standard" },
-		],
-	},
-];
+const PROVIDERS = providerRegistry
+	.getAllProviders()
+	.map((p) => ({ value: p.name, label: p.label }));
 
 const ROLE_TIER_MAP: Record<string, string> = {
 	architect: "flagship",
@@ -131,17 +79,17 @@ export function AddAgentDialog({
 	const [role, setRole] = useState("coder");
 	const [provider, setProvider] = useState("anthropic");
 	const [model, setModel] = useState("");
+	const { models } = useProviderModelCatalog(provider);
 
-	// Auto-select recommended model when role or provider changes
+	// Provider/role changes reset the choice; catalog refreshes preserve it.
 	useEffect(() => {
-		const providerData = PROVIDERS.find((p) => p.value === provider);
-		if (!providerData) return;
-		const recommendedTier = ROLE_TIER_MAP[role] ?? "standard";
-		const recommended = providerData.models.find(
-			(m) => m.tier === recommendedTier,
-		);
-		setModel(recommended?.value ?? providerData.models[0]?.value ?? "");
-	}, [role, provider]);
+		if (!model) {
+			const recommended = models.find(
+				(m) => m.tier === (ROLE_TIER_MAP[role] ?? "standard"),
+			);
+			setModel(recommended?.value ?? models[0]?.value ?? "");
+		}
+	}, [model, models, role]);
 
 	// Auto-generate name from role
 	useEffect(() => {
@@ -153,8 +101,7 @@ export function AddAgentDialog({
 		}
 	}, [role, name]);
 
-	const providerData = PROVIDERS.find((p) => p.value === provider);
-	const modelData = providerData?.models.find((m) => m.value === model);
+	const modelData = models.find((m) => m.value === model);
 
 	const handleSubmit = () => {
 		if (!name.trim()) return;
@@ -197,7 +144,13 @@ export function AddAgentDialog({
 							<Brain className="h-3.5 w-3.5" />
 							{t("missionControl:agentRole", "Role")}
 						</Label>
-						<Select value={role} onValueChange={setRole}>
+						<Select
+							value={role}
+							onValueChange={(value) => {
+								setRole(value);
+								setModel("");
+							}}
+						>
 							<SelectTrigger className="text-sm">
 								<SelectValue />
 							</SelectTrigger>
@@ -222,7 +175,13 @@ export function AddAgentDialog({
 							<Cpu className="h-3.5 w-3.5" />
 							{t("missionControl:provider", "Provider")}
 						</Label>
-						<Select value={provider} onValueChange={setProvider}>
+						<Select
+							value={provider}
+							onValueChange={(value) => {
+								setProvider(value);
+								setModel("");
+							}}
+						>
 							<SelectTrigger className="text-sm">
 								<SelectValue />
 							</SelectTrigger>
@@ -252,7 +211,7 @@ export function AddAgentDialog({
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								{providerData?.models.map((m) => (
+								{models.map((m) => (
 									<SelectItem key={m.value} value={m.value}>
 										<div className="flex items-center gap-2">
 											<span>{m.label}</span>

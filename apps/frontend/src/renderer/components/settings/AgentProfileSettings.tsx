@@ -1,3 +1,4 @@
+import { resolveCatalogModelValue } from "../../../shared/constants/models";
 import {
 	Brain,
 	Check,
@@ -480,7 +481,10 @@ export function AgentProfileSettings() {
 												</Label>
 												{isClaude ? (
 													<Select
-														value={currentPhaseModels[phase]}
+														value={resolveCatalogModelValue(
+															currentPhaseModels[phase],
+															providerModels,
+														)}
 														onValueChange={(value) =>
 															handlePhaseModelChange(phase, value as string)
 														}
@@ -489,7 +493,7 @@ export function AgentProfileSettings() {
 															<SelectValue />
 														</SelectTrigger>
 														<SelectContent>
-															{AVAILABLE_MODELS.map((m) => (
+															{providerModels.map((m) => (
 																<SelectItem key={m.value} value={m.value}>
 																	{m.label}
 																</SelectItem>

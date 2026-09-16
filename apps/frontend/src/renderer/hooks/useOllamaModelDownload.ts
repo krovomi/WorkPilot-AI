@@ -1,3 +1,4 @@
+import { refreshProviderModelCatalog } from "./useProviderModelCatalog";
 /**
  * One place that owns pulling a model onto the local LLM server.
  *
@@ -136,6 +137,7 @@ export function useOllamaModelDownload(options?: {
 							{ model: name },
 						),
 					});
+					refreshProviderModelCatalog("ollama");
 					onDownloaded?.(name);
 					return true;
 				}
