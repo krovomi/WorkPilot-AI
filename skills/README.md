@@ -191,6 +191,17 @@ Hermes also *writes* skills, from its own experience, on surfaces WorkPilot neve
 Those arrive as candidates under `skills/_proposed/` and are promoted by nothing — see
 the hermes-agent section in [docs/CLAUDE.md](../docs/CLAUDE.md).
 
+## AnyDoc document inputs
+
+`tooling/convert-documents-to-markdown` adapts Firecrawl's AnyDoc skill with a
+pinned CLI version and local/offline guidance. Build it with `skills:build` as
+usual. The desktop package includes its generated resource; the Kanban offers
+it as a built-in fallback even in consumer projects without `.agents/skills`.
+Project and user commands with the same name take precedence. The shared agent
+prompt also includes the skill, so document inputs are covered from spec to QA.
+No runtime or API key is installed automatically. Hosted OCR requires permission
+to send the document and is unavailable in strict offline tasks.
+
 ## `mem-search`
 
 `skills/tooling/mem-search/` reads WorkPilot's memory in three layers, each paid for only

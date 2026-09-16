@@ -16,6 +16,7 @@ import {
 	stopAppEmulator,
 	useAppEmulatorStore,
 } from "../../stores/app-emulator-store";
+import { ResponsivePreview } from "../app-emulator/ResponsivePreview";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
@@ -35,18 +36,27 @@ interface AppEmulatorStatusResult {
 	};
 }
 
-function isConfigForProject(configProjectDir: string | undefined, projectPath: string) {
+function isConfigForProject(
+	configProjectDir: string | undefined,
+	projectPath: string,
+) {
 	if (!configProjectDir) return true;
-	const normalize = (value: string) => value.toLowerCase().replaceAll("/", "\\");
+	const normalize = (value: string) =>
+		value.toLowerCase().replaceAll("/", "\\");
 	return normalize(configProjectDir).startsWith(normalize(projectPath));
 }
 
-export function TaskEmulator({ taskId, project, worktreePath }: TaskEmulatorProps) {
+export function TaskEmulator({
+	taskId,
+	project,
+	worktreePath,
+}: TaskEmulatorProps) {
 	const { t } = useTranslation(["appEmulator", "tasks"]);
+	const [browserError, setBrowserError] = useState<string | null>(null);
 	const [refreshKey, setRefreshKey] = useState(0);
-	const [resolvedWorktreePath, setResolvedWorktreePath] = useState<string | null>(
-		worktreePath ?? null,
-	);
+	const [resolvedWorktreePath, setResolvedWorktreePath] = useState<
+		string | null
+	>(worktreePath ?? null);
 	const phase = useAppEmulatorStore((state) => state.phase);
 	const config = useAppEmulatorStore((state) => state.config);
 	const url = useAppEmulatorStore((state) => state.url);
@@ -86,9 +96,14 @@ export function TaskEmulator({ taskId, project, worktreePath }: TaskEmulatorProp
 				if (cancelled || !result.success || !result.data) return;
 				if (result.data.config) setConfig(result.data.config);
 				if (result.data.url) setUrl(result.data.url);
-				if (result.data.running) {
+				if (
+					result.data.running &&
+					(!result.data.config?.isWeb || result.data.url)
+				) {
 					setPhase("running");
-					setStatus(result.data.url ? `Running at ${result.data.url}` : "Running");
+					setStatus(
+						result.data.url ? `Running at ${result.data.url}` : "Running",
+					);
 				}
 			})
 			.catch(() => {
@@ -128,9 +143,14 @@ export function TaskEmulator({ taskId, project, worktreePath }: TaskEmulatorProp
 		await stopAppEmulator();
 	}, []);
 
-	const handleOpenInBrowser = useCallback(() => {
-		if (url) globalThis.electronAPI.openExternal(url);
-	}, [url]);
+	const handleOpenInBrowser = useCallback(async () => {
+		setBrowserError(null);
+		try {
+			if (url) await globalThis.electronAPI.openExternal(url);
+		} catch {
+			setBrowserError(t("appEmulator:preview.browserFailed", { url }));
+		}
+	}, [url, t]);
 
 	if (!emulatorPath) {
 		return (
@@ -157,7 +177,11 @@ export function TaskEmulator({ taskId, project, worktreePath }: TaskEmulatorProp
 							<h3 className="text-lg font-semibold">
 								{t("tasks:emulator.title")}
 							</h3>
-							<Badge variant={isRunning ? "success" : isLoading ? "warning" : "muted"}>
+							<Badge
+								variant={
+									isRunning ? "success" : isLoading ? "warning" : "muted"
+								}
+							>
 								{isRunning
 									? t("appEmulator:running")
 									: isLoading
@@ -174,7 +198,9 @@ export function TaskEmulator({ taskId, project, worktreePath }: TaskEmulatorProp
 						<p className="text-sm text-muted-foreground">
 							{t("tasks:emulator.description")}
 						</p>
-						{status && <p className="text-xs text-muted-foreground">{status}</p>}
+						{status && (
+							<p className="text-xs text-muted-foreground">{status}</p>
+						)}
 						<p className="text-xs text-muted-foreground">
 							{t("tasks:emulator.runtimePath")}: {emulatorPath}
 						</p>
@@ -208,7 +234,12 @@ export function TaskEmulator({ taskId, project, worktreePath }: TaskEmulatorProp
 							</>
 						)}
 						{isRunning || isLoading ? (
-							<Button type="button" variant="destructive" size="sm" onClick={handleStop}>
+							<Button
+								type="button"
+								variant="destructive"
+								size="sm"
+								onClick={handleStop}
+							>
 								<Square className="mr-2 h-4 w-4" />
 								{t("appEmulator:actions.stop")}
 							</Button>
@@ -236,13 +267,14 @@ export function TaskEmulator({ taskId, project, worktreePath }: TaskEmulatorProp
 				</div>
 			</div>
 
+			{browserError && (
+				<p role="alert" className="shrink-0 p-3 text-sm">
+					{browserError}
+				</p>
+			)}
 			<div className="flex-1 min-h-0 overflow-hidden">
-				{canPreview ? (
-					<webview
-						key={`${url}-${refreshKey}`}
-						src={url ?? undefined}
-						className="h-full w-full border-0 bg-white"
-					/>
+				{canPreview && url ? (
+					<ResponsivePreview url={url} refreshKey={refreshKey} />
 				) : (
 					<div className="flex h-full flex-col">
 						<div className="flex items-center gap-2 border-b border-border px-4 py-2">
@@ -260,6 +292,16 @@ export function TaskEmulator({ taskId, project, worktreePath }: TaskEmulatorProp
 				)}
 			</div>
 
+			{canPreview && (
+				<details className="shrink-0 border-t border-border p-2 text-sm">
+					<summary className="cursor-pointer">
+						{t("appEmulator:output.title")}
+					</summary>
+					<pre className="max-h-40 overflow-auto whitespace-pre-wrap p-2 text-xs">
+						{error || formattedOutput}
+					</pre>
+				</details>
+			)}
 			<div className="shrink-0 border-t border-border px-4 py-2 text-xs text-muted-foreground">
 				{t("tasks:emulator.persistenceHint")}
 			</div>

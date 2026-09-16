@@ -126,8 +126,7 @@ def collect_registry_agents() -> list[EmittedAgent]:
     except Exception as exc:  # noqa: BLE001
         logger.debug("pr-review specs unavailable: %s", exc)
 
-    # Deduplicate by name, first roster wins, so a phase agent is not shadowed
-    # by a later one with the same name.
+    # Deduplicate by name, first roster wins
     seen: set[str] = set()
     unique: list[EmittedAgent] = []
     for agent in found:
@@ -136,6 +135,7 @@ def collect_registry_agents() -> list[EmittedAgent]:
             continue
         seen.add(agent.name)
         unique.append(agent)
+
     return sorted(unique, key=lambda a: a.name)
 
 

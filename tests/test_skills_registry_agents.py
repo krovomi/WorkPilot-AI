@@ -29,7 +29,11 @@ from skills_registry.agents import (  # noqa: E402
     emit_for_harness,
     render_agent,
 )
+from skills_registry.build import plan_build  # noqa: E402
 from skills_registry.harnesses import load_harnesses  # noqa: E402
+from skills_registry.packs import load_packs  # noqa: E402
+from skills_registry.project import load_project_config  # noqa: E402
+from skills_registry.resolver import resolve  # noqa: E402
 
 MATRIX = load_harnesses(REPO_ROOT)
 
@@ -195,16 +199,40 @@ def test_warnings_name_the_agent_and_the_file_to_edit():
 # ── what this repo has committed ──────────────────────────────────────────────
 
 
-def test_the_committed_output_matches_the_registry():
-    """`.agents/agents/` is build output, so it must equal what the code says."""
+@pytest.fixture
+def expected_agent_files():
+    """The build combines phase/PR agents with the project's selected packs."""
+    resolution = resolve(
+        load_packs(REPO_ROOT / "skills"), load_project_config(REPO_ROOT)
+    )
+    plan = plan_build(REPO_ROOT, resolution, ["agnostic"])
+    return {
+        path: content
+        for path, content in plan.files.items()
+        if path.parent == Path(".agents/agents")
+    }
+
+
+def test_the_committed_output_matches_the_registry(expected_agent_files):
     on_disk = {p.stem for p in (REPO_ROOT / ".agents" / "agents").glob("*.md")}
-    assert on_disk == {a.name for a in collect_registry_agents()}
+    assert on_disk == {path.stem for path in expected_agent_files}
 
 
-def test_the_committed_output_is_byte_identical_to_a_fresh_render():
-    for agent in collect_registry_agents():
-        expected, _ = render_agent(agent, MATRIX["agnostic"])
-        path = REPO_ROOT / ".agents" / "agents" / f"{agent.name}.md"
-        assert path.read_text(encoding="utf-8") == expected, (
-            f"{agent.name} was hand-edited; run `pnpm run skills:build`"
+def test_the_committed_output_is_byte_identical_to_a_fresh_render(expected_agent_files):
+    for path, expected in expected_agent_files.items():
+        assert (REPO_ROOT / path).read_text(encoding="utf-8") == expected, (
+            f"{path} was hand-edited; run `pnpm run skills:build`"
         )
+
+
+def test_registry_collection_does_not_read_generated_outputs(monkeypatch):
+    before = collect_registry_agents()
+    original_read = Path.read_text
+
+    def without_outputs(path, *args, **kwargs):
+        if path.parent == REPO_ROOT / ".agents" / "agents":
+            raise FileNotFoundError(path)
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", without_outputs)
+    assert collect_registry_agents() == before
