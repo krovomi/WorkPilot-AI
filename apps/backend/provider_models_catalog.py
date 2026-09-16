@@ -10,9 +10,9 @@ provider) the module falls back to a small static catalog so the UI never
 sees an empty dropdown.
 
 Supported providers (with live fetching):
-    anthropic, openai, google, mistral, deepseek, grok, ollama, windsurf
+    anthropic, openai, google, mistral, deepseek, grok, ollama, lm-studio, llama-cpp
 
-Other providers (copilot, aws, meta, custom, claude, …) get the static
+Other providers (copilot, aws, meta, custom, windsurf, …) get the static
 catalog without a live fetch.
 """
 
@@ -29,11 +29,11 @@ from typing import Any
 import httpx
 
 try:
-    from .models_registry import ModelEntry, list_provider
+    from .models_registry import provider_catalog
 except ImportError:
     # Module is imported as a top-level "provider_models_catalog" (no package
     # context), e.g. by provider_api.py when apps/backend is on sys.path.
-    from models_registry import ModelEntry, list_provider  # type: ignore[no-redef]
+    from models_registry import provider_catalog  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 CACHE_PATH = Path.home() / ".work_pilot_ai_model_cache.json"
-CACHE_TTL_SECONDS = 24 * 60 * 60  # 24 hours — refresh manually for sooner updates
+CACHE_TTL_SECONDS = (
+    6 * 60 * 60
+)  # Automatic release discovery; manual refresh bypasses this.
 HTTP_TIMEOUT = httpx.Timeout(8.0, connect=4.0)
 
 
@@ -51,44 +53,7 @@ HTTP_TIMEOUT = httpx.Timeout(8.0, connect=4.0)
 # ---------------------------------------------------------------------------
 
 
-def _to_catalog_entry(entry: ModelEntry) -> dict[str, Any]:
-    """Convert a ModelEntry to catalog dict format."""
-    result: dict[str, Any] = {
-        "value": entry.model_id,
-        "label": entry.label,
-        "tier": entry.tier,
-    }
-    if entry.supports_thinking:
-        result["supportsThinking"] = True
-    return result
-
-
-def _build_static_fallback() -> dict[str, list[dict[str, Any]]]:
-    """Generate STATIC_FALLBACK from registry."""
-    result: dict[str, list[dict[str, Any]]] = {}
-    for provider in [
-        "anthropic",
-        "openai",
-        "google",
-        "mistral",
-        "deepseek",
-        "grok",
-        "meta",
-        "ollama",
-        "windsurf",
-        "aws",
-        "copilot",
-        "cursor",
-    ]:
-        entries = list_provider(provider)
-        result[provider] = [_to_catalog_entry(e) for e in entries]
-    return result
-
-
-STATIC_FALLBACK: dict[str, list[dict[str, Any]]] = _build_static_fallback()
-
-# Aliases — providers that share a catalog
-STATIC_FALLBACK["claude"] = STATIC_FALLBACK.get("anthropic", [])
+STATIC_FALLBACK: dict[str, list[dict[str, Any]]] = provider_catalog()
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +64,7 @@ STATIC_FALLBACK["claude"] = STATIC_FALLBACK.get("anthropic", [])
 # o-series). Excludes embeddings, TTS, Whisper, image, moderations, gpt-3.5,
 # gpt-4-turbo, search/transcribe/realtime variants.
 _OPENAI_KEEP = re.compile(
-    r"^(gpt-5(\.\d)?|gpt-4\.1|o[34]|chatgpt-4o)(-|$)", re.IGNORECASE
+    r"^(gpt-(?:[5-9]|\d{2,})(?:\.\d+)?|gpt-4\.1|o\d+|chatgpt-4o)(-|$)", re.IGNORECASE
 )
 _OPENAI_DROP = re.compile(
     r"(embedding|whisper|tts|dall-?e|moderation|audio|realtime|transcribe|search|image"
@@ -110,8 +75,10 @@ _OPENAI_DROP = re.compile(
     re.IGNORECASE,
 )
 
-# Anthropic: only Claude 4.x and 3.7 (reasoning-capable lineage)
-_ANTHROPIC_KEEP = re.compile(r"^claude-(opus-4|sonnet-4|haiku-4|3-7)", re.IGNORECASE)
+# Version-independent families: the provider API establishes which releases exist.
+_ANTHROPIC_KEEP = re.compile(
+    r"^claude-(?:(?:opus|sonnet|haiku|fable)-\d+|3-7)(?:[-.]|$)", re.IGNORECASE
+)
 
 # Mistral: large/medium/small + magistral (reasoning) + devstral (coding) + pixtral-large.
 # Exclude embed/moderation/OCR/audio (voxtral)/edge variants.
@@ -136,7 +103,7 @@ _GROK_DROP = re.compile(
 # Gemini: 2.5+ pro/flash/flash-lite (covers 3.x). Allow trailing -preview /
 # -latest / dated suffixes, drop image/audio/embedding/vision-only variants.
 _GEMINI_KEEP = re.compile(
-    r"^models/gemini-(2\.5|3\.\d|[4-9])[\w.-]*$",
+    r"^models/gemini-(2\.5|[3-9]|\d{2,})[\w.-]*$",
     re.IGNORECASE,
 )
 _GEMINI_DROP = re.compile(
@@ -179,9 +146,12 @@ def _tier_for_label(label: str) -> str:
 def _supports_thinking(provider: str, value: str) -> bool:
     v = value.lower()
     if provider in ("anthropic", "claude"):
-        return "opus-4" in v or "sonnet-4" in v or "3-7" in v
+        return (
+            bool(re.match(r"^claude-(?:opus|sonnet|fable)-(?:[4-9]|\d{2,})", v))
+            or "3-7" in v
+        )
     if provider == "openai":
-        return v.startswith(("o3", "o4", "gpt-5"))
+        return bool(re.match(r"^(?:o\d+|gpt-(?:[5-9]|\d{2,}))", v))
     if provider in ("google", "gemini"):
         # Gemini 2.5+ all support extended thinking ("Deep Think")
         return "2.5" in v or "3." in v or v.startswith("models/gemini-3")
@@ -258,10 +228,24 @@ def _fetch_anthropic() -> list[dict[str, Any]]:
     if not key:
         return []
     headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
+    items: list[dict[str, Any]] = []
     with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-        resp = client.get("https://api.anthropic.com/v1/models", headers=headers)
-    resp.raise_for_status()
-    items = resp.json().get("data", [])
+        cursor = None
+        seen: set[str] = set()
+        while True:
+            params = {"after_id": cursor} if cursor else {}
+            resp = client.get(
+                "https://api.anthropic.com/v1/models", headers=headers, params=params
+            )
+            resp.raise_for_status()
+            page = resp.json()
+            items.extend(page.get("data", []))
+            if not page.get("has_more"):
+                break
+            cursor = page.get("last_id")
+            if not cursor or cursor in seen or len(seen) >= 20:
+                raise ValueError("Invalid model catalog pagination")
+            seen.add(cursor)
     out: list[dict[str, Any]] = []
     for it in items:
         mid = it.get("id", "")
@@ -331,9 +315,7 @@ def _humanize_openai(mid: str) -> str:
         if "-" in rest:
             version, suffix = rest.split("-", 1)
             suffix_pretty = (
-                suffix.replace("pro", "Pro")
-                .replace("mini", "mini")
-                .replace("nano", "nano")
+                suffix.title().replace("mini", "mini").replace("nano", "nano")
             )
             return f"GPT-{version} {suffix_pretty}"
         return f"GPT-{rest}"
@@ -342,33 +324,36 @@ def _humanize_openai(mid: str) -> str:
     return mid
 
 
-def _openai_sort_key(mid: str) -> tuple[int, str]:
-    """Order so the most capable / most recent appears first."""
-    # Higher GPT version → smaller sort index
-    if mid.startswith("gpt-5.5"):
-        return (0, mid)
-    if mid.startswith("gpt-5.2"):
-        return (1, mid)
-    if mid.startswith("gpt-5"):
-        return (2, mid)
-    family_order = {"o4": 3, "o3": 4, "gpt-4.1": 5, "chatgpt-4o": 6}
-    for prefix, order in family_order.items():
-        if mid.startswith(prefix):
-            return (order, mid)
-    return (99, mid)
+def _openai_sort_key(mid: str) -> tuple[int, int, int, str]:
+    """Sort versions numerically so future releases need no code update."""
+    version = re.match(r"gpt-(\d+)(?:\.(\d+))?", mid)
+    if version:
+        return (0, -int(version[1]), -int(version[2] or 0), mid)
+    return (1, 0, 0, mid)
 
 
 def _fetch_google() -> list[dict[str, Any]]:
     key = _api_key_for("google") or _api_key_for("gemini")
     if not key:
         return []
+    items: list[dict[str, Any]] = []
     with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-        resp = client.get(
-            "https://generativelanguage.googleapis.com/v1beta/models",
-            params={"key": key},
-        )
-    resp.raise_for_status()
-    items = resp.json().get("models", [])
+        params = {"key": key}
+        seen: set[str] = set()
+        while True:
+            resp = client.get(
+                "https://generativelanguage.googleapis.com/v1beta/models", params=params
+            )
+            resp.raise_for_status()
+            page = resp.json()
+            items.extend(page.get("models", []))
+            token = page.get("nextPageToken")
+            if not token:
+                break
+            if token in seen or len(seen) >= 20:
+                raise ValueError("Invalid model catalog pagination")
+            seen.add(token)
+            params["pageToken"] = token
     out: list[dict[str, Any]] = []
     for it in items:
         name = it.get("name", "")  # "models/gemini-3.1-pro"
@@ -443,26 +428,36 @@ def _fetch_grok() -> list[dict[str, Any]]:
     return _fetch_openai_compatible("grok", "https://api.x.ai", _GROK_KEEP, _GROK_DROP)
 
 
-def _local_llm_root() -> str:
+def _local_llm_root(provider: str = "ollama") -> str:
     """Resolve the local LLM server root (no path), honouring env + saved config.
 
     Covers any OpenAI-compatible local server: Ollama (11434), LM Studio (1234),
     llama.cpp, vLLM, LocalAI. Falls back to the Ollama default.
     """
-    root = (
-        os.environ.get("OLLAMA_BASE_URL")
-        or os.environ.get("LOCAL_LLM_BASE_URL")
-        or os.environ.get("LMSTUDIO_BASE_URL")
-    )
+    provider = {
+        "lmstudio": "lm-studio",
+        "local": "ollama",
+        "llamacpp": "llama-cpp",
+    }.get(provider, provider)
+    env_name, default = {
+        "ollama": ("OLLAMA_BASE_URL", "http://localhost:11434"),
+        "lm-studio": ("LMSTUDIO_BASE_URL", "http://localhost:1234"),
+        "llama-cpp": ("LLAMA_CPP_BASE_URL", "http://localhost:8080"),
+    }[provider]
+    root = os.environ.get(env_name)
+    if not root and provider == "ollama":
+        root = os.environ.get("LOCAL_LLM_BASE_URL")
     if not root:
         try:
             from src.connectors.llm_config import load_provider_config
 
-            cfg = load_provider_config("ollama") or load_provider_config("local") or {}
+            cfg = load_provider_config(provider) or {}
+            if not cfg and provider == "ollama":
+                cfg = load_provider_config("local") or {}
             root = cfg.get("base_url")
         except Exception:  # noqa: BLE001
             root = None
-    root = (root or "http://localhost:11434").strip().rstrip("/")
+    root = (root or default).strip().rstrip("/")
     # Strip an OpenAI-style suffix so we have the bare server root.
     if root.endswith("/chat/completions"):
         root = root[: -len("/chat/completions")].rstrip("/")
@@ -471,17 +466,17 @@ def _local_llm_root() -> str:
     return root
 
 
-def _fetch_ollama() -> list[dict[str, Any]]:
+def _fetch_ollama(provider: str = "ollama") -> list[dict[str, Any]]:
     """List models from any OpenAI-compatible local server.
 
     Tries the OpenAI-compatible ``/v1/models`` endpoint first (works for LM
     Studio *and* Ollama), then falls back to Ollama's native ``/api/tags``.
     """
-    root = _local_llm_root()
+    root = _local_llm_root(provider)
 
     # Tag each model with tool-calling support (hide non-tool models) and its
     # parameter size (warn that a small model is weak for planning).
-    from ollama_model_detector import model_meta
+    from ollama_model_detector import is_embedding_model, model_meta
 
     def _entry(name: str) -> dict[str, Any]:
         meta = model_meta(root, name)
@@ -489,7 +484,11 @@ def _fetch_ollama() -> list[dict[str, Any]]:
             "value": name,
             "label": name,
             "tier": "local",
-            "supports_tools": meta["supports_tools"],
+            **(
+                {"supports_tools": meta["supports_tools"]}
+                if meta.get("tools_known", True)
+                else {}
+            ),
             "param_b": meta["param_b"],
         }
 
@@ -500,22 +499,25 @@ def _fetch_ollama() -> list[dict[str, Any]]:
         resp.raise_for_status()
         items = resp.json().get("data", [])
         out: list[dict[str, Any]] = [
-            _entry(it.get("id", "")) for it in items if it.get("id")
+            _entry(it.get("id", ""))
+            for it in items
+            if it.get("id") and not is_embedding_model(it["id"])
         ]
-        if out:
+        if out or provider != "ollama":
             return out
     except (httpx.HTTPError, OSError, ValueError, KeyError):
         pass
 
     # 2) Ollama-native endpoint
-    try:
-        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-            resp = client.get(f"{root}/api/tags")
-        resp.raise_for_status()
-    except (httpx.HTTPError, OSError):
-        return []
+    with httpx.Client(timeout=HTTP_TIMEOUT) as client:
+        resp = client.get(f"{root}/api/tags")
+    resp.raise_for_status()
     items = resp.json().get("models", [])
-    return [_entry(it.get("name", "")) for it in items if it.get("name")]
+    return [
+        _entry(it["name"])
+        for it in items
+        if it.get("name") and not is_embedding_model(it["name"])
+    ]
 
 
 def _fetch_windsurf() -> list[dict[str, Any]]:
@@ -537,6 +539,10 @@ _FETCHERS = {
     "grok": _fetch_grok,
     "ollama": _fetch_ollama,
     "windsurf": _fetch_windsurf,
+    "local": _fetch_ollama,
+    "lmstudio": lambda: _fetch_ollama("lm-studio"),
+    "lm-studio": lambda: _fetch_ollama("lm-studio"),
+    "llama-cpp": lambda: _fetch_ollama("llama-cpp"),
 }
 
 
@@ -558,13 +564,19 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
             "error": str | None,          # populated when fetch failed
         }
     """
-    provider = (provider or "").lower()
+    provider = (provider or "").strip().lower()
+    provider = {
+        "claude": "anthropic",
+        "gemini": "google",
+        "lmstudio": "lm-studio",
+        "llamacpp": "llama-cpp",
+    }.get(provider, provider)
 
     # Local servers (Ollama / LM Studio / …) change their installed-model list
     # frequently and answer instantly, so a 24h-cached list goes stale and shows
     # the wrong "installed" set. Always fetch them live and never fall back to a
     # stale cache for them.
-    is_local = provider in {"ollama", "local", "lmstudio"}
+    is_local = provider in {"ollama", "local", "lm-studio", "llama-cpp"}
     if is_local:
         force_refresh = True
 
@@ -586,8 +598,9 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
     if fetcher is not None:
         try:
             models = fetcher()
-            if models:
-                _store_cache_entry(provider, models)
+            if models or is_local:
+                if not is_local:
+                    _store_cache_entry(provider, models)
                 return {
                     "provider": provider,
                     "models": models,
@@ -598,7 +611,7 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
         except httpx.HTTPStatusError as e:
             error = f"HTTP {e.response.status_code}"
             logger.warning("Live model fetch failed for %s: %s", provider, error)
-        except (httpx.HTTPError, ValueError, KeyError) as e:
+        except (httpx.HTTPError, OSError, ValueError, KeyError) as e:
             error = type(e).__name__
             logger.warning("Live model fetch failed for %s: %s", provider, e)
 
