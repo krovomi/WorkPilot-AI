@@ -1,8 +1,10 @@
+import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
+import { isLocalProvider } from "../../../shared/utils/local-models";
 import { Info, Loader2, Pause, Play, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { THINKING_LEVELS } from "../../../shared/constants/models";
-import { getModelsForProvider } from "../../../shared/services/providerRegistry";
+import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import type { Task } from "../../../shared/types";
 import type { ThinkingLevel } from "../../../shared/types/settings";
 import { getStaticProviders } from "../../../shared/utils/providers";
@@ -17,11 +19,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "../ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 interface TaskPauseControlsProps {
 	task: Task;
@@ -54,12 +52,28 @@ export function TaskPauseControls({
 	const [isLoading, setIsLoading] = useState(false);
 	const [isResuming, setIsResuming] = useState(false);
 	const [providers, setProviders] = useState<ProviderOption[]>([]);
-	const [selectedProvider, setSelectedProvider] = useState(
-		task.metadata?.paused?.provider || task.metadata?.provider || "anthropic",
-	);
-	const [selectedModel, setSelectedModel] = useState(
-		task.metadata?.paused?.model || task.metadata?.model || "",
-	);
+	const phase =
+		task.metadata?.paused?.paused_phase || task.executionProgress?.phase;
+	const resumePhase =
+		phase === "spec"
+			? "spec"
+			: phase === "planning"
+				? "planning"
+				: phase?.startsWith("qa")
+					? "qa"
+					: "coding";
+	const initialProvider =
+		task.metadata?.paused?.provider ||
+		task.metadata?.phaseProviders?.[resumePhase] ||
+		task.metadata?.provider ||
+		"anthropic";
+	const initialModel =
+		task.metadata?.paused?.model ||
+		task.metadata?.phaseModels?.[resumePhase] ||
+		task.metadata?.model ||
+		"";
+	const [selectedProvider, setSelectedProvider] = useState(initialProvider);
+	const [selectedModel, setSelectedModel] = useState(initialModel);
 	// Reasoning "effort" applied to the resumed run. Seed it from the task's
 	// current single thinking level, falling back to the coding phase's per-phase
 	// level, then a sensible default.
@@ -73,6 +87,15 @@ export function TaskPauseControls({
 	// can the user actually switch and resume. While it is still running, the
 	// pause is "in flight" (finishing the current step).
 	const isFullyPaused = isPaused && !isRunning;
+	const selectionKey = `${task.id}:${isFullyPaused}`;
+	const previousSelectionKey = useRef(selectionKey);
+	useEffect(() => {
+		if (previousSelectionKey.current !== selectionKey) {
+			previousSelectionKey.current = selectionKey;
+			setSelectedProvider(initialProvider);
+			setSelectedModel(initialModel);
+		}
+	}, [selectionKey, initialProvider, initialModel]);
 
 	// Build the list of configured providers (same detection as the rest of the
 	// app) once the user reaches the paused-and-stopped state.
@@ -87,13 +110,6 @@ export function TaskPauseControls({
 					.filter((p) => res.status[p.name] === true)
 					.map((p) => ({ name: p.name, label: p.label }));
 				setProviders(configured);
-				// If the current selection isn't configured, fall back to the first.
-				// Functional update so the effect doesn't depend on selectedProvider.
-				setSelectedProvider((prev) =>
-					configured.length > 0 && !configured.some((p) => p.name === prev)
-						? configured[0].name
-						: prev,
-				);
 			})
 			.catch((err) => {
 				debugError("[TaskPauseControls] getStaticProviders failed", err);
@@ -107,22 +123,19 @@ export function TaskPauseControls({
 		};
 	}, [isFullyPaused, profiles, settings]);
 
-	const models = useMemo(
-		() => getModelsForProvider(selectedProvider),
-		[selectedProvider],
+	const { models, loading: catalogLoading } =
+		useProviderModelCatalog(selectedProvider);
+	const { options: modelOptions, value: modelValue } = buildModelSelectOptions(
+		models,
+		selectedModel,
+		{},
+		isLocalProvider(selectedProvider),
 	);
-
-	// Keep the model selection valid whenever the provider changes. Recompute the
-	// model list locally and use a functional update so the only dependency is
-	// the provider itself.
+	// Discovery must never erase the task's current model while it loads.
 	useEffect(() => {
-		const available = getModelsForProvider(selectedProvider);
-		setSelectedModel((prev) =>
-			available.some((m) => m.value === prev)
-				? prev
-				: (available[0]?.value ?? ""),
-		);
-	}, [selectedProvider]);
+		if (!catalogLoading && !selectedModel && models.length)
+			setSelectedModel(models[0].value);
+	}, [catalogLoading, selectedModel, models]);
 
 	const handlePause = useCallback(async () => {
 		setIsLoading(true);
@@ -137,7 +150,10 @@ export function TaskPauseControls({
 			});
 		} catch (error) {
 			toast({
-				title: t("tasks:modal.actions.pauseFailed", "Échec de la mise en pause"),
+				title: t(
+					"tasks:modal.actions.pauseFailed",
+					"Échec de la mise en pause",
+				),
 				description: String(error),
 				variant: "destructive",
 			});
@@ -237,7 +253,10 @@ export function TaskPauseControls({
 									) : (
 										<RotateCcw className="mr-1.5 h-3.5 w-3.5" />
 									)}
-									{t("tasks:modal.actions.pauseToSwitchShort", "Mettre en pause")}
+									{t(
+										"tasks:modal.actions.pauseToSwitchShort",
+										"Mettre en pause",
+									)}
 								</Button>
 							</span>
 						</TooltipTrigger>
@@ -313,7 +332,10 @@ export function TaskPauseControls({
 								</div>
 								<Select
 									value={selectedProvider}
-									onValueChange={setSelectedProvider}
+									onValueChange={(provider) => {
+										setSelectedProvider(provider);
+										setSelectedModel("");
+									}}
 								>
 									<SelectTrigger className="h-8">
 										<SelectValue />
@@ -328,20 +350,17 @@ export function TaskPauseControls({
 								</Select>
 							</div>
 
-							{models.length > 0 && (
+							{modelOptions.length > 0 && (
 								<div className="space-y-1">
 									<div className="text-xs font-medium text-muted-foreground">
 										{t("tasks:modal.actions.chooseModel", "Modèle")}
 									</div>
-									<Select
-										value={selectedModel}
-										onValueChange={setSelectedModel}
-									>
+									<Select value={modelValue} onValueChange={setSelectedModel}>
 										<SelectTrigger className="h-8">
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											{models.map((m) => (
+											{modelOptions.map((m) => (
 												<SelectItem key={m.value} value={m.value}>
 													{m.label}
 												</SelectItem>
@@ -398,7 +417,13 @@ export function TaskPauseControls({
 							variant="default"
 							size="sm"
 							onClick={handleResumeWithProvider}
-							disabled={isResuming || isLoading || providers.length === 0}
+							disabled={
+								isResuming ||
+								isLoading ||
+								catalogLoading ||
+								!selectedModel ||
+								!providers.some((p) => p.name === selectedProvider)
+							}
 							className="flex-1"
 						>
 							{isResuming ? (
@@ -406,7 +431,10 @@ export function TaskPauseControls({
 							) : (
 								<Play className="mr-2 h-4 w-4" />
 							)}
-							{t("tasks:modal.actions.resumeWithChosenLlm", "Reprendre avec ce LLM")}
+							{t(
+								"tasks:modal.actions.resumeWithChosenLlm",
+								"Reprendre avec ce LLM",
+							)}
 						</Button>
 					</div>
 				</div>
