@@ -24,7 +24,7 @@ sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 from skills_registry.build import apply_build, content_hash, plan_build  # noqa: E402
 from skills_registry.frontmatter import parse_frontmatter, workpilot_meta  # noqa: E402
 from skills_registry.packs import load_packs  # noqa: E402
-from skills_registry.project import ProjectConfig  # noqa: E402
+from skills_registry.project import ProjectConfig, load_project_config  # noqa: E402
 from skills_registry.resolver import resolve  # noqa: E402
 
 
@@ -494,7 +494,13 @@ def test_the_committed_outputs_of_this_repo_agree():
     }
     gemini = {p.stem for p in (REPO_ROOT / ".gemini" / "commands").glob("*.toml")}
     assert agnostic, ".agents/skills/ is empty"
-    assert gemini == agnostic, f"gemini mirror has drifted: {agnostic ^ gemini}"
+    resolution = resolve(
+        load_packs(REPO_ROOT / "skills"), load_project_config(REPO_ROOT)
+    )
+    # Pack personas become Gemini commands; Python registry delegation targets do not.
+    pack_agents = {s.name for s in resolution.selected if s.kind == "agent"}
+    expected = agnostic | pack_agents
+    assert gemini == expected, f"gemini mirror has drifted: {expected ^ gemini}"
 
 
 def test_the_plugin_marketplace_lists_what_was_emitted():
