@@ -3,7 +3,7 @@
 # Earlier versions had 400 errors when tool_use blocks had partial failures
 # Utiliser le nom correct du package (tiret) pour l'installation via pip
 claude-agent-sdk>=0.2.144
-python-dotenv>=1.2.2
+python-dotenv>=1.2.3
 
 # WebSocket support for streaming development mode
 websockets>=17.1
@@ -16,7 +16,7 @@ tomli>=2.0.0; python_version < "3.11"
 # scheduling/task_templates.py, and required outright by
 # skills_registry/frontmatter.py -- it was pulled in transitively and those
 # modules silently degraded whenever it was not. Declared so they don't.
-PyYAML>=6.0
+PyYAML>=6.0.3
 
 # Linux Secret Service support for credential storage
 # Provides access to the Freedesktop.org Secret Service API via DBus
@@ -62,7 +62,7 @@ uvicorn[standard]>=0.50.2
 slowapi>=0.1.10
 
 # Multi-user server mode (central deployment)
-alembic>=1.19.2          # DB schema migrations
+alembic>=1.20.0          # DB schema migrations
 asyncpg>=0.31.0          # PostgreSQL async driver (server mode)
 aiosqlite>=0.22.1        # SQLite async driver (dev/tests fallback)
 argon2-cffi>=25.1.0      # Password hashing for local accounts
