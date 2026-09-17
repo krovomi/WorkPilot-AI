@@ -251,7 +251,7 @@ export function MemoryBackendSection({
 							<SelectTrigger>
 								<SelectValue placeholder="Select embedding provider" />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent searchable>
 								<SelectItem value="ollama">Ollama (Local - Free)</SelectItem>
 								<SelectItem value="openai">OpenAI</SelectItem>
 								<SelectItem value="voyage">Voyage AI</SelectItem>
@@ -536,7 +536,7 @@ export function MemoryBackendSection({
 										<SelectTrigger>
 											<SelectValue placeholder="Select embedding model" />
 										</SelectTrigger>
-										<SelectContent>
+										<SelectContent searchable>
 											{ollamaModels.map((model) => (
 												<SelectItem key={model.name} value={model.name}>
 													<div className="flex items-center gap-2">
@@ -624,7 +624,7 @@ export function MemoryBackendSection({
 										<SelectTrigger>
 											<SelectValue placeholder="Select LLM model" />
 										</SelectTrigger>
-										<SelectContent>
+										<SelectContent searchable>
 											{ollamaLlmModels.map((name) => (
 												<SelectItem key={name} value={name}>
 													{name}

@@ -355,7 +355,7 @@ export function MemoryStep({ onNext, onBack }: MemoryStepProps) {
 												placeholder={t("memory.selectEmbeddingModel")}
 											/>
 										</SelectTrigger>
-										<SelectContent>
+										<SelectContent searchable>
 											<SelectItem value="ollama">
 												{t("memory.providers.ollama")}
 											</SelectItem>

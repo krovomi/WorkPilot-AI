@@ -248,7 +248,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 									<SelectTrigger>
 										<SelectValue />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent searchable>
 										{PROVIDERS.map((p) => (
 											<SelectItem key={p} value={p}>
 												{p}

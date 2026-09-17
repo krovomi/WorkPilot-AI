@@ -88,7 +88,7 @@ export function CustomModelModal({
 							<SelectTrigger id="model-select">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent searchable>
 								{models.map((m) => (
 									<SelectItem key={m.value} value={m.value}>
 										{m.label}

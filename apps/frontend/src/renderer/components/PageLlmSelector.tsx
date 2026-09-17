@@ -176,7 +176,7 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 						<SelectTrigger className="h-9">
 							<SelectValue />
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent searchable>
 							<SelectItem value={INHERIT}>
 								{t("dialogs:pageLlm.inheritProvider", {
 									provider: providerLabel,
@@ -207,7 +207,7 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 						<SelectTrigger className="h-9">
 							<SelectValue />
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent searchable>
 							<SelectItem value={INHERIT}>
 								{t("dialogs:pageLlm.inheritModel", { model: modelLabel })}
 							</SelectItem>

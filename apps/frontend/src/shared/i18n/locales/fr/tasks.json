@@ -996,6 +996,8 @@
 			"providerSwitch": "Changer de LLM en cours d'exécution",
 			"providerSwitchDesc": "Override à chaud : met la tâche en pause à la fin de l'étape en cours, puis la reprend avec un autre LLM. Pour les étapes non démarrées, utilisez plutôt les sélecteurs LLM de chaque phase ci-dessus.",
 			"providerSwitchPaused": "Tâche en pause",
+			"customModelId": "Identifiant du modèle",
+			"customModelIdPlaceholder": "Saisissez l’identifiant exact du modèle",
 			"providerSwitchPausedDesc": "Choisissez un provider, un modèle et un niveau d'effort, puis reprenez la tâche.",
 			"pauseToSwitch": "Mettre en pause et changer de LLM",
 			"pauseToSwitchShort": "Mettre en pause",
