@@ -492,7 +492,7 @@ export function AgentProfileSettings() {
 														<SelectTrigger className="h-9">
 															<SelectValue />
 														</SelectTrigger>
-														<SelectContent>
+														<SelectContent searchable>
 															{providerModels.map((m) => (
 																<SelectItem key={m.value} value={m.value}>
 																	{m.label}
@@ -524,7 +524,7 @@ export function AgentProfileSettings() {
 																placeholder={t("agentProfile.selectModel")}
 															/>
 														</SelectTrigger>
-														<SelectContent>
+														<SelectContent searchable>
 															{providerModels.map((m) => (
 																<SelectItem key={m.value} value={m.value}>
 																	<span className="flex items-center gap-2">

@@ -1,4 +1,5 @@
 {
+	"selectSearch": { "placeholder": "Type to filter…", "empty": "No results" },
 	"projectTab": {
 		"settings": "Project settings",
 		"showArchived": "Show archived",

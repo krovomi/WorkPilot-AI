@@ -1,5 +1,8 @@
 import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
-import { isLocalProvider } from "../../../shared/utils/local-models";
+import {
+	isCustomModelSentinel,
+	isLocalProvider,
+} from "../../../shared/utils/local-models";
 import { Info, Loader2, Pause, Play, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +14,7 @@ import { getStaticProviders } from "../../../shared/utils/providers";
 import { debugError } from "../../../shared/utils/debug-logger";
 import { useToast } from "../../hooks/use-toast";
 import { useSettingsStore } from "../../stores/settings-store";
+import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import {
 	Select,
@@ -74,6 +78,10 @@ export function TaskPauseControls({
 		"";
 	const [selectedProvider, setSelectedProvider] = useState(initialProvider);
 	const [selectedModel, setSelectedModel] = useState(initialModel);
+	const [customModel, setCustomModel] = useState("");
+	const resumeModel = (
+		isCustomModelSentinel(selectedModel) ? customModel : selectedModel
+	).trim();
 	// Reasoning "effort" applied to the resumed run. Seed it from the task's
 	// current single thinking level, falling back to the coding phase's per-phase
 	// level, then a sensible default.
@@ -94,6 +102,7 @@ export function TaskPauseControls({
 			previousSelectionKey.current = selectionKey;
 			setSelectedProvider(initialProvider);
 			setSelectedModel(initialModel);
+			setCustomModel("");
 		}
 	}, [selectionKey, initialProvider, initialModel]);
 
@@ -163,12 +172,13 @@ export function TaskPauseControls({
 	}, [onPause, toast, t]);
 
 	const handleResumeWithProvider = useCallback(async () => {
+		if (!resumeModel || isCustomModelSentinel(resumeModel)) return;
 		setIsResuming(true);
 		try {
 			const res = await globalThis.electronAPI?.resumeTaskWithProvider?.(
 				task.id,
 				selectedProvider,
-				selectedModel || undefined,
+				resumeModel,
 				selectedEffort,
 			);
 			if (res?.success) {
@@ -206,7 +216,7 @@ export function TaskPauseControls({
 		} finally {
 			setIsResuming(false);
 		}
-	}, [task.id, selectedProvider, selectedModel, selectedEffort, toast, t]);
+	}, [task.id, selectedProvider, resumeModel, selectedEffort, toast, t]);
 
 	return (
 		<div className="overflow-hidden rounded-lg border bg-muted/20">
@@ -299,6 +309,9 @@ export function TaskPauseControls({
 						<div className="min-w-0 flex-1">
 							<div className="text-sm font-medium">
 								{t("tasks:modal.actions.providerSwitchPaused")}
+								<div className="break-words text-sm" title={task.title}>
+									{task.title || task.id}
+								</div>
 							</div>
 							<div className="text-xs text-muted-foreground">
 								{t("tasks:modal.actions.providerSwitchPausedDesc")}
@@ -321,11 +334,7 @@ export function TaskPauseControls({
 							)}
 						</div>
 					) : (
-						<div
-							className={`grid gap-2 ${
-								models.length > 0 ? "grid-cols-3" : "grid-cols-2"
-							}`}
-						>
+						<div className={`grid gap-2 ${"grid-cols-1 sm:grid-cols-3"}`}>
 							<div className="space-y-1">
 								<div className="text-xs font-medium text-muted-foreground">
 									{t("tasks:modal.actions.chooseProvider", "Provider")}
@@ -335,12 +344,13 @@ export function TaskPauseControls({
 									onValueChange={(provider) => {
 										setSelectedProvider(provider);
 										setSelectedModel("");
+										setCustomModel("");
 									}}
 								>
 									<SelectTrigger className="h-8">
 										<SelectValue />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent searchable>
 										{providers.map((p) => (
 											<SelectItem key={p.name} value={p.name}>
 												{p.label}
@@ -359,14 +369,27 @@ export function TaskPauseControls({
 										<SelectTrigger className="h-8">
 											<SelectValue />
 										</SelectTrigger>
-										<SelectContent>
+										<SelectContent searchable>
 											{modelOptions.map((m) => (
 												<SelectItem key={m.value} value={m.value}>
-													{m.label}
+													{isCustomModelSentinel(m.value)
+														? t("tasks:logs.model.customOption")
+														: m.label}
 												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>
+									{isCustomModelSentinel(selectedModel) && (
+										<Input
+											aria-label={t("tasks:modal.actions.customModelId")}
+											placeholder={t(
+												"tasks:modal.actions.customModelIdPlaceholder",
+											)}
+											value={customModel}
+											onChange={(event) => setCustomModel(event.target.value)}
+											disabled={isResuming}
+										/>
+									)}
 								</div>
 							)}
 
@@ -421,7 +444,8 @@ export function TaskPauseControls({
 								isResuming ||
 								isLoading ||
 								catalogLoading ||
-								!selectedModel ||
+								!resumeModel ||
+								isCustomModelSentinel(resumeModel) ||
 								!providers.some((p) => p.name === selectedProvider)
 							}
 							className="flex-1"

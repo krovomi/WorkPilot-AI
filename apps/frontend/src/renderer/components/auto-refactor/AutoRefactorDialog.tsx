@@ -194,7 +194,7 @@ export function AutoRefactorDialog() {
 								<SelectTrigger id="model-select">
 									<SelectValue />
 								</SelectTrigger>
-								<SelectContent>
+								<SelectContent searchable>
 									{MODELS.map((modelOption) => (
 										<SelectItem key={modelOption} value={modelOption}>
 											{modelOption}

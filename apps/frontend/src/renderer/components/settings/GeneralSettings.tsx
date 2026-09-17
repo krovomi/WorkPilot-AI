@@ -292,7 +292,7 @@ export function GeneralSettings({
 													<SelectTrigger className="h-9">
 														<SelectValue />
 													</SelectTrigger>
-													<SelectContent>
+													<SelectContent searchable>
 														{providerModels.map((m) => (
 															<SelectItem key={m.value} value={m.value}>
 																{m.label}

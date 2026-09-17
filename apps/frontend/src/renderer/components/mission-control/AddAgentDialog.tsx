@@ -185,7 +185,7 @@ export function AddAgentDialog({
 							<SelectTrigger className="text-sm">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent searchable>
 								{PROVIDERS.map((p) => (
 									<SelectItem key={p.value} value={p.value}>
 										{p.label}
@@ -210,7 +210,7 @@ export function AddAgentDialog({
 							<SelectTrigger className="text-sm">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent searchable>
 								{models.map((m) => (
 									<SelectItem key={m.value} value={m.value}>
 										<div className="flex items-center gap-2">

@@ -27,7 +27,14 @@ import {
 	X,
 	XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import type {
 	Task,
@@ -444,12 +451,11 @@ export function TaskLogs({
 				logPhase,
 				// Resolve defaults for the NEW provider so the phase's model is reset
 				// to a model that provider can actually run (prevents `ollama:opus`).
-				buildProviderMetadataUpdate(
-					task.metadata,
-					logPhase,
-					provider,
-					{ ...resolvePhaseDefaults(settings, provider), phaseModels: buildGlobalProviderMetadataUpdate(provider, settings).phaseModels },
-				),
+				buildProviderMetadataUpdate(task.metadata, logPhase, provider, {
+					...resolvePhaseDefaults(settings, provider),
+					phaseModels: buildGlobalProviderMetadataUpdate(provider, settings)
+						.phaseModels,
+				}),
 				t("tasks:logs.provider.updatedTitle", "Fournisseur mis à jour"),
 				t(
 					"tasks:logs.provider.updatedDesc",
@@ -590,7 +596,10 @@ export function TaskLogs({
 	useLayoutEffect(() => {
 		const container = logsContainerRef.current;
 		if (!container) return;
-		return followLogViewport(container, settings.logOrder === "reverse-chronological");
+		return followLogViewport(
+			container,
+			settings.logOrder === "reverse-chronological",
+		);
 	}, [logsContainerRef, settings.logOrder]);
 
 	const scrollToTop = useCallback(() => {
@@ -1443,7 +1452,7 @@ function PhaseLogSection({
 										<Server className="h-3 w-3" />
 										<SelectValue />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent searchable>
 										{providerOptions.map((p) => (
 											<SelectItem key={p.name} value={p.name}>
 												{p.label}
@@ -1490,6 +1499,7 @@ function PhaseLogSection({
 										</SelectValue>
 									</SelectTrigger>
 									<SelectContent
+										searchable
 										onCloseAutoFocus={(event) => {
 											if (editingCustomModel) {
 												event.preventDefault();

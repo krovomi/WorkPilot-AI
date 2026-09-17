@@ -552,7 +552,7 @@ export function SecuritySettings({
 									>
 										<SelectValue placeholder="Select embedding provider" />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent searchable>
 										<SelectItem value="ollama">
 											Ollama (Local - Free)
 										</SelectItem>

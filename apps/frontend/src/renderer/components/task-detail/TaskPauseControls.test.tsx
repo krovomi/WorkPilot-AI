@@ -117,3 +117,29 @@ it("keeps the downloaded phase model and sends its exact ID when resuming", asyn
 		),
 	);
 });
+
+it("names the paused task and requires a real custom model before resuming", async () => {
+	const resume = vi.fn().mockResolvedValue({ success: true });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	const task = {
+		id: "custom-task",
+		title: "Repair checkout",
+		metadata: { provider: "ollama", model: "custom" },
+	} as Task;
+	renderControls({ task, isPaused: true, isRunning: false });
+	expect(screen.getByText("Repair checkout")).toBeInTheDocument();
+	const input = await screen.findByRole("textbox", { name: "Model ID" });
+	const button = screen.getByRole("button", { name: /resume with this llm/i });
+	expect(button).toBeDisabled();
+	fireEvent.change(input, { target: { value: "  gemma4:my-local-tag  " } });
+	await waitFor(() => expect(button).toBeEnabled());
+	fireEvent.click(button);
+	await waitFor(() =>
+		expect(resume).toHaveBeenCalledWith(
+			"custom-task",
+			"ollama",
+			"gemma4:my-local-tag",
+			"medium",
+		),
+	);
+});

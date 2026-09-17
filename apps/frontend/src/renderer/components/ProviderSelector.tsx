@@ -361,7 +361,10 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 		const loadProviders = async () => {
 			setIsLoading(true);
 			try {
-				const data = await getStaticProviders(profiles, settings as unknown as Record<string, unknown>);
+				const data = await getStaticProviders(
+					profiles,
+					settings as unknown as Record<string, unknown>,
+				);
 				setProvidersData(data);
 			} catch (error) {
 				console.error("Failed to load providers:", error);
@@ -425,7 +428,8 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 		try {
 			if (globalThis.electronAPI?.selectProvider) {
 				const result = await globalThis.electronAPI.selectProvider(value);
-				if (!result.success) throw new Error(result.error || "Provider selection failed");
+				if (!result.success)
+					throw new Error(result.error || "Provider selection failed");
 			}
 
 			setSelected(value);
@@ -442,7 +446,13 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 			useSettingsStore.getState().updateSettings({ selectedProvider: value });
 			if (applyToExistingTasks) {
 				const failed = await applyProviderToTasks(tasks, value, settings);
-				if (failed.length) toast({ title: t("dialogs:providerSelector.taskUpdateFailed", { count: failed.length }), variant: "destructive" });
+				if (failed.length)
+					toast({
+						title: t("dialogs:providerSelector.taskUpdateFailed", {
+							count: failed.length,
+						}),
+						variant: "destructive",
+					});
 			}
 
 			// Notifier immédiatement les composants du changement de provider
@@ -456,7 +466,10 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 				"Failed to communicate provider selection to backend:",
 				error,
 			);
-			toast({ title: t("dialogs:providerSelector.updateFailed"), variant: "destructive" });
+			toast({
+				title: t("dialogs:providerSelector.updateFailed"),
+				variant: "destructive",
+			});
 		} finally {
 			setIsApplying(false);
 		}
@@ -573,13 +586,17 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 				<Label htmlFor="provider-select" className="whitespace-nowrap">
 					{t("dialogs:providerSelector.label")}
 				</Label>
-				<Select value={selected} onValueChange={handleSelect} disabled={isApplying}>
+				<Select
+					value={selected}
+					onValueChange={handleSelect}
+					disabled={isApplying}
+				>
 					<SelectTrigger id="provider-select" className="w-full">
 						<SelectValue
 							placeholder={t("dialogs:providerSelector.placeholder")}
 						/>
 					</SelectTrigger>
-					<SelectContent>{renderProviderContent()}</SelectContent>
+					<SelectContent searchable>{renderProviderContent()}</SelectContent>
 				</Select>
 			</div>
 

@@ -1276,7 +1276,7 @@ export function GraphitiStep({ onNext, onBack, onSkip }: GraphitiStepProps) {
 													<SelectTrigger>
 														<SelectValue />
 													</SelectTrigger>
-													<SelectContent>
+													<SelectContent searchable>
 														{LLM_PROVIDERS.map((p) => (
 															<SelectItem key={p.id} value={p.id}>
 																<div className="flex flex-col">
@@ -1313,7 +1313,7 @@ export function GraphitiStep({ onNext, onBack, onSkip }: GraphitiStepProps) {
 													<SelectTrigger>
 														<SelectValue />
 													</SelectTrigger>
-													<SelectContent>
+													<SelectContent searchable>
 														{EMBEDDING_PROVIDERS.map((p) => (
 															<SelectItem key={p.id} value={p.id}>
 																<div className="flex flex-col">
