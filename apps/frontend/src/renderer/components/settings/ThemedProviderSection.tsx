@@ -91,11 +91,11 @@ export function ThemedProviderSection({
 	const [hasClaudeOAuth, setHasClaudeOAuth] = useState(
 		Boolean(settings.globalClaudeOAuthToken),
 	);
-	const [hasOpenAICodexOAuth, setHasOpenAICodexOAuth] = useState(
-		Boolean(settings.globalOpenAICodexOAuthToken),
-	);
+	const [hasOpenAICodexOAuth, setHasOpenAICodexOAuth] = useState(false);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Saved login metadata and closing the dialog invalidate the live status.
 	useEffect(() => {
+		let cancelled = false;
 		const checkOAuth = async () => {
 			// First check settings
 			if (settings.globalClaudeOAuthToken) {
@@ -115,24 +115,19 @@ export function ThemedProviderSection({
 			}
 		};
 		const checkOpenAIOAuth = async () => {
-			if (settings.globalOpenAICodexOAuthToken) {
-				setHasOpenAICodexOAuth(true);
-				return;
-			}
 			try {
 				if (globalThis.electronAPI?.checkOpenAICodexOAuth) {
 					const result = await globalThis.electronAPI.checkOpenAICodexOAuth();
-					if (result.isAuthenticated) {
-						setHasOpenAICodexOAuth(true);
-					}
+					if (!cancelled) setHasOpenAICodexOAuth(result.isAuthenticated);
 				}
 			} catch {
-				// IPC not available
+				if (!cancelled) setHasOpenAICodexOAuth(false);
 			}
 		};
 		checkOAuth();
 		checkOpenAIOAuth();
-	}, [settings.globalClaudeOAuthToken, settings.globalOpenAICodexOAuthToken]);
+		return () => { cancelled = true; };
+	}, [settings.globalClaudeOAuthToken, settings.globalOpenAICodexOAuthToken, configDialogOpen]);
 
 	// Charger les connecteurs
 	useEffect(() => {
