@@ -153,7 +153,7 @@
 		"jsdom": "^29.0.2",
 		"lint-staged": "^17.5.0",
 		"node-pty": "1.1.0",
-		"postcss": "^8.5.18",
+		"postcss": "^8.5.28",
 		"tailwindcss": "^4.2.2",
 		"typescript": "^5.9.3",
 		"unzipper": "^0.10.14",
