@@ -131,7 +131,7 @@ def test_empty_v1_falls_back_to_tags(monkeypatch):
     ]
 
 
-def test_returns_empty_when_unreachable(monkeypatch):
+def test_reports_failure_when_unreachable(monkeypatch):
     _install_fake_client(
         monkeypatch,
         {
@@ -140,7 +140,8 @@ def test_returns_empty_when_unreachable(monkeypatch):
         },
     )
 
-    assert cat._fetch_ollama() == []
+    with pytest.raises(httpx.ConnectError):
+        cat._fetch_ollama()
 
 
 def test_local_root_strips_openai_suffixes(monkeypatch):

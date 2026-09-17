@@ -38,6 +38,15 @@ class ModelEntry:
 # =============================================================================
 
 _ANTHROPIC_MODELS = [
+    ModelEntry(
+        "anthropic",
+        "claude-fable-5-1",
+        "Claude Fable 5.1",
+        "flagship",
+        supports_thinking=True,
+        price_input=10.0,
+        price_output=50.0,
+    ),
     # Claude Fable 5 — « Mythos-class » (GA 2026-06-09), au-dessus d'Opus 4.8.
     ModelEntry(
         "anthropic",
@@ -193,6 +202,47 @@ _ANTHROPIC_MODELS = [
 # =============================================================================
 
 _OPENAI_MODELS = [
+    # Official API model IDs, verified 2026-09-15. Live discovery adds releases.
+    ModelEntry(
+        "openai",
+        "gpt-6-astra",
+        "GPT-6 Astra",
+        "flagship",
+        supports_thinking=True,
+        price_input=10,
+        price_output=50,
+        price_cache_read=1,
+    ),
+    ModelEntry(
+        "openai",
+        "gpt-5.6-sol",
+        "GPT-5.6 Sol",
+        "flagship",
+        supports_thinking=True,
+        price_input=4,
+        price_output=20,
+        price_cache_read=0.4,
+    ),
+    ModelEntry(
+        "openai",
+        "gpt-5.6-terra",
+        "GPT-5.6 Terra",
+        "standard",
+        supports_thinking=True,
+        price_input=2,
+        price_output=12,
+        price_cache_read=0.2,
+    ),
+    ModelEntry(
+        "openai",
+        "gpt-5.6-luna",
+        "GPT-5.6 Luna",
+        "fast",
+        supports_thinking=True,
+        price_input=0.2,
+        price_output=1.2,
+        price_cache_read=0.02,
+    ),
     # Flagship with thinking
     ModelEntry(
         "openai",
@@ -258,7 +308,7 @@ _OPENAI_MODELS = [
         "openai",
         "gpt-4.1-mini",
         "GPT-4.1 Mini",
-        "standard",
+        "fast",
         price_input=0.40,
         price_output=1.60,
         is_default=False,
@@ -1097,6 +1147,191 @@ _CURSOR_MODELS = [
 # REGISTRY
 # =============================================================================
 
+_ADDITIONAL_CATALOG_MODELS = [
+    ModelEntry(
+        "google",
+        "gemini-3-flash",
+        "Gemini 3 Flash",
+        "flagship",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "google",
+        "gemini-2.0-flash-thinking",
+        "Gemini 2.0 Flash Thinking",
+        "standard",
+        supports_thinking=True,
+    ),
+    ModelEntry(
+        "google",
+        "gemini-1.5-pro",
+        "Gemini 1.5 Pro",
+        "standard",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "google",
+        "gemini-1.5-flash",
+        "Gemini 1.5 Flash",
+        "fast",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "mistral",
+        "ministral-3-14b",
+        "Ministral 3 14B",
+        "standard",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "mistral",
+        "ministral-3-8b",
+        "Ministral 3 8B",
+        "standard",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "mistral", "ministral-3-3b", "Ministral 3 3B", "fast", supports_thinking=False
+    ),
+    ModelEntry(
+        "mistral",
+        "mistral-medium-3",
+        "Mistral Medium 3",
+        "standard",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "mistral", "mistral-small-3", "Mistral Small 3", "fast", supports_thinking=False
+    ),
+    ModelEntry(
+        "mistral", "codestral", "Codestral", "standard", supports_thinking=False
+    ),
+    ModelEntry("mistral", "mistral-7b", "Mistral 7B", "fast", supports_thinking=False),
+    ModelEntry(
+        "deepseek",
+        "deepseek-v3.2",
+        "DeepSeek V3.2",
+        "flagship",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "deepseek", "deepseek-r2", "DeepSeek R2", "flagship", supports_thinking=True
+    ),
+    ModelEntry(
+        "deepseek", "deepseek-r1", "DeepSeek R1", "standard", supports_thinking=True
+    ),
+    ModelEntry(
+        "deepseek",
+        "deepseek-coder-v2",
+        "DeepSeek Coder V2",
+        "standard",
+        supports_thinking=False,
+    ),
+    ModelEntry("grok", "grok-3", "Grok 3", "standard", supports_thinking=True),
+    ModelEntry(
+        "meta",
+        "meta-llama/llama-3.3-70b",
+        "Llama 3.3 70B",
+        "standard",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "meta",
+        "meta-llama/llama-3.1-70b",
+        "Llama 3.1 70B",
+        "standard",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "meta",
+        "meta-llama/llama-3.1-8b",
+        "Llama 3.1 8B",
+        "fast",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "aws",
+        "anthropic.claude-opus-4-7-v1",
+        "Claude Opus 4.7 (Bedrock)",
+        "flagship",
+        supports_thinking=True,
+    ),
+    ModelEntry(
+        "aws",
+        "anthropic.claude-sonnet-4-6-v1",
+        "Claude Sonnet 4.6 (Bedrock)",
+        "standard",
+        supports_thinking=True,
+    ),
+    ModelEntry(
+        "aws",
+        "anthropic.claude-sonnet-4-5-v1",
+        "Claude Sonnet 4.5 (Bedrock)",
+        "standard",
+        supports_thinking=True,
+    ),
+    ModelEntry(
+        "aws",
+        "amazon.titan-text-premier-v1",
+        "Amazon Titan Premier",
+        "standard",
+        supports_thinking=False,
+    ),
+    ModelEntry(
+        "aws",
+        "meta.llama3-70b-instruct-v1",
+        "Llama 3 70B (Bedrock)",
+        "standard",
+        supports_thinking=False,
+    ),
+    ModelEntry("ollama", "llama3.2", "Llama 3.2", "local", supports_thinking=False),
+    ModelEntry("ollama", "llama3.1", "Llama 3.1", "local", supports_thinking=False),
+    ModelEntry(
+        "ollama", "mistral-large-3", "Mistral Large 3", "local", supports_thinking=False
+    ),
+    ModelEntry("ollama", "mistral", "Mistral", "local", supports_thinking=False),
+    ModelEntry(
+        "ollama", "mistral-large", "Mistral Large", "local", supports_thinking=False
+    ),
+    ModelEntry(
+        "ollama", "deepseek-v3.2", "DeepSeek V3.2", "local", supports_thinking=False
+    ),
+    ModelEntry(
+        "ollama", "deepseek-r2", "DeepSeek R2", "flagship", supports_thinking=True
+    ),
+    ModelEntry(
+        "ollama", "deepseek-r1", "DeepSeek R1", "standard", supports_thinking=True
+    ),
+    ModelEntry(
+        "ollama", "qwen2.5-coder", "Qwen 2.5 Coder", "local", supports_thinking=False
+    ),
+    ModelEntry("ollama", "qwen2.5", "Qwen 2.5", "local", supports_thinking=False),
+    ModelEntry("ollama", "phi4", "Phi-4", "local", supports_thinking=False),
+    ModelEntry("ollama", "gemma3", "Gemma 3", "local", supports_thinking=False),
+    ModelEntry("ollama", "gemma2", "Gemma 2", "local", supports_thinking=False),
+    ModelEntry("ollama", "codellama", "CodeLlama", "local", supports_thinking=False),
+    ModelEntry("ollama", "yi", "Yi", "local", supports_thinking=False),
+    ModelEntry("ollama", "mixtral", "Mixtral", "local", supports_thinking=False),
+    ModelEntry("ollama", "vicuna", "Vicuna", "local", supports_thinking=False),
+    ModelEntry("ollama", "wizardlm", "WizardLM", "local", supports_thinking=False),
+    ModelEntry("ollama", "solar", "Solar Pro", "local", supports_thinking=False),
+    ModelEntry(
+        "ollama", "custom", "Autre (saisie libre)", "local", supports_thinking=False
+    ),
+    ModelEntry(
+        "custom", "custom-model-1", "Custom Model 1", "flagship", supports_thinking=True
+    ),
+    ModelEntry(
+        "custom", "custom-model-2", "Custom Model 2", "standard", supports_thinking=True
+    ),
+    ModelEntry(
+        "custom", "custom-model-3", "Custom Model 3", "fast", supports_thinking=False
+    ),
+    ModelEntry(
+        "custom", "custom", "Autre (saisie libre)", "local", supports_thinking=True
+    ),
+]
+
 REGISTRY: tuple[ModelEntry, ...] = tuple(
     _ANTHROPIC_MODELS
     + _OPENAI_MODELS
@@ -1110,6 +1345,7 @@ REGISTRY: tuple[ModelEntry, ...] = tuple(
     + _AWS_MODELS
     + _COPILOT_MODELS
     + _CURSOR_MODELS
+    + _ADDITIONAL_CATALOG_MODELS
 )
 
 # =============================================================================
@@ -1144,3 +1380,29 @@ def get_pricing(provider: str, model_id: str) -> ModelEntry | None:
 def list_provider(provider: str) -> list[ModelEntry]:
     """List all models for a provider."""
     return [e for e in REGISTRY if e.provider == provider]
+
+
+def provider_catalog() -> dict[str, list[dict[str, object]]]:
+    """Serializable catalogue shared by the API and generated frontend fallback."""
+    result: dict[str, list[dict[str, object]]] = {}
+    for model in REGISTRY:
+        result.setdefault(model.provider, []).append(
+            {
+                "value": model.model_id,
+                "label": model.label,
+                "tier": model.tier,
+                "supportsThinking": model.supports_thinking,
+            }
+        )
+    for alias, provider in {
+        "claude": "anthropic",
+        "gemini": "google",
+        "local": "ollama",
+    }.items():
+        result[alias] = result[provider]
+    # These runtimes expose their actual inventory through live discovery.
+    result.setdefault("lmstudio", [])
+    result.setdefault("lm-studio", [])
+    result.setdefault("llama-cpp", [])
+    result.setdefault("custom", [])
+    return result
