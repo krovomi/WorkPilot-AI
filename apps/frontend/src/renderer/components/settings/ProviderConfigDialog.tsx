@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle, Globe, Key, Users } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -31,8 +31,10 @@ interface ProviderConfigDialogProps {
 	} | null;
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 	readonly settings: any;
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	readonly onSettingsChange: (settings: any) => void;
+	readonly onSettingsChange: (
+		// biome-ignore lint/suspicious/noExplicitAny: Existing settings callbacks accept heterogeneous provider fields.
+		settings: any,
+	) => void | boolean | Promise<void> | Promise<boolean>;
 	readonly onTest?: (providerId: string) => Promise<void>;
 	readonly useSheet?: boolean;
 	readonly onProviderActivated?: (providerId: string) => void;
@@ -61,10 +63,9 @@ export function ProviderConfigDialog({
 				title: t("sections.accounts.providerConfig.savedTitle", {
 					defaultValue: "Fournisseur enregistré",
 				}),
-				description:
-					model?.trim()
-						? `${providerName} enregistré (modèle : ${model.trim()}) et défini comme fournisseur actif.`
-						: `${providerName} enregistré et défini comme fournisseur actif.`,
+				description: model?.trim()
+					? `${providerName} enregistré (modèle : ${model.trim()}) et défini comme fournisseur actif.`
+					: `${providerName} enregistré et défini comme fournisseur actif.`,
 			});
 		},
 		[toast, t],
@@ -104,19 +105,89 @@ export function ProviderConfigDialog({
 		setWindsurfAccountInfo,
 	} = useProviderAuth();
 
-	// Refresh an existing Codex CLI session whenever the OAuth tab is opened.
-	// The saved settings label is intentionally ignored: only the main-process
-	// credential check may establish the connected state.
+	// Keep background verification independent from settings/usage rerenders.
+	const latestAuth = useRef({
+		settings,
+		onSettingsChange,
+		onProviderActivated,
+		t,
+		providerId: provider?.id,
+		isOpen,
+	});
+	latestAuth.current = {
+		settings,
+		onSettingsChange,
+		onProviderActivated,
+		t,
+		providerId: provider?.id,
+		isOpen,
+	};
+	const verification = useRef<Promise<boolean> | null>(null);
+	const mounted = useRef(false);
+	useEffect(() => {
+		mounted.current = true;
+		return () => {
+			mounted.current = false;
+		};
+	}, []);
+	const verifyCodexSession = useCallback((): Promise<boolean> => {
+		if (verification.current) return verification.current;
+		verification.current = (async () => {
+			try {
+				const result = await globalThis.electronAPI.checkOpenAICodexOAuth();
+				const current = latestAuth.current;
+				if (
+					!mounted.current ||
+					!current.isOpen ||
+					current.providerId !== "openai"
+				)
+					return false;
+				setCodexAuthStatus(result);
+				if (!result.isAuthenticated) return false;
+				const profile = result.profileName || "OpenAI Codex CLI";
+				const saved = await current.onSettingsChange({
+					...current.settings,
+					globalOpenAIAuthMode: "codex-cli",
+					globalOpenAICodexOAuthToken: profile,
+				});
+				if (saved === false) throw new Error("Settings persistence failed");
+				if (!mounted.current) return false;
+				await current.onProviderActivated?.("openai");
+				setTestResult({
+					success: true,
+					message: current.t(
+						"sections.accounts.providerConfig.openaiAuth.active",
+						{ profile },
+					),
+				});
+				return true;
+			} catch {
+				if (!mounted.current) return false;
+				setTestResult({
+					success: false,
+					message: latestAuth.current.t(
+						"sections.accounts.providerConfig.openaiAuth.checkError",
+					),
+				});
+				return false;
+			} finally {
+				verification.current = null;
+			}
+		})();
+		return verification.current;
+	}, []);
+
+	// Opening the tab reads the live session; saving remains an explicit action
+	// until a login terminal has been started in this dialog.
 	useEffect(() => {
 		if (
+			!isOpen ||
 			provider?.id !== "openai" ||
 			activeTab !== "oauth" ||
 			authTerminal ||
 			!globalThis.electronAPI?.checkOpenAICodexOAuth
-		) {
+		)
 			return;
-		}
-
 		let cancelled = false;
 		void globalThis.electronAPI
 			.checkOpenAICodexOAuth()
@@ -124,113 +195,57 @@ export function ProviderConfigDialog({
 				if (!cancelled) setCodexAuthStatus(result);
 			})
 			.catch(() => {
-				// The login button remains available when status cannot be checked.
+				if (!cancelled) setCodexAuthStatus({ isAuthenticated: false });
 			});
-
 		return () => {
 			cancelled = true;
 		};
-	}, [provider?.id, activeTab, authTerminal]);
+	}, [isOpen, provider?.id, activeTab, authTerminal]);
 
-	// Auto-check Codex CLI authentication status when terminal is active
-	// Polls the actual ~/.codex/auth.json file via IPC instead of matching terminal output
 	useEffect(() => {
 		if (
-			provider?.id === "openai" &&
-			activeTab === "oauth" &&
-			authTerminal?.terminalId?.startsWith("auth-codex-") &&
-			isAuthenticating
-		) {
-			let checkCount = 0;
-			const maxChecks = 120; // Maximum 120 checks (2 minutes — user needs time to complete OAuth in browser)
-
-			const checkInterval = setInterval(async () => {
-				checkCount++;
-
-				// Only log every 10th attempt to reduce noise
-				if (checkCount % 10 === 1) {
-					// noop
-				}
-
-				try {
-					const result =
-						await globalThis.electronAPI?.checkOpenAICodexOAuth?.();
-
-					if (result?.isAuthenticated) {
-						clearInterval(checkInterval);
-
-						const profileLabel = result.profileName || "Codex CLI";
-						setCodexAuthStatus({
-							isAuthenticated: true,
-							profileName: profileLabel,
-						});
-						setTestResult({
-							success: true,
-							message: t(
-								"sections.accounts.providerConfig.openaiAuth.active",
-								{ profile: profileLabel },
-							),
-						});
-						setIsTestPending(false);
-
-						// Auto-save: persist the OAuth token to settings so provider shows as configured
-						const newSettings = { ...settings };
-						newSettings.globalOpenAICodexOAuthToken = profileLabel;
-						newSettings.globalOpenAIAuthMode = "codex-cli";
-						onSettingsChange(newSettings);
-						onProviderActivated?.(provider.id);
-
-						// Close the terminal after a brief success display
-						setTimeout(() => {
-							handleAuthTerminalClose();
-						}, 1500);
-					} else if (checkCount >= maxChecks) {
-						clearInterval(checkInterval);
-						setCodexAuthStatus({ isAuthenticated: false });
-						console.warn(
-							"[ProviderConfigDialog] Codex OAuth check timeout after maximum attempts",
-						);
-						setTestResult({
-							success: false,
-							message: t(
-								"sections.accounts.providerConfig.openaiAuth.timeout",
-							),
-						});
-						setIsTestPending(false);
-						handleAuthTerminalClose();
-					}
-				} catch (error) {
-					console.error(
-						"[ProviderConfigDialog] Error checking Codex OAuth status:",
-						error,
-					);
-					if (checkCount >= maxChecks) {
-						clearInterval(checkInterval);
-						setTestResult({
-							success: false,
-							message: t(
-								"sections.accounts.providerConfig.openaiAuth.checkError",
-							),
-						});
-						setIsTestPending(false);
-						handleAuthTerminalClose();
-					}
-				}
-			}, 1000); // Check every second
-
-			return () => clearInterval(checkInterval);
-		}
+			!isOpen ||
+			provider?.id !== "openai" ||
+			!authTerminal?.terminalId.startsWith("auth-codex-")
+		)
+			return;
+		let cancelled = false;
+		let attempts = 0;
+		let timer: ReturnType<typeof setTimeout>;
+		const check = async () => {
+			const connected = await verifyCodexSession();
+			if (cancelled) return;
+			if (connected) {
+				handleAuthTerminalClose();
+			} else if (++attempts < 120) {
+				timer = setTimeout(check, 1000);
+			} else {
+				setTestResult({
+					success: false,
+					message: latestAuth.current.t(
+						"sections.accounts.providerConfig.openaiAuth.timeout",
+					),
+				});
+				handleAuthTerminalClose();
+			}
+		};
+		timer = setTimeout(check, 1000);
+		return () => {
+			cancelled = true;
+			clearTimeout(timer);
+		};
 	}, [
+		isOpen,
 		provider?.id,
-		activeTab,
 		authTerminal?.terminalId,
-		isAuthenticating,
-		settings,
-		onSettingsChange,
-		onProviderActivated,
+		verifyCodexSession,
 		handleAuthTerminalClose,
-		t,
 	]);
+
+	const closeAuthTerminal = async () => {
+		if (provider?.id === "openai") await verifyCodexSession();
+		handleAuthTerminalClose();
+	};
 
 	const providerConfig = provider ? providerFields[provider.id] : null;
 	const supportsOAuth = ["anthropic", "claude", "windsurf", "openai"].includes(
@@ -287,14 +302,29 @@ export function ProviderConfigDialog({
 		[],
 	);
 
+	const initializedProvider = useRef<string | null>(null);
 	useEffect(() => {
-		if (!provider || !providerConfig || !isOpen) return;
+		if (!isOpen) {
+			initializedProvider.current = null;
+			return;
+		}
+		if (
+			!provider ||
+			!providerConfig ||
+			initializedProvider.current === provider.id
+		)
+			return;
+		initializedProvider.current = provider.id;
 
 		const initialData = initializeFormData(providerConfig, settings);
 		setFormData(initialData);
 		setTestResult(null);
 		setWindsurfAccountInfo(null);
-		setActiveTab(getDefaultActiveTab(provider.id, supportsOAuth));
+		setActiveTab(
+			provider.id === "openai" && settings.globalOpenAIAuthMode === "codex-cli"
+				? "oauth"
+				: getDefaultActiveTab(provider.id, supportsOAuth),
+		);
 
 		// Auto-load Windsurf account info when dialog opens
 		if (provider.id === "windsurf") {
@@ -347,31 +377,19 @@ export function ProviderConfigDialog({
 
 		// For OpenAI on OAuth tab: persist Codex CLI OAuth state instead of API keys
 		if (provider.id === "openai" && activeTab === "oauth") {
-			let liveStatus = codexAuthStatus;
-			if (!liveStatus.isAuthenticated) {
-				try {
-					const result =
-						await globalThis.electronAPI?.checkOpenAICodexOAuth?.();
-					liveStatus = result || { isAuthenticated: false };
-				} catch {
-					liveStatus = { isAuthenticated: false };
-				}
-			}
-			if (!liveStatus.isAuthenticated) {
-				setCodexAuthStatus({ isAuthenticated: false });
-				setTestResult({
-					success: false,
-					message: t(
-						"sections.accounts.providerConfig.openaiAuth.notConnected",
-					),
-				});
+			if (!(await verifyCodexSession())) {
+				setTestResult((previous) =>
+					previous?.success === false
+						? previous
+						: {
+								success: false,
+								message: t(
+									"sections.accounts.providerConfig.openaiAuth.notConnected",
+								),
+							},
+				);
 				return;
 			}
-			newSettings.globalOpenAIAuthMode = "codex-cli";
-			newSettings.globalOpenAICodexOAuthToken =
-				liveStatus.profileName || "OpenAI Codex CLI";
-			onSettingsChange(newSettings);
-			onProviderActivated?.(provider.id);
 			onOpenChange(false);
 			return;
 		}
@@ -447,10 +465,9 @@ export function ProviderConfigDialog({
 						setCodexAuthStatus(result);
 						setTestResult({
 							success: true,
-							message: t(
-								"sections.accounts.providerConfig.openaiAuth.active",
-								{ profile: result.profileName || "OpenAI Codex CLI" },
-							),
+							message: t("sections.accounts.providerConfig.openaiAuth.active", {
+								profile: result.profileName || "OpenAI Codex CLI",
+							}),
 						});
 					} else {
 						setCodexAuthStatus({ isAuthenticated: false });
@@ -632,9 +649,11 @@ export function ProviderConfigDialog({
 										setCodexAuthStatus({ isAuthenticated: false });
 										void handleOAuthAuth(provider.id, provider.name);
 									}}
-									onAuthTerminalClose={handleAuthTerminalClose}
+									onAuthTerminalClose={closeAuthTerminal}
 									onAuthTerminalSuccess={(email) => {
-										if (provider.id !== "openai") {
+										if (provider.id === "openai") {
+											void verifyCodexSession();
+										} else {
 											handleAuthTerminalSuccess(
 												email,
 												onSettingsChange,
@@ -704,7 +723,6 @@ export function ProviderConfigDialog({
 					onToggleShowApiKey={() => setShowApiKey(!showApiKey)}
 				/>
 			)}
-
 		</>
 	);
 

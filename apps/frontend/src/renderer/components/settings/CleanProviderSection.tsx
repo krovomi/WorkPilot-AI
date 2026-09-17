@@ -138,22 +138,16 @@ export function CleanProviderSection({
 	>(new Map());
 
 	// Use store directly for real-time updates (like ProviderSelector)
-	const {
-		profiles,
-		settings: storeSettings,
-		updateSettings,
-	} = useSettingsStore();
+	const { profiles, settings: storeSettings } = useSettingsStore();
 	const { setSelectedProvider: setContextProvider } = useProviderContext();
 
 	// Create a unified settings object and onSettingsChange that updates both props and store
 	const settings = storeSettings;
 	const onSettingsChange = async (newSettings: AppSettings & Record<string, unknown>) => {
-		// Update props for backward compatibility
-		propsOnSettingsChange(newSettings);
-		// Update store for real-time sync across components
-		updateSettings(newSettings);
-		// Persist to disk so settings survive app restart
-		await saveSettingsToDisk(newSettings);
+		// Do not acknowledge a login that will be lost on restart.
+		const saved = await saveSettingsToDisk(newSettings);
+		if (saved) propsOnSettingsChange(newSettings);
+		return saved;
 	};
 
 	// Load real data when section is opened (runs once when panel opens)
@@ -556,57 +550,25 @@ export function CleanProviderSection({
 		[profiles, settings, providerStatus],
 	);
 
-	// Charger les providers de manière asynchrone
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
+	// Refresh every provider after settings/profile changes and after closing
+	// an independently managed login (for example GitHub Copilot).
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Closing the dialog invalidates CLI authentication status.
 	useEffect(() => {
-		loadProviders();
-	}, []);
-
-	// Extracted functions to reduce nesting
-	const enrichSettingsWithOAuth = async (baseSettings: AppSettings & Record<string, unknown>) => {
-		const enrichedSettings = { ...baseSettings };
-
-		// Enrich with Claude OAuth status
-		try {
-			if (globalThis.electronAPI?.checkClaudeOAuth) {
-				const oauthResult = await globalThis.electronAPI.checkClaudeOAuth();
-				if (oauthResult.isAuthenticated) {
-					enrichedSettings.globalClaudeOAuthToken =
-						oauthResult.profileName || "oauth-authenticated";
-				}
-			}
-		} catch {
-			// IPC not available
-		}
-
-		// Enrich with OpenAI Codex CLI OAuth status
-		try {
-			if (globalThis.electronAPI?.checkOpenAICodexOAuth) {
-				const oauthResult =
-					await globalThis.electronAPI.checkOpenAICodexOAuth();
-				if (oauthResult.isAuthenticated) {
-					enrichedSettings.globalOpenAICodexOAuthToken =
-						oauthResult.profileName || "codex-authenticated";
-				}
-			}
-		} catch {
-			// IPC not available
-		}
-
-		return enrichedSettings;
-	};
-
-	const loadProviders = async () => {
-		try {
-			const enrichedSettings = await enrichSettingsWithOAuth(settings as AppSettings & Record<string, unknown>);
-			const result = await getStaticProviders(profiles, enrichedSettings);
-			setStaticProviders(result.providers);
-			setProviderStatus(result.status);
-		} catch (error) {
-			console.error("Failed to load providers:", error);
-		}
-	};
+		let cancelled = false;
+		void getStaticProviders(
+			profiles,
+			settings as AppSettings & Record<string, unknown>,
+		)
+			.then((result) => {
+				if (cancelled) return;
+				setStaticProviders(result.providers);
+				setProviderStatus(result.status);
+			})
+			.catch((error) => console.error("Failed to load providers:", error));
+		return () => {
+			cancelled = true;
+		};
+	}, [profiles, settings, configDialogOpen]);
 
 	// Transformer les providers statiques en providers pour la grille avec mémorisation
 	const providers = useMemo(() => {

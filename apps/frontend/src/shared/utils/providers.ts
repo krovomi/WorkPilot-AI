@@ -6,6 +6,7 @@
  * This module re-exports a thin adapter so existing consumers keep working.
  */
 
+import { gitHubCopilotService } from "../services/githubCopilotService";
 import { providerRegistry } from "../services/providerRegistry";
 import type { APIProfile } from "../types/profile";
 import { detectProvider } from "./provider-detection";
@@ -38,13 +39,19 @@ export async function getStaticProviders(
 	settings?: Record<string, unknown>,
 ): Promise<ProvidersResponse> {
 	// Authentication is checked centrally so task and global pickers agree.
-	const checkOAuth = async (check?: () => Promise<{ isAuthenticated: boolean }>) => {
-		try { return (await check?.())?.isAuthenticated === true; }
-		catch { return false; }
+	const checkOAuth = async (
+		check?: () => Promise<{ isAuthenticated: boolean }>,
+	) => {
+		try {
+			return (await check?.())?.isAuthenticated === true;
+		} catch {
+			return false;
+		}
 	};
-	const [claudeOAuth, codexOAuth] = await Promise.all([
+	const [claudeOAuth, codexOAuth, copilot] = await Promise.all([
 		checkOAuth(globalThis.electronAPI?.checkClaudeOAuth),
 		checkOAuth(globalThis.electronAPI?.checkOpenAICodexOAuth),
+		gitHubCopilotService.getStatus(),
 	]);
 	const allProviders = providerRegistry
 		.getAllProviders()
@@ -69,7 +76,7 @@ export async function getStaticProviders(
 		});
 
 		if (p.name === "copilot") {
-			status[p.name] = true;
+			status[p.name] = copilot?.authenticated === true;
 		} else if (p.name === "ollama") {
 			// Ollama is local with a default URL (localhost:11434) — always available
 			// Show as configured if a custom URL is explicitly set, but default to true
@@ -114,15 +121,10 @@ export async function getStaticProviders(
 					String(settings.globalClaudeOAuthToken).trim()
 				);
 
-			// For OpenAI, also check Codex CLI OAuth token
-			const hasCodexOAuth =
-				p.name === "openai" &&
-				!!(
-					settings?.globalOpenAICodexOAuthToken &&
-					String(settings.globalOpenAICodexOAuthToken).trim()
-				);
-
-			status[p.name] = hasProfile || hasGlobalKey || hasOAuth || hasCodexOAuth ||
+			status[p.name] =
+				hasProfile ||
+				hasGlobalKey ||
+				hasOAuth ||
 				(p.name === "anthropic" && claudeOAuth) ||
 				(p.name === "openai" && codexOAuth);
 		}
