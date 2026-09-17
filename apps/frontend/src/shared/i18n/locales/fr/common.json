@@ -1,4 +1,8 @@
 {
+	"selectSearch": {
+		"placeholder": "Saisir pour filtrer…",
+		"empty": "Aucun résultat"
+	},
 	"projectTab": {
 		"settings": "Paramètres du projet",
 		"showArchived": "Afficher archivés",
