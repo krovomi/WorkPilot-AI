@@ -77,6 +77,22 @@
 		"crashed": "The preview renderer stopped. Retry to reload it.",
 		"browserFailed": "Unable to open the external browser. You can open {{url}} manually.",
 		"notFound": "HTTP 404: no page exists at this address. This server may expose an API without a web interface.",
-		"httpError": "The preview server returned HTTP {{code}}. Check the server output."
+		"httpError": "The preview server returned HTTP {{code}}. Check the server output.",
+		"address": "Address",
+		"addressPlaceholder": "Type a path or a URL, then press Enter",
+		"addressInvalid": "This address cannot be opened here. Use a path such as /swagger, or a http(s) URL.",
+		"back": "Back",
+		"forward": "Forward",
+		"reload": "Reload",
+		"home": "Home",
+		"homeFeature": "Back to the task route ({{path}})",
+		"go": "Go",
+		"featureRoute": "Task route: {{path}}",
+		"routeSource": {
+			"declared": "declared in the diff",
+			"page": "page added by the task",
+			"launchProfile": "project launch profile",
+			"apiDocs": "framework API docs"
+		}
 	}
 }

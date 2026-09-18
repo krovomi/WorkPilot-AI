@@ -24,6 +24,7 @@ import {
 } from "../../../shared/constants";
 import { isAnthropicNativeVersionedModelId } from "../../../shared/constants/models";
 import type { TaskEvent } from "../../../shared/state-machines/task-machine";
+import { relaunchEventFor } from "../../../shared/state-machines";
 import type {
 	ImageAttachment,
 	IPCResult,
@@ -533,6 +534,53 @@ function determineStartEvent(
 
 	// Fresh start
 	return { type: "PLANNING_STARTED" };
+}
+
+/**
+ * The SDK session id the backend persisted for this task, if any.
+ *
+ * `<specDir>/.session.json` is written by the Python side on every session, and
+ * handing it back as AUTO_CLAUDE_RESUME_SESSION_ID makes the SDK rehydrate that
+ * transcript instead of starting cold. Best-effort by design: a task that has
+ * never run, a truncated file or a missing field all mean "start fresh", which
+ * is what a resume did before this existed — never a reason to refuse the
+ * resume itself.
+ */
+function readPersistedSessionId(specDir: string): string | undefined {
+	const sessionFile = path.join(specDir, ".session.json");
+	if (!existsSync(sessionFile)) return undefined;
+	try {
+		const parsed = JSON.parse(readFileSync(sessionFile, "utf-8")) as {
+			session_id?: string;
+		};
+		return parsed.session_id || undefined;
+	} catch (err) {
+		appLog.warn(`[readPersistedSessionId] Could not read ${sessionFile}:`, err);
+		return undefined;
+	}
+}
+
+/**
+ * Leave the failure state, and let the next run's events through.
+ *
+ * Two halves, both owed by every relaunch that is not TASK_START. The event
+ * (see `relaunchEventFor`) is what clears the review reason and the
+ * `errorMessage` the failure banner renders. Resetting the sequence counter is
+ * the other: every restarted backend numbers its events from zero, and
+ * `isNewSequence` drops anything below the last number it saw — so without it
+ * the resumed run's phases reached nobody and the panel stayed frozen on the
+ * state it had failed in.
+ */
+function leaveFailureStateForRelaunch(
+	taskId: string,
+	task: Task,
+	project: Project,
+): void {
+	const event = relaunchEventFor(taskStateManager.getCurrentState(taskId), task);
+	if (event) {
+		taskStateManager.handleUiEvent(taskId, event, task, project);
+	}
+	taskStateManager.resetForNewRun(taskId);
 }
 
 /**
@@ -2147,6 +2195,10 @@ print(json.dumps(result))
 				};
 			}
 
+			// A switch is a relaunch too: the failure the user is switching away
+			// from must not stay on screen above the run that replaces it.
+			leaveFailureStateForRelaunch(taskId, task, project);
+
 			// Restart the subprocess so the next session boots with the new
 			// provider/model (and replays the conversation log).
 			return await restartTaskWithNewProvider(
@@ -3509,6 +3561,10 @@ print(json.dumps(result))
 
 				projectStore.invalidateTasksCache(project.id);
 
+				// A resume is a relaunch: drop the previous run's failure and let
+				// the new run's events through. See leaveFailureStateForRelaunch.
+				leaveFailureStateForRelaunch(taskId, task, project);
+
 				const baseBranch =
 					task.metadata?.baseBranch || project.settings?.mainBranch;
 
@@ -3522,6 +3578,14 @@ print(json.dumps(result))
 						baseBranch,
 						useWorktree: task.metadata?.useWorktree,
 						useLocalBranch: task.metadata?.useLocalBranch,
+						// Pick the transcript back up rather than re-deriving it. The
+						// phase the pause interrupted is re-entered from the spec
+						// directory either way — what this adds is the reasoning of
+						// the session that was interrupted, so "Reprendre" continues
+						// the analysis instead of paying for it twice. Single-shot on
+						// the backend (create_client pops the variable), so only the
+						// first session of the resumed run rehydrates.
+						resumeSessionId: readPersistedSessionId(specPaths.specDir),
 					},
 					project.id,
 				);

@@ -28,6 +28,7 @@ import {
 } from "@/stores/app-emulator-store";
 import { useProjectStore } from "@/stores/project-store";
 import { Badge } from "../ui/badge";
+import { buildLandingUrl } from "../../../shared/utils/emulator-landing";
 import { Button } from "../ui/button";
 import {
 	Dialog,
@@ -486,7 +487,9 @@ export function AppEmulatorDialog() {
 						<webview
 							// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 							ref={iframeRef as any}
-							src={url}
+							// Le projet dit où il commence (`launchUrl`) ; la racine d'une Web
+							// API répond 404 et n'a jamais été ce qu'on voulait montrer.
+							src={buildLandingUrl(url, config?.launchPath)}
 							className="flex-1 min-h-0 w-full border-0 bg-white"
 							style={{ display: showPreview ? "flex" : "none" }}
 						/>

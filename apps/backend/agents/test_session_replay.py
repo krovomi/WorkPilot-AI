@@ -58,9 +58,15 @@ async def test_replay_noop_when_no_log_exists(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_replay_noop_for_a_different_model(tmp_path: Path) -> None:
-    """History written under model A must NOT be replayed when model B runs —
-    each model resumes only its own context."""
+async def test_replay_noop_for_a_different_model_when_no_phase_is_named(
+    tmp_path: Path,
+) -> None:
+    """History written under model A is not replayed to model B by recency.
+
+    The phase is what authorises a carry-over (a coder must not inherit the
+    planner's reasoning), so a caller that names none gets the old behaviour:
+    the model reads its own log or starts fresh.
+    """
     from agents.session import _maybe_replay_conversation
 
     _write_history(
@@ -78,6 +84,68 @@ async def test_replay_noop_for_a_different_model(tmp_path: Path) -> None:
     fake_client = AsyncMock()
     # A different model → no log of its own → fresh start.
     await _maybe_replay_conversation(fake_client, tmp_path, "ollama", "llama3.1")
+    fake_client.resume.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_replay_carries_the_phase_over_to_the_model_taking_it(
+    tmp_path: Path,
+) -> None:
+    """Pause, switch model, resume: the coding phase continues where it stopped.
+
+    This is what the Pause button promises. Without the carry-over the chosen
+    model has no log, nothing is replayed, and the phase pays a second time for
+    the analysis the paused session had already done.
+    """
+    from agents.session import _maybe_replay_conversation
+
+    _write_history(
+        tmp_path,
+        [
+            AgentMessage(
+                role=MessageRole.ASSISTANT,
+                content=[
+                    ContentBlock(type=ContentBlockType.TEXT, text="src/app.py is wired")
+                ],
+            )
+        ],
+        provider="ollama",
+        model="gemma4:12b",
+    )
+
+    fake_client = AsyncMock()
+    await _maybe_replay_conversation(
+        fake_client, tmp_path, "ollama", "llama3.1", "coding"
+    )
+
+    fake_client.resume.assert_awaited_once()
+    history_arg = fake_client.resume.await_args.args[0]
+    assert [block.text for m in history_arg for block in m.content] == [
+        "src/app.py is wired"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_replay_never_carries_one_phase_into_another(tmp_path: Path) -> None:
+    """A per-phase model configuration runs coding on a model the planner never
+    used. Inheriting by recency alone would replay the planner's whole
+    reasoning into every such coder session."""
+    from agents.session import _maybe_replay_conversation
+
+    for m in [
+        AgentMessage(
+            role=MessageRole.ASSISTANT,
+            content=[ContentBlock(type=ContentBlockType.TEXT, text="the plan is")],
+        )
+    ]:
+        append_message(
+            tmp_path, m, phase="planning", provider="ollama", model="gemma4:12b"
+        )
+
+    fake_client = AsyncMock()
+    await _maybe_replay_conversation(
+        fake_client, tmp_path, "ollama", "llama3.1", "coding"
+    )
     fake_client.resume.assert_not_called()
 
 

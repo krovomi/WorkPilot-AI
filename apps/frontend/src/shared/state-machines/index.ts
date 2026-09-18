@@ -3,6 +3,7 @@ export { taskMachine } from "./task-machine";
 export type { TaskStateName } from "./task-state-utils";
 export {
 	mapStateToLegacy,
+	relaunchEventFor,
 	TASK_STATE_NAMES,
 	XSTATE_SETTLED_STATES,
 	XSTATE_TO_PHASE,
