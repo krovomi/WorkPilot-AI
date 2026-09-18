@@ -41,6 +41,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Le pourcentage d'une tâche](#le-pourcentage-dune-tâche-sharedprogressts)
   - [Architectures et historique de construction](#architectures-et-historique-de-construction-visual-to-code)
   - [Provider × LLM × effort, par page](#provider--llm--effort-par-page-sharedutilspage-llmts)
+  - [L'adresse qu'ouvre l'émulateur](#ladresse-quouvre-lémulateur-sharedutilsemulator-landingts)
   - [Agent Management](#agent-management)
   - [Claude Profile System](#claude-profile-system)
   - [Terminal System](#terminal-system)
@@ -1814,6 +1815,69 @@ correction : sur le rendu où le document actif change, le miroir s'exécute ave
 le *nouvel* id et les *anciens* blocs. Une ref posée par le chargeur dans le
 même commit se lirait déjà à jour, et le miroir écrirait les blocs d'un
 document dans un autre.
+
+### L'adresse qu'ouvre l'émulateur (`shared/utils/emulator-landing.ts`)
+
+L'aperçu ouvrait la racine du serveur. C'est la bonne réponse pour un site et la
+mauvaise pour tout le reste : une Web API .NET répond 404 sur `/`, et la page que
+la tâche vient d'écrire est trois segments plus loin. L'utilisateur voyait donc,
+pour une fonctionnalité qui marche, un cadre vide et « HTTP 404 ».
+
+Le diff de la tâche dit précisément quelle route a été touchée. C'est une preuve
+mesurée, pas une convention devinée, et ce module est le seul endroit qui la lit
+— ni modèle ni réseau, seulement des chemins et des lignes ajoutées, si bien que
+l'UI peut poser la question avant d'avoir démarré quoi que ce soit.
+
+`deriveLandingCandidates` rend *toutes* les adresses plausibles, la plus probable
+d'abord, dans l'ordre de la force de la preuve :
+
+| Rang | Source | Ce qui la produit |
+|---|---|---|
+| 1 | `route-declaration` | `[Route("api/[controller]")]`, `app.MapGet`, `@Controller`, `<Route path>`, `@app.get`, `@RequestMapping`… lus dans les **lignes ajoutées** du patch |
+| 2 | `file-route` | une page créée par convention : `app/x/page.tsx`, `pages/x.vue`, `src/routes/x/+page.svelte`, `app/routes/x.new.tsx` |
+| 3 | `launch-profile` | le `launchUrl` que le projet déclare dans `Properties/launchSettings.json` |
+| 4 | `api-docs` | la page d'accueil du framework : `/swagger`, `/docs`, `/api` |
+
+Rendre la liste plutôt que la seule réponse est ce qui permet au panneau d'échec
+de proposer les autres : un 404 sur la première devient un bouton vers la
+deuxième, pas un cul-de-sac.
+
+**Un segment dynamique arrête la route.** `api/users/{id}/roles` devient
+`/api/users` : la liste existe presque toujours, l'identifiant non, et inventer
+un `id` produirait un 404 en prétendant l'éviter. `[controller]` fait exception —
+c'est un jeton à substituer, pas un paramètre, et son nom vient de la classe que
+le patch déclare, sinon du fichier, parce qu'ASP.NET *impose* que
+`DocumentsController` vive dans `DocumentsController.cs`.
+
+**Un motif trop courant est réservé aux fichiers de routes.** `path:` est une clé
+de configuration autant qu'une route Angular ; `deriveLandingCandidates` ne la
+lit que dans un fichier dont le nom le dit (`*routes*`, `*router*`, `urls.py`,
+`*-routing.*`). Sans cette règle, un `{ path: 'dist/assets' }` de build devenait
+l'adresse proposée à l'utilisateur.
+
+**La barre d'adresse est une vraie barre d'adresse.** `ResponsivePreview` porte
+Précédent / Suivant / Recharger / Accueil et un champ éditable :
+`resolveAddressInput` résout ce qui est tapé contre le serveur de l'émulateur. Le
+défaut est *relatif* — dans cette barre on tape « /swagger » cent fois pour une
+fois où l'on tape un hôte — et un hôte n'est reconnu que quand il se nomme (un
+point, un port, ou `localhost`). Tout ce qui n'est pas http(s) est refusé avec un
+message : un `file://` chargé dans l'aperçu serait une navigation que personne
+n'a demandée.
+
+La navigation passe par `loadURL`, jamais par un changement de `key` : remonter
+le `<webview>` perdrait l'historique, et l'historique est ce que lisent les deux
+boutons. `src` reste le repli — c'est tout ce dont dispose un environnement de
+test, et c'est aussi ce qui fait la première navigation.
+
+**« Ouvrir dans le navigateur » ouvre ce qui est affiché**, pas la racine du
+serveur : après une navigation dans l'aperçu les deux ne sont plus la même page,
+et sur une Web API la racine est précisément celle qui répond 404. Côté main,
+`open-external.ts` est le seul chemin : il valide le schéma, appelle
+`shell.openExternal`, et **sur Linux seulement** essaie ensuite les lanceurs que
+la machine a vraiment (`xdg-open`, `gio open`, `x-www-browser`…) — Electron y
+rejette quand `xdg-utils` manque ou que le portail XDG n'est pas joignable. Le
+rejet remonte jusqu'au renderer, qui l'affiche : un bouton qui ne fait rien et ne
+dit rien est la pire des deux options, et c'est ce que l'utilisateur voyait.
 
 ### Provider × LLM × effort, par page (`shared/utils/page-llm.ts`)
 
