@@ -17,6 +17,7 @@ import {
 	Package,
 	Palette,
 	Save,
+	Search,
 	Settings,
 	Settings2,
 	Shield,
@@ -26,9 +27,10 @@ import {
 	UserPlus,
 	Users,
 	Workflow,
+	X,
 	Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSettings } from "@shared/types/settings";
 import type { UseProjectSettingsReturn } from "@/components/project-settings";
@@ -63,6 +65,7 @@ import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
 import { SandboxSettings } from "./SandboxSettings";
 import { SchedulerSettings } from "./SchedulerSettings";
+import { filterSettingsThemes } from "./settings-search";
 import { SwarmModeSettings } from "./SwarmModeSettings";
 import { ThemeSettings } from "./ThemeSettings";
 
@@ -397,6 +400,9 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	const [projectSection, setProjectSection] =
 		useState<ProjectSettingsSection>("general");
 	const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [isSearchOpen, setIsSearchOpen] = useState(false);
+	const searchInputRef = useRef<HTMLInputElement>(null);
 	const [collapsedThemes, setCollapsedThemes] = useState<Set<SettingsTheme>>(
 		new Set(),
 	);
@@ -647,6 +653,23 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		);
 	};
 
+	// Une recherche ne survit pas à la fermeture du dialogue : le filtre décrit
+	// ce qu'on cherchait à cet instant, pas un réglage de la navigation.
+	useEffect(() => {
+		if (!open) {
+			setSearchQuery("");
+			setIsSearchOpen(false);
+		}
+	}, [open]);
+
+	const closeSearch = useCallback(() => {
+		setSearchQuery("");
+		setIsSearchOpen(false);
+	}, []);
+
+	const isSearching = searchQuery.trim().length > 0;
+	const filteredThemes = filterSettingsThemes(SETTINGS_THEMES, searchQuery);
+
 	// Correction : on force le dialog à s'ouvrir si forceDialogOpen est true
 	const dialogOpen = typeof open === "boolean" ? open : false;
 
@@ -662,7 +685,23 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				onOpenChange(newOpen);
 			}}
 		>
-			<FullScreenDialogContent>
+			<FullScreenDialogContent
+				onEscapeKeyDown={(event) => {
+					// Échap vide d'abord le filtre, et ne ferme les paramètres
+					// qu'ensuite. Radix écoute le clavier en phase de capture,
+					// sur le document : c'est le seul endroit d'où la touche
+					// peut lui être reprise. Et seulement quand le champ a le
+					// focus — Échap depuis un formulaire de réglages ferme le
+					// dialogue, comme partout ailleurs.
+					if (
+						isSearchOpen &&
+						document.activeElement === searchInputRef.current
+					) {
+						event.preventDefault();
+						closeSearch();
+					}
+				}}
+			>
 				<FullScreenDialogHeader>
 					<FullScreenDialogTitle className="flex items-center gap-3">
 						<Settings className="h-6 w-6" />
@@ -683,28 +722,112 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 						>
 							<ScrollArea className="h-full">
 								<div className="space-y-4">
-									{/* Toggle button */}
-									<button
-										type="button"
-										onClick={() =>
-											setIsNavigationCollapsed(!isNavigationCollapsed)
-										}
+									{/* Toggle + barre de filtre */}
+									<div
 										className={cn(
-											"w-full flex items-center justify-center p-2 rounded-lg transition-all",
-											"hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+											"flex items-center gap-1",
+											isNavigationCollapsed
+												? "justify-center"
+												: "justify-end",
 										)}
 									>
-										<ChevronRight
+										{/* Filtre — uniquement quand la navigation est dépliée :
+										    repliée, elle n'affiche plus les libellés sur
+										    lesquels le filtre porte. */}
+										{!isNavigationCollapsed && (
+											<div
+												className={cn(
+													"flex items-center overflow-hidden rounded-md transition-all duration-300 ease-in-out",
+													isSearchOpen
+														? "flex-1 bg-muted/50 border border-border"
+														: "flex-none",
+												)}
+											>
+												{isSearchOpen ? (
+													<div className="relative flex items-center w-full">
+														<Search className="absolute left-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+														<input
+															ref={searchInputRef}
+															type="text"
+															value={searchQuery}
+															onChange={(e) =>
+																setSearchQuery(e.target.value)
+															}
+															onBlur={() => {
+																if (!searchQuery.trim()) {
+																	setIsSearchOpen(false);
+																}
+															}}
+															placeholder={t("search.placeholder")}
+															aria-label={t("search.placeholder")}
+															className="w-full bg-transparent pl-7 pr-7 py-1 text-sm placeholder:text-muted-foreground/60 focus:outline-none"
+														/>
+														{searchQuery && (
+															<button
+																type="button"
+																onMouseDown={(e) => e.preventDefault()}
+																onClick={() => {
+																	setSearchQuery("");
+																	searchInputRef.current?.focus();
+																}}
+																className="absolute right-1.5 text-muted-foreground hover:text-foreground transition-colors"
+																aria-label={t("search.clear")}
+															>
+																<X className="h-3.5 w-3.5" />
+															</button>
+														)}
+													</div>
+												) : (
+													<button
+														type="button"
+														onClick={() => {
+															setIsSearchOpen(true);
+															requestAnimationFrame(() =>
+																searchInputRef.current?.focus(),
+															);
+														}}
+														title={t("search.placeholder")}
+														aria-label={t("search.placeholder")}
+														className={cn(
+															"flex items-center justify-center p-2 rounded-lg transition-all",
+															"hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+														)}
+													>
+														<Search className="h-4 w-4" />
+													</button>
+												)}
+											</div>
+										)}
+
+										<button
+											type="button"
+											onClick={() => {
+												// Replier masque les libellés : garder le filtre
+												// actif cacherait des sections sans rien qui
+												// l'explique.
+												if (!isNavigationCollapsed) closeSearch();
+												setIsNavigationCollapsed(!isNavigationCollapsed);
+											}}
 											className={cn(
-												"h-4 w-4 transition-transform duration-300",
-												isNavigationCollapsed ? "rotate-0" : "rotate-180",
+												"flex items-center justify-center p-2 rounded-lg transition-all",
+												"hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+												isNavigationCollapsed ? "w-full" : "shrink-0",
 											)}
-										/>
-									</button>
+										>
+											<ChevronRight
+												className={cn(
+													"h-4 w-4 transition-transform duration-300",
+													isNavigationCollapsed ? "rotate-0" : "rotate-180",
+												)}
+											/>
+										</button>
+									</div>
 
 									{/* Getting started — opens the guided Setup Hub. Sits at the
-									    very top so the configuration flow reads top-to-bottom. */}
-									{onOpenSetupHub && (
+									    very top so the configuration flow reads top-to-bottom.
+									    Retiré pendant un filtrage : ce n'est pas un résultat, et
+									    le laisser rendrait « aucun paramètre trouvé » ambigu. */}
+									{onOpenSetupHub && !isSearching && (
 										<button
 											type="button"
 											onClick={() => {
@@ -735,8 +858,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 									)}
 
 									{/* Thematic Navigation */}
-									{Object.entries(SETTINGS_THEMES)
-										.sort(([, a], [, b]) => a.priority - b.priority)
+									{filteredThemes
 										.map(([themeKey, theme]) => {
 											const Icon = theme.icon;
 											const isThemeActive = theme.sections.some((section) => {
@@ -822,9 +944,10 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 																<ChevronRight
 																	className={cn(
 																		"h-3 w-3 transition-transform duration-200",
-																		collapsedThemes.has(
-																			themeKey as SettingsTheme,
-																		)
+																		!isSearching &&
+																			collapsedThemes.has(
+																				themeKey as SettingsTheme,
+																			)
 																			? "rotate-0"
 																			: "rotate-90",
 																	)}
@@ -836,9 +959,15 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 														</div>
 													)}
 
-													{/* Theme Sections - seulement si non replié ET thème non replié */}
+													{/* Theme Sections — visibles si la navigation est
+													    dépliée et que le thème l'est aussi. Une
+													    recherche en cours déplie : masquer ce qu'elle
+													    vient de trouver n'aurait aucun sens. */}
 													{!isNavigationCollapsed &&
-														!collapsedThemes.has(themeKey as SettingsTheme) && (
+														(isSearching ||
+															!collapsedThemes.has(
+																themeKey as SettingsTheme,
+															)) && (
 															<div className="space-y-1 ml-2">
 																{theme.sections.map((section) => {
 																	const SectionIcon = section.icon;
@@ -905,8 +1034,17 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 											);
 										})}
 
-									{/* Re-run Wizard button - seulement si non replié */}
-									{!isNavigationCollapsed && onRerunWizard && (
+									{isSearching &&
+										!isNavigationCollapsed &&
+										filteredThemes.length === 0 && (
+											<div className="px-3 py-6 text-center text-xs text-muted-foreground">
+												{t("search.noResults")}
+											</div>
+										)}
+
+									{/* Re-run Wizard button - seulement si non replié, et
+									    hors filtrage, pour la même raison que le Setup Hub */}
+									{!isNavigationCollapsed && !isSearching && onRerunWizard && (
 										<div className="pt-4 border-t border-border">
 											<button
 												type="button"
