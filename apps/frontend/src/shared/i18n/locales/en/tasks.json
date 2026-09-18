@@ -996,8 +996,6 @@
 			"providerSwitch": "Switch LLM while running",
 			"providerSwitchDesc": "Hot override: pauses the task after the current step finishes, then resumes it with a different LLM. For steps that haven't started, use the per-phase LLM selectors above instead.",
 			"providerSwitchPaused": "Task is paused",
-			"customModelId": "Model ID",
-			"customModelIdPlaceholder": "Enter the exact model ID",
 			"providerSwitchPausedDesc": "Choose a provider, model and effort level, then resume the task.",
 			"pauseToSwitch": "Pause and switch LLM",
 			"pauseToSwitchShort": "Pause & switch",

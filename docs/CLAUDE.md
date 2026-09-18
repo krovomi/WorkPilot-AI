@@ -1502,6 +1502,60 @@ completed subtasks, the spec and the QA sign-off stay as they are. Only an
 explicit "re-run this phase" discards work, and only downstream of the phase
 asked for (`plan-rerun-utils.ts`).
 
+**Resuming continues the phase; it does not pay for it twice.** State-driven
+entry answers *which* phase re-opens, and nothing more: the phase itself
+re-opened with an empty head, re-read the same files and re-derived the same
+analysis the interrupted session had already done. Two channels carry it
+across now, one per half of the product. `TASK_RESUME` hands the subprocess the
+session id in `<spec_dir>/.session.json`, so the Claude SDK rehydrates that
+transcript (single-shot — `create_client` pops the variable, so only the first
+session of the resumed run replays it). For every other provider it is
+`conversation.<provider>-<model>.jsonl`, which `_maybe_replay_conversation`
+already replayed on every session start.
+
+**A model that is new to a phase inherits it.** The conversation log is
+per-(provider, model) on purpose — switch away and back, and a model resumes
+its own context. On the switch itself that property is exactly wrong: the model
+the user just chose has no log, nothing is replayed, and the phase restarts from
+the prompt, which is the opposite of what the Pause button promised.
+`read_log_for_phase_resume` gives a model with no log of its own the **same
+phase's** tail (`MAX_CARRYOVER_MESSAGES`) from whichever model last wrote one,
+and writes it into the new model's log — a takeover, not an alias, so from the
+next session on that model reads its own file like every other.
+
+The phase is the whole guard, and it is not a detail: a per-phase model
+configuration legitimately runs coding on a model the planner never used.
+Inheriting by recency alone would replay the planner's entire reasoning into
+every such coding session, on every build that names two models. An archived log
+(`.too-long.`, `.trimmed.`, `.archived.`) is never inherited either — a
+prompt-too-long halt archives precisely so the next run does not replay it, and
+reading it back through the carry-over would fail the run the same way.
+
+**A relaunch is owed an event.** `TASK_START` tells the machine it is starting
+(`determineStartEvent`); resuming told it nothing, and a machine left settled in
+`human_review`/`error` keeps the review reason and the failure message that go
+with it — so the red "this task failed" banner stayed at the top of a task that
+was visibly running again, quoting the run it had replaced. `relaunchEventFor`
+is the one answer to what the two resume paths owe it, and the sequence counter
+is reset in the same breath: a restarted backend numbers its events from zero,
+and `isNewSequence` drops anything below the last number it saw, so without it
+the resumed run's phases reached nobody at all.
+
+**Pause and Reprendre belong to the run, not to the column.** A paused task
+keeps the status it was paused in — often `human_review`, once a phase reported
+a failure — and the task panel's action bar was keyed on status, so the one
+screen that owns the provider/model/effort switch was the one screen that could
+not simply resume. `TaskRunControls` is now answered from the pause flag first,
+before any status branch, which is how the kanban card had always decided it.
+
+**And the model it resumes with is picked, never typed.** The panel's
+"Autre (catalogue officiel)" row is a door, not a model: it opens
+`OfficialModelSearch` over the provider's own library, which is the same thing
+the per-phase selector does and for the same reason. A free-text field accepts
+`gemma4:12b-it-q4_K_M` whether or not anything published it, and the only
+symptom is the resume failing on `pull model manifest: file does not exist` —
+after the restart, under a name the user has no way to check.
+
 **A phase that gives up says so.** `PLANNING_FAILED` and `CODING_FAILED` were in
 the XState machine from the start and emitted by nobody: every real failure
 reached the frontend as a process exit, and the machine's `setError` did not
