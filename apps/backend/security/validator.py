@@ -28,6 +28,12 @@ from .database_validators import (
     validate_psql_command,
     validate_redis_cli_command,
 )
+from .exec_validators import (
+    validate_eval_command,
+    validate_find_command,
+    validate_source_command,
+    validate_tar_command,
+)
 from .filesystem_validators import (
     validate_chmod_command,
     validate_init_script,
@@ -72,6 +78,11 @@ __all__ = [
     "validate_git_commit",
     "validate_git_command",
     "validate_git_config",
+    # Exec validators
+    "validate_eval_command",
+    "validate_find_command",
+    "validate_source_command",
+    "validate_tar_command",
     # Shell validators
     "validate_shell_c_command",
     "validate_bash_command",

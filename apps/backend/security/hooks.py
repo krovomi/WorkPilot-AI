@@ -10,16 +10,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from project_analyzer import BASE_COMMANDS, SecurityProfile, is_command_allowed
+from project_analyzer import BASE_COMMANDS, SecurityProfile
 
-from .parser import (
-    extract_commands,
-    get_command_for_validation,
-    split_command_segments,
-    unwrap_rtk_prefixes,
-)
+from .command_guard import validate_command_line
 from .profile import get_security_profile
-from .validator import VALIDATORS
 
 
 async def bash_security_hook(
@@ -102,58 +96,15 @@ async def bash_security_hook(
         profile = SecurityProfile()
         profile.base_commands = BASE_COMMANDS.copy()
 
-    # Extract all commands from the command string
-    commands = extract_commands(command)
-
-    if not commands:
-        # Could not parse - fail safe by blocking
+    allowed, reason = validate_command_line(command, profile)
+    if not allowed:
         return {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny",
-                "permissionDecisionReason": f"Could not parse command for security validation: {command}",
+                "permissionDecisionReason": reason,
             }
         }
-
-    # Split into segments for per-command validation
-    segments = split_command_segments(command)
-
-    # Get all allowed commands
-    allowed = profile.get_all_allowed_commands()
-
-    # Check each command against the allowlist
-    for cmd in commands:
-        # Check if command is allowed
-        is_allowed, reason = is_command_allowed(cmd, profile)
-
-        if not is_allowed:
-            return {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": reason,
-                }
-            }
-
-        # Additional validation for sensitive commands
-        if cmd in VALIDATORS:
-            cmd_segment = get_command_for_validation(cmd, segments)
-            if not cmd_segment:
-                # Unwrapped for the same reason the segment is: a validator
-                # reads the first token to decide whether the command is its
-                # business, and `rtk` is nobody's business.
-                cmd_segment = unwrap_rtk_prefixes(command)
-
-            validator = VALIDATORS[cmd]
-            allowed, reason = validator(cmd_segment)
-            if not allowed:
-                return {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PreToolUse",
-                        "permissionDecision": "deny",
-                        "permissionDecisionReason": reason,
-                    }
-                }
 
     return {}
 
@@ -164,6 +115,11 @@ def validate_command(
 ) -> tuple[bool, str]:
     """
     Validate a command string (for testing/debugging).
+
+    Answers from `validate_command_line`, the same function the hook uses.
+    This used to be a second copy of the logic, and the copies had already
+    drifted: on a command with no matching segment the hook handed the
+    validator the unwrapped line and this handed it the raw one.
 
     Args:
         command: Full command string to validate
@@ -176,26 +132,4 @@ def validate_command(
         project_dir = Path.cwd()
 
     profile = get_security_profile(project_dir)
-    commands = extract_commands(command)
-
-    if not commands:
-        return False, "Could not parse command"
-
-    segments = split_command_segments(command)
-
-    for cmd in commands:
-        is_allowed_result, reason = is_command_allowed(cmd, profile)
-        if not is_allowed_result:
-            return False, reason
-
-        if cmd in VALIDATORS:
-            cmd_segment = get_command_for_validation(cmd, segments)
-            if not cmd_segment:
-                cmd_segment = command
-
-            validator = VALIDATORS[cmd]
-            allowed, reason = validator(cmd_segment)
-            if not allowed:
-                return False, reason
-
-    return True, ""
+    return validate_command_line(command, profile)

