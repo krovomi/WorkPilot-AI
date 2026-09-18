@@ -21,6 +21,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "backend"))
 
+import security.path_guard as path_guard  # noqa: E402
 from security.path_guard import (  # noqa: E402
     GUARDED_WRITE_TOOLS,
     make_write_path_hook,
@@ -159,6 +160,10 @@ class TestRootResolution:
     ):
         """A wiring mistake must not look like an attack on every write."""
         monkeypatch.delenv("WORKPILOT_WRITE_ROOTS", raising=False)
-        monkeypatch.setattr("security.path_guard.resolve_write_roots", lambda *_: [])
+        # By module object, not by dotted string — see the note in
+        # test_security_command_guard.py: under `--import-mode=importlib` a
+        # string target can resolve through a placeholder `security` module
+        # that pytest itself created.
+        monkeypatch.setattr(path_guard, "resolve_write_roots", lambda *_: [])
         hook = make_write_path_hook(None, None)
         assert call(hook, "Write", {"file_path": "/etc/passwd"}) == {}

@@ -22,6 +22,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "backend"))
 
+import security.exec_validators as exec_validators  # noqa: E402
+import security.profile as profile_module  # noqa: E402
 from project_analyzer import BASE_COMMANDS, SecurityProfile  # noqa: E402
 from security.command_guard import (  # noqa: E402
     MAX_SUBSTITUTION_DEPTH,
@@ -52,13 +54,18 @@ def profile(tmp_path, monkeypatch) -> SecurityProfile:
     # The validators that re-enter the guard resolve the profile themselves,
     # from the directory the env var names. Pointing the cache at the same
     # empty directory keeps the two answers identical.
-    import security.profile as profile_module
-
+    #
+    # Patched by module **object**, never by dotted string. Under
+    # `--import-mode=importlib` — which `apps/backend/pytest.ini` sets, and
+    # whose comment warns about exactly this — pytest's `insert_missing_modules`
+    # can put an empty placeholder named `security` into `sys.modules`. A
+    # string target resolves through that placeholder and raises
+    # `'module' object at security.exec_validators has no attribute
+    # 'exec_validators'`; the reference this module already holds cannot be
+    # the wrong one.
     profile_module.reset_profile_cache()
     monkeypatch.setattr(profile_module, "resolve_active_profile", lambda: built)
-    monkeypatch.setattr(
-        "security.exec_validators.resolve_active_profile", lambda: built
-    )
+    monkeypatch.setattr(exec_validators, "resolve_active_profile", lambda: built)
     return built
 
 
@@ -210,6 +217,38 @@ class TestValidatorsAnswerOnlyForTheirOwnCommand:
 
     def test_tar_validator_ignores_a_line_that_is_not_tar(self):
         assert validate_tar_command("git status") == (True, "")
+
+
+class TestTheFixturesThemselves:
+    """The guard on how these tests patch, not on what they assert.
+
+    `apps/backend/pytest.ini` runs with `--import-mode=importlib`, and its own
+    comment explains the hazard: one module reached by two paths exists twice,
+    and a monkeypatch then applies to the copy the test is not looking at.
+    pytest's `insert_missing_modules` can also leave an empty placeholder named
+    `security` in `sys.modules`, and a dotted-string patch target resolves
+    through it — which is how
+
+        AttributeError: 'module' object at security.exec_validators
+                        has no attribute 'exec_validators'
+
+    reached CI from a fixture that passed on every developer machine. A module
+    object the test file imported itself cannot be the wrong one.
+    """
+
+    def test_no_patch_target_in_these_files_is_a_dotted_string(self):
+        # Built rather than written out, so the check does not match the
+        # literal in its own source.
+        needles = ["monkeypatch.setattr" + quote for quote in ('("', "('")]
+        here = Path(__file__).resolve().parent
+
+        offenders = []
+        for path in sorted(here.glob("test_security_*.py")):
+            body = path.read_text(encoding="utf-8")
+            if any(needle in body for needle in needles):
+                offenders.append(path.name)
+
+        assert offenders == []
 
 
 class TestUnparseableInputFailsClosed:
