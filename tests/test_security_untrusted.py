@@ -106,7 +106,8 @@ class TestTheLedger:
         cleaned = clean_untrusted(HIDDEN, kind="issue_body")
         record_untrusted(tmp_path, cleaned, source="github:issue#12")
 
-        lines = (tmp_path / LEDGER_FILENAME).read_text().strip().split("\n")
+        ledger = (tmp_path / LEDGER_FILENAME).read_text(encoding="utf-8")
+        lines = ledger.strip().split("\n")
         entry = json.loads(lines[0])
         assert entry["source"] == "github:issue#12"
         assert entry["kind"] == "issue_body"
