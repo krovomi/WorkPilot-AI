@@ -118,9 +118,23 @@ it("keeps the downloaded phase model and sends its exact ID when resuming", asyn
 	);
 });
 
-it("names the paused task and requires a real custom model before resuming", async () => {
+it("names the paused task and takes its model from the official library", async () => {
 	const resume = vi.fn().mockResolvedValue({ success: true });
 	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal(
+		"fetch",
+		vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				models: [
+					{
+						value: "gemma4:12b",
+						source: "https://ollama.com/library/gemma4:12b",
+					},
+				],
+			}),
+		}),
+	);
 	const task = {
 		id: "custom-task",
 		title: "Repair checkout",
@@ -128,17 +142,25 @@ it("names the paused task and requires a real custom model before resuming", asy
 	} as Task;
 	renderControls({ task, isPaused: true, isRunning: false });
 	expect(screen.getByText("Repair checkout")).toBeInTheDocument();
-	const input = await screen.findByRole("textbox", { name: "Model ID" });
+
+	// The sentinel is not a model, so resuming on it is refused — and the
+	// library search opens on its own rather than leaving the task stuck on a
+	// row it cannot resume from.
 	const button = screen.getByRole("button", { name: /resume with this llm/i });
 	expect(button).toBeDisabled();
-	fireEvent.change(input, { target: { value: "  gemma4:my-local-tag  " } });
+	// Nothing is typed: the id can only come from the library listing.
+	expect(screen.queryByRole("textbox", { name: "Model ID" })).toBeNull();
+
+	const option = await screen.findByRole("option", { name: "gemma4:12b" });
+	fireEvent.click(option);
+
 	await waitFor(() => expect(button).toBeEnabled());
 	fireEvent.click(button);
 	await waitFor(() =>
 		expect(resume).toHaveBeenCalledWith(
 			"custom-task",
 			"ollama",
-			"gemma4:my-local-tag",
+			"gemma4:12b",
 			"medium",
 		),
 	);

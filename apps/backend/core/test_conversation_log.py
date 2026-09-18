@@ -319,3 +319,122 @@ def test_append_swallows_io_errors(tmp_path: Path) -> None:
         provider=_PROV,
         model=_MODEL,
     )  # no exception == pass
+
+
+def test_a_new_model_inherits_the_same_phase_from_the_one_it_replaces(
+    tmp_path: Path,
+) -> None:
+    """Pause, switch LLM, resume: the phase continues instead of restarting.
+
+    This is the whole point of the carry-over. Without it the new model's log
+    does not exist, nothing is replayed, and the coder re-derives from the
+    prompt everything the paused session had already worked out.
+    """
+    from core.conversation_log import (
+        append_message,
+        conversation_log_path,
+        read_log_for_phase_resume,
+    )
+
+    append_message(
+        tmp_path,
+        _msg("assistant", [{"type": "text", "text": "I read src/app.py"}]),
+        phase="coding",
+        provider="ollama",
+        model="gemma4:12b",
+    )
+
+    inherited = read_log_for_phase_resume(tmp_path, "ollama", "qwen2.5-coder", "coding")
+
+    assert [b["text"] for e in inherited for b in e["content"]] == ["I read src/app.py"]
+    # Taken over, not aliased: from here on the new model reads its own file.
+    assert conversation_log_path(tmp_path, "ollama", "qwen2.5-coder").exists()
+    assert (
+        read_log_for_phase_resume(tmp_path, "ollama", "qwen2.5-coder", "coding")
+        == inherited
+    )
+
+
+def test_a_phase_never_inherits_another_phase(tmp_path: Path) -> None:
+    """The phase is the guard that makes the carry-over safe.
+
+    A per-phase model configuration legitimately runs coding on a model the
+    planner never used. Inheriting by recency alone would replay the planner's
+    whole reasoning into the coder, on every build that names two models.
+    """
+    from core.conversation_log import append_message, read_log_for_phase_resume
+
+    append_message(
+        tmp_path,
+        _msg("assistant", [{"type": "text", "text": "The plan has 3 subtasks"}]),
+        phase="planning",
+        provider="ollama",
+        model="gemma4:12b",
+    )
+
+    assert (
+        read_log_for_phase_resume(tmp_path, "ollama", "qwen2.5-coder", "coding") == []
+    )
+
+
+def test_a_model_with_its_own_history_inherits_nothing(tmp_path: Path) -> None:
+    """Switch away and back and a model resumes its own context, unchanged."""
+    from core.conversation_log import append_message, read_log_for_phase_resume
+
+    for model, text in (("gemma4:12b", "gemma said"), ("qwen2.5-coder", "qwen said")):
+        append_message(
+            tmp_path,
+            _msg("assistant", [{"type": "text", "text": text}]),
+            phase="coding",
+            provider="ollama",
+            model=model,
+        )
+
+    entries = read_log_for_phase_resume(tmp_path, "ollama", "qwen2.5-coder", "coding")
+    assert [b["text"] for e in entries for b in e["content"]] == ["qwen said"]
+
+
+def test_archived_logs_are_never_inherited(tmp_path: Path) -> None:
+    """A prompt-too-long halt archives every log precisely so the next run does
+    not replay them. Reading them back through the carry-over would undo that
+    and fail the run the same way."""
+    from core.conversation_log import (
+        append_message,
+        archive_all_logs,
+        read_log_for_phase_resume,
+    )
+
+    append_message(
+        tmp_path,
+        _msg("assistant", [{"type": "text", "text": "a very long transcript"}]),
+        phase="coding",
+        provider="ollama",
+        model="gemma4:12b",
+    )
+    archive_all_logs(tmp_path, "too-long")
+
+    assert (
+        read_log_for_phase_resume(tmp_path, "ollama", "qwen2.5-coder", "coding") == []
+    )
+
+
+def test_carry_over_is_capped(tmp_path: Path) -> None:
+    """A long build hands over its tail, not its whole history."""
+    from core.conversation_log import (
+        MAX_CARRYOVER_MESSAGES,
+        append_message,
+        read_log_for_phase_resume,
+    )
+
+    for i in range(MAX_CARRYOVER_MESSAGES + 25):
+        append_message(
+            tmp_path,
+            _msg("assistant", [{"type": "text", "text": f"turn {i}"}]),
+            phase="coding",
+            provider="ollama",
+            model="gemma4:12b",
+        )
+
+    entries = read_log_for_phase_resume(tmp_path, "ollama", "qwen2.5-coder", "coding")
+    assert len(entries) == MAX_CARRYOVER_MESSAGES
+    assert entries[-1]["content"][0]["text"] == f"turn {MAX_CARRYOVER_MESSAGES + 24}"

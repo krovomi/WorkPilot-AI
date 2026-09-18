@@ -14,8 +14,8 @@ import { getStaticProviders } from "../../../shared/utils/providers";
 import { debugError } from "../../../shared/utils/debug-logger";
 import { useToast } from "../../hooks/use-toast";
 import { useSettingsStore } from "../../stores/settings-store";
-import { Input } from "../ui/input";
 import { Button } from "../ui/button";
+import { OfficialModelSearch } from "./OfficialModelSearch";
 import {
 	Select,
 	SelectContent,
@@ -78,10 +78,20 @@ export function TaskPauseControls({
 		"";
 	const [selectedProvider, setSelectedProvider] = useState(initialProvider);
 	const [selectedModel, setSelectedModel] = useState(initialModel);
-	const [customModel, setCustomModel] = useState("");
-	const resumeModel = (
-		isCustomModelSentinel(selectedModel) ? customModel : selectedModel
-	).trim();
+	// "Autre (catalogue officiel)" opens the library search, exactly as the
+	// per-phase selector does. It never becomes the model itself: the sentinel
+	// is a row in the catalogue, and forwarding it asks the server to pull an
+	// image literally called "custom".
+	const [searchingModel, setSearchingModel] = useState(false);
+	const resumeModel = selectedModel.trim();
+	// A task already saved with the sentinel opens the search on its own: the
+	// row is already the Select's value, so re-picking it fires no change and
+	// there would be no way out of the state the old free-text field left
+	// behind. Same escape hatch as the per-phase selector.
+	const stuckOnSentinel = isCustomModelSentinel(selectedModel);
+	useEffect(() => {
+		if (stuckOnSentinel) setSearchingModel(true);
+	}, [stuckOnSentinel]);
 	// Reasoning "effort" applied to the resumed run. Seed it from the task's
 	// current single thinking level, falling back to the coding phase's per-phase
 	// level, then a sensible default.
@@ -102,7 +112,7 @@ export function TaskPauseControls({
 			previousSelectionKey.current = selectionKey;
 			setSelectedProvider(initialProvider);
 			setSelectedModel(initialModel);
-			setCustomModel("");
+			setSearchingModel(false);
 		}
 	}, [selectionKey, initialProvider, initialModel]);
 
@@ -344,7 +354,7 @@ export function TaskPauseControls({
 									onValueChange={(provider) => {
 										setSelectedProvider(provider);
 										setSelectedModel("");
-										setCustomModel("");
+										setSearchingModel(false);
 									}}
 								>
 									<SelectTrigger className="h-8">
@@ -365,7 +375,21 @@ export function TaskPauseControls({
 									<div className="text-xs font-medium text-muted-foreground">
 										{t("tasks:modal.actions.chooseModel", "Modèle")}
 									</div>
-									<Select value={modelValue} onValueChange={setSelectedModel}>
+									<Select
+										value={modelValue}
+										onValueChange={(value) => {
+											// The sentinel row is a door, not a model: it opens
+											// the official library so the id that lands here is
+											// one a server can actually serve. Typed free-hand,
+											// it was how a resume asked Ollama for a model
+											// nobody ever published.
+											if (isCustomModelSentinel(value)) {
+												setSearchingModel(true);
+												return;
+											}
+											setSelectedModel(value);
+										}}
+									>
 										<SelectTrigger className="h-8">
 											<SelectValue />
 										</SelectTrigger>
@@ -379,15 +403,13 @@ export function TaskPauseControls({
 											))}
 										</SelectContent>
 									</Select>
-									{isCustomModelSentinel(selectedModel) && (
-										<Input
-											aria-label={t("tasks:modal.actions.customModelId")}
-											placeholder={t(
-												"tasks:modal.actions.customModelIdPlaceholder",
-											)}
-											value={customModel}
-											onChange={(event) => setCustomModel(event.target.value)}
-											disabled={isResuming}
+									{searchingModel && (
+										<OfficialModelSearch
+											onClose={() => setSearchingModel(false)}
+											onSelect={(value) => {
+												setSearchingModel(false);
+												setSelectedModel(value);
+											}}
 										/>
 									)}
 								</div>

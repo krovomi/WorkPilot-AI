@@ -5,7 +5,8 @@
  * derived from the task machine definition. Used by task-state-manager and
  * agent-events-handlers to avoid duplicate constants.
  */
-import type { ExecutionPhase, ReviewReason, TaskStatus } from "../types";
+import type { ExecutionPhase, ReviewReason, Task, TaskStatus } from "../types";
+import type { TaskEvent } from "./task-machine";
 
 /**
  * All XState task state names.
@@ -104,4 +105,44 @@ export function mapStateToLegacy(
 		default:
 			return { status: "backlog" };
 	}
+}
+
+
+/**
+ * The event a relaunch owes the machine, or null when it owes it nothing.
+ *
+ * Starting a task says so (`determineStartEvent`); resuming one used to say
+ * nothing at all, and a machine left settled in `human_review`/`error` keeps
+ * the review reason and the failure message that go with it. That is the red
+ * "this task failed" banner still sitting above a task that is visibly running
+ * again, quoting the run it replaced.
+ *
+ * Which event, when there is one, follows the phase the backend is about to
+ * re-enter — it reads the spec directory, so a task with no plan re-plans.
+ * USER_RESUMED would settle such a task in `coding`, where PLANNING_STARTED is
+ * not handled, and the planning it then does would be reported to nobody.
+ *
+ * Null for every state that is not settled: a task paused mid-coding is in
+ * `coding`, which is where the resumed run belongs, and an event there would
+ * either be dropped or move it somewhere it is not.
+ */
+export function relaunchEventFor(
+	currentState: string | undefined,
+	task: Pick<Task, "status" | "subtasks"> & {
+		metadata?: { paused?: { paused_phase?: string | null } };
+	},
+): TaskEvent | null {
+	const settled =
+		currentState === "error" ||
+		currentState === "human_review" ||
+		(currentState === undefined &&
+			(task.status === "error" || task.status === "human_review"));
+	if (!settled) return null;
+
+	const pausedPhase = task.metadata?.paused?.paused_phase;
+	const replans =
+		(task.subtasks?.length ?? 0) === 0 ||
+		pausedPhase === "spec" ||
+		pausedPhase === "planning";
+	return replans ? { type: "PLANNING_STARTED" } : { type: "USER_RESUMED" };
 }

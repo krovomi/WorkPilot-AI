@@ -236,6 +236,11 @@ def read_log(
         log_file = conversation_log_path(spec_dir, provider, model)
     else:
         log_file = spec_dir / CONVERSATION_LOG_FILENAME
+    return _read_log_file(log_file)
+
+
+def _read_log_file(log_file: Path) -> list[dict[str, Any]]:
+    """Parse one JSONL log, skipping lines a crash left half-written."""
     if not log_file.exists():
         return []
 
@@ -260,6 +265,106 @@ def read_log(
         return []
 
     return entries
+
+
+# Filename fragments that mark a log as retired rather than live: archived by a
+# prompt-too-long halt, trimmed by the replay cap, or split out of the legacy
+# single file. Shared by archive_all_logs and the carry-over scan below, because
+# "which files are live conversation logs" has to have one answer.
+_RETIRED_LOG_MARKERS = (".too-long.", ".trimmed.", ".archived.", ".migrated")
+
+# How many messages a model inherits when it takes a phase over from another
+# one. Deliberately below the replay cap in agents/session.py: a carry-over is
+# context for the next turn, not a second copy of the whole build.
+MAX_CARRYOVER_MESSAGES = 120
+
+
+def _live_log_files(spec_dir: Path) -> list[Path]:
+    """Every per-model conversation log in `spec_dir` that is still live."""
+    return [
+        path
+        for path in spec_dir.glob(f"{_LOG_PREFIX}.*{_LOG_SUFFIX}")
+        if not any(marker in path.name for marker in _RETIRED_LOG_MARKERS)
+    ]
+
+
+def read_log_for_phase_resume(
+    spec_dir: Path,
+    provider: str | None,
+    model: str | None,
+    phase: str | None,
+) -> list[dict[str, Any]]:
+    """The transcript a session should resume from, carrying a phase over when
+    the chosen model has never run it.
+
+    A model keeps its own log — switch away and back and it picks its own
+    context up again. What that costs, on its own, is the case the user is
+    actually in: pause a build, choose another model, resume. The new model's
+    log does not exist, nothing is replayed, and the phase starts over from
+    the prompt — re-reading the files, re-deriving the analysis the previous
+    model had already paid for. Which is the opposite of what the Pause button
+    promises.
+
+    So a model with no log of its own inherits the **same phase's** transcript
+    from whichever model last wrote one. The phase is the whole guard: a coder
+    starting under a model the planner used does not inherit the planner's
+    reasoning, because none of those entries are coding entries. Without it,
+    any per-phase model configuration would replay the wrong conversation into
+    every phase it names a new model for.
+
+    The inherited tail is written to the new model's own log, so it is a
+    takeover rather than a permanent alias: from the next session on, that
+    model reads its own file like every other, and the trimming in
+    ``_maybe_replay_conversation`` has a file to trim.
+
+    Best-effort: any failure here means "start fresh", which is exactly what
+    this whole function is an improvement on — never a reason to fail a
+    session.
+    """
+    own = read_log(spec_dir, provider, model)
+    if own or not phase:
+        return own
+
+    target = conversation_log_path(spec_dir, provider, model)
+    sources = [path for path in _live_log_files(spec_dir) if path != target]
+    if not sources:
+        return []
+
+    # Most recently written first: the conversation being taken over is the one
+    # that was running when the user pressed Pause.
+    sources.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
+
+    for source in sources:
+        inherited = [
+            entry
+            for entry in _read_log_file(source)
+            if (entry.get("phase") or "") == phase
+        ][-MAX_CARRYOVER_MESSAGES:]
+        if not inherited:
+            continue
+        try:
+            with target.open("ab") as f:
+                for entry in inherited:
+                    f.write(
+                        (json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8")
+                    )
+        except OSError as e:
+            logger.warning(
+                "[conversation_log] Could not seed %s from %s: %s", target, source, e
+            )
+            # The entries are still worth replaying even if they could not be
+            # written: the session continues, the next one starts fresh.
+        logger.info(
+            "[conversation_log] %s/%s inherits %d '%s' message(s) from %s",
+            provider,
+            model,
+            len(inherited),
+            phase,
+            source.name,
+        )
+        return inherited
+
+    return []
 
 
 def deserialize_message(entry: dict[str, Any]) -> AgentMessage:
@@ -341,7 +446,7 @@ def archive_all_logs(spec_dir: Path, tag: str = "archived") -> int:
         spec_dir / CONVERSATION_LOG_FILENAME,
         *spec_dir.glob(f"{_LOG_PREFIX}.*{_LOG_SUFFIX}"),
     ]
-    skip_markers = (".too-long.", ".trimmed.", ".archived.", ".migrated")
+    skip_markers = _RETIRED_LOG_MARKERS
     for path in candidates:
         if path in seen or not path.exists():
             continue
