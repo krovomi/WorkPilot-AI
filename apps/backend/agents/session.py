@@ -304,6 +304,7 @@ async def _maybe_replay_conversation(
     spec_dir: Path,
     provider: str,
     model: str,
+    phase: str | None = None,
 ) -> None:
     """If a prior conversation log exists for this spec, deserialize it and
     hand it to ``client.resume()`` so the new provider picks up the context.
@@ -323,13 +324,15 @@ async def _maybe_replay_conversation(
         from core.conversation_log import (
             conversation_log_path,
             deserialize_message,
-            read_log,
+            read_log_for_phase_resume,
         )
 
         # Per-model log: each (provider, model) keeps its own history so
-        # switching a phase's LLM resumes that model's own context. read_log
-        # migrates any legacy single-file log first.
-        entries = read_log(spec_dir, provider, model)
+        # switching a phase's LLM resumes that model's own context. A model
+        # that has never run THIS phase inherits the phase from the model that
+        # did, so "pause, switch LLM, resume" continues the work instead of
+        # re-deriving it. Migrates any legacy single-file log first.
+        entries = read_log_for_phase_resume(spec_dir, provider, model, phase)
         log_file = conversation_log_path(spec_dir, provider, model)
         if not entries:
             return
@@ -1844,7 +1847,7 @@ async def _run_agent_client_session(
     # different provider than the one that originally produced the transcript.
     # If the last assistant message ended on an un-dispatched tool_use, append
     # a directive nudging the LLM to redo it.
-    await _maybe_replay_conversation(client, spec_dir, provider, log_model)
+    await _maybe_replay_conversation(client, spec_dir, provider, log_model, phase.value)
     message = _maybe_inject_pending_tool_use_note(
         message, spec_dir, provider, log_model
     )
