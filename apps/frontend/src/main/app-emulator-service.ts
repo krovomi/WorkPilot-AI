@@ -69,6 +69,39 @@ function readTextFileSafe(filePath: string): string {
 	}
 }
 
+/**
+ * Parse the `launchUrl` a .NET launch profile declares — "swagger", "weatherforecast",
+ * or an absolute URL whose path is taken. Rendu `null` quand aucun profil n'en
+ * nomme un : un projet qui ne dit rien ne se voit rien inventer.
+ */
+export function parseDotnetLaunchPath(content: string): string | null {
+	let settings: unknown;
+	try {
+		settings = JSON.parse(content);
+	} catch {
+		return null;
+	}
+	const profiles = (settings as { profiles?: Record<string, unknown> })?.profiles;
+	if (!profiles || typeof profiles !== "object") return null;
+	for (const profile of Object.values(profiles)) {
+		const launchUrl = (profile as { launchUrl?: unknown })?.launchUrl;
+		if (typeof launchUrl !== "string" || !launchUrl.trim()) continue;
+		const raw = launchUrl.trim();
+		if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
+			try {
+				const { pathname, search } = new URL(raw);
+				const path = `${pathname}${search}`;
+				if (path && path !== "/") return path;
+				continue;
+			} catch {
+				continue;
+			}
+		}
+		return raw.startsWith("/") ? raw : `/${raw}`;
+	}
+	return null;
+}
+
 /** Default port assumed for Docker projects when none can be parsed. */
 export const DEFAULT_DOCKER_PORT = 3000;
 
@@ -145,6 +178,13 @@ export interface AppEmulatorConfig {
 	port: number; // primary port — API/backend port used by API Studio
 	isWeb: boolean; // Whether the app can be previewed in an iframe
 	projectDir?: string; // Resolved project directory (primary service)
+	/**
+	 * Le chemin que le projet déclare vouloir ouvrir (`launchUrl` d'un profil
+	 * .NET). La racine d'une Web API répond 404 ; ce champ est ce que l'auteur du
+	 * projet a écrit à la place, et l'aperçu l'ouvre quand le diff de la tâche ne
+	 * dit rien de plus précis.
+	 */
+	launchPath?: string;
 	/** For fullstack projects: all services to launch (backend + frontend). */
 	services?: AppEmulatorServiceConfig[];
 }
@@ -1598,6 +1638,7 @@ exit $launched.ExitCode
 					port,
 					isWeb: true,
 					projectDir: dotnetDir,
+					launchPath: this.readDotnetLaunchPath(dotnetDir),
 				};
 			}
 			return {
@@ -1611,6 +1652,7 @@ exit $launched.ExitCode
 		}
 
 		const dotnetPort = this.readDotnetPort(dotnetDir) ?? 5000;
+		const launchPath = this.readDotnetLaunchPath(dotnetDir);
 		const frontendResult = this.findFrontendInSubdirs(rootDir, 3);
 
 		if (frontendResult) {
@@ -1638,6 +1680,7 @@ exit $launched.ExitCode
 			port: dotnetPort,
 			isWeb: true,
 			projectDir: dotnetDir,
+			launchPath,
 		};
 	}
 
@@ -1799,6 +1842,29 @@ exit $launched.ExitCode
 		};
 
 		return scan(rootDir, maxDepth) ?? libraryFallback;
+	}
+
+	/**
+	 * Read the launch path declared by a .NET project, from the first profile
+	 * that names one. `dotnet run` prints a root URL and nothing else; the
+	 * project's own `launchUrl` is what Visual Studio and `dotnet watch` open,
+	 * so it is the project's answer to "where does this start?" rather than ours.
+	 */
+	private readDotnetLaunchPath(csprojDir: string): string | undefined {
+		const launchSettingsPath = path.join(
+			csprojDir,
+			"Properties",
+			"launchSettings.json",
+		);
+		if (!existsSync(launchSettingsPath)) return undefined;
+		try {
+			return (
+				parseDotnetLaunchPath(readFileSync(launchSettingsPath, "utf-8")) ??
+				undefined
+			);
+		} catch {
+			return undefined;
+		}
 	}
 
 	/**

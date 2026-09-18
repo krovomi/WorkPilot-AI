@@ -77,6 +77,22 @@
 		"crashed": "Le moteur de l’aperçu s’est arrêté. Réessayez pour le recharger.",
 		"browserFailed": "Impossible d’ouvrir le navigateur externe. Vous pouvez ouvrir {{url}} manuellement.",
 		"notFound": "HTTP 404 : aucune page à cette adresse. Ce serveur peut exposer une API sans interface web.",
-		"httpError": "Le serveur de l’aperçu a répondu HTTP {{code}}. Consultez les logs du serveur."
+		"httpError": "Le serveur de l’aperçu a répondu HTTP {{code}}. Consultez les logs du serveur.",
+		"address": "Adresse",
+		"addressPlaceholder": "Saisissez un chemin ou une URL, puis Entrée",
+		"addressInvalid": "Cette adresse ne peut pas être ouverte ici. Utilisez un chemin comme /swagger, ou une URL http(s).",
+		"back": "Précédent",
+		"forward": "Suivant",
+		"reload": "Recharger",
+		"home": "Accueil",
+		"homeFeature": "Revenir à la route de la tâche ({{path}})",
+		"go": "Aller",
+		"featureRoute": "Route de la tâche : {{path}}",
+		"routeSource": {
+			"declared": "déclarée dans le diff",
+			"page": "page ajoutée par la tâche",
+			"launchProfile": "profil de lancement du projet",
+			"apiDocs": "documentation d'API du framework"
+		}
 	}
 }

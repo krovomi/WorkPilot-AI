@@ -38,7 +38,7 @@ const ALLOWED = new Map<string, string>([
 		"objet de diagnostic : rapporte la plateforme brute",
 	],
 	[
-		"main/ipc-handlers/settings-handlers.ts:380",
+		"main/ipc-handlers/settings-handlers.ts:381",
 		"console.warn de diagnostic",
 	],
 	[

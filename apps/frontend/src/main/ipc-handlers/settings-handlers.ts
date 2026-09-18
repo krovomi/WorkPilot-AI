@@ -10,7 +10,7 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { is } from "@electron-toolkit/utils";
-import { app, dialog, ipcMain, session, shell } from "electron";
+import { app, dialog, ipcMain, session } from "electron";
 
 // ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +47,7 @@ import {
 	preWarmToolCache,
 } from "../cli-tool-manager";
 import { credentialManager } from "../services/credential-manager";
+import { openExternalUrl } from "../open-external";
 import { getSettingsPath, readSettingsFile } from "../settings-utils";
 import { testGenerationService } from "../test-generation-service";
 import { parseEnvFile } from "./utils";
@@ -1041,23 +1042,16 @@ export function registerSettingsHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.SHELL_OPEN_EXTERNAL,
 		async (_, url: string): Promise<void> => {
-			// Validate URL scheme to prevent opening dangerous protocols
+			// La validation du schéma et les replis Linux vivent dans open-external :
+			// le rejet remonte jusqu'au renderer, qui l'affiche. Avaler l'erreur ici
+			// est ce qui rendait le bouton silencieux quand rien ne s'ouvrait.
 			try {
-				const parsedUrl = new URL(url);
-				if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-					console.warn(
-						`[SHELL_OPEN_EXTERNAL] Blocked URL with unsafe protocol: ${parsedUrl.protocol}`,
-					);
-					throw new Error(`Unsafe URL protocol: ${parsedUrl.protocol}`);
-				}
-				await shell.openExternal(url);
+				await openExternalUrl(url);
 			} catch (error) {
-				if (error instanceof TypeError) {
-					// Invalid URL format
-					console.warn(`[SHELL_OPEN_EXTERNAL] Invalid URL format: ${url}`);
-					throw new Error("Invalid URL format");
-				}
-				throw error;
+				const reason =
+					error instanceof Error ? error.message : String(error);
+				console.warn(`[SHELL_OPEN_EXTERNAL] ${reason}`);
+				throw error instanceof Error ? error : new Error(reason);
 			}
 		},
 	);
