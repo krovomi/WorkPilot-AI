@@ -3,8 +3,7 @@
 `bash_security_hook` used to hold this logic inline, and `validate_command`
 next to it held a second, slightly different copy — the two agreed on the
 allowlist and disagreed on which segment a validator was handed. Both now call
-`validate_command_line`, which is also what `shell_validators` reaches for when
-`eval` hands it another command line to judge.
+`validate_command_line`.
 
 What this adds over "extract the first token and look it up"
 ------------------------------------------------------------
@@ -42,6 +41,7 @@ from typing import TYPE_CHECKING
 
 from project_analyzer import is_command_allowed
 
+from .exec_validators import eval_inner_command, find_exec_command_lines
 from .parser import (
     extract_commands,
     extract_substitutions,
@@ -49,6 +49,7 @@ from .parser import (
     split_command_segments,
     unwrap_rtk_prefixes,
 )
+from .validator import VALIDATORS
 
 if TYPE_CHECKING:  # pragma: no cover - import is for typing only
     from project_analyzer import SecurityProfile
@@ -85,10 +86,6 @@ def validate_command_line(
         # Could not parse - fail safe by blocking
         return False, f"Could not parse command for security validation: {command}"
 
-    # Imported here rather than at module scope: `validator_registry` pulls in
-    # `shell_validators`, which calls back into this module for `eval`.
-    from .validator import VALIDATORS
-
     segments = split_command_segments(command)
 
     for cmd in commands:
@@ -115,5 +112,46 @@ def validate_command_line(
         allowed, reason = validate_command_line(inner, profile, depth=depth + 1)
         if not allowed:
             return False, f"Inside command substitution: {reason}"
+
+    for segment in segments:
+        allowed, reason = _validate_nested_commands(segment, profile, depth)
+        if not allowed:
+            return False, reason
+
+    return True, ""
+
+
+def _validate_nested_commands(
+    segment: str,
+    profile: SecurityProfile,
+    depth: int,
+) -> tuple[bool, str]:
+    """Judge the command lines `eval` and `find -exec` name in one segment.
+
+    `security.exec_validators` reads them out and judges nothing; the recursion
+    is here, next to the one for `$(…)`, because one module owning recursion is
+    what keeps the import graph acyclic — see that module's docstring.
+
+    An empty inner line means the option was there and could not be read. That
+    is a refusal: "there is an eval in this line and I do not know what it
+    runs" is the one answer that must not be optimistic.
+    """
+    unwrapped = unwrap_rtk_prefixes(segment)
+
+    is_eval, inner = eval_inner_command(unwrapped)
+    if is_eval and inner is None:
+        return False, f"Could not read the command inside eval: {segment}"
+    if is_eval and inner:
+        allowed, reason = validate_command_line(inner, profile, depth=depth + 1)
+        if not allowed:
+            return False, f"Command inside eval is not allowed: {reason}"
+
+    is_find, exec_lines = find_exec_command_lines(unwrapped)
+    if is_find and exec_lines is None:
+        return False, f"Could not read the command inside find -exec: {segment}"
+    for line in exec_lines or ():
+        allowed, reason = validate_command_line(line, profile, depth=depth + 1)
+        if not allowed:
+            return False, f"Command inside find -exec is not allowed: {reason}"
 
     return True, ""

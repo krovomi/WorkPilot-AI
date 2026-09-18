@@ -22,15 +22,16 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "backend"))
 
-import security.exec_validators as exec_validators  # noqa: E402
 import security.profile as profile_module  # noqa: E402
+import security.shell_validators as shell_validators  # noqa: E402
 from project_analyzer import BASE_COMMANDS, SecurityProfile  # noqa: E402
 from security.command_guard import (  # noqa: E402
     MAX_SUBSTITUTION_DEPTH,
     validate_command_line,
 )
 from security.exec_validators import (  # noqa: E402
-    validate_find_command,
+    eval_inner_command,
+    find_exec_command_lines,
     validate_source_command,
     validate_tar_command,
 )
@@ -65,7 +66,7 @@ def profile(tmp_path, monkeypatch) -> SecurityProfile:
     # the wrong one.
     profile_module.reset_profile_cache()
     monkeypatch.setattr(profile_module, "resolve_active_profile", lambda: built)
-    monkeypatch.setattr(exec_validators, "resolve_active_profile", lambda: built)
+    monkeypatch.setattr(shell_validators, "resolve_active_profile", lambda: built)
     return built
 
 
@@ -209,14 +210,46 @@ class TestCommandsWhoseArgumentIsACommand:
 class TestValidatorsAnswerOnlyForTheirOwnCommand:
     """Each validator is handed whatever segment matched, so it has to check."""
 
-    def test_find_validator_ignores_a_line_that_is_not_find(self):
-        assert validate_find_command("git status") == (True, "")
-
     def test_source_validator_ignores_a_line_that_is_not_source(self):
         assert validate_source_command("git status") == (True, "")
 
     def test_tar_validator_ignores_a_line_that_is_not_tar(self):
         assert validate_tar_command("git status") == (True, "")
+
+
+class TestTheExtractorsJudgeNothing:
+    """`exec_validators` reads command lines out; `command_guard` judges them.
+
+    The split is what keeps the import graph acyclic — CodeQL found the cycle
+    the first version had, where this module called back into the guard behind
+    two function-level imports.
+
+    Each extractor answers three things, and conflating any two of them is a
+    bug: "not mine", "mine and unreadable" (a refusal) and "mine, runs this"
+    (where running nothing is fine).
+    """
+
+    def test_a_line_that_is_not_an_eval_is_not_its_business(self):
+        assert eval_inner_command("git status") == (False, None)
+
+    def test_a_line_that_is_not_a_find_is_not_its_business(self):
+        assert find_exec_command_lines("git status") == (False, None)
+
+    def test_a_bare_eval_runs_nothing_and_is_not_a_refusal(self):
+        assert eval_inner_command("eval") == (True, "")
+
+    def test_an_unreadable_eval_is_told_apart_from_one_that_runs_nothing(self):
+        is_eval, inner = eval_inner_command('eval "unclosed')
+        assert (is_eval, inner) == (True, None)
+
+    def test_a_find_that_runs_nothing_is_not_a_refusal(self):
+        assert find_exec_command_lines("find . -name '*.py'") == (True, [])
+
+    def test_the_placeholder_is_not_read_as_the_command(self):
+        assert find_exec_command_lines("find . -exec grep -l x {} +") == (
+            True,
+            ["grep -l x"],
+        )
 
 
 class TestTheFixturesThemselves:

@@ -133,7 +133,7 @@ def resolve_active_profile() -> SecurityProfile | None:
 
     A validator is handed one command string and nothing else, so the project
     it belongs to has to be recovered from the environment — the same lookup
-    `bash_security_hook` does, and the same order. Three validators were each
+    `bash_security_hook` does, and in the same order. `shell_validators` was
     doing it inline; `None` here means the caller must fail closed, which is
     what "could not tell whether this is allowed" has to mean.
     """

@@ -11,26 +11,37 @@ was an allowlisted word with an unjudged command line behind it:
 `tar --checkpoint-action=exec=`  and `--to-command=`, same idea
 ===============================  ====================================
 
-Two of them can be validated and two cannot, and the difference is whether the
-command is *in* the line. `eval` and `find -exec` name what they will run, so
-the naming goes through `validate_command_line` like any other. `source` and
-tar's hooks name a *file*, whose contents an agent may have written a moment
-ago and may rewrite between this check and the read — so they are refused, for
-the same reason `shell_validators` refuses `bash script.sh`.
+Two of them can be judged and two cannot, and the difference is whether the
+command is *in* the line. `source` and tar's hooks name a **file**, whose
+contents an agent may have written a moment ago and may rewrite between this
+check and the read, so they are refused outright — the reason
+`shell_validators` already refuses `bash script.sh`. Those two are ordinary
+validators, and they live here.
+
+`eval` and `find -exec` name what they will run, so the naming can be judged.
+This module **extracts** those command lines and judges none of them:
+`eval_inner_command` and `find_exec_command_lines` are pure text, and
+`command_guard` recurses on what they return, exactly as it already does for
+`$(…)`.
+
+That split is what keeps the import graph acyclic. The first version had this
+module call `validate_command_line` directly, which put `command_guard` →
+`validator` → `validator_registry` → `exec_validators` → `command_guard` in a
+loop; both edges were function-level imports written to dodge it, and a lazy
+import whose job is to hide a cycle is the cycle. Recursion belongs to the one
+module that owns recursion.
 """
 
 from __future__ import annotations
 
 import shlex
 
-from .command_guard import validate_command_line
 from .parser import _cross_platform_basename
-from .profile import resolve_active_profile
 from .validation_models import ValidationResult
 
 __all__ = [
-    "validate_eval_command",
-    "validate_find_command",
+    "eval_inner_command",
+    "find_exec_command_lines",
     "validate_source_command",
     "validate_tar_command",
 ]
@@ -52,31 +63,74 @@ def _tokenize(command_string: str) -> list[str] | None:
         return None
 
 
-def validate_eval_command(command_string: str) -> ValidationResult:
-    """Judge the command line `eval` is about to run.
+def eval_inner_command(command_string: str) -> tuple[bool, str | None]:
+    """`(is_eval, inner)` for the command line `eval` would run.
 
     `eval id` and `eval "id"` are the same call, so the arguments are joined
-    back into one line before being judged — which is also what the shell does
-    with them.
+    back into one line — which is what the shell does with them too.
+
+    Three answers, and the caller has to tell them apart:
+
+    ``(False, None)``  not an `eval`; nothing to judge
+    ``(True, None)``   an `eval` this module could not read — a refusal
+    ``(True, text)``   an `eval` that runs `text`; `""` is a bare `eval`,
+                       which runs nothing and is harmless
+
+    A single `str` return cannot carry that: the empty string would have to
+    mean both "runs nothing" and "unreadable", and one of those is a refusal.
     """
     tokens = _tokenize(command_string)
     if tokens is None:
-        return False, "Could not parse eval command"
+        head = command_string.strip().split(" ", 1)[0]
+        if _cross_platform_basename(head) == "eval":
+            return True, None
+        return False, None
     if not tokens or _cross_platform_basename(tokens[0]) != "eval":
-        return True, ""
+        return False, None
+    return True, " ".join(tokens[1:]).strip()
 
-    inner = " ".join(tokens[1:]).strip()
-    if not inner:
-        return True, ""
 
-    profile = resolve_active_profile()
-    if profile is None:
-        return False, "Could not load security profile to validate eval command"
+def find_exec_command_lines(command_string: str) -> tuple[bool, list[str] | None]:
+    """`(is_find, lines)` for the command lines `find -exec` and friends run.
 
-    allowed, reason = validate_command_line(inner, profile)
-    if not allowed:
-        return False, f"Command inside eval is not allowed: {reason}"
-    return True, ""
+    The same three answers as `eval_inner_command`, for the same reason:
+    ``(True, [])`` is a `find` that runs nothing — the common case, and not a
+    refusal — while ``(True, None)`` is a `find` this module could not read,
+    which is.
+
+    The argument list runs to a `;` or `+` terminator. `{}` is find's
+    placeholder for the matched path — an argument, never the command — and it
+    is dropped so that `-exec grep -l x {} +` reads as `grep -l x`.
+    """
+    tokens = _tokenize(command_string)
+    if tokens is None:
+        head = command_string.strip().split(" ", 1)[0]
+        if _cross_platform_basename(head) == "find":
+            return True, None
+        return False, None
+    if not tokens or _cross_platform_basename(tokens[0]) != "find":
+        return False, None
+
+    lines: list[str] = []
+    index = 1
+    while index < len(tokens):
+        if tokens[index] not in _FIND_EXEC_OPTIONS:
+            index += 1
+            continue
+
+        index += 1
+        inner_tokens: list[str] = []
+        while index < len(tokens) and tokens[index] not in (";", "+"):
+            if tokens[index] != "{}":
+                inner_tokens.append(tokens[index])
+            index += 1
+        index += 1  # step over the terminator
+
+        inner = " ".join(inner_tokens).strip()
+        if inner:
+            lines.append(inner)
+
+    return True, lines
 
 
 def validate_source_command(command_string: str) -> ValidationResult:
@@ -108,56 +162,6 @@ def validate_source_command(command_string: str) -> ValidationResult:
     )
 
 
-def validate_find_command(command_string: str) -> ValidationResult:
-    """Judge each command line `find` would run through `-exec` and friends.
-
-    The argument list runs to a `;` or `+` terminator. `{}` is find's
-    placeholder for the matched path — an argument, never the command — and it
-    is dropped before the line is judged so that `-exec grep -l x {} +` is read
-    as `grep -l x`.
-    """
-    tokens = _tokenize(command_string)
-    if tokens is None:
-        return False, "Could not parse find command"
-    if not tokens or _cross_platform_basename(tokens[0]) != "find":
-        return True, ""
-
-    profile: object | None = None
-    index = 1
-    while index < len(tokens):
-        if tokens[index] not in _FIND_EXEC_OPTIONS:
-            index += 1
-            continue
-
-        option = tokens[index]
-        index += 1
-        inner_tokens: list[str] = []
-        while index < len(tokens) and tokens[index] not in (";", "+"):
-            if tokens[index] != "{}":
-                inner_tokens.append(tokens[index])
-            index += 1
-        index += 1  # step over the terminator
-
-        inner = " ".join(inner_tokens).strip()
-        if not inner:
-            continue
-
-        if profile is None:
-            profile = resolve_active_profile()
-            if profile is None:
-                return (
-                    False,
-                    "Could not load security profile to validate find "
-                    f"'{option}' command",
-                )
-
-        allowed, reason = validate_command_line(inner, profile)  # type: ignore[arg-type]
-        if not allowed:
-            return False, f"Command inside find '{option}' is not allowed: {reason}"
-
-    return True, ""
-
-
 def validate_tar_command(command_string: str) -> ValidationResult:
     """Refuse the tar options that hand a command to the shell.
 
@@ -181,8 +185,3 @@ def validate_tar_command(command_string: str) -> ValidationResult:
                     "not allowed: its argument bypasses the command allowlist.",
                 )
     return True, ""
-
-
-#: `.` is `source` under its other spelling, and the registry keys on the
-#: command name, so both names point at the same function.
-validate_dot_command = validate_source_command

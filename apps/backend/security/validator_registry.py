@@ -15,9 +15,6 @@ from .database_validators import (
     validate_redis_cli_command,
 )
 from .exec_validators import (
-    validate_dot_command,
-    validate_eval_command,
-    validate_find_command,
     validate_source_command,
     validate_tar_command,
 )
@@ -55,11 +52,11 @@ VALIDATORS: dict[str, ValidatorFunction] = {
     "bash": validate_bash_command,
     "sh": validate_sh_command,
     "zsh": validate_zsh_command,
-    # Commands whose argument is itself a command line
-    "eval": validate_eval_command,
+    # Commands that name a file whose contents would bypass the allowlist.
+    # `eval` and `find -exec` name a command rather than a file, so they are
+    # not here: `command_guard` recurses on what they name.
     "source": validate_source_command,
-    ".": validate_dot_command,
-    "find": validate_find_command,
+    ".": validate_source_command,
     "tar": validate_tar_command,
     # Database - PostgreSQL
     "dropdb": validate_dropdb_command,

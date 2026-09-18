@@ -29,8 +29,8 @@ from .database_validators import (
     validate_redis_cli_command,
 )
 from .exec_validators import (
-    validate_eval_command,
-    validate_find_command,
+    eval_inner_command,
+    find_exec_command_lines,
     validate_source_command,
     validate_tar_command,
 )
@@ -79,8 +79,8 @@ __all__ = [
     "validate_git_command",
     "validate_git_config",
     # Exec validators
-    "validate_eval_command",
-    "validate_find_command",
+    "eval_inner_command",
+    "find_exec_command_lines",
     "validate_source_command",
     "validate_tar_command",
     # Shell validators
