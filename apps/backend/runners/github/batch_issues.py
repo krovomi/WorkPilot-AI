@@ -19,6 +19,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from security.untrusted import clean_untrusted
+
 logger = logging.getLogger(__name__)
 
 # Import validators
@@ -265,6 +267,15 @@ class IssueBatchItem:
     body: str
     labels: list[str] = field(default_factory=list)
     similarity_to_primary: float = 1.0  # Primary issue has 1.0
+
+    def __post_init__(self) -> None:
+        # Every construction site funnels through here — the two clustering
+        # paths and `from_dict` — which is why the cleaning sits on the
+        # dataclass rather than on each caller. Idempotent, so the round trip
+        # is free.
+        source = f"github:issue#{self.issue_number}"
+        self.title = clean_untrusted(self.title, kind="comment", source=source).text
+        self.body = clean_untrusted(self.body, kind="issue_body", source=source).text
 
     def to_dict(self) -> dict[str, Any]:
         return {
