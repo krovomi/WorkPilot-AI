@@ -2397,5 +2397,10 @@
 			"deny": "Deny",
 			"require_approval": "Require approval"
 		}
+	},
+	"search": {
+		"placeholder": "Search settings...",
+		"clear": "Clear search",
+		"noResults": "No settings found"
 	}
 }

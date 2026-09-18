@@ -2400,5 +2400,10 @@
 			"deny": "Refuser",
 			"require_approval": "Demander une approbation"
 		}
+	},
+	"search": {
+		"placeholder": "Rechercher un paramètre...",
+		"clear": "Effacer la recherche",
+		"noResults": "Aucun paramètre trouvé"
 	}
 }
