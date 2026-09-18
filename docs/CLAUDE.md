@@ -41,6 +41,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Le pourcentage d'une tâche](#le-pourcentage-dune-tâche-sharedprogressts)
   - [Architectures et historique de construction](#architectures-et-historique-de-construction-visual-to-code)
   - [Provider × LLM × effort, par page](#provider--llm--effort-par-page-sharedutilspage-llmts)
+  - [L'adresse qu'ouvre l'émulateur](#ladresse-quouvre-lémulateur-sharedutilsemulator-landingts)
   - [Agent Management](#agent-management)
   - [Claude Profile System](#claude-profile-system)
   - [Terminal System](#terminal-system)
@@ -1502,6 +1503,60 @@ completed subtasks, the spec and the QA sign-off stay as they are. Only an
 explicit "re-run this phase" discards work, and only downstream of the phase
 asked for (`plan-rerun-utils.ts`).
 
+**Resuming continues the phase; it does not pay for it twice.** State-driven
+entry answers *which* phase re-opens, and nothing more: the phase itself
+re-opened with an empty head, re-read the same files and re-derived the same
+analysis the interrupted session had already done. Two channels carry it
+across now, one per half of the product. `TASK_RESUME` hands the subprocess the
+session id in `<spec_dir>/.session.json`, so the Claude SDK rehydrates that
+transcript (single-shot — `create_client` pops the variable, so only the first
+session of the resumed run replays it). For every other provider it is
+`conversation.<provider>-<model>.jsonl`, which `_maybe_replay_conversation`
+already replayed on every session start.
+
+**A model that is new to a phase inherits it.** The conversation log is
+per-(provider, model) on purpose — switch away and back, and a model resumes
+its own context. On the switch itself that property is exactly wrong: the model
+the user just chose has no log, nothing is replayed, and the phase restarts from
+the prompt, which is the opposite of what the Pause button promised.
+`read_log_for_phase_resume` gives a model with no log of its own the **same
+phase's** tail (`MAX_CARRYOVER_MESSAGES`) from whichever model last wrote one,
+and writes it into the new model's log — a takeover, not an alias, so from the
+next session on that model reads its own file like every other.
+
+The phase is the whole guard, and it is not a detail: a per-phase model
+configuration legitimately runs coding on a model the planner never used.
+Inheriting by recency alone would replay the planner's entire reasoning into
+every such coding session, on every build that names two models. An archived log
+(`.too-long.`, `.trimmed.`, `.archived.`) is never inherited either — a
+prompt-too-long halt archives precisely so the next run does not replay it, and
+reading it back through the carry-over would fail the run the same way.
+
+**A relaunch is owed an event.** `TASK_START` tells the machine it is starting
+(`determineStartEvent`); resuming told it nothing, and a machine left settled in
+`human_review`/`error` keeps the review reason and the failure message that go
+with it — so the red "this task failed" banner stayed at the top of a task that
+was visibly running again, quoting the run it had replaced. `relaunchEventFor`
+is the one answer to what the two resume paths owe it, and the sequence counter
+is reset in the same breath: a restarted backend numbers its events from zero,
+and `isNewSequence` drops anything below the last number it saw, so without it
+the resumed run's phases reached nobody at all.
+
+**Pause and Reprendre belong to the run, not to the column.** A paused task
+keeps the status it was paused in — often `human_review`, once a phase reported
+a failure — and the task panel's action bar was keyed on status, so the one
+screen that owns the provider/model/effort switch was the one screen that could
+not simply resume. `TaskRunControls` is now answered from the pause flag first,
+before any status branch, which is how the kanban card had always decided it.
+
+**And the model it resumes with is picked, never typed.** The panel's
+"Autre (catalogue officiel)" row is a door, not a model: it opens
+`OfficialModelSearch` over the provider's own library, which is the same thing
+the per-phase selector does and for the same reason. A free-text field accepts
+`gemma4:12b-it-q4_K_M` whether or not anything published it, and the only
+symptom is the resume failing on `pull model manifest: file does not exist` —
+after the restart, under a name the user has no way to check.
+
 **A phase that gives up says so.** `PLANNING_FAILED` and `CODING_FAILED` were in
 the XState machine from the start and emitted by nobody: every real failure
 reached the frontend as a process exit, and the machine's `setError` did not
@@ -1814,6 +1869,69 @@ correction : sur le rendu où le document actif change, le miroir s'exécute ave
 le *nouvel* id et les *anciens* blocs. Une ref posée par le chargeur dans le
 même commit se lirait déjà à jour, et le miroir écrirait les blocs d'un
 document dans un autre.
+
+### L'adresse qu'ouvre l'émulateur (`shared/utils/emulator-landing.ts`)
+
+L'aperçu ouvrait la racine du serveur. C'est la bonne réponse pour un site et la
+mauvaise pour tout le reste : une Web API .NET répond 404 sur `/`, et la page que
+la tâche vient d'écrire est trois segments plus loin. L'utilisateur voyait donc,
+pour une fonctionnalité qui marche, un cadre vide et « HTTP 404 ».
+
+Le diff de la tâche dit précisément quelle route a été touchée. C'est une preuve
+mesurée, pas une convention devinée, et ce module est le seul endroit qui la lit
+— ni modèle ni réseau, seulement des chemins et des lignes ajoutées, si bien que
+l'UI peut poser la question avant d'avoir démarré quoi que ce soit.
+
+`deriveLandingCandidates` rend *toutes* les adresses plausibles, la plus probable
+d'abord, dans l'ordre de la force de la preuve :
+
+| Rang | Source | Ce qui la produit |
+|---|---|---|
+| 1 | `route-declaration` | `[Route("api/[controller]")]`, `app.MapGet`, `@Controller`, `<Route path>`, `@app.get`, `@RequestMapping`… lus dans les **lignes ajoutées** du patch |
+| 2 | `file-route` | une page créée par convention : `app/x/page.tsx`, `pages/x.vue`, `src/routes/x/+page.svelte`, `app/routes/x.new.tsx` |
+| 3 | `launch-profile` | le `launchUrl` que le projet déclare dans `Properties/launchSettings.json` |
+| 4 | `api-docs` | la page d'accueil du framework : `/swagger`, `/docs`, `/api` |
+
+Rendre la liste plutôt que la seule réponse est ce qui permet au panneau d'échec
+de proposer les autres : un 404 sur la première devient un bouton vers la
+deuxième, pas un cul-de-sac.
+
+**Un segment dynamique arrête la route.** `api/users/{id}/roles` devient
+`/api/users` : la liste existe presque toujours, l'identifiant non, et inventer
+un `id` produirait un 404 en prétendant l'éviter. `[controller]` fait exception —
+c'est un jeton à substituer, pas un paramètre, et son nom vient de la classe que
+le patch déclare, sinon du fichier, parce qu'ASP.NET *impose* que
+`DocumentsController` vive dans `DocumentsController.cs`.
+
+**Un motif trop courant est réservé aux fichiers de routes.** `path:` est une clé
+de configuration autant qu'une route Angular ; `deriveLandingCandidates` ne la
+lit que dans un fichier dont le nom le dit (`*routes*`, `*router*`, `urls.py`,
+`*-routing.*`). Sans cette règle, un `{ path: 'dist/assets' }` de build devenait
+l'adresse proposée à l'utilisateur.
+
+**La barre d'adresse est une vraie barre d'adresse.** `ResponsivePreview` porte
+Précédent / Suivant / Recharger / Accueil et un champ éditable :
+`resolveAddressInput` résout ce qui est tapé contre le serveur de l'émulateur. Le
+défaut est *relatif* — dans cette barre on tape « /swagger » cent fois pour une
+fois où l'on tape un hôte — et un hôte n'est reconnu que quand il se nomme (un
+point, un port, ou `localhost`). Tout ce qui n'est pas http(s) est refusé avec un
+message : un `file://` chargé dans l'aperçu serait une navigation que personne
+n'a demandée.
+
+La navigation passe par `loadURL`, jamais par un changement de `key` : remonter
+le `<webview>` perdrait l'historique, et l'historique est ce que lisent les deux
+boutons. `src` reste le repli — c'est tout ce dont dispose un environnement de
+test, et c'est aussi ce qui fait la première navigation.
+
+**« Ouvrir dans le navigateur » ouvre ce qui est affiché**, pas la racine du
+serveur : après une navigation dans l'aperçu les deux ne sont plus la même page,
+et sur une Web API la racine est précisément celle qui répond 404. Côté main,
+`open-external.ts` est le seul chemin : il valide le schéma, appelle
+`shell.openExternal`, et **sur Linux seulement** essaie ensuite les lanceurs que
+la machine a vraiment (`xdg-open`, `gio open`, `x-www-browser`…) — Electron y
+rejette quand `xdg-utils` manque ou que le portail XDG n'est pas joignable. Le
+rejet remonte jusqu'au renderer, qui l'affiche : un bouton qui ne fait rien et ne
+dit rien est la pire des deux options, et c'est ce que l'utilisateur voyait.
 
 ### Provider × LLM × effort, par page (`shared/utils/page-llm.ts`)
 
