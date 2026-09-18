@@ -45,6 +45,12 @@ const mockDetectAppProject = vi.fn();
 const mockStartAppEmulator = vi.fn();
 const mockStopAppEmulator = vi.fn();
 const mockGetWorktreeStatus = vi.fn();
+const mockGetWorktreeDiff = vi.fn();
+const mockOpenExternal = vi.fn();
+
+/** Une tâche sans diff : l'aperçu ouvre alors la racine du serveur. */
+const noDiff = { success: true, data: { files: [], summary: "" } };
+mockGetWorktreeDiff.mockResolvedValue(noDiff);
 
 Object.defineProperty(window, "electronAPI", {
 	value: {
@@ -53,10 +59,11 @@ Object.defineProperty(window, "electronAPI", {
 			data: { running: false },
 		}),
 		getWorktreeStatus: mockGetWorktreeStatus,
+		getWorktreeDiff: mockGetWorktreeDiff,
 		detectAppProject: mockDetectAppProject,
 		startAppEmulator: mockStartAppEmulator,
 		stopAppEmulator: mockStopAppEmulator,
-		openExternal: vi.fn(),
+		openExternal: mockOpenExternal,
 		onAppEmulatorStatus: vi.fn(() => noopUnsubscribe),
 		onAppEmulatorReady: vi.fn(() => noopUnsubscribe),
 		onAppEmulatorOutput: vi.fn(() => noopUnsubscribe),
@@ -75,6 +82,7 @@ describe("TaskEmulator", () => {
 			success: true,
 			data: { exists: false },
 		});
+		mockGetWorktreeDiff.mockResolvedValue(noDiff);
 		mockDetectAppProject.mockResolvedValue({
 			success: true,
 			data: {
@@ -130,6 +138,12 @@ describe("TaskEmulator", () => {
 
 describe("TaskEmulator preview", () => {
 	beforeEach(() => {
+		vi.clearAllMocks();
+		mockGetWorktreeStatus.mockResolvedValue({
+			success: true,
+			data: { exists: false },
+		});
+		mockGetWorktreeDiff.mockResolvedValue(noDiff);
 		useAppEmulatorStore.setState({
 			phase: "running",
 			url: "http://localhost:5000",
@@ -293,4 +307,182 @@ it("allows typing a custom width without applying incomplete values", () => {
 	fireEvent.change(width, { target: { value: "1200" } });
 	fireEvent.blur(width);
 	expect(container.querySelector("webview")).toHaveStyle({ width: "1200px" });
+});
+
+describe("TaskEmulator — la route de la tâche et la barre d'adresse", () => {
+	// Un framework sans page d'accueil connue : la racine du serveur reste la
+	// réponse par défaut, ce qui isole ces tests du repli « doc d'API ».
+	const plainConfig = {
+		type: "web",
+		framework: "vite",
+		startCommand: "pnpm dev",
+		port: 5000,
+		isWeb: true,
+		projectDir: project.path,
+	};
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockGetWorktreeStatus.mockResolvedValue({
+			success: true,
+			data: { exists: false },
+		});
+		mockGetWorktreeDiff.mockResolvedValue(noDiff);
+		mockOpenExternal.mockResolvedValue(undefined);
+		useAppEmulatorStore.setState({
+			phase: "running",
+			url: "http://localhost:5000",
+			output: "Server listening",
+			config: plainConfig,
+		});
+	});
+
+	/** Le contrôleur que la tâche vient d'ajouter. */
+	function withController() {
+		mockGetWorktreeDiff.mockResolvedValue({
+			success: true,
+			summary: "",
+			data: {
+				summary: "",
+				files: [
+					{
+						path: "src/Rag.Api/Controllers/NamespacesController.cs",
+						status: "added",
+						additions: 3,
+						deletions: 0,
+						patch: [
+							"@@ -0,0 +1,3 @@",
+							"+[ApiController]",
+							'+[Route("api/[controller]")]',
+							"+public class NamespacesController : ControllerBase",
+						].join("\n"),
+					},
+				],
+			},
+		});
+	}
+
+	it("ouvre la route que le diff de la tâche déclare", async () => {
+		withController();
+		const { container } = render(
+			<TaskEmulator taskId="task-1" project={project} />,
+		);
+
+		await screen.findByText(/\/api\/namespaces/);
+		await waitFor(() => {
+			expect(container.querySelector("webview")).toHaveAttribute(
+				"src",
+				"http://localhost:5000/api/namespaces",
+			);
+		});
+	});
+
+	it("ouvre la doc d'API quand la tâche ne suggère rien sur une Web API", async () => {
+		useAppEmulatorStore.setState({
+			config: { ...plainConfig, framework: "dotnet" },
+		});
+		const { container } = render(
+			<TaskEmulator taskId="task-1" project={project} />,
+		);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		await waitFor(() =>
+			expect(container.querySelector("webview")).toHaveAttribute(
+				"src",
+				"http://localhost:5000/swagger",
+			),
+		);
+	});
+
+	it("retombe sur la racine du serveur quand rien ne suggère de route", async () => {
+		const { container } = render(
+			<TaskEmulator taskId="task-1" project={project} />,
+		);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		expect(container.querySelector("webview")).toHaveAttribute(
+			"src",
+			"http://localhost:5000",
+		);
+	});
+
+	it("navigue vers l'adresse saisie sans remonter l'aperçu", async () => {
+		const { container } = render(
+			<TaskEmulator taskId="task-1" project={project} />,
+		);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		const view = container.querySelector("webview");
+
+		const address = screen.getByLabelText("Address");
+		fireEvent.change(address, { target: { value: "/swagger" } });
+		fireEvent.keyDown(address, { key: "Enter" });
+
+		expect(container.querySelector("webview")).toBe(view);
+		expect(view).toHaveAttribute("src", "http://localhost:5000/swagger");
+		expect(address).toHaveValue("http://localhost:5000/swagger");
+	});
+
+	it("refuse une adresse qui n'est pas http(s) et ne navigue pas", async () => {
+		const { container } = render(
+			<TaskEmulator taskId="task-1" project={project} />,
+		);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+
+		const address = screen.getByLabelText("Address");
+		fireEvent.change(address, { target: { value: "javascript:alert(1)" } });
+		fireEvent.click(screen.getByRole("button", { name: "Go" }));
+
+		expect(screen.getByRole("alert")).toHaveTextContent("cannot be opened");
+		expect(container.querySelector("webview")).toHaveAttribute(
+			"src",
+			"http://localhost:5000",
+		);
+	});
+
+	it("suit la navigation de l'aperçu dans la barre d'adresse", async () => {
+		const { container } = render(
+			<TaskEmulator taskId="task-1" project={project} />,
+		);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		const view = container.querySelector("webview");
+		if (!view) throw new Error("Missing preview");
+
+		fireEvent(
+			view,
+			Object.assign(new Event("did-navigate"), {
+				httpResponseCode: 200,
+				url: "http://localhost:5000/swagger/index.html",
+			}),
+		);
+
+		expect(screen.getByLabelText("Address")).toHaveValue(
+			"http://localhost:5000/swagger/index.html",
+		);
+	});
+
+	it("ouvre dans le navigateur la page affichée, pas la racine du serveur", async () => {
+		render(<TaskEmulator taskId="task-1" project={project} />);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+
+		const address = screen.getByLabelText("Address");
+		fireEvent.change(address, { target: { value: "/swagger" } });
+		fireEvent.keyDown(address, { key: "Enter" });
+		fireEvent.click(screen.getByRole("button", { name: /open in browser/i }));
+
+		await waitFor(() =>
+			expect(mockOpenExternal).toHaveBeenCalledWith(
+				"http://localhost:5000/swagger",
+			),
+		);
+	});
+
+	it("dit pourquoi le navigateur n'a pas pu s'ouvrir", async () => {
+		mockOpenExternal.mockRejectedValue(new Error("xdg-open: not found"));
+		render(<TaskEmulator taskId="task-1" project={project} />);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+
+		fireEvent.click(screen.getByRole("button", { name: /open in browser/i }));
+
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"xdg-open: not found",
+		);
+	});
 });
