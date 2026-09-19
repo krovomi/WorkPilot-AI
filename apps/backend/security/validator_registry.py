@@ -14,6 +14,10 @@ from .database_validators import (
     validate_psql_command,
     validate_redis_cli_command,
 )
+from .exec_validators import (
+    validate_source_command,
+    validate_tar_command,
+)
 from .filesystem_validators import (
     validate_chmod_command,
     validate_init_script,
@@ -48,6 +52,12 @@ VALIDATORS: dict[str, ValidatorFunction] = {
     "bash": validate_bash_command,
     "sh": validate_sh_command,
     "zsh": validate_zsh_command,
+    # Commands that name a file whose contents would bypass the allowlist.
+    # `eval` and `find -exec` name a command rather than a file, so they are
+    # not here: `command_guard` recurses on what they name.
+    "source": validate_source_command,
+    ".": validate_source_command,
+    "tar": validate_tar_command,
     # Database - PostgreSQL
     "dropdb": validate_dropdb_command,
     "dropuser": validate_dropuser_command,

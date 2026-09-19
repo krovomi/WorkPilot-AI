@@ -80,6 +80,11 @@ import {
 	loadPersistedState,
 	restoreSession,
 } from "./server-connection";
+import {
+	enforceWebviewPreferences,
+	isPermissionGranted,
+	isWebviewSourceAllowed,
+} from "./security/webview-policy";
 import { initializeCredentialIntegration } from "./services/credential-integration";
 import { ensureOllamaReady } from "./services/ollama-portable";
 import { ensureOAuthServerRunning } from "./oauth-server";
@@ -427,6 +432,52 @@ function setupExternalLinkHandler(mainWindow: BrowserWindow): void {
 	});
 }
 
+/**
+ * Branche la politique `<webview>` sur la fenêtre.
+ *
+ * La politique elle-même vit dans `security/webview-policy.ts` ; cette
+ * fonction ne fait que la poser sur l'événement qu'Electron fournit.
+ */
+function setupWebviewGuards(mainWindow: BrowserWindow): void {
+	mainWindow?.webContents.on(
+		"will-attach-webview",
+		(event, webPreferences, params) => {
+			enforceWebviewPreferences(
+				webPreferences as unknown as Record<string, unknown>,
+			);
+
+			if (!isWebviewSourceAllowed(params.src)) {
+				console.warn("[main] Blocked webview src:", params.src);
+				event.preventDefault();
+			}
+		},
+	);
+}
+
+/**
+ * Branche la politique de permissions sur la session par défaut.
+ *
+ * Les deux handlers sont nécessaires : `setPermissionRequestHandler` ne couvre
+ * pas les vérifications synchrones (`navigator.permissions.query`, et
+ * l'énumération des périphériques média), si bien qu'avec le premier seul une
+ * page lirait « accordé » pour une permission que la demande refusera.
+ */
+function setupPermissionHandlers(): void {
+	session.defaultSession.setPermissionRequestHandler(
+		(_contents, permission, callback) => {
+			const allowed = isPermissionGranted(permission);
+			if (!allowed) {
+				console.warn("[main] Denied permission request:", permission);
+			}
+			callback(allowed);
+		},
+	);
+
+	session.defaultSession.setPermissionCheckHandler((_contents, permission) =>
+		isPermissionGranted(permission),
+	);
+}
+
 function createWindow(): void {
 	// Get the primary display's work area (accounts for taskbar, dock, etc.)
 	// Wrapped in try/catch to handle potential failures with fallback to safe defaults
@@ -467,6 +518,8 @@ function createWindow(): void {
 	// Setup context menu and external link handlers
 	setupContextMenu(mainWindow);
 	setupExternalLinkHandler(mainWindow);
+	setupWebviewGuards(mainWindow);
+	setupPermissionHandlers();
 
 	// Load the renderer
 	if (mainWindow) {

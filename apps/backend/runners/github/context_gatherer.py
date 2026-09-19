@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from security.untrusted import clean_untrusted
+
 try:
     from .gh_client import GHClient, PRTooLargeError
     from .services.io_utils import safe_print
@@ -139,6 +141,16 @@ class AIBotComment:
     line: int | None  # Line number if it's an inline comment
     created_at: str
 
+    def __post_init__(self) -> None:
+        # A bot comment is still text fetched from GitHub, and "it came from
+        # CodeRabbit" is an author string anyone can take. Cleaned at ingest so
+        # the hidden-instruction carriers are gone before any prompt builder
+        # sees it; `clean_untrusted` is idempotent, so a `from_dict` round trip
+        # costs a second pass and changes nothing.
+        self.body = clean_untrusted(
+            self.body, kind="comment", source=f"github:comment#{self.comment_id}"
+        ).text
+
 
 # Known AI code review bots and their display names
 # Organized by category for maintainability
@@ -251,6 +263,16 @@ class PRContext:
     )
     # Deep codebase context (architecture, patterns, memory)
     deep_context: dict = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # The title and the description are written by whoever opened the PR.
+        # This is the reviewer's entry point, so it is the one an attacker
+        # aims at: the agent that reads them has Bash and Write.
+        source = f"github:pr#{self.pr_number}"
+        self.title = clean_untrusted(self.title, kind="comment", source=source).text
+        self.description = clean_untrusted(
+            self.description, kind="pr_body", source=source
+        ).text
 
 
 class PRContextGatherer:

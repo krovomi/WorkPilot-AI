@@ -10,14 +10,12 @@ arbitrary commands since `bash` is in BASE_COMMANDS but the commands
 inside -c were not being validated.
 """
 
-import os
 import shlex
-from pathlib import Path
 
 from project_analyzer import is_command_allowed
 
 from .parser import _cross_platform_basename, extract_commands, split_command_segments
-from .profile import get_security_profile
+from .profile import resolve_active_profile
 from .validation_models import ValidationResult
 
 # Shell interpreters that can execute nested commands
@@ -118,18 +116,12 @@ def validate_shell_c_command(command_string: str) -> ValidationResult:
                     )
         return True, ""
 
-    # Get the security profile for the current project
-    # Use PROJECT_DIR_ENV_VAR if set, otherwise use cwd
-    from .constants import PROJECT_DIR_ENV_VAR
-
-    project_dir = os.environ.get(PROJECT_DIR_ENV_VAR)
-    if not project_dir:
-        project_dir = os.getcwd()
-
-    try:
-        profile = get_security_profile(Path(project_dir))
-    except Exception:
-        # If we can't get the profile, fail safe by blocking
+    # Which project this command belongs to has to be recovered from the
+    # environment — a validator is handed one string and nothing else.
+    # `resolve_active_profile` is that lookup, in the same order
+    # `bash_security_hook` uses it; None means fail closed.
+    profile = resolve_active_profile()
+    if profile is None:
         return False, "Could not load security profile to validate shell -c command"
 
     # Extract command names for allowlist validation
