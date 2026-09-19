@@ -18,9 +18,16 @@ is recoverable without spending another planning session:
 * **It wrote the right file in a shape the schema does not name.** ``tasks``
   instead of ``phases``, one level of ``{"implementation_plan": {…}}`` wrapping,
   ``phases`` as an object keyed by phase id, a subtask that is a bare string.
-  Every one of those is a plan somebody could read.
+  Every one of those is a plan somebody could read. ``"phases": []`` beside a
+  flat ``tasks`` list belongs here too, and it is the one this module used to
+  get wrong: the key was *present*, so the work one key lower was never looked
+  at.
 * **It never called Write and the JSON is in the transcript**, usually inside a
   ```json fence with a sentence either side.
+* **Its Write was refused.** A provider that does not use the Claude SDK puts
+  its plan in a tool call rather than in its prose, so a rejected call leaves
+  the plan in exactly one place: the conversation log, which records every
+  ``tool_use`` with its input. Neither of the two sources above can see it.
 
 So this module answers the question in two halves, and both are reusable on
 their own:
@@ -31,8 +38,9 @@ their own:
     validator reads, so the CLI and the spec pipeline get it too.
 ``recover_plan``
     the same normalization applied to every place the plan could be, in
-    descending order of how much the location proves, writing the winner to the
-    one path WorkPilot reads.
+    descending order of how much the location proves — the files, then the
+    planner's response, then the write that never landed — writing the winner to
+    the one path WorkPilot reads.
 
 **Shape recovery is not invention.** A normalized plan is one whose subtasks the
 model wrote; the only things added are the keys the schema requires and the
@@ -63,7 +71,17 @@ _PHASES_KEYS = ("phases", "stages", "milestones", "workstreams")
 # `subtasks` and `chunks` are WorkPilot's own current and legacy names; the rest
 # are what a model reaches for when it is writing a plan rather than filling in
 # a schema.
-_SUBTASKS_KEYS = ("subtasks", "chunks", "tasks", "steps", "items", "actions")
+_SUBTASKS_KEYS = (
+    "subtasks",
+    "sub_tasks",
+    "subTasks",
+    "chunks",
+    "tasks",
+    "steps",
+    "implementation_steps",
+    "items",
+    "actions",
+)
 
 # How deep `_unwrap` will dig before deciding the document is not a plan.
 _MAX_UNWRAP_DEPTH = 3
@@ -225,18 +243,31 @@ def normalize_plan_shape(data: Any) -> dict[str, Any] | None:
     else:
         plan = {k: v for k, v in document.items() if k not in _PHASES_KEYS}
         raw_phases = _first_present(document, _PHASES_KEYS)
-        if raw_phases is not None:
-            phases = _phases_from_list(_as_phase_list(raw_phases))
-        else:
-            # No phases at all: a flat list of subtasks under any of its names.
-            flat = _first_present(document, _SUBTASKS_KEYS)
+        phases = (
+            _carrying_subtasks(_phases_from_list(_as_phase_list(raw_phases)))
+            if raw_phases is not None
+            else []
+        )
+        if not phases:
+            # Either the document names no phases at all, or it names some and
+            # not one of them carries a subtask. Both fall through to the flat
+            # list, because an *empty* `phases` proves nothing about where the
+            # work is: `{"feature": …, "phases": [], "tasks": [{…}]}` is the
+            # shape PHASE 3 of `prompts/planner.md` warns against by name,
+            # which is precisely why a model produces it — and reading the
+            # empty key as the final answer threw away the subtasks sitting one
+            # key further down. That plan reaches the validator as "No phases
+            # defined / No subtasks defined in any phase", the one report that
+            # says a model produced nothing while it had produced a plan.
+            flat_key = _first_present_key(document, _SUBTASKS_KEYS)
+            flat = document.get(flat_key) if flat_key else None
             if not isinstance(flat, list):
                 return None
-            for key in _SUBTASKS_KEYS:
-                plan.pop(key, None)
-            phases = _phases_from_list([{"subtasks": flat}])
+            # Only the key actually consumed: the others may mean something of
+            # their own in a document this never has to understand.
+            plan.pop(flat_key, None)
+            phases = _carrying_subtasks(_phases_from_list([{"subtasks": flat}]))
 
-    phases = [phase for phase in phases if phase.get("subtasks")]
     if not phases:
         return None
 
@@ -276,6 +307,19 @@ def _first_present(mapping: dict[str, Any], keys: tuple[str, ...]) -> Any | None
         if key in mapping and mapping[key] is not None:
             return mapping[key]
     return None
+
+
+def _first_present_key(mapping: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    """Which of ``keys`` the value came from — needed to drop just that one."""
+    for key in keys:
+        if key in mapping and mapping[key] is not None:
+            return key
+    return None
+
+
+def _carrying_subtasks(phases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The phases with work in them. A phase with no subtask is not a phase."""
+    return [phase for phase in phases if phase.get("subtasks")]
 
 
 def _as_phase_list(raw: Any) -> list[Any]:
@@ -462,6 +506,125 @@ def recover_plan(
             return RecoveredPlan(
                 plan=plan,
                 origin="the planner's response",
+                source_file=None,
+                subtask_count=count_subtasks(plan),
+            )
+
+    return _plan_from_tool_calls(spec_dir)
+
+
+# Tool names that write a *whole* file, across the providers that spell it
+# differently. An edit (`str_replace`, `Edit`) is deliberately not one of them:
+# its replacement string is a fragment by definition, and reading a fragment as
+# a whole plan is how a plan with one phase missing gets built.
+_WRITE_TOOL_NAMES = ("write", "write_file", "writefile", "create_file")
+
+# The argument names those tools carry a path and a body under. The same alias
+# sets `core.runtimes.tool_executor` dispatches on, because this reads the calls
+# that executor received.
+_PATH_ARG_NAMES = ("path", "file_path", "filepath", "filename", "file")
+_CONTENT_ARG_NAMES = ("content", "CodeContent", "text", "data", "file_text")
+
+
+def _looks_like_plan_destination(path: str, spec_dir: Path) -> bool:
+    """Was this write aimed at the plan?
+
+    Deliberately strict: a tool call's content is *any* file the model wrote,
+    and reading an arbitrary one as a plan would build something nobody asked
+    for. The name has to say it is the plan — and the invented names carry the
+    same qualification they carry for files on disk, because the reason is the
+    same one: `tasks.json` is a task-runner config far more often than it is a
+    plan, so it only counts when the write was aimed inside WorkPilot's own spec
+    directory. A relative destination is not credited: that is what lands at the
+    worktree root, which is precisely where a project's own `tasks.json` lives.
+    """
+    normalized = path.replace("\\", "/")
+    name = Path(normalized).name.lower()
+    if name in {n.lower() for n in _ASKED_FOR_NAMES}:
+        return True
+    if "implementation_plan" in name or "implementation-plan" in name:
+        return True
+    if name not in {n.lower() for n in _INVENTED_NAMES}:
+        return False
+    candidate = Path(normalized)
+    if not candidate.is_absolute():
+        return False
+    try:
+        candidate.resolve().relative_to(spec_dir.resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def _plan_from_tool_calls(spec_dir: Path) -> RecoveredPlan | None:
+    """The plan out of a `Write` the model made and the executor refused.
+
+    The last place it can be, and the one the file candidates and the response
+    text both miss. A provider that does not use the Claude SDK puts its plan in
+    a tool call, not in its prose — so when that call is rejected (the JSON was
+    fenced, the path resolved outside the project, the content was too long for
+    the executor to accept), the plan exists in exactly one place: the
+    conversation log, which records every `tool_use` block with its input.
+
+    That is what made the earlier fix look like no fix at all on Ollama. The
+    recovery reads files and response text, the local model had written neither,
+    and three planning sessions were spent re-deriving a plan that was already
+    in the transcript.
+
+    Newest call first, so a corrected second attempt wins over the first.
+    Never raises — the log is a diagnostic, and an unreadable one is one fewer
+    candidate.
+    """
+    spec_dir = Path(spec_dir)
+    try:
+        from core.conversation_log import _live_log_files, _read_log_file
+    except Exception as exc:  # noqa: BLE001 - recovery never fails a build
+        logger.debug("conversation log unavailable for plan recovery: %s", exc)
+        return None
+
+    entries: list[dict[str, Any]] = []
+    try:
+        for log_file in _live_log_files(spec_dir):
+            entries.extend(_read_log_file(log_file))
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("could not read the conversation logs in %s: %s", spec_dir, exc)
+        return None
+
+    # There is one log per (provider, model), so concatenating them gives glob
+    # order, not chronological order — and "newest attempt wins" has to mean the
+    # newest, not the one whose filename sorted last. Timestamps are ISO-8601
+    # UTC, so they sort as strings; the sort is stable, so entries sharing a
+    # timestamp (or missing one) keep the order their own file appended them in.
+    entries.sort(
+        key=lambda entry: str(entry.get("ts") or "") if isinstance(entry, dict) else ""
+    )
+
+    for entry in reversed(entries):
+        if not isinstance(entry, dict):
+            continue
+        for block in reversed(entry.get("content") or []):
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            tool_name = str(block.get("tool_name") or "").lower()
+            if tool_name not in _WRITE_TOOL_NAMES:
+                continue
+            tool_input = block.get("tool_input")
+            if not isinstance(tool_input, dict):
+                continue
+            destination = _first_present(tool_input, _PATH_ARG_NAMES)
+            if not isinstance(destination, str) or not _looks_like_plan_destination(
+                destination, spec_dir
+            ):
+                continue
+            body = _first_present(tool_input, _CONTENT_ARG_NAMES)
+            if not isinstance(body, str) or not body.strip():
+                continue
+            plan = normalize_plan_shape(extract_json_document(body))
+            if plan is None:
+                continue
+            return RecoveredPlan(
+                plan=plan,
+                origin=f"a Write tool call that did not land ({destination})",
                 source_file=None,
                 subtask_count=count_subtasks(plan),
             )
