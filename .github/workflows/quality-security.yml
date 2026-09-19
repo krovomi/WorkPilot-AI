@@ -197,10 +197,10 @@ jobs:
             --format markdown >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
