@@ -211,7 +211,76 @@
 			"localesDirRequired": "Renseignez le répertoire des locales",
 			"sourceLocaleRequired": "Renseignez la locale source",
 			"sourceLocaleInvalid": "Code locale invalide (ex : en, fr, fr-FR)"
-		}
+		},
+		"mode": {
+			"report": "Rapport",
+			"editor": "Éditeur"
+		},
+		"loadTranslations": "Charger les traductions",
+		"editorEmpty": "Chargez les traductions pour les parcourir et les modifier.",
+		"detectedTitle": "Trouvés dans ce projet",
+		"detectedMeta_one": "{{locales}} · {{count}} namespace",
+		"detectedMeta_other": "{{locales}} · {{count}} namespaces"
+	},
+	"i18nEditor": {
+		"searchNamespaces": "Filtrer les namespaces",
+		"searchKeys": "Rechercher dans les clés et les valeurs",
+		"sort": {
+			"todo": "À faire d'abord",
+			"name": "A → Z"
+		},
+		"flatNamespace": "(fichier unique)",
+		"complete": "Complet",
+		"completeness": "{{percent}} % traduit",
+		"noNamespaceMatches": "Aucun namespace ne correspond",
+		"noKeyMatches": "Aucune clé ne correspond",
+		"pickNamespace": "Choisissez un namespace à gauche pour commencer à éditer.",
+		"colKey": "Clé",
+		"reference": "(référence)",
+		"filter": {
+			"all": "Toutes",
+			"missing": "Manquantes",
+			"placeholder": "Non traduites",
+			"mismatch": "Variables"
+		},
+		"addKey": "Ajouter une clé",
+		"addKeyTitle": "Ajouter une clé",
+		"addKeyDescription": "Elle sera créée dans {{namespace}}, dans chaque locale que vous renseignez.",
+		"addKeyConfirm": "Ajouter",
+		"addKeyBlankHint": "Une locale laissée vide reste non traduite, plutôt que d'être enregistrée comme chaîne vide.",
+		"keyLabel": "Clé",
+		"keyPlaceholder": "buttons.save",
+		"optional": "facultatif",
+		"keyError": {
+			"empty": "Une clé ne peut pas être vide.",
+			"shape": "Les segments sont séparés par un seul point, et aucun ne peut être vide ni commencer par une espace.",
+			"tooLong": "Cette clé est trop longue.",
+			"taken": "Cette clé existe déjà dans ce namespace.",
+			"nests": "{{key}} porte déjà une valeur à ce chemin."
+		},
+		"missingValue": "Non traduit",
+		"addTranslation": "Ajouter la traduction {{locale}} de {{key}}",
+		"valueFor": "Valeur {{locale}} de {{key}}",
+		"revertCell": "Annuler cette valeur",
+		"renameKey": "Renommer",
+		"renamedFrom": "Renommée depuis {{key}}",
+		"deleteKey": "Supprimer",
+		"undoDelete": "Restaurer",
+		"willBeDeleted": "Sera supprimée de toutes les locales à l'enregistrement",
+		"newBadge": "nouvelle",
+		"mismatchHint": "La référence utilise : {{vars}}",
+		"pendingChanges_one": "{{count}} modification non enregistrée",
+		"pendingChanges_other": "{{count}} modifications non enregistrées",
+		"noChanges": "Aucune modification en attente",
+		"savedFiles_one": "Enregistré — {{count}} fichier écrit",
+		"savedFiles_other": "Enregistré — {{count}} fichiers écrits",
+		"savedNothingToWrite": "Enregistré — les fichiers étaient déjà à jour",
+		"discard": "Abandonner",
+		"save": "Enregistrer",
+		"showing": "{{shown}} sur {{total}} affichées",
+		"showMore": "Afficher plus",
+		"staleNotice": "Ces fichiers ont changé sur le disque depuis leur ouverture. Vos modifications sont conservées — rechargez pour les appliquer sur le nouveau contenu.",
+		"reloadKeepingEdits": "Recharger en gardant mes modifications"
 	},
 	"cogContext": {
 		"title": "Optimiseur de Contexte Cognitif",

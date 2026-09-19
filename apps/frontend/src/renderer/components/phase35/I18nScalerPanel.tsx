@@ -1,20 +1,32 @@
 /**
  * #3.12 i18n Auto-Scaling panel.
  *
- * Point at a `locales/` directory, pick a source locale, see coverage and
- * missing/obsolete keys per target locale.
+ * Two readings of one directory, behind a switch:
  *
- * UX: directory is picked via the native OS dialog (no manual typing of
- * paths) and source locale is a dropdown of common BCP-47 codes with an
- * escape hatch for custom values like "pt-BR".
+ * * **Report** — coverage and the missing, obsolete and mismatched keys per
+ *   locale. What is wrong.
+ * * **Editor** — the keys themselves, editable, added and removed
+ *   (`i18n-editor/`). Where it gets fixed.
+ *
+ * They share the directory and the source locale rather than each asking
+ * again, because they are two questions about the same files.
+ *
+ * UX: the directory is picked via the native OS dialog (no manual typing of
+ * paths), and in the editor the project's *own* translation directories are
+ * detected and offered first — a native dialog walked down to
+ * `apps/frontend/src/shared/i18n/locales` is a poor way to open the thing the
+ * app already knows about. The source locale is a dropdown of common BCP-47
+ * codes with an escape hatch for custom values like "pt-BR".
  */
 
-import { FolderOpen, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { FolderOpen, Sparkles, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useI18nEditorStore } from "../../stores/i18n-editor-store";
 import { useI18nScalerStore } from "../../stores/phase35-stores";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
+import { TranslationEditor } from "./i18n-editor/TranslationEditor";
 
 const LOCALE_PATTERN = /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/;
 const PATH_MAX_LEN = 1024;
@@ -45,10 +57,17 @@ const COMMON_LOCALES = [
 
 const CUSTOM_SENTINEL = "__custom__";
 
-export function I18nScalerPanel() {
+interface I18nScalerPanelProps {
+	/** The open project. Its own translation directories are offered below. */
+	projectPath?: string;
+}
+
+export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 	const { t } = useTranslation("phase35");
 	const { phase, error, report, scannedDir, redirectedFrom, runReport } =
 		useI18nScalerStore();
+	const editor = useI18nEditorStore();
+	const [mode, setMode] = useState<"report" | "editor">("report");
 	const [dir, setDir] = useState("");
 	const [source, setSource] = useState<string>("en");
 	const [customSource, setCustomSource] = useState("");
@@ -74,6 +93,15 @@ export function I18nScalerPanel() {
 	}, [effectiveSource, t]);
 
 	const hasError = Boolean(dirError) || Boolean(sourceError);
+	const editorBusy = editor.phase === "loading";
+
+	// Asked once per project, and only in the editor: the report has always
+	// been driven by an explicit directory, and a scan nobody asked for on the
+	// way into a panel is a scan that surprises.
+	const detectRoots = editor.detectRoots;
+	useEffect(() => {
+		if (mode === "editor" && projectPath) void detectRoots(projectPath);
+	}, [mode, projectPath, detectRoots]);
 
 	const handleBrowse = async () => {
 		try {
@@ -104,13 +132,43 @@ export function I18nScalerPanel() {
 			subtitle={t("i18nScaler.subtitle")}
 			error={error}
 			actions={
-				<Button
-					size="sm"
-					onClick={() => runReport(dir.trim(), effectiveSource)}
-					disabled={isRunning || hasError}
-				>
-					{isRunning ? t("common.running") : t("i18nScaler.runReport")}
-				</Button>
+				<>
+					{/*
+					 * Two readings of the same directory: the report says what is
+					 * wrong, the editor is where it gets fixed. They share the
+					 * picker above rather than each asking for the path again.
+					 */}
+					<div className="flex rounded-md border p-0.5">
+						{(["report", "editor"] as const).map((value) => (
+							<Button
+								key={value}
+								size="sm"
+								variant={mode === value ? "secondary" : "ghost"}
+								className="h-6 px-2 text-[11px]"
+								onClick={() => setMode(value)}
+							>
+								{t(`i18nScaler.mode.${value}`)}
+							</Button>
+						))}
+					</div>
+					<Button
+						size="sm"
+						onClick={() =>
+							mode === "report"
+								? runReport(dir.trim(), effectiveSource)
+								: void editor.loadNamespaces(dir.trim(), effectiveSource)
+						}
+						disabled={isRunning || editorBusy || hasError}
+					>
+						{mode === "report"
+							? isRunning
+								? t("common.running")
+								: t("i18nScaler.runReport")
+							: editorBusy
+								? t("common.loading")
+								: t("i18nScaler.loadTranslations")}
+					</Button>
+				</>
 			}
 		>
 			<div className="space-y-3 text-sm">
@@ -216,7 +274,59 @@ export function I18nScalerPanel() {
 					</div>
 				</div>
 
-				{report && scannedDir && (
+				{mode === "editor" && editor.detectedRoots.length > 0 && !editor.localesDir && (
+					<div className="rounded border border-dashed p-3">
+						<p className="mb-2 flex items-center gap-1.5 text-xs font-medium">
+							<Sparkles className="h-3.5 w-3.5 text-primary" />
+							{t("i18nScaler.detectedTitle")}
+						</p>
+						<div className="flex flex-wrap gap-2">
+							{editor.detectedRoots.map((root) => (
+								<Button
+									key={root.path}
+									size="sm"
+									variant="outline"
+									className="h-auto flex-col items-start gap-0.5 px-2 py-1.5"
+									onClick={() => {
+										setDir(root.path);
+										void editor.loadNamespaces(root.path, effectiveSource);
+									}}
+								>
+									<span className="font-mono text-[11px]">{root.relative}</span>
+									<span className="text-[10px] font-normal text-muted-foreground">
+										{t("i18nScaler.detectedMeta", {
+											locales: root.locales.join(", "),
+											count: root.namespaces,
+										})}
+									</span>
+								</Button>
+							))}
+						</div>
+					</div>
+				)}
+
+				{mode === "editor" && (
+					<div className="space-y-2">
+						{editor.error && (
+							<p className="text-xs text-destructive">{editor.error}</p>
+						)}
+						{editor.localesDir && (
+							<p className="font-mono text-xs text-muted-foreground break-all">
+								{t("i18nScaler.scannedDir", { dir: editor.localesDir })}
+								{editor.locales.length > 0 && ` · ${editor.locales.join(", ")}`}
+							</p>
+						)}
+						{editor.namespaces.length > 0 ? (
+							<TranslationEditor />
+						) : (
+							<p className="rounded border border-dashed p-6 text-center text-xs text-muted-foreground">
+								{t("i18nScaler.editorEmpty")}
+							</p>
+						)}
+					</div>
+				)}
+
+				{mode === "report" && report && scannedDir && (
 					<p className="text-xs text-muted-foreground font-mono break-all">
 						{redirectedFrom
 							? t("i18nScaler.redirectedNotice", {
@@ -227,7 +337,7 @@ export function I18nScalerPanel() {
 					</p>
 				)}
 
-				{report && (
+				{mode === "report" && report && (
 					<div className="space-y-3">
 						<div>
 							<div className="font-medium mb-1">{t("i18nScaler.coverage")}</div>
