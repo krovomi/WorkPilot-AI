@@ -3,7 +3,9 @@
 The repository carried three prompt-injection defences and called none of
 them: `ContentSanitizer` had zero callers, `BaseAgent` — the only thing that
 reaches `injection_guard.guarded_prompt` — has zero subclasses, and
-`security/injection_scanner.py` was re-exported and never used. So an HTML
+`security/injection_scanner.py` was re-exported and never used (its
+catalogue has since been merged into `injection_guard` and the module
+deleted). So an HTML
 comment in a GitHub issue body reached the model exactly as written, invisible
 to the human who read the same issue in a browser.
 

@@ -162,16 +162,22 @@ jobs:
   #   pip-audit   fails on any finding. apps/backend/requirements.txt is clean
   #               today, so the gate is green and every future failure is a
   #               real regression.
-  #   pnpm audit  fails on `critical` only (0 today), and reports high and
-  #               moderate. There are 9 high findings already, all transitive
-  #               under electron-builder / electron-updater packaging tooling
-  #               with no direct fix path. A gate that is red the day it lands
-  #               is a gate somebody deletes in a week; one that is green and
-  #               prints the backlog is one that survives to catch the next
-  #               one.
+  #   pnpm audit  fails on `critical` and `high`, and reports `moderate` and
+  #               `low` in the job summary.
   #
-  # Raise the pnpm threshold to `high` once that backlog is cleared — that is
-  # the change this comment exists to make obvious.
+  # That threshold used to be `critical` only, because 9 high findings were
+  # already in the tree and a gate that is red the day it lands is a gate
+  # somebody deletes in a week. The comment here said to raise it once the
+  # backlog was cleared; the backlog is cleared — four `pnpm.overrides` in
+  # pnpm-workspace.yaml were pinned to versions that had since become
+  # vulnerable themselves (@xmldom/xmldom, js-yaml, hono) or were missing
+  # (qs), and raising them takes the whole tree to 0 at every severity.
+  #
+  # It stops at `high` rather than "any finding" on purpose. npm's transitive
+  # surface is far larger than this backend's, so moderates will keep
+  # arriving from dependencies nobody here chose; failing on them would put
+  # the branch red for reasons no contributor to this repository can fix in
+  # their own PR. They are printed instead, which is what the summary is for.
   # --------------------------------------------------------------------------
   dependency-audit:
     name: Dependency Audit
@@ -233,9 +239,10 @@ jobs:
               summary += `| ${level} | ${counts[level] ?? 0} |\n`;
             }
 
-            const blocking = advisories.filter(a => a.severity === 'critical');
+            const BLOCKING = ['critical', 'high'];
+            const blocking = advisories.filter(a => BLOCKING.includes(a.severity));
             if (blocking.length > 0) {
-              summary += `\n### Critical\n\n`;
+              summary += `\n### Blocking (critical / high)\n\n`;
               for (const advisory of blocking) {
                 const path = advisory.findings?.[0]?.paths?.[0] ?? 'unknown path';
                 summary += `- **${advisory.module_name}** — ${advisory.title}\n`;
@@ -247,7 +254,10 @@ jobs:
             await core.summary.write();
 
             if (blocking.length > 0) {
-              core.setFailed(`${blocking.length} critical advisory/advisories in npm dependencies`);
+              core.setFailed(
+                `${blocking.length} critical/high advisory/advisories in npm dependencies. ` +
+                `Fix by raising the package in pnpm.overrides (pnpm-workspace.yaml) to a patched version.`
+              );
             }
 
   # --------------------------------------------------------------------------
