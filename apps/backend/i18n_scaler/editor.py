@@ -270,7 +270,12 @@ def _write_atomic(path: Path, text: str) -> None:
         try:
             os.unlink(tmp)
         except OSError:
-            pass
+            # The temporary file is already gone, or is not ours to remove.
+            # Either way the cleanup has nothing left to do, and the failure
+            # worth reporting is the one being unwound — raising this one over
+            # it would replace "the save failed because X" with "could not
+            # delete a scratch file", about a file the caller never saw.
+            logger.debug("Could not remove the temporary file for %s", path.name)
         raise
 
 

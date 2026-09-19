@@ -251,6 +251,60 @@ class TestApplyOperations:
         }
 
 
+class TestAtomicWrite:
+    """What a save leaves behind when it cannot finish.
+
+    The temporary file goes in the target's own directory so `os.replace` stays
+    on one filesystem, which means a crash could leave a stray `.common.json.*`
+    next to the real one — inside a directory the app then scans for locales.
+    """
+
+    def test_a_failed_write_leaves_no_temporary_file(
+        self, nested: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        import i18n_scaler.editor as editor_module
+
+        def boom(_src, _dst):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(editor_module.os, "replace", boom)
+        with pytest.raises(OSError, match="disk full"):
+            apply_operations(
+                nested,
+                "common",
+                [Operation(op="set", key="buttons.save", values={"fr": "Sauver"})],
+            )
+
+        strays = [p.name for p in (nested / "fr").iterdir() if p.name != "common.json"]
+        assert strays == []
+        # And the original is untouched — a half-written file would be worse
+        # than no save at all.
+        assert "Enregistrer" in (nested / "fr" / "common.json").read_text(
+            encoding="utf-8"
+        )
+
+    def test_the_original_failure_is_what_surfaces(
+        self, nested: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Not whatever the cleanup ran into on the way out."""
+        import i18n_scaler.editor as editor_module
+
+        def boom(_src, _dst):
+            raise OSError("disk full")
+
+        def also_boom(_path):
+            raise OSError("cleanup exploded too")
+
+        monkeypatch.setattr(editor_module.os, "replace", boom)
+        monkeypatch.setattr(editor_module.os, "unlink", also_boom)
+        with pytest.raises(OSError, match="disk full"):
+            apply_operations(
+                nested,
+                "common",
+                [Operation(op="set", key="buttons.save", values={"fr": "Sauver"})],
+            )
+
+
 class TestRefusals:
     def test_a_stale_fingerprint_stops_the_whole_batch(self, nested: Path):
         view = load_namespace(nested, "common")
