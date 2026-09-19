@@ -205,21 +205,29 @@ Minimal overhead - just subtasks, no phases.
 
 **🚨 CRITICAL: YOU MUST USE THE WRITE TOOL TO CREATE THIS FILE 🚨**
 
-You MUST use the Write tool to save the implementation plan to `implementation_plan.json`.
+You MUST use the Write tool to save the implementation plan.
 Do NOT just describe what the file should contain - you must actually call the Write tool with the complete JSON content.
 
 **Required action:** Call the Write tool with:
-- file_path: `implementation_plan.json` (in the spec directory)
+- file_path: the **absolute** `.../implementation_plan.json` path given under
+  "SPEC LOCATION" at the top of this prompt. A bare `implementation_plan.json`
+  is resolved against the project root, which is NOT where WorkPilot reads the
+  plan — the file lands beside the source tree and the build reports that no
+  plan was produced.
 - content: The complete JSON plan structure shown below
 
-**🚨 CRITICAL FOR WINDSURF/OPENAI/COPILOT USERS 🚨**
-If you are using Windsurf, OpenAI, Copilot, or any non-Claude provider:
+**🚨 CRITICAL FOR NON-CLAUDE PROVIDERS 🚨**
+If you are using Windsurf, OpenAI, Copilot, Ollama, LM Studio, or any other non-Claude provider:
 - You MUST include a "phases" array in your JSON - this is NOT optional
 - The "phases" array MUST contain at least one phase object
 - Each phase MUST have a "subtasks" array with at least one subtask
 - A plan without "phases" will fail validation with "No phases defined"
 - Do NOT create a plan with an empty phases array: "phases": []
 - The validation will reject empty phases arrays
+- Write the JSON document ALONE into the file: no ``` fence, no sentence before
+  or after it. The file must start with `{` and end with `}`
+- Do NOT rename the top-level key: it is `phases`, not `tasks`, `steps` or
+  `stages`, and it is not nested under an `implementation_plan` key
 
 **Minimal valid structure (use this as template):**
 ```json
