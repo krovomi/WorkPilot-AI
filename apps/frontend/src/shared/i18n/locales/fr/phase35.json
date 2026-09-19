@@ -193,6 +193,8 @@
 		"sourceLocaleCustomLabel": "Code locale personnalisé",
 		"strategy": "Stratégie de placeholder",
 		"runReport": "Lancer le rapport",
+		"scannedDir": "Lu depuis {{dir}}",
+		"redirectedNotice": "{{picked}} est une locale, pas la racine des locales — lecture de {{dir}} à la place.",
 		"coverage": "Couverture par locale",
 		"missingKeys": "Clés manquantes",
 		"obsoleteKeys": "Clés obsolètes",

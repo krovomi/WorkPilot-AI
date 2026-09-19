@@ -20,7 +20,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from core.api_safety import safe_error, validated_dir
+from core.api_safety import safe_error, server_mode_roots, validated_dir
 from fastapi import APIRouter, Query
 from fastapi import Path as PathParam
 from fastapi.responses import PlainTextResponse
@@ -39,39 +39,111 @@ _trails: dict[tuple[str, str], AuditTrail] = {}
 _trails_lock = Lock()
 
 
-def _allowed_storage_roots() -> list[Path]:
+def _allowed_storage_roots() -> list[Path] | None:
     """Roots under which audit-trail storage_dir is allowed to live.
 
-    Why: every endpoint accepts ``storage_dir`` from the HTTP request and
-    creates the directory if missing (via Path.mkdir). Without an allowlist,
-    a caller on the same host could trigger arbitrary directory creation
-    and write JSONL files to surprising locations. We restrict to the env
-    var ``AUDIT_TRAIL_ALLOWED_ROOTS`` (os-pathsep separated) when set, or
-    fall back to the current working directory only.
+    Every endpoint here accepts ``storage_dir`` from the request and creates
+    the directory if missing, so where that path may point is a real
+    question. It has three answers, and only the middle one is a guess:
+
+    * ``AUDIT_TRAIL_ALLOWED_ROOTS`` (os-pathsep separated) when set — an
+      explicit deployment decision, and it wins in either mode.
+    * **server mode**: `server_mode_roots`, the ``REPOS_ROOT`` subtree every
+      project is cloned under. Tighter than what this used to do, and the
+      answer the rest of the backend already gives.
+    * **local mode**: unconfined, like every other path-taking endpoint in
+      this backend. `core.api_safety` states the reason for all of them:
+      there is no privilege boundary to draw, because the backend runs as
+      the person who chose the directory in their own desktop app.
+
+    The fallback this replaces was the current working directory. That reads
+    as caution and was not: the backend is spawned with ``cwd=apps/backend``,
+    while `agents.agent_audit` writes every trail to
+    ``<project_dir>/.workpilot/audit-trail`` — inside the user's own
+    checkout, outside this repository by definition. So the one panel built
+    to read those trails could reach no directory any of them is ever
+    written to, and said "Invalid input" about the path the app itself had
+    chosen. A guard that admits only a directory nothing writes to is not
+    protecting anything; it is switching the feature off.
     """
     raw = os.environ.get("AUDIT_TRAIL_ALLOWED_ROOTS", "").strip()
-    if not raw:
-        return [Path.cwd().resolve()]
-    return [Path(p).expanduser().resolve() for p in raw.split(os.pathsep) if p.strip()]
+    if raw:
+        return [
+            Path(p).expanduser().resolve() for p in raw.split(os.pathsep) if p.strip()
+        ]
+    return server_mode_roots()
+
+
+# What a caller is told when `storage_dir` sits outside every allowed root.
+#
+# A module constant rather than the exception's own message, and that is the
+# whole point: `safe_error` is a barrier because it returns fixed strings, and
+# an earlier version of `_error` returned `str(e)` for this one case. CodeQL
+# read that correctly — exception data reaching a response — and raised
+# `py/stack-trace-exposure` at all seventeen handlers below. Returning a
+# constant says the same sentence to the user with nothing derived from the
+# exception in it, so there is no flow left to trace.
+#
+# The roots themselves are not named. They are server configuration, and in
+# server mode this router is mounted for tenants who have no business reading
+# the deployment's layout.
+STORAGE_DIR_REFUSED = (
+    "This directory is outside the roots the audit trail may read. "
+    "Set AUDIT_TRAIL_ALLOWED_ROOTS on the backend to include it."
+)
+
+
+class StorageDirRefused(ValueError):
+    """`storage_dir` sits outside every allowed root.
+
+    A distinct type because this one refusal is worth reporting in full, and
+    `safe_error` — rightly — flattens every `ValueError` here to "Invalid
+    input". That answer is unreadable for the only mistake a user can actually
+    make on this endpoint: naming a directory the backend is not configured to
+    reach. `api_safety`'s own guidance is to raise a literal message where the
+    handler knows something more useful, and this handler does.
+
+    The type is what carries the meaning; the caller reads
+    `STORAGE_DIR_REFUSED`, never this exception's message.
+    """
 
 
 def _validate_dir(raw: str) -> Path:
-    """The allowlist stays — it is the real containment on this endpoint.
+    """Normalise `storage_dir`, and confine it where a root exists to confine it to.
 
     `validated_dir` adds the normalisation and the `..` refusal that CodeQL
     recognises as a barrier; `is_relative_to`, which the allowlist uses, it
     does not recognise at all, so the module reported `py/path-injection`
     despite being correctly confined. `must_exist=False` because the
-    directory is created below rather than required up front.
+    directory is created below rather than required up front. A ``None`` from
+    `_allowed_storage_roots` is local mode, where `validated_dir` normalises
+    without confining — see its module docstring for why that is the right
+    answer there and not a gap.
     """
-    p = validated_dir(
-        raw,
-        "storage_dir",
-        allowed_roots=_allowed_storage_roots(),
-        must_exist=False,
-    )
+    roots = _allowed_storage_roots()
+    try:
+        p = validated_dir(raw, "storage_dir", allowed_roots=roots, must_exist=False)
+    except ValueError as e:
+        if "outside every allowed root" in str(e):
+            raise StorageDirRefused(STORAGE_DIR_REFUSED) from e
+        raise
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def _error(e: Exception, op: str) -> str:
+    """The message a caller gets. One refusal speaks for itself; the rest don't.
+
+    Every handler below funnels through here instead of calling `safe_error`
+    directly, so the one refusal a caller can act on reaches them while
+    everything else still collapses to "Invalid input" with the real cause in
+    the log. Both arms return a fixed string: nothing derived from the
+    exception is ever handed back.
+    """
+    if isinstance(e, StorageDirRefused):
+        logger.warning("%s refused a storage_dir outside the allowed roots", op)
+        return STORAGE_DIR_REFUSED
+    return safe_error(e, logger, op)
 
 
 def _get_trail(storage_dir: str, name: str) -> AuditTrail:
@@ -121,10 +193,10 @@ def append(req: AppendRequest):
         )
         return {"success": True, "event": evt.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": safe_error(e, logger, "append")}
+        return {"success": False, "error": _error(e, "append")}
     except Exception as e:  # noqa: BLE001
         logger.exception("append failed")
-        return {"success": False, "error": safe_error(e, logger, "append")}
+        return {"success": False, "error": _error(e, "append")}
 
 
 @router.post("/append-decision")
@@ -146,10 +218,10 @@ def append_decision(req: AppendDecisionRequest):
         )
         return {"success": True, "event": evt.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": safe_error(e, logger, "append_decision")}
+        return {"success": False, "error": _error(e, "append_decision")}
     except Exception as e:  # noqa: BLE001
         logger.exception("append_decision failed")
-        return {"success": False, "error": safe_error(e, logger, "append_decision")}
+        return {"success": False, "error": _error(e, "append_decision")}
 
 
 @router.get("/events")
@@ -169,7 +241,7 @@ def events(
             try:
                 AuditEventKind(kind)
             except ValueError as e:
-                return {"success": False, "error": safe_error(e, logger, "events")}
+                return {"success": False, "error": _error(e, "events")}
         results = trail.filter(actor=actor, kind=kind, since=since, until=until)
         return {
             "success": True,
@@ -177,10 +249,10 @@ def events(
             "count": len(results),
         }
     except ValueError as e:
-        return {"success": False, "error": safe_error(e, logger, "events")}
+        return {"success": False, "error": _error(e, "events")}
     except Exception as e:  # noqa: BLE001
         logger.exception("events failed")
-        return {"success": False, "error": safe_error(e, logger, "events")}
+        return {"success": False, "error": _error(e, "events")}
 
 
 @router.get("/replay/{correlation_id}")
@@ -194,10 +266,10 @@ def replay(
         bundle = trail.replay(correlation_id)
         return {"success": True, "bundle": bundle.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": safe_error(e, logger, "replay")}
+        return {"success": False, "error": _error(e, "replay")}
     except Exception as e:  # noqa: BLE001
         logger.exception("replay failed")
-        return {"success": False, "error": safe_error(e, logger, "replay")}
+        return {"success": False, "error": _error(e, "replay")}
 
 
 @router.get("/verify")
@@ -207,10 +279,10 @@ def verify(storage_dir: str = Query(...), trail_name: str = Query("default")):
         report = trail.verify()
         return {"success": True, "integrity": report.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": safe_error(e, logger, "verify")}
+        return {"success": False, "error": _error(e, "verify")}
     except Exception as e:  # noqa: BLE001
         logger.exception("verify failed")
-        return {"success": False, "error": safe_error(e, logger, "verify")}
+        return {"success": False, "error": _error(e, "verify")}
 
 
 @router.get("/trails")
@@ -219,10 +291,10 @@ def list_trails(storage_dir: str = Query(...)):
         path = _validate_dir(storage_dir)
         return {"success": True, "trails": AuditTrail.list_trails(path)}
     except ValueError as e:
-        return {"success": False, "error": safe_error(e, logger, "list_trails")}
+        return {"success": False, "error": _error(e, "list_trails")}
     except Exception as e:  # noqa: BLE001
         logger.exception("list_trails failed")
-        return {"success": False, "error": safe_error(e, logger, "list_trails")}
+        return {"success": False, "error": _error(e, "list_trails")}
 
 
 @router.get("/export/soc2")
@@ -247,10 +319,10 @@ def export_soc2(
             },
         )
     except ValueError as e:
-        return {"success": False, "error": safe_error(e, logger, "export_soc2")}
+        return {"success": False, "error": _error(e, "export_soc2")}
     except Exception as e:  # noqa: BLE001
         logger.exception("export_soc2 failed")
-        return {"success": False, "error": safe_error(e, logger, "export_soc2")}
+        return {"success": False, "error": _error(e, "export_soc2")}
 
 
 @router.get("/export/gdpr")
@@ -269,7 +341,7 @@ def export_gdpr(
         bundle = build_dsar_bundle(trail, actor=actor, correlation_id=correlation_id)
         return {"success": True, "bundle": bundle.to_dict()}
     except ValueError as e:
-        return {"success": False, "error": safe_error(e, logger, "export_gdpr")}
+        return {"success": False, "error": _error(e, "export_gdpr")}
     except Exception as e:  # noqa: BLE001
         logger.exception("export_gdpr failed")
-        return {"success": False, "error": safe_error(e, logger, "export_gdpr")}
+        return {"success": False, "error": _error(e, "export_gdpr")}
