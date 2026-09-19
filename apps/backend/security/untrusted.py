@@ -11,7 +11,8 @@ none of them —
                                    of every runner in the product)
 `injection_guard/` + `BaseAgent`   `BaseAgent` has zero subclasses
 `security/injection_scanner.py`    re-exported by `security/__init__`, called
-                                   by nothing
+                                   by nothing — since merged into
+                                   `injection_guard` and deleted
 =================================  =========================================
 
 — so a `<!-- ignore all previous instructions and … -->` in an issue body
