@@ -40,6 +40,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [IPC Communication](#ipc-communication)
   - [Background work and the sidebar](#background-work-and-the-sidebar-storesactivity-storets)
   - [Le pourcentage d'une tâche](#le-pourcentage-dune-tâche-sharedprogressts)
+  - [Les critères d'acceptation en puces](#les-critères-dacceptation-en-puces-task-detailacceptance-criteria-draftts)
   - [Architectures et historique de construction](#architectures-et-historique-de-construction-visual-to-code)
   - [Provider × LLM × effort, par page](#provider--llm--effort-par-page-sharedutilspage-llmts)
   - [L'adresse qu'ouvre l'émulateur](#ladresse-quouvre-lémulateur-sharedutilsemulator-landingts)
@@ -1853,6 +1854,52 @@ Au-dessus de tout cela, `getDisplayProgress` garde ses deux priorités : dès qu
 existe des sous-tâches, leur part terminée EST l'avancement réel (la pondération
 par phase gonflerait à ~94% dès le démarrage de la QA), et un état terminal vaut
 100% quel que soit un comptage en retard.
+
+### Les critères d'acceptation en puces (`task-detail/acceptance-criteria-draft.ts`)
+
+Les critères sont un `string[]` dans `task_metadata.json`, et ils s'éditaient
+dans un textarea où une ligne valait un critère. Le format lit bien et s'édite
+mal : une ligne de textarea n'est pas une chose. En supprimer une au milieu,
+en déplacer une, savoir combien il y en a — ce sont trois opérations sur du
+texte, faites à la main, sans rien pour dire qu'on s'est trompé de ligne.
+
+Chaque critère est maintenant une puce à part entière : son champ, son bouton
+de suppression, sa place dans la liste. Ce qui rend la chose possible est un
+`id` stable par ligne (`CriterionDraft`), indépendant du texte et de la
+position : c'est la clé React, et c'est la cible du focus après une insertion
+ou une suppression. Un id dérivé du texte ferait de deux critères identiques
+une seule ligne, et changerait à chaque frappe.
+
+| Fichier | Rôle |
+|---|---|
+| `acceptance-criteria-draft.ts` | les règles sans React : découpage d'un collage, marqueurs de puce, insertion / suppression / déplacement, ce qui part à l'enregistrement |
+| `AcceptanceCriteriaEditor.tsx` | les puces, le clavier et le focus |
+| `TaskMetadata.tsx` | la section, les deux modes, l'enregistrement |
+
+**Le mode texte reste offert à côté.** La liste est le mode par défaut et le
+texte brut d'avant est à un clic : c'est lui qui fait bien ce que les puces
+font mal — coller dix critères, en réordonner la moitié, tout effacer d'un
+geste. Les deux éditent la même liste, et le passage de l'un à l'autre garde
+la ligne vide qu'on vient d'ouvrir — d'où la chaîne propre au mode texte,
+plutôt qu'un texte dérivé des puces à chaque frappe, qui supprimerait la ligne
+sur laquelle on est en train de taper.
+
+**Un critère tient sur une ligne**, parce que tout ce qui le relit découpe sur
+les retours à la ligne. Entrée ouvre donc une puce au lieu d'insérer un saut,
+un bloc collé devient une puce par ligne, et la normalisation se reprend à
+l'enregistrement — un glisser-déposer de texte dans un champ n'appuie sur
+aucune touche.
+
+**Le marqueur de puce est retiré plus prudemment qu'à la lecture des
+trackers.** `parseAcceptanceCriteriaText` lit un `<li>` où le marqueur est
+certain ; ici la ligne vient de l'utilisateur, et « 3 tentatives maximum »
+n'est pas une liste numérotée. Un chiffre ne compte comme marqueur que suivi
+d'un point ou d'une parenthèse, et un marqueur doit être suivi d'une espace.
+
+**Une puce vide n'est pas un critère** : elle existe dans l'éditeur, elle ne
+part pas sur le disque. C'est ce qui permet de garder toujours un champ où
+taper — supprimer la dernière puce en laisse une vide plutôt qu'une liste sans
+champ — sans empêcher d'effacer la liste entière.
 
 ### Architectures et historique de construction (`visual-to-code/`)
 
