@@ -197,6 +197,84 @@ class TestFilesystemHelpers:
         with pytest.raises(ValueError):
             I18nAutoScaler().discover_locale_dir(ghost)
 
+    # -- the layouts a folder picker can hand over ---------------------
+
+    def test_discover_flat_layout(self, tmp_path: Path) -> None:
+        """``<root>/<lang>.json`` — one file per language, no namespaces."""
+        (tmp_path / "en.json").write_text('{"hello": "Hi"}', encoding="utf-8")
+        (tmp_path / "pt-BR.json").write_text('{"hello": "Oi"}', encoding="utf-8")
+        found = I18nAutoScaler().discover_locales(tmp_path)
+        assert found.layout == "flat"
+        assert set(found.locales) == {"en", "pt-BR"}
+        assert found.locales["pt-BR"]["hello"] == "Oi"
+
+    def test_namespace_files_are_not_read_as_a_flat_layout(
+        self, tmp_path: Path
+    ) -> None:
+        """A namespace whose stem reads like a locale must not become one.
+
+        ``no.json`` (Norwegian) and ``llm.json`` are both plausible namespace
+        names; taking the flat layout on a partial match would report them as
+        languages.
+        """
+        self._write_locale(
+            tmp_path,
+            "fr",
+            {"common": {"hello": "Bonjour"}, "no": {"x": "y"}, "llm": {"x": "y"}},
+        )
+        found = I18nAutoScaler().discover_locales(tmp_path / "fr")
+        assert found.layout != "flat"
+        assert "no" not in found.locales
+        assert "llm" not in found.locales
+
+    def test_picking_the_locale_directory_finds_its_siblings(
+        self, tmp_path: Path
+    ) -> None:
+        """The mistake the folder dialog invites: picking ``locales/fr``.
+
+        It used to read as an empty root, and the report then said the source
+        locale was missing from the directory named after it.
+        """
+        self._write_locale(tmp_path, "en", {"common": {"hello": "Hi"}})
+        self._write_locale(tmp_path, "fr", {"common": {"hello": "Bonjour"}})
+        found = I18nAutoScaler().discover_locales(tmp_path / "fr")
+        assert set(found.locales) == {"en", "fr"}
+        assert found.root == tmp_path
+        assert found.redirected_from == tmp_path / "fr"
+
+    def test_a_real_root_is_never_redirected(self, tmp_path: Path) -> None:
+        """The redirect only fires when the directory held no locales."""
+        self._write_locale(tmp_path, "en", {"common": {"hello": "Hi"}})
+        found = I18nAutoScaler().discover_locales(tmp_path)
+        assert found.redirected_from is None
+        assert found.root == tmp_path
+
+    def test_directory_not_named_like_a_locale_is_not_redirected(
+        self, tmp_path: Path
+    ) -> None:
+        """``assets/`` holding JSON is not a language that lost its siblings."""
+        self._write_locale(tmp_path, "en", {"common": {"hello": "Hi"}})
+        assets = tmp_path / "assets"
+        assets.mkdir()
+        (assets / "icons.json").write_text('{"a": 1}', encoding="utf-8")
+        found = I18nAutoScaler().discover_locales(assets)
+        assert found.locales == {}
+        assert found.redirected_from is None
+
+    def test_sibling_directory_without_json_is_not_a_locale(
+        self, tmp_path: Path
+    ) -> None:
+        """A directory next to the locales is not a language with no keys."""
+        self._write_locale(tmp_path, "en", {"common": {"hello": "Hi"}})
+        (tmp_path / "__generated__").mkdir()
+        found = I18nAutoScaler().discover_locales(tmp_path)
+        assert set(found.locales) == {"en"}
+
+    def test_empty_directory_reports_nothing_found(self, tmp_path: Path) -> None:
+        found = I18nAutoScaler().discover_locales(tmp_path)
+        assert found.locales == {}
+        assert found.layout == "none"
+
     def test_write_skeleton_creates_files(self, tmp_path: Path) -> None:
         skeleton = {"common": {"hello": "[FR] Hi"}, "errors": {"e": "[FR] err"}}
         written = I18nAutoScaler().write_skeleton_to_dir(skeleton, tmp_path / "fr")

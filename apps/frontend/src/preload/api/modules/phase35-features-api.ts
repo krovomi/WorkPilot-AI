@@ -348,7 +348,20 @@ export interface Phase35FeaturesAPI {
 		localesDir: string,
 		sourceLocale?: string,
 		strategy?: string,
-	) => Promise<Phase35Result<{ report: I18nScalingReport }>>;
+	) => Promise<
+		Phase35Result<{
+			report: I18nScalingReport;
+			/** The directory the locales were actually read from. */
+			locales_dir: string;
+			locales_found: string[];
+			layout: "nested" | "flat" | "none";
+			/**
+			 * Set when the picked directory was one language rather than the
+			 * root of all of them, and the search moved up to its parent.
+			 */
+			redirected_from: string | null;
+		}>
+	>;
 
 	// #3.2 Cognitive Context
 	optimizeContext: (

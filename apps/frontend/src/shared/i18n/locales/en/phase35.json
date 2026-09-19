@@ -193,6 +193,8 @@
 		"sourceLocaleCustomLabel": "Custom locale code",
 		"strategy": "Placeholder strategy",
 		"runReport": "Run report",
+		"scannedDir": "Read from {{dir}}",
+		"redirectedNotice": "{{picked}} is one locale, not the locales root — read {{dir}} instead.",
 		"coverage": "Coverage per locale",
 		"missingKeys": "Missing keys",
 		"obsoleteKeys": "Obsolete keys",
