@@ -2130,6 +2130,7 @@ def create_agent_client(
             agents=copilot_agents,
             cwd=str(project_dir.resolve()),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
         )
 
     elif provider == "claude":
@@ -2185,6 +2186,7 @@ def create_agent_client(
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
         )
 
     elif provider == "openai":
@@ -2249,6 +2251,7 @@ def create_agent_client(
             agent_type=agent_type,
             reasoning_effort=reasoning_effort,
             prompt_cache_key=prompt_cache_key,
+            spec_dir=str(spec_dir),
         )
 
     elif provider == "google":
@@ -2279,6 +2282,7 @@ def create_agent_client(
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
         )
 
     elif provider in ("ollama", "local", "lmstudio", "lm-studio", "llama-cpp"):
@@ -2344,6 +2348,7 @@ def create_agent_client(
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
         )
 
     else:
