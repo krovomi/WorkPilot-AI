@@ -432,3 +432,236 @@ class TestAutoFixReachesTheValidator:
         assert after["phases"][0]["id"] == "phase-1"
         assert after["phases"][0]["subtasks"] == VALID_PLAN["phases"][0]["subtasks"]
         assert self._validate(tmp_path).valid
+
+
+# --------------------------------------------------------------------------- #
+# The shape the earlier fix still gave up on
+# --------------------------------------------------------------------------- #
+
+
+class TestEmptyPhasesFallsThroughToTheFlatList:
+    """`{"phases": [], "tasks": [...]}` — the shape behind the bug report.
+
+    PHASE 3 of `prompts/planner.md` warns against an empty `phases` array by
+    name, which is exactly why a local model produces one. Reading that empty
+    key as the final answer meant the subtasks one key further down were thrown
+    away, and the build reported "No phases defined / No subtasks defined in any
+    phase" — the one report that claims a model produced nothing when it had
+    produced a plan.
+    """
+
+    @pytest.mark.parametrize("alias", ["tasks", "subtasks", "steps", "items"])
+    def test_empty_phases_beside_a_flat_list(self, alias):
+        plan = normalize_plan_shape(
+            {
+                "feature": "Ajout de namespaces manquants",
+                "workflow_type": "feature",
+                "phases": [],
+                alias: [{"description": "Add namespace to Foo.cs"}],
+            }
+        )
+        assert plan is not None and count_subtasks(plan) == 1
+        assert plan["feature"] == "Ajout de namespaces manquants"
+
+    def test_phases_present_but_none_of_them_carries_work(self):
+        plan = normalize_plan_shape(
+            {
+                "feature": "F",
+                "phases": [{"id": "p1", "name": "P", "subtasks": []}],
+                "tasks": [{"description": "a"}, {"description": "b"}],
+            }
+        )
+        assert plan is not None and count_subtasks(plan) == 2
+
+    def test_empty_phases_inside_a_wrapper(self):
+        plan = normalize_plan_shape(
+            {"implementation_plan": {"phases": [], "tasks": [{"description": "a"}]}}
+        )
+        assert plan is not None and count_subtasks(plan) == 1
+
+    def test_a_flat_list_of_bare_strings_beside_empty_phases(self):
+        plan = normalize_plan_shape(
+            {"phases": [], "steps": ["Add the missing namespace to Foo.cs"]}
+        )
+        assert plan is not None and count_subtasks(plan) == 1
+        assert (
+            plan["phases"][0]["subtasks"][0]["description"]
+            == "Add the missing namespace to Foo.cs"
+        )
+
+    def test_empty_phases_with_nothing_else_still_fails(self):
+        """The genuinely empty plan must keep failing: there is no work in it,
+        and inventing a subtask would cost a whole build."""
+        assert normalize_plan_shape({"feature": "F", "phases": []}) is None
+
+    @pytest.mark.parametrize("alias", ["sub_tasks", "subTasks", "implementation_steps"])
+    def test_further_spellings_of_the_subtask_list(self, alias):
+        plan = normalize_plan_shape({"feature": "F", alias: [{"description": "a"}]})
+        assert plan is not None and count_subtasks(plan) == 1
+
+    def test_the_users_exact_failure_reaches_a_valid_plan(self, tmp_path):
+        """End to end, through the path the CLI and the spec pipeline take."""
+        (tmp_path / "implementation_plan.json").write_text(
+            json.dumps(
+                {
+                    "feature": "Ajout de namespaces manquants",
+                    "workflow_type": "feature",
+                    "phases": [],
+                    "tasks": [{"description": "Add namespace to Foo.cs"}],
+                }
+            ),
+            encoding="utf-8",
+        )
+        assert auto_fix_plan(tmp_path) is True
+        result = SpecValidator(tmp_path).validate_implementation_plan()
+        assert result.valid, result.errors
+
+
+# --------------------------------------------------------------------------- #
+# The plan that never reached the disk
+# --------------------------------------------------------------------------- #
+
+
+class TestRecoveryFromARejectedToolCall:
+    """A provider that does not use the Claude SDK puts its plan in a tool call,
+    not in its prose. When the executor refuses that call the plan exists in
+    exactly one place — the conversation log, which records every `tool_use`
+    with its input. Reading files and response text both miss it, which is why
+    the earlier fix looked like no fix at all on Ollama.
+    """
+
+    def _log(self, spec_dir, blocks, name="conversation.ollama-gemma3-12b.jsonl"):
+        entries = [
+            {"v": 1, "role": "user", "content": [{"type": "text", "text": "plan it"}]},
+            {"v": 1, "role": "assistant", "content": blocks},
+        ]
+        (spec_dir / name).write_text(
+            "\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8"
+        )
+
+    def _write_call(self, path, content):
+        return {
+            "type": "tool_use",
+            "tool_id": "t1",
+            "tool_name": "Write",
+            "tool_input": {"file_path": path, "content": content},
+        }
+
+    def test_a_fenced_plan_in_a_refused_write(self, tmp_path):
+        self._log(
+            tmp_path,
+            [
+                {"type": "text", "text": "I will create the plan now."},
+                self._write_call(
+                    "implementation_plan.json",
+                    "```json\n" + json.dumps(VALID_PLAN) + "\n```",
+                ),
+            ],
+        )
+        recovered = recover_plan(tmp_path, tmp_path, response_text="I will create it.")
+        assert recovered is not None
+        assert recovered.subtask_count == 1
+        assert "did not land" in recovered.origin
+        # Nothing to delete: the plan was never a file.
+        assert recovered.source_file is None
+
+    def test_the_newest_attempt_wins(self, tmp_path):
+        second = json.loads(json.dumps(VALID_PLAN))
+        second["phases"][0]["subtasks"].append(
+            {"id": "subtask-1-2", "description": "Add namespace to Bar.cs"}
+        )
+        self._log(
+            tmp_path,
+            [
+                self._write_call("implementation_plan.json", json.dumps(VALID_PLAN)),
+                self._write_call("implementation_plan.json", json.dumps(second)),
+            ],
+        )
+        recovered = recover_plan(tmp_path, tmp_path)
+        assert recovered is not None and recovered.subtask_count == 2
+
+    @pytest.mark.parametrize(
+        "destination", ["src/Program.cs", "package.json", "tasks.json", "README.md"]
+    )
+    def test_a_write_aimed_elsewhere_is_never_read_as_a_plan(
+        self, tmp_path, destination
+    ):
+        """Strict on purpose: a tool call's content is *any* file the model
+        wrote, and building an arbitrary one as a plan is worse than failing."""
+        self._log(tmp_path, [self._write_call(destination, json.dumps(VALID_PLAN))])
+        assert recover_plan(tmp_path, tmp_path) is None
+
+    def test_an_invented_name_inside_the_spec_directory_is_credited(self, tmp_path):
+        """The qualification cuts both ways: inside WorkPilot's own directory,
+        `plan.json` can only be the plan the planner just tried to write."""
+        self._log(
+            tmp_path,
+            [self._write_call(str(tmp_path / "plan.json"), json.dumps(VALID_PLAN))],
+        )
+        recovered = recover_plan(tmp_path, tmp_path)
+        assert recovered is not None and recovered.subtask_count == 1
+
+    def test_a_relative_invented_name_is_not_credited(self, tmp_path):
+        """A relative path lands at the worktree root, which is exactly where a
+        project's own `tasks.json` lives."""
+        self._log(tmp_path, [self._write_call("plan.json", json.dumps(VALID_PLAN))])
+        assert recover_plan(tmp_path, tmp_path) is None
+
+    def test_a_file_on_disk_still_wins_over_the_log(self, tmp_path):
+        """The log is the last resort — a filed plan proves more than a call."""
+        filed = json.loads(json.dumps(VALID_PLAN))
+        filed["feature"] = "the one on disk"
+        (tmp_path / "implementation_plan.json").write_text(
+            json.dumps(filed), encoding="utf-8"
+        )
+        self._log(tmp_path, [self._write_call("implementation_plan.json", "{}")])
+        recovered = recover_plan(tmp_path, tmp_path)
+        assert recovered is not None
+        assert recovered.plan["feature"] == "the one on disk"
+
+    def test_an_archived_log_is_not_read(self, tmp_path):
+        """A prompt-too-long halt archives precisely so nothing replays it."""
+        self._log(
+            tmp_path,
+            [self._write_call("implementation_plan.json", json.dumps(VALID_PLAN))],
+            name="conversation.ollama-gemma3-12b.too-long.jsonl",
+        )
+        assert recover_plan(tmp_path, tmp_path) is None
+
+    def test_a_log_with_no_write_call_recovers_nothing(self, tmp_path):
+        self._log(tmp_path, [{"type": "text", "text": "Here is my plan, in prose."}])
+        assert recover_plan(tmp_path, tmp_path) is None
+
+    def test_a_corrupt_log_is_one_fewer_candidate_not_a_crash(self, tmp_path):
+        (tmp_path / "conversation.ollama-x.jsonl").write_text(
+            '{"v": 1, "role": "assist', encoding="utf-8"
+        )
+        assert recover_plan(tmp_path, tmp_path) is None
+
+
+# --------------------------------------------------------------------------- #
+# A document that parses but is not a plan-shaped object
+# --------------------------------------------------------------------------- #
+
+
+class TestTheValidatorReportsRatherThanCrashes:
+    """Every check in the plan validator reads the document as a mapping, so a
+    model that wrote the bare `phases` array took the whole build down with an
+    AttributeError and the card showed a crash instead of what was wrong."""
+
+    @pytest.mark.parametrize(
+        "document", ['[{"id": "p1", "subtasks": []}]', '"hello"', "null", "42"]
+    )
+    def test_a_non_object_plan_is_an_error(self, tmp_path, document):
+        (tmp_path / "implementation_plan.json").write_text(document, encoding="utf-8")
+        result = SpecValidator(tmp_path).validate_implementation_plan()
+        assert not result.valid
+        assert any("must contain a JSON object" in e for e in result.errors)
+
+    def test_a_bare_phases_array_is_still_recovered(self, tmp_path):
+        """Reported, not fatal — and reshaped by the step that runs next."""
+        (tmp_path / "implementation_plan.json").write_text(
+            json.dumps(VALID_PLAN["phases"]), encoding="utf-8"
+        )
+        assert auto_fix_plan(tmp_path) is True
+        assert SpecValidator(tmp_path).validate_implementation_plan().valid

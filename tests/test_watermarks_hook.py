@@ -206,3 +206,50 @@ def test_a_truncated_ledger_line_is_skipped_rather_than_raised_on(tmp_path):
     )
     entries = read_entries(tmp_path)
     assert [e["file"] for e in entries] == ["a", "c"]
+
+
+# --------------------------------------------------------------------------- #
+# The other half of the product
+# --------------------------------------------------------------------------- #
+#
+# Providers that do not use the Claude SDK never reach this hook: their writes go
+# through `core.runtimes.tool_executor`, which does the same cleaning. It could
+# not do the same *recording*, because not one client passed a spec directory
+# down to it — so on every non-Claude build the bytes were edited and the ledger
+# that exists to say so was never written. These two pin the wiring rather than
+# the cleaning, because the cleaning was never what broke.
+
+
+def test_every_tool_executor_a_client_builds_is_given_a_spec_directory():
+    """A new client is covered by having been written the normal way — or this
+    fails, which is the point. The ledger is the only record of an edit nothing
+    else reports, so a call site that forgets it loses the record silently."""
+    import re
+
+    source = (REPO_ROOT / "apps" / "backend" / "core" / "agent_client.py").read_text(
+        encoding="utf-8"
+    )
+
+    constructions = [
+        match.group(0)
+        for match in re.finditer(r"ToolExecutor\((?:[^()]|\([^()]*\))*\)", source)
+    ]
+    assert constructions, "no ToolExecutor construction found — did the file move?"
+
+    missing = [
+        call
+        for call in constructions
+        # `set_tool_working_directory` builds one only to resolve a path; it
+        # writes nothing, so it has nothing to record.
+        if "spec_dir" not in call and "directory)" not in call
+    ]
+    assert not missing, f"ToolExecutor built without a spec directory: {missing}"
+
+
+def test_a_local_client_carries_the_spec_directory_it_was_given(tmp_path):
+    from core.agent_client import LocalAgentClient
+
+    client = LocalAgentClient(
+        model="gemma3:12b", project_dir=str(tmp_path), spec_dir=str(tmp_path / "spec")
+    )
+    assert client._spec_dir == str(tmp_path / "spec")

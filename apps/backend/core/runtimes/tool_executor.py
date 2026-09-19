@@ -7,6 +7,7 @@ Handles execution of tools during agent sessions.
 
 import asyncio
 import json
+import logging
 import os
 import signal
 from pathlib import Path
@@ -15,6 +16,8 @@ from typing import Any
 from rtk import rewrite_command as rtk_rewrite
 from watermarks import clean_generated
 from watermarks import record as watermarks_record
+
+logger = logging.getLogger(__name__)
 
 
 def _pick_arg(arguments: dict[str, Any], *names: str, default: Any = None) -> Any:
@@ -180,21 +183,7 @@ class ToolExecutor:
                 )
 
         if file_path.name == "implementation_plan.json":
-            # Validate before touching the existing plan. The tool error is fed
-            # back to the model so it can correct escaping in the same session.
-            try:
-                plan = json.loads("" if empty_file else content or "")
-            except json.JSONDecodeError as error:
-                raise ValueError(
-                    f"Invalid implementation_plan.json: {error}. "
-                    "The existing file was not changed. Escape quotes inside JSON strings."
-                ) from error
-            if not isinstance(plan, dict):
-                raise ValueError("implementation_plan.json must contain a JSON object")
-            from core.file_utils import write_json_atomic
-
-            write_json_atomic(file_path, plan)
-            return f"Successfully wrote to {path}"
+            return self._write_implementation_plan(file_path, path, content, empty_file)
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -210,6 +199,77 @@ class ToolExecutor:
             return f"Successfully wrote to {path}"
         except Exception as e:
             raise RuntimeError(f"Error writing file {path}: {e}")
+
+    def _write_implementation_plan(
+        self,
+        file_path: Path,
+        path: str,
+        content: str | None,
+        empty_file: bool,
+    ) -> str:
+        """The plan, parsed before it replaces the one already there.
+
+        Parsed first because the write is destructive: the plan on disk may be a
+        good one from an earlier iteration, and letting an unparseable turn
+        overwrite it costs work no later step can get back.
+
+        **What it must not do is refuse the plan the model actually wrote.** A
+        local model hands back its JSON inside a ```json fence, or with "Here is
+        the plan:" in front of it, far more often than it gets the bare document
+        right — and `json.loads` refuses all of it. The content was then dropped
+        on the floor: the write never happened, so no file existed for
+        `auto_fix_plan` to repair, and the plan was in this tool call rather
+        than in the response text, so `recover_plan` had nothing to read either.
+        Planning failed three times over a plan WorkPilot had been handed and
+        thrown away, reporting "the model did not produce a valid
+        implementation_plan.json" — which was not true.
+
+        So the fence and the surrounding prose are stripped here, by the same
+        `extract_json_document` the file-repair path uses, and the document is
+        written. The shape is left to `normalize_plan_shape` downstream: this
+        answers "are these bytes a JSON document", never "is this a good plan".
+        Only when there is no document at all does the write fail, and the error
+        goes back to the model so it can correct itself in the same session.
+        """
+        from core.file_utils import write_json_atomic
+        from spec.plan_recovery import extract_json_document
+
+        if empty_file:
+            # Said plainly rather than through the JSON parser: blanking the
+            # plan is never what a planner means, and "expecting value at line
+            # 1" is a confusing way to be told so.
+            raise ValueError(
+                "implementation_plan.json cannot be written empty. The existing "
+                "file was not changed. Write the complete JSON plan as `content`."
+            )
+
+        raw = content or ""
+        salvaged = False
+        try:
+            plan = json.loads(raw)
+        except json.JSONDecodeError as error:
+            plan = extract_json_document(raw)
+            if plan is None:
+                raise ValueError(
+                    f"Invalid implementation_plan.json: {error}. "
+                    "The existing file was not changed. Write the JSON document "
+                    "alone — it must start with '{' and end with '}' — and "
+                    "escape quotes inside JSON strings."
+                ) from error
+            salvaged = True
+
+        # A document that is not an object still goes to disk: a bare `phases`
+        # array is a plan `normalize_plan_shape` reshapes, and the validator
+        # now reports a non-object rather than crashing on one. Refusing it here
+        # is the same mistake as refusing the fence — it loses the only copy.
+        write_json_atomic(file_path, plan)
+        if salvaged:
+            logger.info(
+                "implementation_plan.json arrived wrapped in text; wrote the "
+                "JSON document it contained (%s)",
+                path,
+            )
+        return f"Successfully wrote to {path}"
 
     async def _list_files(self, directory: str) -> list[str]:
         """List files in a directory."""

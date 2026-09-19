@@ -54,6 +54,24 @@ class ImplementationPlanValidator:
             )
             return ValidationResult(False, "plan", errors, warnings, fixes)
 
+        # A document that parses but is not an object. Reported rather than
+        # crashed on: every check below reads `plan` as a mapping, so a model
+        # that wrote the bare `phases` array (or a quoted string) used to take
+        # the whole build down with an AttributeError deep in validation, and
+        # the card showed a crash where it should have shown what was wrong
+        # with the file. Recovery reshapes exactly this case, and it only runs
+        # once the validator has answered.
+        if not isinstance(plan, dict):
+            errors.append(
+                "implementation_plan.json must contain a JSON object, not "
+                f"{type(plan).__name__}"
+            )
+            fixes.append(
+                "Wrap the plan in an object: "
+                '{"feature": ..., "workflow_type": ..., "phases": [...]}'
+            )
+            return ValidationResult(False, "plan", errors, warnings, fixes)
+
         # Validate top-level required fields
         schema = IMPLEMENTATION_PLAN_SCHEMA
         for field in schema["required_fields"]:

@@ -304,6 +304,8 @@ another planning session to fix:
 | PHASE 3 of `prompts/planner.md` spelled the destination as a **relative** `implementation_plan.json`, which resolves against the worktree root | `<project_dir>/implementation_plan.json` — the file `_cleanup_stray_root_plan` used to **delete** |
 | the model invented a filename | `plan.json`, `tasks.json`, `subtasks.json`, in the spec directory |
 | it wrote the right file in a shape the schema does not name | `tasks` / `steps` / `stages` instead of `phases`, one level of `{"implementation_plan": {…}}`, `phases` keyed by id, a subtask that is a bare string, the whole document inside a ```` ```json ```` fence |
+| it wrote **`"phases": []`** and put the work one key lower | `{"feature": …, "phases": [], "tasks": [{…}]}` — the shape PHASE 3 warns against by name, which is why a model produces it |
+| its Write was **refused** and the content dropped | the `tool_use` input in `conversation.<provider>-<model>.jsonl` |
 | it never called Write at all | the JSON is in the planner's own response |
 
 `spec/plan_recovery.py` answers the question in two halves, both usable alone:
@@ -329,6 +331,44 @@ carrying a decision. When nothing anywhere holds a single subtask,
 `normalize_plan_shape` returns `None`, and planning fails with exactly the
 message above — which is then true. A plan WorkPilot made up would be worse
 than the error: the coder would spend a whole build implementing it.
+
+**An empty `phases` proves nothing.** `normalize_plan_shape` used to read the
+key it found and stop: `phases` was *present*, so the flat list one key lower
+was never looked at, and a plan whose subtasks were right there reached the
+validator as "No phases defined / No subtasks defined in any phase" — the one
+report that claims a model produced nothing while it had produced a plan. The
+phases key and the flat list are now both tried, in that order, and only a
+document where neither carries a subtask returns `None`.
+
+**A refused write is where the plan of a non-Claude provider goes to die.**
+The recovery above reads files and response text, and a provider that does not
+use the Claude SDK puts its plan in neither: it calls `Write`, and
+`tool_executor._write_implementation_plan` used to reject any content
+`json.loads` refused — a ```json fence, a sentence in front of it — and return
+the error. Nothing was written, so no file existed to repair; the plan was in
+the tool call, not in the prose, so there was nothing to salvage from the
+response either. Three planning sessions were spent on a plan WorkPilot had
+been handed and thrown away. Two layers answer it now, and they are
+independent on purpose:
+
+| Layer | Answers |
+|---|---|
+| `tool_executor._write_implementation_plan` | the fence and the surrounding prose are stripped by the same `extract_json_document`, and the document is written — even when it is not an object, because a bare `phases` array is still the only copy. Only content with no JSON document in it is refused, and that error still goes back to the model |
+| `plan_recovery._plan_from_tool_calls` | the plan out of a `Write` that never landed, read from the conversation log's `tool_use` inputs, newest call first. The last place it can be, and the one both other sources miss |
+
+The second layer is as strict about the destination as the file search is: the
+asked-for name counts anywhere, an invented name only when the write was aimed
+*inside* the spec directory, and a relative path never — a tool call's content
+is any file the model wrote, and building an arbitrary one is worse than
+failing. A write aimed at `src/Program.cs` is not a plan however well its
+content parses.
+
+**A document that is not an object is reported, not crashed on.** Every check
+in `ImplementationPlanValidator` reads the plan as a mapping, so a model that
+wrote the bare `phases` array took the build down with an `AttributeError` deep
+in validation and the card showed a crash instead of what was wrong with the
+file. It is an ordinary validation error now, which is what lets the reshaping
+above run at all — recovery only happens after the validator has answered.
 
 **Two rules keep recovery from finding the wrong thing.** Outside the spec
 directory only the asked-for name is read — `tasks.json` at a project root is a
@@ -1103,7 +1143,15 @@ pipeline, the GitHub runners, the mobile phases — none of them write a file of
 their own, they all go through `core.client.create_client`, so the hook is
 registered there once. The providers that do not use the Claude SDK execute
 their writes in `core/runtimes/tool_executor.py`, which is the same cleaning in
-the other half of the product, exactly where `rtk_rewrite` already sits.
+the other half of the product, exactly where `rtk_rewrite` already sits — and
+the same *record*, which took longer to be true than the cleaning did. Not one
+of those clients passed a spec directory down to the executor, so
+`ToolExecutor.spec_dir` was always `None` and the ledger below was never written
+on a non-Claude build: the bytes were edited and the one file that says so did
+not exist. `create_agent_client` hands each client its `spec_dir` now, and
+`test_watermarks_hook.py` fails on a `ToolExecutor(...)` built without one —
+the cleaning is visible in the file, the record is the only evidence of what was
+taken out of it, and a call site that forgets it loses that silently.
 
 **`Pre`, not `Post`, and that is the whole design.** A PostToolUse hook would
 read the file back, rewrite it, and leave a second mtime behind: a dev server
