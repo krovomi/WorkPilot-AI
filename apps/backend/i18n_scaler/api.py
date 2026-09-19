@@ -64,6 +64,62 @@ def _refused_in_server_mode() -> dict | None:
     return {"success": False, "error": _SERVER_MODE_REFUSAL}
 
 
+#: What each `EditorError.reason` says to the caller.
+#:
+#: Literal templates, filled only from `EditorError.params` — keys and locale
+#: codes the caller sent, and file basenames. The exception's own message is
+#: never returned: it is written to the log, where a resolved path belongs, and
+#: `str(e)` on a response path is exactly the `py/stack-trace-exposure` CodeQL
+#: raised against the first version of this module. Two of those messages did
+#: carry a resolved filesystem path, so it was not only a shape complaint.
+#:
+#: A reason with no row here falls back to "Invalid input", so adding a refusal
+#: in `editor.py` and forgetting it here is quiet rather than leaky.
+_REASONS: dict[str, str] = {
+    "invalid-json": "{file} is not valid JSON. Fix the file and reload.",
+    "not-an-object": "{file} does not hold a JSON object.",
+    "no-locales": (
+        "No locales found in that directory. Expected either <lang>/*.json or "
+        "<lang>.json inside it."
+    ),
+    "no-namespace": "There is no namespace {namespace!r} here.",
+    "not-a-directory": "That path is not a directory.",
+    "key-empty": "A key cannot be empty.",
+    "key-too-long": "That key is too long.",
+    "value-too-long": "That value is too long.",
+    "key-shape": (
+        "{key!r} is not a usable key: segments are separated by single dots, "
+        "and none may be empty or start with a space."
+    ),
+    "key-taken": "{key!r} already exists in this namespace.",
+    "unknown-key": "{key!r} is not in this namespace.",
+    "unknown-locale": "{locale!r} is not one of the locales here.",
+    "key-nests-under": (
+        "{key!r} cannot hold a value: {other!r} already nests underneath it."
+    ),
+    "key-nested-in": (
+        "{key!r} cannot be created: {other!r} already holds a value at that path."
+    ),
+    "stale-file": (
+        "{file} changed on disk since it was opened. Reload the namespace and "
+        "apply the edits again — saving now would discard that change."
+    ),
+}
+
+
+def _editor_error(e: EditorError, op: str) -> str:
+    """The sentence a caller is shown for a refusal it can act on."""
+    template = _REASONS.get(e.reason)
+    if template is None:
+        logger.warning("%s: unmapped editor reason %r", op, e.reason)
+        return "Invalid input"
+    try:
+        return template.format(**e.params)
+    except (KeyError, IndexError):  # pragma: no cover - a template/params drift
+        logger.warning("%s: reason %r does not match its params", op, e.reason)
+        return "Invalid input"
+
+
 def _resolve_strategy(raw: str | None) -> PlaceholderStrategy:
     if not raw:
         return PlaceholderStrategy.LANG_PREFIX
@@ -255,7 +311,8 @@ def namespaces(req: NamespacesRequest):
     try:
         discovery, summaries = list_namespaces(path)
     except EditorError as e:
-        return {"success": False, "error": str(e)}
+        logger.info("namespaces refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "namespaces")}
     except Exception as e:  # noqa: BLE001
         logger.exception("namespaces failed")
         return {"success": False, "error": safe_error(e, logger, "namespaces")}
@@ -297,7 +354,8 @@ def namespace(req: NamespaceRequest):
             path, req.namespace, reference_locale=req.reference_locale
         )
     except EditorError as e:
-        return {"success": False, "error": str(e)}
+        logger.info("namespace refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "namespace")}
     except Exception as e:  # noqa: BLE001
         logger.exception("namespace failed")
         return {"success": False, "error": safe_error(e, logger, "namespace")}
@@ -333,9 +391,11 @@ def mutate(req: MutateRequest):
     except StaleFileError as e:
         # Its own flag: the UI reloads and replays rather than showing an error
         # the user can only answer by losing their edits.
-        return {"success": False, "error": str(e), "stale": True}
+        logger.info("mutate refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "mutate"), "stale": True}
     except EditorError as e:
-        return {"success": False, "error": str(e)}
+        logger.info("mutate refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "mutate")}
     except Exception as e:  # noqa: BLE001
         logger.exception("mutate failed")
         return {"success": False, "error": safe_error(e, logger, "mutate")}
@@ -359,7 +419,8 @@ def detect(req: DetectRequest):
     try:
         roots = find_locale_roots(path)
     except EditorError as e:
-        return {"success": False, "error": str(e)}
+        logger.info("detect refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "detect")}
     except Exception as e:  # noqa: BLE001
         logger.exception("detect failed")
         return {"success": False, "error": safe_error(e, logger, "detect")}

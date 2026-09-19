@@ -148,8 +148,9 @@ class TestLoadNamespace:
         assert greeting.placeholder_mismatch is True
 
     def test_refuses_a_namespace_that_is_not_there(self, nested: Path):
-        with pytest.raises(EditorError, match="No namespace"):
+        with pytest.raises(EditorError) as excinfo:
             load_namespace(nested, "nope")
+        assert excinfo.value.reason == "no-namespace"
 
     def test_carries_a_fingerprint_per_locale(self, nested: Path):
         view = load_namespace(nested, "common")
@@ -291,46 +292,54 @@ class TestRefusals:
     def test_refuses_a_key_that_would_have_to_be_a_string_and_an_object(
         self, nested: Path
     ):
-        with pytest.raises(EditorError, match="already holds a value"):
+        with pytest.raises(EditorError) as excinfo:
             apply_operations(
                 nested,
                 "common",
                 [Operation(op="add", key="buttons.save.deep", values={"en": "x"})],
             )
+        assert excinfo.value.reason == "key-nested-in"
+        assert excinfo.value.params["other"] == "buttons.save"
 
     def test_refuses_to_add_a_key_that_exists(self, nested: Path):
-        with pytest.raises(EditorError, match="already exists"):
+        with pytest.raises(EditorError) as excinfo:
             apply_operations(
                 nested,
                 "common",
                 [Operation(op="add", key="buttons.save", values={"en": "x"})],
             )
+        assert excinfo.value.reason == "key-taken"
 
     def test_refuses_to_rename_onto_an_existing_key(self, nested: Path):
-        with pytest.raises(EditorError, match="already exists"):
+        with pytest.raises(EditorError) as excinfo:
             apply_operations(
                 nested,
                 "common",
                 [Operation(op="rename", key="buttons.save", new_key="buttons.undo")],
             )
+        assert excinfo.value.reason == "key-taken"
 
     def test_refuses_a_locale_it_does_not_have(self, nested: Path):
-        with pytest.raises(EditorError, match="not one of the locales"):
+        with pytest.raises(EditorError) as excinfo:
             apply_operations(
                 nested,
                 "common",
                 [Operation(op="set", key="buttons.save", values={"de": "Speichern"})],
             )
+        assert excinfo.value.reason == "unknown-locale"
+        assert excinfo.value.params["locale"] == "de"
 
     def test_reports_a_broken_json_file_by_name(self, tmp_path: Path):
         root = tmp_path / "locales"
         write_nested(root, "en", "common", {"a": "b"})
         (root / "fr").mkdir(parents=True, exist_ok=True)
         (root / "fr" / "common.json").write_text("{ not json", encoding="utf-8")
-        with pytest.raises(EditorError, match="common.json is not valid JSON"):
+        with pytest.raises(EditorError) as excinfo:
             apply_operations(
                 root, "common", [Operation(op="set", key="a", values={"en": "c"})]
             )
+        assert excinfo.value.reason == "invalid-json"
+        assert excinfo.value.params["file"] == "common.json"
 
 
 # ----------------------------------------------------------------------
@@ -386,5 +395,6 @@ class TestFindLocaleRoots:
         assert found[0].layout == "flat"
 
     def test_refuses_a_path_that_is_not_a_directory(self, tmp_path: Path):
-        with pytest.raises(EditorError, match="Not a directory"):
+        with pytest.raises(EditorError) as excinfo:
             find_locale_roots(tmp_path / "missing")
+        assert excinfo.value.reason == "not-a-directory"

@@ -66,11 +66,36 @@ MAX_VALUE_LEN = 20_000
 
 
 class EditorError(ValueError):
-    """A refusal the caller can act on, with a message meant to be read."""
+    """A refusal the caller can act on.
+
+    It carries a `reason` code and the handful of **safe** values that go with
+    it — a key the caller sent, a locale code, a file's basename — and never a
+    resolved path or another exception's text. `api.py` renders the sentence
+    from a literal table keyed on `reason`, the shape `workflows/api.py` uses
+    and that `core.api_safety` recommends "when the set of rejections is small
+    and known".
+
+    Rendering there rather than here is what keeps the message out of the
+    exception: `safe_error` exists because an exception's own text reaching a
+    response is `py/stack-trace-exposure`, and CodeQL was right to say so of
+    the version of this module that returned `str(e)`. Two of those messages
+    really did carry a resolved filesystem path.
+
+    The `str()` form stays useful for the log and for tests; it is not what a
+    caller is shown.
+    """
+
+    def __init__(self, reason: str, message: str, **params: object) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.params = params
 
 
 class StaleFileError(EditorError):
     """A file changed on disk since it was loaded, so the save was not applied."""
+
+    def __init__(self, message: str, **params: object) -> None:
+        super().__init__("stale-file", message, **params)
 
 
 # ----------------------------------------------------------------------
@@ -213,9 +238,17 @@ def _read(path: Path) -> tuple[dict[str, Any], str]:
     try:
         data = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError as e:
-        raise EditorError(f"{path.name} is not valid JSON ({e.msg}, line {e.lineno}).")
+        raise EditorError(
+            "invalid-json",
+            f"{path.name} is not valid JSON ({e.msg}, line {e.lineno}).",
+            file=path.name,
+        ) from None
     if not isinstance(data, dict):
-        raise EditorError(f"{path.name} does not hold a JSON object.")
+        raise EditorError(
+            "not-an-object",
+            f"{path.name} does not hold a JSON object.",
+            file=path.name,
+        )
     return data, raw
 
 
@@ -317,9 +350,13 @@ def load_namespace(
     root = discovery.root
     locales = sorted(discovery.locales)
     if not locales:
-        raise EditorError(f"No locales found under {root}.")
+        raise EditorError("no-locales", f"No locales found under {root}.")
     if namespace != FLAT_NAMESPACE and namespace not in _namespaces_of(discovery):
-        raise EditorError(f"No namespace {namespace!r} under {root}.")
+        raise EditorError(
+            "no-namespace",
+            f"No namespace {namespace!r} under {root}.",
+            namespace=namespace,
+        )
 
     flats = {loc: _flat_for(discovery, loc, namespace) for loc in locales}
     keys: set[str] = set()
@@ -363,13 +400,16 @@ def validate_key(key: str) -> str:
     """The key, or a refusal naming what is wrong with it."""
     key = key.strip()
     if not key:
-        raise EditorError("A key cannot be empty.")
+        raise EditorError("key-empty", "A key cannot be empty.")
     if len(key) > MAX_KEY_LEN:
-        raise EditorError(f"A key cannot be longer than {MAX_KEY_LEN} characters.")
+        raise EditorError(
+            "key-too-long", f"A key cannot be longer than {MAX_KEY_LEN} characters."
+        )
     if not _KEY_RE.match(key):
         raise EditorError(
-            f"{key!r} is not a usable key: segments are separated by single dots "
-            "and none of them may be empty or start with a space."
+            "key-shape",
+            f"{key!r} is not a usable key.",
+            key=key,
         )
     return key
 
@@ -378,7 +418,10 @@ def _validate_value(value: str | None) -> str | None:
     if value is None:
         return None
     if len(value) > MAX_VALUE_LEN:
-        raise EditorError(f"A value cannot be longer than {MAX_VALUE_LEN} characters.")
+        raise EditorError(
+            "value-too-long",
+            f"A value cannot be longer than {MAX_VALUE_LEN} characters.",
+        )
     return value
 
 
@@ -394,13 +437,21 @@ def _check_no_prefix_collision(flat: dict[str, str], key: str, locale: str) -> N
             continue
         if existing.startswith(key + "."):
             raise EditorError(
+                "key-nests-under",
                 f"{key!r} cannot hold a value in {locale}: {existing!r} already "
-                "nests underneath it."
+                "nests underneath it.",
+                key=key,
+                locale=locale,
+                other=existing,
             )
         if key.startswith(existing + "."):
             raise EditorError(
+                "key-nested-in",
                 f"{key!r} cannot be created in {locale}: {existing!r} already holds "
-                "a value at that path."
+                "a value at that path.",
+                key=key,
+                locale=locale,
+                other=existing,
             )
 
 
@@ -440,7 +491,7 @@ def apply_operations(
     root = discovery.root
     locales = sorted(discovery.locales)
     if not locales:
-        raise EditorError(f"No locales found under {root}.")
+        raise EditorError("no-locales", f"No locales found under {root}.")
 
     # Read every locale's file once: raw text for the style and the
     # fingerprint, parsed content for the edit.
@@ -465,9 +516,8 @@ def apply_operations(
                 continue
             if fingerprint(raws[loc]) != expected:
                 raise StaleFileError(
-                    f"{locale_file(root, loc, namespace).name} changed on disk since "
-                    "it was opened. Reload the namespace and apply the edit again — "
-                    "saving now would discard whatever that change was."
+                    f"{locale_file(root, loc, namespace).name} changed on disk.",
+                    file=locale_file(root, loc, namespace).name,
                 )
 
     for operation in operations:
@@ -496,7 +546,7 @@ def _apply_one(operation: Operation, flats: dict[str, dict[str, str]]) -> None:
 
     if operation.op == "delete":
         if not any(key in flat for flat in flats.values()):
-            raise EditorError(f"{key!r} is not in this namespace.")
+            raise EditorError("unknown-key", f"{key!r} is not here.", key=key)
         for flat in flats.values():
             flat.pop(key, None)
         return
@@ -506,9 +556,9 @@ def _apply_one(operation: Operation, flats: dict[str, dict[str, str]]) -> None:
         if new_key == key:
             return
         if not any(key in flat for flat in flats.values()):
-            raise EditorError(f"{key!r} is not in this namespace.")
+            raise EditorError("unknown-key", f"{key!r} is not here.", key=key)
         if any(new_key in flat for flat in flats.values()):
-            raise EditorError(f"{new_key!r} already exists in this namespace.")
+            raise EditorError("key-taken", f"{new_key!r} is taken.", key=new_key)
         for locale, flat in flats.items():
             if key not in flat:
                 continue
@@ -518,14 +568,16 @@ def _apply_one(operation: Operation, flats: dict[str, dict[str, str]]) -> None:
         return
 
     if operation.op == "add" and any(key in flat for flat in flats.values()):
-        raise EditorError(f"{key!r} already exists in this namespace.")
+        raise EditorError("key-taken", f"{key!r} is taken.", key=key)
 
     # `set` and `add` both write the values they were given, and only those:
     # a locale the caller left out keeps whatever it had, so editing the French
     # column never invents an English string.
     for locale, value in operation.values.items():
         if locale not in flats:
-            raise EditorError(f"{locale!r} is not one of the locales here.")
+            raise EditorError(
+                "unknown-locale", f"{locale!r} is not a locale here.", locale=locale
+            )
         flat = flats[locale]
         if value is None:
             flat.pop(key, None)
@@ -605,7 +657,7 @@ def find_locale_roots(
     scaler = scaler or I18nAutoScaler()
     root = Path(project_dir)
     if not root.is_dir():
-        raise EditorError(f"Not a directory: {root}")
+        raise EditorError("not-a-directory", f"Not a directory: {root}")
 
     found: list[LocaleRoot] = []
     seen: set[Path] = set()
