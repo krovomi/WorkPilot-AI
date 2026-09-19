@@ -65,6 +65,7 @@ import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
 import { SandboxSettings } from "./SandboxSettings";
 import { SchedulerSettings } from "./SchedulerSettings";
+import { resolveSettingsLanding } from "./settings-landing";
 import { filterSettingsThemes } from "./settings-search";
 import { SwarmModeSettings } from "./SwarmModeSettings";
 import { ThemeSettings } from "./ThemeSettings";
@@ -399,6 +400,12 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	);
 	const [projectSection, setProjectSection] =
 		useState<ProjectSettingsSection>("general");
+	// Whether this opening has already chosen where to land. See the effect below.
+	const hasLandedRef = useRef(false);
+	// A project pane is worth landing on only once there is a project behind it.
+	// `initialProjectId` counts: it is the caller naming one the store has not
+	// caught up with yet.
+	const hasProjectToShow = Boolean(selectedProject || initialProjectId);
 	const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -452,25 +459,28 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		});
 	};
 
-	// Navigate to the initial section when dialog opens with a specific section
+	// Where the dialog opens. The decision itself is `resolveSettingsLanding`;
+	// this only applies it and remembers that it was made.
 	useEffect(() => {
-		if (open) {
-			if (initialProjectSection) {
-				setActiveTopLevel("project");
-				setProjectSection(initialProjectSection);
-			} else if (initialSection) {
-				setActiveTopLevel("app");
-				setAppSection(initialSection);
-			} else {
-				// No explicit target: this is the global settings entry point, so
-				// land on the app pane. Without this the dialog kept whichever
-				// top level the previous opening left behind — after opening a
-				// project's settings from its tab, the sidebar gear would come
-				// back on the project pane.
-				setActiveTopLevel("app");
-			}
+		if (!open) {
+			// The landing is chosen once per opening; forgetting it here is what
+			// lets the *next* opening choose again.
+			hasLandedRef.current = false;
+			return;
 		}
-	}, [open, initialSection, initialProjectSection]);
+		const landing = resolveSettingsLanding({
+			initialSection,
+			initialProjectSection,
+			hasProjectToShow,
+			hasLanded: hasLandedRef.current,
+		});
+		if (!landing) return;
+
+		hasLandedRef.current = landing.landed;
+		setActiveTopLevel(landing.topLevel);
+		if (landing.appSection) setAppSection(landing.appSection);
+		if (landing.projectSection) setProjectSection(landing.projectSection);
+	}, [open, initialSection, initialProjectSection, hasProjectToShow]);
 
 	// Synchronise la section projet dès qu'un projet est sélectionné et que le dialog s'ouvre
 	useEffect(() => {

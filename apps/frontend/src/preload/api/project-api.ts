@@ -219,6 +219,23 @@ export interface ProjectAPI {
 		projectPath: string,
 		remoteConfig?: { url?: string; name?: string },
 	) => Promise<IPCResult<InitializationResult>>;
+	/**
+	 * Add, repoint or remove the project's git remote. An empty `remoteUrl`
+	 * removes it — the only way back out of a URL typed by mistake.
+	 */
+	setGitRemote: (
+		projectPath: string,
+		remoteName: string,
+		remoteUrl: string,
+		/** The name this remote had before the edit, so a renamed one is renamed
+		 * rather than duplicated. */
+		previousName?: string,
+	) => Promise<IPCResult<RepoProviderDetectionResult>>;
+	/** Switch the checkout to another branch; resolves to the new current one. */
+	checkoutGitBranch: (
+		projectPath: string,
+		branch: string,
+	) => Promise<IPCResult<string | null>>;
 
 	// Ollama Model Detection
 	checkOllamaStatus: (baseUrl?: string) => Promise<
@@ -571,6 +588,26 @@ export const createProjectAPI = (): ProjectAPI => ({
 		remoteConfig?: { url?: string; name?: string },
 	): Promise<IPCResult<InitializationResult>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.GIT_INITIALIZE, projectPath, remoteConfig),
+
+	setGitRemote: (
+		projectPath: string,
+		remoteName: string,
+		remoteUrl: string,
+		previousName?: string,
+	): Promise<IPCResult<RepoProviderDetectionResult>> =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.GIT_SET_REMOTE,
+			projectPath,
+			remoteName,
+			remoteUrl,
+			previousName,
+		),
+
+	checkoutGitBranch: (
+		projectPath: string,
+		branch: string,
+	): Promise<IPCResult<string | null>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.GIT_CHECKOUT_BRANCH, projectPath, branch),
 
 	// Ollama Model Detection
 	checkOllamaStatus: (baseUrl?: string) =>

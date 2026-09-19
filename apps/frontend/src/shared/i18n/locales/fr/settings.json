@@ -1900,7 +1900,24 @@
 			"remoteNone": "Aucun remote configuré",
 			"openRemote": "Ouvrir",
 			"mainBranch": "Branche principale",
-			"mainBranchAuto": "Auto-détectée (configurable dans GitHub / GitLab)"
+			"mainBranchAuto": "Auto-détectée — saisissez une branche pour la figer.",
+			"rename": "Renommer",
+			"renameFailed": "Impossible de renommer le projet.",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"saved": "Enregistré",
+			"currentBranchPlaceholder": "nom-de-branche",
+			"currentBranchHint": "Choisissez une branche existante, ou saisissez un nouveau nom pour la créer depuis HEAD.",
+			"switchBranch": "Basculer",
+			"branchSwitchFailed": "Impossible de changer de branche.",
+			"remoteName": "Nom du remote",
+			"remoteUrl": "URL du remote",
+			"remoteUrlPlaceholder": "https://github.com/owner/repo.git",
+			"remoteHint": "Videz l'URL pour retirer le remote.",
+			"remoteSaveFailed": "Impossible d'enregistrer le remote.",
+			"mainBranchPlaceholder": "main",
+			"mainBranchDetect": "Auto-détecter",
+			"mainBranchHint": "Branche de base des worktrees de tâches. Enregistrée avec cette fenêtre."
 		}
 	},
 	"projectSettings": {

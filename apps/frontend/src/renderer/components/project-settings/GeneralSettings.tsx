@@ -91,7 +91,11 @@ export function GeneralSettings({
 	return (
 		<>
 			{/* Repository — shown whether or not WorkPilot AI is initialized */}
-			<RepositorySection project={project} settings={settings} />
+			<RepositorySection
+				project={project}
+				settings={settings}
+				setSettings={setSettings}
+			/>
 
 			<Separator />
 
