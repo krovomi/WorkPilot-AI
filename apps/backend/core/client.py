@@ -245,6 +245,7 @@ from rtk import rtk_rewrite_hook
 from rtk import settings as rtk_settings
 from security import bash_security_hook
 from security.guardrails import guardrails_hook as _raw_guardrails_hook
+from security.path_guard import GUARDED_WRITE_TOOLS, make_write_path_hook
 from watermarks import CLEANED_TOOLS as WATERMARK_CLEANED_TOOLS
 from watermarks import make_watermarks_hook
 from watermarks import settings as watermarks_settings
@@ -1285,6 +1286,10 @@ def create_client(
     # go, and nothing else about it varies per tool.
     _watermarks_hook = make_watermarks_hook(spec_dir)
 
+    # Same factory shape, and resolved once: the roots cannot change during a
+    # session and the hook runs on every write.
+    _write_path_hook = make_write_path_hook(project_dir, spec_dir)
+
     # Build options dict, conditionally including output_format
     options_kwargs: dict[str, Any] = {
         "model": model,
@@ -1305,13 +1310,31 @@ def create_client(
                 # without rtk answers in a cached `shutil.which` and the
                 # command runs exactly as written.
                 HookMatcher(matcher="Bash", hooks=[rtk_rewrite_hook]),
-                HookMatcher(
-                    matcher="Write",
-                    hooks=[_make_guardrails_hook(project_dir)],
+                # Where a write may land. Registered before the guardrails
+                # hook because it answers the same question the guardrails
+                # answer — may this write happen — from a rule the project does
+                # not have to have written down. `guardrails.evaluate` returns
+                # "no opinion" with no `.workpilot/guardrails.yaml`, which is
+                # the default, so until this hook existed nothing held an agent
+                # to the worktree it was given.
+                *(
+                    HookMatcher(
+                        matcher=tool,
+                        hooks=[_write_path_hook],
+                    )
+                    for tool in GUARDED_WRITE_TOOLS
                 ),
-                HookMatcher(
-                    matcher="Edit",
-                    hooks=[_make_guardrails_hook(project_dir)],
+                # The user's own policies, on every tool that writes. This used
+                # to name `Write` and `Edit` only; `MultiEdit` and
+                # `NotebookEdit` write too, and a rule a team wrote about a
+                # path was not being applied to two of the four tools that can
+                # reach it.
+                *(
+                    HookMatcher(
+                        matcher=tool,
+                        hooks=[_make_guardrails_hook(project_dir)],
+                    )
+                    for tool in GUARDED_WRITE_TOOLS
                 ),
                 # watermarks — strip the invisible codepoints a model leaves in
                 # what it writes, before the bytes reach the disk. Registered
