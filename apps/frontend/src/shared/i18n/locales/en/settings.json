@@ -950,7 +950,24 @@
 			"remoteNone": "No remote configured",
 			"openRemote": "Open",
 			"mainBranch": "Main branch",
-			"mainBranchAuto": "Auto-detected (configurable under GitHub / GitLab)"
+			"mainBranchAuto": "Auto-detected — type a branch to pin it.",
+			"rename": "Rename",
+			"renameFailed": "Could not rename the project.",
+			"save": "Save",
+			"cancel": "Cancel",
+			"saved": "Saved",
+			"currentBranchPlaceholder": "branch-name",
+			"currentBranchHint": "Pick an existing branch, or type a new name to create it from HEAD.",
+			"switchBranch": "Switch",
+			"branchSwitchFailed": "Could not switch branch.",
+			"remoteName": "Remote name",
+			"remoteUrl": "Remote URL",
+			"remoteUrlPlaceholder": "https://github.com/owner/repo.git",
+			"remoteHint": "Clear the URL to remove the remote.",
+			"remoteSaveFailed": "Could not save the remote.",
+			"mainBranchPlaceholder": "main",
+			"mainBranchDetect": "Auto-detect",
+			"mainBranchHint": "Base branch for task worktrees. Saved with this dialog."
 		}
 	},
 	"workspace": {

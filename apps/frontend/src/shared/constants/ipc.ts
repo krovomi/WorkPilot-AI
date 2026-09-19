@@ -600,6 +600,8 @@ export const IPC_CHANNELS = {
 	GIT_CHECK_STATUS: "git:checkStatus",
 	GIT_DETECT_PROVIDER: "git:detectProvider",
 	GIT_INITIALIZE: "git:initialize",
+	GIT_SET_REMOTE: "git:setRemote",
+	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",
 
 	// LLM Provider operations
 	PROVIDER_SELECT: "provider:select",
