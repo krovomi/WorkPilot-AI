@@ -467,6 +467,7 @@
 		"run": "Run visual proof",
 		"retry": "Retry",
 		"runFailed": "Failed to run visual proof",
+		"publishFailed": "Screenshots were captured but could not be pushed to the task branch, so the PR cannot link to them: {{error}}",
 		"openComment": "Open comment",
 		"openPr": "Open PR",
 		"openCapturedUrl": "Open captured URL",

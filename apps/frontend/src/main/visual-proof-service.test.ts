@@ -4,6 +4,7 @@
  * des projets .NET Framework legacy.
  */
 
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -15,6 +16,7 @@ import {
 	buildPrintWindowScript,
 	buildProofComment,
 	buildUiAutomationStepScript,
+	commitAndPushArtifacts,
 	hasLegacyDotNetDesktopProject,
 	hasLegacyDotNetWebProject,
 	isLegacyDotNetFramework,
@@ -534,5 +536,77 @@ describe("buildUiAutomationStepScript", () => {
 
 	it("returns null when the step has no desktop action", () => {
 		expect(buildUiAutomationStepScript(7, { path: "/x" })).toBeNull();
+	});
+});
+
+describe("commitAndPushArtifacts", () => {
+	let repo: string;
+
+	/** Un dépôt qui ignore `.workpilot/`, comme tout projet piloté par WorkPilot. */
+	function git(...args: string[]): void {
+		execFileSync("git", args, { cwd: repo, stdio: "pipe" });
+	}
+
+	beforeEach(() => {
+		repo = mkdtempSync(path.join(tmpdir(), "wp-proof-git-"));
+		git("init", "--initial-branch", "work");
+		git("config", "user.email", "test@example.com");
+		git("config", "user.name", "Test");
+		writeFileSync(path.join(repo, ".gitignore"), ".workpilot/*\n");
+		git("add", ".gitignore");
+		git("commit", "-m", "init");
+	});
+
+	afterEach(() => rmSync(repo, { recursive: true, force: true }));
+
+	/** Écrit une capture là où un run la met vraiment. */
+	function writeProof(relativeDir: string): void {
+		mkdirSync(path.join(repo, relativeDir), { recursive: true });
+		writeFileSync(path.join(repo, relativeDir, "home.png"), "not-really-a-png");
+	}
+
+	const relativeDir = path.join(
+		".workpilot",
+		"specs",
+		"visual-proofs",
+		"003-namespaces",
+		"run-1",
+	);
+
+	it("indexe les captures bien que le dossier soit ignoré", async () => {
+		writeProof(relativeDir);
+
+		// Pas de remote : le push échoue, ce qui est le cas à isoler — le commit,
+		// lui, doit avoir eu lieu.
+		await expect(
+			commitAndPushArtifacts(repo, relativeDir, "003-namespaces"),
+		).rejects.toThrow();
+
+		const listed = execFileSync(
+			"git",
+			["ls-tree", "-r", "--name-only", "HEAD", "--", relativeDir],
+			{ cwd: repo, encoding: "utf-8" },
+		);
+		expect(listed).toContain("home.png");
+	});
+
+	it("ne commite rien quand les captures y sont déjà", async () => {
+		writeProof(relativeDir);
+		execFileSync("git", ["add", "-f", "--", relativeDir], { cwd: repo });
+		git("commit", "-m", "proofs");
+		const before = execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: repo,
+			encoding: "utf-8",
+		}).trim();
+
+		await expect(
+			commitAndPushArtifacts(repo, relativeDir, "003-namespaces"),
+		).resolves.toBeUndefined();
+
+		const after = execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: repo,
+			encoding: "utf-8",
+		}).trim();
+		expect(after).toBe(before);
 	});
 });

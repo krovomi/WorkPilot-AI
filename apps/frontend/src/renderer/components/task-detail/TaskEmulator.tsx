@@ -13,6 +13,7 @@ import type { AppEmulatorConfig } from "../../../main/app-emulator-service";
 import type { Project } from "../../../shared/types";
 import {
 	deriveLandingCandidates,
+	isBrowsableUrl,
 	type LandingGuess,
 } from "../../../shared/utils/emulator-landing";
 import {
@@ -65,14 +66,12 @@ export function TaskEmulator({
 }: TaskEmulatorProps) {
 	const { t } = useTranslation(["appEmulator", "tasks"]);
 	const [browserError, setBrowserError] = useState<string | null>(null);
+	/** Ce que l'aperçu montre à cet instant — la cible d'« Ouvrir dans le navigateur ». */
+	const [displayedUrl, setDisplayedUrl] = useState<string | null>(null);
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [changedFiles, setChangedFiles] = useState<
 		{ path: string; patch?: string }[]
 	>([]);
-	// L'adresse réellement affichée dans l'aperçu — celle qu'« Ouvrir dans le
-	// navigateur » doit ouvrir. La racine du serveur n'est plus la bonne réponse
-	// dès la première navigation.
-	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 	const [resolvedWorktreePath, setResolvedWorktreePath] = useState<
 		string | null
 	>(worktreePath ?? null);
@@ -82,6 +81,14 @@ export function TaskEmulator({
 	const output = useAppEmulatorStore((state) => state.output);
 	const error = useAppEmulatorStore((state) => state.error);
 	const status = useAppEmulatorStore((state) => state.status);
+	// L'adresse réellement affichée dans l'aperçu — celle qu'« Ouvrir dans le
+	// navigateur » doit ouvrir, et celle que l'onglet retrouve en revenant. Elle
+	// vit dans le store parce que cet onglet est démonté dès qu'on en regarde un
+	// autre ; indexée par tâche, parce que c'est la tâche qui décide de la page.
+	const previewUrl = useAppEmulatorStore(
+		(state) => state.previewUrls[taskId] ?? null,
+	);
+	const setPreviewUrl = useAppEmulatorStore((state) => state.setPreviewUrl);
 	const setPhase = useAppEmulatorStore((state) => state.setPhase);
 	const setConfig = useAppEmulatorStore((state) => state.setConfig);
 	const setUrl = useAppEmulatorStore((state) => state.setUrl);
@@ -183,10 +190,15 @@ export function TaskEmulator({
 
 	// L'aperçu dit où il en est ; on ne le lui demande pas. Stable pour que le
 	// rendu du parent ne relance pas l'abonnement de l'enfant.
-	const handlePreviewNavigate = useCallback((visited: string) => {
-		setPreviewUrl(visited);
-		setBrowserError(null);
-	}, []);
+	const handlePreviewNavigate = useCallback(
+		(visited: string, restorable: boolean) => {
+			setDisplayedUrl(visited);
+			// Seule une page où l'on est allé est reprise au retour sur l'onglet.
+			if (restorable) setPreviewUrl(taskId, visited);
+			setBrowserError(null);
+		},
+		[setPreviewUrl, taskId],
+	);
 
 	const handleStart = useCallback(async () => {
 		if (!emulatorPath || isLoading || isRunning) return;
@@ -209,7 +221,17 @@ export function TaskEmulator({
 		// Ce que l'utilisateur regarde, pas la racine du serveur : après une
 		// navigation dans l'aperçu, les deux ne sont plus la même page — et sur une
 		// Web API la racine est précisément celle qui répond 404.
-		const target = previewUrl ?? url;
+		//
+		// Sauf quand ce n'est pas une adresse : un `<webview>` dont la page n'a pas
+		// répondu annonce `chrome-error://chromewebdata/`, que le processus
+		// principal refuse à juste titre — le bouton ne faisait alors rien d'autre
+		// que rendre une erreur de schéma pour une page que le serveur sert très
+		// bien. On retombe sur la racine, qui est toujours ouvrable.
+		const target = isBrowsableUrl(displayedUrl)
+			? displayedUrl
+			: isBrowsableUrl(url)
+				? url
+				: null;
 		if (!target) return;
 		try {
 			await globalThis.electronAPI.openExternal(target);
@@ -220,7 +242,7 @@ export function TaskEmulator({
 				`${t("appEmulator:preview.browserFailed", { url: target })} ${reason}`.trim(),
 			);
 		}
-	}, [previewUrl, url, t]);
+	}, [displayedUrl, url, t]);
 
 	if (!emulatorPath) {
 		return (
@@ -346,7 +368,10 @@ export function TaskEmulator({
 			</div>
 
 			{browserError && (
-				<p role="alert" className="shrink-0 p-3 text-sm">
+				<p
+					role="alert"
+					className="shrink-0 border-b border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+				>
 					{browserError}
 				</p>
 			)}
@@ -357,6 +382,7 @@ export function TaskEmulator({
 						refreshKey={refreshKey}
 						landingPath={landing?.path ?? null}
 						candidates={landingCandidates}
+						restoredUrl={previewUrl}
 						onNavigate={handlePreviewNavigate}
 					/>
 				) : (

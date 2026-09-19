@@ -369,3 +369,45 @@ export function resolveAddressInput(input: string, baseUrl: string): string | nu
 		return null;
 	}
 }
+
+/**
+ * Une adresse que l'aperçu peut afficher et que le navigateur du système peut
+ * ouvrir.
+ *
+ * Un `<webview>` en annonce d'autres que celles qu'on lui a demandées :
+ * `about:blank` avant la première navigation, et surtout
+ * `chrome-error://chromewebdata/` dès qu'une page n'a pas répondu — ce qui est
+ * le cas courant ici, puisqu'une Web API répond 404 sur la racine. Suivre ces
+ * adresses met dans la barre, puis dans « Ouvrir dans le navigateur », une
+ * valeur que personne ne peut ouvrir : le bouton ne pouvait alors que refuser.
+ */
+export function isBrowsableUrl(value: string | null | undefined): value is string {
+	if (!value) return false;
+	try {
+		const { protocol } = new URL(value);
+		return protocol === "http:" || protocol === "https:";
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Deux écritures de la même adresse.
+ *
+ * Un serveur normalise ce qu'on lui demande : `http://localhost:5000` revient
+ * du `<webview>` en `http://localhost:5000/`. Comparer les chaînes ferait lire
+ * le premier chargement comme une navigation vers ailleurs — et ce qui en
+ * dépend, ici, c'est de savoir si l'utilisateur a choisi la page ou si l'aperçu
+ * l'a ouverte tout seul.
+ */
+export function sameAddress(
+	a: string | null | undefined,
+	b: string | null | undefined,
+): boolean {
+	if (!a || !b) return a === b;
+	try {
+		return new URL(a).href === new URL(b).href;
+	} catch {
+		return a === b;
+	}
+}

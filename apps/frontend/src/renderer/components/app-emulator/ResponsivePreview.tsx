@@ -8,8 +8,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	buildLandingUrl,
+	isBrowsableUrl,
 	type LandingGuess,
 	resolveAddressInput,
+	sameAddress,
 } from "../../../shared/utils/emulator-landing";
 import { Button } from "../ui/button";
 
@@ -94,8 +96,22 @@ interface ResponsivePreviewProps {
 	landingPath?: string | null;
 	/** Les autres adresses plausibles, proposées quand celle-ci ne répond pas. */
 	candidates?: readonly LandingGuess[];
-	/** L'adresse réellement affichée, pour « Ouvrir dans le navigateur ». */
-	onNavigate?: (url: string) => void;
+	/**
+	 * L'adresse affichée avant que l'onglet soit quitté. L'aperçu la reprend au
+	 * remontage : sans elle, revenir sur l'onglet Émulateur ramenait l'utilisateur
+	 * à la route d'accueil et perdait ce qu'il avait tapé.
+	 */
+	restoredUrl?: string | null;
+	/**
+	 * L'adresse réellement affichée, pour « Ouvrir dans le navigateur ».
+	 *
+	 * `restorable` distingue une page où l'on est *allé* — saisie, lien suivi,
+	 * candidat cliqué — de la route d'accueil que l'aperçu ouvre tout seul. Seule
+	 * la première mérite d'être reprise au retour sur l'onglet : mémoriser la
+	 * seconde ferait gagner la racine du serveur contre la route que le diff de
+	 * la tâche révèle une seconde plus tard.
+	 */
+	onNavigate?: (url: string, restorable: boolean) => void;
 }
 
 /** CSS viewport simulation: dimensions change media queries, zoom only scales the preview. */
@@ -104,6 +120,7 @@ export function ResponsivePreview({
 	refreshKey,
 	landingPath,
 	candidates,
+	restoredUrl,
 	onNavigate,
 }: ResponsivePreviewProps) {
 	const { t } = useTranslation("appEmulator");
@@ -113,33 +130,83 @@ export function ResponsivePreview({
 	const [zoom, setZoom] = useState(1);
 	const [loading, setLoading] = useState(true);
 	const [failure, setFailure] = useState<string | null>(null);
-	const [retry, setRetry] = useState(0);
 
 	const homeUrl = useMemo(
 		() => buildLandingUrl(url, landingPath),
 		[url, landingPath],
 	);
-	const [currentUrl, setCurrentUrl] = useState(homeUrl);
-	const [address, setAddress] = useState(homeUrl);
+	/**
+	 * Ce que le `<webview>` charge à sa création. Séparé de `currentUrl` parce
+	 * que naviguer passe par `loadURL` : réécrire `src` à chaque navigation
+	 * ferait charger deux fois la même page, une fois par nous et une fois par
+	 * l'attribut qu'Electron observe.
+	 */
+	const [bootUrl, setBootUrl] = useState(() =>
+		isBrowsableUrl(restoredUrl) ? restoredUrl : homeUrl,
+	);
+	const [currentUrl, setCurrentUrl] = useState(bootUrl);
+	const [address, setAddress] = useState(bootUrl);
 	const [history, setHistory] = useState({ back: false, forward: false });
 
-	// Un nouveau serveur — ou une nouvelle route de tâche — est une autre page.
+	/**
+	 * Une session reprise l'emporte sur la route d'accueil. Celle-ci n'est connue
+	 * qu'une fois le diff de la tâche lu, donc elle *change* une seconde après le
+	 * remontage : sans cette garde, l'adresse restaurée était remplacée par la
+	 * route d'accueil juste après avoir été rendue, et le bug se lisait comme si
+	 * rien n'avait été restauré.
+	 */
+	const restoredRef = useRef(isBrowsableUrl(restoredUrl));
+	const lastServerRef = useRef(url);
+	const lastHomeRef = useRef(homeUrl);
+
+	// Un autre serveur : la page qu'on regardait n'existe plus.
 	useEffect(() => {
+		if (lastServerRef.current === url) return;
+		lastServerRef.current = url;
+		restoredRef.current = false;
+	}, [url]);
+
+	// Une nouvelle route de tâche est une autre page — sauf si l'utilisateur en
+	// regardait déjà une qu'il a choisie.
+	useEffect(() => {
+		if (lastHomeRef.current === homeUrl) return;
+		lastHomeRef.current = homeUrl;
+		if (restoredRef.current) return;
+		setBootUrl(homeUrl);
 		setCurrentUrl(homeUrl);
 		setAddress(homeUrl);
 		setHistory({ back: false, forward: false });
 	}, [homeUrl]);
 
+	/** L'adresse du moment, lisible depuis les écouteurs du `<webview>`. */
+	const currentUrlRef = useRef(currentUrl);
 	useEffect(() => {
-		onNavigate?.(currentUrl);
+		currentUrlRef.current = currentUrl;
+		onNavigate?.(currentUrl, restoredRef.current);
 	}, [currentUrl, onNavigate]);
 
 	const navigate = useCallback((target: string) => {
 		setFailure(null);
+		// Une adresse choisie est une adresse à garder : la route d'accueil ne la
+		// reprend plus, et c'est elle qu'on retrouve en revenant sur l'onglet.
+		restoredRef.current = true;
 		setCurrentUrl(target);
 		setAddress(target);
 		loadInView(viewRef.current, target);
 	}, []);
+
+	/**
+	 * Rafraîchir recharge la page affichée, pas la route d'accueil — et sans
+	 * remplacer le nœud, qui porte l'historique des deux boutons de navigation.
+	 * Le premier rendu est ignoré : le `<webview>` charge déjà `src`.
+	 */
+	const lastRefreshRef = useRef(refreshKey);
+	useEffect(() => {
+		if (lastRefreshRef.current === refreshKey) return;
+		lastRefreshRef.current = refreshKey;
+		setFailure(null);
+		loadInView(viewRef.current, currentUrl);
+	}, [refreshKey, currentUrl]);
 
 	const submitAddress = useCallback(() => {
 		const resolved = resolveAddressInput(address, currentUrl || url);
@@ -150,7 +217,8 @@ export function ResponsivePreview({
 		navigate(resolved);
 	}, [address, currentUrl, navigate, t, url]);
 
-	// The key replaces the webview DOM node, so each replacement needs fresh listeners.
+	// `bootUrl` est la seule chose qui remplace le nœud : les écouteurs se
+	// rattachent alors, et pas à chaque rechargement.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: reattach after keyed webview replacement
 	useEffect(() => {
 		const view = viewRef.current;
@@ -184,12 +252,24 @@ export function ResponsivePreview({
 				`${t("preview.failed")} ${details.errorDescription || details.errorCode}`,
 			);
 		};
-		/** Une navigation interne à l'aperçu : la barre d'adresse la suit. */
+		/**
+		 * Une navigation interne à l'aperçu : la barre d'adresse la suit — mais
+		 * seulement vers une adresse qu'on peut rouvrir. Un échec de chargement
+		 * fait annoncer `chrome-error://chromewebdata/` au `<webview>`, et c'est
+		 * cette valeur-là qui arrivait à « Ouvrir dans le navigateur ».
+		 */
 		const track = (event: Event) => {
 			const visited = (event as Event & { url?: string }).url;
-			if (!visited) return;
-			setCurrentUrl(visited);
-			setAddress(visited);
+			if (!isBrowsableUrl(visited)) return;
+			if (!sameAddress(visited, currentUrlRef.current)) {
+				// La page est allée ailleurs d'elle-même : un lien, une redirection.
+				// Le premier chargement, lui, ne fait que confirmer l'adresse qu'on
+				// vient de demander — le compter comme un choix ferait gagner la
+				// racine du serveur contre la route que le diff révèle juste après.
+				restoredRef.current = true;
+				setCurrentUrl(visited);
+				setAddress(visited);
+			}
 			syncHistory();
 		};
 		const navigated = (event: Event) => {
@@ -226,7 +306,7 @@ export function ResponsivePreview({
 			view.removeEventListener("did-navigate", navigated);
 			view.removeEventListener("did-navigate-in-page", track);
 		};
-	}, [homeUrl, refreshKey, retry, t]);
+	}, [bootUrl, t]);
 
 	const fluid = format === "fluid";
 	const controlClass =
@@ -397,7 +477,7 @@ export function ResponsivePreview({
 						<Button
 							size="sm"
 							variant="outline"
-							onClick={() => setRetry((value) => value + 1)}
+							onClick={() => navigate(currentUrl)}
 						>
 							{t("actions.retry")}
 						</Button>
@@ -427,9 +507,9 @@ export function ResponsivePreview({
 					}
 				>
 					<webview
-						key={`${homeUrl}-${refreshKey}-${retry}`}
+						key={bootUrl}
 						ref={viewRef}
-						src={homeUrl}
+						src={bootUrl}
 						className="border-0 bg-white"
 						style={{
 							display: "flex",

@@ -334,32 +334,37 @@ describe("TaskEmulator — la route de la tâche et la barre d'adresse", () => {
 			url: "http://localhost:5000",
 			output: "Server listening",
 			config: plainConfig,
+			// Le store est un singleton de module : sans ce vidage, l'adresse
+			// mémorisée par un test serait reprise par le suivant.
+			previewUrls: {},
 		});
 	});
 
 	/** Le contrôleur que la tâche vient d'ajouter. */
-	function withController() {
-		mockGetWorktreeDiff.mockResolvedValue({
-			success: true,
+	const controllerDiff = {
+		success: true,
+		summary: "",
+		data: {
 			summary: "",
-			data: {
-				summary: "",
-				files: [
-					{
-						path: "src/Rag.Api/Controllers/NamespacesController.cs",
-						status: "added",
-						additions: 3,
-						deletions: 0,
-						patch: [
-							"@@ -0,0 +1,3 @@",
-							"+[ApiController]",
-							'+[Route("api/[controller]")]',
-							"+public class NamespacesController : ControllerBase",
-						].join("\n"),
-					},
-				],
-			},
-		});
+			files: [
+				{
+					path: "src/Rag.Api/Controllers/NamespacesController.cs",
+					status: "added",
+					additions: 3,
+					deletions: 0,
+					patch: [
+						"@@ -0,0 +1,3 @@",
+						"+[ApiController]",
+						'+[Route("api/[controller]")]',
+						"+public class NamespacesController : ControllerBase",
+					].join("\n"),
+				},
+			],
+		},
+	};
+
+	function withController() {
+		mockGetWorktreeDiff.mockResolvedValue(controllerDiff);
 	}
 
 	it("ouvre la route que le diff de la tâche déclare", async () => {
@@ -471,6 +476,106 @@ describe("TaskEmulator — la route de la tâche et la barre d'adresse", () => {
 			expect(mockOpenExternal).toHaveBeenCalledWith(
 				"http://localhost:5000/swagger",
 			),
+		);
+	});
+
+	it("va quand même sur la route de la tâche quand la page a déjà chargé", async () => {
+		// Le diff arrive après le premier chargement. Ce premier `did-navigate`
+		// ne fait que confirmer l'adresse demandée : le compter comme une page
+		// choisie bloquerait la route que le diff révèle une seconde plus tard.
+		let releaseDiff: () => void = () => undefined;
+		mockGetWorktreeDiff.mockReturnValue(
+			new Promise((resolve) => {
+				releaseDiff = () => resolve(controllerDiff);
+			}),
+		);
+		const { container } = render(
+			<TaskEmulator taskId="task-1" project={project} />,
+		);
+		const view = container.querySelector("webview");
+		if (!view) throw new Error("Missing preview");
+		fireEvent(
+			view,
+			Object.assign(new Event("did-navigate"), {
+				httpResponseCode: 200,
+				// Avec la barre oblique que le serveur ajoute : c'est la forme qui
+				// arrive vraiment, et la comparer par chaîne la lirait comme une
+				// navigation vers une autre page.
+				url: "http://localhost:5000/",
+			}),
+		);
+
+		await act(async () => {
+			releaseDiff();
+		});
+
+		await waitFor(() =>
+			expect(container.querySelector("webview")).toHaveAttribute(
+				"src",
+				"http://localhost:5000/api/namespaces",
+			),
+		);
+	});
+
+	it("retrouve l'adresse saisie en revenant sur l'onglet", async () => {
+		// Changer d'onglet démonte le panneau : c'est exactement ce que fait
+		// `TabsContent`, et c'est ce qui effaçait l'adresse.
+		const first = render(<TaskEmulator taskId="task-1" project={project} />);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		const address = screen.getByLabelText("Address");
+		fireEvent.change(address, { target: { value: "/swagger" } });
+		fireEvent.keyDown(address, { key: "Enter" });
+		first.unmount();
+
+		const second = render(<TaskEmulator taskId="task-1" project={project} />);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		expect(screen.getByLabelText("Address")).toHaveValue(
+			"http://localhost:5000/swagger",
+		);
+		expect(second.container.querySelector("webview")).toHaveAttribute(
+			"src",
+			"http://localhost:5000/swagger",
+		);
+	});
+
+	it("n'emprunte pas l'adresse d'une autre tâche", async () => {
+		const first = render(<TaskEmulator taskId="task-1" project={project} />);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		const address = screen.getByLabelText("Address");
+		fireEvent.change(address, { target: { value: "/swagger" } });
+		fireEvent.keyDown(address, { key: "Enter" });
+		first.unmount();
+
+		render(<TaskEmulator taskId="task-2" project={project} />);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		expect(screen.getByLabelText("Address")).toHaveValue(
+			"http://localhost:5000",
+		);
+	});
+
+	it("ouvre la racine plutôt qu'une adresse que le navigateur refuserait", async () => {
+		// Ce que le `<webview>` annonce quand la page n'a pas répondu. La donner
+		// telle quelle au processus principal ne produisait qu'un refus de schéma.
+		const { container } = render(
+			<TaskEmulator taskId="task-1" project={project} />,
+		);
+		await waitFor(() => expect(mockGetWorktreeDiff).toHaveBeenCalled());
+		const view = container.querySelector("webview");
+		if (!view) throw new Error("Missing preview");
+		fireEvent(
+			view,
+			Object.assign(new Event("did-navigate"), {
+				httpResponseCode: 200,
+				url: "chrome-error://chromewebdata/",
+			}),
+		);
+
+		expect(screen.getByLabelText("Address")).toHaveValue(
+			"http://localhost:5000",
+		);
+		fireEvent.click(screen.getByRole("button", { name: /open in browser/i }));
+		await waitFor(() =>
+			expect(mockOpenExternal).toHaveBeenCalledWith("http://localhost:5000"),
 		);
 	});
 

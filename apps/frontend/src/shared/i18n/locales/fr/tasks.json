@@ -467,6 +467,7 @@
 		"run": "Lancer la preuve visuelle",
 		"retry": "Relancer",
 		"runFailed": "Échec du lancement de la preuve visuelle",
+		"publishFailed": "Les captures ont été prises mais n'ont pas pu être poussées sur la branche de la tâche, donc la PR ne peut pas y renvoyer : {{error}}",
 		"openComment": "Ouvrir le commentaire",
 		"openPr": "Ouvrir la PR",
 		"openCapturedUrl": "Ouvrir l'URL capturée",
