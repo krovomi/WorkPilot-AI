@@ -1933,6 +1933,33 @@ rejette quand `xdg-utils` manque ou que le portail XDG n'est pas joignable. Le
 rejet remonte jusqu'au renderer, qui l'affiche : un bouton qui ne fait rien et ne
 dit rien est la pire des deux options, et c'est ce que l'utilisateur voyait.
 
+**Et il n'ouvre que ce qui s'ouvre.** Un `<webview>` n'annonce pas seulement les
+adresses qu'on lui a demandées : `about:blank` avant sa première navigation, et
+`chrome-error://chromewebdata/` dès qu'une page n'a pas répondu — ce qui est le
+cas courant ici, puisqu'une Web API répond 404 sur la racine. Ces valeurs
+arrivaient telles quelles à `open-external.ts`, qui les refuse à juste titre sur
+le schéma : le bouton ne produisait plus qu'un message d'erreur, pour une page
+que le serveur sert très bien deux segments plus loin. `isBrowsableUrl` est la
+seule réponse à « est-ce une adresse ? » — la barre ne suit plus ce qui n'en est
+pas une, et le bouton retombe sur la racine du serveur, toujours ouvrable. Le
+message d'échec, lui, est rendu comme un échec : il était rendu en texte courant,
+au milieu d'un panneau qui n'avait pas changé par ailleurs.
+
+**L'adresse survit au changement d'onglet.** `TabsContent` démonte le panneau
+qu'on quitte, donc une adresse gardée dans `ResponsivePreview` est une adresse
+perdue à l'aller — l'utilisateur revenait sur l'onglet Émulateur et retrouvait la
+route d'accueil. Elle vit dans `app-emulator-store` (`previewUrls`), **indexée
+par tâche** : le serveur est unique, les pages qu'on y regarde ne le sont pas, et
+une seule adresse ferait ouvrir la tâche B sur la page de la tâche A. Un autre
+serveur les vide toutes — la page d'un run précédent n'existe plus.
+
+Ce qui est mémorisé est une page où l'on est *allé* : une saisie, un lien suivi,
+un candidat cliqué. Pas la route d'accueil que l'aperçu ouvre tout seul, ni le
+premier `did-navigate` qui ne fait que la confirmer — le diff de la tâche est lu
+une seconde après le montage, donc une racine mémorisée comme un choix gagnerait
+contre la route que ce diff révèle. C'est la même distinction que porte le second
+argument d'`onNavigate`.
+
 ### Provider × LLM × effort, par page (`shared/utils/page-llm.ts`)
 
 Une page qui lance un agent posait la question deux fois et n'en gardait qu'une

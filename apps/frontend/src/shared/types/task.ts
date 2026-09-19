@@ -904,6 +904,13 @@ export interface VisualProofRun {
 	artifactDir?: string;
 	commentUrl?: string;
 	commitSha?: string;
+	/**
+	 * Why the captures could not be pushed to the task branch, when that step
+	 * failed. Distinct from `error`: the run itself succeeded and the images are
+	 * on disk — only their publication to the PR is missing, so the tab shows
+	 * them with a warning rather than a failure.
+	 */
+	publishError?: string;
 	screenshots: VisualProofScreenshot[];
 	/** API smoke proof, present when an OpenAPI document was discovered. */
 	apiSmoke?: VisualProofApiSmoke;

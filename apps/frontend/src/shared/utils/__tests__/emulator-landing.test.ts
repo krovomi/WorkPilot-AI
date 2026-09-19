@@ -3,8 +3,10 @@ import {
 	buildLandingUrl,
 	deriveLandingCandidates,
 	deriveLandingPath,
+	isBrowsableUrl,
 	normalizeLandingPath,
 	resolveAddressInput,
+	sameAddress,
 	routeFromFilePath,
 } from "../emulator-landing";
 
@@ -242,5 +244,44 @@ describe("resolveAddressInput", () => {
 		expect(resolveAddressInput("javascript:alert(1)", base)).toBeNull();
 		expect(resolveAddressInput("file:///etc/passwd", base)).toBeNull();
 		expect(resolveAddressInput("   ", base)).toBeNull();
+	});
+});
+
+describe("isBrowsableUrl", () => {
+	it("accepte ce que le navigateur du système sait ouvrir", () => {
+		expect(isBrowsableUrl("http://localhost:5000/swagger")).toBe(true);
+		expect(isBrowsableUrl("https://example.com")).toBe(true);
+	});
+
+	it("refuse ce qu'un <webview> annonce quand il n'a rien chargé", () => {
+		// Les deux valeurs qui arrivaient jusqu'au bouton « Ouvrir dans le
+		// navigateur », où elles ne pouvaient produire qu'un refus de schéma.
+		expect(isBrowsableUrl("about:blank")).toBe(false);
+		expect(isBrowsableUrl("chrome-error://chromewebdata/")).toBe(false);
+	});
+
+	it("refuse l'absence d'adresse et ce qui n'en est pas une", () => {
+		expect(isBrowsableUrl(null)).toBe(false);
+		expect(isBrowsableUrl(undefined)).toBe(false);
+		expect(isBrowsableUrl("")).toBe(false);
+		expect(isBrowsableUrl("/swagger")).toBe(false);
+		expect(isBrowsableUrl("file:///etc/passwd")).toBe(false);
+		expect(isBrowsableUrl("javascript:alert(1)")).toBe(false);
+	});
+});
+
+describe("sameAddress", () => {
+	it("reconnaît la même adresse écrite autrement", () => {
+		// Ce que le serveur rend quand on lui demande sa racine.
+		expect(sameAddress("http://localhost:5000", "http://localhost:5000/")).toBe(
+			true,
+		);
+	});
+
+	it("distingue deux pages", () => {
+		expect(
+			sameAddress("http://localhost:5000/", "http://localhost:5000/swagger"),
+		).toBe(false);
+		expect(sameAddress("http://localhost:5000", null)).toBe(false);
 	});
 });
