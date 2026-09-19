@@ -13,7 +13,13 @@ import os
 from pathlib import Path
 
 import pytest
-from audit_trail.api import StorageDirRefused, _allowed_storage_roots, _validate_dir
+from audit_trail.api import (
+    STORAGE_DIR_REFUSED,
+    StorageDirRefused,
+    _allowed_storage_roots,
+    _error,
+    _validate_dir,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -70,3 +76,27 @@ class TestValidateDir:
             with pytest.raises(ValueError) as excinfo:
                 _validate_dir(bad)
             assert not isinstance(excinfo.value, StorageDirRefused)
+
+
+class TestErrorMessages:
+    """What reaches the caller. Both arms must be fixed strings.
+
+    `safe_error` is a barrier because it returns constants. An earlier version
+    of `_error` returned `str(e)` for the refusal, which put exception data on
+    the response path and raised `py/stack-trace-exposure` at every handler in
+    this module.
+    """
+
+    def test_refusal_returns_the_constant_not_the_exception(self) -> None:
+        assert _error(StorageDirRefused("anything at all"), "events") == (
+            STORAGE_DIR_REFUSED
+        )
+
+    def test_the_constant_is_actionable(self) -> None:
+        assert "AUDIT_TRAIL_ALLOWED_ROOTS" in STORAGE_DIR_REFUSED
+
+    def test_every_other_exception_is_still_flattened(self) -> None:
+        """A path the caller cannot act on must not describe itself."""
+        secret = "/srv/tenant-42/private/db.sqlite is locked"
+        assert secret not in _error(RuntimeError(secret), "events")
+        assert secret not in _error(ValueError(secret), "events")

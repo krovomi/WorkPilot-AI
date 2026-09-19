@@ -74,20 +74,37 @@ def _allowed_storage_roots() -> list[Path] | None:
     return server_mode_roots()
 
 
+# What a caller is told when `storage_dir` sits outside every allowed root.
+#
+# A module constant rather than the exception's own message, and that is the
+# whole point: `safe_error` is a barrier because it returns fixed strings, and
+# an earlier version of `_error` returned `str(e)` for this one case. CodeQL
+# read that correctly — exception data reaching a response — and raised
+# `py/stack-trace-exposure` at all seventeen handlers below. Returning a
+# constant says the same sentence to the user with nothing derived from the
+# exception in it, so there is no flow left to trace.
+#
+# The roots themselves are not named. They are server configuration, and in
+# server mode this router is mounted for tenants who have no business reading
+# the deployment's layout.
+STORAGE_DIR_REFUSED = (
+    "This directory is outside the roots the audit trail may read. "
+    "Set AUDIT_TRAIL_ALLOWED_ROOTS on the backend to include it."
+)
+
+
 class StorageDirRefused(ValueError):
     """`storage_dir` sits outside every allowed root.
 
-    A distinct type because this one refusal is worth reporting in full,
-    and `safe_error` — rightly — flattens every `ValueError` here to
-    "Invalid input". That answer is unreadable for the only mistake a user
-    can actually make on this endpoint: naming a directory the backend is
-    not configured to reach. `api_safety`'s own guidance is to raise a
-    literal message where the handler knows something more useful, and this
-    handler does.
+    A distinct type because this one refusal is worth reporting in full, and
+    `safe_error` — rightly — flattens every `ValueError` here to "Invalid
+    input". That answer is unreadable for the only mistake a user can actually
+    make on this endpoint: naming a directory the backend is not configured to
+    reach. `api_safety`'s own guidance is to raise a literal message where the
+    handler knows something more useful, and this handler does.
 
-    The roots themselves are not named. They are server configuration, and
-    in server mode this router is mounted for tenants who have no business
-    reading the deployment's layout.
+    The type is what carries the meaning; the caller reads
+    `STORAGE_DIR_REFUSED`, never this exception's message.
     """
 
 
@@ -108,10 +125,7 @@ def _validate_dir(raw: str) -> Path:
         p = validated_dir(raw, "storage_dir", allowed_roots=roots, must_exist=False)
     except ValueError as e:
         if "outside every allowed root" in str(e):
-            raise StorageDirRefused(
-                "This directory is outside the roots the audit trail may read. "
-                "Set AUDIT_TRAIL_ALLOWED_ROOTS on the backend to include it."
-            ) from e
+            raise StorageDirRefused(STORAGE_DIR_REFUSED) from e
         raise
     p.mkdir(parents=True, exist_ok=True)
     return p
@@ -121,12 +135,14 @@ def _error(e: Exception, op: str) -> str:
     """The message a caller gets. One refusal speaks for itself; the rest don't.
 
     Every handler below funnels through here instead of calling `safe_error`
-    directly, so `StorageDirRefused` survives to the caller while everything
-    else still collapses to "Invalid input" with the real cause in the log.
+    directly, so the one refusal a caller can act on reaches them while
+    everything else still collapses to "Invalid input" with the real cause in
+    the log. Both arms return a fixed string: nothing derived from the
+    exception is ever handed back.
     """
     if isinstance(e, StorageDirRefused):
         logger.warning("%s refused a storage_dir outside the allowed roots", op)
-        return str(e)
+        return STORAGE_DIR_REFUSED
     return safe_error(e, logger, op)
 
 
