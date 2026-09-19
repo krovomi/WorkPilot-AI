@@ -889,7 +889,26 @@ async def run_autonomous_agent(
     planning_validation_failures = _read_planning_failures(spec_dir)
     max_planning_validation_retries = 3
 
-    def _validate_and_fix_implementation_plan() -> tuple[bool, list[str]]:
+    def _validate_and_fix_implementation_plan(
+        response_text: str | None = None,
+    ) -> tuple[bool, list[str]]:
+        """Is there a usable plan, after everything that can be done for one?
+
+        Three steps, in increasing order of how far they look from the path the
+        validator reads. Validation answers for a plan the model got right;
+        `auto_fix_plan` fills in the fields it left implicit and reshapes a
+        document that is a plan under other names; `recover_plan` looks
+        everywhere else it could be — `implementation_plan.json` at the worktree
+        root, because PHASE 3 of the prompt spells a relative path; a name the
+        model invented; the JSON fenced inside its own response, when it never
+        called Write at all.
+
+        The order is the point: a plan found further out is a plan the model
+        wrote but did not file, and re-running planning to get the same content
+        filed correctly costs a whole session and gets it wrong again as often
+        as not. Nothing here invents a subtask — when no candidate carries one,
+        this returns the validator's own errors and planning fails as before.
+        """
         from spec.validate_pkg import SpecValidator, auto_fix_plan
 
         spec_validator = SpecValidator(spec_dir)
@@ -903,7 +922,45 @@ async def run_autonomous_agent(
             if result.valid:
                 return True, []
 
+        if _recover_implementation_plan(response_text):
+            # The recovered plan is raw model output: it is put through the same
+            # auto-fix as any other plan before it is judged.
+            auto_fix_plan(spec_dir)
+            recovered_result = spec_validator.validate_implementation_plan()
+            if recovered_result.valid:
+                return True, []
+            result = recovered_result
+
         return False, result.errors
+
+    def _recover_implementation_plan(response_text: str | None) -> bool:
+        """Promote a plan found outside the path the validator reads.
+
+        Reported rather than silent: WorkPilot is about to build from a file it
+        moved or reshaped on the model's behalf, and the one line printed here
+        is what tells a reader of the log why the plan on disk is not byte for
+        byte what the transcript shows. Never raises — this runs on a build
+        that has already failed validation once.
+        """
+        try:
+            from spec.plan_recovery import recover_plan, write_recovered_plan
+
+            recovered = recover_plan(spec_dir, project_dir, response_text)
+            if recovered is None or not write_recovered_plan(spec_dir, recovered):
+                return False
+        except Exception as exc:  # noqa: BLE001 - recovery never fails a build
+            logger.debug("plan recovery unavailable: %s", exc)
+            return False
+
+        message = (
+            f"Recovered the implementation plan from {recovered.origin} "
+            f"({recovered.subtask_count} subtask(s)) — the model produced a plan "
+            "but not at the path WorkPilot reads."
+        )
+        print_status(message, "warning")
+        if task_logger:
+            task_logger.log_info(message)
+        return True
 
     def _report_traceability() -> None:
         """Requirement coverage, at the moment the plan stops changing.
@@ -1759,7 +1816,7 @@ async def run_autonomous_agent(
 
         plan_validated = False
         if is_planning_phase and status != "error":
-            valid, errors = _validate_and_fix_implementation_plan()
+            valid, errors = _validate_and_fix_implementation_plan(response)
             # Archive this LLM's plan (valid or not) so plans from different
             # models can be compared side by side later. One snapshot per
             # provider/model; survives a reset (lives under plans/).

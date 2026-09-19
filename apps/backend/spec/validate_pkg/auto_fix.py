@@ -13,6 +13,8 @@ from pathlib import Path
 from core.file_utils import write_json_atomic
 from core.plan_normalization import normalize_subtask_aliases
 
+from ..plan_recovery import extract_json_document, normalize_plan_shape
+
 
 def _repair_json_syntax(content: str) -> str | None:
     """
@@ -119,6 +121,19 @@ def _normalize_status(value: object) -> str:
     return "pending"
 
 
+def _has_subtasks(plan: dict) -> bool:
+    """Does this plan already hold at least one subtask in the schema's shape?
+
+    The gate for reshaping. A plan that answers yes is only missing fields the
+    fixes below fill in; one that answers no is either a different shape or
+    genuinely empty, and only `normalize_plan_shape` can tell those apart.
+    """
+    phases = plan.get("phases")
+    if not isinstance(phases, list):
+        return False
+    return any(isinstance(phase, dict) and phase.get("subtasks") for phase in phases)
+
+
 def auto_fix_plan(spec_dir: Path) -> bool:
     """Attempt to auto-fix common implementation_plan.json issues.
 
@@ -142,43 +157,50 @@ def auto_fix_plan(spec_dir: Path) -> bool:
     try:
         with open(plan_file, encoding="utf-8") as f:
             content = f.read()
-        plan = json.loads(content)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        # Attempt JSON syntax repair
-        try:
-            with open(plan_file, encoding="utf-8") as f:
-                content = f.read()
-            repaired = _repair_json_syntax(content)
-            if repaired:
-                plan = json.loads(repaired)
-                json_repaired = True
-                logging.info(f"JSON syntax repaired: {plan_file}")
-        except Exception as e:
-            logging.warning(f"JSON repair attempt failed for {plan_file}: {e}")
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return False
+
+    try:
+        plan = json.loads(content)
+    except json.JSONDecodeError:
+        # A model that wraps its answer in a ```json fence, or puts a sentence
+        # either side of it, has written a perfectly good plan into a file that
+        # `json.loads` refuses. That is a different failure from a truncated
+        # document, and it is the more common one, so it is tried first.
+        plan = extract_json_document(content)
+        if plan is not None:
+            json_repaired = True
+            logging.info(f"JSON extracted from surrounding text: {plan_file}")
+        else:
+            try:
+                repaired = _repair_json_syntax(content)
+                if repaired:
+                    plan = json.loads(repaired)
+                    json_repaired = True
+                    logging.info(f"JSON syntax repaired: {plan_file}")
+            except Exception as e:
+                logging.warning(f"JSON repair attempt failed for {plan_file}: {e}")
 
     if plan is None:
         return False
 
     fixed = False
 
-    # Support older/simple plans that use top-level "subtasks" (or "chunks")
-    if "phases" not in plan and (
-        isinstance(plan.get("subtasks"), list) or isinstance(plan.get("chunks"), list)
-    ):
-        subtasks = plan.get("subtasks") or plan.get("chunks") or []
-        plan["phases"] = [
-            {
-                "id": "1",
-                "phase": 1,
-                "name": "Phase 1",
-                "subtasks": subtasks,
-            }
-        ]
-        plan.pop("subtasks", None)
-        plan.pop("chunks", None)
-        fixed = True
+    # The plan, in whatever shape the model produced it: a top-level list, one
+    # level of `{"implementation_plan": {...}}`, `tasks`/`steps` instead of
+    # `phases`, `phases` keyed by id, a subtask that is a bare string. Renaming
+    # and re-nesting what the model decided is not inventing a plan — when
+    # nothing in the document carries a subtask, `normalize_plan_shape` returns
+    # None and the schema errors below stand.
+    if not isinstance(plan, dict) or not _has_subtasks(plan):
+        reshaped = normalize_plan_shape(plan)
+        if reshaped is not None:
+            plan = reshaped
+            fixed = True
+        elif not isinstance(plan, dict):
+            # Nothing to validate and nothing to repair: leave the file as the
+            # model wrote it so the validator reports what is actually there.
+            return False
 
     # Fix missing top-level fields
     if "feature" not in plan:

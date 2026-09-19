@@ -16,6 +16,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Claude Agent SDK Usage](#claude-agent-sdk-usage)
   - [Agent Prompts](#agent-prompts)
   - [Spec Directory Structure](#spec-directory-structure)
+  - [Where the implementation plan actually is](#where-the-implementation-plan-actually-is)
   - [Requirement Traceability](#requirement-traceability)
   - [spec-kit projects](#spec-kit-projects)
   - [Memory System (Graphiti)](#memory-system-graphiti)
@@ -284,6 +285,63 @@ from an earlier design and loaded by nothing.
 ### Spec Directory Structure
 
 Each spec in `.workpilot/specs/XXX-name/` contains: `spec.md`, `requirements.json`, `context.json`, `implementation_plan.json`, `qa_report.md`, `QA_FIX_REQUEST.md`
+
+### Where the implementation plan actually is
+
+> *Planning failed: the model did not produce a valid implementation_plan.json
+> (unparseable or missing `phases`). — No phases defined — No subtasks defined
+> in any phase*
+
+That sentence was the answer to a question nobody had asked. The validator
+reads one path, in one shape, and reports what it did not find there; it was
+then repeated three times and the build gave up. Three other things are true
+far more often than "the model produced nothing", and none of them costs
+another planning session to fix:
+
+| What happened | Where the plan was |
+|---|---|
+| PHASE 3 of `prompts/planner.md` spelled the destination as a **relative** `implementation_plan.json`, which resolves against the worktree root | `<project_dir>/implementation_plan.json` — the file `_cleanup_stray_root_plan` used to **delete** |
+| the model invented a filename | `plan.json`, `tasks.json`, `subtasks.json`, in the spec directory |
+| it wrote the right file in a shape the schema does not name | `tasks` / `steps` / `stages` instead of `phases`, one level of `{"implementation_plan": {…}}`, `phases` keyed by id, a subtask that is a bare string, the whole document inside a ```` ```json ```` fence |
+| it never called Write at all | the JSON is in the planner's own response |
+
+`spec/plan_recovery.py` answers the question in two halves, both usable alone:
+
+| Function | Answers |
+|---|---|
+| `extract_json_document` | the first complete JSON document in a blob that may be fenced or wrapped in prose — depth-counted, so a `"map[0] of {x}"` inside a string does not close it early |
+| `normalize_plan_shape` | a parsed *anything* → `phases[].subtasks[]`, or `None` |
+| `recover_plan` / `write_recovered_plan` | the same normalization applied to every place the plan could be, writing the winner to the one path WorkPilot reads |
+
+`validate_pkg.auto_fix` calls the first two on the file the validator reads, so
+the CLI and the spec pipeline get the reshaping too; `agents/coder.py` calls
+`recover_plan` as the third step of `_validate_and_fix_implementation_plan`,
+after validation and after auto-fix, and **prints where the plan came from** —
+this is the one point where WorkPilot builds from a file it moved or reshaped
+on the model's behalf, and a silent rewrite would leave the next reader
+comparing the plan against a transcript that does not match it.
+
+**Reshaping is not inventing.** The only things added are the fields the schema
+requires and the model left implicit: `status: pending`, ids, a phase to hold a
+flat list. A *description* is never synthesised, because that is the only field
+carrying a decision. When nothing anywhere holds a single subtask,
+`normalize_plan_shape` returns `None`, and planning fails with exactly the
+message above — which is then true. A plan WorkPilot made up would be worse
+than the error: the coder would spend a whole build implementing it.
+
+**Two rules keep recovery from finding the wrong thing.** Outside the spec
+directory only the asked-for name is read — `tasks.json` at a project root is a
+task-runner config far more often than it is a plan, and building somebody's
+build config is a worse failure than the one this fixes. And a file found
+outside the spec directory is *moved*, not copied: a second copy of the real
+plan at the worktree root is worse than the truncated one `_cleanup_stray_root_plan`
+removes, because a later read could pick it up.
+
+The status bookkeeping the frontend keeps in `implementation_plan.json` before
+the plan exists (`persistPlanStatusAndReasonSync` creates the file with
+`status`, `xstateState`, `executionPhase` and no `phases`) is merged back over
+the recovered plan. It describes the task, not the plan, and dropping it resets
+a card that is visibly running.
 
 ### Requirement Traceability
 
