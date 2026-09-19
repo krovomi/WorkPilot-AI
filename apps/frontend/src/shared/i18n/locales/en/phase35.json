@@ -211,7 +211,76 @@
 			"localesDirRequired": "Enter the locales directory",
 			"sourceLocaleRequired": "Enter the source locale",
 			"sourceLocaleInvalid": "Invalid locale code (e.g. en, fr, fr-FR)"
-		}
+		},
+		"mode": {
+			"report": "Report",
+			"editor": "Editor"
+		},
+		"loadTranslations": "Load translations",
+		"editorEmpty": "Load the translations to browse and edit them.",
+		"detectedTitle": "Found in this project",
+		"detectedMeta_one": "{{locales}} · {{count}} namespace",
+		"detectedMeta_other": "{{locales}} · {{count}} namespaces"
+	},
+	"i18nEditor": {
+		"searchNamespaces": "Filter namespaces",
+		"searchKeys": "Search keys and values",
+		"sort": {
+			"todo": "To do first",
+			"name": "A → Z"
+		},
+		"flatNamespace": "(single file)",
+		"complete": "Complete",
+		"completeness": "{{percent}}% translated",
+		"noNamespaceMatches": "No namespace matches",
+		"noKeyMatches": "No key matches",
+		"pickNamespace": "Pick a namespace on the left to start editing.",
+		"colKey": "Key",
+		"reference": "(reference)",
+		"filter": {
+			"all": "All",
+			"missing": "Missing",
+			"placeholder": "Untranslated",
+			"mismatch": "Variables"
+		},
+		"addKey": "Add key",
+		"addKeyTitle": "Add a key",
+		"addKeyDescription": "It will be created in {{namespace}}, in every locale you fill in.",
+		"addKeyConfirm": "Add",
+		"addKeyBlankHint": "A locale left blank stays untranslated rather than being saved as an empty string.",
+		"keyLabel": "Key",
+		"keyPlaceholder": "buttons.save",
+		"optional": "optional",
+		"keyError": {
+			"empty": "A key cannot be empty.",
+			"shape": "Segments are separated by single dots, and none may be empty or start with a space.",
+			"tooLong": "This key is too long.",
+			"taken": "This key already exists in this namespace.",
+			"nests": "{{key}} already holds a value at that path."
+		},
+		"missingValue": "Not translated",
+		"addTranslation": "Add the {{locale}} translation of {{key}}",
+		"valueFor": "{{locale}} value of {{key}}",
+		"revertCell": "Revert this value",
+		"renameKey": "Rename",
+		"renamedFrom": "Renamed from {{key}}",
+		"deleteKey": "Delete",
+		"undoDelete": "Restore",
+		"willBeDeleted": "Will be deleted from every locale when you save",
+		"newBadge": "new",
+		"mismatchHint": "The reference uses: {{vars}}",
+		"pendingChanges_one": "{{count}} unsaved change",
+		"pendingChanges_other": "{{count}} unsaved changes",
+		"noChanges": "No unsaved changes",
+		"savedFiles_one": "Saved — {{count}} file written",
+		"savedFiles_other": "Saved — {{count}} files written",
+		"savedNothingToWrite": "Saved — the files already matched",
+		"discard": "Discard",
+		"save": "Save",
+		"showing": "Showing {{shown}} of {{total}}",
+		"showMore": "Show more",
+		"staleNotice": "These files changed on disk since you opened them. Your edits are kept — reload to apply them on top of the new content.",
+		"reloadKeepingEdits": "Reload, keep my edits"
 	},
 	"cogContext": {
 		"title": "Cognitive Context Optimizer",

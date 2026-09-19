@@ -311,6 +311,69 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 			}),
 	);
 
+	// === #3.12 i18n editor ===
+	ipcMain.handle(
+		IPC_CHANNELS.I18N_EDITOR_DETECT,
+		async (_e, { projectPath }: { projectPath: string }) =>
+			backendFetch("/api/i18n-scaler/detect", {
+				method: "POST",
+				body: JSON.stringify({ project_dir: projectPath }),
+			}),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.I18N_EDITOR_NAMESPACES,
+		async (_e, { localesDir }: { localesDir: string }) =>
+			backendFetch("/api/i18n-scaler/namespaces", {
+				method: "POST",
+				body: JSON.stringify({ locales_dir: localesDir }),
+			}),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.I18N_EDITOR_NAMESPACE,
+		async (
+			_e,
+			{
+				localesDir,
+				namespace,
+				referenceLocale,
+			}: { localesDir: string; namespace: string; referenceLocale?: string },
+		) =>
+			backendFetch("/api/i18n-scaler/namespace", {
+				method: "POST",
+				body: JSON.stringify({
+					locales_dir: localesDir,
+					namespace,
+					reference_locale: referenceLocale ?? null,
+				}),
+			}),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.I18N_EDITOR_MUTATE,
+		async (
+			_e,
+			{
+				localesDir,
+				namespace,
+				operations,
+				fingerprints,
+			}: {
+				localesDir: string;
+				namespace: string;
+				operations: unknown[];
+				fingerprints: Record<string, string>;
+			},
+		) =>
+			backendFetch("/api/i18n-scaler/mutate", {
+				method: "POST",
+				body: JSON.stringify({
+					locales_dir: localesDir,
+					namespace,
+					operations,
+					fingerprints,
+				}),
+			}),
+	);
+
 	// === #3.2 Cognitive Context ===
 	ipcMain.handle(
 		IPC_CHANNELS.COGNITIVE_CONTEXT_OPTIMIZE,

@@ -967,6 +967,10 @@ export const IPC_CHANNELS = {
 	I18N_SCALER_DIFF: "i18nScaler:diff",
 	I18N_SCALER_SKELETON: "i18nScaler:skeleton",
 	I18N_SCALER_REPORT_FROM_DIR: "i18nScaler:reportFromDir",
+	I18N_EDITOR_DETECT: "i18nEditor:detect",
+	I18N_EDITOR_NAMESPACES: "i18nEditor:namespaces",
+	I18N_EDITOR_NAMESPACE: "i18nEditor:namespace",
+	I18N_EDITOR_MUTATE: "i18nEditor:mutate",
 	// Cognitive Context Optimizer (#3.2)
 	COGNITIVE_CONTEXT_OPTIMIZE: "cognitiveContext:optimize",
 	// Audit Trail (#3.3)
