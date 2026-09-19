@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify";
 import {
+	AlignLeft,
 	Bug,
 	Check,
 	ChevronDown,
@@ -11,6 +12,7 @@ import {
 	GitBranch,
 	GitPullRequest,
 	Lightbulb,
+	List,
 	ListChecks,
 	Palette,
 	Pencil,
@@ -35,6 +37,16 @@ import {
 	CollapsibleTrigger,
 } from "../ui/collapsible";
 import { Textarea } from "../ui/textarea";
+import { AcceptanceCriteriaEditor } from "./AcceptanceCriteriaEditor";
+import {
+	type CriterionDraft,
+	draftsToText,
+	ensureAtLeastOne,
+	sameCriteria,
+	textToDrafts,
+	toCriteria,
+	toDrafts,
+} from "./acceptance-criteria-draft";
 import { TaskBlockers } from "./TaskBlockers";
 
 // Schéma de sanitization personnalisé permettant les styles inline
@@ -843,7 +855,7 @@ function AcceptanceCriteriaList({ criteria }: AcceptanceCriteriaListProps) {
 							</div>
 						)}
 						{group.lines.length > 0 && (
-							<div
+							<ul
 								className={
 									group.title
 										? "pl-3 border-l-2 border-border space-y-0.5"
@@ -851,9 +863,21 @@ function AcceptanceCriteriaList({ criteria }: AcceptanceCriteriaListProps) {
 								}
 							>
 								{group.lines.map((line) => (
-									<div key={`${groupKey}::${line}`}>{line}</div>
+									<li
+										key={`${groupKey}::${line}`}
+										className="flex items-start gap-2"
+									>
+										{/* La puce est décorative : la liste est déjà
+										    annoncée comme telle par le <ul>, et un
+										    caractère lu à chaque ligne est du bruit. */}
+										<span
+											aria-hidden="true"
+											className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/60"
+										/>
+										<span className="flex-1">{line}</span>
+									</li>
 								))}
-							</div>
+							</ul>
 						)}
 					</div>
 				);
@@ -866,11 +890,16 @@ interface AcceptanceCriteriaSectionProps {
 	readonly task: Task;
 }
 
+/** Les deux façons d'éditer la même liste : une puce par critère, ou le texte
+ * brut d'avant. La liste est le mode par défaut ; le texte reste là pour ce
+ * qu'elle fait mal — coller dix critères d'un ticket, en réordonner la moitié,
+ * tout effacer d'un geste. */
+type AcEditorMode = "list" | "text";
+
 function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 	const { t } = useTranslation(["tasks"]);
 	const { toast } = useToast();
 	const initialCriteria = task.metadata?.acceptanceCriteria ?? [];
-	const initialText = initialCriteria.join("\n");
 
 	// Extract ADO work item ID from "ADO-603226" format
 	const adoWorkItemId = task.metadata?.azureDevOpsIdentifier
@@ -880,39 +909,58 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 
 	const [open, setOpen] = useState(initialCriteria.length > 0);
 	const [isEditing, setIsEditing] = useState(false);
-	const [draft, setDraft] = useState(initialText);
+	const [mode, setMode] = useState<AcEditorMode>("list");
+	const [drafts, setDrafts] = useState<CriterionDraft[]>(() =>
+		ensureAtLeastOne(toDrafts(initialCriteria)),
+	);
+	// Le mode texte porte sa propre chaîne : dériver le texte des puces à
+	// chaque frappe supprimerait la ligne vide qu'on vient d'ouvrir, donc
+	// empêcherait de taper Entrée.
+	const [text, setText] = useState("");
 	const [isSaving, setIsSaving] = useState(false);
 	const [isSyncing, setIsSyncing] = useState(false);
 	const [savedAt, setSavedAt] = useState<number | null>(null);
 
-	// Sync the textarea draft from the source of truth — but ONLY when the
-	// user isn't actively editing. Otherwise every store-triggered re-render
-	// (incoming task refresh, kanban poll, etc.) would silently wipe what
-	// the user has been typing and lock `isDirty` to false, making the
-	// "Enregistrer" button uncliquable.
+	// Sync the draft from the source of truth — but ONLY when the user isn't
+	// actively editing. Otherwise every store-triggered re-render (incoming
+	// task refresh, kanban poll, etc.) would silently wipe what the user has
+	// been typing and lock `isDirty` to false, making the "Enregistrer" button
+	// uncliquable.
 	useEffect(() => {
 		if (isEditing) return;
 		const fresh = task.metadata?.acceptanceCriteria ?? [];
-		setDraft(fresh.join("\n"));
+		setDrafts(ensureAtLeastOne(toDrafts(fresh)));
 	}, [task.metadata?.acceptanceCriteria, isEditing]);
 
-	const parsedDraft = draft
-		.split("\n")
-		.map((l) => l.trim().replace(/^[-*•]\s*/, ""))
-		.filter(Boolean);
+	// Ce qui serait enregistré, quel que soit le mode où l'on se trouve.
+	const edited = mode === "list" ? toCriteria(drafts) : toCriteria(textToDrafts(text));
 
-	const isDirty = parsedDraft.join("\n") !== initialCriteria.join("\n");
+	const isDirty = !sameCriteria(edited, initialCriteria);
+
+	const switchMode = (next: AcEditorMode) => {
+		if (next === mode) return;
+		if (next === "text") setText(draftsToText(drafts));
+		else setDrafts(ensureAtLeastOne(textToDrafts(text)));
+		setMode(next);
+	};
+
+	const startEditing = () => {
+		setDrafts(ensureAtLeastOne(toDrafts(initialCriteria)));
+		setText(initialCriteria.join("\n"));
+		setIsEditing(true);
+		setOpen(true);
+	};
 
 	const handleSave = async () => {
 		setIsSaving(true);
 		const ok = await persistUpdateTask(task.id, {
-			metadata: { acceptanceCriteria: parsedDraft },
+			metadata: { acceptanceCriteria: edited },
 		});
 		setIsSaving(false);
 		if (ok) {
 			setSavedAt(Date.now());
 			setIsEditing(false);
-			if (parsedDraft.length > 0) setOpen(true);
+			if (edited.length > 0) setOpen(true);
 		} else {
 			// Without this toast the button silently bounces back to "Enregistrer"
 			// and the user has no way to know whether the IPC failed, the file
@@ -932,7 +980,8 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 	};
 
 	const handleCancel = () => {
-		setDraft(initialCriteria.join("\n"));
+		setDrafts(ensureAtLeastOne(toDrafts(initialCriteria)));
+		setText(initialCriteria.join("\n"));
 		setIsEditing(false);
 	};
 
@@ -947,7 +996,9 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 			);
 			if (result.success && result.data) {
 				const synced = result.data.acceptanceCriteria;
-				await persistUpdateTask(task.id, { metadata: { acceptanceCriteria: synced } });
+				await persistUpdateTask(task.id, {
+					metadata: { acceptanceCriteria: synced },
+				});
 				setOpen(synced.length > 0);
 				setSavedAt(Date.now());
 			}
@@ -981,18 +1032,31 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 			<CollapsibleContent>
 				{isEditing ? (
 					<>
-						<Textarea
-							value={draft}
-							onChange={(e) => setDraft(e.target.value)}
-							placeholder={t("tasks:metadata.acPlaceholder")}
-							rows={5}
-							className="text-sm"
-						/>
+						<div className="flex justify-end mb-1.5">
+							<AcModeToggle mode={mode} onChange={switchMode} />
+						</div>
+						{mode === "list" ? (
+							<AcceptanceCriteriaEditor
+								drafts={drafts}
+								onChange={setDrafts}
+								disabled={isSaving}
+							/>
+						) : (
+							<Textarea
+								value={text}
+								onChange={(e) => setText(e.target.value)}
+								placeholder={t("tasks:metadata.acPlaceholder")}
+								rows={5}
+								className="text-sm"
+							/>
+						)}
 						<div className="flex items-center justify-between mt-2 gap-2">
 							<span className="text-xs text-muted-foreground">
 								{savedAt && !isDirty
 									? t("tasks:metadata.acSaved")
-									: t("tasks:metadata.acHelp")}
+									: mode === "list"
+										? t("tasks:metadata.acListHelp")
+										: t("tasks:metadata.acHelp")}
 							</span>
 							<div className="flex gap-1.5">
 								<Button
@@ -1034,10 +1098,7 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 						<div className="flex items-center gap-3 flex-wrap">
 							<button
 								type="button"
-								onClick={() => {
-									setIsEditing(true);
-									setOpen(true);
-								}}
+								onClick={startEditing}
 								className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
 							>
 								<Pencil className="h-3 w-3" />
@@ -1061,6 +1122,45 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 				)}
 			</CollapsibleContent>
 		</Collapsible>
+	);
+}
+
+interface AcModeToggleProps {
+	readonly mode: AcEditorMode;
+	readonly onChange: (mode: AcEditorMode) => void;
+}
+
+function AcModeToggle({ mode, onChange }: AcModeToggleProps) {
+	const { t } = useTranslation(["tasks"]);
+	const options: { value: AcEditorMode; label: string; icon: typeof List }[] = [
+		{ value: "list", label: t("tasks:metadata.acModeList"), icon: List },
+		{ value: "text", label: t("tasks:metadata.acModeText"), icon: AlignLeft },
+	];
+
+	return (
+		<fieldset
+			className="inline-flex items-center rounded-md border border-border p-0.5"
+			aria-label={t("tasks:metadata.acModeLabel")}
+		>
+			{options.map(({ value, label, icon: Icon }) => (
+				<button
+					key={value}
+					type="button"
+					onClick={() => onChange(value)}
+					aria-pressed={mode === value}
+					title={label}
+					className={cn(
+						"flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors",
+						mode === value
+							? "bg-muted text-foreground"
+							: "text-muted-foreground hover:text-foreground",
+					)}
+				>
+					<Icon className="h-3 w-3" aria-hidden="true" />
+					{label}
+				</button>
+			))}
+		</fieldset>
 	);
 }
 
