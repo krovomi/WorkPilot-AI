@@ -191,6 +191,21 @@ describe("Phase 3-5 panels smoke tests", () => {
 		expect(screen.getByText("title")).toBeInTheDocument();
 	});
 
+	it("AuditTrailPanel opens on the project's own trail directory", () => {
+		// The one directory agents/agent_audit.py ever writes to. The panel used
+		// to open on an empty field, so reading a trail the app had just written
+		// meant knowing the convention by heart and typing it.
+		render(<AuditTrailPanel projectPath="/tmp/proj" />);
+		expect(screen.getByLabelText("storageDir")).toHaveValue(
+			"/tmp/proj/.workpilot/audit-trail",
+		);
+	});
+
+	it("AuditTrailPanel leaves the trail directory empty with no project", () => {
+		render(<AuditTrailPanel />);
+		expect(screen.getByLabelText("storageDir")).toHaveValue("");
+	});
+
 	it("PairProgrammingPanel renders join form when not in a room", () => {
 		render(<PairProgrammingPanel />);
 		expect(screen.getAllByText("title").length).toBeGreaterThan(0);

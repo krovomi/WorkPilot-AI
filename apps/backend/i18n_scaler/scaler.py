@@ -88,6 +88,17 @@ def _extract_placeholders(value: str) -> set[str]:
     return set(_INTERPOLATION_RE.findall(value))
 
 
+# ``en``, ``fr``, ``en-US``, ``pt_BR``, ``zh-Hans``, ``ckb``. Deliberately not
+# a BCP-47 parser: the question is only whether a file or directory name reads
+# as a language rather than as a namespace (``common``, ``navigation``).
+_LOCALE_CODE_RE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$")
+
+
+def _looks_like_locale_code(name: str) -> bool:
+    """Does this file or directory name read as a locale code?"""
+    return bool(_LOCALE_CODE_RE.match(name))
+
+
 # ----------------------------------------------------------------------
 # Models
 
@@ -145,6 +156,23 @@ class LocaleCoverage:
             "placeholder_keys": self.placeholder_keys,
             "coverage_ratio": round(self.coverage_ratio, 4),
         }
+
+
+@dataclass
+class LocaleDiscovery:
+    """What was found on disk, and where it was actually read from.
+
+    ``root`` is the directory the locales came from, which is not always the
+    one that was asked for — see `I18nAutoScaler.discover_locales`. When they
+    differ, ``redirected_from`` holds the directory that was asked for, so a
+    caller can say which one it answered about instead of silently changing
+    the subject.
+    """
+
+    root: Path
+    layout: str  # "nested" | "flat" | "none"
+    locales: dict[str, dict[str, Any]] = field(default_factory=dict)
+    redirected_from: Path | None = None
 
 
 @dataclass
@@ -303,29 +331,127 @@ class I18nAutoScaler:
     # ------------------------------------------------------------------
     # Filesystem helpers
 
-    def discover_locale_dir(self, locales_dir: Path | str) -> dict[str, dict[str, Any]]:
-        """Load every locale directory under `locales_dir`.
+    def discover_locales(self, locales_dir: Path | str) -> LocaleDiscovery:
+        """Find the locales under `locales_dir`, whichever layout is in use.
 
-        Layout:  ``<locales_dir>/<lang>/*.json`` — typical i18next layout.
-        Each language is the merged content of all its namespace files,
-        keyed by the namespace stem.
+        Two layouts are read, because both are ordinary i18next output and a
+        folder picker gives no hint which one it just handed over:
+
+        * **nested** — ``<root>/<lang>/*.json``, one file per namespace. A
+          language is the merge of its namespace files, keyed by file stem.
+        * **flat** — ``<root>/<lang>.json``, one file per language.
+
+        And one directory is *not* a root at all: the locale directory
+        itself. Picking ``locales/fr`` in the folder dialog is the obvious
+        mistake to make — it is where the translations visibly are — and it
+        used to read as an empty root, which then reported the source locale
+        as missing from the very folder named after it. When the directory
+        holds no locales but is itself named like one, the search moves up to
+        its parent and says so in ``redirected_from``, so the answer names the
+        directory it was actually read from.
         """
         root = Path(locales_dir)
         if not root.is_dir():
             raise ValueError(f"Not a directory: {root}")
 
+        found = self._read_locales_at(root)
+        if found.locales or not self._looks_like_locale_dir(root):
+            return found
+
+        parent = self._read_locales_at(root.parent)
+        if not parent.locales:
+            return found
+        return LocaleDiscovery(
+            root=parent.root,
+            layout=parent.layout,
+            locales=parent.locales,
+            redirected_from=root,
+        )
+
+    def _read_locales_at(self, root: Path) -> LocaleDiscovery:
+        """Read one directory as a locales root. No fallbacks, no redirect."""
+        nested = self._read_nested_layout(root)
+        if nested:
+            return LocaleDiscovery(root=root, layout="nested", locales=nested)
+        flat = self._read_flat_layout(root)
+        if flat:
+            return LocaleDiscovery(root=root, layout="flat", locales=flat)
+        return LocaleDiscovery(root=root, layout="none", locales={})
+
+    def _read_nested_layout(self, root: Path) -> dict[str, dict[str, Any]]:
+        """``<root>/<lang>/*.json`` — every namespace file merged per language.
+
+        A subdirectory counts as a language when its name reads like a locale
+        code *or* it holds at least one ``.json`` file. The second half keeps
+        an unusually named locale directory readable; the first keeps a
+        sibling that merely sits next to the locales (``__generated__``,
+        ``scripts``) from being reported as a language with no keys.
+        """
         out: dict[str, dict[str, Any]] = {}
-        for lang_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        try:
+            children = sorted(p for p in root.iterdir() if p.is_dir())
+        except OSError as e:
+            logger.warning("Cannot list %s: %s", root, e)
+            return {}
+
+        for lang_dir in children:
+            ns_files = sorted(lang_dir.glob("*.json"))
+            if not ns_files and not _looks_like_locale_code(lang_dir.name):
+                continue
             merged: dict[str, Any] = {}
-            for ns_file in sorted(lang_dir.glob("*.json")):
-                try:
-                    payload = json.loads(ns_file.read_text(encoding="utf-8"))
-                except (OSError, json.JSONDecodeError) as e:
-                    logger.warning("Skipping %s: %s", ns_file, e)
-                    continue
-                merged[ns_file.stem] = payload
+            for ns_file in ns_files:
+                payload = self._read_json(ns_file)
+                if payload is not None:
+                    merged[ns_file.stem] = payload
             out[lang_dir.name] = merged
         return out
+
+    def _read_flat_layout(self, root: Path) -> dict[str, dict[str, Any]]:
+        """``<root>/<lang>.json`` — one file per language, no namespaces.
+
+        Accepted only when *every* JSON file directly under the root is named
+        like a locale code. A namespace directory such as ``locales/fr`` also
+        holds JSON files, and a couple of those stems (``no``, ``llm``) read
+        like locale codes on their own — taking the layout on a partial match
+        would report a handful of namespaces as languages.
+        """
+        try:
+            json_files = sorted(root.glob("*.json"))
+        except OSError as e:
+            logger.warning("Cannot list %s: %s", root, e)
+            return {}
+        if not json_files:
+            return {}
+        if not all(_looks_like_locale_code(f.stem) for f in json_files):
+            return {}
+
+        out: dict[str, dict[str, Any]] = {}
+        for f in json_files:
+            payload = self._read_json(f)
+            if payload is not None:
+                out[f.stem] = payload
+        return out
+
+    def _looks_like_locale_dir(self, root: Path) -> bool:
+        """Is this the inside of one language rather than the root of all of them?"""
+        if not _looks_like_locale_code(root.name):
+            return False
+        try:
+            return any(root.glob("*.json"))
+        except OSError:
+            return False
+
+    @staticmethod
+    def _read_json(path: Path) -> dict[str, Any] | None:
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning("Skipping %s: %s", path, e)
+            return None
+
+    def discover_locale_dir(self, locales_dir: Path | str) -> dict[str, dict[str, Any]]:
+        """`discover_locales`, keeping only the locales. See it for the layouts."""
+        return self.discover_locales(locales_dir).locales
 
     def write_skeleton_to_dir(
         self,

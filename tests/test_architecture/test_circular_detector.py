@@ -286,3 +286,83 @@ class TestBoundedContextViolations:
         violations = detector.check_bounded_context_violations()
 
         assert len(violations) == 0
+
+
+class TestImportResolution:
+    """`_resolve_to_file` and the suffix index it answers from.
+
+    The index replaced a scan over every known file, run once per candidate
+    path and once per import edge — on WorkPilot itself, 21 000 edges against
+    3 500 files, which is where the Architecture page spent over a minute of
+    each scan. These pin the behaviour the index has to keep.
+    """
+
+    def _detector(self, files):
+        graph = _make_graph([(f, "x") for f in files])
+        return CircularDependencyDetector(graph, _make_config()), set(files)
+
+    def test_exact_path_wins(self):
+        det, files = self._detector(["src/core/client.py", "core/client.py"])
+        assert det._resolve_to_file("core/client.py", files) == "core/client.py"
+
+    def test_dotted_python_import_resolves_to_a_suffix(self):
+        det, files = self._detector(["apps/backend/core/client.py"])
+        assert (
+            det._resolve_to_file("core.client", files) == "apps/backend/core/client.py"
+        )
+
+    def test_package_import_resolves_through_init(self):
+        det, files = self._detector(["apps/backend/i18n_scaler/__init__.py"])
+        assert det._resolve_to_file("i18n_scaler", files) == (
+            "apps/backend/i18n_scaler/__init__.py"
+        )
+
+    def test_barrel_import_resolves_through_index(self):
+        det, files = self._detector(["src/renderer/components/index.tsx"])
+        assert det._resolve_to_file("renderer/components", files) == (
+            "src/renderer/components/index.tsx"
+        )
+
+    def test_suffix_must_start_at_a_path_segment(self):
+        """A string suffix is not a path suffix: `lient.py` matches nothing."""
+        det, files = self._detector(["src/core/client.py"])
+        assert det._resolve_to_file("lient.py", files) is None
+
+    def test_external_package_resolves_to_nothing(self):
+        det, files = self._detector(["src/core/client.py"])
+        assert det._resolve_to_file("react", files) is None
+
+    def test_ambiguous_suffix_is_resolved_deterministically(self):
+        """Several files share a suffix — the shallowest path wins, every time.
+
+        The scan this replaced returned whichever one a `set` iterated first,
+        so the report could differ between two runs over identical code.
+        """
+        files = [
+            "a/b/c/shared/utils.ts",
+            "shared/utils.ts",
+            "x/shared/utils.ts",
+        ]
+        det, known = self._detector(files)
+        for _ in range(5):
+            assert det._resolve_to_file("shared/utils", known) == "shared/utils.ts"
+
+    def test_index_is_optional(self):
+        """Callers that pass no index still get an answer — they just pay for it."""
+        det, files = self._detector(["apps/backend/core/client.py"])
+        assert det._resolve_to_file("core.client", files, None) == (
+            "apps/backend/core/client.py"
+        )
+
+    def test_index_and_no_index_agree(self):
+        files = [
+            "apps/backend/core/client.py",
+            "apps/frontend/src/main/index.ts",
+            "src/shared/utils/paths.ts",
+        ]
+        det, known = self._detector(files)
+        index = CircularDependencyDetector._build_suffix_index(known)
+        for target in ["core.client", "main/index", "shared/utils/paths", "nope"]:
+            assert det._resolve_to_file(target, known, index) == det._resolve_to_file(
+                target, known, None
+            )

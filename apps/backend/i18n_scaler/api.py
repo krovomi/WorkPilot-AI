@@ -103,14 +103,56 @@ def report_from_dir(req: ReportFromDirRequest):
         return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
     try:
         scaler = I18nAutoScaler(placeholder_strategy=strategy)
-        locales = scaler.discover_locale_dir(path)
-        if req.source_locale not in locales:
-            return {
-                "success": False,
-                "error": f"Source locale {req.source_locale!r} not found under {path}",
-            }
-        report = scaler.report(req.source_locale, locales)
-        return {"success": True, "report": report.to_dict()}
+        found = scaler.discover_locales(path)
+    except ValueError as e:
+        return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
+    except Exception as e:  # noqa: BLE001
+        logger.exception("report-from-dir discovery failed")
+        return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
+
+    # Every refusal below names what was read and what was there. The one this
+    # replaced said only that the source locale was not under the path — which
+    # on the directory of that very locale read as a contradiction, and gave
+    # nobody the one fact that settles it: which locales the scan did find.
+    if not found.locales:
+        return {
+            "success": False,
+            "error": (
+                f"No translation files found under {path}. Expected either "
+                f"{path.name}/<lang>/*.json or {path.name}/<lang>.json."
+            ),
+            "locales_dir": str(path),
+            "locales_found": [],
+        }
+
+    if req.source_locale not in found.locales:
+        available = ", ".join(sorted(found.locales))
+        return {
+            "success": False,
+            "error": (
+                f"Source locale {req.source_locale!r} not found in {found.root}. "
+                f"Locales found: {available}."
+            ),
+            "locales_dir": str(found.root),
+            "locales_found": sorted(found.locales),
+        }
+
+    try:
+        report = scaler.report(req.source_locale, found.locales)
     except Exception as e:  # noqa: BLE001
         logger.exception("report-from-dir failed")
         return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
+
+    return {
+        "success": True,
+        "report": report.to_dict(),
+        "locales_dir": str(found.root),
+        "locales_found": sorted(found.locales),
+        "layout": found.layout,
+        # Set only when the caller named the inside of one language rather
+        # than the root of all of them. The UI says so, because a report about
+        # a directory nobody picked is worse than the error it replaces.
+        "redirected_from": (
+            str(found.redirected_from) if found.redirected_from is not None else None
+        ),
+    }

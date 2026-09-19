@@ -214,25 +214,68 @@ class CircularDependencyDetector:
         (resolves import modules to file paths where possible).
         """
         all_files = self.graph.get_all_sources()
+        suffix_index = self._build_suffix_index(all_files)
         adjacency: dict[str, set[str]] = defaultdict(set)
 
         for edge in self.graph.edges:
             # Try to match the import target to a known source file
-            target_file = self._resolve_to_file(edge.target_module, all_files)
+            target_file = self._resolve_to_file(
+                edge.target_module, all_files, suffix_index
+            )
             if target_file and target_file != edge.source_file:
                 adjacency[edge.source_file].add(target_file)
 
         return dict(adjacency)
 
-    def _resolve_to_file(self, import_target: str, known_files: set[str]) -> str | None:
+    @staticmethod
+    def _build_suffix_index(known_files: set[str]) -> dict[str, str]:
+        """Every path suffix of every known file, mapped to that file.
+
+        `_resolve_to_file` answers "does some known file end with this path?",
+        and used to answer it by scanning all of them — per candidate, per
+        edge. On this repository that is ~50 000 edges × 14 candidates × ~7 000
+        files, and the Architecture page spent over a minute per scan inside
+        that loop. The same question against a prepared index is a dict
+        lookup, and the index costs one pass over the files: a path has a
+        handful of segments, so it contributes a handful of suffixes.
+
+        Where several files share a suffix, the shortest path wins, then
+        alphabetical order. The scan it replaces returned whichever one a set
+        happened to iterate first, so this is also the point where the answer
+        stops depending on hash order.
+        """
+        index: dict[str, str] = {}
+        for known in sorted(known_files, key=lambda k: (k.count("/"), k)):
+            index.setdefault(known, known)
+            # "a/b/c.ts" is reachable as "b/c.ts" and "c.ts" — the suffixes the
+            # old `known.endswith("/" + candidate)` test accepted, and only those.
+            start = known.find("/")
+            while start != -1:
+                index.setdefault(known[start + 1 :], known)
+                start = known.find("/", start + 1)
+        return index
+
+    def _resolve_to_file(
+        self,
+        import_target: str,
+        known_files: set[str],
+        suffix_index: dict[str, str] | None = None,
+    ) -> str | None:
         """
         Try to resolve an import target to one of the known source files.
 
         Uses heuristic matching: convert dots to slashes, check with common extensions.
+
+        `suffix_index` is `_build_suffix_index(known_files)`, built once by the
+        caller. Omitting it is supported and builds one per call, which is the
+        cost this argument exists to avoid.
         """
         # Direct match
         if import_target in known_files:
             return import_target
+
+        if suffix_index is None:
+            suffix_index = self._build_suffix_index(known_files)
 
         # Convert Python dotted path to file path
         as_path = import_target.replace(".", "/")
@@ -261,10 +304,10 @@ class CircularDependencyDetector:
             normalized = candidate.replace("\\", "/")
             if normalized in known_files:
                 return normalized
-            # Partial match: check if any known file ends with this candidate
-            for known in known_files:
-                if known.endswith("/" + normalized) or known == normalized:
-                    return known
+            # Partial match: a known file ending with this candidate.
+            match = suffix_index.get(normalized)
+            if match is not None:
+                return match
 
         return None
 

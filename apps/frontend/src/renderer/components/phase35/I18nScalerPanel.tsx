@@ -47,7 +47,8 @@ const CUSTOM_SENTINEL = "__custom__";
 
 export function I18nScalerPanel() {
 	const { t } = useTranslation("phase35");
-	const { phase, error, report, runReport } = useI18nScalerStore();
+	const { phase, error, report, scannedDir, redirectedFrom, runReport } =
+		useI18nScalerStore();
 	const [dir, setDir] = useState("");
 	const [source, setSource] = useState<string>("en");
 	const [customSource, setCustomSource] = useState("");
@@ -214,6 +215,17 @@ export function I18nScalerPanel() {
 						)}
 					</div>
 				</div>
+
+				{report && scannedDir && (
+					<p className="text-xs text-muted-foreground font-mono break-all">
+						{redirectedFrom
+							? t("i18nScaler.redirectedNotice", {
+									picked: redirectedFrom,
+									dir: scannedDir,
+								})
+							: t("i18nScaler.scannedDir", { dir: scannedDir })}
+					</p>
+				)}
 
 				{report && (
 					<div className="space-y-3">
