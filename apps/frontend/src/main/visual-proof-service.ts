@@ -349,13 +349,30 @@ async function getCurrentBranch(worktreePath: string): Promise<string | null> {
 	}
 }
 
-async function commitAndPushArtifacts(
+/**
+ * Publie les captures sur la branche de la tâche.
+ *
+ * `-f` n'est pas une facilité : les artefacts sont écrits sous le dossier de
+ * travail de WorkPilot (`.workpilot/` par défaut), que tout projet piloté par
+ * WorkPilot ignore volontairement — c'est de la donnée de build, pas du code.
+ * Sans le forçage, `git add` refusait le chemin qu'on venait de lui donner
+ * (« The following paths are ignored by one of your .gitignore files »), et
+ * l'échec remontait jusqu'à faire passer pour raté un run qui avait pris toutes
+ * ses captures. Ces fichiers-ci sont la seule chose de ce dossier que la
+ * relecture de la PR doit pouvoir ouvrir : le forçage porte donc sur ce seul
+ * dossier de run, et rien ne réécrit le `.gitignore` du dépôt de l'utilisateur.
+ */
+export async function commitAndPushArtifacts(
 	worktreePath: string,
 	relativeDir: string,
 	specId: string,
 ): Promise<string | undefined> {
-	await execFileAsync("git", ["add", "--", relativeDir], { cwd: worktreePath });
+	await execFileAsync("git", ["add", "-f", "--", relativeDir], {
+		cwd: worktreePath,
+	});
 
+	// Une fois indexés, ces fichiers ne sont plus ignorés — `.gitignore` ne parle
+	// que de ce que git ne suit pas — donc `git status` les rend normalement.
 	const status = await execFileAsync(
 		"git",
 		["status", "--porcelain", "--", relativeDir],
@@ -2616,14 +2633,29 @@ export class VisualProofService extends EventEmitter {
 
 			let branch: string | null = null;
 			let commitSha: string | undefined;
+			let publishError: string | undefined;
 			if (options.worktreePath && providerResult.screenshots.length > 0) {
 				branch = await getCurrentBranch(options.worktreePath);
-				commitSha = await commitAndPushArtifacts(
-					options.worktreePath,
-					relativeArtifactDir,
-					options.specId,
-				);
-				attachGitHubUrls(providerResult.screenshots, options.prUrl, branch);
+				try {
+					commitSha = await commitAndPushArtifacts(
+						options.worktreePath,
+						relativeArtifactDir,
+						options.specId,
+					);
+					attachGitHubUrls(providerResult.screenshots, options.prUrl, branch);
+				} catch (error) {
+					// Publier est la dernière étape, pas la preuve. Des captures prises
+					// et écrites sur le disque répondent à la question posée, que git
+					// ait su les pousser ou non — un dépôt sans remote, une branche
+					// protégée, un `push` refusé ne rendent pas le run faux. Les faire
+					// échouer faisait afficher à l'onglet un message de git à la place
+					// de captures qui existaient.
+					publishError = error instanceof Error ? error.message : String(error);
+					logger.warn(
+						"[VisualProof] Could not publish artifacts to the branch:",
+						error,
+					);
+				}
 			}
 
 			const completedRun: VisualProofRun = {
@@ -2637,6 +2669,7 @@ export class VisualProofService extends EventEmitter {
 				appUrl: providerResult.appUrl,
 				artifactDir,
 				commitSha,
+				publishError,
 				screenshots: providerResult.screenshots,
 				apiSmoke: providerResult.apiSmoke,
 				error: providerResult.error,
