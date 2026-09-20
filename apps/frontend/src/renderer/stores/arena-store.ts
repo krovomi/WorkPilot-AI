@@ -110,12 +110,13 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 		const participants = activeBattle.participants.map(
 			(p): ArenaParticipant => {
 				if (p.label !== event.label) return p;
+				// Only the text grows while the answer streams. Tokens and cost
+				// are what the provider reports at the end, and a running
+				// counter guessed from the text so far reads exactly like one.
 				return {
 					...p,
 					output: p.output + event.chunk,
 					status: "running",
-					tokensUsed: event.tokensUsed ?? p.tokensUsed,
-					costUsd: event.costUsd ?? p.costUsd,
 				};
 			},
 		);
@@ -136,6 +137,7 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 					status: event.error ? "error" : "completed",
 					tokensUsed: event.tokensUsed,
 					costUsd: event.costUsd,
+					usageEstimated: event.usageEstimated,
 					durationMs: event.durationMs,
 					error: event.error,
 				};
@@ -185,7 +187,7 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 			const result = await globalThis.electronAPI.arenaVote({
 				battleId,
 				winnerLabel,
-				winnerProfileId: winner.profileId,
+				winnerContenderId: winner.contenderId,
 				taskType: activeBattle.taskType,
 				votedAt: Date.now(),
 			});

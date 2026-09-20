@@ -216,6 +216,24 @@ export function useProviderModelCatalog(
 	return { ...snapshot, refresh };
 }
 
+/**
+ * The same catalog, awaited once, for callers that are not a component.
+ *
+ * The Arena needs every configured provider's catalog at once, which a hook
+ * cannot express (one hook per provider, and the set is only known at runtime).
+ * It goes through the same cache, the same TTL and the same in-flight
+ * deduplication as the hook — a second fetcher would be a second answer to
+ * "what models does this provider have".
+ */
+export async function fetchProviderModelCatalog(
+	provider: string,
+	force = false,
+): Promise<Omit<ProviderModelCatalog, "refresh">> {
+	const key = normalize(provider.trim().toLowerCase());
+	await load(key, force);
+	return stateFor(key).snapshot;
+}
+
 /** Invalidate after a provider configuration or local inventory changes. */
 export function refreshProviderModelCatalog(provider: string): void {
 	const key = normalize(provider.trim().toLowerCase());

@@ -16,9 +16,22 @@ Input: a JSON file passed via ``--input <path>`` with keys:
     model         (str, optional)  override; else a cheap per-provider default
     max_turns     (int, optional)  default 1
     stream        (bool, optional) also emit each chunk as it arrives
+    require_provider (bool, optional) refuse rather than run `provider` on
+                  another vendor's SDK — for a caller comparing providers
 
 Output: ``__ONESHOT_RESULT__:<raw model text>`` on stdout (exit 0). Any failure
 exits non-zero with a short reason on stderr so the caller can degrade.
+
+Two further lines are emitted when the provider gives something to emit, both
+JSON-encoded and both optional — a caller that ignores them sees exactly what
+it saw before:
+
+``__ONESHOT_USAGE__:{"input_tokens", "output_tokens", "cost_usd"}``
+    what the provider itself reported. Absent when it reported nothing, so a
+    caller can tell a measurement from a zero it made up.
+``__ONESHOT_ERROR__:{"message", "code", "provider", "model", ...}``
+    the redacted diagnostic behind a failure. stderr already carries a short
+    reason; this carries one a UI can show without risking credential material.
 
 With ``stream`` set, every chunk is additionally printed, as it arrives, on its
 own line as ``__ONESHOT_DELTA__:<json-encoded chunk>``. JSON-encoded because a
@@ -39,6 +52,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 RESULT_MARKER = "__ONESHOT_RESULT__:"
 DELTA_MARKER = "__ONESHOT_DELTA__:"
+USAGE_MARKER = "__ONESHOT_USAGE__:"
+ERROR_MARKER = "__ONESHOT_ERROR__:"
 
 
 def _make_delta_emitter():
@@ -55,6 +70,18 @@ def _make_delta_emitter():
         print(DELTA_MARKER + json.dumps(chunk), flush=True)
 
     return emit
+
+
+def _emit_marker(marker: str, payload: dict) -> None:
+    """Print one marker line, flushed, ignoring anything unserialisable.
+
+    A diagnostic the caller cannot read is not worth failing the run over: the
+    result line is what it is graded on.
+    """
+    try:
+        print(marker + json.dumps(payload, default=str), flush=True)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def main() -> int:
@@ -89,7 +116,10 @@ def main() -> int:
                 project_dir=payload.get("project_dir"),
                 spec_dir=payload.get("spec_dir"),
                 max_turns=int(payload.get("max_turns", 1)),
+                require_provider=bool(payload.get("require_provider")),
                 on_delta=on_delta,
+                on_error=lambda detail: _emit_marker(ERROR_MARKER, detail),
+                on_usage=lambda usage: _emit_marker(USAGE_MARKER, usage),
             )
         )
     except Exception as exc:  # noqa: BLE001
