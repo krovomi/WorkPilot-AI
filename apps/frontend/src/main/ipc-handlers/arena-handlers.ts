@@ -42,9 +42,10 @@ import { runOneShotLLM } from "../oneshot-llm";
 function getArenaDataDir(): string {
 	const userDataPath = app.getPath("userData");
 	const dir = path.join(userDataPath, "arena-mode");
-	if (!fs.existsSync(dir)) {
-		fs.mkdirSync(dir, { recursive: true });
-	}
+	// `recursive` already makes this a no-op on an existing directory, so the
+	// `existsSync` that used to guard it bought nothing and opened the same
+	// check-then-act window CodeQL flags one function below.
+	fs.mkdirSync(dir, { recursive: true });
 	return dir;
 }
 
@@ -63,25 +64,41 @@ function getVotesPath(): string {
  * analytics tab asks, and counting them would put a fabricated price next to a
  * measured one. They are moved aside rather than deleted — a record nobody can
  * use is still the user's.
+ *
+ * The archive is created **exclusively** (`wx`) rather than written after an
+ * `existsSync` check. Between that check and the write sits a window in which
+ * the archive can appear — a second window of the app reading the same file,
+ * or this process racing itself — and the loser of that race would overwrite
+ * the very records it was called to preserve. One syscall asks and answers.
  */
 function quarantineLegacy(filePath: string, records: unknown[]): void {
 	const archive = filePath.replace(/\.json$/, ".pre-real-models.json");
 	try {
-		if (!fs.existsSync(archive)) {
-			fs.writeFileSync(archive, JSON.stringify(records, null, 2));
+		fs.writeFileSync(archive, JSON.stringify(records, null, 2), {
+			flag: "wx",
+		});
+	} catch (err) {
+		// EEXIST means the records are already preserved — by an earlier run or
+		// by whoever won the race — so clearing the live file is still correct.
+		// Anything else means nothing was preserved, so nothing is cleared: the
+		// records stay where they are and the next read tries again.
+		if ((err as NodeJS.ErrnoException)?.code !== "EEXIST") {
+			appLog.warn(`[Arena] Could not archive legacy records: ${err}`);
+			return;
 		}
+	}
+	try {
 		fs.writeFileSync(filePath, "[]");
 		appLog.info(
 			`[Arena] ${records.length} record(s) from the simulated era moved to ${path.basename(archive)}`,
 		);
 	} catch (err) {
-		appLog.warn(`[Arena] Could not archive legacy records: ${err}`);
+		appLog.warn(`[Arena] Could not clear legacy records: ${err}`);
 	}
 }
 
 function readBattles(): ArenaBattle[] {
 	const p = getBattlesPath();
-	if (!fs.existsSync(p)) return [];
 	try {
 		const parsed = JSON.parse(fs.readFileSync(p, "utf-8"));
 		if (!Array.isArray(parsed)) return [];
@@ -99,6 +116,9 @@ function readBattles(): ArenaBattle[] {
 		}
 		return parsed;
 	} catch {
+		// No file yet, or one nobody can parse: an empty history either way.
+		// Reading and catching is also one syscall instead of two, so the file
+		// cannot be removed between the question and the read.
 		return [];
 	}
 }
@@ -111,7 +131,6 @@ function writeBattles(battles: ArenaBattle[]): void {
 
 function readVotes(): ArenaVote[] {
 	const p = getVotesPath();
-	if (!fs.existsSync(p)) return [];
 	try {
 		const parsed = JSON.parse(fs.readFileSync(p, "utf-8"));
 		if (!Array.isArray(parsed)) return [];
@@ -124,6 +143,7 @@ function readVotes(): ArenaVote[] {
 		}
 		return parsed;
 	} catch {
+		// No file yet, or one nobody can parse: no votes either way.
 		return [];
 	}
 }
