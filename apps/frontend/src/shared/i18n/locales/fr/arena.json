@@ -18,7 +18,7 @@
 	"battle": {
 		"taskType": "Type de tâche",
 		"selectModels": "Sélectionner les modèles",
-		"selectModelHint": "2 à 4 modèles",
+		"selectModelHint": "2 à 4 modèles, tous fournisseurs confondus",
 		"prompt": "Prompt",
 		"promptPlaceholder": "Décrivez la tâche que tous les modèles doivent réaliser…",
 		"startBattle": "Lancer le combat",
@@ -32,14 +32,28 @@
 		"statusCompleted": "Terminé",
 		"waitingForStart": "En attente de démarrage…",
 		"generating": "Génération en cours…",
-		"noOutput": "Aucune sortie"
+		"noOutput": "Aucune sortie",
+		"rosterSummary": "{{models}} modèles · {{providers}} fournisseurs",
+		"refreshModels": "Actualiser",
+		"detectingModels": "Détection des modèles disponibles…",
+		"searchModels": "Rechercher un modèle ou un fournisseur…",
+		"noModelMatch": "Aucun modèle ne correspond à cette recherche",
+		"noProviders": "Aucun fournisseur LLM configuré",
+		"noProvidersHint": "Configurez au moins un fournisseur dans Réglages → Fournisseurs (une clé API, une connexion OAuth ou un serveur Ollama local suffit).",
+		"providersUnreachable": "Modèles indisponibles pour : {{providers}}",
+		"maxModelsReached": "4 modèles au maximum par combat",
+		"removeModel": "Retirer ce modèle",
+		"tokensEstimatedHint": "Estimation : ce fournisseur n'a pas rapporté sa consommation",
+		"costUnknownHint": "Ce fournisseur n'a pas rapporté de coût — aucun montant n'est inventé",
+		"providersDegrade": "Sans adaptateur propre, donc hors Arena (leurs réponses viendraient d'un autre modèle) : {{providers}}"
 	},
 	"history": {
 		"loading": "Chargement de l'historique…",
 		"empty": "Aucun combat pour l'instant",
 		"battles": "combats",
 		"clearAll": "Tout effacer",
-		"awaitingVote": "En attente de vote"
+		"awaitingVote": "En attente de vote",
+		"hiddenUntilVote": "Identité masquée jusqu'au vote"
 	},
 	"analytics": {
 		"loading": "Calcul des analytics…",
@@ -51,7 +65,8 @@
 		"modelRankings": "Classement des modèles",
 		"winRate": "Taux de victoire",
 		"winsTotal": "V/Total",
-		"avgCost": "Coût moyen"
+		"avgCost": "Coût moyen",
+		"avgCostUnknown": "Aucun coût rapporté par le fournisseur pour ces combats"
 	},
 	"routing": {
 		"autoRouting": "Routage automatique",

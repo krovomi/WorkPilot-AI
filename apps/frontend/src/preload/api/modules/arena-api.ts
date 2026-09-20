@@ -13,17 +13,30 @@ import type {
 } from "../../../shared/types/arena";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 
+/**
+ * A contestant, as the renderer names it: a (provider, model) pair taken from
+ * the detected roster. The main process runs what it is handed — it does not
+ * resolve a profile id, because a profile id only ever named a Claude account.
+ */
+export interface ArenaContenderRequest {
+	id: string;
+	provider: string;
+	providerLabel?: string;
+	model: string;
+	modelLabel?: string;
+}
+
 export interface ArenaStartBattleRequest {
 	taskType: ArenaTaskType;
 	prompt: string;
-	profileIds: string[];
+	contenders: ArenaContenderRequest[];
 	projectPath?: string;
 }
 
 export interface ArenaVoteRequest {
 	battleId: string;
 	winnerLabel: ArenaLabel;
-	winnerProfileId: string;
+	winnerContenderId: string;
 	taskType: ArenaTaskType;
 	votedAt: number;
 }
@@ -46,11 +59,6 @@ export interface ArenaAPI {
 		error?: string;
 	}>;
 	arenaClearHistory: () => Promise<{ success: boolean; error?: string }>;
-	arenaGetProfiles: () => Promise<{
-		success: boolean;
-		data?: unknown[];
-		error?: string;
-	}>;
 
 	onArenaBattleProgress: (
 		callback: (event: ArenaBattleProgressEvent) => void,
@@ -73,7 +81,6 @@ export function createArenaAPI(): ArenaAPI {
 		arenaGetBattles: () => invokeIpc("arena:getBattles"),
 		arenaGetAnalytics: () => invokeIpc("arena:getAnalytics"),
 		arenaClearHistory: () => invokeIpc("arena:clearHistory"),
-		arenaGetProfiles: () => invokeIpc("arena:getProfiles"),
 
 		onArenaBattleProgress: (callback) =>
 			createIpcListener("arena:battleProgress", callback),
