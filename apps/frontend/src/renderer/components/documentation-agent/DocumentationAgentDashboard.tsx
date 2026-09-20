@@ -10,21 +10,24 @@ import {
 } from "../../stores/documentation-agent-store";
 import { useProjectStore } from "../../stores/project-store";
 
-const PHASE_LABELS: Record<DocumentationAgentPhase, string> = {
-	idle: "Ready",
-	analyzing: "Analyzing documentation coverage...",
-	generating: "Generating documentation...",
-	updating: "Updating outdated docs...",
-	complete: "Complete",
-	error: "Error",
+// Les libellés sont des clés, pas du texte : la phase et le type de document
+// sont affichés à l'utilisateur, et cette page était la seule du menu à les
+// écrire en dur — le libellé de la barre latérale, lui, était déjà traduit.
+const PHASE_LABEL_KEYS: Record<DocumentationAgentPhase, string> = {
+	idle: "documentation:agent.phase.idle",
+	analyzing: "documentation:agent.phase.analyzing",
+	generating: "documentation:agent.phase.generating",
+	updating: "documentation:agent.phase.updating",
+	complete: "documentation:agent.phase.complete",
+	error: "documentation:agent.phase.error",
 };
 
-const DOC_TYPE_LABELS: Record<DocTypeKey, string> = {
-	readme: "README",
-	api: "API Docs",
-	contribution: "Contribution Guide",
-	docstrings: "Docstrings / JSDoc",
-	diagrams: "Sequence Diagrams",
+const DOC_TYPE_LABEL_KEYS: Record<DocTypeKey, string> = {
+	readme: "documentation:agent.docType.readme",
+	api: "documentation:agent.docType.api",
+	contribution: "documentation:agent.docType.contribution",
+	docstrings: "documentation:agent.docType.docstrings",
+	diagrams: "documentation:agent.docType.diagrams",
 };
 
 const DOC_TYPE_ICONS: Record<DocTypeKey, string> = {
@@ -36,8 +39,7 @@ const DOC_TYPE_ICONS: Record<DocTypeKey, string> = {
 };
 
 export function DocumentationAgentDashboard(): React.ReactElement {
-	// biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
-	const { t } = useTranslation(["common"]);
+	const { t } = useTranslation(["documentation", "common"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const {
 		phase,
@@ -65,9 +67,9 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 		<div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
 			{/* Header */}
 			<div className="px-6 py-4 border-b border-[var(--border-color)]">
-				<h1 className="text-xl font-semibold">Documentation Agent</h1>
+				<h1 className="text-xl font-semibold">{t("documentation:title")}</h1>
 				<p className="text-sm text-[var(--text-secondary)] mt-0.5">
-					Generate and maintain project documentation automatically
+					{t("documentation:agent.subtitle")}
 				</p>
 			</div>
 
@@ -77,7 +79,7 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 					{/* Doc types */}
 					<div>
 						<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-							Documentation Types
+							{t("documentation:agent.docTypes")}
 						</h3>
 						<div className="flex flex-col gap-1">
 							{AVAILABLE_DOC_TYPES.map((type) => (
@@ -93,7 +95,7 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 										className="rounded accent-[var(--accent)]"
 									/>
 									<span className="text-sm">
-										{DOC_TYPE_ICONS[type]} {DOC_TYPE_LABELS[type]}
+										{DOC_TYPE_ICONS[type]} {t(DOC_TYPE_LABEL_KEYS[type])}
 									</span>
 								</label>
 							))}
@@ -103,7 +105,7 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 					{/* Options */}
 					<div>
 						<h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-							Options
+							{t("documentation:agent.options")}
 						</h3>
 						<label className="flex items-center gap-2 cursor-pointer mb-3">
 							<input
@@ -114,15 +116,17 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 								className="rounded accent-[var(--accent)]"
 							/>
 							<div>
-								<div className="text-sm font-medium">Insert inline</div>
+								<div className="text-sm font-medium">
+									{t("documentation:agent.insertInline")}
+								</div>
 								<div className="text-xs text-[var(--text-secondary)]">
-									Add docstrings directly to source
+									{t("documentation:agent.insertInlineHint")}
 								</div>
 							</div>
 						</label>
 						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
 						<label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-							Output directory (optional)
+							{t("documentation:agent.outputDir")}
 						</label>
 						<input
 							type="text"
@@ -142,7 +146,7 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 								onClick={cancelDocumentation}
 								className="w-full px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
 							>
-								Cancel
+								{t("common:cancel", "Cancel")}
 							</button>
 						) : (
 							<button
@@ -151,7 +155,9 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 								disabled={!activeProject || selectedDocTypes.length === 0}
 								className="w-full px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity text-sm font-medium"
 							>
-								{isComplete ? "Regenerate" : "Generate Docs"}
+								{isComplete
+									? t("documentation:agent.regenerate")
+									: t("documentation:agent.generate")}
 							</button>
 						)}
 					</div>
@@ -184,8 +190,8 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 									/>
 								</svg>
 							)}
-							<span>{PHASE_LABELS[phase]}</span>
-							{status && status !== PHASE_LABELS[phase] && (
+							<span>{t(PHASE_LABEL_KEYS[phase])}</span>
+							{status && status !== t(PHASE_LABEL_KEYS[phase]) && (
 								<span className="ml-1">— {status}</span>
 							)}
 						</div>
@@ -204,10 +210,14 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 							<div className="flex items-center gap-3 mb-3">
 								<span className="text-2xl">📚</span>
 								<div>
-									<h3 className="font-medium">Documentation Generated</h3>
+									<h3 className="font-medium">
+										{t("documentation:agent.generated")}
+									</h3>
 									<p className="text-sm text-[var(--text-secondary)]">
-										{result.doc_types_processed.length} types •{" "}
-										{result.generated_files.length} files created
+										{t("documentation:agent.generatedSummary", {
+											types: result.doc_types_processed.length,
+											files: result.generated_files.length,
+										})}
 									</p>
 								</div>
 							</div>
@@ -223,7 +233,7 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 											%
 										</div>
 										<div className="text-xs text-[var(--text-secondary)]">
-											Coverage before
+											{t("documentation:agent.coverageBefore")}
 										</div>
 									</div>
 									<div className="bg-[var(--bg-secondary)] rounded-lg p-3 text-center">
@@ -232,7 +242,7 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 											%
 										</div>
 										<div className="text-xs text-[var(--text-secondary)]">
-											Coverage after
+											{t("documentation:agent.coverageAfter")}
 										</div>
 									</div>
 								</div>
@@ -242,7 +252,7 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 							{result.generated_files.length > 0 && (
 								<div>
 									<h4 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
-										Files Created
+										{t("documentation:agent.filesCreated")}
 									</h4>
 									<div className="flex flex-col gap-0.5">
 										{result.generated_files.map((f) => (
@@ -261,11 +271,12 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 							{result.outdated_found > 0 && (
 								<div className="mt-2">
 									<h4 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
-										Outdated Docs Found
+										{t("documentation:agent.outdatedFound")}
 									</h4>
 									<div className="text-xs text-yellow-400/80">
-										{result.outdated_found} outdated documentation entries
-										detected
+										{t("documentation:agent.outdatedCount", {
+											count: result.outdated_found,
+										})}
 									</div>
 								</div>
 							)}
@@ -283,12 +294,10 @@ export function DocumentationAgentDashboard(): React.ReactElement {
 								<div>
 									<div className="text-5xl mb-4">📝</div>
 									<h3 className="text-lg font-medium mb-2">
-										Documentation Agent
+										{t("documentation:title")}
 									</h3>
 									<p className="text-sm text-[var(--text-secondary)] max-w-sm">
-										Select documentation types and click Generate Docs to
-										automatically create and maintain your project
-										documentation.
+										{t("documentation:agent.idleHint")}
 									</p>
 								</div>
 							</div>

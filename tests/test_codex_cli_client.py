@@ -360,7 +360,9 @@ async def test_oneshot_returns_empty_text_on_cli_failure(monkeypatch) -> None:
             raise CodexCliError("Codex CLI failed safely")
             yield  # pragma: no cover
 
-    monkeypatch.setattr("core.oneshot._build_client", lambda *args: _FailingClient())
+    monkeypatch.setattr(
+        "core.oneshot._build_client", lambda *args, **kwargs: _FailingClient()
+    )
 
     result = await oneshot_completion("title this", provider="openai", model="gpt-5.5")
 

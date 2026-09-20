@@ -363,5 +363,161 @@ class OfflineModeTests(unittest.TestCase):
             self.assertFalse(runner._policy_path(Path(directory)).exists())
 
 
+class HybridRoutingIsADefaultTests(unittest.TestCase):
+    """Hors mode strict, la table de routage répond pour qui n'a rien choisi.
+
+    Le bug qu'elles gardent : un Bounty Board lancé sur `anthropic` mourait sur
+    ``Local model llama3.3:latest is unavailable on ollama`` — un fournisseur
+    que personne n'avait sélectionné, nommé par une politique hors-ligne dont
+    le mode strict était désactivé.
+    """
+
+    def _project(self, directory, *, strict, model="llama3.3:latest"):
+        root = Path(directory)
+        (root / ".workpilot").mkdir()
+        (root / ".workpilot/offline-mode.json").write_text(
+            json.dumps(
+                {
+                    "airgapStrict": strict,
+                    "defaultProvider": "ollama",
+                    "routing": {"coder": {"provider": "ollama", "model": model}},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return root
+
+    @staticmethod
+    def _installed(*names):
+        return patch(
+            "core.local_model_catalog.detect_runtime",
+            return_value={
+                "available": True,
+                "models": [{"name": name} for name in names],
+            },
+        )
+
+    def test_hybrid_route_does_not_overrule_a_chosen_provider(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._project(directory, strict=False)
+            with self._installed("llama3.3:latest"):
+                self.assertEqual(
+                    offline_policy.resolve_offline_route(
+                        root, root, "coder", "claude", "claude-sonnet-4-6", chosen=True
+                    ),
+                    ("claude", "claude-sonnet-4-6", None),
+                )
+
+    def test_hybrid_route_still_answers_when_nobody_chose(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._project(directory, strict=False)
+            with (
+                self._installed("llama3.3:latest"),
+                patch.dict("os.environ", {"OLLAMA_BASE_URL": "http://127.0.0.1:11434"}),
+            ):
+                self.assertEqual(
+                    offline_policy.resolve_offline_route(
+                        root, root, "coder", "claude", "claude-sonnet-4-6"
+                    ),
+                    ("ollama", "llama3.3:latest", "http://127.0.0.1:11434"),
+                )
+
+    def test_hybrid_route_to_a_missing_model_declines_instead_of_failing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._project(directory, strict=False)
+            with self._installed("qwen:7b"):
+                self.assertEqual(
+                    offline_policy.resolve_offline_route(
+                        root, root, "coder", "claude", "claude-sonnet-4-6"
+                    ),
+                    ("claude", "claude-sonnet-4-6", None),
+                )
+
+    def test_a_chosen_local_model_that_is_missing_still_raises(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._project(directory, strict=False)
+            with self._installed("qwen:7b"):
+                with self.assertRaises(ValueError):
+                    offline_policy.resolve_offline_route(
+                        root, root, "coder", "ollama", "llama3.3:latest", chosen=True
+                    )
+
+    def test_strict_route_overrules_a_chosen_provider(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._project(directory, strict=True)
+            with (
+                self._installed("llama3.3:latest"),
+                patch.dict("os.environ", {"OLLAMA_BASE_URL": "http://127.0.0.1:11434"}),
+            ):
+                self.assertEqual(
+                    offline_policy.resolve_offline_route(
+                        root, root, "coder", "claude", "claude-sonnet-4-6", chosen=True
+                    ),
+                    ("ollama", "llama3.3:latest", "http://127.0.0.1:11434"),
+                )
+
+    def test_strict_names_the_policy_when_the_model_is_gone(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._project(directory, strict=True)
+            with self._installed("qwen:7b"):
+                with self.assertRaises(ValueError) as caught:
+                    offline_policy.resolve_offline_route(
+                        root, root, "coder", "claude", "claude-sonnet-4-6", chosen=True
+                    )
+        # Le message nommait un fournisseur que l'utilisateur n'avait pas choisi
+        # sans jamais dire d'où il venait : c'est cette moitié qui manquait.
+        self.assertIn("offline-mode policy", str(caught.exception))
+
+
+class ProviderChoiceTests(unittest.TestCase):
+    """`chosen` distingue un choix d'un défaut — c'est tout ce qui le lit."""
+
+    def test_the_fallback_provider_is_not_a_choice(self):
+        from core.client import _resolve_active_provider
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict("os.environ", {}, clear=True):
+                self.assertEqual(
+                    _resolve_active_provider(Path(directory)), ("claude", False)
+                )
+
+    def test_the_selected_provider_is_a_choice(self):
+        from core.client import _resolve_active_provider
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(
+                "os.environ", {"SELECTED_LLM_PROVIDER": "anthropic"}, clear=True
+            ):
+                self.assertEqual(
+                    _resolve_active_provider(Path(directory)), ("claude", True)
+                )
+
+    def test_create_agent_client_tells_the_route_it_was_chosen(self):
+        import core.offline_policy as policy_module
+        from core.client import create_agent_client
+
+        seen = {}
+
+        class _Stop(RuntimeError):
+            pass
+
+        def _spy(*args, **kwargs):
+            seen.update(kwargs)
+            raise _Stop
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(policy_module, "resolve_offline_route", _spy):
+                with self.assertRaises(_Stop):
+                    create_agent_client(
+                        project_dir=root,
+                        spec_dir=root,
+                        model="claude-sonnet-4-6",
+                        agent_type="coder",
+                        provider="anthropic",
+                    )
+        self.assertIs(seen.get("chosen"), True)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -108,6 +108,29 @@ async def default_contestant_runner(
         _finish(contestant)
         return
 
+    # Un fournisseur sans adaptateur agentique (mistral, deepseek, grok, meta,
+    # aws, cursor, custom) est exécuté par le SDK Claude — le bon compromis pour
+    # un build, puisque la tâche tourne, et le mauvais ici : la victoire serait
+    # enregistrée au nom d'un éditeur qui n'a jamais vu le prompt. C'est la
+    # règle que le Mode Arena applique déjà avec `require_provider`, et elle
+    # vaut mot pour mot pour un concours.
+    try:
+        from skills_registry.providers import get_provider_capabilities
+
+        caps = get_provider_capabilities((contestant.provider or "").lower())
+        if not caps.has_adapter:
+            contestant.status = "error"
+            contestant.error = (
+                f"Provider '{contestant.provider}' has no agentic adapter here: "
+                f"it would run on {caps.degrades_to or 'claude'}, and the result "
+                "would carry a name that never saw the prompt."
+            )
+            logger.warning("Contestant %s: %s", contestant.label, contestant.error)
+            _finish(contestant)
+            return
+    except Exception:  # noqa: BLE001 — la matrice manquante ne bloque pas un round
+        logger.debug("provider capability matrix unavailable", exc_info=True)
+
     try:
         client = create_agent_client(
             project_dir=worktree,

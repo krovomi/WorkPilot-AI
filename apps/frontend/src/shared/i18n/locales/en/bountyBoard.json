@@ -17,6 +17,8 @@
 	"running": "Running…",
 	"liveBoard": "Live board",
 	"archives": "Previous rounds",
+	"noAdapter": "No agentic adapter here: this entry would run on {{target}} and is refused before it starts.",
+	"noAdapterOption": "{{provider}} — runs on {{target}}",
 	"field": {
 		"provider": "Provider",
 		"model": "Model",

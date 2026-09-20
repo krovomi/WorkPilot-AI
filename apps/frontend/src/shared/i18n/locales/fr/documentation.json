@@ -30,12 +30,50 @@
 		"readmeFailed": "La génération de README a échoué",
 		"networkError": "Erreur réseau"
 	},
-	"symbols": { "title": "Symboles" },
-	"docstrings": { "title": "Docstrings générés ({{count}})" },
+	"symbols": {
+		"title": "Symboles"
+	},
+	"docstrings": {
+		"title": "Docstrings générés ({{count}})"
+	},
 	"autocomplete": {
 		"searching": "Recherche…",
 		"noResults": "Aucun fichier correspondant",
 		"noResultsDir": "Aucun répertoire correspondant",
 		"noProject": "Sélectionnez d'abord un projet"
+	},
+	"agent": {
+		"subtitle": "Générer et maintenir la documentation du projet automatiquement",
+		"docTypes": "Types de documentation",
+		"options": "Options",
+		"insertInline": "Insérer dans le code",
+		"insertInlineHint": "Ajouter les docstrings directement dans les sources",
+		"outputDir": "Répertoire de sortie (optionnel)",
+		"generate": "Générer la documentation",
+		"regenerate": "Regénérer",
+		"generated": "Documentation générée",
+		"generatedSummary": "{{types}} types • {{files}} fichiers créés",
+		"coverageBefore": "Couverture avant",
+		"coverageAfter": "Couverture après",
+		"filesCreated": "Fichiers créés",
+		"outdatedFound": "Documentation périmée détectée",
+		"outdatedCount_one": "{{count}} entrée de documentation périmée détectée",
+		"outdatedCount_other": "{{count}} entrées de documentation périmées détectées",
+		"idleHint": "Choisissez des types de documentation et lancez une génération pour créer et maintenir la documentation du projet automatiquement.",
+		"phase": {
+			"idle": "Prêt",
+			"analyzing": "Analyse de la couverture documentaire…",
+			"generating": "Génération de la documentation…",
+			"updating": "Mise à jour de la documentation périmée…",
+			"complete": "Terminé",
+			"error": "Erreur"
+		},
+		"docType": {
+			"readme": "README",
+			"api": "Documentation d'API",
+			"contribution": "Guide de contribution",
+			"docstrings": "Docstrings / JSDoc",
+			"diagrams": "Diagrammes de séquence"
+		}
 	}
 }

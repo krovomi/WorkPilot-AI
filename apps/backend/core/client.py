@@ -1596,9 +1596,34 @@ def peek_active_provider(spec_dir: Path | None = None) -> str:
     return _get_active_provider(spec_dir, consume=False)
 
 
+# Le fournisseur retenu quand personne n'en nomme un. C'est un defaut, pas un
+# choix, et `_resolve_active_provider` le dit — voir la regle de routage dans
+# `core.offline_policy.resolve_offline_route`.
+_DEFAULT_PROVIDER = "claude"
+
+
 def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) -> str:
+    """The active provider, without saying where it came from.
+
+    Thin wrapper over `_resolve_active_provider` — see there for the
+    resolution order. Callers that must tell a *choice* from the fallback
+    default use that one instead.
+    """
+    return _resolve_active_provider(spec_dir, consume=consume)[0]
+
+
+def _resolve_active_provider(
+    spec_dir: Path | None = None, *, consume: bool = True
+) -> tuple[str, bool]:
     """
     Determine the active AI provider from IPC selection, environment or project settings.
+
+    Returns `(provider, chosen)`. `chosen` is False only in the last case
+    below — nobody named a provider anywhere and "claude" is a fallback.
+    The difference matters exactly once, and it is where it used to be
+    invisible: `core.offline_policy.resolve_offline_route` may re-route a
+    task to a local model, and it must know whether it is overriding a
+    decision somebody took or filling a blank nobody filled.
 
     Resolution order:
     0. RESUME_WITH_PROVIDER marker file (single-shot, "Reprendre avec X")
@@ -1611,7 +1636,8 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         spec_dir: Optional spec directory to check for project-level settings.
 
     Returns:
-        Provider identifier string: "claude", "copilot", "openai", etc.
+        `(provider, chosen)` — the identifier ("claude", "copilot", "openai",
+        …) and whether any source actually named it.
     """
     # Provider name mapping (shared across all resolution strategies)
     provider_mapping = {
@@ -1645,7 +1671,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                 override,
                 mapped_override,
             )
-            return mapped_override
+            return mapped_override, True
 
     # 1. Check provider selected via IPC (from frontend UI)
     try:
@@ -1657,7 +1683,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                 selected_provider.lower(), selected_provider.lower()
             )
             if mapped_provider:
-                return mapped_provider
+                return mapped_provider, True
     except Exception:
         # Fallback to other methods if IPC provider check fails
         pass
@@ -1669,7 +1695,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         logger.info(
             f"[_get_active_provider] Resolved provider from SELECTED_LLM_PROVIDER env var: '{selected_env}' -> '{resolved}'"
         )
-        return resolved
+        return resolved, True
 
     # 1.7. Check task_metadata.json for provider.
     # This handles the case where the frontend has a non-Claude provider stored in the
@@ -1698,7 +1724,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                         f"[_get_active_provider] Resolved from task_metadata.json: "
                         f"'{_meta_provider}' -> '{_mapped}'"
                     )
-                    return _mapped
+                    return _mapped, True
         except Exception:
             logger.debug(
                 "Could not read provider from task_metadata.json", exc_info=True
@@ -1721,7 +1747,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         "cursor",
         "custom",
     ):
-        return env_provider
+        return env_provider, True
 
     # 3. Project-level setting from spec's parent project
     if spec_dir:
@@ -1756,13 +1782,13 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                                 "cursor",
                                 "custom",
                             ):
-                                return value
+                                return value, True
             except Exception:
                 # Une source de provider illisible : on passe a la suivante, c'est le but de la chaine.
                 pass
 
     # 4. Default
-    return "claude"
+    return _DEFAULT_PROVIDER, False
 
 
 # Per-spec record of the last (provider, model, effort) an agent client was
@@ -2043,14 +2069,19 @@ def create_agent_client(
     if max_thinking_tokens is _UNSET:
         max_thinking_tokens = _effort_for(spec_dir, agent_type)
 
-    # Resolve provider
+    # Resolve provider. `provider_chosen` says whether this pair is a decision
+    # somebody took for this run — an explicit argument (the Bounty Board names
+    # one per contestant), the "Fournisseur IA" list, a per-task metadata entry —
+    # or the fallback nobody asked for. Only `resolve_offline_route` reads it,
+    # and only to decide whether an offline route may overrule it.
+    provider_chosen = provider is not None
     if provider is None:
-        provider = _get_active_provider(spec_dir)
+        provider, provider_chosen = _resolve_active_provider(spec_dir)
 
     from core.offline_policy import local_endpoint, resolve_offline_route
 
     provider, model, offline_base_url = resolve_offline_route(
-        project_dir, spec_dir, agent_type, provider, model
+        project_dir, spec_dir, agent_type, provider, model, chosen=provider_chosen
     )
 
     # Anthropic rejects dotted Copilot-style ids (e.g. "claude-opus-4.8"); rewrite

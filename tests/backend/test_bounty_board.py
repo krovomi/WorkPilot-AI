@@ -555,6 +555,9 @@ def test_default_runner_fails_loudly_when_no_provider_can_be_reached(
     monkeypatch.setitem(sys.modules, "agents.session", fake_session)
 
     c = _contestant(status="queued")
+    # Un fournisseur que la matrice connaît et sait piloter : le refus testé ici
+    # est celui du client, pas celui de l'absence d'adaptateur.
+    c.provider, c.model = "anthropic", "claude-sonnet-4-6"
     c.spec_dir = str(tmp_path)
     asyncio.run(runner_module.default_contestant_runner(c, "spec", tmp_path))
 
@@ -594,6 +597,7 @@ def test_default_runner_reports_a_failed_agent_session(
     monkeypatch.setitem(sys.modules, "agents.session", fake_session)
 
     c = _contestant(status="queued")
+    c.provider, c.model = "anthropic", "claude-sonnet-4-6"
     c.spec_dir = str(tmp_path)
     asyncio.run(runner_module.default_contestant_runner(c, "spec", tmp_path))
 
@@ -602,6 +606,36 @@ def test_default_runner_reports_a_failed_agent_session(
     # Usage still reported: the call was billed whether or not it succeeded.
     assert c.tokens_used == 15
     assert c.cost_usd == pytest.approx(0.02)
+
+
+def test_a_provider_without_an_adapter_never_reaches_a_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """mistral et consorts tournent sur le SDK Claude : bon compromis pour un
+    build, verdict faux pour un concours. Le participant échoue visiblement."""
+    import types
+
+    import bounty_board.runner as runner_module
+
+    fake_client = types.ModuleType("core.client")
+
+    def _must_not_run(**_kwargs):
+        raise AssertionError("a provider with no adapter must not be dispatched")
+
+    fake_client.create_agent_client = _must_not_run
+    fake_session = types.ModuleType("agents.session")
+    fake_session.run_agent_session = None
+    monkeypatch.setitem(sys.modules, "core.client", fake_client)
+    monkeypatch.setitem(sys.modules, "agents.session", fake_session)
+
+    c = _contestant(status="queued")
+    c.provider, c.model = "mistral", "mistral-large-latest"
+    c.spec_dir = str(tmp_path)
+    asyncio.run(runner_module.default_contestant_runner(c, "spec", tmp_path))
+
+    assert c.status == "error"
+    assert "no agentic adapter" in (c.error or "")
+    assert c.completed_at is not None
 
 
 def test_the_package_import_graph_is_acyclic():
