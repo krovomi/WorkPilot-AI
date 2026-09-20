@@ -1492,6 +1492,17 @@ the same ports, temp files and package caches measures the contention. And a
 suite is never run against an empty diff: it would measure the base branch and
 hand every do-nothing contestant a clean pass.
 
+What `discover_test_command` returns is a CI `run:` block, which is a shell
+script rather than an argv list — in this repository, `source .venv/bin/activate`
+followed by `pytest`. So it is executed as one, through
+`asyncio.create_subprocess_shell`, the same call `qa/auto_fix_loop._run_tests`
+already makes for the same question; a `subprocess.run(shell=True)` here is both
+a second answer to it and a fifteen-minute block of the event loop the
+contestants ran on. The suite gets its own process group, so a timeout takes the
+dev server or database it started with it rather than leaving them holding the
+ports the next contestant needs — and a timeout is `unknown`, never a failure the
+contestant caused.
+
 **Credentials for every provider, and no `SELECTED_LLM_PROVIDER`.** This is the
 one run that talks to several providers at once, so `bounty-board-handlers.ts`
 merges `credentialManager.getEnvironmentVariables(provider)` for each and then

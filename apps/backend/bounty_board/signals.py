@@ -23,9 +23,12 @@ honest:
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import os
 import re
+import signal
 import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -219,7 +222,7 @@ def _parse_test_counts(output: str) -> tuple[int, int]:
     return 0, 0
 
 
-def run_tests(
+async def run_tests(
     worktree: Path,
     command: str | None,
     *,
@@ -231,6 +234,20 @@ def run_tests(
     for the pass/fail decision, because a suite whose format nobody here
     recognises would otherwise silently read as "0 passed, 0 failed" and look
     like a failure.
+
+    **This executes a shell script, and it has to.** What `discover_test_command`
+    returns is a CI `run:` block, which is a script and not an argv list — in
+    this repository it is ``source .venv/bin/activate`` followed by ``pytest``.
+    Splitting that into arguments would run `source` with pytest's flags and
+    measure nothing. `qa/auto_fix_loop._run_tests` reached the same conclusion
+    and uses the same call; running the project's declared test command is one
+    question, and two answers to it would drift.
+
+    The trust boundary is therefore the project the user asked WorkPilot to
+    build, which is the boundary every agent phase already works inside. This
+    is not safer than `subprocess.run(shell=True)` — it is the same shell — it
+    is the house pattern for this operation, and it does not block the event
+    loop for the length of a test suite, which the synchronous version did.
     """
     if not command:
         return TestEvidence(status="no-command")
@@ -239,40 +256,62 @@ def run_tests(
             status="error", command=command, output_tail="worktree missing"
         )
 
+    # A contestant's suite must not inherit the bounty's own provider
+    # selection: a test that reads SELECTED_LLM_PROVIDER would see the judge's
+    # configuration rather than the project's.
+    env = {k: v for k, v in os.environ.items() if k != "SELECTED_LLM_PROVIDER"}
+
     try:
-        completed = subprocess.run(
+        process = await asyncio.create_subprocess_shell(
             command,
             cwd=str(worktree),
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-            check=False,
-            shell=True,
-            # A contestant's suite must not inherit the bounty's own provider
-            # selection: a test that reads SELECTED_LLM_PROVIDER would see the
-            # judge's configuration rather than the project's.
-            env={k: v for k, v in os.environ.items() if k != "SELECTED_LLM_PROVIDER"},
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+            # Its own process group, so a suite that spawns a dev server or a
+            # database is killed with it below. Without this a timeout reaps
+            # the shell and leaves its children holding the ports the next
+            # contestant's suite needs.
+            start_new_session=os.name != "nt",
         )
-    except subprocess.TimeoutExpired:
-        return TestEvidence(status="timeout", command=command)
-    except (OSError, subprocess.SubprocessError) as exc:
+    except (OSError, ValueError) as exc:
         return TestEvidence(
             status="error", command=command, output_tail=str(exc)[:2000]
         )
 
-    output = (completed.stdout or "") + (completed.stderr or "")
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(), timeout=timeout_s
+        )
+    except (TimeoutError, asyncio.TimeoutError):
+        _terminate_process_tree(process)
+        with contextlib.suppress(Exception):
+            await process.wait()
+        return TestEvidence(status="timeout", command=command)
+
+    output = stdout.decode("utf-8", "replace") + stderr.decode("utf-8", "replace")
     passed, failed = _parse_test_counts(output)
     return TestEvidence(
-        status="passed" if completed.returncode == 0 else "failed",
+        status="passed" if process.returncode == 0 else "failed",
         command=command,
         passed=passed,
         failed=failed,
-        exit_code=completed.returncode,
+        exit_code=process.returncode,
         output_tail=output[-4000:],
     )
 
 
-def collect_evidence(
+def _terminate_process_tree(process: asyncio.subprocess.Process) -> None:
+    """Kill the test suite and anything it started."""
+    if os.name != "nt":
+        with contextlib.suppress(OSError, ProcessLookupError):
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            return
+    with contextlib.suppress(OSError, ProcessLookupError):
+        process.kill()
+
+
+async def collect_evidence(
     worktree: Path,
     base_ref: str,
     test_command: str | None,
@@ -298,5 +337,5 @@ def collect_evidence(
         )
 
     return Evidence(
-        diff=diff, tests=run_tests(worktree, test_command, timeout_s=timeout_s)
+        diff=diff, tests=await run_tests(worktree, test_command, timeout_s=timeout_s)
     )

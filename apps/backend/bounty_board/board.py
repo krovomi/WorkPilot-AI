@@ -188,7 +188,7 @@ class BountyBoard:
                 contestant.status = "error"
                 contestant.error = f"{type(outcome).__name__}: {outcome}"
 
-        evidences = self._collect_evidence()
+        evidences = await self._collect_evidence()
 
         winner_id, rationale = await self.judge(
             self.contestants,
@@ -224,7 +224,7 @@ class BountyBoard:
         _persist_result(self.spec_dir, result)
         return result
 
-    def _collect_evidence(self) -> dict[str, Evidence]:
+    async def _collect_evidence(self) -> dict[str, Evidence]:
         """Measure every contestant's worktree.
 
         Sequential on purpose: these run the project's test suite, and N suites
@@ -245,7 +245,7 @@ class BountyBoard:
             if not contestant.worktree_path:
                 evidences[contestant.id] = Evidence()
                 continue
-            evidences[contestant.id] = collect_evidence(
+            evidences[contestant.id] = await collect_evidence(
                 Path(contestant.worktree_path),
                 contestant.base_ref or "HEAD",
                 test_command,

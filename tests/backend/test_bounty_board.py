@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -52,6 +53,8 @@ from bounty_board.signals import (  # noqa: E402
     TestEvidence,
     _parse_test_counts,
     collect_diff,
+    collect_evidence,
+    run_tests,
 )
 
 # ─── Fixtures ──────────────────────────────────────────────────────────────────
@@ -435,6 +438,72 @@ def test_unrecognised_test_output_does_not_become_a_failure():
     verdict = score_contestant(_contestant(), evidence, None, 1000.0, 0.0)
     tests = next(c for c in verdict.criteria if c.name == "tests")
     assert tests.value == 1.0
+
+
+# These four assert POSIX shell semantics (`&&`, `$VAR`, `sleep`), which is the
+# thing under test: `discover_test_command` hands back a CI `run:` block, and a
+# block is a shell script. cmd.exe would need different scripts to assert the
+# same behaviour, and writing them here would test our idea of cmd.exe rather
+# than the contract. The code path itself is exercised on Windows by the
+# orchestration tests.
+posix_shell = pytest.mark.skipif(
+    os.name == "nt", reason="asserts POSIX shell syntax; cmd.exe is a different script"
+)
+
+
+@posix_shell
+def test_run_tests_reads_the_exit_code_as_the_verdict(tmp_path: Path):
+    """The project's own command decides; the parsed counts are for the reader.
+    A suite whose output nobody here recognises must not read as a failure."""
+    passing = asyncio.run(run_tests(tmp_path, "echo 'nothing recognisable'"))
+    assert passing.status == "passed"
+    assert passing.exit_code == 0
+    assert (passing.passed, passing.failed) == (0, 0)
+
+    failing = asyncio.run(run_tests(tmp_path, "echo '1 failed' && exit 1"))
+    assert failing.status == "failed"
+    assert failing.failed == 1
+
+
+@posix_shell
+def test_run_tests_executes_a_multi_line_ci_block(tmp_path: Path):
+    """`discover_test_command` returns a CI `run:` block, which is a shell
+    script and not an argv list — in this repository it is `source …/activate`
+    followed by `pytest`. Splitting it into arguments would measure nothing."""
+    evidence = asyncio.run(run_tests(tmp_path, 'VALUE=7\necho "got $VALUE"'))
+    assert evidence.status == "passed"
+    assert "got 7" in evidence.output_tail
+
+
+@posix_shell
+def test_run_tests_times_out_without_hanging_the_board(tmp_path: Path):
+    """A timeout is 'we do not know', not a contestant failing."""
+    evidence = asyncio.run(run_tests(tmp_path, "sleep 30", timeout_s=1))
+    assert evidence.status == "timeout"
+    assert not evidence.conclusive
+
+
+@posix_shell
+def test_run_tests_is_not_given_the_boards_own_provider(tmp_path: Path):
+    """A contestant's suite reading SELECTED_LLM_PROVIDER would see the judge's
+    configuration rather than the project's."""
+    os.environ["SELECTED_LLM_PROVIDER"] = "anthropic"
+    try:
+        evidence = asyncio.run(run_tests(tmp_path, 'echo "[$SELECTED_LLM_PROVIDER]"'))
+    finally:
+        os.environ.pop("SELECTED_LLM_PROVIDER", None)
+    assert "[]" in evidence.output_tail
+
+
+def test_no_suite_is_run_against_an_empty_diff(git_project: Path):
+    """Running it would measure the base branch and hand every do-nothing
+    contestant a clean pass."""
+    evidence = asyncio.run(
+        collect_evidence(git_project, "HEAD", "exit 1", run_test_suite=True)
+    )
+    assert evidence.diff.is_empty
+    assert evidence.tests.status == "no-change"
+    assert not evidence.tests.conclusive
 
 
 # ─── The runner ────────────────────────────────────────────────────────────────
