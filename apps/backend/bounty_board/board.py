@@ -11,17 +11,24 @@ Provider-agnostic: the contestant runner is pluggable, and the default one
 `core.client.create_agent_client`, which takes an explicit provider — so any
 provider WorkPilot supports can be fielded without a branch here.
 
-The three halves of the job live apart on purpose:
+The parts of the job live apart on purpose, and the dependencies point one way:
 
-| Module       | Answers                                                   |
-|--------------|-----------------------------------------------------------|
-| `runner.py`  | how one contestant is run                                  |
-| `signals.py` | what it actually produced — diff, tests; no model involved |
-| `judge.py`   | what that is worth                                         |
+| Module       | Answers                                                    | Imports |
+|--------------|------------------------------------------------------------|---------|
+| `models.py`  | what a contestant and a result *are*                       | nothing |
+| `signals.py` | what a contestant produced — diff, tests; no model involved | nothing |
+| `runner.py`  | how one contestant is run                                   | models |
+| `judge.py`   | what that is worth                                          | models, signals |
+| `board.py`   | orchestration                                               | all of them |
 
 They were one file, and the consequence was not tidiness: the judge read the
 contestant's *answer text*, because that was the object in front of it, and
 scored a contest on prose length while the diffs went unread.
+
+`models.py` is separate for a second reason. With the dataclasses in this file,
+`judge` and `runner` reached back up for `Contestant` and the graph described a
+cycle — harmless at runtime, since the reach was under `if TYPE_CHECKING`, and
+still the wrong direction. The shared type belongs underneath both sides.
 """
 
 from __future__ import annotations
@@ -31,12 +38,16 @@ import json
 import logging
 import time
 import uuid
-from collections.abc import Awaitable, Callable
-from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
 
 from .judge import evidence_judge, summarize_criteria
+from .models import (
+    BountyResult,
+    Contestant,
+    ContestantRunner,
+    ContestantSpec,
+    Judge,
+)
 from .runner import contestant_prompt, default_contestant_runner
 from .signals import Evidence, collect_evidence, discover_test_command, is_git_repo
 
@@ -51,87 +62,6 @@ __all__ = [
     "default_contestant_runner",
     "run_bounty",
 ]
-
-
-# ─── Data model ────────────────────────────────────────────────────────────────
-
-
-@dataclass
-class ContestantSpec:
-    """Inputs describing a single contestant entry."""
-
-    provider: str
-    model: str
-    profile_id: str | None = None
-    prompt_override: str | None = None
-    label: str | None = None  # Human-readable label, auto-assigned if None
-
-
-@dataclass
-class Contestant:
-    """Live state of a contestant during a bounty run."""
-
-    id: str
-    label: str
-    provider: str
-    model: str
-    profile_id: str | None = None
-    prompt_override: str | None = None
-    status: str = "queued"  # queued | running | completed | error | archived | winner
-    worktree_path: str | None = None
-    branch: str | None = None
-    base_ref: str | None = None
-    spec_dir: str | None = None
-    output: str = ""
-    tokens_used: int = 0
-    cost_usd: float = 0.0
-    duration_ms: int = 0
-    error: str | None = None
-    score: float | None = None
-    quality_breakdown: dict[str, float | None] = field(default_factory=dict)
-    # What the judge measured, so the card can show the evidence rather than
-    # only the number derived from it.
-    evidence: dict[str, Any] = field(default_factory=dict)
-    started_at: int | None = None
-    completed_at: int | None = None
-
-
-@dataclass
-class BountyResult:
-    """Outcome of a bounty run, returned to callers and persisted to disk."""
-
-    id: str
-    spec_id: str
-    project_path: str
-    contestants: list[Contestant]
-    winner_id: str | None = None
-    judge_report: str = ""
-    judge_rationale: dict[str, str] = field(default_factory=dict)
-    scoring: dict[str, Any] = field(default_factory=dict)
-    warnings: list[str] = field(default_factory=list)
-    created_at: int = field(default_factory=lambda: int(time.time() * 1000))
-    completed_at: int | None = None
-    status: str = "running"  # running | judging | completed | error
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "specId": self.spec_id,
-            "projectPath": self.project_path,
-            "contestants": [asdict(c) for c in self.contestants],
-            "winnerId": self.winner_id,
-            "judgeReport": self.judge_report,
-            "judgeRationale": self.judge_rationale,
-            "scoring": self.scoring,
-            "warnings": self.warnings,
-            "createdAt": self.created_at,
-            "completedAt": self.completed_at,
-            "status": self.status,
-        }
-
-
-ContestantRunner = Callable[[Contestant, str, Path], Awaitable[None]]
-Judge = Callable[..., Awaitable[tuple[str, dict[str, str]]]]
 
 
 # ─── Orchestrator ──────────────────────────────────────────────────────────────

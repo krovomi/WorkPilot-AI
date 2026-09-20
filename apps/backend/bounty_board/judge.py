@@ -42,12 +42,10 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from .models import Contestant
 from .signals import Evidence
-
-if TYPE_CHECKING:  # pragma: no cover
-    from .board import Contestant
 
 logger = logging.getLogger(__name__)
 

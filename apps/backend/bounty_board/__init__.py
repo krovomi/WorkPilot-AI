@@ -17,8 +17,9 @@ Public surface:
     )
 """
 
-from .board import BountyBoard, BountyResult, Contestant, ContestantSpec, run_bounty
+from .board import BountyBoard, run_bounty
 from .judge import Criterion, Verdict, evidence_judge, score_contestant
+from .models import BountyResult, Contestant, ContestantSpec
 from .signals import Evidence, collect_evidence, discover_test_command
 
 __all__ = [

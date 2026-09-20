@@ -604,6 +604,48 @@ def test_default_runner_reports_a_failed_agent_session(
     assert c.cost_usd == pytest.approx(0.02)
 
 
+def test_the_package_import_graph_is_acyclic():
+    """`judge` and `runner` used to reach up into `board` for `Contestant`.
+    Nothing broke at runtime — the reach was under `if TYPE_CHECKING` — but the
+    graph described a cycle, which CodeQL flagged and which was the wrong
+    dependency direction anyway. The shared model lives underneath both now, and
+    this fails the build if it climbs back up.
+    """
+    import ast
+
+    graph: dict[str, set[str]] = {}
+    for path in (BACKEND / "bounty_board").glob("*.py"):
+        if path.name == "__init__.py":
+            continue
+        deps = {
+            node.module
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+            if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module
+        }
+        graph[path.stem] = deps
+
+    # The two leaves are the property worth pinning: a model that imports a
+    # judge, or evidence that imports an orchestrator, is the cycle coming back.
+    assert graph["models"] == set()
+    assert graph["signals"] == set()
+
+    stack: list[str] = []
+    visited: set[str] = set()
+
+    def walk(module: str) -> None:
+        assert module not in stack, f"import cycle: {' -> '.join([*stack, module])}"
+        if module in visited:
+            return
+        visited.add(module)
+        stack.append(module)
+        for dependency in sorted(graph.get(module, ())):
+            walk(dependency)
+        stack.pop()
+
+    for module in sorted(graph):
+        walk(module)
+
+
 def test_no_module_in_the_package_imports_a_nonexistent_llm_client():
     """Regression guard for the defect this whole change is about: the runner
     imported `llm_client`, which resolves to nothing on the runner's path, and
