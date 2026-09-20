@@ -43,5 +43,30 @@
 		"ranking": "Classement",
 		"contestant": "Participant",
 		"rationale": "Justification"
-	}
+	},
+	"criteria": {
+		"tests": "tests",
+		"spec_fit": "conformité spec",
+		"efficiency": "efficacité",
+		"notMeasured": "non mesuré",
+		"notMeasuredHint": "Aucune preuve pour ce critère — son poids a été redistribué sur les autres."
+	},
+	"evidence": {
+		"diff": "{{files}} fichiers · +{{added}} −{{removed}}",
+		"diffUnavailable": "diff non mesuré",
+		"tests": {
+			"passed": "{{passed}} tests passent",
+			"failed": "{{failed}} tests échouent",
+			"timeout": "tests : délai dépassé",
+			"no-command": "aucune commande de test",
+			"no-change": "aucune modification à tester",
+			"skipped": "tests non exécutés",
+			"error": "tests non exécutables"
+		}
+	},
+	"warnings": {
+		"title": "Signaux non mesurés",
+		"description": "Ces critères n'ont pas pu être évalués ; leur poids a été redistribué."
+	},
+	"noWinnerTie": "Égalité en tête — aucun gagnant n'est désigné."
 }

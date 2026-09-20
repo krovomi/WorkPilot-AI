@@ -43,6 +43,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt
   architecture_visualizer/ carte d'architecture archify du projet, et son delta par tâche
+  bounty_board/        N modèles sur une même spec : worktrees, preuves mesurées, juge anonyme
   vendor/archify/      le renderer archify vendorisé et épinglé (scripts/vendor_archify.py)
   vendor/watermarks/   la table Unicode Layer A vendorisée (scripts/vendor_watermarks.py)
   slash_commands/      sert .agents/skills/ à la barre de commandes du Kanban

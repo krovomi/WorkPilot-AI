@@ -1,4 +1,4 @@
-import { Trophy } from "lucide-react";
+import { AlertTriangle, Trophy } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { BountyResult } from "../../../preload/api/modules/bounty-board-api";
 import { Button } from "../ui/button";
@@ -15,6 +15,15 @@ export function JudgeVerdictModal({ result, onClose }: Props) {
 	const sorted = [...result.contestants].sort(
 		(a, b) => (b.score ?? -1) - (a.score ?? -1),
 	);
+	const warnings = result.warnings ?? [];
+
+	// The judge withholds a winner in two different situations, and the reader
+	// needs them apart: nobody scored anything, or several scored the same.
+	const topScore = sorted[0]?.score ?? 0;
+	const isTie =
+		!winner &&
+		topScore > 0 &&
+		sorted.filter((c) => c.score === topScore).length > 1;
 
 	return (
 		<div
@@ -55,10 +64,41 @@ export function JudgeVerdictModal({ result, onClose }: Props) {
 					</div>
 				) : (
 					<div className="border rounded-md p-3 text-sm">
-						{t(
-							"bountyBoard:verdict.noWinner",
-							"No contestant met the acceptance criteria.",
-						)}
+						{/* A tie and an empty field are different outcomes, and the old
+						    board reported neither: it stable-sorted the tie and handed the
+						    trophy to whoever was declared first. */}
+						{isTie
+							? t(
+									"bountyBoard:noWinnerTie",
+									"Tied at the top — no winner is declared.",
+								)
+							: t(
+									"bountyBoard:verdict.noWinner",
+									"No contestant met the acceptance criteria.",
+								)}
+					</div>
+				)}
+
+				{warnings.length > 0 && (
+					<div className="border border-amber-500/30 bg-amber-500/5 rounded-md p-3">
+						<div className="flex items-center gap-2 text-sm font-medium">
+							<AlertTriangle
+								className="w-4 h-4 text-amber-500"
+								aria-hidden="true"
+							/>
+							{t("bountyBoard:warnings.title", "Unmeasured signals")}
+						</div>
+						<p className="text-xs text-muted-foreground mt-1">
+							{t(
+								"bountyBoard:warnings.description",
+								"These criteria could not be evaluated; their weight was redistributed.",
+							)}
+						</p>
+						<ul className="mt-2 list-disc list-inside text-xs text-muted-foreground space-y-1">
+							{warnings.map((warning) => (
+								<li key={warning}>{warning}</li>
+							))}
+						</ul>
 					</div>
 				)}
 
