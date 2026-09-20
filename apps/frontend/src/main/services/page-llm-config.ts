@@ -62,6 +62,36 @@ export function getPageProviderEnv(page: PageLlmPage): Record<string, string> {
 	}
 }
 
+/**
+ * Le fournisseur global — la liste « Fournisseur IA » — et la clé qui va avec.
+ *
+ * C'est le plancher, pas une seconde réponse : `getPageProviderEnv` retombe
+ * déjà dessus pour une page qui ne surcharge rien. Un runner lancé depuis une
+ * surface qui n'est pas dans `PAGE_LLM_FEATURES` n'avait, lui, aucun
+ * `SELECTED_LLM_PROVIDER` du tout — le backend repartait donc sur son propre
+ * défaut, et le choix affiché en haut à droite ne voulait rien dire pour la
+ * génération de tests, l'auto-fix GitHub ou l'auto-réparation. Une page sans
+ * formule propre est une page qui suit les réglages ; une surface qui n'en a
+ * pas non plus.
+ *
+ * Vide quand personne n'a rien choisi : le backend garde alors sa chaîne de
+ * résolution plutôt qu'un nom inventé ici.
+ */
+export function getGlobalProviderEnv(): Record<string, string> {
+	try {
+		const settings = (readSettingsFile() ?? {}) as Partial<AppSettings>;
+		const provider = normalizeProviderId(settings.selectedProvider);
+		// Le nom choisi est passé en surcharge, comme pour une page : c'est ce qui
+		// force `SELECTED_LLM_PROVIDER` même quand le choix est Claude, que le
+		// chemin sans surcharge laisse au défaut du backend. La distinction
+		// compte maintenant qu'une route hors-ligne hybride ne peut plus passer
+		// devant un fournisseur choisi (`core.offline_policy.resolve_offline_route`).
+		return credentialManager.getEnvironmentVariables(provider || undefined);
+	} catch {
+		return {};
+	}
+}
+
 /** Le fournisseur d'une page, normalisé, ou `""` si aucun n'est choisi. */
 export function getPageProvider(page: PageLlmPage): string {
 	return normalizeProviderId(getPageLlmConfig(page).provider);

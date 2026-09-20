@@ -155,16 +155,23 @@ def _build_client(
     project_dir: str | None,
     spec_dir: str | None,
     max_turns: int,
+    *,
+    chosen: bool = False,
 ):
     cwd = str(Path(project_dir).resolve()) if project_dir else None
     from core.offline_policy import local_endpoint, resolve_offline_route
 
+    # `chosen` says whether this pair is a decision taken for this call — the
+    # Arena names one provider per contestant — or the fallback nobody asked
+    # for. Outside strict mode an offline route is a default, and a default
+    # does not get to answer a question the caller already answered.
     provider, model, offline_base_url = resolve_offline_route(
         Path(cwd or Path.cwd()),
         Path(spec_dir or cwd or Path.cwd()),
         "commit_message",
         provider,
         model,
+        chosen=chosen,
     )
 
     if provider in ("claude", "anthropic"):
@@ -328,11 +335,14 @@ async def oneshot_completion(
     instead of being handed a zero it cannot tell from a measurement. Local
     clients legitimately report ``cost_usd: 0.0`` — that is a measurement.
     """
-    from core.client import _get_active_provider
+    from core.client import _resolve_active_provider
 
     spec_path = Path(spec_dir) if spec_dir else None
-    resolved_provider = (provider or "").strip().lower() or _get_active_provider(
-        spec_path
+    named_provider = (provider or "").strip().lower()
+    resolved_provider, provider_chosen = (
+        (named_provider, True)
+        if named_provider
+        else _resolve_active_provider(spec_path)
     )
     resolved_model = _resolve_model(resolved_provider, model, spec_path)
 
@@ -372,6 +382,7 @@ async def oneshot_completion(
         project_dir,
         spec_dir,
         max_turns,
+        chosen=provider_chosen,
     )
 
     text = ""

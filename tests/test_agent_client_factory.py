@@ -315,15 +315,20 @@ class TestCreateAgentClient:
         assert isinstance(client, LocalAgentClient)
         mock_create_client.assert_not_called()
 
-    @patch("core.client._get_active_provider")
+    @patch("core.client._resolve_active_provider")
     @patch("core.client.create_client")
     def test_auto_detect_uses_get_active_provider(
         self, mock_create_client, mock_detect, tmp_path
     ):
-        """provider=None should auto-detect via _get_active_provider."""
+        """provider=None should auto-detect via the resolution chain.
+
+        It resolves through `_resolve_active_provider`, which also answers
+        *whether anybody chose* — the half `resolve_offline_route` needs to
+        know if it may re-route the task to a local model.
+        """
         from core.client import create_agent_client
 
-        mock_detect.return_value = "claude"
+        mock_detect.return_value = ("claude", True)
         mock_create_client.return_value = MagicMock()
 
         client = create_agent_client(

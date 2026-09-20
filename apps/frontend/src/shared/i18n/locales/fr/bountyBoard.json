@@ -17,6 +17,8 @@
 	"running": "En cours…",
 	"liveBoard": "Tableau en direct",
 	"archives": "Rounds précédents",
+	"noAdapter": "Aucun adaptateur agentique ici : ce participant tournerait sur {{target}}, il est refusé avant de démarrer.",
+	"noAdapterOption": "{{provider}} — tourne sur {{target}}",
 	"field": {
 		"provider": "Provider",
 		"model": "Modèle",

@@ -33,6 +33,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Declarative Workflows](#declarative-workflows)
   - [Workflow Logger](#workflow-logger)
   - [Pause, resume, and how a phase reports failure](#pause-resume-and-how-a-phase-reports-failure)
+  - [Le mode hors-ligne : une barrière, ou un défaut](#le-mode-hors-ligne--une-barrière-ou-un-défaut)
 - [Frontend Development](#frontend-development)
   - [Tech Stack](#tech-stack)
   - [Path Aliases](#path-aliases)
@@ -1516,6 +1517,17 @@ a second answer to a settled question.
 UI offers had no effect on anything. It is added to the brief, never
 substituted for it.
 
+**A provider with no agentic adapter never takes the field.** mistral, deepseek,
+grok, meta, aws, cursor and custom are driven by the Claude SDK
+(`capabilities/providers.yaml`, `degrades_to`) — the right trade for a build,
+since the task runs, and the wrong one for a contest, where a win would be
+recorded under the name of a vendor that never saw the prompt. It is the Arena's
+`require_provider` rule, word for word, and `bounty_board/runner.py` applies it
+before a client is built: that contestant ends `error` with the reason on its
+card. The selector says so too, from the same matrix the Arena reads
+(`GET /providers/agentic-capabilities`, via `useAgenticCapabilities`), so the
+answer arrives before a round is spent learning it rather than after.
+
 ### Declarative Workflows
 
 `workflows/<name>/workflow.yaml` describes a build as phases; `workflows/engine.py`
@@ -1776,6 +1788,48 @@ that is still better than nothing — and the message is persisted beside the
 status it explains (`plan.errorMessage`) so it survives a reload.
 `TaskFailureBanner` renders it at the top of the task panel, and the toast reads
 `reviewReason` rather than the column before choosing its wording.
+
+### Le mode hors-ligne : une barrière, ou un défaut
+
+`.workpilot/offline-mode.json` porte deux politiques sous un seul nom, et les
+confondre est ce qui a fait mourir un Bounty Board configuré sur Anthropic
+sur `ValueError: Local model llama3.3:latest is unavailable on ollama` — un
+fournisseur que personne n'avait sélectionné, un modèle que personne n'avait
+nommé, et pas un mot sur l'origine de l'un ni de l'autre.
+
+| `airgapStrict` | Ce que la table de routage est |
+|---|---|
+| `true` | **une barrière.** Elle remplace ce que l'appelant voulait, et une route impossible à honorer est une erreur dure : il n'y a pas de repli légal, puisque tout l'objet est qu'aucun appel cloud ne quitte la machine |
+| `false` | **un défaut.** La page le dit elle-même : « le mode strict est désactivé : les opérations sans route locale peuvent encore utiliser le cloud ». Un défaut répond pour l'appelant qui n'a rien nommé ; il ne tranche pas à la place de celui qui a nommé quelque chose |
+
+`resolve_offline_route` reçoit donc un `chosen` — vrai quand le couple
+(fournisseur, modèle) est une décision prise pour cette exécution, faux quand
+c'est le défaut `core.client._DEFAULT_PROVIDER` que personne n'a demandé. Sans
+lui, **tous** les appelants avaient l'air explicites : `create_agent_client`
+résout le fournisseur *avant* d'appeler, si bien qu'une table hybride
+redirigeait silencieusement les six phases nommées (`planner`, `coder`,
+`qa_reviewer`, `commit_message`, `summary`, `triage`) de chaque build vers un
+modèle local, et que le seul symptôme était un message nommant un fournisseur
+jamais choisi.
+
+C'est `_resolve_active_provider` qui répond aux deux moitiés — *quel
+fournisseur*, et *quelqu'un l'a-t-il nommé* — et `_get_active_provider` n'est
+plus qu'un appel dessus. Une seconde chaîne de résolution pour répondre à la
+deuxième moitié aurait dérivé de la première au premier changement.
+
+**Un couple local choisi reste validé, et une erreur reste une erreur.**
+Exécuter Anthropic parce qu'Ollama n'est pas démarré est une substitution que
+personne n'a demandée, et le silence ferait passer un modèle indisponible pour
+un modèle qui répond mal. Seule une **route hybride** — un défaut que la
+fonction a appliqué d'elle-même — s'efface au lieu d'échouer, en le disant dans
+le journal : faire échouer un build sur un défaut est le seul résultat que
+personne n'a demandé, et le mode hybride autorise le cloud par définition.
+
+**Et le message nomme sa source.** « Local model X is unavailable on ollama »
+décrivait parfaitement ce qui n'allait pas et rien de ce qu'il fallait savoir :
+quelle tâche, quelle politique, et quoi faire. Il nomme désormais la route qui a
+désigné ce modèle, et les trois issues — l'installer, en choisir un autre dans
+Réglages → Mode hors-ligne, ou couper le mode strict.
 
 ### Workflow Logger
 
@@ -2260,6 +2314,16 @@ backend n'a rien à apprendre : `core.client._get_active_provider` honore déjà
 **Le fournisseur reste vide quand personne n'en a choisi** — et non « Claude ».
 Le backend a sa propre chaîne de résolution, et y écrire un nom la
 court-circuiterait avec une valeur que personne n'a demandée.
+
+**Une surface hors du jeu fermé suit quand même la liste « Fournisseur IA ».**
+Le jeu fermé dit quelles pages ont une *formule propre* ; il ne dit pas
+lesquelles ont le droit d'ignorer le choix global. `getRunnerEnv()` appelé sans
+`page` n'injectait aucun `SELECTED_LLM_PROVIDER` du tout, si bien que la
+génération de tests, l'auto-fix GitHub et l'auto-réparation repartaient sur le
+défaut du backend pendant que la barre du haut affichait autre chose — le même
+symptôme que celui que ce module existe pour corriger, un cran plus bas. Sans
+`page`, `getGlobalProviderEnv()` répond : exactement ce qu'une page sans
+surcharge reçoit.
 
 Dans l'UI, `PageLlmSelector` vit à gauche de la barre sticky, à côté de la liste
 « Fournisseur IA », et n'en est pas un doublon : cette liste dit avec quoi

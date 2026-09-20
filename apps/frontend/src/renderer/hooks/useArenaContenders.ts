@@ -17,34 +17,8 @@ import {
 import { getStaticProviders } from "@shared/utils/providers";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
+import { fetchAgenticCapabilities } from "./useAgenticCapabilities";
 import { fetchProviderModelCatalog } from "./useProviderModelCatalog";
-
-interface AgenticCapability {
-	hasAdapter: boolean;
-	degradesTo: string | null;
-}
-
-/**
- * Which providers drive their own models. An unreadable matrix lets everyone
- * in: refusing every provider because one fetch failed would empty the page
- * over a backend that is merely still starting, and the per-participant
- * refusal in the backend is the guarantee that nothing is ever mislabelled.
- */
-async function fetchAgenticCapabilities(): Promise<
-	Record<string, AgenticCapability>
-> {
-	try {
-		const baseUrl = import.meta.env?.VITE_BACKEND_URL || "";
-		const res = await fetch(`${baseUrl}/providers/agentic-capabilities`);
-		if (!res.ok) return {};
-		const data = (await res.json()) as {
-			providers?: Record<string, AgenticCapability>;
-		};
-		return data?.providers ?? {};
-	} catch {
-		return {};
-	}
-}
 
 export interface ArenaRoster {
 	contenders: ArenaContender[];
