@@ -29,6 +29,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Clean generated files (watermarks)](#clean-generated-files-watermarks)
   - [Architecture diagrams (archify)](#architecture-diagrams-archify)
   - [Mobile applications (Android and Apple)](#mobile-applications-android-and-apple)
+  - [Competitive rounds (Bounty Board)](#competitive-rounds-bounty-board)
   - [Declarative Workflows](#declarative-workflows)
   - [Workflow Logger](#workflow-logger)
   - [Pause, resume, and how a phase reports failure](#pause-resume-and-how-a-phase-reports-failure)
@@ -1422,6 +1423,86 @@ cycle after QA. `store-readiness` sits after QA because it audits a finished
 build — and it exists at all because store rejections cost days and **no test in
 the repository catches any of them**: they are rules about configuration files
 and about behaviours the suite does not look at.
+
+### Competitive rounds (Bounty Board)
+
+N contestants, each a `(provider, model, prompt_override)` triple, implement the
+same spec concurrently in their own git worktrees. A judge then measures what
+each one left on disk and proposes a winner.
+
+```
+apps/backend/bounty_board/
+  board.py    orchestration: worktrees, concurrency, persistence
+  runner.py   how one contestant is run — `create_agent_client(provider=…)`
+  signals.py  what it produced: diff and the project's own test suite. No model
+  judge.py    what that is worth
+```
+
+**The board used to score a string nobody had generated.** `runner` opened with
+`from llm_client import acomplete`: the module is `core.llm_client`, the runner
+puts only `apps/backend` on the path, and `acomplete` exists in it under no
+name. So the import raised on every run and the `except ImportError` handler —
+written for an environment where the multi-provider client "was not wired up
+yet" — produced `f"[stub:{provider}:{model}] {prompt[:200]}"`. That string
+embeds the contestant's own `provider:model`, so the only thing that varied
+between contestants was **the number of characters in their model's name**. A
+real round reported 77.9 / 77.8 / 67.9 and crowned a winner with two decimal
+places of confidence. The warning that said so went to a logger nobody reads:
+the runner is spawned by Electron and its stderr surfaces only on a non-zero
+exit.
+
+There is no stub any more, and that is the point rather than an omission. A
+contestant whose client cannot be built ends `error` with the reason on its
+card. An invisible wrong answer costs more than a visible failure.
+
+**And the judge scored prose.** Its four terms were completion (50 points for
+not crashing), coverage (the *first word* of an acceptance criterion found as a
+substring anywhere in the answer), output length, and latency rank. Three
+measure the shape of the answer text; the fourth measures the field. Five rules
+replace them:
+
+| Rule | What it prevents |
+|---|---|
+| **score the artifact** — every criterion reads the diff or a command run against it | a contest decided by how much the model wrote |
+| **absent evidence renormalises, never scores zero** — `Criterion.value is None` drops that weight out of the total | a project with no test suite reading as a project whose tests fail |
+| **no criterion is a rank** — efficiency is a ratio to the *best*, floored at the resolution below which a difference is noise | `1 - duration/slowest`, which gave the slowest exactly 0 whatever the gap: one millisecond cost ten points |
+| **efficiency is a tiebreaker, never a verdict** — dropped entirely unless `tests` or `spec_fit` was measured | a score built only out of "returned first" |
+| **the judge does not know who it is judging** — diffs arrive as `Candidate 1..N`, provider and model stripped | a judge measuring reputation |
+
+Weights are `tests` 55, `spec_fit` 35, `efficiency` 10, renormalised over
+whichever had evidence — so they are ratios between signals, not points. Two
+gates come before any of them, because both describe a contestant with nothing
+to score rather than one that scored badly: a status other than `completed`,
+and a measured empty diff.
+
+**`null` and `0` stay apart all the way to the card.** `quality_breakdown`
+carries `null` for a criterion with no evidence, and `ContestantCard` renders
+*not measured* in italics rather than `0.0`. Collapsing the two is how an
+unmeasured contest comes to be read as a close one, which is exactly what
+happened. Every dropped signal is also reported as a `warning` on the result and
+listed in the verdict modal.
+
+**A tie is reported as a tie.** The old `scored.sort()` was stable, so equal
+scores handed the trophy to whichever contestant was declared first — at the
+0.1-point margins that board produced, most rounds. `evidence_judge` returns no
+winner and says the top score was tied.
+
+**The test suite runs sequentially, once per contestant.** N suites racing over
+the same ports, temp files and package caches measures the contention. And a
+suite is never run against an empty diff: it would measure the base branch and
+hand every do-nothing contestant a clean pass.
+
+**Credentials for every provider, and no `SELECTED_LLM_PROVIDER`.** This is the
+one run that talks to several providers at once, so `bounty-board-handlers.ts`
+merges `credentialManager.getEnvironmentVariables(provider)` for each and then
+deletes that variable: every contestant names its own provider, which
+`create_agent_client(provider=…)` honours directly, and an ambient one would be
+a second answer to a settled question.
+
+`prompt_override` reaches a model now. It was parsed from the CLI, stored on
+`ContestantSpec`, and dropped by `_materialize`, so the per-entry strategy the
+UI offers had no effect on anything. It is added to the brief, never
+substituted for it.
 
 ### Declarative Workflows
 

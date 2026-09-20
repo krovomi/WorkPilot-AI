@@ -34,9 +34,45 @@ export interface BountyContestant {
 	duration_ms: number;
 	error?: string | null;
 	score?: number | null;
-	quality_breakdown: Record<string, number>;
+	/**
+	 * Points contributed per criterion, or `null` for a criterion that had no
+	 * evidence. `null` and `0` are different statements — "nobody could measure
+	 * this" versus "this was measured and it failed" — and the card must keep
+	 * them apart, because collapsing them is how an unmeasured contest came to
+	 * be reported as a close one.
+	 */
+	quality_breakdown: Record<string, number | null>;
+	/** What the judge measured, so the card can show evidence, not just a number. */
+	evidence?: BountyEvidence | null;
+	branch?: string | null;
+	base_ref?: string | null;
+	prompt_override?: string | null;
 	started_at?: number | null;
 	completed_at?: number | null;
+}
+
+export interface BountyEvidence {
+	diff: {
+		files_changed: number;
+		insertions: number;
+		deletions: number;
+		available: boolean;
+		unavailable_reason?: string | null;
+	};
+	tests: {
+		status:
+			| "passed"
+			| "failed"
+			| "timeout"
+			| "no-command"
+			| "no-change"
+			| "skipped"
+			| "error";
+		command?: string | null;
+		passed: number;
+		failed: number;
+		exit_code?: number | null;
+	};
 }
 
 export interface BountyResult {
@@ -47,6 +83,14 @@ export interface BountyResult {
 	winnerId: string | null;
 	judgeReport: string;
 	judgeRationale: Record<string, string>;
+	/** The weights the judge applied, before renormalisation. */
+	scoring?: {
+		weights?: Record<string, number>;
+		note?: string;
+		contestants?: number;
+	};
+	/** Signals that could not be measured for this run, and why. */
+	warnings?: string[];
 	createdAt: number;
 	completedAt: number | null;
 	status: "running" | "judging" | "completed" | "error";
