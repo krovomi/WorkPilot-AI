@@ -119,7 +119,7 @@ export function MissionControlDashboard() {
 						</div>
 					</div>
 					<h1 className="text-3xl font-bold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-						Mission Control
+						{t("missionControl:title", "Mission Control")}
 					</h1>
 					<p className="text-muted-foreground text-lg">
 						{t(
@@ -189,7 +189,7 @@ export function MissionControlDashboard() {
 						</div>
 						<div>
 							<h1 className="text-xl font-bold text-foreground">
-								Mission Control
+								{t("missionControl:title", "Mission Control")}
 							</h1>
 							<p className="text-xs text-muted-foreground">
 								{session?.session_id ?? "—"}

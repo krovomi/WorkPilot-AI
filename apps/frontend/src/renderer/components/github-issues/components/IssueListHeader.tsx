@@ -44,7 +44,7 @@ export function IssueListHeader({
 	onAnalyzeAndGroup,
 	isAnalyzing,
 }: IssueListHeaderProps) {
-	const { t } = useTranslation("common");
+	const { t } = useTranslation(["common", "navigation"]);
 
 	return (
 		<div className="shrink-0 p-4 border-b border-border">
@@ -55,7 +55,7 @@ export function IssueListHeader({
 					</div>
 					<div>
 						<h2 className="text-lg font-semibold text-foreground">
-							GitHub Issues
+							{t("navigation:items.githubIssues")}
 						</h2>
 						<p className="text-xs text-muted-foreground">{repoFullName}</p>
 					</div>

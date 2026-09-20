@@ -1,3 +1,4 @@
+import { useAgenticCapabilities } from "../../hooks/useAgenticCapabilities";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
 import { isLocalProvider } from "../../../shared/utils/local-models";
@@ -80,6 +81,12 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 		startBounty,
 		loadArchives,
 	} = useBountyBoardStore();
+
+	// Un fournisseur sans adaptateur agentique tourne sur le SDK Claude : la
+	// victoire serait enregistrée au nom d'un éditeur qui n'a jamais vu le
+	// prompt. Le backend refuse le participant (`bounty_board/runner.py`) ; ceci
+	// le dit *avant* qu'un round soit dépensé à l'apprendre.
+	const { degradesTo } = useAgenticCapabilities();
 
 	const tasks = useTaskStore((s) => s.tasks);
 	const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
@@ -251,11 +258,27 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 									<SelectContent searchable>
 										{PROVIDERS.map((p) => (
 											<SelectItem key={p} value={p}>
-												{p}
+												{degradesTo(p)
+													? t("bountyBoard:noAdapterOption", {
+															provider: p,
+															target: degradesTo(p),
+															defaultValue: "{{provider}} — runs on {{target}}",
+														})
+													: p}
 											</SelectItem>
 										))}
 									</SelectContent>
 								</Select>
+								{degradesTo(c.provider) && (
+									<p className="text-[10px] text-destructive mt-1">
+										{t("bountyBoard:noAdapter", {
+											provider: c.provider,
+											target: degradesTo(c.provider),
+											defaultValue:
+												"No agentic adapter: this entry would run on {{target}} and is refused.",
+										})}
+									</p>
+								)}
 							</div>
 							<div className="col-span-4">
 								<Label className="text-[10px]">
