@@ -575,7 +575,9 @@ class AirgapIsVisibleOutsideItsOwnPageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self._strict_project(directory)
             with (
-                patch.object(runner, "_detect_ollama", return_value={"available": False}),
+                patch.object(
+                    runner, "_detect_ollama", return_value={"available": False}
+                ),
                 patch.object(
                     runner, "_detect_lm_studio", return_value={"available": False}
                 ),
@@ -614,8 +616,10 @@ class AirgapIsVisibleOutsideItsOwnPageTests(unittest.TestCase):
                 status="queued",
             )
             contestant.spec_dir = str(root)
-            original = {name: _sys.modules.get(name) for name in
-                        ("core.client", "agents.session")}
+            original = {
+                name: _sys.modules.get(name)
+                for name in ("core.client", "agents.session")
+            }
             _sys.modules["core.client"] = fake_client
             _sys.modules["agents.session"] = fake_session
             try:
