@@ -709,6 +709,11 @@
 		"noAccountsYet": "No accounts added yet. Add your first Claude account below."
 	},
 	"authTerminal": {
+		"signInLink": "Sign-in link",
+		"openInBrowser": "Open in browser",
+		"copyLink": "Copy link",
+		"linkCopied": "Copied!",
+		"copyFailed": "Could not copy the link to the clipboard.",
 		"failedToCreate": "Failed to create terminal",
 		"unknownError": "Unknown error",
 		"instructionTitle": "Claude Authentication",

@@ -50,6 +50,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Agent Management](#agent-management)
   - [Claude Profile System](#claude-profile-system)
   - [Terminal System](#terminal-system)
+  - [Le lien d'un écran d'authentification](#le-lien-dun-écran-dauthentification-terminalterminal-interactionsts)
 - [Code Quality](#code-quality)
 - [i18n Guidelines](#i18n-guidelines)
 - [Cross-Platform](#cross-platform)
@@ -2441,6 +2442,52 @@ Full PTY-based terminal integration:
 - **`terminal-lifecycle.ts`** — Session creation, cleanup, event handling
 - **`claude-integration-handler.ts`** — Claude SDK integration within terminals
 - Renderer: xterm.js 6 with WebGL, fit, web-links, serialize addons. Store: `terminal-store.ts`
+
+### Le lien d'un écran d'authentification (`terminal/terminal-interactions.ts`)
+
+Il y a quatre terminaux xterm.js dans le produit — celui des onglets, et un par
+écran d'authentification (Claude, Codex/Copilot, GitHub Copilot) — et ils
+répondaient différemment à la même question. Le terminal des onglets ouvrait ses
+liens par `openExternal` et traitait Ctrl/Cmd+C ; les terminaux
+d'authentification chargeaient un `WebLinksAddon` nu et n'écoutaient aucun
+raccourci. Ce sont pourtant les seuls écrans où la seule chose à faire est
+d'ouvrir une URL, ou de la copier.
+
+Le résultat, sur l'écran de connexion de Claude Code : un clic partait dans
+`window.open`, que le processus principal refuse par construction, et Ctrl+C
+envoyait un SIGINT au CLI en cours d'authentification au lieu de copier la
+sélection. `terminal-interactions.ts` est la seule réponse, chargée par les
+quatre :
+
+| Fonction | Répond |
+|---|---|
+| `createTerminalWebLinksAddon` | un lien cliqué part dans `openExternal` — le seul chemin, celui qui porte les replis Linux |
+| `handleClipboardKeyEvent` | Cmd/Ctrl+C (copie s'il y a une sélection, interruption sinon), Ctrl+Shift+C/V, Ctrl+V |
+| `attachOsc52Clipboard` | OSC 52, la séquence qu'émet un CLI qui propose lui-même « (c to copy) » — xterm.js ne l'implémente pas, et sans gestionnaire la touche n'a aucun effet observable |
+| `readTerminalText` | ce qui est affiché, lignes repliées recollées — lu dans le tampon et non dans le flux, qu'un CLI qui se redessine remplit de versions successives du même écran |
+
+**Et le lien est sorti du terminal.** Une URL OAuth fait trois lignes de
+quatre-vingts colonnes : la cliquer suppose de viser le bon fragment, la copier
+suppose d'en sélectionner trois dont la césure tombe au milieu d'un `%3A`.
+`shared/utils/terminal-links.ts` recolle les fragments — un repli ne laisse ni
+blanc ni indentation, et une ligne qui n'atteint pas le bord s'est terminée
+d'elle-même — et `TerminalAuthLinkBar` affiche l'URL entière avec de quoi
+l'ouvrir et la copier d'un geste.
+
+Le bandeau n'apparaît que quand une URL **de connexion** est affichée
+(`oauth`, `authorize`, `login`, `device`…) : la documentation citée trois lignes
+plus haut par le même programme n'a rien à y faire, et un bandeau permanent qui
+ne dit rien est un bandeau que personne ne lit. Une ligne qui commence par un
+schéma n'est jamais la suite de la précédente, sinon deux URL pleine largeur
+écrites l'une sous l'autre — ce qu'un CLI qui se redessine produit — n'en
+feraient qu'une.
+
+L'échec est dit : `openExternal` rend son rejet jusqu'au bandeau, qui l'affiche.
+Un bouton qui ne fait rien et ne dit rien est la pire des deux options, et c'est
+ce que `setWindowOpenHandler` produisait en appelant `shell.openExternal`
+directement — court-circuitant les replis de `open-external.ts` — avant d'avaler
+le rejet.
+
 
 ## Code Quality
 
