@@ -1,11 +1,13 @@
 import { FitAddon } from "@xterm/addon-fit";
-import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "@xterm/xterm/css/xterm.css";
 import { AlertCircle, CheckCircle2, Loader2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
+import { TerminalAuthLinkBar } from "../terminal/TerminalAuthLinkBar";
+import { attachTerminalInteractions } from "../terminal/terminal-interactions";
+import { useTerminalAuthUrl } from "../terminal/use-terminal-auth-url";
 import { Button } from "../ui/button";
 
 // Debug logging - only active when DEBUG=true (npm run dev:debug)
@@ -57,6 +59,10 @@ export function GitHubCopilotAuthTerminal({
 	const [authUsername, setAuthUsername] = useState<string | undefined>();
 	const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
+	// L'URL de connexion (le flux « device code » de GitHub en affiche une),
+	// relue depuis ce que le terminal affiche.
+	const { authUrl, scanForAuthUrl } = useTerminalAuthUrl(xtermRef);
+
 	// Refs to track current status/username for exit handler closure
 	const statusRef = useRef(status);
 	const authUsernameRef = useRef(authUsername);
@@ -89,21 +95,11 @@ export function GitHubCopilotAuthTerminal({
 		});
 
 		const fitAddon = new FitAddon();
-		const webLinksAddon = new WebLinksAddon((_event, uri) => {
-			// Use our custom openExternal API instead of default window.open
-			window.electronAPI?.openExternal?.(uri).catch((error) => {
-				console.warn(
-					"[GitHubCopilotAuthTerminal] Failed to open URL:",
-					uri,
-					error,
-				);
-			});
-			// Return false to prevent the default window.open behavior
-			return false;
-		});
 
 		xterm.loadAddon(fitAddon);
-		xterm.loadAddon(webLinksAddon);
+		// Liens ouverts par `openExternal`, plus Ctrl/Cmd+C, Ctrl+V et OSC 52 :
+		// le code d'appareil affiché ici n'existe que pour être copié.
+		attachTerminalInteractions(xterm, "GitHubCopilotAuthTerminal");
 		xterm.open(terminalRef.current);
 
 		// Initial fit
@@ -273,6 +269,7 @@ export function GitHubCopilotAuthTerminal({
 		const unsubOutput = window.electronAPI.onTerminalOutput((id, data) => {
 			if (id === terminalId && xterm) {
 				xterm.write(data);
+				scanForAuthUrl();
 
 				// Monitor output for authentication success/failure
 				debugLog("Terminal output received:", data);
@@ -411,7 +408,7 @@ export function GitHubCopilotAuthTerminal({
 			cleanupFnsRef.current.forEach((fn) => fn());
 			cleanupFnsRef.current = [];
 		};
-	}, [terminalId, onAuthSuccess, onAuthError, onClose, t]);
+	}, [terminalId, onAuthSuccess, onAuthError, onClose, scanForAuthUrl, t]);
 
 	// Handle resize
 	useEffect(() => {
@@ -531,6 +528,11 @@ export function GitHubCopilotAuthTerminal({
 				)}
 				style={{ padding: "8px" }}
 			/>
+
+			{/* Lien de connexion, tant que l'authentification n'a pas abouti */}
+			{authUrl && status !== "success" && (
+				<TerminalAuthLinkBar key={authUrl} url={authUrl} />
+			)}
 
 			{/* Status bar */}
 			{status === "authenticating" && (

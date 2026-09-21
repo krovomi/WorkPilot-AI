@@ -88,6 +88,7 @@ import {
 import { initializeCredentialIntegration } from "./services/credential-integration";
 import { ensureOllamaReady } from "./services/ollama-portable";
 import { ensureOAuthServerRunning } from "./oauth-server";
+import { openExternalUrl } from "./open-external";
 import { isMacOS, isWindows } from "./platform";
 import { pythonEnvManager } from "./python-env-manager";
 import { initSentryMain } from "./sentry";
@@ -360,6 +361,12 @@ function setupExternalLinkHandler(mainWindow: BrowserWindow): void {
 	// Note: Terminal links now use IPC via WebLinksAddon callback, but this handler
 	// catches any other window.open() calls (e.g., from third-party libraries)
 	const ALLOWED_URL_SCHEMES = new Set(["http:", "https:", "mailto:"]);
+
+	// http(s) passe par `open-external`, qui porte les replis Linux ; `mailto:`
+	// reste sur `shell.openExternal`, qui est le seul à savoir ouvrir un client
+	// de messagerie — et que `openExternalUrl` refuse par schéma.
+	const openAllowedUrl = (url: string, protocol: string): Promise<void> =>
+		protocol === "mailto:" ? shell.openExternal(url) : openExternalUrl(url);
 	mainWindow?.webContents.setWindowOpenHandler(
 		(details: Electron.HandlerDetails) => {
 			try {
@@ -377,7 +384,12 @@ function setupExternalLinkHandler(mainWindow: BrowserWindow): void {
 				// *and* let Electron create a second BrowserWindow rendering the
 				// remote page inside the app — every external link opening twice,
 				// with untrusted content hosted in our own process.
-				shell.openExternal(details.url).catch((error) => {
+				//
+				// Par `openExternalUrl` et non `shell.openExternal` : c'est le seul
+				// chemin, et c'est lui qui porte les replis Linux. Un `window.open`
+				// tombant ici sur une machine sans `xdg-utils` n'ouvrait rien et ne
+				// disait rien.
+				openAllowedUrl(details.url, url.protocol).catch((error) => {
 					console.warn(
 						"[main] Failed to open external URL:",
 						details.url,
@@ -425,8 +437,8 @@ function setupExternalLinkHandler(mainWindow: BrowserWindow): void {
 		event.preventDefault();
 		console.warn("[main] Blocked in-app navigation to:", targetUrl);
 		if (ALLOWED_URL_SCHEMES.has(target.protocol)) {
-			shell.openExternal(targetUrl).catch(() => {
-				/* nothing more we can do */
+			openAllowedUrl(targetUrl, target.protocol).catch((error) => {
+				console.warn("[main] Failed to open external URL:", targetUrl, error);
 			});
 		}
 	});

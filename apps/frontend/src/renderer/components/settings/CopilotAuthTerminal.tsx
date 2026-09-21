@@ -1,11 +1,13 @@
 import { FitAddon } from "@xterm/addon-fit";
-import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "@xterm/xterm/css/xterm.css";
 import { AlertCircle, CheckCircle2, Loader2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
+import { TerminalAuthLinkBar } from "../terminal/TerminalAuthLinkBar";
+import { attachTerminalInteractions } from "../terminal/terminal-interactions";
+import { useTerminalAuthUrl } from "../terminal/use-terminal-auth-url";
 import { Button } from "../ui/button";
 
 // Debug logging - only active when DEBUG=true (npm run dev:debug)
@@ -45,6 +47,9 @@ export function CopilotAuthTerminal({
 	const fitAddonRef = useRef<FitAddon | null>(null);
 	const isCreatedRef = useRef(false);
 	const cleanupFnsRef = useRef<(() => void)[]>([]);
+
+	// L'URL de connexion, relue depuis ce que le terminal affiche.
+	const { authUrl, scanForAuthUrl } = useTerminalAuthUrl(xtermRef);
 
 	const [status, setStatus] = useState<
 		"loading" | "running" | "success" | "error"
@@ -149,11 +154,11 @@ export function CopilotAuthTerminal({
 
 			// Create addons
 			const fitAddon = new FitAddon();
-			const webLinksAddon = new WebLinksAddon();
 
-			// Load addons
+			// Load addons. Les liens passent par `openExternal`, et la sélection par
+			// Ctrl/Cmd+C : c'est ici que l'utilisateur a une URL à ouvrir.
 			terminal.loadAddon(fitAddon);
-			terminal.loadAddon(webLinksAddon);
+			attachTerminalInteractions(terminal, "CopilotAuthTerminal");
 
 			// Store references
 			xtermRef.current = terminal;
@@ -174,6 +179,7 @@ export function CopilotAuthTerminal({
 				(id: string, data: string) => {
 					if (id === terminalId) {
 						terminal.write(data);
+						scanForAuthUrl();
 						handleTerminalData(data);
 					}
 				},
@@ -224,7 +230,7 @@ export function CopilotAuthTerminal({
 			setCanClose(true);
 			onAuthError?.(error instanceof Error ? error.message : "Unknown error");
 		}
-	}, [terminalId, handleTerminalData, status, t, onAuthError]);
+	}, [terminalId, handleTerminalData, scanForAuthUrl, status, t, onAuthError]);
 
 	/**
 	 * Handle close button click
@@ -342,6 +348,11 @@ export function CopilotAuthTerminal({
 				className="flex-1 overflow-hidden"
 				style={{ minHeight: "200px" }}
 			/>
+
+			{/* Lien de connexion, tant que l'authentification n'a pas abouti */}
+			{authUrl && status !== "success" && (
+				<TerminalAuthLinkBar key={authUrl} url={authUrl} />
+			)}
 		</div>
 	);
 }

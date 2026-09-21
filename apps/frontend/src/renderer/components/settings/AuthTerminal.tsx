@@ -1,11 +1,13 @@
 import { FitAddon } from "@xterm/addon-fit";
-import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "@xterm/xterm/css/xterm.css";
 import { AlertCircle, CheckCircle2, Loader2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
+import { TerminalAuthLinkBar } from "../terminal/TerminalAuthLinkBar";
+import { attachTerminalInteractions } from "../terminal/terminal-interactions";
+import { useTerminalAuthUrl } from "../terminal/use-terminal-auth-url";
 import { Button } from "../ui/button";
 
 // Debug logging - only active when DEBUG=true (npm run dev:debug)
@@ -65,6 +67,9 @@ export function AuthTerminal({
 	statusRef.current = status;
 	authEmailRef.current = authEmail;
 
+	// L'URL de connexion, relue depuis ce que le terminal affiche.
+	const { authUrl, scanForAuthUrl } = useTerminalAuthUrl(xtermRef);
+
 	debugLog("Component render", {
 		terminalId,
 		status,
@@ -91,10 +96,12 @@ export function AuthTerminal({
 		});
 
 		const fitAddon = new FitAddon();
-		const webLinksAddon = new WebLinksAddon();
 
 		xterm.loadAddon(fitAddon);
-		xterm.loadAddon(webLinksAddon);
+		// Liens ouverts par `openExternal`, Ctrl/Cmd+C, Ctrl+V et OSC 52 : sans
+		// cela, l'URL de connexion ne se clique ni ne se copie — sur l'écran qui
+		// n'existe que pour ça.
+		attachTerminalInteractions(xterm, "AuthTerminal");
 		xterm.open(terminalRef.current);
 
 		// Initial fit
@@ -273,6 +280,7 @@ export function AuthTerminal({
 		const unsubOutput = globalThis.electronAPI.onTerminalOutput((id, data) => {
 			if (id === terminalId && xterm) {
 				xterm.write(data);
+				scanForAuthUrl();
 
 				// Detect Codex CLI authentication success messages
 				const isCodexAuth = terminalId.startsWith("auth-codex-");
@@ -503,7 +511,7 @@ export function AuthTerminal({
 			cleanupFnsRef.current.forEach((fn) => fn());
 			cleanupFnsRef.current = [];
 		};
-	}, [terminalId, onAuthSuccess, onAuthError, onClose, t]);
+	}, [terminalId, onAuthSuccess, onAuthError, onClose, scanForAuthUrl, t]);
 
 	// Handle resize
 	useEffect(() => {
@@ -620,6 +628,11 @@ export function AuthTerminal({
 				)}
 				style={{ padding: "8px" }}
 			/>
+
+			{/* Lien de connexion, tant que l'authentification n'a pas abouti */}
+			{authUrl && status !== "success" && (
+				<TerminalAuthLinkBar key={authUrl} url={authUrl} />
+			)}
 
 			{/* Status bar */}
 			{status === "onboarding" && (
