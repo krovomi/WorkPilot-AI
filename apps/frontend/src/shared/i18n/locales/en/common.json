@@ -122,7 +122,9 @@
 		"disable": "disable",
 		"add": "Add",
 		"cancel": "Cancel",
-		"close": "Close"
+		"close": "Close",
+		"test": "Test",
+		"testing": "Testing..."
 	},
 	"os": {
 		"windows": "Windows",
