@@ -125,7 +125,9 @@
 		"disable": "désactiver",
 		"add": "Ajouter",
 		"cancel": "Annuler",
-		"close": "Fermer"
+		"close": "Fermer",
+		"test": "Tester",
+		"testing": "Test..."
 	},
 	"os": {
 		"windows": "Windows",
