@@ -131,6 +131,36 @@ async def default_contestant_runner(
     except Exception:  # noqa: BLE001 — la matrice manquante ne bloque pas un round
         logger.debug("provider capability matrix unavailable", exc_info=True)
 
+    # Le mode hors-ligne strict remplace le fournisseur de chaque participant
+    # par le modele local que la politique nomme — si bien qu'un plateau de
+    # trois fournisseurs cloud devient trois fois le meme modele, ou, quand ce
+    # modele n'est pas installe, trois fois la meme erreur parlant d'un
+    # fournisseur que personne n'a choisi. C'est ce rapport de bug qui a amene
+    # cette regle ici. Le dire par participant, avant de construire un client,
+    # coute un `exists()` et remplace un verdict faux par un refus lisible ;
+    # un concours entre modeles *locaux* reste parfaitement legitime.
+    try:
+        from core.offline_policy import (
+            STRICT_EXIT_HINT,
+            airgap_status,
+            is_local_provider,
+        )
+
+        if not is_local_provider(contestant.provider):
+            airgap = airgap_status(worktree, contestant.spec_dir)
+            if airgap["airgapStrict"]:
+                contestant.status = "error"
+                contestant.error = (
+                    f"Strict offline mode blocks cloud provider "
+                    f"'{contestant.provider}' for this project "
+                    f"({airgap['policyPath']}). {STRICT_EXIT_HINT}"
+                )
+                logger.warning("Contestant %s: %s", contestant.label, contestant.error)
+                _finish(contestant)
+                return
+    except Exception:  # noqa: BLE001 — une politique illisible ne bloque pas un round
+        logger.debug("offline policy unreadable", exc_info=True)
+
     try:
         client = create_agent_client(
             project_dir=worktree,

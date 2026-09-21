@@ -20,6 +20,17 @@ export interface OfflineStatus {
 	};
 	localModels: string[];
 	offlineReady: boolean;
+	/**
+	 * Le projet bloque-t-il les fournisseurs cloud, et quel fichier le dit.
+	 *
+	 * Le statut ne portait que les runtimes, si bien que « ce projet est en
+	 * airgap » n'était lisible que sur la case à cocher de sa propre page :
+	 * partout ailleurs le choix de fournisseur s'affichait en vert et le
+	 * backend refusait l'appel une seconde plus tard.
+	 */
+	airgapStrict?: boolean;
+	policyPath?: string | null;
+	policyPersisted?: boolean;
 }
 
 export interface OfflineRoutingEntry {
