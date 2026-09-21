@@ -234,13 +234,25 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						</label>
 					</div>
 
-					<p className="text-xs text-muted-foreground">
-						{t(
-							policy.airgapStrict
-								? "offlineMode:strictDescription"
-								: "offlineMode:hybridDescription",
-						)}
-					</p>
+					{/* Le mode strict est la seule bascule du produit qui coupe tous
+					    les fournisseurs cloud, et elle était présentée comme les
+					    autres : du texte gris. Elle a donc été activée sans être
+					    décidée — le défaut proposé la portait cochée — et le
+					    symptôme est arrivé bien plus tard, ailleurs, sous la forme
+					    d'un build parlant d'un modèle local que personne n'avait
+					    nommé. */}
+					{policy.airgapStrict ? (
+						<p
+							role="alert"
+							className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+						>
+							{t("offlineMode:strictDescription")}
+						</p>
+					) : (
+						<p className="text-xs text-muted-foreground">
+							{t("offlineMode:hybridDescription")}
+						</p>
+					)}
 					<label className="flex items-center gap-2 text-sm">
 						{t("offlineMode:defaultProvider")}
 						<select
