@@ -1,4 +1,5 @@
 import { useAgenticCapabilities } from "../../hooks/useAgenticCapabilities";
+import { useAirgapStatus } from "../../hooks/useAirgapStatus";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
 import { isLocalProvider } from "../../../shared/utils/local-models";
@@ -88,6 +89,13 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 	// le dit *avant* qu'un round soit dépensé à l'apprendre.
 	const { degradesTo } = useAgenticCapabilities();
 
+	// Le mode hors-ligne strict remplace le fournisseur de chaque participant
+	// par le modèle local que la politique nomme : un plateau de trois
+	// fournisseurs cloud devient trois fois la même erreur, parlant d'un
+	// fournisseur que personne n'a choisi. Le backend refuse désormais chaque
+	// participant cloud ; ceci le dit avant qu'on clique.
+	const airgap = useAirgapStatus(projectPath);
+
 	const tasks = useTaskStore((s) => s.tasks);
 	const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
 
@@ -170,6 +178,25 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 					"Run N contestants in parallel with different provider/model combinations. An impartial judge picks the winner.",
 				)}
 			</p>
+
+			{airgap.airgapStrict && (
+				<div
+					role="alert"
+					className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm"
+				>
+					<p className="font-medium text-destructive">
+						{t("bountyBoard:airgapTitle")}
+					</p>
+					<p className="mt-1 text-muted-foreground">
+						{t("bountyBoard:airgapBody")}
+					</p>
+					{airgap.policyPath && (
+						<p className="mt-1 font-mono text-xs text-muted-foreground break-all">
+							{airgap.policyPath}
+						</p>
+					)}
+				</div>
+			)}
 
 			<section className="grid grid-cols-1 md:grid-cols-2 gap-2">
 				<div>
