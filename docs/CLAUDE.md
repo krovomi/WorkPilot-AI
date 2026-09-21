@@ -1513,6 +1513,22 @@ deletes that variable: every contestant names its own provider, which
 `create_agent_client(provider=…)` honours directly, and an ambient one would be
 a second answer to a settled question.
 
+**The base of that environment is `getRunnerEnv`, not a second assembly.** It
+used to be built out of `credentialManager` alone, and that object never
+carries Claude's *own* authentication: the OAuth token comes from
+`getBestAvailableProfileEnv` and an API profile from `getAPIProfileEnv`, both
+of which every other runner in the application receives through `getRunnerEnv`.
+So a Claude contestant was dispatched with no Claude credentials at all and
+died on `No OAuth token found` — on an authenticated machine, in the same round
+where OpenAI and Google reached their providers. Two assemblies of one
+environment is how one of them quietly loses a variable, and the symptom looks
+like an authentication bug rather than a wiring one.
+
+Claude's chain is therefore left to `getRunnerEnv` and never re-stated: it
+resolves OAuth mode, API profiles and rate-limit-aware profile swapping
+*together*, and re-injecting a key on top of it could contradict the mode it
+just chose. Only the board's other providers are layered on.
+
 `prompt_override` reaches a model now. It was parsed from the CLI, stored on
 `ContestantSpec`, and dropped by `_materialize`, so the per-entry strategy the
 UI offers had no effect on anything. It is added to the brief, never
