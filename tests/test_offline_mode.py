@@ -335,7 +335,12 @@ class OfflineModeTests(unittest.TestCase):
                 },
             ):
                 policy = runner._load_policy(Path(directory))
-            self.assertTrue(policy["airgapStrict"])
+            # Le defaut d'un fichier absent n'est pas une barriere : la page
+            # marque une politique non persistee comme modifiee, donc le bouton
+            # Enregistrer est actif des le premier rendu, et un defaut a True
+            # coupait tout fournisseur cloud du projet en un clic — pour une
+            # fonctionnalite que personne n'avait demandee.
+            self.assertFalse(policy["airgapStrict"])
             self.assertTrue(
                 all(
                     entry
@@ -465,8 +470,12 @@ class HybridRoutingIsADefaultTests(unittest.TestCase):
                         root, root, "coder", "claude", "claude-sonnet-4-6", chosen=True
                     )
         # Le message nommait un fournisseur que l'utilisateur n'avait pas choisi
-        # sans jamais dire d'où il venait : c'est cette moitié qui manquait.
-        self.assertIn("offline-mode policy", str(caught.exception))
+        # sans jamais dire d'ou il venait, ni pourquoi son propre choix avait
+        # disparu : ce sont ces deux moities qui manquaient.
+        message = str(caught.exception)
+        self.assertIn("strict offline mode", message)
+        self.assertIn("claude", message)
+        self.assertIn("Airgap strict", message)
 
 
 class ProviderChoiceTests(unittest.TestCase):
@@ -517,6 +526,192 @@ class ProviderChoiceTests(unittest.TestCase):
                         provider="anthropic",
                     )
         self.assertIs(seen.get("chosen"), True)
+
+
+class AirgapIsVisibleOutsideItsOwnPageTests(unittest.TestCase):
+    """Le mode strict doit etre lisible ailleurs que sur sa propre case a cocher.
+
+    Le rapport de bug qu'elles gardent : trois participants Anthropic / OpenAI /
+    Google echouant tous sur `llama3.3:latest is unavailable on ollama`, sous un
+    selecteur affichant « Anthropic OK », sans qu'aucune surface ne dise que le
+    projet etait en airgap.
+    """
+
+    def _strict_project(self, directory, *, strict=True):
+        root = Path(directory)
+        (root / ".workpilot").mkdir()
+        (root / ".workpilot/offline-mode.json").write_text(
+            json.dumps(
+                {
+                    "airgapStrict": strict,
+                    "defaultProvider": "ollama",
+                    "routing": {
+                        "coder": {"provider": "ollama", "model": "llama3.3:latest"}
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        return root
+
+    def test_airgap_status_names_the_file_that_decides(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._strict_project(directory)
+            status = offline_policy.airgap_status(root / "nested" / "worktree")
+            self.assertTrue(status["airgapStrict"])
+            # Comparer les chemins *résolus*, jamais les chaînes : la recherche
+            # remonte les ancêtres, donc elle résout — et sur macOS le
+            # répertoire temporaire est `/var/...`, un lien symbolique vers
+            # `/private/var/...`. La propriété qui compte est « ce chemin
+            # désigne ce fichier », pas « la chaîne est identique ».
+            self.assertEqual(
+                Path(status["policyPath"]).resolve(),
+                (root / ".workpilot" / "offline-mode.json").resolve(),
+            )
+
+    def test_airgap_status_is_false_without_a_strict_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._strict_project(directory, strict=False)
+            self.assertEqual(
+                offline_policy.airgap_status(root),
+                {"airgapStrict": False, "policyPath": None},
+            )
+
+    def test_status_reports_the_policy_not_only_the_runtimes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._strict_project(directory)
+            with (
+                patch.object(
+                    runner, "_detect_ollama", return_value={"available": False}
+                ),
+                patch.object(
+                    runner, "_detect_lm_studio", return_value={"available": False}
+                ),
+                patch.object(
+                    runner, "_detect_llama_cpp", return_value={"available": False}
+                ),
+            ):
+                status = runner._status(root)
+        self.assertTrue(status["airgapStrict"])
+        self.assertTrue(status["policyPersisted"])
+        self.assertIn("offline-mode.json", status["policyPath"])
+
+    def test_a_cloud_contestant_is_refused_before_a_client_is_built(self):
+        import asyncio
+        import sys as _sys
+        import types
+
+        import bounty_board.runner as runner_module
+
+        fake_client = types.ModuleType("core.client")
+
+        def _must_not_run(**_kwargs):
+            raise AssertionError("strict offline mode must refuse before dispatch")
+
+        fake_client.create_agent_client = _must_not_run
+        fake_session = types.ModuleType("agents.session")
+        fake_session.run_agent_session = None
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._strict_project(directory)
+            contestant = runner_module.Contestant(
+                id="c-A",
+                label="A",
+                provider="anthropic",
+                model="claude-sonnet-4-6",
+                status="queued",
+            )
+            contestant.spec_dir = str(root)
+            original = {
+                name: _sys.modules.get(name)
+                for name in ("core.client", "agents.session")
+            }
+            _sys.modules["core.client"] = fake_client
+            _sys.modules["agents.session"] = fake_session
+            try:
+                asyncio.run(
+                    runner_module.default_contestant_runner(contestant, "spec", root)
+                )
+            finally:
+                for name, module in original.items():
+                    if module is None:
+                        _sys.modules.pop(name, None)
+                    else:
+                        _sys.modules[name] = module
+
+        self.assertEqual(contestant.status, "error")
+        self.assertIn("Strict offline mode", contestant.error or "")
+        self.assertIn("offline-mode.json", contestant.error or "")
+
+    def test_a_local_contestant_still_reaches_a_client_under_a_strict_policy(self):
+        """Un concours entre modeles locaux reste legitime en mode strict.
+
+        La porte ne doit pas se refermer sur ce pour quoi l'airgap existe.
+        """
+        import asyncio
+        import sys as _sys
+        import types
+
+        import bounty_board.runner as runner_module
+
+        reached = {}
+
+        class _Client:
+            last_usage: dict = {}
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_exc):
+                return False
+
+        def _build(**kwargs):
+            reached.update(kwargs)
+            return _Client()
+
+        async def _session(_client, _prompt, _spec_dir):
+            return "ok", "done", {}
+
+        fake_client = types.ModuleType("core.client")
+        fake_client.create_agent_client = _build
+        fake_session = types.ModuleType("agents.session")
+        fake_session.run_agent_session = _session
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._strict_project(directory)
+            contestant = runner_module.Contestant(
+                id="c-A",
+                label="A",
+                provider="ollama",
+                model="llama3.3:latest",
+                status="queued",
+            )
+            contestant.spec_dir = str(root)
+            original = {
+                name: _sys.modules.get(name)
+                for name in ("core.client", "agents.session")
+            }
+            _sys.modules["core.client"] = fake_client
+            _sys.modules["agents.session"] = fake_session
+            try:
+                asyncio.run(
+                    runner_module.default_contestant_runner(contestant, "spec", root)
+                )
+            finally:
+                for name, module in original.items():
+                    if module is None:
+                        _sys.modules.pop(name, None)
+                    else:
+                        _sys.modules[name] = module
+
+        self.assertEqual(contestant.status, "completed")
+        self.assertEqual(reached.get("provider"), "ollama")
+
+    def test_local_provider_spellings_are_one_question(self):
+        for name in ("ollama", "local", "lm-studio", "lmstudio", "LM-Studio"):
+            self.assertTrue(offline_policy.is_local_provider(name), name)
+        for name in ("anthropic", "claude", "openai", "google", "", None):
+            self.assertFalse(offline_policy.is_local_provider(name), name)
 
 
 if __name__ == "__main__":

@@ -1829,8 +1829,60 @@ personne n'a demandé, et le mode hybride autorise le cloud par définition.
 **Et le message nomme sa source.** « Local model X is unavailable on ollama »
 décrivait parfaitement ce qui n'allait pas et rien de ce qu'il fallait savoir :
 quelle tâche, quelle politique, et quoi faire. Il nomme désormais la route qui a
-désigné ce modèle, et les trois issues — l'installer, en choisir un autre dans
-Réglages → Mode hors-ligne, ou couper le mode strict.
+désigné ce modèle, le fournisseur qu'elle a *remplacé*, et la sortie —
+`STRICT_EXIT_HINT`, écrite une fois. Un message qui décrit une barrière sans
+dire où est l'interrupteur laisse son lecteur chercher dans les réglages d'un
+produit qui en a quatre-vingts.
+
+#### Le défaut d'un fichier absent n'est pas une barrière
+
+Tout ce qui précède décrit le mode strict comme une décision. Il ne l'était pas :
+`_default_policy` — ce que la page propose à un projet qui n'a jamais rien
+configuré — renvoyait **`airgapStrict: True`**, avec les six tâches routées vers
+le premier modèle local par ordre alphabétique. Le store marque une politique
+non persistée `dirty`, donc le bouton Enregistrer est actif dès le premier
+rendu : ouvrir la page par curiosité et cliquer une fois coupait tout
+fournisseur cloud du projet.
+
+Le symptôme arrivait bien plus tard et ailleurs — un Bounty Board configuré sur
+Anthropic, OpenAI et Google mourant trois fois sur
+`llama3.3:latest is unavailable on ollama`, un modèle que personne n'avait
+nommé — et la seule façon de faire le lien était de rouvrir cette page.
+
+Le *fail-closed* est la bonne règle pour **honorer** un airgap que quelqu'un a
+demandé. Appliqué à l'absence d'un fichier, il devient un fail-closed contre
+l'intention de l'utilisateur, ce qui est autre chose portant le même nom. Le
+défaut est `False` ; activer la barrière reste un geste, et la case cochée se
+rend désormais comme une alerte plutôt qu'en texte gris — c'est la seule bascule
+du produit qui désactive tous les fournisseurs cloud.
+
+#### Le mode strict est lisible ailleurs que sur sa propre case
+
+`_status()` ne portait que les runtimes locaux, si bien que « ce projet est en
+airgap » n'était lisible nulle part ailleurs que sur la page Mode hors-ligne.
+Partout ailleurs — la liste « Fournisseur IA », le Bounty Board, l'Arena — le
+fournisseur choisi s'affichait avec sa pastille verte et le backend refusait
+l'appel une seconde plus tard.
+
+| Qui répond | Où |
+|---|---|
+| le fait, et **quel fichier** le décide | `offline_policy.airgap_status` |
+| « ce fournisseur tourne-t-il sur la machine ? », quelle que soit son orthographe | `offline_policy.is_local_provider` |
+| le statut servi à l'UI (`airgapStrict`, `policyPath`, `policyPersisted`) | `offline_mode_runner._status` |
+| le renderer | `useAirgapStatus` |
+
+`_policy_files` est extrait de `project_policies` pour que « quel fichier le
+dit » et « que dit-il » soient une seule recherche lue deux fois : une seconde
+remontée d'ancêtres écrite ailleurs répondrait à côté le jour où un projet
+hérite de la politique d'un répertoire parent — ce qui est précisément le cas
+que `project_policies` existe pour couvrir.
+
+**Le Bounty Board refuse un participant cloud avant de le lancer.** En mode
+strict, chacun était réécrit vers le modèle local de la politique : un plateau
+de trois fournisseurs cloud devenait trois fois le même modèle — ou, quand ce
+modèle n'est pas installé, trois fois la même erreur. C'est la même règle que
+pour un fournisseur sans adaptateur agentique, pour la même raison, et un
+concours entre modèles **locaux** reste parfaitement légitime.
 
 ### Workflow Logger
 
