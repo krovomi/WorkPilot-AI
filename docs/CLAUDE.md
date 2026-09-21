@@ -1884,6 +1884,37 @@ modèle n'est pas installé, trois fois la même erreur. C'est la même règle q
 pour un fournisseur sans adaptateur agentique, pour la même raison, et un
 concours entre modèles **locaux** reste parfaitement légitime.
 
+#### L'interrupteur est là où la barrière se manifeste
+
+Le message ci-dessus décrivait la barrière puis renvoyait ailleurs : « décochez
+Mode strict dans Réglages → Mode hors-ligne ». C'est une instruction de
+navigation, pas une réponse — et elle demande d'aller décocher, dans un autre
+écran, une case que personne n'avait cochée. `AirgapBanner` porte donc le
+bouton, et `useAirgapStatus.disableStrict` l'exécute.
+
+Ce que le bouton ne fait pas, c'est décider : lever un airgap reste un geste
+explicite, sur un clic, avec le fichier concerné écrit à l'écran. Une migration
+qui aurait désactivé le mode strict des politiques existantes serait la faute
+d'origine à l'envers — quelqu'un qui a vraiment voulu l'airgap le perdrait sans
+qu'on le lui demande.
+
+**La désactivation renvoie la politique persistée telle quelle**, `airgapStrict`
+mis à `false` et pas un champ de plus. C'est la seule forme que `_save_policy`
+accepte sans revalider le routage (`disabling_only`), et cela compte exactement
+ici : la politique qui piège l'utilisateur route vers un modèle désinstallé,
+souvent avec le serveur local éteint, donc toute écriture prétendant la
+« corriger » au passage serait refusée et le bouton ne ferait rien.
+`test_strict_can_be_lifted_with_a_missing_model_and_no_server` est ce qui garde
+cette porte ouverte.
+
+**Un airgap hérité d'un parent n'offre pas de bouton.** La recherche remonte les
+répertoires ancêtres, alors que `set-policy` n'écrit que dans
+`<projet>/.workpilot/` — et la résolution est stricte dès qu'une *seule* des
+politiques trouvées l'est. Un bouton y créerait une seconde politique sans rien
+débloquer, ce qui est pire que pas de bouton ; `_status` répond donc
+`policyIsProjectOwn`, en comparant des chemins **résolus** plutôt que des
+chaînes.
+
 ### Workflow Logger
 
 Centralized logging system for tracking all AI agents, skills, hooks and workflows:

@@ -31,6 +31,15 @@ export interface OfflineStatus {
 	airgapStrict?: boolean;
 	policyPath?: string | null;
 	policyPersisted?: boolean;
+	/**
+	 * Le fichier qui décide est-il celui de *ce* projet ?
+	 *
+	 * La recherche remonte les répertoires parents, alors que l'écriture ne
+	 * vise que `<projet>/.workpilot/`. Un airgap hérité d'un parent ne peut
+	 * donc pas être levé depuis ici, et une UI qui l'ignorerait écrirait une
+	 * seconde politique sans rien débloquer.
+	 */
+	policyIsProjectOwn?: boolean;
 }
 
 export interface OfflineRoutingEntry {

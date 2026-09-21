@@ -14,10 +14,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAirgapStatus } from "../useAirgapStatus";
 
 const getOfflineStatus = vi.fn();
+const getOfflinePolicy = vi.fn();
+const setOfflinePolicy = vi.fn();
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	(globalThis as { electronAPI?: unknown }).electronAPI = { getOfflineStatus };
+	(globalThis as { electronAPI?: unknown }).electronAPI = {
+		getOfflineStatus,
+		getOfflinePolicy,
+		setOfflinePolicy,
+	};
 });
 
 describe("useAirgapStatus", () => {
@@ -81,5 +87,89 @@ describe("useAirgapStatus", () => {
 		expect(result.current.airgapStrict).toBe(false);
 		expect(result.current.loaded).toBe(false);
 		expect(getOfflineStatus).toHaveBeenCalledTimes(1);
+	});
+
+	it("rapporte si la politique qui décide appartient au projet", async () => {
+		getOfflineStatus.mockResolvedValue({
+			airgapStrict: true,
+			policyPath: "/parent/.workpilot/offline-mode.json",
+			policyIsProjectOwn: false,
+		});
+
+		const { result } = renderHook(() =>
+			useAirgapStatus("/parent/sub/project"),
+		);
+
+		await waitFor(() => expect(result.current.loaded).toBe(true));
+		expect(result.current.airgapStrict).toBe(true);
+		expect(result.current.policyIsProjectOwn).toBe(false);
+	});
+});
+
+describe("useAirgapStatus().disableStrict", () => {
+	// `_save_policy` n'accepte une politique dont le routage pointe vers un
+	// modèle désinstallé que par sa porte `disabling_only` : la politique
+	// précédente à l'identique, `airgapStrict` mis à false. Or c'est
+	// exactement la politique qui piège l'utilisateur. Renvoyer un champ de
+	// plus — un routage « corrigé », un `version` bumpé — ferait refuser
+	// l'écriture, et le bouton ne ferait rien.
+	it("renvoie la politique persistée avec le seul drapeau basculé", async () => {
+		const saved = {
+			version: 1,
+			airgapStrict: true,
+			defaultProvider: "ollama",
+			routing: { coder: { provider: "ollama", model: "gone:70b" } },
+			history: [],
+		};
+		getOfflineStatus.mockResolvedValue({
+			airgapStrict: true,
+			policyPath: "/repo/.workpilot/offline-mode.json",
+			policyIsProjectOwn: true,
+		});
+		getOfflinePolicy.mockResolvedValue({ policy: saved, persisted: true });
+		setOfflinePolicy.mockResolvedValue({ policy: saved });
+
+		const { result } = renderHook(() => useAirgapStatus("/repo"));
+		await waitFor(() => expect(result.current.loaded).toBe(true));
+
+		const failure = await result.current.disableStrict();
+
+		expect(failure).toBeNull();
+		expect(setOfflinePolicy).toHaveBeenCalledWith("/repo", {
+			...saved,
+			airgapStrict: false,
+		});
+	});
+
+	it("relit le statut après avoir levé le blocage", async () => {
+		getOfflineStatus
+			.mockResolvedValueOnce({ airgapStrict: true, policyIsProjectOwn: true })
+			.mockResolvedValueOnce({ airgapStrict: false, policyIsProjectOwn: true });
+		getOfflinePolicy.mockResolvedValue({ policy: { airgapStrict: true } });
+		setOfflinePolicy.mockResolvedValue({});
+
+		const { result } = renderHook(() => useAirgapStatus("/repo"));
+		await waitFor(() => expect(result.current.airgapStrict).toBe(true));
+
+		await result.current.disableStrict();
+
+		await waitFor(() => expect(result.current.airgapStrict).toBe(false));
+	});
+
+	// Un bandeau ne doit pas faire tomber la page qu'il coiffe.
+	it("rend l'échec plutôt que de le lever", async () => {
+		getOfflineStatus.mockResolvedValue({
+			airgapStrict: true,
+			policyIsProjectOwn: true,
+		});
+		getOfflinePolicy.mockResolvedValue({ policy: { airgapStrict: true } });
+		setOfflinePolicy.mockRejectedValue(new Error("read-only filesystem"));
+
+		const { result } = renderHook(() => useAirgapStatus("/repo"));
+		await waitFor(() => expect(result.current.loaded).toBe(true));
+
+		await expect(result.current.disableStrict()).resolves.toBe(
+			"read-only filesystem",
+		);
 	});
 });

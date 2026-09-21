@@ -596,6 +596,73 @@ class AirgapIsVisibleOutsideItsOwnPageTests(unittest.TestCase):
         self.assertTrue(status["policyPersisted"])
         self.assertIn("offline-mode.json", status["policyPath"])
 
+    def test_status_says_whether_the_deciding_policy_is_the_projects_own(self):
+        """`set-policy` n'ecrit que sous le projet, la recherche remonte plus haut.
+
+        Sans cette reponse, une UI offrant « desactiver » ecrirait une seconde
+        politique sous le projet pendant que celle du parent continuerait de
+        bloquer — un bouton qui ne fait rien.
+        """
+        runtimes = (
+            patch.object(runner, "_detect_ollama", return_value={"available": False}),
+            patch.object(
+                runner, "_detect_lm_studio", return_value={"available": False}
+            ),
+            patch.object(
+                runner, "_detect_llama_cpp", return_value={"available": False}
+            ),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            parent = self._strict_project(directory)
+            child = parent / "sub" / "project"
+            child.mkdir(parents=True)
+            with runtimes[0], runtimes[1], runtimes[2]:
+                own = runner._status(parent)
+                inherited = runner._status(child)
+
+        self.assertTrue(own["airgapStrict"])
+        self.assertTrue(own["policyIsProjectOwn"])
+
+        # Le projet enfant subit l'airgap sans posseder le fichier.
+        self.assertTrue(inherited["airgapStrict"])
+        self.assertFalse(inherited["policyIsProjectOwn"])
+
+    def test_strict_can_be_lifted_with_a_missing_model_and_no_server(self):
+        """La sortie doit marcher dans la situation qui y mene.
+
+        La politique qui piege l'utilisateur route vers un modele desinstalle,
+        et le serveur local est souvent eteint : toute ecriture qui revaliderait
+        le routage serait refusee, et le bouton ne ferait rien. `disabling_only`
+        est cette porte, et ce test est ce qui la garde ouverte.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            saved = {
+                "version": 1,
+                "airgapStrict": True,
+                "defaultProvider": "ollama",
+                "routing": {
+                    task: {"provider": "ollama", "model": "uninstalled:70b"}
+                    for task in runner.TASKS
+                },
+                "history": [],
+            }
+            runner._policy_path(root).parent.mkdir(parents=True)
+            runner._policy_path(root).write_text(json.dumps(saved), encoding="utf-8")
+
+            with patch.object(
+                runner,
+                "_scan_models",
+                side_effect=AssertionError("must not require a running server"),
+            ):
+                runner._save_policy(root, {**saved, "airgapStrict": False})
+
+            on_disk = json.loads(runner._policy_path(root).read_text(encoding="utf-8"))
+            self.assertFalse(on_disk["airgapStrict"])
+            # Le routage local est conserve : seul le blocage du cloud est leve.
+            self.assertEqual(on_disk["routing"], saved["routing"])
+            self.assertFalse(offline_policy.airgap_status(root)["airgapStrict"])
+
     def test_a_cloud_contestant_is_refused_before_a_client_is_built(self):
         import asyncio
         import sys as _sys

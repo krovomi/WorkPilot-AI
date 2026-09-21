@@ -19,7 +19,6 @@
 	"archives": "Rounds précédents",
 	"noAdapter": "Aucun adaptateur agentique ici : ce participant tournerait sur {{target}}, il est refusé avant de démarrer.",
 	"noAdapterOption": "{{provider}} — tourne sur {{target}}",
-	"airgapTitle": "Le mode hors-ligne strict est actif sur ce projet",
 	"airgapBody": "Les fournisseurs cloud sont bloqués : chaque participant cloud est refusé avant de démarrer. Faites concourir des modèles locaux, ou décochez « Mode strict » dans Réglages → Mode hors-ligne.",
 	"field": {
 		"provider": "Provider",

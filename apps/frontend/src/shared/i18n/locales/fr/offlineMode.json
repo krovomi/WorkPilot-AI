@@ -39,5 +39,11 @@
 	"invalidPolicy": "Choisissez un modèle détecté pour chaque tâche et configurez au moins une tâche pour le moteur par défaut en mode strict.",
 	"modelUnavailable": "modèle indisponible à remplacer",
 	"taskPlaceholder": "Ex. : summary",
-	"defaultDescription": "En mode strict, les tâches non listées utilisent le premier modèle configuré dans la table pour ce moteur."
+	"defaultDescription": "En mode strict, les tâches non listées utilisent le premier modèle configuré dans la table pour ce moteur.",
+	"airgapActive": "Le mode hors-ligne strict est actif sur ce projet",
+	"airgapInherited": "Cette politique appartient à un répertoire parent : elle ne se désactive pas d'ici — ouvrez le projet qui la porte, ou modifiez le fichier directement.",
+	"disableStrict": "Désactiver le mode strict",
+	"disablingStrict": "Désactivation…",
+	"disableStrictHint": "La table de routage locale est conservée ; seul le blocage du cloud est levé.",
+	"disableStrictFailed": "Désactivation impossible : {{error}}"
 }
