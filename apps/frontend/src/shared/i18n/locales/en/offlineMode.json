@@ -39,5 +39,11 @@
 	"invalidPolicy": "Choose a detected model for every task and configure at least one task for the default runtime in strict mode.",
 	"modelUnavailable": "unavailable model; select a replacement",
 	"taskPlaceholder": "e.g. summary",
-	"defaultDescription": "In strict mode, unlisted tasks use the first model configured in the table for this runtime."
+	"defaultDescription": "In strict mode, unlisted tasks use the first model configured in the table for this runtime.",
+	"airgapActive": "Strict offline mode is on for this project",
+	"airgapInherited": "This policy belongs to a parent directory, so it cannot be turned off from here — open the project that owns it, or edit the file directly.",
+	"disableStrict": "Turn off strict mode",
+	"disablingStrict": "Turning off…",
+	"disableStrictHint": "Keeps the local routing table; only the cloud block is lifted.",
+	"disableStrictFailed": "Could not turn it off: {{error}}"
 }

@@ -1513,6 +1513,22 @@ deletes that variable: every contestant names its own provider, which
 `create_agent_client(provider=…)` honours directly, and an ambient one would be
 a second answer to a settled question.
 
+**The base of that environment is `getRunnerEnv`, not a second assembly.** It
+used to be built out of `credentialManager` alone, and that object never
+carries Claude's *own* authentication: the OAuth token comes from
+`getBestAvailableProfileEnv` and an API profile from `getAPIProfileEnv`, both
+of which every other runner in the application receives through `getRunnerEnv`.
+So a Claude contestant was dispatched with no Claude credentials at all and
+died on `No OAuth token found` — on an authenticated machine, in the same round
+where OpenAI and Google reached their providers. Two assemblies of one
+environment is how one of them quietly loses a variable, and the symptom looks
+like an authentication bug rather than a wiring one.
+
+Claude's chain is therefore left to `getRunnerEnv` and never re-stated: it
+resolves OAuth mode, API profiles and rate-limit-aware profile swapping
+*together*, and re-injecting a key on top of it could contradict the mode it
+just chose. Only the board's other providers are layered on.
+
 `prompt_override` reaches a model now. It was parsed from the CLI, stored on
 `ContestantSpec`, and dropped by `_materialize`, so the per-entry strategy the
 UI offers had no effect on anything. It is added to the brief, never
@@ -1883,6 +1899,37 @@ de trois fournisseurs cloud devenait trois fois le même modèle — ou, quand c
 modèle n'est pas installé, trois fois la même erreur. C'est la même règle que
 pour un fournisseur sans adaptateur agentique, pour la même raison, et un
 concours entre modèles **locaux** reste parfaitement légitime.
+
+#### L'interrupteur est là où la barrière se manifeste
+
+Le message ci-dessus décrivait la barrière puis renvoyait ailleurs : « décochez
+Mode strict dans Réglages → Mode hors-ligne ». C'est une instruction de
+navigation, pas une réponse — et elle demande d'aller décocher, dans un autre
+écran, une case que personne n'avait cochée. `AirgapBanner` porte donc le
+bouton, et `useAirgapStatus.disableStrict` l'exécute.
+
+Ce que le bouton ne fait pas, c'est décider : lever un airgap reste un geste
+explicite, sur un clic, avec le fichier concerné écrit à l'écran. Une migration
+qui aurait désactivé le mode strict des politiques existantes serait la faute
+d'origine à l'envers — quelqu'un qui a vraiment voulu l'airgap le perdrait sans
+qu'on le lui demande.
+
+**La désactivation renvoie la politique persistée telle quelle**, `airgapStrict`
+mis à `false` et pas un champ de plus. C'est la seule forme que `_save_policy`
+accepte sans revalider le routage (`disabling_only`), et cela compte exactement
+ici : la politique qui piège l'utilisateur route vers un modèle désinstallé,
+souvent avec le serveur local éteint, donc toute écriture prétendant la
+« corriger » au passage serait refusée et le bouton ne ferait rien.
+`test_strict_can_be_lifted_with_a_missing_model_and_no_server` est ce qui garde
+cette porte ouverte.
+
+**Un airgap hérité d'un parent n'offre pas de bouton.** La recherche remonte les
+répertoires ancêtres, alors que `set-policy` n'écrit que dans
+`<projet>/.workpilot/` — et la résolution est stricte dès qu'une *seule* des
+politiques trouvées l'est. Un bouton y créerait une seconde politique sans rien
+débloquer, ce qui est pire que pas de bouton ; `_status` répond donc
+`policyIsProjectOwn`, en comparant des chemins **résolus** plutôt que des
+chaînes.
 
 ### Workflow Logger
 

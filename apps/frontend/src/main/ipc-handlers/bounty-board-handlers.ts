@@ -16,6 +16,7 @@ import { spawn } from "node:child_process";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { credentialManager } from "../services/credential-manager.js";
+import { getRunnerEnv } from "./github/utils/runner-env.js";
 
 interface ContestantInput {
 	provider: string;
@@ -72,19 +73,38 @@ function resolveSpecDir(projectPath: string, specId: string): string {
  * `create_agent_client(provider=...)` honours directly. Leaving an ambient one
  * behind would be a second answer to a settled question, and the contestant it
  * happened to name would be the only one whose provider was chosen twice.
+ *
+ * **The base is `getRunnerEnv`, not a second assembly.** This handler used to
+ * build the whole environment out of `credentialManager` alone, and that
+ * object never carries Claude's own authentication: the OAuth token comes from
+ * `getBestAvailableProfileEnv` and an API profile from `getAPIProfileEnv`,
+ * both of which every other runner in the application gets through
+ * `getRunnerEnv`. So a Claude contestant was dispatched with no Claude
+ * credentials at all and died on "No OAuth token found. WorkPilot AI requires
+ * Claude Code OAuth authentication" — on a machine that was authenticated, in
+ * the same round where OpenAI and Google reached their providers fine. Two
+ * assemblies of one environment is how one of them silently loses a variable.
+ *
+ * Claude's chain is therefore left to `getRunnerEnv` and never re-stated here:
+ * it resolves OAuth mode, API profiles and rate-limit-aware profile swapping
+ * together, and re-injecting a key from `credentialManager` on top could
+ * contradict the mode it just chose. Only the *other* providers of the board
+ * are layered on.
  */
-function buildContestantEnv(
+export async function buildContestantEnv(
 	contestants: ContestantInput[],
-): Record<string, string> {
+	extraEnv: Record<string, string>,
+): Promise<Record<string, string>> {
+	const env = await getRunnerEnv(extraEnv);
+
 	const providers = [
 		...new Set(
 			contestants
 				.map((c) => (c.provider || "").trim().toLowerCase())
 				.filter(Boolean),
 		),
-	];
+	].filter((provider) => provider !== "claude" && provider !== "anthropic");
 
-	const env: Record<string, string> = {};
 	for (const provider of providers) {
 		try {
 			Object.assign(env, credentialManager.getEnvironmentVariables(provider));
@@ -145,8 +165,9 @@ export function registerBountyBoardHandlers(): void {
 
 			const child_env = {
 				...process.env,
-				...buildContestantEnv(req.contestants),
-				PYTHONPATH: backendPath,
+				...(await buildContestantEnv(req.contestants, {
+					PYTHONPATH: backendPath,
+				})),
 			};
 
 			return await new Promise<StartResponse>((resolve, reject) => {

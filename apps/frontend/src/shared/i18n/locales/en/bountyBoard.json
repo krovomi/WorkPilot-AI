@@ -19,7 +19,6 @@
 	"archives": "Previous rounds",
 	"noAdapter": "No agentic adapter here: this entry would run on {{target}} and is refused before it starts.",
 	"noAdapterOption": "{{provider}} — runs on {{target}}",
-	"airgapTitle": "Strict offline mode is on for this project",
 	"airgapBody": "Cloud providers are blocked, so every cloud contestant is refused before it starts. Run local models, or uncheck 'Airgap strict' in Settings → Offline Mode.",
 	"field": {
 		"provider": "Provider",

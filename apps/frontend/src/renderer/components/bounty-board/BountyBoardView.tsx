@@ -1,5 +1,6 @@
 import { useAgenticCapabilities } from "../../hooks/useAgenticCapabilities";
 import { useAirgapStatus } from "../../hooks/useAirgapStatus";
+import { AirgapBanner } from "../offline-mode/AirgapBanner";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
 import { isLocalProvider } from "../../../shared/utils/local-models";
@@ -179,24 +180,10 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 				)}
 			</p>
 
-			{airgap.airgapStrict && (
-				<div
-					role="alert"
-					className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm"
-				>
-					<p className="font-medium text-destructive">
-						{t("bountyBoard:airgapTitle")}
-					</p>
-					<p className="mt-1 text-muted-foreground">
-						{t("bountyBoard:airgapBody")}
-					</p>
-					{airgap.policyPath && (
-						<p className="mt-1 font-mono text-xs text-muted-foreground break-all">
-							{airgap.policyPath}
-						</p>
-					)}
-				</div>
-			)}
+			<AirgapBanner
+				status={airgap}
+				blockedLabel={t("bountyBoard:airgapBody")}
+			/>
 
 			<section className="grid grid-cols-1 md:grid-cols-2 gap-2">
 				<div>

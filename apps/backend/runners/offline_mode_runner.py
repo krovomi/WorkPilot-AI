@@ -232,6 +232,22 @@ def _scan_models(project_path: Path, force: bool = False) -> dict:
     return result
 
 
+def _same_file(candidate: str | None, target: Path) -> bool:
+    """Deux chemins designent-ils le meme fichier ?
+
+    Compare des chemins *resolus*, jamais des chaines : la recherche de
+    politiques resout, et sur macOS un repertoire temporaire est un lien
+    symbolique (`/var` -> `/private/var`). Comparer les chaines rendrait faux
+    un projet qui possede pourtant sa propre politique.
+    """
+    if not candidate:
+        return False
+    try:
+        return Path(candidate).resolve() == target.resolve()
+    except OSError:
+        return False
+
+
 def _status(project_path: Path) -> dict:
     ollama = _detect_ollama()
     llama_cpp = _detect_llama_cpp()
@@ -263,6 +279,17 @@ def _status(project_path: Path) -> dict:
         "airgapStrict": airgap["airgapStrict"],
         "policyPath": airgap["policyPath"],
         "policyPersisted": _policy_path(project_path).exists(),
+        # Le fichier qui decide est-il *celui de ce projet* ? La recherche
+        # remonte les ancetres, donc un airgap peut venir d'un repertoire
+        # parent — et `set-policy` n'ecrit que dans `<projet>/.workpilot/`.
+        # Sans cette reponse, une UI offrant « desactiver » ecrirait une
+        # seconde politique sous le projet pendant que celle du parent
+        # continuerait de bloquer : `resolve_offline_route` est strict des
+        # qu'une seule des politiques trouvees l'est. Un bouton qui ne fait
+        # rien est pire que pas de bouton.
+        "policyIsProjectOwn": _same_file(
+            airgap["policyPath"], _policy_path(project_path)
+        ),
     }
 
 
