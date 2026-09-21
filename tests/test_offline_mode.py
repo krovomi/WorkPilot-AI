@@ -559,8 +559,14 @@ class AirgapIsVisibleOutsideItsOwnPageTests(unittest.TestCase):
             root = self._strict_project(directory)
             status = offline_policy.airgap_status(root / "nested" / "worktree")
             self.assertTrue(status["airgapStrict"])
+            # Comparer les chemins *résolus*, jamais les chaînes : la recherche
+            # remonte les ancêtres, donc elle résout — et sur macOS le
+            # répertoire temporaire est `/var/...`, un lien symbolique vers
+            # `/private/var/...`. La propriété qui compte est « ce chemin
+            # désigne ce fichier », pas « la chaîne est identique ».
             self.assertEqual(
-                status["policyPath"], str(root / ".workpilot" / "offline-mode.json")
+                Path(status["policyPath"]).resolve(),
+                (root / ".workpilot" / "offline-mode.json").resolve(),
             )
 
     def test_airgap_status_is_false_without_a_strict_policy(self):
