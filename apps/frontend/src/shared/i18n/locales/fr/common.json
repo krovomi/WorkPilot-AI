@@ -714,6 +714,11 @@
 		"noAccountsYet": "Aucun compte ajouté pour le moment. Ajoutez votre premier compte Claude ci-dessous."
 	},
 	"authTerminal": {
+		"signInLink": "Lien de connexion",
+		"openInBrowser": "Ouvrir dans le navigateur",
+		"copyLink": "Copier le lien",
+		"linkCopied": "Copié !",
+		"copyFailed": "Impossible de copier le lien dans le presse-papiers.",
 		"failedToCreate": "Échec de la création du terminal",
 		"unknownError": "Erreur inconnue",
 		"instructionTitle": "Authentification Claude",
