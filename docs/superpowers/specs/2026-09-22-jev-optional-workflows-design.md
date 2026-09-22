@@ -1,6 +1,6 @@
 # JEV optionnel dans les workflows WorkPilot-AI
 
-Date : 2026-09-22. Statut : périmètre approuvé ; spécification à relire avant le plan d'implémentation.
+Date : 2026-09-22. Statut : spécification approuvée par l'utilisateur ; plan d'implémentation rédigé séparément pour relecture.
 
 ## Objectif et contrat de compatibilité
 
