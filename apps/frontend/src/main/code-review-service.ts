@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFile, realpath, stat } from "node:fs/promises";
+import { open, realpath } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import type {
@@ -79,15 +79,37 @@ export async function readReviewFile(
 		const actualFile = await realpath(target);
 		if (!contained(actualRoot, actualFile))
 			throw new Error("File is outside project");
-		const info = await stat(actualFile);
-		if (!info.isFile()) throw new Error("Not a regular file");
-		if (scope === "staged") {
-			/* Contents come from the index below. */
-		} else if (info.size > MAX_BYTES) result.unavailable = "large";
-		else {
-			const bytes = await readFile(actualFile);
-			if (bytes.includes(0)) result.unavailable = "binary";
-			else result.content = bytes.toString("utf8");
+		// Check and read the same open file: a pathname can be replaced between awaits.
+		const handle = await open(actualFile, "r");
+		try {
+			const info = await handle.stat();
+			if (!info.isFile()) throw new Error("Not a regular file");
+			if (scope !== "staged") {
+				if (info.size > MAX_BYTES) result.unavailable = "large";
+				else {
+					// Read at most the limit plus one byte, even if the open file grows.
+					const buffer = Buffer.alloc(MAX_BYTES + 1);
+					let length = 0;
+					while (length < buffer.length) {
+						const { bytesRead } = await handle.read(
+							buffer,
+							length,
+							buffer.length - length,
+							length,
+						);
+						if (bytesRead === 0) break;
+						length += bytesRead;
+					}
+					if (length > MAX_BYTES) result.unavailable = "large";
+					else {
+						const bytes = buffer.subarray(0, length);
+						if (bytes.includes(0)) result.unavailable = "binary";
+						else result.content = bytes.toString("utf8");
+					}
+				}
+			}
+		} finally {
+			await handle.close();
 		}
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
