@@ -2,8 +2,11 @@ import type { LanguageSupport } from "@codemirror/language";
 import { LanguageDescription } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
-import CodeMirror, { type Extension } from "@uiw/react-codemirror";
-import { useEffect, useMemo, useState } from "react";
+import CodeMirror, {
+	type Extension,
+	type ReactCodeMirrorRef,
+} from "@uiw/react-codemirror";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { cn } from "../../lib/utils";
 
 /**
@@ -72,6 +75,10 @@ export interface CodeEditorProps {
 	readonly placeholder?: string;
 	readonly className?: string;
 	readonly autoFocus?: boolean;
+	readonly onSelectionChange?: (
+		selection: { start: number; end: number } | null,
+	) => void;
+	readonly revealLine?: number;
 }
 
 /**
@@ -87,23 +94,51 @@ export function CodeEditor({
 	placeholder,
 	className,
 	autoFocus = false,
+	onSelectionChange,
+	revealLine,
 }: CodeEditorProps) {
+	const editorRef = useRef<ReactCodeMirrorRef>(null);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reveal again after asynchronous file content arrives
+	useEffect(() => {
+		const view = editorRef.current?.view;
+		if (!view || !revealLine) return;
+		const line = view.state.doc.line(
+			Math.min(Math.max(1, revealLine), view.state.doc.lines),
+		);
+		view.dispatch({
+			selection: { anchor: line.from, head: line.to },
+			scrollIntoView: true,
+		});
+		view.focus();
+	}, [revealLine, value]);
 	const isDark = useIsDarkMode();
 	const language = useLanguageExtension(filename);
 
-	const extensions = useMemo(
-		() => (language ? [language] : []),
-		[language],
-	);
+	const extensions = useMemo(() => (language ? [language] : []), [language]);
 
 	return (
 		<CodeMirror
+			ref={editorRef}
+			onUpdate={(update) => {
+				if (!update.selectionSet) return;
+				const range = update.state.selection.main;
+				onSelectionChange?.(
+					range.empty
+						? null
+						: {
+								start: update.state.doc.lineAt(range.from).number,
+								end: update.state.doc.lineAt(Math.max(range.from, range.to - 1))
+									.number,
+							},
+				);
+			}}
 			value={value}
 			onChange={onChange}
 			extensions={extensions}
 			theme={isDark ? vscodeDark : vscodeLight}
 			readOnly={readOnly}
-			editable={!readOnly}
+			// Keep the editor focusable/selectable; readOnly prevents document changes.
+			editable={true}
 			placeholder={placeholder}
 			autoFocus={autoFocus}
 			height="100%"

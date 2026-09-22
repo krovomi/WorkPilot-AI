@@ -578,6 +578,8 @@ export const IPC_CHANNELS = {
 	INSIGHTS_SESSION_UPDATED: "insights:sessionUpdated", // Event: session updated (main -> renderer)
 
 	// File explorer operations
+	CODE_REVIEW_FILES: "codeReview:files",
+	CODE_REVIEW_FILE: "codeReview:file",
 	FILE_EXPLORER_LIST: "fileExplorer:list",
 	FILE_EXPLORER_READ: "fileExplorer:read",
 	FILE_EXPLORER_SAVE: "fileExplorer:save", // Save JSON files
