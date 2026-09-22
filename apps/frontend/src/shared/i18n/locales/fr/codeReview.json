@@ -19,7 +19,8 @@
 		"qualityScore": "Score de Qualité",
 		"good": "Bon",
 		"needsImprovement": "À améliorer",
-		"poor": "Mauvais"
+		"poor": "Mauvais",
+		"blocked": "Points critiques à corriger"
 	},
 	"result": {
 		"passed": "Revue Réussie",
@@ -32,5 +33,72 @@
 		"title": "Problèmes",
 		"line": "ligne {{line}}",
 		"suggestion": "Suggestion"
+	},
+	"workspace": {
+		"files": "Fichiers du projet",
+		"search": "Rechercher un fichier…",
+		"modified": "Modifiés",
+		"allFiles": "Tous",
+		"loading": "Chargement…",
+		"noFiles": "Aucun fichier correspondant.",
+		"selectFile": "Sélectionner {{file}}",
+		"gitStatus": "État Git : index / copie de travail",
+		"showMore": "Afficher davantage",
+		"addFiles": "Ajouter la sélection ({{count}})",
+		"closeFile": "Fermer {{file}}",
+		"emptyTitle": "Le code du projet, à portée de revue",
+		"emptyHint": "Ouvrez un fichier pour explorer son code, consulter ses modifications ou préparer un extrait.",
+		"searchShortcut": "Ctrl / ⌘ P · Rechercher un fichier",
+		"code": "Code",
+		"diff": "Diff Git",
+		"split": "Côte à côte",
+		"unified": "Unifié",
+		"previousChange": "Modification précédente",
+		"nextChange": "Modification suivante",
+		"selectedLines": "Lignes {{start}}–{{end}} sélectionnées",
+		"selectionHint": "Sélectionnez du code pour extraire des lignes complètes.",
+		"copy": "Copier",
+		"extract": "Extraire en Markdown",
+		"addDiff": "Ajouter le diff",
+		"addSelection": "Ajouter l’extrait",
+		"addFile": "Ajouter le fichier",
+		"reviewBasket": "À analyser",
+		"snapshotHint": "Les éléments ajoutés sont des instantanés. Ajoutez-les à nouveau pour les actualiser.",
+		"basketEmpty": "Ajoutez des fichiers, des différences ou des extraits pour préparer votre revue.",
+		"remove": "Retirer {{file}}",
+		"tooMuch": "La sélection dépasse 2 Mo. Retirez des éléments.",
+		"reviewShortcut": "Ctrl / ⌘ Entrée · Lancer la revue",
+		"resultsHint": "Les résultats de l’analyse apparaîtront ici.",
+		"subtitle": "Explorez, comparez et analysez le code de votre projet.",
+		"project": "Projet",
+		"paste": "Coller du code",
+		"comparison": "Base de comparaison Git",
+		"refresh": "Actualiser les fichiers et le diff",
+		"retry": "Réessayer",
+		"loadFailed": "Impossible de charger les fichiers du projet.",
+		"copyFailed": "Impossible de copier dans le presse-papiers.",
+		"binary": "Ce fichier binaire ne peut pas être affiché comme du code.",
+		"large": "Ce fichier dépasse 1 Mo. Il ne peut pas être chargé dans la revue.",
+		"deleted": "Ce fichier a été supprimé. Consultez son diff Git.",
+		"scope": {
+			"all": "Tous les changements · HEAD",
+			"staged": "Préparés pour commit · Index",
+			"working": "Changements locaux · Index → Disque"
+		},
+		"panels": "Panneaux de revue",
+		"panel": {
+			"files": "Fichiers",
+			"code": "Code",
+			"review": "Revue"
+		},
+		"reviewedSnapshot": "Version analysée",
+		"missingRevision": "Ce fichier n’est pas présent dans la version Git sélectionnée."
+	},
+	"severity": {
+		"critical": "Critique",
+		"high": "Élevé",
+		"medium": "Modéré",
+		"low": "Faible",
+		"info": "Information"
 	}
 }

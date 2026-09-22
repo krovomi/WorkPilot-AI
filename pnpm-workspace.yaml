@@ -10,6 +10,8 @@ allowBuilds:
   node-pty: true
 
 overrides:
+  # CodeMirror extensions must share the same EditorState class.
+  '@codemirror/state': 6.7.1
   '@babel/core': ^7.29.6
   # Radix keeps the "which layer owns the focus trap" stack in a module-level
   # singleton. Two copies of that module means two stacks, so neither pauses
