@@ -149,16 +149,8 @@ def list_task_templates():
 @router.post("/api/code-review/analyze")
 def analyze_code_review(body: Annotated[dict[str, Any], Body(...)]):
     try:
-        from review.ai_code_review import AICodeReview
+        from .code_review import analyze_diff
 
-        reviewer = AICodeReview()
-        diff = body.get("diff", "")
-        result = reviewer.review_diff(diff)
-        return {
-            "success": True,
-            "review": result.to_dict()
-            if hasattr(result, "to_dict")
-            else result.__dict__,
-        }
+        return {"success": True, "review": analyze_diff(body.get("diff", ""))}
     except Exception as e:
         return {"success": False, "error": _safe_error_message(e)}
