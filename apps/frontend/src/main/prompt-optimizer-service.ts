@@ -1,20 +1,22 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
-import type { AppSettings } from "../shared/types";
-import { getPageProviderEnv } from "./services/page-llm-config";
+import type {
+	PromptOptimizerAgentType,
+	PromptOptimizerError,
+	PromptOptimizerResult,
+	PromptOptimizerStatus,
+} from "../shared/types/prompt-optimizer";
 
-/**
- * Result of prompt optimization
- */
-export interface PromptOptimizerResult {
-	optimized: string;
-	changes: string[];
-	reasoning: string;
-}
+export type { PromptOptimizerResult } from "../shared/types/prompt-optimizer";
+
+export const PROMPT_OPTIMIZER_RUNNER = path.join(
+	"runners",
+	"prompt_optimizer_runner.py",
+);
 
 /**
  * Configuration for a prompt optimization request
@@ -22,9 +24,89 @@ export interface PromptOptimizerResult {
 export interface PromptOptimizeRequest {
 	projectDir: string;
 	prompt: string;
-	agentType: "analysis" | "coding" | "verification" | "general";
+	agentType: PromptOptimizerAgentType;
 	model?: string;
 	thinkingLevel?: string;
+}
+
+/**
+ * Where and how to run the runner. Resolved by the IPC handler, which owns
+ * Electron (settings, Python environment, credentials); the service only
+ * spawns and parses, which is what keeps it testable.
+ */
+export interface PromptOptimizerRuntime {
+	pythonPath: string;
+	backendPath: string;
+	env: Record<string, string>;
+}
+
+/** One stdout line of the runner, classified. */
+export type RunnerLine =
+	| { kind: "status"; status: PromptOptimizerStatus }
+	| { kind: "delta"; text: string }
+	| { kind: "result"; result: PromptOptimizerResult }
+	| { kind: "error"; error: PromptOptimizerError }
+	| { kind: "log"; text: string };
+
+const STATUS_MARKER = "__STATUS__:";
+const DELTA_MARKER = "__DELTA__:";
+const RESULT_MARKER = "__OPTIMIZED_PROMPT__:";
+const ERROR_MARKER = "__ERROR__:";
+
+const KNOWN_STATUSES: readonly PromptOptimizerStatus[] = [
+	"context",
+	"generating",
+	"parsing",
+];
+
+/**
+ * The runner's protocol (`apps/backend/runners/prompt_optimizer_runner.py`),
+ * one line at a time. A malformed marker line is logged rather than trusted:
+ * a half-parsed result is worse than the error the close handler will raise.
+ */
+export function parseRunnerLine(line: string): RunnerLine | null {
+	const trimmed = line.replace(/\r$/, "");
+	if (!trimmed.trim()) return null;
+
+	try {
+		if (trimmed.startsWith(STATUS_MARKER)) {
+			const code = trimmed.slice(STATUS_MARKER.length).trim();
+			return KNOWN_STATUSES.includes(code as PromptOptimizerStatus)
+				? { kind: "status", status: code as PromptOptimizerStatus }
+				: { kind: "log", text: trimmed };
+		}
+		if (trimmed.startsWith(DELTA_MARKER)) {
+			const text = JSON.parse(trimmed.slice(DELTA_MARKER.length));
+			return typeof text === "string" ? { kind: "delta", text } : null;
+		}
+		if (trimmed.startsWith(RESULT_MARKER)) {
+			const raw = JSON.parse(trimmed.slice(RESULT_MARKER.length));
+			if (typeof raw?.optimized !== "string" || !raw.optimized.trim()) {
+				return { kind: "log", text: trimmed };
+			}
+			return {
+				kind: "result",
+				result: {
+					optimized: raw.optimized,
+					changes: Array.isArray(raw.changes) ? raw.changes.map(String) : [],
+					reasoning: typeof raw.reasoning === "string" ? raw.reasoning : "",
+				},
+			};
+		}
+		if (trimmed.startsWith(ERROR_MARKER)) {
+			const raw = JSON.parse(trimmed.slice(ERROR_MARKER.length));
+			return {
+				kind: "error",
+				error: {
+					code: typeof raw?.code === "string" ? raw.code : "generic",
+					message: typeof raw?.message === "string" ? raw.message : "",
+				},
+			};
+		}
+	} catch {
+		return { kind: "log", text: trimmed };
+	}
+	return { kind: "log", text: trimmed };
 }
 
 /**
@@ -34,248 +116,169 @@ export interface PromptOptimizeRequest {
  * back to the renderer via events.
  *
  * Events emitted:
- * - 'status' (status: string) — Status update message
- * - 'stream-chunk' (chunk: string) — Streaming text output
- * - 'error' (error: string) — Error message
- * - 'complete' (result: PromptOptimizerResult) — Optimization complete with structured result
+ * - 'status' (status: PromptOptimizerStatus) — Phase of the run
+ * - 'stream-chunk' (chunk: string) — Raw model text as it arrives
+ * - 'error' (error: PromptOptimizerError) — Coded, translatable failure
+ * - 'complete' (result: PromptOptimizerResult) — Structured result
  */
 export class PromptOptimizerService extends EventEmitter {
 	private activeProcess: ChildProcess | null = null;
-	private pythonPath: string = "python";
-	private autoBuildSourcePath: string | null = null;
 
-	/**
-	 * Configure paths for Python and auto-claude source
-	 */
-	configure(pythonPath?: string, autoBuildSourcePath?: string): void {
-		if (pythonPath) {
-			this.pythonPath = pythonPath;
-		}
-		if (autoBuildSourcePath) {
-			this.autoBuildSourcePath = autoBuildSourcePath;
-		}
+	isRunning(): boolean {
+		return this.activeProcess !== null;
 	}
 
 	/**
-	 * Get the auto-build source path, resolving from settings if needed
-	 */
-	private getAutoBuildSourcePath(): string | null {
-		if (this.autoBuildSourcePath) return this.autoBuildSourcePath;
-
-		// Try common locations
-		const possiblePaths = [
-			path.join(app.getPath("userData"), "..", "auto-claude"),
-			path.join(process.cwd(), "apps", "backend"),
-		];
-
-		for (const p of possiblePaths) {
-			const runnerPath = path.join(p, "runners", "prompt_optimizer_runner.py");
-			if (existsSync(runnerPath)) {
-				this.autoBuildSourcePath = p;
-				return p;
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Cancel any active optimization
+	 * Cancel any active optimization. Silent: the caller asked for it, so no
+	 * error event is emitted for the exit that follows.
 	 */
 	cancel(): boolean {
-		if (!this.activeProcess) return false;
-		this.activeProcess.kill();
+		const proc = this.activeProcess;
+		if (!proc) return false;
 		this.activeProcess = null;
+		proc.kill();
 		return true;
 	}
 
 	/**
 	 * Run prompt optimization
 	 */
-	async optimize(request: PromptOptimizeRequest): Promise<void> {
-		// Cancel any existing process
+	optimize(
+		request: PromptOptimizeRequest,
+		runtime: PromptOptimizerRuntime,
+	): void {
 		this.cancel();
 
-		const autoBuildSource = this.getAutoBuildSourcePath();
-		if (!autoBuildSource) {
-			this.emit(
-				"error",
-				"WorkPilot AI source not found. Cannot locate prompt_optimizer_runner.py",
-			);
-			return;
-		}
-
-		const runnerPath = path.join(
-			autoBuildSource,
-			"runners",
-			"prompt_optimizer_runner.py",
-		);
+		const runnerPath = path.join(runtime.backendPath, PROMPT_OPTIMIZER_RUNNER);
 		if (!existsSync(runnerPath)) {
-			this.emit(
-				"error",
-				"prompt_optimizer_runner.py not found in auto-claude directory",
-			);
+			this.emit("error", {
+				code: "runner_missing",
+				message: runnerPath,
+			} satisfies PromptOptimizerError);
 			return;
 		}
 
-		// Emit initial status
-		this.emit("status", "Analyzing prompt and loading project context...");
+		// The prompt goes through a file: a long prompt on the command line hits
+		// Windows' 32k limit, and quoting is one more thing to get wrong.
+		const workDir = mkdtempSync(path.join(tmpdir(), "workpilot-prompt-"));
+		const promptFile = path.join(workDir, "prompt.txt");
+		writeFileSync(promptFile, request.prompt, "utf-8");
+		const cleanup = () => {
+			try {
+				rmSync(workDir, { recursive: true, force: true });
+			} catch {
+				// A temp file left behind is not worth an error.
+			}
+		};
 
-		// Build command arguments
 		const args = [
 			runnerPath,
 			"--project-dir",
 			request.projectDir,
-			"--prompt",
-			request.prompt,
+			"--prompt-file",
+			promptFile,
 			"--agent-type",
 			request.agentType,
 		];
-
-		// Add model config if provided
 		if (request.model) {
-			const modelId = MODEL_ID_MAP[request.model] || request.model;
-			args.push("--model", modelId);
+			args.push("--model", MODEL_ID_MAP[request.model] || request.model);
 		}
 		if (request.thinkingLevel) {
 			args.push("--thinking-level", request.thinkingLevel);
 		}
 
-		// Build process environment
-		const processEnv: Record<string, string> = {
-			...(process.env as Record<string, string>),
-		};
+		this.emit("status", "context" satisfies PromptOptimizerStatus);
 
-		// Read OAuth token from settings if available
+		let proc: ChildProcess;
 		try {
-			const settingsPath = path.join(app.getPath("userData"), "settings.json");
-			if (existsSync(settingsPath)) {
-				const { readFileSync } = require("node:fs");
-				const settings: AppSettings = JSON.parse(
-					readFileSync(settingsPath, "utf-8"),
-				);
-				if (settings.globalClaudeOAuthToken) {
-					processEnv.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
-				}
-				if (settings.globalAnthropicApiKey) {
-					processEnv.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
-				}
-			}
-		} catch {
-			// Ignore settings read errors
+			proc = spawn(runtime.pythonPath, args, {
+				cwd: runtime.backendPath,
+				env: { ...runtime.env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1" },
+			});
+		} catch (err) {
+			cleanup();
+			this.emit("error", {
+				code: "spawn_failed",
+				message: err instanceof Error ? err.message : String(err),
+			} satisfies PromptOptimizerError);
+			return;
 		}
-
-		// Le fournisseur de la page (son choix propre, sinon celui de la liste
-		// « Fournisseur IA ») et la clé qui va avec : sans SELECTED_LLM_PROVIDER
-		// le runner repartait sur Claude quel que soit le choix affiché.
-		Object.assign(processEnv, getPageProviderEnv("prompt-optimizer"));
-
-		// Spawn Python process
-		const proc = spawn(this.pythonPath, args, {
-			cwd: autoBuildSource,
-			env: processEnv,
-		});
-
 		this.activeProcess = proc;
 
-		let fullOutput = "";
-		let stderrOutput = "";
-		let optimizerResult: PromptOptimizerResult | null = null;
+		let buffer = "";
+		let stderrTail = "";
+		let result: PromptOptimizerResult | null = null;
+		let reportedError: PromptOptimizerError | null = null;
+
+		const handleLine = (line: string) => {
+			if (this.activeProcess !== proc) return;
+			const parsed = parseRunnerLine(line);
+			if (!parsed) return;
+			switch (parsed.kind) {
+				case "status":
+					this.emit("status", parsed.status);
+					break;
+				case "delta":
+					this.emit("stream-chunk", parsed.text);
+					break;
+				case "result":
+					result = parsed.result;
+					break;
+				case "error":
+					reportedError = parsed.error;
+					break;
+				case "log":
+					console.warn("[PromptOptimizer]", parsed.text);
+					break;
+			}
+		};
 
 		proc.stdout?.on("data", (data: Buffer) => {
-			const text = data.toString("utf-8");
-			const lines = text.split("\n");
-
-			for (const line of lines) {
-				// Check for the structured result marker
-				if (line.startsWith("__OPTIMIZED_PROMPT__:")) {
-					try {
-						const jsonStr = line.substring("__OPTIMIZED_PROMPT__:".length);
-						optimizerResult = JSON.parse(jsonStr);
-						this.emit("status", "Optimization complete");
-					} catch (parseErr) {
-						console.error(
-							"[PromptOptimizer] Failed to parse result:",
-							parseErr,
-						);
-					}
-				} else if (line.startsWith("__TOOL_START__:")) {
-					// Handle tool usage notifications
-					try {
-						const toolInfo = JSON.parse(
-							line.substring("__TOOL_START__:".length),
-						);
-						this.emit("status", `Using ${toolInfo.tool}...`);
-					} catch {
-						// Ignore parse errors for tool notifications
-					}
-				} else if (line.startsWith("__TOOL_END__:")) {
-					// Tool completed, continue
-				} else if (line.trim()) {
-					fullOutput += `${line}\n`;
-					this.emit("stream-chunk", `${line}\n`);
-				}
+			buffer += data.toString("utf-8");
+			let newline = buffer.indexOf("\n");
+			while (newline >= 0) {
+				handleLine(buffer.slice(0, newline));
+				buffer = buffer.slice(newline + 1);
+				newline = buffer.indexOf("\n");
 			}
 		});
 
 		proc.stderr?.on("data", (data: Buffer) => {
-			const text = data.toString("utf-8");
-			stderrOutput = (stderrOutput + text).slice(-5000);
-			// Log but don't emit as error (stderr may contain progress info)
-			console.error("[PromptOptimizer]", text);
+			stderrTail = (stderrTail + data.toString("utf-8")).slice(-4000);
 		});
 
 		proc.on("close", (code) => {
+			cleanup();
+			if (buffer) handleLine(buffer);
+			// Cancelled, or superseded by a newer run: nobody is waiting for this one.
+			if (this.activeProcess !== proc) return;
 			this.activeProcess = null;
 
-			if (code === 0 && optimizerResult) {
-				this.emit("complete", optimizerResult);
-			} else if (code !== 0) {
-				// Check for common error patterns
-				const combinedOutput = fullOutput + stderrOutput;
-				if (
-					combinedOutput.includes("rate_limit") ||
-					combinedOutput.includes("Rate limit")
-				) {
-					this.emit(
-						"error",
-						"Rate limit reached. Please try again in a few moments.",
-					);
-				} else if (
-					combinedOutput.includes("authentication") ||
-					combinedOutput.includes("CLAUDE_OAUTH_TOKEN")
-				) {
-					this.emit(
-						"error",
-						"Authentication error. Please check your Claude credentials in Settings.",
-					);
-				} else {
-					this.emit(
-						"error",
-						`Optimization failed (exit code ${code}). ${stderrOutput.slice(-500)}`,
-					);
-				}
-			} else {
-				// Process completed but no structured result found
-				// Try to use the raw output as the optimized prompt
-				if (fullOutput.trim()) {
-					this.emit("complete", {
-						optimized: fullOutput.trim(),
-						changes: [
-							"Raw optimization output (structured parsing unavailable)",
-						],
-						reasoning:
-							"The optimizer completed but did not produce a structured result.",
-					} as PromptOptimizerResult);
-				} else {
-					this.emit("error", "Optimization completed but produced no output.");
-				}
+			if (result) {
+				this.emit("complete", result);
+				return;
 			}
+			if (reportedError) {
+				this.emit("error", reportedError);
+				return;
+			}
+			if (stderrTail.trim()) {
+				console.error("[PromptOptimizer] stderr:", stderrTail);
+			}
+			this.emit("error", {
+				code: "process_failed",
+				message: `exit ${code ?? "?"}${stderrTail.trim() ? ` — ${stderrTail.trim().split("\n").slice(-3).join(" ")}` : ""}`,
+			} satisfies PromptOptimizerError);
 		});
 
 		proc.on("error", (err) => {
+			cleanup();
+			if (this.activeProcess !== proc) return;
 			this.activeProcess = null;
-			this.emit("error", `Failed to start optimizer: ${err.message}`);
+			this.emit("error", {
+				code: "spawn_failed",
+				message: err.message,
+			} satisfies PromptOptimizerError);
 		});
 	}
 }

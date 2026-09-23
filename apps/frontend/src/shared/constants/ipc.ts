@@ -718,6 +718,7 @@ export const IPC_CHANNELS = {
 
 	// Prompt Optimizer operations
 	PROMPT_OPTIMIZER_OPTIMIZE: "promptOptimizer:optimize", // Request prompt optimization
+	PROMPT_OPTIMIZER_CANCEL: "promptOptimizer:cancel", // Cancel the running optimization
 	PROMPT_OPTIMIZER_STREAM_CHUNK: "promptOptimizer:streamChunk", // Streaming text chunk (main -> renderer)
 	PROMPT_OPTIMIZER_STATUS: "promptOptimizer:status", // Status update (main -> renderer)
 	PROMPT_OPTIMIZER_ERROR: "promptOptimizer:error", // Error event (main -> renderer)

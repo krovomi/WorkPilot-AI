@@ -1,12 +1,19 @@
 {
 	"title": "AI Prompt Optimizer",
-	"description": "Enhance your prompt with project context and best practices for better AI results.",
+	"description": "Rewrite your prompt with the project's context and prompting best practices, so the agent acts on it without guessing.",
+	"engine": {
+		"label": "Engine",
+		"default": "default provider"
+	},
 	"prompt": {
-		"label": "Your Prompt",
-		"placeholder": "Enter the prompt you want to optimize..."
+		"label": "Your prompt",
+		"placeholder": "Describe what you want the agent to do…",
+		"characters_one": "{{count}} character",
+		"characters_other": "{{count}} characters",
+		"shortcut": "{{modifier}} + Enter to optimize"
 	},
 	"agentType": {
-		"label": "Agent Type",
+		"label": "Optimize for",
 		"description": "Select the agent type to optimize for",
 		"options": {
 			"general": "General",
@@ -15,37 +22,73 @@
 			"verification": "Verification"
 		},
 		"descriptions": {
-			"general": "General purpose optimization",
-			"analysis": "Optimized for code analysis and review",
-			"coding": "Optimized for code implementation",
-			"verification": "Optimized for testing and QA"
+			"general": "Clear goal, scope and expected output",
+			"analysis": "Review and audit, without changing code",
+			"coding": "Implementation, constraints, acceptance criteria",
+			"verification": "Tests, scenarios, pass/fail criteria"
 		}
 	},
 	"actions": {
-		"optimize": "Optimize Prompt",
-		"optimizing": "Optimizing...",
-		"copy": "Copy Optimized Prompt",
+		"optimize": "Optimize",
+		"optimizing": "Optimizing…",
+		"copy": "Copy",
 		"copied": "Copied!",
-		"usePrompt": "Use This Prompt",
-		"tryAgain": "Try Again",
-		"close": "Close"
+		"usePrompt": "Use this prompt",
+		"tryAgain": "Try again",
+		"close": "Close",
+		"cancel": "Cancel",
+		"runInBackground": "Continue in background",
+		"editPrompt": "Edit prompt",
+		"refine": "Refine again",
+		"newPrompt": "New prompt"
 	},
 	"status": {
 		"idle": "Ready to optimize",
-		"analyzing": "Analyzing prompt and project context...",
+		"analyzing": "Analyzing prompt and project context…",
+		"context": "Reading the project",
+		"generating": "Rewriting",
+		"parsing": "Finalizing",
 		"complete": "Optimization complete",
-		"error": "Optimization failed"
+		"error": "Optimization failed",
+		"backgroundHint": "You can close this window: the optimization keeps running and the result will be waiting when you reopen it."
 	},
 	"result": {
-		"title": "Optimized Prompt",
-		"changes": "Changes Made",
-		"reasoning": "Reasoning",
-		"noChanges": "No changes were needed — your prompt is already well-structured.",
-		"streamingOutput": "Optimizer Output"
+		"title": "Optimized prompt",
+		"changes": "What changed",
+		"reasoning": "Why",
+		"noChanges": "No changes needed — your prompt is already well structured.",
+		"streamingOutput": "Optimizer output",
+		"livePreview": "Optimized prompt, as it is written",
+		"waitingPreview": "The rewrite will appear here as soon as the model starts writing…",
+		"originalPrompt": "Show the original prompt",
+		"editHint": "You can edit the result before using or copying it.",
+		"before": "Before",
+		"after": "After",
+		"tabs": {
+			"optimized": "Optimized prompt",
+			"compare": "Compare"
+		}
 	},
 	"errors": {
-		"noProject": "No project selected. Please select a project first.",
-		"emptyPrompt": "Please enter a prompt to optimize.",
-		"generic": "An error occurred during optimization."
+		"noProject": "No project selected. Select a project first: the optimizer uses its context.",
+		"emptyPrompt": "Enter a prompt to optimize.",
+		"generic": "Something went wrong during the optimization.",
+		"details": "Technical details",
+		"codes": {
+			"auth": "The AI provider refused the credentials. Check your account or API key in Settings.",
+			"rate_limit": "The provider's rate limit was reached. Try again in a few moments.",
+			"quota": "The provider's quota is exhausted for this account.",
+			"network": "The AI provider could not be reached. Check your connection.",
+			"timeout": "The AI provider took too long to answer.",
+			"provider_unavailable": "The selected provider is not available. Pick another one in the provider list.",
+			"provider_error": "The AI provider returned an error.",
+			"empty_response": "The model returned an empty answer. Try again, or pick another model.",
+			"runner_missing": "The optimizer's backend component is missing from this installation.",
+			"python_missing": "No Python environment was found to run the optimizer.",
+			"project_not_found": "The selected project could not be found.",
+			"spawn_failed": "The optimizer could not be started.",
+			"process_failed": "The optimizer stopped unexpectedly.",
+			"generic": "Something went wrong during the optimization."
+		}
 	}
 }

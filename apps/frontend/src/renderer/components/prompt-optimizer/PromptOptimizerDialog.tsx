@@ -1,20 +1,51 @@
 import {
+	AlertTriangle,
+	ArrowRight,
 	Check,
+	CheckCircle2,
+	ChevronDown,
+	Circle,
+	Code2,
 	Copy,
+	Cpu,
 	Loader2,
+	PencilLine,
+	Plus,
 	RotateCcw,
+	Search,
+	ShieldCheck,
 	Sparkles,
+	Square,
 	WandSparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useProjectStore } from "../../stores/project-store";
-import type { PromptOptimizerResult } from "../../stores/prompt-optimizer-store";
 import {
+	type KeyboardEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { useTranslation } from "react-i18next";
+import type { PromptOptimizerStatus } from "../../../shared/types/prompt-optimizer";
+import { resolvePageLlm } from "../../../shared/utils/page-llm";
+import { cn } from "../../lib/utils";
+import { useProjectStore } from "../../stores/project-store";
+import type { AgentType } from "../../stores/prompt-optimizer-store";
+import {
+	cancelOptimization,
+	extractStreamingPrompt,
+	refineFromResult,
 	startOptimization,
 	usePromptOptimizerStore,
 } from "../../stores/prompt-optimizer-store";
+import { useSettingsStore } from "../../stores/settings-store";
 import { Button } from "../ui/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "../ui/collapsible";
 import {
 	Dialog,
 	DialogContent,
@@ -24,26 +55,52 @@ import {
 	DialogTitle,
 } from "../ui/dialog";
 import { Label } from "../ui/label";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "../ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
 
-const AGENT_TYPES = ["general", "analysis", "coding", "verification"] as const;
+const AGENT_TYPES: ReadonlyArray<{
+	value: AgentType;
+	icon: typeof Sparkles;
+}> = [
+	{ value: "general", icon: Sparkles },
+	{ value: "analysis", icon: Search },
+	{ value: "coding", icon: Code2 },
+	{ value: "verification", icon: ShieldCheck },
+];
+
+const STEPS: readonly PromptOptimizerStatus[] = [
+	"context",
+	"generating",
+	"parsing",
+];
+
+/** Error codes that have their own sentence; anything else reads as generic. */
+const KNOWN_ERROR_CODES = new Set([
+	"auth",
+	"rate_limit",
+	"quota",
+	"network",
+	"timeout",
+	"provider_unavailable",
+	"provider_error",
+	"empty_response",
+	"runner_missing",
+	"python_missing",
+	"project_not_found",
+	"spawn_failed",
+	"process_failed",
+]);
+
+const isMac = () =>
+	typeof navigator !== "undefined" && navigator.platform.includes("Mac");
 
 /**
  * PromptOptimizerDialog — AI-powered prompt enhancement dialog.
  *
- * Shows a dialog where users can enter a prompt, pick an agent type,
- * and receive an AI-optimized version enriched with project context.
- *
- * Usage:
- *   const { openDialog, closeDialog, isOpen } = usePromptOptimizerStore();
- *   <PromptOptimizerDialog onUsePrompt={(optimized) => { ... }} />
+ * Rendered once (in the sidebar). Whoever opens it names where the result
+ * goes: the task form passes a target to `openDialog`, so "Use this prompt"
+ * writes back into the description it was opened from. The prop remains for
+ * a caller that renders its own instance.
  */
 interface PromptOptimizerDialogProps {
 	/** Called when the user clicks "Use This Prompt" with the optimized text */
@@ -54,8 +111,6 @@ export function PromptOptimizerDialog({
 	onUsePrompt,
 }: PromptOptimizerDialogProps) {
 	const { t } = useTranslation(["promptOptimizer", "common"]);
-	const [copied, setCopied] = useState(false);
-	const streamOutputRef = useRef<HTMLPreElement>(null);
 
 	const {
 		isOpen,
@@ -65,200 +120,177 @@ export function PromptOptimizerDialog({
 		streamingOutput,
 		result,
 		error,
+		errorCode,
 		initialPrompt,
+		submittedPrompt,
 		agentType,
 		setAgentType,
-		reset,
+		applyTarget,
 	} = usePromptOptimizerStore();
 
-	// Use store's openDialog sets the initialPrompt; we mirror it locally for editing
-	const [editablePrompt, setEditablePrompt] = useState("");
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
+	const settings = useSettingsStore((s) => s.settings);
+	const engine = useMemo(
+		() => resolvePageLlm(settings, "prompt-optimizer"),
+		[settings],
+	);
 
-	// Sync editable prompt when dialog opens
+	const [editablePrompt, setEditablePrompt] = useState("");
+	const [editedResult, setEditedResult] = useState("");
+
+	// Mirror the store's prompt whenever it changes from outside (opening,
+	// "refine again", "new prompt").
 	useEffect(() => {
-		if (isOpen) {
-			setEditablePrompt(initialPrompt);
-			setCopied(false);
-		}
+		if (isOpen) setEditablePrompt(initialPrompt);
 	}, [isOpen, initialPrompt]);
 
-	// Auto-scroll streaming output
 	useEffect(() => {
-		if (streamOutputRef.current) {
-			streamOutputRef.current.scrollTop = streamOutputRef.current.scrollHeight;
-		}
-	}, []);
+		setEditedResult(result?.optimized ?? "");
+	}, [result]);
+
+	const isIdle = phase === "idle";
+	const isOptimizing = phase === "optimizing";
+	const isComplete = phase === "complete" && result !== null;
+	const isError = phase === "error";
+
+	const canOptimize =
+		editablePrompt.trim().length > 0 && !!selectedProjectId && !isOptimizing;
+	const applyPrompt = onUsePrompt ?? applyTarget;
 
 	const handleOptimize = useCallback(() => {
-		if (!selectedProjectId) return;
-		if (!editablePrompt.trim()) return;
-
-		// Update the store's prompt to the edited version before starting
+		if (!selectedProjectId || !editablePrompt.trim()) return;
 		usePromptOptimizerStore.setState({ initialPrompt: editablePrompt });
 		startOptimization(selectedProjectId);
 	}, [selectedProjectId, editablePrompt]);
 
-	const handleCopy = useCallback(async (text: string) => {
-		try {
-			await navigator.clipboard.writeText(text);
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		} catch {
-			// Clipboard not available
+	const handlePromptKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+		if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+			event.preventDefault();
+			if (canOptimize) handleOptimize();
 		}
-	}, []);
+	};
 
 	const handleUsePrompt = useCallback(() => {
-		if (result?.optimized && onUsePrompt) {
-			onUsePrompt(result.optimized);
-			closeDialog();
-		}
-	}, [result, onUsePrompt, closeDialog]);
+		if (!applyPrompt || !editedResult.trim()) return;
+		applyPrompt(editedResult);
+		usePromptOptimizerStore.getState().reset();
+	}, [applyPrompt, editedResult]);
 
-	const handleTryAgain = useCallback(() => {
-		reset();
+	const handleEditPrompt = useCallback(() => {
 		usePromptOptimizerStore.setState({
-			isOpen: true,
-			initialPrompt: editablePrompt,
+			phase: "idle",
+			error: null,
+			errorCode: null,
+			streamingOutput: "",
+			result: null,
 		});
-	}, [reset, editablePrompt]);
+	}, []);
 
-	const handleClose = useCallback(() => {
-		closeDialog();
-	}, [closeDialog]);
-
-	const isOptimizing = phase === "optimizing";
-	const isComplete = phase === "complete";
-	const isError = phase === "error";
-	const canOptimize =
-		editablePrompt.trim().length > 0 && selectedProjectId && !isOptimizing;
+	const handleNewPrompt = useCallback(() => {
+		usePromptOptimizerStore.setState({
+			phase: "idle",
+			result: null,
+			streamingOutput: "",
+			initialPrompt: "",
+			submittedPrompt: "",
+		});
+	}, []);
 
 	return (
-		<Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-			<DialogContent className="sm:max-w-[640px] max-h-[85vh] flex flex-col">
-				<DialogHeader>
+		<Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
+			<DialogContent className="sm:max-w-[760px] max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden">
+				<DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
 					<DialogTitle className="flex items-center gap-2">
-						<WandSparkles className="h-5 w-5 text-primary" />
+						<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+							<WandSparkles className="h-4 w-4 text-primary" />
+						</span>
 						{t("promptOptimizer:title")}
 					</DialogTitle>
 					<DialogDescription>
 						{t("promptOptimizer:description")}
 					</DialogDescription>
+					<EngineChip
+						provider={engine.provider}
+						model={engine.model}
+						label={t("promptOptimizer:engine.label")}
+						fallback={t("promptOptimizer:engine.default")}
+					/>
 				</DialogHeader>
 
-				<div className="flex-1 overflow-y-auto space-y-4 py-2">
-					{/* Prompt Input */}
-					<div className="space-y-2">
-						<Label htmlFor="optimizer-prompt">
-							{t("promptOptimizer:prompt.label")}
-						</Label>
-						<Textarea
-							id="optimizer-prompt"
-							value={editablePrompt}
-							onChange={(e) => setEditablePrompt(e.target.value)}
-							placeholder={t("promptOptimizer:prompt.placeholder")}
-							className="min-h-[120px] border-2 border-yellow-400 focus:border-yellow-500 focus-visible:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
-							style={{
-								border: "2px solid rgb(250, 204, 21)",
-								borderRadius: "0.5rem",
-								outline: "none",
-							}}
-							disabled={isOptimizing}
-						/>
-					</div>
-
-					{/* Agent Type Selector */}
-					<div className="space-y-2">
-						<Label htmlFor="agent-type-select">
-							{t("promptOptimizer:agentType.label")}
-						</Label>
-						<Select
-							value={agentType}
-							onValueChange={(value) => setAgentType(value as typeof agentType)}
-							disabled={isOptimizing}
-						>
-							<SelectTrigger id="agent-type-select">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent className="z-200">
-								{AGENT_TYPES.map((type) => (
-									<SelectItem key={type} value={type}>
-										<div className="flex flex-col">
-											<span>
-												{t(`promptOptimizer:agentType.options.${type}`)}
-											</span>
-										</div>
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						<p className="text-xs text-muted-foreground">
-							{t(`promptOptimizer:agentType.descriptions.${agentType}`)}
-						</p>
-					</div>
-
-					{/* No Project Warning */}
+				<div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 					{!selectedProjectId && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-							<p className="text-sm text-destructive">
-								{t("promptOptimizer:errors.noProject")}
-							</p>
+						<div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+							<AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+							{t("promptOptimizer:errors.noProject")}
 						</div>
 					)}
 
-					{/* Status / Streaming Output during optimization */}
-					{isOptimizing && (
-						<div className="space-y-3">
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
-								<Loader2 className="h-4 w-4 animate-spin text-primary" />
-								<span>{status || t("promptOptimizer:status.analyzing")}</span>
-							</div>
-							{streamingOutput && (
-								<div className="space-y-1">
-									<Label className="text-xs text-muted-foreground">
-										{t("promptOptimizer:result.streamingOutput")}
+					{isIdle && (
+						<>
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<Label htmlFor="optimizer-prompt">
+										{t("promptOptimizer:prompt.label")}
 									</Label>
-									<pre
-										ref={streamOutputRef}
-										className="bg-muted/50 rounded-lg p-3 text-xs font-mono max-h-[200px] overflow-y-auto whitespace-pre-wrap wrap-break-word"
-									>
-										{streamingOutput}
-									</pre>
+									<span className="text-xs text-muted-foreground tabular-nums">
+										{t("promptOptimizer:prompt.characters", {
+											count: editablePrompt.length,
+										})}
+									</span>
 								</div>
-							)}
-						</div>
+								<Textarea
+									id="optimizer-prompt"
+									value={editablePrompt}
+									onChange={(e) => setEditablePrompt(e.target.value)}
+									onKeyDown={handlePromptKeyDown}
+									placeholder={t("promptOptimizer:prompt.placeholder")}
+									className="min-h-[140px] resize-y"
+									autoFocus
+								/>
+								<p className="text-xs text-muted-foreground">
+									{t("promptOptimizer:prompt.shortcut", {
+										modifier: isMac() ? "⌘" : "Ctrl",
+									})}
+								</p>
+							</div>
+
+							<AgentTypePicker
+								value={agentType}
+								onChange={setAgentType}
+								t={t}
+							/>
+						</>
 					)}
 
-					{/* Error state */}
+					{isOptimizing && (
+						<OptimizingView
+							status={status}
+							preview={extractStreamingPrompt(streamingOutput)}
+							submittedPrompt={submittedPrompt}
+							t={t}
+						/>
+					)}
+
 					{isError && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
-							<p className="text-sm font-medium text-destructive">
-								{t("promptOptimizer:status.error")}
-							</p>
-							<p className="text-sm text-destructive/80">
-								{error || t("promptOptimizer:errors.generic")}
-							</p>
-						</div>
+						<ErrorView code={errorCode} detail={error} t={t} />
 					)}
 
-					{/* Result */}
 					{isComplete && result && (
 						<ResultView
-							result={result}
-							copied={copied}
-							onCopy={handleCopy}
+							original={submittedPrompt}
+							edited={editedResult}
+							onEdit={setEditedResult}
+							changes={result.changes}
+							reasoning={result.reasoning}
 							t={t}
 						/>
 					)}
 				</div>
 
-				{/* Footer Buttons */}
-				<DialogFooter className="gap-2 sm:gap-0">
-					{/* Idle / Input state */}
-					{phase === "idle" && (
+				<DialogFooter className="px-6 py-4 border-t border-border bg-muted/30 gap-2 sm:gap-2">
+					{isIdle && (
 						<>
-							<Button variant="outline" onClick={handleClose}>
+							<Button variant="ghost" onClick={closeDialog}>
 								{t("promptOptimizer:actions.close")}
 							</Button>
 							<Button
@@ -272,34 +304,71 @@ export function PromptOptimizerDialog({
 						</>
 					)}
 
-					{/* Optimizing state */}
 					{isOptimizing && (
-						<Button variant="outline" onClick={handleClose}>
-							{t("promptOptimizer:actions.close")}
-						</Button>
+						<>
+							<Button
+								variant="ghost"
+								onClick={cancelOptimization}
+								className="gap-2"
+							>
+								<Square className="h-3.5 w-3.5" />
+								{t("promptOptimizer:actions.cancel")}
+							</Button>
+							<Button variant="outline" onClick={closeDialog}>
+								{t("promptOptimizer:actions.runInBackground")}
+							</Button>
+						</>
 					)}
 
-					{/* Error state */}
 					{isError && (
 						<>
-							<Button variant="outline" onClick={handleClose}>
+							<Button variant="ghost" onClick={closeDialog}>
 								{t("promptOptimizer:actions.close")}
 							</Button>
-							<Button onClick={handleTryAgain} className="gap-2">
+							<Button
+								variant="outline"
+								onClick={handleEditPrompt}
+								className="gap-2"
+							>
+								<PencilLine className="h-4 w-4" />
+								{t("promptOptimizer:actions.editPrompt")}
+							</Button>
+							<Button
+								onClick={handleOptimize}
+								disabled={!canOptimize}
+								className="gap-2"
+							>
 								<RotateCcw className="h-4 w-4" />
 								{t("promptOptimizer:actions.tryAgain")}
 							</Button>
 						</>
 					)}
 
-					{/* Complete state */}
-					{isComplete && result && (
+					{isComplete && (
 						<>
-							<Button variant="outline" onClick={handleClose}>
-								{t("promptOptimizer:actions.close")}
+							<Button
+								variant="ghost"
+								onClick={handleNewPrompt}
+								className="gap-2 sm:mr-auto"
+							>
+								<Plus className="h-4 w-4" />
+								{t("promptOptimizer:actions.newPrompt")}
 							</Button>
-							{onUsePrompt && (
-								<Button onClick={handleUsePrompt} className="gap-2">
+							<Button
+								variant="outline"
+								onClick={refineFromResult}
+								className="gap-2"
+							>
+								<WandSparkles className="h-4 w-4" />
+								{t("promptOptimizer:actions.refine")}
+							</Button>
+							<CopyButton text={editedResult} t={t} />
+							{applyPrompt && (
+								<Button
+									onClick={handleUsePrompt}
+									disabled={!editedResult.trim()}
+									className="gap-2"
+								>
 									<Check className="h-4 w-4" />
 									{t("promptOptimizer:actions.usePrompt")}
 								</Button>
@@ -312,88 +381,347 @@ export function PromptOptimizerDialog({
 	);
 }
 
-/**
- * Renders the optimization result: optimized prompt, changes list, and reasoning.
- */
-function ResultView({
-	result,
-	copied,
-	onCopy,
+type T = (key: string, options?: Record<string, unknown>) => string;
+
+function EngineChip({
+	provider,
+	model,
+	label,
+	fallback,
+}: {
+	readonly provider: string;
+	readonly model: string;
+	readonly label: string;
+	readonly fallback: string;
+}) {
+	const text = [provider || fallback, model].filter(Boolean).join(" · ");
+	return (
+		<div className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+			<Cpu className="h-3.5 w-3.5" />
+			<span>{label}</span>
+			<span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground/80">
+				{text}
+			</span>
+		</div>
+	);
+}
+
+function AgentTypePicker({
+	value,
+	onChange,
 	t,
 }: {
-	readonly result: PromptOptimizerResult;
-	readonly copied: boolean;
-	readonly onCopy: (text: string) => void;
-	readonly t: (key: string) => string;
+	readonly value: AgentType;
+	readonly onChange: (value: AgentType) => void;
+	readonly t: T;
 }) {
 	return (
-		<div className="space-y-4">
-			{/* Optimized Prompt */}
+		<fieldset className="space-y-2">
+			<legend className="mb-2 text-sm font-medium leading-none">
+				{t("promptOptimizer:agentType.label")}
+			</legend>
+			<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+				{AGENT_TYPES.map(({ value: type, icon: Icon }) => {
+					const selected = type === value;
+					return (
+						<button
+							key={type}
+							type="button"
+							aria-pressed={selected}
+							onClick={() => onChange(type)}
+							className={cn(
+								"flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors",
+								"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+								selected
+									? "border-primary bg-primary/5"
+									: "border-border hover:border-primary/40 hover:bg-muted/50",
+							)}
+						>
+							<span className="flex items-center gap-1.5 text-sm font-medium">
+								<Icon
+									className={cn(
+										"h-4 w-4",
+										selected ? "text-primary" : "text-muted-foreground",
+									)}
+								/>
+								{t(`promptOptimizer:agentType.options.${type}`)}
+							</span>
+							<span className="text-xs leading-snug text-muted-foreground">
+								{t(`promptOptimizer:agentType.descriptions.${type}`)}
+							</span>
+						</button>
+					);
+				})}
+			</div>
+		</fieldset>
+	);
+}
+
+function OptimizingView({
+	status,
+	preview,
+	submittedPrompt,
+	t,
+}: {
+	readonly status: PromptOptimizerStatus | "";
+	readonly preview: string;
+	readonly submittedPrompt: string;
+	readonly t: T;
+}) {
+	const previewRef = useRef<HTMLDivElement>(null);
+	const current = Math.max(0, STEPS.indexOf(status || "context"));
+
+	// Follow the text as it is written.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll on each new chunk
+	useEffect(() => {
+		const el = previewRef.current;
+		if (el) el.scrollTop = el.scrollHeight;
+	}, [preview]);
+
+	return (
+		<div className="space-y-5">
+			<ol className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+				{STEPS.map((step, index) => {
+					const done = index < current;
+					const active = index === current;
+					return (
+						<li key={step} className="flex items-center gap-2 text-sm">
+							{done ? (
+								<CheckCircle2 className="h-4 w-4 text-primary" />
+							) : active ? (
+								<Loader2 className="h-4 w-4 animate-spin text-primary" />
+							) : (
+								<Circle className="h-4 w-4 text-muted-foreground/50" />
+							)}
+							<span
+								className={cn(
+									active
+										? "font-medium text-foreground"
+										: done
+											? "text-foreground/80"
+											: "text-muted-foreground",
+								)}
+							>
+								{t(`promptOptimizer:status.${step}`)}
+							</span>
+							{index < STEPS.length - 1 && (
+								<ArrowRight className="hidden h-3.5 w-3.5 text-muted-foreground/50 sm:block" />
+							)}
+						</li>
+					);
+				})}
+			</ol>
+
 			<div className="space-y-2">
-				<div className="flex items-center justify-between">
-					<Label className="text-sm font-medium">
-						{t("promptOptimizer:result.title")}
-					</Label>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => onCopy(result.optimized)}
-						className="h-7 gap-1.5 text-xs"
-					>
-						{copied ? (
-							<>
-								<Check className="h-3 w-3" />
-								{t("promptOptimizer:actions.copied")}
-							</>
-						) : (
-							<>
-								<Copy className="h-3 w-3" />
-								{t("promptOptimizer:actions.copy")}
-							</>
-						)}
-					</Button>
-				</div>
-				<div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-					<p className="text-sm whitespace-pre-wrap">{result.optimized}</p>
+				<Label className="text-xs uppercase tracking-wide text-muted-foreground">
+					{t("promptOptimizer:result.livePreview")}
+				</Label>
+				<div
+					ref={previewRef}
+					aria-live="off"
+					className="min-h-[140px] max-h-[300px] overflow-y-auto rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm whitespace-pre-wrap wrap-break-word"
+				>
+					{preview ? (
+						<>
+							{preview}
+							<span className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse bg-primary/60" />
+						</>
+					) : (
+						<span className="text-muted-foreground italic">
+							{t("promptOptimizer:result.waitingPreview")}
+						</span>
+					)}
 				</div>
 			</div>
 
-			{/* Changes */}
+			<Collapsible>
+				<CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+					<ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+					{t("promptOptimizer:result.originalPrompt")}
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<p className="mt-2 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground whitespace-pre-wrap">
+						{submittedPrompt}
+					</p>
+				</CollapsibleContent>
+			</Collapsible>
+
+			<p className="text-xs text-muted-foreground">
+				{t("promptOptimizer:status.backgroundHint")}
+			</p>
+		</div>
+	);
+}
+
+function ErrorView({
+	code,
+	detail,
+	t,
+}: {
+	readonly code: string | null;
+	readonly detail: string | null;
+	readonly t: T;
+}) {
+	const key = code && KNOWN_ERROR_CODES.has(code) ? code : "generic";
+	return (
+		<div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+			<div className="flex items-start gap-2">
+				<AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+				<div className="space-y-1">
+					<p className="text-sm font-medium text-destructive">
+						{t("promptOptimizer:status.error")}
+					</p>
+					<p className="text-sm text-foreground/80">
+						{t(`promptOptimizer:errors.codes.${key}`)}
+					</p>
+				</div>
+			</div>
+			{detail && (
+				<Collapsible>
+					<CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+						<ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+						{t("promptOptimizer:errors.details")}
+					</CollapsibleTrigger>
+					<CollapsibleContent>
+						<pre className="mt-2 max-h-[160px] overflow-auto rounded-md bg-background/60 p-2 text-xs font-mono whitespace-pre-wrap wrap-break-word">
+							{detail}
+						</pre>
+					</CollapsibleContent>
+				</Collapsible>
+			)}
+		</div>
+	);
+}
+
+function ResultView({
+	original,
+	edited,
+	onEdit,
+	changes,
+	reasoning,
+	t,
+}: {
+	readonly original: string;
+	readonly edited: string;
+	readonly onEdit: (value: string) => void;
+	readonly changes: string[];
+	readonly reasoning: string;
+	readonly t: T;
+}) {
+	return (
+		<div className="space-y-5">
+			<Tabs defaultValue="optimized">
+				<TabsList>
+					<TabsTrigger value="optimized">
+						{t("promptOptimizer:result.tabs.optimized")}
+					</TabsTrigger>
+					<TabsTrigger value="compare">
+						{t("promptOptimizer:result.tabs.compare")}
+					</TabsTrigger>
+				</TabsList>
+
+				<TabsContent value="optimized" className="mt-3 space-y-1.5">
+					<Textarea
+						aria-label={t("promptOptimizer:result.title")}
+						value={edited}
+						onChange={(e) => onEdit(e.target.value)}
+						className="min-h-[220px] resize-y border-primary/30 bg-primary/5 text-sm"
+					/>
+					<p className="text-xs text-muted-foreground">
+						{t("promptOptimizer:result.editHint")}
+					</p>
+				</TabsContent>
+
+				<TabsContent value="compare" className="mt-3">
+					<div className="grid gap-3 sm:grid-cols-2">
+						<div className="space-y-1.5">
+							<Label className="text-xs uppercase tracking-wide text-muted-foreground">
+								{t("promptOptimizer:result.before")}
+							</Label>
+							<div className="max-h-[320px] min-h-[120px] overflow-y-auto rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground whitespace-pre-wrap wrap-break-word">
+								{original}
+							</div>
+						</div>
+						<div className="space-y-1.5">
+							<Label className="text-xs uppercase tracking-wide text-primary">
+								{t("promptOptimizer:result.after")}
+							</Label>
+							<div className="max-h-[320px] min-h-[120px] overflow-y-auto rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm whitespace-pre-wrap wrap-break-word">
+								{edited}
+							</div>
+						</div>
+					</div>
+				</TabsContent>
+			</Tabs>
+
 			<div className="space-y-2">
 				<Label className="text-sm font-medium">
 					{t("promptOptimizer:result.changes")}
 				</Label>
-				{result.changes.length > 0 ? (
-					<ul className="space-y-1 pl-1">
-						{result.changes.map((change) => (
+				{changes.length > 0 ? (
+					<ul className="space-y-1.5">
+						{changes.map((change, index) => (
 							<li
-								key={`change-${change}`}
+								// biome-ignore lint/suspicious/noArrayIndexKey: two identical lines are two changes
+								key={`${index}-${change}`}
 								className="flex items-start gap-2 text-sm text-muted-foreground"
 							>
-								<span className="text-primary mt-1.5 shrink-0">•</span>
+								<Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
 								<span>{change}</span>
 							</li>
 						))}
 					</ul>
 				) : (
-					<p className="text-sm text-muted-foreground italic">
+					<p className="text-sm italic text-muted-foreground">
 						{t("promptOptimizer:result.noChanges")}
 					</p>
 				)}
 			</div>
 
-			{/* Reasoning */}
-			{result.reasoning && (
+			{reasoning && (
 				<div className="space-y-2">
 					<Label className="text-sm font-medium">
 						{t("promptOptimizer:result.reasoning")}
 					</Label>
-					<div className="bg-muted/50 rounded-lg p-3">
-						<p className="text-sm text-muted-foreground">{result.reasoning}</p>
-					</div>
+					<p className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+						{reasoning}
+					</p>
 				</div>
 			)}
 		</div>
+	);
+}
+
+function CopyButton({ text, t }: { readonly text: string; readonly t: T }) {
+	const [copied, setCopied] = useState(false);
+
+	useEffect(() => {
+		if (!copied) return;
+		const timer = setTimeout(() => setCopied(false), 2000);
+		return () => clearTimeout(timer);
+	}, [copied]);
+
+	const copy = async () => {
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopied(true);
+		} catch {
+			// Clipboard not available
+		}
+	};
+
+	return (
+		<Button
+			variant="outline"
+			onClick={copy}
+			disabled={!text.trim()}
+			className="gap-2"
+		>
+			{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+			{copied
+				? t("promptOptimizer:actions.copied")
+				: t("promptOptimizer:actions.copy")}
+		</Button>
 	);
 }
 
