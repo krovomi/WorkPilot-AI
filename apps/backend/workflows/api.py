@@ -230,6 +230,13 @@ def workflow_profile(
 
         profile = resolve_profile(loaded, level, provider=resolved_provider)
         payload = _serialise(loaded, profile, missing=_missing_impls(loaded, profile))
+        from core.offline_policy import airgap_status
+        from integrations.jev.observations import read_observations
+
+        payload["jev"] = {
+            "observation": read_observations(sd),
+            "airgapStrict": airgap_status(sd, project_dir)["airgapStrict"],
+        }
         if include_levels:
             payload["levels"] = _levels(loaded, resolved_provider)
         return {"success": True, "profile": payload}
