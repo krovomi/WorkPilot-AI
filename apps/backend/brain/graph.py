@@ -25,6 +25,7 @@ import os
 import tempfile
 from collections import deque
 from dataclasses import dataclass
+from datetime import date, time
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,34 @@ __all__ = [
 ]
 
 ORIGIN = "workpilot-brain"
+
+
+def _plain(value: Any) -> Any:
+    """*value* as something ``json`` writes: frontmatter is a person's YAML.
+
+    Obsidian writes ``date: 2024-01-01`` and ``created: 2024-01-01T10:00``
+    into daily notes, templates and properties, and YAML reads both as
+    ``date``/``datetime`` objects. One such note in a vault a person plugged
+    in made the graph unwritable, and every write, sync and settings save
+    after it answered 500.
+    """
+    if value is None or isinstance(value, (str, bool, int, float)):
+        return value
+    if isinstance(value, (date, time)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): _plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_plain(v) for v in value]
+    return str(value)
+
+
+def _str_list(value: Any) -> list[str]:
+    """``tasks`` and ``agents`` as the list every reader treats them as."""
+    if value is None or value == "":
+        return []
+    items = value if isinstance(value, (list, tuple, set)) else [value]
+    return [str(_plain(item)) for item in items if item is not None]
 
 
 def _is_ours(node: dict[str, Any]) -> bool:
@@ -80,7 +109,10 @@ def build_graph(root: Path) -> dict[str, Any]:
             "description",
         ):
             if key in note.meta:
-                meta[key] = note.meta[key]
+                value = note.meta[key]
+                meta[key] = (
+                    _str_list(value) if key in ("tasks", "agents") else _plain(value)
+                )
         nodes.append(
             {
                 "id": node_id,
@@ -180,7 +212,9 @@ def write_graph(root: Path, fresh: dict[str, Any]) -> Path:
     fd, tmp = tempfile.mkstemp(prefix=".graph-", suffix=".json", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-            json.dump(merged, handle, ensure_ascii=False, indent=1)
+            # ``default=str``: a graph Graphify wrote, merged in above, is not
+            # ours to vet, and a node it cannot encode must not lose the file.
+            json.dump(merged, handle, ensure_ascii=False, indent=1, default=str)
             handle.write("\n")
         os.replace(tmp, path)
     except BaseException:
