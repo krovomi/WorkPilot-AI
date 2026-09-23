@@ -272,6 +272,7 @@ export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
 export type OpenAIAuthMode = "api-key" | "codex-cli";
 
 export interface AppSettings {
+	jev?: import("./jev").JevSettings;
 	theme: "light" | "dark" | "system";
 	colorTheme?: ColorTheme;
 	defaultModel: string;

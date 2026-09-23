@@ -2422,5 +2422,60 @@
 		"placeholder": "Rechercher un paramètre...",
 		"clear": "Effacer la recherche",
 		"noResults": "Aucun paramètre trouvé"
+	},
+	"jev": {
+		"title": "JEV (TypeSafe)",
+		"description": "Classification et conseils de revue facultatifs. Sans clé API, ou si JEV est indisponible, les workflows continuent normalement. L’activation transmet à TypeSafe une sélection expurgée du contexte de tâche et du diff.",
+		"enabled": "Activer par défaut",
+		"unknown": "État de la clé indisponible",
+		"configured": "Clé API configurée (non vérifiée)",
+		"missingKey": "Aucune clé API — les workflows contournent JEV",
+		"storageUnavailable": "Le stockage sécurisé du système est indisponible.",
+		"apiKey": "Clé API",
+		"saveKey": "Enregistrer / remplacer la clé",
+		"clearKey": "Supprimer la clé",
+		"workflows": "Réglages par workflow",
+		"customWorkflow": "Identifiant d’un workflow déclaré personnalisé",
+		"addWorkflow": "Ajouter le workflow",
+		"save": "Enregistrer les réglages",
+		"saved": "Enregistré",
+		"error": "Échec de l’enregistrement. Vérifiez le stockage sécurisé et réessayez.",
+		"history": "Évaluation précédente (historique, sans valeur d’approbation)",
+		"evaluated": "Évalué",
+		"modes": {
+			"inherit": "Utiliser le réglage global",
+			"enabled": "Activer JEV",
+			"bypass": "Contourner JEV"
+		},
+		"workflowNames": {
+			"feature-build": "Build (planning et QA)",
+			"github-review": "Revues GitHub",
+			"gitlab-review": "Revues GitLab",
+			"azure-devops-review": "Revues Azure DevOps"
+		},
+		"reasons": {
+			"ready": "Prêt pour la prochaine exécution (non vérifié)",
+			"unknown": "État de la clé indisponible",
+			"disabled": "Désactivé",
+			"workflow_bypass": "Contourné pour ce workflow",
+			"offline": "Contourné : mode hors ligne",
+			"missing_key": "Contourné : aucune clé API",
+			"invalid_config": "Contourné : réglages invalides",
+			"missing_context": "Contourné : contexte insuffisant",
+			"context_too_large": "Contourné : contexte trop volumineux",
+			"unauthorized": "Contourné : clé API refusée",
+			"rate_limited": "Contourné : limite d’appels atteinte",
+			"timeout": "Contourné : délai dépassé",
+			"unavailable": "Contourné : service indisponible",
+			"invalid_response": "Contourné : réponse invalide",
+			"low_confidence": "Contourné : confiance insuffisante",
+			"unsupported_context": "Contourné : contexte d’exécution non pris en charge"
+		},
+		"confidence": "(confiance : {{value}} %)",
+		"answers": {
+			"task_class": "Classe de tâche",
+			"coverage": "Couverture (0–2)",
+			"risk": "Risque (0–2)"
+		}
 	}
 }

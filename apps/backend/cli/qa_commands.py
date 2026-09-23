@@ -78,6 +78,7 @@ def handle_qa_command(
     spec_dir: Path,
     model: str,
     verbose: bool = False,
+    jev_run=None,
 ) -> None:
     """
     Handle the --qa command (run QA validation loop).
@@ -113,6 +114,7 @@ def handle_qa_command(
     try:
         approved = asyncio.run(
             run_qa_validation_loop(
+                jev_run=jev_run,
                 project_dir=project_dir,
                 spec_dir=spec_dir,
                 model=model,

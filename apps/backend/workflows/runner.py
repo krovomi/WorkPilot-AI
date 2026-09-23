@@ -250,6 +250,7 @@ class PhaseContext:
     verbose: bool = False
     changed_files: list[str] | None = None
     task_logger: object | None = None
+    jev_run: object | None = None
 
 
 @dataclass(frozen=True)
@@ -599,6 +600,19 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     # create_client, so it is lifted for the duration of the call and put back
     # — the coder loop's own resume must survive a review pass running between
     # two of its iterations.
+    jev_advice = ""
+    if ctx.jev_run is not None and phase.id in (
+        "review",
+        "adversarial-review",
+        "spec-conformance",
+        "verify",
+    ):
+        from integrations.jev.adapters import assess_build
+        from integrations.jev.rubrics import advice_text
+
+        jev_advice = advice_text(
+            await assess_build(ctx.jev_run, "review", pass_id=phase.id)
+        )
     stashed = None
     if fresh_context(resolved.dispatch):
         stashed = os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
@@ -614,6 +628,8 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
             roster=phase.roster,
         )
         prompt = _build_prompt(resolved, body, ctx)
+        if jev_advice:
+            prompt += "\n\n" + jev_advice
         async with client:
             status, response, _err = await run_agent_session(
                 client,

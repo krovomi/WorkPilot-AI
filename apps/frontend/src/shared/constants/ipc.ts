@@ -4,6 +4,9 @@
  */
 
 export const IPC_CHANNELS = {
+	JEV_STATUS: "jev:status",
+	JEV_SAVE_KEY: "jev:saveKey",
+	JEV_CLEAR_KEY: "jev:clearKey",
 	// Project operations
 	PROJECT_ADD: "project:add",
 	PROJECT_REMOVE: "project:remove",

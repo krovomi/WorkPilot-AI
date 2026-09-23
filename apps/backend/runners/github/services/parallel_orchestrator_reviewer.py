@@ -411,6 +411,10 @@ Report findings with specific file paths, line numbers, and code evidence.
 
         # Build the specialist prompt with PR context
         prompt = self._build_specialist_prompt(config, context, project_root)
+        from integrations.jev.reviews import context_advice
+
+        if advice := context_advice(context):
+            prompt += "\n\n" + advice
 
         try:
             # Create provider-agnostic agent client for this specialist

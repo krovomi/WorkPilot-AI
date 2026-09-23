@@ -248,6 +248,10 @@ class PRReviewEngine:
 """
 
         full_prompt = pass_prompt + "\n\n---\n\n" + pr_context
+        from integrations.jev.reviews import context_advice
+
+        if advice := context_advice(context):
+            full_prompt += "\n\n" + advice
 
         project_root = (
             self.project_dir.parent.parent

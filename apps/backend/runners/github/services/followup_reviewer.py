@@ -679,6 +679,10 @@ class FollowupReviewer:
 Analyze this follow-up review context and provide your structured response.
 """
 
+        from integrations.jev.reviews import context_advice
+
+        if advice := context_advice(context):
+            user_message += "\n\n" + advice
         try:
             # Use Claude Agent SDK query() with structured outputs
             # Reference: https://platform.claude.com/docs/en/agent-sdk/structured-outputs

@@ -100,6 +100,8 @@ class PlanningPhaseMixin:
 
         errors = []
 
+        jev_advice = await self._jev_planning_advice()
+
         # Try Python script first (deterministic)
         self.ui.print_status("Trying planner.py (deterministic)...", "progress")
         success, output = self._run_script(
@@ -163,6 +165,7 @@ class PlanningPhaseMixin:
 
             success, output = await self.run_agent_fn(
                 "planner.md",
+                additional_context=jev_advice,
                 phase_name="planning",
             )
 

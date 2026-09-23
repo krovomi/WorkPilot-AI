@@ -71,7 +71,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv=None) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="WorkPilot AI Framework - Autonomous multi-session coding agent",
@@ -534,7 +534,7 @@ Environment Variables:
         help="Screenshot/baseline name (for browser-agent screenshot/compare)",
     )
 
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def handle_provider_command(args):
@@ -641,10 +641,17 @@ def handle_doctor_command() -> None:
         print(f"  {var:<38} {present}")
 
 
-def main() -> None:
+def main(argv=None, jev_run=None) -> None:
     """Main CLI entry point."""
     # Set up environment first
     setup_environment()
+    from integrations.jev.models import JevContext
+    from integrations.jev.runtime import JevRun
+
+    if jev_run is None:
+        jev_run = JevRun.from_env(JevContext("feature-build", Path.cwd()))
+    elif not jev_run.context.server_mode:
+        os.environ.pop("TYPESAFE_API_KEY", None)
 
     # Initialize Sentry early to capture any startup errors
     from core.sentry import capture_exception, init_sentry
@@ -652,7 +659,7 @@ def main() -> None:
     init_sentry(component="cli")
 
     try:
-        _run_cli()
+        _run_cli(argv=argv, jev_run=jev_run)
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
         sys.exit(130)
@@ -663,13 +670,13 @@ def main() -> None:
         sys.exit(1)
 
 
-def _run_cli() -> None:
+def _run_cli(argv=None, jev_run=None) -> None:
     """Run the CLI logic (extracted for error handling)."""
     # Import here to avoid import errors during startup
     from core.sentry import set_context
 
     # Parse arguments
-    args = parse_args()
+    args = parse_args(argv) if argv is not None else parse_args()
 
     # Import debug functions after environment setup
     from debug import debug, debug_error, debug_section, debug_success
@@ -806,6 +813,12 @@ def _run_cli() -> None:
     # Find the spec
     debug("run.py", "Finding spec", spec_identifier=args.spec)
     spec_dir = find_spec(project_dir, args.spec)
+    if jev_run is not None:
+        from dataclasses import replace
+
+        jev_run.context = replace(
+            jev_run.context, project_dir=project_dir, spec_dir=spec_dir
+        )
     if not spec_dir:
         debug_error("run.py", "Spec not found", spec=args.spec)
         print_banner()
@@ -928,6 +941,7 @@ def _run_cli() -> None:
 
     if args.qa:
         handle_qa_command(
+            jev_run=jev_run,
             project_dir=project_dir,
             spec_dir=spec_dir,
             model=model,
@@ -948,6 +962,7 @@ def _run_cli() -> None:
     # Handle --followup command
     if args.followup:
         handle_followup_command(
+            jev_run=jev_run,
             project_dir=project_dir,
             spec_dir=spec_dir,
             model=model,
@@ -970,6 +985,7 @@ def _run_cli() -> None:
         base_branch=args.base_branch,
         enable_streaming=args.enable_streaming,
         streaming_session_id=args.streaming_session_id,
+        jev_run=jev_run,
     )
 
 

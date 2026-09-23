@@ -64,6 +64,7 @@ class SpecOrchestrator:
         thinking_level: str = "medium",  # Thinking level for extended thinking
         complexity_override: str | None = None,  # Force a specific complexity
         use_ai_assessment: bool = True,  # Use AI for complexity assessment (vs heuristics)
+        jev_run=None,
     ):
         """Initialize the spec orchestrator.
 
@@ -78,6 +79,13 @@ class SpecOrchestrator:
             use_ai_assessment: Whether to use AI for complexity assessment
         """
         self.project_dir = Path(project_dir)
+        from integrations.jev.models import JevContext
+        from integrations.jev.runtime import JevRun
+
+        self.jev_run = jev_run or JevRun.from_env(
+            JevContext("feature-build", self.project_dir)
+        )
+
         self.task_description = task_description
         self.model = model
         self.thinking_level = thinking_level
@@ -107,6 +115,11 @@ class SpecOrchestrator:
                 self.spec_dir = create_spec_dir(self.specs_dir, lock)
                 # Create directory inside lock to ensure atomicity
                 self.spec_dir.mkdir(parents=True, exist_ok=True)
+        from dataclasses import replace
+
+        self.jev_run.context = replace(
+            self.jev_run.context, project_dir=self.project_dir, spec_dir=self.spec_dir
+        )
         self.validator = SpecValidator(self.spec_dir)
 
         # Agent runner (initialized when needed)
@@ -303,6 +316,7 @@ class SpecOrchestrator:
             run_agent_fn=self._run_agent,
             task_logger=task_logger,
             ui_module=ui,
+            jev_run=self.jev_run,
         )
 
         results = []

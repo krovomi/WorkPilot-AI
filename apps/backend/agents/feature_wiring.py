@@ -138,6 +138,7 @@ def apply_router_override(
     phase: str,
     prompt_hint: str | None = None,
     cli_model: str | None = None,
+    task_hint: str | None = None,
     available_providers: list[str] | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """Possibly substitute ``current_model`` with the router's suggestion.
@@ -159,7 +160,7 @@ def apply_router_override(
 
     suggestion = suggest_routed_model(
         prompt=prompt_hint or f"{phase} phase",
-        task_hint=phase,
+        task_hint=task_hint or phase,
         available_providers=available_providers,
     )
     if not suggestion:

@@ -1,3 +1,4 @@
+import { JevStatus } from "../jev/JevStatus";
 import {
 	AlertTriangle,
 	ChevronDown,
@@ -14,7 +15,10 @@ import type {
 	WorkflowLevelPayload,
 	WorkflowPhasePayload,
 } from "../../lib/agent-tools-api";
-import { useWorkflowProfileStore } from "../../stores/workflow-profile-store";
+import {
+	workflowProfileKey,
+	useWorkflowProfileStore,
+} from "../../stores/workflow-profile-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 
@@ -55,7 +59,13 @@ export function WorkflowProfileCard({
 
 	const load = useWorkflowProfileStore((s) => s.load);
 	const clear = useWorkflowProfileStore((s) => s.clear);
-	const entry = useWorkflowProfileStore((s) => s.byTask[task.id]);
+	const profileKey = workflowProfileKey({
+		taskId: task.id,
+		projectDir: projectPath,
+		specDir: task.specsPath,
+		specId: task.specId,
+	});
+	const entry = useWorkflowProfileStore((s) => s.byTask[profileKey]);
 
 	const profile = entry?.profile ?? null;
 	const previewEffort = entry?.previewEffort ?? null;
@@ -69,13 +79,14 @@ export function WorkflowProfileCard({
 			specId: task.specId,
 			provider: task.metadata?.provider,
 		});
-		return () => clear(task.id);
+		return () => clear(profileKey);
 	}, [
 		task.id,
 		task.specId,
 		task.specsPath,
 		task.metadata?.provider,
 		projectPath,
+		profileKey,
 		load,
 		clear,
 	]);
@@ -106,6 +117,11 @@ export function WorkflowProfileCard({
 
 	return (
 		<div className="rounded-lg border border-border bg-muted/20">
+			<JevStatus
+				workflow={profile.workflow}
+				offline={profile.jev?.airgapStrict}
+				observation={profile.jev?.observation}
+			/>
 			<div className="flex items-start justify-between gap-3 p-3">
 				<div className="min-w-0">
 					<div className="flex items-center gap-2">
@@ -135,8 +151,7 @@ export function WorkflowProfileCard({
 						<span>
 							{t("workflowProfile:summary.provider")}:{" "}
 							<span className="font-medium text-foreground">
-								{profile.provider ??
-									t("workflowProfile:summary.providerUnset")}
+								{profile.provider ?? t("workflowProfile:summary.providerUnset")}
 							</span>
 						</span>
 						<span>

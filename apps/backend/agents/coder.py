@@ -630,6 +630,7 @@ async def run_autonomous_agent(
     source_spec_dir: Path | None = None,
     streaming_session_id: str | None = None,
     profile: object | None = None,
+    jev_run=None,
 ) -> None:
     """
     Run the autonomous agent loop with automatic memory management.
@@ -656,6 +657,20 @@ async def run_autonomous_agent(
             through its subtasks sequentially. None keeps the previous
             behaviour exactly, which is what the engine being off has to mean.
     """
+    from integrations.jev.adapters import assess_build
+    from integrations.jev.models import JevContext
+    from integrations.jev.rubrics import advice_text, classification_hint
+    from integrations.jev.runtime import JevRun
+
+    jev_run = jev_run or JevRun.from_env(
+        JevContext(getattr(profile, "workflow", "feature-build"), project_dir, spec_dir)
+    )
+    jev_classification = jev_run.classification if not jev_run.eligibility() else None
+    if not (spec_dir / "implementation_plan.json").exists():
+        jev_classification = await assess_build(
+            jev_run, "classification", pass_id="planning"
+        )
+    jev_hint = classification_hint(jev_classification) if jev_classification else None
     # Log agent start
     agent_trace_id = workflow_logger.log_agent_start(
         AGENT_NAME,
@@ -693,6 +708,7 @@ async def run_autonomous_agent(
             model,
             spec_dir=spec_dir,
             phase="coding",
+            task_hint=jev_hint,
             prompt_hint=f"coder run on spec {spec_dir.name}",
         )
         if override_info is not None:
@@ -718,7 +734,7 @@ async def run_autonomous_agent(
             # for cost analyses but keep the user's choice.
             suggestion = suggest_routed_model(
                 prompt=f"coder run on spec {spec_dir.name}",
-                task_hint="coding",
+                task_hint=jev_hint or "coding",
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(
@@ -1025,6 +1041,7 @@ async def run_autonomous_agent(
                 spec_dir=spec_dir,
                 model=model,
                 repo_root=_workflow_repo_root,
+                jev_run=jev_run,
                 effort=getattr(profile, "effort", "medium"),
                 verbose=verbose,
             )
@@ -1340,6 +1357,8 @@ async def run_autonomous_agent(
         if first_run:
             # Create client for planning phase
             prompt = generate_planner_prompt(spec_dir, project_dir)
+            if jev_advice := advice_text(jev_classification):
+                prompt += "\n\n" + jev_advice
             # Chantier 4's portable answer to effort sensitivity: the engine
             # states the level rather than the prompt template branching on a
             # variable only some harnesses expose.

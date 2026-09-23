@@ -532,6 +532,7 @@ export interface PRReviewFinding {
  * PR review result
  */
 export interface PRReviewResult {
+	jev?: import("../../../shared/types/jev").JevObservation;
 	prNumber: number;
 	repo: string;
 	success: boolean;

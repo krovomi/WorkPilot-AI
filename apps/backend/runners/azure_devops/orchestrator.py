@@ -86,6 +86,12 @@ class AzureDevOpsOrchestrator:
         progress_callback: Callable[[ProgressCallback], None] | None = None,
     ):
         self.project_dir = Path(project_dir)
+        from integrations.jev.models import JevContext
+        from integrations.jev.runtime import JevRun
+
+        self._jev_worker = JevRun.from_env(
+            JevContext("azure-devops-review", self.project_dir)
+        )
         self.config = config
         self.progress_callback = progress_callback
 
@@ -226,6 +232,9 @@ class AzureDevOpsOrchestrator:
             self._report_progress("analyzing", 30, "Running AI review...", pr_id=pr_id)
 
             # Run review
+            from integrations.jev.reviews import evaluate_context
+
+            jev_observation = await evaluate_context(self._jev_worker, context)
             findings, verdict, summary, blockers = await self.review_engine.run_review(
                 context
             )
@@ -251,6 +260,7 @@ class AzureDevOpsOrchestrator:
 
             # Create result
             result = PRReviewResult(
+                jev=jev_observation,
                 pr_id=pr_id,
                 project=self.config.project,
                 repository_id=self.config.repository_id,

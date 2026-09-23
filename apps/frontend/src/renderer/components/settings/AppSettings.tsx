@@ -1,3 +1,4 @@
+import { JevSettings } from "./JevSettings";
 import {
 	Activity,
 	Bell,
@@ -113,6 +114,7 @@ interface AppSettingsDialogProps {
 
 // Types de sections thématiques
 export type AppSection =
+	| "jev"
 	// Projet (priorité 1)
 	| "project"
 	// Intégrations & Connexions (priorité 2)
@@ -206,6 +208,7 @@ const createSettingsThemes = (t: {
 				label: "Azure DevOps",
 				type: "project",
 			},
+			{ id: "jev", icon: Zap, label: t("jev.title"), type: "app" },
 			{ id: "jira", icon: JiraIcon, label: "Jira", type: "project" },
 			{ id: "linear", icon: Zap, label: "Linear", type: "project" },
 			{
@@ -268,7 +271,12 @@ const createSettingsThemes = (t: {
 				label: "Outils de développement",
 				type: "app",
 			},
-			{ id: "paths", icon: FolderOpen, label: t("sections.paths.title"), type: "app" },
+			{
+				id: "paths",
+				icon: FolderOpen,
+				label: t("sections.paths.title"),
+				type: "app",
+			},
 			{ id: "agent", icon: Bot, label: "Agent", type: "app" },
 			{
 				id: "continuous-ai",
@@ -556,6 +564,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 
 	const renderAppSection = () => {
 		switch (appSection) {
+			case "jev":
+				return <JevSettings />;
 			case "appearance":
 				return (
 					<ThemeSettings settings={settings} onSettingsChange={setSettings} />
@@ -736,9 +746,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 									<div
 										className={cn(
 											"flex items-center gap-1",
-											isNavigationCollapsed
-												? "justify-center"
-												: "justify-end",
+											isNavigationCollapsed ? "justify-center" : "justify-end",
 										)}
 									>
 										{/* Filtre — uniquement quand la navigation est dépliée :
@@ -760,9 +768,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 															ref={searchInputRef}
 															type="text"
 															value={searchQuery}
-															onChange={(e) =>
-																setSearchQuery(e.target.value)
-															}
+															onChange={(e) => setSearchQuery(e.target.value)}
 															onBlur={() => {
 																if (!searchQuery.trim()) {
 																	setIsSearchOpen(false);
@@ -868,181 +874,173 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 									)}
 
 									{/* Thematic Navigation */}
-									{filteredThemes
-										.map(([themeKey, theme]) => {
-											const Icon = theme.icon;
-											const isThemeActive = theme.sections.some((section) => {
-												if (section.type === "app") {
-													return (
-														activeTopLevel === "app" &&
-														appSection === section.id
-													);
-												} else {
-													return (
-														activeTopLevel === "project" &&
-														projectSection === section.id
-													);
-												}
-											});
+									{filteredThemes.map(([themeKey, theme]) => {
+										const Icon = theme.icon;
+										const isThemeActive = theme.sections.some((section) => {
+											if (section.type === "app") {
+												return (
+													activeTopLevel === "app" && appSection === section.id
+												);
+											} else {
+												return (
+													activeTopLevel === "project" &&
+													projectSection === section.id
+												);
+											}
+										});
 
-											return (
-												<div key={themeKey} className="space-y-1">
-													{/* Theme Header */}
-													{isNavigationCollapsed ? (
+										return (
+											<div key={themeKey} className="space-y-1">
+												{/* Theme Header */}
+												{isNavigationCollapsed ? (
+													<button
+														type="button"
+														onClick={() => {
+															if (theme.sections.length === 1) {
+																const section = theme.sections[0];
+																if (section.type === "app") {
+																	setActiveTopLevel("app");
+																	setAppSection(section.id as AppSection);
+																} else {
+																	setActiveTopLevel("project");
+																	setProjectSection(
+																		section.id as ProjectSettingsSection,
+																	);
+																}
+															} else {
+																// Si plusieurs sections, on pourrait développer ou afficher un menu
+																// Pour l'instant, on navigue vers la première section
+																const firstSection = theme.sections[0];
+																if (firstSection.type === "app") {
+																	setActiveTopLevel("app");
+																	setAppSection(firstSection.id as AppSection);
+																} else {
+																	setActiveTopLevel("project");
+																	setProjectSection(
+																		firstSection.id as ProjectSettingsSection,
+																	);
+																}
+															}
+														}}
+														className={cn(
+															"w-full flex flex-col items-center justify-center p-2 rounded-lg transition-all",
+															isThemeActive
+																? "bg-accent text-accent-foreground"
+																: "hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+														)}
+														title={theme.title}
+													>
+														<Icon className={cn("h-5 w-5", theme.color)} />
+													</button>
+												) : (
+													<div className="px-3 py-2">
 														<button
 															type="button"
-															onClick={() => {
-																if (theme.sections.length === 1) {
-																	const section = theme.sections[0];
-																	if (section.type === "app") {
-																		setActiveTopLevel("app");
-																		setAppSection(section.id as AppSection);
-																	} else {
-																		setActiveTopLevel("project");
-																		setProjectSection(
-																			section.id as ProjectSettingsSection,
-																		);
-																	}
-																} else {
-																	// Si plusieurs sections, on pourrait développer ou afficher un menu
-																	// Pour l'instant, on navigue vers la première section
-																	const firstSection = theme.sections[0];
-																	if (firstSection.type === "app") {
-																		setActiveTopLevel("app");
-																		setAppSection(
-																			firstSection.id as AppSection,
-																		);
-																	} else {
-																		setActiveTopLevel("project");
-																		setProjectSection(
-																			firstSection.id as ProjectSettingsSection,
-																		);
-																	}
-																}
-															}}
+															onClick={() =>
+																toggleThemeCollapse(themeKey as SettingsTheme)
+															}
 															className={cn(
-																"w-full flex flex-col items-center justify-center p-2 rounded-lg transition-all",
+																"w-full flex items-center justify-between text-sm font-medium transition-all",
 																isThemeActive
-																	? "bg-accent text-accent-foreground"
-																	: "hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+																	? "text-foreground"
+																	: "text-muted-foreground",
+																"hover:text-foreground",
 															)}
-															title={theme.title}
 														>
-															<Icon className={cn("h-5 w-5", theme.color)} />
-														</button>
-													) : (
-														<div className="px-3 py-2">
-															<button
-																type="button"
-																onClick={() =>
-																	toggleThemeCollapse(themeKey as SettingsTheme)
-																}
-																className={cn(
-																	"w-full flex items-center justify-between text-sm font-medium transition-all",
-																	isThemeActive
-																		? "text-foreground"
-																		: "text-muted-foreground",
-																	"hover:text-foreground",
-																)}
-															>
-																<div className="flex items-center gap-2">
-																	<Icon
-																		className={cn("h-4 w-4", theme.color)}
-																	/>
-																	{theme.title}
-																</div>
-																<ChevronRight
-																	className={cn(
-																		"h-3 w-3 transition-transform duration-200",
-																		!isSearching &&
-																			collapsedThemes.has(
-																				themeKey as SettingsTheme,
-																			)
-																			? "rotate-0"
-																			: "rotate-90",
-																	)}
-																/>
-															</button>
-															<div className="text-xs text-muted-foreground mt-1">
-																{theme.description}
+															<div className="flex items-center gap-2">
+																<Icon className={cn("h-4 w-4", theme.color)} />
+																{theme.title}
 															</div>
+															<ChevronRight
+																className={cn(
+																	"h-3 w-3 transition-transform duration-200",
+																	!isSearching &&
+																		collapsedThemes.has(
+																			themeKey as SettingsTheme,
+																		)
+																		? "rotate-0"
+																		: "rotate-90",
+																)}
+															/>
+														</button>
+														<div className="text-xs text-muted-foreground mt-1">
+															{theme.description}
 														</div>
-													)}
+													</div>
+												)}
 
-													{/* Theme Sections — visibles si la navigation est
+												{/* Theme Sections — visibles si la navigation est
 													    dépliée et que le thème l'est aussi. Une
 													    recherche en cours déplie : masquer ce qu'elle
 													    vient de trouver n'aurait aucun sens. */}
-													{!isNavigationCollapsed &&
-														(isSearching ||
-															!collapsedThemes.has(
-																themeKey as SettingsTheme,
-															)) && (
-															<div className="space-y-1 ml-2">
-																{theme.sections.map((section) => {
-																	const SectionIcon = section.icon;
-																	const isActive =
-																		section.type === "app"
-																			? activeTopLevel === "app" &&
-																				appSection === section.id
-																			: activeTopLevel === "project" &&
-																				projectSection === section.id;
+												{!isNavigationCollapsed &&
+													(isSearching ||
+														!collapsedThemes.has(
+															themeKey as SettingsTheme,
+														)) && (
+														<div className="space-y-1 ml-2">
+															{theme.sections.map((section) => {
+																const SectionIcon = section.icon;
+																const isActive =
+																	section.type === "app"
+																		? activeTopLevel === "app" &&
+																			appSection === section.id
+																		: activeTopLevel === "project" &&
+																			projectSection === section.id;
 
-																	const isDisabled =
-																		section.type === "project" &&
-																		!selectedProjectId;
+																const isDisabled =
+																	section.type === "project" &&
+																	!selectedProjectId;
 
-																	let activeOrDisabledClassName: string;
-																	if (isActive) {
-																		activeOrDisabledClassName =
-																			"bg-accent text-accent-foreground";
-																	} else if (isDisabled) {
-																		activeOrDisabledClassName =
-																			"opacity-50 cursor-not-allowed text-muted-foreground";
-																	} else {
-																		activeOrDisabledClassName =
-																			"hover:bg-accent/50 text-muted-foreground hover:text-foreground";
-																	}
+																let activeOrDisabledClassName: string;
+																if (isActive) {
+																	activeOrDisabledClassName =
+																		"bg-accent text-accent-foreground";
+																} else if (isDisabled) {
+																	activeOrDisabledClassName =
+																		"opacity-50 cursor-not-allowed text-muted-foreground";
+																} else {
+																	activeOrDisabledClassName =
+																		"hover:bg-accent/50 text-muted-foreground hover:text-foreground";
+																}
 
-																	const buttonClassName = cn(
-																		"w-full flex items-center gap-3 p-2 rounded-md text-left transition-all",
-																		activeOrDisabledClassName,
-																	);
+																const buttonClassName = cn(
+																	"w-full flex items-center gap-3 p-2 rounded-md text-left transition-all",
+																	activeOrDisabledClassName,
+																);
 
-																	return (
-																		<button
-																			type="button"
-																			key={section.id}
-																			onClick={() => {
-																				if (section.type === "app") {
-																					setActiveTopLevel("app");
-																					setAppSection(
-																						section.id as AppSection,
-																					);
-																				} else {
-																					setActiveTopLevel("project");
-																					setProjectSection(
-																						section.id as ProjectSettingsSection,
-																					);
-																				}
-																			}}
-																			disabled={isDisabled}
-																			className={buttonClassName}
-																		>
-																			<SectionIcon className="h-4 w-4 shrink-0" />
-																			<div className="min-w-0">
-																				<div className="font-medium text-xs">
-																					{section.label}
-																				</div>
+																return (
+																	<button
+																		type="button"
+																		key={section.id}
+																		onClick={() => {
+																			if (section.type === "app") {
+																				setActiveTopLevel("app");
+																				setAppSection(section.id as AppSection);
+																			} else {
+																				setActiveTopLevel("project");
+																				setProjectSection(
+																					section.id as ProjectSettingsSection,
+																				);
+																			}
+																		}}
+																		disabled={isDisabled}
+																		className={buttonClassName}
+																	>
+																		<SectionIcon className="h-4 w-4 shrink-0" />
+																		<div className="min-w-0">
+																			<div className="font-medium text-xs">
+																				{section.label}
 																			</div>
-																		</button>
-																	);
-																})}
-															</div>
-														)}
-												</div>
-											);
-										})}
+																		</div>
+																	</button>
+																);
+															})}
+														</div>
+													)}
+											</div>
+										);
+									})}
 
 									{isSearching &&
 										!isNavigationCollapsed &&

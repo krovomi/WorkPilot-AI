@@ -1,3 +1,4 @@
+import { buildJevEnvironment } from "../../../jev/environment";
 import { getOAuthModeClearVars } from "../../../agent/env-utils";
 import type { PageLlmPage } from "../../../../shared/utils/page-llm";
 import { pythonEnvManager } from "../../../python-env-manager";
@@ -38,7 +39,7 @@ import { getGitHubTokenForSubprocess } from "../utils";
  */
 export async function getRunnerEnv(
 	extraEnv?: Record<string, string>,
-	options?: { page?: PageLlmPage },
+	options?: { page?: PageLlmPage; jevWorkflow?: string },
 ): Promise<Record<string, string>> {
 	const pythonEnv = pythonEnvManager.getPythonEnv();
 	const apiProfileEnv = await getAPIProfileEnv();
@@ -65,13 +66,16 @@ export async function getRunnerEnv(
 		? getPageProviderEnv(options.page)
 		: getGlobalProviderEnv();
 
-	return {
-		...pythonEnv, // Python environment including PYTHONPATH (fixes #139)
-		...apiProfileEnv,
-		...oauthModeClearVars,
-		...profileEnv, // OAuth token from profile manager (fixes #563, rate-limit aware)
-		...githubEnv, // Fresh GitHub token from gh CLI (fixes #151)
-		...providerEnv, // Provider of the calling page (SELECTED_LLM_PROVIDER + key)
-		...extraEnv,
-	};
+	return buildJevEnvironment(
+		{
+			...pythonEnv, // Python environment including PYTHONPATH (fixes #139)
+			...apiProfileEnv,
+			...oauthModeClearVars,
+			...profileEnv, // OAuth token from profile manager (fixes #563, rate-limit aware)
+			...githubEnv, // Fresh GitHub token from gh CLI (fixes #151)
+			...providerEnv, // Provider of the calling page (SELECTED_LLM_PROVIDER + key)
+			...extraEnv,
+		},
+		options?.jevWorkflow,
+	);
 }

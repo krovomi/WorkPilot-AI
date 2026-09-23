@@ -12,10 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
-import {
-	IPC_CHANNELS,
-	MODEL_ID_MAP,
-} from "../../../shared/constants";
+import { IPC_CHANNELS, MODEL_ID_MAP } from "../../../shared/constants";
 import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
 import { getAugmentedEnv } from "../../env-utils";
@@ -299,6 +296,7 @@ export interface PRReviewFinding {
  * Complete PR review result
  */
 export interface PRReviewResult {
+	jev?: import("../../../shared/types/jev").JevObservation;
 	prNumber: number;
 	repo: string;
 	success: boolean;
@@ -1299,6 +1297,7 @@ function getReviewResult(
 			error: data.error,
 			// Follow-up review fields (snake_case -> camelCase)
 			reviewedCommitSha: data.reviewed_commit_sha,
+			jev: data.jev,
 			reviewedFileBlobs: data.reviewed_file_blobs,
 			isFollowupReview: data.is_followup_review ?? false,
 			previousReviewId: data.previous_review_id,
@@ -1324,9 +1323,8 @@ function getReviewResult(
 function getGitHubPRSettings(): { model: string; thinkingLevel: string } {
 	// Provider × LLM × effort : ce que la page a choisi, sinon les réglages.
 	// Une seule lecture, dans `services/page-llm-config`.
-	const { model: modelShort, thinkingLevel } = getPageFeatureSettings(
-		"github-prs",
-	);
+	const { model: modelShort, thinkingLevel } =
+		getPageFeatureSettings("github-prs");
 
 	// Convert model short name to full model ID
 	const model = MODEL_ID_MAP[modelShort] ?? modelShort;
@@ -1387,6 +1385,7 @@ async function runPRReview(
 
 	// Build environment with project settings
 	const subprocessEnv = await getRunnerEnv(getClaudeMdEnv(project), {
+		jevWorkflow: "github-review",
 		page: "github-prs",
 	});
 
@@ -3033,10 +3032,10 @@ export function registerPRHandlers(
 						);
 
 						// Build environment with project settings
-						const followupEnv = await getRunnerEnv(
-							getClaudeMdEnv(project),
-							{ page: "github-prs" },
-						);
+						const followupEnv = await getRunnerEnv(getClaudeMdEnv(project), {
+							jevWorkflow: "github-review",
+							page: "github-prs",
+						});
 
 						const { process: childProcess, promise } =
 							runPythonSubprocess<PRReviewResult>({

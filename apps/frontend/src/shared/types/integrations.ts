@@ -404,6 +404,7 @@ export interface GitLabMRReviewFinding {
 }
 
 export interface GitLabMRReviewResult {
+	jev?: import("./jev").JevObservation;
 	mrIid: number;
 	project: string;
 	success: boolean;

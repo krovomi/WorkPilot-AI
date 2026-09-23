@@ -29,14 +29,8 @@ import {
 	type BountyBoardAPI,
 	createBountyBoardAPI,
 } from "./modules/bounty-board-api";
-import {
-	type TechDebtAPI,
-	createTechDebtAPI,
-} from "./modules/tech-debt-api";
-import {
-	type TeamBotAPI,
-	createTeamBotAPI,
-} from "./modules/team-bot-api";
+import { type TechDebtAPI, createTechDebtAPI } from "./modules/tech-debt-api";
+import { type TeamBotAPI, createTeamBotAPI } from "./modules/team-bot-api";
 import {
 	type ApiExplorerAPI,
 	createApiExplorerAPI,
@@ -45,10 +39,7 @@ import {
 	type ApiWatcherAPI,
 	createApiWatcherAPI,
 } from "./modules/api-watcher-api";
-import {
-	type DocDriftAPI,
-	createDocDriftAPI,
-} from "./modules/doc-drift-api";
+import { type DocDriftAPI, createDocDriftAPI } from "./modules/doc-drift-api";
 import {
 	type CarbonProfilerAPI,
 	createCarbonProfilerAPI,
@@ -221,6 +212,7 @@ import {
 	createServerAuthAPI,
 	type ServerAuthAPI,
 } from "./modules/server-auth-api";
+import { createJevAPI, type JevAPI } from "./jev-api";
 import { createSettingsAPI, type SettingsAPI } from "./settings-api";
 import { createTaskAPI, type TaskAPI } from "./task-api";
 import { createTerminalAPI, type TerminalAPI } from "./terminal-api";
@@ -231,6 +223,7 @@ export interface ElectronAPI
 		TerminalAPI,
 		TaskAPI,
 		SettingsAPI,
+		JevAPI,
 		FileAPI,
 		AgentAPI,
 		IdeationAPI,
@@ -376,6 +369,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createTerminalAPI(),
 		...createTaskAPI(),
 		...createSettingsAPI(),
+		...createJevAPI(),
 		...createFileAPI(),
 		...createAgentAPI(),
 		...createAppUpdateAPI(),

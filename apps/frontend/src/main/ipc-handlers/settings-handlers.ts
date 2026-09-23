@@ -1,3 +1,4 @@
+import { parseJevSettings } from "../../shared/utils/jev-settings";
 import { execFileSync } from "node:child_process";
 import {
 	existsSync,
@@ -597,6 +598,8 @@ export function registerSettingsHandlers(
 				const savedSettings = readSettingsFile();
 				const currentSettings = { ...DEFAULT_APP_SETTINGS, ...savedSettings };
 				const newSettings = { ...currentSettings, ...settings };
+				if (settings.jev !== undefined)
+					newSettings.jev = parseJevSettings(settings.jev);
 
 				// Sync defaultModel when agent profile changes (#414)
 				if (settings.selectedAgentProfile) {
@@ -1048,8 +1051,7 @@ export function registerSettingsHandlers(
 			try {
 				await openExternalUrl(url);
 			} catch (error) {
-				const reason =
-					error instanceof Error ? error.message : String(error);
+				const reason = error instanceof Error ? error.message : String(error);
 				console.warn(`[SHELL_OPEN_EXTERNAL] ${reason}`);
 				throw error instanceof Error ? error : new Error(reason);
 			}

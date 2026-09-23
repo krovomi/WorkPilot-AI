@@ -471,6 +471,10 @@ The SDK will run invoked agents in parallel automatically.
 
             # Build orchestrator prompt
             prompt = self._build_orchestrator_prompt(context)
+            from integrations.jev.reviews import context_advice
+
+            if advice := context_advice(context):
+                prompt += "\n\n" + advice
 
             # Get project root - default to local checkout
             project_root = (
