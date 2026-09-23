@@ -27,11 +27,20 @@ from __future__ import annotations
 import json
 import logging
 import re
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import Any
 
 from .notes import Note, inside, now_iso, read_note, slugify, write_note
 from .runtime import active
+from .tasks import (
+    build_note_id,
+    build_rel,
+    project_name,
+    project_name_from,
+    project_rel,
+    split_task,
+    task_ref,
+)
 from .vault import Brain
 
 logger = logging.getLogger(__name__)
@@ -39,6 +48,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "SURFACES",
     "project_name",
+    "project_name_from",
     "task_ref",
     "split_task",
     "build_note_id",
@@ -65,76 +75,9 @@ _MAX_FILES = 25
 _MAX_SUMMARY = 700
 
 
-def project_name(project_dir: Path) -> str:
-    """The project a path belongs to, seen through a worktree.
-
-    A build runs in ``<project>/.workpilot/worktrees/<spec>/``; naming the note
-    after the worktree would file every task under a different "project".
-    """
-    return project_name_from(str(Path(project_dir).resolve()))
-
-
-def project_name_from(path: str) -> str:
-    """`project_name` on a string alone, touching no file system.
-
-    What the HTTP API uses: a client-supplied path is read as a name there,
-    never resolved or opened.
-    """
-    parts = PurePath(path.replace("\\", "/")).parts
-    for marker in (".workpilot", ".worktrees"):
-        if marker in parts:
-            index = parts.index(marker)
-            if index > 0:
-                return parts[index - 1]
-    return parts[-1] if parts else ""
-
-
-def _project_rel(project: str) -> Path:
-    return Path("knowledge") / "projects" / slugify(project) / "index.md"
-
-
-def _build_rel(project: str, spec_id: str) -> Path:
-    return (
-        Path("knowledge")
-        / "projects"
-        / slugify(project)
-        / "builds"
-        / f"{slugify(spec_id)}.md"
-    )
-
-
-def split_task(task: str) -> tuple[str, str]:
-    """``project/spec`` -> ``(project, spec)``; ``ValueError`` for anything else."""
-    project, sep, spec = (task or "").rpartition("/")
-    if not sep or not project or not spec:
-        raise ValueError(f"not a task reference: {task!r}")
-    return project, spec
-
-
-def build_note_id(task: str) -> str:
-    """The graph id of a task's build note — the node its notes link to."""
-    project, spec = split_task(task)
-    return _build_rel(project, spec).with_suffix("").as_posix()
-
-
-def task_ref(project_dir: Path | str | None, spec_dir: Path | str | None) -> str | None:
-    """``<project>/<spec-id>`` for a spec directory, else ``None``.
-
-    Only a real spec (``…/.workpilot/specs/<id>``) names a task: several
-    features hand `create_client` a directory that is not one, and stamping
-    their notes with it would invent a task.
-    """
-    if not spec_dir or not project_dir:
-        return None
-    spec = Path(spec_dir)
-    if spec.parent.name != "specs":
-        return None
-    return f"{project_name(Path(project_dir))}/{spec.name}"
-
-
 def _ensure_project(root: Path, project: str) -> str:
     """The project's hub note; returns the wikilink target builds point at."""
-    rel = _project_rel(project)
+    rel = project_rel(project)
     if not inside(root, rel).exists():
         write_note(
             root,
@@ -240,7 +183,7 @@ def record_build(
         tags = ["build", slugify(project)]
         if language:
             tags.append(slugify(language))
-        rel = _build_rel(project, spec_id)
+        rel = build_rel(project, spec_id)
         meta: dict[str, Any] = {}
         if inside(brain.root, rel).exists():
             meta = dict(read_note(brain.root, rel).meta)
@@ -278,7 +221,7 @@ def record_merge(
         if not active(brain.root):
             return None
         project = project_name(project_dir)
-        rel = _build_rel(project, spec_id)
+        rel = build_rel(project, spec_id)
         if not inside(brain.root, rel).exists():
             return None
         note = read_note(brain.root, rel)
@@ -380,12 +323,12 @@ def task_learning(
     if brain.graph_is_stale():
         brain._refresh()
     ref = f"{project}/{spec_id}"
-    build_rel = _build_rel(project, spec_id).as_posix()
+    build_path = build_rel(project, spec_id).as_posix()
     build = None
-    if inside(brain.root, build_rel).is_file():
-        meta = read_note(brain.root, build_rel).meta
+    if inside(brain.root, build_path).is_file():
+        meta = read_note(brain.root, build_path).meta
         build = {
-            **_note_summary(brain.root, build_rel, meta),
+            **_note_summary(brain.root, build_path, meta),
             "qa": meta.get("qa"),
             "tests": meta.get("tests"),
             "merged": meta.get("merged"),
@@ -394,7 +337,7 @@ def task_learning(
     for node in brain.graph().nodes.values():
         meta = node.get("metadata") or {}
         source = node.get("source_file")
-        if not source or source == build_rel or ref not in (meta.get("tasks") or []):
+        if not source or source == build_path or ref not in (meta.get("tasks") or []):
             continue
         notes.append(_note_summary(brain.root, source, meta, node.get("label")))
     notes.sort(key=lambda n: (str(n.get("updated") or ""), n["path"]), reverse=True)

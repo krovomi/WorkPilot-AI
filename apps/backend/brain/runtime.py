@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from .home import brain_dir, is_brain, read_config
+from .tasks import task_ref
 
 __all__ = [
     "SERVER_KEY",
@@ -110,16 +111,6 @@ def mcp_server_config(
         "args": [str(_BACKEND / "runners" / "brain_mcp.py")],
         "env": env,
     }
-
-
-def task_ref(project_dir: Path | str | None, spec_dir: Path | str | None) -> str | None:
-    """The Kanban task a session works on, for stamping what it writes."""
-    try:
-        from .learn import task_ref as ref
-
-        return ref(project_dir, spec_dir)
-    except Exception:  # noqa: BLE001 - a missing task only loses the stamp
-        return None
 
 
 def awareness_section(root: Path | None = None) -> str:

@@ -30,6 +30,7 @@ from .sync import (
     set_remote,
     sync,
 )
+from .tasks import build_note_id
 
 __all__ = ["Brain", "SEED_DIR"]
 
@@ -282,8 +283,6 @@ class Brain:
             meta["agents"] = agents
         text = body.strip() + "\n"
         if task:
-            from .learn import build_note_id
-
             links = [*(links or []), build_note_id(task)]
         extra = [f"[[{link}]]" for link in (links or []) if f"[[{link}]]" not in text]
         if extra:
