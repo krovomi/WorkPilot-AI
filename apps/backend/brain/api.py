@@ -193,11 +193,33 @@ def get_settings() -> dict:
     return {"success": True, "settings": settings_view()}
 
 
+def _unexpected(what: str) -> dict:
+    """An exception nobody planned for, answered as a code rather than a 500.
+
+    A 500 raised past the route leaves without the CORS headers the desktop
+    renderer needs, so the page reads "Failed to fetch" — a network error, for
+    what was a bug in a note parser. The traceback stays in the backend log.
+    """
+    logger.exception("brain: %s failed", what)
+    try:
+        return _refusal("failed")
+    except Exception:  # noqa: BLE001 - the view itself may be what is broken
+        logger.exception("brain: settings view failed")
+        return {"success": False, "error": "failed", "code": "failed"}
+
+
 @router.post("/settings")
 def save_settings(request: SettingsRequest) -> dict:
     """Plug a folder and/or a remote, then create, clone or adopt the brain there."""
     if _refused():
         return _DESKTOP_ONLY
+    try:
+        return _save_settings(request)
+    except Exception:  # noqa: BLE001 - see `_unexpected`
+        return _unexpected("saving the settings")
+
+
+def _save_settings(request: SettingsRequest) -> dict:
     if request.path is not None and brain_source() == "env":
         return _refusal("env-locked")
     remote, code = _checked_remote(request.remote)
@@ -274,9 +296,18 @@ def status() -> dict:
 def sync(request: SyncRequest) -> dict:
     if _refused():
         return _DESKTOP_ONLY
-    result = Brain().sync(request.message)
+    try:
+        result = Brain().sync(request.message)
+    except Exception:  # noqa: BLE001 - see `_unexpected`
+        logger.exception("brain: sync failed")
+        return {"success": False, "error": "sync-failed", "code": "sync-failed"}
+    code = None
     if result.error:
-        logger.warning("brain: sync failed")
+        # A private repository the backend's git cannot authenticate to is
+        # the common case, and "sync failed" does not tell anyone that.
+        code = _clone_error(result.error)
+        code = "sync-failed" if code == "failed" else code
+        logger.warning("brain: sync failed (%s)", code)
     return {
         "success": result.error is None,
         "committed": result.committed,
@@ -285,7 +316,8 @@ def sync(request: SyncRequest) -> dict:
         "remote": result.remote,
         "conflicts": list(result.conflicts),
         "skipped": result.skipped,
-        "error": "sync-failed" if result.error else None,
+        "error": code,
+        "code": code,
     }
 
 

@@ -325,3 +325,73 @@ def test_clone_failures_become_codes_the_ui_translates(stderr, code):
 def test_the_home_directory_itself_is_not_a_brain_folder(client, home):
     reply = client.post("/api/brain/settings", json={"path": str(home)}).json()
     assert reply["code"] == "outside-home"
+
+
+# ---------------------------------------------------------------------------
+# A real Obsidian vault: YAML a person wrote, not frontmatter we wrote
+# ---------------------------------------------------------------------------
+
+
+def _daily_note_vault(home: Path) -> Path:
+    vault = _vault(home)
+    (vault / "Daily").mkdir()
+    (vault / "Daily" / "2024-01-01.md").write_text(
+        "---\n"
+        "date: 2024-01-01\n"
+        "created: 2024-01-01T10:00:00\n"
+        "tags: [2024, journal, null]\n"
+        "tasks: shop/001-auth\n"
+        "---\n"
+        "# Jour 1\n\n[[Projets]]\n",
+        encoding="utf-8",
+    )
+    return vault
+
+
+@needs_git
+def test_a_vault_with_yaml_dates_can_be_plugged_and_synced(client, home):
+    # Obsidian's daily notes and properties write `date: 2024-01-01`, which
+    # YAML reads as a date object: it used to make graph.json unwritable, and
+    # both the settings save and the sync answered 500 ("Failed to fetch").
+    vault = _daily_note_vault(home)
+    reply = client.post("/api/brain/settings", json={"path": str(vault)}).json()
+    assert reply["success"], reply
+    synced = client.post("/api/brain/sync", json={})
+    assert synced.status_code == 200
+
+    graph = json.loads(
+        (vault / "graphify-out" / "graph.json").read_text(encoding="utf-8")
+    )
+    node = next(n for n in graph["nodes"] if n["id"] == "Daily/2024-01-01")
+    assert node["metadata"]["created"] == "2024-01-01T10:00:00"
+    assert node["metadata"]["tasks"] == ["shop/001-auth"]
+    assert "tag:none" not in {n["id"] for n in graph["nodes"]}
+    assert "tag:2024" in {n["id"] for n in graph["nodes"]}
+
+
+@needs_git
+def test_a_sync_the_remote_refuses_says_why(client, home, tmp_path):
+    vault = _vault(home)
+    client.post("/api/brain/settings", json={"path": str(vault)})
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(tmp_path / "missing.git")],
+        cwd=vault,
+        check=True,
+    )
+    reply = client.post("/api/brain/sync", json={}).json()
+    assert reply["success"] is False and reply["code"] == "not-found", reply
+
+
+def test_an_unexpected_error_is_an_answer_not_a_500(client, home, monkeypatch):
+    # A 500 leaves without CORS headers: the renderer reads "Failed to fetch".
+    import brain.api as api
+
+    def boom(self, *args, **kwargs):
+        raise TypeError("a bug nobody planned for")
+
+    monkeypatch.setattr(api.Brain, "sync", boom)
+    monkeypatch.setattr(api.Brain, "init", boom)
+    synced = client.post("/api/brain/sync", json={})
+    assert synced.status_code == 200 and synced.json()["code"] == "sync-failed"
+    saved = client.post("/api/brain/settings", json={"path": str(home / "b")})
+    assert saved.status_code == 200 and saved.json()["code"] == "failed"

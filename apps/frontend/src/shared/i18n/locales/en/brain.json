@@ -87,7 +87,7 @@
 			"auth": "Access to the repository was refused: check your git credentials (SSH key, or \"gh auth setup-git\" for HTTPS).",
 			"notFound": "Repository not found: check its name and that your account can access it.",
 			"network": "The repository cannot be reached: check your connection.",
-			"timeout": "Cloning took too long.",
+			"timeout": "The git operation took too long.",
 			"gitMissing": "git was not found on this machine.",
 			"failed": "The git operation failed (details in the backend log).",
 			"syncFailed": "Syncing failed (details in the backend log).",
