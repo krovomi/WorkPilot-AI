@@ -279,7 +279,7 @@ def remember(
         write_note(root, note)
         return RememberResult("reinforced", match.rel, round(score, 3))
 
-    digest = hashlib.sha1(_normalize(text).encode()).hexdigest()[:6]
+    digest = hashlib.sha256(_normalize(text).encode()).hexdigest()[:6]
     rel = Path(kind_dir(root, "instruction").name) / f"{slugify(text, 56)}-{digest}.md"
     note = Note(
         path=rel,
@@ -413,7 +413,7 @@ def ingest(
                         "agent": spec.name,
                         "scope": scope,
                         "source": str(path),
-                        "sha1": hashlib.sha1(text.encode()).hexdigest(),
+                        "sha256": hashlib.sha256(text.encode()).hexdigest(),
                         "updated": now_iso(),
                         "tags": ["agent-memory", spec.name],
                     },
