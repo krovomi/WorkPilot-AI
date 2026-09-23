@@ -33,6 +33,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .home import digest_path
 from .memories import instructions as list_instructions
 from .vault import Brain
 
@@ -181,15 +182,27 @@ hermes connected by `connect.py` — has no such variable and writes as the
 person."""
 
 
+TASK_ENV = "WORKPILOT_BRAIN_TASK"
+"""``<project>/<spec-id>`` of the Kanban task the server was started for, so
+what an agent writes during a build shows up on that task's card."""
+
+
 def _trusted_default() -> bool:
     return os.environ.get(ORIGIN_ENV, "").strip().lower() != "workpilot"
 
 
 def _call(
-    brain: Brain, name: str, args: dict[str, Any], *, trusted: bool | None = None
+    brain: Brain,
+    name: str,
+    args: dict[str, Any],
+    *,
+    trusted: bool | None = None,
+    task: str | None = None,
 ) -> Any:
     if trusted is None:
         trusted = _trusted_default()
+    if task is None:
+        task = os.environ.get(TASK_ENV, "").strip() or None
     graph_tools: dict[str, Callable[[], Any]] = {
         "query_graph": lambda: brain.graph().query(
             args["query"], limit=int(args.get("limit", 8))
@@ -226,10 +239,14 @@ def _call(
             agent=args.get("agent"),
             path=args.get("path"),
             trusted=trusted,
+            task=task,
         ).to_dict()
     if name == "brain_remember":
         return brain.remember(
-            args["text"], agent=args.get("agent") or "brain", trusted=trusted
+            args["text"],
+            agent=args.get("agent") or "brain",
+            trusted=trusted,
+            task=task,
         )
     if name == "brain_sync":
         return brain.sync().to_dict()
@@ -298,7 +315,7 @@ def handle(brain: Brain, message: dict[str, Any]) -> dict[str, Any] | None:
         try:
             if uri == "brain://INSTRUCTIONS.md":
                 brain.before_read()
-                text = (brain.root / "INSTRUCTIONS.md").read_text(encoding="utf-8")
+                text = digest_path(brain.root).read_text(encoding="utf-8")
             elif uri.startswith("brain://skills/"):
                 text = _skills(brain, uri.removeprefix("brain://skills/"))
             else:

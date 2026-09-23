@@ -70,7 +70,15 @@ def build_graph(root: Path) -> dict[str, Any]:
             "kind": note.kind,
             "tags": note.tags,
         }
-        for key in ("status", "agents", "updated", "created", "scope", "description"):
+        for key in (
+            "status",
+            "tasks",
+            "agents",
+            "updated",
+            "created",
+            "scope",
+            "description",
+        ):
             if key in note.meta:
                 meta[key] = note.meta[key]
         nodes.append(

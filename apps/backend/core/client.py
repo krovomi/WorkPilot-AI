@@ -1186,9 +1186,13 @@ def create_client(
     # The shared brain (`brain/runtime.py`): offered to every agent with tools
     # once a brain exists on this machine, whatever the feature.
     if "brain" in required_servers:
-        from brain.runtime import SERVER_KEY, mcp_server_config
+        from brain.runtime import SERVER_KEY, mcp_server_config, task_ref
 
-        mcp_servers[SERVER_KEY] = mcp_server_config()
+        # The task, when there is one, so what the agent learns shows up on
+        # its Kanban card.
+        mcp_servers[SERVER_KEY] = mcp_server_config(
+            task=task_ref(project_dir, spec_dir)
+        )
 
     # Add custom workpilot MCP server if required and available
     if "workpilot" in required_servers and auto_claude_tools_enabled:

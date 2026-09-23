@@ -250,6 +250,7 @@ def remember(
     agent_name: str = "brain",
     source: str | None = None,
     status: str = "active",
+    task: str | None = None,
 ) -> RememberResult:
     """File *text* as an instruction, merging it into a similar one if any.
 
@@ -283,6 +284,11 @@ def remember(
         if source and source not in sources:
             sources.append(source)
             changed = True
+        tasks = list(note.meta.get("tasks") or [])
+        if task and task not in tasks:
+            tasks.append(task)
+            note.meta["tasks"] = tasks
+            changed = True
         if status == "active" and note.meta.get("status") not in (None, "active"):
             # A trusted source confirms a proposed or retired rule.
             note.meta["status"] = "active"
@@ -310,6 +316,7 @@ def remember(
             "status": status,
             "agents": [agent_name],
             "sources": [source] if source else [],
+            **({"tasks": [task]} if task else {}),
             "tags": ["instruction"],
             "created": now_iso(),
             "updated": now_iso(),
@@ -465,7 +472,11 @@ def ingest(
 
 
 def write_digest(root: Path) -> Path:
-    """``INSTRUCTIONS.md``: every active instruction, one line, most shared first."""
+    """The digest: every active instruction, one line, most shared first.
+
+    Written into the brain's hidden state folder, where Claude Code and Gemini
+    import it from (``@path``) and Obsidian does not list it.
+    """
     items = sorted(instructions(root), key=lambda i: (-len(i.agents), i.text.lower()))
     lines = [
         "---",

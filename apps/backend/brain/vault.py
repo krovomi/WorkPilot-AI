@@ -9,6 +9,7 @@ leave the brain half-updated or unpushed. Every read goes through
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -17,10 +18,18 @@ from pathlib import Path
 from typing import Any
 
 from .graph import BrainGraph, rebuild
-from .home import KINDS, brain_dir, graph_path, kind_dir
+from .home import KINDS, MARKER, brain_dir, graph_path, is_brain, kind_dir
 from .memories import refresh_bridges, remember, write_digest
 from .notes import Note, inside, iter_notes, now_iso, read_note, slugify, write_note
-from .sync import SyncResult, ensure_repo, pull_if_stale, remote_url, set_remote, sync
+from .sync import (
+    SyncResult,
+    ensure_repo,
+    normalize_remote,
+    pull_if_stale,
+    remote_url,
+    set_remote,
+    sync,
+)
 
 __all__ = ["Brain", "SEED_DIR"]
 
@@ -41,7 +50,7 @@ le lisent et l'écrivent via le serveur MCP `workpilot-brain`.
 | `knowledge/` | décisions, faits, emplacements |
 | `agents/` | instantanés des mémoires propres à chaque agent |
 | `skills/` | skills communs (dont `graph-first-recall`) |
-| `INSTRUCTIONS.md` | condensé généré des instructions actives |
+| `.workpilot-brain/INSTRUCTIONS.md` | condensé généré des instructions actives |
 
 Tu peux éditer à la main : la prochaine synchronisation committe et pousse tes changements.
 """
@@ -49,7 +58,7 @@ Tu peux éditer à la main : la prochaine synchronisation committe et pousse tes
 _AGENTS_MD = """# Utiliser ce cerveau
 
 1. **Rappel** : applique `skills/graph-first-recall/SKILL.md` — graphe, puis index, puis fichier.
-2. **Instructions** : `INSTRUCTIONS.md` s'applique en plus des tiennes. Similaire = renforcé, pas en double.
+2. **Instructions** : `.workpilot-brain/INSTRUCTIONS.md` s'applique en plus des tiennes. Similaire = renforcé, pas en double.
 3. **Écriture** : une note par idée, des `[[liens]]` vers ce qu'elle concerne, du frontmatter
    (`title`, `tags`, `status`). Le graphe est reconstruit à chaque écriture.
 """
@@ -82,42 +91,73 @@ class Brain:
 
     @property
     def exists(self) -> bool:
-        return (self.root / "README.md").is_file()
+        return is_brain(self.root)
+
+    @property
+    def is_obsidian_vault(self) -> bool:
+        """Obsidian keeps its settings in ``.obsidian/``: the folder is a vault."""
+        return (self.root / ".obsidian").is_dir()
 
     def init(self, remote: str | None = None) -> dict[str, Any]:
-        """Create the vault if needed and seed it. Idempotent; never overwrites a note."""
-        self.root.mkdir(parents=True, exist_ok=True)
-        cloned = False
-        if (
-            remote
-            and not (self.root / ".git").exists()
-            and not any(self.root.iterdir())
-        ):
-            # An existing brain on another machine: clone it rather than start a
-            # second one that would have to be merged into it later.
-            import subprocess
+        """Create, clone or adopt the brain here. Idempotent; never overwrites a note.
 
-            done = subprocess.run(
-                ["git", "clone", "-q", remote, str(self.root)],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            cloned = done.returncode == 0
+        Three cases, told apart by what is on disk:
+
+        | Folder | What happens |
+        |---|---|
+        | missing or empty, a remote given | cloned — a brain from another machine, or a vault kept on GitHub |
+        | missing or empty | a new brain, with its README and folders |
+        | anything else | adopted as is — an Obsidian vault a person already has |
+
+        An adopted folder gets the hidden marker, the ``graph-first-recall``
+        skill and the ignore lines, and nothing at its root a person would see
+        in their file list. Its notes are the brain's notes from then on:
+        recall reads the whole vault, which is the point of plugging it in.
+        """
+        from .sync import clone
+
+        existed = self.root.is_dir() and any(self.root.iterdir())
+        cloned = False
+        if remote and not existed:
+            error = clone(remote, self.root)
+            if error:
+                return {"root": str(self.root), "cloned": False, "error": error}
+            cloned = True
+            existed = any(p for p in self.root.iterdir() if p.name != ".git")
+        self.root.mkdir(parents=True, exist_ok=True)
+        fresh = not existed and not (self.root / MARKER).exists()
+        # A brain cloned from another machine: git does not carry empty
+        # folders, so its layout is laid out again — it is ours to lay out.
+        already_brain = is_brain(self.root)
         ensure_repo(self.root)
-        if remote and remote_url(self.root) != remote:
+        if remote and not cloned and remote_url(self.root) != normalize_remote(remote):
             set_remote(self.root, remote)
-        for folder in KINDS.values():
-            (self.root / folder).mkdir(exist_ok=True)
-        for name, text in (("README.md", _README), ("AGENTS.md", _AGENTS_MD)):
-            if not (self.root / name).exists():
-                (self.root / name).write_text(text, encoding="utf-8")
+        adopted = not fresh and not already_brain
+        if fresh or already_brain:
+            for folder in KINDS.values():
+                (self.root / folder).mkdir(exist_ok=True)
+        if fresh:
+            for name, text in (("README.md", _README), ("AGENTS.md", _AGENTS_MD)):
+                if not (self.root / name).exists():
+                    (self.root / name).write_text(text, encoding="utf-8")
+        marker = self.root / MARKER
+        if not marker.exists():
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text(
+                json.dumps(
+                    {"version": 1, "created": now_iso(), "adopted": adopted}, indent=2
+                )
+                + "\n",
+                encoding="utf-8",
+            )
         seeded = self._seed()
         self._refresh()
         result = sync(self.root, "brain: init")
         return {
             "root": str(self.root),
             "cloned": cloned,
+            "adopted": adopted,
+            "obsidianVault": self.is_obsidian_vault,
             "seeded": seeded,
             "remote": remote_url(self.root),
             "sync": result.to_dict(),
@@ -189,6 +229,7 @@ class Brain:
         agent: str | None = None,
         path: str | None = None,
         trusted: bool = True,
+        task: str | None = None,
     ) -> WriteResult:
         """Create or update a note, then sync. An existing note keeps its frontmatter.
 
@@ -227,12 +268,23 @@ class Brain:
         merged_tags = list(dict.fromkeys([*(meta.get("tags") or []), *(tags or [])]))
         if merged_tags:
             meta["tags"] = merged_tags
+        if task:
+            # The Kanban task this note was learned on (`runtime.task_ref`):
+            # what the task panel's brain card lists.
+            tasks = list(meta.get("tasks") or [])
+            if task not in tasks:
+                tasks.append(task)
+            meta["tasks"] = tasks
         if agent:
             agents = list(meta.get("agents") or [])
             if agent not in agents:
                 agents.append(agent)
             meta["agents"] = agents
         text = body.strip() + "\n"
+        if task:
+            from .learn import build_note_id
+
+            links = [*(links or []), build_note_id(task)]
         extra = [f"[[{link}]]" for link in (links or []) if f"[[{link}]]" not in text]
         if extra:
             text += "\n## Liens\n\n" + "\n".join(f"- {item}" for item in extra) + "\n"
@@ -246,10 +298,15 @@ class Brain:
         )
 
     def remember(
-        self, text: str, agent: str = "brain", *, trusted: bool = True
+        self,
+        text: str,
+        agent: str = "brain",
+        *,
+        trusted: bool = True,
+        task: str | None = None,
     ) -> dict[str, Any]:
         status = "active" if trusted else "proposed"
-        outcome = remember(self.root, text, agent_name=agent, status=status)
+        outcome = remember(self.root, text, agent_name=agent, status=status, task=task)
         result = self.after_write(f"brain: {outcome.outcome} instruction ({agent})")
         payload = {**outcome.to_dict(), "sync": result.to_dict()}
         if outcome.outcome == "created" and not trusted:

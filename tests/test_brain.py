@@ -264,7 +264,7 @@ def test_ingest_snapshots_redacts_and_merges_across_agents(tmp_path, _isolated_h
     assert "hunter2" not in "".join(
         p.read_text(encoding="utf-8") for p in root.rglob("*.md")
     )
-    assert (root / "INSTRUCTIONS.md").is_file()
+    assert (root / ".workpilot-brain" / "INSTRUCTIONS.md").is_file()
 
 
 def test_bridge_previews_then_writes_additively_and_is_idempotent(

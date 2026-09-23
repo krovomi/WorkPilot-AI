@@ -36,7 +36,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .home import brain_dir
+from .home import brain_dir, is_brain, read_config
 
 __all__ = [
     "SERVER_KEY",
@@ -49,6 +49,7 @@ __all__ = [
     "tool_definitions",
     "is_brain_tool",
     "execute_tool",
+    "task_ref",
 ]
 
 SERVER_KEY = "workpilot-brain"
@@ -76,12 +77,11 @@ _MAX_PROMPT_CHARS = 4000
 
 
 def enabled() -> bool:
-    return os.environ.get("BRAIN_ENABLED", "true").strip().lower() not in (
-        "0",
-        "false",
-        "no",
-        "off",
-    )
+    """``BRAIN_ENABLED`` when set, else the switch in Settings, else on."""
+    raw = os.environ.get("BRAIN_ENABLED", "").strip().lower()
+    if raw:
+        return raw not in ("0", "false", "no", "off")
+    return read_config().get("enabled", True) is not False
 
 
 def active(root: Path | None = None) -> bool:
@@ -89,22 +89,37 @@ def active(root: Path | None = None) -> bool:
     if not enabled():
         return False
     try:
-        return ((root or brain_dir()) / "README.md").is_file()
+        return is_brain(root or brain_dir())
     except OSError:
         return False
 
 
-def mcp_server_config(root: Path | None = None) -> dict[str, Any]:
+def mcp_server_config(
+    root: Path | None = None, task: str | None = None
+) -> dict[str, Any]:
+    env = {
+        "WORKPILOT_BRAIN_DIR": str(root or brain_dir()),
+        # Marks the server as WorkPilot's own: its agents' instructions are
+        # filed as proposals (`mcp_server.ORIGIN_ENV`).
+        "WORKPILOT_BRAIN_ORIGIN": "workpilot",
+    }
+    if task:
+        env["WORKPILOT_BRAIN_TASK"] = task
     return {
         "command": sys.executable,
         "args": [str(_BACKEND / "runners" / "brain_mcp.py")],
-        # Marks the server as WorkPilot's own: its agents' instructions are
-        # filed as proposals (`mcp_server.ORIGIN_ENV`).
-        "env": {
-            "WORKPILOT_BRAIN_DIR": str(root or brain_dir()),
-            "WORKPILOT_BRAIN_ORIGIN": "workpilot",
-        },
+        "env": env,
     }
+
+
+def task_ref(project_dir: Path | str | None, spec_dir: Path | str | None) -> str | None:
+    """The Kanban task a session works on, for stamping what it writes."""
+    try:
+        from .learn import task_ref as ref
+
+        return ref(project_dir, spec_dir)
+    except Exception:  # noqa: BLE001 - a missing task only loses the stamp
+        return None
 
 
 def awareness_section(root: Path | None = None) -> str:
@@ -200,12 +215,12 @@ def is_brain_tool(name: str) -> bool:
     return name in AGENT_TOOL_NAMES
 
 
-def _call(name: str, arguments: dict[str, Any]) -> str:
+def _call(name: str, arguments: dict[str, Any], task: str | None = None) -> str:
     from .mcp_server import _call as call
     from .vault import Brain
 
     try:
-        payload = call(Brain(), name, dict(arguments or {}), trusted=False)
+        payload = call(Brain(), name, dict(arguments or {}), trusted=False, task=task)
     except (KeyError, ValueError, OSError) as exc:
         detail = f"missing argument {exc}" if isinstance(exc, KeyError) else str(exc)
         return f"Error: {detail}"
@@ -214,6 +229,8 @@ def _call(name: str, arguments: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=1, default=str)
 
 
-async def execute_tool(name: str, arguments: dict[str, Any]) -> str:
+async def execute_tool(
+    name: str, arguments: dict[str, Any], task: str | None = None
+) -> str:
     """Run a brain tool off the event loop: a read may pull, a write pushes."""
-    return await asyncio.to_thread(_call, name, arguments)
+    return await asyncio.to_thread(_call, name, arguments, task)

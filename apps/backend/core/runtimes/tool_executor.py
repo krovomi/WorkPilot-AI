@@ -140,9 +140,11 @@ class ToolExecutor:
         elif _is_brain_tool(tool_name):
             # The shared brain: the same tools the Claude SDK reaches over MCP,
             # executed in-process for every other provider.
-            from brain.runtime import execute_tool
+            from brain.runtime import execute_tool, task_ref
 
-            return await execute_tool(tool_name, arguments)
+            return await execute_tool(
+                tool_name, arguments, task=task_ref(self.project_dir, self.spec_dir)
+            )
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 

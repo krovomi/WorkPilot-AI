@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -53,6 +54,9 @@ __all__ = [
     "pull_if_stale",
     "remote_url",
     "set_remote",
+    "normalize_remote",
+    "clone",
+    "ensure_ignored",
     "brain_lock",
     "git_available",
 ]
@@ -113,28 +117,101 @@ def _commit(root: Path, message: str) -> bool:
     return _git(root, *ident, "commit", "-q", "-m", message).returncode == 0
 
 
+_IGNORED = (
+    # Obsidian's workspace layout changes on every click; committing it would
+    # make every sync a conflict between two window layouts.
+    ".obsidian/workspace*.json",
+    ".obsidian/cache",
+    ".trash/",
+    ".DS_Store",
+    # Rebuilt from the notes after every pull; committed, two machines each
+    # adding a note would conflict on them at every sync.
+    "graphify-out/",
+    ".workpilot-brain/INSTRUCTIONS.md",
+)
+
+
+def ensure_ignored(root: Path) -> None:
+    """Add the lines the brain needs to ``.gitignore``, keeping everything else.
+
+    Run on every repository, not only one this module created: a vault a
+    person plugs in is often already a git repository (the obsidian-git
+    plugin), and its ignore file is theirs to keep.
+    """
+    path = root / ".gitignore"
+    try:
+        current = path.read_text(encoding="utf-8") if path.is_file() else ""
+    except OSError:
+        return
+    present = {line.strip() for line in current.splitlines()}
+    missing = [line for line in _IGNORED if line not in present]
+    if not missing:
+        return
+    sep = "" if not current or current.endswith("\n") else "\n"
+    block = "# WorkPilot Brain\n" if "# WorkPilot Brain" not in present else ""
+    path.write_text(current + sep + block + "\n".join(missing) + "\n", encoding="utf-8")
+
+
 def ensure_repo(root: Path) -> bool:
     """Make *root* a git repository if it is not one. False when git is absent."""
     if not git_available():
         return False
     root.mkdir(parents=True, exist_ok=True)
-    if (root / ".git").exists():
-        return True
-    if _git(root, "init", "-q").returncode != 0:
-        return False
-    _git(root, "symbolic-ref", "HEAD", "refs/heads/main")
-    gitignore = root / ".gitignore"
-    if not gitignore.exists():
-        # Obsidian's workspace layout changes on every click; committing it
-        # would make every sync a conflict between two window layouts.
-        # The graph and the digest are rebuilt from the notes after every pull;
-        # committing them would make two machines conflict on every sync.
-        gitignore.write_text(
-            ".obsidian/workspace*.json\n.obsidian/cache\n.trash/\n.DS_Store\n"
-            "graphify-out/\nINSTRUCTIONS.md\n",
-            encoding="utf-8",
-        )
+    if not (root / ".git").exists():
+        if _git(root, "init", "-q").returncode != 0:
+            return False
+        _git(root, "symbolic-ref", "HEAD", "refs/heads/main")
+    ensure_ignored(root)
     return True
+
+
+_GITHUB_SHORTHAND = re.compile(
+    r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$"
+)
+_REMOTE = re.compile(
+    r"^(?:https?://[^\s]+|ssh://[^\s]+|git@[A-Za-z0-9.-]+:[^\s]+|file://[^\s]+|/[^\s]*|[A-Za-z]:[\\/][^\s]*)$"
+)
+
+
+def normalize_remote(value: str) -> str:
+    """A git remote the brain may clone from and push to, or ``ValueError``.
+
+    ``owner/repo`` is GitHub shorthand. Everything else must name its transport
+    — https, ssh, ``git@host:``, file, or a local path — because the value ends
+    up in ``git clone`` and ``git remote add``: a string starting with ``-`` is
+    an option there (``--upload-pack=…`` runs a program), and ``ext::`` is a
+    transport that runs one too. Both are refused before git ever sees them.
+    """
+    text = (value or "").strip()
+    if not text:
+        raise ValueError("an empty remote")
+    if _GITHUB_SHORTHAND.fullmatch(text):
+        return f"https://github.com/{text.removesuffix('.git')}.git"
+    if text.startswith("-") or "::" in text or not _REMOTE.fullmatch(text):
+        raise ValueError(f"not a git remote: {text!r}")
+    return text
+
+
+def clone(remote: str, root: Path, timeout_s: int = 180) -> str | None:
+    """Clone *remote* into *root*; returns None, or why it failed."""
+    url = normalize_remote(remote)
+    root.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        done = subprocess.run(
+            ["git", "clone", "-q", "--", url, str(root)],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_s,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+        )
+    except subprocess.TimeoutExpired:
+        return "git clone timed out"
+    except OSError as exc:
+        return str(exc)
+    if done.returncode != 0:
+        return done.stderr.strip()[-500:] or "git clone failed"
+    return None
 
 
 def remote_url(root: Path) -> str | None:
@@ -147,11 +224,12 @@ def remote_url(root: Path) -> str | None:
 
 
 def set_remote(root: Path, url: str) -> None:
+    url = normalize_remote(url)
     ensure_repo(root)
     if remote_url(root):
-        _git(root, "remote", "set-url", "origin", url, check=True)
+        _git(root, "remote", "set-url", "--", "origin", url, check=True)
     else:
-        _git(root, "remote", "add", "origin", url, check=True)
+        _git(root, "remote", "add", "--", "origin", url, check=True)
 
 
 def _branch(root: Path) -> str:
