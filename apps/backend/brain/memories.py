@@ -455,8 +455,10 @@ def write_digest(root: Path) -> Path:
         "",
         "# Instructions partagées",
         "",
-        "Généré par WorkPilot Brain à chaque modification — ne pas éditer ici, "
-        "éditer la note dans `instructions/`.",
+        (
+            "Généré par WorkPilot Brain à chaque modification — ne pas éditer ici, "
+            "éditer la note dans `instructions/`."
+        ),
         "",
     ]
     for item in items:
@@ -490,18 +492,26 @@ def bridge_block(root: Path, spec: AgentSpec, own_text: str = "") -> str:
         BRIDGE_START,
         "## Cerveau partagé (WorkPilot Brain)",
         "",
-        f"Tu partages un cerveau avec les autres agents IA de cet utilisateur : `{root}` "
-        "(vault Obsidian + `graphify-out/graph.json`), exposé par le serveur MCP `workpilot-brain`.",
+        (
+            f"Tu partages un cerveau avec les autres agents IA de cet utilisateur : `{root}` "
+            "(vault Obsidian + `graphify-out/graph.json`), exposé par le serveur MCP `workpilot-brain`."
+        ),
         "",
-        "- **Rappel** : pour toute question « qu'avait-on décidé / où est / qu'est-ce qui est relié à », "
-        "applique le skill `graph-first-recall` — `brain_recall` (graphe puis index) avant "
-        "`brain_read_note` (fichier brut), et arrête-toi dès que tu as la réponse.",
-        "- **Instructions** : celles du cerveau s'appliquent **en plus** des tiennes. Une instruction "
-        "similaire à l'une des tiennes se renforce : applique les deux. En cas de contradiction, "
-        "l'instruction la plus spécifique (ce projet, puis cet agent) l'emporte — signale-la avec "
-        "`brain_remember`.",
-        "- **Écriture** : une décision, une convention ou une préférence durable va dans le cerveau "
-        "(`brain_write_note`, `brain_remember`) ; elle est poussée (git push) aux autres agents.",
+        (
+            "- **Rappel** : pour toute question « qu'avait-on décidé / où est / qu'est-ce qui est relié à », "
+            "applique le skill `graph-first-recall` — `brain_recall` (graphe puis index) avant "
+            "`brain_read_note` (fichier brut), et arrête-toi dès que tu as la réponse."
+        ),
+        (
+            "- **Instructions** : celles du cerveau s'appliquent **en plus** des tiennes. Une instruction "
+            "similaire à l'une des tiennes se renforce : applique les deux. En cas de contradiction, "
+            "l'instruction la plus spécifique (ce projet, puis cet agent) l'emporte — signale-la avec "
+            "`brain_remember`."
+        ),
+        (
+            "- **Écriture** : une décision, une convention ou une préférence durable va dans le cerveau "
+            "(`brain_write_note`, `brain_remember`) ; elle est poussée (git push) aux autres agents."
+        ),
     ]
     if spec.supports_import:
         head += ["", f"@{digest_path(root)}"]

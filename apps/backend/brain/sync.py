@@ -35,6 +35,7 @@ two ``git commit`` at once collide on ``.git/index.lock``. A lock directory
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
@@ -42,6 +43,8 @@ import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "SyncResult",
@@ -205,9 +208,8 @@ def _keep_both(root: Path, their_ref: str) -> list[str]:
                 f"{stem}.conflict-{short}.{ext}" if dot else f"{rel}.conflict-{short}"
             )
             (root / side).write_text(theirs.stdout, encoding="utf-8")
-        elif ours.returncode != 0:
-            # deleted on both sides differently: keep whatever is on disk
-            pass
+        # Neither side readable (deleted on one, changed on the other): whatever
+        # is on disk stays, and `git add -A` below records it.
     _git(root, "add", "-A")
     return conflicted
 
@@ -296,8 +298,9 @@ def sync(root: Path, message: str = "brain: sync", *, push: bool = True) -> Sync
 def _stamp(root: Path) -> None:
     try:
         (root / ".git" / _STAMP_NAME).write_text(str(time.time()), encoding="utf-8")
-    except OSError:
-        pass
+    except OSError as exc:
+        # Only costs an early re-pull on the next read; not worth failing a sync.
+        logger.debug("could not record the pull time in %s: %s", root, exc)
 
 
 def _last_pull(root: Path) -> float:
