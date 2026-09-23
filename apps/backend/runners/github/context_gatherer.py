@@ -263,6 +263,7 @@ class PRContext:
     )
     # Deep codebase context (architecture, patterns, memory)
     deep_context: dict = field(default_factory=dict)
+    jev_outcome: object | None = None
 
     def __post_init__(self) -> None:
         # The title and the description are written by whoever opened the PR.

@@ -132,3 +132,23 @@ def test_invalid_configuration_and_server_skip(tmp_path):
         )
     )
     assert result.reason == "unsupported_context"
+
+
+def test_classification_is_shared_only_within_current_run(tmp_path):
+    from integrations.jev.models import JevAnswer, JevOutcome
+    from integrations.jev.rubrics import classification_hint
+
+    run = JevRun.from_env(JevContext("feature-build", tmp_path), env={})
+    result = JevOutcome(
+        "evaluated", answers={"task_class": JevAnswer("choice", "multi_file", 0.95)}
+    )
+    run.record("classification", pass_id="planning", revision="request", outcome=result)
+    assert classification_hint(run.classification) == "multi_file"
+    assert run.fork().classification is None
+    run.record(
+        "classification",
+        pass_id="planning",
+        revision="new",
+        outcome=JevOutcome("bypassed", "low_confidence"),
+    )
+    assert run.classification is None

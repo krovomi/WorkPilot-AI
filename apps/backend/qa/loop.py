@@ -245,6 +245,7 @@ async def run_qa_validation_loop(
     model: str,
     verbose: bool = False,
     source_spec_dir: Path | None = None,
+    jev_run=None,
 ) -> bool:
     """
     Run the full QA validation loop.
@@ -558,6 +559,26 @@ async def run_qa_validation_loop(
         qa_model = get_phase_model(spec_dir, "qa", model)
         qa_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
         qa_provider = get_phase_provider(spec_dir, phase="qa")
+        from integrations.jev.adapters import assess_build
+        from integrations.jev.models import JevContext
+        from integrations.jev.rubrics import advice_text
+        from integrations.jev.runtime import JevRun
+
+        if jev_run is None:
+            jev_run = JevRun.from_env(
+                JevContext("feature-build", project_dir, spec_dir)
+            )
+        if not hasattr(jev_run, "base_revision") and not jev_run.eligibility():
+            from integrations.jev.adapters import capture_base
+            from prompts_pkg.prompts import _detect_base_branch
+
+            try:
+                capture_base(jev_run, _detect_base_branch(spec_dir, project_dir))
+            except (OSError, ValueError):
+                jev_run.base_revision = None
+        jev_advice = advice_text(
+            await assess_build(jev_run, "review", pass_id=f"qa-{qa_iteration}")
+        )
         debug(
             "qa_loop",
             "Creating client for QA reviewer session...",
@@ -595,6 +616,7 @@ async def run_qa_validation_loop(
                     qa_iteration,
                     MAX_QA_ITERATIONS,
                     verbose,
+                    jev_advice=jev_advice,
                     previous_error=last_error_context,  # Pass error context for self-correction
                 )
         except Exception as e:

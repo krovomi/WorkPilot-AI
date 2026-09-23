@@ -58,6 +58,7 @@ class JevRun:
         self.invalid_config = invalid_config
         self._cached: dict[tuple[str, str, str], JevOutcome] = {}
         self._suspended_reason = None
+        self.classification: JevOutcome | None = None
         self.observation: dict = {
             "version": 1,
             "runId": run_id,
@@ -82,6 +83,10 @@ class JevRun:
             settings, context, key=key, run_id=uuid4().hex, invalid_config=invalid
         )
 
+    @property
+    def has_credential(self) -> bool:
+        return bool(self._key)
+
     def fork(self, context: JevContext | None = None) -> JevRun:
         """A fresh review in the same worker retains its private credential, not prior results."""
         return JevRun(
@@ -105,6 +110,8 @@ class JevRun:
     def record(
         self, point: JevPoint, *, pass_id: str, revision: str, outcome: JevOutcome
     ) -> JevOutcome:
+        if point == "classification":
+            self.classification = outcome if outcome.status == "evaluated" else None
         row = {
             **outcome.to_dict(),
             "point": point,

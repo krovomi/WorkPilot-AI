@@ -134,6 +134,7 @@ export interface MRReviewFinding {
 }
 
 export interface MRReviewResult {
+	jev?: import("../../../shared/types/jev").JevObservation;
 	mrIid: number;
 	project: string;
 	success: boolean;

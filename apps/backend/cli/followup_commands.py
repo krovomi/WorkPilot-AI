@@ -221,6 +221,7 @@ def handle_followup_command(
     spec_dir: Path,
     model: str,
     verbose: bool = False,
+    jev_run=None,
 ) -> None:
     """
     Handle the --followup command.
@@ -331,6 +332,7 @@ def handle_followup_command(
     try:
         success_result = asyncio.run(
             run_followup_planner(
+                jev_run=jev_run,
                 project_dir=project_dir,
                 spec_dir=spec_dir,
                 model=model,

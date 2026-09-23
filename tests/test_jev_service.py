@@ -1,4 +1,5 @@
 import asyncio
+import sys
 
 import httpx
 import pytest
@@ -111,7 +112,7 @@ async def test_pause_closes_inflight_request(tmp_path, monkeypatch):
         finally:
             closed.set()
 
-    monkeypatch.setattr("integrations.jev.service.is_paused", lambda _: paused)
+    monkeypatch.setattr(sys.modules[evaluate.__module__], "is_paused", lambda _: paused)
     task = asyncio.create_task(
         evaluate(
             JevSettings(enabled=True),

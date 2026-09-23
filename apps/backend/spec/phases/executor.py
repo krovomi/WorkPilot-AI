@@ -41,6 +41,7 @@ class PhaseExecutor(
         run_agent_fn: Callable,
         task_logger,
         ui_module,
+        jev_run=None,
     ):
         """
         Initialize the phase executor.
@@ -61,6 +62,17 @@ class PhaseExecutor(
         self.run_agent_fn = run_agent_fn
         self.task_logger = task_logger
         self.ui = ui_module
+        self.jev_run = jev_run
+
+    async def _jev_planning_advice(self) -> str:
+        if self.jev_run is None:
+            return ""
+        from integrations.jev.adapters import assess_planning
+        from integrations.jev.rubrics import advice_text
+
+        return advice_text(
+            await assess_planning(self.jev_run, self.task_description or "")
+        )
 
     def _run_script(self, script: str, args: list[str]) -> tuple[bool, str]:
         """

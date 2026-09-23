@@ -12,12 +12,9 @@
  * is supported on every call (for useEffect cleanup).
  */
 
-export type ApiResult<T> =
-	| { ok: true; data: T }
-	| { ok: false; error: string };
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-const backendUrl = (): string =>
-	(import.meta.env?.VITE_BACKEND_URL) ?? "";
+const backendUrl = (): string => import.meta.env?.VITE_BACKEND_URL ?? "";
 
 async function _post<T>(
 	path: string,
@@ -249,13 +246,7 @@ export async function fetchTimeline(
 export interface ProgressIndicatorPayload {
 	spec_id: string;
 	label: string;
-	phase:
-		| "planning"
-		| "coding"
-		| "qa"
-		| "idle"
-		| "completed"
-		| "unknown";
+	phase: "planning" | "coding" | "qa" | "idle" | "completed" | "unknown";
 	sub_phase: string | null;
 	subtasks_completed: number;
 	subtasks_total: number;
@@ -439,6 +430,10 @@ export interface WorkflowLevelPayload {
 }
 
 export interface WorkflowProfilePayload {
+	jev?: {
+		observation: import("../../shared/types/jev").JevObservation | null;
+		airgapStrict: boolean;
+	};
 	workflow: string;
 	description: string;
 	effort: string;
@@ -626,7 +621,10 @@ export interface HermesStatus {
 	readonly adopted: readonly string[];
 	/** Le pack d'adoption — non listé dans `.workpilot/skills.toml`, donc émis nulle part. */
 	readonly adoptedPack: string;
-	readonly surfaces: readonly { readonly id: string; readonly description: string }[];
+	readonly surfaces: readonly {
+		readonly id: string;
+		readonly description: string;
+	}[];
 }
 
 export interface HermesCycle {

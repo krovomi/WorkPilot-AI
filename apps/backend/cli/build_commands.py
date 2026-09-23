@@ -313,6 +313,8 @@ def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None)
         if summary := run.describe():
             print("\n" + summary)
         return run
+    except (BuildPaused, BuildHalted):
+        raise
     except Exception as exc:  # noqa: BLE001 - phases report, they do not fail builds
         from debug import debug_warning
 
@@ -522,6 +524,7 @@ def handle_build_command(
     base_branch: str | None = None,
     enable_streaming: bool = False,
     streaming_session_id: str | None = None,
+    jev_run=None,
 ) -> None:
     """
     Handle the main build command.
@@ -542,6 +545,12 @@ def handle_build_command(
         streaming_session_id: Streaming session ID for live coding
     """
     # Lazy imports to avoid loading heavy modules
+    from integrations.jev.models import JevContext
+    from integrations.jev.runtime import JevRun
+
+    jev_run = jev_run or JevRun.from_env(
+        JevContext("feature-build", project_dir, spec_dir)
+    )
     from agent import run_autonomous_agent, sync_spec_to_source
     from debug import (
         debug,
@@ -702,6 +711,20 @@ def handle_build_command(
         if localized_spec_dir:
             spec_dir = localized_spec_dir
 
+    from dataclasses import replace
+
+    from integrations.jev.adapters import capture_base
+
+    jev_run.context = replace(
+        jev_run.context,
+        workflow=getattr(_profile, "workflow", "feature-build"),
+        project_dir=working_dir,
+        spec_dir=spec_dir,
+    )
+    capture_base(
+        jev_run,
+        base_branch or (worktree_manager.base_branch if worktree_manager else "HEAD"),
+    )
     # Run the autonomous agent
     debug_section("run.py", "Starting Build Execution")
     debug(
@@ -727,6 +750,8 @@ def handle_build_command(
         _pre_ctx = _phase_context(
             _profile, working_dir, spec_dir, model, verbose, changed_files=None
         )
+        if _pre_ctx is not None:
+            _pre_ctx.jev_run = jev_run
         _run_workflow_phases(_profile, _pre_ctx, after=None, before="planning")
 
         asyncio.run(
@@ -743,6 +768,7 @@ def handle_build_command(
                 # whether planning is bought at this effort and whether coding
                 # may dispatch to subagents.
                 profile=_profile,
+                jev_run=jev_run,
             )
         )
         debug_success("run.py", "Agent execution completed")
@@ -794,6 +820,8 @@ def handle_build_command(
         # call, so it is not pruned by effort, and its verdict is an *external*
         # signal, which is what makes it usable as corroboration by the
         # learning loop below.
+        if _post_ctx is not None:
+            _post_ctx.jev_run = jev_run
         gate_run = _run_deterministic_gates(_post_profile, working_dir, spec_dir)
 
         # `review` — declared between `coding` and `qa`, dispatched in a fresh
@@ -828,6 +856,7 @@ def handle_build_command(
                         model=model,
                         verbose=verbose,
                         source_spec_dir=source_spec_dir,
+                        jev_run=jev_run,
                     )
                 )
 
@@ -964,6 +993,7 @@ def handle_build_command(
             max_iterations=max_iterations,
             verbose=verbose,
             profile=_profile,
+            jev_run=jev_run,
         )
     except Exception as e:
         import traceback
@@ -983,6 +1013,7 @@ def _handle_build_interrupt(
     max_iterations: int | None,
     verbose: bool,
     profile=None,
+    jev_run=None,
 ) -> None:
     """
     Handle keyboard interrupt during build.
@@ -1108,6 +1139,7 @@ def _handle_build_interrupt(
                     verbose=verbose,
                     streaming_session_id=streaming_session_id,  # noqa: F821
                     profile=profile,
+                    jev_run=jev_run,
                 )
             )
             # Build completed or was interrupted again - exit

@@ -117,6 +117,10 @@ from ui import Icons, highlight, muted, print_section, print_status
 
 def main():
     """CLI entry point."""
+    from integrations.jev.models import JevContext
+    from integrations.jev.runtime import JevRun
+
+    jev_run = JevRun.from_env(JevContext("feature-build", Path.cwd()))
     debug_section("spec_runner", "Spec Runner CLI")
     import argparse
 
@@ -337,6 +341,7 @@ Examples:
     )
 
     orchestrator = SpecOrchestrator(
+        jev_run=jev_run,
         project_dir=project_dir,
         task_description=task_description,
         spec_name=args.continue_spec,
@@ -456,6 +461,14 @@ Examples:
             )
             print(f"  {muted('Running:')} {' '.join(run_cmd)}")
             print()
+
+            # Keep JEV credentials in the private runtime; never put them back
+            # into an environment inherited by SDK tools or background servers.
+            if jev_run.has_credential:
+                from run import main as build_main
+
+                build_main(argv=run_cmd[2:], jev_run=jev_run)
+                sys.exit(0)
 
             # Execute run.py - use subprocess on Windows to maintain connection with Electron
             # Fix for issue #609: os.execv() breaks connection on Windows

@@ -49,6 +49,16 @@ def redact(value: str, sensitive_values: tuple[str, ...] = ()) -> str:
 def _safe_diff(diff: str) -> str:
     if not diff.strip():
         return ""
+    if diff.startswith("--- a/"):
+        # GitHub follow-up and Azure DevOps provide unified diffs without git headers.
+        diff = re.sub(
+            r"(?m)^--- (a/[^\r\n]+)\n\+\+\+ (b/[^\r\n]+)\n",
+            lambda match: (
+                f"diff --git {shlex.quote(match[1])} {shlex.quote(match[2])}\n"
+                + match[0]
+            ),
+            diff,
+        )
     if not diff.startswith("diff --git "):
         raise JevContextError("missing_context")
     kept = []

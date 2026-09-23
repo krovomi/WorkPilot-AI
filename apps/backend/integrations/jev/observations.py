@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 from typing import get_args
 
-from .models import WORKFLOW_ID, BypassReason, finite_number
+from .models import MODEL_ID, WORKFLOW_ID, BypassReason, finite_number
 
 logger = logging.getLogger(__name__)
 _MAX_BYTES = 256 * 1024
@@ -78,6 +78,7 @@ def read_observations(directory: Path) -> dict | None:
             answers = row.get("answers", {})
             if not isinstance(answers, dict):
                 return None
+            safe_answers = {}
             for name, answer in answers.items():
                 if name not in ("task_class", "coverage", "risk") or not isinstance(
                     answer, dict
@@ -104,6 +105,29 @@ def read_observations(directory: Path) -> dict | None:
                     or not 0 <= answer["confidence"] <= 1
                 ):
                     return None
+                safe_answers[name] = {
+                    "value": value,
+                    "confidence": answer.get("confidence"),
+                }
+            row = dict(row)
+            row["answers"] = safe_answers
+            model = row.get("model")
+            row["model"] = (
+                model if isinstance(model, str) and MODEL_ID.fullmatch(model) else None
+            )
+            usage = row.get("usage")
+            row["usage"] = (
+                {
+                    k: v
+                    for k, v in usage.items()
+                    if k in ("input_tokens", "output_tokens")
+                    and isinstance(v, int)
+                    and not isinstance(v, bool)
+                    and v >= 0
+                }
+                if isinstance(usage, dict)
+                else {}
+            )
             clean.append(
                 {
                     key: row.get(key)

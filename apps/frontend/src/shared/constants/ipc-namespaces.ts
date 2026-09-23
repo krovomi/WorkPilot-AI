@@ -29,6 +29,11 @@ type ChannelValue = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
 // ============================================
 
 export const IPC_NS = {
+	jev: {
+		STATUS: IPC_CHANNELS.JEV_STATUS,
+		SAVE_KEY: IPC_CHANNELS.JEV_SAVE_KEY,
+		CLEAR_KEY: IPC_CHANNELS.JEV_CLEAR_KEY,
+	},
 	project: {
 		ADD: IPC_CHANNELS.PROJECT_ADD,
 		REMOVE: IPC_CHANNELS.PROJECT_REMOVE,
