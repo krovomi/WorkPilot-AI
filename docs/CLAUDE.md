@@ -839,6 +839,8 @@ format Graphify, un dépôt git synchronisé, servi par un serveur MCP.
 | `connect.py` | inscrire `workpilot-brain` dans la configuration MCP de chaque agent |
 | `mcp_server.py` | le serveur MCP stdio |
 | `vault.py` | `Brain`, le seul objet qu'appellent MCP, CLI et HTTP |
+| `runtime.py` | le branchement sur **toutes** les features de WorkPilot |
+| `learn.py` | ce que WorkPilot enregistre lui-même : chaque build, chaque merge |
 
 ```bash
 python apps/backend/runners/brain_runner.py --action init --remote git@github.com:moi/brain.git
@@ -916,9 +918,69 @@ cerveau que personne ne joint. JSON-RPC 2.0 sur stdio, une ligne par message, et
 le champ `instructions` d'`initialize` porte les règles d'usage : un agent jamais
 branché par `bridge` les apprend en se connectant.
 
+#### Branché sur toutes les features
+
+Aucune feature ne parle au cerveau d'elle-même. Planner, coder, QA, pipeline
+de spec, insights, idéation, roadmap, runners GitHub/GitLab, self-healing :
+chacune construit son agent par `create_client` et son prompt par
+`build_base_system_prompt`, et les fournisseurs sans SDK Claude exécutent leurs
+outils dans `tool_executor`. Ces trois points sont branchés une fois, comme rtk
+et watermarks : une feature ajoutée le mois prochain est branchée parce
+qu'elle a été écrite normalement.
+
+| Où | Ce que le cerveau ajoute |
+|---|---|
+| `get_required_mcp_servers` + `create_client` | le serveur `workpilot-brain` et ses outils autorisés, pour **tout** agent qui a des outils (pas `commit_message` ni `merge_resolver`). Il n'est pas déclaré agent par agent dans `AGENT_CONFIGS` : une liste à tenir à jour, c'est la prochaine feature débranchée. `AGENT_MCP_<agent>_REMOVE=brain` le retire |
+| `build_base_system_prompt` | `awareness_section` : rappel graph-first, apprendre en travaillant, et les instructions partagées **en plus** des règles de la tâche. Lue sur disque, jamais tirée du réseau, stable au byte près pour le cache de prompt |
+| `tool_executor` | les mêmes outils pour Copilot, OpenAI, Gemini, Ollama…, exécutés dans le processus |
+
+L'apprentissage a deux moitiés. Les agents écrivent quand ils remarquent
+quelque chose (le prompt le leur demande) ; ça dépend d'un modèle qui le décide.
+`learn.py` est l'autre moitié : ce que WorkPilot **sait**, enregistré qu'un
+agent y ait pensé ou non.
+
+| Surface | Moment | Note |
+|---|---|---|
+| `build` | fin de chaque build Kanban/CLI (`_record_build_in_brain`), à tout niveau d'effort, moteur de workflow ou non | `knowledge/projects/<projet>/builds/<spec>.md` : la demande, le verdict QA et tests (`non mesuré` n'est pas `vert`), les fichiers touchés |
+| `merge` | un merge depuis le Kanban (`run.py --merge`) | la même note, `status: merged` : une personne a relu le diff et dit oui |
+| les autres | `POST /api/brain/learn` avec une surface de `SURFACES` | `knowledge/projects/<projet>/<surface>/…` |
+
+Chaque note de build pointe vers `knowledge/projects/<projet>/index.md`, si bien
+qu'un seul `brain_recall` répond à « qu'a-t-on fait sur ce projet, et qu'est-ce
+qui a été accepté », depuis n'importe quel agent. Le nom du projet est lu à
+travers le worktree : sinon chaque tâche serait classée sous un « projet »
+différent.
+
+**Les agents de WorkPilot proposent des règles, une personne les active.** Une
+instruction active est injectée dans le prompt de tous les agents, sur tous les
+projets. Et un agent de build lit, dans la même session, des issues, des PR et
+des pages web, qui peuvent toutes lui demander de « retenir » n'importe quoi. Le
+serveur que WorkPilot lance pour ses propres agents porte donc
+`WORKPILOT_BRAIN_ORIGIN=workpilot`, et l'exécuteur d'outils appelle le cerveau
+en non fiable. Dans ce mode, un agent :
+
+- écrit des connaissances (`knowledge/`), rappelées à la demande et lues comme
+  des données ;
+- **propose** des instructions (`status: proposed`), qui ne s'appliquent à
+  personne tant qu'une personne ne les a pas activées ;
+- ne touche ni à une instruction en vigueur, ni aux skills, ni aux instantanés
+  de mémoire.
+
+Les agents qu'une personne branche elle-même par `connect` (Claude Code,
+Codex, hermes…) écrivent en son nom, sans cette restriction. Pour activer ou
+refuser une proposition : `--action proposals`, puis `--action promote` ou
+`--action reject` avec `--path` ; ou bien changer `status:` dans Obsidian.
+
+**Actif seulement quand un cerveau existe.** `BRAIN_ENABLED` vaut `true` par
+défaut ; sans cerveau sur disque, chaque point d'entrée répond en un `is_file`
+et n'ajoute rien — pas de serveur lancé, pas de section de prompt, pas d'outil.
+L'allumer, c'est lancer `--action init` : une décision de la personne sur
+l'endroit où vit sa connaissance et le distant où elle est poussée.
+
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `WORKPILOT_BRAIN_DIR` | `~/.workpilot/brain` (`%APPDATA%\WorkPilot\brain`) | où est le cerveau |
+| `BRAIN_ENABLED` | `true` | branche le cerveau sur toutes les features, quand il existe |
 | `BRAIN_PULL_INTERVAL` | `60` | secondes entre deux pulls avant lecture |
 | `BRAIN_AUTO_PULL` / `BRAIN_AUTO_PUSH` | `true` | pull avant lecture / push après écriture |
 | `BRAIN_SIMILARITY` | `0.72` | seuil au-delà duquel deux instructions n'en font qu'une |

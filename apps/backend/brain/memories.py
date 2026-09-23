@@ -199,7 +199,13 @@ def _instruction_text(note: Note) -> str:
     return " ".join(line.strip() for line in lines).strip()
 
 
-def instructions(root: Path, *, include_retired: bool = False) -> list[Instruction]:
+def instructions(root: Path, *, include_inactive: bool = False) -> list[Instruction]:
+    """The instructions in force: ``status: active`` (or no status at all).
+
+    ``proposed`` ones — written by a WorkPilot agent rather than a person — and
+    ``retired`` ones are left out of every prompt and bridge until a person
+    changes the status. ``include_inactive`` is for deduplication only.
+    """
     folder = kind_dir(root, "instruction").name
     out: list[Instruction] = []
     for rel in iter_notes(root):
@@ -210,7 +216,7 @@ def instructions(root: Path, *, include_retired: bool = False) -> list[Instructi
         except OSError:
             continue
         status = str(note.meta.get("status") or "active")
-        if status == "retired" and not include_retired:
+        if status != "active" and not include_inactive:
             continue
         agents = note.meta.get("agents") or []
         out.append(
@@ -238,16 +244,30 @@ class RememberResult:
 
 
 def remember(
-    root: Path, text: str, *, agent_name: str = "brain", source: str | None = None
+    root: Path,
+    text: str,
+    *,
+    agent_name: str = "brain",
+    source: str | None = None,
+    status: str = "active",
 ) -> RememberResult:
-    """File *text* as an instruction, merging it into a similar one if any."""
+    """File *text* as an instruction, merging it into a similar one if any.
+
+    ``status="proposed"`` is how a WorkPilot agent files one: it lands in the
+    brain, reinforces a similar instruction if there is one, and applies to
+    nobody until a person activates it. An agent reading an issue, a PR or a
+    web page can be told to "remember" anything, and an active instruction is
+    injected into the prompt of every agent on every project.
+    """
+    if status not in ("active", "proposed"):
+        raise ValueError(f"unknown instruction status {status!r}")
     text = re.sub(r"\s+", " ", text).strip()
     if not text:
         raise ValueError("an instruction cannot be empty")
     if _SECRET.search(text):
         raise ValueError("refusing to store what looks like a credential")
     best: tuple[float, Instruction | None] = (0.0, None)
-    for existing in instructions(root, include_retired=True):
+    for existing in instructions(root, include_inactive=True):
         score = similarity(text, existing.text)
         if score > best[0]:
             best = (score, existing)
@@ -263,7 +283,8 @@ def remember(
         if source and source not in sources:
             sources.append(source)
             changed = True
-        if note.meta.get("status") == "retired":
+        if status == "active" and note.meta.get("status") not in (None, "active"):
+            # A trusted source confirms a proposed or retired rule.
             note.meta["status"] = "active"
             changed = True
         if score < 0.999 and text not in note.body:
@@ -286,7 +307,7 @@ def remember(
         meta={
             "kind": "instruction",
             "title": text if len(text) <= 80 else text[:77].rstrip() + "…",
-            "status": "active",
+            "status": status,
             "agents": [agent_name],
             "sources": [source] if source else [],
             "tags": ["instruction"],
@@ -537,8 +558,10 @@ def bridge_block(root: Path, spec: AgentSpec, own_text: str = "") -> str:
         head[:4]
         + [
             "",
-            f"Instructions partagées : {len(items)} (outil MCP `brain_instructions`). "
-            "Elles s'appliquent en plus des tiennes.",
+            (
+                f"Instructions partagées : {len(items)} (outil MCP `brain_instructions`). "
+                "Elles s'appliquent en plus des tiennes."
+            ),
         ]
         + tail
     )

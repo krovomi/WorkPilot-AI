@@ -25,6 +25,7 @@ agent that was never bridged still learns them the moment it connects.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import traceback
 from collections.abc import Callable
@@ -169,7 +170,25 @@ def _skills(brain: Brain, name: str | None) -> Any:
     return path.read_text(encoding="utf-8")
 
 
-def _call(brain: Brain, name: str, args: dict[str, Any]) -> Any:
+ORIGIN_ENV = "WORKPILOT_BRAIN_ORIGIN"
+"""Set to ``workpilot`` on the server WorkPilot starts for its own agents.
+
+Those agents read issues, PRs and web pages in the same session they write
+from, so what they write is untrusted (`Brain.write`): knowledge yes,
+instructions only as proposals. A person's own agent — Claude Code, Codex,
+hermes connected by `connect.py` — has no such variable and writes as the
+person."""
+
+
+def _trusted_default() -> bool:
+    return os.environ.get(ORIGIN_ENV, "").strip().lower() != "workpilot"
+
+
+def _call(
+    brain: Brain, name: str, args: dict[str, Any], *, trusted: bool | None = None
+) -> Any:
+    if trusted is None:
+        trusted = _trusted_default()
     graph_tools: dict[str, Callable[[], Any]] = {
         "query_graph": lambda: brain.graph().query(
             args["query"], limit=int(args.get("limit", 8))
@@ -205,9 +224,12 @@ def _call(brain: Brain, name: str, args: dict[str, Any]) -> Any:
             links=args.get("links"),
             agent=args.get("agent"),
             path=args.get("path"),
+            trusted=trusted,
         ).to_dict()
     if name == "brain_remember":
-        return brain.remember(args["text"], agent=args.get("agent") or "brain")
+        return brain.remember(
+            args["text"], agent=args.get("agent") or "brain", trusted=trusted
+        )
     if name == "brain_sync":
         return brain.sync().to_dict()
     if name == "brain_status":

@@ -681,6 +681,13 @@ class _NoSubagents(Exception):
     """
 
 
+def _brain_mcp_tools() -> tuple[str, ...]:
+    """The shared brain's MCP tool names, for the permission allowlist."""
+    from brain.runtime import MCP_TOOL_NAMES
+
+    return MCP_TOOL_NAMES
+
+
 def create_client(
     project_dir: Path,
     spec_dir: Path,
@@ -965,6 +972,11 @@ def create_client(
                     if graphiti_mcp_enabled
                     else []
                 ),
+                *(
+                    [f"{tool}(*)" for tool in _brain_mcp_tools()]
+                    if "brain" in required_servers
+                    else []
+                ),
                 *[f"{tool}(*)" for tool in browser_tools_permissions],
             ],
         },
@@ -1000,6 +1012,8 @@ def create_client(
         mcp_servers_list.append("linear (project management)")
     if graphiti_mcp_enabled:
         mcp_servers_list.append("graphiti-memory (knowledge graph)")
+    if "brain" in required_servers:
+        mcp_servers_list.append("workpilot-brain (shared brain)")
     if "workpilot" in required_servers and auto_claude_tools_enabled:
         mcp_servers_list.append(f"workpilot ({agent_type} tools)")
     if mcp_servers_list:
@@ -1168,6 +1182,13 @@ def create_client(
                 "args": ["-y", "teams-mcp-server"],
                 "env": {"TEAMS_WEBHOOK_URL": teams_webhook_url},
             }
+
+    # The shared brain (`brain/runtime.py`): offered to every agent with tools
+    # once a brain exists on this machine, whatever the feature.
+    if "brain" in required_servers:
+        from brain.runtime import SERVER_KEY, mcp_server_config
+
+        mcp_servers[SERVER_KEY] = mcp_server_config()
 
     # Add custom workpilot MCP server if required and available
     if "workpilot" in required_servers and auto_claude_tools_enabled:

@@ -27,6 +27,15 @@ class SyncRequest(BaseModel):
     message: str = "brain: sync"
 
 
+class LearnRequest(BaseModel):
+    surface: str
+    """One of `brain.learn.SURFACES`: which feature is reporting."""
+    title: str
+    body: str
+    project: str | None = None
+    tags: list[str] = []
+
+
 class RecallRequest(BaseModel):
     query: str
     limit: int = 5
@@ -57,3 +66,26 @@ def recall(request: RecallRequest) -> dict:
     if server_mode_roots() is not None:
         return _DESKTOP_ONLY
     return {"success": True, **Brain().recall(request.query, limit=request.limit)}
+
+
+@router.post("/learn")
+def learn(request: LearnRequest) -> dict:
+    """A feature reports something it knows; filed under its surface and project."""
+    if server_mode_roots() is not None:
+        return _DESKTOP_ONLY
+    from .learn import SURFACES, record
+
+    if request.surface not in SURFACES:
+        return {
+            "success": False,
+            "error": f"unknown surface {request.surface!r}",
+            "surfaces": sorted(SURFACES),
+        }
+    rel = record(
+        request.surface,
+        request.title,
+        request.body,
+        project=request.project,
+        tags=request.tags,
+    )
+    return {"success": rel is not None, "path": rel}

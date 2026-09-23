@@ -10,6 +10,9 @@ Output: ``__BRAIN_RESULT__:{json}`` — the convention the other runners use.
     python runners/brain_runner.py --action recall --query "auth"
     python runners/brain_runner.py --action read --path knowledge/auth.md
     python runners/brain_runner.py --action remember --text "Toujours répondre en français" --agent codex
+    python runners/brain_runner.py --action proposals       # instructions WorkPilot agents proposed
+    python runners/brain_runner.py --action promote --path instructions/x.md
+    python runners/brain_runner.py --action reject  --path instructions/x.md
     python runners/brain_runner.py --action discover [--project-dir .]
     python runners/brain_runner.py --action ingest [--project-dir .] [--agent claude-code]
     python runners/brain_runner.py --action bridge [--agent codex] [--apply]
@@ -47,6 +50,9 @@ ACTIONS = (
     "recall",
     "read",
     "remember",
+    "proposals",
+    "promote",
+    "reject",
     "discover",
     "ingest",
     "bridge",
@@ -79,6 +85,13 @@ def run(args: argparse.Namespace) -> dict:
             "success": True,
             **brain.remember(args.text, agent=args.agent or "brain"),
         }
+    if action == "proposals":
+        return {"success": True, "proposals": brain.proposals()}
+    if action in ("promote", "reject"):
+        if not args.path:
+            raise ValueError("--path is required")
+        status = "active" if action == "promote" else "retired"
+        return {"success": True, **brain.set_instruction_status(args.path, status)}
     project = Path(args.project_dir).resolve() if args.project_dir else None
     if action == "discover":
         return {

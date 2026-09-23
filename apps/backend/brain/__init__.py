@@ -15,6 +15,8 @@ any agent over MCP (``workpilot-brain``).
 | `connect.py` | registering the MCP server in each agent |
 | `vault.py` | `Brain`: the one object every surface calls |
 | `mcp_server.py` | the stdio MCP server |
+| `runtime.py` | how every WorkPilot feature reaches it: MCP server, prompt section, tool executor |
+| `learn.py` | what WorkPilot records itself: every build, every merge, other surfaces |
 | `api.py` | ``/api/brain/*`` for the desktop app |
 """
 

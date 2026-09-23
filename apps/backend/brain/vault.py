@@ -188,8 +188,17 @@ class Brain:
         links: list[str] | None = None,
         agent: str | None = None,
         path: str | None = None,
+        trusted: bool = True,
     ) -> WriteResult:
-        """Create or update a note, then sync. An existing note keeps its frontmatter."""
+        """Create or update a note, then sync. An existing note keeps its frontmatter.
+
+        ``trusted=False`` is a write from one of WorkPilot's own agents, which
+        may have read untrusted content (an issue, a PR, a web page) in the
+        same session. Such a write may add or update *knowledge* — recalled on
+        demand, read as data — and may *propose* a new instruction; it may not
+        touch an instruction in force, a skill every agent loads, an agent's
+        memory snapshot or the brain's own files.
+        """
         folder = kind_dir(self.root, kind).name
         rel = Path(path) if path else Path(folder) / f"{slugify(title)}.md"
         if rel.suffix != ".md":
@@ -197,7 +206,20 @@ class Brain:
         if rel.is_absolute() or ".." in rel.parts:
             raise ValueError("a note path is relative to the brain and stays inside it")
         created = not (self.root / rel).exists()
+        is_instruction = rel.parts[0] == KINDS["instruction"]
+        if not trusted:
+            if rel.parts[0] not in (KINDS["knowledge"], KINDS["instruction"]):
+                raise ValueError(
+                    "an agent writes knowledge/ notes, or proposes instructions"
+                )
+            if is_instruction and not created:
+                raise ValueError(
+                    "an instruction in the brain is changed by a person; "
+                    "propose a new one with brain_remember"
+                )
         meta: dict[str, Any] = {} if created else dict(read_note(self.root, rel).meta)
+        if is_instruction and created:
+            meta["status"] = "active" if trusted else "proposed"
         meta.setdefault("kind", kind)
         meta["title"] = title
         meta.setdefault("created", now_iso())
@@ -223,10 +245,43 @@ class Brain:
             self.after_write(f"brain: {verb} {rel.as_posix()}{who}"),
         )
 
-    def remember(self, text: str, agent: str = "brain") -> dict[str, Any]:
-        outcome = remember(self.root, text, agent_name=agent)
+    def remember(
+        self, text: str, agent: str = "brain", *, trusted: bool = True
+    ) -> dict[str, Any]:
+        status = "active" if trusted else "proposed"
+        outcome = remember(self.root, text, agent_name=agent, status=status)
         result = self.after_write(f"brain: {outcome.outcome} instruction ({agent})")
-        return {**outcome.to_dict(), "sync": result.to_dict()}
+        payload = {**outcome.to_dict(), "sync": result.to_dict()}
+        if outcome.outcome == "created" and not trusted:
+            payload["status"] = "proposed"
+            payload["note"] = (
+                "filed as a proposal: it applies once a person activates it"
+            )
+        return payload
+
+    def proposals(self) -> list[dict[str, Any]]:
+        """Instructions waiting for a person: what agents proposed."""
+        from .memories import instructions
+
+        return [
+            i.to_dict()
+            for i in instructions(self.root, include_inactive=True)
+            if i.status == "proposed"
+        ]
+
+    def set_instruction_status(self, rel: str, status: str) -> dict[str, Any]:
+        """Activate (``active``) or turn down (``retired``) an instruction."""
+        if status not in ("active", "retired"):
+            raise ValueError("status is 'active' or 'retired'")
+        path = Path(rel)
+        if path.parts[0] != KINDS["instruction"] or ".." in path.parts:
+            raise ValueError("not an instruction note")
+        note = read_note(self.root, path)
+        note.meta["status"] = status
+        note.meta["updated"] = now_iso()
+        write_note(self.root, note)
+        result = self.after_write(f"brain: {status} {path.as_posix()}")
+        return {"path": path.as_posix(), "status": status, "sync": result.to_dict()}
 
     # -- read: the recall ladder ------------------------------------------
 
@@ -320,6 +375,7 @@ class Brain:
             "graph": str(graph_path(self.root)),
             "graphStale": self.graph_is_stale() if self.exists else None,
             "notes": counts,
+            "proposals": len(self.proposals()) if self.exists else 0,
             "autoPull": _auto("BRAIN_AUTO_PULL"),
             "autoPush": _auto("BRAIN_AUTO_PUSH"),
         }
