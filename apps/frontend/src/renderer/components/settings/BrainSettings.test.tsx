@@ -15,11 +15,13 @@ import i18n from "../../../shared/i18n";
 
 const mockFetchSettings = vi.fn();
 const mockSaveSettings = vi.fn();
+const mockSync = vi.fn();
 
 vi.mock("../../lib/agent-tools-api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../../lib/agent-tools-api")>()),
 	fetchBrainSettings: (...args: unknown[]) => mockFetchSettings(...args),
 	saveBrainSettings: (...args: unknown[]) => mockSaveSettings(...args),
+	syncBrain: (...args: unknown[]) => mockSync(...args),
 }));
 
 import { useBrainStore } from "../../stores/brain-store";
@@ -47,10 +49,12 @@ beforeEach(async () => {
 	await i18n.changeLanguage("en");
 	mockFetchSettings.mockReset();
 	mockSaveSettings.mockReset();
+	mockSync.mockReset();
 	useBrainStore.setState({
 		settings: null,
 		unavailable: false,
 		error: null,
+		errorDetail: null,
 		saving: false,
 		lastSync: null,
 	});
@@ -123,4 +127,29 @@ it("does not pretend to choose the folder when the environment does", async () =
 	render(<BrainSettings />);
 	expect(await screen.findByLabelText("Brain folder (Obsidian vault)")).toBeDisabled();
 	expect(screen.getByText(/WORKPILOT_BRAIN_DIR environment variable/)).toBeInTheDocument();
+});
+
+it("says what git answered when a sync fails", async () => {
+	mockFetchSettings.mockResolvedValue({
+		ok: true,
+		data: {
+			settings: {
+				...base,
+				exists: true,
+				git: true,
+				active: true,
+				remote: "https://github.com/me/vault.git",
+			},
+		},
+	});
+	mockSync.mockResolvedValue({
+		ok: false,
+		error: "rejected",
+		detail: "! [rejected] main -> main (fetch first)",
+	});
+	render(<BrainSettings />);
+	fireEvent.click(await screen.findByRole("button", { name: /Sync now/ }));
+	const alert = await screen.findByRole("alert");
+	expect(alert).toHaveTextContent(/GitHub refused the push/);
+	expect(alert).toHaveTextContent("git said: ! [rejected] main -> main (fetch first)");
 });

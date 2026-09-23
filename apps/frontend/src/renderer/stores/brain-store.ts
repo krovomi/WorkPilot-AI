@@ -46,6 +46,8 @@ interface BrainState {
 	unavailable: boolean;
 	/** The last save or sync failure, verbatim from the backend. */
 	error: string | null;
+	/** git's own message for that failure, when the backend had one. */
+	errorDetail: string | null;
 	saving: boolean;
 	syncing: boolean;
 	lastSync: BrainSyncResult | null;
@@ -73,6 +75,7 @@ export const useBrainStore = create<BrainState>((set, get) => ({
 	settingsLoading: false,
 	unavailable: false,
 	error: null,
+	errorDetail: null,
 	saving: false,
 	syncing: false,
 	lastSync: null,
@@ -95,13 +98,13 @@ export const useBrainStore = create<BrainState>((set, get) => ({
 	},
 
 	saveSettings: async (update) => {
-		set({ saving: true, error: null });
+		set({ saving: true, error: null, errorDetail: null });
 		const res = await saveBrainSettings(update);
 		if (!res.ok) {
 			// The backend sends the settings back with the refusal: show where
 			// the brain still is, not a stale copy.
 			await get().loadSettings(true);
-			set({ saving: false, error: res.error });
+			set({ saving: false, error: res.error, errorDetail: res.detail ?? null });
 			return false;
 		}
 		set({ saving: false, settings: res.data.settings, error: null });
@@ -109,10 +112,10 @@ export const useBrainStore = create<BrainState>((set, get) => ({
 	},
 
 	sync: async () => {
-		set({ syncing: true, error: null });
+		set({ syncing: true, error: null, errorDetail: null });
 		const res = await syncBrain();
 		if (!res.ok) {
-			set({ syncing: false, error: res.error });
+			set({ syncing: false, error: res.error, errorDetail: res.detail ?? null });
 			return false;
 		}
 		set({ syncing: false, lastSync: res.data });
