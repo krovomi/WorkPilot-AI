@@ -19,7 +19,8 @@
 		"qualityScore": "Quality Score",
 		"good": "Good",
 		"needsImprovement": "Needs improvement",
-		"poor": "Poor"
+		"poor": "Poor",
+		"blocked": "Critical issues to address"
 	},
 	"result": {
 		"passed": "Review Passed",
@@ -32,5 +33,72 @@
 		"title": "Issues",
 		"line": "line {{line}}",
 		"suggestion": "Suggestion"
+	},
+	"workspace": {
+		"files": "Project files",
+		"search": "Search files…",
+		"modified": "Modified",
+		"allFiles": "All",
+		"loading": "Loading…",
+		"noFiles": "No matching files.",
+		"selectFile": "Select {{file}}",
+		"gitStatus": "Git status: index / working tree",
+		"showMore": "Show more",
+		"addFiles": "Add selected ({{count}})",
+		"closeFile": "Close {{file}}",
+		"emptyTitle": "Your code, ready for review",
+		"emptyHint": "Open a file to explore its code, inspect changes, or prepare an excerpt.",
+		"searchShortcut": "Ctrl / ⌘ P · Search files",
+		"code": "Code",
+		"diff": "Git diff",
+		"split": "Side by side",
+		"unified": "Unified",
+		"previousChange": "Previous change",
+		"nextChange": "Next change",
+		"selectedLines": "Lines {{start}}–{{end}} selected",
+		"selectionHint": "Select code to extract complete lines.",
+		"copy": "Copy",
+		"extract": "Extract as Markdown",
+		"addDiff": "Add diff",
+		"addSelection": "Add excerpt",
+		"addFile": "Add file",
+		"reviewBasket": "Review selection",
+		"snapshotHint": "Added items are snapshots. Add them again to refresh their content.",
+		"basketEmpty": "Add files, changes, or excerpts to prepare your review.",
+		"remove": "Remove {{file}}",
+		"tooMuch": "Selection exceeds 2 MB. Remove some items.",
+		"reviewShortcut": "Ctrl / ⌘ Enter · Run review",
+		"resultsHint": "Analysis results will appear here.",
+		"subtitle": "Explore, compare, and review your project’s code.",
+		"project": "Project",
+		"paste": "Paste code",
+		"comparison": "Git comparison base",
+		"refresh": "Refresh files and diff",
+		"retry": "Retry",
+		"loadFailed": "Could not load project files.",
+		"copyFailed": "Could not copy to the clipboard.",
+		"binary": "This binary file cannot be displayed as code.",
+		"large": "This file exceeds 1 MB and cannot be loaded for review.",
+		"deleted": "This file was deleted. Inspect its Git diff.",
+		"scope": {
+			"all": "All changes · HEAD",
+			"staged": "Staged for commit · Index",
+			"working": "Local changes · Index → Disk"
+		},
+		"panels": "Review panels",
+		"panel": {
+			"files": "Files",
+			"code": "Code",
+			"review": "Review"
+		},
+		"reviewedSnapshot": "Reviewed snapshot",
+		"missingRevision": "This file is not present in the selected Git revision."
+	},
+	"severity": {
+		"critical": "Critical",
+		"high": "High",
+		"medium": "Medium",
+		"low": "Low",
+		"info": "Information"
 	}
 }
