@@ -487,7 +487,9 @@ export function TaskFormFields({
 								onClick={() =>
 									usePromptOptimizerStore
 										.getState()
-										.openDialog(description, "general")
+										// A task description is handed to the coder, and
+										// "Use this prompt" writes back into this field.
+										.openDialog(description, "coding", onDescriptionChange)
 								}
 							>
 								<WandSparkles className="h-3.5 w-3.5" />

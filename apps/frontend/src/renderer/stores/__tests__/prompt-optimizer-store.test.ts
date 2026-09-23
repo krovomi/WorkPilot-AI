@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock electronAPI
 const mockOptimizePrompt = vi.fn();
+const mockCancelPromptOptimization = vi.fn();
 const mockOnPromptOptimizerStreamChunk = vi.fn();
 const mockOnPromptOptimizerStatus = vi.fn();
 const mockOnPromptOptimizerError = vi.fn();
@@ -24,6 +25,7 @@ beforeEach(() => {
 	Object.defineProperty(globalThis, "electronAPI", {
 		value: {
 			optimizePrompt: mockOptimizePrompt,
+			cancelPromptOptimization: mockCancelPromptOptimization,
 			onPromptOptimizerStreamChunk: mockOnPromptOptimizerStreamChunk,
 			onPromptOptimizerStatus: mockOnPromptOptimizerStatus,
 			onPromptOptimizerError: mockOnPromptOptimizerError,
@@ -111,13 +113,37 @@ describe("Prompt Optimizer Store", () => {
 	});
 
 	describe("closeDialog", () => {
-		it("should close dialog and reset transient state", () => {
+		it("keeps a finished result to show when the dialog is reopened", () => {
+			const result = { optimized: "test", changes: ["a"], reasoning: "r" };
 			usePromptOptimizerStore.setState({
 				isOpen: true,
 				phase: "complete",
-				status: "done",
-				streamingOutput: "output",
-				result: { optimized: "test", changes: ["a"], reasoning: "r" },
+				result,
+			});
+
+			usePromptOptimizerStore.getState().closeDialog();
+
+			const state = usePromptOptimizerStore.getState();
+			expect(state.isOpen).toBe(false);
+			expect(state.phase).toBe("complete");
+			expect(state.result).toEqual(result);
+		});
+
+		it("does not stop a run in flight", () => {
+			usePromptOptimizerStore.setState({ isOpen: true, phase: "optimizing" });
+
+			usePromptOptimizerStore.getState().closeDialog();
+
+			expect(usePromptOptimizerStore.getState().phase).toBe("optimizing");
+			expect(mockCancelPromptOptimization).not.toHaveBeenCalled();
+		});
+
+		it("resets a failed run", () => {
+			usePromptOptimizerStore.setState({
+				isOpen: true,
+				phase: "error",
+				error: "boom",
+				errorCode: "auth",
 			});
 
 			usePromptOptimizerStore.getState().closeDialog();
@@ -125,10 +151,32 @@ describe("Prompt Optimizer Store", () => {
 			const state = usePromptOptimizerStore.getState();
 			expect(state.isOpen).toBe(false);
 			expect(state.phase).toBe("idle");
-			expect(state.status).toBe("");
-			expect(state.streamingOutput).toBe("");
-			expect(state.result).toBeNull();
 			expect(state.error).toBeNull();
+			expect(state.errorCode).toBeNull();
+		});
+	});
+
+	describe("openDialog during a run", () => {
+		it("reopens on the run instead of wiping it", () => {
+			usePromptOptimizerStore.setState({
+				phase: "optimizing",
+				streamingOutput: "partial",
+				initialPrompt: "running prompt",
+			});
+
+			usePromptOptimizerStore.getState().openDialog("another prompt");
+
+			const state = usePromptOptimizerStore.getState();
+			expect(state.isOpen).toBe(true);
+			expect(state.phase).toBe("optimizing");
+			expect(state.streamingOutput).toBe("partial");
+			expect(state.initialPrompt).toBe("running prompt");
+		});
+
+		it("remembers where the result goes", () => {
+			const target = vi.fn();
+			usePromptOptimizerStore.getState().openDialog("p", "coding", target);
+			expect(usePromptOptimizerStore.getState().applyTarget).toBe(target);
 		});
 	});
 
@@ -144,10 +192,8 @@ describe("Prompt Optimizer Store", () => {
 
 	describe("setStatus", () => {
 		it("should update status text", () => {
-			usePromptOptimizerStore.getState().setStatus("Analyzing prompt...");
-			expect(usePromptOptimizerStore.getState().status).toBe(
-				"Analyzing prompt...",
-			);
+			usePromptOptimizerStore.getState().setStatus("generating");
+			expect(usePromptOptimizerStore.getState().status).toBe("generating");
 		});
 	});
 
@@ -193,7 +239,18 @@ describe("Prompt Optimizer Store", () => {
 
 			const state = usePromptOptimizerStore.getState();
 			expect(state.error).toBe("Connection timeout");
+			expect(state.errorCode).toBe("generic");
 			expect(state.phase).toBe("error");
+		});
+
+		it("keeps the code of a structured error", () => {
+			usePromptOptimizerStore
+				.getState()
+				.setError({ code: "rate_limit", message: "429" });
+
+			const state = usePromptOptimizerStore.getState();
+			expect(state.error).toBe("429");
+			expect(state.errorCode).toBe("rate_limit");
 		});
 	});
 
@@ -211,7 +268,7 @@ describe("Prompt Optimizer Store", () => {
 		it("should restore all state to initial values", () => {
 			usePromptOptimizerStore.setState({
 				phase: "complete",
-				status: "done",
+				status: "parsing",
 				streamingOutput: "output",
 				result: { optimized: "x", changes: [], reasoning: "" },
 				error: null,
@@ -302,6 +359,28 @@ describe("Prompt Optimizer Store", () => {
 	});
 
 	describe("setupPromptOptimizerListeners", () => {
+		beforeEach(() => {
+			usePromptOptimizerStore.setState({ phase: "optimizing" });
+		});
+
+		it("ignores events of a run that is no longer running", () => {
+			usePromptOptimizerStore.setState({ phase: "idle" });
+			mockOnPromptOptimizerStreamChunk.mockReturnValue(vi.fn());
+			mockOnPromptOptimizerStatus.mockReturnValue(vi.fn());
+			mockOnPromptOptimizerError.mockReturnValue(vi.fn());
+			mockOnPromptOptimizerComplete.mockImplementation(
+				(cb: (result: unknown) => void) => {
+					cb({ optimized: "late", changes: [], reasoning: "" });
+					return vi.fn();
+				},
+			);
+
+			setupPromptOptimizerListeners();
+
+			expect(usePromptOptimizerStore.getState().result).toBeNull();
+			expect(usePromptOptimizerStore.getState().phase).toBe("idle");
+		});
+
 		it("should register all four IPC listeners", () => {
 			// Mock all listener registrations to return cleanup fns
 			mockOnPromptOptimizerStreamChunk.mockReturnValue(vi.fn());
@@ -360,7 +439,7 @@ describe("Prompt Optimizer Store", () => {
 			mockOnPromptOptimizerStreamChunk.mockReturnValue(vi.fn());
 			mockOnPromptOptimizerStatus.mockImplementation(
 				(cb: (status: string) => void) => {
-					cb("Analyzing project context...");
+					cb("generating");
 					return vi.fn();
 				},
 			);
@@ -369,17 +448,15 @@ describe("Prompt Optimizer Store", () => {
 
 			setupPromptOptimizerListeners();
 
-			expect(usePromptOptimizerStore.getState().status).toBe(
-				"Analyzing project context...",
-			);
+			expect(usePromptOptimizerStore.getState().status).toBe("generating");
 		});
 
 		it("should update store on error event", () => {
 			mockOnPromptOptimizerStreamChunk.mockReturnValue(vi.fn());
 			mockOnPromptOptimizerStatus.mockReturnValue(vi.fn());
 			mockOnPromptOptimizerError.mockImplementation(
-				(cb: (error: string) => void) => {
-					cb("Process crashed");
+				(cb: (error: unknown) => void) => {
+					cb({ code: "process_failed", message: "Process crashed" });
 					return vi.fn();
 				},
 			);
@@ -389,6 +466,7 @@ describe("Prompt Optimizer Store", () => {
 
 			const state = usePromptOptimizerStore.getState();
 			expect(state.error).toBe("Process crashed");
+			expect(state.errorCode).toBe("process_failed");
 			expect(state.phase).toBe("error");
 		});
 
@@ -414,6 +492,85 @@ describe("Prompt Optimizer Store", () => {
 			const state = usePromptOptimizerStore.getState();
 			expect(state.result).toEqual(mockResult);
 			expect(state.phase).toBe("complete");
+		});
+	});
+
+	describe("cancelOptimization", () => {
+		it("stops the run and goes back to editing", async () => {
+			const { cancelOptimization } = await import("../prompt-optimizer-store");
+			usePromptOptimizerStore.setState({
+				phase: "optimizing",
+				streamingOutput: "partial",
+				initialPrompt: "keep me",
+			});
+
+			cancelOptimization();
+
+			const state = usePromptOptimizerStore.getState();
+			expect(mockCancelPromptOptimization).toHaveBeenCalledTimes(1);
+			expect(state.phase).toBe("idle");
+			expect(state.streamingOutput).toBe("");
+			expect(state.initialPrompt).toBe("keep me");
+		});
+
+		it("does nothing when nothing runs", async () => {
+			const { cancelOptimization } = await import("../prompt-optimizer-store");
+			cancelOptimization();
+			expect(mockCancelPromptOptimization).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("refineFromResult", () => {
+		it("takes the optimized prompt as the new input", async () => {
+			const { refineFromResult } = await import("../prompt-optimizer-store");
+			usePromptOptimizerStore.setState({
+				phase: "complete",
+				result: { optimized: "better", changes: [], reasoning: "" },
+			});
+
+			refineFromResult();
+
+			const state = usePromptOptimizerStore.getState();
+			expect(state.phase).toBe("idle");
+			expect(state.initialPrompt).toBe("better");
+			expect(state.result).toBeNull();
+		});
+	});
+
+	describe("extractStreamingPrompt", () => {
+		it("shows nothing before the prompt section opens", async () => {
+			const { extractStreamingPrompt } = await import(
+				"../prompt-optimizer-store"
+			);
+			expect(extractStreamingPrompt("<optimi")).toBe("");
+			expect(extractStreamingPrompt("")).toBe("");
+		});
+
+		it("shows the raw text of a model that ignores the tags", async () => {
+			const { extractStreamingPrompt } = await import(
+				"../prompt-optimizer-store"
+			);
+			expect(extractStreamingPrompt("Plain rewrite")).toBe("Plain rewrite");
+		});
+
+		it("shows the prompt as it forms, without a half-written closing tag", async () => {
+			const { extractStreamingPrompt } = await import(
+				"../prompt-optimizer-store"
+			);
+			expect(extractStreamingPrompt("<optimized_prompt>\nAdd a route</opt")).toBe(
+				"Add a route",
+			);
+		});
+
+		it("stops at the end of the prompt section", async () => {
+			const { extractStreamingPrompt } = await import(
+				"../prompt-optimizer-store"
+			);
+			expect(
+				extractStreamingPrompt(
+					"<optimized_prompt>P</optimized_prompt>\n<changes>\n- a",
+				),
+			).toBe("P");
 		});
 	});
 });
