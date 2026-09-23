@@ -96,6 +96,10 @@ from core.dependency_validator import validate_platform_dependencies
 validate_platform_dependencies()
 
 from cli import main
+from integrations.jev.models import JevContext
+from integrations.jev.runtime import JevRun
+
+_jev_run = JevRun.from_env(JevContext("feature-build", Path.cwd()))
 
 
 def is_uvicorn_running(host="127.0.0.1", port=9000):
@@ -139,4 +143,4 @@ if not is_uvicorn_running():
         )
 
 if __name__ == "__main__":
-    main()
+    main(jev_run=_jev_run)

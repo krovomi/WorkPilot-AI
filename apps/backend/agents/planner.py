@@ -43,6 +43,7 @@ async def run_followup_planner(
     spec_dir: Path,
     model: str,
     verbose: bool = False,
+    jev_run=None,
 ) -> bool:
     """
     Run the follow-up planner to add new subtasks to a completed spec.
@@ -69,8 +70,19 @@ async def run_followup_planner(
         bool: True if planning completed successfully
     """
     from implementation_plan import ImplementationPlan
+    from integrations.jev.adapters import _read, assess_planning
+    from integrations.jev.models import JevContext
+    from integrations.jev.rubrics import advice_text, classification_hint
+    from integrations.jev.runtime import JevRun
     from prompts import get_followup_planner_prompt
 
+    jev_run = jev_run or JevRun.from_env(
+        JevContext("feature-build", project_dir, spec_dir)
+    )
+    jev_outcome = await assess_planning(
+        jev_run, _read(spec_dir / "FOLLOWUP_REQUEST.md")
+    )
+    jev_hint = classification_hint(jev_outcome)
     # Initialize status manager for ccstatusline
     status_manager = StatusManager(project_dir)
     status_manager.set_active(spec_dir.name, BuildState.PLANNING)
@@ -91,6 +103,7 @@ async def run_followup_planner(
             model,
             spec_dir=spec_dir,
             phase="planning",
+            task_hint=jev_hint,
             prompt_hint=f"follow-up planning for spec {spec_dir.name}",
         )
         if override_info is not None:
@@ -112,7 +125,7 @@ async def run_followup_planner(
         else:
             suggestion = suggest_routed_model(
                 prompt=f"follow-up planning for spec {spec_dir.name}",
-                task_hint="planning",
+                task_hint=jev_hint or "planning",
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(
@@ -184,6 +197,8 @@ async def run_followup_planner(
 
     # Generate follow-up planner prompt
     prompt = get_followup_planner_prompt(spec_dir)
+    if advice := advice_text(jev_outcome):
+        prompt += "\n\n" + advice
 
     print_status("Running follow-up planner...", "progress")
     print()

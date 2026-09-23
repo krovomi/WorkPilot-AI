@@ -164,6 +164,7 @@ async def run_qa_agent_session(
     max_iterations: int,
     verbose: bool = False,
     previous_error: dict | None = None,
+    jev_advice: str = "",
 ) -> tuple[str, str]:
     """
     Run a QA reviewer agent session.
@@ -243,6 +244,8 @@ async def run_qa_agent_session(
     # Load QA prompt with dynamically-injected project-specific MCP tools
     # This includes Electron validation for Electron apps, Puppeteer for web, etc.
     prompt = get_qa_reviewer_prompt(spec_dir, project_dir)
+    if jev_advice:
+        prompt += "\n\n" + jev_advice
     debug_detailed(
         "qa_reviewer",
         "Loaded QA reviewer prompt with project-specific tools",

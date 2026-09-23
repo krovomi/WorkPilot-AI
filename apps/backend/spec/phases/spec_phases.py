@@ -29,6 +29,7 @@ class SpecPhaseMixin:
                 "quick_spec", True, [str(spec_file), str(plan_file)], [], 0
             )
 
+        jev_advice = await self._jev_planning_advice()
         errors = []
         for attempt in range(MAX_RETRIES):
             self.ui.print_status(
@@ -49,7 +50,8 @@ Create:
 """
             success, output = await self.run_agent_fn(
                 "spec_quick.md",
-                additional_context=context_str,
+                additional_context=context_str
+                + ("\n\n" + jev_advice if jev_advice else ""),
                 phase_name="quick_spec",
             )
 

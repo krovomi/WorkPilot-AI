@@ -92,6 +92,12 @@ class GitLabOrchestrator:
         progress_callback: Callable[[ProgressCallback], None] | None = None,
     ):
         self.project_dir = Path(project_dir)
+        from integrations.jev.models import JevContext
+        from integrations.jev.runtime import JevRun
+
+        self._jev_worker = JevRun.from_env(
+            JevContext("gitlab-review", self.project_dir)
+        )
         self.config = config
         self.progress_callback = progress_callback
 
@@ -265,6 +271,9 @@ class GitLabOrchestrator:
             )
 
             # Run review
+            from integrations.jev.reviews import evaluate_context
+
+            jev_observation = await evaluate_context(self._jev_worker, context)
             findings, verdict, summary, blockers = await self.review_engine.run_review(
                 context
             )
@@ -290,6 +299,7 @@ class GitLabOrchestrator:
 
             # Create result
             result = MRReviewResult(
+                jev=jev_observation,
                 mr_iid=mr_iid,
                 project=self.config.project,
                 success=True,
@@ -459,6 +469,9 @@ class GitLabOrchestrator:
             )
 
             # Run full review on current state
+            from integrations.jev.reviews import evaluate_context
+
+            jev_observation = await evaluate_context(self._jev_worker, context)
             findings, verdict, summary, blockers = await self.review_engine.run_review(
                 context
             )
@@ -501,6 +514,7 @@ class GitLabOrchestrator:
 {full_summary}"""
 
             result = MRReviewResult(
+                jev=jev_observation,
                 mr_iid=mr_iid,
                 project=self.config.project,
                 success=True,

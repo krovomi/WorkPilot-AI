@@ -1,3 +1,4 @@
+import { JevStatus } from "../../jev/JevStatus";
 import {
 	AlertCircle,
 	AlertTriangle,
@@ -34,6 +35,7 @@ import type {
 import { ReviewFindings } from "./ReviewFindings";
 
 interface MRDetailProps {
+	projectId?: string;
 	mr: GitLabMergeRequest;
 	reviewResult: GitLabMRReviewResult | null;
 	reviewProgress: GitLabMRReviewProgress | null;
@@ -84,6 +86,7 @@ function getMRStateColor(state: string): string {
 }
 
 export function MRDetail({
+	projectId,
 	mr,
 	reviewResult,
 	reviewProgress,
@@ -392,6 +395,11 @@ export function MRDetail({
 		<ErrorBoundary>
 			<ScrollArea className="flex-1">
 				<div className="p-4 space-y-4">
+					<JevStatus
+						projectId={projectId}
+						workflow="gitlab-review"
+						observation={reviewResult?.jev}
+					/>
 					{/* Header */}
 					<div className="space-y-2">
 						<div className="flex items-start justify-between gap-4">

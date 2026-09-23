@@ -119,8 +119,11 @@ class PRReviewResult:
     # Deep codebase context metadata
     deep_context: dict = field(default_factory=dict)
 
+    jev: dict | None = None
+
     def to_dict(self) -> dict:
         return {
+            "jev": self.jev,
             "pr_id": self.pr_id,
             "project": self.project,
             "repository_id": self.repository_id,
@@ -146,6 +149,7 @@ class PRReviewResult:
     @classmethod
     def from_dict(cls, data: dict) -> PRReviewResult:
         return cls(
+            jev=data.get("jev"),
             pr_id=data["pr_id"],
             project=data["project"],
             repository_id=data.get("repository_id", ""),
@@ -233,3 +237,4 @@ class AzDOPRContext:
 
     # Deep codebase context (architecture, patterns, memory)
     deep_context: dict = field(default_factory=dict)
+    jev_outcome: object | None = None

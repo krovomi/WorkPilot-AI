@@ -96,6 +96,7 @@ export function GitLabMergeRequests({
 			<div className="flex-1 flex flex-col">
 				{selectedMR ? (
 					<MRDetail
+                        projectId={projectId}
 						mr={selectedMR}
 						reviewResult={reviewResult}
 						reviewProgress={reviewProgress}

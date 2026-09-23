@@ -2419,5 +2419,60 @@
 		"placeholder": "Search settings...",
 		"clear": "Clear search",
 		"noResults": "No settings found"
+	},
+	"jev": {
+		"title": "JEV (TypeSafe)",
+		"description": "Optional classification and review advice. Without an API key, or if JEV is unavailable, workflows continue normally. Enabling JEV sends selected, redacted task and diff context to TypeSafe.",
+		"enabled": "Enable by default",
+		"unknown": "Credential status unavailable",
+		"configured": "API key configured (not verified)",
+		"missingKey": "No API key — workflows bypass JEV",
+		"storageUnavailable": "Secure OS storage is unavailable.",
+		"apiKey": "API key",
+		"saveKey": "Save / replace key",
+		"clearKey": "Delete key",
+		"workflows": "Workflow overrides",
+		"customWorkflow": "Custom declared workflow ID",
+		"addWorkflow": "Add workflow",
+		"save": "Save settings",
+		"saved": "Saved",
+		"error": "Could not save. Check secure storage and try again.",
+		"history": "Previous assessment (historical, not an approval)",
+		"evaluated": "Evaluated",
+		"modes": {
+			"inherit": "Use global default",
+			"enabled": "Enable JEV",
+			"bypass": "Bypass JEV"
+		},
+		"workflowNames": {
+			"feature-build": "Build (planning and QA)",
+			"github-review": "GitHub reviews",
+			"gitlab-review": "GitLab reviews",
+			"azure-devops-review": "Azure DevOps reviews"
+		},
+		"reasons": {
+			"ready": "Ready for next execution (not verified)",
+			"unknown": "Credential status unavailable",
+			"disabled": "Disabled",
+			"workflow_bypass": "Bypassed for this workflow",
+			"offline": "Bypassed: offline mode",
+			"missing_key": "Bypassed: no API key",
+			"invalid_config": "Bypassed: invalid settings",
+			"missing_context": "Bypassed: insufficient context",
+			"context_too_large": "Bypassed: context too large",
+			"unauthorized": "Bypassed: API key rejected",
+			"rate_limited": "Bypassed: rate limit reached",
+			"timeout": "Bypassed: timeout",
+			"unavailable": "Bypassed: service unavailable",
+			"invalid_response": "Bypassed: invalid response",
+			"low_confidence": "Bypassed: low confidence",
+			"unsupported_context": "Bypassed: unsupported execution context"
+		},
+		"confidence": "(confidence: {{value}}%)",
+		"answers": {
+			"task_class": "Task class",
+			"coverage": "Coverage (0–2)",
+			"risk": "Risk (0–2)"
+		}
 	}
 }

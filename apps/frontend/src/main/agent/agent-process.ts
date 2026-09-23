@@ -1,3 +1,4 @@
+import { buildJevEnvironment } from "../jev/environment";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -945,13 +946,16 @@ export class AgentProcessManager {
 		try {
 			childProcess = spawn(pythonCommand, [...pythonBaseArgs, ...args], {
 				cwd,
-				env: {
-					...env, // Already includes process.env, extraEnv, profileEnv, PYTHONUNBUFFERED, PYTHONUTF8
-					...pythonEnv, // Include Python environment (PYTHONPATH for bundled packages)
-					...oauthModeClearVars, // Clear stale ANTHROPIC_* vars when in OAuth mode
-					...apiProfileEnv, // Include active API profile config (highest priority for ANTHROPIC_* vars)
-					...providerSpecificEnv, // Include provider credentials (WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
-				},
+				env: buildJevEnvironment(
+					{
+						...env, // Already includes process.env, extraEnv, profileEnv, PYTHONUNBUFFERED, PYTHONUTF8
+						...pythonEnv, // Include Python environment (PYTHONPATH for bundled packages)
+						...oauthModeClearVars, // Clear stale ANTHROPIC_* vars when in OAuth mode
+						...apiProfileEnv, // Include active API profile config (highest priority for ANTHROPIC_* vars)
+						...providerSpecificEnv, // Include provider credentials (WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
+					},
+					processType === "task-execution" ? "feature-build" : undefined,
+				),
 			});
 		} catch (err) {
 			// spawn() failed synchronously (e.g., command not found, permission denied)
