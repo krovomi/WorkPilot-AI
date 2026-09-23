@@ -19,7 +19,7 @@ from typing import Any
 from .graph import BrainGraph, rebuild
 from .home import KINDS, brain_dir, graph_path, kind_dir
 from .memories import refresh_bridges, remember, write_digest
-from .notes import Note, iter_notes, now_iso, read_note, slugify, write_note
+from .notes import Note, inside, iter_notes, now_iso, read_note, slugify, write_note
 from .sync import SyncResult, ensure_repo, pull_if_stale, remote_url, set_remote, sync
 
 __all__ = ["Brain", "SEED_DIR"]
@@ -205,7 +205,7 @@ class Brain:
             rel = rel.with_suffix(".md")
         if rel.is_absolute() or ".." in rel.parts:
             raise ValueError("a note path is relative to the brain and stays inside it")
-        created = not (self.root / rel).exists()
+        created = not inside(self.root, rel).exists()
         is_instruction = rel.parts[0] == KINDS["instruction"]
         if not trusted:
             if rel.parts[0] not in (KINDS["knowledge"], KINDS["instruction"]):
@@ -302,7 +302,7 @@ class Brain:
             level = "index"
         for hit in hits:
             source = hit.get("source_file")
-            if source and (self.root / source).is_file():
+            if source and inside(self.root, source).is_file():
                 meta = read_note(self.root, source).meta
                 hit["frontmatter"] = {
                     k: meta[k]

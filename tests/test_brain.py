@@ -92,6 +92,20 @@ def test_a_note_cannot_be_written_outside_the_brain(tmp_path):
         write_note(tmp_path / "brain", Note(path=Path("../escape.md"), body="x"))
 
 
+def test_no_note_path_leaves_the_brain(tmp_path):
+    from brain.notes import inside, read_note
+
+    brain = Brain(tmp_path / "brain")
+    for bad in ("../escape.md", "knowledge/../../escape.md", str(tmp_path / "abs.md")):
+        with pytest.raises(ValueError):
+            inside(brain.root, bad)
+        with pytest.raises(ValueError):
+            read_note(brain.root, bad)
+        with pytest.raises(ValueError):
+            brain.write("t", "b", path=bad)
+    assert not (tmp_path / "escape.md").exists()
+
+
 def test_the_graph_has_graphify_shape(tmp_path):
     root = tmp_path / "brain"
     _note(

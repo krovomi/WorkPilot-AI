@@ -33,6 +33,7 @@ __all__ = [
     "wikilinks",
     "body_tags",
     "now_iso",
+    "inside",
 ]
 
 _WIKILINK = re.compile(r"\[\[([^\]\|#]+)(?:#[^\]\|]*)?(?:\|[^\]]*)?\]\]")
@@ -133,18 +134,32 @@ class Note:
         return f"---\n{head}\n---\n\n{body.lstrip(chr(10))}"
 
 
+def inside(root: Path | str, rel: Path | str) -> Path:
+    """*rel* resolved under *root*, or ``ValueError`` if it would leave it.
+
+    The one gate every note path goes through before a file is opened. Note
+    paths arrive from MCP tool calls, the HTTP API and agents that have read
+    untrusted content, so ``../`` and absolute paths are not hypothetical.
+    Written as normalise-then-prefix-check, the shape path-injection analysis
+    (CodeQL ``py/path-injection``) recognises as a sanitiser.
+    """
+    base = os.path.normpath(os.path.abspath(os.fspath(root)))
+    full = os.path.normpath(os.path.join(base, os.fspath(rel)))
+    if not full.startswith(base + os.sep):
+        raise ValueError(f"refusing a path outside the brain: {rel}")
+    return Path(full)
+
+
 def read_note(root: Path, rel: Path | str) -> Note:
-    rel_path = Path(rel)
-    text = (root / rel_path).read_text(encoding="utf-8", errors="replace")
+    target = inside(root, rel)
+    text = target.read_text(encoding="utf-8", errors="replace")
     meta, body = parse_frontmatter(text)
-    return Note(path=rel_path, meta=dict(meta or {}), body=body)
+    return Note(path=Path(rel), meta=dict(meta or {}), body=body)
 
 
 def write_note(root: Path, note: Note) -> Path:
     """Write *note* under *root* atomically; returns the absolute path."""
-    target = (root / note.path).resolve()
-    if root.resolve() not in target.parents:
-        raise ValueError(f"refusing to write outside the brain: {note.path}")
+    target = inside(root, note.path)
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=".note-", suffix=".md", dir=target.parent)
     try:

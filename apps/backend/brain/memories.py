@@ -40,7 +40,7 @@ from pathlib import Path
 
 from .agents import AGENTS, AgentSpec, agent
 from .home import digest_path, kind_dir
-from .notes import Note, iter_notes, now_iso, read_note, slugify, write_note
+from .notes import Note, inside, iter_notes, now_iso, read_note, slugify, write_note
 
 __all__ = [
     "BRIDGE_START",
@@ -383,7 +383,7 @@ class IngestReport:
 def _agent_page(root: Path, spec: AgentSpec) -> None:
     """``agents/<name>.md`` — the node every one of its instructions links to."""
     rel = Path("agents") / f"{spec.name}.md"
-    if (root / rel).exists():
+    if inside(root, rel).exists():
         return
     write_note(
         root,

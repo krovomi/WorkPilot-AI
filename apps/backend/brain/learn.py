@@ -30,7 +30,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .notes import Note, now_iso, read_note, slugify, write_note
+from .notes import Note, inside, now_iso, read_note, slugify, write_note
 from .runtime import active
 from .vault import Brain
 
@@ -87,7 +87,7 @@ def _build_rel(project: str, spec_id: str) -> Path:
 def _ensure_project(root: Path, project: str) -> str:
     """The project's hub note; returns the wikilink target builds point at."""
     rel = _project_rel(project)
-    if not (root / rel).exists():
+    if not inside(root, rel).exists():
         write_note(
             root,
             Note(
@@ -192,7 +192,7 @@ def record_build(
             tags.append(slugify(language))
         rel = _build_rel(project, spec_id)
         meta: dict[str, Any] = {}
-        if (brain.root / rel).exists():
+        if inside(brain.root, rel).exists():
             meta = dict(read_note(brain.root, rel).meta)
         meta.update(
             {
@@ -229,7 +229,7 @@ def record_merge(
             return None
         project = project_name(project_dir)
         rel = _build_rel(project, spec_id)
-        if not (brain.root / rel).exists():
+        if not inside(brain.root, rel).exists():
             return None
         note = read_note(brain.root, rel)
         if note.meta.get("status") == "merged":
