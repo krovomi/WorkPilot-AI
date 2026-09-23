@@ -111,14 +111,14 @@ def test_plugging_an_obsidian_vault_adopts_it_without_writing_at_its_root(client
 def test_the_folder_must_be_under_home(client, home, tmp_path):
     outside = tmp_path / "elsewhere"
     reply = client.post("/api/brain/settings", json={"path": str(outside)}).json()
-    assert reply["success"] is False and "home directory" in reply["error"]
+    assert reply["success"] is False and reply["code"] == "outside-home"
     assert not outside.exists()
 
 
 def test_an_environment_variable_wins_over_settings(client, home, monkeypatch):
     monkeypatch.setenv("WORKPILOT_BRAIN_DIR", str(home / "from-env"))
     reply = client.post("/api/brain/settings", json={"path": str(home / "x")}).json()
-    assert reply["success"] is False
+    assert reply["success"] is False and reply["code"] == "env-locked"
     assert reply["settings"]["source"] == "env"
 
 
@@ -167,7 +167,7 @@ def test_a_bad_remote_is_refused_by_the_api(client, home):
         "/api/brain/settings",
         json={"path": str(home / "b"), "remote": "--upload-pack=x"},
     ).json()
-    assert reply["success"] is False
+    assert reply["success"] is False and reply["code"] == "invalid-remote"
     assert not (home / "b").exists()
 
 
@@ -196,7 +196,8 @@ def test_a_clone_that_fails_says_why(client, home, tmp_path):
         "/api/brain/settings",
         json={"path": str(home / "nothing"), "remote": str(tmp_path / "missing.git")},
     ).json()
-    assert reply["success"] is False and reply["error"]
+    assert reply["success"] is False and reply["code"] == "not-found"
+    assert "missing.git" not in json.dumps(reply)  # git's message stays in the log
     assert reply["settings"]["exists"] is False
 
 
@@ -287,4 +288,26 @@ def test_instruction_paths_cannot_leave_the_brain(client, home):
     reply = client.post(
         "/api/brain/instruction", json={"path": "../../etc/passwd", "status": "active"}
     ).json()
-    assert reply["success"] is False
+    assert reply["success"] is False and reply["code"] == "invalid-path"
+
+
+@pytest.mark.parametrize(
+    ("stderr", "code"),
+    [
+        ("git@github.com: Permission denied (publickey).", "auth"),
+        ("fatal: could not read Username for 'https://github.com'", "auth"),
+        ("remote: Repository not found.", "not-found"),
+        ("fatal: unable to access 'https://x/': Could not resolve host: x", "network"),
+        ("git clone timed out", "timeout"),
+        ("something else", "failed"),
+    ],
+)
+def test_clone_failures_become_codes_the_ui_translates(stderr, code):
+    from brain.api import _clone_error
+
+    assert _clone_error(stderr) == code
+
+
+def test_the_home_directory_itself_is_not_a_brain_folder(client, home):
+    reply = client.post("/api/brain/settings", json={"path": str(home)}).json()
+    assert reply["code"] == "outside-home"

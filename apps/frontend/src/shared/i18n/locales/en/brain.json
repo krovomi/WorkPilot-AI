@@ -78,6 +78,21 @@
 			"conflicts": "Synced, {{count}} conflict: both versions were kept.",
 			"conflicts_other": "Synced, {{count}} conflicts: both versions were kept.",
 			"skipped": "Nothing to sync ({{reason}})."
+		},
+		"errors": {
+			"outsideHome": "The brain folder must be inside your home folder (and not be that folder itself).",
+			"isFile": "This path is a file, not a folder.",
+			"invalidRemote": "Not a git repository: enter \"user/repo\" or an https:// or git@ URL.",
+			"envLocked": "The folder is set by an environment variable.",
+			"auth": "Access to the repository was refused: check your git credentials (SSH key, or \"gh auth setup-git\" for HTTPS).",
+			"notFound": "Repository not found: check its name and that your account can access it.",
+			"network": "The repository cannot be reached: check your connection.",
+			"timeout": "Cloning took too long.",
+			"gitMissing": "git was not found on this machine.",
+			"failed": "The git operation failed (details in the backend log).",
+			"syncFailed": "Syncing failed (details in the backend log).",
+			"invalidPath": "This rule could not be found in the brain.",
+			"invalidStatus": "Unknown rule status."
 		}
 	}
 }

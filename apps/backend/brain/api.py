@@ -21,6 +21,7 @@ brain anywhere, for the person who sets it themselves.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -40,6 +41,8 @@ from .memories import discover
 from .notes import iter_notes
 from .sync import git_available, normalize_remote, remote_url
 from .vault import Brain
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/brain", tags=["brain"])
 
@@ -88,15 +91,66 @@ def _refused() -> bool:
     return server_mode_roots() is not None
 
 
-def _home_path(raw: str) -> Path:
-    """*raw* as an absolute folder under the home directory, or ``ValueError``."""
+def _home_path(raw: str) -> tuple[Path | None, str | None]:
+    """*raw* as an absolute folder under the home directory, or an error code.
+
+    Normalised, then prefix-checked against the home directory plus a
+    separator, in one condition: the home directory itself is refused too — a
+    brain whose notes are every Markdown file a person owns is not a choice
+    anyone makes on purpose.
+    """
     home = os.path.normpath(os.path.abspath(os.path.expanduser("~")))
     full = os.path.normpath(os.path.abspath(os.path.expanduser(raw.strip())))
-    if full != home and not full.startswith(home + os.sep):
-        raise ValueError("the brain folder must be inside your home directory")
+    if not full.startswith(home + os.sep):
+        return None, "outside-home"
     if os.path.isfile(full):
-        raise ValueError("the brain folder is a file")
-    return Path(full)
+        return None, "is-file"
+    return Path(full), None
+
+
+def _checked_remote(value: str | None) -> tuple[str | None, str | None]:
+    if not value:
+        return None, None
+    try:
+        return normalize_remote(value), None
+    except ValueError:
+        return None, "invalid-remote"
+
+
+def _clone_error(text: str) -> str:
+    """What went wrong with a clone, as a code the UI translates.
+
+    git's own message is English, carries URLs and paths, and changes between
+    versions; the response carries a code instead, and the message stays in
+    the backend's log.
+    """
+    low = (text or "").lower()
+    if any(
+        k in low
+        for k in (
+            "permission denied",
+            "authentication",
+            "could not read username",
+            "403",
+        )
+    ):
+        return "auth"
+    if any(k in low for k in ("not found", "does not exist", "not a git repository")):
+        return "not-found"
+    if "timed out" in low:
+        return "timeout"
+    if any(
+        k in low
+        for k in ("could not resolve", "unable to access", "connection", "network")
+    ):
+        return "network"
+    if "no such file" in low or "not recognized" in low:
+        return "git-missing"
+    return "failed"
+
+
+def _refusal(code: str) -> dict:
+    return {"success": False, "error": code, "code": code, "settings": settings_view()}
 
 
 def settings_view() -> dict:
@@ -136,36 +190,35 @@ def save_settings(request: SettingsRequest) -> dict:
     if _refused():
         return _DESKTOP_ONLY
     if request.path is not None and brain_source() == "env":
-        return {
-            "success": False,
-            "error": f"{BRAIN_ENV} is set: the brain folder is chosen by that variable",
-            "settings": settings_view(),
-        }
-    try:
-        remote = normalize_remote(request.remote) if request.remote else None
-        if request.path is not None:
-            if request.path.strip():
-                target = _home_path(request.path)
-                keep = None if target == default_brain_dir() else str(target)
-                write_config(path=keep)
-            else:
-                write_config(path=None)
-        if request.enabled is not None:
-            write_config(enabled=request.enabled)
-    except ValueError as exc:
-        return {"success": False, "error": str(exc), "settings": settings_view()}
+        return _refusal("env-locked")
+    remote, code = _checked_remote(request.remote)
+    if code:
+        return _refusal(code)
+    if request.path is not None:
+        if request.path.strip():
+            target, code = _home_path(request.path)
+            if code or target is None:
+                return _refusal(code or "outside-home")
+            write_config(path=None if target == default_brain_dir() else str(target))
+        else:
+            write_config(path=None)
+    if request.enabled is not None:
+        write_config(enabled=request.enabled)
 
-    result = None
+    summary = None
     if request.connect and (request.path is not None or remote):
         result = Brain(brain_dir()).init(remote=remote)
         if result.get("error"):
-            return {
-                "success": False,
-                "error": result["error"],
-                "result": result,
-                "settings": settings_view(),
-            }
-    return {"success": True, "result": result, "settings": settings_view()}
+            code = _clone_error(str(result["error"]))
+            # The code only: git's message quotes the remote a request supplied.
+            logger.warning("brain: clone failed (%s)", code)
+            return _refusal(code)
+        summary = {
+            "cloned": result.get("cloned") is True,
+            "adopted": result.get("adopted") is True,
+            "obsidianVault": result.get("obsidianVault") is True,
+        }
+    return {"success": True, "result": summary, "settings": settings_view()}
 
 
 @router.get("/task")
@@ -186,13 +239,14 @@ def instruction(request: InstructionRequest) -> dict:
     """A person activates, or turns down, an instruction an agent proposed."""
     if _refused():
         return _DESKTOP_ONLY
+    if request.status not in ("active", "retired"):
+        return {"success": False, "error": "invalid-status", "code": "invalid-status"}
     try:
-        return {
-            "success": True,
-            **Brain().set_instruction_status(request.path, request.status),
-        }
+        changed = Brain().set_instruction_status(request.path, request.status)
     except (ValueError, OSError) as exc:
-        return {"success": False, "error": str(exc)}
+        logger.info("brain: instruction status not changed: %s", type(exc).__name__)
+        return {"success": False, "error": "invalid-path", "code": "invalid-path"}
+    return {"success": True, "path": str(changed["path"]), "status": request.status}
 
 
 @router.get("/status")
@@ -212,7 +266,18 @@ def sync(request: SyncRequest) -> dict:
     if _refused():
         return _DESKTOP_ONLY
     result = Brain().sync(request.message)
-    return {"success": result.error is None, **result.to_dict()}
+    if result.error:
+        logger.warning("brain: sync failed")
+    return {
+        "success": result.error is None,
+        "committed": result.committed,
+        "pulled": result.pulled,
+        "pushed": result.pushed,
+        "remote": result.remote,
+        "conflicts": list(result.conflicts),
+        "skipped": result.skipped,
+        "error": "sync-failed" if result.error else None,
+    }
 
 
 @router.post("/recall")

@@ -30,6 +30,23 @@ import { Switch } from "../ui/switch";
  * défini, c'est lui qui décide et le champ est en lecture seule — un réglage
  * qui ne gagne pas ne doit pas avoir l'air de gagner.
  */
+/** The backend answers with a code; the sentence is the UI's to write. */
+const ERROR_KEYS: Record<string, string> = {
+	"outside-home": "brain:settings.errors.outsideHome",
+	"is-file": "brain:settings.errors.isFile",
+	"invalid-remote": "brain:settings.errors.invalidRemote",
+	"env-locked": "brain:settings.errors.envLocked",
+	auth: "brain:settings.errors.auth",
+	"not-found": "brain:settings.errors.notFound",
+	network: "brain:settings.errors.network",
+	timeout: "brain:settings.errors.timeout",
+	"git-missing": "brain:settings.errors.gitMissing",
+	failed: "brain:settings.errors.failed",
+	"sync-failed": "brain:settings.errors.syncFailed",
+	"invalid-path": "brain:settings.errors.invalidPath",
+	"invalid-status": "brain:settings.errors.invalidStatus",
+};
+
 export function BrainSettings() {
 	const { t } = useTranslation(["brain"]);
 	const settings = useBrainStore((s) => s.settings);
@@ -41,6 +58,11 @@ export function BrainSettings() {
 	const loadSettings = useBrainStore((s) => s.loadSettings);
 	const saveSettings = useBrainStore((s) => s.saveSettings);
 	const sync = useBrainStore((s) => s.sync);
+
+	const errorText = (code: string) =>
+		ERROR_KEYS[code]
+			? t(ERROR_KEYS[code])
+			: t("brain:settings.error", { error: code });
 
 	const [path, setPath] = useState("");
 	const [remote, setRemote] = useState("");
@@ -72,9 +94,7 @@ export function BrainSettings() {
 			<section className="space-y-3 p-6">
 				<h2 className="text-lg font-semibold">{t("brain:settings.title")}</h2>
 				<p className="text-sm text-muted-foreground" role="status">
-					{error
-						? t("brain:settings.error", { error })
-						: t("brain:settings.loading")}
+					{error ? errorText(error) : t("brain:settings.loading")}
 				</p>
 			</section>
 		);
@@ -208,7 +228,7 @@ export function BrainSettings() {
 			)}
 			{error && (
 				<p className="text-sm text-destructive" role="alert">
-					{t("brain:settings.error", { error })}
+					{errorText(error)}
 				</p>
 			)}
 			{lastSync && !error && (

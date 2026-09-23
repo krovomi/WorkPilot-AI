@@ -105,14 +105,14 @@ it("shows the backend's refusal", async () => {
 	mockFetchSettings.mockResolvedValue({ ok: true, data: { settings: base } });
 	mockSaveSettings.mockResolvedValue({
 		ok: false,
-		error: "the brain folder must be inside your home directory",
+		error: "outside-home",
 	});
 	render(<BrainSettings />);
 	fireEvent.change(await screen.findByLabelText("Brain folder (Obsidian vault)"), {
 		target: { value: "/etc" },
 	});
 	fireEvent.click(screen.getByRole("button", { name: /Save and connect/ }));
-	expect(await screen.findByRole("alert")).toHaveTextContent(/home directory/);
+	expect(await screen.findByRole("alert")).toHaveTextContent(/inside your home folder/);
 });
 
 it("does not pretend to choose the folder when the environment does", async () => {

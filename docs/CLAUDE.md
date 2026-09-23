@@ -953,7 +953,11 @@ distant est un distant (`sync.normalize_remote`) : `utilisateur/dépôt` pour
 GitHub, sinon https, ssh, `git@hôte:`, file ou un chemin. Une valeur qui commence
 par `-` est une option pour `git clone` (`--upload-pack=…` lance un programme) et
 `ext::` est un transport qui en lance un aussi ; les deux sont refusés avant que
-git ne les voie, et les commandes passent `--` avant leurs arguments positionnels.
+git ne les voie, et les commandes passent `--` avant leurs arguments positionnels. Les
+refus et les échecs reviennent sous forme de **codes** (`outside-home`,
+`invalid-remote`, `auth`, `not-found`…) que l'interface traduit : le message de
+git, en anglais, cite l'URL fournie par la requête et change d'une version à
+l'autre, alors il reste dans le journal du backend.
 
 #### Ce que la tâche a appris, dans le Kanban
 

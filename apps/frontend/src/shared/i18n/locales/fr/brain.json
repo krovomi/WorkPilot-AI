@@ -78,6 +78,21 @@
 			"conflicts": "Synchronisé, {{count}} conflit : les deux versions sont gardées.",
 			"conflicts_other": "Synchronisé, {{count}} conflits : les deux versions sont gardées.",
 			"skipped": "Rien à synchroniser ({{reason}})."
+		},
+		"errors": {
+			"outsideHome": "Le dossier du cerveau doit se trouver dans votre dossier personnel (et pas être ce dossier lui-même).",
+			"isFile": "Ce chemin désigne un fichier, pas un dossier.",
+			"invalidRemote": "Ce n'est pas un dépôt git : indiquez « utilisateur/dépôt » ou une URL https:// ou git@.",
+			"envLocked": "Le dossier est imposé par une variable d'environnement.",
+			"auth": "Accès refusé au dépôt : vérifiez vos identifiants git (clé SSH, ou « gh auth setup-git » pour HTTPS).",
+			"notFound": "Dépôt introuvable : vérifiez son nom et que votre compte y a accès.",
+			"network": "Le dépôt est injoignable : vérifiez votre connexion.",
+			"timeout": "Le clonage a pris trop de temps.",
+			"gitMissing": "git est introuvable sur cette machine.",
+			"failed": "L'opération git a échoué (détails dans le journal du backend).",
+			"syncFailed": "La synchronisation a échoué (détails dans le journal du backend).",
+			"invalidPath": "Cette règle est introuvable dans le cerveau.",
+			"invalidStatus": "Statut de règle inconnu."
 		}
 	}
 }
