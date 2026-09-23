@@ -356,16 +356,18 @@ def test_a_conflict_keeps_both_sides(tmp_path):
     a.init(remote=str(remote))
     b = Brain(tmp_path / "B")
     b.init(remote=str(remote))
-    (a.root / "knowledge" / "x.md").write_text("from A\n", encoding="utf-8")
+    (a.root / "knowledge" / "x.md").write_text("écrit par A\n", encoding="utf-8")
     sync(a.root, "a")
-    (b.root / "knowledge" / "x.md").write_text("from B\n", encoding="utf-8")
+    (b.root / "knowledge" / "x.md").write_text("écrit par B\n", encoding="utf-8")
     result = sync(b.root, "b")
 
     assert result.conflicts == ["knowledge/x.md"]
     assert result.pushed
-    assert (b.root / "knowledge" / "x.md").read_text(encoding="utf-8") == "from B\n"
+    assert (b.root / "knowledge" / "x.md").read_text(
+        encoding="utf-8"
+    ) == "écrit par B\n"
     [theirs] = list((b.root / "knowledge").glob("x.conflict-*.md"))
-    assert theirs.read_text(encoding="utf-8") == "from A\n"
+    assert theirs.read_text(encoding="utf-8") == "écrit par A\n"
 
 
 @needs_git

@@ -91,7 +91,10 @@ def _git(root: Path, *args: str, check: bool = False) -> subprocess.CompletedPro
         ["git", *args],
         cwd=root,
         capture_output=True,
-        text=True,
+        # Notes are UTF-8; the platform default on Windows is not, and a
+        # conflicted note decoded as cp1252 is written back as mojibake.
+        encoding="utf-8",
+        errors="replace",
         timeout=_GIT_TIMEOUT_S,
         check=check,
         env=env,
@@ -201,13 +204,13 @@ def _keep_both(root: Path, their_ref: str) -> list[str]:
         theirs = _git(root, "show", f":3:{rel}")
         target = root / rel
         if ours.returncode == 0:
-            target.write_text(ours.stdout, encoding="utf-8")
+            target.write_text(ours.stdout, encoding="utf-8", newline="")
         if theirs.returncode == 0:
             stem, dot, ext = rel.rpartition(".")
             side = (
                 f"{stem}.conflict-{short}.{ext}" if dot else f"{rel}.conflict-{short}"
             )
-            (root / side).write_text(theirs.stdout, encoding="utf-8")
+            (root / side).write_text(theirs.stdout, encoding="utf-8", newline="")
         # Neither side readable (deleted on one, changed on the other): whatever
         # is on disk stays, and `git add -A` below records it.
     _git(root, "add", "-A")
