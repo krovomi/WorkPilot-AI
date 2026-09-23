@@ -113,8 +113,10 @@ def _spec_title_and_summary(spec_dir: Path) -> tuple[str, str]:
         if text:
             summary = text
             title = text.splitlines()[0][:90]
-    except (OSError, ValueError, AttributeError):
-        pass
+    except (OSError, ValueError, AttributeError) as exc:
+        # No requirements.json, or one without a description: spec.md below
+        # still names the task, and the spec id is the last resort.
+        logger.debug("brain: no task description in %s: %s", requirements, exc)
     spec = spec_dir / "spec.md"
     try:
         body = spec.read_text(encoding="utf-8", errors="replace")
@@ -282,5 +284,9 @@ def record(
         )
         return result.rel
     except Exception as exc:  # noqa: BLE001 - learning never fails the feature
-        logger.warning("brain: could not record from %s: %s", surface, exc)
+        # The surface, title and project come from the request: only the
+        # error's type goes to the log, never a caller-supplied string.
+        logger.warning(
+            "brain: could not record a feature note (%s)", type(exc).__name__
+        )
         return None

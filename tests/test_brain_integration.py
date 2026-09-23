@@ -311,12 +311,17 @@ def test_a_workpilot_agent_cannot_touch_rules_skills_or_snapshots(brain, tmp_pat
             executor.execute("brain_write_note", {"title": "t", "body": "b", **args})
         )
 
-    assert write(path="skills/graph-first-recall/SKILL.md").startswith("Error:")
-    assert write(path="agents/codex/global.md").startswith("Error:")
-    assert write(kind="instruction", path=active_rule.rel).startswith("Error:")
+    refused = [
+        write(path="skills/graph-first-recall/SKILL.md"),
+        write(path="agents/codex/global.md"),
+        write(kind="instruction", path=active_rule.rel),
+    ]
+    assert all(reply.startswith("Error:") for reply in refused)
     created = json.loads(write(kind="instruction", title="Nouvelle règle"))
-    assert brain.read(created["path"])["frontmatter"]["status"] == "proposed"
-    assert json.loads(write(title="Un fait"))["created"] is True
+    status = brain.read(created["path"])["frontmatter"]["status"]
+    assert status == "proposed"
+    fact = json.loads(write(title="Un fait"))
+    assert fact["created"] is True
 
 
 def test_the_person_s_own_agents_write_rules_directly(brain, monkeypatch):
