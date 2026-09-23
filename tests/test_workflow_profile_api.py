@@ -209,10 +209,19 @@ def test_jev_profile_is_read_only(project, monkeypatch):
     monkeypatch.setattr(JevClient, "post", forbidden)
     monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
     spec = project / ".workpilot" / "specs" / "001-x"
-    write_observation(spec, {"version": 1, "workflow": "feature-build", "runId": "old-run", "evaluations": []})
+    write_observation(
+        spec,
+        {
+            "version": 1,
+            "workflow": "feature-build",
+            "runId": "old-run",
+            "evaluations": [],
+        },
+    )
     result = ask(project, effort="low")
     assert result["success"] is True
     assert result["profile"]["jev"]["observation"]["runId"] == "old-run"
     assert result["profile"]["jev"]["airgapStrict"] is False
     import os
+
     assert os.environ["TYPESAFE_API_KEY"] == "test-key"

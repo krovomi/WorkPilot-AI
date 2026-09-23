@@ -35,7 +35,7 @@ def write_observation(directory: Path, record: dict) -> None:
             try:
                 temporary.unlink(missing_ok=True)
             except OSError:
-                pass
+                logger.debug("JEV temporary observation could not be removed")
 
 
 def read_observations(directory: Path) -> dict | None:

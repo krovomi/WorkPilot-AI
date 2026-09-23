@@ -1,8 +1,6 @@
 import asyncio
 import os
 import subprocess
-from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 from integrations.jev.adapters import assess_build, capture_base

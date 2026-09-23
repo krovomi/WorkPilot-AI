@@ -124,10 +124,10 @@ async def test_pause_closes_inflight_request(tmp_path, monkeypatch):
             client=JevClient(httpx.MockTransport(respond)),
         )
     )
-    await entered.wait()
+    await asyncio.wait_for(entered.wait(), timeout=2)
     paused = True
     with pytest.raises(BuildPaused):
-        await task
+        await asyncio.wait_for(task, timeout=2)
     assert closed.is_set()
 
 
