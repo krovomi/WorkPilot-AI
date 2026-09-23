@@ -22,6 +22,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Memory System (Graphiti)](#memory-system-graphiti)
   - [Skills System](#skills-system)
   - [Memory Search (mem-search)](#memory-search-mem-search)
+  - [Le cerveau partagé (Obsidian + Graphify + MCP)](#le-cerveau-partagé-obsidian--graphify--mcp)
   - [Where generated tests are written](#where-generated-tests-are-written)
   - [What generated tests are written against](#what-generated-tests-are-written-against)
   - [Library Documentation (libdocs)](#library-documentation-libdocs)
@@ -809,6 +810,123 @@ of a build that used the skill. Counting it as corroboration would manufacture e
 the evidence `skill_proposer.evaluate` refuses to invent. Hermes proposes from breadth,
 WorkPilot decides from evidence, and a person reads one diff. Nothing under
 `skills/<pack>/` is modified, and nothing under `~/.hermes` is ever written.
+
+### Le cerveau partagé (Obsidian + Graphify + MCP)
+
+Chaque agent a sa mémoire — `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, le
+`MEMORY.md` de hermes, le workspace d'OpenClaw — et aucun ne lit celle des
+autres. Une préférence dite à Claude Code un lundi est inconnue de Codex le
+mardi. `apps/backend/brain/` est **un seul cerveau que tous les agents lisent et
+écrivent, et qu'aucun ne possède** : un vault Obsidian, un `graph.json` au
+format Graphify, un dépôt git synchronisé, servi par un serveur MCP.
+
+```
+<cerveau>/                       ~/.workpilot/brain, ou WORKPILOT_BRAIN_DIR
+  instructions/<slug>.md         une instruction partagée par note — `agents:` dit qui la suit
+  knowledge/<slug>.md            décisions, faits, emplacements
+  agents/<agent>/…               instantanés des mémoires propres à chaque agent
+  skills/graph-first-recall/     le skill de rappel graph-first, semé à l'init
+  INSTRUCTIONS.md                condensé généré (ignoré par git)
+  graphify-out/graph.json        le graphe, reconstruit à chaque écriture (ignoré par git)
+```
+
+| Module | Répond à |
+|---|---|
+| `graph.py` | le `graph.json` au format node-link de Graphify, construit depuis les notes, et ses requêtes (`query`, `get_node`, `shortest_path`) |
+| `sync.py` | commit → pull (rebase, puis merge) → push ; conflit = les deux versions gardées |
+| `agents.py` | **la** table : où chaque agent garde sa mémoire et déclare ses serveurs MCP |
+| `memories.py` | mémoire d'agent → cerveau (`ingest`), cerveau → mémoire d'agent (`bridge`) |
+| `connect.py` | inscrire `workpilot-brain` dans la configuration MCP de chaque agent |
+| `mcp_server.py` | le serveur MCP stdio |
+| `vault.py` | `Brain`, le seul objet qu'appellent MCP, CLI et HTTP |
+
+```bash
+python apps/backend/runners/brain_runner.py --action init --remote git@github.com:moi/brain.git
+python apps/backend/runners/brain_runner.py --action ingest --project-dir .   # importe les mémoires existantes
+python apps/backend/runners/brain_runner.py --action connect                  # aperçu ; --apply pour écrire
+python apps/backend/runners/brain_runner.py --action bridge  --apply
+python apps/backend/runners/brain_runner.py --action watch                    # pendant qu'on édite dans Obsidian
+```
+
+**Le graphe est celui de Graphify, pas un format voisin.** Nœuds `id`, `label`,
+`file_type`, `source_file`, `metadata` ; liens `source`, `target`. C'est ce qui
+fait que le skill `graph-first-recall`, le serveur MCP de Graphify et tout
+lecteur node-link fonctionnent sur le cerveau sans adaptation — et les outils
+MCP `query_graph`, `get_node`, `shortest_path` portent les noms de ceux de
+Graphify pour la même raison. Un `graph.json` que Graphify a écrit dans le même
+fichier survit à la reconstruction : nos nœuds portent
+`metadata.origin = "workpilot-brain"`, et seuls ceux-là sont remplacés.
+
+**Le rappel descend une échelle.** `brain_recall` répond aux niveaux 1 et 2 —
+les nœuds, leurs voisins, leur frontmatter — et `brain_read_note` au niveau 3,
+dans un appel séparé : décider quel fichier mérite d'être ouvert est tout
+l'intérêt des deux premiers.
+
+**Chaque modification est poussée, chaque lecture est précédée d'un pull.**
+`Brain.write` finit toujours pareil — graphe reconstruit, condensé réécrit,
+ponts rafraîchis, commit, pull, push — et `before_read` tire le distant quand la
+copie locale a plus de `BRAIN_PULL_INTERVAL` secondes. Le commit *précède* le
+pull : ce qu'une personne a tapé dans Obsidian part avec la prochaine lecture
+d'un agent, et `--action watch` le fait sans attendre d'agent. Le graphe et le
+condensé sont dérivés, donc ignorés par git et reconstruits après chaque pull :
+committés, deux machines ajoutant chacune une note seraient en conflit sur
+`graph.json` à chaque synchronisation.
+
+**Un conflit ne perd rien.** Une note par fichier rend les conflits rares ;
+quand deux agents touchent la même note, le rebase est tenté, puis le merge, et
+si les mêmes lignes divergent encore, la nôtre reste en place et la leur est
+écrite à côté (`<nom>.conflict-<sha>.md`). Choisir un gagnant en silence serait
+décider à la place de la personne lequel des deux agents avait raison.
+
+**Similaire n'est pas doublon, et aucune des deux n'est perdue.** `remember`
+cherche une instruction proche (mots à cinq lettres près, ou ratio de
+caractères, seuil `BRAIN_SIMILARITY`) : trouvée, l'agent y est ajouté et sa
+formulation est gardée sous la note ; sinon une note est créée. C'est ainsi que
+le cerveau apprend qu'une instruction est *partagée*.
+
+**Le pont s'ajoute à la mémoire de l'agent, il ne la remplace pas.** `bridge`
+écrit un bloc délimité (`<!-- workpilot-brain:start -->`) dans le fichier de
+mémoire global de l'agent : comment utiliser le cerveau, les instructions à
+appliquer **en plus** des siennes, et celles qu'il suit déjà et que d'autres
+agents partagent — une instruction similaire se lit comme une confirmation, pas
+comme une seconde règle. Claude Code et Gemini importent `INSTRUCTIONS.md` par
+`@chemin` ; les autres reçoivent la liste en ligne ; hermes, qui plafonne son
+`MEMORY.md`, reçoit un pointeur et lit le reste en MCP. Le bloc est retiré avant
+toute lecture d'instructions : sans cela, chaque `ingest` réimporterait le
+cerveau dans lui-même, crédité à l'agent qu'on venait de brancher. Une
+synchronisation ne rafraîchit que les fichiers qui portent déjà le bloc.
+
+**Les fichiers des autres ne sont écrits que sur demande.** `connect` et
+`bridge` affichent un aperçu ; `--apply` écrit, après une sauvegarde unique
+(`*.workpilot-brain.bak`). Un JSON illisible n'est jamais réécrit ; un
+`mcp_servers:` hermes déjà présent, ni une entrée Codex non gérée, non plus — le
+fragment est rendu à la personne. TOML et YAML sont écrits en bloc délimité et
+non par aller-retour de parseur, qui effacerait les commentaires d'un fichier
+édité à la main. `connect_all --apply` n'installe rien chez un agent absent.
+Pour Claude Code, la CLI `claude mcp add-json --scope user` est préférée à
+l'édition de `~/.claude.json`, que Claude Code réécrit pendant qu'il tourne.
+
+**Un secret n'est pas une connaissance.** Le cerveau a un distant : une ligne
+qui ressemble à un identifiant est expurgée des instantanés et ne devient jamais
+une instruction.
+
+**Le serveur MCP n'a aucune dépendance.** Il est lancé par les agents *des
+autres*, avec le Python qu'ils trouvent ; une dépendance absente là-bas est un
+cerveau que personne ne joint. JSON-RPC 2.0 sur stdio, une ligne par message, et
+le champ `instructions` d'`initialize` porte les règles d'usage : un agent jamais
+branché par `bridge` les apprend en se connectant.
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `WORKPILOT_BRAIN_DIR` | `~/.workpilot/brain` (`%APPDATA%\WorkPilot\brain`) | où est le cerveau |
+| `BRAIN_PULL_INTERVAL` | `60` | secondes entre deux pulls avant lecture |
+| `BRAIN_AUTO_PULL` / `BRAIN_AUTO_PUSH` | `true` | pull avant lecture / push après écriture |
+| `BRAIN_SIMILARITY` | `0.72` | seuil au-delà duquel deux instructions n'en font qu'une |
+
+`GET /api/brain/status`, `POST /api/brain/sync` et `POST /api/brain/recall`
+exposent la même chose au desktop ; comme `hermes/api.py`, le routeur est refusé
+en mode serveur — le cerveau vit dans le répertoire personnel de la machine qui
+exécute le backend.
 
 ### Memory Search (`mem-search`)
 
