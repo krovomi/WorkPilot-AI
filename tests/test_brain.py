@@ -417,7 +417,12 @@ def test_connect_toml_block_is_replaced_not_appended(tmp_path, _isolated_home):
     text = cfg.read_text(encoding="utf-8")
     assert text.startswith('model = "o4"  # mine\n')
     assert text.count(f"[mcp_servers.{SERVER_NAME}]") == 1
-    assert str(tmp_path / "two") in text
+    # Parsed, not searched: TOML escapes the backslashes of a Windows path.
+    import tomllib
+
+    entry = tomllib.loads(text)["mcp_servers"][SERVER_NAME]
+    assert entry["env"]["WORKPILOT_BRAIN_DIR"] == str(tmp_path / "two")
+    assert entry["command"] == sys.executable
 
 
 def test_connect_hermes_leaves_an_existing_mcp_servers_map_to_the_person(
