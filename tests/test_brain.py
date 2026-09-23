@@ -136,11 +136,12 @@ def test_a_graph_graphify_wrote_survives_the_rebuild(tmp_path):
                 ],
                 "links": [{"source": "code:main", "target": "code:main"}],
             }
-        )
+        ),
+        encoding="utf-8",
     )
     rebuild(root)
     rebuild(root)  # twice: our nodes are replaced, never duplicated
-    data = json.loads(out.read_text())
+    data = json.loads(out.read_text(encoding="utf-8"))
     ids = [n["id"] for n in data["nodes"]]
     assert ids.count("knowledge/a") == 1
     assert "code:main" in ids
@@ -246,7 +247,9 @@ def test_ingest_snapshots_redacts_and_merges_across_agents(tmp_path, _isolated_h
     assert (report.created, report.reinforced) == (1, 1)
     [only] = instructions(root)
     assert sorted(only.agents) == ["claude-code", "codex"]
-    assert "hunter2" not in "".join(p.read_text() for p in root.rglob("*.md"))
+    assert "hunter2" not in "".join(
+        p.read_text(encoding="utf-8") for p in root.rglob("*.md")
+    )
     assert (root / "INSTRUCTIONS.md").is_file()
 
 
@@ -268,10 +271,10 @@ def test_bridge_previews_then_writes_additively_and_is_idempotent(
 
     preview = bridge(root, "codex")
     assert preview.action == "preview"
-    assert BRIDGE_START not in memory.read_text()
+    assert BRIDGE_START not in memory.read_text(encoding="utf-8")
 
     written = bridge(root, "codex", apply=True)
-    text = memory.read_text()
+    text = memory.read_text(encoding="utf-8")
     assert written.action == "written" and Path(written.backup).is_file()
     assert text.startswith(
         "# Mes règles\n\n- Réponds toujours en français\n"
@@ -296,7 +299,7 @@ def test_refresh_only_touches_files_that_were_bridged(tmp_path, _isolated_home):
     gemini.parent.mkdir()
     gemini.write_text("- rule of my own here\n", encoding="utf-8")
     assert refresh_bridges(root) == []
-    assert gemini.read_text() == "- rule of my own here\n"
+    assert gemini.read_text(encoding="utf-8") == "- rule of my own here\n"
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +343,9 @@ def test_edits_made_outside_any_agent_are_pushed_by_the_next_sync(tmp_path):
     assert result.committed and result.pushed
     b = Brain(tmp_path / "B")
     b.init(remote=str(remote))
-    assert (b.root / "knowledge" / "obsidian.md").read_text() == "typed in Obsidian\n"
+    assert (b.root / "knowledge" / "obsidian.md").read_text(
+        encoding="utf-8"
+    ) == "typed in Obsidian\n"
 
 
 @needs_git
@@ -358,9 +363,9 @@ def test_a_conflict_keeps_both_sides(tmp_path):
 
     assert result.conflicts == ["knowledge/x.md"]
     assert result.pushed
-    assert (b.root / "knowledge" / "x.md").read_text() == "from B\n"
+    assert (b.root / "knowledge" / "x.md").read_text(encoding="utf-8") == "from B\n"
     [theirs] = list((b.root / "knowledge").glob("x.conflict-*.md"))
-    assert theirs.read_text() == "from A\n"
+    assert theirs.read_text(encoding="utf-8") == "from A\n"
 
 
 @needs_git
@@ -380,12 +385,13 @@ def test_connect_json_preserves_the_file_and_is_idempotent(tmp_path, _isolated_h
     cfg = _isolated_home / ".gemini" / "settings.json"
     cfg.parent.mkdir()
     cfg.write_text(
-        json.dumps({"theme": "dark", "mcpServers": {"other": {"command": "x"}}})
+        json.dumps({"theme": "dark", "mcpServers": {"other": {"command": "x"}}}),
+        encoding="utf-8",
     )
     root = tmp_path / "brain"
     assert connect(root, "gemini").action == "preview"
     assert connect(root, "gemini", apply=True).action == "written"
-    data = json.loads(cfg.read_text())
+    data = json.loads(cfg.read_text(encoding="utf-8"))
     assert data["theme"] == "dark" and "other" in data["mcpServers"]
     assert data["mcpServers"][SERVER_NAME]["env"]["WORKPILOT_BRAIN_DIR"] == str(root)
     assert connect(root, "gemini", apply=True).action == "unchanged"
@@ -394,19 +400,19 @@ def test_connect_json_preserves_the_file_and_is_idempotent(tmp_path, _isolated_h
 def test_connect_never_rewrites_a_file_it_cannot_parse(tmp_path, _isolated_home):
     cfg = _isolated_home / ".cursor" / "mcp.json"
     cfg.parent.mkdir()
-    cfg.write_text("{ not json")
+    cfg.write_text("{ not json", encoding="utf-8")
     result = connect(tmp_path / "brain", "cursor", apply=True)
     assert result.action == "error"
-    assert cfg.read_text() == "{ not json"
+    assert cfg.read_text(encoding="utf-8") == "{ not json"
 
 
 def test_connect_toml_block_is_replaced_not_appended(tmp_path, _isolated_home):
     cfg = _isolated_home / ".codex" / "config.toml"
     cfg.parent.mkdir()
-    cfg.write_text('model = "o4"  # mine\n')
+    cfg.write_text('model = "o4"  # mine\n', encoding="utf-8")
     connect(tmp_path / "one", "codex", apply=True)
     connect(tmp_path / "two", "codex", apply=True)
-    text = cfg.read_text()
+    text = cfg.read_text(encoding="utf-8")
     assert text.startswith('model = "o4"  # mine\n')
     assert text.count(f"[mcp_servers.{SERVER_NAME}]") == 1
     assert str(tmp_path / "two") in text
@@ -417,10 +423,10 @@ def test_connect_hermes_leaves_an_existing_mcp_servers_map_to_the_person(
 ):
     cfg = _isolated_home / ".hermes" / "config.yaml"
     cfg.parent.mkdir()
-    cfg.write_text("mcp_servers:\n  github: {command: gh}\n")
+    cfg.write_text("mcp_servers:\n  github: {command: gh}\n", encoding="utf-8")
     result = connect(tmp_path / "brain", "hermes", apply=True)
     assert result.action == "manual" and SERVER_NAME in result.snippet
-    assert cfg.read_text() == "mcp_servers:\n  github: {command: gh}\n"
+    assert cfg.read_text(encoding="utf-8") == "mcp_servers:\n  github: {command: gh}\n"
 
 
 def test_connect_all_does_not_install_config_for_absent_agents(
