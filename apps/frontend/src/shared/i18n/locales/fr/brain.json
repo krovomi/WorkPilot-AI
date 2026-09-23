@@ -87,7 +87,7 @@
 			"auth": "Accès refusé au dépôt : vérifiez vos identifiants git (clé SSH, ou « gh auth setup-git » pour HTTPS).",
 			"notFound": "Dépôt introuvable : vérifiez son nom et que votre compte y a accès.",
 			"network": "Le dépôt est injoignable : vérifiez votre connexion.",
-			"timeout": "Le clonage a pris trop de temps.",
+			"timeout": "L'opération git a pris trop de temps.",
 			"gitMissing": "git est introuvable sur cette machine.",
 			"failed": "L'opération git a échoué (détails dans le journal du backend).",
 			"syncFailed": "La synchronisation a échoué (détails dans le journal du backend).",

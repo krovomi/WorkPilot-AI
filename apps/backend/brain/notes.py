@@ -117,7 +117,14 @@ class Note:
         raw = self.meta.get("tags") or []
         if isinstance(raw, str):
             raw = [part.strip() for part in raw.split(",")]
-        tags = {str(t).lstrip("#").lower(): None for t in raw if str(t).strip()}
+        if not isinstance(raw, (list, tuple, set)):
+            raw = [raw]
+        # ``tags: [null]`` is an empty Obsidian property, not a tag named "None".
+        tags = {
+            str(t).strip().lstrip("#").lower(): None
+            for t in raw
+            if t is not None and str(t).strip().lstrip("#")
+        }
         for tag in body_tags(self.body):
             tags.setdefault(tag, None)
         return list(tags)
