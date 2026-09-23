@@ -192,9 +192,19 @@ def test_a_github_style_remote_is_cloned(client, home, tmp_path):
 
 @needs_git
 def test_a_clone_that_fails_says_why(client, home, tmp_path):
+    from brain.api import _clone_error
+    from brain.sync import clone
+
+    missing = tmp_path / "missing.git"
+    # git's own words, kept in the assertion message: they differ between
+    # platforms, and this is what a person reads when the classifier misses one.
+    message = clone(str(missing), tmp_path / "probe")
+    assert message, "cloning a missing repository must fail"
+    assert _clone_error(message) == "not-found", message
+
     reply = client.post(
         "/api/brain/settings",
-        json={"path": str(home / "nothing"), "remote": str(tmp_path / "missing.git")},
+        json={"path": str(home / "nothing"), "remote": str(missing)},
     ).json()
     assert reply["success"] is False and reply["code"] == "not-found"
     assert "missing.git" not in json.dumps(reply)  # git's message stays in the log
@@ -297,6 +307,10 @@ def test_instruction_paths_cannot_leave_the_brain(client, home):
         ("git@github.com: Permission denied (publickey).", "auth"),
         ("fatal: could not read Username for 'https://github.com'", "auth"),
         ("remote: Repository not found.", "not-found"),
+        (
+            "fatal: 'C:/Users/x/missing.git' does not appear to be a git repository",
+            "not-found",
+        ),
         ("fatal: unable to access 'https://x/': Could not resolve host: x", "network"),
         ("git clone timed out", "timeout"),
         ("something else", "failed"),

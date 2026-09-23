@@ -135,7 +135,16 @@ def _clone_error(text: str) -> str:
         )
     ):
         return "auth"
-    if any(k in low for k in ("not found", "does not exist", "not a git repository")):
+    if any(
+        k in low
+        for k in (
+            "not found",
+            "does not exist",
+            "not a git repository",
+            "does not appear to be a git repository",
+            "could not read from remote repository",
+        )
+    ):
         return "not-found"
     if "timed out" in low:
         return "timeout"
