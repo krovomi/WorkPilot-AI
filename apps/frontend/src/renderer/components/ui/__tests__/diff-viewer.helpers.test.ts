@@ -40,14 +40,18 @@ describe("buildSplitRows", () => {
 	});
 
 	it("met un ajout pur à droite, côté gauche vide", () => {
-		const rows = buildSplitRows(parseDiff(["@@ -1,0 +1,1 @@", "+added"].join("\n")));
+		const rows = buildSplitRows(
+			parseDiff(["@@ -1,0 +1,1 @@", "+added"].join("\n")),
+		);
 		const change = rows.find((r) => r.type === "change");
 		expect(change?.left).toBeUndefined();
 		expect(change?.right?.content).toBe("added");
 	});
 
 	it("met une suppression pure à gauche, côté droit vide", () => {
-		const rows = buildSplitRows(parseDiff(["@@ -1,1 +1,0 @@", "-removed"].join("\n")));
+		const rows = buildSplitRows(
+			parseDiff(["@@ -1,1 +1,0 @@", "-removed"].join("\n")),
+		);
 		const change = rows.find((r) => r.type === "change");
 		expect(change?.left?.content).toBe("removed");
 		expect(change?.right).toBeUndefined();
@@ -77,8 +81,21 @@ describe("buildSplitRows", () => {
 	});
 
 	it("conserve l'en-tête de hunk sur une ligne pleine largeur", () => {
-		const rows = buildSplitRows(parseDiff(["@@ -1,1 +1,1 @@", " ctx"].join("\n")));
+		const rows = buildSplitRows(
+			parseDiff(["@@ -1,1 +1,1 @@", " ctx"].join("\n")),
+		);
 		expect(rows[0].type).toBe("hunk");
 		expect(rows[0].left).toBe(rows[0].right);
 	});
+});
+
+it("does not count Git metadata as code changes", () => {
+	const patch =
+		"diff --git a/a.ts b/a.ts\nindex aaa..bbb 100644\n--- a/a.ts\n+++ b/a.ts\n@@ -2,1 +2,1 @@\n-old\n+++counter;\n";
+	const rows = parseDiff(patch);
+	expect(rows.filter((row) => row.type === "added")).toEqual([
+		{ type: "added", content: "++counter;", newLineNumber: 2 },
+	]);
+	expect(rows.filter((row) => row.type === "removed")).toHaveLength(1);
+	expect(rows[0].type).toBe("hunk");
 });
