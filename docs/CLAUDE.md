@@ -821,12 +821,14 @@ mardi. `apps/backend/brain/` est **un seul cerveau que tous les agents lisent et
 format Graphify, un dépôt git synchronisé, servi par un serveur MCP.
 
 ```
-<cerveau>/                       ~/.workpilot/brain, ou WORKPILOT_BRAIN_DIR
+<cerveau>/                       Réglages → Cerveau partagé, WORKPILOT_BRAIN_DIR, sinon ~/.workpilot/brain
   instructions/<slug>.md         une instruction partagée par note — `agents:` dit qui la suit
   knowledge/<slug>.md            décisions, faits, emplacements
+  knowledge/projects/<p>/builds/ une note par tâche du Kanban, et ce qu'on y a appris
   agents/<agent>/…               instantanés des mémoires propres à chaque agent
   skills/graph-first-recall/     le skill de rappel graph-first, semé à l'init
-  INSTRUCTIONS.md                condensé généré (ignoré par git)
+  .workpilot-brain/brain.json    le marqueur : ce dossier est un cerveau (versionné)
+  .workpilot-brain/INSTRUCTIONS.md  condensé généré (ignoré par git)
   graphify-out/graph.json        le graphe, reconstruit à chaque écriture (ignoré par git)
 ```
 
@@ -891,7 +893,7 @@ le cerveau apprend qu'une instruction est *partagée*.
 mémoire global de l'agent : comment utiliser le cerveau, les instructions à
 appliquer **en plus** des siennes, et celles qu'il suit déjà et que d'autres
 agents partagent — une instruction similaire se lit comme une confirmation, pas
-comme une seconde règle. Claude Code et Gemini importent `INSTRUCTIONS.md` par
+comme une seconde règle. Claude Code et Gemini importent le condensé par
 `@chemin` ; les autres reçoivent la liste en ligne ; hermes, qui plafonne son
 `MEMORY.md`, reçoit un pointeur et lit le reste en MCP. Le bloc est retiré avant
 toute lecture d'instructions : sans cela, chaque `ingest` réimporterait le
@@ -917,6 +919,58 @@ autres*, avec le Python qu'ils trouvent ; une dépendance absente là-bas est un
 cerveau que personne ne joint. JSON-RPC 2.0 sur stdio, une ligne par message, et
 le champ `instructions` d'`initialize` porte les règles d'usage : un agent jamais
 branché par `bridge` les apprend en se connectant.
+
+#### Brancher un vault Obsidian, un dépôt GitHub
+
+Réglages → Intégrations → **Cerveau partagé** (`BrainSettings`, `GET/POST
+/api/brain/settings`). Le choix est par personne, pas par projet, et vit dans
+`~/.workpilot/brain.json` : les processus qui en ont besoin sont des processus
+Python — lancés par l'application, par la CLI, par les agents des autres — et un
+fichier est la seule chose qu'ils peuvent tous lire. `WORKPILOT_BRAIN_DIR` gagne
+toujours, et le champ passe alors en lecture seule : un réglage qui ne gagne pas
+ne doit pas avoir l'air de gagner.
+
+`Brain.init` distingue trois cas, d'après ce qu'il y a sur le disque :
+
+| Dossier | Ce qui se passe |
+|---|---|
+| absent ou vide, un distant donné | **cloné** — un cerveau d'une autre machine, ou un vault gardé sur GitHub |
+| absent ou vide | un nouveau cerveau, avec son README et ses dossiers |
+| tout le reste | **adopté** tel quel — un vault Obsidian que la personne a déjà |
+
+**Un vault adopté ne voit rien apparaître à sa racine.** Le marqueur et le
+condensé vivent dans `.workpilot-brain/`, qu'Obsidian ne liste pas ; pas de
+README, pas de note générée. Ses notes deviennent celles du cerveau : le rappel
+lit tout le vault, et c'est tout l'intérêt de le brancher. Un vault déjà sous git
+(le plugin obsidian-git) garde son dépôt et son `.gitignore`, auquel on ajoute
+seulement les lignes dont le cerveau a besoin. Un clone raté dit pourquoi au lieu
+de laisser derrière lui un cerveau vide.
+
+**Deux garde-fous, parce que l'API locale est joignable depuis un navigateur.**
+Le dossier choisi reste sous le répertoire personnel : un endpoint qui crée un
+dépôt git là où on le lui dit écrit dans `/etc` pour qui le demande. Et un
+distant est un distant (`sync.normalize_remote`) : `utilisateur/dépôt` pour
+GitHub, sinon https, ssh, `git@hôte:`, file ou un chemin. Une valeur qui commence
+par `-` est une option pour `git clone` (`--upload-pack=…` lance un programme) et
+`ext::` est un transport qui en lance un aussi ; les deux sont refusés avant que
+git ne les voie, et les commandes passent `--` avant leurs arguments positionnels.
+
+#### Ce que la tâche a appris, dans le Kanban
+
+`BrainTaskCard`, dans le panneau de tâche (`GET /api/brain/task`). Le serveur MCP
+lancé pour un build porte `WORKPILOT_BRAIN_TASK=<projet>/<spec>`, et l'exécuteur
+d'outils des autres fournisseurs passe la même référence : chaque note et chaque
+règle écrites pendant la tâche portent `tasks:` et un lien vers la note de build.
+La carte lit le graphe, pas chaque fichier d'un gros vault, et ne tire pas le
+distant : ouvrir un panneau n'est pas une raison d'attendre le réseau.
+
+Elle ne s'affiche que quand le cerveau a quelque chose de cette tâche. Elle
+montre la note de build (verdicts QA et tests, `acceptée` après un merge), les
+notes apprises, et les **règles proposées**, qu'une personne active ou refuse sur
+place : c'est devant la tâche qui l'a fait naître qu'on juge le mieux une règle.
+« Ouvrir dans Obsidian » ouvre la note par son chemin (`obsidian://open?path=`),
+d'où `obsidian:` dans les schémas qu'`open-external.ts` accepte — il ne lance que
+l'application Obsidian, jamais un programme arbitraire.
 
 #### Branché sur toutes les features
 
@@ -980,7 +1034,8 @@ l'endroit où vit sa connaissance et le distant où elle est poussée.
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `WORKPILOT_BRAIN_DIR` | `~/.workpilot/brain` (`%APPDATA%\WorkPilot\brain`) | où est le cerveau |
-| `BRAIN_ENABLED` | `true` | branche le cerveau sur toutes les features, quand il existe |
+| `BRAIN_ENABLED` | l'interrupteur des Réglages, sinon `true` | branche le cerveau sur toutes les features, quand il existe |
+| `WORKPILOT_BRAIN_CONFIG` | `~/.workpilot/brain.json` | où les Réglages enregistrent le dossier et l'interrupteur |
 | `BRAIN_PULL_INTERVAL` | `60` | secondes entre deux pulls avant lecture |
 | `BRAIN_AUTO_PULL` / `BRAIN_AUTO_PUSH` | `true` | pull avant lecture / push après écriture |
 | `BRAIN_SIMILARITY` | `0.72` | seuil au-delà duquel deux instructions n'en font qu'une |
