@@ -1,12 +1,19 @@
 {
 	"title": "Optimiseur de Prompts IA",
-	"description": "Améliorez votre prompt avec le contexte du projet et les meilleures pratiques pour de meilleurs résultats IA.",
+	"description": "Réécrit votre prompt avec le contexte du projet et les bonnes pratiques, pour que l'agent agisse sans avoir à deviner.",
+	"engine": {
+		"label": "Moteur",
+		"default": "fournisseur par défaut"
+	},
 	"prompt": {
-		"label": "Votre Prompt",
-		"placeholder": "Entrez le prompt que vous souhaitez optimiser..."
+		"label": "Votre prompt",
+		"placeholder": "Décrivez ce que l'agent doit faire…",
+		"characters_one": "{{count}} caractère",
+		"characters_other": "{{count}} caractères",
+		"shortcut": "{{modifier}} + Entrée pour optimiser"
 	},
 	"agentType": {
-		"label": "Type d'Agent",
+		"label": "Optimiser pour",
 		"description": "Sélectionnez le type d'agent pour lequel optimiser",
 		"options": {
 			"general": "Général",
@@ -15,37 +22,73 @@
 			"verification": "Vérification"
 		},
 		"descriptions": {
-			"general": "Optimisation à usage général",
-			"analysis": "Optimisé pour l'analyse et la revue de code",
-			"coding": "Optimisé pour l'implémentation de code",
-			"verification": "Optimisé pour les tests et l'assurance qualité"
+			"general": "Objectif, périmètre et résultat attendu clairs",
+			"analysis": "Revue et audit, sans modifier le code",
+			"coding": "Implémentation, contraintes, critères d'acceptation",
+			"verification": "Tests, scénarios, critères de réussite"
 		}
 	},
 	"actions": {
-		"optimize": "Optimiser le Prompt",
-		"optimizing": "Optimisation en cours...",
-		"copy": "Copier le Prompt Optimisé",
+		"optimize": "Optimiser",
+		"optimizing": "Optimisation en cours…",
+		"copy": "Copier",
 		"copied": "Copié !",
-		"usePrompt": "Utiliser ce Prompt",
+		"usePrompt": "Utiliser ce prompt",
 		"tryAgain": "Réessayer",
-		"close": "Fermer"
+		"close": "Fermer",
+		"cancel": "Annuler",
+		"runInBackground": "Continuer en arrière-plan",
+		"editPrompt": "Modifier le prompt",
+		"refine": "Affiner encore",
+		"newPrompt": "Nouveau prompt"
 	},
 	"status": {
 		"idle": "Prêt à optimiser",
-		"analyzing": "Analyse du prompt et du contexte du projet...",
+		"analyzing": "Analyse du prompt et du contexte du projet…",
+		"context": "Lecture du projet",
+		"generating": "Réécriture",
+		"parsing": "Finalisation",
 		"complete": "Optimisation terminée",
-		"error": "L'optimisation a échoué"
+		"error": "L'optimisation a échoué",
+		"backgroundHint": "Vous pouvez fermer cette fenêtre : l'optimisation continue et le résultat vous attendra à la réouverture."
 	},
 	"result": {
-		"title": "Prompt Optimisé",
-		"changes": "Modifications Apportées",
-		"reasoning": "Raisonnement",
+		"title": "Prompt optimisé",
+		"changes": "Ce qui a changé",
+		"reasoning": "Pourquoi",
 		"noChanges": "Aucune modification nécessaire — votre prompt est déjà bien structuré.",
-		"streamingOutput": "Sortie de l'Optimiseur"
+		"streamingOutput": "Sortie de l'optimiseur",
+		"livePreview": "Prompt optimisé, en cours d'écriture",
+		"waitingPreview": "La réécriture apparaîtra ici dès que le modèle commencera à écrire…",
+		"originalPrompt": "Afficher le prompt d'origine",
+		"editHint": "Vous pouvez retoucher le résultat avant de l'utiliser ou de le copier.",
+		"before": "Avant",
+		"after": "Après",
+		"tabs": {
+			"optimized": "Prompt optimisé",
+			"compare": "Comparer"
+		}
 	},
 	"errors": {
-		"noProject": "Aucun projet sélectionné. Veuillez d'abord sélectionner un projet.",
-		"emptyPrompt": "Veuillez entrer un prompt à optimiser.",
-		"generic": "Une erreur est survenue lors de l'optimisation."
+		"noProject": "Aucun projet sélectionné. Sélectionnez d'abord un projet : l'optimiseur utilise son contexte.",
+		"emptyPrompt": "Saisissez un prompt à optimiser.",
+		"generic": "Une erreur est survenue pendant l'optimisation.",
+		"details": "Détails techniques",
+		"codes": {
+			"auth": "Le fournisseur IA a refusé les identifiants. Vérifiez votre compte ou votre clé API dans les Réglages.",
+			"rate_limit": "La limite de requêtes du fournisseur est atteinte. Réessayez dans quelques instants.",
+			"quota": "Le quota du fournisseur est épuisé pour ce compte.",
+			"network": "Le fournisseur IA est injoignable. Vérifiez votre connexion.",
+			"timeout": "Le fournisseur IA a mis trop de temps à répondre.",
+			"provider_unavailable": "Le fournisseur sélectionné n'est pas disponible. Choisissez-en un autre dans la liste des fournisseurs.",
+			"provider_error": "Le fournisseur IA a renvoyé une erreur.",
+			"empty_response": "Le modèle a renvoyé une réponse vide. Réessayez, ou choisissez un autre modèle.",
+			"runner_missing": "Le composant backend de l'optimiseur est absent de cette installation.",
+			"python_missing": "Aucun environnement Python n'a été trouvé pour lancer l'optimiseur.",
+			"project_not_found": "Le projet sélectionné est introuvable.",
+			"spawn_failed": "L'optimiseur n'a pas pu être démarré.",
+			"process_failed": "L'optimiseur s'est arrêté de façon inattendue.",
+			"generic": "Une erreur est survenue pendant l'optimisation."
+		}
 	}
 }
