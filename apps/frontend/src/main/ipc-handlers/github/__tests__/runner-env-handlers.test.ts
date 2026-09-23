@@ -211,7 +211,7 @@ describe("GitHub runner env usage", () => {
 		// le fournisseur choisi pour « GitHub PRs » plutôt que Claude par défaut.
 		expect(mockGetRunnerEnv).toHaveBeenCalledWith(
 			{ USE_CLAUDE_MD: "true" },
-			{ page: "github-prs" },
+			{ jevWorkflow: "github-review", page: "github-prs" },
 		);
 		expect(mockRunPythonSubprocess).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -259,7 +259,7 @@ describe("GitHub runner env usage", () => {
 				USE_CLAUDE_MD: "true",
 				TDD_MODE: "true",
 			},
-			{ page: "github-prs" },
+			{ jevWorkflow: "github-review", page: "github-prs" },
 		);
 	});
 

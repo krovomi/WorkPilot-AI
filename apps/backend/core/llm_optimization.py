@@ -131,7 +131,25 @@ def build_base_system_prompt(
     if tool_use_hint:
         prompt += _TOOL_USE_HINT
     prompt += _rtk_awareness()
+    prompt += _brain_awareness()
     return prompt
+
+
+def _brain_awareness() -> str:
+    """How to use the shared brain, and the instructions it carries.
+
+    Here rather than in `create_client` for the reason `_rtk_awareness` is:
+    every provider branch builds its prompt through this function, and the
+    instructions have to apply to an Ollama build as much as to a Claude one.
+    Read from the notes on disk, never pulled: building a prompt costs no
+    network call, and the text changes only when an instruction does.
+    """
+    try:
+        from brain.runtime import awareness_section
+
+        return awareness_section()
+    except Exception:  # noqa: BLE001 - an optional store never breaks a prompt
+        return ""
 
 
 def _rtk_awareness() -> str:

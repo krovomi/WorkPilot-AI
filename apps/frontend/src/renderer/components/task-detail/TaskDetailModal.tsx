@@ -96,6 +96,7 @@ import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask, resumeTask } from "../../stores/task-store";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { HermesLearningCard } from "./HermesLearningCard";
+import { BrainTaskCard } from "./BrainTaskCard";
 import { RtkSavingsCard } from "./RtkSavingsCard";
 import {
 	shouldShowArchitectureDelta,
@@ -1338,6 +1339,17 @@ function TaskDetailModalContent({
 											    quand rtk n'est pas installé — la découverte
 											    se fait dans les Réglages. */}
 											<RtkSavingsCard
+												projectPath={
+													taskProject?.path ?? activeProject?.path
+												}
+											/>
+
+											{/* Le cerveau partagé : ce que cette tâche lui a
+											    appris, et les règles que ses agents proposent.
+											    Ne s'affiche que quand il y a quelque chose —
+											    la découverte se fait dans les Réglages. */}
+											<BrainTaskCard
+												task={task}
 												projectPath={
 													taskProject?.path ?? activeProject?.path
 												}

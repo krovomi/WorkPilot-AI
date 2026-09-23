@@ -350,6 +350,37 @@ def _primary_language(spec_dir: Path) -> str:
         return ""
 
 
+def _record_build_in_brain(
+    spec_dir: Path,
+    *,
+    qa_approved: bool | None,
+    tests_passed: bool | None,
+    changed_files: list[str] | None,
+) -> None:
+    """File the finished build in the shared brain (`brain/learn.py`).
+
+    A no-op without a brain on this machine, and never raises: the build is
+    done, and losing the note is cheaper than losing the run.
+    """
+    try:
+        from brain.learn import record_build
+
+        rel = record_build(
+            spec_dir,
+            _project_dir(spec_dir),
+            qa_approved=qa_approved,
+            tests_passed=tests_passed,
+            changed_files=changed_files,
+            language=_primary_language(spec_dir),
+        )
+        if rel:
+            print(f"  brain: build recorded in {rel}")
+    except Exception as exc:  # noqa: BLE001 - learning never fails a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Brain record skipped: {exc}")
+
+
 def _run_observe_phase(
     spec_dir: Path,
     *,
@@ -935,6 +966,16 @@ def handle_build_command(
             # The real git diff, already computed above for the conditional
             # phases. Reused rather than re-derived from the plan: the plan
             # says what was intended, the diff says what happened.
+            changed_files=_changed,
+        )
+
+        # The shared brain keeps what this build was and how it ended, for
+        # every agent on every machine — whatever the effort level and whether
+        # or not the workflow engine ran the observe phase above.
+        _record_build_in_brain(
+            spec_dir,
+            qa_approved=qa_approved if qa_should_run else None,
+            tests_passed=_tests_green,
             changed_files=_changed,
         )
 

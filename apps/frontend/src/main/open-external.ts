@@ -14,10 +14,17 @@ import { isLinux } from "./platform";
  * nomme l'échec quand il n'y en a aucun.
  */
 
-/** Les schémas qu'une page peut demander d'ouvrir. */
+/**
+ * Les schémas qu'une page peut demander d'ouvrir.
+ *
+ * `obsidian:` ouvre une note du cerveau partagé dans Obsidian (carte de tâche
+ * du Kanban). Il ne lance que l'application Obsidian, jamais un programme
+ * arbitraire — à la différence de `file:`, qui reste refusé.
+ */
 export const ALLOWED_EXTERNAL_PROTOCOLS: ReadonlySet<string> = new Set([
 	"http:",
 	"https:",
+	"obsidian:",
 ]);
 
 /**

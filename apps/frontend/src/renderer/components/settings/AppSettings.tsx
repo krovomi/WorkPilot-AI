@@ -1,8 +1,10 @@
 import { JevSettings } from "./JevSettings";
+import { BrainSettings } from "./BrainSettings";
 import {
 	Activity,
 	Bell,
 	Bot,
+	Brain,
 	Bug,
 	CalendarClock,
 	ChevronRight,
@@ -115,6 +117,7 @@ interface AppSettingsDialogProps {
 // Types de sections thématiques
 export type AppSection =
 	| "jev"
+	| "brain"
 	// Projet (priorité 1)
 	| "project"
 	// Intégrations & Connexions (priorité 2)
@@ -209,6 +212,12 @@ const createSettingsThemes = (t: {
 				type: "project",
 			},
 			{ id: "jev", icon: Zap, label: t("jev.title"), type: "app" },
+			{
+				id: "brain",
+				icon: Brain,
+				label: t("brain:settings.title"),
+				type: "app",
+			},
 			{ id: "jira", icon: JiraIcon, label: "Jira", type: "project" },
 			{ id: "linear", icon: Zap, label: "Linear", type: "project" },
 			{
@@ -361,7 +370,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		onRerunWizard,
 		onOpenSetupHub,
 	} = props;
-	const { t } = useTranslation(["settings", "swarm", "continuousAI"]);
+	const { t } = useTranslation(["settings", "swarm", "continuousAI", "brain"]);
 	const {
 		settings,
 		setSettings,
@@ -566,6 +575,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		switch (appSection) {
 			case "jev":
 				return <JevSettings />;
+			case "brain":
+				return <BrainSettings />;
 			case "appearance":
 				return (
 					<ThemeSettings settings={settings} onSettingsChange={setSettings} />

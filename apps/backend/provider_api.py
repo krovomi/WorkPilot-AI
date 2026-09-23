@@ -2039,6 +2039,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import hermes router: {e}")
 
+# --- Brain API (the shared brain: one knowledge base, every agent) ---
+try:
+    from brain.api import router as brain_router
+
+    _mount(brain_router, "brain")
+except ImportError as e:
+    print(f"Warning: Could not import brain router: {e}")
+
 # --- rtk API (is the output-condensing proxy working here, and what it saved) ---
 try:
     from rtk.api import router as rtk_router

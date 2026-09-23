@@ -32,6 +32,7 @@ import enWorkflowProfile from "./locales/en/workflowProfile.json";
 import enHermes from "./locales/en/hermes.json";
 import enRtk from "./locales/en/rtk.json";
 import enTraceability from "./locales/en/traceability.json";
+import enBrain from "./locales/en/brain.json";
 
 // Import English translation resources
 import enAppEmulator from "./locales/en/appEmulator.json";
@@ -129,6 +130,7 @@ import frWorkflowProfile from "./locales/fr/workflowProfile.json";
 import frHermes from "./locales/fr/hermes.json";
 import frRtk from "./locales/fr/rtk.json";
 import frTraceability from "./locales/fr/traceability.json";
+import frBrain from "./locales/fr/brain.json";
 
 // Import French translation resources
 import frAppEmulator from "./locales/fr/appEmulator.json";
@@ -234,6 +236,7 @@ export const resources = {
 		hermes: enHermes,
 		rtk: enRtk,
 		traceability: enTraceability,
+		brain: enBrain,
 		changelog: enChangelog,
 		codePlayground: enCodePlayground,
 		codeReview: enCodeReview,
@@ -331,6 +334,7 @@ export const resources = {
 		hermes: frHermes,
 		rtk: frRtk,
 		traceability: frTraceability,
+		brain: frBrain,
 		changelog: frChangelog,
 		codePlayground: frCodePlayground,
 		codeReview: frCodeReview,
@@ -435,6 +439,7 @@ i18n.use(initReactI18next).init({
 		"hermes",
 		"rtk",
 		"traceability",
+		"brain",
 		"changelog",
 		"codePlayground",
 		"codeReview",

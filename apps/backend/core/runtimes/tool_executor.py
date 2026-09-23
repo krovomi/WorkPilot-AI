@@ -137,6 +137,14 @@ class ToolExecutor:
             )
         elif tool_name == "create_directory":
             return await self._create_directory(_pick_arg(arguments, *dir_aliases))
+        elif _is_brain_tool(tool_name):
+            # The shared brain: the same tools the Claude SDK reaches over MCP,
+            # executed in-process for every other provider.
+            from brain.runtime import execute_tool, task_ref
+
+            return await execute_tool(
+                tool_name, arguments, task=task_ref(self.project_dir, self.spec_dir)
+            )
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 
@@ -398,6 +406,25 @@ class ToolExecutor:
         await process.wait()
 
 
+def _is_brain_tool(name: str) -> bool:
+    try:
+        from brain.runtime import is_brain_tool
+
+        return is_brain_tool(name)
+    except Exception:  # noqa: BLE001 - an optional store never breaks dispatch
+        return False
+
+
+def _brain_tool_definitions() -> list[dict[str, Any]]:
+    """The shared brain's tools, when a brain exists on this machine."""
+    try:
+        from brain.runtime import tool_definitions
+
+        return tool_definitions()
+    except Exception:  # noqa: BLE001 - an optional store never breaks a session
+        return []
+
+
 def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
     """
     Get tool definitions for a specific agent type.
@@ -534,4 +561,6 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
             ]
         )
 
+    # Every agent type, like `create_client` does for the Claude SDK.
+    base_tools.extend(_brain_tool_definitions())
     return base_tools

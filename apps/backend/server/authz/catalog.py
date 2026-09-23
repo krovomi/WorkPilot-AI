@@ -266,6 +266,10 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "progress_indicator": "task",
         "qa_promotion": "qa",
         "hermes": "agent",
+        # The shared brain lives in the home directory of the machine running
+        # the backend; the router refuses server mode, and this entry keeps a
+        # mounted router from being permission-less.
+        "brain": "agent",
         # rtk reports whether the output-condensing proxy works on this machine
         # and what it has saved. Both are facts about the agent tooling this
         # deployment is configured with, which is what the `settings` domain

@@ -1,0 +1,98 @@
+{
+	"card": {
+		"title": "Shared brain",
+		"subtitle": "What this task taught the brain shared by all your AI agents.",
+		"state": {
+			"built": "built",
+			"merged": "accepted"
+		},
+		"badge": {
+			"notes": "{{count}} note",
+			"notes_other": "{{count}} notes",
+			"proposals": "{{count}} proposed rule",
+			"proposals_other": "{{count}} proposed rules"
+		},
+		"verdict": {
+			"qa": "QA: {{value}}",
+			"tests": "Tests: {{value}}",
+			"qaYes": "approved",
+			"qaNo": "rejected",
+			"testsYes": "green",
+			"testsNo": "red",
+			"unknown": "not measured"
+		},
+		"refresh": "Refresh",
+		"expand": "Details",
+		"collapse": "Hide",
+		"buildNote": "Task note",
+		"notesTitle": "Learned during the task",
+		"notesEmpty": "No agent has written to the brain during this task yet.",
+		"proposalsTitle": "Rules proposed by agents",
+		"proposalsHint": "An active rule applies to all your agents, on all your projects. WorkPilot's agents only propose it: the decision is yours.",
+		"activate": "Activate",
+		"reject": "Reject",
+		"openInObsidian": "Open in Obsidian",
+		"by": "by {{agents}}",
+		"kind": {
+			"instruction": "rule",
+			"knowledge": "knowledge",
+			"note": "note"
+		},
+		"error": "The brain could not be read: {{error}}"
+	},
+	"settings": {
+		"title": "Shared brain",
+		"description": "One place for all your AI agents' knowledge — Claude Code, Codex, Hermes, OpenClaw… and every WorkPilot feature. An Obsidian vault, a Graphify graph, synced through git.",
+		"unavailable": "The shared brain is a desktop app feature.",
+		"loading": "Reading the configuration…",
+		"enabled": "Plug the brain into WorkPilot",
+		"enabledHint": "Every agent of every feature recalls from the brain and learns into it. Off, nothing is read or written.",
+		"folder": "Brain folder (Obsidian vault)",
+		"folderHint": "An existing Obsidian vault is adopted as it is: its notes become the agents' memory, and nothing is added at its root. An empty folder becomes a new brain. It must be inside your home folder.",
+		"browse": "Browse…",
+		"useDefault": "Default location",
+		"remote": "Remote git repository (GitHub…)",
+		"remoteHint": "\"user/repo\" for GitHub, or an https:// or git@ URL. An empty folder is cloned from it; after that, every change is pulled and pushed. Your git credentials are used: prefer a private repository.",
+		"remotePlaceholder": "user/my-brain",
+		"connect": "Save and connect",
+		"connecting": "Connecting…",
+		"sync": "Sync now",
+		"syncing": "Syncing…",
+		"envOverride": "The folder is set by the {{variable}} environment variable.",
+		"saved": "Brain connected.",
+		"error": "Failed: {{error}}",
+		"status": {
+			"title": "Status",
+			"active": "Plugged in: {{notes}} notes",
+			"inactive": "No brain at this location yet.",
+			"disabled": "Disabled.",
+			"obsidian": "Obsidian vault detected",
+			"noGit": "git was not found on this machine: the brain works without syncing.",
+			"remote": "Remote: {{remote}}",
+			"noRemote": "No remote: changes stay on this machine.",
+			"proposals": "{{count}} rule proposed by agents is waiting for your decision",
+			"proposals_other": "{{count}} rules proposed by agents are waiting for your decision"
+		},
+		"lastSync": {
+			"ok": "Synced.",
+			"conflicts": "Synced, {{count}} conflict: both versions were kept.",
+			"conflicts_other": "Synced, {{count}} conflicts: both versions were kept.",
+			"skipped": "Nothing to sync ({{reason}})."
+		},
+		"errors": {
+			"outsideHome": "The brain folder must be inside your home folder (and not be that folder itself).",
+			"isFile": "This path is a file, not a folder.",
+			"invalidRemote": "Not a git repository: enter \"user/repo\" or an https:// or git@ URL.",
+			"envLocked": "The folder is set by an environment variable.",
+			"auth": "Access to the repository was refused: check your git credentials (SSH key, or \"gh auth setup-git\" for HTTPS).",
+			"notFound": "Repository not found: check its name and that your account can access it.",
+			"network": "The repository cannot be reached: check your connection.",
+			"timeout": "Cloning took too long.",
+			"gitMissing": "git was not found on this machine.",
+			"failed": "The git operation failed (details in the backend log).",
+			"syncFailed": "Syncing failed (details in the backend log).",
+			"invalidPath": "This rule could not be found in the brain.",
+			"invalidStatus": "Unknown rule status."
+		}
+	}
+}

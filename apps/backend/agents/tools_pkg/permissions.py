@@ -108,6 +108,10 @@ def _get_mcp_tools_for_servers(servers: list[str]) -> list[str]:
             tools.extend(PUPPETEER_TOOLS)
         elif server == "chrome-devtools":
             tools.extend(CHROME_DEVTOOLS_TOOLS)
+        elif server == "brain":
+            from brain.runtime import MCP_TOOL_NAMES
+
+            tools.extend(MCP_TOOL_NAMES)
         # workpilot tools are already added via config["auto_claude_tools"]
 
     return tools
