@@ -25,6 +25,7 @@ agent that was never bridged still learns them the moment it connects.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 import traceback
@@ -333,11 +334,29 @@ def handle(brain: Brain, message: dict[str, Any]) -> dict[str, Any] | None:
     return _error(msg_id, -32601, f"method not found: {method}")
 
 
+def _utf8(stream):
+    """The stdio stream, in UTF-8 with bare ``\n`` line ends.
+
+    MCP's stdio transport is UTF-8, and the platform default is not: on
+    Windows it is cp1252, so the first reply carrying an accent or an arrow
+    raised ``UnicodeEncodeError`` and the server died before answering
+    ``initialize`` — to every agent on the machine.
+    """
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace", newline="\n")
+    except (AttributeError, ValueError) as exc:
+        # Not a TextIOWrapper (a test's StringIO): already text, nothing to do.
+        logging.getLogger(__name__).debug("stdio left as is: %s", exc)
+    return stream
+
+
 def serve(brain: Brain | None = None, stdin=None, stdout=None) -> None:
     """Read JSON-RPC lines from stdin until EOF. Logs go to stderr, never stdout."""
     brain = brain or Brain()
-    stdin = stdin or sys.stdin
-    stdout = stdout or sys.stdout
+    if stdin is None:
+        stdin = _utf8(sys.stdin)
+    if stdout is None:
+        stdout = _utf8(sys.stdout)
     for line in stdin:
         line = line.strip()
         if not line:

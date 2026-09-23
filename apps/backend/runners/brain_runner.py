@@ -133,7 +133,7 @@ def watch(brain: Brain, interval: float) -> None:
         result = brain.sync("brain: edits")
         if result.committed or result.pulled or result.conflicts or result.error:
             print(
-                RESULT_MARKER + json.dumps(result.to_dict(), ensure_ascii=False),
+                RESULT_MARKER + json.dumps(result.to_dict()),
                 flush=True,
             )
         time.sleep(interval)
@@ -173,7 +173,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = run(args)
     except (ValueError, KeyError, OSError, TypeError) as exc:
         payload = {"success": False, "error": str(exc)}
-    print(RESULT_MARKER + json.dumps(payload, ensure_ascii=False, default=str))
+    print(RESULT_MARKER + json.dumps(payload, default=str))
     return 0 if payload.get("success") else 1
 
 

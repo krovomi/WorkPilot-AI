@@ -583,20 +583,28 @@ def test_serve_reads_lines_and_writes_one_reply_per_request(tmp_path):
     assert replies[1]["error"]["code"] == -32700
 
 
-def test_the_registered_command_starts_a_working_server(tmp_path):
+@pytest.mark.parametrize("platform_encoding", [None, "cp1252"])
+def test_the_registered_command_starts_a_working_server(tmp_path, platform_encoding):
+    """cp1252 is Windows' default: the server must speak UTF-8 regardless."""
     import os
 
     env = {**os.environ, "WORKPILOT_BRAIN_DIR": str(tmp_path / "brain")}
+    if platform_encoding:
+        env["PYTHONIOENCODING"] = platform_encoding
     done = subprocess.run(
         [sys.executable, str(BACKEND / "runners" / "brain_mcp.py")],
-        input=json.dumps(
-            {"jsonrpc": "2.0", "id": 7, "method": "initialize", "params": {}}
-        )
-        + "\n",
+        input=(
+            json.dumps(
+                {"jsonrpc": "2.0", "id": 7, "method": "initialize", "params": {}}
+            )
+            + "\n"
+        ).encode(),
         capture_output=True,
-        text=True,
         timeout=60,
         env=env,
     )
-    reply = json.loads(done.stdout.splitlines()[0])
+    lines = done.stdout.decode("utf-8").splitlines()
+    assert lines, done.stderr.decode("utf-8", errors="replace")
+    reply = json.loads(lines[0])
     assert reply["id"] == 7 and reply["result"]["serverInfo"]["name"] == SERVER_NAME
+    assert "→" in reply["result"]["instructions"]
