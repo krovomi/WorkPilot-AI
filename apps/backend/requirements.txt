@@ -2,7 +2,7 @@
 # SDK 0.1.25+ required for improved tool use concurrency handling
 # Earlier versions had 400 errors when tool_use blocks had partial failures
 # Utiliser le nom correct du package (tiret) pour l'installation via pip
-claude-agent-sdk>=0.2.153
+claude-agent-sdk>=0.2.157
 python-dotenv>=1.2.3
 
 # WebSocket support for streaming development mode
@@ -89,7 +89,7 @@ msrest>=0.7.1           # Required by azure-devops SDK
 defusedxml>=0.7.1
 
 # Anthropic SDK for Claude API integration
-anthropic>=1.5.0
+anthropic>=1.7.0
 
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:
