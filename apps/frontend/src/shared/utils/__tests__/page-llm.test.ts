@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_FEATURE_MODELS,
 	DEFAULT_FEATURE_THINKING,
+	getModelsForProvider,
 } from "../../constants/models";
 import type { AppSettings } from "../../types/settings";
 import {
@@ -83,7 +84,10 @@ describe("resolvePageLlm — l'ordre établi", () => {
 	});
 
 	it("retombe sur les défauts du dépôt quand les réglages ne disent rien", () => {
-		const resolved = resolvePageLlm({ selectedProvider: "anthropic" }, "roadmap");
+		const resolved = resolvePageLlm(
+			{ selectedProvider: "anthropic" },
+			"roadmap",
+		);
 		expect(resolved.model).toBe(DEFAULT_FEATURE_MODELS.roadmap);
 		expect(resolved.modelSource).toBe("default");
 		expect(resolved.thinking).toBe(DEFAULT_FEATURE_THINKING.roadmap);
@@ -123,6 +127,44 @@ describe("resolvePageLlm — l'ordre établi", () => {
 	});
 });
 
+describe("inherited provider models", () => {
+	it.each([
+		"openai",
+		"copilot",
+		"google",
+		"ollama",
+	])("adapts the default optimizer model to %s from global settings", (provider) => {
+		const resolved = resolvePageLlm(
+			{ selectedProvider: provider },
+			"prompt-optimizer",
+		);
+		expect(
+			getModelsForProvider(provider).map((model) => model.value),
+		).toContain(resolved.model);
+		expect(resolved.modelSource).toBe("default");
+	});
+
+	it.each(
+		PAGE_LLM_PAGES,
+	)("adapts inherited Claude models to OpenAI on %s", (page) => {
+		const resolved = resolvePageLlm(base(), page);
+		expect(
+			getModelsForProvider("openai").map((model) => model.value),
+		).toContain(resolved.model);
+	});
+
+	it("keeps an already compatible feature model and its source", () => {
+		const model = getModelsForProvider("openai")[0].value;
+		const resolved = resolvePageLlm(
+			base({
+				featureModels: { ...DEFAULT_FEATURE_MODELS, promptOptimizer: model },
+			}),
+			"prompt-optimizer",
+		);
+		expect(resolved.model).toBe(model);
+		expect(resolved.modelSource).toBe("settings");
+	});
+});
 describe("isPageLlmPage", () => {
 	it("reconnaît une page déclarée", () => {
 		expect(isPageLlmPage("github-prs")).toBe(true);
