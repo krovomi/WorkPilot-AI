@@ -37,6 +37,10 @@ afterEach(() => {
 });
 
 const openMenu = async (user: ReturnType<typeof userEvent.setup>) => {
+	// Focus the trigger before Radix opens the menu. After cleanup, jsdom 30.1
+	// emits a window blur when focus first leaves the document, closing open menus.
+	await user.tab();
+	expect(screen.getByRole("button", { name: /agent tools/i })).toHaveFocus();
 	await user.click(screen.getByRole("button", { name: /agent tools/i }));
 };
 
