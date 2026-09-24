@@ -104,4 +104,26 @@ describe("dictation IPC ownership and lifecycle", () => {
 		owner.emit("destroyed");
 		expect(child.kill).toHaveBeenCalledOnce();
 	});
+	it("cancels pending transcription when the application quits", async () => {
+		const ready = handlers.get(IPC_CHANNELS.DICTATION_START)?.(
+			event(),
+			"s",
+			false,
+		);
+		child.stdout.write('{"ready":true}\n');
+		await ready;
+		const pending = handlers.get(IPC_CHANNELS.DICTATION_TRANSCRIBE)?.(
+			event(),
+			"s",
+			new ArrayBuffer(44),
+			"en-US",
+		);
+		const beforeQuit = mocks.on.mock.calls.find(
+			([name]) => name === "before-quit",
+		)?.[1];
+		expect(beforeQuit).toBeTypeOf("function");
+		beforeQuit();
+		expect(await pending).toEqual({ error: "cancelled" });
+		expect(child.kill).toHaveBeenCalledOnce();
+	});
 });
