@@ -35,3 +35,4 @@
 # --check` re-downloads the pinned release and compares files, so a line ending
 # git normalised on checkout would report as drift on every machine.
 skills/bmad/** -text
+graphify-out/graph.json merge=graphify
