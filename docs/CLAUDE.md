@@ -880,7 +880,14 @@ committés, deux machines ajoutant chacune une note seraient en conflit sur
 quand deux agents touchent la même note, le rebase est tenté, puis le merge, et
 si les mêmes lignes divergent encore, la nôtre reste en place et la leur est
 écrite à côté (`<nom>.conflict-<sha>.md`). Choisir un gagnant en silence serait
-décider à la place de la personne lequel des deux agents avait raison.
+décider à la place de la personne lequel des deux agents avait raison. Les
+chemins en conflit sont lus avec `-z` : en sortie ligne, git met entre
+guillemets et échappe en octal un nom non ASCII (`"Id\303\251es.md"`), et une
+note française partait sur GitHub avec ses marqueurs `<<<<<<<` dedans.
+
+**La branche suivie est celle du distant.** Un cerveau créé ici sur `main` et
+branché sur un vault gardé sur `master` suit `master` (`_remote_branch`) : il
+tirait le distant pour vide et poussait une seconde branche à côté du vault.
 
 **Similaire n'est pas doublon, et aucune des deux n'est perdue.** `remember`
 cherche une instruction proche (mots à cinq lettres près, ou ratio de
@@ -955,9 +962,20 @@ par `-` est une option pour `git clone` (`--upload-pack=…` lance un programme)
 `ext::` est un transport qui en lance un aussi ; les deux sont refusés avant que
 git ne les voie, et les commandes passent `--` avant leurs arguments positionnels. Les
 refus et les échecs reviennent sous forme de **codes** (`outside-home`,
-`invalid-remote`, `auth`, `not-found`…) que l'interface traduit : le message de
-git, en anglais, cite l'URL fournie par la requête et change d'une version à
-l'autre, alors il reste dans le journal du backend.
+`invalid-remote`, `auth`, `not-found`, `locked`, `identity`, `rejected`…) que
+l'interface traduit, **et** avec les mots de git (`detail`, `_git_detail`) : le
+code dit quel genre d'échec, le détail dit lequel, et c'est lui qu'on colle dans
+un moteur de recherche. Une ligne, les trois premières de git, sans les
+identifiants qu'une URL peut porter (`https://user:token@…`) ; le journal reçoit
+la même ligne avec l'étape (`commit`, `fetch`, `pull`, `push`). Un message
+« détails dans le journal » dont le journal ne contenait que le code n'aidait
+personne. Et aucune exception imprévue ne sort en 500 : sans en-têtes CORS, le
+renderer n'en lit que « Failed to fetch ».
+
+**Le frontmatter est celui d'une personne.** `date: 2024-01-01` — notes
+quotidiennes, propriétés Obsidian — est un objet `date` pour YAML ; une seule
+note de ce genre rendait `graph.json` impossible à écrire. `graph._plain` ramène
+chaque valeur à du JSON.
 
 #### Ce que la tâche a appris, dans le Kanban
 
