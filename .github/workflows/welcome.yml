@@ -22,11 +22,11 @@ jobs:
             - Make sure you've provided all the requested info
             - Join our [Discord](https://discord.gg/QhRnz9m5HE) for faster help
           pr_message: |
-            🎉 Thanks for your first PR!
+            🎉 Thanks for your PR!
 
             A maintainer will review it soon. Please make sure:
             - Your branch is synced with `develop`
             - CI checks pass
             - You've followed our [contribution guide](https://github.com/krovomi/WorkPilot-AI/blob/develop/CONTRIBUTING.md)
 
-            Welcome to the WorkPilot AI community!
+            Welcome to the WorkPilot-AI community!
