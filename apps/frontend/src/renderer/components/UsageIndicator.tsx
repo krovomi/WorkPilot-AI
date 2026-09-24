@@ -842,9 +842,15 @@ export function UsageIndicator() {
 
 	// Badge color based on the limiting (higher) percentage
 	// Override to red/destructive when re-auth is needed
-	const badgeColorClasses = usage.needsReauthentication
-		? "text-red-500 bg-red-500/10 border-red-500/20"
-		: getBadgeColorClasses(limitingPercent);
+	const isUnmeasured = usage.usageUnmeasured === true;
+	let badgeColorClasses: string;
+	if (usage.needsReauthentication) {
+		badgeColorClasses = "text-red-500 bg-red-500/10 border-red-500/20";
+	} else if (isUnmeasured) {
+		badgeColorClasses = "text-muted-foreground bg-muted/50 border-border";
+	} else {
+		badgeColorClasses = getBadgeColorClasses(limitingPercent);
+	}
 
 	// Individual colors for session and weekly in the badge
 	const sessionColorClass = getColorClass(sessionPercent);
@@ -863,9 +869,18 @@ export function UsageIndicator() {
 
 	const maxUsage = Math.max(usage.sessionPercent, weeklyPercent);
 
-	// Provider detection
+	// Provider detection. OpenAI has two very different meters: a ChatGPT
+	// plan (Codex CLI login) has 5-hour / weekly windows like Claude Code,
+	// an API key has a monthly cost.
 	const isOpenAI = usage.providerName === "openai";
+	const isOpenAICost = isOpenAI && !usage.openaiSubscription;
 	const isCopilot = usage.providerName === "copilot";
+	const copilotPremiumPercent =
+		isCopilot &&
+		usage.copilotUsageDetails?.scope === "personal-quotas" &&
+		!usage.copilotUsageDetails.premiumRequestsUnlimited
+			? usage.sessionPercent
+			: undefined;
 
 	// Copilot may have an error field for authentication issues
 	const hasCopilotError =
@@ -895,7 +910,15 @@ export function UsageIndicator() {
 			return <ReauthContent onOpenAccounts={handleOpenAccounts} />;
 		}
 
-		if (isOpenAI) {
+		if (isUnmeasured) {
+			return (
+				<p className="text-[11px] text-muted-foreground leading-relaxed">
+					{t("common:usage.notMeasuredDescription")}
+				</p>
+			);
+		}
+
+		if (isOpenAICost) {
 			return <OpenAIUsageContent usage={usage} />;
 		}
 
@@ -903,14 +926,28 @@ export function UsageIndicator() {
 			return <CopilotUsageContent usage={usage} />;
 		}
 
+		const subscription = usage.openaiSubscription;
 		return (
-			<DefaultUsageContent
-				usage={usage}
-				sessionResetTime={sessionResetTime}
-				weeklyResetTime={weeklyResetTime}
-				sessionLabel={sessionLabel}
-				weeklyLabel={weeklyLabel}
-			/>
+			<>
+				<DefaultUsageContent
+					usage={usage}
+					sessionResetTime={sessionResetTime}
+					weeklyResetTime={weeklyResetTime}
+					sessionLabel={sessionLabel}
+					weeklyLabel={weeklyLabel}
+				/>
+				{subscription && (
+					<p className="text-[10px] text-muted-foreground leading-relaxed">
+						{subscription.source === "codex-session-log"
+							? t("common:usage.chatgptFromCodexLog", {
+									time: new Date(subscription.observedAt).toLocaleString(
+										i18n.language,
+									),
+								})
+							: t("common:usage.chatgptFromApi")}
+					</p>
+				)}
+			</>
 		);
 	};
 
@@ -953,11 +990,28 @@ export function UsageIndicator() {
 			);
 		}
 
-		if (isOpenAI) {
+		if (isUnmeasured) {
+			return (
+				<div
+					className="flex items-center gap-0.5 text-xs font-semibold font-mono text-muted-foreground/60"
+					title={t("common:usage.notMeasured")}
+				>
+					<span>–</span>
+					<span className="text-muted-foreground/50">│</span>
+					<span>–</span>
+				</div>
+			);
+		}
+
+		if (isOpenAICost) {
+			const cost = formatUsageValue(usage.weeklyUsageValue, i18n.language);
 			return (
 				<div className="flex items-center gap-0.5 text-xs font-semibold font-mono">
-					<span className="text-green-500" title="OpenAI Cost">
-						${formatUsageValue(usage.weeklyUsageValue, i18n.language)}
+					<span
+						className={cost ? "text-green-500" : "text-muted-foreground/60"}
+						title={t("common:usage.openaiCostLabel")}
+					>
+						${cost ?? "–"}
 					</span>
 				</div>
 			);
@@ -983,6 +1037,24 @@ export function UsageIndicator() {
 							})}
 						>
 							{pct.toFixed(0)}
+							<span className="ml-0.5 text-[10px] font-normal opacity-80">
+								%
+							</span>
+						</span>
+					</div>
+				);
+			}
+
+			// Quota Premium Requests mensuel, quand GitHub le rapporte : c'est
+			// la limite réelle du compte, et non un compteur de tokens à 0.
+			if (copilotPremiumPercent !== undefined) {
+				return (
+					<div className="flex items-center gap-0.5 text-xs font-semibold font-mono">
+						<span
+							className={getColorClass(copilotPremiumPercent)}
+							title={t("common:usage.copilotPremiumTitle")}
+						>
+							{Math.round(copilotPremiumPercent)}
 							<span className="ml-0.5 text-[10px] font-normal opacity-80">
 								%
 							</span>
