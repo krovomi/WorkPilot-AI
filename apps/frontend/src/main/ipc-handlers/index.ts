@@ -6,6 +6,7 @@
  */
 
 import path from "node:path";
+import { registerDictationHandlers } from "./dictation-handlers";
 import { app, type BrowserWindow } from "electron";
 import type { AgentManager } from "../agent";
 import { getClaudeProfileManager } from "../claude-profile-manager";
@@ -410,6 +411,7 @@ export function setupIpcHandlers(
 
 	// Voice Control handlers
 	registerVoiceControlHandlers();
+	registerDictationHandlers(() => pythonEnvManager.getPythonPath(), getBackendSourcePath, getMainWindow);
 	setupVoiceControlEvents();
 
 	// App Emulator handlers

@@ -184,6 +184,8 @@ vi.mock("electron", () => {
 
 	return {
 		app: {
+			// IPC registration subscribes to Electron lifecycle events for cleanup.
+			on: vi.fn().mockReturnThis(),
 			getPath: vi.fn((name: string) => {
 				if (name === "userData") return path.join(TEST_DIR, "userData");
 				return TEST_DIR;

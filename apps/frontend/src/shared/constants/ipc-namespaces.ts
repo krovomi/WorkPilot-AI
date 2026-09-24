@@ -29,6 +29,7 @@ type ChannelValue = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
 // ============================================
 
 export const IPC_NS = {
+	dictation: { START: IPC_CHANNELS.DICTATION_START, TRANSCRIBE: IPC_CHANNELS.DICTATION_TRANSCRIBE, CANCEL: IPC_CHANNELS.DICTATION_CANCEL },
 	jev: {
 		STATUS: IPC_CHANNELS.JEV_STATUS,
 		SAVE_KEY: IPC_CHANNELS.JEV_SAVE_KEY,

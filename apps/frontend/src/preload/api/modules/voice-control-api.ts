@@ -6,8 +6,10 @@
 
 import { type IpcRendererEvent, ipcRenderer } from "electron";
 import { invokeIpc } from "./ipc-utils";
+import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type { DictationAPI } from "../../../shared/types/dictation";
 
-export interface VoiceControlAPI {
+export interface VoiceControlAPI extends DictationAPI {
 	// Voice recording control
 	startVoiceRecording: (request?: {
 		projectDir?: string;
@@ -54,6 +56,9 @@ export interface VoiceControlAPI {
 
 export function createVoiceControlAPI(): VoiceControlAPI {
 	return {
+		dictationStart: (id, download, projectPath) => invokeIpc(IPC_CHANNELS.DICTATION_START, id, download, projectPath),
+		dictationTranscribe: (id, audio, language) => invokeIpc(IPC_CHANNELS.DICTATION_TRANSCRIBE, id, audio, language),
+		dictationCancel: id => invokeIpc(IPC_CHANNELS.DICTATION_CANCEL, id),
 		// Voice recording control
 		startVoiceRecording: async (request) => {
 			return await invokeIpc("voice-control:startRecording", request);

@@ -137,6 +137,7 @@ export function TaskEditDialog({
 	// Form state
 	const [title, setTitle] = useState(initialTitle);
 	const [description, setDescription] = useState(task.description);
+	const [dictationPending, setDictationPending] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [showClassification, setShowClassification] = useState(false);
@@ -351,6 +352,7 @@ export function TaskEditDialog({
 	);
 
 	const handleSave = async () => {
+		if (dictationPending) { setError(t("tasks:dictation.pending")); return; }
 		// Validate input
 		if (!description.trim()) {
 			setError(t("tasks:form.errors.descriptionRequired"));
@@ -470,11 +472,12 @@ export function TaskEditDialog({
 		setIsSaving(false);
 	};
 
-	const isValid = description.trim().length > 0;
+	const isValid = description.trim().length > 0 && !dictationPending;
 
 	// Advance to the engine step, enforcing the only hard requirement (description)
 	// before leaving the details page.
 	const goToEngineStep = () => {
+		if (dictationPending) { setError(t("tasks:dictation.pending")); return; }
 		if (!description.trim()) {
 			setError(t("tasks:form.errors.descriptionRequired"));
 			return;
@@ -486,7 +489,7 @@ export function TaskEditDialog({
 	return (
 		<TaskModalLayout
 			open={open}
-			onOpenChange={onOpenChange}
+			onOpenChange={(next) => { if (!next && dictationPending) { setError(t("tasks:dictation.pending")); return; } onOpenChange(next); }}
 			title={isDuplicate ? t("tasks:duplicate.title") : t("tasks:edit.title")}
 			description={
 				isDuplicate
@@ -512,7 +515,7 @@ export function TaskEditDialog({
 							<>
 								<Button
 									variant="outline"
-									onClick={() => onOpenChange(false)}
+									onClick={() => { if (dictationPending) { setError(t("tasks:dictation.pending")); return; } onOpenChange(false); }}
 									disabled={isSaving}
 								>
 									{t("common:buttons.cancel")}
@@ -553,6 +556,7 @@ export function TaskEditDialog({
 			}
 		>
 			<TaskFormFields
+				onDictationPendingChange={setDictationPending}
 				section={step === 1 ? "content" : "engine"}
 				projectPath={projectPath}
 				specId={task.specId}

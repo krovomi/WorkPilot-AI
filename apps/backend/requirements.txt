@@ -5,6 +5,9 @@
 claude-agent-sdk>=0.2.157
 python-dotenv>=1.2.3
 
+# Local multilingual Kanban dictation (explicit model download from the UI).
+faster-whisper>=1.2.1
+
 # WebSocket support for streaming development mode
 websockets>=17.1
 

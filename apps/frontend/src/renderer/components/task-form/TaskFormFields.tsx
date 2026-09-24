@@ -57,9 +57,11 @@ import { Textarea } from "../ui/textarea";
 import { ClassificationFields } from "./ClassificationFields";
 import { ImagePreviewModal } from "./ImagePreviewModal";
 import { RichTextEditor } from "./RichTextEditor";
+import { TaskDictation } from "./TaskDictation";
 import { type FileReferenceData, useImageUpload } from "./useImageUpload";
 
 interface TaskFormFieldsProps {
+	onDictationPendingChange?: (pending: boolean) => void;
 	// Project context (for loading image thumbnails from disk)
 	projectPath?: string;
 	specId?: string;
@@ -161,6 +163,7 @@ interface TaskFormFieldsProps {
 }
 
 export function TaskFormFields({
+	onDictationPendingChange,
 	projectPath,
 	specId,
 	description,
@@ -497,6 +500,7 @@ export function TaskFormFields({
 							</Button>
 						</div>
 
+						<TaskDictation onPendingChange={onDictationPendingChange} key={`${projectPath}:${specId}`} description={description} onChange={onDescriptionChange} richText={richText} disabled={disabled || !inContent} projectPath={projectPath} />
 						{/* Optional children (e.g., @ mention autocomplete) */}
 						{children}
 					</div>

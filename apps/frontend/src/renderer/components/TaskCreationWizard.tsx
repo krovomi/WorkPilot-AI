@@ -91,6 +91,7 @@ export function TaskCreationWizard({
 	// Form state
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
+	const [dictationPending, setDictationPending] = useState(false);
 	const [isCreating, setIsCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [showClassification, setShowClassification] = useState(false);
@@ -538,6 +539,7 @@ export function TaskCreationWizard({
 	);
 
 	const handleCreate = async () => {
+		if (dictationPending) { setError(t("tasks:dictation.pending")); return; }
 		if (!description.trim()) {
 			setError(t("tasks:form.errors.descriptionRequired"));
 			return;
@@ -643,6 +645,7 @@ export function TaskCreationWizard({
 	};
 
 	const handleClose = () => {
+		if (dictationPending) { setError(t("tasks:dictation.pending")); return; }
 		if (isCreating) return;
 
 		const draft = getCurrentDraft();
@@ -760,7 +763,7 @@ export function TaskCreationWizard({
 						</Button>
 						<Button
 							onClick={handleCreate}
-							disabled={isCreating || !description.trim()}
+							disabled={isCreating || dictationPending || !description.trim()}
 						>
 							{isCreating ? (
 								<>
@@ -791,6 +794,7 @@ export function TaskCreationWizard({
 
 				{/* Main form fields */}
 				<TaskFormFields
+				onDictationPendingChange={setDictationPending}
 					description={description}
 					onDescriptionChange={handleDescriptionChange}
 					descriptionPlaceholder={t("tasks:wizard.descriptionPlaceholder")}
