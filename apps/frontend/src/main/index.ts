@@ -85,6 +85,7 @@ import {
 	isPermissionGranted,
 	isWebviewSourceAllowed,
 } from "./security/webview-policy";
+import { canUseDictationMicrophone } from "./security/dictation-permission";
 import { initializeCredentialIntegration } from "./services/credential-integration";
 import { ensureOllamaReady } from "./services/ollama-portable";
 import { ensureOAuthServerRunning } from "./oauth-server";
@@ -476,8 +477,8 @@ function setupWebviewGuards(mainWindow: BrowserWindow): void {
  */
 function setupPermissionHandlers(): void {
 	session.defaultSession.setPermissionRequestHandler(
-		(_contents, permission, callback) => {
-			const allowed = isPermissionGranted(permission);
+		(contents, permission, callback, details) => {
+			const allowed = isPermissionGranted(permission) || canUseDictationMicrophone(permission, contents === mainWindow?.webContents, details.isMainFrame, "mediaTypes" in details ? details.mediaTypes : undefined);
 			if (!allowed) {
 				console.warn("[main] Denied permission request:", permission);
 			}
@@ -485,8 +486,8 @@ function setupPermissionHandlers(): void {
 		},
 	);
 
-	session.defaultSession.setPermissionCheckHandler((_contents, permission) =>
-		isPermissionGranted(permission),
+	session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
+		isPermissionGranted(permission) || canUseDictationMicrophone(permission, contents === mainWindow?.webContents, details.isMainFrame, details.mediaType ? [details.mediaType] : undefined),
 	);
 }
 
