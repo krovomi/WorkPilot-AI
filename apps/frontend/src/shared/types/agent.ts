@@ -91,6 +91,26 @@ export interface UsageSnapshot {
 	/** Provider name this snapshot belongs to (e.g., 'anthropic', 'openai', 'ollama', 'ollama_local') */
 	providerName?: string;
 
+	/**
+	 * True when nothing was measured for this provider: the percentages are
+	 * placeholders, and the UI must say "not measured" rather than show 0%.
+	 */
+	usageUnmeasured?: boolean;
+
+	/**
+	 * OpenAI billed through a ChatGPT plan (Codex CLI login). When present,
+	 * sessionPercent / weeklyPercent are the plan's real rate-limit windows
+	 * (5 hours / 7 days) rather than an API cost.
+	 */
+	openaiSubscription?: {
+		/** ChatGPT plan as reported ("plus", "pro", "team"…) */
+		planType?: string;
+		/** Live usage API, or the last limits Codex CLI recorded in its session log */
+		source: "chatgpt-usage-api" | "codex-session-log";
+		/** When the figures were true (ISO 8601) */
+		observedAt: string;
+	};
+
 	/** Provider-side error code when usage retrieval fails (e.g., 'INSUFFICIENT_PERMISSIONS', 'BACKEND_UNAVAILABLE') */
 	error?: string;
 	/** Human-readable error message accompanying `error` */
