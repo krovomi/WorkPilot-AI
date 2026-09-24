@@ -207,7 +207,9 @@ def test_a_clone_that_fails_says_why(client, home, tmp_path):
         json={"path": str(home / "nothing"), "remote": str(missing)},
     ).json()
     assert reply["success"] is False and reply["code"] == "not-found"
-    assert "missing.git" not in json.dumps(reply)  # git's message stays in the log
+    # git's own words come back as `detail`: the remote is the one the person
+    # typed, and "which repository, and what git said" is what they need.
+    assert "missing.git" in (reply["detail"] or "")
     assert reply["settings"]["exists"] is False
 
 
@@ -313,6 +315,14 @@ def test_instruction_paths_cannot_leave_the_brain(client, home):
         ),
         ("fatal: unable to access 'https://x/': Could not resolve host: x", "network"),
         ("git clone timed out", "timeout"),
+        (
+            "fatal: Unable to create '/v/.git/index.lock': File exists. "
+            "Another git process seems to be running",
+            "locked",
+        ),
+        ("Author identity unknown *** Please tell me who you are.", "identity"),
+        (" ! [rejected]        main -> main (fetch first)", "rejected"),
+        ("error: unable to create file a/b.md: Filename too long", "path-too-long"),
         ("something else", "failed"),
     ],
 )
@@ -395,3 +405,30 @@ def test_an_unexpected_error_is_an_answer_not_a_500(client, home, monkeypatch):
     assert synced.status_code == 200 and synced.json()["code"] == "sync-failed"
     saved = client.post("/api/brain/settings", json={"path": str(home / "b")})
     assert saved.status_code == 200 and saved.json()["code"] == "failed"
+
+
+def test_git_detail_is_one_line_without_credentials():
+    from brain.api import _git_detail
+
+    detail = _git_detail(
+        "To https://tom:ghp_secret@github.com/k/v.git\n"
+        " ! [rejected]        main -> main (fetch first)\n"
+        "hint: Updates were rejected because the remote contains work"
+    )
+    assert "ghp_secret" not in detail and "tom" not in detail
+    assert "\n" not in detail and "hint" not in detail
+    assert "[rejected]" in detail
+
+
+@needs_git
+def test_a_failed_sync_shows_what_git_said(client, home, tmp_path):
+    vault = _vault(home)
+    client.post("/api/brain/settings", json={"path": str(vault)})
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(tmp_path / "missing.git")],
+        cwd=vault,
+        check=True,
+    )
+    reply = client.post("/api/brain/sync", json={}).json()
+    assert reply["step"] == "fetch"
+    assert reply["detail"] and "missing.git" in reply["detail"]

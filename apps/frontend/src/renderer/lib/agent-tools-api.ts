@@ -12,7 +12,10 @@
  * is supported on every call (for useEffect cleanup).
  */
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
+export type ApiResult<T> =
+	| { ok: true; data: T }
+	/** `detail`: the backend's own words, when it has any worth showing. */
+	| { ok: false; error: string; detail?: string };
 
 const backendUrl = (): string => import.meta.env?.VITE_BACKEND_URL ?? "";
 
@@ -38,6 +41,7 @@ async function _post<T>(
 				typeof json.error === "string"
 					? json.error
 					: `request failed with HTTP ${res.status}`,
+			...(typeof json.detail === "string" ? { detail: json.detail } : {}),
 		};
 	} catch (err) {
 		if ((err as { name?: string })?.name === "AbortError") {
@@ -817,6 +821,10 @@ export interface BrainSyncResult {
 	readonly conflicts: readonly string[];
 	readonly skipped: string | null;
 	readonly error: string | null;
+	/** Where it failed: `commit`, `fetch`, `pull`, `push` or `git`. */
+	readonly step?: string | null;
+	/** git's own message, credentials removed. */
+	readonly detail?: string | null;
 }
 
 export async function fetchBrainSettings(
