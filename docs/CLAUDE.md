@@ -2642,9 +2642,10 @@ rien se comporte comme avant. Le champ absent est **retiré** de
 « le même choix que les réglages » distincts, et qui fait qu'un changement de
 fournisseur global bouge bien les pages qui n'ont rien demandé.
 
-Quand la page choisit un **fournisseur** sans choisir de modèle, le modèle des
+Quand un **fournisseur** est choisi sur la page ou globalement, sans modèle
+explicite sur la page, le modèle hérité des
 réglages est ramené au catalogue de ce fournisseur
-(`resolveModelForProviderCatalog`) : il avait été choisi pour le fournisseur
+(`resolveModelForProviderCatalog`) : il peut encore désigner le fournisseur
 global, et demander `claude-opus-4-6` à Ollama échoue à l'appel, avec un message
 qui parle d'un modèle inconnu plutôt que du choix.
 

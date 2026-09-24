@@ -12,6 +12,7 @@ vi.mock("./credential-manager", () => ({
 	credentialManager: { getEnvironmentVariables: vi.fn(() => ({})) },
 }));
 
+import { getModelsForProvider } from "../../shared/constants/models";
 import { readSettingsFile } from "../settings-utils";
 import { credentialManager } from "./credential-manager";
 import {
@@ -32,7 +33,9 @@ describe("getPageLlmConfig", () => {
 
 		expect(resolved.provider).toBe("copilot");
 		expect(resolved.providerSource).toBe("settings");
-		expect(resolved.model).toBe("claude-opus-4-6");
+		expect(
+			getModelsForProvider("copilot").map((model) => model.value),
+		).toContain(resolved.model);
 		expect(resolved.thinking).toBe("medium");
 	});
 
@@ -84,4 +87,22 @@ describe("getPageProviderEnv", () => {
 			undefined,
 		);
 	});
+});
+
+it("sends the optimizer runner a model matching its global provider", () => {
+	vi.mocked(readSettingsFile).mockReturnValue({
+		selectedProvider: "openai",
+		featureModels: { promptOptimizer: "claude-sonnet-4-6" },
+		featureThinking: { promptOptimizer: "medium" },
+	});
+	const request = getPageFeatureSettings("prompt-optimizer");
+	getPageProviderEnv("prompt-optimizer");
+	expect(request.provider).toBe("openai");
+	expect(getModelsForProvider("openai").map((model) => model.value)).toContain(
+		request.model,
+	);
+	expect(request.thinkingLevel).toBe("medium");
+	expect(credentialManager.getEnvironmentVariables).toHaveBeenCalledWith(
+		"openai",
+	);
 });

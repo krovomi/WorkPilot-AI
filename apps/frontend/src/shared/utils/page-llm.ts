@@ -150,19 +150,18 @@ export function resolvePageLlm(
 
 	// --- Modèle : la page, puis les réglages, puis le défaut du dépôt.
 	const settingsModel = settings?.featureModels?.[feature];
-	let model = override.model ?? settingsModel ?? DEFAULT_FEATURE_MODELS[feature];
+	let model =
+		override.model ?? settingsModel ?? DEFAULT_FEATURE_MODELS[feature];
 	let modelSource: PageLlmSource = override.model
 		? "page"
 		: settingsModel
 			? "settings"
 			: "default";
 
-	// Un fournisseur choisi *sur la page* n'offre pas forcément le modèle que
-	// les réglages nomment — celui-ci a été choisi pour le fournisseur global.
-	// On retombe alors sur l'équivalent de même gamme chez ce fournisseur :
-	// demander `claude-opus-4-6` à Ollama n'échoue pas plus tard, il échoue à
-	// l'appel, et le message parle d'un modèle inconnu plutôt que du choix.
-	if (providerSource === "page" && !override.model && provider) {
+	// Inherited feature/default models must match the effective provider,
+	// whether it comes from the page or the global provider selector.
+	// Explicit page models remain authoritative (including custom IDs).
+	if (!override.model && provider) {
 		const coerced = resolveModelForProviderCatalog(
 			model,
 			getModelsForProvider(provider),
