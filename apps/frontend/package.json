@@ -222,6 +222,7 @@
 			"hardenedRuntime": true,
 			"gatekeeperAssess": false,
 			"entitlements": "resources/entitlements.mac.plist",
+			"extendInfo": { "NSMicrophoneUsageDescription": "WorkPilot uses the microphone to transcribe your task descriptions locally when you start dictation." },
 			"entitlementsInherit": "resources/entitlements.mac.plist",
 			"target": [
 				"dmg",

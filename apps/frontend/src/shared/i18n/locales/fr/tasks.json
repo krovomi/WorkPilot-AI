@@ -1,4 +1,36 @@
 {
+	"dictation": {
+		"pending": "Ajoutez ou annulez le brouillon vocal avant de continuer.",
+		"start": "Dicter",
+		"resume": "Reprendre la dictée",
+		"stop": "Arrêter",
+		"language": "Langue parlée",
+		"auto": "Détecter la langue",
+		"level": "Niveau du microphone",
+		"preparing": "Préparation du microphone et du modèle…",
+		"recording": "Écoute en cours",
+		"finishing": "Finalisation de la transcription…",
+		"downloading": "Téléchargement du modèle vocal local…",
+		"help": "Transcription locale. Choisissez la langue parlée ; les accents régionaux sont pris en charge, avec une précision qui peut varier.",
+		"draft": "Brouillon vocal modifiable",
+		"placeholder": "Vos paroles apparaîtront ici après chaque pause…",
+		"editHelp": "Corrigez les mots ici tout en parlant. Les nouvelles phrases s’ajoutent sans remplacer vos corrections. Le ticket reste inchangé jusqu’à l’ajout de ce brouillon.",
+		"insert": "Ajouter à la description",
+		"cancel": "Annuler le brouillon vocal",
+		"undo": "Annuler l’insertion",
+		"download": "Télécharger le modèle multilingue (environ 150 Mo)",
+		"errors": {
+			"model": "Le modèle vocal local n’est pas installé. Téléchargez-le une fois pour dicter hors ligne.",
+			"dependency": "Le moteur vocal est indisponible. Installez les dépendances du backend (faster-whisper), puis redémarrez WorkPilot.",
+			"offline": "Le mode hors ligne strict interdit le téléchargement. Préparez le modèle avant d’activer ce mode.",
+			"download": "Le téléchargement a échoué. Vérifiez la connexion et l’espace disque, puis réessayez de dicter.",
+			"busy": "Une autre dictée est active. Arrêtez-la avant de démarrer celle-ci.",
+			"timeout": "Le moteur vocal a mis trop de temps à répondre. Votre texte est conservé.",
+			"microphone": "Impossible d’ouvrir le microphone. Vérifiez le périphérique et les autorisations micro du système, puis réessayez.",
+			"transcription": "La transcription s’est interrompue. Votre texte existant est conservé ; la dernière portion audio devra peut-être être dictée à nouveau.",
+			"backlog": "La transcription rattrape son retard. L’enregistrement est arrêté ; attendez les dernières phrases avant de reprendre."
+		}
+	},
 	"refreshTasks": "Actualiser les tâches",
 	"status": {
 		"backlog": "Backlog",

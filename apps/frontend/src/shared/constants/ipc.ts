@@ -4,6 +4,9 @@
  */
 
 export const IPC_CHANNELS = {
+	DICTATION_START: "dictation:start",
+	DICTATION_TRANSCRIBE: "dictation:transcribe",
+	DICTATION_CANCEL: "dictation:cancel",
 	JEV_STATUS: "jev:status",
 	JEV_SAVE_KEY: "jev:saveKey",
 	JEV_CLEAR_KEY: "jev:clearKey",
