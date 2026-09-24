@@ -50,6 +50,15 @@ export interface CodexAuth {
 	accountId?: string;
 }
 
+/**
+ * What a ChatGPT access token (a JWT) and an account id look like. Anything
+ * else read from `auth.json` is not sent anywhere: the file is only trusted to
+ * hold a token, not to decide what leaves the machine.
+ */
+const TOKEN_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/;
+const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+const MAX_TOKEN_LENGTH = 16_384;
+
 export function resolveCodexHome(): string {
 	const fromEnv = process.env.CODEX_HOME?.trim();
 	return fromEnv ? fromEnv : path.join(homedir(), ".codex");
@@ -72,12 +81,19 @@ export async function readCodexAuth(
 			return null;
 		}
 		const accessToken = data.tokens?.access_token;
-		if (typeof accessToken !== "string" || !accessToken) return null;
+		if (
+			typeof accessToken !== "string" ||
+			accessToken.length > MAX_TOKEN_LENGTH ||
+			!TOKEN_PATTERN.test(accessToken)
+		) {
+			return null;
+		}
+		const accountId = data.tokens?.account_id;
 		return {
 			accessToken,
 			accountId:
-				typeof data.tokens?.account_id === "string"
-					? data.tokens.account_id
+				typeof accountId === "string" && ACCOUNT_ID_PATTERN.test(accountId)
+					? accountId
 					: undefined,
 		};
 	} catch {
@@ -314,8 +330,11 @@ export async function fetchCodexRateLimits(
 				"User-Agent": "codex_cli_rs",
 			};
 			if (auth.accountId) headers["ChatGPT-Account-Id"] = auth.accountId;
+			// The token goes to its issuer and nowhere else: a fixed URL, and no
+			// redirect that could carry the Authorization header to another host.
 			const resp = await doFetch(CHATGPT_USAGE_URL, {
 				method: "GET",
+				redirect: "error",
 				headers,
 				signal: AbortSignal.timeout(options.timeoutMs ?? 8000),
 			});

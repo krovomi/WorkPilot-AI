@@ -159,7 +159,7 @@ describe("fetchCodexRateLimits", () => {
 
 	it("asks the usage API with the ChatGPT token and account id", async () => {
 		writeAuth({
-			tokens: { access_token: "tok", account_id: "acc", refresh_token: "r" },
+			tokens: { access_token: "aaa.bbb.ccc", account_id: "acc-1", refresh_token: "r" },
 		});
 		const fetchImpl = vi.fn().mockResolvedValue({
 			ok: true,
@@ -178,9 +178,10 @@ describe("fetchCodexRateLimits", () => {
 		expect(fetchImpl).toHaveBeenCalledWith(
 			CHATGPT_USAGE_URL,
 			expect.objectContaining({
+				redirect: "error",
 				headers: expect.objectContaining({
-					Authorization: "Bearer tok",
-					"ChatGPT-Account-Id": "acc",
+					Authorization: "Bearer aaa.bbb.ccc",
+					"ChatGPT-Account-Id": "acc-1",
 				}),
 			}),
 		);
@@ -189,7 +190,7 @@ describe("fetchCodexRateLimits", () => {
 	});
 
 	it("falls back to the session log when the token is refused", async () => {
-		writeAuth({ tokens: { access_token: "expired" } });
+		writeAuth({ tokens: { access_token: "old.expired.token" } });
 		writeRollout(
 			JSON.stringify({
 				timestamp: "2026-09-24T09:50:00Z",
@@ -212,6 +213,18 @@ describe("fetchCodexRateLimits", () => {
 		expect(limits?.source).toBe("codex-session-log");
 		expect(limits?.primary?.usedPercent).toBe(64);
 		expect(limits?.secondary?.usedPercent).toBe(21);
+	});
+
+	it("sends nothing that is not shaped like a token", async () => {
+		writeAuth({
+			tokens: { access_token: "line one\nline two", account_id: "acc\r\nX: y" },
+		});
+		expect(await readCodexAuth(home)).toBeNull();
+		writeAuth({ tokens: { access_token: "aaa.bbb.ccc", account_id: "acc\r\nX: y" } });
+		expect(await readCodexAuth(home)).toEqual({
+			accessToken: "aaa.bbb.ccc",
+			accountId: undefined,
+		});
 	});
 
 	it("does not call the API for an API-key Codex login", async () => {
