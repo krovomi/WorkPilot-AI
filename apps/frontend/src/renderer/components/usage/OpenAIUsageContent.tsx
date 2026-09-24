@@ -40,7 +40,7 @@ export function OpenAIUsageContent({ usage }: OpenAIUsageContentProps) {
 						</a>
 					</p>
 					<div className="mt-2 text-lg font-bold text-primary">
-						${formatUsageValue(usage.weeklyUsageValue)}
+						${formatUsageValue(usage.weeklyUsageValue) ?? "–"}
 					</div>
 				</div>
 			</div>
