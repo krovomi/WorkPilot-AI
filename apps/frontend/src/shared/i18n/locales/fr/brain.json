@@ -89,10 +89,15 @@
 			"network": "Le dépôt est injoignable : vérifiez votre connexion.",
 			"timeout": "L'opération git a pris trop de temps.",
 			"gitMissing": "git est introuvable sur cette machine.",
-			"failed": "L'opération git a échoué (détails dans le journal du backend).",
-			"syncFailed": "La synchronisation a échoué (détails dans le journal du backend).",
+			"failed": "L'opération git a échoué.",
+			"syncFailed": "La synchronisation a échoué.",
 			"invalidPath": "Cette règle est introuvable dans le cerveau.",
-			"invalidStatus": "Statut de règle inconnu."
-		}
+			"invalidStatus": "Statut de règle inconnu.",
+			"locked": "Un autre programme git travaille sur ce dossier (le plugin obsidian-git ?). Réessayez dans un instant.",
+			"identity": "git ne sait pas qui committe : lancez « git config --global user.name \"Votre nom\" » et « git config --global user.email vous@exemple.com ».",
+			"rejected": "GitHub a refusé l'envoi (branche protégée, ou dépôt modifié ailleurs entre-temps). Resynchronisez ; si ça persiste, voyez le détail ci-dessous.",
+			"pathTooLong": "Un chemin du vault est trop long pour Windows : lancez « git config --global core.longpaths true »."
+		},
+		"gitSaid": "git a répondu :"
 	}
 }

@@ -45,6 +45,10 @@ const ERROR_KEYS: Record<string, string> = {
 	"sync-failed": "brain:settings.errors.syncFailed",
 	"invalid-path": "brain:settings.errors.invalidPath",
 	"invalid-status": "brain:settings.errors.invalidStatus",
+	locked: "brain:settings.errors.locked",
+	identity: "brain:settings.errors.identity",
+	rejected: "brain:settings.errors.rejected",
+	"path-too-long": "brain:settings.errors.pathTooLong",
 };
 
 export function BrainSettings() {
@@ -52,6 +56,7 @@ export function BrainSettings() {
 	const settings = useBrainStore((s) => s.settings);
 	const unavailable = useBrainStore((s) => s.unavailable);
 	const error = useBrainStore((s) => s.error);
+	const errorDetail = useBrainStore((s) => s.errorDetail);
 	const saving = useBrainStore((s) => s.saving);
 	const syncing = useBrainStore((s) => s.syncing);
 	const lastSync = useBrainStore((s) => s.lastSync);
@@ -227,9 +232,17 @@ export function BrainSettings() {
 				</p>
 			)}
 			{error && (
-				<p className="text-sm text-destructive" role="alert">
-					{errorText(error)}
-				</p>
+				<div className="space-y-1" role="alert">
+					<p className="text-sm text-destructive">{errorText(error)}</p>
+					{errorDetail && (
+						<p className="text-xs text-muted-foreground">
+							{t("brain:settings.gitSaid")}{" "}
+							<code className="break-all rounded bg-muted px-1 py-0.5">
+								{errorDetail}
+							</code>
+						</p>
+					)}
+				</div>
 			)}
 			{lastSync && !error && (
 				<p className="text-xs text-muted-foreground" role="status">

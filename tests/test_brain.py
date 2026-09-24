@@ -385,6 +385,78 @@ def test_a_conflict_keeps_both_sides(tmp_path):
 
 
 @needs_git
+def test_a_conflict_on_a_note_with_an_accented_name_keeps_both_sides(tmp_path):
+    # git quotes a non-ASCII path ("Id\\303\\251es.md") in line output: the
+    # conflict went unresolved and the note was pushed with its markers in it.
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+    a = Brain(tmp_path / "A")
+    a.init(remote=str(remote))
+    b = Brain(tmp_path / "B")
+    b.init(remote=str(remote))
+    (a.root / "Été").mkdir()
+    (a.root / "Été" / "Idées.md").write_text("écrit par A\n", encoding="utf-8")
+    sync(a.root, "a")
+    (b.root / "Été").mkdir()
+    (b.root / "Été" / "Idées.md").write_text("écrit par B\n", encoding="utf-8")
+    result = sync(b.root, "b")
+
+    assert result.conflicts == ["Été/Idées.md"], result
+    assert result.pushed
+    mine = (b.root / "Été" / "Idées.md").read_text(encoding="utf-8")
+    assert mine == "écrit par B\n" and "<<<<<<<" not in mine
+    [theirs] = list((b.root / "Été").glob("Idées.conflict-*.md"))
+    assert theirs.read_text(encoding="utf-8") == "écrit par A\n"
+
+
+def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-c", "user.email=v@x", "-c", "user.name=v", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+
+@needs_git
+def test_a_brain_on_main_follows_a_vault_kept_on_master(tmp_path):
+    # A brain started here on `main`, then plugged into a vault whose branch
+    # is `master`: it used to push a second branch instead of pulling the vault.
+    remote = tmp_path / "vault.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+    _git(remote, "symbolic-ref", "HEAD", "refs/heads/master")
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    _git(seed, "init", "-q", "-b", "master")
+    (seed / "Vault note.md").write_text("from the vault\n", encoding="utf-8")
+    _git(seed, "add", "-A")
+    _git(seed, "commit", "-qm", "vault")
+    _git(seed, "push", "-q", str(remote), "master")
+
+    brain = Brain(tmp_path / "brain")
+    brain.init()
+    brain.init(remote=str(remote))
+
+    assert (brain.root / "Vault note.md").is_file()
+    branches = _git(remote, "branch", "--format=%(refname:short)").stdout.split()
+    assert branches == ["master"]
+    log = _git(remote, "log", "--format=%s", "master").stdout
+    assert "brain: init" in log
+
+
+@needs_git
+def test_a_refused_commit_is_reported_where_it_happened(tmp_path, monkeypatch):
+    brain = Brain(tmp_path / "solo")
+    brain.init()
+    (brain.root / ".git" / "index.lock").write_text("", encoding="utf-8")
+    (brain.root / "knowledge" / "x.md").write_text("x\n", encoding="utf-8")
+    result = sync(brain.root, "x")
+    assert result.step == "commit" and not result.committed
+    assert "index.lock" in (result.error or "")
+
+
+@needs_git
 def test_without_a_remote_the_brain_still_commits(tmp_path):
     brain = Brain(tmp_path / "solo")
     brain.init()

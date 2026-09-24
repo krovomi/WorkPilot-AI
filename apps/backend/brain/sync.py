@@ -79,6 +79,8 @@ class SyncResult:
     skipped: str | None = None
     """Why a step did not run: ``no-git``, ``no-remote``, ``offline``…"""
     error: str | None = None
+    step: str | None = None
+    """Where it failed: ``commit``, ``fetch``, ``pull``, ``push`` or ``git``."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -106,15 +108,30 @@ def _git(root: Path, *args: str, check: bool = False) -> subprocess.CompletedPro
 
 
 def _has_identity(root: Path) -> bool:
-    return bool(_git(root, "config", "user.email").stdout.strip())
+    # git needs both; a machine with an e-mail and no name refuses to commit.
+    return bool(
+        _git(root, "config", "user.email").stdout.strip()
+        and _git(root, "config", "user.name").stdout.strip()
+    )
 
 
-def _commit(root: Path, message: str) -> bool:
-    _git(root, "add", "-A")
+def _commit(root: Path, message: str, result: SyncResult | None = None) -> bool:
+    """Commit everything on disk. A refusal is recorded on *result*.
+
+    It used to be ignored, and a commit that failed left the working tree
+    dirty: the rebase after it refused ("unstaged changes"), the merge
+    refused ("would be overwritten") and the sync reported a merge problem
+    for what was an index lock or a missing identity.
+    """
+    added = _git(root, "add", "-A")
     if not _git(root, "status", "--porcelain").stdout.strip():
         return False
     ident = [] if _has_identity(root) else _AUTHOR
-    return _git(root, *ident, "commit", "-q", "-m", message).returncode == 0
+    done = _git(root, *ident, "commit", "-q", "-m", message)
+    if done.returncode != 0 and result is not None:
+        result.step = "commit"
+        result.error = (done.stderr or added.stderr).strip()[-500:] or "commit refused"
+    return done.returncode == 0
 
 
 _IGNORED = (
@@ -237,6 +254,36 @@ def _branch(root: Path) -> str:
     return out or "main"
 
 
+def _remote_branch(root: Path, local: str) -> str:
+    """The branch of ``origin`` this brain follows, after a fetch.
+
+    The local one when the remote has it. Otherwise the remote's only
+    branch, or its default: a brain started here on ``main`` and plugged
+    into a vault kept on ``master`` used to find no ``origin/main``, take the
+    remote for empty, and push a second branch beside the vault instead of
+    pulling it.
+    """
+    if _git(root, "rev-parse", "--verify", "-q", f"origin/{local}").returncode == 0:
+        return local
+    names = [
+        ref.removeprefix("origin/")
+        for ref in _git(
+            root, "for-each-ref", "--format=%(refname:short)", "refs/remotes/origin"
+        ).stdout.split()
+        if ref.startswith("origin/") and ref != "origin/HEAD"
+    ]
+    if len(names) == 1:
+        return names[0]
+    head = _git(root, "ls-remote", "--symref", "origin", "HEAD").stdout
+    match = re.search(r"^ref: refs/heads/(\S+)\s+HEAD", head, re.M)
+    if match and match.group(1) in names:
+        return match.group(1)
+    for name in ("main", "master"):
+        if name in names:
+            return name
+    return local
+
+
 @contextmanager
 def brain_lock(root: Path, timeout_s: float = 30.0):
     """Serialise writers on this machine. Yields whether the lock was obtained."""
@@ -267,15 +314,22 @@ def brain_lock(root: Path, timeout_s: float = 30.0):
             shutil.rmtree(lock, ignore_errors=True)
 
 
+def _conflicted(root: Path) -> list[str]:
+    """The unmerged paths, as they are on disk.
+
+    ``-z`` and not line output: git quotes a path with a non-ASCII byte and
+    escapes it in octal (``"Id\\303\\251es.md"``), so a French note came back
+    as a name no file has — ``git show :2:<that>`` failed, nothing was
+    resolved, and the note was committed and pushed with its conflict
+    markers in it.
+    """
+    out = _git(root, "diff", "--name-only", "-z", "--diff-filter=U").stdout
+    return sorted({rel for rel in out.split("\0") if rel})
+
+
 def _keep_both(root: Path, their_ref: str) -> list[str]:
     """Resolve every conflicted file by keeping ours in place and theirs beside it."""
-    conflicted = [
-        line.strip()
-        for line in _git(
-            root, "diff", "--name-only", "--diff-filter=U"
-        ).stdout.splitlines()
-        if line.strip()
-    ]
+    conflicted = _conflicted(root)
     short = _git(root, "rev-parse", "--short", their_ref).stdout.strip() or "remote"
     for rel in conflicted:
         ours = _git(root, "show", f":2:{rel}")
@@ -295,26 +349,28 @@ def _keep_both(root: Path, their_ref: str) -> list[str]:
     return conflicted
 
 
-def _pull(root: Path, result: SyncResult) -> None:
-    branch = _branch(root)
+def _pull(root: Path, result: SyncResult) -> str:
+    """Bring ``origin`` in; returns the remote branch the push goes to."""
     fetch = _git(root, "fetch", "-q", "origin")
     if fetch.returncode != 0:
         result.skipped = "offline"
+        result.step = "fetch"
         result.error = fetch.stderr.strip()[-500:] or None
-        return
+        return _branch(root)
+    branch = _remote_branch(root, _branch(root))
     remote_ref = f"origin/{branch}"
     if _git(root, "rev-parse", "--verify", "-q", remote_ref).returncode != 0:
         # An empty remote: nothing to pull, the push below creates the branch.
-        return
+        return branch
     if _git(root, "rev-parse", "--verify", "-q", "HEAD").returncode != 0:
         _git(root, "reset", "-q", "--hard", remote_ref)
         result.pulled = True
-        return
+        return branch
     ident = [] if _has_identity(root) else _AUTHOR
     rebase = _git(root, *ident, "rebase", "-q", remote_ref)
     if rebase.returncode == 0:
         result.pulled = True
-        return
+        return branch
     _git(root, "rebase", "--abort")
     merge = _git(
         root,
@@ -327,7 +383,13 @@ def _pull(root: Path, result: SyncResult) -> None:
     )
     if merge.returncode == 0:
         result.pulled = True
-        return
+        return branch
+    if not _conflicted(root):
+        # Refused before merging anything: nothing to keep both sides of.
+        _git(root, "merge", "--abort")
+        result.step = "pull"
+        result.error = (merge.stderr or rebase.stderr).strip()[-500:] or "merge refused"
+        return branch
     result.conflicts = _keep_both(root, remote_ref)
     committed = _git(
         root,
@@ -340,7 +402,12 @@ def _pull(root: Path, result: SyncResult) -> None:
     result.pulled = committed.returncode == 0
     if not result.pulled:
         _git(root, "merge", "--abort")
-        result.error = "merge could not be completed; local copy left unchanged"
+        result.step = "pull"
+        result.error = (
+            committed.stderr.strip()[-500:]
+            or "merge could not be completed; local copy left unchanged"
+        )
+    return branch
 
 
 def sync(root: Path, message: str = "brain: sync", *, push: bool = True) -> SyncResult:
@@ -354,25 +421,30 @@ def sync(root: Path, message: str = "brain: sync", *, push: bool = True) -> Sync
             result.skipped = "locked"
             return result
         try:
-            result.committed = _commit(root, message)
+            result.committed = _commit(root, message, result)
+            if result.error:
+                return result
             result.remote = remote_url(root)
             if not result.remote:
                 result.skipped = "no-remote"
                 return result
-            _pull(root, result)
+            branch = _pull(root, result)
             if result.skipped == "offline" or result.error:
                 return result
             _stamp(root)
             if push:
-                pushed = _git(root, "push", "-q", "-u", "origin", _branch(root))
+                pushed = _git(root, "push", "-q", "-u", "origin", f"HEAD:{branch}")
                 result.pushed = pushed.returncode == 0
                 if not result.pushed:
+                    result.step = "push"
                     result.error = pushed.stderr.strip()[-500:] or "push refused"
         except subprocess.TimeoutExpired:
             result.skipped = "offline"
+            result.step = result.step or "git"
             result.error = "git timed out"
         except OSError as exc:
-            result.error = str(exc)
+            result.step = result.step or "git"
+            result.error = f"{type(exc).__name__}: {exc.strerror or 'OS error'}"
     return result
 
 

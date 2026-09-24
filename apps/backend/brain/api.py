@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 
 from core.api_safety import server_mode_roots
@@ -117,6 +118,27 @@ def _checked_remote(value: str | None) -> tuple[str | None, str | None]:
         return None, "invalid-remote"
 
 
+_USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/@\s]+@", re.I)
+
+
+def _git_detail(text: str | None) -> str | None:
+    """git's own last words, fit for the log and for the person who asked.
+
+    The code says what kind of failure it was; this says which one, and it is
+    what a person pastes into a search engine. Credentials a remote URL may
+    carry (``https://user:token@host``) are removed, and it is one line, so
+    nothing in it can forge another log entry.
+    """
+    if not text:
+        return None
+    lines = [line.strip() for line in str(text).splitlines() if line.strip()]
+    # "hint:" lines are git's advice for a terminal user; the error is elsewhere.
+    lines = [line for line in lines if not line.lower().startswith("hint:")] or lines
+    # The first lines name the problem; what follows is git's explanation of it.
+    detail = _USERINFO.sub(r"\1", " | ".join(lines[:3]))
+    return detail[:300] or None
+
+
 def _clone_error(text: str) -> str:
     """What went wrong with a clone, as a code the UI translates.
 
@@ -148,6 +170,25 @@ def _clone_error(text: str) -> str:
         return "not-found"
     if "timed out" in low:
         return "timeout"
+    if "index.lock" in low or "another git process" in low:
+        return "locked"
+    if any(
+        k in low
+        for k in (
+            "tell me who you are",
+            "author identity unknown",
+            "empty ident",
+            "unable to auto-detect email",
+        )
+    ):
+        return "identity"
+    if any(
+        k in low
+        for k in ("[rejected]", "non-fast-forward", "fetch first", "protected branch")
+    ):
+        return "rejected"
+    if "filename too long" in low or "name too long" in low:
+        return "path-too-long"
     if any(
         k in low
         for k in ("could not resolve", "unable to access", "connection", "network")
@@ -241,9 +282,9 @@ def _save_settings(request: SettingsRequest) -> dict:
         result = Brain(brain_dir()).init(remote=remote)
         if result.get("error"):
             code = _clone_error(str(result["error"]))
-            # The code only: git's message quotes the remote a request supplied.
-            logger.warning("brain: clone failed (%s)", code)
-            return _refusal(code)
+            detail = _git_detail(str(result["error"]))
+            logger.warning("brain: clone failed (%s): %s", code, detail)
+            return {**_refusal(code), "detail": detail}
         summary = {
             "cloned": result.get("cloned") is True,
             "adopted": result.get("adopted") is True,
@@ -301,13 +342,16 @@ def sync(request: SyncRequest) -> dict:
     except Exception:  # noqa: BLE001 - see `_unexpected`
         logger.exception("brain: sync failed")
         return {"success": False, "error": "sync-failed", "code": "sync-failed"}
-    code = None
+    code = detail = None
     if result.error:
         # A private repository the backend's git cannot authenticate to is
         # the common case, and "sync failed" does not tell anyone that.
         code = _clone_error(result.error)
         code = "sync-failed" if code == "failed" else code
-        logger.warning("brain: sync failed (%s)", code)
+        detail = _git_detail(result.error)
+        logger.warning(
+            "brain: sync failed at %s (%s): %s", result.step or "?", code, detail
+        )
     return {
         "success": result.error is None,
         "committed": result.committed,
@@ -318,6 +362,8 @@ def sync(request: SyncRequest) -> dict:
         "skipped": result.skipped,
         "error": code,
         "code": code,
+        "step": result.step,
+        "detail": detail,
     }
 
 

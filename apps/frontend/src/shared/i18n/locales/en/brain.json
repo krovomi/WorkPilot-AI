@@ -89,10 +89,15 @@
 			"network": "The repository cannot be reached: check your connection.",
 			"timeout": "The git operation took too long.",
 			"gitMissing": "git was not found on this machine.",
-			"failed": "The git operation failed (details in the backend log).",
-			"syncFailed": "Syncing failed (details in the backend log).",
+			"failed": "The git operation failed.",
+			"syncFailed": "Synchronisation failed.",
 			"invalidPath": "This rule could not be found in the brain.",
-			"invalidStatus": "Unknown rule status."
-		}
+			"invalidStatus": "Unknown rule status.",
+			"locked": "Another git process is working on this folder (the obsidian-git plugin?). Try again in a moment.",
+			"identity": "git does not know who is committing: run “git config --global user.name \"Your name\"” and “git config --global user.email you@example.com”.",
+			"rejected": "GitHub refused the push (protected branch, or the repository changed elsewhere meanwhile). Sync again; if it persists, see the detail below.",
+			"pathTooLong": "A path in the vault is too long for Windows: run “git config --global core.longpaths true”."
+		},
+		"gitSaid": "git said:"
 	}
 }
