@@ -440,3 +440,61 @@ describe("CQRS et abstractions", () => {
 		);
 	});
 });
+
+describe("TypeScript — champs de classe et alias de type", () => {
+	it("voit un champ ajouté sans modificateur, sans l'attribuer à la méthode d'avant", () => {
+		const graph = buildChangeGraph([
+			{
+				path: "src/Counter.ts",
+				patch: [
+					"@@ -1,6 +1,8 @@ export class Counter {",
+					"   reset() {",
+					"     this.n = 0;",
+					"   }",
+					"+  count = 0;",
+					"+  increment = () => {",
+					"+    this.count = this.count + 1;",
+					"+  };",
+					" }",
+				].join("\n"),
+			},
+		]);
+		expect(byName(graph.nodes, "Counter").members).toEqual([
+			{ name: "count", kind: "property", change: "added" },
+			{ name: "increment", kind: "method", change: "added" },
+		]);
+	});
+
+	it("ne prend pas une affectation dans le corps d'une méthode pour un champ", () => {
+		const graph = buildChangeGraph([
+			{
+				path: "src/Counter.ts",
+				patch: [
+					"@@ -1,5 +1,6 @@ export class Counter {",
+					"   reset() {",
+					"     let total = 1;",
+					"+    total = 2;",
+					"   }",
+				].join("\n"),
+			},
+		]);
+		expect(byName(graph.nodes, "Counter").members).toEqual([
+			{ name: "reset", kind: "method", change: "modified" },
+		]);
+	});
+
+	it("appelle un alias de type un type, pas une interface", () => {
+		const graph = buildChangeGraph([
+			{
+				path: "src/types.ts",
+				status: "added",
+				patch: added("export type Status = 'draft' | 'done';"),
+			},
+		]);
+		const status = byName(graph.nodes, "Status");
+		expect(status.kind).toBe("type");
+		expect(describeNode(status, fr)).toBe(
+			"J'ai créé le type Status dans le projet.",
+		);
+	});
+});

@@ -62,6 +62,7 @@ export type SymbolKind =
 	| "component"
 	| "hook"
 	| "module"
+	| "type"
 	| "file";
 
 /** Ce que le nom dit du rôle — c'est lui qui donne le nom commun de la phrase. */
@@ -397,7 +398,7 @@ function parseTypeDecl(text: string, language: Language): TypeDecl | null {
 			return null;
 		return {
 			name: m[2] ?? "",
-			kind: keyword === "type" ? "interface" : kindFromKeyword(keyword),
+			kind: keyword === "type" ? "type" : kindFromKeyword(keyword),
 			bases: m[3] ?? "",
 		};
 	}
@@ -472,6 +473,42 @@ const TS_METHOD =
 	/^\s*(?:(?:public|private|protected|static|readonly|async|override|abstract|get|set)\s+)*(?:#)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*\([^)]*\)?\s*(?::[^{=]+)?\s*\{?\s*$/;
 const TS_PROPERTY =
 	/^\s*(?:(?:public|private|protected|static|readonly|declare|override)\s+)*(?:#)?([A-Za-z_$][\w$]*)\s*[?!]?\s*:\s*[^;,]+[;,]?\s*$/;
+/**
+ * Un champ de classe sans modificateur ni type : `count = 0;`,
+ * `handle = () => {…}`. La même forme qu'une affectation dans le corps d'une
+ * méthode — d'où la condition d'indentation dans `tsBareClassField`.
+ */
+const TS_BARE_CLASS_FIELD =
+	/^\s*(#?[A-Za-z_$][\w$]*)\s*[?!]?\s*(?::[^=;]+)?=(?![=>])\s*(.*)$/;
+
+function indentOf(text: string): number {
+	return /^\s*/.exec(text)?.[0].length ?? 0;
+}
+
+/**
+ * `count = 0;` au niveau des membres d'une classe TypeScript. On ne le
+ * reconnaît qu'à la hauteur du dernier membre déclaré — plus profond, c'est une
+ * affectation dans son corps — ou, sans membre connu, au premier niveau
+ * d'indentation.
+ */
+function tsBareClassField(
+	text: string,
+	memberIndent: number | null,
+): { name: string; kind: MemberKind } | null {
+	const indent = /^\s*/.exec(text)?.[0] ?? "";
+	const atMemberLevel =
+		memberIndent === null
+			? indent === "\t" || (indent.length > 0 && indent.length <= 4 && !indent.includes("\t"))
+			: indent.length <= memberIndent;
+	if (!atMemberLevel) return null;
+	const match = TS_BARE_CLASS_FIELD.exec(text);
+	const name = match?.[1]?.replace(/^#/, "");
+	if (!name || RESERVED.has(name)) return null;
+	const value = match?.[2] ?? "";
+	const callable = /^(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>/.test(value);
+	return { name, kind: callable ? "method" : "property" };
+}
+
 const TS_CLASS_FIELD =
 	/^\s*(?:(?:public|private|protected|static|readonly|override)\s+)+(?:#)?([A-Za-z_$][\w$]*)\s*[?!]?\s*(?::[^=]+)?=\s*/;
 const TS_ENUM_VALUE = /^\s*([A-Za-z_$][\w$]*)\s*(?:=\s*[^,]+)?,?\s*$/;
@@ -567,7 +604,7 @@ function parseMember(
 			const field2 = /;\s*$/.test(text) ? TS_PROPERTY.exec(text)?.[1] : undefined;
 			return field2 ? accept(field2, "property") : null;
 		}
-		if (owner.kind !== "interface") return null;
+		if (owner.kind !== "interface" && owner.kind !== "type") return null;
 		const property = TS_PROPERTY.exec(text)?.[1];
 		return property ? accept(property, "property") : null;
 	}
@@ -795,11 +832,15 @@ function draftsForFile(file: ChangeGraphFile, subtaskIds: string[]): Draft[] {
 
 	let current: Draft | null = null;
 	let currentMember: { name: string; kind: MemberKind } | null = null;
+	// L'indentation de la ligne qui a déclaré `currentMember` : ce qui est plus
+	// profond est son corps, ce qui est à la même hauteur est un autre membre.
+	let memberIndent: number | null = null;
 
 	for (const line of lines) {
 		if (line.hunkStart) {
 			current = null;
 			currentMember = null;
+			memberIndent = null;
 			const fromHeader = parseTypeDecl(line.hunkContext, language);
 			if (fromHeader?.name) {
 				current = make(fromHeader.name, fromHeader.kind, fromHeader);
@@ -811,6 +852,7 @@ function draftsForFile(file: ChangeGraphFile, subtaskIds: string[]): Draft[] {
 				if (receiver) {
 					current = make(receiver.owner, "struct", null);
 					currentMember = { name: receiver.name, kind: "method" };
+					memberIndent = null;
 				}
 			}
 			if (!current && !currentMember) {
@@ -820,6 +862,7 @@ function draftsForFile(file: ChangeGraphFile, subtaskIds: string[]): Draft[] {
 				} else if (fn) {
 					current = make(fileNodeName, fileKind, null);
 					currentMember = { name: fn.name, kind: "function" };
+					memberIndent = null;
 				}
 			}
 			if (!current && (language === "csharp" || language === "jvm")) {
@@ -827,6 +870,7 @@ function draftsForFile(file: ChangeGraphFile, subtaskIds: string[]): Draft[] {
 				if (member) {
 					current = fallback();
 					currentMember = member;
+					memberIndent = null;
 				}
 			}
 		}
@@ -843,6 +887,7 @@ function draftsForFile(file: ChangeGraphFile, subtaskIds: string[]): Draft[] {
 				}
 			}
 			currentMember = null;
+			memberIndent = null;
 			continue;
 		}
 
@@ -870,6 +915,7 @@ function draftsForFile(file: ChangeGraphFile, subtaskIds: string[]): Draft[] {
 				if (line.side !== "-") owner.text.push(line.text);
 				if (line.side !== " ") owner.changedLines++;
 				currentMember = null;
+				memberIndent = null;
 				continue;
 			}
 			owner = make(fileNodeName, fileKind, null);
@@ -878,6 +924,8 @@ function draftsForFile(file: ChangeGraphFile, subtaskIds: string[]): Draft[] {
 		}
 
 		if (!member) member = parseMember(line.text, language, owner?.decl ?? null);
+		if (!member && language === "ts" && owner?.decl?.kind === "class")
+			member = tsBareClassField(line.text, memberIndent);
 
 		// En Python, une ligne revenue en colonne 0 a quitté la classe.
 		if (language === "python" && owner && /^\S/.test(line.text) && !member) {
@@ -894,6 +942,7 @@ function draftsForFile(file: ChangeGraphFile, subtaskIds: string[]): Draft[] {
 		if (member) {
 			recordMember(owner, member.name, member.kind, line.side);
 			currentMember = member;
+			memberIndent = indentOf(line.text);
 			if (line.side !== " ") owner.changedLines++;
 			continue;
 		}
@@ -1052,7 +1101,9 @@ function relationFor(from: Draft, to: Draft, evidence: string | undefined): Edge
 		bases !== "" &&
 		new RegExp(`${opener}[^{]*\\b${escapeRegExp(to.node.name)}\\b`).test(bases);
 	if (inBases && from.node.layer !== "tests") {
-		return to.node.kind === "interface" ? "implements" : "inherits";
+		return to.node.kind === "interface" || to.node.kind === "type"
+			? "implements"
+			: "inherits";
 	}
 	if (from.node.layer === "tests") return "tests";
 	if (

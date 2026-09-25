@@ -1299,7 +1299,8 @@
 			"config": "the configuration file {{name}}",
 			"docs": "the documentation {{name}}",
 			"style": "the stylesheet {{name}}",
-			"translations": "the translations {{name}}"
+			"translations": "the translations {{name}}",
+			"type": "the type {{name}}"
 		},
 		"nounsOf": {
 			"class": "of the class {{name}}",
@@ -1330,7 +1331,8 @@
 			"config": "of the configuration file {{name}}",
 			"docs": "of the documentation {{name}}",
 			"style": "of the stylesheet {{name}}",
-			"translations": "of the translations {{name}}"
+			"translations": "of the translations {{name}}",
+			"type": "of the type {{name}}"
 		},
 		"members": {
 			"property": "the property {{name}}",
