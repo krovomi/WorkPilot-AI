@@ -74,7 +74,7 @@ def served(monkeypatch, tmp_path):
 
     client_type = _REAL_CLIENT
     monkeypatch.setattr(registry, "CACHE_PATH", tmp_path / "registry.json")
-    monkeypatch.setattr(registry, "_last_failure_at", 0.0)
+    monkeypatch.setattr(registry, "_backoff", registry._Backoff())
     monkeypatch.setattr(
         registry.httpx,
         "Client",
@@ -169,7 +169,7 @@ def test_an_unreachable_registry_falls_back_and_backs_off(monkeypatch, tmp_path)
 
     client_type = _REAL_CLIENT
     monkeypatch.setattr(registry, "CACHE_PATH", tmp_path / "registry.json")
-    monkeypatch.setattr(registry, "_last_failure_at", 0.0)
+    monkeypatch.setattr(registry, "_backoff", registry._Backoff())
     monkeypatch.setattr(
         registry.httpx,
         "Client",

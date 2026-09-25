@@ -74,7 +74,15 @@ PROVIDER_IDS: dict[str, str] = {
 _KEPT_FIELDS = ("id", "name", "reasoning", "tool_call", "status", "release_date")
 
 _lock = threading.Lock()
-_last_failure_at: float = 0.0
+
+
+class _Backoff:
+    """When the registry last failed to answer; 0 while it answers."""
+
+    last_failure_at: float = 0.0
+
+
+_backoff = _Backoff()
 
 
 def is_enabled() -> bool:
@@ -151,7 +159,6 @@ def _download() -> dict[str, Any]:
 
 def _snapshot(force_refresh: bool) -> dict[str, Any] | None:
     """The slimmed registry, fresh when possible, stale rather than nothing."""
-    global _last_failure_at
     cached = _read_cache()
     fresh = cached and time.time() - cached.get("fetched_at", 0) < CACHE_TTL_SECONDS
     if fresh and not force_refresh:
@@ -167,16 +174,16 @@ def _snapshot(force_refresh: bool) -> dict[str, Any] | None:
             return cached
         if (
             not force_refresh
-            and time.time() - _last_failure_at < FAILURE_BACKOFF_SECONDS
+            and time.time() - _backoff.last_failure_at < FAILURE_BACKOFF_SECONDS
         ):
             return cached
         try:
             data = _download()
         except (httpx.HTTPError, OSError, ValueError) as e:
-            _last_failure_at = time.time()
+            _backoff.last_failure_at = time.time()
             logger.info("Public model registry unavailable (%s): %s", registry_url(), e)
             return cached
-        _last_failure_at = 0.0
+        _backoff.last_failure_at = 0.0
         _write_cache(data)
         return data
 
