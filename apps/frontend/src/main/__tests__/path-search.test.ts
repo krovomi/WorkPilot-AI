@@ -87,15 +87,53 @@ describe("searchProjectPaths", () => {
 		expect(dirPaths).not.toContain(".git");
 	});
 
-	it("ranks closer (shorter-path) matches first", async () => {
+	it("ranks closer (shorter-path) matches first among equally good matches", async () => {
 		const results = await searchProjectPaths(ROOT, "connector", "file");
 		const paths = results.map((r) => r.relativePath);
-		// jira/connector.py (shorter) ranks before github/connector.py? Both equal
-		// length here, so assert the sort is stable & shorter-first overall by
-		// checking lengths are non-decreasing.
-		const lengths = paths.map((p) => p.length);
+		// The two connector.py match by name; jira/client.py only through its
+		// directory, so it comes last although its path is the shortest.
+		expect(paths.at(-1)).toBe("src/connectors/jira/client.py");
+		const byName = paths.slice(0, -1);
+		const lengths = byName.map((p) => p.length);
 		for (let i = 1; i < lengths.length; i++) {
 			expect(lengths[i]).toBeGreaterThanOrEqual(lengths[i - 1]);
+		}
+	});
+
+	it("ranks a file-name match before a match found only in its directories", async () => {
+		const results = await searchProjectPaths(ROOT, "jira", "file");
+		const paths = results.map((r) => r.relativePath);
+		// Both live under jira/ — neither name contains "jira", so both are path
+		// matches; the ranking must not invent a name match.
+		expect(paths).toEqual(
+			expect.arrayContaining([
+				"src/connectors/jira/client.py",
+				"src/connectors/jira/connector.py",
+			]),
+		);
+		const byName = await searchProjectPaths(ROOT, "index", "file");
+		expect(byName[0]?.relativePath).toBe("src/index.ts");
+	});
+
+	it("ranks over every match, not over the first fifty found by the walk", async () => {
+		const deep = mkdtempSync(path.join(tmpdir(), "path-search-deep-"));
+		try {
+			// Sixty files whose *path* matches, walked before the one whose name does.
+			mkdirSync(path.join(deep, "aaa", "widgets"), { recursive: true });
+			for (let i = 0; i < 60; i++) {
+				writeFileSync(path.join(deep, "aaa", "widgets", `part${i}.ts`), "");
+			}
+			mkdirSync(path.join(deep, "zzz", "nested", "deeper"), {
+				recursive: true,
+			});
+			writeFileSync(
+				path.join(deep, "zzz", "nested", "deeper", "widgets.tsx"),
+				"",
+			);
+			const results = await searchProjectPaths(deep, "widgets", "file");
+			expect(results[0]?.relativePath).toBe("zzz/nested/deeper/widgets.tsx");
+		} finally {
+			rmSync(deep, { recursive: true, force: true });
 		}
 	});
 

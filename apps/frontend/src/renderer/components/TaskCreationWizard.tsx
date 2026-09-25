@@ -58,6 +58,13 @@ import {
 import { FileAutocomplete } from "./FileAutocomplete";
 import { useProviderContext } from "./ProviderContext";
 import { TaskFileExplorerDrawer } from "./TaskFileExplorerDrawer";
+import {
+	type CriterionDraft,
+	ensureAtLeastOne,
+	toCriteria,
+	toDrafts,
+} from "./task-detail/acceptance-criteria-draft";
+import { TaskCreationExtras } from "./task-form/TaskCreationExtras";
 import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
 import type { FileReferenceData } from "./task-form/useImageUpload";
@@ -174,6 +181,12 @@ export function TaskCreationWizard({
 	// Empty is the default and means "every platform the project has":
 	// a card that names none on a mobile repo is not asking for none.
 	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>([]);
+	// Critères d'acceptation et note supplémentaire : les mêmes champs que le
+	// panneau d'une tâche créée, remplis avant qu'elle ne parte.
+	const [acceptanceCriteria, setAcceptanceCriteria] = useState<
+		CriterionDraft[]
+	>(() => ensureAtLeastOne([]));
+	const [extraNote, setExtraNote] = useState("");
 
 	// Draft state
 	const [isDraftRestored, setIsDraftRestored] = useState(false);
@@ -227,6 +240,10 @@ export function TaskCreationWizard({
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
 				setMobileTargets(draft.mobileTargets ?? []);
+				setAcceptanceCriteria(
+					ensureAtLeastOne(toDrafts(draft.acceptanceCriteria ?? [])),
+				);
+				setExtraNote(draft.extraNote ?? "");
 				setIsDraftRestored(true);
 
 				if (
@@ -262,6 +279,8 @@ export function TaskCreationWizard({
 				setImages([]);
 				setReferencedFiles([]);
 				setRequireReviewBeforeCoding(false);
+				setAcceptanceCriteria(ensureAtLeastOne([]));
+				setExtraNote("");
 				setBaseBranch(PROJECT_DEFAULT_BRANCH);
 				setUseWorktree(true);
 				setIsDraftRestored(false);
@@ -353,6 +372,8 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			mobileTargets,
+			acceptanceCriteria: toCriteria(acceptanceCriteria),
+			extraNote,
 			savedAt: new Date(),
 		}),
 		[
@@ -373,6 +394,8 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			mobileTargets,
+			acceptanceCriteria,
+			extraNote,
 		],
 	);
 
@@ -434,7 +457,9 @@ export function TaskCreationWizard({
 	 * Handle autocomplete selection
 	 */
 	const handleAutocompleteSelect = useCallback(
-		(filename: string, _fullPath?: string) => {
+		// The project-relative path, not the bare name: two `index.ts` are the
+		// norm once the whole tree is searchable, and the agent has to know which.
+		(filename: string) => {
 			if (!autocomplete) return;
 			const textarea = descriptionRef.current;
 			if (!textarea) return;
@@ -576,6 +601,9 @@ export function TaskCreationWizard({
 			if (requireReviewBeforeCoding) metadata.requireReviewBeforeCoding = true;
 			if (tddMode) metadata.tddMode = true;
 			if (mobileTargets.length > 0) metadata.mobileTargets = mobileTargets;
+			const criteria = toCriteria(acceptanceCriteria);
+			if (criteria.length > 0) metadata.acceptanceCriteria = criteria;
+			if (extraNote.trim()) metadata.extraNote = extraNote.trim();
 			// Always include baseBranch - resolve PROJECT_DEFAULT_BRANCH to actual branch name
 			// This ensures the backend always knows which branch to use for worktree creation
 			if (baseBranch === PROJECT_DEFAULT_BRANCH) {
@@ -635,6 +663,8 @@ export function TaskCreationWizard({
 		setImages([]);
 		setReferencedFiles([]);
 		setRequireReviewBeforeCoding(false);
+		setAcceptanceCriteria(ensureAtLeastOne([]));
+		setExtraNote("");
 		setBaseBranch(PROJECT_DEFAULT_BRANCH);
 		setUseWorktree(true);
 		setError(null);
@@ -794,7 +824,11 @@ export function TaskCreationWizard({
 
 				{/* Main form fields */}
 				<TaskFormFields
-				onDictationPendingChange={setDictationPending}
+					onDictationPendingChange={setDictationPending}
+					// The dictation runner reads the project's airgap policy before it
+					// downloads the speech model; without a project the download button
+					// stays disabled, which is exactly what creation used to show.
+					projectPath={projectPath ?? undefined}
 					description={description}
 					onDescriptionChange={handleDescriptionChange}
 					descriptionPlaceholder={t("tasks:wizard.descriptionPlaceholder")}
@@ -851,6 +885,14 @@ export function TaskCreationWizard({
 						/>
 					)}
 				</TaskFormFields>
+
+				<TaskCreationExtras
+					criteria={acceptanceCriteria}
+					onCriteriaChange={setAcceptanceCriteria}
+					extraNote={extraNote}
+					onExtraNoteChange={setExtraNote}
+					disabled={isCreating}
+				/>
 
 				{/* Git Options Toggle - unique to creation */}
 				<button

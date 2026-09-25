@@ -241,6 +241,8 @@ export interface TaskDraft {
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
 	mobileTargets?: MobilePlatform[];
+	acceptanceCriteria?: string[];
+	extraNote?: string;
 	savedAt: Date;
 }
 

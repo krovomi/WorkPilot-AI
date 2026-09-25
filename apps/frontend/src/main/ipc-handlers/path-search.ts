@@ -34,14 +34,35 @@ export const IGNORED_DIRS = new Set([
 export const MAX_SEARCH_RESULTS = 50;
 export const MAX_SEARCH_ENTRIES = 20000;
 export const MAX_SEARCH_DEPTH = 12;
+// Matches collected before ranking. Stopping the walk at MAX_SEARCH_RESULTS
+// returned the first fifty matches in *walk* order, so on any real project
+// `@app` listed whatever sat under the first directory and never reached
+// `src/App.tsx`. Ranking needs the candidates first.
+export const MAX_SEARCH_CANDIDATES = 2000;
+
+/**
+ * How well a match answers the query: the file *name* matching beats a match
+ * found only in its directories, because a name is what someone types after
+ * `@`. Lower is better.
+ */
+function matchTier(name: string, tokens: readonly string[]): number {
+	const last = tokens.at(-1);
+	if (!last) return 0;
+	const lower = name.toLowerCase();
+	if (tokens.length === 1 && lower === last) return 0;
+	if (lower.startsWith(last)) return 1;
+	if (lower.includes(last)) return 2;
+	return 3;
+}
 
 /**
  * Recursively walk `rootPath` collecting files or directories whose
  * project-relative POSIX path matches every whitespace-separated token in
  * `query` (case-insensitive substring). Powers the file-path autocomplete in
- * the agent inputs. Async (uses fs/promises) so it never blocks the main
- * process, and bounded on depth, visited entries, and results. Closest matches
- * (shortest relative path) are returned first.
+ * the agent inputs and the `@` mentions of a task description. Async (uses
+ * fs/promises) so it never blocks the main process, and bounded on depth,
+ * visited entries, and candidates. Name matches come first, then the closest
+ * (shortest relative path).
  */
 export async function searchProjectPaths(
 	rootPath: string,
@@ -57,7 +78,7 @@ export async function searchProjectPaths(
 		relDir: string,
 		depth: number,
 	): Promise<void> {
-		if (results.length >= MAX_SEARCH_RESULTS || depth > MAX_SEARCH_DEPTH) {
+		if (results.length >= MAX_SEARCH_CANDIDATES || depth > MAX_SEARCH_DEPTH) {
 			return;
 		}
 		let entries: Dirent[];
@@ -68,7 +89,7 @@ export async function searchProjectPaths(
 		}
 
 		for (const entry of entries) {
-			if (results.length >= MAX_SEARCH_RESULTS) return;
+			if (results.length >= MAX_SEARCH_CANDIDATES) return;
 			if (visited++ > MAX_SEARCH_ENTRIES) return;
 
 			const isDirectory = entry.isDirectory();
@@ -98,9 +119,11 @@ export async function searchProjectPaths(
 
 	await walk(rootPath, "", 0);
 
-	// Rank shorter (closer-to-root, tighter) matches first, then alphabetically.
+	// Rank name matches before path-only matches, then shorter (closer-to-root,
+	// tighter) paths, then alphabetically.
 	results.sort(
 		(a, b) =>
+			matchTier(a.name, tokens) - matchTier(b.name, tokens) ||
 			a.relativePath.length - b.relativePath.length ||
 			a.relativePath.localeCompare(b.relativePath, undefined, {
 				sensitivity: "base",
