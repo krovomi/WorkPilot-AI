@@ -407,7 +407,7 @@ def parse_unified_diff(diff_text: str) -> list[DiffFile]:
                 files.append(current_file)
             # Extract file path from "diff --git a/path b/path"
             parts = line.split()
-            file_path = parts[-1].lstrip("b/") if len(parts) >= 4 else ""
+            file_path = parts[-1].removeprefix("b/") if len(parts) >= 4 else ""
             current_file = DiffFile(file_path=file_path)
             current_new_line = 0
             continue
@@ -424,7 +424,9 @@ def parse_unified_diff(diff_text: str) -> list[DiffFile]:
             pass  # old file header
         elif line.startswith("+++ "):
             # Detect language from extension
-            path = line[4:].strip().lstrip("b/")
+            path = line[4:].split("\t", 1)[0].removeprefix("b/")
+            if path != "/dev/null":
+                current_file.file_path = path
             current_file.language = _detect_language(path)
         elif line.startswith("@@"):
             # Hunk header: @@ -old_start,old_count +new_start,new_count @@
@@ -436,10 +438,10 @@ def parse_unified_diff(diff_text: str) -> list[DiffFile]:
                 current_file.hunks.append((start, start + count - 1))
             else:
                 current_new_line = 1
-        elif line.startswith("+") and not line.startswith("+++"):
+        elif line.startswith("+"):
             current_file.added_lines[current_new_line] = line[1:]
             current_new_line += 1
-        elif line.startswith("-") and not line.startswith("---"):
+        elif line.startswith("-"):
             current_file.removed_lines[current_new_line] = line[1:]
             # Don't increment new line for removed lines
         else:

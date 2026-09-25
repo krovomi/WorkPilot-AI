@@ -4,6 +4,12 @@
  */
 
 export const IPC_CHANNELS = {
+	DICTATION_START: "dictation:start",
+	DICTATION_TRANSCRIBE: "dictation:transcribe",
+	DICTATION_CANCEL: "dictation:cancel",
+	JEV_STATUS: "jev:status",
+	JEV_SAVE_KEY: "jev:saveKey",
+	JEV_CLEAR_KEY: "jev:clearKey",
 	// Project operations
 	PROJECT_ADD: "project:add",
 	PROJECT_REMOVE: "project:remove",
@@ -578,6 +584,8 @@ export const IPC_CHANNELS = {
 	INSIGHTS_SESSION_UPDATED: "insights:sessionUpdated", // Event: session updated (main -> renderer)
 
 	// File explorer operations
+	CODE_REVIEW_FILES: "codeReview:files",
+	CODE_REVIEW_FILE: "codeReview:file",
 	FILE_EXPLORER_LIST: "fileExplorer:list",
 	FILE_EXPLORER_READ: "fileExplorer:read",
 	FILE_EXPLORER_SAVE: "fileExplorer:save", // Save JSON files
@@ -600,6 +608,8 @@ export const IPC_CHANNELS = {
 	GIT_CHECK_STATUS: "git:checkStatus",
 	GIT_DETECT_PROVIDER: "git:detectProvider",
 	GIT_INITIALIZE: "git:initialize",
+	GIT_SET_REMOTE: "git:setRemote",
+	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",
 
 	// LLM Provider operations
 	PROVIDER_SELECT: "provider:select",
@@ -711,6 +721,7 @@ export const IPC_CHANNELS = {
 
 	// Prompt Optimizer operations
 	PROMPT_OPTIMIZER_OPTIMIZE: "promptOptimizer:optimize", // Request prompt optimization
+	PROMPT_OPTIMIZER_CANCEL: "promptOptimizer:cancel", // Cancel the running optimization
 	PROMPT_OPTIMIZER_STREAM_CHUNK: "promptOptimizer:streamChunk", // Streaming text chunk (main -> renderer)
 	PROMPT_OPTIMIZER_STATUS: "promptOptimizer:status", // Status update (main -> renderer)
 	PROMPT_OPTIMIZER_ERROR: "promptOptimizer:error", // Error event (main -> renderer)
@@ -965,6 +976,10 @@ export const IPC_CHANNELS = {
 	I18N_SCALER_DIFF: "i18nScaler:diff",
 	I18N_SCALER_SKELETON: "i18nScaler:skeleton",
 	I18N_SCALER_REPORT_FROM_DIR: "i18nScaler:reportFromDir",
+	I18N_EDITOR_DETECT: "i18nEditor:detect",
+	I18N_EDITOR_NAMESPACES: "i18nEditor:namespaces",
+	I18N_EDITOR_NAMESPACE: "i18nEditor:namespace",
+	I18N_EDITOR_MUTATE: "i18nEditor:mutate",
 	// Cognitive Context Optimizer (#3.2)
 	COGNITIVE_CONTEXT_OPTIMIZE: "cognitiveContext:optimize",
 	// Audit Trail (#3.3)

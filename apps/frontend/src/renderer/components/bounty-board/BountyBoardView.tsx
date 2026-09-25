@@ -1,3 +1,9 @@
+import { useAgenticCapabilities } from "../../hooks/useAgenticCapabilities";
+import { useAirgapStatus } from "../../hooks/useAirgapStatus";
+import { AirgapBanner } from "../offline-mode/AirgapBanner";
+import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
+import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
+import { isLocalProvider } from "../../../shared/utils/local-models";
 import { Plus, Swords, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,6 +32,38 @@ function firstModelFor(provider: string): string {
 	return list && list.length > 0 ? list[0].value : "";
 }
 
+function ContestantModelSelect({
+	provider,
+	value,
+	onChange,
+}: {
+	provider: string;
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	const { models } = useProviderModelCatalog(provider);
+	const selection = buildModelSelectOptions(
+		models,
+		value,
+		{},
+		isLocalProvider(provider),
+	);
+	return (
+		<Select value={selection.value} onValueChange={onChange}>
+			<SelectTrigger>
+				<SelectValue />
+			</SelectTrigger>
+			<SelectContent>
+				{selection.options.map((m) => (
+					<SelectItem key={m.value} value={m.value}>
+						{m.label}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
+}
+
 interface Props {
 	readonly projectPath?: string;
 	readonly specId?: string;
@@ -45,6 +83,19 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 		startBounty,
 		loadArchives,
 	} = useBountyBoardStore();
+
+	// Un fournisseur sans adaptateur agentique tourne sur le SDK Claude : la
+	// victoire serait enregistrée au nom d'un éditeur qui n'a jamais vu le
+	// prompt. Le backend refuse le participant (`bounty_board/runner.py`) ; ceci
+	// le dit *avant* qu'un round soit dépensé à l'apprendre.
+	const { degradesTo } = useAgenticCapabilities();
+
+	// Le mode hors-ligne strict remplace le fournisseur de chaque participant
+	// par le modèle local que la politique nomme : un plateau de trois
+	// fournisseurs cloud devient trois fois la même erreur, parlant d'un
+	// fournisseur que personne n'a choisi. Le backend refuse désormais chaque
+	// participant cloud ; ceci le dit avant qu'on clique.
+	const airgap = useAirgapStatus(projectPath);
 
 	const tasks = useTaskStore((s) => s.tasks);
 	const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
@@ -128,6 +179,11 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 					"Run N contestants in parallel with different provider/model combinations. An impartial judge picks the winner.",
 				)}
 			</p>
+
+			<AirgapBanner
+				status={airgap}
+				blockedLabel={t("bountyBoard:airgapBody")}
+			/>
 
 			<section className="grid grid-cols-1 md:grid-cols-2 gap-2">
 				<div>
@@ -213,36 +269,40 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 									<SelectTrigger>
 										<SelectValue />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent searchable>
 										{PROVIDERS.map((p) => (
 											<SelectItem key={p} value={p}>
-												{p}
+												{degradesTo(p)
+													? t("bountyBoard:noAdapterOption", {
+															provider: p,
+															target: degradesTo(p),
+															defaultValue: "{{provider}} — runs on {{target}}",
+														})
+													: p}
 											</SelectItem>
 										))}
 									</SelectContent>
 								</Select>
+								{degradesTo(c.provider) && (
+									<p className="text-[10px] text-destructive mt-1">
+										{t("bountyBoard:noAdapter", {
+											provider: c.provider,
+											target: degradesTo(c.provider),
+											defaultValue:
+												"No agentic adapter: this entry would run on {{target}} and is refused.",
+										})}
+									</p>
+								)}
 							</div>
 							<div className="col-span-4">
 								<Label className="text-[10px]">
 									{t("bountyBoard:field.model", "Model")}
 								</Label>
-								<Select
+								<ContestantModelSelect
+									provider={c.provider}
 									value={c.model}
-									onValueChange={(model) =>
-										updateContestant(idx, { model })
-									}
-								>
-									<SelectTrigger>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{(PROVIDER_MODELS_MAP[c.provider] ?? []).map((m) => (
-											<SelectItem key={m.value} value={m.value}>
-												{m.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+									onChange={(model) => updateContestant(idx, { model })}
+								/>
 							</div>
 							<div className="col-span-3">
 								<Label className="text-[10px]">
@@ -334,7 +394,10 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 			)}
 
 			{current && verdictOpen && (
-				<JudgeVerdictModal result={current} onClose={() => setVerdictOpen(false)} />
+				<JudgeVerdictModal
+					result={current}
+					onClose={() => setVerdictOpen(false)}
+				/>
 			)}
 		</div>
 	);

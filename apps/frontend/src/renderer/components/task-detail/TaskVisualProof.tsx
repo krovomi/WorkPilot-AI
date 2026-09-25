@@ -386,6 +386,21 @@ export function TaskVisualProof({ task }: TaskVisualProofProps) {
 					</div>
 				)}
 
+				{/* Les captures existent, seule leur publication sur la branche a
+				    échoué : un avertissement, pas un échec — et la distinction est
+				    ce qui manquait quand un refus de `git add` masquait un run
+				    entièrement réussi. */}
+				{proof.publishError && (
+					<div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning flex gap-2">
+						<AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+						<span>
+							{t("tasks:visualProof.publishFailed", {
+								error: proof.publishError,
+							})}
+						</span>
+					</div>
+				)}
+
 				{/* API smoke proof - shown when the emulated app exposed an OpenAPI document */}
 				{proof.apiSmoke && proof.apiSmoke.attempted > 0 && (
 					<div className="space-y-2">

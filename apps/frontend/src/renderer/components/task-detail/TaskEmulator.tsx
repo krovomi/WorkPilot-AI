@@ -12,6 +12,11 @@ import { useTranslation } from "react-i18next";
 import type { AppEmulatorConfig } from "../../../main/app-emulator-service";
 import type { Project } from "../../../shared/types";
 import {
+	deriveLandingCandidates,
+	isBrowsableUrl,
+	type LandingGuess,
+} from "../../../shared/utils/emulator-landing";
+import {
 	startAppEmulator,
 	stopAppEmulator,
 	useAppEmulatorStore,
@@ -26,6 +31,14 @@ interface TaskEmulatorProps {
 	project?: Project;
 	worktreePath?: string;
 }
+
+/** L'étiquette qui dit d'où vient la route proposée. */
+const LANDING_SOURCE_KEYS: Record<LandingGuess["source"], string> = {
+	"route-declaration": "appEmulator:preview.routeSource.declared",
+	"file-route": "appEmulator:preview.routeSource.page",
+	"launch-profile": "appEmulator:preview.routeSource.launchProfile",
+	"api-docs": "appEmulator:preview.routeSource.apiDocs",
+};
 
 interface AppEmulatorStatusResult {
 	success: boolean;
@@ -53,7 +66,12 @@ export function TaskEmulator({
 }: TaskEmulatorProps) {
 	const { t } = useTranslation(["appEmulator", "tasks"]);
 	const [browserError, setBrowserError] = useState<string | null>(null);
+	/** Ce que l'aperçu montre à cet instant — la cible d'« Ouvrir dans le navigateur ». */
+	const [displayedUrl, setDisplayedUrl] = useState<string | null>(null);
 	const [refreshKey, setRefreshKey] = useState(0);
+	const [changedFiles, setChangedFiles] = useState<
+		{ path: string; patch?: string }[]
+	>([]);
 	const [resolvedWorktreePath, setResolvedWorktreePath] = useState<
 		string | null
 	>(worktreePath ?? null);
@@ -63,6 +81,14 @@ export function TaskEmulator({
 	const output = useAppEmulatorStore((state) => state.output);
 	const error = useAppEmulatorStore((state) => state.error);
 	const status = useAppEmulatorStore((state) => state.status);
+	// L'adresse réellement affichée dans l'aperçu — celle qu'« Ouvrir dans le
+	// navigateur » doit ouvrir, et celle que l'onglet retrouve en revenant. Elle
+	// vit dans le store parce que cet onglet est démonté dès qu'on en regarde un
+	// autre ; indexée par tâche, parce que c'est la tâche qui décide de la page.
+	const previewUrl = useAppEmulatorStore(
+		(state) => state.previewUrls[taskId] ?? null,
+	);
+	const setPreviewUrl = useAppEmulatorStore((state) => state.setPreviewUrl);
 	const setPhase = useAppEmulatorStore((state) => state.setPhase);
 	const setConfig = useAppEmulatorStore((state) => state.setConfig);
 	const setUrl = useAppEmulatorStore((state) => state.setUrl);
@@ -114,6 +140,31 @@ export function TaskEmulator({
 		};
 	}, [setConfig, setPhase, setStatus, setUrl]);
 
+	// Le diff de la tâche est la seule preuve de ce que cette fonctionnalité a
+	// touché. Il est lu une fois par tâche, indépendamment de l'émulateur : la
+	// question « quelle route ? » se pose avant d'avoir un serveur, et la réponse
+	// ne coûte ni modèle ni réseau.
+	useEffect(() => {
+		let cancelled = false;
+		globalThis.electronAPI
+			.getWorktreeDiff(taskId)
+			.then((result) => {
+				if (cancelled || !result.success || !result.data?.files) return;
+				setChangedFiles(
+					result.data.files.map((file) => ({
+						path: file.path,
+						patch: file.patch,
+					})),
+				);
+			})
+			.catch(() => {
+				// Pas de worktree, pas de diff : l'aperçu ouvre la racine du serveur.
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [taskId]);
+
 	const isLoading = phase === "detecting" || phase === "starting";
 	const isRunning = phase === "running";
 	const canPreview = isRunning && config?.isWeb && Boolean(url);
@@ -125,6 +176,28 @@ export function TaskEmulator({
 	const formattedOutput = useMemo(
 		() => output || t("appEmulator:output.noOutput"),
 		[output, t],
+	);
+
+	const landingCandidates = useMemo(
+		() =>
+			deriveLandingCandidates(changedFiles, {
+				framework: config?.framework,
+				launchPath: config?.launchPath,
+			}),
+		[changedFiles, config?.framework, config?.launchPath],
+	);
+	const landing = landingCandidates[0] ?? null;
+
+	// L'aperçu dit où il en est ; on ne le lui demande pas. Stable pour que le
+	// rendu du parent ne relance pas l'abonnement de l'enfant.
+	const handlePreviewNavigate = useCallback(
+		(visited: string, restorable: boolean) => {
+			setDisplayedUrl(visited);
+			// Seule une page où l'on est allé est reprise au retour sur l'onglet.
+			if (restorable) setPreviewUrl(taskId, visited);
+			setBrowserError(null);
+		},
+		[setPreviewUrl, taskId],
 	);
 
 	const handleStart = useCallback(async () => {
@@ -151,6 +224,31 @@ export function TaskEmulator({
 			setBrowserError(t("appEmulator:preview.browserFailed", { url }));
 		}
 	}, [url, t]);
+		// Ce que l'utilisateur regarde, pas la racine du serveur : après une
+		// navigation dans l'aperçu, les deux ne sont plus la même page — et sur une
+		// Web API la racine est précisément celle qui répond 404.
+		//
+		// Sauf quand ce n'est pas une adresse : un `<webview>` dont la page n'a pas
+		// répondu annonce `chrome-error://chromewebdata/`, que le processus
+		// principal refuse à juste titre — le bouton ne faisait alors rien d'autre
+		// que rendre une erreur de schéma pour une page que le serveur sert très
+		// bien. On retombe sur la racine, qui est toujours ouvrable.
+		const target = isBrowsableUrl(displayedUrl)
+			? displayedUrl
+			: isBrowsableUrl(url)
+				? url
+				: null;
+		if (!target) return;
+		try {
+			await globalThis.electronAPI.openExternal(target);
+		} catch (failure) {
+			const reason =
+				failure instanceof Error ? failure.message : String(failure);
+			setBrowserError(
+				`${t("appEmulator:preview.browserFailed", { url: target })} ${reason}`.trim(),
+			);
+		}
+	}, [displayedUrl, url, t]);
 
 	if (!emulatorPath) {
 		return (
@@ -204,6 +302,14 @@ export function TaskEmulator({
 						<p className="text-xs text-muted-foreground">
 							{t("tasks:emulator.runtimePath")}: {emulatorPath}
 						</p>
+						{canPreview && landing && (
+							<p className="text-xs text-muted-foreground">
+								{t("appEmulator:preview.featureRoute", { path: landing.path })}{" "}
+								<span className="text-muted-foreground/70">
+									({t(LANDING_SOURCE_KEYS[landing.source])})
+								</span>
+							</p>
+						)}
 						{isOtherProject && (
 							<p className="text-xs text-warning">
 								{t("tasks:emulator.otherProjectWarning")}
@@ -274,7 +380,14 @@ export function TaskEmulator({
 			)}
 			<div className="flex-1 min-h-0 overflow-hidden">
 				{canPreview && url ? (
-					<ResponsivePreview url={url} refreshKey={refreshKey} />
+					<ResponsivePreview
+						url={url}
+						refreshKey={refreshKey}
+						landingPath={landing?.path ?? null}
+						candidates={landingCandidates}
+						restoredUrl={previewUrl}
+						onNavigate={handlePreviewNavigate}
+					/>
 				) : (
 					<div className="flex h-full flex-col">
 						<div className="flex items-center gap-2 border-b border-border px-4 py-2">

@@ -35,7 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.local_model_catalog import detect_runtime
-from core.offline_policy import LOCAL_PROVIDERS
+from core.offline_policy import LOCAL_PROVIDERS, airgap_status
 from ollama_model_detector import is_embedding_model
 
 SCAN_CACHE_TTL_SECONDS = 900  # 15 minutes
@@ -45,12 +45,32 @@ TASKS = ("commit_message", "summary", "triage", "planner", "coder", "qa_reviewer
 
 
 def _default_policy(project_path: Path) -> dict:
+    """What the page offers a project that has never configured offline mode.
+
+    **`airgapStrict` is False here, and that is the whole point of this
+    docstring.** It used to be True, which made the most restrictive feature
+    of the product the pre-ticked default of a page somebody opens out of
+    curiosity: the store marks an unpersisted policy `dirty`, so the Save
+    button is live from the first render, and one click blocked every cloud
+    provider for that project and routed all six phases to whichever local
+    model happened to sort first. The symptom arrived much later and
+    elsewhere — a Bounty Board configured for Anthropic dying on
+    `llama3.3:latest is unavailable on ollama`, a provider nobody had picked.
+
+    Fail-closed is the right rule for *honouring* an airgap somebody asked
+    for. Applying it to the absence of a file turns it into fail-closed
+    against the user's own intent, which is a different thing wearing the same
+    name. Turning the barrier on stays a decision, taken by ticking a box.
+
+    The routing table is still filled in, because it is the answer to "which
+    local model would run this?" and it costs nothing while strict is off.
+    """
     providers = _scan_models(project_path)["providers"]
     provider = next((p for p in LOCAL_PROVIDERS if providers.get(p)), "ollama")
     models = providers.get(provider, [])
     return {
         "version": 1,
-        "airgapStrict": True,
+        "airgapStrict": False,
         "defaultProvider": provider,
         "routing": {
             task: {"provider": provider, "model": models[0] if models else ""}
@@ -212,7 +232,23 @@ def _scan_models(project_path: Path, force: bool = False) -> dict:
     return result
 
 
-def _status() -> dict:
+def _same_file(candidate: str | None, target: Path) -> bool:
+    """Deux chemins designent-ils le meme fichier ?
+
+    Compare des chemins *resolus*, jamais des chaines : la recherche de
+    politiques resout, et sur macOS un repertoire temporaire est un lien
+    symbolique (`/var` -> `/private/var`). Comparer les chaines rendrait faux
+    un projet qui possede pourtant sa propre politique.
+    """
+    if not candidate:
+        return False
+    try:
+        return Path(candidate).resolve() == target.resolve()
+    except OSError:
+        return False
+
+
+def _status(project_path: Path) -> dict:
     ollama = _detect_ollama()
     llama_cpp = _detect_llama_cpp()
     lm_studio = _detect_lm_studio()
@@ -226,6 +262,11 @@ def _status() -> dict:
         for m in runtime.get("models", [])
         if not is_embedding_model(m["name"])
     ]
+    # Le statut porte la politique, et pas seulement les runtimes. Sans cela,
+    # « ce projet est en mode strict » n'etait lisible que sur la page Mode
+    # hors-ligne : partout ailleurs le selecteur affichait « Anthropic OK »
+    # pendant que le backend refusait chaque appel cloud.
+    airgap = airgap_status(project_path)
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "runtimes": {
@@ -235,6 +276,20 @@ def _status() -> dict:
         },
         "localModels": local_models,
         "offlineReady": bool(local_models),
+        "airgapStrict": airgap["airgapStrict"],
+        "policyPath": airgap["policyPath"],
+        "policyPersisted": _policy_path(project_path).exists(),
+        # Le fichier qui decide est-il *celui de ce projet* ? La recherche
+        # remonte les ancetres, donc un airgap peut venir d'un repertoire
+        # parent — et `set-policy` n'ecrit que dans `<projet>/.workpilot/`.
+        # Sans cette reponse, une UI offrant « desactiver » ecrirait une
+        # seconde politique sous le projet pendant que celle du parent
+        # continuerait de bloquer : `resolve_offline_route` est strict des
+        # qu'une seule des politiques trouvees l'est. Un bouton qui ne fait
+        # rien est pire que pas de bouton.
+        "policyIsProjectOwn": _same_file(
+            airgap["policyPath"], _policy_path(project_path)
+        ),
     }
 
 
@@ -286,7 +341,7 @@ def main() -> None:
 
     try:
         if args.command in {"status", "list-models"}:
-            print(json.dumps(_status()), flush=True)
+            print(json.dumps(_status(project_path)), flush=True)
             return
 
         if args.command == "scan-models":

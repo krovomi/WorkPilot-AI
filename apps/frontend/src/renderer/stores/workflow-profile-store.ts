@@ -46,6 +46,18 @@ export interface LoadWorkflowProfileArgs {
 	effort?: string;
 }
 
+export function workflowProfileKey(
+	args: Pick<
+		LoadWorkflowProfileArgs,
+		"taskId" | "specDir" | "projectDir" | "specId"
+	>,
+): string {
+	return JSON.stringify([
+		args.projectDir ?? "",
+		args.specDir ?? args.specId ?? "",
+		args.taskId,
+	]);
+}
 interface WorkflowProfileState {
 	byTask: Record<string, WorkflowProfileEntry>;
 	load: (args: LoadWorkflowProfileArgs) => Promise<void>;
@@ -68,7 +80,20 @@ export const useWorkflowProfileStore = create<WorkflowProfileState>((set) => ({
 		});
 	},
 
-	load: async ({ taskId, projectDir, specId, specDir, provider, effort }) => {
+	load: async ({
+		taskId: id,
+		projectDir,
+		specId,
+		specDir,
+		provider,
+		effort,
+	}) => {
+		const taskId = workflowProfileKey({
+			taskId: id,
+			projectDir,
+			specId,
+			specDir,
+		});
 		if (!specDir && !(projectDir && specId)) return;
 
 		inFlight.get(taskId)?.abort();

@@ -392,6 +392,21 @@ def _record_merge_for_learning(spec_name: str) -> None:
         pass
 
 
+def _record_merge_in_brain(project_dir: Path, spec_name: str) -> None:
+    """Mark the build accepted in the shared brain (`brain/learn.py`).
+
+    A merge is a person saying yes to the diff: the one verdict worth more than
+    any a verifier gives. Never raises, like the learning-loop bookkeeping.
+    """
+    try:
+        from brain.learn import record_merge
+
+        if rel := record_merge(project_dir, spec_name):
+            print(f"  brain: merge recorded in {rel}")
+    except Exception as exc:  # noqa: BLE001 - never fail a merge over bookkeeping
+        debug_warning(MODULE, f"Brain merge record skipped: {exc}")
+
+
 def handle_merge_command(
     project_dir: Path,
     spec_name: str,
@@ -422,6 +437,7 @@ def handle_merge_command(
 
     if success:
         _record_merge_for_learning(spec_name)
+        _record_merge_in_brain(project_dir, spec_name)
 
     # Generate commit message suggestion if staging succeeded (no_commit mode)
     if success and no_commit:

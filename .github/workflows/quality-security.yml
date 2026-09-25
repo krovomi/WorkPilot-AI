@@ -12,6 +12,8 @@ on:
       - 'tests/**'
       - 'pyproject.toml'
       - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'apps/backend/requirements.txt'
       - '.github/workflows/quality-security.yml'
   pull_request:
     branches: [main, develop]
@@ -20,6 +22,8 @@ on:
       - 'tests/**'
       - 'pyproject.toml'
       - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'apps/backend/requirements.txt'
       - '.github/workflows/quality-security.yml'
   schedule:
     - cron: '0 0 * * 1' # Weekly on Monday at midnight UTC
@@ -145,12 +149,124 @@ jobs:
             }
 
   # --------------------------------------------------------------------------
+  # Known-vulnerable dependencies.
+  #
+  # CodeQL reads the code we wrote and Bandit reads its Python; neither looks
+  # at what the lockfiles pull in. Dependabot does, but Dependabot opens pull
+  # requests — it does not stop one. So a PR could add a dependency with a
+  # published advisory and nothing in CI would say so.
+  #
+  # The two ecosystems get different gates on purpose, because they are in
+  # different states and one rule would have to be the weaker of the two:
+  #
+  #   pip-audit   fails on any finding. apps/backend/requirements.txt is clean
+  #               today, so the gate is green and every future failure is a
+  #               real regression.
+  #   pnpm audit  fails on `critical` and `high`, and reports `moderate` and
+  #               `low` in the job summary.
+  #
+  # That threshold used to be `critical` only, because 9 high findings were
+  # already in the tree and a gate that is red the day it lands is a gate
+  # somebody deletes in a week. The comment here said to raise it once the
+  # backlog was cleared; the backlog is cleared — four `pnpm.overrides` in
+  # pnpm-workspace.yaml were pinned to versions that had since become
+  # vulnerable themselves (@xmldom/xmldom, js-yaml, hono) or were missing
+  # (qs), and raising them takes the whole tree to 0 at every severity.
+  #
+  # It stops at `high` rather than "any finding" on purpose. npm's transitive
+  # surface is far larger than this backend's, so moderates will keep
+  # arriving from dependencies nobody here chose; failing on them would put
+  # the branch red for reasons no contributor to this repository can fix in
+  # their own PR. They are printed instead, which is what the summary is for.
+  # --------------------------------------------------------------------------
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit Python dependencies
+        run: |
+          pip-audit -r apps/backend/requirements.txt \
+            --progress-spinner off \
+            --desc \
+            --format markdown >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      # No `pnpm install`: `pnpm audit` answers from pnpm-lock.yaml alone.
+      # Installing would add minutes and a second way for this job to fail
+      # (a frozen-lockfile mismatch) without changing the answer.
+      - name: Audit npm dependencies
+        run: pnpm audit --json > pnpm-audit.json || true
+
+      - name: Report npm findings
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync('pnpm-audit.json', 'utf8'));
+            } catch (error) {
+              core.setFailed(`Could not read pnpm audit output: ${error.message}`);
+              return;
+            }
+
+            const counts = report.metadata?.vulnerabilities ?? {};
+            const advisories = Object.values(report.advisories ?? {});
+
+            let summary = `## npm Dependency Audit\n\n`;
+            summary += `| Severity | Count |\n|----------|-------|\n`;
+            for (const level of ['critical', 'high', 'moderate', 'low']) {
+              summary += `| ${level} | ${counts[level] ?? 0} |\n`;
+            }
+
+            const BLOCKING = ['critical', 'high'];
+            const blocking = advisories.filter(a => BLOCKING.includes(a.severity));
+            if (blocking.length > 0) {
+              summary += `\n### Blocking (critical / high)\n\n`;
+              for (const advisory of blocking) {
+                const path = advisory.findings?.[0]?.paths?.[0] ?? 'unknown path';
+                summary += `- **${advisory.module_name}** — ${advisory.title}\n`;
+                summary += `  - via \`${path}\`\n`;
+              }
+            }
+
+            core.summary.addRaw(summary);
+            await core.summary.write();
+
+            if (blocking.length > 0) {
+              core.setFailed(
+                `${blocking.length} critical/high advisory/advisories in npm dependencies. ` +
+                `Fix by raising the package in pnpm.overrides (pnpm-workspace.yaml) to a patched version.`
+              );
+            }
+
+  # --------------------------------------------------------------------------
   # Gate Job - Single check for branch protection
   # --------------------------------------------------------------------------
   security-summary:
     name: Security Summary
     runs-on: ubuntu-latest
-    needs: [codeql, python-security]
+    needs: [codeql, python-security, dependency-audit]
     if: always()
     timeout-minutes: 5
     steps:
@@ -160,16 +276,19 @@ jobs:
           script: |
             const codeql = '${{ needs.codeql.result }}';
             const bandit = '${{ needs.python-security.result }}';
+            const deps = '${{ needs.dependency-audit.result }}';
 
             console.log('Security Check Results:');
             console.log(`  CodeQL:        ${codeql}`);
             console.log(`  Bandit:        ${bandit}`);
+            console.log(`  Dependencies:  ${deps}`);
 
             // Only 'failure' is a real failure; 'skipped' is acceptable (e.g., path filters, PR skipping CodeQL)
             const acceptable = ['success', 'skipped'];
             const codeqlOk = acceptable.includes(codeql);
             const banditOk = acceptable.includes(bandit);
-            const allPassed = codeqlOk && banditOk;
+            const depsOk = acceptable.includes(deps);
+            const allPassed = codeqlOk && banditOk && depsOk;
 
             if (allPassed) {
               console.log('\n✅ All security checks passed');

@@ -68,6 +68,7 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 				<div
 					// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
 					key={index}
+					data-diff-hunk={line.type === "hunk" ? "true" : undefined}
 					className={cn(
 						"flex diff-line",
 						line.type === "added" && "bg-green-500/20",
@@ -130,8 +131,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 		<div
 			className="diff-content grid"
 			style={{
-				gridTemplateColumns:
-					"auto minmax(0,1fr) auto minmax(0,1fr)",
+				gridTemplateColumns: "auto minmax(0,1fr) auto minmax(0,1fr)",
 			}}
 		>
 			{rows.map((row, index) => {
@@ -140,6 +140,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
 							key={index}
+							data-diff-hunk="true"
 							className="col-span-4 bg-blue-500/20 text-blue-400 font-medium px-2 py-0.5 whitespace-pre overflow-x-auto"
 						>
 							{row.left?.content}
@@ -248,11 +249,25 @@ export function parseDiff(patch: string): DiffLine[] {
 	const result: DiffLine[] = [];
 	let oldLineNumber = 0;
 	let newLineNumber = 0;
+	let inHunk = false;
 
 	for (const line of lines) {
+		if (line.startsWith("diff --git ")) {
+			inHunk = false;
+			continue;
+		}
+		if (
+			!inHunk &&
+			/^(index |--- |\+\+\+ |new file mode |deleted file mode |old mode |new mode |similarity index |rename from |rename to )/.test(
+				line,
+			)
+		)
+			continue;
+		if (!line || line.startsWith("\\ No newline")) continue;
 		let diffLine: DiffLine;
 
 		if (line.startsWith("@@")) {
+			inHunk = true;
 			// Hunk header - extract line numbers
 			const match = line.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
 			if (match) {

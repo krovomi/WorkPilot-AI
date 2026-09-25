@@ -112,9 +112,9 @@ const ArchitectureVisualizer = lazy(() =>
 	),
 );
 const PerformanceProfilerDashboard = lazy(() =>
-	import(
-		"./components/performance-profiler/PerformanceProfilerDashboard"
-	).then((m) => ({ default: m.PerformanceProfilerDashboard })),
+	import("./components/performance-profiler/PerformanceProfilerDashboard").then(
+		(m) => ({ default: m.PerformanceProfilerDashboard }),
+	),
 );
 const VisualToCodeHub = lazy(() =>
 	import("./components/visual-to-code/VisualToCodeHub").then((m) => ({
@@ -241,12 +241,16 @@ const SimulationReport = lazy(() =>
 	})),
 );
 const _DiffPreview = lazy(() =>
-	import("./components/sandbox/DiffPreview").then((m) => ({ default: m.DiffPreview })),
+	import("./components/sandbox/DiffPreview").then((m) => ({
+		default: m.DiffPreview,
+	})),
 );
 const RegressionGuardianDashboard = lazy(() =>
-	import("./components/regression-guardian/RegressionGuardianDashboard").then((m) => ({
-		default: m.RegressionGuardianDashboard,
-	})),
+	import("./components/regression-guardian/RegressionGuardianDashboard").then(
+		(m) => ({
+			default: m.RegressionGuardianDashboard,
+		}),
+	),
 );
 const InjectionGuardView = lazy(() =>
 	import("./components/injection-guard/InjectionGuardView").then((m) => ({
@@ -423,7 +427,10 @@ import {
 	renameProject,
 	useProjectStore,
 } from "./stores/project-store";
-import { loadProjectEnvConfig, useProjectEnvStore } from "./stores/project-env-store";
+import {
+	loadProjectEnvConfig,
+	useProjectEnvStore,
+} from "./stores/project-env-store";
 import {
 	loadProfiles,
 	loadSettings,
@@ -492,9 +499,7 @@ export function App() {
 
 	// Multi-user server mode: sync session state and gate the UI behind
 	// the login screen while a configured server session is unauthenticated.
-	const initServerSession = useServerSessionStore(
-		(state) => state.initialize,
-	);
+	const initServerSession = useServerSessionStore((state) => state.initialize);
 	const serverMode = useServerSessionStore((state) => state.mode);
 	const serverAuthenticated = useServerSessionStore(
 		(state) => state.isAuthenticated,
@@ -506,8 +511,7 @@ export function App() {
 		void initServerSession();
 	}, [initServerSession]);
 	useEffect(() => {
-		const open = () =>
-			useServerSessionStore.getState().openLoginScreen();
+		const open = () => useServerSessionStore.getState().openLoginScreen();
 		window.addEventListener("workpilot:open-server-login", open);
 		return () =>
 			window.removeEventListener("workpilot:open-server-login", open);
@@ -670,9 +674,8 @@ export function App() {
 	// Kanban after queuing a scaffold task).
 	useEffect(() => {
 		const handler = (e: Event) => {
-			const detail = (
-				e as CustomEvent<{ view?: SidebarView; taskId?: string }>
-			).detail;
+			const detail = (e as CustomEvent<{ view?: SidebarView; taskId?: string }>)
+				.detail;
 			const view = detail?.view;
 			if (view) setActiveView(view);
 			// Optionally open a specific task once we land on the Kanban (e.g. the
@@ -814,8 +817,6 @@ export function App() {
 	// State global pour provider LLM actif et modèles associés
 	const [_providers, setProviders] = useState<string[]>([]);
 	const [selectedProvider, setSelectedProvider] = useState<string>("");
-	const [_providerModels, setProviderModels] = useState<string[]>([]);
-	const [_providerModelsError, setProviderModelsError] = useState<string>("");
 
 	// Initial load
 	useEffect(() => {
@@ -1674,54 +1675,6 @@ export function App() {
 		return () => controller.abort();
 	}, [selectedProvider]);
 
-	// Récupère les modèles du provider sélectionné
-	useEffect(() => {
-		if (!selectedProvider) {
-			setProviderModels([]);
-			setProviderModelsError("");
-			return;
-		}
-		const controller = new AbortController();
-		const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-		fetch(`${backendUrl}/providers/models/${selectedProvider}`, {
-			signal: controller.signal,
-		})
-			.then((res) => {
-				if (!res.ok) {
-					throw new Error(`HTTP ${res.status}`);
-				}
-				// Check if response is actually JSON
-				const contentType = res.headers.get("content-type");
-				if (!contentType?.includes("application/json")) {
-					throw new Error("Response is not JSON");
-				}
-				return res.json();
-			})
-			.then((data) => {
-				setProviderModels(data.models || []);
-				setProviderModelsError(data.error || "");
-			})
-			.catch((err) => {
-				if (err?.name === "AbortError") return;
-				// Don't log loudly if backend is not available - this is expected in some setups
-				if (err.message === "Response is not JSON") {
-					console.info(
-						"[App] Backend providers API not available - running without provider models",
-					);
-				} else {
-					console.error(
-						`Failed to fetch models for provider ${selectedProvider}:`,
-						err,
-					);
-				}
-				setProviderModels([]);
-				setProviderModelsError(
-					`Erreur lors de la récupération des modèles pour le provider «${selectedProvider}».`,
-				);
-			});
-		return () => controller.abort();
-	}, [selectedProvider]);
-
 	const getKanbanContent = () => {
 		if (isLoadingTasks && tasks.length === 0) {
 			return <KanbanSkeleton />;
@@ -1835,18 +1788,14 @@ export function App() {
 										}
 									>
 										{activeView === "phase35-hub" && (
-											<Phase35Hub
-												projectPath={selectedProject?.path || ""}
-											/>
+											<Phase35Hub projectPath={selectedProject?.path || ""} />
 										)}
 										{activeView === "mcp-marketplace" && <McpMarketplace />}
 										{activeView === "plugin-marketplace" && (
 											<PluginMarketplace />
 										)}
 										{activeView === "api-explorer" && <ApiExplorer />}
-										{activeView === "administration" && (
-											<AdministrationView />
-										)}
+										{activeView === "administration" && <AdministrationView />}
 										{activeView === "mission-control" && (
 											<MissionControlDashboard />
 										)}
@@ -2069,133 +2018,255 @@ export function App() {
 														<PipelineGeneratorView />
 													)}
 												{activeView === "sandbox" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<SimulationReport projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<SimulationReport
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "regression-guardian" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<RegressionGuardianDashboard projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<RegressionGuardianDashboard
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "injection-guard" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<InjectionGuardView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<InjectionGuardView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "api-watcher" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<ApiWatcherDashboard projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<ApiWatcherDashboard
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "accessibility-agent" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<A11yReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<A11yReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "i18n-agent" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<I18nReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<I18nReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "onboarding-agent" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<OnboardingPackageView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<OnboardingPackageView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "onboarding-guide" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<OnboardingGuideView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<OnboardingGuideView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "flaky-tests" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<FlakyTestReport projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<FlakyTestReport
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "doc-drift" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<DocDriftReport projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<DocDriftReport
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "compliance" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<ComplianceReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<ComplianceReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "git-surgeon" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<GitSurgeonDashboard projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<GitSurgeonDashboard
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "release-coordinator" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<ReleasePlanView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<ReleasePlanView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "carbon-profiler" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<CarbonReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<CarbonReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "consensus-arbiter" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<ConsensusView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<ConsensusView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "notebook-agent" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
 														<NotebookView projectPath={selectedProject?.path} />
 													</div>
 												)}
 												{activeView === "spec-refinement" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<RefinementHistoryView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<RefinementHistoryView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "agent-coach" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<CoachReportView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<CoachReportView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "bounty-board" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<BountyBoardView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<BountyBoardView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "tech-debt" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<TechDebtDashboard projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<TechDebtDashboard
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "agent-debugger" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
 														<AgentDebuggerPanel />
 													</div>
 												)}
 												{activeView === "blast-radius" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<BlastRadiusView projectRoot={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<BlastRadiusView
+															projectRoot={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "team-bot" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
 														<TeamBotSettings />
 													</div>
 												)}
 												{activeView === "guardrails" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
 														<GuardrailsSettings />
 													</div>
 												)}
 												{activeView === "env-snapshot" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<EnvSnapshotView projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<EnvSnapshotView
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 												{activeView === "offline-mode" && (
-													<div className="overflow-auto" style={{ height: 'calc(100vh - 100px)' }}>
-														<OfflineModeSettings projectPath={selectedProject?.path} />
+													<div
+														className="overflow-auto"
+														style={{ height: "calc(100vh - 100px)" }}
+													>
+														<OfflineModeSettings
+															projectPath={selectedProject?.path}
+														/>
 													</div>
 												)}
 											</>
@@ -2413,10 +2484,7 @@ export function App() {
 					/>
 
 					{/* What is still working, wherever the user happens to be */}
-					<ActivityCentre
-						activeView={activeView}
-						onOpen={handleOpenActivity}
-					/>
+					<ActivityCentre activeView={activeView} onOpen={handleOpenActivity} />
 				</CliStatusProvider>
 			</ViewStateProvider>
 		</ProviderContextProvider>

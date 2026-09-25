@@ -590,6 +590,14 @@
 			"contentSha256": "ae9a1ee749ce5acbda34b1317c4b3b44a69c20fda8c569fbb42dfe331af4d4f2",
 			"targets": {}
 		},
+		"convert-documents-to-markdown": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/convert-documents-to-markdown/SKILL.md",
+			"contentSha256": "c2bc3558ece96d4ff8e30cf2ce7a15ab6b2eb6b897743065fb52aecd7874f52c",
+			"targets": {}
+		},
 		"cross-platform-mobile": {
 			"kind": "skill",
 			"pack": "mobile",
@@ -606,7 +614,7 @@
 			"pack": "hermes",
 			"packVersion": "0.0.1",
 			"source": "skills/hermes/github/SKILL.md",
-			"contentSha256": "d8ded7c3ff006f084571e6cefb8496cd4200aeab49cae0b41580305bcb8b641b",
+			"contentSha256": "024e2ddd893111fa45275f01b7bb8472f2653131acfc687f88b1f3e30226773e",
 			"targets": {}
 		},
 		"ios-developer": {
@@ -762,7 +770,7 @@
 			"pack": "hermes",
 			"packVersion": "0.0.1",
 			"source": "skills/hermes/python-debugpy/SKILL.md",
-			"contentSha256": "9c2fcdcbda3f8cf3d5544638079f15deaf6120e3de4e41c093faeb946eed1aed",
+			"contentSha256": "9879a67fefdfb47022c92eabf3dfca80868c54d78bb1d6bd27d56742d0f65ea4",
 			"targets": {}
 		},
 		"sdlc-review": {
@@ -802,7 +810,7 @@
 			"pack": "hermes",
 			"packVersion": "0.0.1",
 			"source": "skills/hermes/systematic-debugging/SKILL.md",
-			"contentSha256": "7ed24a65d4d9d6d8f912253948c41963f8195706344b7f750303ab6eb0df1d2f",
+			"contentSha256": "f4810745cc5b78f2760e8f04f0f4795364e2de097419803fc1ec442993e5000f",
 			"targets": {}
 		},
 		"testcontainers-integration": {
@@ -1104,6 +1112,8 @@
 		".agents/skills/codebase-inspection/SKILL.md",
 		".agents/skills/codex/SKILL.md",
 		".agents/skills/computer-use/SKILL.md",
+		".agents/skills/convert-documents-to-markdown/LICENSE",
+		".agents/skills/convert-documents-to-markdown/SKILL.md",
 		".agents/skills/cross-platform-mobile/SKILL.md",
 		".agents/skills/github/SKILL.md",
 		".agents/skills/github/references/auth.md",
@@ -1215,6 +1225,7 @@
 		".gemini/commands/codebase-inspection.toml",
 		".gemini/commands/codex.toml",
 		".gemini/commands/computer-use.toml",
+		".gemini/commands/convert-documents-to-markdown.toml",
 		".gemini/commands/cross-platform-mobile.toml",
 		".gemini/commands/github.toml",
 		".gemini/commands/ios-developer.toml",

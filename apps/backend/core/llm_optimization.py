@@ -103,10 +103,53 @@ def build_base_system_prompt(
         f"Your working directory is: {resolved}\n"
         f"{_BASE_PROMPT_RULES}"
     )
+    # Bundled instructions also reach consumer worktrees without .agents/skills.
+    from skills_registry.bundled import load_bundled_skill
+
+    document_skill_name = "convert-documents-to-markdown"
+    project_skill_paths = (
+        f".agents/skills/{document_skill_name}/SKILL.md",
+        f".claude/commands/{document_skill_name}.md",
+    )
+    project_skill = next(
+        (path for path in project_skill_paths if (resolved / path).is_file()), None
+    )
+    if project_skill:
+        prompt += (
+            f"\n\nFor document inputs, first read ./{project_skill} and follow "
+            "the project's document skill, within the task's permissions and network policy."
+        )
+    else:
+        document_skill = load_bundled_skill(document_skill_name)
+        if document_skill is not None:
+            prompt += (
+                "\n\nDefault document handling follows. If the user invokes a project "
+                "or user command overriding this skill, follow that command's instructions "
+                "instead, within the task's permissions and network policy.\n\n"
+                + document_skill[1]
+            )
     if tool_use_hint:
         prompt += _TOOL_USE_HINT
     prompt += _rtk_awareness()
+    prompt += _brain_awareness()
     return prompt
+
+
+def _brain_awareness() -> str:
+    """How to use the shared brain, and the instructions it carries.
+
+    Here rather than in `create_client` for the reason `_rtk_awareness` is:
+    every provider branch builds its prompt through this function, and the
+    instructions have to apply to an Ollama build as much as to a Claude one.
+    Read from the notes on disk, never pulled: building a prompt costs no
+    network call, and the text changes only when an instruction does.
+    """
+    try:
+        from brain.runtime import awareness_section
+
+        return awareness_section()
+    except Exception:  # noqa: BLE001 - an optional store never breaks a prompt
+        return ""
 
 
 def _rtk_awareness() -> str:

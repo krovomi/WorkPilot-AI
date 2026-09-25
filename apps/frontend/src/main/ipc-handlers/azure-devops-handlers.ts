@@ -1,3 +1,4 @@
+import { buildJevEnvironment } from "../jev/environment";
 import { spawn } from "node:child_process";
 import {
 	existsSync,
@@ -1102,7 +1103,10 @@ except Exception as e:
 		): Promise<IPCResult<{ acceptanceCriteria: string[] }>> => {
 			const project = projectStore.getProject(projectId);
 			if (!project?.autoBuildPath) {
-				return { success: false, error: "Project not found or not initialized" };
+				return {
+					success: false,
+					error: "Project not found or not initialized",
+				};
 			}
 
 			const config = getAzureDevOpsConfig(project);
@@ -1110,13 +1114,17 @@ except Exception as e:
 			if (config.pat) envOverrides.AZURE_DEVOPS_PAT = config.pat;
 			if (config.orgUrl) envOverrides.AZURE_DEVOPS_ORG_URL = config.orgUrl;
 			const normalizedProject = normalizeProjectName(config.projectName);
-			if (normalizedProject) envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
+			if (normalizedProject)
+				envOverrides.AZURE_DEVOPS_PROJECT = normalizedProject;
 			if (!config.pat || !config.orgUrl) {
 				return { success: false, error: "Azure DevOps not configured" };
 			}
 
 			try {
-				const projectPath = path.join(project.path, project.autoBuildPath || "");
+				const projectPath = path.join(
+					project.path,
+					project.autoBuildPath || "",
+				);
 
 				const rawItem = (await callAzureDevOpsPython(
 					projectPath,
@@ -1130,7 +1138,9 @@ except Exception as e:
 				);
 
 				// Persist to disk via TASK_UPDATE path (task_metadata.json + requirements.json)
-				const task = projectStore.getTasks(projectId).find((t) => t.id === taskId);
+				const task = projectStore
+					.getTasks(projectId)
+					.find((t) => t.id === taskId);
 				if (task?.specsPath) {
 					const specDir = task.specsPath;
 					const metadataPath = path.join(specDir, "task_metadata.json");
@@ -1155,7 +1165,10 @@ except Exception as e:
 					projectStore.invalidateTasksCache(projectId);
 				}
 
-				return { success: true, data: { acceptanceCriteria: acceptanceCriteriaList } };
+				return {
+					success: true,
+					data: { acceptanceCriteria: acceptanceCriteriaList },
+				};
 			} catch (error: unknown) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
@@ -1224,7 +1237,7 @@ except Exception as e:
 
 					const child = spawn("python", pythonArgs, {
 						cwd: backendPath,
-						env,
+						env: buildJevEnvironment(env, "azure-devops-review"),
 						stdio: ["pipe", "pipe", "pipe"],
 					});
 

@@ -726,7 +726,7 @@ describe("useXterm keyboard handlers", () => {
 
 			// Should log error but not throw
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				"[useXterm] Failed to copy selection:",
+				"[terminal] Failed to copy selection:",
 				expect.any(Error),
 			);
 
@@ -766,7 +766,7 @@ describe("useXterm keyboard handlers", () => {
 
 			// Should log error but not throw
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				"[useXterm] Failed to read clipboard:",
+				"[terminal] Failed to read clipboard:",
 				expect.any(Error),
 			);
 

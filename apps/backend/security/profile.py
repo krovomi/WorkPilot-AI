@@ -126,3 +126,23 @@ def reset_profile_cache() -> None:
     _cached_spec_dir = None
     _cached_profile_mtime = None
     _cached_allowlist_mtime = None
+
+
+def resolve_active_profile() -> SecurityProfile | None:
+    """The profile for the build currently running, or None when it cannot load.
+
+    A validator is handed one command string and nothing else, so the project
+    it belongs to has to be recovered from the environment — the same lookup
+    `bash_security_hook` does, and in the same order. `shell_validators` was
+    doing it inline; `None` here means the caller must fail closed, which is
+    what "could not tell whether this is allowed" has to mean.
+    """
+    import os
+
+    from .constants import PROJECT_DIR_ENV_VAR
+
+    project_dir = os.environ.get(PROJECT_DIR_ENV_VAR) or os.getcwd()
+    try:
+        return get_security_profile(Path(project_dir))
+    except Exception:  # noqa: BLE001 - an unreadable profile is a refusal, not a crash
+        return None

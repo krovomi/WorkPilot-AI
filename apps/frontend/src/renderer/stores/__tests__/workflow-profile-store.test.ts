@@ -17,7 +17,16 @@ vi.mock("../../lib/agent-tools-api", () => ({
 	fetchWorkflowProfile: (...args: unknown[]) => mockFetch(...args),
 }));
 
-import { useWorkflowProfileStore } from "../workflow-profile-store";
+import {
+	workflowProfileKey,
+	useWorkflowProfileStore,
+} from "../workflow-profile-store";
+
+const key = workflowProfileKey({
+	taskId: "t1",
+	projectDir: "/p",
+	specId: "001-x",
+});
 
 function profile(effort: string, phaseIds: string[]) {
 	return {
@@ -67,7 +76,7 @@ describe("workflow-profile-store", () => {
 			await result.current.load({ taskId: "t1" });
 		});
 		expect(mockFetch).not.toHaveBeenCalled();
-		expect(result.current.byTask.t1).toBeUndefined();
+		expect(result.current.byTask[key]).toBeUndefined();
 	});
 
 	it("stores the resolved profile under the task id", async () => {
@@ -80,9 +89,9 @@ describe("workflow-profile-store", () => {
 				specId: "001-x",
 			});
 		});
-		expect(result.current.byTask.t1.profile?.effort).toBe("high");
-		expect(result.current.byTask.t1.loading).toBe(false);
-		expect(result.current.byTask.t1.error).toBeNull();
+		expect(result.current.byTask[key].profile?.effort).toBe("high");
+		expect(result.current.byTask[key].loading).toBe(false);
+		expect(result.current.byTask[key].error).toBeNull();
 	});
 
 	it("records an error without keeping a stale profile", async () => {
@@ -95,8 +104,8 @@ describe("workflow-profile-store", () => {
 				specId: "001-x",
 			});
 		});
-		expect(result.current.byTask.t1.error).toBe("backend down");
-		expect(result.current.byTask.t1.profile).toBeNull();
+		expect(result.current.byTask[key].error).toBe("backend down");
+		expect(result.current.byTask[key].profile).toBeNull();
 	});
 
 	it("marks a preview so the UI can say it is not the task's own level", async () => {
@@ -110,7 +119,7 @@ describe("workflow-profile-store", () => {
 				effort: "ultrathink",
 			});
 		});
-		expect(result.current.byTask.t1.previewEffort).toBe("ultrathink");
+		expect(result.current.byTask[key].previewEffort).toBe("ultrathink");
 	});
 
 	it("a superseded request does not overwrite the newer answer", async () => {
@@ -146,8 +155,8 @@ describe("workflow-profile-store", () => {
 			await first;
 		});
 
-		expect(result.current.byTask.t1.profile?.effort).toBe("ultrathink");
-		expect(result.current.byTask.t1.previewEffort).toBe("ultrathink");
+		expect(result.current.byTask[key].profile?.effort).toBe("ultrathink");
+		expect(result.current.byTask[key].previewEffort).toBe("ultrathink");
 	});
 
 	it("clear drops the entry and aborts what is in flight", async () => {
@@ -160,7 +169,27 @@ describe("workflow-profile-store", () => {
 				specId: "001-x",
 			});
 		});
-		act(() => result.current.clear("t1"));
-		expect(result.current.byTask.t1).toBeUndefined();
+		act(() => result.current.clear(key));
+		expect(result.current.byTask[key]).toBeUndefined();
 	});
+});
+
+it("isolates identical task ids from different projects", async () => {
+	mockFetch
+		.mockResolvedValueOnce(profile("low", ["coding"]))
+		.mockResolvedValueOnce(profile("high", ["review"]));
+	const store = useWorkflowProfileStore.getState();
+	await store.load({ taskId: "t1", projectDir: "/p", specId: "001-x" });
+	await store.load({ taskId: "t1", projectDir: "/other", specId: "001-x" });
+	const other = workflowProfileKey({
+		taskId: "t1",
+		projectDir: "/other",
+		specId: "001-x",
+	});
+	expect(useWorkflowProfileStore.getState().byTask[key].profile?.effort).toBe(
+		"low",
+	);
+	expect(useWorkflowProfileStore.getState().byTask[other].profile?.effort).toBe(
+		"high",
+	);
 });

@@ -630,6 +630,7 @@ async def run_autonomous_agent(
     source_spec_dir: Path | None = None,
     streaming_session_id: str | None = None,
     profile: object | None = None,
+    jev_run=None,
 ) -> None:
     """
     Run the autonomous agent loop with automatic memory management.
@@ -656,6 +657,20 @@ async def run_autonomous_agent(
             through its subtasks sequentially. None keeps the previous
             behaviour exactly, which is what the engine being off has to mean.
     """
+    from integrations.jev.adapters import assess_build
+    from integrations.jev.models import JevContext
+    from integrations.jev.rubrics import advice_text, classification_hint
+    from integrations.jev.runtime import JevRun
+
+    jev_run = jev_run or JevRun.from_env(
+        JevContext(getattr(profile, "workflow", "feature-build"), project_dir, spec_dir)
+    )
+    jev_classification = jev_run.classification if not jev_run.eligibility() else None
+    if not (spec_dir / "implementation_plan.json").exists():
+        jev_classification = await assess_build(
+            jev_run, "classification", pass_id="planning"
+        )
+    jev_hint = classification_hint(jev_classification) if jev_classification else None
     # Log agent start
     agent_trace_id = workflow_logger.log_agent_start(
         AGENT_NAME,
@@ -693,6 +708,7 @@ async def run_autonomous_agent(
             model,
             spec_dir=spec_dir,
             phase="coding",
+            task_hint=jev_hint,
             prompt_hint=f"coder run on spec {spec_dir.name}",
         )
         if override_info is not None:
@@ -718,7 +734,7 @@ async def run_autonomous_agent(
             # for cost analyses but keep the user's choice.
             suggestion = suggest_routed_model(
                 prompt=f"coder run on spec {spec_dir.name}",
-                task_hint="coding",
+                task_hint=jev_hint or "coding",
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(
@@ -889,7 +905,26 @@ async def run_autonomous_agent(
     planning_validation_failures = _read_planning_failures(spec_dir)
     max_planning_validation_retries = 3
 
-    def _validate_and_fix_implementation_plan() -> tuple[bool, list[str]]:
+    def _validate_and_fix_implementation_plan(
+        response_text: str | None = None,
+    ) -> tuple[bool, list[str]]:
+        """Is there a usable plan, after everything that can be done for one?
+
+        Three steps, in increasing order of how far they look from the path the
+        validator reads. Validation answers for a plan the model got right;
+        `auto_fix_plan` fills in the fields it left implicit and reshapes a
+        document that is a plan under other names; `recover_plan` looks
+        everywhere else it could be — `implementation_plan.json` at the worktree
+        root, because PHASE 3 of the prompt spells a relative path; a name the
+        model invented; the JSON fenced inside its own response, when it never
+        called Write at all.
+
+        The order is the point: a plan found further out is a plan the model
+        wrote but did not file, and re-running planning to get the same content
+        filed correctly costs a whole session and gets it wrong again as often
+        as not. Nothing here invents a subtask — when no candidate carries one,
+        this returns the validator's own errors and planning fails as before.
+        """
         from spec.validate_pkg import SpecValidator, auto_fix_plan
 
         spec_validator = SpecValidator(spec_dir)
@@ -903,7 +938,45 @@ async def run_autonomous_agent(
             if result.valid:
                 return True, []
 
+        if _recover_implementation_plan(response_text):
+            # The recovered plan is raw model output: it is put through the same
+            # auto-fix as any other plan before it is judged.
+            auto_fix_plan(spec_dir)
+            recovered_result = spec_validator.validate_implementation_plan()
+            if recovered_result.valid:
+                return True, []
+            result = recovered_result
+
         return False, result.errors
+
+    def _recover_implementation_plan(response_text: str | None) -> bool:
+        """Promote a plan found outside the path the validator reads.
+
+        Reported rather than silent: WorkPilot is about to build from a file it
+        moved or reshaped on the model's behalf, and the one line printed here
+        is what tells a reader of the log why the plan on disk is not byte for
+        byte what the transcript shows. Never raises — this runs on a build
+        that has already failed validation once.
+        """
+        try:
+            from spec.plan_recovery import recover_plan, write_recovered_plan
+
+            recovered = recover_plan(spec_dir, project_dir, response_text)
+            if recovered is None or not write_recovered_plan(spec_dir, recovered):
+                return False
+        except Exception as exc:  # noqa: BLE001 - recovery never fails a build
+            logger.debug("plan recovery unavailable: %s", exc)
+            return False
+
+        message = (
+            f"Recovered the implementation plan from {recovered.origin} "
+            f"({recovered.subtask_count} subtask(s)) — the model produced a plan "
+            "but not at the path WorkPilot reads."
+        )
+        print_status(message, "warning")
+        if task_logger:
+            task_logger.log_info(message)
+        return True
 
     def _report_traceability() -> None:
         """Requirement coverage, at the moment the plan stops changing.
@@ -968,6 +1041,7 @@ async def run_autonomous_agent(
                 spec_dir=spec_dir,
                 model=model,
                 repo_root=_workflow_repo_root,
+                jev_run=jev_run,
                 effort=getattr(profile, "effort", "medium"),
                 verbose=verbose,
             )
@@ -1050,6 +1124,8 @@ async def run_autonomous_agent(
 
     # Main loop
     iteration = 0
+    status = "continue"
+    error_info = {}
     consecutive_concurrency_errors = 0  # Track consecutive 400 tool concurrency errors
     current_retry_delay = INITIAL_RETRY_DELAY_SECONDS  # Exponential backoff delay
     concurrency_error_context: str | None = (
@@ -1122,7 +1198,9 @@ async def run_autonomous_agent(
                         encoding="utf-8",
                     )
                     status_manager.update(state=BuildState.PAUSED)
-                    return
+                    raise BuildPaused("planning" if is_planning_phase else "coding")
+        except BuildPaused:
+            raise
         except Exception as exc:
             logger.debug(f"Loop detection check skipped: {exc}")
 
@@ -1283,6 +1361,8 @@ async def run_autonomous_agent(
         if first_run:
             # Create client for planning phase
             prompt = generate_planner_prompt(spec_dir, project_dir)
+            if jev_advice := advice_text(jev_classification):
+                prompt += "\n\n" + jev_advice
             # Chantier 4's portable answer to effort sensitivity: the engine
             # states the level rather than the prompt template branching on a
             # variable only some harnesses expose.
@@ -1334,7 +1414,8 @@ async def run_autonomous_agent(
                     "Mobile stack and device toolchain applied to planning", "success"
                 )
 
-            first_run = False
+            # Stay in planning until its output has passed validation. Errors,
+            # rate limits and provider switches must retry this same phase.
             current_log_phase = LogPhase.PLANNING
 
             # Set session info in logger
@@ -1759,7 +1840,7 @@ async def run_autonomous_agent(
 
         plan_validated = False
         if is_planning_phase and status != "error":
-            valid, errors = _validate_and_fix_implementation_plan()
+            valid, errors = _validate_and_fix_implementation_plan(response)
             # Archive this LLM's plan (valid or not) so plans from different
             # models can be compared side by side later. One snapshot per
             # provider/model; survives a reset (lives under plans/).
@@ -1779,6 +1860,7 @@ async def run_autonomous_agent(
                 # L'instantane du plan est un confort de diagnostic, pas une etape du build.
                 pass
             if valid:
+                first_run = False
                 plan_validated = True
                 planning_retry_context = None
                 _clear_planning_failures(spec_dir)  # success → reset the cap
@@ -2230,8 +2312,17 @@ async def run_autonomous_agent(
                         print_status("Resumed early by user", "success")
 
                     # Resume execution
-                    emit_phase(ExecutionPhase.CODING, "Resuming after rate limit")
-                    status_manager.update(state=BuildState.BUILDING)
+                    emit_phase(
+                        ExecutionPhase.PLANNING
+                        if is_planning_phase
+                        else ExecutionPhase.CODING,
+                        "Resuming after rate limit",
+                    )
+                    status_manager.update(
+                        state=BuildState.PLANNING
+                        if is_planning_phase
+                        else BuildState.BUILDING
+                    )
                     continue  # Resume the loop
                 else:
                     # Couldn't parse reset time - fall back to standard retry
@@ -2284,8 +2375,17 @@ async def run_autonomous_agent(
                 await wait_for_auth_resume(spec_dir, source_spec_dir)
 
                 print_status("Authentication restored - resuming", "success")
-                emit_phase(ExecutionPhase.CODING, "Resuming after re-authentication")
-                status_manager.update(state=BuildState.BUILDING)
+                emit_phase(
+                    ExecutionPhase.PLANNING
+                    if is_planning_phase
+                    else ExecutionPhase.CODING,
+                    "Resuming after re-authentication",
+                )
+                status_manager.update(
+                    state=BuildState.PLANNING
+                    if is_planning_phase
+                    else BuildState.BUILDING
+                )
                 continue  # Resume the loop
 
             else:
@@ -2341,7 +2441,11 @@ async def run_autonomous_agent(
                         recoverable=False,
                         subtask_id=subtask_id,
                     )
-                    break
+                    raise BuildHalted(
+                        "planning" if is_planning_phase else "coding",
+                        halt_msg,
+                        recoverable=False,
+                    )
 
                 print_status("Session encountered an error", "error")
                 print(muted("Will retry with a fresh session..."))
@@ -2355,6 +2459,31 @@ async def run_autonomous_agent(
         if max_iterations is None or iteration < max_iterations:
             print("\nPreparing next session...\n")
             await asyncio.sleep(1)
+
+    # A normal return authorizes handle_build_command to start QA and finalize
+    # the workspace. Neither an error, a missing/empty plan (0 == 0), nor an
+    # exhausted iteration budget is evidence that implementation is complete.
+    if status == "error" or first_run or not is_build_complete(spec_dir):
+        failed_phase = "planning" if is_planning_phase else "coding"
+        completed, total = count_subtasks(spec_dir)
+        detail = (error_info or {}).get("message") if status == "error" else None
+        if not detail:
+            detail = (
+                f"Iteration limit reached ({max_iterations})."
+                if max_iterations and iteration > max_iterations
+                else "No runnable subtasks remain, but the build is incomplete."
+            )
+        halt_msg = f"{failed_phase.capitalize()} stopped: {detail} ({completed}/{total} subtasks complete)."
+        status_manager.update(state=BuildState.ERROR)
+        if task_logger:
+            task_logger.end_phase(current_log_phase, success=False, message=halt_msg)
+        _emit_phase_failure(spec_dir, failed_phase, halt_msg, recoverable=True)
+        if streaming_wrapper:
+            try:
+                await streaming_wrapper.end_session()
+            except Exception as exc:
+                logger.warning("Failed to end streaming session: %s", exc)
+        raise BuildHalted(failed_phase, halt_msg)
 
     # Final summary
     content = [

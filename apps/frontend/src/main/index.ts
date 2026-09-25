@@ -80,9 +80,16 @@ import {
 	loadPersistedState,
 	restoreSession,
 } from "./server-connection";
+import {
+	enforceWebviewPreferences,
+	isPermissionGranted,
+	isWebviewSourceAllowed,
+} from "./security/webview-policy";
+import { canUseDictationMicrophone } from "./security/dictation-permission";
 import { initializeCredentialIntegration } from "./services/credential-integration";
 import { ensureOllamaReady } from "./services/ollama-portable";
 import { ensureOAuthServerRunning } from "./oauth-server";
+import { openExternalUrl } from "./open-external";
 import { isMacOS, isWindows } from "./platform";
 import { pythonEnvManager } from "./python-env-manager";
 import { initSentryMain } from "./sentry";
@@ -355,6 +362,12 @@ function setupExternalLinkHandler(mainWindow: BrowserWindow): void {
 	// Note: Terminal links now use IPC via WebLinksAddon callback, but this handler
 	// catches any other window.open() calls (e.g., from third-party libraries)
 	const ALLOWED_URL_SCHEMES = new Set(["http:", "https:", "mailto:"]);
+
+	// http(s) passe par `open-external`, qui porte les replis Linux ; `mailto:`
+	// reste sur `shell.openExternal`, qui est le seul à savoir ouvrir un client
+	// de messagerie — et que `openExternalUrl` refuse par schéma.
+	const openAllowedUrl = (url: string, protocol: string): Promise<void> =>
+		protocol === "mailto:" ? shell.openExternal(url) : openExternalUrl(url);
 	mainWindow?.webContents.setWindowOpenHandler(
 		(details: Electron.HandlerDetails) => {
 			try {
@@ -372,7 +385,12 @@ function setupExternalLinkHandler(mainWindow: BrowserWindow): void {
 				// *and* let Electron create a second BrowserWindow rendering the
 				// remote page inside the app — every external link opening twice,
 				// with untrusted content hosted in our own process.
-				shell.openExternal(details.url).catch((error) => {
+				//
+				// Par `openExternalUrl` et non `shell.openExternal` : c'est le seul
+				// chemin, et c'est lui qui porte les replis Linux. Un `window.open`
+				// tombant ici sur une machine sans `xdg-utils` n'ouvrait rien et ne
+				// disait rien.
+				openAllowedUrl(details.url, url.protocol).catch((error) => {
 					console.warn(
 						"[main] Failed to open external URL:",
 						details.url,
@@ -420,11 +438,57 @@ function setupExternalLinkHandler(mainWindow: BrowserWindow): void {
 		event.preventDefault();
 		console.warn("[main] Blocked in-app navigation to:", targetUrl);
 		if (ALLOWED_URL_SCHEMES.has(target.protocol)) {
-			shell.openExternal(targetUrl).catch(() => {
-				/* nothing more we can do */
+			openAllowedUrl(targetUrl, target.protocol).catch((error) => {
+				console.warn("[main] Failed to open external URL:", targetUrl, error);
 			});
 		}
 	});
+}
+
+/**
+ * Branche la politique `<webview>` sur la fenêtre.
+ *
+ * La politique elle-même vit dans `security/webview-policy.ts` ; cette
+ * fonction ne fait que la poser sur l'événement qu'Electron fournit.
+ */
+function setupWebviewGuards(mainWindow: BrowserWindow): void {
+	mainWindow?.webContents.on(
+		"will-attach-webview",
+		(event, webPreferences, params) => {
+			enforceWebviewPreferences(
+				webPreferences as unknown as Record<string, unknown>,
+			);
+
+			if (!isWebviewSourceAllowed(params.src)) {
+				console.warn("[main] Blocked webview src:", params.src);
+				event.preventDefault();
+			}
+		},
+	);
+}
+
+/**
+ * Branche la politique de permissions sur la session par défaut.
+ *
+ * Les deux handlers sont nécessaires : `setPermissionRequestHandler` ne couvre
+ * pas les vérifications synchrones (`navigator.permissions.query`, et
+ * l'énumération des périphériques média), si bien qu'avec le premier seul une
+ * page lirait « accordé » pour une permission que la demande refusera.
+ */
+function setupPermissionHandlers(): void {
+	session.defaultSession.setPermissionRequestHandler(
+		(contents, permission, callback, details) => {
+			const allowed = isPermissionGranted(permission) || canUseDictationMicrophone(permission, contents === mainWindow?.webContents, details.isMainFrame, "mediaTypes" in details ? details.mediaTypes : undefined);
+			if (!allowed) {
+				console.warn("[main] Denied permission request:", permission);
+			}
+			callback(allowed);
+		},
+	);
+
+	session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
+		isPermissionGranted(permission) || canUseDictationMicrophone(permission, contents === mainWindow?.webContents, details.isMainFrame, details.mediaType ? [details.mediaType] : undefined),
+	);
 }
 
 function createWindow(): void {
@@ -467,6 +531,8 @@ function createWindow(): void {
 	// Setup context menu and external link handlers
 	setupContextMenu(mainWindow);
 	setupExternalLinkHandler(mainWindow);
+	setupWebviewGuards(mainWindow);
+	setupPermissionHandlers();
 
 	// Load the renderer
 	if (mainWindow) {

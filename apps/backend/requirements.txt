@@ -2,8 +2,11 @@
 # SDK 0.1.25+ required for improved tool use concurrency handling
 # Earlier versions had 400 errors when tool_use blocks had partial failures
 # Utiliser le nom correct du package (tiret) pour l'installation via pip
-claude-agent-sdk>=0.2.144
-python-dotenv>=1.2.2
+claude-agent-sdk>=0.2.157
+python-dotenv>=1.2.3
+
+# Local multilingual Kanban dictation (explicit model download from the UI).
+faster-whisper>=1.2.1
 
 # WebSocket support for streaming development mode
 websockets>=17.1
@@ -16,7 +19,7 @@ tomli>=2.0.0; python_version < "3.11"
 # scheduling/task_templates.py, and required outright by
 # skills_registry/frontmatter.py -- it was pulled in transitively and those
 # modules silently degraded whenever it was not. Declared so they don't.
-PyYAML>=6.0
+PyYAML>=6.0.3
 
 # Linux Secret Service support for credential storage
 # Provides access to the Freedesktop.org Secret Service API via DBus
@@ -26,10 +29,10 @@ secretstorage>=3.5.0; sys_platform == "linux"
 # Memory Integration - LadybugDB (embedded graph database)
 # Requires Python 3.12+ (no Docker required); wheels available for 3.14 since 0.15.x
 real_ladybug>=0.15.3; python_version >= "3.12"
-graphiti-core>=0.30.1; python_version >= "3.12"
+graphiti-core>=0.30.2; python_version >= "3.12"
 # pandas is required by real_ladybug for get_as_df() method
 # pandas 2.2.0+ required for pre-built wheels on Python 3.12
-pandas>=3.0.5; python_version >= "3.12"
+pandas>=3.0.6; python_version >= "3.12"
 
 # Windows-specific dependency for LadybugDB/Graphiti
 # pywin32 provides Windows system bindings required by real_ladybug
@@ -46,7 +49,7 @@ pydantic>=2.13.5
 rich>=15.0.0
 
 # Error tracking (optional - requires SENTRY_DSN environment variable)
-sentry-sdk>=2.68.1
+sentry-sdk>=2.69.2
 
 # Security-First Features
 # Basic secret scanning is built-in, these enhance capabilities
@@ -58,15 +61,15 @@ bandit>=1.9.4
 # Install separately: pip install pip-audit
 
 fastapi>=0.141.1
-uvicorn[standard]>=0.50.2
+uvicorn[standard]>=0.53.0
 slowapi>=0.1.10
 
 # Multi-user server mode (central deployment)
-alembic>=1.19.2          # DB schema migrations
+alembic>=1.20.0          # DB schema migrations
 asyncpg>=0.31.0          # PostgreSQL async driver (server mode)
 aiosqlite>=0.22.1        # SQLite async driver (dev/tests fallback)
 argon2-cffi>=25.1.0      # Password hashing for local accounts
-PyJWT[crypto]>=2.13.0     # JWT access/refresh tokens + Entra ID JWKS validation
+PyJWT[crypto]>=2.14.0     # JWT access/refresh tokens + Entra ID JWKS validation
 cryptography>=50.0.1     # Fernet encryption for per-user integration secrets
 email-validator>=2.3.0   # pydantic EmailStr support (auth schemas)
 requests>=2.34.2
@@ -77,7 +80,7 @@ httpx[http2]>=0.28.1
 # any environment that did not happen to pull aiohttp in transitively.
 aiohttp>=3.14.3
 h2>=4.4.1  # HTTP/2 support for Windsurf gRPC proxy
-sqlalchemy>=2.0.52
+sqlalchemy>=2.0.54
 psutil>=7.2.2
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK
@@ -89,12 +92,12 @@ msrest>=0.7.1           # Required by azure-devops SDK
 defusedxml>=0.7.1
 
 # Anthropic SDK for Claude API integration
-anthropic>=1.4.0
+anthropic>=1.7.0
 
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:
 #   playwright install chromium
-playwright>=1.62.0
+playwright>=1.63.0
 
 # Ajout d'une note pour l'installation automatique de uvicorn si absent
 # Pour garantir l'automatisation, il est recommandé d'ajouter uvicorn dans requirements.txt racine ou de documenter l'installation automatique.

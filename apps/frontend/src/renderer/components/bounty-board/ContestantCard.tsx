@@ -1,6 +1,9 @@
-import { Trophy, X } from "lucide-react";
+import { FlaskConical, GitCompare, Trophy, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { BountyContestant } from "../../../preload/api/modules/bounty-board-api";
+import type {
+	BountyContestant,
+	BountyEvidence,
+} from "../../../preload/api/modules/bounty-board-api";
 
 interface Props {
 	readonly contestant: BountyContestant;
@@ -17,9 +20,62 @@ const STATUS_STYLES: Record<BountyContestant["status"], string> = {
 	winner: "bg-yellow-500/15 text-yellow-500",
 };
 
+/**
+ * A test status carries a verdict or an absence, never both, and the card has
+ * to say which. `failed` is red because the suite ran and said no; every other
+ * non-passing status is muted because nobody measured anything — the same
+ * distinction the judge makes when it renormalises a missing criterion out of
+ * the total instead of scoring it zero.
+ */
+const TEST_STATUS_STYLES: Record<BountyEvidence["tests"]["status"], string> = {
+	passed: "text-green-500",
+	failed: "text-red-500",
+	timeout: "text-muted-foreground",
+	"no-command": "text-muted-foreground",
+	"no-change": "text-muted-foreground",
+	skipped: "text-muted-foreground",
+	error: "text-muted-foreground",
+};
+
+function EvidenceRow({ evidence }: { readonly evidence: BountyEvidence }) {
+	const { t } = useTranslation(["bountyBoard"]);
+	const { diff, tests } = evidence;
+
+	const diffLabel = diff.available
+		? t("bountyBoard:evidence.diff", {
+				files: diff.files_changed,
+				added: diff.insertions,
+				removed: diff.deletions,
+				defaultValue: "{{files}} files · +{{added}} −{{removed}}",
+			})
+		: t("bountyBoard:evidence.diffUnavailable", "diff not measured");
+
+	const testLabel = t(`bountyBoard:evidence.tests.${tests.status}`, {
+		passed: tests.passed,
+		failed: tests.failed,
+		defaultValue: tests.status,
+	});
+
+	return (
+		<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+			<span className="inline-flex items-center gap-1 text-muted-foreground">
+				<GitCompare className="w-3 h-3" aria-hidden="true" />
+				{diffLabel}
+			</span>
+			<span
+				className={`inline-flex items-center gap-1 ${TEST_STATUS_STYLES[tests.status] ?? "text-muted-foreground"}`}
+			>
+				<FlaskConical className="w-3 h-3" aria-hidden="true" />
+				{testLabel}
+			</span>
+		</div>
+	);
+}
+
 export function ContestantCard({ contestant, isWinner, rationale }: Props) {
 	const { t } = useTranslation(["bountyBoard", "common"]);
 	const statusClass = STATUS_STYLES[contestant.status] ?? STATUS_STYLES.queued;
+	const breakdown = Object.entries(contestant.quality_breakdown ?? {});
 
 	return (
 		<div
@@ -63,15 +119,36 @@ export function ContestantCard({ contestant, isWinner, rationale }: Props) {
 					<div className="text-muted-foreground">
 						{t("bountyBoard:metrics.duration", "Duration")}
 					</div>
-					<div className="font-mono">{contestant.duration_ms} ms</div>
+					<div className="font-mono">
+						{(contestant.duration_ms / 1000).toFixed(1)} s
+					</div>
 				</div>
 			</div>
 
-			{Object.keys(contestant.quality_breakdown).length > 0 && (
+			{contestant.evidence && <EvidenceRow evidence={contestant.evidence} />}
+
+			{breakdown.length > 0 && (
 				<div className="text-[10px] text-muted-foreground flex flex-wrap gap-2">
-					{Object.entries(contestant.quality_breakdown).map(([k, v]) => (
-						<span key={k} className="px-1.5 py-0.5 rounded bg-muted">
-							{k}: {v}
+					{breakdown.map(([criterion, points]) => (
+						<span
+							key={criterion}
+							className={`px-1.5 py-0.5 rounded ${points == null ? "bg-muted/50 italic" : "bg-muted"}`}
+							title={
+								points == null
+									? t(
+											"bountyBoard:criteria.notMeasuredHint",
+											"No evidence for this criterion — its weight was redistributed over the others.",
+										)
+									: undefined
+							}
+						>
+							{t(`bountyBoard:criteria.${criterion}`, criterion)}:{" "}
+							{/* An unmeasured criterion is not a zero. Printing `0` here
+							    would say the contestant was judged and found wanting, when
+							    in fact nothing was judged at all. */}
+							{points == null
+								? t("bountyBoard:criteria.notMeasured", "not measured")
+								: points.toFixed(1)}
 						</span>
 					))}
 				</div>

@@ -1252,6 +1252,41 @@ def get_provider_models_catalog(provider: str, refresh: bool = False):
     return list_models(provider, force_refresh=refresh)
 
 
+@app.get("/providers/agentic-capabilities")
+def get_agentic_capabilities():
+    """What each provider can drive, from `capabilities/providers.yaml`.
+
+    A provider with `adapter: null` has no agentic client of its own: selecting
+    it runs the task on `degradesTo` instead. That is a deliberate trade for a
+    build, and the wrong one for anything that *compares* providers — the Arena
+    would record a win under the name of a vendor that never saw the prompt.
+
+    Served rather than mirrored in TypeScript on purpose: the matrix is one
+    file, and a second copy of it drifts silently the day an adapter is
+    written.
+
+    Response shape::
+
+        {"providers": {"<name>": {"hasAdapter": bool, "degradesTo": str|None,
+                                  "subagents": str, "effort": str,
+                                  "note": str}, ...}}
+    """
+    from skills_registry.providers import load_providers
+
+    return {
+        "providers": {
+            name: {
+                "hasAdapter": caps.has_adapter,
+                "degradesTo": caps.degrades_to,
+                "subagents": caps.subagents,
+                "effort": caps.effort,
+                "note": caps.note,
+            }
+            for name, caps in load_providers().items()
+        }
+    }
+
+
 @app.get("/providers/capabilities/{provider}")
 def get_provider_capabilities(provider: str):
     provider_cls = get_provider_by_name(provider)
@@ -2003,6 +2038,14 @@ try:
     _mount(hermes_router, "hermes")
 except ImportError as e:
     print(f"Warning: Could not import hermes router: {e}")
+
+# --- Brain API (the shared brain: one knowledge base, every agent) ---
+try:
+    from brain.api import router as brain_router
+
+    _mount(brain_router, "brain")
+except ImportError as e:
+    print(f"Warning: Could not import brain router: {e}")
 
 # --- rtk API (is the output-condensing proxy working here, and what it saved) ---
 try:

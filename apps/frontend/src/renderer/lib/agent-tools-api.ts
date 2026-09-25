@@ -14,10 +14,10 @@
 
 export type ApiResult<T> =
 	| { ok: true; data: T }
-	| { ok: false; error: string };
+	/** `detail`: the backend's own words, when it has any worth showing. */
+	| { ok: false; error: string; detail?: string };
 
-const backendUrl = (): string =>
-	(import.meta.env?.VITE_BACKEND_URL) ?? "";
+const backendUrl = (): string => import.meta.env?.VITE_BACKEND_URL ?? "";
 
 async function _post<T>(
 	path: string,
@@ -41,6 +41,7 @@ async function _post<T>(
 				typeof json.error === "string"
 					? json.error
 					: `request failed with HTTP ${res.status}`,
+			...(typeof json.detail === "string" ? { detail: json.detail } : {}),
 		};
 	} catch (err) {
 		if ((err as { name?: string })?.name === "AbortError") {
@@ -249,13 +250,7 @@ export async function fetchTimeline(
 export interface ProgressIndicatorPayload {
 	spec_id: string;
 	label: string;
-	phase:
-		| "planning"
-		| "coding"
-		| "qa"
-		| "idle"
-		| "completed"
-		| "unknown";
+	phase: "planning" | "coding" | "qa" | "idle" | "completed" | "unknown";
 	sub_phase: string | null;
 	subtasks_completed: number;
 	subtasks_total: number;
@@ -439,6 +434,10 @@ export interface WorkflowLevelPayload {
 }
 
 export interface WorkflowProfilePayload {
+	jev?: {
+		observation: import("../../shared/types/jev").JevObservation | null;
+		airgapStrict: boolean;
+	};
 	workflow: string;
 	description: string;
 	effort: string;
@@ -626,7 +625,10 @@ export interface HermesStatus {
 	readonly adopted: readonly string[];
 	/** Le pack d'adoption — non listé dans `.workpilot/skills.toml`, donc émis nulle part. */
 	readonly adoptedPack: string;
-	readonly surfaces: readonly { readonly id: string; readonly description: string }[];
+	readonly surfaces: readonly {
+		readonly id: string;
+		readonly description: string;
+	}[];
 }
 
 export interface HermesCycle {
@@ -741,4 +743,142 @@ export async function fetchRtkStatus(
 		projectDir ? { project_dir: projectDir } : {},
 		signal,
 	);
+}
+
+/* ------------------------------------------------------------------ */
+/* Brain — the shared brain every agent reads and writes              */
+/*                                                                    */
+/* GET  /api/brain/settings     where it is, its remote, its vault    */
+/* POST /api/brain/settings     plug a folder and/or a git remote     */
+/* GET  /api/brain/task         what one Kanban task taught it        */
+/* POST /api/brain/instruction  activate / turn down a proposed rule  */
+/* POST /api/brain/sync         commit, pull, push now                */
+/*                                                                    */
+/* Refused in server mode, like hermes: the brain lives in the home   */
+/* directory of the machine running the backend.                      */
+/* ------------------------------------------------------------------ */
+
+export interface BrainSettings {
+	readonly path: string;
+	readonly defaultPath: string;
+	/** Who chose the folder: the environment, Settings, or nobody. */
+	readonly source: "env" | "config" | "default";
+	readonly envVariable: string;
+	readonly configPath: string;
+	readonly enabled: boolean;
+	/** Enabled and a brain exists: every feature is plugged into it. */
+	readonly active: boolean;
+	readonly exists: boolean;
+	readonly folderExists: boolean;
+	readonly git: boolean;
+	readonly gitAvailable: boolean;
+	readonly remote: string | null;
+	readonly obsidianVault: boolean;
+	readonly notes: number;
+	readonly proposals: number;
+}
+
+export interface BrainSettingsUpdate {
+	/** A folder under the home directory; "" goes back to the default. */
+	path?: string;
+	/** A git remote, or GitHub's `owner/repo`. */
+	remote?: string;
+	enabled?: boolean;
+	/** Create, clone or adopt the brain now. */
+	connect?: boolean;
+}
+
+export interface BrainNoteSummary {
+	readonly path: string;
+	readonly absPath: string;
+	readonly title: string;
+	readonly kind: string;
+	readonly status: string | null;
+	readonly agents: readonly string[];
+	readonly updated: string | null;
+}
+
+export interface BrainBuildNote extends BrainNoteSummary {
+	readonly qa: boolean | null;
+	readonly tests: boolean | null;
+	readonly merged: string | null;
+}
+
+export interface BrainTaskLearning {
+	readonly active: boolean;
+	readonly task: string;
+	readonly root?: string;
+	readonly build: BrainBuildNote | null;
+	readonly notes: readonly BrainNoteSummary[];
+	readonly proposals: readonly BrainNoteSummary[];
+}
+
+export interface BrainSyncResult {
+	readonly committed: boolean;
+	readonly pulled: boolean;
+	readonly pushed: boolean;
+	readonly remote: string | null;
+	readonly conflicts: readonly string[];
+	readonly skipped: string | null;
+	readonly error: string | null;
+	/** Where it failed: `commit`, `fetch`, `pull`, `push` or `git`. */
+	readonly step?: string | null;
+	/** git's own message, credentials removed. */
+	readonly detail?: string | null;
+}
+
+export async function fetchBrainSettings(
+	signal?: AbortSignal,
+): Promise<ApiResult<{ settings: BrainSettings }>> {
+	return _get<{ settings: BrainSettings }>("/api/brain/settings", {}, signal);
+}
+
+export async function saveBrainSettings(
+	update: BrainSettingsUpdate,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ settings: BrainSettings }>> {
+	return _post<{ settings: BrainSettings }>(
+		"/api/brain/settings",
+		update,
+		signal,
+	);
+}
+
+export async function fetchBrainTask(
+	projectDir: string,
+	specId: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ learning: BrainTaskLearning }>> {
+	return _get<{ learning: BrainTaskLearning }>(
+		"/api/brain/task",
+		{ project_dir: projectDir, spec_id: specId },
+		signal,
+	);
+}
+
+export async function setBrainInstructionStatus(
+	path: string,
+	status: "active" | "retired",
+	signal?: AbortSignal,
+): Promise<ApiResult<{ path: string; status: string }>> {
+	return _post<{ path: string; status: string }>(
+		"/api/brain/instruction",
+		{ path, status },
+		signal,
+	);
+}
+
+export async function syncBrain(
+	signal?: AbortSignal,
+): Promise<ApiResult<BrainSyncResult>> {
+	return _post<BrainSyncResult>(
+		"/api/brain/sync",
+		{ message: "brain: sync from WorkPilot" },
+		signal,
+	);
+}
+
+/** Opens a note in Obsidian — the vault must be one Obsidian knows. */
+export function obsidianUri(absPath: string): string {
+	return `obsidian://open?path=${encodeURIComponent(absPath)}`;
 }

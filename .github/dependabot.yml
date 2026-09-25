@@ -28,6 +28,21 @@ updates:
       - javascript
     commit-message:
       prefix: "chore(deps)"
+    # react and react-dom are one package in two tarballs: react-dom asserts at
+    # runtime that both carry the *exact* same version and throws
+    # "Incompatible React versions" otherwise. Ungrouped, the updater bumped
+    # react-dom to 19.3.0 and left react at 19.2.4, and every one of the ~290
+    # renderer test files failed to load — on a pull request that looked like a
+    # routine patch bump. The types travel with them: @types/react-dom declares
+    # a dependency on @types/react, so a lone bump pins the pair to a stale
+    # resolution of the other.
+    groups:
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
 
   # GitHub Actions
   - package-ecosystem: github-actions

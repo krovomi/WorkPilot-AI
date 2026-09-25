@@ -1,8 +1,13 @@
+import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
+import {
+	isCustomModelSentinel,
+	isLocalProvider,
+} from "../../../shared/utils/local-models";
 import { Info, Loader2, Pause, Play, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { THINKING_LEVELS } from "../../../shared/constants/models";
-import { getModelsForProvider } from "../../../shared/services/providerRegistry";
+import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import type { Task } from "../../../shared/types";
 import type { ThinkingLevel } from "../../../shared/types/settings";
 import { getStaticProviders } from "../../../shared/utils/providers";
@@ -10,6 +15,7 @@ import { debugError } from "../../../shared/utils/debug-logger";
 import { useToast } from "../../hooks/use-toast";
 import { useSettingsStore } from "../../stores/settings-store";
 import { Button } from "../ui/button";
+import { OfficialModelSearch } from "./OfficialModelSearch";
 import {
 	Select,
 	SelectContent,
@@ -17,11 +23,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "../ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 interface TaskPauseControlsProps {
 	task: Task;
@@ -54,12 +56,42 @@ export function TaskPauseControls({
 	const [isLoading, setIsLoading] = useState(false);
 	const [isResuming, setIsResuming] = useState(false);
 	const [providers, setProviders] = useState<ProviderOption[]>([]);
-	const [selectedProvider, setSelectedProvider] = useState(
-		task.metadata?.paused?.provider || task.metadata?.provider || "anthropic",
-	);
-	const [selectedModel, setSelectedModel] = useState(
-		task.metadata?.paused?.model || task.metadata?.model || "",
-	);
+	const phase =
+		task.metadata?.paused?.paused_phase || task.executionProgress?.phase;
+	const resumePhase =
+		phase === "spec"
+			? "spec"
+			: phase === "planning"
+				? "planning"
+				: phase?.startsWith("qa")
+					? "qa"
+					: "coding";
+	const initialProvider =
+		task.metadata?.paused?.provider ||
+		task.metadata?.phaseProviders?.[resumePhase] ||
+		task.metadata?.provider ||
+		"anthropic";
+	const initialModel =
+		task.metadata?.paused?.model ||
+		task.metadata?.phaseModels?.[resumePhase] ||
+		task.metadata?.model ||
+		"";
+	const [selectedProvider, setSelectedProvider] = useState(initialProvider);
+	const [selectedModel, setSelectedModel] = useState(initialModel);
+	// "Autre (catalogue officiel)" opens the library search, exactly as the
+	// per-phase selector does. It never becomes the model itself: the sentinel
+	// is a row in the catalogue, and forwarding it asks the server to pull an
+	// image literally called "custom".
+	const [searchingModel, setSearchingModel] = useState(false);
+	const resumeModel = selectedModel.trim();
+	// A task already saved with the sentinel opens the search on its own: the
+	// row is already the Select's value, so re-picking it fires no change and
+	// there would be no way out of the state the old free-text field left
+	// behind. Same escape hatch as the per-phase selector.
+	const stuckOnSentinel = isCustomModelSentinel(selectedModel);
+	useEffect(() => {
+		if (stuckOnSentinel) setSearchingModel(true);
+	}, [stuckOnSentinel]);
 	// Reasoning "effort" applied to the resumed run. Seed it from the task's
 	// current single thinking level, falling back to the coding phase's per-phase
 	// level, then a sensible default.
@@ -73,6 +105,16 @@ export function TaskPauseControls({
 	// can the user actually switch and resume. While it is still running, the
 	// pause is "in flight" (finishing the current step).
 	const isFullyPaused = isPaused && !isRunning;
+	const selectionKey = `${task.id}:${isFullyPaused}`;
+	const previousSelectionKey = useRef(selectionKey);
+	useEffect(() => {
+		if (previousSelectionKey.current !== selectionKey) {
+			previousSelectionKey.current = selectionKey;
+			setSelectedProvider(initialProvider);
+			setSelectedModel(initialModel);
+			setSearchingModel(false);
+		}
+	}, [selectionKey, initialProvider, initialModel]);
 
 	// Build the list of configured providers (same detection as the rest of the
 	// app) once the user reaches the paused-and-stopped state.
@@ -87,13 +129,6 @@ export function TaskPauseControls({
 					.filter((p) => res.status[p.name] === true)
 					.map((p) => ({ name: p.name, label: p.label }));
 				setProviders(configured);
-				// If the current selection isn't configured, fall back to the first.
-				// Functional update so the effect doesn't depend on selectedProvider.
-				setSelectedProvider((prev) =>
-					configured.length > 0 && !configured.some((p) => p.name === prev)
-						? configured[0].name
-						: prev,
-				);
 			})
 			.catch((err) => {
 				debugError("[TaskPauseControls] getStaticProviders failed", err);
@@ -107,22 +142,19 @@ export function TaskPauseControls({
 		};
 	}, [isFullyPaused, profiles, settings]);
 
-	const models = useMemo(
-		() => getModelsForProvider(selectedProvider),
-		[selectedProvider],
+	const { models, loading: catalogLoading } =
+		useProviderModelCatalog(selectedProvider);
+	const { options: modelOptions, value: modelValue } = buildModelSelectOptions(
+		models,
+		selectedModel,
+		{},
+		isLocalProvider(selectedProvider),
 	);
-
-	// Keep the model selection valid whenever the provider changes. Recompute the
-	// model list locally and use a functional update so the only dependency is
-	// the provider itself.
+	// Discovery must never erase the task's current model while it loads.
 	useEffect(() => {
-		const available = getModelsForProvider(selectedProvider);
-		setSelectedModel((prev) =>
-			available.some((m) => m.value === prev)
-				? prev
-				: (available[0]?.value ?? ""),
-		);
-	}, [selectedProvider]);
+		if (!catalogLoading && !selectedModel && models.length)
+			setSelectedModel(models[0].value);
+	}, [catalogLoading, selectedModel, models]);
 
 	const handlePause = useCallback(async () => {
 		setIsLoading(true);
@@ -137,7 +169,10 @@ export function TaskPauseControls({
 			});
 		} catch (error) {
 			toast({
-				title: t("tasks:modal.actions.pauseFailed", "Échec de la mise en pause"),
+				title: t(
+					"tasks:modal.actions.pauseFailed",
+					"Échec de la mise en pause",
+				),
 				description: String(error),
 				variant: "destructive",
 			});
@@ -147,12 +182,13 @@ export function TaskPauseControls({
 	}, [onPause, toast, t]);
 
 	const handleResumeWithProvider = useCallback(async () => {
+		if (!resumeModel || isCustomModelSentinel(resumeModel)) return;
 		setIsResuming(true);
 		try {
 			const res = await globalThis.electronAPI?.resumeTaskWithProvider?.(
 				task.id,
 				selectedProvider,
-				selectedModel || undefined,
+				resumeModel,
 				selectedEffort,
 			);
 			if (res?.success) {
@@ -190,7 +226,7 @@ export function TaskPauseControls({
 		} finally {
 			setIsResuming(false);
 		}
-	}, [task.id, selectedProvider, selectedModel, selectedEffort, toast, t]);
+	}, [task.id, selectedProvider, resumeModel, selectedEffort, toast, t]);
 
 	return (
 		<div className="overflow-hidden rounded-lg border bg-muted/20">
@@ -237,7 +273,10 @@ export function TaskPauseControls({
 									) : (
 										<RotateCcw className="mr-1.5 h-3.5 w-3.5" />
 									)}
-									{t("tasks:modal.actions.pauseToSwitchShort", "Mettre en pause")}
+									{t(
+										"tasks:modal.actions.pauseToSwitchShort",
+										"Mettre en pause",
+									)}
 								</Button>
 							</span>
 						</TooltipTrigger>
@@ -280,6 +319,9 @@ export function TaskPauseControls({
 						<div className="min-w-0 flex-1">
 							<div className="text-sm font-medium">
 								{t("tasks:modal.actions.providerSwitchPaused")}
+								<div className="break-words text-sm" title={task.title}>
+									{task.title || task.id}
+								</div>
 							</div>
 							<div className="text-xs text-muted-foreground">
 								{t("tasks:modal.actions.providerSwitchPausedDesc")}
@@ -302,23 +344,23 @@ export function TaskPauseControls({
 							)}
 						</div>
 					) : (
-						<div
-							className={`grid gap-2 ${
-								models.length > 0 ? "grid-cols-3" : "grid-cols-2"
-							}`}
-						>
+						<div className={`grid gap-2 ${"grid-cols-1 sm:grid-cols-3"}`}>
 							<div className="space-y-1">
 								<div className="text-xs font-medium text-muted-foreground">
 									{t("tasks:modal.actions.chooseProvider", "Provider")}
 								</div>
 								<Select
 									value={selectedProvider}
-									onValueChange={setSelectedProvider}
+									onValueChange={(provider) => {
+										setSelectedProvider(provider);
+										setSelectedModel("");
+										setSearchingModel(false);
+									}}
 								>
 									<SelectTrigger className="h-8">
 										<SelectValue />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent searchable>
 										{providers.map((p) => (
 											<SelectItem key={p.name} value={p.name}>
 												{p.label}
@@ -328,26 +370,48 @@ export function TaskPauseControls({
 								</Select>
 							</div>
 
-							{models.length > 0 && (
+							{modelOptions.length > 0 && (
 								<div className="space-y-1">
 									<div className="text-xs font-medium text-muted-foreground">
 										{t("tasks:modal.actions.chooseModel", "Modèle")}
 									</div>
 									<Select
-										value={selectedModel}
-										onValueChange={setSelectedModel}
+										value={modelValue}
+										onValueChange={(value) => {
+											// The sentinel row is a door, not a model: it opens
+											// the official library so the id that lands here is
+											// one a server can actually serve. Typed free-hand,
+											// it was how a resume asked Ollama for a model
+											// nobody ever published.
+											if (isCustomModelSentinel(value)) {
+												setSearchingModel(true);
+												return;
+											}
+											setSelectedModel(value);
+										}}
 									>
 										<SelectTrigger className="h-8">
 											<SelectValue />
 										</SelectTrigger>
-										<SelectContent>
-											{models.map((m) => (
+										<SelectContent searchable>
+											{modelOptions.map((m) => (
 												<SelectItem key={m.value} value={m.value}>
-													{m.label}
+													{isCustomModelSentinel(m.value)
+														? t("tasks:logs.model.customOption")
+														: m.label}
 												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>
+									{searchingModel && (
+										<OfficialModelSearch
+											onClose={() => setSearchingModel(false)}
+											onSelect={(value) => {
+												setSearchingModel(false);
+												setSelectedModel(value);
+											}}
+										/>
+									)}
 								</div>
 							)}
 
@@ -398,7 +462,14 @@ export function TaskPauseControls({
 							variant="default"
 							size="sm"
 							onClick={handleResumeWithProvider}
-							disabled={isResuming || isLoading || providers.length === 0}
+							disabled={
+								isResuming ||
+								isLoading ||
+								catalogLoading ||
+								!resumeModel ||
+								isCustomModelSentinel(resumeModel) ||
+								!providers.some((p) => p.name === selectedProvider)
+							}
 							className="flex-1"
 						>
 							{isResuming ? (
@@ -406,7 +477,10 @@ export function TaskPauseControls({
 							) : (
 								<Play className="mr-2 h-4 w-4" />
 							)}
-							{t("tasks:modal.actions.resumeWithChosenLlm", "Reprendre avec ce LLM")}
+							{t(
+								"tasks:modal.actions.resumeWithChosenLlm",
+								"Reprendre avec ce LLM",
+							)}
 						</Button>
 					</div>
 				</div>

@@ -995,6 +995,7 @@ async function downloadPython(targetPlatform, targetArch, options = {}) {
 				"claude_agent_sdk",
 				"dotenv",
 				"pydantic_core",
+				"faster_whisper",
 			].concat(PLATFORM_CRITICAL_PACKAGES[info.nodePlatform] || []);
 			const missingPackages = criticalPackages.filter((pkg) =>
 				isCriticalPackageMissing(sitePackagesDir, pkg),
@@ -1096,6 +1097,7 @@ async function downloadPython(targetPlatform, targetArch, options = {}) {
 				"claude_agent_sdk",
 				"dotenv",
 				"pydantic_core",
+				"faster_whisper",
 			].concat(PLATFORM_CRITICAL_PACKAGES[info.nodePlatform] || []);
 			const postInstallMissing = criticalPackages.filter((pkg) =>
 				isCriticalPackageMissing(sitePackagesDir, pkg),

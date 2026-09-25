@@ -83,6 +83,19 @@ def _cached() -> dict[str, ProviderCapabilities]:
     return load_providers()
 
 
+# Les orthographes qui désignent le même fournisseur que la matrice. Elles
+# existent parce que l'UI dit « anthropic » là où `providers.yaml` dit
+# « claude », et que les runtimes locaux sont écrits avec ou sans tiret selon
+# l'appelant. Sans elles, la réponse prudente ci-dessous — « pas d'adaptateur »
+# — est rendue pour un fournisseur qui en a un, ce qui est le seul sens où se
+# tromper coûte cher : un appelant qui refuse ce qu'il sait faire tourner.
+_PROVIDER_ALIASES = {
+    "anthropic": "claude",
+    "lm-studio": "lmstudio",
+    "llama-cpp": "local",
+}
+
+
 def get_provider_capabilities(provider: str) -> ProviderCapabilities:
     """Capabilities for ``provider``.
 
@@ -91,6 +104,7 @@ def get_provider_capabilities(provider: str) -> ProviderCapabilities:
     does not have fails at run time in a confusing way; assuming the opposite
     only costs some parallelism.
     """
+    provider = _PROVIDER_ALIASES.get(provider, provider)
     caps = _cached().get(provider)
     if caps is None:
         logger.debug("provider %r not in the capability matrix", provider)

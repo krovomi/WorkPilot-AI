@@ -843,10 +843,13 @@ class CopilotAgentClient(AgentClient):
         max_turns: int = 50,
         github_token: str | None = None,
         agent_type: str = "coder",
+        spec_dir: str | None = None,
     ):
         import os
 
         self.model = _normalize_copilot_model_id(model) or "gpt-4o"
+        # See OpenAIAgentClient: only for the watermark ledger's spec directory.
+        self._spec_dir = spec_dir
         self.system_prompt = system_prompt
         self.allowed_tools = allowed_tools or []
         self.agents = agents or {}
@@ -1884,7 +1887,9 @@ class CopilotAgentClient(AgentClient):
                     get_tool_definitions,
                 )
 
-                self._tool_executor = ToolExecutor(self.cwd)
+                self._tool_executor = ToolExecutor(
+                    self.cwd, spec_dir=getattr(self, "_spec_dir", None)
+                )
                 self._tool_definitions = get_tool_definitions(self._agent_type)
                 logger.info(
                     f"[CopilotAgentClient] Tool execution enabled: "
@@ -1948,6 +1953,7 @@ class OpenAIAgentClient(AgentClient):
         agent_type: str = "coder",
         reasoning_effort: str | None = None,
         prompt_cache_key: str | None = None,
+        spec_dir: str | None = None,
     ):
         import os as _os
 
@@ -1956,6 +1962,13 @@ class OpenAIAgentClient(AgentClient):
         self.max_turns = max_turns
         self._project_dir = project_dir
         self._agent_type = agent_type
+        # Only so the tool executor can record what it stripped from a generated
+        # file. `<spec_dir>/watermarks.jsonl` is the record of the one place a
+        # build edits bytes a model wrote without telling it, and every one of
+        # these clients used to build the executor without a spec directory — so
+        # the cleaning happened and the record never did, on exactly the
+        # providers that never reach `create_client`'s hooks.
+        self._spec_dir = spec_dir
         # Token optimizations (provider-specific layer on the common trunk):
         # reasoning_effort maps the Kanban thinking level to OpenAI reasoning
         # models; prompt_cache_key routes same-task sessions to the same
@@ -2010,7 +2023,9 @@ class OpenAIAgentClient(AgentClient):
                 )
 
                 self._tool_executor = ToolExecutor(
-                    self._project_dir, getattr(self, "_tool_working_directory", None)
+                    self._project_dir,
+                    getattr(self, "_tool_working_directory", None),
+                    spec_dir=getattr(self, "_spec_dir", None),
                 )
                 self._tool_definitions = get_tool_definitions(self._agent_type)
                 logger.info(
@@ -2404,6 +2419,7 @@ class GoogleAgentClient(OpenAIAgentClient):
         agent_type: str = "coder",
         reasoning_effort: str | None = None,  # accepted for parity; unused on Gemini
         prompt_cache_key: str | None = None,  # accepted for parity; unused on Gemini
+        spec_dir: str | None = None,
     ):
         import os as _os
 
@@ -2415,6 +2431,7 @@ class GoogleAgentClient(OpenAIAgentClient):
             agent_type=agent_type,
             reasoning_effort=None,
             prompt_cache_key=None,
+            spec_dir=spec_dir,
         )
         self._api_key = _os.environ.get("GEMINI_API_KEY") or _os.environ.get(
             "GOOGLE_API_KEY", ""
@@ -3006,6 +3023,7 @@ class LocalAgentClient(OpenAIAgentClient):
         offline_only: bool = False,
         reasoning_effort: str | None = None,  # accepted for parity; unused locally
         prompt_cache_key: str | None = None,  # accepted for parity; unused locally
+        spec_dir: str | None = None,
     ):
         import os as _os
 
@@ -3025,6 +3043,7 @@ class LocalAgentClient(OpenAIAgentClient):
             agent_type=agent_type,
             reasoning_effort=None,
             prompt_cache_key=None,
+            spec_dir=spec_dir,
         )
         # Optional key — local servers don't need one. Placeholder keeps the
         # inherited missing-key guard from aborting; "Bearer local" is harmless.
@@ -4244,6 +4263,7 @@ class WindsurfAgentClient(AgentClient):
         max_turns: int = 50,
         project_dir: str | None = None,
         agent_type: str = "coder",
+        spec_dir: str | None = None,
     ):
         import os as _os
 
@@ -4259,6 +4279,8 @@ class WindsurfAgentClient(AgentClient):
         self.max_turns = max_turns
         self._project_dir = project_dir
         self._agent_type = agent_type
+        # See OpenAIAgentClient: only for the watermark ledger's spec directory.
+        self._spec_dir = spec_dir
         self._credentials: Any = None  # WindsurfCredentials (Mode 1)
         self._use_local_grpc = False
         self._api_key: str | None = None  # For Mode 2
@@ -4502,7 +4524,9 @@ class WindsurfAgentClient(AgentClient):
                     get_tool_definitions,
                 )
 
-                self._tool_executor = ToolExecutor(self._project_dir)
+                self._tool_executor = ToolExecutor(
+                    self._project_dir, spec_dir=getattr(self, "_spec_dir", None)
+                )
                 self._tool_definitions = get_tool_definitions(self._agent_type)
                 mode_label = (
                     "gRPC text-based"

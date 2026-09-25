@@ -424,6 +424,213 @@ function detectRepoProvider(projectPath: string): RepoProviderDetectionResult {
 	}
 }
 
+/**
+ * What git printed, rather than what Node made of it. `execFile` puts the
+ * command's own diagnostic on stderr and leaves `error.message` as "Command
+ * failed" — which is the one sentence a user cannot act on. "Your local changes
+ * would be overwritten by checkout" is the whole answer.
+ */
+function describeGitFailure(error: unknown): string {
+	const stderr = (error as { stderr?: string | Buffer })?.stderr;
+	const text = typeof stderr === "string" ? stderr : stderr?.toString();
+	const trimmed = text?.trim();
+	if (trimmed) return trimmed;
+	return error instanceof Error ? error.message : "Unknown error";
+}
+
+/**
+ * A remote name is handed to `git` as an argument, so it is checked here rather
+ * than trusted: git's own rules for a remote name are narrower than a path, and
+ * a value starting with `-` would be read as an option.
+ */
+function isValidRemoteName(name: string): boolean {
+	return /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name);
+}
+
+/**
+ * The remote URLs git actually accepts, which is wider than http(s): an SSH
+ * clone (`git@github.com:owner/repo.git`), an explicit scheme, and a path to a
+ * bare repository on disk are all legitimate. Everything else — a `file://` URL
+ * typed by hand, an argument-looking string — is refused with a message rather
+ * than handed to git to fail on.
+ */
+function isValidRemoteUrl(url: string): boolean {
+	if (!url || url.startsWith("-") || /\s/.test(url)) return false;
+	if (/^(https?|ssh|git):\/\/[^/]+/i.test(url)) return true;
+	// scp-like syntax: user@host:path
+	if (/^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:.+$/.test(url)) return true;
+	// A local clone source — absolute POSIX or Windows path.
+	if (/^(\/|[A-Za-z]:[\\/])/.test(url)) return true;
+	return false;
+}
+
+/**
+ * Point the project's checkout at a remote, or drop it.
+ *
+ * `git remote add` and `git remote set-url` answer the same question from the
+ * user's side ("where does this repository push?") and differ only on whether
+ * the name already exists, so the caller states the intent and this decides
+ * which command says it. An empty URL removes the remote — that is the only way
+ * back out of a value typed by mistake.
+ */
+function setGitRemote(
+	projectPath: string,
+	remoteName: string,
+	remoteUrl: string,
+	previousName?: string,
+): RepoProviderDetectionResult {
+	const git = getToolPath("git");
+	const name = remoteName.trim() || "origin";
+	const url = remoteUrl.trim();
+
+	if (!isValidRemoteName(name)) {
+		throw new Error(`Invalid remote name: "${name}"`);
+	}
+	if (url && !isValidRemoteUrl(url)) {
+		throw new Error(`Invalid remote URL: "${url}"`);
+	}
+
+	const remoteExists = (candidate: string): boolean => {
+		try {
+			execFileSync(git, ["remote", "get-url", candidate], {
+				cwd: projectPath,
+				encoding: "utf-8",
+				stdio: "pipe",
+			});
+			return true;
+		} catch {
+			return false;
+		}
+	};
+
+	// Editing the name field in place means renaming *this* remote, not adding a
+	// second one beside it: `git remote rename` carries the tracking refs over,
+	// which an add-and-leave would strand on a name nothing pushes to any more.
+	const previous = previousName?.trim();
+	if (
+		previous &&
+		previous !== name &&
+		isValidRemoteName(previous) &&
+		remoteExists(previous) &&
+		!remoteExists(name)
+	) {
+		execFileSync(git, ["remote", "rename", previous, name], {
+			cwd: projectPath,
+			encoding: "utf-8",
+			stdio: "pipe",
+		});
+	}
+
+	const exists = remoteExists(name);
+
+	if (!url) {
+		if (exists) {
+			execFileSync(git, ["remote", "remove", name], {
+				cwd: projectPath,
+				encoding: "utf-8",
+				stdio: "pipe",
+			});
+		}
+		return detectRepoProvider(projectPath);
+	}
+
+	execFileSync(
+		git,
+		exists
+			? ["remote", "set-url", name, url]
+			: ["remote", "add", name, url],
+		{ cwd: projectPath, encoding: "utf-8", stdio: "pipe" },
+	);
+
+	return detectRepoProvider(projectPath);
+}
+
+/**
+ * Switch the checkout to another branch.
+ *
+ * A name the user picked from the list may be a *remote* one
+ * (`origin/feature/x`); checking that out directly would leave a detached HEAD,
+ * which is not what "change the current branch" means to anyone. So a remote
+ * name is turned into the local branch that tracks it, created on first use.
+ *
+ * Nothing here forces the switch: git refuses when the working tree would lose
+ * changes, and that refusal is returned verbatim. A settings pane is the last
+ * place that should be discarding someone's work to satisfy a dropdown.
+ */
+async function checkoutGitBranch(
+	projectPath: string,
+	branch: string,
+): Promise<string | null> {
+	const git = getToolPath("git");
+	const target = branch.trim();
+
+	if (!target || target.startsWith("-")) {
+		throw new Error(`Invalid branch name: "${branch}"`);
+	}
+	// git's own answer to "is this a usable branch name", rather than a second
+	// opinion written here.
+	await execFileAsync(git, ["check-ref-format", "--branch", target], {
+		cwd: projectPath,
+		encoding: "utf-8",
+	});
+
+	const localExists = await execFileAsync(
+		git,
+		["rev-parse", "--verify", "--quiet", `refs/heads/${target}`],
+		{ cwd: projectPath, encoding: "utf-8" },
+	)
+		.then(({ stdout }) => stdout.trim().length > 0)
+		.catch(() => false);
+
+	if (localExists) {
+		await execFileAsync(git, ["checkout", target], {
+			cwd: projectPath,
+			encoding: "utf-8",
+		});
+		return getCurrentGitBranch(projectPath);
+	}
+
+	// A remote-tracking name: check out the branch it tracks, under its short
+	// name, the way `git checkout feature/x` would have done on a fresh clone.
+	const remoteMatch = /^([^/]+)\/(.+)$/.exec(target);
+	if (remoteMatch) {
+		const shortName = remoteMatch[2];
+		const remoteRefExists = await execFileAsync(
+			git,
+			["rev-parse", "--verify", "--quiet", `refs/remotes/${target}`],
+			{ cwd: projectPath, encoding: "utf-8" },
+		)
+			.then(({ stdout }) => stdout.trim().length > 0)
+			.catch(() => false);
+
+		if (remoteRefExists) {
+			const shortLocalExists = await execFileAsync(
+				git,
+				["rev-parse", "--verify", "--quiet", `refs/heads/${shortName}`],
+				{ cwd: projectPath, encoding: "utf-8" },
+			)
+				.then(({ stdout }) => stdout.trim().length > 0)
+				.catch(() => false);
+
+			await execFileAsync(
+				git,
+				shortLocalExists
+					? ["checkout", shortName]
+					: ["checkout", "-b", shortName, "--track", target],
+				{ cwd: projectPath, encoding: "utf-8" },
+			);
+			return getCurrentGitBranch(projectPath);
+		}
+	}
+
+	// Nothing of that name anywhere: create it from where HEAD is now.
+	await execFileAsync(git, ["checkout", "-b", target], {
+		cwd: projectPath,
+		encoding: "utf-8",
+	});
+	return getCurrentGitBranch(projectPath);
+}
+
 async function detectMainBranch(projectPath: string): Promise<string | null> {
 	const branches = await getGitBranches(projectPath);
 	if (branches.length === 0) return null;
@@ -1085,6 +1292,62 @@ export function registerProjectHandlers(
 				return {
 					success: false,
 					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		},
+	);
+
+	// Point the checkout at a remote (or drop it)
+	ipcMain.handle(
+		IPC_CHANNELS.GIT_SET_REMOTE,
+		async (
+			_,
+			projectPath: string,
+			remoteName: string,
+			remoteUrl: string,
+			previousName?: string,
+		): Promise<IPCResult<RepoProviderDetectionResult>> => {
+			try {
+				if (!existsSync(projectPath)) {
+					return { success: false, error: "Directory does not exist" };
+				}
+				const result = setGitRemote(
+					projectPath,
+					remoteName,
+					remoteUrl,
+					previousName,
+				);
+				return { success: true, data: result };
+			} catch (error) {
+				// git's own refusal is the useful message here (a URL it cannot
+				// parse, a remote name already taken), so it is passed through
+				// rather than replaced by a generic one.
+				return {
+					success: false,
+					error: describeGitFailure(error),
+				};
+			}
+		},
+	);
+
+	// Switch the checkout to another branch
+	ipcMain.handle(
+		IPC_CHANNELS.GIT_CHECKOUT_BRANCH,
+		async (
+			_,
+			projectPath: string,
+			branch: string,
+		): Promise<IPCResult<string | null>> => {
+			try {
+				if (!existsSync(projectPath)) {
+					return { success: false, error: "Directory does not exist" };
+				}
+				const current = await checkoutGitBranch(projectPath, branch);
+				return { success: true, data: current };
+			} catch (error) {
+				return {
+					success: false,
+					error: describeGitFailure(error),
 				};
 			}
 		},

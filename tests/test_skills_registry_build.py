@@ -24,7 +24,7 @@ sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 from skills_registry.build import apply_build, content_hash, plan_build  # noqa: E402
 from skills_registry.frontmatter import parse_frontmatter, workpilot_meta  # noqa: E402
 from skills_registry.packs import load_packs  # noqa: E402
-from skills_registry.project import ProjectConfig  # noqa: E402
+from skills_registry.project import ProjectConfig, load_project_config  # noqa: E402
 from skills_registry.resolver import resolve  # noqa: E402
 
 
@@ -494,7 +494,13 @@ def test_the_committed_outputs_of_this_repo_agree():
     }
     gemini = {p.stem for p in (REPO_ROOT / ".gemini" / "commands").glob("*.toml")}
     assert agnostic, ".agents/skills/ is empty"
-    assert gemini == agnostic, f"gemini mirror has drifted: {agnostic ^ gemini}"
+    resolution = resolve(
+        load_packs(REPO_ROOT / "skills"), load_project_config(REPO_ROOT)
+    )
+    # Pack personas become Gemini commands; Python registry delegation targets do not.
+    pack_agents = {s.name for s in resolution.selected if s.kind == "agent"}
+    expected = agnostic | pack_agents
+    assert gemini == expected, f"gemini mirror has drifted: {expected ^ gemini}"
 
 
 def test_the_plugin_marketplace_lists_what_was_emitted():
@@ -571,3 +577,24 @@ def test_the_registry_agents_are_part_of_the_build(source, tmp_path):
     emitted = {p.stem for p in (out / ".agents" / "agents").glob("*.md")}
     assert "test-runner" in emitted, "the Python roster did not reach the output"
     assert "greeter" in emitted, "the pack's own agent was dropped"
+
+
+def test_resource_hash_uses_portable_paths(source):
+    import hashlib
+
+    packs = load_packs(source / "skills")
+    resolution = resolve(packs, ProjectConfig(project_dir=source))
+    skill = next(s for s in resolution.selected if s.name == "hello")
+    nested = skill.dir / "scripts" / "helper.py"
+    nested.parent.mkdir(exist_ok=True)
+    nested.write_bytes(b"print(1)\n")
+    expected = hashlib.sha256()
+    for resource in sorted(
+        (p for p in skill.dir.rglob("*") if p.is_file()),
+        key=lambda p: p.relative_to(skill.dir).as_posix(),
+    ):
+        expected.update(resource.relative_to(skill.dir).as_posix().encode("utf-8"))
+        expected.update(
+            hashlib.sha256(resource.read_bytes()).hexdigest().encode("ascii")
+        )
+    assert content_hash(skill) == expected.hexdigest()

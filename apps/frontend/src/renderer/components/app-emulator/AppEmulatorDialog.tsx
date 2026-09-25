@@ -28,6 +28,10 @@ import {
 } from "@/stores/app-emulator-store";
 import { useProjectStore } from "@/stores/project-store";
 import { Badge } from "../ui/badge";
+import {
+	buildLandingUrl,
+	isBrowsableUrl,
+} from "../../../shared/utils/emulator-landing";
 import { Button } from "../ui/button";
 import {
 	Dialog,
@@ -276,12 +280,20 @@ export function AppEmulatorDialog() {
 
 	const handleOpenInBrowser = useCallback(() => {
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		const currentUrl = (iframeRef.current as any)?.getURL?.() ?? url;
+		const shown = (iframeRef.current as any)?.getURL?.();
+		// `getURL()` rend aussi `about:blank` avant la première navigation et
+		// `chrome-error://chromewebdata/` quand la page n'a pas répondu — que le
+		// processus principal refuse, à juste titre. Le bouton ne faisait alors
+		// rien du tout : on retombe sur la racine, qui est toujours ouvrable.
+		const target = isBrowsableUrl(shown) ? shown : url;
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		if (currentUrl && (globalThis as any).electronAPI?.openExternal) {
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-			(globalThis as any).electronAPI.openExternal(currentUrl);
-		}
+		const open = (globalThis as any).electronAPI?.openExternal;
+		if (!target || !open) return;
+		// Le rejet du processus principal porte ce qui a été essayé ; le perdre
+		// est ce qui rendait l'échec silencieux.
+		Promise.resolve(open(target)).catch((error: unknown) => {
+			console.warn("[AppEmulator] Could not open in browser:", error);
+		});
 	}, [url]);
 
 	const handleClose = useCallback(() => {
@@ -486,7 +498,9 @@ export function AppEmulatorDialog() {
 						<webview
 							// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 							ref={iframeRef as any}
-							src={url}
+							// Le projet dit où il commence (`launchUrl`) ; la racine d'une Web
+							// API répond 404 et n'a jamais été ce qu'on voulait montrer.
+							src={buildLandingUrl(url, config?.launchPath)}
 							className="flex-1 min-h-0 w-full border-0 bg-white"
 							style={{ display: showPreview ? "flex" : "none" }}
 						/>

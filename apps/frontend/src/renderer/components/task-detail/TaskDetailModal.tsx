@@ -93,9 +93,10 @@ import { TaskPauseControls } from "./TaskPauseControls";
 import { TaskFailureBanner } from "./TaskFailureBanner";
 import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
-import { pauseTask } from "../../stores/task-store";
+import { pauseTask, resumeTask } from "../../stores/task-store";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { HermesLearningCard } from "./HermesLearningCard";
+import { BrainTaskCard } from "./BrainTaskCard";
 import { RtkSavingsCard } from "./RtkSavingsCard";
 import {
 	shouldShowArchitectureDelta,
@@ -866,6 +867,32 @@ function TaskDetailModalContent({
 
 	// Render primary action button based on state
 	const renderPrimaryAction = () => {
+		// Pause / Reprendre / Arrêter belongs to the *run*, not to the column a
+		// run happens to have landed in. A cooperatively-paused task keeps the
+		// status it was paused in — often human_review, once a phase reported a
+		// failure — and every branch below is keyed on status, so the control the
+		// kanban card offers had no equivalent here: the panel that owns the
+		// provider/model/effort switch was the one place the task could not
+		// simply be resumed. Answered first, from the pause flag itself.
+		if (state.isPaused) {
+			return (
+				<div className="flex items-center gap-2">
+					{activeProject?.path && (
+						<StreamingSessionButton
+							taskId={task.id}
+							projectPath={activeProject.path}
+						/>
+					)}
+					<TaskRunControls
+						task={task}
+						isPaused={state.isPaused}
+						pauseProcessAlive={state.pauseProcessAlive}
+						onStop={handleStartStop}
+					/>
+				</div>
+			);
+		}
+
 		if (state.isStuck) {
 			return (
 				<Button
@@ -1317,6 +1344,17 @@ function TaskDetailModalContent({
 												}
 											/>
 
+											{/* Le cerveau partagé : ce que cette tâche lui a
+											    appris, et les règles que ses agents proposent.
+											    Ne s'affiche que quand il y a quelque chose —
+											    la découverte se fait dans les Réglages. */}
+											<BrainTaskCard
+												task={task}
+												projectPath={
+													taskProject?.path ?? activeProject?.path
+												}
+											/>
+
 											{/* Metadata */}
 											<TaskMetadataComponent task={task} />
 
@@ -1480,6 +1518,9 @@ function TaskDetailModalContent({
 										isRunning={state.pauseProcessAlive !== false}
 										onPause={async (subtaskId) => {
 											await pauseTask(task.id, subtaskId);
+										}}
+										onResumeSameProvider={async () => {
+											await resumeTask(task.id);
 										}}
 									/>
 								</div>

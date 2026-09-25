@@ -1,3 +1,4 @@
+import { JevStatus } from "../../jev/JevStatus";
 import {
 	AlertCircle,
 	AlertTriangle,
@@ -959,6 +960,11 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 	return (
 		<ScrollArea className="flex-1">
 			<div className="p-6 max-w-5xl mx-auto space-y-6">
+				<JevStatus
+					projectId={projectId}
+					workflow="github-review"
+					observation={reviewResult?.jev}
+				/>
 				{/* Refactored Header */}
 				<PRHeader pr={pr} isLoadingFiles={isLoadingFiles} />
 

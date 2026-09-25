@@ -1,7 +1,10 @@
+import { JevSettings } from "./JevSettings";
+import { BrainSettings } from "./BrainSettings";
 import {
 	Activity,
 	Bell,
 	Bot,
+	Brain,
 	Bug,
 	CalendarClock,
 	ChevronRight,
@@ -17,6 +20,7 @@ import {
 	Package,
 	Palette,
 	Save,
+	Search,
 	Settings,
 	Settings2,
 	Shield,
@@ -26,9 +30,10 @@ import {
 	UserPlus,
 	Users,
 	Workflow,
+	X,
 	Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSettings } from "@shared/types/settings";
 import type { UseProjectSettingsReturn } from "@/components/project-settings";
@@ -63,6 +68,8 @@ import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
 import { SandboxSettings } from "./SandboxSettings";
 import { SchedulerSettings } from "./SchedulerSettings";
+import { resolveSettingsLanding } from "./settings-landing";
+import { filterSettingsThemes } from "./settings-search";
 import { SwarmModeSettings } from "./SwarmModeSettings";
 import { ThemeSettings } from "./ThemeSettings";
 
@@ -109,6 +116,8 @@ interface AppSettingsDialogProps {
 
 // Types de sections thématiques
 export type AppSection =
+	| "jev"
+	| "brain"
 	// Projet (priorité 1)
 	| "project"
 	// Intégrations & Connexions (priorité 2)
@@ -202,6 +211,13 @@ const createSettingsThemes = (t: {
 				label: "Azure DevOps",
 				type: "project",
 			},
+			{ id: "jev", icon: Zap, label: t("jev.title"), type: "app" },
+			{
+				id: "brain",
+				icon: Brain,
+				label: t("brain:settings.title"),
+				type: "app",
+			},
 			{ id: "jira", icon: JiraIcon, label: "Jira", type: "project" },
 			{ id: "linear", icon: Zap, label: "Linear", type: "project" },
 			{
@@ -264,7 +280,12 @@ const createSettingsThemes = (t: {
 				label: "Outils de développement",
 				type: "app",
 			},
-			{ id: "paths", icon: FolderOpen, label: t("sections.paths.title"), type: "app" },
+			{
+				id: "paths",
+				icon: FolderOpen,
+				label: t("sections.paths.title"),
+				type: "app",
+			},
 			{ id: "agent", icon: Bot, label: "Agent", type: "app" },
 			{
 				id: "continuous-ai",
@@ -349,7 +370,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		onRerunWizard,
 		onOpenSetupHub,
 	} = props;
-	const { t } = useTranslation(["settings", "swarm", "continuousAI"]);
+	const { t } = useTranslation(["settings", "swarm", "continuousAI", "brain"]);
 	const {
 		settings,
 		setSettings,
@@ -396,7 +417,16 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	);
 	const [projectSection, setProjectSection] =
 		useState<ProjectSettingsSection>("general");
+	// Whether this opening has already chosen where to land. See the effect below.
+	const hasLandedRef = useRef(false);
+	// A project pane is worth landing on only once there is a project behind it.
+	// `initialProjectId` counts: it is the caller naming one the store has not
+	// caught up with yet.
+	const hasProjectToShow = Boolean(selectedProject || initialProjectId);
 	const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [isSearchOpen, setIsSearchOpen] = useState(false);
+	const searchInputRef = useRef<HTMLInputElement>(null);
 	const [collapsedThemes, setCollapsedThemes] = useState<Set<SettingsTheme>>(
 		new Set(),
 	);
@@ -446,25 +476,28 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		});
 	};
 
-	// Navigate to the initial section when dialog opens with a specific section
+	// Where the dialog opens. The decision itself is `resolveSettingsLanding`;
+	// this only applies it and remembers that it was made.
 	useEffect(() => {
-		if (open) {
-			if (initialProjectSection) {
-				setActiveTopLevel("project");
-				setProjectSection(initialProjectSection);
-			} else if (initialSection) {
-				setActiveTopLevel("app");
-				setAppSection(initialSection);
-			} else {
-				// No explicit target: this is the global settings entry point, so
-				// land on the app pane. Without this the dialog kept whichever
-				// top level the previous opening left behind — after opening a
-				// project's settings from its tab, the sidebar gear would come
-				// back on the project pane.
-				setActiveTopLevel("app");
-			}
+		if (!open) {
+			// The landing is chosen once per opening; forgetting it here is what
+			// lets the *next* opening choose again.
+			hasLandedRef.current = false;
+			return;
 		}
-	}, [open, initialSection, initialProjectSection]);
+		const landing = resolveSettingsLanding({
+			initialSection,
+			initialProjectSection,
+			hasProjectToShow,
+			hasLanded: hasLandedRef.current,
+		});
+		if (!landing) return;
+
+		hasLandedRef.current = landing.landed;
+		setActiveTopLevel(landing.topLevel);
+		if (landing.appSection) setAppSection(landing.appSection);
+		if (landing.projectSection) setProjectSection(landing.projectSection);
+	}, [open, initialSection, initialProjectSection, hasProjectToShow]);
 
 	// Synchronise la section projet dès qu'un projet est sélectionné et que le dialog s'ouvre
 	useEffect(() => {
@@ -540,6 +573,10 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 
 	const renderAppSection = () => {
 		switch (appSection) {
+			case "jev":
+				return <JevSettings />;
+			case "brain":
+				return <BrainSettings />;
 			case "appearance":
 				return (
 					<ThemeSettings settings={settings} onSettingsChange={setSettings} />
@@ -647,6 +684,23 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		);
 	};
 
+	// Une recherche ne survit pas à la fermeture du dialogue : le filtre décrit
+	// ce qu'on cherchait à cet instant, pas un réglage de la navigation.
+	useEffect(() => {
+		if (!open) {
+			setSearchQuery("");
+			setIsSearchOpen(false);
+		}
+	}, [open]);
+
+	const closeSearch = useCallback(() => {
+		setSearchQuery("");
+		setIsSearchOpen(false);
+	}, []);
+
+	const isSearching = searchQuery.trim().length > 0;
+	const filteredThemes = filterSettingsThemes(SETTINGS_THEMES, searchQuery);
+
 	// Correction : on force le dialog à s'ouvrir si forceDialogOpen est true
 	const dialogOpen = typeof open === "boolean" ? open : false;
 
@@ -662,7 +716,23 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				onOpenChange(newOpen);
 			}}
 		>
-			<FullScreenDialogContent>
+			<FullScreenDialogContent
+				onEscapeKeyDown={(event) => {
+					// Échap vide d'abord le filtre, et ne ferme les paramètres
+					// qu'ensuite. Radix écoute le clavier en phase de capture,
+					// sur le document : c'est le seul endroit d'où la touche
+					// peut lui être reprise. Et seulement quand le champ a le
+					// focus — Échap depuis un formulaire de réglages ferme le
+					// dialogue, comme partout ailleurs.
+					if (
+						isSearchOpen &&
+						document.activeElement === searchInputRef.current
+					) {
+						event.preventDefault();
+						closeSearch();
+					}
+				}}
+			>
 				<FullScreenDialogHeader>
 					<FullScreenDialogTitle className="flex items-center gap-3">
 						<Settings className="h-6 w-6" />
@@ -683,28 +753,108 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 						>
 							<ScrollArea className="h-full">
 								<div className="space-y-4">
-									{/* Toggle button */}
-									<button
-										type="button"
-										onClick={() =>
-											setIsNavigationCollapsed(!isNavigationCollapsed)
-										}
+									{/* Toggle + barre de filtre */}
+									<div
 										className={cn(
-											"w-full flex items-center justify-center p-2 rounded-lg transition-all",
-											"hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+											"flex items-center gap-1",
+											isNavigationCollapsed ? "justify-center" : "justify-end",
 										)}
 									>
-										<ChevronRight
+										{/* Filtre — uniquement quand la navigation est dépliée :
+										    repliée, elle n'affiche plus les libellés sur
+										    lesquels le filtre porte. */}
+										{!isNavigationCollapsed && (
+											<div
+												className={cn(
+													"flex items-center overflow-hidden rounded-md transition-all duration-300 ease-in-out",
+													isSearchOpen
+														? "flex-1 bg-muted/50 border border-border"
+														: "flex-none",
+												)}
+											>
+												{isSearchOpen ? (
+													<div className="relative flex items-center w-full">
+														<Search className="absolute left-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+														<input
+															ref={searchInputRef}
+															type="text"
+															value={searchQuery}
+															onChange={(e) => setSearchQuery(e.target.value)}
+															onBlur={() => {
+																if (!searchQuery.trim()) {
+																	setIsSearchOpen(false);
+																}
+															}}
+															placeholder={t("search.placeholder")}
+															aria-label={t("search.placeholder")}
+															className="w-full bg-transparent pl-7 pr-7 py-1 text-sm placeholder:text-muted-foreground/60 focus:outline-none"
+														/>
+														{searchQuery && (
+															<button
+																type="button"
+																onMouseDown={(e) => e.preventDefault()}
+																onClick={() => {
+																	setSearchQuery("");
+																	searchInputRef.current?.focus();
+																}}
+																className="absolute right-1.5 text-muted-foreground hover:text-foreground transition-colors"
+																aria-label={t("search.clear")}
+															>
+																<X className="h-3.5 w-3.5" />
+															</button>
+														)}
+													</div>
+												) : (
+													<button
+														type="button"
+														onClick={() => {
+															setIsSearchOpen(true);
+															requestAnimationFrame(() =>
+																searchInputRef.current?.focus(),
+															);
+														}}
+														title={t("search.placeholder")}
+														aria-label={t("search.placeholder")}
+														className={cn(
+															"flex items-center justify-center p-2 rounded-lg transition-all",
+															"hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+														)}
+													>
+														<Search className="h-4 w-4" />
+													</button>
+												)}
+											</div>
+										)}
+
+										<button
+											type="button"
+											onClick={() => {
+												// Replier masque les libellés : garder le filtre
+												// actif cacherait des sections sans rien qui
+												// l'explique.
+												if (!isNavigationCollapsed) closeSearch();
+												setIsNavigationCollapsed(!isNavigationCollapsed);
+											}}
 											className={cn(
-												"h-4 w-4 transition-transform duration-300",
-												isNavigationCollapsed ? "rotate-0" : "rotate-180",
+												"flex items-center justify-center p-2 rounded-lg transition-all",
+												"hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+												isNavigationCollapsed ? "w-full" : "shrink-0",
 											)}
-										/>
-									</button>
+										>
+											<ChevronRight
+												className={cn(
+													"h-4 w-4 transition-transform duration-300",
+													isNavigationCollapsed ? "rotate-0" : "rotate-180",
+												)}
+											/>
+										</button>
+									</div>
 
 									{/* Getting started — opens the guided Setup Hub. Sits at the
-									    very top so the configuration flow reads top-to-bottom. */}
-									{onOpenSetupHub && (
+									    very top so the configuration flow reads top-to-bottom.
+									    Retiré pendant un filtrage : ce n'est pas un résultat, et
+									    le laisser rendrait « aucun paramètre trouvé » ambigu. */}
+									{onOpenSetupHub && !isSearching && (
 										<button
 											type="button"
 											onClick={() => {
@@ -735,178 +885,185 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 									)}
 
 									{/* Thematic Navigation */}
-									{Object.entries(SETTINGS_THEMES)
-										.sort(([, a], [, b]) => a.priority - b.priority)
-										.map(([themeKey, theme]) => {
-											const Icon = theme.icon;
-											const isThemeActive = theme.sections.some((section) => {
-												if (section.type === "app") {
-													return (
-														activeTopLevel === "app" &&
-														appSection === section.id
-													);
-												} else {
-													return (
-														activeTopLevel === "project" &&
-														projectSection === section.id
-													);
-												}
-											});
+									{filteredThemes.map(([themeKey, theme]) => {
+										const Icon = theme.icon;
+										const isThemeActive = theme.sections.some((section) => {
+											if (section.type === "app") {
+												return (
+													activeTopLevel === "app" && appSection === section.id
+												);
+											} else {
+												return (
+													activeTopLevel === "project" &&
+													projectSection === section.id
+												);
+											}
+										});
 
-											return (
-												<div key={themeKey} className="space-y-1">
-													{/* Theme Header */}
-													{isNavigationCollapsed ? (
+										return (
+											<div key={themeKey} className="space-y-1">
+												{/* Theme Header */}
+												{isNavigationCollapsed ? (
+													<button
+														type="button"
+														onClick={() => {
+															if (theme.sections.length === 1) {
+																const section = theme.sections[0];
+																if (section.type === "app") {
+																	setActiveTopLevel("app");
+																	setAppSection(section.id as AppSection);
+																} else {
+																	setActiveTopLevel("project");
+																	setProjectSection(
+																		section.id as ProjectSettingsSection,
+																	);
+																}
+															} else {
+																// Si plusieurs sections, on pourrait développer ou afficher un menu
+																// Pour l'instant, on navigue vers la première section
+																const firstSection = theme.sections[0];
+																if (firstSection.type === "app") {
+																	setActiveTopLevel("app");
+																	setAppSection(firstSection.id as AppSection);
+																} else {
+																	setActiveTopLevel("project");
+																	setProjectSection(
+																		firstSection.id as ProjectSettingsSection,
+																	);
+																}
+															}
+														}}
+														className={cn(
+															"w-full flex flex-col items-center justify-center p-2 rounded-lg transition-all",
+															isThemeActive
+																? "bg-accent text-accent-foreground"
+																: "hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+														)}
+														title={theme.title}
+													>
+														<Icon className={cn("h-5 w-5", theme.color)} />
+													</button>
+												) : (
+													<div className="px-3 py-2">
 														<button
 															type="button"
-															onClick={() => {
-																if (theme.sections.length === 1) {
-																	const section = theme.sections[0];
-																	if (section.type === "app") {
-																		setActiveTopLevel("app");
-																		setAppSection(section.id as AppSection);
-																	} else {
-																		setActiveTopLevel("project");
-																		setProjectSection(
-																			section.id as ProjectSettingsSection,
-																		);
-																	}
-																} else {
-																	// Si plusieurs sections, on pourrait développer ou afficher un menu
-																	// Pour l'instant, on navigue vers la première section
-																	const firstSection = theme.sections[0];
-																	if (firstSection.type === "app") {
-																		setActiveTopLevel("app");
-																		setAppSection(
-																			firstSection.id as AppSection,
-																		);
-																	} else {
-																		setActiveTopLevel("project");
-																		setProjectSection(
-																			firstSection.id as ProjectSettingsSection,
-																		);
-																	}
-																}
-															}}
+															onClick={() =>
+																toggleThemeCollapse(themeKey as SettingsTheme)
+															}
 															className={cn(
-																"w-full flex flex-col items-center justify-center p-2 rounded-lg transition-all",
+																"w-full flex items-center justify-between text-sm font-medium transition-all",
 																isThemeActive
-																	? "bg-accent text-accent-foreground"
-																	: "hover:bg-accent/50 text-muted-foreground hover:text-foreground",
+																	? "text-foreground"
+																	: "text-muted-foreground",
+																"hover:text-foreground",
 															)}
-															title={theme.title}
 														>
-															<Icon className={cn("h-5 w-5", theme.color)} />
-														</button>
-													) : (
-														<div className="px-3 py-2">
-															<button
-																type="button"
-																onClick={() =>
-																	toggleThemeCollapse(themeKey as SettingsTheme)
-																}
+															<div className="flex items-center gap-2">
+																<Icon className={cn("h-4 w-4", theme.color)} />
+																{theme.title}
+															</div>
+															<ChevronRight
 																className={cn(
-																	"w-full flex items-center justify-between text-sm font-medium transition-all",
-																	isThemeActive
-																		? "text-foreground"
-																		: "text-muted-foreground",
-																	"hover:text-foreground",
-																)}
-															>
-																<div className="flex items-center gap-2">
-																	<Icon
-																		className={cn("h-4 w-4", theme.color)}
-																	/>
-																	{theme.title}
-																</div>
-																<ChevronRight
-																	className={cn(
-																		"h-3 w-3 transition-transform duration-200",
+																	"h-3 w-3 transition-transform duration-200",
+																	!isSearching &&
 																		collapsedThemes.has(
 																			themeKey as SettingsTheme,
 																		)
-																			? "rotate-0"
-																			: "rotate-90",
-																	)}
-																/>
-															</button>
-															<div className="text-xs text-muted-foreground mt-1">
-																{theme.description}
-															</div>
+																		? "rotate-0"
+																		: "rotate-90",
+																)}
+															/>
+														</button>
+														<div className="text-xs text-muted-foreground mt-1">
+															{theme.description}
+														</div>
+													</div>
+												)}
+
+												{/* Theme Sections — visibles si la navigation est
+													    dépliée et que le thème l'est aussi. Une
+													    recherche en cours déplie : masquer ce qu'elle
+													    vient de trouver n'aurait aucun sens. */}
+												{!isNavigationCollapsed &&
+													(isSearching ||
+														!collapsedThemes.has(
+															themeKey as SettingsTheme,
+														)) && (
+														<div className="space-y-1 ml-2">
+															{theme.sections.map((section) => {
+																const SectionIcon = section.icon;
+																const isActive =
+																	section.type === "app"
+																		? activeTopLevel === "app" &&
+																			appSection === section.id
+																		: activeTopLevel === "project" &&
+																			projectSection === section.id;
+
+																const isDisabled =
+																	section.type === "project" &&
+																	!selectedProjectId;
+
+																let activeOrDisabledClassName: string;
+																if (isActive) {
+																	activeOrDisabledClassName =
+																		"bg-accent text-accent-foreground";
+																} else if (isDisabled) {
+																	activeOrDisabledClassName =
+																		"opacity-50 cursor-not-allowed text-muted-foreground";
+																} else {
+																	activeOrDisabledClassName =
+																		"hover:bg-accent/50 text-muted-foreground hover:text-foreground";
+																}
+
+																const buttonClassName = cn(
+																	"w-full flex items-center gap-3 p-2 rounded-md text-left transition-all",
+																	activeOrDisabledClassName,
+																);
+
+																return (
+																	<button
+																		type="button"
+																		key={section.id}
+																		onClick={() => {
+																			if (section.type === "app") {
+																				setActiveTopLevel("app");
+																				setAppSection(section.id as AppSection);
+																			} else {
+																				setActiveTopLevel("project");
+																				setProjectSection(
+																					section.id as ProjectSettingsSection,
+																				);
+																			}
+																		}}
+																		disabled={isDisabled}
+																		className={buttonClassName}
+																	>
+																		<SectionIcon className="h-4 w-4 shrink-0" />
+																		<div className="min-w-0">
+																			<div className="font-medium text-xs">
+																				{section.label}
+																			</div>
+																		</div>
+																	</button>
+																);
+															})}
 														</div>
 													)}
+											</div>
+										);
+									})}
 
-													{/* Theme Sections - seulement si non replié ET thème non replié */}
-													{!isNavigationCollapsed &&
-														!collapsedThemes.has(themeKey as SettingsTheme) && (
-															<div className="space-y-1 ml-2">
-																{theme.sections.map((section) => {
-																	const SectionIcon = section.icon;
-																	const isActive =
-																		section.type === "app"
-																			? activeTopLevel === "app" &&
-																				appSection === section.id
-																			: activeTopLevel === "project" &&
-																				projectSection === section.id;
+									{isSearching &&
+										!isNavigationCollapsed &&
+										filteredThemes.length === 0 && (
+											<div className="px-3 py-6 text-center text-xs text-muted-foreground">
+												{t("search.noResults")}
+											</div>
+										)}
 
-																	const isDisabled =
-																		section.type === "project" &&
-																		!selectedProjectId;
-
-																	let activeOrDisabledClassName: string;
-																	if (isActive) {
-																		activeOrDisabledClassName =
-																			"bg-accent text-accent-foreground";
-																	} else if (isDisabled) {
-																		activeOrDisabledClassName =
-																			"opacity-50 cursor-not-allowed text-muted-foreground";
-																	} else {
-																		activeOrDisabledClassName =
-																			"hover:bg-accent/50 text-muted-foreground hover:text-foreground";
-																	}
-
-																	const buttonClassName = cn(
-																		"w-full flex items-center gap-3 p-2 rounded-md text-left transition-all",
-																		activeOrDisabledClassName,
-																	);
-
-																	return (
-																		<button
-																			type="button"
-																			key={section.id}
-																			onClick={() => {
-																				if (section.type === "app") {
-																					setActiveTopLevel("app");
-																					setAppSection(
-																						section.id as AppSection,
-																					);
-																				} else {
-																					setActiveTopLevel("project");
-																					setProjectSection(
-																						section.id as ProjectSettingsSection,
-																					);
-																				}
-																			}}
-																			disabled={isDisabled}
-																			className={buttonClassName}
-																		>
-																			<SectionIcon className="h-4 w-4 shrink-0" />
-																			<div className="min-w-0">
-																				<div className="font-medium text-xs">
-																					{section.label}
-																				</div>
-																			</div>
-																		</button>
-																	);
-																})}
-															</div>
-														)}
-												</div>
-											);
-										})}
-
-									{/* Re-run Wizard button - seulement si non replié */}
-									{!isNavigationCollapsed && onRerunWizard && (
+									{/* Re-run Wizard button - seulement si non replié, et
+									    hors filtrage, pour la même raison que le Setup Hub */}
+									{!isNavigationCollapsed && !isSearching && onRerunWizard && (
 										<div className="pt-4 border-t border-border">
 											<button
 												type="button"

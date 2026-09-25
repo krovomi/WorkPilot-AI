@@ -16,11 +16,13 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Claude Agent SDK Usage](#claude-agent-sdk-usage)
   - [Agent Prompts](#agent-prompts)
   - [Spec Directory Structure](#spec-directory-structure)
+  - [Where the implementation plan actually is](#where-the-implementation-plan-actually-is)
   - [Requirement Traceability](#requirement-traceability)
   - [spec-kit projects](#spec-kit-projects)
   - [Memory System (Graphiti)](#memory-system-graphiti)
   - [Skills System](#skills-system)
   - [Memory Search (mem-search)](#memory-search-mem-search)
+  - [Le cerveau partagé (Obsidian + Graphify + MCP)](#le-cerveau-partagé-obsidian--graphify--mcp)
   - [Where generated tests are written](#where-generated-tests-are-written)
   - [What generated tests are written against](#what-generated-tests-are-written-against)
   - [Library Documentation (libdocs)](#library-documentation-libdocs)
@@ -28,9 +30,11 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Clean generated files (watermarks)](#clean-generated-files-watermarks)
   - [Architecture diagrams (archify)](#architecture-diagrams-archify)
   - [Mobile applications (Android and Apple)](#mobile-applications-android-and-apple)
+  - [Competitive rounds (Bounty Board)](#competitive-rounds-bounty-board)
   - [Declarative Workflows](#declarative-workflows)
   - [Workflow Logger](#workflow-logger)
   - [Pause, resume, and how a phase reports failure](#pause-resume-and-how-a-phase-reports-failure)
+  - [Le mode hors-ligne : une barrière, ou un défaut](#le-mode-hors-ligne--une-barrière-ou-un-défaut)
 - [Frontend Development](#frontend-development)
   - [Tech Stack](#tech-stack)
   - [Path Aliases](#path-aliases)
@@ -39,11 +43,15 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [IPC Communication](#ipc-communication)
   - [Background work and the sidebar](#background-work-and-the-sidebar-storesactivity-storets)
   - [Le pourcentage d'une tâche](#le-pourcentage-dune-tâche-sharedprogressts)
+  - [Les critères d'acceptation en puces](#les-critères-dacceptation-en-puces-task-detailacceptance-criteria-draftts)
   - [Architectures et historique de construction](#architectures-et-historique-de-construction-visual-to-code)
   - [Provider × LLM × effort, par page](#provider--llm--effort-par-page-sharedutilspage-llmts)
+  - [Qui combat dans le Mode Arena](#qui-combat-dans-le-mode-arena-sharedutilsarena-contendersts)
+  - [L'adresse qu'ouvre l'émulateur](#ladresse-quouvre-lémulateur-sharedutilsemulator-landingts)
   - [Agent Management](#agent-management)
   - [Claude Profile System](#claude-profile-system)
   - [Terminal System](#terminal-system)
+  - [Le lien d'un écran d'authentification](#le-lien-dun-écran-dauthentification-terminalterminal-interactionsts)
 - [Code Quality](#code-quality)
 - [i18n Guidelines](#i18n-guidelines)
 - [Cross-Platform](#cross-platform)
@@ -283,6 +291,103 @@ from an earlier design and loaded by nothing.
 ### Spec Directory Structure
 
 Each spec in `.workpilot/specs/XXX-name/` contains: `spec.md`, `requirements.json`, `context.json`, `implementation_plan.json`, `qa_report.md`, `QA_FIX_REQUEST.md`
+
+### Where the implementation plan actually is
+
+> *Planning failed: the model did not produce a valid implementation_plan.json
+> (unparseable or missing `phases`). — No phases defined — No subtasks defined
+> in any phase*
+
+That sentence was the answer to a question nobody had asked. The validator
+reads one path, in one shape, and reports what it did not find there; it was
+then repeated three times and the build gave up. Three other things are true
+far more often than "the model produced nothing", and none of them costs
+another planning session to fix:
+
+| What happened | Where the plan was |
+|---|---|
+| PHASE 3 of `prompts/planner.md` spelled the destination as a **relative** `implementation_plan.json`, which resolves against the worktree root | `<project_dir>/implementation_plan.json` — the file `_cleanup_stray_root_plan` used to **delete** |
+| the model invented a filename | `plan.json`, `tasks.json`, `subtasks.json`, in the spec directory |
+| it wrote the right file in a shape the schema does not name | `tasks` / `steps` / `stages` instead of `phases`, one level of `{"implementation_plan": {…}}`, `phases` keyed by id, a subtask that is a bare string, the whole document inside a ```` ```json ```` fence |
+| it wrote **`"phases": []`** and put the work one key lower | `{"feature": …, "phases": [], "tasks": [{…}]}` — the shape PHASE 3 warns against by name, which is why a model produces it |
+| its Write was **refused** and the content dropped | the `tool_use` input in `conversation.<provider>-<model>.jsonl` |
+| it never called Write at all | the JSON is in the planner's own response |
+
+`spec/plan_recovery.py` answers the question in two halves, both usable alone:
+
+| Function | Answers |
+|---|---|
+| `extract_json_document` | the first complete JSON document in a blob that may be fenced or wrapped in prose — depth-counted, so a `"map[0] of {x}"` inside a string does not close it early |
+| `normalize_plan_shape` | a parsed *anything* → `phases[].subtasks[]`, or `None` |
+| `recover_plan` / `write_recovered_plan` | the same normalization applied to every place the plan could be, writing the winner to the one path WorkPilot reads |
+
+`validate_pkg.auto_fix` calls the first two on the file the validator reads, so
+the CLI and the spec pipeline get the reshaping too; `agents/coder.py` calls
+`recover_plan` as the third step of `_validate_and_fix_implementation_plan`,
+after validation and after auto-fix, and **prints where the plan came from** —
+this is the one point where WorkPilot builds from a file it moved or reshaped
+on the model's behalf, and a silent rewrite would leave the next reader
+comparing the plan against a transcript that does not match it.
+
+**Reshaping is not inventing.** The only things added are the fields the schema
+requires and the model left implicit: `status: pending`, ids, a phase to hold a
+flat list. A *description* is never synthesised, because that is the only field
+carrying a decision. When nothing anywhere holds a single subtask,
+`normalize_plan_shape` returns `None`, and planning fails with exactly the
+message above — which is then true. A plan WorkPilot made up would be worse
+than the error: the coder would spend a whole build implementing it.
+
+**An empty `phases` proves nothing.** `normalize_plan_shape` used to read the
+key it found and stop: `phases` was *present*, so the flat list one key lower
+was never looked at, and a plan whose subtasks were right there reached the
+validator as "No phases defined / No subtasks defined in any phase" — the one
+report that claims a model produced nothing while it had produced a plan. The
+phases key and the flat list are now both tried, in that order, and only a
+document where neither carries a subtask returns `None`.
+
+**A refused write is where the plan of a non-Claude provider goes to die.**
+The recovery above reads files and response text, and a provider that does not
+use the Claude SDK puts its plan in neither: it calls `Write`, and
+`tool_executor._write_implementation_plan` used to reject any content
+`json.loads` refused — a ```json fence, a sentence in front of it — and return
+the error. Nothing was written, so no file existed to repair; the plan was in
+the tool call, not in the prose, so there was nothing to salvage from the
+response either. Three planning sessions were spent on a plan WorkPilot had
+been handed and thrown away. Two layers answer it now, and they are
+independent on purpose:
+
+| Layer | Answers |
+|---|---|
+| `tool_executor._write_implementation_plan` | the fence and the surrounding prose are stripped by the same `extract_json_document`, and the document is written — even when it is not an object, because a bare `phases` array is still the only copy. Only content with no JSON document in it is refused, and that error still goes back to the model |
+| `plan_recovery._plan_from_tool_calls` | the plan out of a `Write` that never landed, read from the conversation log's `tool_use` inputs, newest call first. The last place it can be, and the one both other sources miss |
+
+The second layer is as strict about the destination as the file search is: the
+asked-for name counts anywhere, an invented name only when the write was aimed
+*inside* the spec directory, and a relative path never — a tool call's content
+is any file the model wrote, and building an arbitrary one is worse than
+failing. A write aimed at `src/Program.cs` is not a plan however well its
+content parses.
+
+**A document that is not an object is reported, not crashed on.** Every check
+in `ImplementationPlanValidator` reads the plan as a mapping, so a model that
+wrote the bare `phases` array took the build down with an `AttributeError` deep
+in validation and the card showed a crash instead of what was wrong with the
+file. It is an ordinary validation error now, which is what lets the reshaping
+above run at all — recovery only happens after the validator has answered.
+
+**Two rules keep recovery from finding the wrong thing.** Outside the spec
+directory only the asked-for name is read — `tasks.json` at a project root is a
+task-runner config far more often than it is a plan, and building somebody's
+build config is a worse failure than the one this fixes. And a file found
+outside the spec directory is *moved*, not copied: a second copy of the real
+plan at the worktree root is worse than the truncated one `_cleanup_stray_root_plan`
+removes, because a later read could pick it up.
+
+The status bookkeeping the frontend keeps in `implementation_plan.json` before
+the plan exists (`persistPlanStatusAndReasonSync` creates the file with
+`status`, `xstateState`, `executionPhase` and no `phases`) is merged back over
+the recovered plan. It describes the task, not the plan, and dropping it resets
+a card that is visibly running.
 
 ### Requirement Traceability
 
@@ -706,6 +811,262 @@ the evidence `skill_proposer.evaluate` refuses to invent. Hermes proposes from b
 WorkPilot decides from evidence, and a person reads one diff. Nothing under
 `skills/<pack>/` is modified, and nothing under `~/.hermes` is ever written.
 
+### Le cerveau partagé (Obsidian + Graphify + MCP)
+
+Chaque agent a sa mémoire — `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, le
+`MEMORY.md` de hermes, le workspace d'OpenClaw — et aucun ne lit celle des
+autres. Une préférence dite à Claude Code un lundi est inconnue de Codex le
+mardi. `apps/backend/brain/` est **un seul cerveau que tous les agents lisent et
+écrivent, et qu'aucun ne possède** : un vault Obsidian, un `graph.json` au
+format Graphify, un dépôt git synchronisé, servi par un serveur MCP.
+
+```
+<cerveau>/                       Réglages → Cerveau partagé, WORKPILOT_BRAIN_DIR, sinon ~/.workpilot/brain
+  instructions/<slug>.md         une instruction partagée par note — `agents:` dit qui la suit
+  knowledge/<slug>.md            décisions, faits, emplacements
+  knowledge/projects/<p>/builds/ une note par tâche du Kanban, et ce qu'on y a appris
+  agents/<agent>/…               instantanés des mémoires propres à chaque agent
+  skills/graph-first-recall/     le skill de rappel graph-first, semé à l'init
+  .workpilot-brain/brain.json    le marqueur : ce dossier est un cerveau (versionné)
+  .workpilot-brain/INSTRUCTIONS.md  condensé généré (ignoré par git)
+  graphify-out/graph.json        le graphe, reconstruit à chaque écriture (ignoré par git)
+```
+
+| Module | Répond à |
+|---|---|
+| `graph.py` | le `graph.json` au format node-link de Graphify, construit depuis les notes, et ses requêtes (`query`, `get_node`, `shortest_path`) |
+| `sync.py` | commit → pull (rebase, puis merge) → push ; conflit = les deux versions gardées |
+| `agents.py` | **la** table : où chaque agent garde sa mémoire et déclare ses serveurs MCP |
+| `memories.py` | mémoire d'agent → cerveau (`ingest`), cerveau → mémoire d'agent (`bridge`) |
+| `connect.py` | inscrire `workpilot-brain` dans la configuration MCP de chaque agent |
+| `mcp_server.py` | le serveur MCP stdio |
+| `vault.py` | `Brain`, le seul objet qu'appellent MCP, CLI et HTTP |
+| `runtime.py` | le branchement sur **toutes** les features de WorkPilot |
+| `learn.py` | ce que WorkPilot enregistre lui-même : chaque build, chaque merge |
+
+```bash
+python apps/backend/runners/brain_runner.py --action init --remote git@github.com:moi/brain.git
+python apps/backend/runners/brain_runner.py --action ingest --project-dir .   # importe les mémoires existantes
+python apps/backend/runners/brain_runner.py --action connect                  # aperçu ; --apply pour écrire
+python apps/backend/runners/brain_runner.py --action bridge  --apply
+python apps/backend/runners/brain_runner.py --action watch                    # pendant qu'on édite dans Obsidian
+```
+
+**Le graphe est celui de Graphify, pas un format voisin.** Nœuds `id`, `label`,
+`file_type`, `source_file`, `metadata` ; liens `source`, `target`. C'est ce qui
+fait que le skill `graph-first-recall`, le serveur MCP de Graphify et tout
+lecteur node-link fonctionnent sur le cerveau sans adaptation — et les outils
+MCP `query_graph`, `get_node`, `shortest_path` portent les noms de ceux de
+Graphify pour la même raison. Un `graph.json` que Graphify a écrit dans le même
+fichier survit à la reconstruction : nos nœuds portent
+`metadata.origin = "workpilot-brain"`, et seuls ceux-là sont remplacés.
+
+**Le rappel descend une échelle.** `brain_recall` répond aux niveaux 1 et 2 —
+les nœuds, leurs voisins, leur frontmatter — et `brain_read_note` au niveau 3,
+dans un appel séparé : décider quel fichier mérite d'être ouvert est tout
+l'intérêt des deux premiers.
+
+**Chaque modification est poussée, chaque lecture est précédée d'un pull.**
+`Brain.write` finit toujours pareil — graphe reconstruit, condensé réécrit,
+ponts rafraîchis, commit, pull, push — et `before_read` tire le distant quand la
+copie locale a plus de `BRAIN_PULL_INTERVAL` secondes. Le commit *précède* le
+pull : ce qu'une personne a tapé dans Obsidian part avec la prochaine lecture
+d'un agent, et `--action watch` le fait sans attendre d'agent. Le graphe et le
+condensé sont dérivés, donc ignorés par git et reconstruits après chaque pull :
+committés, deux machines ajoutant chacune une note seraient en conflit sur
+`graph.json` à chaque synchronisation.
+
+**Un conflit ne perd rien.** Une note par fichier rend les conflits rares ;
+quand deux agents touchent la même note, le rebase est tenté, puis le merge, et
+si les mêmes lignes divergent encore, la nôtre reste en place et la leur est
+écrite à côté (`<nom>.conflict-<sha>.md`). Choisir un gagnant en silence serait
+décider à la place de la personne lequel des deux agents avait raison. Les
+chemins en conflit sont lus avec `-z` : en sortie ligne, git met entre
+guillemets et échappe en octal un nom non ASCII (`"Id\303\251es.md"`), et une
+note française partait sur GitHub avec ses marqueurs `<<<<<<<` dedans.
+
+**La branche suivie est celle du distant.** Un cerveau créé ici sur `main` et
+branché sur un vault gardé sur `master` suit `master` (`_remote_branch`) : il
+tirait le distant pour vide et poussait une seconde branche à côté du vault.
+
+**Similaire n'est pas doublon, et aucune des deux n'est perdue.** `remember`
+cherche une instruction proche (mots à cinq lettres près, ou ratio de
+caractères, seuil `BRAIN_SIMILARITY`) : trouvée, l'agent y est ajouté et sa
+formulation est gardée sous la note ; sinon une note est créée. C'est ainsi que
+le cerveau apprend qu'une instruction est *partagée*.
+
+**Le pont s'ajoute à la mémoire de l'agent, il ne la remplace pas.** `bridge`
+écrit un bloc délimité (`<!-- workpilot-brain:start -->`) dans le fichier de
+mémoire global de l'agent : comment utiliser le cerveau, les instructions à
+appliquer **en plus** des siennes, et celles qu'il suit déjà et que d'autres
+agents partagent — une instruction similaire se lit comme une confirmation, pas
+comme une seconde règle. Claude Code et Gemini importent le condensé par
+`@chemin` ; les autres reçoivent la liste en ligne ; hermes, qui plafonne son
+`MEMORY.md`, reçoit un pointeur et lit le reste en MCP. Le bloc est retiré avant
+toute lecture d'instructions : sans cela, chaque `ingest` réimporterait le
+cerveau dans lui-même, crédité à l'agent qu'on venait de brancher. Une
+synchronisation ne rafraîchit que les fichiers qui portent déjà le bloc.
+
+**Les fichiers des autres ne sont écrits que sur demande.** `connect` et
+`bridge` affichent un aperçu ; `--apply` écrit, après une sauvegarde unique
+(`*.workpilot-brain.bak`). Un JSON illisible n'est jamais réécrit ; un
+`mcp_servers:` hermes déjà présent, ni une entrée Codex non gérée, non plus — le
+fragment est rendu à la personne. TOML et YAML sont écrits en bloc délimité et
+non par aller-retour de parseur, qui effacerait les commentaires d'un fichier
+édité à la main. `connect_all --apply` n'installe rien chez un agent absent.
+Pour Claude Code, la CLI `claude mcp add-json --scope user` est préférée à
+l'édition de `~/.claude.json`, que Claude Code réécrit pendant qu'il tourne.
+
+**Un secret n'est pas une connaissance.** Le cerveau a un distant : une ligne
+qui ressemble à un identifiant est expurgée des instantanés et ne devient jamais
+une instruction.
+
+**Le serveur MCP n'a aucune dépendance.** Il est lancé par les agents *des
+autres*, avec le Python qu'ils trouvent ; une dépendance absente là-bas est un
+cerveau que personne ne joint. JSON-RPC 2.0 sur stdio, une ligne par message, et
+le champ `instructions` d'`initialize` porte les règles d'usage : un agent jamais
+branché par `bridge` les apprend en se connectant.
+
+#### Brancher un vault Obsidian, un dépôt GitHub
+
+Réglages → Intégrations → **Cerveau partagé** (`BrainSettings`, `GET/POST
+/api/brain/settings`). Le choix est par personne, pas par projet, et vit dans
+`~/.workpilot/brain.json` : les processus qui en ont besoin sont des processus
+Python — lancés par l'application, par la CLI, par les agents des autres — et un
+fichier est la seule chose qu'ils peuvent tous lire. `WORKPILOT_BRAIN_DIR` gagne
+toujours, et le champ passe alors en lecture seule : un réglage qui ne gagne pas
+ne doit pas avoir l'air de gagner.
+
+`Brain.init` distingue trois cas, d'après ce qu'il y a sur le disque :
+
+| Dossier | Ce qui se passe |
+|---|---|
+| absent ou vide, un distant donné | **cloné** — un cerveau d'une autre machine, ou un vault gardé sur GitHub |
+| absent ou vide | un nouveau cerveau, avec son README et ses dossiers |
+| tout le reste | **adopté** tel quel — un vault Obsidian que la personne a déjà |
+
+**Un vault adopté ne voit rien apparaître à sa racine.** Le marqueur et le
+condensé vivent dans `.workpilot-brain/`, qu'Obsidian ne liste pas ; pas de
+README, pas de note générée. Ses notes deviennent celles du cerveau : le rappel
+lit tout le vault, et c'est tout l'intérêt de le brancher. Un vault déjà sous git
+(le plugin obsidian-git) garde son dépôt et son `.gitignore`, auquel on ajoute
+seulement les lignes dont le cerveau a besoin. Un clone raté dit pourquoi au lieu
+de laisser derrière lui un cerveau vide.
+
+**Deux garde-fous, parce que l'API locale est joignable depuis un navigateur.**
+Le dossier choisi reste sous le répertoire personnel : un endpoint qui crée un
+dépôt git là où on le lui dit écrit dans `/etc` pour qui le demande. Et un
+distant est un distant (`sync.normalize_remote`) : `utilisateur/dépôt` pour
+GitHub, sinon https, ssh, `git@hôte:`, file ou un chemin. Une valeur qui commence
+par `-` est une option pour `git clone` (`--upload-pack=…` lance un programme) et
+`ext::` est un transport qui en lance un aussi ; les deux sont refusés avant que
+git ne les voie, et les commandes passent `--` avant leurs arguments positionnels. Les
+refus et les échecs reviennent sous forme de **codes** (`outside-home`,
+`invalid-remote`, `auth`, `not-found`, `locked`, `identity`, `rejected`…) que
+l'interface traduit, **et** avec les mots de git (`detail`, `_git_detail`) : le
+code dit quel genre d'échec, le détail dit lequel, et c'est lui qu'on colle dans
+un moteur de recherche. Une ligne, les trois premières de git, sans les
+identifiants qu'une URL peut porter (`https://user:token@…`) ; le journal reçoit
+la même ligne avec l'étape (`commit`, `fetch`, `pull`, `push`). Un message
+« détails dans le journal » dont le journal ne contenait que le code n'aidait
+personne. Et aucune exception imprévue ne sort en 500 : sans en-têtes CORS, le
+renderer n'en lit que « Failed to fetch ».
+
+**Le frontmatter est celui d'une personne.** `date: 2024-01-01` — notes
+quotidiennes, propriétés Obsidian — est un objet `date` pour YAML ; une seule
+note de ce genre rendait `graph.json` impossible à écrire. `graph._plain` ramène
+chaque valeur à du JSON.
+
+#### Ce que la tâche a appris, dans le Kanban
+
+`BrainTaskCard`, dans le panneau de tâche (`GET /api/brain/task`). Le serveur MCP
+lancé pour un build porte `WORKPILOT_BRAIN_TASK=<projet>/<spec>`, et l'exécuteur
+d'outils des autres fournisseurs passe la même référence : chaque note et chaque
+règle écrites pendant la tâche portent `tasks:` et un lien vers la note de build.
+La carte lit le graphe, pas chaque fichier d'un gros vault, et ne tire pas le
+distant : ouvrir un panneau n'est pas une raison d'attendre le réseau.
+
+Elle ne s'affiche que quand le cerveau a quelque chose de cette tâche. Elle
+montre la note de build (verdicts QA et tests, `acceptée` après un merge), les
+notes apprises, et les **règles proposées**, qu'une personne active ou refuse sur
+place : c'est devant la tâche qui l'a fait naître qu'on juge le mieux une règle.
+« Ouvrir dans Obsidian » ouvre la note par son chemin (`obsidian://open?path=`),
+d'où `obsidian:` dans les schémas qu'`open-external.ts` accepte — il ne lance que
+l'application Obsidian, jamais un programme arbitraire.
+
+#### Branché sur toutes les features
+
+Aucune feature ne parle au cerveau d'elle-même. Planner, coder, QA, pipeline
+de spec, insights, idéation, roadmap, runners GitHub/GitLab, self-healing :
+chacune construit son agent par `create_client` et son prompt par
+`build_base_system_prompt`, et les fournisseurs sans SDK Claude exécutent leurs
+outils dans `tool_executor`. Ces trois points sont branchés une fois, comme rtk
+et watermarks : une feature ajoutée le mois prochain est branchée parce
+qu'elle a été écrite normalement.
+
+| Où | Ce que le cerveau ajoute |
+|---|---|
+| `get_required_mcp_servers` + `create_client` | le serveur `workpilot-brain` et ses outils autorisés, pour **tout** agent qui a des outils (pas `commit_message` ni `merge_resolver`). Il n'est pas déclaré agent par agent dans `AGENT_CONFIGS` : une liste à tenir à jour, c'est la prochaine feature débranchée. `AGENT_MCP_<agent>_REMOVE=brain` le retire |
+| `build_base_system_prompt` | `awareness_section` : rappel graph-first, apprendre en travaillant, et les instructions partagées **en plus** des règles de la tâche. Lue sur disque, jamais tirée du réseau, stable au byte près pour le cache de prompt |
+| `tool_executor` | les mêmes outils pour Copilot, OpenAI, Gemini, Ollama…, exécutés dans le processus |
+
+L'apprentissage a deux moitiés. Les agents écrivent quand ils remarquent
+quelque chose (le prompt le leur demande) ; ça dépend d'un modèle qui le décide.
+`learn.py` est l'autre moitié : ce que WorkPilot **sait**, enregistré qu'un
+agent y ait pensé ou non.
+
+| Surface | Moment | Note |
+|---|---|---|
+| `build` | fin de chaque build Kanban/CLI (`_record_build_in_brain`), à tout niveau d'effort, moteur de workflow ou non | `knowledge/projects/<projet>/builds/<spec>.md` : la demande, le verdict QA et tests (`non mesuré` n'est pas `vert`), les fichiers touchés |
+| `merge` | un merge depuis le Kanban (`run.py --merge`) | la même note, `status: merged` : une personne a relu le diff et dit oui |
+| les autres | `POST /api/brain/learn` avec une surface de `SURFACES` | `knowledge/projects/<projet>/<surface>/…` |
+
+Chaque note de build pointe vers `knowledge/projects/<projet>/index.md`, si bien
+qu'un seul `brain_recall` répond à « qu'a-t-on fait sur ce projet, et qu'est-ce
+qui a été accepté », depuis n'importe quel agent. Le nom du projet est lu à
+travers le worktree : sinon chaque tâche serait classée sous un « projet »
+différent.
+
+**Les agents de WorkPilot proposent des règles, une personne les active.** Une
+instruction active est injectée dans le prompt de tous les agents, sur tous les
+projets. Et un agent de build lit, dans la même session, des issues, des PR et
+des pages web, qui peuvent toutes lui demander de « retenir » n'importe quoi. Le
+serveur que WorkPilot lance pour ses propres agents porte donc
+`WORKPILOT_BRAIN_ORIGIN=workpilot`, et l'exécuteur d'outils appelle le cerveau
+en non fiable. Dans ce mode, un agent :
+
+- écrit des connaissances (`knowledge/`), rappelées à la demande et lues comme
+  des données ;
+- **propose** des instructions (`status: proposed`), qui ne s'appliquent à
+  personne tant qu'une personne ne les a pas activées ;
+- ne touche ni à une instruction en vigueur, ni aux skills, ni aux instantanés
+  de mémoire.
+
+Les agents qu'une personne branche elle-même par `connect` (Claude Code,
+Codex, hermes…) écrivent en son nom, sans cette restriction. Pour activer ou
+refuser une proposition : `--action proposals`, puis `--action promote` ou
+`--action reject` avec `--path` ; ou bien changer `status:` dans Obsidian.
+
+**Actif seulement quand un cerveau existe.** `BRAIN_ENABLED` vaut `true` par
+défaut ; sans cerveau sur disque, chaque point d'entrée répond en un `is_file`
+et n'ajoute rien — pas de serveur lancé, pas de section de prompt, pas d'outil.
+L'allumer, c'est lancer `--action init` : une décision de la personne sur
+l'endroit où vit sa connaissance et le distant où elle est poussée.
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `WORKPILOT_BRAIN_DIR` | `~/.workpilot/brain` (`%APPDATA%\WorkPilot\brain`) | où est le cerveau |
+| `BRAIN_ENABLED` | l'interrupteur des Réglages, sinon `true` | branche le cerveau sur toutes les features, quand il existe |
+| `WORKPILOT_BRAIN_CONFIG` | `~/.workpilot/brain.json` | où les Réglages enregistrent le dossier et l'interrupteur |
+| `BRAIN_PULL_INTERVAL` | `60` | secondes entre deux pulls avant lecture |
+| `BRAIN_AUTO_PULL` / `BRAIN_AUTO_PUSH` | `true` | pull avant lecture / push après écriture |
+| `BRAIN_SIMILARITY` | `0.72` | seuil au-delà duquel deux instructions n'en font qu'une |
+
+`GET /api/brain/status`, `POST /api/brain/sync` et `POST /api/brain/recall`
+exposent la même chose au desktop ; comme `hermes/api.py`, le routeur est refusé
+en mode serveur — le cerveau vit dans le répertoire personnel de la machine qui
+exécute le backend.
+
 ### Memory Search (`mem-search`)
 
 Three-layer progressive retrieval over the memories that already exist — `task_logger`
@@ -1043,7 +1404,15 @@ pipeline, the GitHub runners, the mobile phases — none of them write a file of
 their own, they all go through `core.client.create_client`, so the hook is
 registered there once. The providers that do not use the Claude SDK execute
 their writes in `core/runtimes/tool_executor.py`, which is the same cleaning in
-the other half of the product, exactly where `rtk_rewrite` already sits.
+the other half of the product, exactly where `rtk_rewrite` already sits — and
+the same *record*, which took longer to be true than the cleaning did. Not one
+of those clients passed a spec directory down to the executor, so
+`ToolExecutor.spec_dir` was always `None` and the ledger below was never written
+on a non-Claude build: the bytes were edited and the one file that says so did
+not exist. `create_agent_client` hands each client its `spec_dir` now, and
+`test_watermarks_hook.py` fails on a `ToolExecutor(...)` built without one —
+the cleaning is visible in the file, the record is the only evidence of what was
+taken out of it, and a call site that forgets it loses that silently.
 
 **`Pre`, not `Post`, and that is the whole design.** A PostToolUse hook would
 read the file back, rewrite it, and leave a second mtime behind: a dev server
@@ -1315,6 +1684,124 @@ build — and it exists at all because store rejections cost days and **no test 
 the repository catches any of them**: they are rules about configuration files
 and about behaviours the suite does not look at.
 
+### Competitive rounds (Bounty Board)
+
+N contestants, each a `(provider, model, prompt_override)` triple, implement the
+same spec concurrently in their own git worktrees. A judge then measures what
+each one left on disk and proposes a winner.
+
+```
+apps/backend/bounty_board/
+  board.py    orchestration: worktrees, concurrency, persistence
+  runner.py   how one contestant is run — `create_agent_client(provider=…)`
+  signals.py  what it produced: diff and the project's own test suite. No model
+  judge.py    what that is worth
+```
+
+**The board used to score a string nobody had generated.** `runner` opened with
+`from llm_client import acomplete`: the module is `core.llm_client`, the runner
+puts only `apps/backend` on the path, and `acomplete` exists in it under no
+name. So the import raised on every run and the `except ImportError` handler —
+written for an environment where the multi-provider client "was not wired up
+yet" — produced `f"[stub:{provider}:{model}] {prompt[:200]}"`. That string
+embeds the contestant's own `provider:model`, so the only thing that varied
+between contestants was **the number of characters in their model's name**. A
+real round reported 77.9 / 77.8 / 67.9 and crowned a winner with two decimal
+places of confidence. The warning that said so went to a logger nobody reads:
+the runner is spawned by Electron and its stderr surfaces only on a non-zero
+exit.
+
+There is no stub any more, and that is the point rather than an omission. A
+contestant whose client cannot be built ends `error` with the reason on its
+card. An invisible wrong answer costs more than a visible failure.
+
+**And the judge scored prose.** Its four terms were completion (50 points for
+not crashing), coverage (the *first word* of an acceptance criterion found as a
+substring anywhere in the answer), output length, and latency rank. Three
+measure the shape of the answer text; the fourth measures the field. Five rules
+replace them:
+
+| Rule | What it prevents |
+|---|---|
+| **score the artifact** — every criterion reads the diff or a command run against it | a contest decided by how much the model wrote |
+| **absent evidence renormalises, never scores zero** — `Criterion.value is None` drops that weight out of the total | a project with no test suite reading as a project whose tests fail |
+| **no criterion is a rank** — efficiency is a ratio to the *best*, floored at the resolution below which a difference is noise | `1 - duration/slowest`, which gave the slowest exactly 0 whatever the gap: one millisecond cost ten points |
+| **efficiency is a tiebreaker, never a verdict** — dropped entirely unless `tests` or `spec_fit` was measured | a score built only out of "returned first" |
+| **the judge does not know who it is judging** — diffs arrive as `Candidate 1..N`, provider and model stripped | a judge measuring reputation |
+
+Weights are `tests` 55, `spec_fit` 35, `efficiency` 10, renormalised over
+whichever had evidence — so they are ratios between signals, not points. Two
+gates come before any of them, because both describe a contestant with nothing
+to score rather than one that scored badly: a status other than `completed`,
+and a measured empty diff.
+
+**`null` and `0` stay apart all the way to the card.** `quality_breakdown`
+carries `null` for a criterion with no evidence, and `ContestantCard` renders
+*not measured* in italics rather than `0.0`. Collapsing the two is how an
+unmeasured contest comes to be read as a close one, which is exactly what
+happened. Every dropped signal is also reported as a `warning` on the result and
+listed in the verdict modal.
+
+**A tie is reported as a tie.** The old `scored.sort()` was stable, so equal
+scores handed the trophy to whichever contestant was declared first — at the
+0.1-point margins that board produced, most rounds. `evidence_judge` returns no
+winner and says the top score was tied.
+
+**The test suite runs sequentially, once per contestant.** N suites racing over
+the same ports, temp files and package caches measures the contention. And a
+suite is never run against an empty diff: it would measure the base branch and
+hand every do-nothing contestant a clean pass.
+
+What `discover_test_command` returns is a CI `run:` block, which is a shell
+script rather than an argv list — in this repository, `source .venv/bin/activate`
+followed by `pytest`. So it is executed as one, through
+`asyncio.create_subprocess_shell`, the same call `qa/auto_fix_loop._run_tests`
+already makes for the same question; a `subprocess.run(shell=True)` here is both
+a second answer to it and a fifteen-minute block of the event loop the
+contestants ran on. The suite gets its own process group, so a timeout takes the
+dev server or database it started with it rather than leaving them holding the
+ports the next contestant needs — and a timeout is `unknown`, never a failure the
+contestant caused.
+
+**Credentials for every provider, and no `SELECTED_LLM_PROVIDER`.** This is the
+one run that talks to several providers at once, so `bounty-board-handlers.ts`
+merges `credentialManager.getEnvironmentVariables(provider)` for each and then
+deletes that variable: every contestant names its own provider, which
+`create_agent_client(provider=…)` honours directly, and an ambient one would be
+a second answer to a settled question.
+
+**The base of that environment is `getRunnerEnv`, not a second assembly.** It
+used to be built out of `credentialManager` alone, and that object never
+carries Claude's *own* authentication: the OAuth token comes from
+`getBestAvailableProfileEnv` and an API profile from `getAPIProfileEnv`, both
+of which every other runner in the application receives through `getRunnerEnv`.
+So a Claude contestant was dispatched with no Claude credentials at all and
+died on `No OAuth token found` — on an authenticated machine, in the same round
+where OpenAI and Google reached their providers. Two assemblies of one
+environment is how one of them quietly loses a variable, and the symptom looks
+like an authentication bug rather than a wiring one.
+
+Claude's chain is therefore left to `getRunnerEnv` and never re-stated: it
+resolves OAuth mode, API profiles and rate-limit-aware profile swapping
+*together*, and re-injecting a key on top of it could contradict the mode it
+just chose. Only the board's other providers are layered on.
+
+`prompt_override` reaches a model now. It was parsed from the CLI, stored on
+`ContestantSpec`, and dropped by `_materialize`, so the per-entry strategy the
+UI offers had no effect on anything. It is added to the brief, never
+substituted for it.
+
+**A provider with no agentic adapter never takes the field.** mistral, deepseek,
+grok, meta, aws, cursor and custom are driven by the Claude SDK
+(`capabilities/providers.yaml`, `degrades_to`) — the right trade for a build,
+since the task runs, and the wrong one for a contest, where a win would be
+recorded under the name of a vendor that never saw the prompt. It is the Arena's
+`require_provider` rule, word for word, and `bounty_board/runner.py` applies it
+before a client is built: that contestant ends `error` with the reason on its
+card. The selector says so too, from the same matrix the Arena reads
+(`GET /providers/agentic-capabilities`, via `useAgenticCapabilities`), so the
+answer arrives before a round is spent learning it rather than after.
+
 ### Declarative Workflows
 
 `workflows/<name>/workflow.yaml` describes a build as phases; `workflows/engine.py`
@@ -1469,6 +1956,13 @@ over a worktree with no implementation plan in it.
 `BuildPaused` (not a failure — nothing is finalized, the card keeps its column)
 and `BuildHalted` (which carries the sentence the user will read).
 
+The planner remains the active phase until its plan passes validation. Starting
+its session is not a transition: a timeout, quota wait, authentication recovery
+or hot model switch must reopen planning, for every provider. The coder loop
+may return normally only with a nonempty, completed plan and no session error;
+an empty plan, exhausted budget or unfinished subtasks halt before QA. The loop
+detector propagates `BuildPaused` too, rather than returning as if coding finished.
+
 **The pause has one store.** `core/pause_state.py` owns `pause_state.json`,
 which lives in the spec directory. That is the whole point: the flag used to
 live inside `implementation_plan.json`, a file that does not exist during spec
@@ -1502,6 +1996,60 @@ completed subtasks, the spec and the QA sign-off stay as they are. Only an
 explicit "re-run this phase" discards work, and only downstream of the phase
 asked for (`plan-rerun-utils.ts`).
 
+**Resuming continues the phase; it does not pay for it twice.** State-driven
+entry answers *which* phase re-opens, and nothing more: the phase itself
+re-opened with an empty head, re-read the same files and re-derived the same
+analysis the interrupted session had already done. Two channels carry it
+across now, one per half of the product. `TASK_RESUME` hands the subprocess the
+session id in `<spec_dir>/.session.json`, so the Claude SDK rehydrates that
+transcript (single-shot — `create_client` pops the variable, so only the first
+session of the resumed run replays it). For every other provider it is
+`conversation.<provider>-<model>.jsonl`, which `_maybe_replay_conversation`
+already replayed on every session start.
+
+**A model that is new to a phase inherits it.** The conversation log is
+per-(provider, model) on purpose — switch away and back, and a model resumes
+its own context. On the switch itself that property is exactly wrong: the model
+the user just chose has no log, nothing is replayed, and the phase restarts from
+the prompt, which is the opposite of what the Pause button promised.
+`read_log_for_phase_resume` gives a model with no log of its own the **same
+phase's** tail (`MAX_CARRYOVER_MESSAGES`) from whichever model last wrote one,
+and writes it into the new model's log — a takeover, not an alias, so from the
+next session on that model reads its own file like every other.
+
+The phase is the whole guard, and it is not a detail: a per-phase model
+configuration legitimately runs coding on a model the planner never used.
+Inheriting by recency alone would replay the planner's entire reasoning into
+every such coding session, on every build that names two models. An archived log
+(`.too-long.`, `.trimmed.`, `.archived.`) is never inherited either — a
+prompt-too-long halt archives precisely so the next run does not replay it, and
+reading it back through the carry-over would fail the run the same way.
+
+**A relaunch is owed an event.** `TASK_START` tells the machine it is starting
+(`determineStartEvent`); resuming told it nothing, and a machine left settled in
+`human_review`/`error` keeps the review reason and the failure message that go
+with it — so the red "this task failed" banner stayed at the top of a task that
+was visibly running again, quoting the run it had replaced. `relaunchEventFor`
+is the one answer to what the two resume paths owe it, and the sequence counter
+is reset in the same breath: a restarted backend numbers its events from zero,
+and `isNewSequence` drops anything below the last number it saw, so without it
+the resumed run's phases reached nobody at all.
+
+**Pause and Reprendre belong to the run, not to the column.** A paused task
+keeps the status it was paused in — often `human_review`, once a phase reported
+a failure — and the task panel's action bar was keyed on status, so the one
+screen that owns the provider/model/effort switch was the one screen that could
+not simply resume. `TaskRunControls` is now answered from the pause flag first,
+before any status branch, which is how the kanban card had always decided it.
+
+**And the model it resumes with is picked, never typed.** The panel's
+"Autre (catalogue officiel)" row is a door, not a model: it opens
+`OfficialModelSearch` over the provider's own library, which is the same thing
+the per-phase selector does and for the same reason. A free-text field accepts
+`gemma4:12b-it-q4_K_M` whether or not anything published it, and the only
+symptom is the resume failing on `pull model manifest: file does not exist` —
+after the restart, under a name the user has no way to check.
+
 **A phase that gives up says so.** `PLANNING_FAILED` and `CODING_FAILED` were in
 the XState machine from the start and emitted by nobody: every real failure
 reached the frontend as a process exit, and the machine's `setError` did not
@@ -1521,6 +2069,131 @@ that is still better than nothing — and the message is persisted beside the
 status it explains (`plan.errorMessage`) so it survives a reload.
 `TaskFailureBanner` renders it at the top of the task panel, and the toast reads
 `reviewReason` rather than the column before choosing its wording.
+
+### Le mode hors-ligne : une barrière, ou un défaut
+
+`.workpilot/offline-mode.json` porte deux politiques sous un seul nom, et les
+confondre est ce qui a fait mourir un Bounty Board configuré sur Anthropic
+sur `ValueError: Local model llama3.3:latest is unavailable on ollama` — un
+fournisseur que personne n'avait sélectionné, un modèle que personne n'avait
+nommé, et pas un mot sur l'origine de l'un ni de l'autre.
+
+| `airgapStrict` | Ce que la table de routage est |
+|---|---|
+| `true` | **une barrière.** Elle remplace ce que l'appelant voulait, et une route impossible à honorer est une erreur dure : il n'y a pas de repli légal, puisque tout l'objet est qu'aucun appel cloud ne quitte la machine |
+| `false` | **un défaut.** La page le dit elle-même : « le mode strict est désactivé : les opérations sans route locale peuvent encore utiliser le cloud ». Un défaut répond pour l'appelant qui n'a rien nommé ; il ne tranche pas à la place de celui qui a nommé quelque chose |
+
+`resolve_offline_route` reçoit donc un `chosen` — vrai quand le couple
+(fournisseur, modèle) est une décision prise pour cette exécution, faux quand
+c'est le défaut `core.client._DEFAULT_PROVIDER` que personne n'a demandé. Sans
+lui, **tous** les appelants avaient l'air explicites : `create_agent_client`
+résout le fournisseur *avant* d'appeler, si bien qu'une table hybride
+redirigeait silencieusement les six phases nommées (`planner`, `coder`,
+`qa_reviewer`, `commit_message`, `summary`, `triage`) de chaque build vers un
+modèle local, et que le seul symptôme était un message nommant un fournisseur
+jamais choisi.
+
+C'est `_resolve_active_provider` qui répond aux deux moitiés — *quel
+fournisseur*, et *quelqu'un l'a-t-il nommé* — et `_get_active_provider` n'est
+plus qu'un appel dessus. Une seconde chaîne de résolution pour répondre à la
+deuxième moitié aurait dérivé de la première au premier changement.
+
+**Un couple local choisi reste validé, et une erreur reste une erreur.**
+Exécuter Anthropic parce qu'Ollama n'est pas démarré est une substitution que
+personne n'a demandée, et le silence ferait passer un modèle indisponible pour
+un modèle qui répond mal. Seule une **route hybride** — un défaut que la
+fonction a appliqué d'elle-même — s'efface au lieu d'échouer, en le disant dans
+le journal : faire échouer un build sur un défaut est le seul résultat que
+personne n'a demandé, et le mode hybride autorise le cloud par définition.
+
+**Et le message nomme sa source.** « Local model X is unavailable on ollama »
+décrivait parfaitement ce qui n'allait pas et rien de ce qu'il fallait savoir :
+quelle tâche, quelle politique, et quoi faire. Il nomme désormais la route qui a
+désigné ce modèle, le fournisseur qu'elle a *remplacé*, et la sortie —
+`STRICT_EXIT_HINT`, écrite une fois. Un message qui décrit une barrière sans
+dire où est l'interrupteur laisse son lecteur chercher dans les réglages d'un
+produit qui en a quatre-vingts.
+
+#### Le défaut d'un fichier absent n'est pas une barrière
+
+Tout ce qui précède décrit le mode strict comme une décision. Il ne l'était pas :
+`_default_policy` — ce que la page propose à un projet qui n'a jamais rien
+configuré — renvoyait **`airgapStrict: True`**, avec les six tâches routées vers
+le premier modèle local par ordre alphabétique. Le store marque une politique
+non persistée `dirty`, donc le bouton Enregistrer est actif dès le premier
+rendu : ouvrir la page par curiosité et cliquer une fois coupait tout
+fournisseur cloud du projet.
+
+Le symptôme arrivait bien plus tard et ailleurs — un Bounty Board configuré sur
+Anthropic, OpenAI et Google mourant trois fois sur
+`llama3.3:latest is unavailable on ollama`, un modèle que personne n'avait
+nommé — et la seule façon de faire le lien était de rouvrir cette page.
+
+Le *fail-closed* est la bonne règle pour **honorer** un airgap que quelqu'un a
+demandé. Appliqué à l'absence d'un fichier, il devient un fail-closed contre
+l'intention de l'utilisateur, ce qui est autre chose portant le même nom. Le
+défaut est `False` ; activer la barrière reste un geste, et la case cochée se
+rend désormais comme une alerte plutôt qu'en texte gris — c'est la seule bascule
+du produit qui désactive tous les fournisseurs cloud.
+
+#### Le mode strict est lisible ailleurs que sur sa propre case
+
+`_status()` ne portait que les runtimes locaux, si bien que « ce projet est en
+airgap » n'était lisible nulle part ailleurs que sur la page Mode hors-ligne.
+Partout ailleurs — la liste « Fournisseur IA », le Bounty Board, l'Arena — le
+fournisseur choisi s'affichait avec sa pastille verte et le backend refusait
+l'appel une seconde plus tard.
+
+| Qui répond | Où |
+|---|---|
+| le fait, et **quel fichier** le décide | `offline_policy.airgap_status` |
+| « ce fournisseur tourne-t-il sur la machine ? », quelle que soit son orthographe | `offline_policy.is_local_provider` |
+| le statut servi à l'UI (`airgapStrict`, `policyPath`, `policyPersisted`) | `offline_mode_runner._status` |
+| le renderer | `useAirgapStatus` |
+
+`_policy_files` est extrait de `project_policies` pour que « quel fichier le
+dit » et « que dit-il » soient une seule recherche lue deux fois : une seconde
+remontée d'ancêtres écrite ailleurs répondrait à côté le jour où un projet
+hérite de la politique d'un répertoire parent — ce qui est précisément le cas
+que `project_policies` existe pour couvrir.
+
+**Le Bounty Board refuse un participant cloud avant de le lancer.** En mode
+strict, chacun était réécrit vers le modèle local de la politique : un plateau
+de trois fournisseurs cloud devenait trois fois le même modèle — ou, quand ce
+modèle n'est pas installé, trois fois la même erreur. C'est la même règle que
+pour un fournisseur sans adaptateur agentique, pour la même raison, et un
+concours entre modèles **locaux** reste parfaitement légitime.
+
+#### L'interrupteur est là où la barrière se manifeste
+
+Le message ci-dessus décrivait la barrière puis renvoyait ailleurs : « décochez
+Mode strict dans Réglages → Mode hors-ligne ». C'est une instruction de
+navigation, pas une réponse — et elle demande d'aller décocher, dans un autre
+écran, une case que personne n'avait cochée. `AirgapBanner` porte donc le
+bouton, et `useAirgapStatus.disableStrict` l'exécute.
+
+Ce que le bouton ne fait pas, c'est décider : lever un airgap reste un geste
+explicite, sur un clic, avec le fichier concerné écrit à l'écran. Une migration
+qui aurait désactivé le mode strict des politiques existantes serait la faute
+d'origine à l'envers — quelqu'un qui a vraiment voulu l'airgap le perdrait sans
+qu'on le lui demande.
+
+**La désactivation renvoie la politique persistée telle quelle**, `airgapStrict`
+mis à `false` et pas un champ de plus. C'est la seule forme que `_save_policy`
+accepte sans revalider le routage (`disabling_only`), et cela compte exactement
+ici : la politique qui piège l'utilisateur route vers un modèle désinstallé,
+souvent avec le serveur local éteint, donc toute écriture prétendant la
+« corriger » au passage serait refusée et le bouton ne ferait rien.
+`test_strict_can_be_lifted_with_a_missing_model_and_no_server` est ce qui garde
+cette porte ouverte.
+
+**Un airgap hérité d'un parent n'offre pas de bouton.** La recherche remonte les
+répertoires ancêtres, alors que `set-policy` n'écrit que dans
+`<projet>/.workpilot/` — et la résolution est stricte dès qu'une *seule* des
+politiques trouvées l'est. Un bouton y créerait une seconde politique sans rien
+débloquer, ce qui est pire que pas de bouton ; `_status` répond donc
+`policyIsProjectOwn`, en comparant des chemins **résolus** plutôt que des
+chaînes.
 
 ### Workflow Logger
 
@@ -1741,6 +2414,52 @@ existe des sous-tâches, leur part terminée EST l'avancement réel (la pondéra
 par phase gonflerait à ~94% dès le démarrage de la QA), et un état terminal vaut
 100% quel que soit un comptage en retard.
 
+### Les critères d'acceptation en puces (`task-detail/acceptance-criteria-draft.ts`)
+
+Les critères sont un `string[]` dans `task_metadata.json`, et ils s'éditaient
+dans un textarea où une ligne valait un critère. Le format lit bien et s'édite
+mal : une ligne de textarea n'est pas une chose. En supprimer une au milieu,
+en déplacer une, savoir combien il y en a — ce sont trois opérations sur du
+texte, faites à la main, sans rien pour dire qu'on s'est trompé de ligne.
+
+Chaque critère est maintenant une puce à part entière : son champ, son bouton
+de suppression, sa place dans la liste. Ce qui rend la chose possible est un
+`id` stable par ligne (`CriterionDraft`), indépendant du texte et de la
+position : c'est la clé React, et c'est la cible du focus après une insertion
+ou une suppression. Un id dérivé du texte ferait de deux critères identiques
+une seule ligne, et changerait à chaque frappe.
+
+| Fichier | Rôle |
+|---|---|
+| `acceptance-criteria-draft.ts` | les règles sans React : découpage d'un collage, marqueurs de puce, insertion / suppression / déplacement, ce qui part à l'enregistrement |
+| `AcceptanceCriteriaEditor.tsx` | les puces, le clavier et le focus |
+| `TaskMetadata.tsx` | la section, les deux modes, l'enregistrement |
+
+**Le mode texte reste offert à côté.** La liste est le mode par défaut et le
+texte brut d'avant est à un clic : c'est lui qui fait bien ce que les puces
+font mal — coller dix critères, en réordonner la moitié, tout effacer d'un
+geste. Les deux éditent la même liste, et le passage de l'un à l'autre garde
+la ligne vide qu'on vient d'ouvrir — d'où la chaîne propre au mode texte,
+plutôt qu'un texte dérivé des puces à chaque frappe, qui supprimerait la ligne
+sur laquelle on est en train de taper.
+
+**Un critère tient sur une ligne**, parce que tout ce qui le relit découpe sur
+les retours à la ligne. Entrée ouvre donc une puce au lieu d'insérer un saut,
+un bloc collé devient une puce par ligne, et la normalisation se reprend à
+l'enregistrement — un glisser-déposer de texte dans un champ n'appuie sur
+aucune touche.
+
+**Le marqueur de puce est retiré plus prudemment qu'à la lecture des
+trackers.** `parseAcceptanceCriteriaText` lit un `<li>` où le marqueur est
+certain ; ici la ligne vient de l'utilisateur, et « 3 tentatives maximum »
+n'est pas une liste numérotée. Un chiffre ne compte comme marqueur que suivi
+d'un point ou d'une parenthèse, et un marqueur doit être suivi d'une espace.
+
+**Une puce vide n'est pas un critère** : elle existe dans l'éditeur, elle ne
+part pas sur le disque. C'est ce qui permet de garder toujours un champ où
+taper — supprimer la dernière puce en laisse une vide plutôt qu'une liste sans
+champ — sans empêcher d'effacer la liste entière.
+
 ### Architectures et historique de construction (`visual-to-code/`)
 
 Le canvas ne tenait qu'**un** diagramme, dans trois champs libres du store
@@ -1815,6 +2534,96 @@ le *nouvel* id et les *anciens* blocs. Une ref posée par le chargeur dans le
 même commit se lirait déjà à jour, et le miroir écrirait les blocs d'un
 document dans un autre.
 
+### L'adresse qu'ouvre l'émulateur (`shared/utils/emulator-landing.ts`)
+
+L'aperçu ouvrait la racine du serveur. C'est la bonne réponse pour un site et la
+mauvaise pour tout le reste : une Web API .NET répond 404 sur `/`, et la page que
+la tâche vient d'écrire est trois segments plus loin. L'utilisateur voyait donc,
+pour une fonctionnalité qui marche, un cadre vide et « HTTP 404 ».
+
+Le diff de la tâche dit précisément quelle route a été touchée. C'est une preuve
+mesurée, pas une convention devinée, et ce module est le seul endroit qui la lit
+— ni modèle ni réseau, seulement des chemins et des lignes ajoutées, si bien que
+l'UI peut poser la question avant d'avoir démarré quoi que ce soit.
+
+`deriveLandingCandidates` rend *toutes* les adresses plausibles, la plus probable
+d'abord, dans l'ordre de la force de la preuve :
+
+| Rang | Source | Ce qui la produit |
+|---|---|---|
+| 1 | `route-declaration` | `[Route("api/[controller]")]`, `app.MapGet`, `@Controller`, `<Route path>`, `@app.get`, `@RequestMapping`… lus dans les **lignes ajoutées** du patch |
+| 2 | `file-route` | une page créée par convention : `app/x/page.tsx`, `pages/x.vue`, `src/routes/x/+page.svelte`, `app/routes/x.new.tsx` |
+| 3 | `launch-profile` | le `launchUrl` que le projet déclare dans `Properties/launchSettings.json` |
+| 4 | `api-docs` | la page d'accueil du framework : `/swagger`, `/docs`, `/api` |
+
+Rendre la liste plutôt que la seule réponse est ce qui permet au panneau d'échec
+de proposer les autres : un 404 sur la première devient un bouton vers la
+deuxième, pas un cul-de-sac.
+
+**Un segment dynamique arrête la route.** `api/users/{id}/roles` devient
+`/api/users` : la liste existe presque toujours, l'identifiant non, et inventer
+un `id` produirait un 404 en prétendant l'éviter. `[controller]` fait exception —
+c'est un jeton à substituer, pas un paramètre, et son nom vient de la classe que
+le patch déclare, sinon du fichier, parce qu'ASP.NET *impose* que
+`DocumentsController` vive dans `DocumentsController.cs`.
+
+**Un motif trop courant est réservé aux fichiers de routes.** `path:` est une clé
+de configuration autant qu'une route Angular ; `deriveLandingCandidates` ne la
+lit que dans un fichier dont le nom le dit (`*routes*`, `*router*`, `urls.py`,
+`*-routing.*`). Sans cette règle, un `{ path: 'dist/assets' }` de build devenait
+l'adresse proposée à l'utilisateur.
+
+**La barre d'adresse est une vraie barre d'adresse.** `ResponsivePreview` porte
+Précédent / Suivant / Recharger / Accueil et un champ éditable :
+`resolveAddressInput` résout ce qui est tapé contre le serveur de l'émulateur. Le
+défaut est *relatif* — dans cette barre on tape « /swagger » cent fois pour une
+fois où l'on tape un hôte — et un hôte n'est reconnu que quand il se nomme (un
+point, un port, ou `localhost`). Tout ce qui n'est pas http(s) est refusé avec un
+message : un `file://` chargé dans l'aperçu serait une navigation que personne
+n'a demandée.
+
+La navigation passe par `loadURL`, jamais par un changement de `key` : remonter
+le `<webview>` perdrait l'historique, et l'historique est ce que lisent les deux
+boutons. `src` reste le repli — c'est tout ce dont dispose un environnement de
+test, et c'est aussi ce qui fait la première navigation.
+
+**« Ouvrir dans le navigateur » ouvre ce qui est affiché**, pas la racine du
+serveur : après une navigation dans l'aperçu les deux ne sont plus la même page,
+et sur une Web API la racine est précisément celle qui répond 404. Côté main,
+`open-external.ts` est le seul chemin : il valide le schéma, appelle
+`shell.openExternal`, et **sur Linux seulement** essaie ensuite les lanceurs que
+la machine a vraiment (`xdg-open`, `gio open`, `x-www-browser`…) — Electron y
+rejette quand `xdg-utils` manque ou que le portail XDG n'est pas joignable. Le
+rejet remonte jusqu'au renderer, qui l'affiche : un bouton qui ne fait rien et ne
+dit rien est la pire des deux options, et c'est ce que l'utilisateur voyait.
+
+**Et il n'ouvre que ce qui s'ouvre.** Un `<webview>` n'annonce pas seulement les
+adresses qu'on lui a demandées : `about:blank` avant sa première navigation, et
+`chrome-error://chromewebdata/` dès qu'une page n'a pas répondu — ce qui est le
+cas courant ici, puisqu'une Web API répond 404 sur la racine. Ces valeurs
+arrivaient telles quelles à `open-external.ts`, qui les refuse à juste titre sur
+le schéma : le bouton ne produisait plus qu'un message d'erreur, pour une page
+que le serveur sert très bien deux segments plus loin. `isBrowsableUrl` est la
+seule réponse à « est-ce une adresse ? » — la barre ne suit plus ce qui n'en est
+pas une, et le bouton retombe sur la racine du serveur, toujours ouvrable. Le
+message d'échec, lui, est rendu comme un échec : il était rendu en texte courant,
+au milieu d'un panneau qui n'avait pas changé par ailleurs.
+
+**L'adresse survit au changement d'onglet.** `TabsContent` démonte le panneau
+qu'on quitte, donc une adresse gardée dans `ResponsivePreview` est une adresse
+perdue à l'aller — l'utilisateur revenait sur l'onglet Émulateur et retrouvait la
+route d'accueil. Elle vit dans `app-emulator-store` (`previewUrls`), **indexée
+par tâche** : le serveur est unique, les pages qu'on y regarde ne le sont pas, et
+une seule adresse ferait ouvrir la tâche B sur la page de la tâche A. Un autre
+serveur les vide toutes — la page d'un run précédent n'existe plus.
+
+Ce qui est mémorisé est une page où l'on est *allé* : une saisie, un lien suivi,
+un candidat cliqué. Pas la route d'accueil que l'aperçu ouvre tout seul, ni le
+premier `did-navigate` qui ne fait que la confirmer — le diff de la tâche est lu
+une seconde après le montage, donc une racine mémorisée comme un choix gagnerait
+contre la route que ce diff révèle. C'est la même distinction que porte le second
+argument d'`onNavigate`.
+
 ### Provider × LLM × effort, par page (`shared/utils/page-llm.ts`)
 
 Une page qui lance un agent posait la question deux fois et n'en gardait qu'une
@@ -1840,9 +2649,10 @@ rien se comporte comme avant. Le champ absent est **retiré** de
 « le même choix que les réglages » distincts, et qui fait qu'un changement de
 fournisseur global bouge bien les pages qui n'ont rien demandé.
 
-Quand la page choisit un **fournisseur** sans choisir de modèle, le modèle des
+Quand un **fournisseur** est choisi sur la page ou globalement, sans modèle
+explicite sur la page, le modèle hérité des
 réglages est ramené au catalogue de ce fournisseur
-(`resolveModelForProviderCatalog`) : il avait été choisi pour le fournisseur
+(`resolveModelForProviderCatalog`) : il peut encore désigner le fournisseur
 global, et demander `claude-opus-4-6` à Ollama échoue à l'appel, avec un message
 qui parle d'un modèle inconnu plutôt que du choix.
 
@@ -1870,10 +2680,108 @@ backend n'a rien à apprendre : `core.client._get_active_provider` honore déjà
 Le backend a sa propre chaîne de résolution, et y écrire un nom la
 court-circuiterait avec une valeur que personne n'a demandée.
 
+**Une surface hors du jeu fermé suit quand même la liste « Fournisseur IA ».**
+Le jeu fermé dit quelles pages ont une *formule propre* ; il ne dit pas
+lesquelles ont le droit d'ignorer le choix global. `getRunnerEnv()` appelé sans
+`page` n'injectait aucun `SELECTED_LLM_PROVIDER` du tout, si bien que la
+génération de tests, l'auto-fix GitHub et l'auto-réparation repartaient sur le
+défaut du backend pendant que la barre du haut affichait autre chose — le même
+symptôme que celui que ce module existe pour corriger, un cran plus bas. Sans
+`page`, `getGlobalProviderEnv()` répond : exactement ce qu'une page sans
+surcharge reçoit.
+
 Dans l'UI, `PageLlmSelector` vit à gauche de la barre sticky, à côté de la liste
 « Fournisseur IA », et n'en est pas un doublon : cette liste dit avec quoi
 l'application travaille, celui-ci dit avec quoi *cette page* travaille. Il
 n'affiche rien sur une page hors du jeu fermé.
+
+### Qui combat dans le Mode Arena (`shared/utils/arena-contenders.ts`)
+
+Le Mode Arena ne faisait tourner aucun modèle. `runBattle` renvoyait un
+paragraphe écrit d'avance par type de tâche, facturait tout le monde à
+3 $/million de tokens, et enregistrait chaque participant en
+`modelName: "Model A", provider: "unknown"` — si bien que la révélation après
+le vote ne révélait rien, que le classement classait des étiquettes, et que la
+seule chose que la page existe pour mesurer n'était jamais mesurée. En façade,
+la liste des concurrents était quatre noms écrits en dur (`DEMO_PROFILES`),
+servis dès que la vraie liste revenait vide — ce qui arrivait toujours, parce
+que la vraie liste était `profile:list`, le magasin d'identifiants Claude, qui
+ne connaît ni Ollama, ni Copilot, ni Mistral, ni Google.
+
+**Un concurrent est un couple (fournisseur, modèle).** Son `id` est
+`fournisseur:modèle`, c'est la clé sous laquelle chaque statistique est classée,
+et l'identité voyage avec le participant — masquée par l'UI jusqu'au vote, ce
+qui est ce que « à l'aveugle » veut dire : cachée au *lecteur*, connue de
+l'enregistrement. L'historique applique la même règle : un combat en attente de
+vote n'y affiche pas les noms que l'onglet Combat cache.
+
+**Rien ici ne détecte quoi que ce soit de nouveau.** Deux réponses que
+l'application possédait déjà sont jointes : quels fournisseurs sont configurés
+(`getStaticProviders`, la source de la liste « Fournisseur IA ») et quels
+modèles chacun propose (`fetchProviderModelCatalog`, le catalogue interrogé
+auprès du fournisseur lui-même, avec le registre généré en repli). Aucun nom de
+fournisseur ni de modèle n'est écrit dans `arena-contenders.ts` ni dans
+`useArenaContenders.ts` : un fournisseur ajouté à l'un ou l'autre arrive dans
+l'Arena sans qu'on y touche.
+
+| Couche | Répond |
+|---|---|
+| `shared/utils/arena-contenders.ts` | la liste, la recherche, le couple d'ouverture, l'identité d'un concurrent |
+| `renderer/hooks/useArenaContenders.ts` | la jonction des deux sources, et ce qui est injoignable |
+| `main/ipc-handlers/arena-handlers.ts` | l'exécution réelle, via `runOneShotLLM` — un contestant, son fournisseur, son modèle |
+
+**Deux modèles locaux sont écartés, pour la même raison : ils ne peuvent pas
+gagner un combat, seulement en perdre un sur une erreur.** Celui dont le backend
+dit qu'il ne sait pas appeler d'outil, exactement comme le sélecteur de modèles
+l'écarte ; et celui qui **n'est pas téléchargé**. Le sélecteur garde ces
+derniers comme suggestions parce qu'il sait lancer le `pull` ; l'Arena ne le
+sait pas, et y entrer dépense un combat en
+`pull model manifest: file does not exist`. Cela règle au passage le cas du
+serveur éteint : il répond par le catalogue hors ligne, où rien n'est installé,
+donc il ne présente personne au lieu de trente-cinq modèles que la machine n'a
+pas.
+
+**Un fournisseur sans adaptateur propre n'entre pas.** mistral, deepseek, grok,
+meta, aws, cursor et custom sont servis par le SDK Claude
+(`capabilities/providers.yaml`, `degrades_to`) : c'est le bon compromis pour un
+build — la tâche tourne — et le mauvais ici, puisqu'une victoire serait
+enregistrée au nom d'un éditeur qui n'a jamais vu le prompt. Deux barrières, et
+elles ne disent pas la même chose : `oneshot_completion(require_provider=True)`
+**refuse** plutôt que de substituer, ce qui est la garantie ; et
+`GET /providers/agentic-capabilities` sert cette même matrice au renderer, ce
+qui permet de le *dire* dans le sélecteur au lieu de le faire découvrir un
+combat plus tard. La matrice est servie et non recopiée en TypeScript : une
+seconde copie dériverait le jour où un adaptateur est écrit. Un fetch en échec
+laisse tout le monde entrer — vider la page parce que le backend démarre encore
+serait pire, et c'est le refus côté backend qui tient la promesse.
+
+**Le couple d'ouverture vient de deux fournisseurs différents** quand c'est
+possible. Comparer deux modèles du même éditeur est un combat légitime, mais ce
+n'est pas celui qu'on ouvre l'Arena pour lancer, et prendre les deux premiers
+d'une liste triée par fournisseur ne donnerait jamais que celui-là.
+
+**Ce qui est affiché est ce qui a été mesuré.** `oneshot_completion` rend
+désormais le `last_usage` du fournisseur (`__ONESHOT_USAGE__`), et *seulement*
+quand il y en a un : un fournisseur muet ne devient pas
+`{"input_tokens": 0, "cost_usd": 0.0}`, parce que dans un classement un zéro
+inventé ne se distingue plus d'une mesure. Les tokens tombent alors sur une
+estimation, préfixée d'un `~` et dite telle quelle ; le coût, lui, s'affiche
+`—`. Un `0` venu d'un modèle local, c'est une vraie réponse et elle s'affiche.
+La moyenne du classement ne porte que sur les combats dont le coût a été
+rapporté (`costSamples`).
+
+**Les combats de l'ère simulée sont mis de côté, pas comptés.** Ils ne portent
+aucune identité résoluble, donc ils ne peuvent pas répondre à la question que
+l'onglet Analytics pose, et les compter mettrait un prix inventé à côté d'un
+prix mesuré. `readBattles` les déplace une fois vers
+`battles.pre-real-models.json` — un enregistrement que personne ne peut
+exploiter reste celui de l'utilisateur.
+
+**Une session d'Arena est un vrai appel par modèle.** Le prompt système est le
+même pour tous (`TASK_SYSTEM_PROMPTS`, un par type de tâche) : l'Arena mesure le
+modèle, donc tout ce qui diffère entre les concurrents est un facteur
+confondant. Il est court volontairement — une longue charte maison mesurerait la
+capacité à suivre une charte.
 
 ### Agent Management (`src/main/agent/`)
 
@@ -1898,6 +2806,52 @@ Full PTY-based terminal integration:
 - **`terminal-lifecycle.ts`** — Session creation, cleanup, event handling
 - **`claude-integration-handler.ts`** — Claude SDK integration within terminals
 - Renderer: xterm.js 6 with WebGL, fit, web-links, serialize addons. Store: `terminal-store.ts`
+
+### Le lien d'un écran d'authentification (`terminal/terminal-interactions.ts`)
+
+Il y a quatre terminaux xterm.js dans le produit — celui des onglets, et un par
+écran d'authentification (Claude, Codex/Copilot, GitHub Copilot) — et ils
+répondaient différemment à la même question. Le terminal des onglets ouvrait ses
+liens par `openExternal` et traitait Ctrl/Cmd+C ; les terminaux
+d'authentification chargeaient un `WebLinksAddon` nu et n'écoutaient aucun
+raccourci. Ce sont pourtant les seuls écrans où la seule chose à faire est
+d'ouvrir une URL, ou de la copier.
+
+Le résultat, sur l'écran de connexion de Claude Code : un clic partait dans
+`window.open`, que le processus principal refuse par construction, et Ctrl+C
+envoyait un SIGINT au CLI en cours d'authentification au lieu de copier la
+sélection. `terminal-interactions.ts` est la seule réponse, chargée par les
+quatre :
+
+| Fonction | Répond |
+|---|---|
+| `createTerminalWebLinksAddon` | un lien cliqué part dans `openExternal` — le seul chemin, celui qui porte les replis Linux |
+| `handleClipboardKeyEvent` | Cmd/Ctrl+C (copie s'il y a une sélection, interruption sinon), Ctrl+Shift+C/V, Ctrl+V |
+| `attachOsc52Clipboard` | OSC 52, la séquence qu'émet un CLI qui propose lui-même « (c to copy) » — xterm.js ne l'implémente pas, et sans gestionnaire la touche n'a aucun effet observable |
+| `readTerminalText` | ce qui est affiché, lignes repliées recollées — lu dans le tampon et non dans le flux, qu'un CLI qui se redessine remplit de versions successives du même écran |
+
+**Et le lien est sorti du terminal.** Une URL OAuth fait trois lignes de
+quatre-vingts colonnes : la cliquer suppose de viser le bon fragment, la copier
+suppose d'en sélectionner trois dont la césure tombe au milieu d'un `%3A`.
+`shared/utils/terminal-links.ts` recolle les fragments — un repli ne laisse ni
+blanc ni indentation, et une ligne qui n'atteint pas le bord s'est terminée
+d'elle-même — et `TerminalAuthLinkBar` affiche l'URL entière avec de quoi
+l'ouvrir et la copier d'un geste.
+
+Le bandeau n'apparaît que quand une URL **de connexion** est affichée
+(`oauth`, `authorize`, `login`, `device`…) : la documentation citée trois lignes
+plus haut par le même programme n'a rien à y faire, et un bandeau permanent qui
+ne dit rien est un bandeau que personne ne lit. Une ligne qui commence par un
+schéma n'est jamais la suite de la précédente, sinon deux URL pleine largeur
+écrites l'une sous l'autre — ce qu'un CLI qui se redessine produit — n'en
+feraient qu'une.
+
+L'échec est dit : `openExternal` rend son rejet jusqu'au bandeau, qui l'affiche.
+Un bouton qui ne fait rien et ne dit rien est la pire des deux options, et c'est
+ce que `setWindowOpenHandler` produisait en appelant `shell.openExternal`
+directement — court-circuitant les replis de `open-external.ts` — avant d'avaler
+le rejet.
+
 
 ## Code Quality
 

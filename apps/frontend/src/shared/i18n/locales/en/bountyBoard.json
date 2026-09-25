@@ -17,6 +17,9 @@
 	"running": "Running…",
 	"liveBoard": "Live board",
 	"archives": "Previous rounds",
+	"noAdapter": "No agentic adapter here: this entry would run on {{target}} and is refused before it starts.",
+	"noAdapterOption": "{{provider}} — runs on {{target}}",
+	"airgapBody": "Cloud providers are blocked, so every cloud contestant is refused before it starts. Run local models, or uncheck 'Airgap strict' in Settings → Offline Mode.",
 	"field": {
 		"provider": "Provider",
 		"model": "Model",
@@ -43,5 +46,30 @@
 		"ranking": "Ranking",
 		"contestant": "Contestant",
 		"rationale": "Rationale"
-	}
+	},
+	"criteria": {
+		"tests": "tests",
+		"spec_fit": "spec fit",
+		"efficiency": "efficiency",
+		"notMeasured": "not measured",
+		"notMeasuredHint": "No evidence for this criterion — its weight was redistributed over the others."
+	},
+	"evidence": {
+		"diff": "{{files}} files · +{{added}} −{{removed}}",
+		"diffUnavailable": "diff not measured",
+		"tests": {
+			"passed": "{{passed}} tests passing",
+			"failed": "{{failed}} tests failing",
+			"timeout": "tests timed out",
+			"no-command": "no test command",
+			"no-change": "no change to test",
+			"skipped": "tests not run",
+			"error": "tests could not run"
+		}
+	},
+	"warnings": {
+		"title": "Unmeasured signals",
+		"description": "These criteria could not be evaluated; their weight was redistributed."
+	},
+	"noWinnerTie": "Tied at the top — no winner is declared."
 }

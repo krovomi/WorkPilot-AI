@@ -383,6 +383,10 @@ interface I18nScalerState extends BaseSlice {
 	report: I18nScalingReport | null;
 	skeleton: I18nDict | null;
 	diff: LocaleDiffData | null;
+	/** Where the locales were actually read from — not always what was picked. */
+	scannedDir: string | null;
+	/** Set only when the picked directory was one language, not the root. */
+	redirectedFrom: string | null;
 	runReport: (localesDir: string, sourceLocale?: string) => Promise<void>;
 }
 
@@ -392,15 +396,22 @@ export const useI18nScalerStore = create<I18nScalerState>((set) => ({
 	report: null,
 	skeleton: null,
 	diff: null,
+	scannedDir: null,
+	redirectedFrom: null,
 	runReport: async (localesDir, sourceLocale) => {
-		set({ phase: "running", error: null });
+		set({ phase: "running", error: null, redirectedFrom: null });
 		try {
 			const res = await globalThis.electronAPI.reportI18nFromDir(
 				localesDir,
 				sourceLocale,
 			);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", report: res.report });
+			set({
+				phase: "ok",
+				report: res.report,
+				scannedDir: res.locales_dir ?? null,
+				redirectedFrom: res.redirected_from ?? null,
+			});
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}

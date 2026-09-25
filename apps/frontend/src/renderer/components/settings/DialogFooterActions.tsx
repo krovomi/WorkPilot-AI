@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "../ui/button";
 
 interface DialogFooterActionsProps {
@@ -24,6 +25,7 @@ export function DialogFooterActions({
 	onDelete,
 	onOpenChange,
 }: DialogFooterActionsProps) {
+	const { t } = useTranslation("common");
 	// Local servers (Ollama / LM Studio / …) run on a default URL (e.g.
 	// localhost:11434) and need NO API key, so the "Test" button must stay
 	// enabled even when both fields are empty — otherwise it's permanently greyed.
@@ -41,25 +43,22 @@ export function DialogFooterActions({
 		<>
 			{provider?.isConfigured && (
 				<Button variant="destructive" onClick={onDelete} className="mr-auto">
-					Supprimer
+					{t("actions.delete")}
 				</Button>
 			)}
 
 			<div className="flex gap-2 ml-auto">
-				{/* Hide Test/Save on Windsurf SSO tab and OpenAI Codex OAuth tab — auth auto-saves */}
-				{!(
-					(provider?.id === "windsurf" || provider?.id === "openai") &&
-					activeTab === "oauth"
-				) && (
+				{/* Windsurf SSO supplies its own save action */}
+				{!(provider?.id === "windsurf" && activeTab === "oauth") && (
 					<>
 						<Button variant="outline" onClick={onTest} disabled={testDisabled}>
-							{isTesting ? "Test..." : "Tester"}
+							{t(isTesting ? "actions.testing" : "actions.test")}
 						</Button>
-						<Button onClick={onSave}>Enregistrer</Button>
+						<Button onClick={onSave}>{t("actions.save")}</Button>
 					</>
 				)}
 				<Button variant="outline" onClick={() => onOpenChange(false)}>
-					Annuler
+					{t(activeTab === "api" ? "actions.cancel" : "actions.close")}
 				</Button>
 			</div>
 		</>

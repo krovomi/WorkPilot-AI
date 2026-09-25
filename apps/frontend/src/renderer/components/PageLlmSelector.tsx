@@ -1,3 +1,4 @@
+import { useProviderModelCatalog } from "../hooks/useProviderModelCatalog";
 /**
  * Le choix « provider × LLM × effort » de la page courante.
  *
@@ -13,7 +14,6 @@
  */
 
 import {
-	getModelsForProvider,
 	providerSupportsThinking,
 	THINKING_LEVELS,
 } from "@shared/constants/models";
@@ -56,9 +56,9 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 	const { t } = useTranslation(["dialogs", "common"]);
 	const { settings, profiles } = useSettingsStore();
 	const [providers, setProviders] = useState<CanonicalProvider[]>([]);
-	const [providerStatus, setProviderStatus] = useState<
-		Record<string, boolean>
-	>({});
+	const [providerStatus, setProviderStatus] = useState<Record<string, boolean>>(
+		{},
+	);
 	const [isOpen, setIsOpen] = useState(false);
 
 	useEffect(() => {
@@ -79,14 +79,17 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 
 	const resolved = useMemo(
 		() =>
-			isPageLlmPage(page) ? resolvePageLlm(settings, page as PageLlmPage) : null,
+			isPageLlmPage(page)
+				? resolvePageLlm(settings, page as PageLlmPage)
+				: null,
 		[page, settings],
 	);
+
+	const { models } = useProviderModelCatalog(resolved?.provider || "");
 
 	if (!resolved || !isPageLlmPage(page)) return null;
 
 	const override = settings.pageLlmOverrides?.[page] ?? {};
-	const models = getModelsForProvider(resolved.provider || "anthropic");
 	// Les tables de capacités sont indexées sur « anthropic », le backend sur
 	// « claude » : le résolveur rend la seconde forme, il faut demander la
 	// première — sinon l'effort disparaît de la page sur le fournisseur qui le
@@ -97,9 +100,8 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 		!capabilityProvider || providerSupportsThinking(capabilityProvider);
 
 	const providerLabel =
-		providers.find(
-			(p) => normalizeProviderId(p.name) === resolved.provider,
-		)?.label ||
+		providers.find((p) => normalizeProviderId(p.name) === resolved.provider)
+			?.label ||
 		resolved.provider ||
 		t("dialogs:pageLlm.providerUnset");
 	const modelLabel =
@@ -174,7 +176,7 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 						<SelectTrigger className="h-9">
 							<SelectValue />
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent searchable>
 							<SelectItem value={INHERIT}>
 								{t("dialogs:pageLlm.inheritProvider", {
 									provider: providerLabel,
@@ -205,7 +207,7 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 						<SelectTrigger className="h-9">
 							<SelectValue />
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent searchable>
 							<SelectItem value={INHERIT}>
 								{t("dialogs:pageLlm.inheritModel", { model: modelLabel })}
 							</SelectItem>

@@ -1,8 +1,19 @@
+import type {
+	ReviewFileEntry,
+	ReviewFileData,
+	ReviewScope,
+} from "../../shared/types/code-review";
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
 
 export interface FileAPI {
+	listReviewFiles: (projectId: string) => Promise<IPCResult<ReviewFileEntry[]>>;
+	readReviewFile: (
+		projectId: string,
+		file: string,
+		scope: ReviewScope,
+	) => Promise<IPCResult<ReviewFileData>>;
 	// File Explorer Operations
 	listDirectory: (
 		dirPath: string,
@@ -22,6 +33,10 @@ export interface FileAPI {
 }
 
 export const createFileAPI = (): FileAPI => ({
+	listReviewFiles: (projectId) =>
+		ipcRenderer.invoke(IPC_CHANNELS.CODE_REVIEW_FILES, projectId),
+	readReviewFile: (projectId, file, scope) =>
+		ipcRenderer.invoke(IPC_CHANNELS.CODE_REVIEW_FILE, projectId, file, scope),
 	// File Explorer Operations
 	listDirectory: (
 		dirPath: string,

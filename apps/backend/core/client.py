@@ -245,6 +245,7 @@ from rtk import rtk_rewrite_hook
 from rtk import settings as rtk_settings
 from security import bash_security_hook
 from security.guardrails import guardrails_hook as _raw_guardrails_hook
+from security.path_guard import GUARDED_WRITE_TOOLS, make_write_path_hook
 from watermarks import CLEANED_TOOLS as WATERMARK_CLEANED_TOOLS
 from watermarks import make_watermarks_hook
 from watermarks import settings as watermarks_settings
@@ -680,6 +681,13 @@ class _NoSubagents(Exception):
     """
 
 
+def _brain_mcp_tools() -> tuple[str, ...]:
+    """The shared brain's MCP tool names, for the permission allowlist."""
+    from brain.runtime import MCP_TOOL_NAMES
+
+    return MCP_TOOL_NAMES
+
+
 def create_client(
     project_dir: Path,
     spec_dir: Path,
@@ -964,6 +972,11 @@ def create_client(
                     if graphiti_mcp_enabled
                     else []
                 ),
+                *(
+                    [f"{tool}(*)" for tool in _brain_mcp_tools()]
+                    if "brain" in required_servers
+                    else []
+                ),
                 *[f"{tool}(*)" for tool in browser_tools_permissions],
             ],
         },
@@ -999,6 +1012,8 @@ def create_client(
         mcp_servers_list.append("linear (project management)")
     if graphiti_mcp_enabled:
         mcp_servers_list.append("graphiti-memory (knowledge graph)")
+    if "brain" in required_servers:
+        mcp_servers_list.append("workpilot-brain (shared brain)")
     if "workpilot" in required_servers and auto_claude_tools_enabled:
         mcp_servers_list.append(f"workpilot ({agent_type} tools)")
     if mcp_servers_list:
@@ -1168,6 +1183,17 @@ def create_client(
                 "env": {"TEAMS_WEBHOOK_URL": teams_webhook_url},
             }
 
+    # The shared brain (`brain/runtime.py`): offered to every agent with tools
+    # once a brain exists on this machine, whatever the feature.
+    if "brain" in required_servers:
+        from brain.runtime import SERVER_KEY, mcp_server_config, task_ref
+
+        # The task, when there is one, so what the agent learns shows up on
+        # its Kanban card.
+        mcp_servers[SERVER_KEY] = mcp_server_config(
+            task=task_ref(project_dir, spec_dir)
+        )
+
     # Add custom workpilot MCP server if required and available
     if "workpilot" in required_servers and auto_claude_tools_enabled:
         auto_claude_mcp_server = create_auto_claude_mcp_server(spec_dir, project_dir)
@@ -1285,6 +1311,10 @@ def create_client(
     # go, and nothing else about it varies per tool.
     _watermarks_hook = make_watermarks_hook(spec_dir)
 
+    # Same factory shape, and resolved once: the roots cannot change during a
+    # session and the hook runs on every write.
+    _write_path_hook = make_write_path_hook(project_dir, spec_dir)
+
     # Build options dict, conditionally including output_format
     options_kwargs: dict[str, Any] = {
         "model": model,
@@ -1305,13 +1335,31 @@ def create_client(
                 # without rtk answers in a cached `shutil.which` and the
                 # command runs exactly as written.
                 HookMatcher(matcher="Bash", hooks=[rtk_rewrite_hook]),
-                HookMatcher(
-                    matcher="Write",
-                    hooks=[_make_guardrails_hook(project_dir)],
+                # Where a write may land. Registered before the guardrails
+                # hook because it answers the same question the guardrails
+                # answer — may this write happen — from a rule the project does
+                # not have to have written down. `guardrails.evaluate` returns
+                # "no opinion" with no `.workpilot/guardrails.yaml`, which is
+                # the default, so until this hook existed nothing held an agent
+                # to the worktree it was given.
+                *(
+                    HookMatcher(
+                        matcher=tool,
+                        hooks=[_write_path_hook],
+                    )
+                    for tool in GUARDED_WRITE_TOOLS
                 ),
-                HookMatcher(
-                    matcher="Edit",
-                    hooks=[_make_guardrails_hook(project_dir)],
+                # The user's own policies, on every tool that writes. This used
+                # to name `Write` and `Edit` only; `MultiEdit` and
+                # `NotebookEdit` write too, and a rule a team wrote about a
+                # path was not being applied to two of the four tools that can
+                # reach it.
+                *(
+                    HookMatcher(
+                        matcher=tool,
+                        hooks=[_make_guardrails_hook(project_dir)],
+                    )
+                    for tool in GUARDED_WRITE_TOOLS
                 ),
                 # watermarks — strip the invisible codepoints a model leaves in
                 # what it writes, before the bytes reach the disk. Registered
@@ -1573,9 +1621,34 @@ def peek_active_provider(spec_dir: Path | None = None) -> str:
     return _get_active_provider(spec_dir, consume=False)
 
 
+# Le fournisseur retenu quand personne n'en nomme un. C'est un defaut, pas un
+# choix, et `_resolve_active_provider` le dit — voir la regle de routage dans
+# `core.offline_policy.resolve_offline_route`.
+_DEFAULT_PROVIDER = "claude"
+
+
 def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) -> str:
+    """The active provider, without saying where it came from.
+
+    Thin wrapper over `_resolve_active_provider` — see there for the
+    resolution order. Callers that must tell a *choice* from the fallback
+    default use that one instead.
+    """
+    return _resolve_active_provider(spec_dir, consume=consume)[0]
+
+
+def _resolve_active_provider(
+    spec_dir: Path | None = None, *, consume: bool = True
+) -> tuple[str, bool]:
     """
     Determine the active AI provider from IPC selection, environment or project settings.
+
+    Returns `(provider, chosen)`. `chosen` is False only in the last case
+    below — nobody named a provider anywhere and "claude" is a fallback.
+    The difference matters exactly once, and it is where it used to be
+    invisible: `core.offline_policy.resolve_offline_route` may re-route a
+    task to a local model, and it must know whether it is overriding a
+    decision somebody took or filling a blank nobody filled.
 
     Resolution order:
     0. RESUME_WITH_PROVIDER marker file (single-shot, "Reprendre avec X")
@@ -1588,7 +1661,8 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         spec_dir: Optional spec directory to check for project-level settings.
 
     Returns:
-        Provider identifier string: "claude", "copilot", "openai", etc.
+        `(provider, chosen)` — the identifier ("claude", "copilot", "openai",
+        …) and whether any source actually named it.
     """
     # Provider name mapping (shared across all resolution strategies)
     provider_mapping = {
@@ -1622,7 +1696,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                 override,
                 mapped_override,
             )
-            return mapped_override
+            return mapped_override, True
 
     # 1. Check provider selected via IPC (from frontend UI)
     try:
@@ -1634,7 +1708,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                 selected_provider.lower(), selected_provider.lower()
             )
             if mapped_provider:
-                return mapped_provider
+                return mapped_provider, True
     except Exception:
         # Fallback to other methods if IPC provider check fails
         pass
@@ -1646,7 +1720,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         logger.info(
             f"[_get_active_provider] Resolved provider from SELECTED_LLM_PROVIDER env var: '{selected_env}' -> '{resolved}'"
         )
-        return resolved
+        return resolved, True
 
     # 1.7. Check task_metadata.json for provider.
     # This handles the case where the frontend has a non-Claude provider stored in the
@@ -1675,7 +1749,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                         f"[_get_active_provider] Resolved from task_metadata.json: "
                         f"'{_meta_provider}' -> '{_mapped}'"
                     )
-                    return _mapped
+                    return _mapped, True
         except Exception:
             logger.debug(
                 "Could not read provider from task_metadata.json", exc_info=True
@@ -1698,7 +1772,7 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
         "cursor",
         "custom",
     ):
-        return env_provider
+        return env_provider, True
 
     # 3. Project-level setting from spec's parent project
     if spec_dir:
@@ -1733,13 +1807,13 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
                                 "cursor",
                                 "custom",
                             ):
-                                return value
+                                return value, True
             except Exception:
                 # Une source de provider illisible : on passe a la suivante, c'est le but de la chaine.
                 pass
 
     # 4. Default
-    return "claude"
+    return _DEFAULT_PROVIDER, False
 
 
 # Per-spec record of the last (provider, model, effort) an agent client was
@@ -2020,14 +2094,19 @@ def create_agent_client(
     if max_thinking_tokens is _UNSET:
         max_thinking_tokens = _effort_for(spec_dir, agent_type)
 
-    # Resolve provider
+    # Resolve provider. `provider_chosen` says whether this pair is a decision
+    # somebody took for this run — an explicit argument (the Bounty Board names
+    # one per contestant), the "Fournisseur IA" list, a per-task metadata entry —
+    # or the fallback nobody asked for. Only `resolve_offline_route` reads it,
+    # and only to decide whether an offline route may overrule it.
+    provider_chosen = provider is not None
     if provider is None:
-        provider = _get_active_provider(spec_dir)
+        provider, provider_chosen = _resolve_active_provider(spec_dir)
 
     from core.offline_policy import local_endpoint, resolve_offline_route
 
     provider, model, offline_base_url = resolve_offline_route(
-        project_dir, spec_dir, agent_type, provider, model
+        project_dir, spec_dir, agent_type, provider, model, chosen=provider_chosen
     )
 
     # Anthropic rejects dotted Copilot-style ids (e.g. "claude-opus-4.8"); rewrite
@@ -2107,6 +2186,7 @@ def create_agent_client(
             agents=copilot_agents,
             cwd=str(project_dir.resolve()),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
         )
 
     elif provider == "claude":
@@ -2162,6 +2242,7 @@ def create_agent_client(
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
         )
 
     elif provider == "openai":
@@ -2226,6 +2307,7 @@ def create_agent_client(
             agent_type=agent_type,
             reasoning_effort=reasoning_effort,
             prompt_cache_key=prompt_cache_key,
+            spec_dir=str(spec_dir),
         )
 
     elif provider == "google":
@@ -2256,6 +2338,7 @@ def create_agent_client(
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
         )
 
     elif provider in ("ollama", "local", "lmstudio", "lm-studio", "llama-cpp"):
@@ -2321,6 +2404,7 @@ def create_agent_client(
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
+            spec_dir=str(spec_dir),
         )
 
     else:

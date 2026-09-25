@@ -15,10 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
-import {
-	IPC_CHANNELS,
-	MODEL_ID_MAP,
-} from "../../../shared/constants";
+import { IPC_CHANNELS, MODEL_ID_MAP } from "../../../shared/constants";
 import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
 import { createIPCCommunicators } from "../github/utils/ipc-communicator";
@@ -139,6 +136,7 @@ function getReviewResult(
 				overallStatus: data.overall_status ?? "comment",
 				reviewedAt: data.reviewed_at ?? new Date().toISOString(),
 				reviewedCommitSha: data.reviewed_commit_sha,
+				jev: data.jev,
 				isFollowupReview: data.is_followup_review ?? false,
 				previousReviewId: data.previous_review_id,
 				resolvedFindings: data.resolved_findings ?? [],
@@ -244,6 +242,7 @@ async function runMRReview(
 
 	// Get runner environment with PYTHONPATH for bundled packages (fixes #139)
 	const subprocessEnv = await getRunnerEnv(undefined, {
+		jevWorkflow: "gitlab-review",
 		page: "gitlab-merge-requests",
 	});
 
@@ -1003,6 +1002,7 @@ export function registerMRReviewHandlers(
 
 					// Get runner environment with PYTHONPATH for bundled packages (fixes #139)
 					const followupSubprocessEnv = await getRunnerEnv(undefined, {
+						jevWorkflow: "gitlab-review",
 						page: "gitlab-merge-requests",
 					});
 

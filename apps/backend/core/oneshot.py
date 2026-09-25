@@ -29,9 +29,36 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Providers with a first-class AgentClient that can be instantiated without any
-# project context — required for the context-free utilities.
-_unused_first_class = {"claude", "anthropic", "copilot", "openai", "windsurf"}
+# Providers `_build_client` drives itself, without borrowing another vendor's
+# SDK. Anything outside this set has no agentic adapter — mistral, deepseek,
+# grok, meta, aws, cursor, custom — and `create_agent_client` runs it on Claude
+# instead, which `capabilities/providers.yaml` records as `degrades_to`.
+#
+# For a build that is the right trade: the task runs. For a caller that is
+# *comparing* providers it is the wrong one, because the answer comes back
+# labelled with a vendor that never saw the prompt. `require_provider` is how
+# such a caller says so; see `oneshot_completion`.
+_DIRECT_PROVIDERS = frozenset(
+    {
+        "claude",
+        "anthropic",
+        "copilot",
+        "openai",
+        "windsurf",
+        "google",
+        "ollama",
+        "local",
+        "lmstudio",
+        "lm-studio",
+        "llama-cpp",
+    }
+)
+
+
+def drives_itself(provider: str) -> bool:
+    """True when `provider` runs its own models here rather than degrading."""
+    return (provider or "").strip().lower() in _DIRECT_PROVIDERS
+
 
 # Cheap default model per provider for these tiny one-shot calls.
 _DEFAULT_MODELS = {
@@ -128,16 +155,23 @@ def _build_client(
     project_dir: str | None,
     spec_dir: str | None,
     max_turns: int,
+    *,
+    chosen: bool = False,
 ):
     cwd = str(Path(project_dir).resolve()) if project_dir else None
     from core.offline_policy import local_endpoint, resolve_offline_route
 
+    # `chosen` says whether this pair is a decision taken for this call — the
+    # Arena names one provider per contestant — or the fallback nobody asked
+    # for. Outside strict mode an offline route is a default, and a default
+    # does not get to answer a question the caller already answered.
     provider, model, offline_base_url = resolve_offline_route(
         Path(cwd or Path.cwd()),
         Path(spec_dir or cwd or Path.cwd()),
         "commit_message",
         provider,
         model,
+        chosen=chosen,
     )
 
     if provider in ("claude", "anthropic"):
@@ -241,6 +275,24 @@ def _build_client(
     return _claude_client(_DEFAULT_MODELS["claude"], system_prompt, project_dir)
 
 
+def _report_usage(client, on_usage: Callable[[dict], None] | None) -> None:
+    """Hand the provider's own usage record to the caller, once, if there is one.
+
+    Absence is information: a client that reported nothing must not be turned
+    into ``{"input_tokens": 0, ...}``, because the caller would then have no way
+    to tell a measurement from a default.
+    """
+    if on_usage is None:
+        return
+    usage = getattr(client, "last_usage", None)
+    if not isinstance(usage, dict) or not usage:
+        return
+    try:
+        on_usage(usage)
+    except Exception:  # noqa: BLE001 — reporting must not break the completion
+        logger.debug("[oneshot] on_usage callback raised", exc_info=True)
+
+
 async def oneshot_completion(
     prompt: str,
     system_prompt: str | None = None,
@@ -252,6 +304,8 @@ async def oneshot_completion(
     max_turns: int = 1,
     on_delta: Callable[[str], None] | None = None,
     on_error: Callable[[dict], None] | None = None,
+    on_usage: Callable[[dict], None] | None = None,
+    require_provider: bool = False,
 ) -> str:
     """Run a single text completion against the active provider; return the text.
 
@@ -273,12 +327,22 @@ async def oneshot_completion(
     wants to *explain* the failure gets something to explain, instead of having
     to guess from "the model returned nothing". Nothing here re-raises: the
     empty-string contract above is what every existing caller depends on.
+
+    ``on_usage`` — optional callback invoked once, whatever the outcome, with
+    the provider's own ``last_usage`` (``input_tokens`` / ``output_tokens`` /
+    ``cost_usd``) when it reported one. It is **not** called when the client
+    reported nothing: a caller that needs a number then knows it is estimating,
+    instead of being handed a zero it cannot tell from a measurement. Local
+    clients legitimately report ``cost_usd: 0.0`` — that is a measurement.
     """
-    from core.client import _get_active_provider
+    from core.client import _resolve_active_provider
 
     spec_path = Path(spec_dir) if spec_dir else None
-    resolved_provider = (provider or "").strip().lower() or _get_active_provider(
-        spec_path
+    named_provider = (provider or "").strip().lower()
+    resolved_provider, provider_chosen = (
+        (named_provider, True)
+        if named_provider
+        else _resolve_active_provider(spec_path)
     )
     resolved_model = _resolve_model(resolved_provider, model, spec_path)
 
@@ -289,6 +353,28 @@ async def oneshot_completion(
         "yes" if (project_dir and spec_dir) else "no",
     )
 
+    if require_provider and not drives_itself(resolved_provider):
+        message = (
+            f"Provider '{resolved_provider}' has no adapter of its own here: "
+            "running it would answer from a different vendor's model."
+        )
+        logger.warning("[oneshot] %s", message)
+        if on_error is not None:
+            from core.error_details import PROVIDER_UNAVAILABLE, ErrorDetail
+
+            detail = ErrorDetail(
+                message=message,
+                code=PROVIDER_UNAVAILABLE,
+                details=message,
+                provider=resolved_provider,
+                model=resolved_model,
+            )
+            try:
+                on_error(detail.to_dict())
+            except Exception:  # noqa: BLE001 — reporting must not mask the refusal
+                logger.debug("[oneshot] on_error callback raised", exc_info=True)
+        return ""
+
     client = _build_client(
         resolved_provider,
         resolved_model,
@@ -296,45 +382,51 @@ async def oneshot_completion(
         project_dir,
         spec_dir,
         max_turns,
+        chosen=provider_chosen,
     )
 
     text = ""
     try:
-        async with client:
-            await client.query(prompt)
-            async for msg in client.receive_response():
-                delta = _extract_text(msg)
-                if not delta:
-                    continue
-                text += delta
-                if on_delta is not None:
-                    try:
-                        on_delta(delta)
-                    except Exception:  # noqa: BLE001 — a flaky consumer must not break generation
-                        logger.debug(
-                            "[oneshot] on_delta callback raised", exc_info=True
-                        )
-    except Exception as error:  # noqa: BLE001 — one-shot callers own degradation
-        # Never echo a raw provider diagnostic: it may carry credential material.
-        # ``ErrorDetail`` redacts it, which is what makes it safe to hand to the
-        # caller (and, through it, to a copy-to-clipboard button in the UI).
-        logger.warning(
-            "[oneshot] provider completion failed (%s)", type(error).__name__
-        )
-        if on_error is not None:
-            from core.error_details import ErrorDetail, classify
-
-            message = str(error).strip() or type(error).__name__
-            detail = ErrorDetail(
-                message=message,
-                code=classify(type(error).__name__, message),
-                details=f"{type(error).__name__}: {message}",
-                provider=resolved_provider,
-                model=resolved_model,
+        try:
+            async with client:
+                await client.query(prompt)
+                async for msg in client.receive_response():
+                    delta = _extract_text(msg)
+                    if not delta:
+                        continue
+                    text += delta
+                    if on_delta is not None:
+                        try:
+                            on_delta(delta)
+                        except Exception:  # noqa: BLE001 — a flaky consumer must not break generation
+                            logger.debug(
+                                "[oneshot] on_delta callback raised", exc_info=True
+                            )
+        except Exception as error:  # noqa: BLE001 — one-shot callers own degradation
+            # Never echo a raw provider diagnostic: it may carry credential material.
+            # ``ErrorDetail`` redacts it, which is what makes it safe to hand to the
+            # caller (and, through it, to a copy-to-clipboard button in the UI).
+            logger.warning(
+                "[oneshot] provider completion failed (%s)", type(error).__name__
             )
-            try:
-                on_error(detail.to_dict())
-            except Exception:  # noqa: BLE001 — reporting must not mask the failure
-                logger.debug("[oneshot] on_error callback raised", exc_info=True)
-        return ""
-    return text.strip()
+            if on_error is not None:
+                from core.error_details import ErrorDetail, classify
+
+                message = str(error).strip() or type(error).__name__
+                detail = ErrorDetail(
+                    message=message,
+                    code=classify(type(error).__name__, message),
+                    details=f"{type(error).__name__}: {message}",
+                    provider=resolved_provider,
+                    model=resolved_model,
+                )
+                try:
+                    on_error(detail.to_dict())
+                except Exception:  # noqa: BLE001 — reporting must not mask the failure
+                    logger.debug("[oneshot] on_error callback raised", exc_info=True)
+            return ""
+        return text.strip()
+    finally:
+        # A run that failed halfway still spent tokens; a caller billing or
+        # ranking on them must see what the provider actually reported.
+        _report_usage(client, on_usage)

@@ -463,6 +463,8 @@ def _map_mcp_server_name(
     if not name:
         return None
     mappings = {
+        "brain": "brain",
+        "workpilot-brain": "brain",
         "context7": "context7",
         "graphiti-memory": "graphiti",
         "graphiti": "graphiti",
@@ -563,6 +565,22 @@ def get_required_mcp_servers(
     # Filter graphiti if not enabled
     if "graphiti" in servers and not os.environ.get("GRAPHITI_MCP_URL"):
         servers = [s for s in servers if s != "graphiti"]
+
+    # The shared brain reaches every agent that has tools at all, in every
+    # feature, the moment a brain exists on this machine (`brain/runtime.py`).
+    # Not declared per agent in AGENT_CONFIGS: a list to keep in step with
+    # every new agent type is how the next feature ends up unplugged. Added
+    # before the per-agent overrides, so AGENT_MCP_<agent>_REMOVE=brain works.
+    if config.get("tools") and "brain" not in servers:
+        try:
+            from brain.runtime import active as brain_active
+
+            if brain_active():
+                servers.append("brain")
+        except Exception as exc:  # noqa: BLE001 - an optional store never blocks an agent
+            import logging
+
+            logging.getLogger(__name__).debug("shared brain not offered: %s", exc)
 
     # Filter chrome-devtools if not enabled (default: disabled)
     if "chrome-devtools" in servers:

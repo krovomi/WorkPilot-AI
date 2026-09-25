@@ -6,6 +6,7 @@
  */
 
 import path from "node:path";
+import { registerDictationHandlers } from "./dictation-handlers";
 import { app, type BrowserWindow } from "electron";
 import type { AgentManager } from "../agent";
 import { getClaudeProfileManager } from "../claude-profile-manager";
@@ -118,6 +119,7 @@ import { registerScreenshotHandlers } from "./screenshot-handlers";
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
+import { registerJevHandlers } from "./jev-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
 import { setupSmartEstimationHandlers } from "./smart-estimation-handlers";
 import { registerAgentCoachHandlers } from "./agent-coach-handlers";
@@ -313,6 +315,7 @@ export function setupIpcHandlers(
 
 	// Settings and dialog handlers
 	registerSettingsHandlers(agentManager, getMainWindow);
+	registerJevHandlers();
 
 	// Multi-user server mode: connection + login (local / Entra ID)
 	registerServerAuthHandlers(getMainWindow);
@@ -408,6 +411,12 @@ export function setupIpcHandlers(
 
 	// Voice Control handlers
 	registerVoiceControlHandlers();
+	registerDictationHandlers(
+		() => pythonEnvManager.getPythonPath(),
+		getBackendSourcePath,
+		getMainWindow,
+		() => pythonEnvManager.getPythonEnv(),
+	);
 	setupVoiceControlEvents();
 
 	// App Emulator handlers

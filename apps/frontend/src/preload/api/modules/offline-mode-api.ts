@@ -20,6 +20,26 @@ export interface OfflineStatus {
 	};
 	localModels: string[];
 	offlineReady: boolean;
+	/**
+	 * Le projet bloque-t-il les fournisseurs cloud, et quel fichier le dit.
+	 *
+	 * Le statut ne portait que les runtimes, si bien que « ce projet est en
+	 * airgap » n'était lisible que sur la case à cocher de sa propre page :
+	 * partout ailleurs le choix de fournisseur s'affichait en vert et le
+	 * backend refusait l'appel une seconde plus tard.
+	 */
+	airgapStrict?: boolean;
+	policyPath?: string | null;
+	policyPersisted?: boolean;
+	/**
+	 * Le fichier qui décide est-il celui de *ce* projet ?
+	 *
+	 * La recherche remonte les répertoires parents, alors que l'écriture ne
+	 * vise que `<projet>/.workpilot/`. Un airgap hérité d'un parent ne peut
+	 * donc pas être levé depuis ici, et une UI qui l'ignorerait écrirait une
+	 * seconde politique sans rien débloquer.
+	 */
+	policyIsProjectOwn?: boolean;
 }
 
 export interface OfflineRoutingEntry {

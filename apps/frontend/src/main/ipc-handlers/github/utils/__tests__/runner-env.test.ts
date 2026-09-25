@@ -5,6 +5,8 @@ const mockGetOAuthModeClearVars = vi.fn();
 const mockGetPythonEnv = vi.fn();
 const mockGetBestAvailableProfileEnv = vi.fn();
 const mockGetGitHubTokenForSubprocess = vi.fn();
+const mockGetPageProviderEnv = vi.fn();
+const mockGetGlobalProviderEnv = vi.fn();
 
 vi.mock("../../../../services/profile", () => ({
 	getAPIProfileEnv: (...args: unknown[]) => mockGetAPIProfileEnv(...args),
@@ -31,6 +33,11 @@ vi.mock("../../utils", () => ({
 	getGitHubTokenForSubprocess: () => mockGetGitHubTokenForSubprocess(),
 }));
 
+vi.mock("../../../../services/page-llm-config", () => ({
+	getPageProviderEnv: (...args: unknown[]) => mockGetPageProviderEnv(...args),
+	getGlobalProviderEnv: () => mockGetGlobalProviderEnv(),
+}));
+
 import { getRunnerEnv } from "../runner-env";
 
 describe("getRunnerEnv", () => {
@@ -52,6 +59,8 @@ describe("getRunnerEnv", () => {
 		});
 		// Default mock for GitHub token - returns null (no token) by default
 		mockGetGitHubTokenForSubprocess.mockResolvedValue(null);
+		mockGetPageProviderEnv.mockReturnValue({});
+		mockGetGlobalProviderEnv.mockReturnValue({});
 	});
 
 	it("merges Python env with API profile env and OAuth clear vars", async () => {
@@ -161,5 +170,49 @@ describe("getRunnerEnv", () => {
 		const result = await getRunnerEnv();
 
 		expect(result.GITHUB_TOKEN).toBeUndefined();
+	});
+
+	it("uses the calling page's provider when one is named", async () => {
+		mockGetAPIProfileEnv.mockResolvedValue({});
+		mockGetOAuthModeClearVars.mockReturnValue({});
+		mockGetPageProviderEnv.mockReturnValue({
+			SELECTED_LLM_PROVIDER: "copilot",
+		});
+
+		const result = await getRunnerEnv(undefined, { page: "github-prs" });
+
+		expect(mockGetPageProviderEnv).toHaveBeenCalledWith("github-prs");
+		expect(mockGetGlobalProviderEnv).not.toHaveBeenCalled();
+		expect(result.SELECTED_LLM_PROVIDER).toBe("copilot");
+	});
+
+	// Une surface hors de `PAGE_LLM_FEATURES` ne recevait aucun
+	// SELECTED_LLM_PROVIDER : le backend repartait sur son propre défaut et la
+	// liste « Fournisseur IA » ne voulait rien dire pour elle.
+	it("falls back to the global provider when the caller names no page", async () => {
+		mockGetAPIProfileEnv.mockResolvedValue({});
+		mockGetOAuthModeClearVars.mockReturnValue({});
+		mockGetGlobalProviderEnv.mockReturnValue({
+			SELECTED_LLM_PROVIDER: "openai",
+			OPENAI_API_KEY: "key",
+		});
+
+		const result = await getRunnerEnv();
+
+		expect(mockGetPageProviderEnv).not.toHaveBeenCalled();
+		expect(result.SELECTED_LLM_PROVIDER).toBe("openai");
+		expect(result.OPENAI_API_KEY).toBe("key");
+	});
+
+	it("still lets extraEnv override the provider it resolved", async () => {
+		mockGetAPIProfileEnv.mockResolvedValue({});
+		mockGetOAuthModeClearVars.mockReturnValue({});
+		mockGetGlobalProviderEnv.mockReturnValue({
+			SELECTED_LLM_PROVIDER: "openai",
+		});
+
+		const result = await getRunnerEnv({ SELECTED_LLM_PROVIDER: "ollama" });
+
+		expect(result.SELECTED_LLM_PROVIDER).toBe("ollama");
 	});
 });

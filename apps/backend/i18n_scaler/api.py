@@ -5,6 +5,19 @@ Mounted at `/api/i18n-scaler`. Endpoints:
 * `POST /diff`              — diff a target locale against a source dict
 * `POST /skeleton`          — generate a target locale skeleton from source
 * `POST /report-from-dir`   — discover + report on a locales/ folder on disk
+
+And the editor, which is the half that writes:
+
+* `POST /detect`            — the translation directories inside a project
+* `POST /namespaces`        — every namespace, with per-locale completeness
+* `POST /namespace`         — one namespace across every locale, editable
+* `POST /mutate`            — apply a batch of edits to the JSON files
+
+The editor is **refused in server mode**, like `workflows/api.py` and
+`hermes/api.py`. It takes a filesystem path from the request and writes to it;
+on a shared deployment that is a cross-tenant write, and the repository's own
+rule is that a client-supplied path is refused outright there. Confining it to
+`REPOS_ROOT` would not be enough — every tenant's checkout is under it.
 """
 
 from __future__ import annotations
@@ -13,10 +26,19 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from core.api_safety import safe_error, validated_dir
+from core.api_safety import safe_error, server_mode_roots, validated_dir
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from .editor import (
+    EditorError,
+    Operation,
+    StaleFileError,
+    apply_operations,
+    find_locale_roots,
+    list_namespaces,
+    load_namespace,
+)
 from .scaler import I18nAutoScaler, PlaceholderStrategy
 
 logger = logging.getLogger(__name__)
@@ -26,6 +48,76 @@ router = APIRouter(prefix="/api/i18n-scaler", tags=["i18n-scaler"])
 
 def _validate_dir(raw: str) -> Path:
     return validated_dir(raw, "path")
+
+
+_SERVER_MODE_REFUSAL = (
+    "The translation editor is not available in server mode: it reads and "
+    "writes a directory named by the caller, which on a shared deployment is "
+    "another tenant's checkout."
+)
+
+
+def _refused_in_server_mode() -> dict | None:
+    """`None` in local mode. The refusal payload otherwise."""
+    if server_mode_roots() is None:
+        return None
+    return {"success": False, "error": _SERVER_MODE_REFUSAL}
+
+
+#: What each `EditorError.reason` says to the caller.
+#:
+#: Literal templates, filled only from `EditorError.params` — keys and locale
+#: codes the caller sent, and file basenames. The exception's own message is
+#: never returned: it is written to the log, where a resolved path belongs, and
+#: `str(e)` on a response path is exactly the `py/stack-trace-exposure` CodeQL
+#: raised against the first version of this module. Two of those messages did
+#: carry a resolved filesystem path, so it was not only a shape complaint.
+#:
+#: A reason with no row here falls back to "Invalid input", so adding a refusal
+#: in `editor.py` and forgetting it here is quiet rather than leaky.
+_REASONS: dict[str, str] = {
+    "invalid-json": "{file} is not valid JSON. Fix the file and reload.",
+    "not-an-object": "{file} does not hold a JSON object.",
+    "no-locales": (
+        "No locales found in that directory. Expected either <lang>/*.json or "
+        "<lang>.json inside it."
+    ),
+    "no-namespace": "There is no namespace {namespace!r} here.",
+    "not-a-directory": "That path is not a directory.",
+    "key-empty": "A key cannot be empty.",
+    "key-too-long": "That key is too long.",
+    "value-too-long": "That value is too long.",
+    "key-shape": (
+        "{key!r} is not a usable key: segments are separated by single dots, "
+        "and none may be empty or start with a space."
+    ),
+    "key-taken": "{key!r} already exists in this namespace.",
+    "unknown-key": "{key!r} is not in this namespace.",
+    "unknown-locale": "{locale!r} is not one of the locales here.",
+    "key-nests-under": (
+        "{key!r} cannot hold a value: {other!r} already nests underneath it."
+    ),
+    "key-nested-in": (
+        "{key!r} cannot be created: {other!r} already holds a value at that path."
+    ),
+    "stale-file": (
+        "{file} changed on disk since it was opened. Reload the namespace and "
+        "apply the edits again — saving now would discard that change."
+    ),
+}
+
+
+def _editor_error(e: EditorError, op: str) -> str:
+    """The sentence a caller is shown for a refusal it can act on."""
+    template = _REASONS.get(e.reason)
+    if template is None:
+        logger.warning("%s: unmapped editor reason %r", op, e.reason)
+        return "Invalid input"
+    try:
+        return template.format(**e.params)
+    except (KeyError, IndexError):  # pragma: no cover - a template/params drift
+        logger.warning("%s: reason %r does not match its params", op, e.reason)
+        return "Invalid input"
 
 
 def _resolve_strategy(raw: str | None) -> PlaceholderStrategy:
@@ -103,14 +195,233 @@ def report_from_dir(req: ReportFromDirRequest):
         return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
     try:
         scaler = I18nAutoScaler(placeholder_strategy=strategy)
-        locales = scaler.discover_locale_dir(path)
-        if req.source_locale not in locales:
-            return {
-                "success": False,
-                "error": f"Source locale {req.source_locale!r} not found under {path}",
-            }
-        report = scaler.report(req.source_locale, locales)
-        return {"success": True, "report": report.to_dict()}
+        found = scaler.discover_locales(path)
+    except ValueError as e:
+        return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
+    except Exception as e:  # noqa: BLE001
+        logger.exception("report-from-dir discovery failed")
+        return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
+
+    # Every refusal below names what was read and what was there. The one this
+    # replaced said only that the source locale was not under the path — which
+    # on the directory of that very locale read as a contradiction, and gave
+    # nobody the one fact that settles it: which locales the scan did find.
+    if not found.locales:
+        return {
+            "success": False,
+            "error": (
+                f"No translation files found under {path}. Expected either "
+                f"{path.name}/<lang>/*.json or {path.name}/<lang>.json."
+            ),
+            "locales_dir": str(path),
+            "locales_found": [],
+        }
+
+    if req.source_locale not in found.locales:
+        available = ", ".join(sorted(found.locales))
+        return {
+            "success": False,
+            "error": (
+                f"Source locale {req.source_locale!r} not found in {found.root}. "
+                f"Locales found: {available}."
+            ),
+            "locales_dir": str(found.root),
+            "locales_found": sorted(found.locales),
+        }
+
+    try:
+        report = scaler.report(req.source_locale, found.locales)
     except Exception as e:  # noqa: BLE001
         logger.exception("report-from-dir failed")
         return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
+
+    return {
+        "success": True,
+        "report": report.to_dict(),
+        "locales_dir": str(found.root),
+        "locales_found": sorted(found.locales),
+        "layout": found.layout,
+        # Set only when the caller named the inside of one language rather
+        # than the root of all of them. The UI says so, because a report about
+        # a directory nobody picked is worse than the error it replaces.
+        "redirected_from": (
+            str(found.redirected_from) if found.redirected_from is not None else None
+        ),
+    }
+
+
+# ----------------------------------------------------------------------
+# The editor
+
+
+class NamespacesRequest(BaseModel):
+    locales_dir: str = Field(..., description="Path to the locales/ directory.")
+
+
+class NamespaceRequest(BaseModel):
+    locales_dir: str = Field(..., description="Path to the locales/ directory.")
+    namespace: str = Field(
+        "", description="Namespace stem. Empty for a flat <root>/<lang>.json layout."
+    )
+    reference_locale: str | None = Field(
+        None,
+        description=(
+            "Whose interpolation variables the other locales are checked "
+            "against. Defaults to the first locale alphabetically."
+        ),
+    )
+
+
+class OperationModel(BaseModel):
+    op: str = Field(..., description="set | add | rename | delete")
+    key: str = Field(..., description="Dotted key path inside the namespace.")
+    new_key: str | None = Field(None, description="Required by `rename`.")
+    values: dict[str, str | None] = Field(
+        default_factory=dict,
+        description=(
+            "Locale → value, for `set` and `add`. A locale left out keeps what "
+            "it had; an explicit null removes the key from that locale only."
+        ),
+    )
+
+
+class MutateRequest(BaseModel):
+    locales_dir: str
+    namespace: str = ""
+    operations: list[OperationModel] = Field(default_factory=list)
+    fingerprints: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Per-locale fingerprints from the load. A file that no longer "
+            "matches makes the whole batch fail rather than overwrite it."
+        ),
+    )
+
+
+@router.post("/namespaces")
+def namespaces(req: NamespacesRequest):
+    """Every namespace under the directory, with per-locale completeness."""
+    refusal = _refused_in_server_mode()
+    if refusal:
+        return refusal
+    try:
+        path = _validate_dir(req.locales_dir)
+    except ValueError as e:
+        return {"success": False, "error": safe_error(e, logger, "namespaces")}
+    try:
+        discovery, summaries = list_namespaces(path)
+    except EditorError as e:
+        logger.info("namespaces refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "namespaces")}
+    except Exception as e:  # noqa: BLE001
+        logger.exception("namespaces failed")
+        return {"success": False, "error": safe_error(e, logger, "namespaces")}
+
+    if not discovery.locales:
+        return {
+            "success": False,
+            "error": (
+                f"No translation files found under {path}. Expected either "
+                f"{path.name}/<lang>/*.json or {path.name}/<lang>.json."
+            ),
+        }
+    return {
+        "success": True,
+        "locales_dir": str(discovery.root),
+        "locales": sorted(discovery.locales),
+        "layout": discovery.layout,
+        "redirected_from": (
+            str(discovery.redirected_from)
+            if discovery.redirected_from is not None
+            else None
+        ),
+        "namespaces": [s.to_dict() for s in summaries],
+    }
+
+
+@router.post("/namespace")
+def namespace(req: NamespaceRequest):
+    """One namespace across every locale, with the fingerprints a save needs."""
+    refusal = _refused_in_server_mode()
+    if refusal:
+        return refusal
+    try:
+        path = _validate_dir(req.locales_dir)
+    except ValueError as e:
+        return {"success": False, "error": safe_error(e, logger, "namespace")}
+    try:
+        view = load_namespace(
+            path, req.namespace, reference_locale=req.reference_locale
+        )
+    except EditorError as e:
+        logger.info("namespace refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "namespace")}
+    except Exception as e:  # noqa: BLE001
+        logger.exception("namespace failed")
+        return {"success": False, "error": safe_error(e, logger, "namespace")}
+    return {"success": True, "view": view.to_dict()}
+
+
+@router.post("/mutate")
+def mutate(req: MutateRequest):
+    """Apply a batch of edits to the translation files, or none of them."""
+    refusal = _refused_in_server_mode()
+    if refusal:
+        return refusal
+    try:
+        path = _validate_dir(req.locales_dir)
+    except ValueError as e:
+        return {"success": False, "error": safe_error(e, logger, "mutate")}
+
+    operations = [
+        Operation(op=o.op, key=o.key, new_key=o.new_key, values=o.values)
+        for o in req.operations
+    ]
+    unknown = {o.op for o in operations} - {"set", "add", "rename", "delete"}
+    if unknown:
+        return {
+            "success": False,
+            "error": f"Unknown operation(s): {', '.join(sorted(unknown))}.",
+        }
+
+    try:
+        result = apply_operations(
+            path, req.namespace, operations, expected_fingerprints=req.fingerprints
+        )
+    except StaleFileError as e:
+        # Its own flag: the UI reloads and replays rather than showing an error
+        # the user can only answer by losing their edits.
+        logger.info("mutate refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "mutate"), "stale": True}
+    except EditorError as e:
+        logger.info("mutate refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "mutate")}
+    except Exception as e:  # noqa: BLE001
+        logger.exception("mutate failed")
+        return {"success": False, "error": safe_error(e, logger, "mutate")}
+    return {"success": True, **result.to_dict()}
+
+
+class DetectRequest(BaseModel):
+    project_dir: str = Field(..., description="Root of the project to look in.")
+
+
+@router.post("/detect")
+def detect(req: DetectRequest):
+    """The translation directories this project actually has, best first."""
+    refusal = _refused_in_server_mode()
+    if refusal:
+        return refusal
+    try:
+        path = validated_dir(req.project_dir, "project_dir")
+    except ValueError as e:
+        return {"success": False, "error": safe_error(e, logger, "detect")}
+    try:
+        roots = find_locale_roots(path)
+    except EditorError as e:
+        logger.info("detect refused: %s", e)
+        return {"success": False, "error": _editor_error(e, "detect")}
+    except Exception as e:  # noqa: BLE001
+        logger.exception("detect failed")
+        return {"success": False, "error": safe_error(e, logger, "detect")}
+    return {"success": True, "roots": [r.to_dict() for r in roots]}

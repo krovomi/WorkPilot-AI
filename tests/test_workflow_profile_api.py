@@ -197,3 +197,31 @@ class TestItRefusesToWander:
         assert res["reason"] == "missing"
         assert str(missing) not in res["error"]
         assert "nope" not in res["error"]
+
+
+def test_jev_profile_is_read_only(project, monkeypatch):
+    from integrations.jev.client import JevClient
+    from integrations.jev.observations import write_observation
+
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("profile must not contact TypeSafe")
+
+    monkeypatch.setattr(JevClient, "post", forbidden)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    spec = project / ".workpilot" / "specs" / "001-x"
+    write_observation(
+        spec,
+        {
+            "version": 1,
+            "workflow": "feature-build",
+            "runId": "old-run",
+            "evaluations": [],
+        },
+    )
+    result = ask(project, effort="low")
+    assert result["success"] is True
+    assert result["profile"]["jev"]["observation"]["runId"] == "old-run"
+    assert result["profile"]["jev"]["airgapStrict"] is False
+    import os
+
+    assert os.environ["TYPESAFE_API_KEY"] == "test-key"

@@ -15,6 +15,8 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { app, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
+import { credentialManager } from "../services/credential-manager.js";
+import { getRunnerEnv } from "./github/utils/runner-env.js";
 
 interface ContestantInput {
 	provider: string;
@@ -61,6 +63,65 @@ function resolveSpecDir(projectPath: string, specId: string): string {
 	return candidates[0];
 }
 
+/**
+ * Credentials for every provider fielded in this round.
+ *
+ * A bounty is the one run in this application that talks to several providers
+ * at once, so it needs all of their keys in one environment — and explicitly
+ * *not* a `SELECTED_LLM_PROVIDER`. That variable is how the backend resolves a
+ * provider when nobody named one; here every contestant names its own, which
+ * `create_agent_client(provider=...)` honours directly. Leaving an ambient one
+ * behind would be a second answer to a settled question, and the contestant it
+ * happened to name would be the only one whose provider was chosen twice.
+ *
+ * **The base is `getRunnerEnv`, not a second assembly.** This handler used to
+ * build the whole environment out of `credentialManager` alone, and that
+ * object never carries Claude's own authentication: the OAuth token comes from
+ * `getBestAvailableProfileEnv` and an API profile from `getAPIProfileEnv`,
+ * both of which every other runner in the application gets through
+ * `getRunnerEnv`. So a Claude contestant was dispatched with no Claude
+ * credentials at all and died on "No OAuth token found. WorkPilot AI requires
+ * Claude Code OAuth authentication" — on a machine that was authenticated, in
+ * the same round where OpenAI and Google reached their providers fine. Two
+ * assemblies of one environment is how one of them silently loses a variable.
+ *
+ * Claude's chain is therefore left to `getRunnerEnv` and never re-stated here:
+ * it resolves OAuth mode, API profiles and rate-limit-aware profile swapping
+ * together, and re-injecting a key from `credentialManager` on top could
+ * contradict the mode it just chose. Only the *other* providers of the board
+ * are layered on.
+ */
+export async function buildContestantEnv(
+	contestants: ContestantInput[],
+	extraEnv: Record<string, string>,
+): Promise<Record<string, string>> {
+	const env = await getRunnerEnv(extraEnv);
+
+	const providers = [
+		...new Set(
+			contestants
+				.map((c) => (c.provider || "").trim().toLowerCase())
+				.filter(Boolean),
+		),
+	].filter((provider) => provider !== "claude" && provider !== "anthropic");
+
+	for (const provider of providers) {
+		try {
+			Object.assign(env, credentialManager.getEnvironmentVariables(provider));
+		} catch (err) {
+			// One provider's credentials being unreadable must not stop the round:
+			// that contestant fails visibly in the board with the provider's own
+			// error, which is more useful than refusing to start at all.
+			console.warn(
+				`[bountyBoard] no credentials for provider "${provider}":`,
+				(err as Error).message,
+			);
+		}
+	}
+	delete env.SELECTED_LLM_PROVIDER;
+	return env;
+}
+
 export function registerBountyBoardHandlers(): void {
 	ipcMain.handle(
 		"bountyBoard:start",
@@ -102,10 +163,17 @@ export function registerBountyBoardHandlers(): void {
 				args.push("--prompt-overrides", overridesArg);
 			}
 
+			const child_env = {
+				...process.env,
+				...(await buildContestantEnv(req.contestants, {
+					PYTHONPATH: backendPath,
+				})),
+			};
+
 			return await new Promise<StartResponse>((resolve, reject) => {
 				const child = spawn(pythonExe, args, {
 					cwd: backendPath,
-					env: { ...process.env, PYTHONPATH: backendPath },
+					env: child_env,
 				} as Parameters<typeof spawn>[2]);
 
 				let stdout = "";

@@ -1,4 +1,8 @@
 {
+	"selectSearch": {
+		"placeholder": "Saisir pour filtrer…",
+		"empty": "Aucun résultat"
+	},
 	"projectTab": {
 		"settings": "Paramètres du projet",
 		"showArchived": "Afficher archivés",
@@ -121,7 +125,9 @@
 		"disable": "désactiver",
 		"add": "Ajouter",
 		"cancel": "Annuler",
-		"close": "Fermer"
+		"close": "Fermer",
+		"test": "Tester",
+		"testing": "Test..."
 	},
 	"os": {
 		"windows": "Windows",
@@ -588,6 +594,10 @@
 		"windsurfFlowActions": "Actions Flow",
 		"windsurfNotDetected": "IDE Windsurf non détecté. Assurez-vous que Windsurf est en cours d'exécution.",
 		"windsurfDashboardLink": "Voir le tableau de bord Windsurf →",
+		"notMeasured": "Non mesuré",
+		"notMeasuredDescription": "Ce fournisseur ne publie pas de quota lisible par WorkPilot : aucun pourcentage n'est affiché plutôt qu'un 0 % inventé.",
+		"chatgptFromApi": "Limites du forfait ChatGPT, telles que rapportées par ChatGPT.",
+		"chatgptFromCodexLog": "Limites du forfait ChatGPT relevées par Codex CLI ({{time}}).",
 		"openaiCostLabel": "Coût OpenAI (mois en cours)",
 		"openaiCostDescription": "Le coût affiché correspond à votre utilisation OpenAI pour le mois en cours (estimation).",
 		"openaiDashboard": "Afficher le tableau de bord OpenAI",
@@ -708,6 +718,11 @@
 		"noAccountsYet": "Aucun compte ajouté pour le moment. Ajoutez votre premier compte Claude ci-dessous."
 	},
 	"authTerminal": {
+		"signInLink": "Lien de connexion",
+		"openInBrowser": "Ouvrir dans le navigateur",
+		"copyLink": "Copier le lien",
+		"linkCopied": "Copié !",
+		"copyFailed": "Impossible de copier le lien dans le presse-papiers.",
 		"failedToCreate": "Échec de la création du terminal",
 		"unknownError": "Erreur inconnue",
 		"instructionTitle": "Authentification Claude",

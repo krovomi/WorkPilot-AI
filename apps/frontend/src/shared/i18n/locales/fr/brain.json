@@ -1,0 +1,103 @@
+{
+	"card": {
+		"title": "Cerveau partagé",
+		"subtitle": "Ce que cette tâche a appris au cerveau partagé par tous vos agents IA.",
+		"state": {
+			"built": "construite",
+			"merged": "acceptée"
+		},
+		"badge": {
+			"notes": "{{count}} note",
+			"notes_other": "{{count}} notes",
+			"proposals": "{{count}} règle proposée",
+			"proposals_other": "{{count}} règles proposées"
+		},
+		"verdict": {
+			"qa": "QA : {{value}}",
+			"tests": "Tests : {{value}}",
+			"qaYes": "approuvée",
+			"qaNo": "refusée",
+			"testsYes": "verts",
+			"testsNo": "rouges",
+			"unknown": "non mesuré"
+		},
+		"refresh": "Actualiser",
+		"expand": "Détails",
+		"collapse": "Masquer",
+		"buildNote": "Note de la tâche",
+		"notesTitle": "Appris pendant la tâche",
+		"notesEmpty": "Aucun agent n'a encore écrit dans le cerveau pendant cette tâche.",
+		"proposalsTitle": "Règles proposées par les agents",
+		"proposalsHint": "Une règle active s'applique à tous vos agents, sur tous vos projets. Les agents de WorkPilot ne font que la proposer : à vous de décider.",
+		"activate": "Activer",
+		"reject": "Refuser",
+		"openInObsidian": "Ouvrir dans Obsidian",
+		"by": "par {{agents}}",
+		"kind": {
+			"instruction": "règle",
+			"knowledge": "connaissance",
+			"note": "note"
+		},
+		"error": "Le cerveau n'a pas pu être lu : {{error}}"
+	},
+	"settings": {
+		"title": "Cerveau partagé",
+		"description": "Un seul endroit pour toute la connaissance de vos agents IA — Claude Code, Codex, Hermes, OpenClaw… et toutes les fonctionnalités de WorkPilot. Un vault Obsidian, un graphe Graphify, synchronisé par git.",
+		"unavailable": "Le cerveau partagé est une fonctionnalité de l'application de bureau.",
+		"loading": "Lecture de la configuration…",
+		"enabled": "Brancher le cerveau sur WorkPilot",
+		"enabledHint": "Tous les agents de toutes les fonctionnalités consultent le cerveau et y apprennent. Désactivé, rien n'est lu ni écrit.",
+		"folder": "Dossier du cerveau (vault Obsidian)",
+		"folderHint": "Un vault Obsidian existant est adopté tel quel : ses notes deviennent la mémoire des agents, et rien n'est ajouté à sa racine. Un dossier vide devient un nouveau cerveau. Il doit se trouver dans votre dossier personnel.",
+		"browse": "Parcourir…",
+		"useDefault": "Emplacement par défaut",
+		"remote": "Dépôt Git distant (GitHub…)",
+		"remoteHint": "« utilisateur/dépôt » pour GitHub, ou une URL https:// ou git@. Un dossier vide est cloné depuis ce dépôt ; ensuite, chaque modification est tirée (pull) et poussée (push). Vos identifiants git sont utilisés : préférez un dépôt privé.",
+		"remotePlaceholder": "utilisateur/mon-cerveau",
+		"connect": "Enregistrer et connecter",
+		"connecting": "Connexion…",
+		"sync": "Synchroniser maintenant",
+		"syncing": "Synchronisation…",
+		"envOverride": "Le dossier est imposé par la variable d'environnement {{variable}}.",
+		"saved": "Cerveau connecté.",
+		"error": "Échec : {{error}}",
+		"status": {
+			"title": "État",
+			"active": "Branché : {{notes}} notes",
+			"inactive": "Pas encore de cerveau à cet emplacement.",
+			"disabled": "Désactivé.",
+			"obsidian": "Vault Obsidian détecté",
+			"noGit": "git introuvable sur cette machine : le cerveau fonctionne sans synchronisation.",
+			"remote": "Distant : {{remote}}",
+			"noRemote": "Pas de distant : les modifications restent sur cette machine.",
+			"proposals": "{{count}} règle proposée par les agents attend votre décision",
+			"proposals_other": "{{count}} règles proposées par les agents attendent votre décision"
+		},
+		"lastSync": {
+			"ok": "Synchronisé.",
+			"conflicts": "Synchronisé, {{count}} conflit : les deux versions sont gardées.",
+			"conflicts_other": "Synchronisé, {{count}} conflits : les deux versions sont gardées.",
+			"skipped": "Rien à synchroniser ({{reason}})."
+		},
+		"errors": {
+			"outsideHome": "Le dossier du cerveau doit se trouver dans votre dossier personnel (et pas être ce dossier lui-même).",
+			"isFile": "Ce chemin désigne un fichier, pas un dossier.",
+			"invalidRemote": "Ce n'est pas un dépôt git : indiquez « utilisateur/dépôt » ou une URL https:// ou git@.",
+			"envLocked": "Le dossier est imposé par une variable d'environnement.",
+			"auth": "Accès refusé au dépôt : vérifiez vos identifiants git (clé SSH, ou « gh auth setup-git » pour HTTPS).",
+			"notFound": "Dépôt introuvable : vérifiez son nom et que votre compte y a accès.",
+			"network": "Le dépôt est injoignable : vérifiez votre connexion.",
+			"timeout": "L'opération git a pris trop de temps.",
+			"gitMissing": "git est introuvable sur cette machine.",
+			"failed": "L'opération git a échoué.",
+			"syncFailed": "La synchronisation a échoué.",
+			"invalidPath": "Cette règle est introuvable dans le cerveau.",
+			"invalidStatus": "Statut de règle inconnu.",
+			"locked": "Un autre programme git travaille sur ce dossier (le plugin obsidian-git ?). Réessayez dans un instant.",
+			"identity": "git ne sait pas qui committe : lancez « git config --global user.name \"Votre nom\" » et « git config --global user.email vous@exemple.com ».",
+			"rejected": "GitHub a refusé l'envoi (branche protégée, ou dépôt modifié ailleurs entre-temps). Resynchronisez ; si ça persiste, voyez le détail ci-dessous.",
+			"pathTooLong": "Un chemin du vault est trop long pour Windows : lancez « git config --global core.longpaths true »."
+		},
+		"gitSaid": "git a répondu :"
+	}
+}
