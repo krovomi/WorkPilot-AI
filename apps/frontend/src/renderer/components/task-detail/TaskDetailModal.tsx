@@ -103,6 +103,7 @@ import {
 	useArchitectureDelta,
 } from "../../stores/architecture-delta-store";
 import { TaskArchitectureDelta } from "./TaskArchitectureDelta";
+import { DocumentInsightsCard } from "./DocumentInsightsCard";
 import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
 import { WorkflowProfileCard } from "./WorkflowProfileCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
@@ -1323,6 +1324,17 @@ function TaskDetailModalContent({
 											    does not build. Renders nothing when there is
 											    neither. */}
 											<SpecTraceabilityCard
+												task={task}
+												projectPath={
+													taskProject?.path ?? activeProject?.path
+												}
+											/>
+
+											{/* Ce que les agents liront des pièces jointes
+											    (schémas, captures) et les ADR qui s'imposent.
+											    Ne s'affiche pas quand il n'y a ni l'un ni
+											    l'autre. */}
+											<DocumentInsightsCard
 												task={task}
 												projectPath={
 													taskProject?.path ?? activeProject?.path

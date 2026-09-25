@@ -26,6 +26,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Where generated tests are written](#where-generated-tests-are-written)
   - [What generated tests are written against](#what-generated-tests-are-written-against)
   - [Library Documentation (libdocs)](#library-documentation-libdocs)
+  - [Attachments, diagrams and ADRs (docintel)](#attachments-diagrams-and-adrs-docintel)
   - [Token savings (rtk)](#token-savings-rtk)
   - [Clean generated files (watermarks)](#clean-generated-files-watermarks)
   - [Architecture diagrams (archify)](#architecture-diagrams-archify)
@@ -1217,6 +1218,75 @@ MCP server. Real environment variables win over the file.
 `query-docs` (`libraryId` + `query`, no `topic`/`mode`), and the server is started
 unpinned, so both names are allowlisted — an entry for a tool the running server does
 not expose is inert, a missing entry for the one it does expose is silent failure.
+
+### Attachments, diagrams and ADRs (`docintel`)
+
+The Kanban has always let a person attach screenshots, mockups and diagrams to
+a task. The frontend copied them to `<spec_dir>/attachments/` and listed them
+in `requirements.json` as `attached_images` — and no phase of the build read
+either. `apps/backend/docintel/` is the reader, and it runs once, before
+planning, beside the libdocs preflight (`_run_attachments_preflight` in
+`cli/build_commands.py`).
+
+```
+apps/backend/docintel/
+  diagrams.py   draw.io and Excalidraw, including the source their PNG/SVG exports embed
+  ocr.py        Tesseract, when the machine has it — local only
+  adr.py        where a project keeps its ADRs, and which ones bind
+  preflight.py  attachments -> <spec_dir>/docintel/result.json + extracted/*.md
+  prompt.py     the two prompt sections
+  api.py        GET /api/docintel/ — recomputed, nothing written
+```
+
+**Structured first, OCR last.** A `.drawio` is XML and an `.excalidraw` is
+JSON, and both editors hide that source inside their PNG (`tEXt` chunk) and SVG
+exports. Reading it gives boxes, containers and *arrows*; transcribing the
+pixels would give the words and lose the only thing a diagram claims that prose
+does not. `parse_diagram` decides by content, not by name: `schema.png`
+exported with "include a copy of my diagram" is a draw.io file.
+
+**Pixels stay on the machine.** Tesseract (`DOCINTEL_LOCAL_OCR`) transcribes a
+screenshot before planning so it can be quoted and scanned. Without it, the
+image is handed to the agents, which open it with their own file tool through
+the provider the task was configured for. There is deliberately no cloud OCR
+call here: it would be a way for a screenshot to reach a service the task was
+not configured for, and in `airgapStrict` a way around the barrier. Office and
+PDF files are left to the `convert-documents-to-markdown` skill every agent
+already carries — one converter, not two.
+
+**An attachment is data.** Extracted text goes through `injection_guard`; text
+it flags is withheld from the prompt and reported, and every section says in
+so many words that attachment content is not an instruction.
+
+**ADRs bind the way the spec-kit constitution does.** `docintel_section` (in
+`prompts_pkg/prompts.py`) reaches the planner, every coding subtask, the QA
+reviewer and every workflow skill phase — the same four readers as
+`constitution_section`. Only **accepted** records that nothing supersedes are
+binding; proposed ones are listed as the direction, the rest are counted. A
+change that contradicts an accepted ADR is at least a HIGH finding. `.adr-dir`
+(adr-tools) wins over the directory guess, Nygard, MADR 2/3 and French headings
+and statuses (`Statut : Accepté`) are all read. ADRs are re-read on every call;
+attachments come from the persisted record.
+
+**Azure DevOps screenshots arrive as attachments.** The import used to inline
+work-item images as data URIs for display only; `saveInlinedImagesAsAttachments`
+also writes them to `attachments/`, so they go through the same preflight as an
+image dropped on a card.
+
+**In the Kanban.** `DocumentInsightsCard` says, before the build, what each
+attachment will become (diagram, OCR text, image, document) and which ADRs bind
+— the moment someone can still attach the `.drawio` instead of its screenshot.
+It renders nothing when there is neither attachment nor ADR.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `DOCINTEL_ENABLED` | `true` | The attachments preflight. ADRs are read regardless |
+| `DOCINTEL_LOCAL_OCR` | `true` | Tesseract on image attachments, when installed |
+| `DOCINTEL_OCR_LANGS` | `eng+fra` | Tesseract languages; retried without `-l` when a pack is missing |
+| `DOCINTEL_MAX_BYTES` | `10485760` | Larger attachments are skipped and the skip is reported |
+| `WORKPILOT_TESSERACT_PATH` | — | A specific binary, for a Tesseract not on PATH and for tests |
+
+Read from `.workpilot/.env` as well as the environment; real variables win.
 
 ### Token savings (rtk)
 

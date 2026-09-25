@@ -262,6 +262,29 @@ def _run_docs_preflight(
         print("\n" + summary)
 
 
+def _run_attachments_preflight(spec_dir: Path, source_project_dir: Path) -> None:
+    """Read the task's attachments into `<spec_dir>/docintel/` before planning.
+
+    The settings come from the *source* project's `.workpilot/.env`, which is
+    what the settings screen writes; a worktree does not carry it.
+
+    Never raises, like the documentation preflight: an attachment nobody could
+    read is a line in the record, not a failed build.
+    """
+    try:
+        from docintel import run_preflight
+
+        result = run_preflight(spec_dir, source_project_dir)
+    except Exception as exc:  # noqa: BLE001 - attachments never fail a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Attachments preflight skipped: {exc}")
+        return
+
+    if summary := result.describe():
+        print("\n" + summary)
+
+
 def _phase_context(
     profile,
     project_dir: Path,
@@ -773,6 +796,10 @@ def handle_build_command(
         # The `docs` phase. Everything below reasons about library APIs, so
         # the reference they reason about is fetched first.
         _run_docs_preflight(working_dir, spec_dir, project_dir)
+
+        # What the person attached to the task — screenshots, mockups, draw.io
+        # and Excalidraw diagrams — read once, before the plan is written.
+        _run_attachments_preflight(spec_dir, project_dir)
 
         # Phases the workflow declares before `planning`. At low and medium
         # effort the profile has already dropped them, so this is a no-op there

@@ -70,7 +70,12 @@ from prompt_generator import (
     generate_subtask_prompt,
     load_subtask_context,
 )
-from prompts import constitution_section, is_first_run, mobile_section
+from prompts import (
+    constitution_section,
+    docintel_section,
+    is_first_run,
+    mobile_section,
+)
 from recovery import RecoveryManager
 from security.constants import PROJECT_DIR_ENV_VAR
 from task_logger import (
@@ -1403,6 +1408,14 @@ async def run_autonomous_agent(
                 prompt += "\n\n" + planner_rules
                 print_status("spec-kit constitution applied to planning", "success")
 
+            # The ADRs bind the plan the way the constitution does, and the
+            # diagram or mockup attached to the task is where the person said
+            # what they meant when the description did not.
+            planner_documents = docintel_section(project_dir, spec_dir)
+            if planner_documents:
+                prompt += "\n\n" + planner_documents
+                print_status("ADRs and task attachments applied to planning", "success")
+
             # A phone application has no dev server and no URL: the plan has to
             # say which platform each subtask is verified on, and on a machine
             # without the toolchain for one of them, that it is not. A planner
@@ -1690,6 +1703,12 @@ async def run_autonomous_agent(
             constitution = constitution_section(project_dir)
             if constitution:
                 prompt += "\n\n" + constitution
+
+            # Same for the ADRs; the attachments come with them because a
+            # subtask implementing a screen is the one that needs the mockup.
+            documents = docintel_section(project_dir, spec_dir)
+            if documents:
+                prompt += "\n\n" + documents
 
             # Same reasoning as the constitution: the platform rules apply to
             # every subtask, not to the one that happens to mention a device.

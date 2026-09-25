@@ -282,6 +282,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # are facts about how this deployment's agent tooling is configured.
         "watermarks": "settings",
         "spec_traceability": "task",
+        # What a task's attachments and the project's ADRs say. Read-only and
+        # addressed like spec_traceability, so it answers to the same domain.
+        "docintel": "task",
         "workflow_profile": "task",
         "slash_commands": "agent",
         "parallel_variations": "lab",
