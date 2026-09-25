@@ -10,6 +10,7 @@ import json
 import subprocess
 import sys
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -17,6 +18,7 @@ import pytest
 import websockets
 from cli.build_commands import handle_build_command
 from cli.main import parse_args
+from core.build_signals import BuildHalted
 from websockets.client import WebSocketClientProtocol
 
 
@@ -39,6 +41,12 @@ class TestCLIStreamingIntegration:
             patch("cli.build_commands._run_docs_preflight"),
             patch("cli.build_commands._run_deterministic_gates"),
             patch("cli.build_commands._run_workflow_phases"),
+            patch(
+                "agents.coder.get_graphiti_context",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch("agents.coder.AUTO_CONTINUE_DELAY_SECONDS", 0),
         ):
             yield
 
@@ -188,9 +196,31 @@ Test streaming functionality
             assert call_args["streaming_session_id"] is None
 
     @pytest.mark.asyncio
-    async def test_streaming_wrapper_integration(self, temp_project_dir):
+    @pytest.mark.parametrize("completed", [False, True], ids=["halted", "completed"])
+    async def test_streaming_wrapper_integration(self, temp_project_dir, completed):
         """Test streaming wrapper integration with agent execution."""
         spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
+
+        plan_path = spec_dir / "implementation_plan.json"
+        plan = {
+            "feature": "Streaming lifecycle",
+            "workflow_type": "feature",
+            "phases": [
+                {
+                    "id": "1",
+                    "name": "Implementation",
+                    "subtasks": [
+                        {
+                            "id": "1.1",
+                            "description": "Implement streaming",
+                            "status": "pending",
+                        }
+                    ],
+                }
+            ],
+        }
+        if completed:
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
 
         # Mock streaming components. `create_agent_client` is mocked too: it
         # resolves real credentials, and this test is about the streaming
@@ -213,20 +243,32 @@ Test streaming functionality
             mock_wrapper.emit_agent_response = AsyncMock()
             mock_create_wrapper.return_value = mock_wrapper
 
-            # Mock agent session response
-            mock_run_session.return_value = ("continue", "Test response", None)
+            async def run_session(*args, **kwargs):
+                if completed:
+                    plan["phases"][0]["subtasks"][0]["status"] = "completed"
+                    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+                    return "complete", "Test response", {}
+                return "continue", "Test response", {}
 
-            # Import and run the agent with streaming
+            mock_run_session.side_effect = run_session
+
             from agents.coder import run_autonomous_agent
 
-            await run_autonomous_agent(
-                project_dir=temp_project_dir,
-                spec_dir=spec_dir,
-                model="sonnet",
-                max_iterations=1,
-                verbose=False,
-                streaming_session_id="integration-test-session",
+            # A session without a plan must halt, but still close its stream.
+            expected = (
+                nullcontext()
+                if completed
+                else pytest.raises(BuildHalted, match="Planning stopped")
             )
+            with expected:
+                await run_autonomous_agent(
+                    project_dir=temp_project_dir,
+                    spec_dir=spec_dir,
+                    model="sonnet",
+                    max_iterations=1,
+                    verbose=False,
+                    streaming_session_id="integration-test-session",
+                )
 
             # Verify streaming wrapper was created and used
             mock_create_wrapper.assert_called_once_with(
@@ -361,15 +403,16 @@ Test streaming functionality
 
             from agents.coder import run_autonomous_agent
 
-            # Should run without streaming when unavailable
-            await run_autonomous_agent(
-                project_dir=temp_project_dir,
-                spec_dir=spec_dir,
-                model="sonnet",
-                max_iterations=1,
-                verbose=False,
-                streaming_session_id="unavailable-test",
-            )
+            # Streaming availability does not turn an unfinished plan into success.
+            with pytest.raises(BuildHalted, match="Planning stopped"):
+                await run_autonomous_agent(
+                    project_dir=temp_project_dir,
+                    spec_dir=spec_dir,
+                    model="sonnet",
+                    max_iterations=1,
+                    verbose=False,
+                    streaming_session_id="unavailable-test",
+                )
 
             # Agent session should still run
             mock_run_session.assert_called()

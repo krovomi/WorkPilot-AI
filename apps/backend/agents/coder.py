@@ -1124,6 +1124,8 @@ async def run_autonomous_agent(
 
     # Main loop
     iteration = 0
+    status = "continue"
+    error_info = {}
     consecutive_concurrency_errors = 0  # Track consecutive 400 tool concurrency errors
     current_retry_delay = INITIAL_RETRY_DELAY_SECONDS  # Exponential backoff delay
     concurrency_error_context: str | None = (
@@ -1196,7 +1198,9 @@ async def run_autonomous_agent(
                         encoding="utf-8",
                     )
                     status_manager.update(state=BuildState.PAUSED)
-                    return
+                    raise BuildPaused("planning" if is_planning_phase else "coding")
+        except BuildPaused:
+            raise
         except Exception as exc:
             logger.debug(f"Loop detection check skipped: {exc}")
 
@@ -1410,7 +1414,8 @@ async def run_autonomous_agent(
                     "Mobile stack and device toolchain applied to planning", "success"
                 )
 
-            first_run = False
+            # Stay in planning until its output has passed validation. Errors,
+            # rate limits and provider switches must retry this same phase.
             current_log_phase = LogPhase.PLANNING
 
             # Set session info in logger
@@ -1855,6 +1860,7 @@ async def run_autonomous_agent(
                 # L'instantane du plan est un confort de diagnostic, pas une etape du build.
                 pass
             if valid:
+                first_run = False
                 plan_validated = True
                 planning_retry_context = None
                 _clear_planning_failures(spec_dir)  # success → reset the cap
@@ -2306,8 +2312,17 @@ async def run_autonomous_agent(
                         print_status("Resumed early by user", "success")
 
                     # Resume execution
-                    emit_phase(ExecutionPhase.CODING, "Resuming after rate limit")
-                    status_manager.update(state=BuildState.BUILDING)
+                    emit_phase(
+                        ExecutionPhase.PLANNING
+                        if is_planning_phase
+                        else ExecutionPhase.CODING,
+                        "Resuming after rate limit",
+                    )
+                    status_manager.update(
+                        state=BuildState.PLANNING
+                        if is_planning_phase
+                        else BuildState.BUILDING
+                    )
                     continue  # Resume the loop
                 else:
                     # Couldn't parse reset time - fall back to standard retry
@@ -2360,8 +2375,17 @@ async def run_autonomous_agent(
                 await wait_for_auth_resume(spec_dir, source_spec_dir)
 
                 print_status("Authentication restored - resuming", "success")
-                emit_phase(ExecutionPhase.CODING, "Resuming after re-authentication")
-                status_manager.update(state=BuildState.BUILDING)
+                emit_phase(
+                    ExecutionPhase.PLANNING
+                    if is_planning_phase
+                    else ExecutionPhase.CODING,
+                    "Resuming after re-authentication",
+                )
+                status_manager.update(
+                    state=BuildState.PLANNING
+                    if is_planning_phase
+                    else BuildState.BUILDING
+                )
                 continue  # Resume the loop
 
             else:
@@ -2417,7 +2441,11 @@ async def run_autonomous_agent(
                         recoverable=False,
                         subtask_id=subtask_id,
                     )
-                    break
+                    raise BuildHalted(
+                        "planning" if is_planning_phase else "coding",
+                        halt_msg,
+                        recoverable=False,
+                    )
 
                 print_status("Session encountered an error", "error")
                 print(muted("Will retry with a fresh session..."))
@@ -2431,6 +2459,31 @@ async def run_autonomous_agent(
         if max_iterations is None or iteration < max_iterations:
             print("\nPreparing next session...\n")
             await asyncio.sleep(1)
+
+    # A normal return authorizes handle_build_command to start QA and finalize
+    # the workspace. Neither an error, a missing/empty plan (0 == 0), nor an
+    # exhausted iteration budget is evidence that implementation is complete.
+    if status == "error" or first_run or not is_build_complete(spec_dir):
+        failed_phase = "planning" if is_planning_phase else "coding"
+        completed, total = count_subtasks(spec_dir)
+        detail = (error_info or {}).get("message") if status == "error" else None
+        if not detail:
+            detail = (
+                f"Iteration limit reached ({max_iterations})."
+                if max_iterations and iteration > max_iterations
+                else "No runnable subtasks remain, but the build is incomplete."
+            )
+        halt_msg = f"{failed_phase.capitalize()} stopped: {detail} ({completed}/{total} subtasks complete)."
+        status_manager.update(state=BuildState.ERROR)
+        if task_logger:
+            task_logger.end_phase(current_log_phase, success=False, message=halt_msg)
+        _emit_phase_failure(spec_dir, failed_phase, halt_msg, recoverable=True)
+        if streaming_wrapper:
+            try:
+                await streaming_wrapper.end_session()
+            except Exception as exc:
+                logger.warning("Failed to end streaming session: %s", exc)
+        raise BuildHalted(failed_phase, halt_msg)
 
     # Final summary
     content = [
