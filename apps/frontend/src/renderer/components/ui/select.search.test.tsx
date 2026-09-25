@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom";
 import "../../../shared/i18n";
@@ -11,11 +12,20 @@ import {
 	SelectValue,
 } from "./select";
 
+// Focus the trigger before opening: jsdom 30.1 emits window blur when focus
+// leaves the document after the previously focused content was removed.
+const openSelect = async () => {
+	const user = userEvent.setup();
+	await user.tab();
+	expect(screen.getByRole("combobox")).toHaveFocus();
+	await user.keyboard("[ArrowDown]");
+};
+
 describe("searchable model and provider lists", () => {
 	it("sorts labels, filters IDs, preserves the selection and selects a visible result", async () => {
 		const change = vi.fn();
 		render(
-			<Select defaultOpen defaultValue="zeta" onValueChange={change}>
+			<Select defaultValue="zeta" onValueChange={change}>
 				<SelectTrigger>
 					<SelectValue />
 				</SelectTrigger>
@@ -28,6 +38,7 @@ describe("searchable model and provider lists", () => {
 				</SelectContent>
 			</Select>,
 		);
+		await openSelect();
 		await screen.findByRole("searchbox");
 		expect(
 			screen.getAllByRole("option").map((option) => option.textContent),
@@ -45,6 +56,8 @@ describe("searchable model and provider lists", () => {
 		await waitFor(() => expect(screen.getByRole("option")).toHaveFocus());
 		fireEvent.keyDown(screen.getByRole("option"), { key: "Enter" });
 		expect(change).toHaveBeenCalledWith("gemma4:12b");
+		// Closing restores focus and resets the query asynchronously.
+		await waitFor(() => expect(screen.getByRole("combobox")).toHaveFocus());
 		fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
 		expect(await screen.findByRole("searchbox")).toHaveValue("");
 		expect(screen.getAllByRole("option")).toHaveLength(3);
@@ -54,7 +67,7 @@ describe("searchable model and provider lists", () => {
 	});
 	it("shows an empty state and does not sort ordinary ordered lists", async () => {
 		const { unmount } = render(
-			<Select defaultOpen>
+			<Select>
 				<SelectTrigger>
 					<SelectValue />
 				</SelectTrigger>
@@ -63,6 +76,7 @@ describe("searchable model and provider lists", () => {
 				</SelectContent>
 			</Select>,
 		);
+		await openSelect();
 		fireEvent.change(await screen.findByRole("searchbox"), {
 			target: { value: "missing" },
 		});
@@ -70,7 +84,7 @@ describe("searchable model and provider lists", () => {
 		expect(screen.getByText("No results")).toBeInTheDocument();
 		unmount();
 		render(
-			<Select defaultOpen>
+			<Select>
 				<SelectTrigger>
 					<SelectValue />
 				</SelectTrigger>
@@ -80,6 +94,7 @@ describe("searchable model and provider lists", () => {
 				</SelectContent>
 			</Select>,
 		);
+		await openSelect();
 		expect(
 			(await screen.findAllByRole("option")).map(
 				(option) => option.textContent,
