@@ -141,4 +141,27 @@ describe("editable task dictation", () => {
 		expect(stop).toHaveBeenCalledWith(true);
 		expect(pending).toHaveBeenLastCalledWith(false);
 	});
+	it("offers a clickable model download once the project is known", async () => {
+		start.mockResolvedValueOnce({ error: "model" });
+		render(
+			<TaskDictation
+				description=""
+				onChange={vi.fn()}
+				richText={false}
+				projectPath="/work/project"
+			/>,
+		);
+		fireEvent.click(screen.getByText("dictation.start"));
+		const download = await screen.findByText("dictation.download");
+		expect(download).toBeEnabled();
+		start.mockResolvedValueOnce({ ready: true });
+		fireEvent.click(download);
+		await waitFor(() =>
+			expect(start).toHaveBeenLastCalledWith(
+				expect.any(String),
+				true,
+				"/work/project",
+			),
+		);
+	});
 });

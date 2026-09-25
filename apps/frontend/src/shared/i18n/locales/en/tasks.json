@@ -603,7 +603,17 @@
 		"backgroundTaskTitle": "Task continues in background",
 		"backgroundTaskDescription": "The task is still running. You can reopen this dialog to monitor progress."
 	},
+	"fileAutocomplete": {
+		"searching": "Searching the project…",
+		"empty": "No files found",
+		"hint": "↑↓ navigate · Enter select · Esc close"
+	},
 	"wizard": {
+		"extras": {
+			"acListHelp": "Enter for a new bullet, Alt+↑/↓ to reorder. Passed to the planner, the coder and QA.",
+			"acTextHelp": "One criterion per line. Passed to the planner, the coder and QA.",
+			"noteHelp": "Saved in requirements.json as additional_context."
+		},
 		"createTitle": "Create New Task",
 		"createDescription": "Describe what you want to build. The AI will analyze your request and create a detailed specification.",
 		"descriptionPlaceholder": "Describe the feature, bug fix, or improvement you want to implement. Be as specific as possible about requirements, constraints, and expected behavior. Type @ to reference files.",
