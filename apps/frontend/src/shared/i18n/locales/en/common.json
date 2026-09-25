@@ -1139,5 +1139,17 @@
 			"failedMany": "{{count}} jobs failed",
 			"open": "View"
 		}
+	},
+	"modelCatalog": {
+		"live": "Up to date (provider)",
+		"registry": "Up to date (public registry)",
+		"cache": "Cached · {{when}}",
+		"static": "Offline list",
+		"justNow": "just now",
+		"minutesAgo": "{{count}} min ago",
+		"hoursAgo": "{{count}} h ago",
+		"daysAgo": "{{count}} d ago",
+		"refresh": "Refresh the model list",
+		"registryHint": "Releases read from models.dev, because no API key is configured for this provider. Add a key to see exactly what your account can call."
 	}
 }

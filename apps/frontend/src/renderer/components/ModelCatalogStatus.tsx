@@ -1,10 +1,11 @@
 /**
  * ModelCatalogStatus — small inline indicator showing where the current model
- * list comes from (live API, cache, static fallback) plus a refresh button
- * that bypasses the 24h backend cache.
+ * list comes from (provider API, public registry, cache, static fallback) plus
+ * a refresh button that bypasses the backend cache.
  */
 
 import { Loader2, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { ProviderModelCatalog } from "../hooks/useProviderModelCatalog";
 import { cn } from "../lib/utils";
 
@@ -13,31 +14,30 @@ interface ModelCatalogStatusProps {
 	className?: string;
 }
 
-function formatRelative(ts: number | null): string {
-	if (!ts) return "à l'instant";
-	const diffMs = Date.now() - ts * 1000;
-	const minutes = Math.floor(diffMs / 60000);
-	if (minutes < 1) return "à l'instant";
-	if (minutes < 60) return `il y a ${minutes} min`;
+type TFunction = ReturnType<typeof useTranslation>["t"];
+
+function formatRelative(ts: number | null, t: TFunction): string {
+	if (!ts) return t("common:modelCatalog.justNow");
+	const minutes = Math.floor((Date.now() - ts * 1000) / 60000);
+	if (minutes < 1) return t("common:modelCatalog.justNow");
+	if (minutes < 60) return t("common:modelCatalog.minutesAgo", { count: minutes });
 	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `il y a ${hours}h`;
-	const days = Math.floor(hours / 24);
-	return `il y a ${days}j`;
+	if (hours < 24) return t("common:modelCatalog.hoursAgo", { count: hours });
+	return t("common:modelCatalog.daysAgo", { count: Math.floor(hours / 24) });
 }
 
 export function ModelCatalogStatus({
 	catalog,
 	className,
 }: ModelCatalogStatusProps) {
+	const { t } = useTranslation(["common"]);
 	const { source, fetchedAt, error, loading, refresh } = catalog;
 
 	const Icon = error || source === "static" ? WifiOff : Wifi;
 	const label =
-		source === "live"
-			? "Liste à jour"
-			: source === "cache"
-				? `En cache · ${formatRelative(fetchedAt)}`
-				: "Liste hors-ligne";
+		source === "cache"
+			? t("common:modelCatalog.cache", { when: formatRelative(fetchedAt, t) })
+			: t(`common:modelCatalog.${source}`);
 
 	return (
 		<div
@@ -45,6 +45,9 @@ export function ModelCatalogStatus({
 				"flex items-center gap-1.5 text-[10px] text-muted-foreground",
 				className,
 			)}
+			title={
+				source === "registry" ? t("common:modelCatalog.registryHint") : undefined
+			}
 		>
 			<Icon className="h-3 w-3" />
 			<span>{label}</span>
@@ -52,7 +55,7 @@ export function ModelCatalogStatus({
 				type="button"
 				onClick={refresh}
 				disabled={loading}
-				aria-label="Rafraîchir la liste des modèles"
+				aria-label={t("common:modelCatalog.refresh")}
 				className={cn(
 					"ml-1 rounded p-0.5 hover:bg-muted disabled:opacity-50",
 					"focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",

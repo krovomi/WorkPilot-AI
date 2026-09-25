@@ -5,9 +5,12 @@ using the API key stored in `~/.work_pilot_ai_llm_providers.json`, applies a
 strict filter to keep only chat/reasoning models relevant to phase
 configuration, and caches the result on disk for 6 hours.
 
-On any failure (no key, network down, malformed response, unsupported
-provider) the module falls back to a small static catalog so the UI never
-sees an empty dropdown.
+Without a key — a Claude Code subscription, a Copilot login, Bedrock — the
+provider cannot be asked, so the releases come from the public model registry
+(`public_model_registry`, models.dev), filtered by the same allow-lists. Only
+when neither answers does the module fall back to the static catalog compiled
+from `models_registry.py`, so the UI never sees an empty dropdown — and a model
+released after that file was last edited still reaches it.
 
 Supported providers (with live fetching):
     anthropic, openai, google, mistral, deepseek, grok, ollama, lm-studio, llama-cpp
@@ -29,10 +32,12 @@ from typing import Any
 import httpx
 
 try:
+    from . import public_model_registry
     from .models_registry import provider_catalog
 except ImportError:
     # Module is imported as a top-level "provider_models_catalog" (no package
     # context), e.g. by provider_api.py when apps/backend is on sys.path.
+    import public_model_registry  # type: ignore[no-redef]
     from models_registry import provider_catalog  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
@@ -107,13 +112,23 @@ _GEMINI_KEEP = re.compile(
     re.IGNORECASE,
 )
 _GEMINI_DROP = re.compile(
-    r"(image|tts|embedding|audio|nano-banana|live|vision-only)",
+    r"(image|tts|embedding|audio|nano-banana|live|vision-only|computer-use|customtools)",
+    re.IGNORECASE,
+)
+
+# Bedrock: the model ids WorkPilot sends as-is. Regional inference profiles
+# (`us.`, `eu.`, `global.` …) repeat every model five times over and are a
+# deployment choice, not a model.
+_AWS_KEEP = re.compile(
+    r"^(anthropic\.claude|meta\.llama|amazon\.nova|mistral\.|deepseek\.|openai\.)",
     re.IGNORECASE,
 )
 
 
 def _tier_for_label(label: str) -> str:
-    low = label.lower()
+    # "gemini" contains "mini": without this every Gemini, Pro included, was
+    # filed as a fast model.
+    low = label.lower().replace("gemini", "")
     if any(
         k in low
         for k in ("nano", "haiku", "flash-lite", "small", "mini", "fast", "lite")
@@ -123,6 +138,8 @@ def _tier_for_label(label: str) -> str:
         k in low
         for k in (
             "opus",
+            "fable",
+            "mythos",
             "ultra",
             "pro",
             "large",
@@ -547,6 +564,92 @@ _FETCHERS = {
 
 
 # ---------------------------------------------------------------------------
+# Public registry (no key): the same allow-lists as the live fetchers
+# ---------------------------------------------------------------------------
+
+
+def _registry_allows(provider: str, mid: str) -> bool:
+    """Whether a registry id would survive the provider's own live filter.
+
+    One filter for both sources on purpose: the registry lists embeddings,
+    image and speech models too, and a second, looser rule here would put in
+    the dropdown exactly what the live path was written to keep out of it.
+    """
+    if provider == "anthropic":
+        return bool(_ANTHROPIC_KEEP.search(mid))
+    if provider == "openai":
+        return bool(_OPENAI_KEEP.match(mid)) and not _OPENAI_DROP.search(mid)
+    if provider == "google":
+        name = f"models/{mid}"
+        return bool(_GEMINI_KEEP.match(name)) and not _GEMINI_DROP.search(name)
+    if provider == "mistral":
+        return bool(_MISTRAL_KEEP.search(mid)) and not _MISTRAL_DROP.search(mid)
+    if provider == "deepseek":
+        return bool(_DEEPSEEK_KEEP.search(mid))
+    if provider == "grok":
+        return bool(_GROK_KEEP.search(mid)) and not _GROK_DROP.search(mid)
+    if provider == "aws":
+        return bool(_AWS_KEEP.match(mid))
+    # Copilot has no live fetcher to mirror; the registry's own "calls tools,
+    # reads and writes text, not deprecated" rule is the filter.
+    return True
+
+
+def _registry_label(name: str) -> str:
+    # "Claude Haiku 4.5 (latest)" — the id already says it is the alias.
+    return re.sub(r"\s*\(latest\)$", "", name).strip()
+
+
+def _registry_entry(provider: str, record: dict[str, Any]) -> dict[str, Any] | None:
+    """One registry record as a catalogue entry, or ``None`` if it is filtered out."""
+    mid = record["id"]
+    if not _registry_allows(provider, mid):
+        return None
+    name = record.get("name")
+    label = _registry_label(name if isinstance(name, str) else "") or mid
+    return {
+        "value": mid,
+        "label": label,
+        "tier": _tier_for_label(label if provider != "openai" else mid),
+        # The registry records whether the model reasons; the id heuristic
+        # only covers the families that existed when it was written.
+        "supportsThinking": record.get("reasoning") is True
+        or _supports_thinking(provider, mid),
+    }
+
+
+def _with_static(provider: str, found: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The registry adds, it never removes.
+
+    A model the static catalogue knows and the registry does not list (it is
+    community-maintained, and lags on some providers) stays offered. Where both
+    know an id, the curated tier wins — it was decided, the keyword heuristic
+    only guessed.
+    """
+    static = {m["value"]: m for m in STATIC_FALLBACK.get(provider, [])}
+    for entry in found:
+        known = static.pop(entry["value"], None)
+        if known and known.get("tier"):
+            entry["tier"] = known["tier"]
+    return found + list(static.values())
+
+
+def _fetch_registry(
+    provider: str, *, force_refresh: bool = False
+) -> tuple[list[dict[str, Any]], float] | None:
+    found = public_model_registry.models_for(provider, force_refresh=force_refresh)
+    if not found:
+        return None
+    records, fetched_at = found
+    out = [e for e in (_registry_entry(provider, r) for r in records) if e]
+    if not out:
+        return None
+    if provider == "openai":
+        out.sort(key=lambda m: _openai_sort_key(m["value"]))
+    return _with_static(provider, out), fetched_at
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -559,8 +662,8 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
         {
             "provider": str,
             "models": [{"value", "label", "tier", "supportsThinking"?}, …],
-            "source": "live" | "cache" | "static",
-            "fetchedAt": float | None,    # epoch seconds when source=cache/live
+            "source": "live" | "cache" | "registry" | "static",
+            "fetchedAt": float | None,    # epoch seconds, except for static
             "error": str | None,          # populated when fetch failed
         }
     """
@@ -615,7 +718,33 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
             error = type(e).__name__
             logger.warning("Live model fetch failed for %s: %s", provider, e)
 
-    # 3) Stale cache (better than nothing) — but never for local providers, where
+    # 3) The public registry: what the provider has released, without its key.
+    # Before the stale cache, because a cache that failed to refresh is older
+    # knowledge of the same thing — and after the live fetch, because only the
+    # provider can say what this account may call. Never for local runtimes,
+    # whose list is what is installed on this machine.
+    registry = None
+    if not is_local:
+        try:
+            registry = _fetch_registry(provider, force_refresh=force_refresh)
+        except Exception as e:  # noqa: BLE001 — a best-effort source never fails a dropdown
+            # `provider` is the URL path segment: no line breaks into the log.
+            safe = provider.replace("\r", "").replace("\n", "")
+            logger.warning(
+                "Public model registry unusable for %s: %s", safe, type(e).__name__
+            )
+            error = error or type(e).__name__
+    if registry:
+        models, fetched_at = registry
+        return {
+            "provider": provider,
+            "models": models,
+            "source": "registry",
+            "fetchedAt": fetched_at,
+            "error": error,
+        }
+
+    # 4) Stale cache (better than nothing) — but never for local providers, where
     # a stale list would falsely mark uninstalled models as installed.
     cache = None if is_local else _read_cache().get(provider)
     if cache and cache.get("models"):
@@ -627,7 +756,7 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
             "error": error,
         }
 
-    # 4) Static fallback
+    # 5) Static fallback
     return {
         "provider": provider,
         "models": STATIC_FALLBACK.get(provider, []),

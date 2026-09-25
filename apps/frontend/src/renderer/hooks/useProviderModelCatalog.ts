@@ -1,6 +1,8 @@
 /** Shared provider catalog. Every selector subscribes to the same snapshot.
- * Live discovery is refreshed while in use and on window focus. Static entries
- * are generated from the backend registry and are only an offline fallback.
+ * Live discovery is refreshed while in use and on window focus. Without an API
+ * key the backend answers from the public model registry (models.dev), so a
+ * release reaches the dropdowns without a code change. Static entries are
+ * generated from the backend registry and are only an offline fallback.
  */
 import { useCallback, useSyncExternalStore } from "react";
 import {
@@ -10,7 +12,12 @@ import {
 } from "../../shared/constants/models";
 import { dedupeLocalCatalog } from "../../shared/utils/local-models";
 
-export type CatalogSource = "live" | "cache" | "static";
+/**
+ * `live`: the provider's own API (a key is configured).
+ * `registry`: the public model registry — what the provider has released,
+ * read without a key. `cache`: an earlier `live` answer. `static`: offline.
+ */
+export type CatalogSource = "live" | "cache" | "registry" | "static";
 
 /** Subset of ProviderModel — `tier` and `supportsThinking` are optional. */
 export interface CatalogModel {
