@@ -603,7 +603,17 @@
 		"backgroundTaskTitle": "La tâche continue en arrière-plan",
 		"backgroundTaskDescription": "La tâche est toujours en cours. Vous pouvez rouvrir cette boîte de dialogue pour suivre la progression."
 	},
+	"fileAutocomplete": {
+		"searching": "Recherche dans le projet…",
+		"empty": "Aucun fichier trouvé",
+		"hint": "↑↓ naviguer · Entrée choisir · Échap fermer"
+	},
 	"wizard": {
+		"extras": {
+			"acListHelp": "Entrée pour une nouvelle puce, Alt+↑/↓ pour réordonner. Transmis au planificateur, au codeur et à la QA.",
+			"acTextHelp": "Un critère par ligne. Transmis au planificateur, au codeur et à la QA.",
+			"noteHelp": "Enregistrée dans requirements.json comme additional_context."
+		},
 		"createTitle": "Créer une nouvelle tâche",
 		"createDescription": "Décrivez ce que vous voulez construire. L'IA analysera votre demande et créera une spécification détaillée.",
 		"descriptionPlaceholder": "Décrivez la fonctionnalité, la correction de bug ou l'amélioration que vous souhaitez implémenter. Soyez aussi précis que possible sur les exigences, les contraintes et le comportement attendu. Tapez @ pour référencer des fichiers.",

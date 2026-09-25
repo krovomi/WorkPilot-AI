@@ -1,21 +1,29 @@
-import { ChevronRight, File, Folder } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FileNode } from "../../shared/types";
+import { ChevronRight, File } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { FileSearchResult } from "../../shared/types";
 import { cn } from "../lib/utils";
-import { useFileExplorerStore } from "../stores/file-explorer-store";
 
 interface FileAutocompleteProps {
 	query: string;
 	projectPath: string;
 	position: { top: number; left: number };
-	onSelect: (filename: string, fullPath: string) => void;
+	/** Receives the project-relative POSIX path — what goes after the `@`. */
+	onSelect: (relativePath: string) => void;
 	onClose: () => void;
 	maxResults?: number;
 }
 
+const SEARCH_DEBOUNCE_MS = 120;
+
 /**
  * Autocomplete popup for @ file mentions in the task description.
- * Shows filtered list of files based on the query after @.
+ *
+ * The whole project is searched in the main process (`searchProjectFiles`,
+ * the same walk the agent path inputs use). It used to flatten whatever the
+ * file explorer happened to have cached — the root directory and nothing
+ * else unless the user had expanded folders in the explorer drawer — so a
+ * file one level down could not be mentioned at all.
  */
 export function FileAutocomplete({
 	query,
@@ -25,101 +33,59 @@ export function FileAutocomplete({
 	onClose,
 	maxResults = 10,
 }: FileAutocompleteProps) {
+	const { t } = useTranslation(["tasks"]);
 	const [selectedIndex, setSelectedIndex] = useState(0);
+	const [results, setResults] = useState<FileSearchResult[]>([]);
+	// The query `results` answers. While it differs from `query` a newer search
+	// is on its way, and the keyboard must not pick from the previous list:
+	// typing `@app` then Enter would otherwise insert a match for `@a`.
+	const [answered, setAnswered] = useState<string | null>(null);
+	const loading = answered !== query;
 	const listRef = useRef<HTMLDivElement>(null);
-	const { files, loadDirectory } = useFileExplorerStore();
+	// Latest-wins: a slow search for "@a" must not overwrite the one for "@app".
+	const requestSeq = useRef(0);
 
-	// Load root directory if not cached
 	useEffect(() => {
-		if (projectPath && !files.has(projectPath)) {
-			loadDirectory(projectPath);
-		}
-	}, [projectPath, files, loadDirectory]);
-
-	// Collect all files from cache (flatten the tree)
-	const allFiles = useMemo(() => {
-		const result: FileNode[] = [];
-
-		// Recursive function to collect all cached files
-		const collectFiles = (dirPath: string, visited = new Set<string>()) => {
-			if (visited.has(dirPath)) return;
-			visited.add(dirPath);
-
-			const dirFiles = files.get(dirPath);
-			if (!dirFiles) return;
-
-			for (const file of dirFiles) {
-				result.push(file);
-				// For directories, also load and collect their children if cached
-				if (file.isDirectory && files.has(file.path)) {
-					collectFiles(file.path, visited);
+		const seq = ++requestSeq.current;
+		const timer = setTimeout(async () => {
+			try {
+				const result = await window.electronAPI.searchProjectFiles(
+					projectPath,
+					query,
+					"file",
+				);
+				if (seq !== requestSeq.current) return;
+				setResults(
+					result.success && result.data
+						? result.data.slice(0, maxResults)
+						: [],
+				);
+			} catch {
+				if (seq === requestSeq.current) setResults([]);
+			} finally {
+				if (seq === requestSeq.current) {
+					setAnswered(query);
+					setSelectedIndex(0);
 				}
 			}
+		}, SEARCH_DEBOUNCE_MS);
+		return () => {
+			clearTimeout(timer);
+			// A search already in flight answers nobody once the query changed
+			// or the popup closed.
+			requestSeq.current++;
 		};
-
-		collectFiles(projectPath);
-		return result;
-	}, [files, projectPath]);
-
-	// Filter files based on query
-	const filteredFiles = useMemo(() => {
-		if (!query) {
-			// Show most recently accessed or common files when no query
-			return allFiles.filter((f) => !f.isDirectory).slice(0, maxResults);
-		}
-
-		const lowerQuery = query.toLowerCase();
-
-		// Score files by match quality
-		const scored = allFiles
-			.filter((f) => !f.isDirectory) // Only files, not directories
-			.map((file) => {
-				const name = file.name.toLowerCase();
-				const path = file.path.toLowerCase();
-
-				let score = 0;
-
-				// Exact name match (highest priority)
-				if (name === lowerQuery) {
-					score = 1000;
-				}
-				// Name starts with query
-				else if (name.startsWith(lowerQuery)) {
-					score = 100;
-				}
-				// Name contains query
-				else if (name.includes(lowerQuery)) {
-					score = 50;
-				}
-				// Path contains query
-				else if (path.includes(lowerQuery)) {
-					score = 10;
-				}
-
-				return { file, score };
-			})
-			.filter((item) => item.score > 0)
-			.sort((a, b) => b.score - a.score)
-			.slice(0, maxResults)
-			.map((item) => item.file);
-
-		return scored;
-	}, [allFiles, query, maxResults]);
-
-	// Reset selection when results change
-	useEffect(() => {
-		setSelectedIndex(0);
-	}, []);
+	}, [projectPath, query, maxResults]);
 
 	// Scroll selected item into view
 	useEffect(() => {
 		const list = listRef.current;
 		if (!list) return;
 
-		const selectedElement = list.children[selectedIndex] as HTMLElement;
-		if (selectedElement) {
-			selectedElement.scrollIntoView({ block: "nearest" });
-		}
+		const selectedElement = list.children[selectedIndex] as
+			| HTMLElement
+			| undefined;
+		selectedElement?.scrollIntoView?.({ block: "nearest" });
 	}, [selectedIndex]);
 
 	// Handle keyboard navigation
@@ -129,7 +95,7 @@ export function FileAutocomplete({
 				case "ArrowDown":
 					e.preventDefault();
 					setSelectedIndex((prev) =>
-						prev < filteredFiles.length - 1 ? prev + 1 : prev,
+						prev < results.length - 1 ? prev + 1 : prev,
 					);
 					break;
 				case "ArrowUp":
@@ -137,26 +103,21 @@ export function FileAutocomplete({
 					setSelectedIndex((prev) => (prev > 0 ? prev - 1 : prev));
 					break;
 				case "Enter":
+				case "Tab": {
+					const file = results[selectedIndex];
+					if (!file) return;
+					// Swallow the key rather than insert a match for an older query.
 					e.preventDefault();
-					if (filteredFiles[selectedIndex]) {
-						const file = filteredFiles[selectedIndex];
-						onSelect(file.name, file.path);
-					}
+					if (!loading) onSelect(file.relativePath);
 					break;
+				}
 				case "Escape":
 					e.preventDefault();
 					onClose();
 					break;
-				case "Tab":
-					e.preventDefault();
-					if (filteredFiles[selectedIndex]) {
-						const file = filteredFiles[selectedIndex];
-						onSelect(file.name, file.path);
-					}
-					break;
 			}
 		},
-		[filteredFiles, selectedIndex, onSelect, onClose],
+		[results, selectedIndex, loading, onSelect, onClose],
 	);
 
 	// Attach keyboard listener
@@ -165,16 +126,7 @@ export function FileAutocomplete({
 		return () => document.removeEventListener("keydown", handleKeyDown);
 	}, [handleKeyDown]);
 
-	// Get relative path from project root
-	const getRelativePath = (fullPath: string) => {
-		if (fullPath.startsWith(projectPath)) {
-			return fullPath.slice(projectPath.length + 1); // +1 for the slash
-		}
-		return fullPath;
-	};
-
-	// Don't render if no results
-	if (filteredFiles.length === 0) {
+	if (results.length === 0) {
 		return (
 			<div
 				className="absolute z-50 bg-popover border border-border rounded-md shadow-lg p-3 text-sm text-muted-foreground"
@@ -183,8 +135,11 @@ export function FileAutocomplete({
 					left: position.left,
 					minWidth: "200px",
 				}}
+				role="status"
 			>
-				No files found
+				{loading
+					? t("tasks:fileAutocomplete.searching")
+					: t("tasks:fileAutocomplete.empty")}
 			</div>
 		);
 	}
@@ -201,38 +156,32 @@ export function FileAutocomplete({
 			}}
 		>
 			<div ref={listRef} className="overflow-y-auto max-h-[240px]">
-				{filteredFiles.map((file, index) => (
+				{results.map((file, index) => (
 					<button
 						type="button"
-						key={file.path}
+						key={file.relativePath}
 						className={cn(
 							"w-full flex items-center gap-2 px-3 py-2 text-left text-sm",
 							"hover:bg-accent hover:text-accent-foreground",
 							"focus:outline-none transition-colors",
 							index === selectedIndex && "bg-accent text-accent-foreground",
 						)}
-						onClick={() => onSelect(file.name, file.path)}
+						onClick={() => onSelect(file.relativePath)}
 						onMouseEnter={() => setSelectedIndex(index)}
 					>
-						{file.isDirectory ? (
-							<Folder className="h-4 w-4 text-muted-foreground shrink-0" />
-						) : (
-							<File className="h-4 w-4 text-muted-foreground shrink-0" />
-						)}
+						<File className="h-4 w-4 text-muted-foreground shrink-0" />
 						<div className="flex-1 min-w-0">
 							<div className="font-medium truncate">{file.name}</div>
 							<div className="text-xs text-muted-foreground truncate flex items-center gap-1">
 								<ChevronRight className="h-3 w-3 shrink-0" />
-								{getRelativePath(file.path)}
+								{file.relativePath}
 							</div>
 						</div>
 					</button>
 				))}
 			</div>
 			<div className="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground bg-muted/30">
-				<span className="font-medium">↑↓</span> navigate ·{" "}
-				<span className="font-medium">Enter</span> select ·{" "}
-				<span className="font-medium">Esc</span> close
+				{t("tasks:fileAutocomplete.hint")}
 			</div>
 		</div>
 	);
