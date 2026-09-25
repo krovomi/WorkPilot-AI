@@ -7,7 +7,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { searchProjectPaths } from "../ipc-handlers/path-search";
+import {
+	MAX_SEARCH_RESULTS,
+	searchProjectPaths,
+} from "../ipc-handlers/path-search";
 
 let ROOT: string;
 
@@ -132,6 +135,8 @@ describe("searchProjectPaths", () => {
 			);
 			const results = await searchProjectPaths(deep, "widgets", "file");
 			expect(results[0]?.relativePath).toBe("zzz/nested/deeper/widgets.tsx");
+			// Ranking over more candidates still returns a bounded list.
+			expect(results).toHaveLength(MAX_SEARCH_RESULTS);
 		} finally {
 			rmSync(deep, { recursive: true, force: true });
 		}

@@ -4,7 +4,7 @@ import {
 	ListChecks,
 	StickyNote,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AcceptanceCriteriaEditor } from "../task-detail/AcceptanceCriteriaEditor";
 import { type AcEditorMode, AcModeToggle } from "../task-detail/AcModeToggle";
@@ -12,6 +12,7 @@ import {
 	type CriterionDraft,
 	draftsToText,
 	ensureAtLeastOne,
+	sameCriteria,
 	textToDrafts,
 	toCriteria,
 } from "../task-detail/acceptance-criteria-draft";
@@ -60,6 +61,20 @@ export function TaskCreationExtras({
 	// Le mode texte garde sa chaîne : la recalculer depuis les puces à chaque
 	// frappe supprimerait la ligne vide qu'on vient d'ouvrir.
 	const [text, setText] = useState("");
+
+	// La liste vient du parent : « Ignorer le brouillon » la vide pendant que le
+	// mode texte est ouvert. Sans cette resynchronisation, le champ montrerait
+	// l'ancien texte et la frappe suivante le renverrait au parent. Une liste
+	// qui dit la même chose que le texte est celle qu'on vient d'émettre, et on
+	// ne touche pas au texte — sinon la ligne vide qu'on tape disparaîtrait.
+	useEffect(() => {
+		if (mode !== "text") return;
+		setText((current) =>
+			sameCriteria(toCriteria(textToDrafts(current)), toCriteria(criteria))
+				? current
+				: draftsToText(criteria),
+		);
+	}, [criteria, mode]);
 
 	const switchMode = (next: AcEditorMode) => {
 		if (next === mode) return;

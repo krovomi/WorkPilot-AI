@@ -23,6 +23,7 @@ function Harness() {
 	const [criteria, setCriteria] = useState<CriterionDraft[]>(() =>
 		ensureAtLeastOne([]),
 	);
+	const reset = () => setCriteria(ensureAtLeastOne([]));
 	const [note, setNote] = useState("");
 	return (
 		<>
@@ -34,6 +35,9 @@ function Harness() {
 			/>
 			<output data-testid="criteria">{toCriteria(criteria).join(" | ")}</output>
 			<output data-testid="note">{note}</output>
+			<button type="button" onClick={reset}>
+				reset-form
+			</button>
 		</>
 	);
 }
@@ -72,5 +76,18 @@ describe("TaskCreationExtras", () => {
 		expect(
 			(screen.getAllByRole("textbox") as HTMLTextAreaElement[]).map((el) => el.value),
 		).toEqual(["First", "Second"]);
+	});
+
+	it("follows a reset made by the form while text mode is open", () => {
+		render(<Harness />);
+		fireEvent.click(screen.getByRole("button", { name: /acceptance criteria/i }));
+		fireEvent.click(screen.getByRole("button", { name: "Text" }));
+		const field = screen.getByRole("textbox") as HTMLTextAreaElement;
+		fireEvent.change(field, { target: { value: "Stale\n" } });
+		// The trailing empty line the user just opened survives its own echo.
+		expect(field.value).toBe("Stale\n");
+		fireEvent.click(screen.getByRole("button", { name: "reset-form" }));
+		expect(field.value).toBe("");
+		expect(screen.getByTestId("criteria")).toHaveTextContent("");
 	});
 });
