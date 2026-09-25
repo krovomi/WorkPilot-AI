@@ -291,3 +291,15 @@ def test_credentials_in_the_url_are_not_logged(monkeypatch, tmp_path, caplog):
     assert "mirror.example" in caplog.text
     # The mirror still receives them, as HTTP basic auth.
     assert sent == [httpx.BasicAuth("user", "s3cret")._auth_header]
+
+
+def test_a_provider_name_cannot_forge_a_log_line(monkeypatch, tmp_path, caplog):
+    _serve(monkeypatch, tmp_path, lambda r: httpx.Response(200, json={}))
+
+    def boom(*a, **kw):
+        raise RuntimeError("unforeseen")
+
+    monkeypatch.setattr(catalog, "_fetch_registry", boom)
+    with caplog.at_level("WARNING"):
+        catalog.list_models("openai\nFAKE ENTRY")
+    assert all("\n" not in r.getMessage() for r in caplog.records)

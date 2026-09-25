@@ -728,8 +728,10 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
         try:
             registry = _fetch_registry(provider, force_refresh=force_refresh)
         except Exception as e:  # noqa: BLE001 — a best-effort source never fails a dropdown
+            # `provider` is the URL path segment: no line breaks into the log.
+            safe = provider.replace("\r", "").replace("\n", "")
             logger.warning(
-                "Public model registry unusable for %s: %s", provider, type(e).__name__
+                "Public model registry unusable for %s: %s", safe, type(e).__name__
             )
     if registry:
         models, fetched_at = registry
