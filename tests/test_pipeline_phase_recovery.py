@@ -52,10 +52,8 @@ async def test_planning_retries_stay_in_planning(pipeline, monkeypatch, error_ty
         )
 
     monkeypatch.setattr(coder, "run_agent_session", session)
-    try:
+    with pytest.raises(BuildHalted):
         await coder.run_autonomous_agent(project, spec, "test-model", max_iterations=2)
-    except BuildHalted:
-        pass
     assert phases == [LogPhase.PLANNING, LogPhase.PLANNING]
 
 
