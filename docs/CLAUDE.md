@@ -1956,6 +1956,13 @@ over a worktree with no implementation plan in it.
 `BuildPaused` (not a failure — nothing is finalized, the card keeps its column)
 and `BuildHalted` (which carries the sentence the user will read).
 
+The planner remains the active phase until its plan passes validation. Starting
+its session is not a transition: a timeout, quota wait, authentication recovery
+or hot model switch must reopen planning, for every provider. The coder loop
+may return normally only with a nonempty, completed plan and no session error;
+an empty plan, exhausted budget or unfinished subtasks halt before QA. The loop
+detector propagates `BuildPaused` too, rather than returning as if coding finished.
+
 **The pause has one store.** `core/pause_state.py` owns `pause_state.json`,
 which lives in the spec directory. That is the whole point: the flag used to
 live inside `implementation_plan.json`, a file that does not exist during spec
