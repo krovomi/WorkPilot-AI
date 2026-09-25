@@ -130,6 +130,7 @@ export function ResponsivePreview({
 	const [zoom, setZoom] = useState(1);
 	const [loading, setLoading] = useState(true);
 	const [failure, setFailure] = useState<string | null>(null);
+	// The key replaces the webview DOM node, so each replacement needs fresh listeners.
 
 	const homeUrl = useMemo(
 		() => buildLandingUrl(url, landingPath),

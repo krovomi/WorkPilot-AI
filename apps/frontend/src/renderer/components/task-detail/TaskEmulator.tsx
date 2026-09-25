@@ -217,7 +217,6 @@ export function TaskEmulator({
 	}, []);
 
 	const handleOpenInBrowser = useCallback(async () => {
-		setBrowserError(null);
 		// Ce que l'utilisateur regarde, pas la racine du serveur : après une
 		// navigation dans l'aperçu, les deux ne sont plus la même page — et sur une
 		// Web API la racine est précisément celle qui répond 404.
@@ -368,10 +367,7 @@ export function TaskEmulator({
 			</div>
 
 			{browserError && (
-				<p
-					role="alert"
-					className="shrink-0 border-b border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-				>
+				<p role="alert" className="shrink-0 p-3 text-sm">
 					{browserError}
 				</p>
 			)}
