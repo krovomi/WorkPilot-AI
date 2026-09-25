@@ -411,7 +411,12 @@ export function setupIpcHandlers(
 
 	// Voice Control handlers
 	registerVoiceControlHandlers();
-	registerDictationHandlers(() => pythonEnvManager.getPythonPath(), getBackendSourcePath, getMainWindow);
+	registerDictationHandlers(
+		() => pythonEnvManager.getPythonPath(),
+		getBackendSourcePath,
+		getMainWindow,
+		() => pythonEnvManager.getPythonEnv(),
+	);
 	setupVoiceControlEvents();
 
 	// App Emulator handlers

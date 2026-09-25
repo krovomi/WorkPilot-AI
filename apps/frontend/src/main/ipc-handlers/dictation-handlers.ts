@@ -10,6 +10,7 @@ export function registerDictationHandlers(
 	getPython: () => string | null,
 	getBackend: () => string | null,
 	getWindow: () => BrowserWindow | null,
+	getPythonEnv: () => Record<string, string>,
 ) {
 	let active:
 		| {
@@ -70,7 +71,7 @@ export function registerDictationHandlers(
 				windowsHide: true,
 				stdio: "pipe",
 				env: {
-					...process.env,
+					...getPythonEnv(),
 					PYTHONIOENCODING: "utf-8",
 					HF_HUB_DISABLE_TELEMETRY: "1",
 					...(download
