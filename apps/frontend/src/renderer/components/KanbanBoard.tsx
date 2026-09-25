@@ -2101,9 +2101,13 @@ export function KanbanBoard({
 								metadata.attachedImages = attachments.data;
 							}
 						} catch (error) {
+							const sanitizedJiraItemId = String(jiraItem.id ?? "").replace(
+								/[\r\n]/g,
+								"",
+							);
 							console.warn(
 								"[Import] Jira attachments skipped:",
-								jiraItem.id,
+								sanitizedJiraItemId,
 								error,
 							);
 						}
