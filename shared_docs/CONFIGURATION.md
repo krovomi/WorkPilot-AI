@@ -97,6 +97,30 @@ Internally, the active provider is stored under the reserved key
 `__active_provider__`. That key is filtered out of `list_provider_configs()`,
 so it never appears as a "configured provider" in the UI.
 
+### How the model dropdowns learn about new releases
+
+Every model selector reads `GET /providers/models/{provider}/catalog`
+([provider_models_catalog.py](../apps/backend/provider_models_catalog.py)),
+which answers from the first source that works:
+
+| Order | Source (`source` field) | When |
+|---|---|---|
+| 1 | `cache` | a provider answer less than 6 h old (`~/.work_pilot_ai_model_cache.json`) |
+| 2 | `live` | an API key is configured: the provider's own `/v1/models` — exactly what the account may call |
+| 3 | `registry` | no key (Claude Code subscription, Copilot, Bedrock…): the public [models.dev](https://models.dev) registry, cached 6 h in `~/.work_pilot_ai_model_registry.json` |
+| 4 | `cache` (stale) | everything above failed |
+| 5 | `static` | offline: the list generated from `models_registry.py` |
+
+Both network sources go through the same per-provider allow-list, and the
+registry **adds** to the static list rather than replacing it. A new model
+therefore appears in the dropdowns within six hours of being listed, with no
+code change; the refresh button next to a selector forces it immediately.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `MODEL_REGISTRY_ENABLED` | `true` | `false` removes the registry source (no request to models.dev) |
+| `MODEL_REGISTRY_URL` | `https://models.dev/api.json` | a mirror or self-hosted copy of the same document |
+
 ---
 
 ## 3. Authentication token resolution order
