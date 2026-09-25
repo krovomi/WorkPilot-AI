@@ -133,6 +133,7 @@ export class PythonEnvManager extends EventEmitter {
 			"claude_agent_sdk",
 			"dotenv",
 			"pydantic_core",
+			"faster_whisper",
 			...(isWindows() ? platformCriticalPackages.win32 : []),
 		];
 		const optionalPackages = isLinux() ? platformOptionalPackages.linux : [];
@@ -211,7 +212,7 @@ export class PythonEnvManager extends EventEmitter {
 		// child process (not execSync) so it never blocks the main event loop.
 		const checkScript = [
 			"import importlib.util as u, sys",
-			"mods = ['claude_agent_sdk', 'dotenv', 'google.generativeai']",
+			"mods = ['claude_agent_sdk', 'dotenv', 'google.generativeai', 'faster_whisper']",
 			"if sys.version_info >= (3, 12):",
 			"    mods += ['real_ladybug', 'graphiti_core']",
 			"def present(m):",

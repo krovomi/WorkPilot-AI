@@ -45,6 +45,7 @@ describe("dictation IPC ownership and lifecycle", () => {
 			() => "python",
 			() => "backend",
 			() => ({ webContents: owner }) as never,
+			() => ({ PYTHONPATH: "bundled/site-packages", PYTHONNOUSERSITE: "1" }),
 		);
 	});
 	const event = () => ({ sender: owner, senderFrame: owner.mainFrame });
@@ -66,7 +67,11 @@ describe("dictation IPC ownership and lifecycle", () => {
 		);
 		child.stdout.write('{"ready":true}\n');
 		expect(await ready).toEqual({ ready: true });
-		expect(mocks.spawn.mock.calls[0][2].env.HF_HUB_OFFLINE).toBe("1");
+		expect(mocks.spawn.mock.calls[0][2].env).toMatchObject({
+			PYTHONPATH: "bundled/site-packages",
+			PYTHONNOUSERSITE: "1",
+			HF_HUB_OFFLINE: "1",
+		});
 		const result = handlers.get(IPC_CHANNELS.DICTATION_TRANSCRIBE)?.(
 			event(),
 			"s",
