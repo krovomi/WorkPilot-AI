@@ -1,4 +1,5 @@
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock fs module before importing the module under test
@@ -45,6 +46,20 @@ describe("PythonEnvManager", () => {
 
 	afterEach(() => {
 		vi.restoreAllMocks();
+	});
+
+	it("rejects a bundled installation missing the dictation engine", () => {
+		const internal = manager as unknown as {
+			getBundledSitePackagesPath: () => string;
+			hasBundledPackages: () => boolean;
+		};
+		vi.spyOn(internal, "getBundledSitePackagesPath").mockReturnValue("/bundled");
+		vi.mocked(existsSync).mockImplementation(
+			(file) => !String(file).includes("faster_whisper"),
+		);
+		expect(internal.hasBundledPackages()).toBe(false);
+		vi.mocked(existsSync).mockReturnValue(true);
+		expect(internal.hasBundledPackages()).toBe(true);
 	});
 
 	describe("getPythonEnv", () => {
