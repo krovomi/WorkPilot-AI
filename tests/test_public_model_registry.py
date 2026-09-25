@@ -206,3 +206,88 @@ def test_a_stale_registry_is_better_than_the_static_list(served, monkeypatch):
 def test_gemini_is_not_filed_as_a_mini_model():
     assert catalog._tier_for_label("gemini-3.1-pro") == "flagship"
     assert catalog._tier_for_label("gemini-3.5-flash-lite") == "fast"
+
+
+def _serve(monkeypatch, tmp_path, respond):
+    monkeypatch.setattr(registry, "CACHE_PATH", tmp_path / "registry.json")
+    monkeypatch.setattr(registry, "_backoff", registry._Backoff())
+    monkeypatch.setattr(
+        registry.httpx,
+        "Client",
+        lambda **kw: _REAL_CLIENT(transport=httpx.MockTransport(respond), **kw),
+    )
+    monkeypatch.setattr(catalog, "CACHE_PATH", tmp_path / "catalog.json")
+    monkeypatch.setattr(catalog, "_api_key_for", lambda _: None)
+    monkeypatch.delenv("MODEL_REGISTRY_ENABLED", raising=False)
+
+
+def test_malformed_records_are_skipped_not_fatal(monkeypatch, tmp_path):
+    document = {
+        "anthropic": {
+            "models": {
+                "a": {"id": "claude-opus-5-5", "modalities": ["text"]},
+                "b": {"id": "claude-opus-6", "modalities": {"input": 5}},
+                "c": {"id": "claude-sonnet-6", "modalities": {"input": ["text"]}},
+                "d": {"name": "no id"},
+                "e": "not a record",
+            }
+        }
+    }
+    _serve(monkeypatch, tmp_path, lambda r: httpx.Response(200, json=document))
+    result = catalog.list_models("anthropic")
+    assert result["source"] == "registry"
+    assert "claude-sonnet-6" in {m["value"] for m in result["models"]}
+
+
+def test_a_corrupted_cache_falls_back_instead_of_raising(monkeypatch, tmp_path):
+    _serve(monkeypatch, tmp_path, lambda r: httpx.Response(500))
+    (tmp_path / "registry.json").write_text(
+        '{"fetched_at": 9e99, "providers": {"anthropic": [{"name": "x"}, 3]}}',
+        encoding="utf-8",
+    )
+    assert catalog.list_models("anthropic")["source"] == "static"
+
+
+def test_an_unexpected_registry_error_never_fails_the_dropdown(monkeypatch, tmp_path):
+    _serve(monkeypatch, tmp_path, lambda r: httpx.Response(200, json={}))
+
+    def boom(*a, **kw):
+        raise RuntimeError("unforeseen")
+
+    monkeypatch.setattr(registry, "models_for", boom)
+    assert catalog.list_models("anthropic")["source"] == "static"
+
+
+def test_redirects_are_not_followed(monkeypatch, tmp_path):
+    seen = []
+
+    def respond(request):
+        seen.append(request.url.host)
+        if request.url.host == "models.dev":
+            return httpx.Response(
+                302, headers={"Location": "http://169.254.169.254/latest"}
+            )
+        return httpx.Response(200, json=DOCUMENT)
+
+    _serve(monkeypatch, tmp_path, respond)
+    assert catalog.list_models("anthropic")["source"] == "static"
+    assert seen == ["models.dev"]
+
+
+def test_credentials_in_the_url_are_not_logged(monkeypatch, tmp_path, caplog):
+    sent = []
+
+    def respond(request):
+        sent.append(request.headers.get("authorization"))
+        return httpx.Response(503)
+
+    _serve(monkeypatch, tmp_path, respond)
+    monkeypatch.setenv(
+        "MODEL_REGISTRY_URL", "https://user:s3cret@mirror.example/api.json"
+    )
+    with caplog.at_level("INFO"):
+        catalog.list_models("anthropic")
+    assert "s3cret" not in caplog.text
+    assert "mirror.example" in caplog.text
+    # The mirror still receives them, as HTTP basic auth.
+    assert sent == [httpx.BasicAuth("user", "s3cret")._auth_header]

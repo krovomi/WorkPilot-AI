@@ -45,6 +45,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 import httpx
 
@@ -94,6 +95,60 @@ def registry_url() -> str:
     return (os.environ.get("MODEL_REGISTRY_URL") or DEFAULT_REGISTRY_URL).strip()
 
 
+def _is_record(model: Any) -> bool:
+    return (
+        isinstance(model, dict)
+        and isinstance(model.get("id"), str)
+        and bool(model["id"])
+    )
+
+
+def _handles_text(modalities: Any, side: str) -> bool:
+    """Whether a record reads (``input``) or writes (``output``) text.
+
+    The document is community-edited: a field that is absent says nothing and
+    is read as text, a field of any unexpected shape says nothing usable and
+    is read as not text.
+    """
+    if modalities is None:
+        return True
+    if not isinstance(modalities, dict):
+        return False
+    kinds = modalities.get(side)
+    if kinds is None:
+        return True
+    return isinstance(kinds, list) and "text" in kinds
+
+
+def _usable(model: Any) -> bool:
+    return (
+        _is_record(model)
+        and _handles_text(model.get("modalities"), "input")
+        and _handles_text(model.get("modalities"), "output")
+        and model.get("tool_call") is not False
+        and model.get("status") != "deprecated"
+    )
+
+
+def _split_credentials(url: str) -> tuple[str, tuple[str, str] | None]:
+    """The URL without the credentials a mirror's address may carry, and them.
+
+    Sent as ``auth=`` rather than inside the URL, because httpx logs every
+    request URL at INFO — credentials included.
+    """
+    parts = urlsplit(url)
+    if "@" not in parts.netloc:
+        return url, None
+    userinfo, host = parts.netloc.rsplit("@", 1)
+    user, _, password = userinfo.partition(":")
+    bare = urlunsplit(parts._replace(netloc=host))
+    return bare, (unquote(user), unquote(password))
+
+
+def _redacted(url: str) -> str:
+    return _split_credentials(url)[0]
+
+
 def _slim(document: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     """Keep only the providers and fields WorkPilot reads.
 
@@ -108,18 +163,11 @@ def _slim(document: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
         models = provider.get("models") if isinstance(provider, dict) else None
         if not isinstance(models, dict):
             continue
-        kept: list[dict[str, Any]] = []
-        for model in models.values():
-            if not isinstance(model, dict) or not isinstance(model.get("id"), str):
-                continue
-            modalities = model.get("modalities") or {}
-            if "text" not in (modalities.get("input") or ["text"]):
-                continue
-            if "text" not in (modalities.get("output") or ["text"]):
-                continue
-            if model.get("tool_call") is False or model.get("status") == "deprecated":
-                continue
-            kept.append({k: model[k] for k in _KEPT_FIELDS if k in model})
+        kept = [
+            {k: model[k] for k in _KEPT_FIELDS if k in model}
+            for model in models.values()
+            if _usable(model)
+        ]
         # Newest first: a release is the thing a person opens the list to find.
         kept.sort(key=lambda m: str(m.get("release_date") or ""), reverse=True)
         out[registry_id] = kept
@@ -148,8 +196,11 @@ def _write_cache(data: dict[str, Any]) -> None:
 
 
 def _download() -> dict[str, Any]:
-    with httpx.Client(timeout=HTTP_TIMEOUT, follow_redirects=True) as client:
-        resp = client.get(registry_url(), headers={"Accept": "application/json"})
+    # No redirects: the address is the one configured, and a document that
+    # moved says so with an error rather than by sending the request elsewhere.
+    with httpx.Client(timeout=HTTP_TIMEOUT, follow_redirects=False) as client:
+        url, auth = _split_credentials(registry_url())
+        resp = client.get(url, auth=auth, headers={"Accept": "application/json"})
     resp.raise_for_status()
     document = resp.json()
     if not isinstance(document, dict):
@@ -181,7 +232,14 @@ def _snapshot(force_refresh: bool) -> dict[str, Any] | None:
             data = _download()
         except (httpx.HTTPError, OSError, ValueError) as e:
             _backoff.last_failure_at = time.time()
-            logger.info("Public model registry unavailable (%s): %s", registry_url(), e)
+            # The exception text can quote the URL, credentials included.
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            logger.info(
+                "Public model registry unavailable (%s): %s%s",
+                _redacted(registry_url()),
+                type(e).__name__,
+                f" {status}" if status else "",
+            )
             return cached
         _backoff.last_failure_at = 0.0
         _write_cache(data)
@@ -202,7 +260,10 @@ def models_for(
     snapshot = _snapshot(force_refresh)
     if not snapshot:
         return None
+    # The cache is a file on disk, and a file can be edited: every record is
+    # checked again rather than trusted because this module once wrote it.
     models = snapshot["providers"].get(registry_id)
+    models = [m for m in models if _is_record(m)] if isinstance(models, list) else []
     if not models:
         return None
     return models, float(snapshot.get("fetched_at") or 0.0)

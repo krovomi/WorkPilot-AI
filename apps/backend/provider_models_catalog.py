@@ -600,6 +600,40 @@ def _registry_label(name: str) -> str:
     return re.sub(r"\s*\(latest\)$", "", name).strip()
 
 
+def _registry_entry(provider: str, record: dict[str, Any]) -> dict[str, Any] | None:
+    """One registry record as a catalogue entry, or ``None`` if it is filtered out."""
+    mid = record["id"]
+    if not _registry_allows(provider, mid):
+        return None
+    name = record.get("name")
+    label = _registry_label(name if isinstance(name, str) else "") or mid
+    return {
+        "value": mid,
+        "label": label,
+        "tier": _tier_for_label(label if provider != "openai" else mid),
+        # The registry records whether the model reasons; the id heuristic
+        # only covers the families that existed when it was written.
+        "supportsThinking": record.get("reasoning") is True
+        or _supports_thinking(provider, mid),
+    }
+
+
+def _with_static(provider: str, found: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The registry adds, it never removes.
+
+    A model the static catalogue knows and the registry does not list (it is
+    community-maintained, and lags on some providers) stays offered. Where both
+    know an id, the curated tier wins — it was decided, the keyword heuristic
+    only guessed.
+    """
+    static = {m["value"]: m for m in STATIC_FALLBACK.get(provider, [])}
+    for entry in found:
+        known = static.pop(entry["value"], None)
+        if known and known.get("tier"):
+            entry["tier"] = known["tier"]
+    return found + list(static.values())
+
+
 def _fetch_registry(
     provider: str, *, force_refresh: bool = False
 ) -> tuple[list[dict[str, Any]], float] | None:
@@ -607,39 +641,12 @@ def _fetch_registry(
     if not found:
         return None
     records, fetched_at = found
-    out: list[dict[str, Any]] = []
-    for record in records:
-        mid = record["id"]
-        if not _registry_allows(provider, mid):
-            continue
-        label = _registry_label(record.get("name") or mid) or mid
-        out.append(
-            {
-                "value": mid,
-                "label": label,
-                "tier": _tier_for_label(label if provider != "openai" else mid),
-                # The registry records whether the model reasons; the id
-                # heuristic only covers the families that existed when it was
-                # written.
-                "supportsThinking": bool(record.get("reasoning"))
-                or _supports_thinking(provider, mid),
-            }
-        )
-    if provider == "openai":
-        out.sort(key=lambda m: _openai_sort_key(m["value"]))
+    out = [e for e in (_registry_entry(provider, r) for r in records) if e]
     if not out:
         return None
-    # The registry adds, it never removes: a model the static catalogue knows
-    # and the registry does not list (it is community-maintained, and lags on
-    # some providers) stays offered. Where both know an id, the curated tier
-    # wins — it was decided, the keyword heuristic only guessed.
-    static = {m["value"]: m for m in STATIC_FALLBACK.get(provider, [])}
-    for entry in out:
-        known = static.pop(entry["value"], None)
-        if known and known.get("tier"):
-            entry["tier"] = known["tier"]
-    out.extend(static.values())
-    return out, fetched_at
+    if provider == "openai":
+        out.sort(key=lambda m: _openai_sort_key(m["value"]))
+    return _with_static(provider, out), fetched_at
 
 
 # ---------------------------------------------------------------------------
@@ -716,9 +723,14 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
     # knowledge of the same thing — and after the live fetch, because only the
     # provider can say what this account may call. Never for local runtimes,
     # whose list is what is installed on this machine.
-    registry = (
-        None if is_local else _fetch_registry(provider, force_refresh=force_refresh)
-    )
+    registry = None
+    if not is_local:
+        try:
+            registry = _fetch_registry(provider, force_refresh=force_refresh)
+        except Exception as e:  # noqa: BLE001 — a best-effort source never fails a dropdown
+            logger.warning(
+                "Public model registry unusable for %s: %s", provider, type(e).__name__
+            )
     if registry:
         models, fetched_at = registry
         return {
