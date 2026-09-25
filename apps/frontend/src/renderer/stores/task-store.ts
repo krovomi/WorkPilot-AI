@@ -1623,7 +1623,9 @@ export function isDraftEmpty(draft: TaskDraft | null): boolean {
 		!draft.category &&
 		!draft.priority &&
 		!draft.complexity &&
-		!draft.impact
+		!draft.impact &&
+		!draft.acceptanceCriteria?.length &&
+		!draft.extraNote?.trim()
 	);
 }
 
