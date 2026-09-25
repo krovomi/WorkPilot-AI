@@ -1181,5 +1181,196 @@
 			"qa_fixing": "les correctifs QA",
 			"unknown": "le dernier point de contrôle"
 		}
+	},
+	"changeGraph": {
+		"tab": "Graphe des modifications",
+		"title": "Le chemin de cette tâche",
+		"description": "Chaque nœud est un élément que la tâche a créé, modifié ou supprimé, rangé dans sa couche ; chaque arête est un lien lu dans le code. Cliquez sur un nœud ou une arête pour lire ce qu'il fait.",
+		"loading": "Lecture du diff de la tâche…",
+		"empty": "Aucune modification à représenter : la tâche n'a encore rien écrit dans son worktree.",
+		"noDiff": "Le diff de cette tâche n'est pas disponible (worktree absent ou déjà fusionné).",
+		"error": "Impossible de lire le diff : {{error}}",
+		"actions": {
+			"refresh": "Relire le diff",
+			"export": "Exporter graph.json (Graphify)",
+			"exportHint": "Au format node-link de Graphify : lisible par Graphify, son serveur MCP et le skill graph-first-recall."
+		},
+		"legend": {
+			"added": "Créé",
+			"modified": "Modifié",
+			"deleted": "Supprimé"
+		},
+		"memberChange": {
+			"added": "ajouté",
+			"deleted": "retiré",
+			"modified": "modifié"
+		},
+		"relations": {
+			"inherits": "hérite de",
+			"implements": "implémente",
+			"tests": "teste",
+			"maps": "transporte",
+			"uses": "utilise",
+			"handles": "traite"
+		},
+		"story": {
+			"title": "Récit de la tâche",
+			"hint": "Cliquez sur une phrase pour la retrouver dans le graphe."
+		},
+		"panel": {
+			"placeholder": "Cliquez sur un nœud ou sur une arête du graphe pour savoir ce qu'il représente.",
+			"file": "Fichier",
+			"layer": "Couche",
+			"lines": "+{{additions}} / −{{deletions}} lignes",
+			"members": "Membres touchés",
+			"subtasks": "Sous-tâches du plan",
+			"outgoing": "Ce qu'il utilise",
+			"incoming": "Ce qui l'utilise",
+			"evidence": "Ligne du code qui porte le lien",
+			"noEvidence": "Lien déduit des membres ajoutés des deux côtés.",
+			"from": "De",
+			"to": "Vers",
+			"close": "Fermer le détail"
+		},
+		"skipped_one": "{{count}} fichier généré ignoré (lockfile, snapshot…)",
+		"skipped_other": "{{count}} fichiers générés ignorés (lockfiles, snapshots…)",
+		"truncated_one": "{{count}} fichier de plus n'est pas dessiné, pour que le graphe reste lisible",
+		"truncated_other": "{{count}} fichiers de plus ne sont pas dessinés, pour que le graphe reste lisible",
+		"layers": {
+			"domain": {
+				"name": "Domain",
+				"in": "dans la couche Domain"
+			},
+			"application": {
+				"name": "Application",
+				"in": "dans la couche Application"
+			},
+			"infrastructure": {
+				"name": "Infrastructure",
+				"in": "dans la couche Infrastructure"
+			},
+			"presentation": {
+				"name": "Présentation",
+				"in": "dans la couche Présentation (API / UI)"
+			},
+			"tests": {
+				"name": "Tests",
+				"in": "dans les tests"
+			},
+			"config": {
+				"name": "Configuration",
+				"in": "dans la configuration"
+			},
+			"docs": {
+				"name": "Documentation",
+				"in": "dans la documentation"
+			},
+			"other": {
+				"name": "Autres",
+				"in": "dans le projet"
+			}
+		},
+		"nouns": {
+			"class": "la classe {{name}}",
+			"interface": "l'interface {{name}}",
+			"record": "le record {{name}}",
+			"struct": "la structure {{name}}",
+			"enum": "l'énumération {{name}}",
+			"function": "la fonction {{name}}",
+			"component": "le composant {{name}}",
+			"hook": "le hook {{name}}",
+			"module": "le module {{name}}",
+			"file": "le fichier {{name}}",
+			"dto": "le DTO {{name}}",
+			"request": "la requête {{name}}",
+			"response": "la réponse {{name}}",
+			"viewModel": "le ViewModel {{name}}",
+			"command": "la commande {{name}}",
+			"query": "la query {{name}}",
+			"handler": "le handler {{name}}",
+			"controller": "le contrôleur {{name}}",
+			"repository": "le repository {{name}}",
+			"service": "le service {{name}}",
+			"validator": "le validateur {{name}}",
+			"mapper": "le mapper {{name}}",
+			"migration": "la migration {{name}}",
+			"test": "le fichier de tests {{name}}",
+			"testClass": "la classe de tests {{name}}",
+			"config": "le fichier de configuration {{name}}",
+			"docs": "la documentation {{name}}",
+			"style": "la feuille de style {{name}}",
+			"translations": "les traductions {{name}}"
+		},
+		"nounsOf": {
+			"class": "de la classe {{name}}",
+			"interface": "de l'interface {{name}}",
+			"record": "du record {{name}}",
+			"struct": "de la structure {{name}}",
+			"enum": "de l'énumération {{name}}",
+			"function": "de la fonction {{name}}",
+			"component": "du composant {{name}}",
+			"hook": "du hook {{name}}",
+			"module": "du module {{name}}",
+			"file": "du fichier {{name}}",
+			"dto": "du DTO {{name}}",
+			"request": "de la requête {{name}}",
+			"response": "de la réponse {{name}}",
+			"viewModel": "du ViewModel {{name}}",
+			"command": "de la commande {{name}}",
+			"query": "de la query {{name}}",
+			"handler": "du handler {{name}}",
+			"controller": "du contrôleur {{name}}",
+			"repository": "du repository {{name}}",
+			"service": "du service {{name}}",
+			"validator": "du validateur {{name}}",
+			"mapper": "du mapper {{name}}",
+			"migration": "de la migration {{name}}",
+			"test": "du fichier de tests {{name}}",
+			"testClass": "de la classe de tests {{name}}",
+			"config": "du fichier de configuration {{name}}",
+			"docs": "de la documentation {{name}}",
+			"style": "de la feuille de style {{name}}",
+			"translations": "des traductions {{name}}"
+		},
+		"members": {
+			"property": "la propriété {{name}}",
+			"method": "la méthode {{name}}()",
+			"field": "le champ {{name}}",
+			"constructor": "le constructeur",
+			"function": "la fonction {{name}}()",
+			"value": "la valeur {{name}}",
+			"more_one": "{{count}} autre membre",
+			"more_other": "{{count}} autres membres",
+			"propertyPlural": "les propriétés {{names}}",
+			"methodPlural": "les méthodes {{names}}",
+			"fieldPlural": "les champs {{names}}",
+			"functionPlural": "les fonctions {{names}}",
+			"valuePlural": "les valeurs {{names}}"
+		},
+		"join": "{{head}} et {{last}}",
+		"sentences": {
+			"added": "J'ai créé {{subject}} {{where}}",
+			"modified": "J'ai modifié {{subject}} {{where}}",
+			"deleted": "J'ai supprimé {{subject}} {{where}}",
+			"createdWith": "{{base}}, avec {{items}}",
+			"modifiedWith": "{{base}} et j'y ai {{changes}}",
+			"modifiedLines": "{{base}} (+{{additions}} / −{{deletions}} lignes)"
+		},
+		"clauses": {
+			"added": "ajouté {{items}}",
+			"removed": "retiré {{items}}",
+			"modified": "modifié {{items}}"
+		},
+		"edges": {
+			"inherits": "{{from}} hérite {{toOf}}.",
+			"implements": "{{from}} implémente {{to}}.",
+			"tests": "{{from}} vérifie le comportement {{toOf}}.",
+			"maps": "{{from}} reprend les données {{toOf}}.",
+			"mapsCross": "{{from}} reprend les données {{toOf}} (couche {{toLayer}}) pour les faire passer à la couche {{fromLayer}}.",
+			"uses": "{{from}} utilise {{to}}.",
+			"usesCross": "{{from}}, dans la couche {{fromLayer}}, s'appuie sur {{to}}, dans la couche {{toLayer}}.",
+			"shared": "Ajouté des deux côtés : {{items}}.",
+			"handles": "{{from}} traite {{to}}."
+		}
 	}
 }

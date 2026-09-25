@@ -1181,5 +1181,196 @@
 			"qa_fixing": "QA fixes",
 			"unknown": "the last checkpoint"
 		}
+	},
+	"changeGraph": {
+		"tab": "Change graph",
+		"title": "The path of this task",
+		"description": "Each node is something the task created, modified or deleted, placed in its layer; each edge is a link read in the code. Click a node or an edge to read what it does.",
+		"loading": "Reading the task diff…",
+		"empty": "Nothing to draw yet: the task has not written anything in its worktree.",
+		"noDiff": "This task's diff is not available (no worktree, or already merged).",
+		"error": "Could not read the diff: {{error}}",
+		"actions": {
+			"refresh": "Re-read the diff",
+			"export": "Export graph.json (Graphify)",
+			"exportHint": "In Graphify's node-link format: readable by Graphify, its MCP server and the graph-first-recall skill."
+		},
+		"legend": {
+			"added": "Created",
+			"modified": "Modified",
+			"deleted": "Deleted"
+		},
+		"memberChange": {
+			"added": "added",
+			"deleted": "removed",
+			"modified": "changed"
+		},
+		"relations": {
+			"inherits": "inherits",
+			"implements": "implements",
+			"tests": "tests",
+			"maps": "carries",
+			"uses": "uses",
+			"handles": "handles"
+		},
+		"story": {
+			"title": "What the task did",
+			"hint": "Click a sentence to find it in the graph."
+		},
+		"panel": {
+			"placeholder": "Click a node or an edge of the graph to learn what it stands for.",
+			"file": "File",
+			"layer": "Layer",
+			"lines": "+{{additions}} / −{{deletions}} lines",
+			"members": "Members touched",
+			"subtasks": "Plan subtasks",
+			"outgoing": "What it uses",
+			"incoming": "What uses it",
+			"evidence": "Line of code carrying the link",
+			"noEvidence": "Link inferred from members added on both sides.",
+			"from": "From",
+			"to": "To",
+			"close": "Close details"
+		},
+		"skipped_one": "{{count}} generated file ignored (lockfile, snapshot…)",
+		"skipped_other": "{{count}} generated files ignored (lockfiles, snapshots…)",
+		"truncated_one": "{{count}} more file is not drawn, to keep the graph readable",
+		"truncated_other": "{{count}} more files are not drawn, to keep the graph readable",
+		"layers": {
+			"domain": {
+				"name": "Domain",
+				"in": "in the Domain layer"
+			},
+			"application": {
+				"name": "Application",
+				"in": "in the Application layer"
+			},
+			"infrastructure": {
+				"name": "Infrastructure",
+				"in": "in the Infrastructure layer"
+			},
+			"presentation": {
+				"name": "Presentation",
+				"in": "in the Presentation layer (API / UI)"
+			},
+			"tests": {
+				"name": "Tests",
+				"in": "in the tests"
+			},
+			"config": {
+				"name": "Configuration",
+				"in": "in the configuration"
+			},
+			"docs": {
+				"name": "Documentation",
+				"in": "in the documentation"
+			},
+			"other": {
+				"name": "Other",
+				"in": "in the project"
+			}
+		},
+		"nouns": {
+			"class": "the class {{name}}",
+			"interface": "the interface {{name}}",
+			"record": "the record {{name}}",
+			"struct": "the struct {{name}}",
+			"enum": "the enum {{name}}",
+			"function": "the function {{name}}",
+			"component": "the component {{name}}",
+			"hook": "the hook {{name}}",
+			"module": "the module {{name}}",
+			"file": "the file {{name}}",
+			"dto": "the DTO {{name}}",
+			"request": "the request {{name}}",
+			"response": "the response {{name}}",
+			"viewModel": "the view model {{name}}",
+			"command": "the command {{name}}",
+			"query": "the query {{name}}",
+			"handler": "the handler {{name}}",
+			"controller": "the controller {{name}}",
+			"repository": "the repository {{name}}",
+			"service": "the service {{name}}",
+			"validator": "the validator {{name}}",
+			"mapper": "the mapper {{name}}",
+			"migration": "the migration {{name}}",
+			"test": "the test file {{name}}",
+			"testClass": "the test class {{name}}",
+			"config": "the configuration file {{name}}",
+			"docs": "the documentation {{name}}",
+			"style": "the stylesheet {{name}}",
+			"translations": "the translations {{name}}"
+		},
+		"nounsOf": {
+			"class": "of the class {{name}}",
+			"interface": "of the interface {{name}}",
+			"record": "of the record {{name}}",
+			"struct": "of the struct {{name}}",
+			"enum": "of the enum {{name}}",
+			"function": "of the function {{name}}",
+			"component": "of the component {{name}}",
+			"hook": "of the hook {{name}}",
+			"module": "of the module {{name}}",
+			"file": "of the file {{name}}",
+			"dto": "of the DTO {{name}}",
+			"request": "of the request {{name}}",
+			"response": "of the response {{name}}",
+			"viewModel": "of the view model {{name}}",
+			"command": "of the command {{name}}",
+			"query": "of the query {{name}}",
+			"handler": "of the handler {{name}}",
+			"controller": "of the controller {{name}}",
+			"repository": "of the repository {{name}}",
+			"service": "of the service {{name}}",
+			"validator": "of the validator {{name}}",
+			"mapper": "of the mapper {{name}}",
+			"migration": "of the migration {{name}}",
+			"test": "of the test file {{name}}",
+			"testClass": "of the test class {{name}}",
+			"config": "of the configuration file {{name}}",
+			"docs": "of the documentation {{name}}",
+			"style": "of the stylesheet {{name}}",
+			"translations": "of the translations {{name}}"
+		},
+		"members": {
+			"property": "the property {{name}}",
+			"method": "the method {{name}}()",
+			"field": "the field {{name}}",
+			"constructor": "the constructor",
+			"function": "the function {{name}}()",
+			"value": "the value {{name}}",
+			"more_one": "{{count}} other member",
+			"more_other": "{{count}} other members",
+			"propertyPlural": "the properties {{names}}",
+			"methodPlural": "the methods {{names}}",
+			"fieldPlural": "the fields {{names}}",
+			"functionPlural": "the functions {{names}}",
+			"valuePlural": "the values {{names}}"
+		},
+		"join": "{{head}} and {{last}}",
+		"sentences": {
+			"added": "I created {{subject}} {{where}}",
+			"modified": "I modified {{subject}} {{where}}",
+			"deleted": "I deleted {{subject}} {{where}}",
+			"createdWith": "{{base}}, with {{items}}",
+			"modifiedWith": "{{base}} and {{changes}}",
+			"modifiedLines": "{{base}} (+{{additions}} / −{{deletions}} lines)"
+		},
+		"clauses": {
+			"added": "added {{items}} to it",
+			"removed": "removed {{items}} from it",
+			"modified": "changed {{items}}"
+		},
+		"edges": {
+			"inherits": "{{from}} inherits from {{to}}.",
+			"implements": "{{from}} implements {{to}}.",
+			"tests": "{{from}} checks the behaviour {{toOf}}.",
+			"maps": "{{from}} carries the data {{toOf}}.",
+			"mapsCross": "{{from}} carries the data {{toOf}} ({{toLayer}} layer) over to the {{fromLayer}} layer.",
+			"uses": "{{from}} uses {{to}}.",
+			"usesCross": "{{from}}, in the {{fromLayer}} layer, relies on {{to}}, in the {{toLayer}} layer.",
+			"shared": "Added on both sides: {{items}}.",
+			"handles": "{{from}} handles {{to}}."
+		}
 	}
 }
