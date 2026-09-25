@@ -22,7 +22,7 @@ Pipeline : **spec → planner → coder → QA reviewer → QA fixer → revue h
 | **Abstraction plateforme** — jamais `process.platform` en direct | Windows / macOS / Linux sont tous supportés en CI |
 | **PR vers `develop`**, jamais `main` | `main` est la branche de release |
 | **iOS ne se construit que sur macOS** — le signaler, jamais réessayer | la chaîne d'outils Apple n'existe pas ailleurs ; `mobile/readiness.py` répond avant la phase |
-| **Versions d'outils épinglées** — ruff `0.15.7`, Biome `2.4.10` | toute autre version produit un diff que la CI refuse |
+| **Versions d'outils épinglées** — ruff `0.15.7`, Biome `2.5.11` | toute autre version produit un diff que la CI refuse |
 
 ## Carte du dépôt
 

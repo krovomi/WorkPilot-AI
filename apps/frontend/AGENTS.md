@@ -40,7 +40,7 @@ les lectures complètes au-delà de 1 000 lignes.
   `ipc-namespaces.ts`. Pas de chaîne littérale.
 - **Zustand** — un store par domaine sous `src/renderer/stores/`. Sélecteurs granulaires :
   `useX((s) => s.champ)`, jamais le store entier, sinon tout re-rend.
-- **Biome 2.4.10** exactement (`pnpm run lint`). Une autre version reformate tout.
+- **Biome 2.5.11** exactement (`pnpm run lint`). Une autre version reformate tout.
 
 ## Tests
 
