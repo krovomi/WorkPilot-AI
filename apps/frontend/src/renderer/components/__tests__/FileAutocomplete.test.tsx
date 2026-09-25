@@ -83,4 +83,40 @@ describe("FileAutocomplete", () => {
 		expect(screen.queryByText("a.md")).not.toBeInTheDocument();
 		expect(screen.getByText("App.tsx")).toBeInTheDocument();
 	});
+
+	it("does not let Enter pick a match for the previous query while the new one loads", async () => {
+		let pending!: (value: unknown) => void;
+		search
+			.mockResolvedValueOnce({
+				success: true,
+				data: [{ relativePath: "docs/a.md", name: "a.md", isDirectory: false }],
+			})
+			.mockImplementationOnce(
+				() =>
+					new Promise((resolve) => {
+						pending = resolve;
+					}),
+			);
+		const onSelect = vi.fn();
+		const props = {
+			projectPath: "/work/project",
+			position: { top: 0, left: 0 },
+			onSelect,
+			onClose: vi.fn(),
+		};
+		const view = render(<FileAutocomplete query="a" {...props} />);
+		await screen.findByText("a.md");
+		view.rerender(<FileAutocomplete query="app" {...props} />);
+		fireEvent.keyDown(document, { key: "Enter" });
+		expect(onSelect).not.toHaveBeenCalled();
+
+		await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+		pending({
+			success: true,
+			data: [{ relativePath: "src/App.tsx", name: "App.tsx", isDirectory: false }],
+		});
+		await screen.findByText("App.tsx");
+		fireEvent.keyDown(document, { key: "Enter" });
+		expect(onSelect).toHaveBeenCalledWith("src/App.tsx");
+	});
 });

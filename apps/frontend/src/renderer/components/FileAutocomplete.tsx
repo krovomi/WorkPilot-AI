@@ -36,14 +36,17 @@ export function FileAutocomplete({
 	const { t } = useTranslation(["tasks"]);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [results, setResults] = useState<FileSearchResult[]>([]);
-	const [loading, setLoading] = useState(true);
+	// The query `results` answers. While it differs from `query` a newer search
+	// is on its way, and the keyboard must not pick from the previous list:
+	// typing `@app` then Enter would otherwise insert a match for `@a`.
+	const [answered, setAnswered] = useState<string | null>(null);
+	const loading = answered !== query;
 	const listRef = useRef<HTMLDivElement>(null);
 	// Latest-wins: a slow search for "@a" must not overwrite the one for "@app".
 	const requestSeq = useRef(0);
 
 	useEffect(() => {
 		const seq = ++requestSeq.current;
-		setLoading(true);
 		const timer = setTimeout(async () => {
 			try {
 				const result = await window.electronAPI.searchProjectFiles(
@@ -61,12 +64,17 @@ export function FileAutocomplete({
 				if (seq === requestSeq.current) setResults([]);
 			} finally {
 				if (seq === requestSeq.current) {
-					setLoading(false);
+					setAnswered(query);
 					setSelectedIndex(0);
 				}
 			}
 		}, SEARCH_DEBOUNCE_MS);
-		return () => clearTimeout(timer);
+		return () => {
+			clearTimeout(timer);
+			// A search already in flight answers nobody once the query changed
+			// or the popup closed.
+			requestSeq.current++;
+		};
 	}, [projectPath, query, maxResults]);
 
 	// Scroll selected item into view
@@ -98,8 +106,9 @@ export function FileAutocomplete({
 				case "Tab": {
 					const file = results[selectedIndex];
 					if (!file) return;
+					// Swallow the key rather than insert a match for an older query.
 					e.preventDefault();
-					onSelect(file.relativePath);
+					if (!loading) onSelect(file.relativePath);
 					break;
 				}
 				case "Escape":
@@ -108,7 +117,7 @@ export function FileAutocomplete({
 					break;
 			}
 		},
-		[results, selectedIndex, onSelect, onClose],
+		[results, selectedIndex, loading, onSelect, onClose],
 	);
 
 	// Attach keyboard listener

@@ -73,51 +73,67 @@ export async function searchProjectPaths(
 	const results: FileSearchResult[] = [];
 	let visited = 0;
 
-	async function walk(
-		absDir: string,
-		relDir: string,
-		depth: number,
-	): Promise<void> {
-		if (results.length >= MAX_SEARCH_CANDIDATES || depth > MAX_SEARCH_DEPTH) {
-			return;
-		}
-		let entries: Dirent[];
-		try {
-			entries = await readdir(absDir, { withFileTypes: true });
-		} catch {
-			return; // unreadable dir — skip silently
-		}
-
-		for (const entry of entries) {
-			if (results.length >= MAX_SEARCH_CANDIDATES) return;
-			if (visited++ > MAX_SEARCH_ENTRIES) return;
-
-			const isDirectory = entry.isDirectory();
-			// Skip noisy build/vendor dirs and hidden entries entirely.
+	// Breadth-first, so the entries and candidate caps cut the *deepest* part of
+	// a large tree: the ranking prefers short paths, and a depth-first walk
+	// could spend both caps inside the first big folder before reaching a
+	// matching file at the root.
+	let level: { absDir: string; relDir: string }[] = [
+		{ absDir: rootPath, relDir: "" },
+	];
+	for (
+		let depth = 0;
+		level.length > 0 && depth <= MAX_SEARCH_DEPTH;
+		depth++
+	) {
+		const next: typeof level = [];
+		for (const { absDir, relDir } of level) {
 			if (
-				isDirectory &&
-				(IGNORED_DIRS.has(entry.name) || entry.name.startsWith("."))
+				results.length >= MAX_SEARCH_CANDIDATES ||
+				visited > MAX_SEARCH_ENTRIES
 			) {
-				continue;
+				break;
 			}
-			if (!isDirectory && entry.name.startsWith(".")) continue;
+			let entries: Dirent[];
+			try {
+				entries = await readdir(absDir, { withFileTypes: true });
+			} catch {
+				continue; // unreadable dir — skip silently
+			}
 
-			const relPath = relDir ? `${relDir}/${entry.name}` : entry.name;
-			const typeMatches = mode === "directory" ? isDirectory : !isDirectory;
-			if (typeMatches) {
-				const haystack = relPath.toLowerCase();
-				if (tokens.every((tok) => haystack.includes(tok))) {
-					results.push({ relativePath: relPath, name: entry.name, isDirectory });
+			for (const entry of entries) {
+				if (results.length >= MAX_SEARCH_CANDIDATES) break;
+				if (visited++ > MAX_SEARCH_ENTRIES) break;
+
+				const isDirectory = entry.isDirectory();
+				// Skip noisy build/vendor dirs and hidden entries entirely.
+				if (
+					isDirectory &&
+					(IGNORED_DIRS.has(entry.name) || entry.name.startsWith("."))
+				) {
+					continue;
+				}
+				if (!isDirectory && entry.name.startsWith(".")) continue;
+
+				const relPath = relDir ? `${relDir}/${entry.name}` : entry.name;
+				const typeMatches = mode === "directory" ? isDirectory : !isDirectory;
+				if (typeMatches) {
+					const haystack = relPath.toLowerCase();
+					if (tokens.every((tok) => haystack.includes(tok))) {
+						results.push({
+							relativePath: relPath,
+							name: entry.name,
+							isDirectory,
+						});
+					}
+				}
+
+				if (isDirectory) {
+					next.push({ absDir: path.join(absDir, entry.name), relDir: relPath });
 				}
 			}
-
-			if (isDirectory) {
-				await walk(path.join(absDir, entry.name), relPath, depth + 1);
-			}
 		}
+		level = next;
 	}
-
-	await walk(rootPath, "", 0);
 
 	// Rank name matches before path-only matches, then shorter (closer-to-root,
 	// tighter) paths, then alphabetically.

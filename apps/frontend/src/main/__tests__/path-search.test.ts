@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+	MAX_SEARCH_CANDIDATES,
 	MAX_SEARCH_RESULTS,
 	searchProjectPaths,
 } from "../ipc-handlers/path-search";
@@ -139,6 +140,21 @@ describe("searchProjectPaths", () => {
 			expect(results).toHaveLength(MAX_SEARCH_RESULTS);
 		} finally {
 			rmSync(deep, { recursive: true, force: true });
+		}
+	});
+
+	it("reaches a root file even when a big folder would exhaust the candidate cap", async () => {
+		const wide = mkdtempSync(path.join(tmpdir(), "path-search-wide-"));
+		try {
+			mkdirSync(path.join(wide, "aaa"));
+			for (let i = 0; i < MAX_SEARCH_CANDIDATES + 100; i++) {
+				writeFileSync(path.join(wide, "aaa", `x${i}.txt`), "");
+			}
+			writeFileSync(path.join(wide, "zz.txt"), "");
+			const results = await searchProjectPaths(wide, "", "file");
+			expect(results[0]?.relativePath).toBe("zz.txt");
+		} finally {
+			rmSync(wide, { recursive: true, force: true });
 		}
 	});
 
