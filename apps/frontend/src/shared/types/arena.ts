@@ -39,7 +39,7 @@ export type ArenaParticipantStatus =
 export type ArenaLabel = "A" | "B" | "C" | "D";
 
 /** Where a contender's model id came from. Mirrors the provider catalog. */
-export type ArenaContenderSource = "live" | "cache" | "static";
+export type ArenaContenderSource = "live" | "cache" | "registry" | "static";
 
 /**
  * One model the user can enter into a battle: a model of a provider that is

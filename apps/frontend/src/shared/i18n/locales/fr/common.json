@@ -1142,5 +1142,17 @@
 			"failedMany": "{{count}} traitements en échec",
 			"open": "Voir"
 		}
+	},
+	"modelCatalog": {
+		"live": "À jour (fournisseur)",
+		"registry": "À jour (registre public)",
+		"cache": "En cache · {{when}}",
+		"static": "Liste hors-ligne",
+		"justNow": "à l'instant",
+		"minutesAgo": "il y a {{count}} min",
+		"hoursAgo": "il y a {{count}} h",
+		"daysAgo": "il y a {{count}} j",
+		"refresh": "Rafraîchir la liste des modèles",
+		"registryHint": "Sorties lues sur models.dev, faute de clé API configurée pour ce fournisseur. Ajoutez une clé pour voir exactement ce que votre compte peut appeler."
 	}
 }
