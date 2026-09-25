@@ -34,14 +34,35 @@ export const IGNORED_DIRS = new Set([
 export const MAX_SEARCH_RESULTS = 50;
 export const MAX_SEARCH_ENTRIES = 20000;
 export const MAX_SEARCH_DEPTH = 12;
+// Matches collected before ranking. Stopping the walk at MAX_SEARCH_RESULTS
+// returned the first fifty matches in *walk* order, so on any real project
+// `@app` listed whatever sat under the first directory and never reached
+// `src/App.tsx`. Ranking needs the candidates first.
+export const MAX_SEARCH_CANDIDATES = 2000;
+
+/**
+ * How well a match answers the query: the file *name* matching beats a match
+ * found only in its directories, because a name is what someone types after
+ * `@`. Lower is better.
+ */
+function matchTier(name: string, tokens: readonly string[]): number {
+	const last = tokens.at(-1);
+	if (!last) return 0;
+	const lower = name.toLowerCase();
+	if (tokens.length === 1 && lower === last) return 0;
+	if (lower.startsWith(last)) return 1;
+	if (lower.includes(last)) return 2;
+	return 3;
+}
 
 /**
  * Recursively walk `rootPath` collecting files or directories whose
  * project-relative POSIX path matches every whitespace-separated token in
  * `query` (case-insensitive substring). Powers the file-path autocomplete in
- * the agent inputs. Async (uses fs/promises) so it never blocks the main
- * process, and bounded on depth, visited entries, and results. Closest matches
- * (shortest relative path) are returned first.
+ * the agent inputs and the `@` mentions of a task description. Async (uses
+ * fs/promises) so it never blocks the main process, and bounded on depth,
+ * visited entries, and candidates. Name matches come first, then the closest
+ * (shortest relative path).
  */
 export async function searchProjectPaths(
 	rootPath: string,
@@ -52,55 +73,73 @@ export async function searchProjectPaths(
 	const results: FileSearchResult[] = [];
 	let visited = 0;
 
-	async function walk(
-		absDir: string,
-		relDir: string,
-		depth: number,
-	): Promise<void> {
-		if (results.length >= MAX_SEARCH_RESULTS || depth > MAX_SEARCH_DEPTH) {
-			return;
-		}
-		let entries: Dirent[];
-		try {
-			entries = await readdir(absDir, { withFileTypes: true });
-		} catch {
-			return; // unreadable dir — skip silently
-		}
-
-		for (const entry of entries) {
-			if (results.length >= MAX_SEARCH_RESULTS) return;
-			if (visited++ > MAX_SEARCH_ENTRIES) return;
-
-			const isDirectory = entry.isDirectory();
-			// Skip noisy build/vendor dirs and hidden entries entirely.
+	// Breadth-first, so the entries and candidate caps cut the *deepest* part of
+	// a large tree: the ranking prefers short paths, and a depth-first walk
+	// could spend both caps inside the first big folder before reaching a
+	// matching file at the root.
+	let level: { absDir: string; relDir: string }[] = [
+		{ absDir: rootPath, relDir: "" },
+	];
+	for (
+		let depth = 0;
+		level.length > 0 && depth <= MAX_SEARCH_DEPTH;
+		depth++
+	) {
+		const next: typeof level = [];
+		for (const { absDir, relDir } of level) {
 			if (
-				isDirectory &&
-				(IGNORED_DIRS.has(entry.name) || entry.name.startsWith("."))
+				results.length >= MAX_SEARCH_CANDIDATES ||
+				visited > MAX_SEARCH_ENTRIES
 			) {
-				continue;
+				break;
 			}
-			if (!isDirectory && entry.name.startsWith(".")) continue;
+			let entries: Dirent[];
+			try {
+				entries = await readdir(absDir, { withFileTypes: true });
+			} catch {
+				continue; // unreadable dir — skip silently
+			}
 
-			const relPath = relDir ? `${relDir}/${entry.name}` : entry.name;
-			const typeMatches = mode === "directory" ? isDirectory : !isDirectory;
-			if (typeMatches) {
-				const haystack = relPath.toLowerCase();
-				if (tokens.every((tok) => haystack.includes(tok))) {
-					results.push({ relativePath: relPath, name: entry.name, isDirectory });
+			for (const entry of entries) {
+				if (results.length >= MAX_SEARCH_CANDIDATES) break;
+				if (visited++ > MAX_SEARCH_ENTRIES) break;
+
+				const isDirectory = entry.isDirectory();
+				// Skip noisy build/vendor dirs and hidden entries entirely.
+				if (
+					isDirectory &&
+					(IGNORED_DIRS.has(entry.name) || entry.name.startsWith("."))
+				) {
+					continue;
+				}
+				if (!isDirectory && entry.name.startsWith(".")) continue;
+
+				const relPath = relDir ? `${relDir}/${entry.name}` : entry.name;
+				const typeMatches = mode === "directory" ? isDirectory : !isDirectory;
+				if (typeMatches) {
+					const haystack = relPath.toLowerCase();
+					if (tokens.every((tok) => haystack.includes(tok))) {
+						results.push({
+							relativePath: relPath,
+							name: entry.name,
+							isDirectory,
+						});
+					}
+				}
+
+				if (isDirectory) {
+					next.push({ absDir: path.join(absDir, entry.name), relDir: relPath });
 				}
 			}
-
-			if (isDirectory) {
-				await walk(path.join(absDir, entry.name), relPath, depth + 1);
-			}
 		}
+		level = next;
 	}
 
-	await walk(rootPath, "", 0);
-
-	// Rank shorter (closer-to-root, tighter) matches first, then alphabetically.
+	// Rank name matches before path-only matches, then shorter (closer-to-root,
+	// tighter) paths, then alphabetically.
 	results.sort(
 		(a, b) =>
+			matchTier(a.name, tokens) - matchTier(b.name, tokens) ||
 			a.relativePath.length - b.relativePath.length ||
 			a.relativePath.localeCompare(b.relativePath, undefined, {
 				sensitivity: "base",
