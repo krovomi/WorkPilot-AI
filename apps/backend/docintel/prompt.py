@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .adr import collect_adrs
+from .conformance import conformance_section
 from .models import AdrRecord, ExtractedDocument
 from .preflight import load_result
 
@@ -153,6 +154,11 @@ def docintel_section(project_dir: Path, spec_dir: Path | None = None) -> str:
         if adrs := adr_section(Path(project_dir)):
             parts.append(adrs)
     except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        pass
+    try:
+        if rules := conformance_section(Path(project_dir)):
+            parts.append(rules)
+    except Exception:  # noqa: BLE001
         pass
     try:
         if spec_dir is not None and (attached := attachments_section(Path(spec_dir))):

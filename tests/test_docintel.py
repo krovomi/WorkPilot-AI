@@ -613,3 +613,130 @@ class TestTheBuildIsWired:
         from prompts_pkg.prompts import docintel_section as wrapper
 
         assert "ADR-0003" in wrapper(adr_project)
+
+
+# ---------------------------------------------------------------------------
+# Diagram vs. project references
+# ---------------------------------------------------------------------------
+
+CLEAN_ARCHI = """<mxfile><diagram name="Clean"><mxGraphModel><root>
+  <mxCell id="0"/><mxCell id="1" parent="0"/>
+  <mxCell id="api" value="Api" vertex="1" parent="1"/>
+  <mxCell id="app" value="Application" vertex="1" parent="1"/>
+  <mxCell id="dom" value="Domain" vertex="1" parent="1"/>
+  <mxCell id="infra" value="Infrastructure" vertex="1" parent="1"/>
+  <mxCell id="shared" value="Shared Kernel" vertex="1" parent="1"/>
+  <mxCell id="a1" edge="1" source="api" target="app" parent="1"/>
+  <mxCell id="a2" edge="1" source="app" target="dom" parent="1"/>
+  <mxCell id="a3" edge="1" source="infra" target="app" parent="1"/>
+  <mxCell id="a4" edge="1" source="api" target="infra" parent="1"/>
+</root></mxGraphModel></diagram></mxfile>"""
+
+
+def _csproj(root: Path, name: str, refs: list[str], *, legacy: bool = False) -> None:
+    folder = root / "src" / name
+    folder.mkdir(parents=True, exist_ok=True)
+    items = "".join(f'<ProjectReference Include="..\\{r}\\{r}.csproj" />' for r in refs)
+    namespace = (
+        ' xmlns="http://schemas.microsoft.com/developer/msbuild/2003"' if legacy else ""
+    )
+    (folder / f"{name}.csproj").write_text(
+        f'<Project Sdk="Microsoft.NET.Sdk"{namespace}><ItemGroup>{items}</ItemGroup></Project>',
+        encoding="utf-8",
+    )
+
+
+@pytest.fixture
+def solution(tmp_path: Path) -> Path:
+    _csproj(
+        tmp_path, "Acme.Api", ["Acme.Application", "Acme.Infrastructure", "Acme.Domain"]
+    )
+    _csproj(tmp_path, "Acme.Application", ["Acme.Domain"])
+    _csproj(
+        tmp_path, "Acme.Infrastructure.Persistence", ["Acme.Application"], legacy=True
+    )
+    # The two violations: Domain reaching into Infrastructure, and a kernel
+    # the diagram draws no arrow to.
+    _csproj(
+        tmp_path,
+        "Acme.Domain",
+        ["Acme.Infrastructure.Persistence", "Acme.SharedKernel"],
+    )
+    _csproj(tmp_path, "Acme.SharedKernel", [])
+    # A test project references everything; that is not a layer crossing.
+    _csproj(tmp_path, "Acme.Domain.Tests", ["Acme.Api", "Acme.Domain"])
+    # Build output is never read.
+    _csproj(tmp_path / "src" / "Acme.Api" / "bin", "Stale", ["Acme.Api"])
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "architecture.drawio").write_text(
+        CLEAN_ARCHI, encoding="utf-8"
+    )
+    return tmp_path
+
+
+class TestConformance:
+    def test_layers_are_matched_most_specifically(self, solution: Path):
+        from docintel import check_conformance
+
+        report = check_conformance(solution)
+        (check,) = report.checks
+        assert check.status == "checked"
+        assert check.layers["Infrastructure"] == ["Acme.Infrastructure.Persistence"]
+        assert check.layers["Domain"] == ["Acme.Domain"]
+        assert "Acme.Domain.Tests" not in str(check.layers)
+
+    def test_violations_inverted_first(self, solution: Path):
+        from docintel import check_conformance
+
+        findings = check_conformance(solution).findings
+        pairs = [(f.source_project, f.target_project, f.kind) for f in findings]
+        assert pairs == [
+            ("Acme.Domain", "Acme.Infrastructure.Persistence", "inverted"),
+            ("Acme.Domain", "Acme.SharedKernel", "undrawn"),
+        ]
+        assert findings[0].file == "src/Acme.Domain/Acme.Domain.csproj"
+
+    def test_transitive_reference_is_allowed(self, solution: Path):
+        from docintel import check_conformance
+
+        # Api -> Domain is not drawn, but Api -> Application -> Domain is.
+        findings = check_conformance(solution).findings
+        assert not any(f.source_project == "Acme.Api" for f in findings)
+
+    def test_data_flow_diagram_reports_nothing(self, tmp_path: Path):
+        from docintel import check_conformance
+
+        _csproj(tmp_path, "Acme.Api", ["Acme.Application"])
+        _csproj(tmp_path, "Acme.Application", ["Acme.Domain"])
+        _csproj(tmp_path, "Acme.Domain", [])
+        # Drawn as data flow: every arrow points against the references.
+        flow = """<mxfile><diagram><mxGraphModel><root>
+          <mxCell id="0"/><mxCell id="1" parent="0"/>
+          <mxCell id="api" value="Api" vertex="1" parent="1"/>
+          <mxCell id="app" value="Application" vertex="1" parent="1"/>
+          <mxCell id="dom" value="Domain" vertex="1" parent="1"/>
+          <mxCell id="e1" edge="1" source="dom" target="app" parent="1"/>
+          <mxCell id="e2" edge="1" source="app" target="api" parent="1"/>
+        </root></mxGraphModel></diagram></mxfile>"""
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "flow.drawio").write_text(flow, encoding="utf-8")
+
+        report = check_conformance(tmp_path)
+        assert report.checks[0].status == "ambiguous-direction"
+        assert report.findings == []
+
+    def test_nothing_to_compare(self, tmp_path: Path):
+        from docintel import check_conformance, conformance_section
+
+        assert check_conformance(tmp_path).skipped == "no-diagram"
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "a.drawio").write_text(CLEAN_ARCHI, encoding="utf-8")
+        assert check_conformance(tmp_path).skipped == "no-projects"
+        assert conformance_section(tmp_path) == ""
+
+    def test_section_states_rules_and_debt(self, solution: Path):
+        section = docintel_section(solution)
+        assert "Architecture diagram vs. project references" in section
+        assert "Allowed: " in section and "Api -> Application" in section
+        assert "`Acme.Domain` (Domain) -> `Acme.Infrastructure.Persistence`" in section
+        assert "points backwards" in section

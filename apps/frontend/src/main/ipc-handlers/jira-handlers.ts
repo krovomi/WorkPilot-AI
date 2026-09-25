@@ -6,6 +6,7 @@ import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type {
+	ImageAttachment,
 	IPCResult,
 	JiraSyncStatus,
 	JiraWorkItem,
@@ -13,6 +14,7 @@ import type {
 } from "../../shared/types";
 import type { AgentManager } from "../agent";
 import { projectStore } from "../project-store";
+import { downloadJiraImageAttachments } from "./shared/jira-attachments";
 import { parseEnvFile } from "./utils";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -369,6 +371,37 @@ except Exception as e:
 					error instanceof Error ? error.message : String(error);
 				return { success: false, error: errorMessage };
 			}
+		},
+	);
+
+	// The issue's image attachments, downloaded in the main process with the
+	// project's credentials so the renderer never holds the token. Returned as
+	// task attachments: TASK_CREATE writes them to attachments/, where the
+	// attachments preflight reads them before planning.
+	ipcMain.handle(
+		IPC_CHANNELS.JIRA_GET_ATTACHMENTS,
+		async (
+			_,
+			projectId: string,
+			issueKey: string,
+		): Promise<IPCResult<ImageAttachment[]>> => {
+			const project = projectStore.getProject(projectId);
+			if (!project) {
+				return { success: false, error: "Project not found" };
+			}
+			const config = getJiraConfig(project);
+			if (!config.instanceUrl || !config.email || !config.apiToken) {
+				return { success: false, error: "Jira not configured for this project" };
+			}
+			const images = await downloadJiraImageAttachments(
+				{
+					instanceUrl: config.instanceUrl,
+					email: config.email,
+					apiToken: config.apiToken,
+				},
+				issueKey,
+			);
+			return { success: true, data: images };
 		},
 	);
 

@@ -6,6 +6,7 @@ calls a model or the network, and nothing here can fail a build.
 """
 
 from .adr import collect_adrs, find_adr_dir, parse_adr
+from .conformance import check_conformance, conformance_section
 from .diagrams import parse_diagram, render_diagram
 from .models import (
     AdrRecord,
@@ -28,7 +29,9 @@ __all__ = [
     "adr_section",
     "attachment_paths",
     "attachments_section",
+    "check_conformance",
     "collect_adrs",
+    "conformance_section",
     "docintel_section",
     "extract_file",
     "find_adr_dir",

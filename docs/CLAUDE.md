@@ -1231,6 +1231,7 @@ planning, beside the libdocs preflight (`_run_attachments_preflight` in
 ```
 apps/backend/docintel/
   diagrams.py   draw.io and Excalidraw, including the source their PNG/SVG exports embed
+  conformance.py the repository's architecture diagram vs. the .csproj reference graph
   ocr.py        Tesseract, when the machine has it — local only
   adr.py        where a project keeps its ADRs, and which ones bind
   preflight.py  attachments -> <spec_dir>/docintel/result.json + extracted/*.md
@@ -1271,7 +1272,28 @@ attachments come from the persisted record.
 **Azure DevOps screenshots arrive as attachments.** The import used to inline
 work-item images as data URIs for display only; `saveInlinedImagesAsAttachments`
 also writes them to `attachments/`, so they go through the same preflight as an
-image dropped on a card.
+image dropped on a card. **Jira** gets the same treatment one step earlier:
+`JIRA_GET_ATTACHMENTS` downloads the issue's image attachments in the main
+process (`shared/jira-attachments.ts` — the token never reaches the renderer,
+and a content URL on another host is ignored rather than followed with it), and
+the Kanban import hands them to `createTask` as `attachedImages`.
+
+**The repository's own diagram is a rule too.** `conformance.py` reads the
+draw.io / Excalidraw files under `docs/` (and beside the solution file) as
+dependency rules — `A -> B` means *A may depend on B*, transitively — and
+compares them with the `.csproj` `<ProjectReference>` graph, the one dependency
+graph that is declared rather than inferred. Boxes are matched to projects by
+their words, PascalCase split (`Shared Kernel` names `Acme.SharedKernel`,
+`Infrastructure` names `Acme.Infrastructure.Persistence`), the most specific box
+winning; test projects are left out. A reference the diagram cannot reach is
+reported, *inverted* first — Domain referencing Infrastructure is the
+clean-architecture violation. The section tells the planner and coder the
+allowed arrows and the existing debt, and QA to report a *new* crossing as
+HIGH. A diagram whose arrows only ever contradict the references is drawn as
+data flow, not dependencies: it is reported `ambiguous-direction` and produces
+no finding, because a check that flags a whole solution is a check people stop
+reading. .NET only for now: other stacks have no declared project graph, and an
+import-based one answers a fuzzier question.
 
 **In the Kanban.** `DocumentInsightsCard` says, before the build, what each
 attachment will become (diagram, OCR text, image, document) and which ADRs bind

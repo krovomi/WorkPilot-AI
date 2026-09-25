@@ -20,6 +20,7 @@ from core.api_safety import SPEC_ADDRESS_REASONS, SpecAddressError, resolve_spec
 from fastapi import APIRouter, Query
 
 from .adr import collect_adrs
+from .conformance import check_conformance
 from .preflight import run_preflight
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,9 @@ def docintel(
             "documents": [d.to_dict() for d in result.documents],
             "skipped": result.skipped,
             "adrs": [a.to_dict() for a in adrs],
+            "conformance": (
+                check_conformance(project).to_dict() if project is not None else None
+            ),
         }
     except Exception:  # noqa: BLE001
         logger.exception("docintel collection failed")
