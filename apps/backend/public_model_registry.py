@@ -38,9 +38,11 @@ no model name in it.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -146,7 +148,11 @@ def _split_credentials(url: str) -> tuple[str, tuple[str, str] | None]:
 
 
 def _redacted(url: str) -> str:
-    return _split_credentials(url)[0]
+    # Called from an error path: it must not raise on the URL that failed.
+    try:
+        return _split_credentials(url)[0]
+    except ValueError:
+        return "<unparseable MODEL_REGISTRY_URL>"
 
 
 def _slim(document: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -178,21 +184,36 @@ def _read_cache() -> dict[str, Any] | None:
     try:
         with open(CACHE_PATH, encoding="utf-8") as f:
             data = json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError):  # ValueError: bad JSON and bad UTF-8 alike
         return None
     if not isinstance(data, dict) or not isinstance(data.get("providers"), dict):
+        return None
+    fetched_at = data.get("fetched_at")
+    if isinstance(fetched_at, bool) or not isinstance(fetched_at, int | float):
         return None
     return data
 
 
+def _is_fresh(data: dict[str, Any] | None) -> bool:
+    return bool(data) and time.time() - data["fetched_at"] < CACHE_TTL_SECONDS
+
+
 def _write_cache(data: dict[str, Any]) -> None:
+    # A unique temporary file: the lock only covers this process, and a runner
+    # spawned beside the API server may be writing the same cache.
+    tmp = None
     try:
-        tmp = CACHE_PATH.with_suffix(".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
+        fd, tmp = tempfile.mkstemp(
+            prefix=f"{CACHE_PATH.name}.", suffix=".tmp", dir=CACHE_PATH.parent
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f)
         os.replace(tmp, CACHE_PATH)
     except OSError as e:
-        logger.warning("Could not write model registry cache: %s", e)
+        logger.warning("Could not write model registry cache: %s", type(e).__name__)
+        if tmp:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
 
 
 def _download() -> dict[str, Any]:
@@ -211,17 +232,12 @@ def _download() -> dict[str, Any]:
 def _snapshot(force_refresh: bool) -> dict[str, Any] | None:
     """The slimmed registry, fresh when possible, stale rather than nothing."""
     cached = _read_cache()
-    fresh = cached and time.time() - cached.get("fetched_at", 0) < CACHE_TTL_SECONDS
-    if fresh and not force_refresh:
+    if _is_fresh(cached) and not force_refresh:
         return cached
     with _lock:
         # Another request may have refreshed it while this one waited.
         cached = _read_cache()
-        if (
-            cached
-            and not force_refresh
-            and time.time() - cached.get("fetched_at", 0) < CACHE_TTL_SECONDS
-        ):
+        if _is_fresh(cached) and not force_refresh:
             return cached
         if (
             not force_refresh
@@ -230,7 +246,7 @@ def _snapshot(force_refresh: bool) -> dict[str, Any] | None:
             return cached
         try:
             data = _download()
-        except (httpx.HTTPError, OSError, ValueError) as e:
+        except (httpx.HTTPError, httpx.InvalidURL, OSError, ValueError) as e:
             _backoff.last_failure_at = time.time()
             # The exception text can quote the URL, credentials included.
             status = getattr(getattr(e, "response", None), "status_code", None)
@@ -266,4 +282,4 @@ def models_for(
     models = [m for m in models if _is_record(m)] if isinstance(models, list) else []
     if not models:
         return None
-    return models, float(snapshot.get("fetched_at") or 0.0)
+    return models, float(snapshot["fetched_at"])

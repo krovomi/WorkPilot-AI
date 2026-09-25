@@ -733,6 +733,7 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
             logger.warning(
                 "Public model registry unusable for %s: %s", safe, type(e).__name__
             )
+            error = error or type(e).__name__
     if registry:
         models, fetched_at = registry
         return {

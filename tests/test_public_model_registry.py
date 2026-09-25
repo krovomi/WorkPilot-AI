@@ -303,3 +303,52 @@ def test_a_provider_name_cannot_forge_a_log_line(monkeypatch, tmp_path, caplog):
     with caplog.at_level("WARNING"):
         catalog.list_models("openai\nFAKE ENTRY")
     assert all("\n" not in r.getMessage() for r in caplog.records)
+
+
+def test_a_cache_that_is_not_utf8_is_ignored(monkeypatch, tmp_path):
+    _serve(monkeypatch, tmp_path, lambda r: httpx.Response(200, json=DOCUMENT))
+    (tmp_path / "registry.json").write_bytes(b"\xff\xfe\x00garbage")
+    result = catalog.list_models("anthropic")
+    assert result["source"] == "registry"
+
+
+def test_a_cache_with_a_bad_timestamp_is_refreshed(monkeypatch, tmp_path):
+    _serve(monkeypatch, tmp_path, lambda r: httpx.Response(200, json=DOCUMENT))
+    (tmp_path / "registry.json").write_text(
+        '{"fetched_at": "yesterday", "providers": {"anthropic": [{"id": "x"}]}}',
+        encoding="utf-8",
+    )
+    result = catalog.list_models("anthropic")
+    assert result["source"] == "registry"
+    assert result["models"][0]["value"] == "claude-opus-5-5"
+
+
+def test_an_unparseable_registry_url_is_reported_not_raised(monkeypatch, tmp_path):
+    _serve(monkeypatch, tmp_path, lambda r: httpx.Response(200, json=DOCUMENT))
+    monkeypatch.setenv("MODEL_REGISTRY_URL", "http://[::1")
+    # Handled inside the registry module, so the failure backoff applies.
+    assert registry.models_for("anthropic") is None
+    assert registry._backoff.last_failure_at > 0
+
+
+def test_a_registry_failure_is_reported_in_the_provenance(monkeypatch, tmp_path):
+    _serve(monkeypatch, tmp_path, lambda r: httpx.Response(200, json={}))
+
+    def boom(*a, **kw):
+        raise RuntimeError("unforeseen")
+
+    monkeypatch.setattr(catalog, "_fetch_registry", boom)
+    result = catalog.list_models("anthropic")
+    assert result["source"] == "static"
+    assert result["error"] == "RuntimeError"
+
+
+def test_the_cache_is_written_through_a_unique_temporary_file(monkeypatch, tmp_path):
+    _serve(monkeypatch, tmp_path, lambda r: httpx.Response(200, json=DOCUMENT))
+    (tmp_path / "registry.tmp").mkdir()  # the old fixed name, now occupied
+    catalog.list_models("anthropic")
+    assert (tmp_path / "registry.json").is_file()
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "registry.json",
+        "registry.tmp",
+    ]
