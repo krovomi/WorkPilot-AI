@@ -217,13 +217,6 @@ export function TaskEmulator({
 	}, []);
 
 	const handleOpenInBrowser = useCallback(async () => {
-		setBrowserError(null);
-		try {
-			if (url) await globalThis.electronAPI.openExternal(url);
-		} catch {
-			setBrowserError(t("appEmulator:preview.browserFailed", { url }));
-		}
-	}, [url, t]);
 		// Ce que l'utilisateur regarde, pas la racine du serveur : après une
 		// navigation dans l'aperçu, les deux ne sont plus la même page — et sur une
 		// Web API la racine est précisément celle qui répond 404.
