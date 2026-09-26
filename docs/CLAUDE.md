@@ -1269,7 +1269,10 @@ planning, beside the libdocs preflight (`_run_attachments_preflight` in
 apps/backend/docintel/
   diagrams.py   draw.io and Excalidraw, including the source their PNG/SVG exports embed
   conformance.py the repository's architecture diagram vs. the .csproj reference graph
-  ocr.py        Tesseract, when the machine has it — local only
+  ocr.py        the OCR entry point, over engines/
+  engines/      Tesseract, PaddleOCR, docTR, a local vision model, Azure — tried in order
+  redact.py     secrets in what was read: masked in text, painted out of images
+  read_guard.py `Read` refused on an original the preflight withheld or redacted
   adr.py        where a project keeps its ADRs, and which ones bind
   preflight.py  attachments -> <spec_dir>/docintel/result.json + extracted/*.md
   prompt.py     the two prompt sections
@@ -1284,18 +1287,81 @@ pixels would give the words and lose the only thing a diagram claims that prose
 does not. `parse_diagram` decides by content, not by name: `schema.png`
 exported with "include a copy of my diagram" is a draw.io file.
 
-**Pixels stay on the machine.** Tesseract (`DOCINTEL_LOCAL_OCR`) transcribes a
-screenshot before planning so it can be quoted and scanned. Without it, the
-image is handed to the agents, which open it with their own file tool through
-the provider the task was configured for. There is deliberately no cloud OCR
-call here: it would be a way for a screenshot to reach a service the task was
-not configured for, and in `airgapStrict` a way around the barrier. Office and
-PDF files are left to the `convert-documents-to-markdown` skill every agent
-already carries — one converter, not two.
+**Pixels stay on the machine.** OCR transcribes a screenshot before planning
+so it can be quoted and scanned; without it, the image is handed to the agents,
+which open it with their own file tool through the provider the task was
+configured for. Office and PDF files are left to the
+`convert-documents-to-markdown` skill every agent already carries — one
+converter, not two.
 
-**An attachment is data.** Extracted text goes through `injection_guard`; text
-it flags is withheld from the prompt and reported, and every section says in
-so many words that attachment content is not an instruction.
+**The engine is a list, not a choice.** `DOCINTEL_OCR_ENGINE` is an ordered
+fallback chain (`engines/__init__.py`): the first engine that produces text
+answers, the record names it (`engine`), and every engine skipped on the way
+leaves `engine:reason` in `attempts` — "why did the vision model not answer" is
+a line on the record, not a debug log. The default is `tesseract` alone, the
+engine the previous release used and the only one that is a binary rather than
+a Python stack.
+
+| Engine | Where it runs | Why it is here |
+|---|---|---|
+| `tesseract` | a binary on PATH | the default; asked for TSV so the words come with boxes |
+| `paddleocr`, `doctr` | Python, imported on first use | better on small UI text and dark themes; heavy, so a person installs them |
+| `ollama-vision` | a local vision model through Ollama (`qwen2.5vl`, `llava`) | *describes* a screenshot — the dialog, the layout, the arrows — not only its words |
+| `azure-document-intelligence` | Azure, the one cloud engine | teams that already keep it in their tenant; handwriting and dense scans |
+
+Two refusals live in the chain rather than in each engine, because an engine
+must not be the one deciding whether it may run. A **cloud engine** runs only
+when it is listed *and* has an https endpoint and a key; it is refused under
+`airgapStrict` before it is asked anything, with a message naming
+`DOCINTEL_OCR_ENGINE` and the Offline Mode switch; and it is refused when there
+is no project to read the policy from, or the policy is unreadable — the one
+setting whose failure mode must be "nothing left the machine". The **Kanban
+preview** (`GET /api/docintel/`, recomputed on every panel opening) defers the
+vision and cloud engines to the build: opening a panel is not a reason to run a
+vision model or to upload a screenshot to a metered service.
+
+`ollama-vision` is local by the same rule: an `OLLAMA_BASE_URL` that is not
+loopback is refused (`remote-host`), because a GPU box on the LAN is exactly
+"the pixels leave the machine", and the request bypasses the proxy. Its answer
+is marked `described` and the prompt says so — a description is a model's
+reading, a transcription is the pixels' words.
+
+**A secret on screen is masked, and never repeated.** A screenshot is where a
+credential leaks without anybody deciding to leak it: the portal with the
+storage key on screen, `appsettings.json` open behind a stack trace. The
+patterns are `security/scan_secrets.py`'s — the pre-commit table, extended with
+the unquoted `Key=Value;` connection strings (ADO.NET `Password=`,
+`AccountKey=`, `SharedAccessKey=`) and generic JWTs it had never matched — and
+there is no second list. A match is replaced by `[REDACTED: <kind>]` in the
+text before it reaches `result.json`, `extracted/` or a prompt, in diagram
+labels too; the record carries the *kinds* (`secrets`), never a value.
+
+The image itself is then **redacted** — a copy under `docintel/redacted/` with
+every OCR line that carried a secret painted black, re-encoded from pixels so
+no metadata chunk survives — when the engine gave boxes and Pillow is
+installed. Otherwise it is **withheld**. Whole lines rather than matched words:
+OCR splits and merges tokens, and covering `Server=db;` beside the password
+costs context where missing one character of the key costs the key. None of
+this depends on the task's provider: phases can run on different providers, and
+the preflight runs before any of them. A scanner that cannot load withholds
+(`secret-scan-unavailable`) — "could not check" must not read as "none".
+
+**An attachment is data.** Extracted text — masked first, so the scanner's own
+report cannot quote a secret — goes through `injection_guard`. Text it flags in
+a document is withheld from the prompt and reported; text it flags in an
+*image* withholds the image, because the image is the carrier, and a vision
+model shown it may repeat it. Every section says in so many words that
+attachment content is not an instruction.
+
+**The prompt asks, `Read` enforces.** The attachments section tells agents to
+use the masked copy and never to open a redacted or withheld original. A prompt
+is a request, so `read_guard.make_read_guard_hook` is registered in
+`create_client` beside the write-path guard and denies a `Read` of any original
+the record names — `Read` is the one tool that turns an image into pixels a
+Claude model sees. The other providers read through `ToolExecutor.read_file`,
+which decodes UTF-8 and cannot hand an image to a model at all. What no layer
+can do is read an image nobody transcribed: with no OCR engine, a screenshot
+goes to the agents as it always did, and the card says why.
 
 **ADRs bind the way the spec-kit constitution does.** `docintel_section` (in
 `prompts_pkg/prompts.py`) reaches the planner, every coding subtask, the QA
@@ -1351,15 +1417,20 @@ claude mcp add workpilot-docintel -- python apps/backend/runners/docintel_mcp.py
 ```
 
 **In the Kanban.** `DocumentInsightsCard` says, before the build, what each
-attachment will become (diagram, OCR text, image, document) and which ADRs bind
-— the moment someone can still attach the `.drawio` instead of its screenshot.
-It renders nothing when there is neither attachment nor ADR.
+attachment will become (diagram, OCR text and the engine that read it, image,
+document, masked, withheld) and which ADRs bind — the moment someone can still
+attach the `.drawio` instead of its screenshot, or a screenshot without the
+key on it. A secret is shown by its kind; the card never receives the value. It
+renders nothing when there is neither attachment nor ADR.
 
 | Variable | Default | What it does |
 |---|---|---|
 | `DOCINTEL_ENABLED` | `true` | The attachments preflight. ADRs are read regardless |
-| `DOCINTEL_LOCAL_OCR` | `true` | Tesseract on image attachments, when installed |
-| `DOCINTEL_OCR_LANGS` | `eng+fra` | Tesseract languages; retried without `-l` when a pack is missing |
+| `DOCINTEL_LOCAL_OCR` | `true` | The OCR master switch: off, no engine is asked, cloud included |
+| `DOCINTEL_OCR_ENGINE` | `tesseract` | Ordered fallback chain: `tesseract`, `paddleocr`, `doctr`, `ollama-vision`, `azure-document-intelligence` |
+| `DOCINTEL_OCR_LANGS` | `eng+fra` | OCR languages (Tesseract spelling); retried without `-l` when a pack is missing |
+| `DOCINTEL_VISION_MODEL` | `qwen2.5vl` | The Ollama model `ollama-vision` asks; an unpulled model is a recorded reason |
+| `DOCINTEL_AZURE_ENDPOINT` / `DOCINTEL_AZURE_KEY` | — | Azure Document Intelligence, https only. Both required, and the engine listed, before anything is sent |
 | `DOCINTEL_MAX_BYTES` | `10485760` | Larger attachments are skipped and the skip is reported |
 | `WORKPILOT_TESSERACT_PATH` | — | A specific binary, for a Tesseract not on PATH and for tests |
 

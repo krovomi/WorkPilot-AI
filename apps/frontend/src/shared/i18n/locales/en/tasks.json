@@ -1203,7 +1203,9 @@
 			"adrs": "{{count}} accepted ADR",
 			"adrs_other": "{{count}} accepted ADRs",
 			"flagged": "{{count}} flagged",
-			"flagged_other": "{{count}} flagged"
+			"flagged_other": "{{count}} flagged",
+			"secrets": "{{count}} secret masked",
+			"secrets_other": "{{count}} secrets masked"
 		},
 		"attachments": {
 			"title": "Attachments"
@@ -1218,20 +1220,27 @@
 			"text": "text",
 			"image": "image",
 			"document": "document",
-			"skipped": "skipped"
+			"skipped": "skipped",
+			"redacted": "masked",
+			"withheld": "withheld"
 		},
 		"detail": {
 			"diagram": "{{engine}} diagram read from its source: {{nodes}} elements, {{edges}} arrows",
 			"text": "text read as is",
-			"ocr": "transcribed by local OCR",
+			"ocr": "transcribed by OCR ({{engine}})",
 			"image": "handed to the agents as an image ({{reason}})",
 			"document": "converted by the agents with the document skill",
 			"skipped": "not read ({{reason}})",
-			"flagged": "text withheld from the prompt: it looks like an instruction aimed at the agent"
+			"flagged": "text withheld from the prompt: it looks like an instruction aimed at the agent",
+			"described": "described by a local vision model ({{engine}})",
+			"redacted": "secret on screen ({{kinds}}): agents get a copy with it painted out",
+			"withheld": "not given to the agents: it shows a secret that could not be masked ({{kinds}})",
+			"withheldInjection": "not given to the agents: text in the image looks like an instruction aimed at them",
+			"secretsInText": "secrets masked in the text ({{kinds}})"
 		},
 		"reason": {
 			"disabled": "local OCR turned off",
-			"no-engine": "Tesseract is not installed",
+			"no-engine": "no OCR engine installed (Tesseract by default)",
 			"timeout": "OCR timed out",
 			"failed": "OCR failed",
 			"empty": "no text found",
@@ -1239,7 +1248,20 @@
 			"unreadable": "file unreadable",
 			"no-diagram": "no embedded diagram",
 			"unsupported": "unsupported format",
-			"unknown": "unknown reason"
+			"unknown": "unknown reason",
+			"airgap": "cloud OCR refused: the project is in strict offline mode",
+			"no-project": "cloud OCR refused: no project policy to check",
+			"deferred": "read by the vision or cloud engine at build time",
+			"not-installed": "OCR engine not installed",
+			"not-configured": "OCR engine not configured",
+			"unknown-engine": "unknown OCR engine name",
+			"remote-host": "the vision model runs on another machine",
+			"model-not-installed": "vision model not pulled in Ollama",
+			"server-unreachable": "Ollama is not running",
+			"secret-no-boxes": "the engine gave no positions to mask",
+			"secret-no-pillow": "Pillow is not installed to mask it",
+			"redaction-failed": "the masked copy could not be written",
+			"secret-scan-unavailable": "secrets could not be checked"
 		}
 	},
 	"changeGraph": {

@@ -1,5 +1,5 @@
-import { FileSearch, ShieldAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { EyeOff, FileSearch, KeyRound, ShieldAlert } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Task } from "../../../shared/types";
 import type { DocintelDocument } from "../../lib/agent-tools-api";
@@ -23,6 +23,12 @@ export interface DocumentInsightsCardProps {
  * telle quelle aux agents. La carte dit, *avant* le build, ce que chacun
  * deviendra — c'est le moment où l'on peut encore joindre le `.drawio`
  * plutôt que sa capture d'écran.
+ *
+ * Une capture qui montre un secret (chaîne de connexion, clé de compte de
+ * stockage, jeton) est « masquée » — les agents reçoivent une copie repeinte —
+ * ou « retenue » quand elle ne peut pas l'être ; une capture dont le texte
+ * s'adresse à l'agent est retenue aussi. La carte le dit avec le *type* de
+ * secret, jamais sa valeur : le backend ne la lui envoie pas.
  *
  * Elle ne s'affiche que quand elle a quelque chose à dire : ni pièce jointe ni
  * ADR, pas de carte.
@@ -55,6 +61,7 @@ export function DocumentInsightsCard({
 	const binding = data.adrs.filter((adr) => adr.binding);
 	const proposed = data.adrs.filter((adr) => adr.status === "proposed");
 	const flagged = documents.filter((doc) => doc.threat !== "safe");
+	const secrets = documents.filter((doc) => doc.secrets.length > 0);
 
 	if (documents.length === 0 && binding.length === 0 && proposed.length === 0) {
 		return null;
@@ -82,6 +89,11 @@ export function DocumentInsightsCard({
 						{flagged.length > 0 && (
 							<Badge variant="destructive" className="text-[10px]">
 								{t("tasks:docintel.badge.flagged", { count: flagged.length })}
+							</Badge>
+						)}
+						{secrets.length > 0 && (
+							<Badge variant="destructive" className="text-[10px]">
+								{t("tasks:docintel.badge.secrets", { count: secrets.length })}
 							</Badge>
 						)}
 					</div>
@@ -143,12 +155,31 @@ export function DocumentInsightsCard({
 	);
 }
 
+function reasonLabel(
+	t: (key: string, options?: Record<string, unknown>) => string,
+	reason: string,
+): string {
+	return t(`tasks:docintel.reason.${reason || "unknown"}`, {
+		defaultValue: reason,
+	});
+}
+
 function DocumentRow({ doc }: { readonly doc: DocintelDocument }) {
 	const { t } = useTranslation(["tasks"]);
 	const name = doc.path.split("/").pop() ?? doc.path;
+	const kinds = doc.secrets.join(", ");
 
 	let detail: string;
-	if (doc.threat !== "safe") {
+	if (doc.status === "withheld") {
+		detail =
+			doc.reason === "injection"
+				? t("tasks:docintel.detail.withheldInjection")
+				: t("tasks:docintel.detail.withheld", {
+						kinds: kinds || reasonLabel(t, doc.reason),
+					});
+	} else if (doc.status === "redacted") {
+		detail = t("tasks:docintel.detail.redacted", { kinds });
+	} else if (doc.threat !== "safe") {
 		detail = t("tasks:docintel.detail.flagged");
 	} else if (doc.status === "diagram") {
 		detail = t("tasks:docintel.detail.diagram", {
@@ -157,35 +188,56 @@ function DocumentRow({ doc }: { readonly doc: DocintelDocument }) {
 			edges: doc.edgeCount,
 		});
 	} else if (doc.status === "text") {
-		detail =
-			doc.engine === "tesseract"
-				? t("tasks:docintel.detail.ocr")
-				: t("tasks:docintel.detail.text");
+		if (doc.described) {
+			detail = t("tasks:docintel.detail.described", { engine: doc.engine });
+		} else if (doc.engine && doc.engine !== "text") {
+			detail = t("tasks:docintel.detail.ocr", { engine: doc.engine });
+		} else {
+			detail = t("tasks:docintel.detail.text");
+		}
 	} else if (doc.status === "image") {
 		detail = t("tasks:docintel.detail.image", {
-			reason: t(`tasks:docintel.reason.${doc.reason || "unknown"}`, {
-				defaultValue: doc.reason,
-			}),
+			reason: reasonLabel(t, doc.reason),
 		});
 	} else if (doc.status === "document") {
 		detail = t("tasks:docintel.detail.document");
 	} else {
 		detail = t("tasks:docintel.detail.skipped", {
-			reason: t(`tasks:docintel.reason.${doc.reason || "unknown"}`, {
-				defaultValue: doc.reason,
-			}),
+			reason: reasonLabel(t, doc.reason),
 		});
+	}
+	if (
+		doc.secrets.length > 0 &&
+		doc.status !== "redacted" &&
+		doc.status !== "withheld"
+	) {
+		detail += ` — ${t("tasks:docintel.detail.secretsInText", { kinds })}`;
+	}
+
+	let marker: ReactNode;
+	if (doc.status === "withheld") {
+		marker = (
+			<EyeOff className="mt-0.5 h-3 w-3 shrink-0 text-destructive" aria-hidden />
+		);
+	} else if (doc.status === "redacted") {
+		marker = (
+			<KeyRound className="mt-0.5 h-3 w-3 shrink-0 text-destructive" aria-hidden />
+		);
+	} else if (doc.threat !== "safe") {
+		marker = (
+			<ShieldAlert className="mt-0.5 h-3 w-3 shrink-0 text-destructive" aria-hidden />
+		);
+	} else {
+		marker = (
+			<Badge variant="outline" className="shrink-0 text-[10px]">
+				{t(`tasks:docintel.status.${doc.status}`)}
+			</Badge>
+		);
 	}
 
 	return (
 		<li className="flex items-start gap-2 text-xs text-muted-foreground">
-			{doc.threat !== "safe" ? (
-				<ShieldAlert className="mt-0.5 h-3 w-3 shrink-0 text-destructive" aria-hidden />
-			) : (
-				<Badge variant="outline" className="shrink-0 text-[10px]">
-					{t(`tasks:docintel.status.${doc.status}`)}
-				</Badge>
-			)}
+			{marker}
 			<span className="min-w-0">
 				<span className="break-all font-medium text-foreground">{name}</span>
 				<span className="ml-1">— {detail}</span>

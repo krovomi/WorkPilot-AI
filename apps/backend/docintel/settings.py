@@ -15,13 +15,33 @@ LOCAL_OCR_ENV = "DOCINTEL_LOCAL_OCR"
 OCR_LANGS_ENV = "DOCINTEL_OCR_LANGS"
 MAX_BYTES_ENV = "DOCINTEL_MAX_BYTES"
 TESSERACT_PATH_ENV = "WORKPILOT_TESSERACT_PATH"
+OCR_ENGINE_ENV = "DOCINTEL_OCR_ENGINE"
+VISION_MODEL_ENV = "DOCINTEL_VISION_MODEL"
+AZURE_ENDPOINT_ENV = "DOCINTEL_AZURE_ENDPOINT"
+AZURE_KEY_ENV = "DOCINTEL_AZURE_KEY"
 
-_KEYS = (ENABLED_ENV, LOCAL_OCR_ENV, OCR_LANGS_ENV, MAX_BYTES_ENV, TESSERACT_PATH_ENV)
+_KEYS = (
+    ENABLED_ENV,
+    LOCAL_OCR_ENV,
+    OCR_LANGS_ENV,
+    MAX_BYTES_ENV,
+    TESSERACT_PATH_ENV,
+    OCR_ENGINE_ENV,
+    VISION_MODEL_ENV,
+    AZURE_ENDPOINT_ENV,
+    AZURE_KEY_ENV,
+)
 
 DEFAULT_MAX_BYTES = 10 * 1024 * 1024
 #: The two languages the product ships in. Tesseract refuses a language whose
 #: data is not installed, and `ocr.py` retries without `-l` when it does.
 DEFAULT_OCR_LANGS = "eng+fra"
+#: The fallback chain when nothing is configured: the one engine that needs no
+#: Python stack and that the previous release already used.
+DEFAULT_OCR_ENGINES = ("tesseract",)
+#: Used only when `ollama-vision` is in the chain. Pulling it is the person's
+#: call (`ollama pull qwen2.5vl`); an absent model is a recorded reason.
+DEFAULT_VISION_MODEL = "qwen2.5vl"
 
 
 def project_env(project_dir: Path | None) -> dict[str, str]:
@@ -56,6 +76,29 @@ def is_enabled(env: dict[str, str]) -> bool:
 
 def local_ocr_enabled(env: dict[str, str]) -> bool:
     return _flag(env, LOCAL_OCR_ENV)
+
+
+def ocr_engines(env: dict[str, str]) -> tuple[str, ...]:
+    """The ordered fallback chain, lower-cased, each name once."""
+    raw = str(env.get(OCR_ENGINE_ENV) or "").replace(";", ",")
+    names: list[str] = []
+    for part in raw.split(","):
+        name = part.strip().lower()
+        if name and name not in names:
+            names.append(name)
+    return tuple(names) or DEFAULT_OCR_ENGINES
+
+
+def vision_model(env: dict[str, str]) -> str:
+    return str(env.get(VISION_MODEL_ENV) or DEFAULT_VISION_MODEL).strip()
+
+
+def azure_endpoint(env: dict[str, str]) -> str:
+    return str(env.get(AZURE_ENDPOINT_ENV) or "").strip()
+
+
+def azure_key(env: dict[str, str]) -> str:
+    return str(env.get(AZURE_KEY_ENV) or "").strip()
 
 
 def ocr_langs(env: dict[str, str]) -> str:
