@@ -681,9 +681,10 @@ class TestWhiteboard:
     def test_a_saved_file_is_never_overwritten(self, spec_dir, photo, vision):
         vision(json.dumps(BOARD))
         target = spec_dir / "attachments" / "board.whiteboard.drawio"
-        target.write_text('<mxfile host="app.diagrams.net"></mxfile>', encoding="utf-8")
+        saved = '<mxfile host="app.diagrams.net"></mxfile>'
+        target.write_text(saved, encoding="utf-8")
         assert whiteboard.convert(spec_dir, photo, None, env={}).status == "exists"
-        assert "app.diagrams.net" in target.read_text(encoding="utf-8")
+        assert target.read_text(encoding="utf-8") == saved
 
     def test_an_injected_label_writes_nothing(self, spec_dir, photo, vision):
         board = {
