@@ -26,6 +26,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Where generated tests are written](#where-generated-tests-are-written)
   - [What generated tests are written against](#what-generated-tests-are-written-against)
   - [Library Documentation (libdocs)](#library-documentation-libdocs)
+  - [New models without a pull request](#new-models-without-a-pull-request)
   - [Attachments, diagrams and ADRs (docintel)](#attachments-diagrams-and-adrs-docintel)
   - [Token savings (rtk)](#token-savings-rtk)
   - [Clean generated files (watermarks)](#clean-generated-files-watermarks)
@@ -49,6 +50,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Provider × LLM × effort, par page](#provider--llm--effort-par-page-sharedutilspage-llmts)
   - [Qui combat dans le Mode Arena](#qui-combat-dans-le-mode-arena-sharedutilsarena-contendersts)
   - [L'adresse qu'ouvre l'émulateur](#ladresse-quouvre-lémulateur-sharedutilsemulator-landingts)
+  - [Le chemin d'une tâche, en graphe](#le-chemin-dune-tâche-en-graphe-sharedutilschange-graphts)
   - [Agent Management](#agent-management)
   - [Claude Profile System](#claude-profile-system)
   - [Terminal System](#terminal-system)
@@ -1218,6 +1220,41 @@ MCP server. Real environment variables win over the file.
 `query-docs` (`libraryId` + `query`, no `topic`/`mode`), and the server is started
 unpinned, so both names are allowlisted — an entry for a tool the running server does
 not expose is inert, a missing entry for the one it does expose is silent failure.
+
+### New models without a pull request
+
+The dropdowns used to learn about a release in one of two ways: the provider's
+own `/v1/models`, which needs an API key, or a line added to
+`models_registry.py`. Most users have no key — Claude runs on a Claude Code
+subscription, Copilot on a GitHub login, Bedrock on AWS credentials the
+catalogue never sees — so for them a model like Claude Opus 5.5 stayed invisible
+until somebody opened a pull request.
+
+`public_model_registry.py` is the third source: the open
+[models.dev](https://models.dev) registry (MIT), one keyless JSON document,
+downloaded once for every provider, slimmed to the providers and fields
+WorkPilot reads, and cached for six hours. `provider_models_catalog.list_models`
+asks it **after** a live answer and **before** a stale cache — only the provider
+can say what an account may call, but a cache that failed to refresh is older
+knowledge of what the registry already knows.
+
+Three rules keep it from putting noise in a selector:
+
+| Rule | Why |
+|---|---|
+| the same allow-list as the live fetchers (`_registry_allows`) | the registry lists embeddings, image and speech models; a looser second rule would show exactly what the live path keeps out |
+| a model that cannot call a tool, does not read and write text, or is deprecated is dropped | it cannot drive a phase |
+| the registry adds, never removes, and a curated tier wins over the keyword guess | it is community-maintained and lags on some providers |
+
+It never fails a dropdown: unreachable, refused by a proxy, unparseable — the
+static list answers, and the failure is remembered for ten minutes so a page
+opening six selectors does not wait six timeouts. Local runtimes never ask it:
+their list is what is installed on the machine. `MODEL_REGISTRY_ENABLED=false`
+turns it off; see [CONFIGURATION.md](../shared_docs/CONFIGURATION.md).
+
+`models_registry.py` stays the place for what the registry cannot know: the
+default model of a provider, curated tiers, and prices. A release no longer
+needs it to be *selectable*.
 
 ### Attachments, diagrams and ADRs (`docintel`)
 
@@ -2715,6 +2752,48 @@ premier `did-navigate` qui ne fait que la confirmer — le diff de la tâche est
 une seconde après le montage, donc une racine mémorisée comme un choix gagnerait
 contre la route que ce diff révèle. C'est la même distinction que porte le second
 argument d'`onNavigate`.
+
+### Le chemin d'une tâche, en graphe (`shared/utils/change-graph.ts`)
+
+La liste des fichiers d'un diff répond à « quoi ? » et jamais à « pourquoi
+ensemble ? ». Une propriété ajoutée à une entité du Domain, reprise par un DTO
+de l'Application, exposée par un contrôleur et vérifiée par un test est un
+*chemin*, et il se lit dans le diff lui-même. L'onglet **Graphe des
+modifications** du panneau de tâche (`TaskChangeGraph`, entre Sous-tâches et
+Logs) le dessine, et le raconte :
+
+> J'ai modifié la classe UserProfile dans la couche Domain et j'y ai ajouté la
+> propriété BirthDate.
+> ↳ Le DTO UserProfileDto reprend les données de la classe UserProfile (couche
+> Domain) pour les faire passer à la couche Application.
+
+| Question | Où elle se lit |
+|---|---|
+| quels éléments ? | les déclarations du patch (classe, interface, record, composant, hook…) ; un fichier qui n'en révèle aucun devient un nœud fichier |
+| qu'est-il arrivé à leurs membres ? | une signature vue du seul côté `+` est ajoutée, du seul côté `-` retirée, des deux côtés modifiée ; un corps changé sous une signature en contexte modifie ce membre |
+| dans quelle couche ? | le chemin : tests d'abord, puis les projets d'une solution (`App.Domain/`, `.Application/`, `.Infrastructure/`, `.Api/`), puis les dossiers qui le suggèrent |
+| quel lien ? | une ligne que la tâche laisse dans A cite le nom de B — gardée comme **preuve** et affichée au clic sur l'arête. Bases (`: IFoo`) → hérite / implémente, handler → commande : traite, DTO → entité : transporte, test → teste, sinon utilise |
+| pourquoi ? | les sous-tâches du plan qui déclarent le fichier |
+
+**Aucun modèle, aucun réseau** — la même règle qu'`emulator-landing.ts`. Le
+graphe est donc là dès qu'un diff existe, il ne coûte rien, et surtout il ne
+peut pas raconter une relation que le code ne porte pas : une phrase générée
+par un modèle se lirait exactement pareil qu'elle soit vraie ou non. Les
+phrases sont des gabarits i18n (`tasks:changeGraph.*`) remplis avec des faits
+mesurés.
+
+**Pourquoi pas Graphify directement.** Graphify construit le graphe de *tout*
+un dépôt, depuis l'AST, dans un processus Python lancé par un hook git ; la
+question ici est ce qu'*un diff* a changé, membre par membre, et elle doit
+répondre dans le renderer sans rien installer. Le graphe s'exporte en revanche
+**au format node-link de Graphify** (`toGraphifyNodeLink`, bouton « Exporter
+graph.json ») : mêmes clés que `brain/graph.py`, `metadata.origin =
+"workpilot-change-graph"`, si bien que Graphify, son serveur MCP et le skill
+`graph-first-recall` le lisent tels quels.
+
+Les lockfiles et snapshots sont écartés et comptés ; au-delà de 60 nœuds, les
+plus chargés sont gardés et le reste est compté — un graphe de trois cents
+nœuds est une liste de fichiers dessinée.
 
 ### Provider × LLM × effort, par page (`shared/utils/page-llm.ts`)
 

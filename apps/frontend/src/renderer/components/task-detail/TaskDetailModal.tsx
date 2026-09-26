@@ -104,6 +104,7 @@ import {
 } from "../../stores/architecture-delta-store";
 import { TaskArchitectureDelta } from "./TaskArchitectureDelta";
 import { DocumentInsightsCard } from "./DocumentInsightsCard";
+import { TaskChangeGraph } from "./TaskChangeGraph";
 import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
 import { WorkflowProfileCard } from "./WorkflowProfileCard";
 import { SpecInterviewBanner } from "./SpecInterviewDialog";
@@ -1258,6 +1259,12 @@ function TaskDetailModalContent({
 										})}
 									</TabsTrigger>
 									<TabsTrigger
+										value="changeGraph"
+										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+									>
+										{t("tasks:changeGraph.tab")}
+									</TabsTrigger>
+									<TabsTrigger
 										value="logs"
 										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
 									>
@@ -1428,6 +1435,14 @@ function TaskDetailModalContent({
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
 									<TaskSubtasks task={task} onUpdatePlan={handleUpdatePlan} />
+								</TabsContent>
+
+								{/* Change graph Tab — the task's path, drawn from its diff */}
+								<TabsContent
+									value="changeGraph"
+									className="flex-1 min-h-0 overflow-hidden mt-0"
+								>
+									<TaskChangeGraph task={task} />
 								</TabsContent>
 
 								{/* Logs Tab */}
