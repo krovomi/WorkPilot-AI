@@ -188,16 +188,23 @@ class Brain:
         if not path.is_file():
             return True
         built = path.stat().st_mtime
-        if any(
-            (self.root / rel).stat().st_mtime > built for rel in iter_notes(self.root)
-        ):
+        if any(self._newer(rel, built) for rel in iter_notes(self.root)):
             return True
         # A screenshot pasted into the vault is new content too: recall must
         # be able to find it by its text without waiting for a note to change.
         return any(
-            (self.root / rel).stat().st_mtime > built
+            self._newer(rel, built)
             for rel in iter_images(self.root, limit=DEFAULT_MAX_IMAGES)
         )
+
+    def _newer(self, rel: Path, built: float) -> bool:
+        """A file removed between the walk and the ``stat`` (Obsidian, a sync,
+        another agent) is simply not newer: the rebuild it would trigger
+        happens anyway, and a read must not fail on it."""
+        try:
+            return (self.root / rel).stat().st_mtime > built
+        except OSError:
+            return False
 
     # -- sync --------------------------------------------------------------
 

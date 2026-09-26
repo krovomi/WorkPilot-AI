@@ -270,3 +270,22 @@ def test_a_drawio_export_is_read_as_a_diagram_not_ocr(tmp_path, engine):
     assert fake.calls == []
     assert images[0].engine == "drawio"
     assert "Api" in images[0].text and "Domain" in images[0].text
+
+
+def test_a_file_removed_during_the_staleness_walk_is_not_an_error(
+    tmp_path, engine, monkeypatch
+):
+    engine({})
+    root = _vault(tmp_path)
+    brain = Brain(root)
+    brain.init()
+    (root / "assets" / "gone.png").write_bytes(_png(9))
+    import brain.vault as vault_mod
+
+    real = vault_mod.iter_images
+    monkeypatch.setattr(
+        vault_mod,
+        "iter_images",
+        lambda r, limit=None: [Path("assets/vanished.png"), *real(r, limit)],
+    )
+    assert brain.graph_is_stale() in (True, False)
