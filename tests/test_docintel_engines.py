@@ -456,10 +456,14 @@ class TestParsers:
 
     def test_paddle_3x_numpy_like_fields(self):
         class Arrayish(list):
-            """numpy's contract: a truth value is ambiguous, iteration is fine."""
+            """numpy's contract: a truth value is refused, iteration is fine.
+
+            numpy raises ValueError; TypeError here keeps CodeQL's rule on
+            special methods, and the parser under test never asks either way.
+            """
 
             def __bool__(self):
-                raise ValueError("The truth value of an array is ambiguous")
+                raise TypeError("The truth value of an array is ambiguous")
 
         v3 = [
             {
