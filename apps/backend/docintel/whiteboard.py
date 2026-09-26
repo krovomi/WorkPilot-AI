@@ -281,13 +281,16 @@ def convert(
 
     spec_dir = Path(spec_dir)
     env = settings.project_env(project_dir) if env is None else env
-    if image.suffix.lower() not in IMAGE_EXTENSIONS:
-        return WhiteboardResult(status="not-an-image")
     # Only a file this task carries: the `.drawio` is written beside it, and
     # "beside" must be `attachments/`, never `docintel/` or the spec itself.
-    attached = {p.resolve() for p in attachment_paths(spec_dir)}
-    if image.is_symlink() or not image.is_file() or image.resolve() not in attached:
+    # The caller's path is only compared with that list — the file that is
+    # opened is the list's own entry, which is never a symlink.
+    chosen = next((p for p in attachment_paths(spec_dir) if p == image), None)
+    if chosen is None:
         return WhiteboardResult(status="unreadable")
+    image = chosen
+    if image.suffix.lower() not in IMAGE_EXTENSIONS:
+        return WhiteboardResult(status="not-an-image")
     if not settings.local_ocr_enabled(env):
         return WhiteboardResult(status="disabled")
     try:

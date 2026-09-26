@@ -296,12 +296,25 @@ def whiteboard(body: WhiteboardRequest):
     resolved, error = _resolve(body)
     if error:
         return error
-    relative = body.path.replace("\\", "/")
-    if relative.startswith("/") or ".." in relative.split("/"):
-        return {"success": False, "error": "Invalid path.", "reason": "path"}
+    from .preflight import attachment_paths
+
+    # The photo is *chosen* among the task's own attachments, never built from
+    # the request: a path the client sends is a name to look up, not a path to
+    # open, so nothing on disk is touched on its say-so.
+    wanted = body.path.replace("\\", "/")
+    attached = {
+        p.relative_to(resolved).as_posix(): p for p in attachment_paths(resolved)
+    }
+    image = attached.get(wanted)
+    if image is None:
+        return {
+            "success": False,
+            "error": "Not an attachment of this task.",
+            "reason": "path",
+        }
     try:
         project = project_of(resolved)
-        result = convert(resolved, resolved / relative, project)
+        result = convert(resolved, image, project)
         return {"success": True, "result": result.to_dict()}
     except Exception:  # noqa: BLE001
         logger.exception("docintel whiteboard conversion failed")

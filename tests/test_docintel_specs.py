@@ -777,3 +777,24 @@ def test_api_whiteboard_refuses_a_path_outside(client, project, spec_dir):
 def test_api_drafts_refuses_bad_addressing(client):
     body = client.get("/api/docintel/drafts", params={"spec_id": "x"}).json()
     assert body["success"] is False and body["reason"] == "addressing"
+
+
+def test_api_whiteboard_only_opens_an_attachment(client, project, spec_dir, vision):
+    """The photo is looked up among the attachments, never opened from the request."""
+    image_mod = pytest.importorskip("PIL.Image")
+    vision(json.dumps(BOARD))
+    stray = spec_dir / "docintel" / "x.png"
+    stray.parent.mkdir(parents=True)
+    image_mod.new("RGB", (4, 4)).save(stray)
+    image_mod.new("RGB", (4, 4)).save(spec_dir / "attachments" / "board.jpg")
+    address = {"project_dir": str(project), "spec_id": spec_dir.name}
+
+    refused = client.post(
+        "/api/docintel/whiteboard", json={**address, "path": "docintel/x.png"}
+    ).json()
+    assert refused["success"] is False and refused["reason"] == "path"
+
+    converted = client.post(
+        "/api/docintel/whiteboard", json={**address, "path": "attachments/board.jpg"}
+    ).json()
+    assert converted["result"]["status"] == "converted"
