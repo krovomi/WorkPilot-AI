@@ -556,6 +556,11 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		success: true,
 		data: [],
 	}),
+	getFigmaTokenStatus: async () => ({
+		success: true,
+		data: { configured: false, fromEnvironment: false },
+	}),
+	setFigmaToken: async () => ({ success: true, data: false }),
 	checkJiraConnection: async () => ({
 		success: true,
 		data: { connected: false, siteUrl: null, error: undefined },

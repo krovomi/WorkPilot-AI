@@ -21,6 +21,7 @@ export type ProjectSettingsSection =
 	| "gitlab"
 	| "azure-devops"
 	| "jira"
+	| "figma"
 	| "cicd"
 	| "teams"
 	| "memory";

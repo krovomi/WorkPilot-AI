@@ -3,6 +3,7 @@
  */
 
 import type { BrowserWindow } from "electron";
+import { attachGitHubIssueImages } from "../shared/issue-attachments";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type {
@@ -166,6 +167,14 @@ export function registerInvestigateIssue(
 					issue.html_url,
 					labels,
 					project.settings?.mainBranch, // Pass project's configured main branch
+				);
+
+				// The screenshots pasted into the issue, for the attachments preflight.
+				await attachGitHubIssueImages(
+					config.token,
+					issue.body,
+					issue.number,
+					specData.specDir,
 				);
 
 				// NOTE: We intentionally do NOT call agentManager.startSpecCreation() here

@@ -846,6 +846,7 @@ format Graphify, un dépôt git synchronisé, servi par un serveur MCP.
 | `vault.py` | `Brain`, le seul objet qu'appellent MCP, CLI et HTTP |
 | `runtime.py` | le branchement sur **toutes** les features de WorkPilot |
 | `learn.py` | ce que WorkPilot enregistre lui-même : chaque build, chaque merge |
+| `images.py` | les images du vault lues par docintel (source d'un schéma, sinon OCR local), en cache par empreinte |
 
 ```bash
 python apps/backend/runners/brain_runner.py --action init --remote git@github.com:moi/brain.git
@@ -929,6 +930,73 @@ autres*, avec le Python qu'ils trouvent ; une dépendance absente là-bas est un
 cerveau que personne ne joint. JSON-RPC 2.0 sur stdio, une ligne par message, et
 le champ `instructions` d'`initialize` porte les règles d'usage : un agent jamais
 branché par `bridge` les apprend en se connectant.
+
+#### Les images du vault, retrouvées par leur texte
+
+Un vault ne contient pas que des notes : la capture collée dans une note du
+jour, le schéma exporté de draw.io, la photo d'un tableau blanc. Le graphe les
+voyait comme des liens fantômes — `![[schema.png]]` ne menait à rien — et
+« où est le schéma du flux de commande ? » n'avait de réponse que si quelqu'un
+en avait recopié les mots dans une note. `images.py` fait de chaque image un
+nœud de `graph.json` (`file_type: image`) dont les métadonnées portent ce que
+docintel en a lu — `ocr.text`, `ocr.engine`, `ocr.date` —, l'embed y mène, et
+`brain_recall` la trouve par ce qu'elle dit, avec la ligne qui correspond
+(`match`).
+
+**La lecture est celle de docintel, pas une seconde.** Un export draw.io ou
+Excalidraw embarque sa source et `parse_diagram` en lit les boîtes et les
+flèches ; sinon `ocr_image`, avec la chaîne réduite aux moteurs **locaux** et
+sans projet pour lire une politique — le cas précis où la chaîne refuse déjà
+un moteur cloud. Le graphe est reconstruit après chaque écriture de chaque
+agent : c'est le dernier endroit d'où une capture devrait quitter la machine,
+airgap ou non. Et seuls les moteurs de la prévisualisation répondent : un
+modèle de vision est trop lent pour une reconstruction, il est `deferred`
+comme sur la carte du Kanban.
+
+Puis la protection de docintel, dans son ordre : caractères invisibles,
+secrets masqués (`docintel/redact.py`), `injection_guard`. Un texte signalé
+n'est pas indexé du tout (`status: withheld`) : les métadonnées d'un nœud sont
+ce que le rappel remet à un agent, et une consigne cachée dans une capture ne
+doit pas en devenir une.
+
+**La reconstruction reste rapide.** L'OCR coûte une seconde par image et le
+graphe est reconstruit à chaque écriture, donc chaque réponse est mise en
+cache par l'**empreinte du contenu** dans `.workpilot-brain/ocr-cache.json` —
+ignoré par git comme `graph.json`, parce que dérivé : deux machines y
+seraient en conflit à chaque synchronisation. Une image dont la taille et la
+date n'ont pas changé n'est même pas re-hachée, une image renommée ou
+dupliquée reprend la réponse de ses octets, et une image supprimée sort du
+cache. Au plus `BRAIN_OCR_PER_BUILD` images nouvelles sont lues par
+reconstruction ; les suivantes attendent la prochaine (`status: pending`).
+Un moteur absent n'est **pas** mis en cache : installer Tesseract plus tard
+doit suffire, sans vider quoi que ce soit.
+
+Rien n'y suit un lien symbolique, ni un dossier caché (`.obsidian`, `.git`) :
+un vault est le dossier de quelqu'un, et un lien vers `~/.ssh` n'est pas une
+de ses images.
+
+#### Ce que docintel a validé, rappelé d'une tâche à l'autre
+
+Une exigence acceptée depuis le cahier des charges d'un client, un tableau de
+règles gardé, un schéma de tableau blanc corrigé et enregistré dans draw.io :
+chacune est une décision prise par une personne devant une tâche, et elle ne
+vivait que dans le dossier de spec de cette tâche. `docintel/knowledge.py` la
+classe par `learn.record` (surface `docintel`) dans
+`knowledge/projects/<projet>/docintel/`, rattachée à la tâche (`tasks:`), si
+bien que la tâche suivante du même projet — dans une autre session, avec un
+autre agent — la retrouve par `brain_recall`.
+
+Ce qui est classé, et seulement cela : les exigences et critères **acceptés**,
+les tableaux **non rejetés une fois la carte utilisée** (une proposition que
+personne n'a regardée n'est pas encore une connaissance), et un
+`*.whiteboard.drawio` dont le marqueur `host` a changé — une personne l'a
+enregistré. La note dit dans sa première ligne qu'il s'agit de données, pas
+d'instructions, et rien n'est écrit sous `instructions/` : une exigence d'un
+projet appliquée à tous les agents de tous les projets serait une règle que
+personne n'a décidée. Elle est réécrite après chaque décision et chaque
+préflight **seulement si son contenu a changé** — sinon chaque build
+committerait une note identique —, et rien n'est écrit quand aucun cerveau
+n'existe.
 
 #### Brancher un vault Obsidian, un dépôt GitHub
 
@@ -1064,6 +1132,9 @@ l'endroit où vit sa connaissance et le distant où elle est poussée.
 | `BRAIN_PULL_INTERVAL` | `60` | secondes entre deux pulls avant lecture |
 | `BRAIN_AUTO_PULL` / `BRAIN_AUTO_PUSH` | `true` | pull avant lecture / push après écriture |
 | `BRAIN_SIMILARITY` | `0.72` | seuil au-delà duquel deux instructions n'en font qu'une |
+| `BRAIN_OCR_ENABLED` | `true` | lit les images du vault pour les indexer ; `false` les laisse hors du graphe |
+| `BRAIN_OCR_PER_BUILD` | `10` | images nouvelles lues par reconstruction du graphe, le reste attend la suivante |
+| `BRAIN_OCR_MAX_IMAGES` | `300` | images du vault prises en compte au plus |
 
 `GET /api/brain/status`, `POST /api/brain/sync` et `POST /api/brain/recall`
 exposent la même chose au desktop ; comme `hermes/api.py`, le routeur est refusé
@@ -1286,6 +1357,8 @@ apps/backend/docintel/
   tables.py     business-rule tables in a document -> a parametrised test per language
   spec_drafts.py requirements and acceptance criteria proposed from a specification, decided by a person
   whiteboard.py a whiteboard photo -> an editable .drawio, through the local vision model only
+  figma.py      a Figma link -> attachments/<name>.figma.json (frames and labels, through the API)
+  knowledge.py  what a person validated in the card, filed in the shared brain's knowledge/
   preflight.py  attachments -> <spec_dir>/docintel/result.json + extracted/*.md
   prompt.py     the prompt sections
   api.py        GET /api/docintel/ — recomputed, nothing written
@@ -1394,7 +1467,47 @@ image dropped on a card. **Jira** gets the same treatment one step earlier:
 `JIRA_GET_ATTACHMENTS` downloads the issue's image attachments in the main
 process (`shared/jira-attachments.ts` — the token never reaches the renderer,
 and a content URL on another host is ignored rather than followed with it), and
-the Kanban import hands them to `createTask` as `attachedImages`.
+the Kanban import hands them to `createTask` as `attachedImages`. **GitHub and
+GitLab** issues complete the set: `shared/issue-attachments.ts` reads the images
+the issue body cites (`![](…)`, `<img src>`), downloads them in the main process
+when they are on the instance's host — `github.com`, or the GitLab instance,
+whose `/uploads/<secret>/<file>` is asked through the API because the web path
+needs a session since GitLab 17 — and writes them to `attachments/` at import
+and at investigation. The token goes to that host and nowhere else; a redirect
+(GitHub answers with a signed storage URL) is followed once, *without* it. The
+type is read from the bytes, not from the URL, and the caps are Jira's: ten
+images of 5 MB at most, and an image that fails is an image fewer, never a
+failed import. An older `*.githubusercontent.com` URL is another host, and is
+left alone by the same rule.
+
+**A Figma mockup is read as data, not as pixels.** A PNG export OCR'd back
+reads `Cornmande` for `Commande` and loses which frame a label belonged to; the
+Figma file holds both as data. `figma.py` reads a link a person pastes in the
+card (`POST /api/docintel/figma`) through the REST API — frames of the linked
+node, or the file's pages, and every visible text layer in order — and writes
+`<spec_dir>/attachments/<name>.figma.json`:
+
+```json
+{"source": "figma", "file_key": "…", "frames": [{"id": "…", "name": "…", "texts": ["Libellé 1", "…"]}]}
+```
+
+That shape is a **contract** with the visual review, which reads every
+`*.figma.json` among the attachments as the structured source of the mockup /
+rendering comparison; nothing is added to it, because a field only one reader
+understands is how two readers of one file start to disagree. What is written
+has been protected first, since later phases read the file as it is: every
+label masked by the secret patterns, and each frame scanned by
+`injection_guard` — a flagged frame is left out and counted. The preflight
+reads it back through the same shape (`read_figma`, so a hand-edited file
+smuggles nothing past it) as text, engine `figma`, and it is never taken for an
+HTTP capture: `api_capture` and `api_tests` skip it by name and by `source`. The
+token is `FIGMA_ACCESS_TOKEN` in `.workpilot/.env`, written by the main process
+through a write-only channel (Settings → Figma) that answers "configured" and
+never the value; it is sent to `api.figma.com` only, a constant, while the link
+gives a file key and node ids matched by character class — the host of the
+link is checked on the parsed URL, not searched in the string. A Figma call is
+a cloud call, so it is refused under `airgapStrict` like a cloud OCR engine.
+The card offers the link row only when a token is configured.
 
 **The repository's own diagram is a rule too.** `conformance.py` reads the
 draw.io / Excalidraw files under `docs/` (and beside the solution file) — and
@@ -1656,9 +1769,12 @@ build's own preflight on request — the one place outside a build where a
 scanned PDF is OCR'd, because a person pressed the button and is waiting), lists
 the proposals to tick, edit, add or reject (`POST /api/docintel/drafts/decide`),
 shows each rule table with its test per language, and converts a whiteboard
-photo (`POST /api/docintel/whiteboard`) or says why it cannot. It renders nothing
+photo (`POST /api/docintel/whiteboard`) or says why it cannot. `FigmaLinkRow`
+links a mockup when the project has a Figma token. It renders nothing
 when there is neither attachment, nor ADR, nor trace, nor a diagram to hold
-against the code — and the panel nothing when nothing is proposed.
+against the code, nor a mockup to link — and the panel nothing when nothing is
+proposed. What a person decides there is also filed in the shared brain (see
+*Ce que docintel a validé*).
 
 | Variable | Default | What it does |
 |---|---|---|
@@ -1671,6 +1787,7 @@ against the code — and the panel nothing when nothing is proposed.
 | `DOCINTEL_MAX_BYTES` | `10485760` | Larger attachments are skipped and the skip is reported |
 | `DOCINTEL_PDF_MAX_PAGES` | `20` | Pages of a scanned PDF rendered and OCR'd per reading; the rest is reported, not read |
 | `WORKPILOT_TESSERACT_PATH` | — | A specific binary, for a Tesseract not on PATH and for tests |
+| `FIGMA_ACCESS_TOKEN` | — | Read-only Figma token for linking mockups; written from Settings → Figma, never sent to the renderer |
 
 Read from `.workpilot/.env` as well as the environment; real variables win.
 
