@@ -86,6 +86,23 @@ class TestProtocol:
             is None
         )
 
+    def test_initialize_as_a_notification_gets_no_reply(self, project: Path):
+        assert (
+            handle(project, {"jsonrpc": "2.0", "method": "initialize", "params": {}})
+            is None
+        )
+
+    @pytest.mark.parametrize(
+        "params",
+        [["docintel_rules"], {"name": "docintel_rules", "arguments": "path"}],
+    )
+    def test_params_and_arguments_must_be_objects(self, project: Path, params):
+        reply = handle(
+            project,
+            {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": params},
+        )
+        assert reply["id"] == 5 and reply["error"]["code"] == -32602
+
     def test_unknown_tool_and_method(self, project: Path):
         unknown = handle(
             project,

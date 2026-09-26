@@ -594,6 +594,19 @@ class TestTheBuildIsWired:
         _run_attachments_preflight(spec_dir, spec_dir.parents[2])
         assert load_result(spec_dir) is not None
 
+    def test_a_summary_that_fails_does_not_fail_the_build(
+        self, spec_dir: Path, monkeypatch
+    ):
+        from cli.build_commands import _run_attachments_preflight
+        from docintel.models import DocintelResult
+
+        def boom(_self):
+            raise RuntimeError("summary exploded")
+
+        monkeypatch.setattr(DocintelResult, "describe", boom)
+        (spec_dir / "attachments" / "a.md").write_text("x", encoding="utf-8")
+        _run_attachments_preflight(spec_dir, spec_dir.parents[2])
+
     def test_planner_coder_qa_and_skill_phases_get_the_section(self):
         import inspect
 
@@ -780,6 +793,14 @@ class TestUntrustedAttachments:
         page = base64.b64encode(bomb).decode()
         drawio = f'<mxfile><diagram name="p">{page}</diagram></mxfile>'
         assert parse_diagram(Path("bomb.drawio"), drawio.encode()) is None
+
+    def test_a_truncated_stream_is_refused(self):
+        from docintel.diagrams import inflate
+
+        whole = zlib.compress(b"<mxGraphModel>" + b"A" * 4096 + b"</mxGraphModel>")
+        assert inflate(whole).endswith(b"</mxGraphModel>")
+        with pytest.raises(zlib.error):
+            inflate(whole[: len(whole) // 2])
 
     def test_a_png_chunk_cannot_inflate_without_bound(self, monkeypatch):
         from docintel import diagrams

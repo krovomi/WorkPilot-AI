@@ -77,6 +77,9 @@ def inflate(data: bytes, wbits: int = zlib.MAX_WBITS) -> bytes:
     out = inflater.decompress(data, MAX_INFLATED_BYTES)
     if inflater.unconsumed_tail:
         raise zlib.error("inflated payload exceeds the size limit")
+    if not inflater.eof:
+        # A truncated stream would otherwise parse as a smaller, wrong diagram.
+        raise zlib.error("compressed payload is truncated")
     return out
 
 

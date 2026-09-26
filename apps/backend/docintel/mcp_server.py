@@ -216,9 +216,13 @@ def _error(msg_id: Any, code: int, message: str) -> dict[str, Any]:
 
 def handle(root: Path, message: dict[str, Any]) -> dict[str, Any] | None:
     """One JSON-RPC message in, at most one out (notifications get none)."""
+    if "id" not in message:
+        return None
     method = message.get("method")
     msg_id = message.get("id")
     params = message.get("params") or {}
+    if not isinstance(params, dict):
+        return _error(msg_id, -32602, "params must be an object")
 
     if method == "initialize":
         asked = params.get("protocolVersion")
@@ -233,8 +237,6 @@ def handle(root: Path, message: dict[str, Any]) -> dict[str, Any] | None:
                 "instructions": SERVER_INSTRUCTIONS,
             },
         )
-    if "id" not in message:
-        return None
     if method == "ping":
         return _result(msg_id, {})
     if method == "tools/list":
@@ -244,8 +246,11 @@ def handle(root: Path, message: dict[str, Any]) -> dict[str, Any] | None:
         handler = _HANDLERS.get(name)
         if handler is None:
             return _error(msg_id, -32602, f"unknown tool {name}")
+        arguments = params.get("arguments") or {}
+        if not isinstance(arguments, dict):
+            return _error(msg_id, -32602, "arguments must be an object")
         try:
-            payload = handler(root, params.get("arguments") or {})
+            payload = handler(root, arguments)
         except (KeyError, ValueError, OSError) as exc:
             detail = (
                 f"missing argument {exc}" if isinstance(exc, KeyError) else str(exc)

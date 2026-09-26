@@ -275,14 +275,12 @@ def _run_attachments_preflight(spec_dir: Path, source_project_dir: Path) -> None
         from docintel import run_preflight
 
         result = run_preflight(spec_dir, source_project_dir)
+        if summary := result.describe():
+            print("\n" + summary)
     except Exception as exc:  # noqa: BLE001 - attachments never fail a build
         from debug import debug_warning
 
         debug_warning("run.py", f"Attachments preflight skipped: {exc}")
-        return
-
-    if summary := result.describe():
-        print("\n" + summary)
 
 
 def _phase_context(
