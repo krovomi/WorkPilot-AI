@@ -1192,6 +1192,56 @@
 			"unknown": "le dernier point de contrôle"
 		}
 	},
+	"docintel": {
+		"title": "Pièces jointes et ADR",
+		"subtitle": "Ce que les agents liront des pièces jointes de cette tâche, et les décisions d'architecture qui s'imposent au build",
+		"expand": "Détails",
+		"collapse": "Masquer",
+		"badge": {
+			"attachments": "{{count}} pièce jointe",
+			"attachments_other": "{{count}} pièces jointes",
+			"adrs": "{{count}} ADR acceptée",
+			"adrs_other": "{{count}} ADR acceptées",
+			"flagged": "{{count}} signalée",
+			"flagged_other": "{{count}} signalées"
+		},
+		"attachments": {
+			"title": "Pièces jointes"
+		},
+		"adrs": {
+			"title": "Architecture Decision Records",
+			"body": "Les ADR acceptées sont données au planner, au coder et à la QA comme des règles à respecter.",
+			"proposed": "proposée"
+		},
+		"status": {
+			"diagram": "schéma",
+			"text": "texte",
+			"image": "image",
+			"document": "document",
+			"skipped": "ignoré"
+		},
+		"detail": {
+			"diagram": "schéma {{engine}} lu depuis sa source : {{nodes}} éléments, {{edges}} flèches",
+			"text": "texte lu tel quel",
+			"ocr": "transcrit par l'OCR local",
+			"image": "remise aux agents comme image ({{reason}})",
+			"document": "converti par les agents avec le skill de documents",
+			"skipped": "non lu ({{reason}})",
+			"flagged": "texte retiré du prompt : il ressemble à une instruction adressée à l'agent"
+		},
+		"reason": {
+			"disabled": "OCR local désactivé",
+			"no-engine": "Tesseract n'est pas installé",
+			"timeout": "OCR trop long",
+			"failed": "échec de l'OCR",
+			"empty": "aucun texte trouvé",
+			"too-large": "fichier trop volumineux",
+			"unreadable": "fichier illisible",
+			"no-diagram": "aucun schéma embarqué",
+			"unsupported": "format non pris en charge",
+			"unknown": "raison inconnue"
+		}
+	},
 	"changeGraph": {
 		"tab": "Graphe des modifications",
 		"title": "Le chemin de cette tâche",

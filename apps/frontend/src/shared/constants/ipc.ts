@@ -309,6 +309,7 @@ export const IPC_CHANNELS = {
 	JIRA_GET_ISSUE: "jira:getIssue",
 	JIRA_CHECK_CONNECTION: "jira:checkConnection",
 	JIRA_TEST_CONNECTION: "jira:testConnection",
+	JIRA_GET_ATTACHMENTS: "jira:getAttachments",
 
 	// GitHub integration
 	GITHUB_GET_REPOSITORIES: "github:getRepositories",

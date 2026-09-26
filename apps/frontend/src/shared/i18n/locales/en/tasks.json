@@ -1192,6 +1192,56 @@
 			"unknown": "the last checkpoint"
 		}
 	},
+	"docintel": {
+		"title": "Attachments and ADRs",
+		"subtitle": "What the agents will read from this task's attachments, and which architecture decisions bind the build",
+		"expand": "Details",
+		"collapse": "Hide",
+		"badge": {
+			"attachments": "{{count}} attachment",
+			"attachments_other": "{{count}} attachments",
+			"adrs": "{{count}} accepted ADR",
+			"adrs_other": "{{count}} accepted ADRs",
+			"flagged": "{{count}} flagged",
+			"flagged_other": "{{count}} flagged"
+		},
+		"attachments": {
+			"title": "Attachments"
+		},
+		"adrs": {
+			"title": "Architecture Decision Records",
+			"body": "Accepted records are given to the planner, the coder and QA as binding rules.",
+			"proposed": "proposed"
+		},
+		"status": {
+			"diagram": "diagram",
+			"text": "text",
+			"image": "image",
+			"document": "document",
+			"skipped": "skipped"
+		},
+		"detail": {
+			"diagram": "{{engine}} diagram read from its source: {{nodes}} elements, {{edges}} arrows",
+			"text": "text read as is",
+			"ocr": "transcribed by local OCR",
+			"image": "handed to the agents as an image ({{reason}})",
+			"document": "converted by the agents with the document skill",
+			"skipped": "not read ({{reason}})",
+			"flagged": "text withheld from the prompt: it looks like an instruction aimed at the agent"
+		},
+		"reason": {
+			"disabled": "local OCR turned off",
+			"no-engine": "Tesseract is not installed",
+			"timeout": "OCR timed out",
+			"failed": "OCR failed",
+			"empty": "no text found",
+			"too-large": "file too large",
+			"unreadable": "file unreadable",
+			"no-diagram": "no embedded diagram",
+			"unsupported": "unsupported format",
+			"unknown": "unknown reason"
+		}
+	},
 	"changeGraph": {
 		"tab": "Change graph",
 		"title": "The path of this task",
