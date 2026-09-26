@@ -30,7 +30,7 @@ import urllib.request
 from pathlib import Path
 
 from .. import settings
-from .base import OcrOutcome
+from .base import OcrOutcome, http_opener
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +75,9 @@ def is_loopback(root: str) -> bool:
 
 
 def _opener() -> urllib.request.OpenerDirector:
-    # Never through the proxy: the request carries the image, and a proxy is
-    # by definition somewhere else.
-    return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    # Never through the proxy — the request carries the image, and a proxy is
+    # by definition somewhere else — and never on to a redirect's target.
+    return http_opener(proxy=False)
 
 
 def _installed(root: str, model: str) -> str | None:

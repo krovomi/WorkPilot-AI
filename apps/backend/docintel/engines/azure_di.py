@@ -19,11 +19,12 @@ import json
 import logging
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 from .. import settings
-from .base import OcrBox, OcrOutcome
+from .base import OcrBox, OcrOutcome, http_opener
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,18 @@ def parse_analyze_result(payload: dict) -> tuple[str, list[OcrBox]]:
     return "\n".join(texts).strip(), boxes
 
 
+def same_origin(url: str, endpoint: str) -> bool:
+    """https, and the same host and port as the configured endpoint."""
+    a, b = urllib.parse.urlparse(url), urllib.parse.urlparse(endpoint)
+    return (
+        a.scheme == "https"
+        and b.scheme == "https"
+        and (a.hostname or "").lower() == (b.hostname or "").lower()
+        and bool(a.hostname)
+        and (a.port or 443) == (b.port or 443)
+    )
+
+
 class AzureDocumentIntelligenceEngine:
     name = "azure-document-intelligence"
     local = False
@@ -96,6 +109,7 @@ class AzureDocumentIntelligenceEngine:
             f"{endpoint.rstrip('/')}/documentintelligence/documentModels/"
             f"prebuilt-read:analyze?api-version={API_VERSION}"
         )
+        opener = http_opener()
         try:
             request = urllib.request.Request(
                 url,
@@ -106,16 +120,18 @@ class AzureDocumentIntelligenceEngine:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+            with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
                 location = response.headers.get("Operation-Location", "")
-            if not location.startswith("https://"):
+            if not same_origin(location, endpoint):
+                # The poll carries the key: it goes back to the endpoint the
+                # person configured, never to a host a response named.
                 return OcrOutcome(reason="failed", engine=self.name)
             payload: dict = {}
             for _ in range(_MAX_POLLS):
                 poll = urllib.request.Request(
                     location, headers={"Ocp-Apim-Subscription-Key": key}
                 )
-                with urllib.request.urlopen(poll, timeout=_TIMEOUT_SECONDS) as response:
+                with opener.open(poll, timeout=_TIMEOUT_SECONDS) as response:
                     payload = json.loads(
                         response.read().decode("utf-8", errors="replace")
                     )

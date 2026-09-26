@@ -7,6 +7,7 @@ for a PaddlePaddle import to learn that the machine has no PaddlePaddle.
 
 from __future__ import annotations
 
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -90,3 +91,24 @@ def primary_lang(langs: str) -> str:
         "por": "pt",
         "nld": "nl",
     }.get(first, "en")
+
+
+class _RefuseRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect is an error, never a new destination.
+
+    urllib copies the request headers onto the redirected request, so a
+    server answering 302 to another host would receive whatever credential
+    the first request carried — and the image, for a 307. The engines talk
+    to one host they were configured for, and nowhere else.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def http_opener(*, proxy: bool = True) -> urllib.request.OpenerDirector:
+    """An opener that never follows a redirect; without the proxy on request."""
+    handlers: list = [_RefuseRedirect()]
+    if not proxy:
+        handlers.append(urllib.request.ProxyHandler({}))
+    return urllib.request.build_opener(*handlers)

@@ -63,6 +63,15 @@ def _box(points: Any, text: str, confidence: float, line: int) -> OcrBox | None:
     )
 
 
+def _as_list(value: Any) -> list:
+    if value is None:
+        return []
+    try:
+        return list(value)
+    except TypeError:
+        return []
+
+
 def parse_paddle(raw: Any) -> list[OcrBox]:
     """Both result shapes PaddleOCR has shipped, one box per recognised line.
 
@@ -79,9 +88,13 @@ def parse_paddle(raw: Any) -> list[OcrBox]:
         if isinstance(data, dict) and "res" in data:
             data = data["res"]
         if isinstance(data, dict) and "rec_texts" in data:
-            texts = data.get("rec_texts") or []
-            scores = data.get("rec_scores") or [-1.0] * len(texts)
-            polys = data.get("rec_polys") or data.get("dt_polys") or [None] * len(texts)
+            # 3.x returns numpy arrays here, whose truth value raises: every
+            # field is tested against None and listed, never `or`-ed.
+            texts = _as_list(data.get("rec_texts"))
+            scores = _as_list(data.get("rec_scores")) or [-0.01] * len(texts)
+            polys = _as_list(data.get("rec_polys"))
+            if not polys:
+                polys = _as_list(data.get("dt_polys")) or [None] * len(texts)
             for text, score, poly in zip(texts, scores, polys):
                 if not str(text).strip():
                     continue

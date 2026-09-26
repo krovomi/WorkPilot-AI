@@ -287,7 +287,7 @@ class TestCloudEngine:
         def boom(*_a, **_k):
             raise AssertionError("the image was about to leave the machine")
 
-        monkeypatch.setattr("urllib.request.urlopen", boom)
+        monkeypatch.setattr("urllib.request.OpenerDirector.open", boom)
         outcome = recognize(
             project / "x.png",
             {
@@ -298,6 +298,66 @@ class TestCloudEngine:
             policy_paths=(project,),
         )
         assert outcome.reason == "airgap"
+
+    def test_the_key_goes_back_only_to_the_configured_endpoint(self):
+        from docintel.engines.azure_di import same_origin
+
+        endpoint = "https://acme.cognitiveservices.azure.com"
+        assert same_origin(f"{endpoint}/documentintelligence/x?api=1", endpoint)
+        assert not same_origin("https://evil.example.com/x", endpoint)
+        assert not same_origin("http://acme.cognitiveservices.azure.com/x", endpoint)
+        assert not same_origin(
+            "https://acme.cognitiveservices.azure.com:8443/x", endpoint
+        )
+
+    def test_the_poll_is_not_sent_to_a_host_the_response_names(
+        self, tmp_path, monkeypatch
+    ):
+        image = tmp_path / "x.png"
+        image.write_bytes(b"png")
+        seen: list[str] = []
+
+        class Answer:
+            headers = {"Operation-Location": "https://evil.example.com/steal"}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+        def open_(_self, request, timeout=None):
+            seen.append(request.full_url)
+            return Answer()
+
+        monkeypatch.setattr("urllib.request.OpenerDirector.open", open_)
+        outcome = AzureDocumentIntelligenceEngine().recognize(
+            image,
+            "eng",
+            {
+                "DOCINTEL_AZURE_ENDPOINT": "https://acme.cognitiveservices.azure.com",
+                "DOCINTEL_AZURE_KEY": "k",
+            },
+        )
+        assert outcome.reason == "failed"
+        assert len(seen) == 1 and "acme.cognitiveservices" in seen[0]
+
+    def test_engines_never_follow_a_redirect(self):
+        import urllib.request
+
+        from docintel.engines.base import http_opener
+
+        opener = http_opener(proxy=False)
+        handler = next(
+            h
+            for h in opener.handlers
+            if isinstance(h, urllib.request.HTTPRedirectHandler)
+        )
+        request = urllib.request.Request("http://127.0.0.1:11434/api/generate")
+        assert (
+            handler.redirect_request(request, None, 302, "Found", {}, "http://x/y")
+            is None
+        )
 
     def test_needs_an_https_endpoint_and_a_key(self):
         engine = AzureDocumentIntelligenceEngine()
@@ -393,6 +453,22 @@ class TestParsers:
             ("Line one", 0, 0),
             ("Line two", 1, 20),
         ]
+
+    def test_paddle_3x_numpy_like_fields(self):
+        class Arrayish(list):
+            """numpy's contract: a truth value is ambiguous, iteration is fine."""
+
+            def __bool__(self):
+                raise ValueError("The truth value of an array is ambiguous")
+
+        v3 = [
+            {
+                "rec_texts": Arrayish(["Build failed"]),
+                "rec_scores": Arrayish([0.9]),
+                "rec_polys": Arrayish([Arrayish([[0, 0], [90, 0], [90, 12], [0, 12]])]),
+            }
+        ]
+        assert [(b.text, b.width) for b in parse_paddle(v3)] == [("Build failed", 90)]
 
     def test_doctr_export(self):
         export = {
