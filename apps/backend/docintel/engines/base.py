@@ -64,11 +64,9 @@ class OcrEngine(Protocol):
 
     def available(self, env: dict[str, str]) -> str | None:
         """None when the engine can run here, else the reason it cannot."""
-        ...
 
     def recognize(self, image: Path, langs: str, env: dict[str, str]) -> OcrOutcome:
         """Text in `image`. Never raises: a failure is an outcome's reason."""
-        ...
 
 
 def lines_from_boxes(boxes: list[OcrBox]) -> str:
