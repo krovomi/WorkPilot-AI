@@ -267,16 +267,38 @@ def _example(node) -> str:
     )
 
 
+def _openapi_base_path(document: dict) -> str:
+    """The path every operation hangs under: Swagger 2's `basePath`, or the
+    path of OpenAPI 3's first server (`https://h/api/v1` or `/api/v1`).
+
+    A server URL with a `{variable}` names no path a test can call, so it is
+    left out rather than guessed.
+    """
+    if isinstance(document.get("basePath"), str):
+        base = document["basePath"]
+    else:
+        servers = document.get("servers")
+        first = servers[0] if isinstance(servers, list) and servers else {}
+        url = first.get("url", "") if isinstance(first, dict) else ""
+        base = urlsplit(url).path if "://" in url else url
+    base = (base or "").strip().rstrip("/")
+    if not base or "{" in base or not base.startswith("/"):
+        return ""
+    return base
+
+
 def parse_openapi(document: dict, source: str) -> list[ApiExchange]:
     if not ("openapi" in document or "swagger" in document):
         return []
     paths = document.get("paths")
     if not isinstance(paths, dict):
         return []
+    base = _openapi_base_path(document)
     out: list[ApiExchange] = []
     for route, operations in paths.items():
         if not isinstance(operations, dict):
             continue
+        route = f"{base}/{str(route).lstrip('/')}" if base else route
         shared = operations.get("parameters") or []
         for method, operation in operations.items():
             if method.upper() not in METHODS or not isinstance(operation, dict):
@@ -373,6 +395,34 @@ def parse_http_file(text: str, source: str) -> list[ApiExchange]:
     return out
 
 
+_CURL_DATA = ("-d", "--data", "--data-raw", "--data-binary", "--data-ascii", "--json")
+#: Options that take a value; every other option is a flag.
+_CURL_VALUED = {"-X", "--request", "-H", "--header", "--url", *_CURL_DATA}
+_CURL_SHORT_VALUED = ("-X", "-H", "-d")
+
+
+def _curl_option(argv: list[str], index: int) -> tuple[str, str, int]:
+    """(option, value, next index) — "" as option for a positional URL.
+
+    curl takes a value three ways: `-X POST`, `-XPOST` and `--request=POST`;
+    reading only the first would drop the method or the header of the other
+    two and draft a test for a request nobody made.
+    """
+    arg = argv[index]
+    following = argv[index + 1] if index + 1 < len(argv) else ""
+    if not arg.startswith("-"):
+        return "", arg, index + 1
+    if arg.startswith("--") and "=" in arg:
+        name, _, value = arg.partition("=")
+        return name, value, index + 1
+    if arg in _CURL_VALUED:
+        return arg, following, index + 2
+    for short in _CURL_SHORT_VALUED:
+        if arg.startswith(short) and len(arg) > len(short):
+            return short, arg[len(short) :], index + 1
+    return arg, "", index + 1
+
+
 def parse_curl(text: str, source: str) -> list[ApiExchange]:
     out: list[ApiExchange] = []
     joined = re.sub(r"\\\r?\n", " ", text or "")
@@ -388,22 +438,20 @@ def parse_curl(text: str, source: str) -> list[ApiExchange]:
         headers: dict[str, str] = {}
         index = 1
         while index < len(argv):
-            arg = argv[index]
-            value = argv[index + 1] if index + 1 < len(argv) else ""
+            arg, value, index = _curl_option(argv, index)
             if arg in ("-X", "--request"):
-                method, index = value, index + 2
+                method = value
+            elif arg in ("-I", "--head"):
+                method = "HEAD"
             elif arg in ("-H", "--header"):
                 name, _, val = value.partition(":")
-                headers[name] = val.strip()
-                index += 2
-            elif arg in ("-d", "--data", "--data-raw", "--data-binary", "--json"):
-                body, index = value, index + 2
+                headers[name.strip()] = val.strip()
+            elif arg in _CURL_DATA:
+                body = value
                 if arg == "--json":
                     headers.setdefault("Content-Type", "application/json")
-            elif arg.startswith("-"):
-                index += 1
-            else:
-                url, index = arg, index + 1
+            elif arg == "--url" or not arg:
+                url = value
         if exchange := _exchange(
             method or ("POST" if body else "GET"),
             url,
