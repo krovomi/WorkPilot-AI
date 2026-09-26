@@ -561,8 +561,15 @@ export async function fetchSpecTraceability(
  * same addressing rules as the traceability endpoint.
  * ---------------------------------------------------------------------- */
 
-/** `diagram` | `text` | `image` | `document` | `skipped` — see docintel/models.py */
-export type DocintelStatus = "diagram" | "text" | "image" | "document" | "skipped";
+/** See `STATUSES` in docintel/models.py. */
+export type DocintelStatus =
+	| "diagram"
+	| "text"
+	| "image"
+	| "document"
+	| "skipped"
+	| "redacted"
+	| "withheld";
 
 export interface DocintelDocument {
 	path: string;
@@ -572,6 +579,10 @@ export interface DocintelDocument {
 	reason: string;
 	/** `safe` | `suspect` | `blocked` — from injection_guard. */
 	threat: string;
+	/** Kinds of secret found (never a value), from security/scan_secrets.py. */
+	secrets: string[];
+	/** True when a local vision model described the image. */
+	described: boolean;
 	nodeCount: number;
 	edgeCount: number;
 }
@@ -596,6 +607,8 @@ interface RawDocintelDocument {
 	engine: string;
 	reason: string;
 	threat: string;
+	secrets?: string[];
+	described?: boolean;
 	diagram: { nodes?: unknown[]; edges?: unknown[] } | null;
 }
 
@@ -623,6 +636,8 @@ export async function fetchDocintel(
 				engine: doc.engine,
 				reason: doc.reason,
 				threat: doc.threat,
+				secrets: doc.secrets ?? [],
+				described: doc.described ?? false,
 				nodeCount: doc.diagram?.nodes?.length ?? 0,
 				edgeCount: doc.diagram?.edges?.length ?? 0,
 			})),

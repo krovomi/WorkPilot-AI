@@ -17,7 +17,10 @@ from dataclasses import asdict, dataclass, field
 #: ``image``    pixels nobody transcribed here: the agent opens the file itself
 #: ``document`` an Office/PDF file: the document skill converts it in-session
 #: ``skipped``  too large, unreadable, or not a format this module knows
-STATUSES = ("diagram", "text", "image", "document", "skipped")
+#: ``redacted`` an image that showed a secret: agents get a masked copy
+#: ``withheld`` an image no agent gets at all — a secret that could not be
+#:              masked, or text in it flagged as a prompt injection
+STATUSES = ("diagram", "text", "image", "document", "skipped", "redacted", "withheld")
 
 
 @dataclass
@@ -90,6 +93,17 @@ class ExtractedDocument:
     #: is data a person attached, and text inside an image is the easiest place
     #: to hide an instruction nobody reviewing the task will read.
     threat: str = "safe"
+    #: The *kinds* of secret found (``Azure Storage account key``…), never a
+    #: value: this record is served to the UI and read into prompts.
+    secrets: list[str] = field(default_factory=list)
+    #: The masked copy agents are pointed at instead of the original image,
+    #: relative to the spec dir. Empty unless ``status == "redacted"``.
+    redacted_path: str = ""
+    #: ``engine:reason`` for every OCR engine that did not answer before the
+    #: one that did (``engine``), in `DOCINTEL_OCR_ENGINE` order.
+    attempts: list[str] = field(default_factory=list)
+    #: True when a vision model described the image rather than transcribing it.
+    described: bool = False
 
     def to_dict(self) -> dict:
         payload = asdict(self)
@@ -108,6 +122,10 @@ class ExtractedDocument:
             diagram=DiagramModel.from_dict(diagram) if diagram else None,
             reason=str(payload.get("reason", "")),
             threat=str(payload.get("threat", "safe")),
+            secrets=[str(k) for k in payload.get("secrets") or []],
+            redacted_path=str(payload.get("redacted_path", "")),
+            attempts=[str(a) for a in payload.get("attempts") or []],
+            described=bool(payload.get("described", False)),
         )
 
 

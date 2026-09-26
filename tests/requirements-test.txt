@@ -20,6 +20,11 @@ anyio>=4.0.0
 # runtime dependency loaded lazily in production.
 aiohttp>=3.9.0
 
+# docintel paints secrets out of screenshots with Pillow when it is installed,
+# and withholds the image when it is not. Both paths are tested; this makes
+# the first one run in CI rather than skip.
+Pillow>=10.0.0
+
 # For testing validation models (required by backend code)
 pydantic>=2.0.0
 

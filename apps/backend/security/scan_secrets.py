@@ -144,11 +144,40 @@ DATABASE_PATTERNS = [
         r'amqp://[^"\s:]+:[^@"\s]+@[^\s"]+',
         "RabbitMQ Connection String with credentials",
     ),
+    (
+        r'(?:mssql|sqlserver)://[^"\s:]+:[^@"\s]+@[^\s"]+',
+        "SQL Server Connection String with credentials",
+    ),
+]
+
+# Connection strings in the `Key=Value;` shape — ADO.NET, Azure Storage, Service
+# Bus, Event Hubs. Unquoted, which is why the generic "Password assignment"
+# pattern above never saw them, and the shape an `appsettings.json` or a
+# screenshot of the Azure portal carries.
+CONNECTION_STRING_PATTERNS = [
+    (
+        r"(?:Server|Data Source|Host|Address|Addr)\s*=[^;\n]*;[^\n]*?"
+        r"(?:Password|Pwd)\s*=\s*[^;\"'\s]{3,}",
+        "Connection string with password",
+    ),
+    (r"AccountKey\s*=\s*[A-Za-z0-9+/]{20,}={0,2}", "Azure Storage account key"),
+    (
+        r"SharedAccessKey\s*=\s*[A-Za-z0-9+/]{20,}={0,2}",
+        "Azure shared access key",
+    ),
+    (
+        r"eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
+        "JSON Web Token",
+    ),
 ]
 
 # Combine all patterns
 ALL_PATTERNS = (
-    GENERIC_PATTERNS + SERVICE_PATTERNS + PRIVATE_KEY_PATTERNS + DATABASE_PATTERNS
+    GENERIC_PATTERNS
+    + SERVICE_PATTERNS
+    + PRIVATE_KEY_PATTERNS
+    + DATABASE_PATTERNS
+    + CONNECTION_STRING_PATTERNS
 )
 
 
