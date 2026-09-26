@@ -43,6 +43,10 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   docintel/            pièces jointes (draw.io, Excalidraw, captures OCR) et ADR, avant le build
   docintel/engines/    moteurs OCR interchangeables (Tesseract, PaddleOCR, docTR, vision Ollama, Azure)
   docintel/redact.py   secrets des captures : masqués dans le texte, repeints dans l'image, ou retenus
+  docintel/erd.py      ERD (draw.io, DBML, Mermaid) face au mapping ORM lu par docintel/orm.py, toutes piles
+  docintel/api_tests.py appel HTTP joint (Postman, OpenAPI, .http, capture) -> test d'intégration dans l'idiome du projet
+  docintel/sequence.py diagrammes de séquence PlantUML / Mermaid, chaque appel cherché dans le code
+  docintel/c4.py       C4 en code (Structurizr, C4-PlantUML) comme règles de dépendance de conformance.py
   rtk/                 proxy rtk : la sortie des commandes condensée avant qu'un modèle la lise
   watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt

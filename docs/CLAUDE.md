@@ -1274,8 +1274,14 @@ apps/backend/docintel/
   redact.py     secrets in what was read: masked in text, painted out of images
   read_guard.py `Read` refused on an original the preflight withheld or redacted
   adr.py        where a project keeps its ADRs, and which ones bind
+  c4.py         Structurizr DSL and C4-PlantUML, read as the same boxes and arrows
+  orm.py        the ORM mapping, read from the code without compiling (EF Core, SQLAlchemy, Django, TypeORM, Prisma, JPA, ActiveRecord, Doctrine, Eloquent, GORM)
+  erd.py        an ERD (draw.io/Excalidraw crow's feet, DBML, Mermaid) vs. that mapping
+  api_capture.py a Postman collection, OpenAPI spec, .http file, curl or screenshot -> HTTP calls
+  api_tests.py  each call as an integration test in the project's own stack and libraries
+  sequence.py   PlantUML / Mermaid sequence diagrams, each call looked up in the code
   preflight.py  attachments -> <spec_dir>/docintel/result.json + extracted/*.md
-  prompt.py     the two prompt sections
+  prompt.py     the prompt sections
   api.py        GET /api/docintel/ — recomputed, nothing written
   mcp_server.py the same answers, for any agent working in the project (read-only)
 ```
@@ -1383,7 +1389,8 @@ and a content URL on another host is ignored rather than followed with it), and
 the Kanban import hands them to `createTask` as `attachedImages`.
 
 **The repository's own diagram is a rule too.** `conformance.py` reads the
-draw.io / Excalidraw files under `docs/` (and beside the solution file) as
+draw.io / Excalidraw files under `docs/` (and beside the solution file) — and
+C4 written as code, a Structurizr `workspace.dsl` or a C4-PlantUML file — as
 dependency rules — `A -> B` means *A may depend on B*, transitively — and
 compares them with the `.csproj` `<ProjectReference>` graph, the one dependency
 graph that is declared rather than inferred. Boxes are matched to projects by
@@ -1396,14 +1403,84 @@ allowed arrows and the existing debt, and QA to report a *new* crossing as
 HIGH. A diagram whose arrows only ever contradict the references is drawn as
 data flow, not dependencies: it is reported `ambiguous-direction` and produces
 no finding, because a check that flags a whole solution is a check people stop
-reading. .NET only for now: other stacks have no declared project graph, and an
-import-based one answers a fuzzier question.
+reading.
+
+**Every build system that declares a module graph, not only .NET.** The code
+side is the graph the build declares, whatever builds it: `.csproj`
+`ProjectReference`, the Maven reactor's `<dependency>` on a sibling
+artifactId, Gradle's `project(":domain")` for the modules `settings.gradle`
+includes, npm / pnpm / yarn workspace packages depending on each other, Cargo
+`path =` crates. A Spring or NestJS clean architecture is split into modules as
+often as a .NET one is into projects, and it breaks the same way. What stays out
+is an import-based graph: a single-module project declares nothing, and a guess
+at its layers from import statements answers a fuzzier question. JS workspace
+packages are the ones the workspace *declares* (`workspaces`,
+`pnpm-workspace.yaml`), not every `package.json` on disk. A diagram whose arrows
+carry ER markers is an ERD and is left to `erd.py` — its boxes are tables, not
+layers.
+
+**C4 as code is read, not rendered.** A Structurizr element (`api = container
+"Api"`), its nesting and `group "Layer" { … }` are boxes and containers; `a -> b`
+— or `-> b` inside an element — is an arrow; views and styles say nothing about
+the model and are skipped. C4-PlantUML's `Container(…)`, `*_Boundary(…) { … }`,
+`Rel(…)`, `Rel_Back` (reversed) and `BiRel` (both ways) map the same way. "A
+uses B" in C4 is a dependency of A on B, the direction the rules already expect.
+
+**An ERD against the ORM, in every stack.** `orm.py` reads the mapping the code
+declares — EF Core `DbSet<>`, `HasOne/WithMany`, `IEntityTypeConfiguration<>`,
+`[Table]`, navigation properties; SQLAlchemy `relationship` / `Mapped[...]` /
+`ForeignKey`; Django fields; TypeORM and MikroORM decorators; Prisma models;
+JPA annotations in Java and Kotlin; ActiveRecord associations; Doctrine
+attributes and Eloquent relations; GORM structs — without compiling, running or
+connecting to anything. Explicit mapping wins over convention, and convention
+follows the ORMs' own rule (a collection one way and a reference the other is
+one-to-many). `erd.py` reads the diagram: tables are the boxes of a draw.io or
+Excalidraw ERD (rows are columns, crow's feet — `ERmany`, Excalidraw's
+`crowfoot_*` — or a `1:N` label the cardinality), a DBML file, a Mermaid
+`erDiagram`; OCR text only when it *is* one of those sources. Findings: a table
+drawn and mapped by nothing, an entity mapped and not drawn, a relation missing
+either way, a cardinality that differs. **An ambiguity is said, never scored**:
+an arrow with no cardinality, a crow's foot at one end only, and a `1:N` label
+the code has exactly the other way round (the arrow may be drawn backwards) are
+listed as not judged — the rule `ambiguous-direction` set. An ERD attached to
+the task is the *target* model and its differences are likely the work; one in
+`docs/` is the record and its differences are drift. Planner, coder and QA get
+the section; any agent gets `docintel_erd`.
+
+**An HTTP call attached is an integration test to write.** `api_capture.py`
+reads what the task carries — a Postman collection (with its saved responses
+and `pm.response.to.have.status(…)`), an OpenAPI 3 / Swagger 2 spec in JSON or
+YAML, a `.http` file, a `curl` line — and a screenshot of Postman or Swagger UI
+only when none of those exists: a collection states `/api/orders` exactly, OCR
+reads `/api/0rders`. `Authorization`, cookies and API-key headers are replaced
+by a placeholder and every other value goes through the secret patterns before
+anything is drafted — a bearer token in a test file is a token committed.
+`api_tests.py` drafts one test per call, deterministically, in the project's
+own stack (ASP.NET Core with xUnit or NUnit and `WebApplicationFactory<Program>`,
+FastAPI / Flask / Django with pytest, Express / Fastify / NestJS with supertest,
+Spring Boot with MockMvc, Go with httptest) and the assertion library it already
+references (`test_generation/libraries.py`: FluentAssertions or Shouldly when
+present, bare `Assert` otherwise). The destination is `test_generation/layout.py`'s,
+fed the file that serves the route, and a C# file goes *into* the test project
+(an `IntegrationTests` one first). The draft reaches the coder in the prompt and
+any agent through `docintel_api_test`; nothing is written into the project.
+
+**A sequence diagram's calls are looked up, not trusted.** `sequence.py` reads
+PlantUML (`.puml`, fenced blocks, and the source PlantUML embeds in its PNG
+exports — structured before OCR) and Mermaid `sequenceDiagram`, then looks up
+each call: the participant as a type in any backend language, the message as a
+method in that type's file. **Not verified is not wrong** — a participant
+named for a role, a generated method or the flow the task is about to build
+read the same way — so an unmatched call is reported *not verified* and never
+becomes a finding. Actors, databases and queues are not code; a dashed arrow is
+a return, not a call; `POST /api/orders` is a request, not a method.
 
 **For every other agent: `workpilot-docintel`.** The rules the planner and QA
 receive are just as useful to Claude Code, Codex or Copilot editing the same
 checkout, so `mcp_server.py` serves them over MCP: `docintel_rules`,
-`docintel_adrs`, `docintel_conformance`, `docintel_parse_diagram` and
-`docintel_attachments`. Same shape as the brain's server — stdio, JSON-RPC,
+`docintel_adrs`, `docintel_conformance`, `docintel_parse_diagram`,
+`docintel_attachments`, `docintel_erd`, `docintel_sequences` and
+`docintel_api_test`. Same shape as the brain's server — stdio, JSON-RPC,
 no SDK — and two stricter rules. It answers for **one project**
 (`--project-dir`, `WORKPILOT_DOCINTEL_ROOT`, or the working directory), and every
 path argument must resolve inside it, links included: a tool that reads any path
@@ -1420,8 +1497,11 @@ claude mcp add workpilot-docintel -- python apps/backend/runners/docintel_mcp.py
 attachment will become (diagram, OCR text and the engine that read it, image,
 document, masked, withheld) and which ADRs bind — the moment someone can still
 attach the `.drawio` instead of its screenshot, or a screenshot without the
-key on it. A secret is shown by its kind; the card never receives the value. It
-renders nothing when there is neither attachment nor ADR.
+key on it. A secret is shown by its kind; the card never receives the value.
+It also counts what the diagrams say of the code — the ERD's differences with
+the mapping, a sequence's verified calls, each attached HTTP call and where its
+test goes. It renders nothing when there is neither attachment, nor ADR, nor a
+diagram to hold against the code.
 
 | Variable | Default | What it does |
 |---|---|---|

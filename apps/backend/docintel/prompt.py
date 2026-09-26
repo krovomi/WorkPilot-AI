@@ -15,9 +15,12 @@ import re
 from pathlib import Path
 
 from .adr import collect_adrs
+from .api_tests import api_tests_section
 from .conformance import conformance_section
+from .erd import erd_section
 from .models import AdrRecord, ExtractedDocument
 from .preflight import load_result
+from .sequence import sequence_section
 
 MAX_SECTION_CHARS = 12000
 MAX_DOC_CHARS = 2500
@@ -234,4 +237,17 @@ def docintel_section(project_dir: Path, spec_dir: Path | None = None) -> str:
             parts.append(attached)
     except Exception:  # noqa: BLE001
         pass
+    # Lot C: the data model, the flows and the HTTP calls, against the code.
+    # Each is empty unless the task or the repository carries such a source.
+    readers = (
+        lambda: erd_section(Path(project_dir), spec_dir),
+        lambda: sequence_section(Path(project_dir), spec_dir),
+        lambda: api_tests_section(Path(project_dir), spec_dir),
+    )
+    for read in readers:
+        try:
+            if section := read():
+                parts.append(section)
+        except Exception:  # noqa: BLE001 - a missing section never stops a phase
+            pass
     return "\n\n".join(parts)

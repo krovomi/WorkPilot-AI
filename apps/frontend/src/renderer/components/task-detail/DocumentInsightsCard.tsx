@@ -2,7 +2,12 @@ import { EyeOff, FileSearch, KeyRound, ShieldAlert } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Task } from "../../../shared/types";
-import type { DocintelDocument } from "../../lib/agent-tools-api";
+import type {
+	DocintelApiTestSummary,
+	DocintelDocument,
+	DocintelErdSummary,
+	DocintelSequenceSummary,
+} from "../../lib/agent-tools-api";
 import { useDocintelStore } from "../../stores/docintel-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -30,8 +35,13 @@ export interface DocumentInsightsCardProps {
  * s'adresse à l'agent est retenue aussi. La carte le dit avec le *type* de
  * secret, jamais sa valeur : le backend ne la lui envoie pas.
  *
- * Elle ne s'affiche que quand elle a quelque chose à dire : ni pièce jointe ni
- * ADR, pas de carte.
+ * Elle dit aussi ce que les schémas disent du code : un ERD comparé au mapping
+ * de l'ORM (écarts), un diagramme de séquence dont chaque appel est cherché
+ * dans le code (vérifiés sur total), et chaque appel HTTP joint (Postman,
+ * OpenAPI, capture) devenu un test d'intégration, avec sa destination.
+ *
+ * Elle ne s'affiche que quand elle a quelque chose à dire : ni pièce jointe, ni
+ * ADR, ni schéma à confronter au code, pas de carte.
  */
 export function DocumentInsightsCard({
 	task,
@@ -63,7 +73,17 @@ export function DocumentInsightsCard({
 	const flagged = documents.filter((doc) => doc.threat !== "safe");
 	const secrets = documents.filter((doc) => doc.secrets.length > 0);
 
-	if (documents.length === 0 && binding.length === 0 && proposed.length === 0) {
+	const erd = data.erd ?? null;
+	const sequences = data.sequences ?? [];
+	const apiTests = data.apiTests ?? [];
+	const codeChecks = erd !== null || sequences.length > 0 || apiTests.length > 0;
+
+	if (
+		documents.length === 0 &&
+		binding.length === 0 &&
+		proposed.length === 0 &&
+		!codeChecks
+	) {
 		return null;
 	}
 
@@ -96,6 +116,13 @@ export function DocumentInsightsCard({
 								{t("tasks:docintel.badge.secrets", { count: secrets.length })}
 							</Badge>
 						)}
+						{codeChecks && (
+							<Badge variant="outline" className="text-[10px]">
+								{t("tasks:docintel.badge.codeChecks", {
+									count: (erd ? 1 : 0) + sequences.length + apiTests.length,
+								})}
+							</Badge>
+						)}
 					</div>
 					<p className="mt-1 text-xs text-muted-foreground">
 						{t("tasks:docintel.subtitle")}
@@ -124,6 +151,10 @@ export function DocumentInsightsCard({
 								))}
 							</ul>
 						</section>
+					)}
+
+					{codeChecks && (
+						<CodeChecks erd={erd} sequences={sequences} apiTests={apiTests} />
 					)}
 
 					{(binding.length > 0 || proposed.length > 0) && (
@@ -243,5 +274,60 @@ function DocumentRow({ doc }: { readonly doc: DocintelDocument }) {
 				<span className="ml-1">— {detail}</span>
 			</span>
 		</li>
+	);
+}
+
+/** ERD vs. ORM, séquences vs. code, appels HTTP devenus tests : les comptes. */
+function CodeChecks({
+	erd,
+	sequences,
+	apiTests,
+}: {
+	readonly erd: DocintelErdSummary | null;
+	readonly sequences: readonly DocintelSequenceSummary[];
+	readonly apiTests: readonly DocintelApiTestSummary[];
+}) {
+	const { t } = useTranslation(["tasks"]);
+	const name = (path: string) => path.split("/").pop() ?? path;
+	return (
+		<section>
+			<h4 className="text-xs font-medium">{t("tasks:docintel.code.title")}</h4>
+			<ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+				{erd && (
+					<li>
+						{erd.findings > 0
+							? t("tasks:docintel.code.erdFindings", {
+									count: erd.findings,
+									diagram: name(erd.diagrams[0]?.path ?? ""),
+								})
+							: t("tasks:docintel.code.erdClean", {
+									diagram: name(erd.diagrams[0]?.path ?? ""),
+								})}
+						{erd.ambiguous > 0 &&
+							` — ${t("tasks:docintel.code.erdAmbiguous", { count: erd.ambiguous })}`}
+					</li>
+				)}
+				{sequences.map((sequence) => (
+					<li key={sequence.path}>
+						{t("tasks:docintel.code.sequence", {
+							diagram: name(sequence.path),
+							verified: sequence.verified,
+							total: sequence.checkable,
+						})}
+					</li>
+				))}
+				{apiTests.map((call) => (
+					<li key={`${call.method} ${call.path}`}>
+						<span className="font-medium text-foreground">
+							{call.method} {call.path}
+						</span>{" "}
+						—{" "}
+						{call.destination
+							? t("tasks:docintel.code.apiTest", { destination: call.destination })
+							: t("tasks:docintel.code.apiTestNoStack")}
+					</li>
+				))}
+			</ul>
+		</section>
 	);
 }

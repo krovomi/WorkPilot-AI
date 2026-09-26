@@ -50,7 +50,17 @@ TEXT_EXTENSIONS = {
     ".mermaid",
     ".puml",
     ".plantuml",
+    ".iuml",
     ".log",
+    # Read by lot C's readers: ERDs (DBML), C4 (Structurizr), HTTP captures
+    # (Postman, OpenAPI, `.http`) — all text, all scanned like the rest.
+    ".dbml",
+    ".dsl",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".http",
+    ".rest",
 }
 DOCUMENT_EXTENSIONS = {
     ".pdf",
@@ -69,7 +79,17 @@ DOCUMENT_EXTENSIONS = {
     ".csv",
 }
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
-DIAGRAM_EXTENSIONS = {".drawio", ".dio", ".excalidraw", ".svg", ".xml"}
+DIAGRAM_EXTENSIONS = {
+    ".drawio",
+    ".dio",
+    ".excalidraw",
+    ".svg",
+    ".xml",
+    # C4 as code: a diagram when it is one, text otherwise.
+    ".dsl",
+    ".puml",
+    ".plantuml",
+}
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 

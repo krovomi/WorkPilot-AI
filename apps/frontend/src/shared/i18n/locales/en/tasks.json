@@ -1205,7 +1205,9 @@
 			"flagged": "{{count}} flagged",
 			"flagged_other": "{{count}} flagged",
 			"secrets": "{{count}} secret masked",
-			"secrets_other": "{{count}} secrets masked"
+			"secrets_other": "{{count}} secrets masked",
+			"codeChecks": "{{count}} diagram or call checked against the code",
+			"codeChecks_other": "{{count}} diagrams or calls checked against the code"
 		},
 		"attachments": {
 			"title": "Attachments"
@@ -1262,6 +1264,17 @@
 			"secret-no-pillow": "Pillow is not installed to mask it",
 			"redaction-failed": "the masked copy could not be written",
 			"secret-scan-unavailable": "secrets could not be checked"
+		},
+		"code": {
+			"title": "Diagrams and API calls vs. code",
+			"erdFindings": "{{diagram}}: {{count}} difference with the ORM mapping",
+			"erdFindings_other": "{{diagram}}: {{count}} differences with the ORM mapping",
+			"erdClean": "{{diagram}}: matches the ORM mapping",
+			"erdAmbiguous": "{{count}} relation the diagram leaves ambiguous",
+			"erdAmbiguous_other": "{{count}} relations the diagram leaves ambiguous",
+			"sequence": "{{diagram}}: {{verified}} of {{total}} calls found in the code",
+			"apiTest": "integration test drafted for {{destination}}",
+			"apiTestNoStack": "no HTTP API stack recognised: the test is left to the agents"
 		}
 	},
 	"changeGraph": {

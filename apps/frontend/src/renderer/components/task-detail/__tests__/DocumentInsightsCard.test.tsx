@@ -36,8 +36,15 @@ import { DocumentInsightsCard } from "../DocumentInsightsCard";
 
 const task = { id: "t1", specId: "001-orders" } as unknown as Task;
 
-function answer(documents: unknown[], adrs: unknown[] = []) {
-	return { ok: true as const, data: { documents, adrs } };
+function answer(
+	documents: unknown[],
+	adrs: unknown[] = [],
+	checks: Record<string, unknown> = {},
+) {
+	return {
+		ok: true as const,
+		data: { documents, adrs, erd: null, sequences: [], apiTests: [], ...checks },
+	};
 }
 
 const diagram = {
@@ -195,5 +202,48 @@ describe("DocumentInsightsCard", () => {
 		expect(
 			screen.getByText(/tasks:docintel\.detail\.described/),
 		).toBeInTheDocument();
+	});
+
+	it("shows what the diagrams and HTTP calls say of the code, even alone", async () => {
+		mockFetch.mockResolvedValueOnce(
+			answer([], [], {
+				erd: {
+					diagrams: [{ path: "docs/model.dbml", origin: "repository" }],
+					findings: 2,
+					kinds: ["missing-entity"],
+					ambiguous: 1,
+				},
+				sequences: [
+					{
+						path: "docs/create-order.puml",
+						origin: "repository",
+						verified: 2,
+						checkable: 3,
+					},
+				],
+				apiTests: [
+					{
+						method: "POST",
+						path: "/api/orders",
+						status: 201,
+						origin: "postman",
+						destination: "tests/Acme.Api.Tests/OrdersApiTests.cs",
+						stack: "aspnetcore",
+					},
+				],
+			}),
+		);
+		render(<DocumentInsightsCard task={task} projectPath="/p" />);
+
+		expect(
+			await screen.findByText("tasks:docintel.badge.codeChecks:3"),
+		).toBeInTheDocument();
+		fireEvent.click(screen.getByText("tasks:docintel.expand"));
+		expect(screen.getByText("tasks:docintel.code.title")).toBeInTheDocument();
+		expect(
+			screen.getByText(/tasks:docintel\.code\.erdFindings:2/),
+		).toBeInTheDocument();
+		expect(screen.getByText("tasks:docintel.code.sequence")).toBeInTheDocument();
+		expect(screen.getByText("POST /api/orders")).toBeInTheDocument();
 	});
 });
