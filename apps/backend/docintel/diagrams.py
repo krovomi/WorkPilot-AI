@@ -22,9 +22,29 @@ import zlib
 from pathlib import Path
 from xml.etree.ElementTree import Element
 
-from defusedxml.ElementTree import fromstring as _xml
-
 from .models import DiagramEdge, DiagramModel, DiagramNode
+
+
+def xml_available() -> bool:
+    """Whether the hardened XML parser is importable in this interpreter.
+
+    The MCP server runs under whatever Python another agent finds; there the
+    package must still import, and only the XML formats may be missing.
+    """
+    try:
+        import defusedxml.ElementTree  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def _xml(text: str) -> Element:
+    """`defusedxml`, imported on first use: an attached diagram is untrusted
+    XML, and the stdlib parser is never the fallback."""
+    from defusedxml.ElementTree import fromstring
+
+    return fromstring(text)
+
 
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 #: Ceiling on what one compressed payload may inflate to. The *file* size is

@@ -38,9 +38,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from defusedxml.ElementTree import fromstring as _xml
-
-from .diagrams import parse_diagram
+from .diagrams import _xml, parse_diagram
 from .models import DiagramModel
 
 #: Where a repository keeps architecture diagrams.

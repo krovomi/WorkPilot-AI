@@ -1274,6 +1274,7 @@ apps/backend/docintel/
   preflight.py  attachments -> <spec_dir>/docintel/result.json + extracted/*.md
   prompt.py     the two prompt sections
   api.py        GET /api/docintel/ — recomputed, nothing written
+  mcp_server.py the same answers, for any agent working in the project (read-only)
 ```
 
 **Structured first, OCR last.** A `.drawio` is XML and an `.excalidraw` is
@@ -1331,6 +1332,23 @@ data flow, not dependencies: it is reported `ambiguous-direction` and produces
 no finding, because a check that flags a whole solution is a check people stop
 reading. .NET only for now: other stacks have no declared project graph, and an
 import-based one answers a fuzzier question.
+
+**For every other agent: `workpilot-docintel`.** The rules the planner and QA
+receive are just as useful to Claude Code, Codex or Copilot editing the same
+checkout, so `mcp_server.py` serves them over MCP: `docintel_rules`,
+`docintel_adrs`, `docintel_conformance`, `docintel_parse_diagram` and
+`docintel_attachments`. Same shape as the brain's server — stdio, JSON-RPC,
+no SDK — and two stricter rules. It answers for **one project**
+(`--project-dir`, `WORKPILOT_DOCINTEL_ROOT`, or the working directory), and every
+path argument must resolve inside it, links included: a tool that reads any path
+it is handed is a file reader for whoever can put text in front of the agent.
+And it is **read-only** — attachments are read with `persist=False`.
+`defusedxml` is imported on first use, so the server starts under another
+agent's Python even without it, and only the diagram tools say what is missing.
+
+```bash
+claude mcp add workpilot-docintel -- python apps/backend/runners/docintel_mcp.py --project-dir .
+```
 
 **In the Kanban.** `DocumentInsightsCard` says, before the build, what each
 attachment will become (diagram, OCR text, image, document) and which ADRs bind
