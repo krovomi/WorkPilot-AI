@@ -1,11 +1,12 @@
 """hermes-agent as a WorkPilot capability.
 
-Four questions, one package:
+Five questions, one package:
 
 ``home``       where hermes keeps its state, and what the user configured there
 ``soul``       the persona this repository offers, and whether it is installed
 ``readiness``  whether the loop can run in this checkout, and what is missing
 ``loop``       the cycle itself, opened by a named feature surface
+``brain_link`` what hermes learned, filed in the shared brain for every agent
 
 The ingest that files hermes-authored skills as review candidates stays in
 `learning_loop/hermes_ingest.py`, because that is where the review queue and

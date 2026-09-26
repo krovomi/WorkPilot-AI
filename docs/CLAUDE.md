@@ -45,6 +45,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [IPC Communication](#ipc-communication)
   - [Background work and the sidebar](#background-work-and-the-sidebar-storesactivity-storets)
   - [Le pourcentage d'une tâche](#le-pourcentage-dune-tâche-sharedprogressts)
+  - [L'onglet Vue d'ensemble](#longlet-vue-densemble-task-detailtaskoverviewtsx)
   - [Les critères d'acceptation en puces](#les-critères-dacceptation-en-puces-task-detailacceptance-criteria-draftts)
   - [Architectures et historique de construction](#architectures-et-historique-de-construction-visual-to-code)
   - [Provider × LLM × effort, par page](#provider--llm--effort-par-page-sharedutilspage-llmts)
@@ -728,7 +729,8 @@ because that is where the review queue and its rules live.
 | `soul.py` | the persona this repository offers, and whether it is installed |
 | `readiness.py` | whether the loop can run in this checkout, and what is missing |
 | `loop.py` | the cycle itself, opened by a named feature surface |
-| `api.py` | `GET /api/hermes/status`, `POST /api/hermes/cycle`, `POST /api/hermes/soul/install` |
+| `api.py` | `GET /api/hermes/status`, `POST /api/hermes/cycle`, `POST /api/hermes/review`, `POST /api/hermes/soul/install` |
+| `brain_link.py` | what hermes learned, filed in the shared brain — and whether hermes reads it back |
 
 The three steps that always go together — *can this run here*, *what did hermes
 author*, *who asked* — are one function, and a **surface** is a name rather than a code
@@ -760,8 +762,35 @@ that is where it stops. Trusting a checkout makes every `SKILL.md` in it a proce
 hermes will follow in every session on the machine — the prompt-injection vector the
 gate was built to close. Software that grants itself the trust has removed the gate.
 
-**In the Kanban.** `HermesLearningCard` in the task panel shows the five conditions with
-their remedies, the candidates already waiting, and a button that turns the cycle now.
+**In the Kanban, an inbox rather than a list of paths.** `HermesLearningCard` used to
+print the queue as thirty-four `skills/_proposed/…` paths with nothing to do with any of
+them — reported, word for word, as *"je ne sais pas ce que je dois faire de tout ce
+texte"*. It now draws a skill's path in four steps (hermes learned → filtered out on its
+own → **to decide** → in the brain), says in one sentence what there is to do, and gives
+each candidate its purpose, its hermes category, a preview of the procedure and two
+answers, one at a time or for a selection:
+
+| Answer | What happens (`learning_loop/hermes_review.py`) |
+|---|---|
+| **Keep** | the same `hermes_adopt.adopt` the loop runs, then a `knowledge/hermes/<skill>.md` note in the brain, linked to the task the person was looking at |
+| **Turn down** | `hermes_adopt.decline` writes `decision: declined` to `ADOPTED.json` and removes the file; the ingest never mirrors, proposes or adopts that name again |
+
+Only `hermes--<slug>.md` names the ingest wrote are accepted (`recorded_facts`): a name
+from the request is matched against that pattern before it is joined to a path, and a
+proposal from the learning loop's own gates is never decided here.
+
+**The cycle is automatic.** It already ran at the end of every build (`observe`); the
+panel adds a pass when it opens, at most once every fifteen minutes
+(`hermes-store.autoCycle`). The refresh button is a shortcut, not the mechanism.
+
+**Every kept skill feeds the brain** (`hermes/brain_link.py`) — kept by a person *or* by
+auto-adoption. It is filed as **knowledge**, never as an instruction or a brain skill:
+both of those are loaded by every connected agent, and a hermes skill carries no
+evidence from a build and names hermes's tools. Knowledge is recalled on demand and read
+as data, which is the standing an unverified procedure deserves. The card also reports
+the other half of the loop: whether hermes has the `workpilot-brain` MCP server, i.e.
+whether it reads back what the brain holds — and opens the brain settings when not.
+
 It renders nothing when hermes is not installed: a permanent card reading "feature not in
 use" is a card nobody reads. Like `workflows/api.py`, the router is refused in server
 mode — every answer is about `$HERMES_HOME` on the machine running the backend, which on
@@ -2869,6 +2898,40 @@ Au-dessus de tout cela, `getDisplayProgress` garde ses deux priorités : dès qu
 existe des sous-tâches, leur part terminée EST l'avancement réel (la pondération
 par phase gonflerait à ~94% dès le démarrage de la QA), et un état terminal vaut
 100% quel que soit un comptage en retard.
+
+### L'onglet Vue d'ensemble (`task-detail/TaskOverview.tsx`)
+
+L'onglet empilait dix blocs dans l'ordre où ils avaient été écrits, et la
+description de la tâche arrivait en neuvième position — la revue humaine, seule
+chose qu'on vient faire sur une tâche en revue, en dixième. Il est rangé par la
+question que se pose la personne :
+
+| Section | Répond à | Contient |
+|---|---|---|
+| *(préalables)* | puis-je démarrer ? | entretien de spec, formule d'exécution — au-dessus de tout |
+| **À traiter** | que dois-je faire maintenant ? | la revue humaine, quand la tâche l'attend |
+| **La tâche** | de quoi parle-t-on ? | `TaskMetadata` |
+| **Plan d'exécution** | que vont faire les agents ? | profil d'effort, JEV, traçabilité, pièces jointes et ADR |
+| **Mémoire & apprentissage** | que retient le système ? | hermes, cerveau partagé, rtk |
+
+Une barre de raccourcis collante mène à chaque section et porte le nombre de
+décisions en attente (skills hermes, règles proposées au cerveau).
+
+**Une section vide disparaît avec son titre et son raccourci.** Chaque carte
+décide seule de s'afficher, et la plupart ne rendent rien quand elles n'ont rien
+à dire ; la présence est donc *observée* (`MutationObserver` sur le corps de la
+section) plutôt que recopiée : dix règles d'affichage dupliquées ici seraient dix
+occasions de se tromper.
+
+**JEV a sa carte** (`TaskJevCard` → `jev/JevStatus.tsx`). Il était rendu à
+l'intérieur du profil d'exécution, au-dessus de son titre, en une ligne d'état
+brute. La carte dit ce qu'est JEV, dans quel état il sera à la prochaine
+exécution, ce qu'il a répondu (couverture et risque sur leur échelle 0–2, en
+jauge), et porte l'interrupteur **par workflow** — le même réglage que les
+Réglages, écrit par `parseJevSettings`. La clé API reste dans les Réglages (un
+secret ne se saisit pas dans un panneau de tâche) et le mode hors-ligne strict
+gagne toujours : la carte le dit au lieu de proposer un bouton qui mentirait.
+Les revues de PR/MR GitHub et GitLab affichent la même carte.
 
 ### Les critères d'acceptation en puces (`task-detail/acceptance-criteria-draft.ts`)
 

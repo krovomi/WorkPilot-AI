@@ -592,6 +592,28 @@ def _adopt_one(
     )
 
 
+def _share_with_brain(candidate: HermesCandidate) -> None:
+    """File a skill the loop just kept in the shared brain (`hermes.brain_link`).
+
+    Only on a fresh adoption: an adoption the ledger already settled was filed
+    then, and a person may have edited the note since. Costs one `is_file`
+    when there is no brain.
+    """
+    try:
+        from hermes.brain_link import share_skill
+
+        share_skill(
+            candidate.name,
+            description=candidate.description,
+            procedure=candidate.body,
+            portability=_portability_section(candidate.body),
+            category=candidate.category,
+            decided_by="loop",
+        )
+    except Exception as exc:  # noqa: BLE001 - the brain never fails the loop
+        logger.debug("could not share %s with the brain: %s", candidate.name, exc)
+
+
 def queue_state(repo_root: Path) -> tuple[list[str], int]:
     """What the review queue still asks of a person, and what it no longer does.
 
@@ -624,7 +646,10 @@ def queue_state(repo_root: Path) -> tuple[list[str], int]:
             facts = recorded_facts(path)
             if facts is not None:
                 name, category, catalogue = facts
-                if name in settled:
+                # The ledger is keyed by slug; the file records hermes's own
+                # spelling. Compared both ways, so a name with a capital or a
+                # space is not asked about twice.
+                if name in settled or _slug(name) in settled:
                     continue
                 if not verdict_for(
                     name, category=category, catalogue=catalogue, scope=scope
@@ -758,13 +783,20 @@ def ingest_hermes_skills(
             )
             return report
 
-        from .hermes_adopt import adoption_enabled
+        from .hermes_adopt import adoption_enabled, declined_names
 
         adopting = adoption_enabled()
+        # A name a person turned down from the panel. Its queue file was
+        # removed on purpose, so re-mirroring it here would put back the very
+        # file the refusal took away — hidden by `queue_state`, but on disk.
+        refused = declined_names(repo_root)
         if write:
             target_dir.mkdir(parents=True, exist_ok=True)
 
         for candidate in keep:
+            if _slug(candidate.name) in refused:
+                report.already_adopted += 1
+                continue
             # The queue and the pack answer different questions, so a kept
             # candidate reaches both. `skills/_proposed/hermes--x.md` is a live
             # mirror of what hermes has on *this* machine — gitignored, and
@@ -792,6 +824,8 @@ def ingest_hermes_skills(
                 continue
             if adoption.written:
                 report.adopted.append(adoption.path)
+                if write:
+                    _share_with_brain(candidate)
             else:
                 report.already_adopted += 1
     except Exception as exc:  # noqa: BLE001 - observation never fails a build
