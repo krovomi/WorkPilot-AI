@@ -1193,13 +1193,19 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 
 	const adoptFromDescription = async () => {
 		setIsAdopting(true);
-		const ok = await persistUpdateTask(task.id, {
-			metadata: {
-				acceptanceCriteria: describedCriteria,
-				ignoreDescriptionCriteria: undefined,
-			},
-		});
-		setIsAdopting(false);
+		let ok = false;
+		try {
+			ok = await persistUpdateTask(task.id, {
+				metadata: {
+					acceptanceCriteria: describedCriteria,
+					ignoreDescriptionCriteria: undefined,
+				},
+			});
+		} catch {
+			ok = false;
+		} finally {
+			setIsAdopting(false);
+		}
 		if (ok) {
 			setSavedAt(Date.now());
 		} else {

@@ -70,6 +70,14 @@ export function EditableTaskTitle({
 		if (!editable) setEditing(false);
 	}, [editable]);
 
+	// Le dialogue navigue d'une tâche à l'autre sans démonter ce composant : un
+	// champ encore ouvert enregistrerait le titre de l'une sous l'id de l'autre.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: only a new task closes the field
+	useEffect(() => {
+		settled.current = true;
+		setEditing(false);
+	}, [task.id]);
+
 	const open = () => {
 		if (!editable) return;
 		settled.current = false;

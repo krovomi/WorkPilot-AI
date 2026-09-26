@@ -9,7 +9,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import i18n from "../../../shared/i18n";
 import type { Task } from "../../../shared/types";
 
-const persist = vi.fn<(id: string, updates: unknown) => Promise<boolean>>();
+// Hoisted with the mock factory below, so the factory never reads it before
+// it exists, whatever order vitest evaluates the module in.
+const { persist } = vi.hoisted(() => ({
+	persist: vi.fn<(id: string, updates: unknown) => Promise<boolean>>(),
+}));
 vi.mock("../../stores/task-store", () => ({
 	persistUpdateTask: (id: string, updates: unknown) => persist(id, updates),
 	useTaskStore: { getState: () => ({ updateTask: vi.fn() }) },

@@ -8,7 +8,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import i18n from "../../../shared/i18n";
 import type { Task } from "../../../shared/types";
 
-const persist = vi.fn<(id: string, updates: unknown) => Promise<boolean>>();
+// Hoisted with the mock factory below, so the factory never reads it before
+// it exists, whatever order vitest evaluates the module in.
+const { persist } = vi.hoisted(() => ({
+	persist: vi.fn<(id: string, updates: unknown) => Promise<boolean>>(),
+}));
 vi.mock("../../stores/task-store", () => ({
 	persistUpdateTask: (id: string, updates: unknown) => persist(id, updates),
 }));
@@ -67,4 +71,18 @@ it("is plain text while an agent is running", () => {
 	setup(false);
 	expect(screen.queryByRole("button")).toBeNull();
 	expect(screen.getByRole("heading")).toHaveTextContent("Exporter en CSV");
+});
+
+it("closes an open field without saving when the dialog moves to another task", () => {
+	const { rerender } = render(
+		<EditableTaskTitle task={task} displayTitle={task.title} editable as={Title} />,
+	);
+	fireEvent.click(screen.getByRole("button", { name: /Exporter en CSV/ }));
+	fireEvent.change(screen.getByRole("textbox", { name: "Task title" }), {
+		target: { value: "Titre de A" },
+	});
+	const other = { id: "t2", title: "Autre tâche" } as unknown as Task;
+	rerender(<EditableTaskTitle task={other} displayTitle={other.title} editable as={Title} />);
+	expect(screen.queryByRole("textbox")).toBeNull();
+	expect(persist).not.toHaveBeenCalled();
 });
