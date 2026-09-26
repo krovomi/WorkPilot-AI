@@ -20,6 +20,11 @@ Read and understand the full context of the regression:
 ### Failing Tests
 {{FAILING_TESTS}}
 
+### Build Errors
+Compiler, restore and packaging errors read from the log, code first. When a
+build does not compile, no test ran: fix these before reasoning about tests.
+{{BUILD_ERRORS}}
+
 ### Test Runner Output
 ```
 {{TEST_FAILURES}}
