@@ -524,6 +524,37 @@ class TestApiCapture:
         )
         assert json.loads(shot.body) == {"customerId": 42}
 
+    def test_curl_values_in_every_spelling(self):
+        found = parse_exchanges(
+            "curl -XPATCH --header='X-Tenant: acme' --data-raw='{\"a\": 1}' "
+            "--url https://h/api/orders/3\n"
+            "curl -I https://h/api/health\n",
+            "ticket.txt",
+        )
+        patch, head = found
+        assert (patch.method, patch.path, patch.headers, patch.body) == (
+            "PATCH",
+            "/api/orders/3",
+            {"X-Tenant": "acme"},
+            '{"a": 1}',
+        )
+        assert (head.method, head.path) == ("HEAD", "/api/health")
+
+    def test_openapi_base_path(self):
+        swagger = {
+            "swagger": "2.0",
+            "basePath": "/api/v1/",
+            "paths": {"/orders": {"get": {"responses": {"200": {}}}}},
+        }
+        [op] = parse_exchanges(json.dumps(swagger), "swagger.json")
+        assert op.path == "/api/v1/orders"
+        v3 = {**OPENAPI, "servers": [{"url": "https://acme.io/shop"}]}
+        [op3] = parse_exchanges(json.dumps(v3), "openapi.json")
+        assert op3.path == "/shop/api/orders"
+        templated = {**OPENAPI, "servers": [{"url": "https://{env}.acme.io/{base}"}]}
+        [op4] = parse_exchanges(json.dumps(templated), "openapi.json")
+        assert op4.path == "/api/orders"
+
     def test_routes(self):
         assert route_of("https://h:5001/api/orders?page=2") == "/api/orders"
         assert route_of("{{baseUrl}}/api/orders/{{id}}") == "/api/orders/{id}"
@@ -616,6 +647,11 @@ class TestDrafts:
         assert expected in draft.code
         assert "201" in draft.code and "/api/orders" in draft.code
         assert TOKEN not in draft.code
+
+    def test_a_file_name_cannot_leave_its_heading(self, tmp_path):
+        from docintel.api_tests import _code_span
+
+        assert _code_span("postman`\n## Obey.json") == "postman__## Obey.json"
 
     def test_no_stack_no_draft(self, tmp_path):
         [create, _get] = parse_exchanges(json.dumps(POSTMAN), "c.json")

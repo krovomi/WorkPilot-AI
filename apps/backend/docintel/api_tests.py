@@ -569,12 +569,15 @@ _FILE_NAMES = {
 def draft_test(project_dir: Path, exchange: ApiExchange) -> ApiTestDraft | None:
     """The integration test for one exchange, in the project's idiom, or None."""
     project_dir = Path(project_dir)
-    stack, language = detect_api_stack(project_dir)
+    try:
+        stack, language = detect_api_stack(project_dir)
+    except Exception:  # noqa: BLE001 - no stack known is no draft, never an error
+        return None
     if not stack:
         return None
-    from test_generation.libraries import resolve_selection
-
     try:
+        from test_generation.libraries import resolve_selection
+
         libraries = (
             resolve_selection(project_dir, language).ids() if language != "go" else []
         )
@@ -677,6 +680,13 @@ def draft_tests(
     return [(e, draft_test(project_dir, e)) for e in exchanges[:MAX_DRAFTS]]
 
 
+def _code_span(text: str) -> str:
+    """A route or a file name for a heading's code span: both come from the
+    attachment, and a backtick or a line break would end the span or the
+    heading and have the rest read as prompt."""
+    return re.sub(r"[`\r\n\x00-\x1f]", "_", text)
+
+
 def _fence_code(code: str, language: str) -> str:
     """A fence longer than any run of backticks in the code: a body from the
     attachment cannot close it."""
@@ -708,17 +718,26 @@ def api_tests_section(project_dir: Path, spec_dir: Path | None) -> str:
         status = exchange.status or "not stated"
         lines += [
             "",
-            f"### `{exchange.method} {exchange.path}` → {status} ({exchange.origin}, `{exchange.source}`)",
+            f"### `{exchange.method} {_code_span(exchange.path)}` → {status} "
+            f"({exchange.origin}, `{_code_span(exchange.source)}`)",
         ]
         if draft is None:
             lines.append(
                 "No HTTP API stack recognised in this project: write the test in its own test framework."
             )
             continue
-        where = f"`{draft.path}`" if draft.path else "a test directory of your choice"
+        where = (
+            f"`{_code_span(draft.path)}`"
+            if draft.path
+            else "a test directory of your choice"
+        )
         if draft.destination == "needs_choice":
             where += " (no test directory yet — this is a proposal)"
-        handler = f" The route is served by `{draft.handler}`." if draft.handler else ""
+        handler = (
+            f" The route is served by `{_code_span(draft.handler)}`."
+            if draft.handler
+            else ""
+        )
         lines.append(f"Destination: {where}.{handler}")
         lines.append(
             _fence_code(
