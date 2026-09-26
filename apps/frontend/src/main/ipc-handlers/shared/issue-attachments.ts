@@ -130,6 +130,14 @@ async function fetchOne(
 	return response.ok ? readBody(response) : null;
 }
 
+function rewriteUrl(url: string, source: IssueImageSource): string | null {
+	try {
+		return source.rewrite ? source.rewrite(new URL(url)) : url;
+	} catch {
+		return null;
+	}
+}
+
 /** Télécharge les images d'un corps d'issue hébergées sur l'instance. */
 export async function downloadIssueImages(
 	markdown: string,
@@ -143,13 +151,8 @@ export async function downloadIssueImages(
 	for (const url of issueImageUrls(markdown, base)) {
 		if (images.length >= MAX_ISSUE_IMAGES) break;
 		if (!sameHost(url, source.host)) continue;
-		let target = url;
-		try {
-			target = source.rewrite ? source.rewrite(new URL(url)) : url;
-		} catch {
-			continue;
-		}
-		if (!sameHost(target, source.host)) continue;
+		const target = rewriteUrl(url, source);
+		if (target === null || !sameHost(target, source.host)) continue;
 		try {
 			const data = await fetchOne(target, source, fetchImpl);
 			if (!data) continue;

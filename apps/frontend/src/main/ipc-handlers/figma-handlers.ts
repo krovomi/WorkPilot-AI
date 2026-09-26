@@ -9,7 +9,7 @@
  * l'autre dit s'il y en a une.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
@@ -45,6 +45,20 @@ export function hasFigmaToken(content: string): boolean {
 		);
 }
 
+/**
+ * Le contenu du `.env`, "" s'il n'existe pas encore. Lu d'un seul appel,
+ * sans `existsSync` avant : un test puis une lecture laissent une fenêtre où
+ * le fichier change entre les deux.
+ */
+function readEnv(file: string): string {
+	try {
+		return readFileSync(file, "utf-8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+		throw error;
+	}
+}
+
 function envPath(projectId: string): string | null {
 	const project = projectStore.getProject(projectId);
 	if (!project?.autoBuildPath) return null;
@@ -60,9 +74,9 @@ export function registerFigmaHandlers(): void {
 		): Promise<IPCResult<{ configured: boolean; fromEnvironment: boolean }>> => {
 			const file = envPath(projectId);
 			let configured = false;
-			if (file && existsSync(file)) {
+			if (file) {
 				try {
-					configured = hasFigmaToken(readFileSync(file, "utf-8"));
+					configured = hasFigmaToken(readEnv(file));
 				} catch {
 					configured = false;
 				}
@@ -85,7 +99,7 @@ export function registerFigmaHandlers(): void {
 			const file = envPath(projectId);
 			if (!file) return { success: false, error: "not-initialized" };
 			try {
-				const current = existsSync(file) ? readFileSync(file, "utf-8") : "";
+				const current = readEnv(file);
 				mkdirSync(path.dirname(file), { recursive: true });
 				writeFileSync(file, withFigmaToken(current, token), "utf-8");
 				return { success: true, data: token !== "" };
