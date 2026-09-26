@@ -1282,6 +1282,10 @@ apps/backend/docintel/
   api_capture.py a Postman collection, OpenAPI spec, .http file, curl or screenshot -> HTTP calls
   api_tests.py  each call as an integration test in the project's own stack and libraries
   sequence.py   PlantUML / Mermaid sequence diagrams, each call looked up in the code
+  pdf.py        a PDF's text layer (with its columns), else its pages rendered for OCR
+  tables.py     business-rule tables in a document -> a parametrised test per language
+  spec_drafts.py requirements and acceptance criteria proposed from a specification, decided by a person
+  whiteboard.py a whiteboard photo -> an editable .drawio, through the local vision model only
   preflight.py  attachments -> <spec_dir>/docintel/result.json + extracted/*.md
   prompt.py     the prompt sections
   api.py        GET /api/docintel/ — recomputed, nothing written
@@ -1298,9 +1302,11 @@ exported with "include a copy of my diagram" is a draw.io file.
 **Pixels stay on the machine.** OCR transcribes a screenshot before planning
 so it can be quoted and scanned; without it, the image is handed to the agents,
 which open it with their own file tool through the provider the task was
-configured for. Office and PDF files are left to the
+configured for. Office files and PDFs with a text layer are left to the
 `convert-documents-to-markdown` skill every agent already carries — one
-converter, not two.
+converter, not two. A *scanned* PDF is the exception, because that converter
+returns empty pages for it: see **A specification is proposed, never written**
+below.
 
 **The engine is a list, not a choice.** `DOCINTEL_OCR_ENGINE` is an ordered
 fallback chain (`engines/__init__.py`): the first engine that produces text
@@ -1553,6 +1559,83 @@ correlated nothing and a common name correlated the wrong file.
 `_correlate_stack_trace` is now `stacktrace.analyze`, and the responder's
 prompt carries **Where It Broke** beside the raw trace.
 
+**A specification is proposed, never written.** The document a customer sends
+— often a scanned PDF, the signed copy that went through the photocopier —
+already states the requirements, and what reached the spec pipeline was the
+card's title: the spec writer invented requirements the document stated, and QA
+held the build to those. `pdf.py` reads a PDF the cheapest way that works: the
+text layer, with characters placed where they are on the page so columns
+survive; a page with no text is rendered (pypdfium2, else pdf2image; both
+imported on first use, a missing one is `no-pdf-backend`) into a temporary
+directory, handed to the same OCR chain as a screenshot — same airgap refusal
+for a cloud engine — and deleted. Pages are capped (`DOCINTEL_PDF_MAX_PAGES`),
+an engine that is absent stops the loop at the first page instead of being asked
+twenty times, and the Kanban preview only says *scanned PDF, N pages*: twenty
+pages of OCR is not what opening a panel costs. A PDF with a text layer stays a
+*document* for the agents; its layer is read only to propose. A secret in a scan
+masks the text and withholds the original (`secret-in-scan`): no copy of twenty
+rendered pages is painted.
+
+From that text — only text that was masked and that `injection_guard` passed —
+`spec_drafts.py` proposes, without a model: requirements (a sentence that
+obliges, `shall` / `must` / `doit` / `devra`…, or that carries the document's
+own reference, `REQ-12`, `EF-03`, `Exigence 4`; non-functional when it talks
+about response times, availability, security, GDPR…), and acceptance criteria
+(Given/When/Then and `Étant donné`/`Quand`/`Alors` scenarios, the bullets under
+an acceptance heading). **Nothing reaches the spec without a person.** A
+proposal is a line in `<spec_dir>/docintel/drafts.json`; the card lists them
+with a checkbox and an editable wording, and `decide` is the one writer:
+accepted requirements go into `spec.md` under *Requirements from attachments*
+with the next free `FR-###` / `NFR-###` *at that moment* (the provisional id
+shown before is just that), next to the requirements section so
+`spec/traceability.py` reads them like any other, and `traceability.json` is
+refreshed when it exists. Before the spec exists they go into the task
+description — the path `SpecInterviewBanner` already takes — and
+`spec_writer.md` keeps their ids and wording. Accepted criteria join the bullet
+editor through its own save path. A heuristic that wrote into the spec by itself
+would make every false positive a requirement QA holds the build to: the guess
+reading exactly like a decision, which is what `[NEEDS CLARIFICATION]` exists to
+prevent. Decisions are keyed by the normalised text, so a second reading never
+re-proposes a rejection and keeps what was accepted; the card's edit is one
+line, masked like an attachment, and a key that names no proposal adds nothing.
+
+**A rule table is a parametrised test, in the project's language.** A
+specification states its rules as tables more often than as prose — a discount
+by customer type and amount, a rate by country — and each row is an example.
+`tables.py` finds the grid in a Markdown pipe table, an ASCII grid, columns
+aligned by spaces (the PDF layout text), or from OCR *word boxes*, where
+Tesseract's text has already lost the columns: a cell is a run of words closer
+than two character widths, a row belongs while its cells start under the
+header's. A grid needs a header and two rows and no cell that reads like a
+sentence. Each table gets a draft test for every language the project is
+written in (`project.stack_detector`, the repository's one language detector),
+in the framework it already references (`test_generation.libraries`): xUnit
+`[Theory]`/`[InlineData]` — `TheoryData` when a column is decimal, since an
+attribute cannot carry one — NUnit `[TestCase]`, MSTest `[DataRow]`, pytest
+`parametrize`, Vitest/Jest `it.each`, JUnit 5 `@CsvSource` in Java or Kotlin,
+Go and Rust table-driven tests, PHPUnit data providers, RSpec. French numbers
+(`12,5`, `1 000`) are read as numbers, and the expected column is the one whose
+header says so (`attendu`, `expected`, `résultat`…), else the last. The table
+does not name the function it specifies, and the draft says so rather than
+inventing one. The coder receives the tables and one draft each under
+**Business rule tables**; a person can dismiss a table that is not one.
+
+**A whiteboard photo becomes a diagram only through a local vision model.**
+`whiteboard.py` asks the vision model (`engines/ollama_vision.ask`, the same
+loopback-only request as the OCR chain) for the drawing's *model* — boxes,
+containers, arrows — as JSON, and writes it as
+`attachments/<photo>.whiteboard.drawio`. From there it is an ordinary
+attachment: `parse_diagram` reads it, `conformance` holds it against the module
+graph the build declares (Maven, Gradle, JS workspaces and Cargo as well as
+`.csproj`), and a person opens it in draw.io to correct it. A person asks for
+it from the card: whether a photo is a diagram is not something to guess on
+every build. No vision model is an answer (`no-vision-model` and why), never a
+diagram guessed from OCR words. The file carries `host="workpilot-vision"`, so
+the preflight reports it as a model's reading to verify until a person saves it
+in draw.io, which rewrites the host — and from then on it is never
+overwritten. Labels are masked and scanned before anything is written; only a
+file the task carries is converted, so the diagram lands in `attachments/`.
+
 What reaches a prompt from this is built from the repository's own paths and
 from symbols matched by character classes that admit no sentence; a message a
 tool printed (a CI error's text) is quoted inside the attachment fence, as data.
@@ -1567,9 +1650,15 @@ stack trace or a failed build — attached or pasted in the description — is
 shown located: how many frames the project owns and which one to open first,
 or which codes the build failed on. It also counts what the diagrams say of the
 code — the ERD's differences with the mapping, a sequence's verified calls,
-each attached HTTP call and where its test goes. It renders nothing when there
-is neither attachment, nor ADR, nor trace, nor a diagram to hold against the
-code.
+each attached HTTP call and where its test goes. `AttachmentDraftsPanel`, inside
+it, offers to read a specification now (`POST /api/docintel/drafts/extract`, the
+build's own preflight on request — the one place outside a build where a
+scanned PDF is OCR'd, because a person pressed the button and is waiting), lists
+the proposals to tick, edit, add or reject (`POST /api/docintel/drafts/decide`),
+shows each rule table with its test per language, and converts a whiteboard
+photo (`POST /api/docintel/whiteboard`) or says why it cannot. It renders nothing
+when there is neither attachment, nor ADR, nor trace, nor a diagram to hold
+against the code — and the panel nothing when nothing is proposed.
 
 | Variable | Default | What it does |
 |---|---|---|
@@ -1580,6 +1669,7 @@ code.
 | `DOCINTEL_VISION_MODEL` | `qwen2.5vl` | The Ollama model `ollama-vision` asks; an unpulled model is a recorded reason |
 | `DOCINTEL_AZURE_ENDPOINT` / `DOCINTEL_AZURE_KEY` | — | Azure Document Intelligence, https only. Both required, and the engine listed, before anything is sent |
 | `DOCINTEL_MAX_BYTES` | `10485760` | Larger attachments are skipped and the skip is reported |
+| `DOCINTEL_PDF_MAX_PAGES` | `20` | Pages of a scanned PDF rendered and OCR'd per reading; the rest is reported, not read |
 | `WORKPILOT_TESSERACT_PATH` | — | A specific binary, for a Tesseract not on PATH and for tests |
 
 Read from `.workpilot/.env` as well as the environment; real variables win.

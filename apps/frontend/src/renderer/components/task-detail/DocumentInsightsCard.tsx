@@ -12,6 +12,7 @@ import type {
 import { useDocintelStore } from "../../stores/docintel-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { AttachmentDraftsPanel } from "./AttachmentDraftsPanel";
 
 export interface DocumentInsightsCardProps {
 	readonly task: Task;
@@ -152,6 +153,10 @@ export function DocumentInsightsCard({
 				</Button>
 			</div>
 
+			{/* Ce que les pièces jointes proposent : exigences, critères, tableaux
+			    de règles, schéma d'un tableau blanc. Rien quand rien n'est à proposer. */}
+			<AttachmentDraftsPanel task={task} projectPath={projectPath} />
+
 			{expanded && (
 				<div className="space-y-3 border-t border-border p-3">
 					{fromDescription && (
@@ -236,11 +241,16 @@ function DocumentRow({ doc }: { readonly doc: DocintelDocument }) {
 	} else if (doc.threat !== "safe") {
 		detail = t("tasks:docintel.detail.flagged");
 	} else if (doc.status === "diagram") {
-		detail = t("tasks:docintel.detail.diagram", {
-			engine: doc.engine,
-			nodes: doc.nodeCount,
-			edges: doc.edgeCount,
-		});
+		detail = t(
+			doc.described
+				? "tasks:docintel.detail.whiteboardDiagram"
+				: "tasks:docintel.detail.diagram",
+			{
+				engine: doc.engine,
+				nodes: doc.nodeCount,
+				edges: doc.edgeCount,
+			},
+		);
 	} else if (doc.status === "text") {
 		if (doc.described) {
 			detail = t("tasks:docintel.detail.described", { engine: doc.engine });
@@ -249,6 +259,23 @@ function DocumentRow({ doc }: { readonly doc: DocintelDocument }) {
 		} else {
 			detail = t("tasks:docintel.detail.text");
 		}
+		if (doc.pagesTotal > 0) {
+			detail += ` — ${t("tasks:docintel.detail.pages", {
+				read: doc.pagesRead,
+				total: doc.pagesTotal,
+			})}`;
+		}
+	} else if (doc.status === "document" && doc.reason.startsWith("scanned-pdf")) {
+		// Un scan : le convertisseur de texte ne lirait que des pages vides.
+		detail =
+			doc.reason === "scanned-pdf"
+				? t("tasks:docintel.detail.scannedPdf", { count: doc.pagesTotal })
+				: t("tasks:docintel.detail.scannedPdfUnread", {
+						count: doc.pagesTotal,
+						reason: reasonLabel(t, doc.reason.replace("scanned-pdf-", "")),
+					});
+	} else if (doc.status === "document" && doc.reason === "no-pdf-backend") {
+		detail = t("tasks:docintel.detail.noPdfBackend");
 	} else if (doc.status === "image") {
 		detail = t("tasks:docintel.detail.image", {
 			reason: reasonLabel(t, doc.reason),

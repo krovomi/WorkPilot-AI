@@ -18,7 +18,9 @@ from pathlib import Path
 
 from core.api_safety import SPEC_ADDRESS_REASONS, SpecAddressError, resolve_spec_dir
 from fastapi import APIRouter, Query
+from pydantic import BaseModel, Field
 
+from . import settings
 from .adr import collect_adrs
 from .api_tests import draft_tests
 from .conformance import check_conformance
@@ -26,6 +28,8 @@ from .diagnostics import summary
 from .erd import check_erd
 from .preflight import run_preflight
 from .sequence import check_sequences
+from .spec_drafts import decide, load_drafts
+from .whiteboard import convert
 
 logger = logging.getLogger(__name__)
 
@@ -130,4 +134,188 @@ def docintel(
         }
     except Exception:  # noqa: BLE001
         logger.exception("docintel collection failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+# ---------------------------------------------------------------------------
+# Drafts: requirements, criteria and rule tables proposed from the attachments
+# ---------------------------------------------------------------------------
+
+
+class SpecAddress(BaseModel):
+    spec_dir: str | None = None
+    project_dir: str | None = None
+    spec_id: str | None = None
+
+
+class DraftDecision(SpecAddress):
+    #: Draft key -> the text the person kept (their edit, or the proposal).
+    accept_requirements: dict[str, str] = Field(default_factory=dict)
+    reject_requirements: list[str] = Field(default_factory=list)
+    accept_criteria: dict[str, str] = Field(default_factory=dict)
+    reject_criteria: list[str] = Field(default_factory=list)
+    reject_tables: list[str] = Field(default_factory=list)
+
+
+class WhiteboardRequest(SpecAddress):
+    #: The photo, relative to the spec directory (`attachments/board.jpg`).
+    path: str
+
+
+def _resolve(address: SpecAddress) -> tuple[Path | None, dict | None]:
+    try:
+        return (
+            resolve_spec_dir(address.spec_dir, address.project_dir, address.spec_id),
+            None,
+        )
+    except SpecAddressError as exc:
+        logger.warning("invalid docintel request: %s", exc)
+        return None, {
+            "success": False,
+            "error": SPEC_ADDRESS_REASONS.get(
+                exc.reason, SPEC_ADDRESS_REASONS["addressing"]
+            ),
+            "reason": exc.reason,
+        }
+
+
+def _vision(spec_dir: Path, project: Path | None) -> dict:
+    """Whether a photo can be turned into a diagram here, and why not.
+
+    Asked only when the task has an image: the probe is a loopback call to
+    Ollama (cached a minute), and a task without a photo has nothing to offer.
+    """
+    from .engines.ollama_vision import OllamaVisionEngine
+    from .preflight import IMAGE_EXTENSIONS, attachment_paths
+
+    images = [
+        p.relative_to(spec_dir).as_posix()
+        for p in attachment_paths(spec_dir)
+        if p.suffix.lower() in IMAGE_EXTENSIONS
+    ]
+    if not images:
+        return {"images": [], "available": False, "reason": "no-image"}
+    env = settings.project_env(project)
+    if not settings.local_ocr_enabled(env):
+        return {"images": images, "available": False, "reason": "disabled"}
+    reason = OllamaVisionEngine().available(env)
+    return {
+        "images": images,
+        "available": reason is None,
+        "reason": reason or "",
+        "model": settings.vision_model(env),
+    }
+
+
+def _drafts_payload(spec_dir: Path, project: Path | None) -> dict:
+    from .pdf import backends
+    from .preflight import IMAGE_EXTENSIONS, SPEC_SOURCE_EXTENSIONS, attachment_paths
+
+    drafts = load_drafts(spec_dir)
+    readable = [
+        p.relative_to(spec_dir).as_posix()
+        for p in attachment_paths(spec_dir)
+        if p.suffix.lower() in SPEC_SOURCE_EXTENSIONS | IMAGE_EXTENSIONS
+    ]
+    return {
+        "success": True,
+        "drafts": drafts.to_dict() if drafts else None,
+        "pending": drafts.pending if drafts else 0,
+        "readable": readable,
+        "pdfBackends": backends(),
+        "vision": _vision(spec_dir, project),
+    }
+
+
+@router.get("/drafts")
+def drafts(
+    spec_dir: str | None = Query(None),
+    project_dir: str | None = Query(None),
+    spec_id: str | None = Query(None),
+):
+    """What the attachments propose, and what the person already decided."""
+    resolved, error = _resolve(
+        SpecAddress(spec_dir=spec_dir, project_dir=project_dir, spec_id=spec_id)
+    )
+    if error:
+        return error
+    try:
+        return _drafts_payload(resolved, project_of(resolved))
+    except Exception:  # noqa: BLE001
+        logger.exception("docintel drafts failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+@router.post("/drafts/extract")
+def extract_drafts(address: SpecAddress):
+    """Read the attachments now — the build's own preflight, on request.
+
+    This is the one place outside a build where the OCR of a scanned PDF runs:
+    a person pressed the button and is waiting for it. It writes what a build
+    writes (`result.json`, `extracted/`, `drafts.json`), and nothing else.
+    """
+    resolved, error = _resolve(address)
+    if error:
+        return error
+    try:
+        project = project_of(resolved)
+        run_preflight(resolved, project, persist=True)
+        return _drafts_payload(resolved, project)
+    except Exception:  # noqa: BLE001
+        logger.exception("docintel draft extraction failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+@router.post("/drafts/decide")
+def decide_drafts(body: DraftDecision):
+    """Accept or reject proposals. Accepted requirements go into `spec.md`."""
+    resolved, error = _resolve(body)
+    if error:
+        return error
+    try:
+        decision = decide(
+            resolved,
+            accept_requirements=body.accept_requirements,
+            reject_requirements=body.reject_requirements,
+            accept_criteria=body.accept_criteria,
+            reject_criteria=body.reject_criteria,
+            reject_tables=body.reject_tables,
+        )
+        return {
+            **_drafts_payload(resolved, project_of(resolved)),
+            "decision": decision.to_dict(),
+        }
+    except Exception:  # noqa: BLE001
+        logger.exception("docintel draft decision failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+@router.post("/whiteboard")
+def whiteboard(body: WhiteboardRequest):
+    """A whiteboard photo of this task, as an editable `.drawio` beside it."""
+    resolved, error = _resolve(body)
+    if error:
+        return error
+    from .preflight import attachment_paths
+
+    # The photo is *chosen* among the task's own attachments, never built from
+    # the request: a path the client sends is a name to look up, not a path to
+    # open, so nothing on disk is touched on its say-so.
+    wanted = body.path.replace("\\", "/")
+    attached = {
+        p.relative_to(resolved).as_posix(): p for p in attachment_paths(resolved)
+    }
+    image = attached.get(wanted)
+    if image is None:
+        return {
+            "success": False,
+            "error": "Not an attachment of this task.",
+            "reason": "path",
+        }
+    try:
+        project = project_of(resolved)
+        result = convert(resolved, image, project)
+        return {"success": True, "result": result.to_dict()}
+    except Exception:  # noqa: BLE001
+        logger.exception("docintel whiteboard conversion failed")
         return {"success": False, "error": "An internal error has occurred."}
