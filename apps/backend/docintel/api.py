@@ -20,9 +20,12 @@ from core.api_safety import SPEC_ADDRESS_REASONS, SpecAddressError, resolve_spec
 from fastapi import APIRouter, Query
 
 from .adr import collect_adrs
+from .api_tests import draft_tests
 from .conformance import check_conformance
 from .diagnostics import summary
+from .erd import check_erd
 from .preflight import run_preflight
+from .sequence import check_sequences
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,58 @@ def project_of(spec_dir: Path) -> Path | None:
     if spec_dir.parent.name == "specs" and spec_dir.parent.parent.name == ".workpilot":
         return spec_dir.parent.parent.parent
     return None
+
+
+def _code_checks(project: Path, spec_dir: Path) -> dict:
+    """ERD vs. ORM, sequences vs. code, HTTP captures -> tests: the counts the card shows.
+
+    Each one returns before touching the code when there is no source for it,
+    which is what makes asking on every panel opening affordable.
+    """
+    out: dict = {}
+    erd = check_erd(project, spec_dir)
+    checked = [c for c in erd.checks if c.status == "checked"]
+    if checked:
+        out["erd"] = {
+            "diagrams": [{"path": c.erd, "origin": c.origin} for c in checked],
+            "findings": len(erd.findings),
+            "kinds": sorted({f.kind for f in erd.findings}),
+            "ambiguous": sum(len(c.ambiguous) for c in checked),
+        }
+    sequences = [c for c in check_sequences(project, spec_dir).checks if c.calls]
+    if sequences:
+        out["sequences"] = [
+            {
+                "path": c.diagram,
+                "origin": c.origin,
+                "verified": c.verified,
+                "checkable": c.checkable,
+            }
+            for c in sequences
+        ]
+    drafts = draft_tests(project, spec_dir)
+    if drafts:
+        out["apiTests"] = [
+            {
+                "method": exchange.method,
+                "path": exchange.path,
+                "status": exchange.status,
+                "origin": exchange.origin,
+                "destination": draft.path if draft else "",
+                "stack": draft.stack if draft else "",
+            }
+            for exchange, draft in drafts
+        ]
+    return out
+
+
+def _safe_code_checks(project: Path, spec_dir: Path) -> dict:
+    """The attachments and ADRs are the card's first answer; these never cost it."""
+    try:
+        return _code_checks(project, spec_dir)
+    except Exception:  # noqa: BLE001
+        logger.debug("docintel code checks failed", exc_info=True)
+        return {}
 
 
 @router.get("/")
@@ -71,6 +126,7 @@ def docintel(
             "conformance": (
                 check_conformance(project).to_dict() if project is not None else None
             ),
+            **(_safe_code_checks(project, resolved) if project is not None else {}),
         }
     except Exception:  # noqa: BLE001
         logger.exception("docintel collection failed")

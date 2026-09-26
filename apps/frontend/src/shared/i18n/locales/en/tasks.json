@@ -1207,7 +1207,9 @@
 			"secrets": "{{count}} secret masked",
 			"secrets_other": "{{count}} secrets masked",
 			"diagnosed": "{{count}} failure located",
-			"diagnosed_other": "{{count}} failures located"
+			"diagnosed_other": "{{count}} failures located",
+			"codeChecks": "{{count}} diagram or call checked against the code",
+			"codeChecks_other": "{{count}} diagrams or calls checked against the code"
 		},
 		"attachments": {
 			"title": "Attachments"
@@ -1275,6 +1277,17 @@
 			"buildErrors_other": "{{count}} build errors ({{codes}})",
 			"failingTests": "{{count}} failing test",
 			"failingTests_other": "{{count}} failing tests"
+		},
+		"code": {
+			"title": "Diagrams and API calls vs. code",
+			"erdFindings": "{{diagram}}: {{count}} difference with the ORM mapping",
+			"erdFindings_other": "{{diagram}}: {{count}} differences with the ORM mapping",
+			"erdClean": "{{diagram}}: matches the ORM mapping",
+			"erdAmbiguous": "{{count}} relation the diagram leaves ambiguous",
+			"erdAmbiguous_other": "{{count}} relations the diagram leaves ambiguous",
+			"sequence": "{{diagram}}: {{verified}} of {{total}} calls found in the code",
+			"apiTest": "integration test drafted for {{destination}}",
+			"apiTestNoStack": "no HTTP API stack recognised: the test is left to the agents"
 		}
 	},
 	"changeGraph": {
