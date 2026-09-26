@@ -40,6 +40,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .files import writable
+from .knowledge import record_validated
 from .tables import RuleTable, TestDraft, drafts_for, project_languages
 
 logger = logging.getLogger(__name__)
@@ -729,7 +730,5 @@ def decide(
 
     # A person just decided: what they kept is knowledge the next task on this
     # project should be able to recall, from any agent.
-    from .knowledge import record_validated
-
-    record_validated(spec_dir)
+    record_validated(spec_dir, drafts=drafts)
     return decision

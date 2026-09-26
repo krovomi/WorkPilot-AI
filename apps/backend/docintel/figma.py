@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import urllib.error
 import urllib.parse
@@ -230,6 +231,20 @@ def fetch_file(file_key: str, token: str, node_ids: list[str]) -> dict:
     return json.loads(body.decode("utf-8"))
 
 
+def _attachment_target(spec_dir: Path, name: str) -> Path | None:
+    """`<spec_dir>/attachments/<name>`, or None if it would leave that folder.
+
+    The name is already reduced to ``[A-Za-z0-9._-]``; this is the
+    normalise-then-prefix check on top of it, so the confinement does not rest
+    on a regex alone.
+    """
+    base = os.path.normpath(os.path.join(os.path.abspath(spec_dir), "attachments"))
+    full = os.path.normpath(os.path.join(base, name))
+    if not full.startswith(base + os.sep):
+        return None
+    return Path(full)
+
+
 def _target_name(file_name: str, file_key: str) -> str:
     stem = _UNSAFE.sub("-", file_name).strip("-.")[:60] or file_key
     return f"{stem}{SUFFIX}"
@@ -283,8 +298,8 @@ def import_figma(
         result.status = "injection"
         return result
 
-    target = Path(spec_dir) / "attachments" / _target_name(name, file_key)
-    if not writable(target, Path(spec_dir)):
+    target = _attachment_target(Path(spec_dir), _target_name(name, file_key))
+    if target is None or not writable(target, Path(spec_dir)):
         result.status = "unwritable"
         return result
     document = {"source": "figma", "file_key": file_key, "frames": kept}

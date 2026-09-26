@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from . import redact
 from .files import attachment_paths, threat
@@ -78,11 +79,13 @@ def _saved_whiteboards(spec_dir: Path) -> list[tuple[str, str]]:
     return found
 
 
-def render_body(spec_dir: Path) -> str:
-    """The note's body — "" when nothing validated exists for this task."""
-    from .spec_drafts import load_drafts
+def render_body(spec_dir: Path, drafts: Any = None) -> str:
+    """The note's body — "" when nothing validated exists for this task.
 
-    drafts = load_drafts(spec_dir)
+    ``drafts`` is the task's `spec_drafts.DraftSet`, handed in by the caller:
+    `spec_drafts` imports this module to file a decision, so this one does not
+    import it back.
+    """
     sections: list[str] = []
     if drafts is not None:
         requirements = [r for r in drafts.requirements if r.status == "accepted"]
@@ -127,7 +130,9 @@ def render_body(spec_dir: Path) -> str:
     return "\n".join([DISCLAIMER, "", *sections]).strip() + "\n"
 
 
-def record_validated(spec_dir: Path, project_dir: Path | None = None) -> str | None:
+def record_validated(
+    spec_dir: Path, project_dir: Path | None = None, drafts: Any = None
+) -> str | None:
     """File the task's validated knowledge in the brain. Returns the note path."""
     try:
         from brain.runtime import active
@@ -138,7 +143,7 @@ def record_validated(spec_dir: Path, project_dir: Path | None = None) -> str | N
         project_dir = project_dir or _project_of(spec_dir)
         if project_dir is None:
             return None
-        body = render_body(spec_dir)
+        body = render_body(spec_dir, drafts)
         if not body:
             return None
 

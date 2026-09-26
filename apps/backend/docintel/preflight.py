@@ -37,9 +37,10 @@ from .files import (
 from .files import clean as _clean
 from .files import threat as _threat
 from .files import writable as _writable
+from .knowledge import record_validated
 from .models import DocintelResult, ExtractedDocument
 from .ocr import OcrBox, OcrOutcome, ocr_image
-from .spec_drafts import SourceText, refresh
+from .spec_drafts import SourceText, load_drafts, refresh
 from .stacktrace import RepoIndex
 from .tables import RuleTable, tables_from_boxes, tables_from_text
 from .whiteboard import is_generated
@@ -509,9 +510,7 @@ def run_preflight(
         _refresh_drafts(spec_dir, sources, project_dir)
         # A whiteboard diagram a person saved since the last build is
         # validated knowledge; the note is only rewritten when it changed.
-        from .knowledge import record_validated
-
-        record_validated(spec_dir, project_dir)
+        record_validated(spec_dir, project_dir, load_drafts(spec_dir))
     return _persist(spec_dir, result) if persist else result
 
 

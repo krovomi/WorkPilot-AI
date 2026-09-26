@@ -202,14 +202,18 @@ def _save_cache(root: Path, cache: dict[str, Any]) -> None:
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp = tempfile.mkstemp(prefix=".ocr-", suffix=".json", dir=target.parent)
+        replaced = False
         try:
             with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
                 json.dump(cache, handle, ensure_ascii=False, indent=1)
                 handle.write("\n")
             os.replace(tmp, target)
-        except BaseException:
-            Path(tmp).unlink(missing_ok=True)
-            raise
+            replaced = True
+        finally:
+            # Whatever interrupted the write, no half-written temporary file
+            # is left beside the cache.
+            if not replaced:
+                Path(tmp).unlink(missing_ok=True)
     except OSError:
         # A cache that cannot be written costs the next rebuild its OCR, not
         # this one its graph.

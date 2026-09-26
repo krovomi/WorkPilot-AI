@@ -24,6 +24,7 @@ from docintel.spec_drafts import (  # noqa: E402
     RequirementDraft,
     TableDraft,
     decide,
+    load_drafts,
     save_drafts,
 )
 from docintel.tables import RuleTable  # noqa: E402
@@ -137,12 +138,12 @@ def test_an_unchanged_note_is_not_rewritten(spec_dir, tmp_path):
     decide(spec_dir, accept_requirements={"r1": ""})
     path = _note_path(brain.root)
     before = path.stat().st_mtime_ns
-    assert record_validated(spec_dir) is not None
+    assert record_validated(spec_dir, drafts=load_drafts(spec_dir)) is not None
     assert path.stat().st_mtime_ns == before
 
 
 def test_untouched_proposals_are_not_knowledge(spec_dir):
-    assert render_body(spec_dir) == ""
+    assert render_body(spec_dir, load_drafts(spec_dir)) == ""
 
 
 def test_a_whiteboard_saved_by_a_person_is_filed(spec_dir, tmp_path):
