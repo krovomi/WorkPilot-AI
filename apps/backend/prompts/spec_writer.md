@@ -187,6 +187,12 @@ implementation plan, the QA report and the reviewers refer to this exact
 requirement, so it must be **stable and unique**: never renumber to close a gap
 if a requirement is dropped, and never reuse an id for something else.
 
+If the task description has a **"Requirements from attachments"** section, a
+person already validated those requirements against the document they
+attached: keep each one with **its id and its wording**, and number the
+requirements you add after the highest of those ids. Rewording one would turn
+the document's requirement into your paraphrase of it.
+
 1. **FR-001 — [Requirement Name from requirements.json or task description]**
    - Description: [What it does]
    - Acceptance: [How to verify - from acceptance_criteria or task description]
