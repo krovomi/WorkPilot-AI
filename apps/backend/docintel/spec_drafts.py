@@ -40,6 +40,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .files import writable
+from .knowledge import record_validated
 from .tables import RuleTable, TestDraft, drafts_for, project_languages
 
 logger = logging.getLogger(__name__)
@@ -726,4 +727,8 @@ def decide(
             decision.traceability = write_record(spec_dir)["coverage"]["summary"]
         except Exception:  # noqa: BLE001 - the record is refreshed next build
             logger.debug("docintel: traceability refresh failed", exc_info=True)
+
+    # A person just decided: what they kept is knowledge the next task on this
+    # project should be able to recall, from any agent.
+    record_validated(spec_dir, drafts=drafts)
     return decision

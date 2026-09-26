@@ -7,7 +7,12 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { GitLabImportResult, IPCResult } from "../../../shared/types";
 import { projectStore } from "../../project-store";
-import { createSpecForIssue, type GitLabTaskInfo } from "./spec-utils";
+import { attachGitLabIssueImages } from "../shared/issue-attachments";
+import {
+	createSpecForIssue,
+	type GitLabTaskInfo,
+	gitlabSpecDir,
+} from "./spec-utils";
 import type { GitLabAPIIssue } from "./types";
 import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 
@@ -76,6 +81,16 @@ export function registerImportIssues(): void {
 					);
 
 					if (task) {
+						// The screenshots pasted into the issue, for the
+						// attachments preflight.
+						await attachGitLabIssueImages(
+							config.token,
+							config.instanceUrl,
+							config.project,
+							apiIssue.description,
+							apiIssue.iid,
+							gitlabSpecDir(project, task.specId),
+						);
 						tasks.push(task);
 						imported++;
 						debugLog("Imported issue:", { iid, taskId: task.id });

@@ -11,6 +11,7 @@ import type {
 } from "../../../shared/types";
 import type { AgentManager } from "../../agent";
 import { projectStore } from "../../project-store";
+import { attachGitHubIssueImages } from "../shared/issue-attachments";
 import { createSpecForIssue } from "./spec-utils";
 import { getGitHubConfig, githubFetch } from "./utils";
 
@@ -79,6 +80,15 @@ ${issue.body || "No description provided."}
 						issue.html_url,
 						labelNames,
 						project.settings?.mainBranch, // Pass project's configured main branch
+					);
+
+					// The screenshots pasted into the issue, downloaded here with
+					// the token, so the attachments preflight reads them.
+					await attachGitHubIssueImages(
+						config.token,
+						issue.body,
+						issue.number,
+						specData.specDir,
 					);
 
 					// Start spec creation with the existing spec directory

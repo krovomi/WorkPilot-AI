@@ -39,6 +39,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   hermes/              hermes-agent : doctor, persona SOUL.md, cycle d'apprentissage par surface
   mem_search/          lecture de la mémoire par paliers (skill mem-search)
   brain/               le cerveau partagé : vault Obsidian + graph.json Graphify + git, servi en MCP à tous les agents
+  brain/images.py      les images du vault lues par OCR local, en cache par empreinte, retrouvées par brain_recall
   libdocs/             docs des bibliothèques que le dépôt n'illustre pas, avant le build
   docintel/            pièces jointes (draw.io, Excalidraw, captures OCR) et ADR, avant le build
   docintel/engines/    moteurs OCR interchangeables (Tesseract, PaddleOCR, docTR, vision Ollama, Azure)
@@ -52,6 +53,8 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   docintel/spec_drafts.py exigences FR-### et critères proposés depuis un cahier des charges, validés par une personne
   docintel/tables.py   tableaux de règles métier -> un test paramétré par langage du projet
   docintel/whiteboard.py photo de tableau blanc -> .drawio éditable, par le modèle de vision local seulement
+  docintel/figma.py    lien Figma -> attachments/<nom>.figma.json (frames et libellés, par l'API), contrat de la revue visuelle
+  docintel/knowledge.py ce qu'une personne a validé dans la carte -> knowledge/ du cerveau partagé
   rtk/                 proxy rtk : la sortie des commandes condensée avant qu'un modèle la lise
   watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt

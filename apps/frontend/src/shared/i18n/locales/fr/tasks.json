@@ -1357,6 +1357,28 @@
 				"write-failed": "le schéma n'a pas pu être écrit",
 				"not-an-image": "pas une image"
 			}
+		},
+		"figma": {
+			"label": "Lien Figma",
+			"placeholder": "Collez un lien Figma pour joindre ses frames et ses libellés",
+			"link": "Lier",
+			"imported": "{{frames}} frame(s), {{texts}} libellé(s) joints dans {{path}}.",
+			"withheld_one": "{{count}} frame écartée : ses libellés ressemblent à des instructions.",
+			"withheld_other": "{{count}} frames écartées : leurs libellés ressemblent à des instructions.",
+			"secrets": "Masqués : {{kinds}}.",
+			"status": {
+				"invalid-url": "Ce n'est pas un lien de fichier Figma.",
+				"no-token": "Aucun jeton Figma pour ce projet (Réglages → Figma).",
+				"airgap": "Ce projet est en mode hors-ligne strict : Figma n'a pas été appelé.",
+				"network": "Figma est injoignable.",
+				"http": "Figma a refusé la requête : vérifiez le jeton et l'accès au fichier.",
+				"too-large": "Ce fichier est trop volumineux ; liez plutôt une frame (node-id).",
+				"empty": "Aucune frame avec du texte à ce lien.",
+				"injection": "Les libellés de chaque frame ressemblent à des instructions : rien n'a été joint.",
+				"unwritable": "La pièce jointe n'a pas pu être écrite.",
+				"secret-scan-unavailable": "Les secrets n'ont pas pu être vérifiés : rien n'a été joint.",
+				"failed": "La maquette n'a pas pu être liée."
+			}
 		}
 	},
 	"changeGraph": {

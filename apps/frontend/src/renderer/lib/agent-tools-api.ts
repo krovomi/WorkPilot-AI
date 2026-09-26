@@ -655,6 +655,8 @@ export interface DocintelPayload {
 	sequences: DocintelSequenceSummary[];
 	/** HTTP captures of the task, each drafted as an integration test. */
 	apiTests: DocintelApiTestSummary[];
+	/** Whether a Figma mockup can be linked: a boolean, never the token. */
+	figma: { configured: boolean };
 }
 
 interface RawDocintelDocument {
@@ -687,6 +689,7 @@ export async function fetchDocintel(
 		erd?: DocintelErdSummary | null;
 		sequences?: DocintelSequenceSummary[];
 		apiTests?: DocintelApiTestSummary[];
+		figma?: { configured?: boolean };
 	}>("/api/docintel/", params, signal);
 	if (!res.ok) return res;
 
@@ -712,6 +715,7 @@ export async function fetchDocintel(
 			erd: res.data.erd ?? null,
 			sequences: res.data.sequences ?? [],
 			apiTests: res.data.apiTests ?? [],
+			figma: { configured: res.data.figma?.configured === true },
 		},
 	};
 }
@@ -883,6 +887,31 @@ export function convertWhiteboard(
 	return _post<{ result: WhiteboardResult }>(
 		"/api/docintel/whiteboard",
 		{ ...specAddress(query), path },
+		signal,
+	);
+}
+
+/** See `FigmaImport` in docintel/figma.py. */
+export interface FigmaImportResult {
+	/** `imported`, or why not: `invalid-url`, `no-token`, `airgap`, `http-403`… */
+	status: string;
+	path: string;
+	file_key: string;
+	frames: number;
+	texts: number;
+	withheld: number;
+	secrets: string[];
+}
+
+/** A Figma link -> `attachments/<name>.figma.json`, read by the backend. */
+export function linkFigmaMockup(
+	query: SpecTraceabilityQuery,
+	url: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ result: FigmaImportResult }>> {
+	return _post<{ result: FigmaImportResult }>(
+		"/api/docintel/figma",
+		{ ...specAddress(query), url },
 		signal,
 	);
 }

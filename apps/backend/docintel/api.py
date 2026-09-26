@@ -20,7 +20,7 @@ from core.api_safety import SPEC_ADDRESS_REASONS, SpecAddressError, resolve_spec
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
-from . import settings
+from . import figma, settings
 from .adr import collect_adrs
 from .api_tests import draft_tests
 from .conformance import check_conformance
@@ -131,6 +131,7 @@ def docintel(
                 check_conformance(project).to_dict() if project is not None else None
             ),
             **(_safe_code_checks(project, resolved) if project is not None else {}),
+            "figma": _figma_status(project),
         }
     except Exception:  # noqa: BLE001
         logger.exception("docintel collection failed")
@@ -157,6 +158,12 @@ class DraftDecision(SpecAddress):
     reject_tables: list[str] = Field(default_factory=list)
 
 
+class FigmaRequest(SpecAddress):
+    #: The Figma link a person pasted: parsed for a file key and node ids,
+    #: never fetched as given.
+    url: str
+
+
 class WhiteboardRequest(SpecAddress):
     #: The photo, relative to the spec directory (`attachments/board.jpg`).
     path: str
@@ -177,6 +184,12 @@ def _resolve(address: SpecAddress) -> tuple[Path | None, dict | None]:
             ),
             "reason": exc.reason,
         }
+
+
+def _figma_status(project: Path | None) -> dict:
+    """Whether a mockup can be linked here — a boolean, never the token."""
+    token = settings.read_keys(project, (figma.TOKEN_ENV,)).get(figma.TOKEN_ENV, "")
+    return {"configured": bool(token.strip())}
 
 
 def _vision(spec_dir: Path, project: Path | None) -> dict:
@@ -318,4 +331,18 @@ def whiteboard(body: WhiteboardRequest):
         return {"success": True, "result": result.to_dict()}
     except Exception:  # noqa: BLE001
         logger.exception("docintel whiteboard conversion failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+@router.post("/figma")
+def figma_link(body: FigmaRequest):
+    """A Figma mockup of this task, as `attachments/<name>.figma.json`."""
+    resolved, error = _resolve(body)
+    if error:
+        return error
+    try:
+        result = figma.import_figma(resolved, project_of(resolved), body.url)
+        return {"success": True, "result": result.to_dict()}
+    except Exception:  # noqa: BLE001
+        logger.exception("docintel figma import failed")
         return {"success": False, "error": "An internal error has occurred."}

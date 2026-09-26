@@ -332,6 +332,11 @@ async function pathExists(filePath: string): Promise<boolean> {
 	}
 }
 
+/** Where `createSpecForIssue` puts a task's spec directory. */
+export function gitlabSpecDir(project: Project, specId: string): string {
+	return path.join(project.path, project.autoBuildPath, "specs", specId);
+}
+
 /**
  * Create a task spec from a GitLab issue
  */

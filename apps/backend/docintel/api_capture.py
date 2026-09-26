@@ -547,6 +547,9 @@ def parse_exchanges(text: str, source: str, *, ocr: bool = False) -> list[ApiExc
     if ocr:
         return parse_ocr(text, source)
     if document := _structured(text):
+        if document.get("source") == "figma":
+            # A linked mockup (`<name>.figma.json`): labels, not requests.
+            return []
         return (parse_postman(document, source) or parse_openapi(document, source))[
             :MAX_EXCHANGES
         ]

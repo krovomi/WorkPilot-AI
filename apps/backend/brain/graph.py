@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from .home import graph_path
+from .images import index_images
 from .notes import iter_notes, read_note
 
 __all__ = [
@@ -70,6 +71,14 @@ def _str_list(value: Any) -> list[str]:
         return []
     items = value if isinstance(value, (list, tuple, set)) else [value]
     return [str(_plain(item)) for item in items if item is not None]
+
+
+def _ocr_text(node: dict[str, Any]) -> str:
+    """What docintel read out of an image node, "" for anything else."""
+    meta = node.get("metadata")
+    ocr = meta.get("ocr") if isinstance(meta, dict) else None
+    text = ocr.get("text") if isinstance(ocr, dict) else None
+    return text if isinstance(text, str) else ""
 
 
 def _is_ours(node: dict[str, Any]) -> bool:
@@ -123,6 +132,27 @@ def build_graph(root: Path) -> dict[str, Any]:
             }
         )
 
+    # The vault's images, with what docintel read out of them: a link
+    # ``![[schema.png]]`` resolves to a node recall can find by its text,
+    # instead of a ghost.
+    image_nodes: list[dict[str, Any]] = []
+    for image in index_images(root):
+        image_nodes.append(
+            {
+                "id": image.rel,
+                "label": Path(image.rel).name,
+                "file_type": "image",
+                "source_file": image.rel,
+                "metadata": {
+                    "origin": ORIGIN,
+                    "kind": "image",
+                    "ocr": image.metadata(),
+                },
+            }
+        )
+        by_stem.setdefault(Path(image.rel).name.lower(), image.rel)
+        by_stem.setdefault(image.rel.lower(), image.rel)
+
     links: list[dict[str, Any]] = []
     tag_nodes: dict[str, dict[str, Any]] = {}
     missing: dict[str, dict[str, Any]] = {}
@@ -167,7 +197,10 @@ def build_graph(root: Path) -> dict[str, Any]:
         "directed": True,
         "multigraph": False,
         "graph": {"generator": ORIGIN},
-        "nodes": nodes + list(tag_nodes.values()) + list(missing.values()),
+        "nodes": nodes
+        + image_nodes
+        + list(tag_nodes.values())
+        + list(missing.values()),
         "links": links,
     }
 
@@ -281,6 +314,7 @@ class BrainGraph:
                     label,
                     str(node.get("id", "")).lower(),
                     " ".join(map(str, meta.get("tags") or [])),
+                    _ocr_text(node).lower(),
                 ]
             )
             if not all(w in hay for w in words):
@@ -291,16 +325,29 @@ class BrainGraph:
             )
             scored.append((score, node))
         scored.sort(key=lambda pair: (-pair[0], str(pair[1].get("id"))))
-        return [
-            {
-                "id": node["id"],
-                "label": node.get("label"),
-                "source_file": node.get("source_file"),
-                "kind": (node.get("metadata") or {}).get("kind"),
-                "neighbors": self.neighbors(node["id"], limit=8),
-            }
-            for _, node in scored[:limit]
-        ]
+        return [self._hit(node, words) for _, node in scored[:limit]]
+
+    def _hit(self, node: dict[str, Any], words: list[str]) -> dict[str, Any]:
+        meta = node.get("metadata") or {}
+        hit: dict[str, Any] = {
+            "id": node["id"],
+            "label": node.get("label"),
+            "source_file": node.get("source_file"),
+            "kind": meta.get("kind"),
+            "neighbors": self.neighbors(node["id"], limit=8),
+        }
+        text = _ocr_text(node)
+        if text:
+            # The line that matched, not the whole transcription: level 1 of
+            # the ladder says *where*, and the node holds the rest.
+            ocr = meta.get("ocr") or {}
+            line = next(
+                (ln for ln in text.splitlines() if any(w in ln.lower() for w in words)),
+                text.splitlines()[0],
+            )
+            hit["match"] = line.strip()[:200]
+            hit["ocr"] = {"engine": ocr.get("engine"), "date": ocr.get("date")}
+        return hit
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
         node = self.nodes.get(node_id)
