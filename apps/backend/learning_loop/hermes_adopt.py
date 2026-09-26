@@ -82,6 +82,8 @@ __all__ = [
     "adopt",
     "adoption_enabled",
     "adopted_names",
+    "decline",
+    "declined_names",
     "ledger_names",
     "pack_dir",
 ]
@@ -169,8 +171,38 @@ def ledger_names(repo_root: Path) -> set[str]:
     return {str(k) for k in data} if isinstance(data, dict) else set()
 
 
-def _record(repo_root: Path, name: str, candidate, surface: str) -> None:
-    """Append one adoption to the ledger, keeping what is already there."""
+def declined_names(repo_root: Path) -> set[str]:
+    """The names a person turned down from the panel, by slug.
+
+    A subset of `ledger_names`: the ledger already means "never adopt this
+    again", and a refusal is exactly that. The distinction is kept only so the
+    loop can also stop *mirroring* a refused skill into the review queue — an
+    adopted one keeps its live mirror, a refused one has nothing left to say.
+    """
+    try:
+        data = json.loads(
+            _ledger_path(repo_root).read_text(encoding="utf-8", errors="replace")
+        )
+    except (OSError, ValueError):
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    return {
+        str(k)
+        for k, v in data.items()
+        if isinstance(v, dict) and v.get("decision") == "declined"
+    }
+
+
+def _record(
+    repo_root: Path,
+    name: str,
+    candidate,
+    surface: str,
+    *,
+    decision: str = "adopted",
+) -> None:
+    """Append one decision to the ledger, keeping what is already there."""
     path = _ledger_path(repo_root)
     try:
         data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
@@ -178,11 +210,13 @@ def _record(repo_root: Path, name: str, candidate, surface: str) -> None:
             data = {}
     except (OSError, ValueError):
         data = {}
+    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
     data[name] = {
         "skill": candidate.name,
         "digest": candidate.digest,
         "surface": surface,
-        "adopted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "decision": decision,
+        f"{decision}_at": stamp,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -295,3 +329,22 @@ def adopt(
     except Exception as exc:  # noqa: BLE001 - adoption never fails a build
         logger.warning("could not adopt %s: %s", getattr(candidate, "name", "?"), exc)
         return None
+
+
+def decline(repo_root: Path, candidate, *, surface: str) -> bool:
+    """Record that a person said no to one candidate. Never raises.
+
+    Deleting an adopted file was the only way to say no, and it only worked
+    *after* adoption — a candidate still in the queue could only be left there.
+    A refusal from the panel writes the same ledger entry deleting would have
+    implied, so the name is never adopted and never listed again. Nothing in
+    the pack is touched: an earlier adoption a person kept stays theirs.
+    """
+    try:
+        name = _slug(candidate.name)
+        _record(repo_root, name, candidate, surface, decision="declined")
+        logger.info("declined %s from the hermes review queue", candidate.name)
+        return True
+    except Exception as exc:  # noqa: BLE001 - a panel click never crashes the API
+        logger.warning("could not decline %s: %s", getattr(candidate, "name", "?"), exc)
+        return False
