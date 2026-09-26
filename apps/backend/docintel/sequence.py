@@ -334,7 +334,7 @@ def find_sequences(project_dir: Path) -> list[SequenceDiagram]:
 
 def sequences_from_attachments(spec_dir: Path) -> list[SequenceDiagram]:
     """Sequences among the task's attachments: embedded source first, OCR last."""
-    from .preflight import load_result
+    from .preflight import full_text, load_result
 
     result = load_result(Path(spec_dir))
     if result is None:
@@ -353,14 +353,7 @@ def sequences_from_attachments(spec_dir: Path) -> list[SequenceDiagram]:
         except (ValueError, OSError):
             continue
         fmt_suffix = ""
-        if not text and doc.extracted_path:
-            try:
-                full = Path(spec_dir) / doc.extracted_path
-                full.resolve().relative_to(spec_root)
-                text = full.read_text(encoding="utf-8")
-            except (ValueError, OSError):
-                text = ""
-        text = text or doc.text
+        text = text or full_text(doc, Path(spec_dir))
         if doc.engine not in (
             "",
             "text",
@@ -411,18 +404,22 @@ def sequence_section(project_dir: Path, spec_dir: Path | None = None) -> str:
     lines = [
         "## Sequence diagrams vs. code",
         "",
-        "Each call of the diagram(s) below was looked up by name: the participant as a "
-        "type, the message as a method. **Not verified is not wrong** — a participant "
-        "named for a role, a generated method, or the flow this task is about to build "
-        "all read the same way; check before relying on one. A task's own diagram is "
-        "the flow to implement; a repository diagram is the flow to keep.",
+        (
+            "Each call of the diagram(s) below was looked up by name: the participant as a "
+            "type, the message as a method. **Not verified is not wrong** — a participant "
+            "named for a role, a generated method, or the flow this task is about to build "
+            "all read the same way; check before relying on one. A task's own diagram is "
+            "the flow to implement; a repository diagram is the flow to keep."
+        ),
     ]
     for check in checks:
         role = "the task's flow" if check.origin == "attachment" else "documented flow"
         lines += [
             "",
-            f"`{check.diagram}` ({check.format}, {role}) — {check.verified} of "
-            f"{check.checkable} call(s) verified:",
+            (
+                f"`{check.diagram}` ({check.format}, {role}) — {check.verified} of "
+                f"{check.checkable} call(s) verified:"
+            ),
         ]
         for call in check.calls:
             if call.status in ("not-code", "not-a-call"):

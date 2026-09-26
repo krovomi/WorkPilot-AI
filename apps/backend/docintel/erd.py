@@ -124,7 +124,6 @@ class ErdReport:
 # ---------------------------------------------------------------------------
 
 _MANY = {"n", "m", "*", "0..*", "1..*", "0..n", "1..n", "many"}
-_ONE = {"1", "0..1", "1..1", "one"}
 _LABEL = re.compile(
     r"(?<![\w.])(?P<l>0\.\.1|1\.\.1|0\.\.\*|1\.\.\*|0\.\.n|1\.\.n|1|n|m|\*|one|many)\s*"
     r"(?:[:\-–/]|\bto\b)\s*"
@@ -354,7 +353,7 @@ def find_erds(project_dir: Path) -> list[Erd]:
 
 def erds_from_attachments(spec_dir: Path) -> list[Erd]:
     """ERDs among the task's attachments, as the preflight read them."""
-    from .preflight import load_result
+    from .preflight import full_text, load_result
 
     result = load_result(Path(spec_dir))
     if result is None:
@@ -367,14 +366,7 @@ def erds_from_attachments(spec_dir: Path) -> list[Erd]:
             if erd := erd_from_diagram(doc.diagram, doc.path):
                 found.append(erd)
             continue
-        text = doc.text
-        if doc.extracted_path:
-            full = Path(spec_dir) / doc.extracted_path
-            try:
-                full.resolve().relative_to(Path(spec_dir).resolve())
-                text = full.read_text(encoding="utf-8")
-            except (ValueError, OSError):
-                pass
+        text = full_text(doc, Path(spec_dir))
         if text and (erd := parse_erd_text(text, doc.path)):
             if doc.engine not in ("", "text"):
                 erd.format += f" ({doc.engine})"
@@ -563,9 +555,11 @@ def erd_section(project_dir: Path, spec_dir: Path | None = None) -> str:
     lines = [
         "## Data model: ERD vs. ORM mapping",
         "",
-        f"ORM read from the code ({', '.join(report.frameworks)}), without compiling. "
-        "Cardinality is written `A 1:N B` (one A, many B). A reviewer reports a *new* "
-        "difference with a repository ERD as MEDIUM, and one left with the task's ERD as HIGH.",
+        (
+            f"ORM read from the code ({', '.join(report.frameworks)}), without compiling. "
+            "Cardinality is written `A 1:N B` (one A, many B). A reviewer reports a *new* "
+            "difference with a repository ERD as MEDIUM, and one left with the task's ERD as HIGH."
+        ),
     ]
     for check in checked:
         lines += ["", f"`{check.erd}` ({check.format}) — {_INTRO[check.origin]}"]
