@@ -2473,6 +2473,42 @@
 			"task_class": "Task class",
 			"coverage": "Coverage (0–2)",
 			"risk": "Risk (0–2)"
+		},
+		"card": {
+			"title": "JEV second opinion",
+			"subtitle": "Optional TypeSafe service: it classifies the task and rates the diff's coverage and risk before planning and QA. Without it, the workflow carries on normally.",
+			"state": {
+				"ready": "ready",
+				"unknown": "unknown",
+				"disabled": "disabled",
+				"workflow_bypass": "bypassed here",
+				"offline": "offline",
+				"missing_key": "API key missing"
+			},
+			"historyNote": "Latest evaluation · revision {{revision}} · advisory, approves nothing.",
+			"lastBypassed": "Last run: {{reason}}.",
+			"noRunYet": "No evaluation yet: it will appear here after the next planning.",
+			"forWorkflow": "For “{{workflow}}”:",
+			"modes": {
+				"inherit": "Global setting",
+				"enabled": "On",
+				"bypass": "Bypassed"
+			},
+			"addKey": "Add API key",
+			"settings": "JEV settings",
+			"offlineHint": "Strict offline mode is on: JEV is never called, whatever this setting says.",
+			"scale": {
+				"coverage": {
+					"0": "low",
+					"1": "partial",
+					"2": "good"
+				},
+				"risk": {
+					"0": "low",
+					"1": "moderate",
+					"2": "high"
+				}
+			}
 		}
 	}
 }

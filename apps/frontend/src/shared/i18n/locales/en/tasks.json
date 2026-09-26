@@ -1469,5 +1469,26 @@
 			"shared": "Added on both sides: {{items}}.",
 			"handles": "{{from}} handles {{to}}."
 		}
+	},
+	"overview": {
+		"nav": "Overview sections",
+		"sections": {
+			"review": {
+				"title": "To do",
+				"hint": "The task is waiting for your review: read, test, then merge or request changes."
+			},
+			"task": {
+				"title": "The task",
+				"hint": "What is asked: description, acceptance criteria, context."
+			},
+			"plan": {
+				"title": "Execution plan",
+				"hint": "What the agents will do, at which effort, and what they will read."
+			},
+			"learning": {
+				"title": "Memory & learning",
+				"hint": "What the system remembers — and what is waiting for your decision."
+			}
+		}
 	}
 }

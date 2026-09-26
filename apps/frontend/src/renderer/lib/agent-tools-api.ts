@@ -697,9 +697,10 @@ export async function fetchWorkflowProfile(
  *
  *   GET  /api/hermes/status
  *   POST /api/hermes/cycle
+ *   POST /api/hermes/review
  *   POST /api/hermes/soul/install
  *
- * All three are refused in server mode: every answer is about $HERMES_HOME on
+ * All four are refused in server mode: every answer is about $HERMES_HOME on
  * the machine running the backend, which on a shared deployment belongs to the
  * server and not to the tenant asking. The caller renders `reason === "server-mode"`
  * as "not available here" rather than as a failure.
@@ -731,10 +732,47 @@ export interface HermesSoul {
 	readonly repoPath: string;
 }
 
+/** Un candidat de la file de revue, avec ce qu'il faut pour trancher. */
+export interface HermesCandidate {
+	/** Nom du fichier dans `skills/_proposed/` — la clé d'une décision. */
+	readonly file: string;
+	readonly name: string;
+	readonly description: string;
+	/** Catégorie du catalogue hermes, vide pour un skill appris « à plat ». */
+	readonly category: string;
+	/** Encore en attente d'approbation dans hermes lui-même. */
+	readonly pendingInHermes: boolean;
+	/** La surface qui l'a proposé la première (`build`, `kanban`…). */
+	readonly surface: string;
+	/** Les outils propres à hermes qu'il nomme — à réécrire avant usage ailleurs. */
+	readonly tools: readonly string[];
+	/** Les premières lignes de la procédure. */
+	readonly excerpt: string;
+	readonly lines: number;
+}
+
+/** Le couplage avec le cerveau partagé (`hermes/brain_link.py`). */
+export interface HermesBrainLink {
+	/** Un cerveau existe et est allumé : chaque skill gardé y est versé. */
+	readonly active: boolean;
+	readonly root: string;
+	/** Notes `knowledge/hermes/` déjà dans le cerveau. */
+	readonly notes: number;
+	/** hermes a le serveur MCP `workpilot-brain` : il relit ce qu'on y verse. */
+	readonly hermesConnected: boolean;
+}
+
 export interface HermesStatus {
 	readonly readiness: HermesReadiness;
 	readonly soul: HermesSoul;
 	readonly pending: readonly string[];
+	/** Les mêmes candidats que `pending`, détaillés. Absent d'un backend ancien. */
+	readonly candidates?: readonly HermesCandidate[];
+	/** Noms refusés depuis le panneau — jamais reproposés. */
+	readonly declined?: number;
+	/** `HERMES_AUTO_ADOPT` : la boucle garde seule ce qui passe le triage. */
+	readonly autoAdopt?: boolean;
+	readonly brain?: HermesBrainLink;
 	/**
 	 * Candidats encore dans la file mais que ce dépôt a déjà écartés — filés
 	 * avant que le triage existe. Un nombre, pas une liste : ce n'est plus du
@@ -787,10 +825,38 @@ export async function fetchHermesStatus(
 export async function runHermesCycle(
 	surface: string,
 	signal?: AbortSignal,
-): Promise<ApiResult<{ cycle: HermesCycle }>> {
-	return _post<{ cycle: HermesCycle }>(
+): Promise<ApiResult<{ cycle: HermesCycle; status?: HermesStatus }>> {
+	return _post<{ cycle: HermesCycle; status?: HermesStatus }>(
 		"/api/hermes/cycle",
 		{ surface, dryRun: false },
+		signal,
+	);
+}
+
+export type HermesDecision = "adopt" | "decline";
+
+export interface HermesReviewOutcome {
+	readonly adopted: readonly string[];
+	readonly declined: readonly string[];
+	readonly skipped: readonly { readonly file: string; readonly reason: string }[];
+	/** Notes écrites dans le cerveau partagé pour les skills gardés. */
+	readonly brainNotes: readonly string[];
+}
+
+export async function reviewHermesCandidates(
+	files: readonly string[],
+	decision: HermesDecision,
+	task?: { projectDir?: string; specId?: string },
+	signal?: AbortSignal,
+): Promise<ApiResult<{ review: HermesReviewOutcome; status: HermesStatus }>> {
+	return _post<{ review: HermesReviewOutcome; status: HermesStatus }>(
+		"/api/hermes/review",
+		{
+			files,
+			decision,
+			projectDir: task?.projectDir ?? null,
+			specId: task?.specId ?? null,
+		},
 		signal,
 	);
 }

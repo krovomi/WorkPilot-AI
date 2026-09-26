@@ -26,6 +26,13 @@ from hermes.loop import SURFACES, normalise_surface  # noqa: E402
 from learning_loop.hermes_ingest import discover_authored_skills  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _no_brain(tmp_path, monkeypatch):
+    """A kept skill is filed in the brain (`hermes.brain_link`): never in the
+    brain of whoever runs the suite."""
+    monkeypatch.setenv("WORKPILOT_BRAIN_DIR", str(tmp_path / "absent-brain"))
+
+
 @pytest.fixture
 def home(tmp_path: Path) -> Path:
     """A hermes home that exists but was never configured."""
