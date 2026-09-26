@@ -587,6 +587,9 @@ export interface DocintelDocument {
 	edgeCount: number;
 	/** A crash or a failed build found in the text, located in the repository. */
 	diagnosis: DocintelDiagnosis | null;
+	/** A PDF's pages, and how many were rendered for OCR (0 otherwise). */
+	pagesTotal: number;
+	pagesRead: number;
 }
 
 /** See `summary` in docintel/diagnostics.py. */
@@ -664,6 +667,8 @@ interface RawDocintelDocument {
 	described?: boolean;
 	diagram: { nodes?: unknown[]; edges?: unknown[] } | null;
 	diagnosis_summary?: DocintelDiagnosis | null;
+	pages_total?: number;
+	pages_read?: number;
 }
 
 export async function fetchDocintel(
@@ -699,6 +704,8 @@ export async function fetchDocintel(
 				nodeCount: doc.diagram?.nodes?.length ?? 0,
 				edgeCount: doc.diagram?.edges?.length ?? 0,
 				diagnosis: doc.diagnosis_summary ?? null,
+				pagesTotal: doc.pages_total ?? 0,
+				pagesRead: doc.pages_read ?? 0,
 			})),
 			adrs: res.data.adrs ?? [],
 			descriptionDiagnosis: res.data.description_diagnosis ?? null,
@@ -707,6 +714,177 @@ export async function fetchDocintel(
 			apiTests: res.data.apiTests ?? [],
 		},
 	};
+}
+
+/* -------------------------------------------------------------------------
+ * Docintel drafts — requirements, criteria and rule tables proposed from the
+ * attachments, and a whiteboard photo turned into a diagram
+ *
+ *   GET  /api/docintel/drafts
+ *   POST /api/docintel/drafts/extract   read the attachments now (OCR included)
+ *   POST /api/docintel/drafts/decide    accept / reject; accepted go to spec.md
+ *   POST /api/docintel/whiteboard       photo -> attachments/<name>.whiteboard.drawio
+ * ---------------------------------------------------------------------- */
+
+export type DraftStatus = "proposed" | "accepted" | "rejected";
+
+export interface RequirementDraft {
+	key: string;
+	/** Provisional until accepted: the next free id in spec.md at that moment. */
+	id: string;
+	kind: "FR" | "NFR";
+	text: string;
+	source: string;
+	page: number;
+	/** The document's own reference (`REQ-12`, `EF-03`). */
+	ref: string;
+	status: DraftStatus;
+}
+
+export interface CriterionDraft {
+	key: string;
+	text: string;
+	source: string;
+	page: number;
+	status: DraftStatus;
+}
+
+export interface RuleTestDraft {
+	language: string;
+	framework: string;
+	code: string;
+	notes: string[];
+}
+
+export interface RuleTableDraft {
+	key: string;
+	table: {
+		headers: string[];
+		rows: string[][];
+		caption: string;
+		source: string;
+		page: number;
+	};
+	source: string;
+	tests: RuleTestDraft[];
+	status: "proposed" | "rejected";
+}
+
+export interface DocintelDrafts {
+	requirements: RequirementDraft[];
+	criteria: CriterionDraft[];
+	tables: RuleTableDraft[];
+	sources: string[];
+	generated_at: string;
+}
+
+export interface DocintelVision {
+	images: string[];
+	available: boolean;
+	/** Why a photo cannot be converted here: `model-not-installed`… */
+	reason: string;
+	model?: string;
+}
+
+export interface DocintelDraftsPayload {
+	drafts: DocintelDrafts | null;
+	pending: number;
+	/** Attachments a proposal can be read from (prose, PDF, images). */
+	readable: string[];
+	pdfBackends: string[];
+	vision: DocintelVision;
+}
+
+export interface DraftDecisionResult {
+	requirements: { id: string; text: string; key: string }[];
+	criteria: string[];
+	spec_updated: boolean;
+	description_section: string;
+	traceability: string;
+}
+
+export interface DraftDecision {
+	acceptRequirements?: Record<string, string>;
+	rejectRequirements?: string[];
+	acceptCriteria?: Record<string, string>;
+	rejectCriteria?: string[];
+	rejectTables?: string[];
+}
+
+export interface WhiteboardResult {
+	/** `converted`, or why not: `no-vision-model`, `injection`, `exists`… */
+	status: string;
+	reason: string;
+	path: string;
+	nodes: number;
+	edges: number;
+	secrets: string[];
+	conformance: {
+		status: string;
+		findings: number;
+		inverted: number;
+	} | null;
+}
+
+function specAddress(query: SpecTraceabilityQuery): Record<string, string> {
+	const address: Record<string, string> = {};
+	if (query.specDir) address.spec_dir = query.specDir;
+	if (query.projectDir) address.project_dir = query.projectDir;
+	if (query.specId) address.spec_id = query.specId;
+	return address;
+}
+
+export function fetchDocintelDrafts(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<DocintelDraftsPayload>> {
+	return _get<DocintelDraftsPayload>(
+		"/api/docintel/drafts",
+		specAddress(query),
+		signal,
+	);
+}
+
+export function extractDocintelDrafts(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<DocintelDraftsPayload>> {
+	return _post<DocintelDraftsPayload>(
+		"/api/docintel/drafts/extract",
+		specAddress(query),
+		signal,
+	);
+}
+
+export function decideDocintelDrafts(
+	query: SpecTraceabilityQuery,
+	decision: DraftDecision,
+	signal?: AbortSignal,
+): Promise<ApiResult<DocintelDraftsPayload & { decision: DraftDecisionResult }>> {
+	return _post<DocintelDraftsPayload & { decision: DraftDecisionResult }>(
+		"/api/docintel/drafts/decide",
+		{
+			...specAddress(query),
+			accept_requirements: decision.acceptRequirements ?? {},
+			reject_requirements: decision.rejectRequirements ?? [],
+			accept_criteria: decision.acceptCriteria ?? {},
+			reject_criteria: decision.rejectCriteria ?? [],
+			reject_tables: decision.rejectTables ?? [],
+		},
+		signal,
+	);
+}
+
+export function convertWhiteboard(
+	query: SpecTraceabilityQuery,
+	path: string,
+	signal?: AbortSignal,
+): Promise<ApiResult<{ result: WhiteboardResult }>> {
+	return _post<{ result: WhiteboardResult }>(
+		"/api/docintel/whiteboard",
+		{ ...specAddress(query), path },
+		signal,
+	);
 }
 
 export async function fetchWorkflowProfile(

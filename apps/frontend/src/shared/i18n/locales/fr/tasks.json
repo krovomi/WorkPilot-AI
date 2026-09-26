@@ -1240,7 +1240,14 @@
 			"redacted": "secret à l'écran ({{kinds}}) : les agents reçoivent une copie où il est masqué",
 			"withheld": "non transmise aux agents : elle montre un secret impossible à masquer ({{kinds}})",
 			"withheldInjection": "non transmise aux agents : un texte de l'image ressemble à une instruction qui leur est adressée",
-			"secretsInText": "secrets masqués dans le texte ({{kinds}})"
+			"secretsInText": "secrets masqués dans le texte ({{kinds}})",
+			"whiteboardDiagram": "redessiné par le modèle de vision local depuis une photo — une lecture de modèle à vérifier : {{nodes}} éléments, {{edges}} flèches",
+			"pages": "{{read}} page(s) sur {{total}}",
+			"scannedPdf": "PDF scanné ({{count}} page) : lu par OCR au build, ou dès maintenant depuis les propositions ci-dessous",
+			"scannedPdf_other": "PDF scanné ({{count}} pages) : lu par OCR au build, ou dès maintenant depuis les propositions ci-dessous",
+			"scannedPdfUnread": "PDF scanné ({{count}} page) non transcrit ({{reason}})",
+			"scannedPdfUnread_other": "PDF scanné ({{count}} pages) non transcrit ({{reason}})",
+			"noPdfBackend": "PDF : installez pypdfium2 pour lire sa couche texte ou l'OCR de ses pages scannées"
 		},
 		"reason": {
 			"disabled": "OCR local désactivé",
@@ -1265,7 +1272,10 @@
 			"secret-no-boxes": "le moteur n'a donné aucune position à masquer",
 			"secret-no-pillow": "Pillow n'est pas installé pour le masquer",
 			"redaction-failed": "la copie masquée n'a pas pu être écrite",
-			"secret-scan-unavailable": "les secrets n'ont pas pu être vérifiés"
+			"secret-scan-unavailable": "les secrets n'ont pas pu être vérifiés",
+			"secret-in-scan": "un secret apparaît dans le scan ; les agents n'ont que le texte masqué",
+			"no-pages": "aucune page n'a pu être rendue",
+			"no-image": "aucune photo jointe"
 		},
 		"diagnosis": {
 			"fromDescription": "Depuis la description de la tâche",
@@ -1288,6 +1298,65 @@
 			"sequence": "{{diagram}} : {{verified}} appels sur {{total}} trouvés dans le code",
 			"apiTest": "test d'intégration préparé pour {{destination}}",
 			"apiTestNoStack": "aucune pile d'API HTTP reconnue : le test est laissé aux agents"
+		},
+		"drafts": {
+			"page": "p. {{page}}",
+			"offer": "Les pièces jointes énoncent peut-être les exigences. Lisez-les maintenant pour proposer exigences, critères d'acceptation et tableaux de règles — rien n'est ajouté sans votre validation.",
+			"extract": "Lire les pièces jointes",
+			"extracting": "Lecture…",
+			"title": "{{count}} proposition tirée des pièces jointes",
+			"title_other": "{{count}} propositions tirées des pièces jointes",
+			"body": "Cochez ce que le document exige vraiment, corrigez la formulation si besoin, puis ajoutez : les exigences entrent dans la spec avec le prochain identifiant libre, les critères dans les critères d'acceptation.",
+			"selectAll": "Tout cocher",
+			"selectNone": "Tout décocher",
+			"requirements": "Exigences proposées",
+			"select": "Cocher {{id}}",
+			"edit": "Formulation de {{id}}",
+			"criteria": "Critères d'acceptation proposés",
+			"selectCriterion": "Cocher ce critère",
+			"editCriterion": "Formulation de ce critère",
+			"accept": "Ajouter {{count}} à la spec",
+			"accept_other": "Ajouter {{count}} à la spec",
+			"reject": "Rejeter {{count}}",
+			"reject_other": "Rejeter {{count}}",
+			"acceptedTitle": "Propositions ajoutées",
+			"saveErrorTitle": "La tâche n'a pas pu être mise à jour",
+			"acceptedInSpec": "{{requirements}} exigence(s) ajoutée(s) à spec.md, {{criteria}} critère(s) ajouté(s) aux critères d'acceptation.",
+			"acceptedInDescription": "{{requirements}} exigence(s) ajoutée(s) à la description de la tâche (le rédacteur de spec garde leurs identifiants), {{criteria}} critère(s) ajouté(s) aux critères d'acceptation.",
+			"error": "Impossible de lire les propositions : {{error}}"
+		},
+		"rules": {
+			"title": "{{count}} tableau de règles métier",
+			"title_other": "{{count}} tableaux de règles métier",
+			"body": "Chaque ligne est un exemple que l'implémentation doit respecter. Le codeur reçoit le tableau et ce test paramétré, écrit dans le framework de test du projet.",
+			"untitled": "Tableau de règles",
+			"dismiss": "Pas un tableau de règles",
+			"moreRows": "{{count}} ligne de plus",
+			"moreRows_other": "{{count}} lignes de plus",
+			"framework": "{{language}} · {{framework}}",
+			"copy": "Copier",
+			"copied": "Copié",
+			"noLanguage": "Aucun idiome de test pour les langages de ce projet."
+		},
+		"whiteboard": {
+			"title": "Photo de tableau blanc",
+			"body": "Le modèle de vision local redessine la photo en schéma draw.io éditable dans les pièces jointes ; il est ensuite lu et confronté au code comme tout schéma.",
+			"convert": "Convertir en schéma",
+			"converted": "{{path}} : {{nodes}} éléments, {{edges}} flèches — ouvrez-le dans draw.io pour le corriger",
+			"conformance": "{{count}} dépendance que le dessin n'autorise pas",
+			"conformance_other": "{{count}} dépendances que le dessin n'autorise pas",
+			"unavailable": "Une photo de tableau blanc peut devenir un schéma grâce à un modèle de vision local ; aucun n'est disponible ici ({{reason}}).",
+			"status": {
+				"no-vision-model": "aucun modèle de vision local",
+				"disabled": "OCR local désactivé",
+				"unreadable": "photo illisible",
+				"not-a-diagram": "le modèle n'a trouvé aucun schéma sur cette photo",
+				"unparseable": "la réponse du modèle est illisible",
+				"injection": "un texte de la photo ressemble à une instruction adressée à l'agent : rien n'a été écrit",
+				"exists": "un schéma modifié par une personne existe déjà ; il n'a pas été écrasé",
+				"write-failed": "le schéma n'a pas pu être écrit",
+				"not-an-image": "pas une image"
+			}
 		}
 	},
 	"changeGraph": {

@@ -23,6 +23,18 @@ const mockFetch = vi.fn();
 
 vi.mock("../../../lib/agent-tools-api", () => ({
 	fetchDocintel: (...args: unknown[]) => mockFetch(...args),
+	// The proposals panel inside the card: nothing to propose in these tests.
+	fetchDocintelDrafts: () =>
+		Promise.resolve({
+			ok: true,
+			data: {
+				drafts: null,
+				pending: 0,
+				readable: [],
+				pdfBackends: [],
+				vision: { images: [], available: false, reason: "no-image" },
+			},
+		}),
 }));
 
 vi.mock("react-i18next", () => ({

@@ -123,6 +123,10 @@ class ExtractedDocument:
     #: ``{"stacktrace": StackTrace.to_dict(), "ci": {"errors", "failing_tests"}}``
     #: (`docintel/diagnostics.py`). None for everything else.
     diagnosis: dict | None = None
+    #: A PDF's pages, and how many were rendered for OCR (capped by
+    #: `DOCINTEL_PDF_MAX_PAGES`). Zero for everything that is not a PDF.
+    pages_total: int = 0
+    pages_read: int = 0
 
     def to_dict(self) -> dict:
         payload = asdict(self)
@@ -148,7 +152,16 @@ class ExtractedDocument:
             diagnosis=payload.get("diagnosis")
             if isinstance(payload.get("diagnosis"), dict)
             else None,
+            pages_total=_count(payload.get("pages_total")),
+            pages_read=_count(payload.get("pages_read")),
         )
+
+
+def _count(value: object) -> int:
+    try:
+        return max(int(value or 0), 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 @dataclass

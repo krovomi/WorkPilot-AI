@@ -26,19 +26,28 @@ import logging
 import re
 from pathlib import Path
 
-from . import redact, settings
+from . import pdf, redact, settings
 from .diagnostics import diagnose
 from .diagrams import parse_diagram, render_diagram
+from .files import (
+    IMAGE_EXTENSIONS,
+    RESULT_DIR,
+    attachment_paths,
+)
+from .files import clean as _clean
+from .files import threat as _threat
+from .files import writable as _writable
 from .models import DocintelResult, ExtractedDocument
-from .ocr import OcrOutcome, ocr_image
+from .ocr import OcrBox, OcrOutcome, ocr_image
+from .spec_drafts import SourceText, refresh
 from .stacktrace import RepoIndex
+from .tables import RuleTable, tables_from_boxes, tables_from_text
+from .whiteboard import is_generated
 
 logger = logging.getLogger(__name__)
 
-RESULT_DIR = "docintel"
 RESULT_FILE = "result.json"
 EXTRACTED_DIR = "extracted"
-MAX_FILES = 25
 #: What the record keeps inline; the full text is in `extracted/`.
 EXCERPT_CHARS = 4000
 
@@ -80,7 +89,6 @@ DOCUMENT_EXTENSIONS = {
     ".ods",
     ".csv",
 }
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 DIAGRAM_EXTENSIONS = {
     ".drawio",
     ".dio",
@@ -94,82 +102,6 @@ DIAGRAM_EXTENSIONS = {
 }
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
-
-
-def _inside(path: Path, root: Path) -> bool:
-    try:
-        path.resolve().relative_to(root.resolve())
-    except ValueError:
-        return False
-    return True
-
-
-def attachment_paths(spec_dir: Path) -> list[Path]:
-    """Every file attached to this task, each once, never outside the spec.
-
-    Two sources, because the frontend writes both and they can disagree: the
-    `attachments/` directory (what is on disk) and `attached_images` in
-    `requirements.json` (what the task says it carries). A path in the latter
-    that leaves the spec directory is ignored rather than followed.
-    """
-    found: list[Path] = []
-    attachments = spec_dir / "attachments"
-    if attachments.is_dir():
-        # A symlink is never followed: `attachments/` is the task's own copy of
-        # what was attached, and a link inside it pointing at `~/.ssh` would
-        # otherwise be read into a prompt.
-        found.extend(
-            sorted(
-                p
-                for p in attachments.rglob("*")
-                if p.is_file() and not p.is_symlink() and _inside(p, spec_dir)
-            )
-        )
-
-    try:
-        requirements = json.loads(
-            (spec_dir / "requirements.json").read_text(encoding="utf-8")
-        )
-    except (OSError, ValueError):
-        requirements = {}
-    for entry in requirements.get("attached_images") or []:
-        relative = entry.get("path") if isinstance(entry, dict) else None
-        if not relative:
-            continue
-        candidate = spec_dir / str(relative)
-        if (
-            candidate.is_file()
-            and not candidate.is_symlink()
-            and _inside(candidate, spec_dir)
-        ):
-            found.append(candidate)
-
-    unique: list[Path] = []
-    seen: set[Path] = set()
-    for path in found:
-        key = path.resolve()
-        if key not in seen and not _inside(path, spec_dir / RESULT_DIR):
-            seen.add(key)
-            unique.append(path)
-    return unique[:MAX_FILES]
-
-
-def _threat(text: str, source: str) -> str:
-    try:
-        from injection_guard import InjectionScanner
-
-        return InjectionScanner().scan(text, source=source).threat_level.value
-    except Exception:  # noqa: BLE001 - a scanner failure is not a verdict
-        return "safe"
-
-
-def _clean(text: str) -> str:
-    try:
-        from watermarks.clean import clean_generated
-
-        return clean_generated(text).text
-    except Exception:  # noqa: BLE001 - a cosmetic pass never blocks the read
-        return text
 
 
 def extract_file(
@@ -257,6 +189,9 @@ def _extract(
     if size > settings.max_bytes(env):
         return _doc(relative, "skipped", reason="too-large")
 
+    if suffix == ".pdf":
+        return _extract_pdf(path, relative, env, policy_paths, preview=preview)
+
     if suffix in DOCUMENT_EXTENSIONS:
         # Office and PDF conversion is the document skill's job, and every
         # agent already carries it (`build_base_system_prompt`). Converting a
@@ -277,6 +212,9 @@ def _extract(
                 engine=diagram.format,
                 text=render_diagram(diagram),
                 diagram=diagram,
+                # A whiteboard photo converted by the local vision model, and
+                # not yet saved by a person in draw.io: a model's reading.
+                described=is_generated(data),
             )
             return doc, None
 
@@ -306,6 +244,94 @@ def _extract(
 
 def _doc(relative: str, status: str, **fields) -> tuple[ExtractedDocument, None]:
     return ExtractedDocument(path=relative, status=status, **fields), None
+
+
+#: Why an OCR engine gave nothing that will not change on the next page: stop
+#: rendering rather than ask the same absent engine twenty times.
+_NO_OCR = {"disabled", "no-engine", "not-installed", "not-configured", "airgap"}
+
+
+def _page_marker(number: int) -> str:
+    return f"[page {number}]"
+
+
+def _extract_pdf(
+    path: Path,
+    relative: str,
+    env: dict[str, str],
+    policy_paths: tuple[Path, ...],
+    *,
+    preview: bool,
+) -> tuple[ExtractedDocument, OcrOutcome | None]:
+    """A PDF with a text layer stays a document; a scanned one is OCR'd.
+
+    A text layer is what the document skill converts, and converting it here
+    too would be two answers to one question. A scan is the case that skill
+    cannot answer — it returns empty pages — so its pages are rendered and
+    handed to the OCR chain, up to `DOCINTEL_PDF_MAX_PAGES`. The Kanban preview
+    only says it is a scan: twenty pages of OCR is not what opening a panel
+    should cost.
+    """
+    max_pages = settings.pdf_max_pages(env)
+    layer = pdf.read_text(path, max_pages)
+    if layer.reason in ("no-pdf-backend", "encrypted", "unreadable"):
+        reason = (
+            layer.reason if layer.reason == "no-pdf-backend" else f"pdf-{layer.reason}"
+        )
+        return _doc(relative, "document", reason=reason)
+    pages = {"pages_total": layer.total, "pages_read": 0}
+    if not (layer.scanned or layer.reason == "no-text-layer"):
+        return _doc(relative, "document", reason="document-skill", **pages)
+    if preview:
+        return _doc(relative, "document", reason="scanned-pdf", **pages)
+
+    lines: list[str] = []
+    boxes: list[OcrBox] = []
+    attempts: list[str] = []
+    engine, reason, described, read = "", "no-pages", False, 0
+    for index, image in pdf.render_pages(
+        path, list(range(min(layer.total, max_pages)))
+    ):
+        read += 1
+        outcome = ocr_image(image, env, policy_paths=policy_paths, preview=False)
+        if not outcome.text:
+            reason = outcome.reason or "empty"
+            attempts.extend(a for a in outcome.attempts if a not in attempts)
+            if reason in _NO_OCR:
+                break
+            continue
+        engine = engine or outcome.engine
+        described = described or outcome.described
+        lines.append(_page_marker(index + 1))
+        offset = len(lines)
+        lines.extend(outcome.text.splitlines())
+        boxes.extend(
+            OcrBox(
+                text=b.text,
+                left=b.left,
+                top=b.top,
+                width=b.width,
+                height=b.height,
+                confidence=b.confidence,
+                line=b.line + offset,
+            )
+            for b in outcome.boxes
+        )
+    pages["pages_read"] = read
+    text = "\n".join(lines).strip()
+    if not text:
+        return _doc(relative, "document", reason=f"scanned-pdf-{reason}", **pages)
+    doc = ExtractedDocument(
+        path=relative,
+        status="text",
+        engine=engine,
+        text=text,
+        attempts=attempts,
+        described=described,
+        **pages,
+    )
+    # No redacted copy of a PDF can be painted: `paintable` is False below.
+    return doc, OcrOutcome(text=text, engine=engine, boxes=tuple(boxes))
 
 
 def _mask_diagram(doc: ExtractedDocument) -> list[str]:
@@ -370,6 +396,12 @@ def _protect(
         return doc
     if not findings:
         return doc
+    if path.suffix.lower() == ".pdf":
+        # A scanned PDF showed a secret: its text is masked, but no copy of
+        # twenty rendered pages is painted — the original is withheld, and
+        # the masked text is what the agents get.
+        doc.status, doc.reason = "withheld", "secret-in-scan"
+        return doc
 
     boxes = redact.covering_boxes(outcome.boxes, findings)
     if boxes is None:
@@ -390,21 +422,6 @@ def _protect(
         else:
             doc.status, doc.reason = "withheld", "redaction-failed"
     return doc
-
-
-def _writable(target: Path, spec_dir: Path) -> bool:
-    """Whether `target` can be written without leaving the spec directory.
-
-    Nothing on the way to it may be a symlink — `docintel/`, `extracted/` or
-    the file itself: a spec directory copied from somewhere else, or edited by
-    hand, could carry one pointing at a file the build must never overwrite.
-    """
-    current = target
-    while current != spec_dir and spec_dir in current.parents:
-        if current.is_symlink():
-            return False
-        current = current.parent
-    return _inside(target.parent, spec_dir) if target.parent.exists() else True
 
 
 def _write_extracted(doc: ExtractedDocument, spec_dir: Path) -> None:
@@ -456,10 +473,13 @@ def run_preflight(
     paths = attachment_paths(spec_dir)
     if not paths and not described:
         result = DocintelResult(skipped="no-attachments")
+        if persist:
+            _refresh_drafts(spec_dir, [], project_dir)
         return _discard(spec_dir, result) if persist else result
 
     policy_paths = tuple(Path(p) for p in (spec_dir, project_dir) if p is not None)
     result = DocintelResult(description_diagnosis=described)
+    sources: list[SourceText] = []
     for path in paths:
         try:
             doc, outcome = _extract(
@@ -467,6 +487,8 @@ def run_preflight(
             )
             doc = _protect(doc, outcome, path, spec_dir, persist=persist)
             _diagnose_document(doc, project_dir, index)
+            if persist and (source := _spec_source(doc, outcome, path, env)):
+                sources.append(source)
         except Exception:  # noqa: BLE001 - one attachment, not the build
             logger.debug("docintel: extraction failed for %s", path, exc_info=True)
             doc = ExtractedDocument(path=path.name, status="skipped", reason="failed")
@@ -475,7 +497,80 @@ def run_preflight(
         elif len(doc.text) > EXCERPT_CHARS:
             doc.text = doc.text[:EXCERPT_CHARS].rstrip() + "\n…"
         result.documents.append(doc)
+    if persist:
+        _refresh_drafts(spec_dir, sources, project_dir)
     return _persist(spec_dir, result) if persist else result
+
+
+#: Attachments that can carry a specification's prose. An HTTP capture or a
+#: YAML file is text too, and "must" in a JSON body is not a requirement.
+SPEC_SOURCE_EXTENSIONS = {".md", ".markdown", ".txt", ".adoc", ".rst", ".pdf"}
+
+
+def _masked_cells(table: RuleTable) -> RuleTable | None:
+    """A table built from OCR boxes carries the raw words: mask them too."""
+    try:
+        table.headers = [redact.redact_text(c)[0] for c in table.headers]
+        table.rows = [[redact.redact_text(c)[0] for c in row] for row in table.rows]
+    except redact.ScannerUnavailable:
+        return None
+    return table
+
+
+def _spec_source(
+    doc: ExtractedDocument,
+    outcome: OcrOutcome | None,
+    path: Path,
+    env: dict[str, str],
+) -> SourceText | None:
+    """What of an attachment may be read for requirements and rule tables.
+
+    Only text every check has passed: masked, and not flagged by
+    `injection_guard` — a proposal is shown to a person as something the
+    document asks for, and an injected instruction must not be one. A PDF with
+    a text layer stays a *document* for the agents; its layer is read here
+    only to propose, through the same cleaning, masking and scan.
+    """
+    suffix = path.suffix.lower()
+    if doc.threat != "safe":
+        return None
+    text = ""
+    if doc.status == "text" or (
+        doc.status == "withheld" and doc.reason == "secret-in-scan"
+    ):
+        if suffix not in SPEC_SOURCE_EXTENSIONS | IMAGE_EXTENSIONS:
+            return None
+        text = doc.text
+    elif (
+        doc.status == "document" and suffix == ".pdf" and doc.reason == "document-skill"
+    ):
+        layer = pdf.read_text(path, settings.pdf_max_pages(env))
+        text = "\n".join(
+            f"{_page_marker(n)}\n{page}" for n, page in enumerate(layer.pages, 1)
+        ).strip()
+        try:
+            text = redact.redact_text(_clean(text))[0]
+        except redact.ScannerUnavailable:
+            return None
+        if not text or _threat(text, source=f"attachment:{doc.path}") != "safe":
+            return None
+    if not text:
+        return None
+
+    found = tables_from_boxes(outcome.boxes, text) if outcome and outcome.boxes else []
+    found = found or tables_from_text(text)
+    tables = [t for t in (_masked_cells(t) for t in found) if t is not None]
+    return SourceText(source=doc.path, text=text, tables=tables)
+
+
+def _refresh_drafts(
+    spec_dir: Path, sources: list[SourceText], project_dir: Path | None
+) -> None:
+    """Proposals from what was read; a failure here costs the card, not the build."""
+    try:
+        refresh(spec_dir, sources, project_dir)
+    except Exception:  # noqa: BLE001
+        logger.debug("docintel: drafts refresh failed", exc_info=True)
 
 
 def _discard(spec_dir: Path, result: DocintelResult) -> DocintelResult:

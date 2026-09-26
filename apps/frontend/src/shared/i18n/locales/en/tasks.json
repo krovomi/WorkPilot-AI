@@ -1240,7 +1240,14 @@
 			"redacted": "secret on screen ({{kinds}}): agents get a copy with it painted out",
 			"withheld": "not given to the agents: it shows a secret that could not be masked ({{kinds}})",
 			"withheldInjection": "not given to the agents: text in the image looks like an instruction aimed at them",
-			"secretsInText": "secrets masked in the text ({{kinds}})"
+			"secretsInText": "secrets masked in the text ({{kinds}})",
+			"whiteboardDiagram": "drawn by the local vision model from a photo — a model's reading to verify: {{nodes}} elements, {{edges}} arrows",
+			"pages": "{{read}} of {{total}} pages",
+			"scannedPdf": "scanned PDF ({{count}} page): read by OCR at build time, or now from the proposals below",
+			"scannedPdf_other": "scanned PDF ({{count}} pages): read by OCR at build time, or now from the proposals below",
+			"scannedPdfUnread": "scanned PDF ({{count}} page) not transcribed ({{reason}})",
+			"scannedPdfUnread_other": "scanned PDF ({{count}} pages) not transcribed ({{reason}})",
+			"noPdfBackend": "PDF: install pypdfium2 to read its text layer or OCR its scanned pages"
 		},
 		"reason": {
 			"disabled": "local OCR turned off",
@@ -1265,7 +1272,10 @@
 			"secret-no-boxes": "the engine gave no positions to mask",
 			"secret-no-pillow": "Pillow is not installed to mask it",
 			"redaction-failed": "the masked copy could not be written",
-			"secret-scan-unavailable": "secrets could not be checked"
+			"secret-scan-unavailable": "secrets could not be checked",
+			"secret-in-scan": "a secret appears in the scan; agents get the masked text only",
+			"no-pages": "no page could be rendered",
+			"no-image": "no photo attached"
 		},
 		"diagnosis": {
 			"fromDescription": "From the task description",
@@ -1288,6 +1298,65 @@
 			"sequence": "{{diagram}}: {{verified}} of {{total}} calls found in the code",
 			"apiTest": "integration test drafted for {{destination}}",
 			"apiTestNoStack": "no HTTP API stack recognised: the test is left to the agents"
+		},
+		"drafts": {
+			"page": "p. {{page}}",
+			"offer": "The attachments may state the requirements. Read them now to propose requirements, acceptance criteria and rule tables — nothing is added without your approval.",
+			"extract": "Read the attachments",
+			"extracting": "Reading…",
+			"title": "{{count}} proposal from the attachments",
+			"title_other": "{{count}} proposals from the attachments",
+			"body": "Tick what the document really requires, edit the wording if needed, then add it: requirements go into the spec with the next free id, criteria into the acceptance criteria.",
+			"selectAll": "Select all",
+			"selectNone": "Select none",
+			"requirements": "Proposed requirements",
+			"select": "Select {{id}}",
+			"edit": "Wording of {{id}}",
+			"criteria": "Proposed acceptance criteria",
+			"selectCriterion": "Select this criterion",
+			"editCriterion": "Wording of this criterion",
+			"accept": "Add {{count}} to the spec",
+			"accept_other": "Add {{count}} to the spec",
+			"reject": "Reject {{count}}",
+			"reject_other": "Reject {{count}}",
+			"acceptedTitle": "Proposals added",
+			"saveErrorTitle": "The task could not be updated",
+			"acceptedInSpec": "{{requirements}} requirement(s) added to spec.md, {{criteria}} criterion(s) added to the acceptance criteria.",
+			"acceptedInDescription": "{{requirements}} requirement(s) added to the task description (the spec writer keeps their ids), {{criteria}} criterion(s) added to the acceptance criteria.",
+			"error": "Could not read the proposals: {{error}}"
+		},
+		"rules": {
+			"title": "{{count}} business rule table",
+			"title_other": "{{count}} business rule tables",
+			"body": "Each row is an example the implementation must satisfy. The coder receives the table and this parametrised test, written in the project's own test framework.",
+			"untitled": "Rule table",
+			"dismiss": "Not a rule table",
+			"moreRows": "{{count}} more row",
+			"moreRows_other": "{{count}} more rows",
+			"framework": "{{language}} · {{framework}}",
+			"copy": "Copy",
+			"copied": "Copied",
+			"noLanguage": "No test idiom for this project's languages."
+		},
+		"whiteboard": {
+			"title": "Whiteboard photo",
+			"body": "The local vision model redraws the photo as an editable draw.io diagram in the attachments, then it is read and checked against the code like any diagram.",
+			"convert": "Convert to a diagram",
+			"converted": "{{path}}: {{nodes}} elements, {{edges}} arrows — open it in draw.io to correct it",
+			"conformance": "{{count}} dependency the drawing does not allow",
+			"conformance_other": "{{count}} dependencies the drawing does not allow",
+			"unavailable": "A whiteboard photo can be turned into a diagram by a local vision model; none is available here ({{reason}}).",
+			"status": {
+				"no-vision-model": "no local vision model",
+				"disabled": "local OCR turned off",
+				"unreadable": "photo unreadable",
+				"not-a-diagram": "the model found no diagram in this photo",
+				"unparseable": "the model's answer could not be read",
+				"injection": "text in the photo looks like an instruction aimed at the agent: nothing written",
+				"exists": "a diagram edited by a person already exists; it was not overwritten",
+				"write-failed": "the diagram could not be written",
+				"not-an-image": "not an image"
+			}
 		}
 	},
 	"changeGraph": {

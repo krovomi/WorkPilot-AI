@@ -48,6 +48,10 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   docintel/api_tests.py appel HTTP joint (Postman, OpenAPI, .http, capture) -> test d'intégration dans l'idiome du projet
   docintel/sequence.py diagrammes de séquence PlantUML / Mermaid, chaque appel cherché dans le code
   docintel/c4.py       C4 en code (Structurizr, C4-PlantUML) comme règles de dépendance de conformance.py
+  docintel/pdf.py      un PDF : sa couche texte (colonnes gardées), sinon ses pages rendues pour l'OCR
+  docintel/spec_drafts.py exigences FR-### et critères proposés depuis un cahier des charges, validés par une personne
+  docintel/tables.py   tableaux de règles métier -> un test paramétré par langage du projet
+  docintel/whiteboard.py photo de tableau blanc -> .drawio éditable, par le modèle de vision local seulement
   rtk/                 proxy rtk : la sortie des commandes condensée avant qu'un modèle la lise
   watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt
