@@ -1,6 +1,7 @@
 import {
 	ArrowLeft,
 	ArrowRight,
+	Camera,
 	Home,
 	RotateCw,
 } from "lucide-react";
@@ -112,6 +113,14 @@ interface ResponsivePreviewProps {
 	 * la tâche révèle une seconde plus tard.
 	 */
 	onNavigate?: (url: string, restorable: boolean) => void;
+	/**
+	 * Garde l'image affichée comme capture de revue (`data:image/png;…`) avec
+	 * l'adresse qu'elle montre. Sans ce rappel, pas de bouton : l'aperçu de la
+	 * page Émulateur n'appartient à aucune tâche.
+	 */
+	onCapture?: (image: string, url: string) => void;
+	/** Une capture est en cours d'envoi : le bouton attend. */
+	capturing?: boolean;
 }
 
 /** CSS viewport simulation: dimensions change media queries, zoom only scales the preview. */
@@ -122,6 +131,8 @@ export function ResponsivePreview({
 	candidates,
 	restoredUrl,
 	onNavigate,
+	onCapture,
+	capturing = false,
 }: ResponsivePreviewProps) {
 	const { t } = useTranslation("appEmulator");
 	const viewRef = useRef<Electron.WebviewTag>(null);
@@ -365,6 +376,33 @@ export function ResponsivePreview({
 				>
 					<Home className="h-4 w-4" />
 				</Button>
+				{onCapture && (
+					<Button
+						size="icon"
+						variant="ghost"
+						className="h-8 w-8"
+						aria-label={t("preview.capture")}
+						title={t("preview.capture")}
+						disabled={capturing}
+						onClick={() => {
+							const view = viewRef.current as
+								| (Electron.WebviewTag & {
+										capturePage?: () => Promise<{ toDataURL: () => string }>;
+								  })
+								| null;
+							if (typeof view?.capturePage !== "function") return;
+							void view
+								.capturePage()
+								.then((image) => onCapture(image.toDataURL(), currentUrl))
+								.catch(() => {
+									// Une page qui n'a pas fini de charger n'a pas d'image :
+									// le bouton reste là pour la tentative suivante.
+								});
+						}}
+					>
+						<Camera className="h-4 w-4" />
+					</Button>
+				)}
 				<label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
 					<span className="sr-only">{t("preview.address")}</span>
 					<input

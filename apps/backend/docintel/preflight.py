@@ -127,6 +127,26 @@ def extract_file(
     return _protect(doc, outcome, path, spec_dir, persist=False)
 
 
+def read_screen(
+    path: Path,
+    root: Path,
+    env: dict[str, str],
+    *,
+    policy_paths: tuple[Path, ...] = (),
+) -> tuple[ExtractedDocument, tuple[OcrBox, ...]]:
+    """A capture of the running app, read like an attachment, with its boxes.
+
+    Same chain and same protection as `extract_file` — cleaned, masked, scanned
+    — and nothing written. The boxes come back too, because the visual QA
+    (`visual_qa.py`) splits a toolbar into its buttons by where the words are,
+    and finds a label running off the edge by where it ends. They carry the raw
+    words: a caller that builds text from them masks it again.
+    """
+    doc, outcome = _extract(path, root, env, policy_paths, preview=False)
+    doc = _protect(doc, outcome, path, root, persist=False)
+    return doc, (outcome.boxes if outcome is not None else ())
+
+
 def _diagnose_document(
     doc: ExtractedDocument, project_dir: Path | None, index: RepoIndex | None
 ) -> None:

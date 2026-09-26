@@ -21,6 +21,7 @@ import { useHermesStore } from "../../stores/hermes-store";
 import { ScrollArea } from "../ui/scroll-area";
 import { BrainTaskCard } from "./BrainTaskCard";
 import { DocumentInsightsCard } from "./DocumentInsightsCard";
+import { VisualReviewCard } from "./VisualReviewCard";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { HermesLearningCard } from "./HermesLearningCard";
 import { RtkSavingsCard } from "./RtkSavingsCard";
@@ -218,6 +219,10 @@ export function TaskOverview({
 						<TaskJevCard task={task} projectPath={projectPath} />
 						<SpecTraceabilityCard task={task} projectPath={projectPath} />
 						<DocumentInsightsCard task={task} projectPath={projectPath} />
+						{/* Ce que montrent les captures de l'application, lues par OCR :
+						    clés brutes, langue, libellés coupés, base → tâche, maquette.
+						    Rien sans capture. */}
+						<VisualReviewCard task={task} projectPath={projectPath} />
 					</OverviewSection>
 
 					<OverviewSection taskId={task.id} id="learning" icon={BrainCircuit} tone="violet" onPresence={report}>
