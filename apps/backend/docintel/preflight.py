@@ -93,7 +93,16 @@ def attachment_paths(spec_dir: Path) -> list[Path]:
     found: list[Path] = []
     attachments = spec_dir / "attachments"
     if attachments.is_dir():
-        found.extend(sorted(p for p in attachments.rglob("*") if p.is_file()))
+        # A symlink is never followed: `attachments/` is the task's own copy of
+        # what was attached, and a link inside it pointing at `~/.ssh` would
+        # otherwise be read into a prompt.
+        found.extend(
+            sorted(
+                p
+                for p in attachments.rglob("*")
+                if p.is_file() and not p.is_symlink() and _inside(p, spec_dir)
+            )
+        )
 
     try:
         requirements = json.loads(
@@ -106,7 +115,11 @@ def attachment_paths(spec_dir: Path) -> list[Path]:
         if not relative:
             continue
         candidate = spec_dir / str(relative)
-        if candidate.is_file() and _inside(candidate, spec_dir):
+        if (
+            candidate.is_file()
+            and not candidate.is_symlink()
+            and _inside(candidate, spec_dir)
+        ):
             found.append(candidate)
 
     unique: list[Path] = []
@@ -195,6 +208,21 @@ def extract_file(path: Path, spec_dir: Path, env: dict[str, str]) -> ExtractedDo
     return ExtractedDocument(path=relative, status="skipped", reason="unsupported")
 
 
+def _writable(target: Path, spec_dir: Path) -> bool:
+    """Whether `target` can be written without leaving the spec directory.
+
+    Nothing on the way to it may be a symlink — `docintel/`, `extracted/` or
+    the file itself: a spec directory copied from somewhere else, or edited by
+    hand, could carry one pointing at a file the build must never overwrite.
+    """
+    current = target
+    while current != spec_dir and spec_dir in current.parents:
+        if current.is_symlink():
+            return False
+        current = current.parent
+    return _inside(target.parent, spec_dir) if target.parent.exists() else True
+
+
 def _write_extracted(doc: ExtractedDocument, spec_dir: Path) -> None:
     """The full text beside the record; the record keeps an excerpt."""
     if not doc.text:
@@ -202,6 +230,9 @@ def _write_extracted(doc: ExtractedDocument, spec_dir: Path) -> None:
     name = _UNSAFE.sub("_", doc.path.replace("/", "__")).strip("_") or "document"
     target = spec_dir / RESULT_DIR / EXTRACTED_DIR / f"{name}.md"
     header = f"<!-- extracted from {doc.path} by {doc.engine or 'docintel'} -->\n\n"
+    if not _writable(target, spec_dir):
+        logger.warning("docintel: refusing to write through a symlink: %s", target)
+        return
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(header + doc.text + "\n", encoding="utf-8")
@@ -266,12 +297,17 @@ def _discard(spec_dir: Path, result: DocintelResult) -> DocintelResult:
     try:
         (spec_dir / RESULT_DIR / RESULT_FILE).unlink(missing_ok=True)
     except OSError:
-        pass
+        # A record that cannot be removed is stale, not fatal: the next build
+        # that has attachments overwrites it.
+        logger.debug("docintel: could not remove a stale record", exc_info=True)
     return result
 
 
 def _persist(spec_dir: Path, result: DocintelResult) -> DocintelResult:
     target = spec_dir / RESULT_DIR / RESULT_FILE
+    if not _writable(target, spec_dir):
+        logger.warning("docintel: refusing to write through a symlink: %s", target)
+        return result
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(

@@ -138,7 +138,11 @@ def _walk(root: Path, max_depth: int):
             d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")
         )
         for name in sorted(files):
-            yield path / name
+            candidate = path / name
+            # A link could name a file outside the repository; `os.walk`
+            # already refuses to descend into linked directories.
+            if not candidate.is_symlink():
+                yield candidate
 
 
 def find_diagrams(project_dir: Path) -> list[Path]:
@@ -147,7 +151,7 @@ def find_diagrams(project_dir: Path) -> list[Path]:
     seen: set[Path] = set()
     for relative in DIAGRAM_DIRS:
         base = project_dir / relative
-        if not base.is_dir():
+        if not base.is_dir() or (relative != "." and base.is_symlink()):
             continue
         # Only the root's own files: a diagram kept beside the solution file
         # is a diagram of it, one buried in a sample project is not.
@@ -374,6 +378,15 @@ def check_conformance(project_dir: Path) -> ConformanceReport:
     return report
 
 
+_SECTION_INTRO = (
+    "The repository's architecture diagram(s) below were read as dependency "
+    "rules (an arrow `A -> B` means *A may depend on B*, transitively) and "
+    "compared with the `<ProjectReference>` items of the solution. Do not add "
+    "a reference the diagram does not allow; if the task needs one, say so "
+    "and name the diagram rather than adding it silently."
+)
+
+
 def conformance_section(project_dir: Path) -> str:
     """The declared dependency rules, and where the code already breaks them."""
     report = check_conformance(Path(project_dir))
@@ -381,15 +394,7 @@ def conformance_section(project_dir: Path) -> str:
     if not checked:
         return ""
 
-    lines = [
-        "## Architecture diagram vs. project references",
-        "",
-        "The repository's architecture diagram(s) below were read as dependency "
-        "rules (an arrow `A -> B` means *A may depend on B*, transitively) and "
-        "compared with the `<ProjectReference>` items of the solution. Do not add "
-        "a reference the diagram does not allow; if the task needs one, say so "
-        "and name the diagram rather than adding it silently.",
-    ]
+    lines = ["## Architecture diagram vs. project references", "", _SECTION_INTRO]
     for check in checked:
         lines.append("")
         lines.append(f"`{check.diagram}` — layers:")

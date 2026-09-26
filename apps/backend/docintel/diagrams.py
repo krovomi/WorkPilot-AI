@@ -27,6 +27,11 @@ from defusedxml.ElementTree import fromstring as _xml
 from .models import DiagramEdge, DiagramModel, DiagramNode
 
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+#: Ceiling on what one compressed payload may inflate to. The *file* size is
+#: capped before parsing, and that says nothing about a zlib stream inside it:
+#: a few kilobytes of deflate can claim gigabytes. A real diagram's source is
+#: far below this.
+MAX_INFLATED_BYTES = 20 * 1024 * 1024
 _EXCALIDRAW_MIME = "application/vnd.excalidraw+json"
 _EXCALIDRAW_SVG_PAYLOAD = re.compile(
     r"<!--\s*payload-start\s*-->\s*(.+?)\s*<!--\s*payload-end\s*-->", re.S
@@ -39,6 +44,20 @@ _SPACES = re.compile(r"\s+")
 # ---------------------------------------------------------------------------
 # Containers: PNG text chunks and SVG attributes
 # ---------------------------------------------------------------------------
+
+
+def inflate(data: bytes, wbits: int = zlib.MAX_WBITS) -> bytes:
+    """`zlib.decompress`, refusing to produce more than `MAX_INFLATED_BYTES`.
+
+    Every compressed payload here comes from a file somebody attached or
+    committed, so it is untrusted: an unbounded decompress is a way to exhaust
+    the memory of the process that is about to run a build.
+    """
+    inflater = zlib.decompressobj(wbits)
+    out = inflater.decompress(data, MAX_INFLATED_BYTES)
+    if inflater.unconsumed_tail:
+        raise zlib.error("inflated payload exceeds the size limit")
+    return out
 
 
 def png_text_chunks(data: bytes) -> dict[str, str]:
@@ -65,16 +84,14 @@ def png_text_chunks(data: bytes) -> dict[str, str]:
                 chunks[key.decode("latin-1")] = text.decode("latin-1")
             elif kind == b"zTXt":
                 key, _, rest = body.partition(b"\0")
-                chunks[key.decode("latin-1")] = zlib.decompress(rest[1:]).decode(
-                    "latin-1"
-                )
+                chunks[key.decode("latin-1")] = inflate(rest[1:]).decode("latin-1")
             elif kind == b"iTXt":
                 key, _, rest = body.partition(b"\0")
                 compressed, rest = rest[0], rest[2:]
                 _lang, _, rest = rest.partition(b"\0")
                 _translated, _, text = rest.partition(b"\0")
                 if compressed:
-                    text = zlib.decompress(text)
+                    text = inflate(text)
                 chunks[key.decode("latin-1")] = text.decode("utf-8", "replace")
             elif kind == b"IEND":
                 break
@@ -97,7 +114,7 @@ def _plain(label: str) -> str:
 
 def _inflate_diagram(text: str) -> str:
     """A compressed `<diagram>` body: base64, raw deflate, then URL-encoding."""
-    raw = zlib.decompress(base64.b64decode(text.strip()), -15)
+    raw = inflate(base64.b64decode(text.strip()), -15)
     return urllib.parse.unquote(raw.decode("utf-8"))
 
 
@@ -224,7 +241,7 @@ def _decode_excalidraw_payload(text: str) -> dict | None:
         try:
             raw = str(payload["encoded"]).encode("latin-1")
             if payload.get("compressed"):
-                raw = zlib.decompress(raw)
+                raw = inflate(raw)
             payload = json.loads(raw.decode("utf-8"))
         except (ValueError, zlib.error, UnicodeError):
             return None

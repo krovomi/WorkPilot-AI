@@ -11,6 +11,7 @@ projects keep no ADRs and most tasks attach nothing.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .adr import collect_adrs
@@ -41,16 +42,40 @@ contradicts an accepted ADR is at least a HIGH finding, citing its id.
 """
 
 
+_FENCE_TAG = re.compile(r"<\s*/?\s*attachment-content", re.IGNORECASE)
+
+
 def _fence(text: str, limit: int) -> str:
+    """The text between tags it cannot close.
+
+    An attachment is somebody else's text: one that contains the closing tag
+    would end the fence early and have the rest read as prompt. Every spelling
+    of the tag inside the text is defused before it is wrapped.
+    """
     body = text if len(text) <= limit else text[:limit].rstrip() + "\n…"
+    body = _FENCE_TAG.sub(lambda m: m.group(0).replace("<", "&lt;"), body)
     return f"<attachment-content>\n{body}\n</attachment-content>"
 
 
+def _within(spec_dir: Path, relative: str) -> bool:
+    """`result.json` is a file on disk, not a promise: a path read back from it
+    is only cited when it still names something inside the spec directory."""
+    if not relative:
+        return False
+    try:
+        (spec_dir / relative).resolve().relative_to(spec_dir.resolve())
+    except (ValueError, OSError):
+        return False
+    return True
+
+
 def _document_block(doc: ExtractedDocument, spec_dir: Path) -> str:
+    if not _within(spec_dir, doc.path):
+        return ""
     location = (spec_dir / doc.path).as_posix()
     full = (
         f" Full text: `{(spec_dir / doc.extracted_path).as_posix()}`."
-        if doc.extracted_path
+        if _within(spec_dir, doc.extracted_path)
         else ""
     )
     title = f"### `{location}`"
