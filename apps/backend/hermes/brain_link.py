@@ -124,16 +124,20 @@ def _body(
         "",
         "## D'où ça vient",
         "",
-        "hermes-agent l'a écrite depuis sa propre expérience, sur une surface que "
-        "WorkPilot ne voit pas (Telegram, cron, terminal…). "
-        + (
-            "Une personne l'a gardée depuis le Kanban."
-            if decided_by == "person"
-            else "La boucle d'apprentissage l'a gardée après triage."
+        (
+            "hermes-agent l'a écrite depuis sa propre expérience, sur une surface "
+            "que WorkPilot ne voit pas (Telegram, cron, terminal…). "
+            + (
+                "Une personne l'a gardée depuis le Kanban."
+                if decided_by == "person"
+                else "La boucle d'apprentissage l'a gardée après triage."
+            )
         ),
         "",
-        "C'est une **connaissance**, pas une règle : aucun build ne s'en est encore "
-        "servi. Lis-la comme une piste, vérifie-la avant de l'appliquer.",
+        (
+            "C'est une **connaissance**, pas une règle : aucun build ne s'en est "
+            "encore servi. Lis-la comme une piste, vérifie-la avant de l'appliquer."
+        ),
     ]
     if category:
         lines += ["", f"Catégorie hermes : `{category}`."]

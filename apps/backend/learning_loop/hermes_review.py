@@ -32,7 +32,6 @@ and a proposal from the learning loop's own gates is never ours to decide here.
 
 from __future__ import annotations
 
-import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,8 +43,6 @@ from .hermes_ingest import (
     queue_state,
     recorded_facts,
 )
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "DECISIONS",
