@@ -22,6 +22,7 @@ from fastapi import APIRouter, Query
 from .adr import collect_adrs
 from .api_tests import draft_tests
 from .conformance import check_conformance
+from .diagnostics import summary
 from .erd import check_erd
 from .preflight import run_preflight
 from .sequence import check_sequences
@@ -115,8 +116,12 @@ def docintel(
         adrs = collect_adrs(project) if project is not None else []
         return {
             "success": True,
-            "documents": [d.to_dict() for d in result.documents],
+            "documents": [
+                {**d.to_dict(), "diagnosis_summary": summary(d.diagnosis)}
+                for d in result.documents
+            ],
             "skipped": result.skipped,
+            "description_diagnosis": summary(result.description_diagnosis),
             "adrs": [a.to_dict() for a in adrs],
             "conformance": (
                 check_conformance(project).to_dict() if project is not None else None

@@ -18,7 +18,6 @@ Flow:
 from __future__ import annotations
 
 import logging
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -97,6 +96,9 @@ class ProductionMode:
 
         # Correlate with source files
         affected_files = self._correlate_stack_trace(prod_data.stack_trace)
+        source_data = prod_data.to_dict()
+        if locations := self._stack_locations(prod_data.stack_trace):
+            source_data["stack_locations"] = locations
 
         incident = Incident(
             mode=IncidentMode.PRODUCTION,
@@ -110,7 +112,7 @@ class ProductionMode:
                 f"Affected users: {prod_data.affected_users}."
             ),
             status=HealingStatus.PENDING,
-            source_data=prod_data.to_dict(),
+            source_data=source_data,
             affected_files=affected_files,
             error_message=prod_data.error_message,
             stack_trace=prod_data.stack_trace,
@@ -145,8 +147,10 @@ class ProductionMode:
             "{{LAST_SEEN}}": data.get("last_seen", ""),
             "{{AFFECTED_USERS}}": str(data.get("affected_users", 0)),
             "{{ENVIRONMENT}}": data.get("environment", "production"),
-            "{{SERVICE_NAME}}": data.get("service_name", "unknown"),
+            "{{SERVICE_NAME}}": data.get("service_name") or "unknown",
             "{{AFFECTED_FILES}}": "\n".join(f"- {f}" for f in incident.affected_files),
+            "{{STACK_LOCATIONS}}": data.get("stack_locations")
+            or "No frame of the stack trace was located in this repository.",
         }
 
         for key, value in replacements.items():
@@ -160,6 +164,9 @@ class ProductionMode:
         """Create an Incident from raw production data."""
         severity = self._assess_severity(data)
         affected_files = self._correlate_stack_trace(data.stack_trace)
+        source_data = data.to_dict()
+        if locations := self._stack_locations(data.stack_trace):
+            source_data["stack_locations"] = locations
 
         source = IncidentSource.SENTRY  # Default, overridden by connector
         if data.service_name:
@@ -175,7 +182,7 @@ class ProductionMode:
             title=f"{data.error_type}: {data.error_message[:100]}",
             description=f"Occurrences: {data.occurrence_count}, Users: {data.affected_users}",
             status=HealingStatus.PENDING,
-            source_data=data.to_dict(),
+            source_data=source_data,
             affected_files=affected_files,
             error_message=data.error_message,
             stack_trace=data.stack_trace,
@@ -191,65 +198,47 @@ class ProductionMode:
             return IncidentSeverity.MEDIUM
         return IncidentSeverity.LOW
 
-    def _correlate_stack_trace(self, stack_trace: str) -> list[str]:
-        """Extract file paths from a stack trace and match with project files."""
+    def _trace(self, stack_trace: str):
+        """The trace read by `docintel.stacktrace`: the one reader of stack traces.
+
+        It knows the .NET, Python, Node, JVM, Go, Ruby, PHP and Rust formats,
+        attaches a frame to a file only on evidence (shared path segments, or a
+        single file declaring the class and the method), and folds framework
+        frames. None when the text is not a trace or the reader is unavailable.
+        """
         if not stack_trace:
+            return None
+        # One incident asks twice (files, then locations); the repository is
+        # walked once.
+        cached = getattr(self, "_last_trace", None)
+        if cached is not None and cached[0] == stack_trace:
+            return cached[1]
+        try:
+            from docintel.stacktrace import analyze
+
+            trace = analyze(stack_trace, self.project_dir)
+        except Exception:  # noqa: BLE001 - a trace nobody could read is not a crash
+            logger.debug("stack trace could not be read", exc_info=True)
+            trace = None
+        self._last_trace = (stack_trace, trace)
+        return trace
+
+    def _correlate_stack_trace(self, stack_trace: str) -> list[str]:
+        """The project files the stack trace runs through, innermost first."""
+        trace = self._trace(stack_trace)
+        if trace is None:
             return []
+        files = list(dict.fromkeys(f.path for f in trace.project_frames))
+        return files[:20]
 
-        import re
+    def _stack_locations(self, stack_trace: str) -> str:
+        """`path:line — Type.method` for each project frame, framework folded."""
+        trace = self._trace(stack_trace)
+        if trace is None:
+            return ""
+        from docintel.stacktrace import render_stacktrace
 
-        # Match common stack trace file patterns
-        patterns = [
-            r'File "([^"]+)", line \d+',  # Python
-            r"at\s+(?:\S+\s+\()?(/[^\s:)]+):\d+",  # Node.js
-            r"at\s+(?:\S+\s+\()?([^\s:)]+\.(?:ts|js|tsx|jsx)):\d+",  # JS relative
-            r"(\S+\.(?:go|rs|java|rb)):\d+",  # Go/Rust/Java/Ruby
-        ]
-
-        found_files: list[str] = []
-        for pattern in patterns:
-            for match in re.finditer(pattern, stack_trace):
-                file_path = match.group(1)
-                # Try to resolve relative to project
-                resolved = self._resolve_project_file(file_path)
-                if resolved and resolved not in found_files:
-                    found_files.append(resolved)
-
-        return found_files[:20]  # Limit to 20 files
-
-    def _resolve_project_file(self, file_path: str) -> str | None:
-        """Resolve a file path to a project-relative path."""
-        path = Path(file_path)
-
-        # Already relative and exists in project
-        if (self.project_dir / path).exists():
-            return str(path)
-
-        # Absolute path - make relative
-        try:
-            rel = path.relative_to(self.project_dir)
-            if (self.project_dir / rel).exists():
-                return str(rel)
-        except ValueError:
-            pass
-
-        # Try finding by filename
-        name = path.name
-        try:
-            result = subprocess.run(
-                ["git", "ls-files", f"*/{name}"],
-                cwd=str(self.project_dir),
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            matches = result.stdout.strip().splitlines()
-            if len(matches) == 1:
-                return matches[0]
-        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-            pass
-
-        return None
+        return render_stacktrace(trace)
 
     def get_status(self) -> dict[str, Any]:
         """Get production mode status for the dashboard."""
@@ -275,6 +264,9 @@ You analyze production errors and generate fixes with regression tests.
 
 ## AFFECTED FILES
 {{AFFECTED_FILES}}
+
+## WHERE IT BROKE
+{{STACK_LOCATIONS}}
 
 ## INSTRUCTIONS
 1. Parse the stack trace to identify the root cause

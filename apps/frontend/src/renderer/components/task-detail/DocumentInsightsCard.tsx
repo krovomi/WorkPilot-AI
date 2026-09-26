@@ -1,9 +1,10 @@
-import { EyeOff, FileSearch, KeyRound, ShieldAlert } from "lucide-react";
+import { Bug, EyeOff, FileSearch, KeyRound, ShieldAlert } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Task } from "../../../shared/types";
 import type {
 	DocintelApiTestSummary,
+	DocintelDiagnosis,
 	DocintelDocument,
 	DocintelErdSummary,
 	DocintelSequenceSummary,
@@ -35,13 +36,18 @@ export interface DocumentInsightsCardProps {
  * s'adresse à l'agent est retenue aussi. La carte le dit avec le *type* de
  * secret, jamais sa valeur : le backend ne la lui envoie pas.
  *
+ * Une trace de pile ou un log de CI en échec — dans une pièce jointe ou collé
+ * dans la description — est rattaché aux fichiers du dépôt : la carte dit
+ * combien de cadres appartiennent au projet et par lequel commencer, et quels
+ * codes d'erreur le build a produits.
+ *
  * Elle dit aussi ce que les schémas disent du code : un ERD comparé au mapping
  * de l'ORM (écarts), un diagramme de séquence dont chaque appel est cherché
  * dans le code (vérifiés sur total), et chaque appel HTTP joint (Postman,
  * OpenAPI, capture) devenu un test d'intégration, avec sa destination.
  *
  * Elle ne s'affiche que quand elle a quelque chose à dire : ni pièce jointe, ni
- * ADR, ni schéma à confronter au code, pas de carte.
+ * ADR, ni trace, ni schéma à confronter au code, pas de carte.
  */
 export function DocumentInsightsCard({
 	task,
@@ -72,16 +78,19 @@ export function DocumentInsightsCard({
 	const proposed = data.adrs.filter((adr) => adr.status === "proposed");
 	const flagged = documents.filter((doc) => doc.threat !== "safe");
 	const secrets = documents.filter((doc) => doc.secrets.length > 0);
-
+	const fromDescription = data.descriptionDiagnosis ?? null;
 	const erd = data.erd ?? null;
 	const sequences = data.sequences ?? [];
 	const apiTests = data.apiTests ?? [];
 	const codeChecks = erd !== null || sequences.length > 0 || apiTests.length > 0;
+	const diagnosed =
+		documents.filter((doc) => doc.diagnosis).length + (fromDescription ? 1 : 0);
 
 	if (
 		documents.length === 0 &&
 		binding.length === 0 &&
 		proposed.length === 0 &&
+		!fromDescription &&
 		!codeChecks
 	) {
 		return null;
@@ -116,6 +125,11 @@ export function DocumentInsightsCard({
 								{t("tasks:docintel.badge.secrets", { count: secrets.length })}
 							</Badge>
 						)}
+						{diagnosed > 0 && (
+							<Badge variant="outline" className="text-[10px]">
+								{t("tasks:docintel.badge.diagnosed", { count: diagnosed })}
+							</Badge>
+						)}
 						{codeChecks && (
 							<Badge variant="outline" className="text-[10px]">
 								{t("tasks:docintel.badge.codeChecks", {
@@ -140,6 +154,15 @@ export function DocumentInsightsCard({
 
 			{expanded && (
 				<div className="space-y-3 border-t border-border p-3">
+					{fromDescription && (
+						<section>
+							<h4 className="text-xs font-medium">
+								{t("tasks:docintel.diagnosis.fromDescription")}
+							</h4>
+							<DiagnosisLines diagnosis={fromDescription} />
+						</section>
+					)}
+
 					{documents.length > 0 && (
 						<section>
 							<h4 className="text-xs font-medium">
@@ -272,8 +295,60 @@ function DocumentRow({ doc }: { readonly doc: DocintelDocument }) {
 			<span className="min-w-0">
 				<span className="break-all font-medium text-foreground">{name}</span>
 				<span className="ml-1">— {detail}</span>
+				{doc.diagnosis && <DiagnosisLines diagnosis={doc.diagnosis} />}
 			</span>
 		</li>
+	);
+}
+
+/** Où la trace ou le build a cassé, dans ce dépôt — ce que l'agent ouvrira d'abord. */
+function DiagnosisLines({
+	diagnosis,
+}: {
+	readonly diagnosis: DocintelDiagnosis;
+}) {
+	const { t } = useTranslation(["tasks"]);
+	const lines: string[] = [];
+	const trace = diagnosis.trace;
+	if (trace) {
+		const exception = trace.exception || t("tasks:docintel.diagnosis.trace");
+		lines.push(
+			trace.top
+				? t("tasks:docintel.diagnosis.located", {
+						exception,
+						count: trace.projectFrames,
+						top: trace.top,
+					})
+				: t("tasks:docintel.diagnosis.notLocated", {
+						exception,
+						framework: trace.frameworkFrames,
+					}),
+		);
+	}
+	const ci = diagnosis.ci;
+	if (ci && ci.errors > 0) {
+		lines.push(
+			t("tasks:docintel.diagnosis.buildErrors", {
+				count: ci.errors,
+				codes: ci.codes.join(", "),
+			}),
+		);
+	}
+	if (ci && ci.failingTests > 0) {
+		lines.push(
+			t("tasks:docintel.diagnosis.failingTests", { count: ci.failingTests }),
+		);
+	}
+	if (lines.length === 0) return null;
+	return (
+		<span className="mt-0.5 block">
+			{lines.map((line) => (
+				<span key={line} className="flex items-start gap-1">
+					<Bug className="mt-0.5 h-3 w-3 shrink-0 text-primary" aria-hidden />
+					<span className="break-all">{line}</span>
+				</span>
+			))}
+		</span>
 	);
 }
 

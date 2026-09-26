@@ -534,6 +534,11 @@ def main():
         "--test-output", help="Raw test output (reads stdin if omitted)"
     )
     cicd_parser.add_argument("--ci-log-url", help="URL to CI pipeline logs")
+    cicd_parser.add_argument(
+        "--capture",
+        help="Screenshot or saved log of the failed pipeline, read by local OCR "
+        "(secrets masked, prompt injections refused) instead of --test-output",
+    )
 
     # Production subcommand
     prod_parser = subparsers.add_parser("production", help="Handle production incident")
@@ -661,6 +666,15 @@ def _dispatch(
 
     if cmd == "cicd":
         test_output = args.test_output
+        if args.capture and not test_output:
+            from self_healing.incident_responder.cicd_mode import CICDMode
+
+            test_output, problem = CICDMode(runner.project_dir).read_capture(
+                args.capture
+            )
+            if problem:
+                print(f"❌ Capture not used: {problem}")
+                return False
         if not test_output and not sys.stdin.isatty():
             test_output = sys.stdin.read()
         return asyncio.run(

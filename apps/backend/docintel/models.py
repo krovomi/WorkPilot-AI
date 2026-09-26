@@ -119,6 +119,10 @@ class ExtractedDocument:
     attempts: list[str] = field(default_factory=list)
     #: True when a vision model described the image rather than transcribing it.
     described: bool = False
+    #: What the text says broke, when it is a crash or a failed pipeline:
+    #: ``{"stacktrace": StackTrace.to_dict(), "ci": {"errors", "failing_tests"}}``
+    #: (`docintel/diagnostics.py`). None for everything else.
+    diagnosis: dict | None = None
 
     def to_dict(self) -> dict:
         payload = asdict(self)
@@ -141,6 +145,9 @@ class ExtractedDocument:
             redacted_path=str(payload.get("redacted_path", "")),
             attempts=[str(a) for a in payload.get("attempts") or []],
             described=bool(payload.get("described", False)),
+            diagnosis=payload.get("diagnosis")
+            if isinstance(payload.get("diagnosis"), dict)
+            else None,
         )
 
 
@@ -174,11 +181,15 @@ class DocintelResult:
     documents: list[ExtractedDocument] = field(default_factory=list)
     #: Why the preflight did nothing at all (``disabled``, ``no-attachments``).
     skipped: str = ""
+    #: A stack trace or CI log pasted into the task description itself — the
+    #: most common way a crash reaches a card, and not an attachment.
+    description_diagnosis: dict | None = None
 
     def to_dict(self) -> dict:
         return {
             "documents": [d.to_dict() for d in self.documents],
             "skipped": self.skipped,
+            "description_diagnosis": self.description_diagnosis,
         }
 
     @classmethod
@@ -190,14 +201,25 @@ class DocintelResult:
                 if isinstance(d, dict)
             ],
             skipped=str(payload.get("skipped", "")),
+            description_diagnosis=payload.get("description_diagnosis")
+            if isinstance(payload.get("description_diagnosis"), dict)
+            else None,
         )
 
     def describe(self) -> str:
         """One line for the build log, or "" when there is nothing to say."""
-        if not self.documents:
-            return ""
-        counts: dict[str, int] = {}
-        for doc in self.documents:
-            counts[doc.status] = counts.get(doc.status, 0) + 1
-        parts = ", ".join(f"{n} {status}" for status, n in sorted(counts.items()))
-        return f"Attachments read for this task: {parts}"
+        lines: list[str] = []
+        if self.documents:
+            counts: dict[str, int] = {}
+            for doc in self.documents:
+                counts[doc.status] = counts.get(doc.status, 0) + 1
+            parts = ", ".join(f"{n} {status}" for status, n in sorted(counts.items()))
+            lines.append(f"Attachments read for this task: {parts}")
+        diagnosed = sum(1 for d in self.documents if d.diagnosis) + (
+            1 if self.description_diagnosis else 0
+        )
+        if diagnosed:
+            lines.append(
+                f"Stack traces / build logs located in the repository: {diagnosed}"
+            )
+        return "\n".join(lines)

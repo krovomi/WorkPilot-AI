@@ -24,6 +24,11 @@ Read and understand the production error:
 ### Affected Files
 {{AFFECTED_FILES}}
 
+### Where It Broke
+The frames of the stack trace, resolved against this repository (innermost
+first, framework frames folded). Start reading at the first one.
+{{STACK_LOCATIONS}}
+
 ## PHASE 1: ROOT CAUSE ANALYSIS
 
 1. **Parse the stack trace** — identify the exact code path that triggered the error

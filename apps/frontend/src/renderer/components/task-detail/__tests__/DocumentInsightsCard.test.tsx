@@ -10,7 +10,8 @@
  * say (no attachment, no ADR), and an attachment whose text was withheld as a
  * possible injection is shown as such rather than as an ordinary document.
  * A screenshot showing a secret is shown as masked or withheld, naming the
- * kind of secret — the card never receives the value.
+ * kind of secret — the card never receives the value. A stack trace or a failed
+ * build — attached or pasted in the description — is shown located.
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -39,11 +40,20 @@ const task = { id: "t1", specId: "001-orders" } as unknown as Task;
 function answer(
 	documents: unknown[],
 	adrs: unknown[] = [],
+	descriptionDiagnosis: unknown = null,
 	checks: Record<string, unknown> = {},
 ) {
 	return {
 		ok: true as const,
-		data: { documents, adrs, erd: null, sequences: [], apiTests: [], ...checks },
+		data: {
+			documents,
+			adrs,
+			descriptionDiagnosis,
+			erd: null,
+			sequences: [],
+			apiTests: [],
+			...checks,
+		},
 	};
 }
 
@@ -204,9 +214,60 @@ describe("DocumentInsightsCard", () => {
 		).toBeInTheDocument();
 	});
 
-	it("shows what the diagrams and HTTP calls say of the code, even alone", async () => {
+	it("shows a trace pasted in the description even without attachments", async () => {
 		mockFetch.mockResolvedValueOnce(
 			answer([], [], {
+				trace: {
+					exception: "System.NullReferenceException",
+					language: "dotnet",
+					projectFrames: 2,
+					frameworkFrames: 14,
+					top: "src/Api/OrdersController.cs:42",
+				},
+			}),
+		);
+		render(<DocumentInsightsCard task={task} projectPath="/p" />);
+
+		expect(
+			await screen.findByText("tasks:docintel.badge.diagnosed:1"),
+		).toBeInTheDocument();
+		fireEvent.click(screen.getByText("tasks:docintel.expand"));
+		expect(
+			screen.getByText("tasks:docintel.diagnosis.fromDescription"),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText("tasks:docintel.diagnosis.located:2"),
+		).toBeInTheDocument();
+	});
+
+	it("lists the build errors of a pipeline capture", async () => {
+		mockFetch.mockResolvedValueOnce(
+			answer([
+				{
+					...diagram,
+					path: "attachments/pipeline.png",
+					status: "text",
+					engine: "tesseract",
+					diagnosis: {
+						ci: { errors: 3, codes: ["CS0103", "NU1101"], failingTests: 1 },
+					},
+				},
+			]),
+		);
+		render(<DocumentInsightsCard task={task} projectPath="/p" />);
+
+		fireEvent.click(await screen.findByText("tasks:docintel.expand"));
+		expect(
+			screen.getByText("tasks:docintel.diagnosis.buildErrors:3"),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText("tasks:docintel.diagnosis.failingTests:1"),
+		).toBeInTheDocument();
+	});
+
+	it("shows what the diagrams and HTTP calls say of the code, even alone", async () => {
+		mockFetch.mockResolvedValueOnce(
+			answer([], [], null, {
 				erd: {
 					diagrams: [{ path: "docs/model.dbml", origin: "repository" }],
 					findings: 2,
