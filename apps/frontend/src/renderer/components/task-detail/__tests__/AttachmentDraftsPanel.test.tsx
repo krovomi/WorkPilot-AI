@@ -154,11 +154,21 @@ describe("AttachmentDraftsPanel", () => {
 
 	it("adds nothing without a tick, then sends exactly what was kept", async () => {
 		api.fetchDocintelDrafts.mockResolvedValueOnce(withDrafts());
+		// After the decision: nothing left to decide, the table still there.
+		const decided = withDrafts({
+			pending: 0,
+			drafts: {
+				requirements: [],
+				criteria: [],
+				tables: [table],
+				sources: ["attachments/cdc.pdf"],
+				generated_at: "",
+			},
+		});
 		api.decideDocintelDrafts.mockResolvedValueOnce({
-			...withDrafts({ pending: 0 }),
+			...decided,
 			data: {
-				...withDrafts().data,
-				drafts: { ...withDrafts().data.drafts, requirements: [], criteria: [] },
+				...decided.data,
 				decision: {
 					requirements: [{ id: "FR-002", text: "Edited", key: "req-1" }],
 					criteria: [criterion.text],
