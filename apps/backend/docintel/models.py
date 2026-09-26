@@ -37,6 +37,11 @@ class DiagramEdge:
     source: str
     target: str
     label: str = ""
+    #: The entity-relationship marker drawn at each end — ``one`` or ``many``
+    #: (draw.io `ERmany`, `ERmandOne`…, Excalidraw crow's feet), "" for a plain
+    #: arrow. Not decoration: on an ERD it *is* the cardinality.
+    source_end: str = ""
+    target_end: str = ""
 
 
 @dataclass
@@ -68,7 +73,17 @@ class DiagramModel:
             format=str(payload.get("format", "")),
             name=str(payload.get("name", "")),
             nodes=[DiagramNode(**n) for n in payload.get("nodes") or []],
-            edges=[DiagramEdge(**e) for e in payload.get("edges") or []],
+            edges=[
+                DiagramEdge(
+                    **{
+                        k: v
+                        for k, v in e.items()
+                        if k in DiagramEdge.__dataclass_fields__
+                    }
+                )
+                for e in payload.get("edges") or []
+                if isinstance(e, dict)
+            ],
         )
 
 

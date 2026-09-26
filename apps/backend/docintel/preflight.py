@@ -52,7 +52,17 @@ TEXT_EXTENSIONS = {
     ".mermaid",
     ".puml",
     ".plantuml",
+    ".iuml",
     ".log",
+    # Read by lot C's readers: ERDs (DBML), C4 (Structurizr), HTTP captures
+    # (Postman, OpenAPI, `.http`) — all text, all scanned like the rest.
+    ".dbml",
+    ".dsl",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".http",
+    ".rest",
 }
 DOCUMENT_EXTENSIONS = {
     ".pdf",
@@ -71,7 +81,17 @@ DOCUMENT_EXTENSIONS = {
     ".csv",
 }
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
-DIAGRAM_EXTENSIONS = {".drawio", ".dio", ".excalidraw", ".svg", ".xml"}
+DIAGRAM_EXTENSIONS = {
+    ".drawio",
+    ".dio",
+    ".excalidraw",
+    ".svg",
+    ".xml",
+    # C4 as code: a diagram when it is one, text otherwise.
+    ".dsl",
+    ".puml",
+    ".plantuml",
+}
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -514,3 +534,25 @@ def read_capture(path: Path, project_dir: Path | None) -> ExtractedDocument:
     env = settings.project_env(project_dir)
     policy = tuple(Path(p) for p in (project_dir,) if p is not None)
     return extract_file(path, path.parent, env, policy_paths=policy, preview=False)
+
+
+def full_text(doc: ExtractedDocument, spec_dir: Path) -> str:
+    """The whole text read from an attachment, not the record's excerpt.
+
+    `result.json` keeps `EXCERPT_CHARS`; the rest is in `extracted/`, behind a
+    one-line provenance comment. A path read back from the record is only
+    followed while it stays inside the spec directory; otherwise — or when the
+    file is gone — the excerpt is what there is.
+    """
+    if not doc.extracted_path:
+        return doc.text
+    root = Path(spec_dir).resolve()
+    full = Path(spec_dir) / doc.extracted_path
+    try:
+        full.resolve().relative_to(root)
+        text = full.read_text(encoding="utf-8")
+    except (ValueError, OSError):
+        return doc.text
+    if text.startswith("<!--") and "-->\n" in text:
+        text = text.split("-->\n", 1)[1]
+    return text.strip() or doc.text

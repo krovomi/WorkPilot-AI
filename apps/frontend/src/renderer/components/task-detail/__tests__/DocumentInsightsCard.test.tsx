@@ -41,10 +41,19 @@ function answer(
 	documents: unknown[],
 	adrs: unknown[] = [],
 	descriptionDiagnosis: unknown = null,
+	checks: Record<string, unknown> = {},
 ) {
 	return {
 		ok: true as const,
-		data: { documents, adrs, descriptionDiagnosis },
+		data: {
+			documents,
+			adrs,
+			descriptionDiagnosis,
+			erd: null,
+			sequences: [],
+			apiTests: [],
+			...checks,
+		},
 	};
 }
 
@@ -254,5 +263,48 @@ describe("DocumentInsightsCard", () => {
 		expect(
 			screen.getByText("tasks:docintel.diagnosis.failingTests:1"),
 		).toBeInTheDocument();
+	});
+
+	it("shows what the diagrams and HTTP calls say of the code, even alone", async () => {
+		mockFetch.mockResolvedValueOnce(
+			answer([], [], null, {
+				erd: {
+					diagrams: [{ path: "docs/model.dbml", origin: "repository" }],
+					findings: 2,
+					kinds: ["missing-entity"],
+					ambiguous: 1,
+				},
+				sequences: [
+					{
+						path: "docs/create-order.puml",
+						origin: "repository",
+						verified: 2,
+						checkable: 3,
+					},
+				],
+				apiTests: [
+					{
+						method: "POST",
+						path: "/api/orders",
+						status: 201,
+						origin: "postman",
+						destination: "tests/Acme.Api.Tests/OrdersApiTests.cs",
+						stack: "aspnetcore",
+					},
+				],
+			}),
+		);
+		render(<DocumentInsightsCard task={task} projectPath="/p" />);
+
+		expect(
+			await screen.findByText("tasks:docintel.badge.codeChecks:3"),
+		).toBeInTheDocument();
+		fireEvent.click(screen.getByText("tasks:docintel.expand"));
+		expect(screen.getByText("tasks:docintel.code.title")).toBeInTheDocument();
+		expect(
+			screen.getByText(/tasks:docintel\.code\.erdFindings:2/),
+		).toBeInTheDocument();
+		expect(screen.getByText("tasks:docintel.code.sequence")).toBeInTheDocument();
+		expect(screen.getByText("POST /api/orders")).toBeInTheDocument();
 	});
 });
