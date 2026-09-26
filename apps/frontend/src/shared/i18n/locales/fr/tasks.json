@@ -1205,7 +1205,9 @@
 			"flagged": "{{count}} signalée",
 			"flagged_other": "{{count}} signalées",
 			"secrets": "{{count}} secret masqué",
-			"secrets_other": "{{count}} secrets masqués"
+			"secrets_other": "{{count}} secrets masqués",
+			"diagnosed": "{{count}} échec localisé",
+			"diagnosed_other": "{{count}} échecs localisés"
 		},
 		"attachments": {
 			"title": "Pièces jointes"
@@ -1262,6 +1264,17 @@
 			"secret-no-pillow": "Pillow n'est pas installé pour le masquer",
 			"redaction-failed": "la copie masquée n'a pas pu être écrite",
 			"secret-scan-unavailable": "les secrets n'ont pas pu être vérifiés"
+		},
+		"diagnosis": {
+			"fromDescription": "Depuis la description de la tâche",
+			"trace": "Trace de pile",
+			"located": "{{exception}} : {{count}} cadre dans ce dépôt, à partir de {{top}}",
+			"located_other": "{{exception}} : {{count}} cadres dans ce dépôt, à partir de {{top}}",
+			"notLocated": "{{exception}} : aucun cadre trouvé dans ce dépôt ({{framework}} cadres du framework)",
+			"buildErrors": "{{count}} erreur de build ({{codes}})",
+			"buildErrors_other": "{{count}} erreurs de build ({{codes}})",
+			"failingTests": "{{count}} test en échec",
+			"failingTests_other": "{{count}} tests en échec"
 		}
 	},
 	"changeGraph": {

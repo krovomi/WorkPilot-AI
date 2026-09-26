@@ -1205,7 +1205,9 @@
 			"flagged": "{{count}} flagged",
 			"flagged_other": "{{count}} flagged",
 			"secrets": "{{count}} secret masked",
-			"secrets_other": "{{count}} secrets masked"
+			"secrets_other": "{{count}} secrets masked",
+			"diagnosed": "{{count}} failure located",
+			"diagnosed_other": "{{count}} failures located"
 		},
 		"attachments": {
 			"title": "Attachments"
@@ -1262,6 +1264,17 @@
 			"secret-no-pillow": "Pillow is not installed to mask it",
 			"redaction-failed": "the masked copy could not be written",
 			"secret-scan-unavailable": "secrets could not be checked"
+		},
+		"diagnosis": {
+			"fromDescription": "From the task description",
+			"trace": "Stack trace",
+			"located": "{{exception}}: {{count}} frame in this repository, starting at {{top}}",
+			"located_other": "{{exception}}: {{count}} frames in this repository, starting at {{top}}",
+			"notLocated": "{{exception}}: no frame found in this repository ({{framework}} framework frames)",
+			"buildErrors": "{{count}} build error ({{codes}})",
+			"buildErrors_other": "{{count}} build errors ({{codes}})",
+			"failingTests": "{{count}} failing test",
+			"failingTests_other": "{{count}} failing tests"
 		}
 	},
 	"changeGraph": {

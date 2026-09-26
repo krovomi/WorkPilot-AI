@@ -1274,8 +1274,10 @@ apps/backend/docintel/
   redact.py     secrets in what was read: masked in text, painted out of images
   read_guard.py `Read` refused on an original the preflight withheld or redacted
   adr.py        where a project keeps its ADRs, and which ones bind
+  stacktrace.py a stack trace (.NET, Python, Node, JVM, Go, Ruby, PHP, Rust) -> this repo's file:line
+  diagnostics.py stack traces + CI logs of an attachment or the description, located
   preflight.py  attachments -> <spec_dir>/docintel/result.json + extracted/*.md
-  prompt.py     the two prompt sections
+  prompt.py     the prompt sections
   api.py        GET /api/docintel/ — recomputed, nothing written
   mcp_server.py the same answers, for any agent working in the project (read-only)
 ```
@@ -1402,8 +1404,8 @@ import-based one answers a fuzzier question.
 **For every other agent: `workpilot-docintel`.** The rules the planner and QA
 receive are just as useful to Claude Code, Codex or Copilot editing the same
 checkout, so `mcp_server.py` serves them over MCP: `docintel_rules`,
-`docintel_adrs`, `docintel_conformance`, `docintel_parse_diagram` and
-`docintel_attachments`. Same shape as the brain's server — stdio, JSON-RPC,
+`docintel_adrs`, `docintel_conformance`, `docintel_parse_diagram`,
+`docintel_attachments` and `docintel_stacktrace`. Same shape as the brain's server — stdio, JSON-RPC,
 no SDK — and two stricter rules. It answers for **one project**
 (`--project-dir`, `WORKPILOT_DOCINTEL_ROOT`, or the working directory), and every
 path argument must resolve inside it, links included: a tool that reads any path
@@ -1416,12 +1418,78 @@ agent's Python even without it, and only the diagram tools say what is missing.
 claude mcp add workpilot-docintel -- python apps/backend/runners/docintel_mcp.py --project-dir .
 ```
 
+**A crash is read down to the file.** A person attaching a crash to a task
+attaches the one thing that says where the code broke, and an agent handed it
+as text re-derived it: grepped for the method, opened the wrong `Program.cs`,
+read fifty framework frames before the one the project owns.
+`stacktrace.py` parses the frames of every backend WorkPilot builds — .NET
+(including `à … dans …:ligne 42` and the other localised runtimes), Python,
+Node, the JVM, Go, Ruby, PHP, Rust — and attaches each one to *this*
+repository's file. The compiler's artefacts are undone first:
+`<Create>d__2.MoveNext` is `OrdersController.Create`, `<>c.<Total>b__4_0` is
+`Total`, `lambda$create$0` is `create`, a `.js` under `dist/` is the one `.ts`
+that shares its path. The prompt section **Where it broke** lists the project's
+frames innermost first, whatever order the runtime printed them in, and counts
+the framework (`System.*`, `Microsoft.*`, `node_modules`, `site-packages`,
+`java.*`, the Go runtime) instead of listing it.
+
+**Evidence, never a guess.** A frame is attached by the longest run of path
+segments the trace and the repository share — which is what tells the two
+`OrdersController.cs` of a solution apart, and a Windows build agent's
+`C:\agent\_work\1\s\src\…` from a Linux runner's. A bare file name counts
+only when it is unique, not a name every project has (`Program.cs`, `index.js`,
+`__init__.py`), and the file holds the method. With no path at all — a .NET
+release build without PDBs, a Java `Unknown Source` — the type and method are
+looked up in the language's sources, and one file declaring the one and holding
+the other is required. Two candidates of equal weight are reported
+*ambiguous*; a line past the end of the file is dropped and said to come from
+another version. An agent sent to the wrong file spends a session there; one
+told to look spends a grep. Build output (`bin/`, `obj/`, `dist/`, `target/`)
+and dependencies are never indexed, so a frame never lands on a copy.
+
+**The description is read too.** The commonest way a crash reaches a card is
+pasted into it, often from a Jira or GitHub import — somebody else's text. So
+`task_description` goes through the same cleaning, secret masking and
+`injection_guard` as an attachment before a trace is read out of it, and a task
+with a pasted trace and no attachment gets a record, where one with neither
+still writes nothing.
+
+**A red pipeline is read by the incident model's parsers.** A screenshot or log
+of a failed CI run is read for its codes — `CS0103`, `NU1101`, `MSB1009`,
+`NETSDK1045`, `TS2345`, `npm ERR! code`, `ERR_PNPM_*`, `error[E0425]`, javac,
+kotlinc, go, mypy, pytest collection errors — and its failing tests (pytest,
+jest/vitest, go, cargo, `dotnet test`, Gradle, Surefire). The table lives in
+`self_healing/incident_responder/cicd_mode.py` and nowhere else: the incident
+created from a failed pipeline records the same `build_errors`, titles a
+pipeline that does not compile "Build broken" rather than "0 test(s) failing",
+and hands the analyzer a **Build Errors** section. Two tables would disagree
+the first time a toolchain changes its output. Errors only — a list padded with
+the two hundred warnings every solution prints is a list nobody reads — and a
+runner's absolute path is resolved to the repository's file the same way a
+frame is. `self_healing_runner.py cicd --capture <image|log>` reads a capture
+through `docintel` (local OCR, airgap policy, secrets masked, an injection
+refused) and uses it as the test output.
+
+**Production incidents use the same reader.** `production_mode` used to match
+four regexes and look a bare file name up with `git ls-files`, so a .NET trace
+correlated nothing and a common name correlated the wrong file.
+`_correlate_stack_trace` is now `stacktrace.analyze`, and the responder's
+prompt carries **Where It Broke** beside the raw trace.
+
+What reaches a prompt from this is built from the repository's own paths and
+from symbols matched by character classes that admit no sentence; a message a
+tool printed (a CI error's text) is quoted inside the attachment fence, as data.
+Text flagged by `injection_guard` is never diagnosed at all.
+
 **In the Kanban.** `DocumentInsightsCard` says, before the build, what each
 attachment will become (diagram, OCR text and the engine that read it, image,
 document, masked, withheld) and which ADRs bind — the moment someone can still
 attach the `.drawio` instead of its screenshot, or a screenshot without the
-key on it. A secret is shown by its kind; the card never receives the value. It
-renders nothing when there is neither attachment nor ADR.
+key on it. A secret is shown by its kind; the card never receives the value. A
+stack trace or a failed build — attached or pasted in the description — is
+shown located: how many frames the project owns and which one to open first,
+or which codes the build failed on. It renders nothing when there is neither
+attachment, nor ADR, nor trace.
 
 | Variable | Default | What it does |
 |---|---|---|

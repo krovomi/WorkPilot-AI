@@ -585,6 +585,26 @@ export interface DocintelDocument {
 	described: boolean;
 	nodeCount: number;
 	edgeCount: number;
+	/** A crash or a failed build found in the text, located in the repository. */
+	diagnosis: DocintelDiagnosis | null;
+}
+
+/** See `summary` in docintel/diagnostics.py. */
+export interface DocintelDiagnosis {
+	trace?: {
+		exception: string;
+		language: string;
+		projectFrames: number;
+		frameworkFrames: number;
+		/** `path:line` of the innermost frame the project owns. */
+		top: string | null;
+	};
+	ci?: {
+		errors: number;
+		/** First codes, e.g. `CS0103`, `NU1101`, `TS2345`. */
+		codes: string[];
+		failingTests: number;
+	};
 }
 
 export interface DocintelAdr {
@@ -599,6 +619,8 @@ export interface DocintelAdr {
 export interface DocintelPayload {
 	documents: DocintelDocument[];
 	adrs: DocintelAdr[];
+	/** A stack trace or build log pasted into the task description. */
+	descriptionDiagnosis: DocintelDiagnosis | null;
 }
 
 interface RawDocintelDocument {
@@ -610,6 +632,7 @@ interface RawDocintelDocument {
 	secrets?: string[];
 	described?: boolean;
 	diagram: { nodes?: unknown[]; edges?: unknown[] } | null;
+	diagnosis_summary?: DocintelDiagnosis | null;
 }
 
 export async function fetchDocintel(
@@ -624,6 +647,7 @@ export async function fetchDocintel(
 	const res = await _get<{
 		documents: RawDocintelDocument[];
 		adrs: DocintelAdr[];
+		description_diagnosis?: DocintelDiagnosis | null;
 	}>("/api/docintel/", params, signal);
 	if (!res.ok) return res;
 
@@ -640,8 +664,10 @@ export async function fetchDocintel(
 				described: doc.described ?? false,
 				nodeCount: doc.diagram?.nodes?.length ?? 0,
 				edgeCount: doc.diagram?.edges?.length ?? 0,
+				diagnosis: doc.diagnosis_summary ?? null,
 			})),
 			adrs: res.data.adrs ?? [],
+			descriptionDiagnosis: res.data.description_diagnosis ?? null,
 		},
 	};
 }

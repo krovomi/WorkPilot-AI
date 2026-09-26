@@ -159,6 +159,9 @@ class CICDIncidentData:
     ci_log_url: str | None = None
     pipeline_id: str | None = None
     test_output: str = ""
+    #: Compiler, restore and packaging errors (`cicd_mode.BuildError.to_dict`):
+    #: a pipeline that fails to compile has no failing test to name.
+    build_errors: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -169,6 +172,7 @@ class CICDIncidentData:
             "ci_log_url": self.ci_log_url,
             "pipeline_id": self.pipeline_id,
             "test_output": self.test_output,
+            "build_errors": self.build_errors,
         }
 
 

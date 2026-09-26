@@ -43,6 +43,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   docintel/            pièces jointes (draw.io, Excalidraw, captures OCR) et ADR, avant le build
   docintel/engines/    moteurs OCR interchangeables (Tesseract, PaddleOCR, docTR, vision Ollama, Azure)
   docintel/redact.py   secrets des captures : masqués dans le texte, repeints dans l'image, ou retenus
+  docintel/stacktrace.py une trace de pile (.NET, Python, Node, JVM, Go…) vers fichier:ligne du dépôt
   rtk/                 proxy rtk : la sortie des commandes condensée avant qu'un modèle la lise
   watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt
