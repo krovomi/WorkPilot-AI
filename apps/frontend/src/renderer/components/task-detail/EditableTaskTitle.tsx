@@ -53,6 +53,10 @@ export function EditableTaskTitle({
 	// Entrée enregistre puis le champ perd le focus : sans ce drapeau, le blur
 	// qui suit relancerait un second enregistrement du même texte.
 	const settled = useRef(false);
+	// La tâche affichée *maintenant* : un enregistrement lancé sur une autre
+	// tâche ne touche plus au champ quand il se termine.
+	const shownTask = useRef(task.id);
+	shownTask.current = task.id;
 
 	useEffect(() => {
 		if (!editing) setDraft(displayTitle);
@@ -99,10 +103,11 @@ export function EditableTaskTitle({
 			cancel();
 			return;
 		}
+		const savedTask = task.id;
 		setSaving(true);
 		let ok = false;
 		try {
-			ok = await persistUpdateTask(task.id, { title: next });
+			ok = await persistUpdateTask(savedTask, { title: next });
 		} catch {
 			ok = false;
 		} finally {
@@ -110,16 +115,18 @@ export function EditableTaskTitle({
 			// laisser un titre gelé en lecture seule.
 			setSaving(false);
 		}
+		const stillShown = shownTask.current === savedTask;
 		if (ok) {
-			setEditing(false);
+			if (stillShown) setEditing(false);
 			return;
 		}
-		settled.current = false;
 		toast({
 			title: t("tasks:inlineEdit.saveErrorTitle"),
 			description: t("tasks:inlineEdit.titleSaveError"),
 			variant: "destructive",
 		});
+		if (!stillShown) return;
+		settled.current = false;
 		input.current?.focus();
 	};
 

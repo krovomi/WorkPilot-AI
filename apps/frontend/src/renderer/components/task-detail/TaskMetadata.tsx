@@ -212,13 +212,20 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 		setIsEditingDescription(true);
 	};
 
+	// La tâche affichée maintenant : un enregistrement terminé après un
+	// changement de tâche ne referme pas l'éditeur ouvert sur la suivante.
+	const shownTask = useRef(task.id);
+	shownTask.current = task.id;
+
 	const saveDescription = async (next: string): Promise<boolean> => {
+		const savedTask = task.id;
 		let ok = false;
 		try {
-			ok = await persistUpdateTask(task.id, { description: next });
+			ok = await persistUpdateTask(savedTask, { description: next });
 		} catch {
 			ok = false;
 		}
+		if (ok && shownTask.current !== savedTask) return ok;
 		if (ok) {
 			setIsEditingDescription(false);
 			// La description a changé de taille : on réévalue le repli.

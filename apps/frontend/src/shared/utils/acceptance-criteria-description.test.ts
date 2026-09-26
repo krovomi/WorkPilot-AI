@@ -74,3 +74,15 @@ describe("extractAcceptanceCriteriaFromDescription", () => {
 		expect(extract(html)).toEqual(["first", "second"]);
 	});
 });
+
+describe("extractAcceptanceCriteriaFromDescription — mixed content", () => {
+	it("reads an HTML section that follows a plain-text prefix", () => {
+		const mixed =
+			"Contexte en texte brut.\n<h2>Acceptance Criteria</h2><ul><li>one</li><li>two</li></ul>";
+		expect(extract(mixed)).toEqual(["one", "two"]);
+	});
+
+	it("does not treat a comparison in prose as markup", () => {
+		expect(extract("## Acceptance criteria\n- a < b holds\n- c")).toEqual(["a < b holds", "c"]);
+	});
+});

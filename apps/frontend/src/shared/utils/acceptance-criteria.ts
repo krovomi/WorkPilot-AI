@@ -245,8 +245,12 @@ function stripListMarker(line: string): string {
 }
 
 /** HTML or Markdown → lines, headings kept as Markdown `#` lines. */
+// Block-level markup, wherever it sits: a description can open with a plain
+// sentence and carry the tracker's HTML after it. `a < b` in prose matches none.
+const BLOCK_HTML = /<(?:h[1-6]|p|div|ul|ol|li|br|table|tr)\b[^>]*>/i;
+
 function descriptionToLines(description: string): string[] {
-	if (!description.trimStart().startsWith("<")) {
+	if (!BLOCK_HTML.test(description)) {
 		return description.split(/\r?\n/);
 	}
 	const text = decodeHtmlEntities(

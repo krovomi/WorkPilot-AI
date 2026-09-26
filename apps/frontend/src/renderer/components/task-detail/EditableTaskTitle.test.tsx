@@ -86,3 +86,25 @@ it("closes an open field without saving when the dialog moves to another task", 
 	expect(screen.queryByRole("textbox")).toBeNull();
 	expect(persist).not.toHaveBeenCalled();
 });
+
+it("does not reopen or refocus a field when a failed save finishes after a task switch", async () => {
+	const pending: { settle?: (ok: boolean) => void } = {};
+	persist.mockReturnValueOnce(
+		new Promise<boolean>((resolve) => {
+			pending.settle = resolve;
+		}),
+	);
+	const { rerender } = render(
+		<EditableTaskTitle task={task} displayTitle={task.title} editable as={Title} />,
+	);
+	fireEvent.click(screen.getByRole("button", { name: /Exporter en CSV/ }));
+	const field = screen.getByRole("textbox", { name: "Task title" });
+	fireEvent.change(field, { target: { value: "Nouveau" } });
+	fireEvent.keyDown(field, { key: "Enter" });
+	const other = { id: "t2", title: "Autre tâche" } as unknown as Task;
+	rerender(<EditableTaskTitle task={other} displayTitle={other.title} editable as={Title} />);
+	pending.settle?.(false);
+	await waitFor(() => expect(persist).toHaveBeenCalledWith("t1", { title: "Nouveau" }));
+	expect(screen.queryByRole("textbox")).toBeNull();
+	expect(screen.getByRole("heading")).toHaveTextContent("Autre tâche");
+});
