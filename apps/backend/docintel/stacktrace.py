@@ -129,7 +129,6 @@ _FRAMEWORK_PATHS = re.compile(
 # Every symbol group is a character class without spaces: a "frame" that is a
 # sentence is not a frame, and nothing a trace carries reaches a prompt as prose.
 
-_SYMBOL = r"[\w.$`<>|+\[\],#:/*()~-]+?"
 
 _JAVA = re.compile(
     r"^\s*at\s+(?:[\w.$-]+/)?(?P<symbol>[\w.$<>]+)\("

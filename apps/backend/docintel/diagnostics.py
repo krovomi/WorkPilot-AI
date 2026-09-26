@@ -70,10 +70,10 @@ def diagnose(
     """``{"stacktrace": …, "ci": …}`` for whatever `text` holds, or None. Never raises."""
     if not text:
         return None
-    if index is None and project_dir is not None:
-        index = RepoIndex(Path(project_dir))
     found: dict = {}
     try:
+        if index is None and project_dir is not None:
+            index = RepoIndex(Path(project_dir))
         if trace := analyze(text, project_dir, index):
             found["stacktrace"] = trace.to_dict()
     except Exception:  # noqa: BLE001
@@ -154,23 +154,3 @@ def summary(diagnosis: dict | None) -> dict | None:
             "failingTests": len(ci.get("failing_tests") or []),
         }
     return out or None
-
-
-def read_capture(path: Path, project_dir: Path | None):
-    """A screenshot or log of a failed pipeline, read the way an attachment is.
-
-    Same chain, same checks: OCR from `DOCINTEL_OCR_ENGINE` under the project's
-    airgap policy, secrets masked, text scanned by `injection_guard`. Returns
-    the `ExtractedDocument`; its `text` is what may be used, and a ``withheld``
-    status for an injection means nothing of it may be.
-    """
-    from . import settings
-    from .models import ExtractedDocument
-    from .preflight import extract_file
-
-    path = Path(path)
-    if path.is_symlink() or not path.is_file():
-        return ExtractedDocument(path=path.name, status="skipped", reason="unreadable")
-    env = settings.project_env(project_dir)
-    policy = tuple(Path(p) for p in (project_dir,) if p is not None)
-    return extract_file(path, path.parent, env, policy_paths=policy, preview=False)

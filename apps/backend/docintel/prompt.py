@@ -63,6 +63,13 @@ def _fence(text: str, limit: int) -> str:
     return f"<attachment-content>\n{body}\n</attachment-content>"
 
 
+def _code_path(path: str) -> str:
+    """A path for a Markdown code span: a file name is somebody else's text, and
+    one carrying a backtick or a line break would end the span or the heading
+    and have the rest read as prompt."""
+    return re.sub(r"[`\r\n\x00-\x1f]", "_", path)
+
+
 def _within(spec_dir: Path, relative: str) -> bool:
     """`result.json` is a file on disk, not a promise: a path read back from it
     is only cited when it still names something inside the spec directory."""
@@ -78,9 +85,9 @@ def _within(spec_dir: Path, relative: str) -> bool:
 def _document_block(doc: ExtractedDocument, spec_dir: Path) -> str:
     if not _within(spec_dir, doc.path):
         return ""
-    location = (spec_dir / doc.path).as_posix()
+    location = _code_path((spec_dir / doc.path).as_posix())
     full = (
-        f" Full text: `{(spec_dir / doc.extracted_path).as_posix()}`."
+        f" Full text: `{_code_path((spec_dir / doc.extracted_path).as_posix())}`."
         if _within(spec_dir, doc.extracted_path)
         else ""
     )
@@ -114,7 +121,7 @@ def _document_block(doc: ExtractedDocument, spec_dir: Path) -> str:
     if doc.status == "redacted":
         if not _within(spec_dir, doc.redacted_path):
             return ""
-        copy = (spec_dir / doc.redacted_path).as_posix()
+        copy = _code_path((spec_dir / doc.redacted_path).as_posix())
         return (
             f"{title} — image, secrets masked\n"
             f"Open the masked copy `{copy}`, never the original.{secrets}\n"
@@ -217,7 +224,7 @@ def diagnostics_section(spec_dir: Path) -> str:
             continue
         if not _within(Path(spec_dir), doc.path):
             continue
-        location = (Path(spec_dir) / doc.path).as_posix()
+        location = _code_path((Path(spec_dir) / doc.path).as_posix())
         if block := _diagnosis_block(f"### From `{location}`", doc.diagnosis):
             blocks.append(block)
     if not blocks:

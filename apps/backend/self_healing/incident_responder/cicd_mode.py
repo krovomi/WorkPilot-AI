@@ -426,7 +426,7 @@ class CICDMode:
         when the text may be used.
         """
         try:
-            from docintel.diagnostics import read_capture
+            from docintel.preflight import read_capture
         except Exception as exc:  # noqa: BLE001
             return "", f"capture reader unavailable: {exc}"
         doc = read_capture(Path(path), self.project_dir)
@@ -581,7 +581,9 @@ You analyze test regressions and generate fixes.
 {{FAILING_TESTS}}
 
 ## BUILD ERRORS
+```
 {{BUILD_ERRORS}}
+```
 
 ## TEST OUTPUT
 {{TEST_FAILURES}}
