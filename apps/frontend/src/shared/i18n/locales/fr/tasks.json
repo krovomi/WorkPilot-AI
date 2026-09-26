@@ -586,6 +586,27 @@
 			"missingHint": "Cette tâche n'existe plus ; le prérequis est ignoré.",
 			"saveErrorTitle": "Enregistrement impossible",
 			"saveErrorDesc": "Les prérequis n'ont pas pu être enregistrés."
+		},
+		"description": "Description",
+		"descriptionEdit": "Modifier",
+		"descriptionClickHint": "Cliquez pour modifier la description",
+		"descriptionAdd": "Ajouter une description",
+		"descriptionEmpty": "Aucune description.",
+		"descriptionPlaceholder": "Décrivez ce qui est attendu — Markdown accepté.",
+		"acFromDescription": "lus dans la description",
+		"acFromDescriptionHint": "Ces critères viennent de la section « Critères d'acceptation » de la description. Enregistrez-les pour les figer dans task_metadata.json.",
+		"acAdopt": "Enregistrer comme critères",
+		"source": {
+			"ideation": "Idéation",
+			"manual": "Manuelle",
+			"imported": "Importée",
+			"insights": "Insights",
+			"roadmap": "Roadmap",
+			"linear": "Linear",
+			"github": "GitHub",
+			"gitlab": "GitLab",
+			"visual-canvas": "Canvas visuel",
+			"tech-debt": "Dette technique"
 		}
 	},
 	"images": {
@@ -1594,5 +1615,17 @@
 				"hint": "Ce que le système retient — et ce qui attend votre décision."
 			}
 		}
+	},
+	"inlineEdit": {
+		"save": "Enregistrer",
+		"saving": "Enregistrement…",
+		"cancel": "Annuler",
+		"saveErrorTitle": "Échec de l'enregistrement",
+		"titleSaveError": "Le titre n'a pas pu être enregistré.",
+		"descriptionSaveError": "La description n'a pas pu être enregistrée.",
+		"titleLabel": "Titre de la tâche",
+		"titleHint": "Cliquez pour modifier le titre",
+		"descriptionHelp": "Ctrl+Entrée pour enregistrer · Échap pour annuler",
+		"descriptionRequired": "La description ne peut pas être vide."
 	}
 }
