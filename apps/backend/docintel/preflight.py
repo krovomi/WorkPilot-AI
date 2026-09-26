@@ -27,9 +27,11 @@ import re
 from pathlib import Path
 
 from . import redact, settings
+from .diagnostics import diagnose
 from .diagrams import parse_diagram, render_diagram
 from .models import DocintelResult, ExtractedDocument
 from .ocr import OcrOutcome, ocr_image
+from .stacktrace import RepoIndex
 
 logger = logging.getLogger(__name__)
 
@@ -156,15 +158,62 @@ def extract_file(
     env: dict[str, str],
     *,
     policy_paths: tuple[Path, ...] = (),
+    preview: bool = True,
 ) -> ExtractedDocument:
     """What can be read out of one file without a model. Never raises.
 
     The text comes back already cleaned, with its secrets masked and its
     threat level set — the same protection `run_preflight` applies, minus the
     redacted copy of an image, which only a persisting read writes.
+
+    ``preview=False`` lets the vision and cloud engines of the chain answer
+    too (still subject to the airgap policy of ``policy_paths``): a caller
+    that is doing the work now, not a panel guessing what a build will do.
     """
-    doc, outcome = _extract(path, spec_dir, env, policy_paths, preview=True)
+    doc, outcome = _extract(path, spec_dir, env, policy_paths, preview=preview)
     return _protect(doc, outcome, path, spec_dir, persist=False)
+
+
+def _diagnose_document(
+    doc: ExtractedDocument, project_dir: Path | None, index: RepoIndex | None
+) -> None:
+    """A crash or a red pipeline in the text, located in the repository.
+
+    Only text that passed every check: a diagram's labels are not a log, and
+    text flagged as an injection is not read further by anything.
+    """
+    if not doc.text or doc.threat != "safe" or doc.status == "diagram":
+        return
+    doc.diagnosis = diagnose(doc.text, project_dir, index)
+
+
+def _description_diagnosis(
+    spec_dir: Path, project_dir: Path | None, index: RepoIndex | None
+) -> dict | None:
+    """A trace pasted into the task itself — through the same checks as an attachment.
+
+    The description is often not the person's own text: an imported Jira
+    ticket, a GitHub issue. So its secrets are masked and it is scanned before
+    anything is read out of it.
+    """
+    try:
+        requirements = json.loads(
+            (spec_dir / "requirements.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return None
+    text = (
+        requirements.get("task_description") if isinstance(requirements, dict) else None
+    )
+    if not isinstance(text, str) or not text.strip():
+        return None
+    try:
+        text, _kinds = redact.redact_text(_clean(text))
+    except redact.ScannerUnavailable:
+        return None
+    if _threat(text, source="task-description") != "safe":
+        return None
+    return diagnose(text, project_dir, index)
 
 
 def _extract(
@@ -379,19 +428,25 @@ def run_preflight(
         result = DocintelResult(skipped="disabled")
         return _discard(spec_dir, result) if persist else result
 
+    # One index of the repository for every trace in this task, built only if
+    # one of them needs it.
+    index = RepoIndex(Path(project_dir)) if project_dir is not None else None
+    described = _description_diagnosis(spec_dir, project_dir, index)
+
     paths = attachment_paths(spec_dir)
-    if not paths:
+    if not paths and not described:
         result = DocintelResult(skipped="no-attachments")
         return _discard(spec_dir, result) if persist else result
 
     policy_paths = tuple(Path(p) for p in (spec_dir, project_dir) if p is not None)
-    result = DocintelResult()
+    result = DocintelResult(description_diagnosis=described)
     for path in paths:
         try:
             doc, outcome = _extract(
                 path, spec_dir, env, policy_paths, preview=not persist
             )
             doc = _protect(doc, outcome, path, spec_dir, persist=persist)
+            _diagnose_document(doc, project_dir, index)
         except Exception:  # noqa: BLE001 - one attachment, not the build
             logger.debug("docintel: extraction failed for %s", path, exc_info=True)
             doc = ExtractedDocument(path=path.name, status="skipped", reason="failed")
@@ -443,3 +498,19 @@ def load_result(spec_dir: Path) -> DocintelResult | None:
     except (OSError, ValueError):
         return None
     return DocintelResult.from_dict(payload) if isinstance(payload, dict) else None
+
+
+def read_capture(path: Path, project_dir: Path | None) -> ExtractedDocument:
+    """A screenshot or log of a failed pipeline, read the way an attachment is.
+
+    Same chain, same checks: OCR from `DOCINTEL_OCR_ENGINE` under the project's
+    airgap policy, secrets masked, text scanned by `injection_guard`. Returns
+    the `ExtractedDocument`; its `text` is what may be used, and a ``withheld``
+    status for an injection means nothing of it may be.
+    """
+    path = Path(path)
+    if path.is_symlink() or not path.is_file():
+        return ExtractedDocument(path=path.name, status="skipped", reason="unreadable")
+    env = settings.project_env(project_dir)
+    policy = tuple(Path(p) for p in (project_dir,) if p is not None)
+    return extract_file(path, path.parent, env, policy_paths=policy, preview=False)
