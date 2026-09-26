@@ -115,37 +115,49 @@ class OllamaVisionEngine:
         return _installed(root, model)
 
     def recognize(self, image: Path, langs: str, env: dict[str, str]) -> OcrOutcome:
-        reason = self.available(env)
-        if reason:
-            return OcrOutcome(reason=reason, engine=self.name)
-        try:
-            encoded = base64.b64encode(image.read_bytes()).decode("ascii")
-        except OSError:
-            return OcrOutcome(reason="failed", engine=self.name)
-        body = json.dumps(
-            {
-                "model": settings.vision_model(env),
-                "prompt": PROMPT,
-                "images": [encoded],
-                "stream": False,
-                "options": {"temperature": 0},
-            }
-        ).encode("utf-8")
-        request = urllib.request.Request(
-            f"{ollama_root()}/api/generate",
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with _opener().open(request, timeout=_TIMEOUT_SECONDS) as response:
-                payload = json.loads(response.read().decode("utf-8", errors="replace"))
-        except TimeoutError:
-            return OcrOutcome(reason="timeout", engine=self.name)
-        except (OSError, ValueError, urllib.error.URLError):
-            logger.debug("docintel: ollama vision failed on %s", image, exc_info=True)
-            return OcrOutcome(reason="failed", engine=self.name)
-        text = str(payload.get("response") or "").strip()
+        text, reason = ask(image, PROMPT, env)
         if not text:
-            return OcrOutcome(reason="empty", engine=self.name)
+            return OcrOutcome(reason=reason, engine=self.name)
         return OcrOutcome(text=text, engine=self.name, described=True)
+
+
+def ask(image: Path, prompt: str, env: dict[str, str]) -> tuple[str, str]:
+    """(answer, "") from the local vision model, or ("", reason). Never raises.
+
+    The one request to the model, shared by the OCR chain and by anything else
+    that needs a local reading of an image (`docintel/whiteboard.py`): the
+    loopback rule, the proxy bypass and the refused redirects are decided here
+    once, not re-derived by each caller.
+    """
+    reason = OllamaVisionEngine().available(env)
+    if reason:
+        return "", reason
+    try:
+        encoded = base64.b64encode(image.read_bytes()).decode("ascii")
+    except OSError:
+        return "", "failed"
+    body = json.dumps(
+        {
+            "model": settings.vision_model(env),
+            "prompt": prompt,
+            "images": [encoded],
+            "stream": False,
+            "options": {"temperature": 0},
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        f"{ollama_root()}/api/generate",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with _opener().open(request, timeout=_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    except TimeoutError:
+        return "", "timeout"
+    except (OSError, ValueError, urllib.error.URLError):
+        logger.debug("docintel: ollama vision failed on %s", image, exc_info=True)
+        return "", "failed"
+    text = str(payload.get("response") or "").strip()
+    return (text, "") if text else ("", "empty")

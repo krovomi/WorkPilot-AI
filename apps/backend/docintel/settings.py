@@ -19,6 +19,7 @@ OCR_ENGINE_ENV = "DOCINTEL_OCR_ENGINE"
 VISION_MODEL_ENV = "DOCINTEL_VISION_MODEL"
 AZURE_ENDPOINT_ENV = "DOCINTEL_AZURE_ENDPOINT"
 AZURE_KEY_ENV = "DOCINTEL_AZURE_KEY"
+PDF_MAX_PAGES_ENV = "DOCINTEL_PDF_MAX_PAGES"
 
 _KEYS = (
     ENABLED_ENV,
@@ -30,6 +31,7 @@ _KEYS = (
     VISION_MODEL_ENV,
     AZURE_ENDPOINT_ENV,
     AZURE_KEY_ENV,
+    PDF_MAX_PAGES_ENV,
 )
 
 DEFAULT_MAX_BYTES = 10 * 1024 * 1024
@@ -42,6 +44,10 @@ DEFAULT_OCR_ENGINES = ("tesseract",)
 #: Used only when `ollama-vision` is in the chain. Pulling it is the person's
 #: call (`ollama pull qwen2.5vl`); an absent model is a recorded reason.
 DEFAULT_VISION_MODEL = "qwen2.5vl"
+#: Pages of a scanned PDF rendered and OCR'd per build. A specification is a
+#: few dozen pages; an annex of three hundred scanned invoices is not what the
+#: task is about, and OCR costs a second or two a page.
+DEFAULT_PDF_MAX_PAGES = 20
 
 
 def project_env(project_dir: Path | None) -> dict[str, str]:
@@ -112,3 +118,12 @@ def max_bytes(env: dict[str, str]) -> int:
     except ValueError:
         return DEFAULT_MAX_BYTES
     return value if value > 0 else DEFAULT_MAX_BYTES
+
+
+def pdf_max_pages(env: dict[str, str]) -> int:
+    """Same rule as `max_bytes`: a nonsense value is the default, never "none"."""
+    try:
+        value = int(str(env.get(PDF_MAX_PAGES_ENV, "")).strip())
+    except ValueError:
+        return DEFAULT_PDF_MAX_PAGES
+    return value if value > 0 else DEFAULT_PDF_MAX_PAGES
