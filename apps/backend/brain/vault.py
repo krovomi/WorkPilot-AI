@@ -19,6 +19,7 @@ from typing import Any
 
 from .graph import BrainGraph, rebuild
 from .home import KINDS, MARKER, brain_dir, graph_path, is_brain, kind_dir
+from .images import DEFAULT_MAX_IMAGES, iter_images
 from .memories import refresh_bridges, remember, write_digest
 from .notes import Note, inside, iter_notes, now_iso, read_note, slugify, write_note
 from .sync import (
@@ -187,8 +188,15 @@ class Brain:
         if not path.is_file():
             return True
         built = path.stat().st_mtime
-        return any(
+        if any(
             (self.root / rel).stat().st_mtime > built for rel in iter_notes(self.root)
+        ):
+            return True
+        # A screenshot pasted into the vault is new content too: recall must
+        # be able to find it by its text without waiting for a note to change.
+        return any(
+            (self.root / rel).stat().st_mtime > built
+            for rel in iter_images(self.root, limit=DEFAULT_MAX_IMAGES)
         )
 
     # -- sync --------------------------------------------------------------
@@ -358,7 +366,13 @@ class Brain:
             level = "index"
         for hit in hits:
             source = hit.get("source_file")
-            if source and inside(self.root, source).is_file():
+            # An image hit carries its text in ``match``; its bytes have no
+            # frontmatter to read.
+            if (
+                source
+                and str(source).endswith(".md")
+                and inside(self.root, source).is_file()
+            ):
                 meta = read_note(self.root, source).meta
                 hit["frontmatter"] = {
                     k: meta[k]

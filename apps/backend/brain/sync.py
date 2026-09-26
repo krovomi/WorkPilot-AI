@@ -145,6 +145,9 @@ _IGNORED = (
     # adding a note would conflict on them at every sync.
     "graphify-out/",
     ".workpilot-brain/INSTRUCTIONS.md",
+    # What docintel read out of the vault's images, by content hash: derived
+    # like the graph, and rebuilt on any machine that lacks it.
+    ".workpilot-brain/ocr-cache.json",
 )
 
 

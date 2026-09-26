@@ -68,6 +68,9 @@ SURFACES = frozenset(
         "roadmap",
         "github",
         "self-healing",
+        # What a person validated in the docintel card: accepted requirements,
+        # rule tables they kept, a whiteboard diagram they saved in draw.io.
+        "docintel",
     }
 )
 
@@ -249,8 +252,13 @@ def record(
     project: str | None = None,
     tags: list[str] | None = None,
     brain: Brain | None = None,
+    task: str | None = None,
 ) -> str | None:
-    """A fact another feature knows, filed under its surface and its project."""
+    """A fact another feature knows, filed under its surface and its project.
+
+    ``task`` (``<project>/<spec>``) files the note under that Kanban task too,
+    so the task panel's brain card lists it beside the build note.
+    """
     if surface not in SURFACES:
         raise ValueError(
             f"unknown surface {surface!r} (expected one of {sorted(SURFACES)})"
@@ -272,6 +280,7 @@ def record(
             links=links,
             agent="workpilot",
             path=f"{folder}/{slugify(title)}.md",
+            task=task,
         )
         return result.rel
     except Exception as exc:  # noqa: BLE001 - learning never fails the feature

@@ -726,4 +726,10 @@ def decide(
             decision.traceability = write_record(spec_dir)["coverage"]["summary"]
         except Exception:  # noqa: BLE001 - the record is refreshed next build
             logger.debug("docintel: traceability refresh failed", exc_info=True)
+
+    # A person just decided: what they kept is knowledge the next task on this
+    # project should be able to recall, from any agent.
+    from .knowledge import record_validated
+
+    record_validated(spec_dir)
     return decision
