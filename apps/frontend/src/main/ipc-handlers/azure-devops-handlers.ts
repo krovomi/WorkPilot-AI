@@ -33,6 +33,7 @@ import {
 } from "../../shared/utils/acceptance-criteria";
 import {
 	inlineAzureDevOpsImages,
+	saveInlinedImagesAsAttachments,
 	stripAzureAttachmentImages,
 } from "./shared/azure-attachments";
 import {
@@ -737,6 +738,14 @@ except Exception as e:
 
 						const specDir = path.join(specsDir, specId);
 						mkdirSync(specDir, { recursive: true });
+
+						// Les captures du ticket, inlinées pour l'affichage, sont aussi
+						// écrites en pièces jointes : c'est là que les agents les lisent.
+						saveInlinedImagesAsAttachments(
+							displayDescription,
+							specDir,
+							`ado-${item.id}`,
+						);
 
 						// Map work item type to task category
 						let category: string;

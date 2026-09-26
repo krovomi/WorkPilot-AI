@@ -12,6 +12,9 @@
  * authentification ni accès réseau au moment du rendu.
  */
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
 /** Taille maximale d'une pièce jointe image inlinée en data URI (5 Mo). */
 const MAX_INLINE_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -116,4 +119,81 @@ export function stripAzureAttachmentImages(
 		(full, _quote, src) =>
 			isAzureDevOpsAttachmentUrl(src, orgUrl) ? "" : full,
 	);
+}
+
+/** Types d'image acceptés en pièce jointe, et leur extension sur le disque. */
+const ATTACHMENT_EXTENSIONS: Record<string, string> = {
+	"image/png": "png",
+	"image/jpeg": "jpg",
+	"image/gif": "gif",
+	"image/webp": "webp",
+	"image/bmp": "bmp",
+};
+
+export interface InlinedImage {
+	mimeType: string;
+	extension: string;
+	data: Buffer;
+}
+
+/**
+ * Les images qu'`inlineAzureDevOpsImages` a inlinées en data URIs, décodées.
+ *
+ * Seules les data URIs d'un type image connu sont retenues (un SVG est du
+ * code, pas une capture), et chaque contenu n'apparaît qu'une fois même s'il
+ * est cité plusieurs fois dans la description.
+ */
+export function extractInlinedImages(html: string): InlinedImage[] {
+	if (!html?.includes("data:image/")) return [];
+	const images: InlinedImage[] = [];
+	const seen = new Set<string>();
+	const dataUri = /data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=]+)/gi;
+	for (const match of html.matchAll(dataUri)) {
+		const mimeType = match[1].toLowerCase();
+		const extension = ATTACHMENT_EXTENSIONS[mimeType];
+		if (!extension || seen.has(match[2])) continue;
+		seen.add(match[2]);
+		const data = Buffer.from(match[2], "base64");
+		if (data.length === 0 || data.length > MAX_INLINE_IMAGE_BYTES) continue;
+		images.push({ mimeType, extension, data });
+	}
+	return images;
+}
+
+/**
+ * Écrit les captures d'un work item dans `<specDir>/attachments/`.
+ *
+ * L'inlining ne servait qu'à l'affichage : les agents lisent les pièces
+ * jointes de la tâche (`docintel`, avant la planification), jamais le HTML de
+ * la description. Une capture d'erreur ou une maquette jointe au ticket
+ * n'atteignait donc aucun agent. Écrite ici, elle passe par le même chemin
+ * qu'une image déposée à la main dans le Kanban.
+ *
+ * Ne lève jamais : une capture qui ne s'écrit pas ne bloque pas l'import.
+ * Renvoie les noms de fichiers écrits.
+ */
+export function saveInlinedImagesAsAttachments(
+	html: string,
+	specDir: string,
+	prefix: string,
+): string[] {
+	const images = extractInlinedImages(html);
+	if (images.length === 0) return [];
+	const directory = path.join(specDir, "attachments");
+	const written: string[] = [];
+	try {
+		mkdirSync(directory, { recursive: true });
+	} catch {
+		return written;
+	}
+	images.forEach((image, index) => {
+		const filename = `${prefix}-image-${index + 1}.${image.extension}`;
+		try {
+			writeFileSync(path.join(directory, filename), image.data);
+			written.push(filename);
+		} catch {
+			// Une capture de moins, pas un import raté.
+		}
+	});
+	return written;
 }

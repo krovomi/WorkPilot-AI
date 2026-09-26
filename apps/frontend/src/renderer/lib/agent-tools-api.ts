@@ -552,6 +552,85 @@ export async function fetchSpecTraceability(
 	};
 }
 
+/* -------------------------------------------------------------------------
+ * Docintel — task attachments and ADRs, as the agents will read them
+ *
+ *   GET /api/docintel/?project_dir=…&spec_id=…
+ *
+ * Recomputed on every call, nothing written; refused in server mode by the
+ * same addressing rules as the traceability endpoint.
+ * ---------------------------------------------------------------------- */
+
+/** `diagram` | `text` | `image` | `document` | `skipped` — see docintel/models.py */
+export type DocintelStatus = "diagram" | "text" | "image" | "document" | "skipped";
+
+export interface DocintelDocument {
+	path: string;
+	status: DocintelStatus;
+	engine: string;
+	/** Why nothing (or less than everything) was read: a reason code. */
+	reason: string;
+	/** `safe` | `suspect` | `blocked` — from injection_guard. */
+	threat: string;
+	nodeCount: number;
+	edgeCount: number;
+}
+
+export interface DocintelAdr {
+	id: string;
+	title: string;
+	status: string;
+	path: string;
+	decision: string;
+	binding: boolean;
+}
+
+export interface DocintelPayload {
+	documents: DocintelDocument[];
+	adrs: DocintelAdr[];
+}
+
+interface RawDocintelDocument {
+	path: string;
+	status: DocintelStatus;
+	engine: string;
+	reason: string;
+	threat: string;
+	diagram: { nodes?: unknown[]; edges?: unknown[] } | null;
+}
+
+export async function fetchDocintel(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<DocintelPayload>> {
+	const params: Record<string, string> = {};
+	if (query.specDir) params.spec_dir = query.specDir;
+	if (query.projectDir) params.project_dir = query.projectDir;
+	if (query.specId) params.spec_id = query.specId;
+
+	const res = await _get<{
+		documents: RawDocintelDocument[];
+		adrs: DocintelAdr[];
+	}>("/api/docintel/", params, signal);
+	if (!res.ok) return res;
+
+	return {
+		ok: true,
+		data: {
+			documents: (res.data.documents ?? []).map((doc) => ({
+				path: doc.path,
+				status: doc.status,
+				engine: doc.engine,
+				reason: doc.reason,
+				threat: doc.threat,
+				nodeCount: doc.diagram?.nodes?.length ?? 0,
+				edgeCount: doc.diagram?.edges?.length ?? 0,
+			})),
+			adrs: res.data.adrs ?? [],
+		},
+	};
+}
+
 export async function fetchWorkflowProfile(
 	query: WorkflowProfileQuery,
 	signal?: AbortSignal,

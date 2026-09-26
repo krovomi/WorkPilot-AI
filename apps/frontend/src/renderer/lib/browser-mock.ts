@@ -552,6 +552,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		success: true,
 		data: [],
 	}),
+	getJiraAttachments: async () => ({
+		success: true,
+		data: [],
+	}),
 	checkJiraConnection: async () => ({
 		success: true,
 		data: { connected: false, siteUrl: null, error: undefined },

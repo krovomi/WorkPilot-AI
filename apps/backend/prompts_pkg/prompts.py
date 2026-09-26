@@ -505,6 +505,22 @@ def mobile_section(project_dir: Path) -> str:
         return ""
 
 
+def docintel_section(project_dir: Path, spec_dir: Path | None = None) -> str:
+    """The project's accepted ADRs, and what the task's attachments say.
+
+    Public and single for the same reason as the two above: the planner, every
+    coding subtask, the QA reviewer and the workflow's skill phases need the
+    identical section. Empty for a project with no ADRs and a task with no
+    attachments, which is most of them.
+    """
+    try:
+        from docintel import docintel_section as _section
+
+        return _section(project_dir, spec_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def get_qa_reviewer_prompt(spec_dir: Path, project_dir: Path) -> str:
     """
     Load the QA reviewer prompt with project-specific MCP tools dynamically injected.
@@ -620,6 +636,12 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     # that does not know which is which reports "could not verify" as a defect.
     if mobile := mobile_section(project_dir):
         spec_context += mobile + "\n\n---\n\n"
+
+    # The decisions the project wrote down, and the mockup or diagram the
+    # person attached to the task: the two things a reviewer judging only the
+    # diff against the spec text cannot see.
+    if documents := docintel_section(project_dir, spec_dir):
+        spec_context += documents + "\n\n---\n\n"
 
     # Find injection point in base prompt (after PHASE 4, before PHASE 5)
     injection_marker = (

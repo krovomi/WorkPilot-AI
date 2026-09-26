@@ -2071,6 +2071,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import spec_traceability router: {e}")
 
+# --- Docintel API (task attachments and ADRs, as the agents will read them) ---
+try:
+    from docintel.api import router as docintel_router
+
+    _mount(docintel_router, "docintel")
+except ImportError as e:
+    print(f"Warning: Could not import docintel router: {e}")
+
 # --- Slash Commands API (Kanban Quick-Command bar: list + run .claude/commands) ---
 try:
     from slash_commands.api import router as slash_commands_router

@@ -40,6 +40,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   mem_search/          lecture de la mémoire par paliers (skill mem-search)
   brain/               le cerveau partagé : vault Obsidian + graph.json Graphify + git, servi en MCP à tous les agents
   libdocs/             docs des bibliothèques que le dépôt n'illustre pas, avant le build
+  docintel/            pièces jointes (draw.io, Excalidraw, captures OCR) et ADR, avant le build
   rtk/                 proxy rtk : la sortie des commandes condensée avant qu'un modèle la lise
   watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt

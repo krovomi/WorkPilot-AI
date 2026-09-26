@@ -422,6 +422,16 @@ def _constitution(project_dir: Path) -> str:
         return ""
 
 
+def _docintel(project_dir: Path, spec_dir: Path | None) -> str:
+    """`prompts.docintel_section`, deferred for the same reason as the above."""
+    try:
+        from prompts import docintel_section
+
+        return docintel_section(project_dir, spec_dir)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def _mobile(project_dir: Path) -> str:
     """`prompts.mobile_section`, deferred for the same reason as the above.
 
@@ -486,6 +496,12 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
     # every project that is not a phone application.
     if mobile := _mobile(ctx.project_dir):
         lines += ["", "---", "", mobile]
+
+    # The project's accepted ADRs and the task's attachments. `analyze` is
+    # asked what the plan does that the project forbids, and an ADR is where
+    # the project said so. Empty for most projects and most tasks.
+    if documents := _docintel(ctx.project_dir, ctx.spec_dir):
+        lines += ["", "---", "", documents]
 
     lines += [
         "",

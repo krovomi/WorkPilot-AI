@@ -2088,6 +2088,30 @@ export function KanbanBoard({
 						metadata.jiraType = jiraItem.workItemType;
 						metadata.importSource = "jira";
 
+						// The issue's screenshots and diagram exports become task
+						// attachments, which the build reads before planning. A
+						// failed download costs the images, not the import.
+						try {
+							const attachments =
+								await globalThis.electronAPI.getJiraAttachments?.(
+									projectId,
+									jiraItem.id,
+								);
+							if (attachments?.success && attachments.data?.length) {
+								metadata.attachedImages = attachments.data;
+							}
+						} catch (error) {
+							const sanitizedJiraItemId = String(jiraItem.id ?? "").replace(
+								/[\r\n]/g,
+								"",
+							);
+							console.warn(
+								"[Import] Jira attachments skipped:",
+								sanitizedJiraItemId,
+								error,
+							);
+						}
+
 						const jiraAc = parseAcceptanceCriteriaText(
 							jiraItem.acceptanceCriteria,
 						);
