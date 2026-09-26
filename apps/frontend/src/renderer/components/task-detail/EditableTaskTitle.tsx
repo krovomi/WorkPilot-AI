@@ -92,8 +92,16 @@ export function EditableTaskTitle({
 			return;
 		}
 		setSaving(true);
-		const ok = await persistUpdateTask(task.id, { title: next });
-		setSaving(false);
+		let ok = false;
+		try {
+			ok = await persistUpdateTask(task.id, { title: next });
+		} catch {
+			ok = false;
+		} finally {
+			// Toujours rendu au champ : un enregistrement refusé ne doit pas
+			// laisser un titre gelé en lecture seule.
+			setSaving(false);
+		}
 		if (ok) {
 			setEditing(false);
 			return;

@@ -213,7 +213,12 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 	};
 
 	const saveDescription = async (next: string): Promise<boolean> => {
-		const ok = await persistUpdateTask(task.id, { description: next });
+		let ok = false;
+		try {
+			ok = await persistUpdateTask(task.id, { description: next });
+		} catch {
+			ok = false;
+		}
 		if (ok) {
 			setIsEditingDescription(false);
 			// La description a changé de taille : on réévalue le repli.
@@ -974,8 +979,15 @@ function DescriptionEditor({ initial, onSave, onCancel }: DescriptionEditorProps
 			return;
 		}
 		setSaving(true);
-		const ok = await onSave(trimmed);
-		if (!ok) setSaving(false);
+		let ok = false;
+		try {
+			ok = await onSave(trimmed);
+		} catch {
+			ok = false;
+		} finally {
+			// Réussi, l'éditeur se referme ; refusé, il reste ouvert et éditable.
+			if (!ok) setSaving(false);
+		}
 	};
 
 	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1116,8 +1128,12 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 		() => extractAcceptanceCriteriaFromDescription(task.description),
 		[task.description],
 	);
+	// Vider la liste est une décision : elle n'est pas défaite au rendu suivant
+	// par une relecture de la description.
 	const fromDescription =
-		storedCriteria.length === 0 && describedCriteria.length > 0;
+		storedCriteria.length === 0 &&
+		describedCriteria.length > 0 &&
+		!task.metadata?.ignoreDescriptionCriteria;
 	const initialCriteria = fromDescription ? describedCriteria : storedCriteria;
 
 	// Extract ADO work item ID from "ADO-603226" format
@@ -1161,7 +1177,12 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 	useEffect(() => {
 		if (isEditing) return;
 		setDrafts(ensureAtLeastOne(toDrafts(initialCriteria)));
-	}, [task.metadata?.acceptanceCriteria, describedCriteria, isEditing]);
+	}, [
+		task.metadata?.acceptanceCriteria,
+		task.metadata?.ignoreDescriptionCriteria,
+		describedCriteria,
+		isEditing,
+	]);
 
 	// Ce qui serait enregistré, quel que soit le mode où l'on se trouve.
 	const edited = mode === "list" ? toCriteria(drafts) : toCriteria(textToDrafts(text));
@@ -1173,7 +1194,10 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 	const adoptFromDescription = async () => {
 		setIsAdopting(true);
 		const ok = await persistUpdateTask(task.id, {
-			metadata: { acceptanceCriteria: describedCriteria },
+			metadata: {
+				acceptanceCriteria: describedCriteria,
+				ignoreDescriptionCriteria: undefined,
+			},
 		});
 		setIsAdopting(false);
 		if (ok) {
@@ -1204,7 +1228,11 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 	const handleSave = async () => {
 		setIsSaving(true);
 		const ok = await persistUpdateTask(task.id, {
-			metadata: { acceptanceCriteria: edited },
+			metadata: {
+				acceptanceCriteria: edited,
+				ignoreDescriptionCriteria:
+					edited.length === 0 && describedCriteria.length > 0 ? true : undefined,
+			},
 		});
 		setIsSaving(false);
 		if (ok) {

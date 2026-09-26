@@ -97,3 +97,30 @@ it("does not open the editor while an agent is running", () => {
 	expect(screen.queryByRole("textbox", { name: "Description" })).toBeNull();
 	expect(screen.queryByRole("button", { name: "Save as criteria" })).toBeNull();
 });
+
+it("does not read the description back once the user emptied the list", () => {
+	setup(
+		makeTask({
+			metadata: { sourceType: "manual", acceptanceCriteria: [], ignoreDescriptionCriteria: true },
+		} as Partial<Task>),
+	);
+	expect(screen.queryByText("read from the description")).toBeNull();
+	expect(screen.queryByRole("button", { name: "Save as criteria" })).toBeNull();
+});
+
+it("records that decision when the criteria read from the description are all removed", async () => {
+	setup(makeTask());
+	// The description card has its own "Edit"; the criteria one comes last.
+	const edits = screen.getAllByRole("button", { name: "Edit" });
+	fireEvent.click(edits[edits.length - 1]);
+	fireEvent.click(screen.getByRole("button", { name: "Text" }));
+	fireEvent.change(screen.getByPlaceholderText("One criterion per line…"), {
+		target: { value: "" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Save" }));
+	await waitFor(() =>
+		expect(persist).toHaveBeenCalledWith("t1", {
+			metadata: { acceptanceCriteria: [], ignoreDescriptionCriteria: true },
+		}),
+	);
+});
