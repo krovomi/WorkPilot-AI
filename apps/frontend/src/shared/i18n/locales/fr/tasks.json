@@ -1207,7 +1207,9 @@
 			"secrets": "{{count}} secret masqué",
 			"secrets_other": "{{count}} secrets masqués",
 			"diagnosed": "{{count}} échec localisé",
-			"diagnosed_other": "{{count}} échecs localisés"
+			"diagnosed_other": "{{count}} échecs localisés",
+			"codeChecks": "{{count}} schéma ou appel confronté au code",
+			"codeChecks_other": "{{count}} schémas ou appels confrontés au code"
 		},
 		"attachments": {
 			"title": "Pièces jointes"
@@ -1275,6 +1277,17 @@
 			"buildErrors_other": "{{count}} erreurs de build ({{codes}})",
 			"failingTests": "{{count}} test en échec",
 			"failingTests_other": "{{count}} tests en échec"
+		},
+		"code": {
+			"title": "Schémas et appels d'API face au code",
+			"erdFindings": "{{diagram}} : {{count}} écart avec le mapping de l'ORM",
+			"erdFindings_other": "{{diagram}} : {{count}} écarts avec le mapping de l'ORM",
+			"erdClean": "{{diagram}} : conforme au mapping de l'ORM",
+			"erdAmbiguous": "{{count}} relation que le schéma laisse ambiguë",
+			"erdAmbiguous_other": "{{count}} relations que le schéma laisse ambiguës",
+			"sequence": "{{diagram}} : {{verified}} appels sur {{total}} trouvés dans le code",
+			"apiTest": "test d'intégration préparé pour {{destination}}",
+			"apiTestNoStack": "aucune pile d'API HTTP reconnue : le test est laissé aux agents"
 		}
 	},
 	"changeGraph": {

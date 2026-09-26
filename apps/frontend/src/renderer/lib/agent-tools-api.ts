@@ -616,11 +616,42 @@ export interface DocintelAdr {
 	binding: boolean;
 }
 
+/** See `_code_checks` in docintel/api.py. */
+export interface DocintelErdSummary {
+	diagrams: { path: string; origin: "attachment" | "repository" }[];
+	findings: number;
+	kinds: string[];
+	ambiguous: number;
+}
+
+export interface DocintelSequenceSummary {
+	path: string;
+	origin: "attachment" | "repository";
+	verified: number;
+	checkable: number;
+}
+
+export interface DocintelApiTestSummary {
+	method: string;
+	path: string;
+	status: number | null;
+	origin: string;
+	/** Where the drafted test goes, relative to the project; "" when undecided. */
+	destination: string;
+	stack: string;
+}
+
 export interface DocintelPayload {
 	documents: DocintelDocument[];
 	adrs: DocintelAdr[];
 	/** A stack trace or build log pasted into the task description. */
 	descriptionDiagnosis: DocintelDiagnosis | null;
+	/** ERD vs. ORM mapping, when an ERD exists. */
+	erd: DocintelErdSummary | null;
+	/** Sequence diagrams whose calls were looked up in the code. */
+	sequences: DocintelSequenceSummary[];
+	/** HTTP captures of the task, each drafted as an integration test. */
+	apiTests: DocintelApiTestSummary[];
 }
 
 interface RawDocintelDocument {
@@ -648,6 +679,9 @@ export async function fetchDocintel(
 		documents: RawDocintelDocument[];
 		adrs: DocintelAdr[];
 		description_diagnosis?: DocintelDiagnosis | null;
+		erd?: DocintelErdSummary | null;
+		sequences?: DocintelSequenceSummary[];
+		apiTests?: DocintelApiTestSummary[];
 	}>("/api/docintel/", params, signal);
 	if (!res.ok) return res;
 
@@ -668,6 +702,9 @@ export async function fetchDocintel(
 			})),
 			adrs: res.data.adrs ?? [],
 			descriptionDiagnosis: res.data.description_diagnosis ?? null,
+			erd: res.data.erd ?? null,
+			sequences: res.data.sequences ?? [],
+			apiTests: res.data.apiTests ?? [],
 		},
 	};
 }

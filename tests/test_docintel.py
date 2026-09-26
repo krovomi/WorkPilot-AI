@@ -751,7 +751,7 @@ class TestConformance:
 
     def test_section_states_rules_and_debt(self, solution: Path):
         section = docintel_section(solution)
-        assert "Architecture diagram vs. project references" in section
+        assert "Architecture diagram vs. module references" in section
         assert "Allowed: " in section and "Api -> Application" in section
         assert "`Acme.Domain` (Domain) -> `Acme.Infrastructure.Persistence`" in section
         assert "points backwards" in section

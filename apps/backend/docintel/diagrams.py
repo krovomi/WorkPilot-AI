@@ -1,4 +1,4 @@
-"""draw.io and Excalidraw files, read as the structures they are.
+"""draw.io and Excalidraw files — and C4 as code — read as the structures they are.
 
 Neither format needs OCR. A `.drawio` is XML, an `.excalidraw` is JSON, and
 both editors hide the same source inside their PNG and SVG exports so the file
@@ -175,6 +175,37 @@ def _cells(model: Element) -> list[tuple[str, str, Element]]:
     return cells
 
 
+#: draw.io's entity-relation arrow heads, and what each end says.
+_DRAWIO_ER_ENDS = {
+    "erone": "one",
+    "ermandone": "one",
+    "erzerotoone": "one",
+    "ermany": "many",
+    "eronetomany": "many",
+    "erzerotomany": "many",
+}
+#: Excalidraw's crow's-foot arrowheads.
+_EXCALIDRAW_ER_ENDS = {
+    "crowfoot_one": "one",
+    "crowfoot_many": "many",
+    "crowfoot_one_or_many": "many",
+}
+
+
+def _style(cell: Element) -> dict[str, str]:
+    """`endArrow=ERmany;html=1;rounded` -> {"endArrow": "ERmany", "html": "1"}."""
+    style: dict[str, str] = {}
+    for item in (cell.get("style") or "").split(";"):
+        key, sep, value = item.partition("=")
+        if sep:
+            style[key.strip()] = value.strip()
+    return style
+
+
+def _er_end(style: dict[str, str], key: str) -> str:
+    return _DRAWIO_ER_ENDS.get(style.get(key, "").lower(), "")
+
+
 def parse_drawio_xml(text: str) -> DiagramModel | None:
     try:
         root = _xml(text)
@@ -220,7 +251,16 @@ def parse_drawio_xml(text: str) -> DiagramModel | None:
             if not source or not target:
                 continue  # a dangling arrow claims nothing
             label = " ".join(filter(None, [labels[cid], *edge_labels.get(cid, [])]))
-            diagram.edges.append(DiagramEdge(source=source, target=target, label=label))
+            style = _style(cell)
+            diagram.edges.append(
+                DiagramEdge(
+                    source=source,
+                    target=target,
+                    label=label,
+                    source_end=_er_end(style, "startArrow"),
+                    target_end=_er_end(style, "endArrow"),
+                )
+            )
 
     return diagram if diagram.nodes else None
 
@@ -327,6 +367,10 @@ def parse_excalidraw_scene(scene: dict) -> DiagramModel | None:
                 source=str(start),
                 target=str(end),
                 label=" ".join(bound_text.get(str(arrow.get("id", "")), [])),
+                source_end=_EXCALIDRAW_ER_ENDS.get(
+                    str(arrow.get("startArrowhead")), ""
+                ),
+                target_end=_EXCALIDRAW_ER_ENDS.get(str(arrow.get("endArrowhead")), ""),
             )
         )
 
@@ -380,6 +424,13 @@ def parse_diagram(path: Path, data: bytes) -> DiagramModel | None:
         return parse_drawio_xml(text)
     if name.endswith(".excalidraw") or '"excalidraw"' in head:
         return parse_excalidraw_json(text)
+    # C4 written as code: the same boxes and arrows, and the same rules.
+    from .c4 import parse_c4_plantuml, parse_structurizr
+
+    if name.endswith(".dsl") or head.startswith("workspace"):
+        return parse_structurizr(text, path.stem)
+    if name.endswith((".puml", ".plantuml", ".iuml", ".wsd")) or "@startuml" in head:
+        return parse_c4_plantuml(text, path.stem)
     return None
 
 

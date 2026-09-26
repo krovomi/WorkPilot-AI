@@ -131,7 +131,7 @@ class TestTools:
     def test_rules_carry_adrs_and_diagram(self, project: Path):
         rules = text(call(project, "docintel_rules"))
         assert "ADR-0003" in rules
-        assert "Architecture diagram vs. project references" in rules
+        assert "Architecture diagram vs. module references" in rules
 
     def test_rules_when_there_is_nothing(self, tmp_path: Path):
         assert "no ADR and no architecture diagram" in text(

@@ -12,13 +12,15 @@ This module reads both sides without a model:
 
 | Side | Read from |
 |---|---|
-| the diagram | the repository's own draw.io / Excalidraw files (`diagrams.py`) |
-| the code | `.csproj` `ProjectReference` items — the graph the compiler enforces |
+| the diagram | the repository's own draw.io / Excalidraw files, and C4 written as code — Structurizr DSL, C4-PlantUML (`diagrams.py`, `c4.py`) |
+| the code | the module graph the build declares: `.csproj` `ProjectReference`, Maven `<dependency>` between the reactor's modules, Gradle `project(":x")`, npm / pnpm / yarn workspace dependencies, Cargo `path =` dependencies |
 
-**.NET first, on purpose.** A project reference is the one dependency graph that
-is declared rather than inferred: it is what the build uses, and a layer in a
-.NET clean-architecture solution *is* a project. An import-based graph for other
-stacks answers a fuzzier question and would be a different module.
+**Declared, not inferred.** A module dependency is the one graph that is
+declared rather than guessed: it is what the build uses, and a layer of a
+clean-architecture solution *is* a module — a .NET project, a Maven or Gradle
+module, a workspace package, a crate. An import-based graph answers a fuzzier
+question and would be a different module; a single-module project has no
+declared graph and is left alone.
 
 **Transitive, not literal.** A diagram draws `Api -> Application -> Domain`; a
 direct `Api -> Domain` reference is allowed by it and is not reported. Only a
@@ -44,6 +46,9 @@ from .models import DiagramModel
 #: Where a repository keeps architecture diagrams.
 DIAGRAM_DIRS = ("docs", "doc", "architecture", "design", ".")
 DIAGRAM_SUFFIXES = (
+    ".dsl",
+    ".puml",
+    ".plantuml",
     ".drawio",
     ".dio",
     ".excalidraw",
@@ -202,6 +207,198 @@ def read_project_references(
     return projects, [r for r in references if r[1] in projects]
 
 
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _read_maven(
+    project_dir: Path, modules: dict[str, str], edges: list[tuple[str, str, str]]
+) -> None:
+    """Maven: a module is an artifactId; an edge, a `<dependency>` on a sibling's."""
+    for path in _walk(project_dir, 8):
+        if path.name != "pom.xml":
+            continue
+        try:
+            root = _xml(path.read_text(encoding="utf-8", errors="replace"))
+        except Exception:  # noqa: BLE001 - an unreadable pom adds no module
+            continue
+        artifact = next(
+            (c.text or "" for c in root if _local(c.tag) == "artifactId"), ""
+        ).strip()
+        if not artifact or _is_test_project(artifact):
+            continue
+        relative = path.relative_to(project_dir).as_posix()
+        modules[artifact] = relative
+        for dependencies in (c for c in root if _local(c.tag) == "dependencies"):
+            for dependency in dependencies:
+                target = next(
+                    (c.text or "" for c in dependency if _local(c.tag) == "artifactId"),
+                    "",
+                ).strip()
+                if target:
+                    edges.append((artifact, target, relative))
+
+
+_GRADLE_INCLUDE = re.compile(r"""['"]:?(?P<path>[\w.:-]+)['"]""")
+_GRADLE_PROJECT = re.compile(
+    r"""project\(\s*(?:path\s*[:=]\s*)?['"]:?(?P<path>[\w.:-]+)['"]|\bprojects\.(?P<accessor>[\w.]+)"""
+)
+
+
+def _read_gradle(
+    project_dir: Path, modules: dict[str, str], edges: list[tuple[str, str, str]]
+) -> None:
+    """Gradle: modules from `settings.gradle(.kts)`, edges from `project(":x")`."""
+    for settings_name in ("settings.gradle", "settings.gradle.kts"):
+        settings = project_dir / settings_name
+        if not settings.is_file() or settings.is_symlink():
+            continue
+        text = settings.read_text(encoding="utf-8", errors="replace")
+        declared = [
+            m["path"]
+            for line in text.splitlines()
+            if line.strip().startswith("include")
+            for m in _GRADLE_INCLUDE.finditer(line)
+        ]
+        for module_path in declared:
+            name = module_path.split(":")[-1]
+            directory = project_dir / module_path.replace(":", "/")
+            build = next(
+                (
+                    directory / f
+                    for f in ("build.gradle.kts", "build.gradle")
+                    if (directory / f).is_file()
+                ),
+                None,
+            )
+            if _is_test_project(name) or build is None or build.is_symlink():
+                continue
+            relative = build.relative_to(project_dir).as_posix()
+            modules[name] = relative
+            for m in _GRADLE_PROJECT.finditer(
+                build.read_text(encoding="utf-8", errors="replace")
+            ):
+                target = (m["path"] or "").split(":")[-1] or (
+                    m["accessor"] or ""
+                ).split(".")[-1]
+                if target:
+                    edges.append((name, target, relative))
+
+
+def _workspace_patterns(project_dir: Path) -> list[str]:
+    """The globs a JS monorepo declares: `workspaces` in package.json, or pnpm's file."""
+    import json
+
+    patterns: list[str] = []
+    try:
+        root = json.loads((project_dir / "package.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        root = {}
+    declared = root.get("workspaces") if isinstance(root, dict) else None
+    if isinstance(declared, dict):
+        declared = declared.get("packages")
+    if isinstance(declared, list):
+        patterns += [str(p) for p in declared]
+    try:
+        pnpm = (project_dir / "pnpm-workspace.yaml").read_text(encoding="utf-8")
+    except OSError:
+        pnpm = ""
+    patterns += re.findall(r"^\s*-\s*['\"]?([^'\"#\n]+?)['\"]?\s*$", pnpm, re.M)
+    return [p for p in patterns if not p.startswith("!") and ".." not in p]
+
+
+def _read_workspaces(
+    project_dir: Path, modules: dict[str, str], edges: list[tuple[str, str, str]]
+) -> None:
+    """npm / pnpm / yarn workspaces: a package's `dependencies` on a sibling package.
+
+    The packages are the ones the workspace declares, not every `package.json`
+    on disk: a fixture or an example app is not a module of the build.
+    """
+    import json
+
+    packages: list[tuple[str, dict, str]] = []
+    seen: set[Path] = set()
+    for pattern in _workspace_patterns(project_dir):
+        for manifest in sorted(project_dir.glob(f"{pattern.rstrip('/')}/package.json")):
+            if (
+                manifest in seen
+                or manifest.is_symlink()
+                or "node_modules" in manifest.parts
+            ):
+                continue
+            seen.add(manifest)
+            try:
+                data = json.loads(manifest.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(data, dict) and isinstance(data.get("name"), str):
+                packages.append(
+                    (data["name"], data, manifest.relative_to(project_dir).as_posix())
+                )
+    if len(packages) < 2:
+        return
+    for name, data, relative in packages:
+        if _is_test_project(name):
+            continue
+        modules[name] = relative
+        for key in ("dependencies", "peerDependencies"):
+            section = data.get(key)
+            if isinstance(section, dict):
+                edges.extend((name, str(target), relative) for target in section)
+
+
+_CARGO_NAME = re.compile(r"^\s*name\s*=\s*\"(?P<name>[^\"]+)\"", re.M)
+_CARGO_PATH_DEP = re.compile(
+    r"^\s*(?P<name>[\w-]+)\s*=\s*\{[^}\n]*\bpath\s*=\s*\"(?P<path>[^\"]+)\"", re.M
+)
+
+
+def _read_cargo(
+    project_dir: Path, modules: dict[str, str], edges: list[tuple[str, str, str]]
+) -> None:
+    """Cargo workspaces: a crate's `path =` dependency on a sibling crate."""
+    for path in _walk(project_dir, 6):
+        if path.name != "Cargo.toml":
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        package = text.split("[package]", 1)
+        if len(package) < 2 or not (m := _CARGO_NAME.search(package[1])):
+            continue
+        name = m["name"]
+        if _is_test_project(name):
+            continue
+        relative = path.relative_to(project_dir).as_posix()
+        modules[name] = relative
+        for dep in _CARGO_PATH_DEP.finditer(text):
+            edges.append((name, dep["name"], relative))
+
+
+def read_module_references(
+    project_dir: Path,
+) -> tuple[dict[str, str], list[tuple[str, str, str]]]:
+    """(module -> manifest, [(from, to, manifest)]) across every build system.
+
+    `.csproj` first, then Maven, Gradle, JS workspaces and Cargo: a repository
+    with a .NET API and a TypeScript front-end workspace gets both graphs, and a
+    box names whichever modules it covers.
+    """
+    modules, edges = read_project_references(project_dir)
+    extra: dict[str, str] = {}
+    extra_edges: list[tuple[str, str, str]] = []
+    for reader in (_read_maven, _read_gradle, _read_workspaces, _read_cargo):
+        try:
+            reader(project_dir, extra, extra_edges)
+        except OSError:
+            continue
+        if len(extra) >= MAX_PROJECTS:
+            break
+    for name, manifest in extra.items():
+        modules.setdefault(name, manifest)
+    edges = edges + [e for e in extra_edges if e[1] in modules and e[0] != e[1]]
+    return modules, list(dict.fromkeys(edges))
+
+
 # ---------------------------------------------------------------------------
 # Matching boxes to projects
 # ---------------------------------------------------------------------------
@@ -352,7 +549,7 @@ def check_conformance(project_dir: Path) -> ConformanceReport:
         if not diagrams:
             report.skipped = "no-diagram"
             return report
-        projects, references = read_project_references(project_dir)
+        projects, references = read_module_references(project_dir)
         if len(projects) < 2:
             report.skipped = "no-projects"
             return report
@@ -363,7 +560,10 @@ def check_conformance(project_dir: Path) -> ConformanceReport:
                 diagram = parse_diagram(path, path.read_bytes())
             except OSError:
                 continue
-            if diagram is None:
+            if diagram is None or any(
+                e.source_end or e.target_end for e in diagram.edges
+            ):
+                # An ERD's boxes are tables, not layers: `erd.py` reads it.
                 continue
             relative = path.relative_to(project_dir).as_posix()
             check, findings = check_diagram(diagram, relative, projects, references)
@@ -379,9 +579,10 @@ def check_conformance(project_dir: Path) -> ConformanceReport:
 _SECTION_INTRO = (
     "The repository's architecture diagram(s) below were read as dependency "
     "rules (an arrow `A -> B` means *A may depend on B*, transitively) and "
-    "compared with the `<ProjectReference>` items of the solution. Do not add "
-    "a reference the diagram does not allow; if the task needs one, say so "
-    "and name the diagram rather than adding it silently."
+    "compared with the module dependencies the build declares (`.csproj` "
+    "project references, Maven / Gradle modules, workspace packages, crates). "
+    "Do not add a reference the diagram does not allow; if the task needs one, "
+    "say so and name the diagram rather than adding it silently."
 )
 
 
@@ -392,7 +593,7 @@ def conformance_section(project_dir: Path) -> str:
     if not checked:
         return ""
 
-    lines = ["## Architecture diagram vs. project references", "", _SECTION_INTRO]
+    lines = ["## Architecture diagram vs. module references", "", _SECTION_INTRO]
     for check in checked:
         lines.append("")
         lines.append(f"`{check.diagram}` — layers:")
