@@ -26,10 +26,10 @@ import logging
 import re
 from pathlib import Path
 
-from . import settings
+from . import redact, settings
 from .diagrams import parse_diagram, render_diagram
 from .models import DocintelResult, ExtractedDocument
-from .ocr import ocr_image
+from .ocr import OcrOutcome, ocr_image
 
 logger = logging.getLogger(__name__)
 
@@ -150,8 +150,31 @@ def _clean(text: str) -> str:
         return text
 
 
-def extract_file(path: Path, spec_dir: Path, env: dict[str, str]) -> ExtractedDocument:
-    """What can be read out of one file without a model. Never raises."""
+def extract_file(
+    path: Path,
+    spec_dir: Path,
+    env: dict[str, str],
+    *,
+    policy_paths: tuple[Path, ...] = (),
+) -> ExtractedDocument:
+    """What can be read out of one file without a model. Never raises.
+
+    The text comes back already cleaned, with its secrets masked and its
+    threat level set — the same protection `run_preflight` applies, minus the
+    redacted copy of an image, which only a persisting read writes.
+    """
+    doc, outcome = _extract(path, spec_dir, env, policy_paths, preview=True)
+    return _protect(doc, outcome, path, spec_dir, persist=False)
+
+
+def _extract(
+    path: Path,
+    spec_dir: Path,
+    env: dict[str, str],
+    policy_paths: tuple[Path, ...],
+    *,
+    preview: bool,
+) -> tuple[ExtractedDocument, OcrOutcome | None]:
     try:
         relative = path.relative_to(spec_dir).as_posix()
     except ValueError:
@@ -161,51 +184,143 @@ def extract_file(path: Path, spec_dir: Path, env: dict[str, str]) -> ExtractedDo
     try:
         size = path.stat().st_size
     except OSError:
-        return ExtractedDocument(path=relative, status="skipped", reason="unreadable")
+        return _doc(relative, "skipped", reason="unreadable")
     if size > settings.max_bytes(env):
-        return ExtractedDocument(path=relative, status="skipped", reason="too-large")
+        return _doc(relative, "skipped", reason="too-large")
 
     if suffix in DOCUMENT_EXTENSIONS:
         # Office and PDF conversion is the document skill's job, and every
         # agent already carries it (`build_base_system_prompt`). Converting a
         # second way here would be two answers to one question.
-        return ExtractedDocument(
-            path=relative, status="document", reason="document-skill"
-        )
+        return _doc(relative, "document", reason="document-skill")
 
     try:
         data = path.read_bytes()
     except OSError:
-        return ExtractedDocument(path=relative, status="skipped", reason="unreadable")
+        return _doc(relative, "skipped", reason="unreadable")
 
     if suffix in DIAGRAM_EXTENSIONS | IMAGE_EXTENSIONS:
         diagram = parse_diagram(path, data)
         if diagram is not None:
-            return ExtractedDocument(
+            doc = ExtractedDocument(
                 path=relative,
                 status="diagram",
                 engine=diagram.format,
                 text=render_diagram(diagram),
                 diagram=diagram,
             )
+            return doc, None
 
     if suffix in TEXT_EXTENSIONS:
         text = data.decode("utf-8", errors="replace").strip()
         if not text:
-            return ExtractedDocument(path=relative, status="skipped", reason="empty")
-        return ExtractedDocument(path=relative, status="text", engine="text", text=text)
+            return _doc(relative, "skipped", reason="empty")
+        return _doc(relative, "text", engine="text", text=text)
 
     if suffix in IMAGE_EXTENSIONS:
-        outcome = ocr_image(path, env)
-        if outcome.text:
-            return ExtractedDocument(
-                path=relative, status="text", engine="tesseract", text=outcome.text
-            )
-        return ExtractedDocument(path=relative, status="image", reason=outcome.reason)
+        outcome = ocr_image(path, env, policy_paths=policy_paths, preview=preview)
+        doc = ExtractedDocument(
+            path=relative,
+            status="text" if outcome.text else "image",
+            engine=outcome.engine if outcome.text else "",
+            text=outcome.text,
+            reason="" if outcome.text else outcome.reason,
+            attempts=list(outcome.attempts),
+            described=outcome.described,
+        )
+        return doc, outcome
 
     if suffix == ".svg":
-        return ExtractedDocument(path=relative, status="image", reason="no-diagram")
-    return ExtractedDocument(path=relative, status="skipped", reason="unsupported")
+        return _doc(relative, "image", reason="no-diagram")
+    return _doc(relative, "skipped", reason="unsupported")
+
+
+def _doc(relative: str, status: str, **fields) -> tuple[ExtractedDocument, None]:
+    return ExtractedDocument(path=relative, status=status, **fields), None
+
+
+def _mask_diagram(doc: ExtractedDocument) -> list[str]:
+    """Secrets in a diagram's labels: the model is persisted as well as the
+    rendered text, and a box labelled with a connection string is both."""
+    if doc.diagram is None:
+        return []
+    found: list[str] = []
+    for item in [*doc.diagram.nodes, *doc.diagram.edges]:
+        if item.label:
+            item.label, item_kinds = redact.redact_text(item.label)
+            found.extend(item_kinds)
+    return found
+
+
+def _protect(
+    doc: ExtractedDocument,
+    outcome: OcrOutcome | None,
+    path: Path,
+    spec_dir: Path,
+    *,
+    persist: bool,
+) -> ExtractedDocument:
+    """Clean, mask, scan — and decide what an agent may see of an image.
+
+    The order matters. Invisible characters go first, because a zero-width
+    space inside a key is how a key slips past a pattern. Secrets are masked
+    before the injection scan, so the scanner's own report cannot quote one.
+    And an image is only repainted once both scans are done: an image flagged
+    as an injection is withheld, and painting a copy nobody will be pointed at
+    would leave a file behind for nothing.
+    """
+    if not doc.text:
+        return doc
+    doc.text = _clean(doc.text)
+    from_image = outcome is not None and bool(outcome.text)
+
+    try:
+        findings = redact.find_secrets(doc.text)
+        diagram_kinds = _mask_diagram(doc)
+    except redact.ScannerUnavailable:
+        # Fail closed: "could not check for secrets" must not read as "none".
+        logger.warning(
+            "docintel: secret patterns unavailable; withholding %s", doc.path
+        )
+        doc.text = ""
+        doc.diagram = None
+        doc.status = "withheld"
+        doc.reason = "secret-scan-unavailable"
+        return doc
+
+    doc.text = redact.mask_text(doc.text, findings)
+    doc.secrets = sorted({*redact.kinds(findings), *diagram_kinds})
+    doc.threat = _threat(doc.text, source=f"attachment:{doc.path}")
+
+    if not from_image:
+        return doc
+    if doc.threat != "safe":
+        # Text in an image that reads like an order to the agent: the image is
+        # the carrier, so the image goes nowhere — not only its transcription.
+        doc.status, doc.reason = "withheld", "injection"
+        return doc
+    if not findings:
+        return doc
+
+    boxes = redact.covering_boxes(outcome.boxes, findings)
+    if boxes is None:
+        doc.status, doc.reason = "withheld", "secret-no-boxes"
+    elif not redact.pillow_available():
+        doc.status, doc.reason = "withheld", "secret-no-pillow"
+    elif not persist:
+        # The panel's read: what the build will do, nothing written.
+        doc.status, doc.reason = "redacted", ""
+    else:
+        name = _UNSAFE.sub("_", doc.path.replace("/", "__")).strip("_") or "image"
+        target = spec_dir / RESULT_DIR / redact.REDACTED_DIR / f"{name}.png"
+        if _writable(target, spec_dir) and redact.write_redacted_image(
+            path, boxes, target
+        ):
+            doc.status, doc.reason = "redacted", ""
+            doc.redacted_path = target.relative_to(spec_dir).as_posix()
+        else:
+            doc.status, doc.reason = "withheld", "redaction-failed"
+    return doc
 
 
 def _writable(target: Path, spec_dir: Path) -> bool:
@@ -269,16 +384,17 @@ def run_preflight(
         result = DocintelResult(skipped="no-attachments")
         return _discard(spec_dir, result) if persist else result
 
+    policy_paths = tuple(Path(p) for p in (spec_dir, project_dir) if p is not None)
     result = DocintelResult()
     for path in paths:
         try:
-            doc = extract_file(path, spec_dir, env)
+            doc, outcome = _extract(
+                path, spec_dir, env, policy_paths, preview=not persist
+            )
+            doc = _protect(doc, outcome, path, spec_dir, persist=persist)
         except Exception:  # noqa: BLE001 - one attachment, not the build
             logger.debug("docintel: extraction failed for %s", path, exc_info=True)
             doc = ExtractedDocument(path=path.name, status="skipped", reason="failed")
-        if doc.text:
-            doc.text = _clean(doc.text)
-            doc.threat = _threat(doc.text, source=f"attachment:{doc.path}")
         if persist:
             _write_extracted(doc, spec_dir)
         elif len(doc.text) > EXCERPT_CHARS:

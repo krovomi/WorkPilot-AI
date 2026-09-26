@@ -239,6 +239,7 @@ except ImportError:
         return {}
 
 
+from docintel.read_guard import make_read_guard_hook
 from linear_updater import is_linear_enabled
 from prompts_pkg.project_context import detect_project_capabilities, load_project_index
 from rtk import rtk_rewrite_hook
@@ -1314,6 +1315,11 @@ def create_client(
     # Same factory shape, and resolved once: the roots cannot change during a
     # session and the hook runs on every write.
     _write_path_hook = make_write_path_hook(project_dir, spec_dir)
+    # docintel — an attachment the preflight withheld or redacted (a secret on
+    # screen, text aimed at the agent) is refused to `Read`, the one tool that
+    # hands pixels to the model. The prompt already says so; this is the
+    # backstop. It answers only for files the record names.
+    _read_guard_hook = make_read_guard_hook(spec_dir)
 
     # Build options dict, conditionally including output_format
     options_kwargs: dict[str, Any] = {
@@ -1349,6 +1355,7 @@ def create_client(
                     )
                     for tool in GUARDED_WRITE_TOOLS
                 ),
+                HookMatcher(matcher="Read", hooks=[_read_guard_hook]),
                 # The user's own policies, on every tool that writes. This used
                 # to name `Write` and `Edit` only; `MultiEdit` and
                 # `NotebookEdit` write too, and a rule a team wrote about a
