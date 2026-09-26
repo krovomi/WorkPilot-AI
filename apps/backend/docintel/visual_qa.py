@@ -160,6 +160,15 @@ def _images_under(directory: Path, root: Path) -> list[Path]:
     )
 
 
+def _items(value: object, limit: int) -> list:
+    """A list read from a file anyone can edit, or nothing.
+
+    `manifest.json` and `task_metadata.json` are on disk and hand-editable: a
+    `"captures": 5` or an `"expected": {}` must cost that entry, not the review.
+    """
+    return list(value[:limit]) if isinstance(value, list) else []
+
+
 def _text(value: object, limit: int = 200) -> str:
     return " ".join(str(value or "").split())[:limit]
 
@@ -174,7 +183,7 @@ def _manifest(spec_dir: Path) -> dict[str, dict]:
     entries = payload.get("captures") if isinstance(payload, dict) else None
     return {
         str(e.get("file")): e
-        for e in (entries or [])
+        for e in _items(entries, MAX_MANIFEST_ENTRIES)
         if isinstance(e, dict) and isinstance(e.get("file"), str)
     }
 
@@ -216,7 +225,7 @@ def spec_captures(spec_dir: Path) -> list[Capture]:
                     label=_text(entry.get("label"), 120),
                     expected=[
                         _text(e, 120)
-                        for e in (entry.get("expected") or [])[:40]
+                        for e in _items(entry.get("expected"), 40)
                         if isinstance(e, str) and e.strip()
                     ],
                     file=path,
@@ -264,7 +273,7 @@ def visual_proof_captures(spec_dir: Path, roots: list[Path]) -> list[Capture]:
         for image in _images_under(directory, directory):
             listing.setdefault(image.name, (image, root))
     found: list[Capture] = []
-    for shot in proof.get("screenshots") or []:
+    for shot in _items(proof.get("screenshots"), MAX_CAPTURES):
         if not isinstance(shot, dict):
             continue
         name = PurePosixPath(
@@ -398,8 +407,21 @@ def read_capture(
 
     Labels are built from the boxes when the text carried no secret — the
     boxes hold the raw words, and a key split across two cells would slip past
-    a per-cell mask — and every label is masked again either way.
+    a per-cell mask — and every label is masked again either way. One capture
+    that cannot be read is a line with its reason, never the whole review.
     """
+    try:
+        return _read_capture(capture, env, policy_paths)
+    except Exception:  # noqa: BLE001 - one capture, not the review
+        logger.debug(
+            "docintel: capture read failed for %s", capture.path, exc_info=True
+        )
+        return {"status": "unreadable", "reason": "failed", "labels": [], "text": ""}
+
+
+def _read_capture(
+    capture: Capture, env: dict[str, str], policy_paths: tuple[Path, ...]
+) -> dict:
     from .preflight import read_screen
 
     reading: dict = {"status": "unreadable", "reason": "", "labels": [], "text": ""}

@@ -694,3 +694,57 @@ def test_a_rendered_screen_through_tesseract_to_the_card(project, spec_dir, clie
         for f in card["record"]["findings"]
     )
     assert "What the screens show" in docintel_section(project, spec_dir)
+
+
+# ---------------------------------------------------------------------------
+# Files anyone can edit: a malformed value costs the entry, not the review
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        {"captures": 5},
+        {"captures": "task/web--home.png"},
+        {"captures": [{"file": "task/web--home.png", "expected": 3}]},
+        {"captures": [{"file": "task/web--home.png", "expected": {"a": 1}}]},
+    ],
+)
+def test_a_malformed_manifest_does_not_stop_discovery(spec_dir, manifest):
+    capture(spec_dir, "task", "web--home")
+    (spec_dir / "captures" / "manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    found = visual_qa.spec_captures(spec_dir)
+    assert [c.path for c in found] == ["captures/task/web--home.png"]
+    assert found[0].expected == []
+
+
+def test_malformed_visual_proof_metadata_finds_nothing(project, spec_dir):
+    (spec_dir / "task_metadata.json").write_text(
+        json.dumps({"visualProof": {"id": "vp-1", "screenshots": 7}}),
+        encoding="utf-8",
+    )
+    assert visual_qa.visual_proof_captures(spec_dir, [project]) == []
+
+
+def test_one_capture_that_raises_is_a_reason(project, spec_dir, ocr, monkeypatch):
+    ocr({"task/web--home": "Mes commandes", "task/web--orders": "orders:list.title"})
+    capture(spec_dir, "task", "web--home")
+    capture(spec_dir, "task", "web--orders")
+    real = visual_qa.image_width
+
+    def flaky(path):
+        if path.stem == "web--home":
+            raise RuntimeError("decoder exploded")
+        return real(path)
+
+    monkeypatch.setattr(visual_qa, "image_width", flaky)
+    record = visual_qa.run_visual_qa(spec_dir, project)
+    assert record.skipped == ""
+    statuses = {c["path"]: c["reading"]["status"] for c in record.captures}
+    assert statuses == {
+        "captures/task/web--home.png": "unreadable",
+        "captures/task/web--orders.png": "read",
+    }
+    assert any(f["kind"] == "untranslated-key" for f in record.findings)
