@@ -1378,6 +1378,28 @@
 				"write-failed": "the diagram could not be written",
 				"not-an-image": "not an image"
 			}
+		},
+		"figma": {
+			"label": "Figma link",
+			"placeholder": "Paste a Figma link to attach its frames and labels",
+			"link": "Link",
+			"imported": "{{frames}} frame(s), {{texts}} label(s) attached as {{path}}.",
+			"withheld_one": "{{count}} frame left out: its labels read like instructions.",
+			"withheld_other": "{{count}} frames left out: their labels read like instructions.",
+			"secrets": "Masked: {{kinds}}.",
+			"status": {
+				"invalid-url": "This is not a Figma file link.",
+				"no-token": "No Figma token for this project (Settings → Figma).",
+				"airgap": "This project is under strict offline mode: Figma was not called.",
+				"network": "Figma could not be reached.",
+				"http": "Figma refused the request: check the token and the file's access.",
+				"too-large": "This file is too large to read; link a frame (node-id) instead.",
+				"empty": "No frame with text was found at this link.",
+				"injection": "Every frame's labels read like instructions: nothing was attached.",
+				"unwritable": "The attachment could not be written.",
+				"secret-scan-unavailable": "Secrets could not be checked: nothing was attached.",
+				"failed": "The mockup could not be linked."
+			}
 		}
 	},
 	"changeGraph": {

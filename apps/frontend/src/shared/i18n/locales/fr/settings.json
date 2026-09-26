@@ -1373,6 +1373,21 @@
 			"projectId": "ID de projet (Optionnel)",
 			"projectIdDescription": "L'identifiant unique du projet Linear à synchroniser",
 			"projectIdPlaceholder": "Créé automatiquement"
+		},
+		"figma": {
+			"title": "Figma",
+			"subtitle": "Lier des maquettes Figma aux tâches, lues comme des frames et des libellés",
+			"description": "Avec un jeton d'accès personnel, un lien Figma collé dans une tâche est lu par l'API Figma : les frames et leurs textes exacts, plutôt qu'un OCR d'un export. Le jeton est enregistré dans le .workpilot/.env du projet et n'est plus jamais affiché.",
+			"configured": "Un jeton est configuré pour ce projet.",
+			"fromEnvironment": "Un jeton est fourni par la variable d'environnement FIGMA_ACCESS_TOKEN.",
+			"notConfigured": "Aucun jeton configuré.",
+			"tokenLabel": "Jeton d'accès personnel",
+			"tokenPlaceholder": "figd_…",
+			"tokenHint": "Figma → Settings → Security → Personal access tokens (la lecture du contenu des fichiers suffit).",
+			"save": "Enregistrer",
+			"remove": "Retirer",
+			"invalidToken": "Ceci ne ressemble pas à un jeton Figma.",
+			"saveFailed": "Le jeton n'a pas pu être enregistré."
 		}
 	},
 	"jira": {

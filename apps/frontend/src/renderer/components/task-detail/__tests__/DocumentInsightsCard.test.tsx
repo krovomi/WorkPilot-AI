@@ -20,9 +20,11 @@ import "@testing-library/jest-dom";
 import type { Task } from "../../../../shared/types";
 
 const mockFetch = vi.fn();
+const mockLink = vi.fn();
 
 vi.mock("../../../lib/agent-tools-api", () => ({
 	fetchDocintel: (...args: unknown[]) => mockFetch(...args),
+	linkFigmaMockup: (...args: unknown[]) => mockLink(...args),
 	// The proposals panel inside the card: nothing to propose in these tests.
 	fetchDocintelDrafts: () =>
 		Promise.resolve({
@@ -41,6 +43,7 @@ vi.mock("react-i18next", () => ({
 	useTranslation: () => ({
 		t: (key: string, options?: Record<string, unknown>) =>
 			options && "count" in options ? `${key}:${options.count}` : key,
+		i18n: { language: "en" },
 	}),
 }));
 
@@ -64,6 +67,7 @@ function answer(
 			erd: null,
 			sequences: [],
 			apiTests: [],
+			figma: { configured: false },
 			...checks,
 		},
 	};
@@ -94,6 +98,39 @@ describe("DocumentInsightsCard", () => {
 		);
 		await waitFor(() => expect(mockFetch).toHaveBeenCalled());
 		expect(container).toBeEmptyDOMElement();
+	});
+
+	it("offers to link a Figma mockup when the project has a token", async () => {
+		mockFetch.mockResolvedValue(answer([], [], null, { figma: { configured: true } }));
+		mockLink.mockResolvedValueOnce({
+			ok: true,
+			data: {
+				result: {
+					status: "imported",
+					path: "attachments/Checkout.figma.json",
+					file_key: "k",
+					frames: 2,
+					texts: 5,
+					withheld: 0,
+					secrets: [],
+				},
+			},
+		});
+		render(<DocumentInsightsCard task={task} projectPath="/p" />);
+		const input = await screen.findByLabelText("tasks:docintel.figma.label");
+		fireEvent.change(input, {
+			target: { value: "https://www.figma.com/design/AbCdEf1234/X" },
+		});
+		fireEvent.click(screen.getByText("tasks:docintel.figma.link"));
+		await waitFor(() =>
+			expect(mockLink).toHaveBeenCalledWith(
+				expect.objectContaining({ projectDir: "/p", specId: "001-orders" }),
+				"https://www.figma.com/design/AbCdEf1234/X",
+			),
+		);
+		expect(
+			await screen.findByText("tasks:docintel.figma.imported"),
+		).toBeInTheDocument();
 	});
 
 	it("does not ask without a project", () => {

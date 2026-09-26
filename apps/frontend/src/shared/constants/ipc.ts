@@ -311,6 +311,10 @@ export const IPC_CHANNELS = {
 	JIRA_TEST_CONNECTION: "jira:testConnection",
 	JIRA_GET_ATTACHMENTS: "jira:getAttachments",
 
+	// Figma: the token is written, never read back
+	FIGMA_TOKEN_STATUS: "figma:tokenStatus",
+	FIGMA_SET_TOKEN: "figma:setToken",
+
 	// GitHub integration
 	GITHUB_GET_REPOSITORIES: "github:getRepositories",
 	GITHUB_GET_ISSUES: "github:getIssues",

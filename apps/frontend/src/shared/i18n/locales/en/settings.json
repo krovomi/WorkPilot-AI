@@ -1083,6 +1083,21 @@
 				"noBranchesFound": "No branches found",
 				"selectedBranchHelp": "Pull requests will target {{branch}}."
 			}
+		},
+		"figma": {
+			"title": "Figma",
+			"subtitle": "Link Figma mockups to tasks, read as frames and labels",
+			"description": "With a personal access token, a Figma link pasted in a task is read through the Figma API: frames and their exact texts, instead of an OCR of an export. The token is stored in this project's .workpilot/.env and never shown again.",
+			"configured": "A token is configured for this project.",
+			"fromEnvironment": "A token is provided by the FIGMA_ACCESS_TOKEN environment variable.",
+			"notConfigured": "No token configured.",
+			"tokenLabel": "Personal access token",
+			"tokenPlaceholder": "figd_…",
+			"tokenHint": "Figma → Settings → Security → Personal access tokens (read-only file content is enough).",
+			"save": "Save",
+			"remove": "Remove",
+			"invalidToken": "This does not look like a Figma token.",
+			"saveFailed": "The token could not be saved."
 		}
 	},
 	"accounts": {

@@ -18,6 +18,7 @@ import { ChannelNotificationsIntegration } from "../integrations/ChannelNotifica
 import { CICDPipelineIntegration } from "../integrations/CICDPipelineIntegration";
 import { GitHubIntegration } from "../integrations/GitHubIntegration";
 import { GitLabIntegration } from "../integrations/GitLabIntegration";
+import { FigmaIntegration } from "../integrations/FigmaIntegration";
 import { JiraIntegration } from "../integrations/JiraIntegration";
 import { LinearIntegration } from "../integrations/LinearIntegration";
 import type { ProjectSettingsSection } from "../ProjectSettingsContent";
@@ -267,6 +268,22 @@ export function SectionRouter({
 							showJiraToken={showAzureDevOpsToken}
 							setShowJiraToken={setShowAzureDevOpsToken}
 						/>
+					</InitializationGuard>
+				</SettingsSection>
+			);
+
+		case "figma":
+			return (
+				<SettingsSection
+					title={t("integrations.figma.title")}
+					description={t("integrations.figma.subtitle")}
+				>
+					<InitializationGuard
+						initialized={!!project.autoBuildPath}
+						title={t("integrations.figma.title")}
+						description={t("integrations.figma.subtitle")}
+					>
+						<FigmaIntegration projectId={project.id} />
 					</InitializationGuard>
 				</SettingsSection>
 			);
