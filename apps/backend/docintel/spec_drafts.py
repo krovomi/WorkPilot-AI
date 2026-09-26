@@ -39,6 +39,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .files import writable
 from .tables import RuleTable, TestDraft, drafts_for, project_languages
 
 logger = logging.getLogger(__name__)
@@ -444,15 +445,9 @@ def load_drafts(spec_dir: Path) -> DraftSet | None:
     return DraftSet.from_dict(payload) if isinstance(payload, dict) else None
 
 
-def _writable(target: Path, spec_dir: Path) -> bool:
-    from .preflight import _writable as writable
-
-    return writable(target, Path(spec_dir))
-
-
 def save_drafts(spec_dir: Path, drafts: DraftSet) -> None:
     target = drafts_path(spec_dir)
-    if not _writable(target, spec_dir):
+    if not writable(target, spec_dir):
         logger.warning("docintel: refusing to write through a symlink: %s", target)
         return
     try:
@@ -527,7 +522,9 @@ def refresh(
             try:
                 drafts_path(spec_dir).unlink()
             except OSError:
-                pass
+                # A stale file that cannot be removed only keeps old proposals
+                # on screen; the next reading that has any overwrites it.
+                logger.debug("docintel: could not remove %s", drafts_path(spec_dir))
         return None
     _number(
         drafts.requirements,
@@ -705,7 +702,7 @@ def decide(
             table.status = "rejected"
 
     if lines or decision.criteria:
-        if spec_path.is_file() and _writable(spec_path, spec_dir):
+        if spec_path.is_file() and writable(spec_path, spec_dir):
             try:
                 spec_path.write_text(
                     _insert_section(spec_text, lines, decision.criteria),

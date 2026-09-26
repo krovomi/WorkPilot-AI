@@ -873,8 +873,10 @@ def draft_for(
     style = "snake" if target in ("python", "rust", "ruby") else "camel"
     shape = _Shape(table, target, style)
     notes = [
-        "The table does not name the function it specifies: replace the "
-        "placeholder call with the rule under test.",
+        (
+            "The table does not name the function it specifies: replace the "
+            "placeholder call with the rule under test."
+        ),
     ]
     if target == "csharp":
         code = _csharp(shape, framework)

@@ -41,6 +41,7 @@ from pathlib import Path
 
 from . import redact, settings
 from .diagrams import parse_diagram
+from .files import IMAGE_EXTENSIONS, attachment_paths, threat, writable
 from .models import DiagramEdge, DiagramModel, DiagramNode
 
 logger = logging.getLogger(__name__)
@@ -239,12 +240,6 @@ def is_generated(data: bytes) -> bool:
     return f'host="{HOST_MARKER}"'.encode() in data[:400]
 
 
-def _threat(text: str) -> str:
-    from .preflight import _threat as threat
-
-    return threat(text, source="whiteboard")
-
-
 def _conformance(
     diagram: DiagramModel, relative: str, project_dir: Path | None
 ) -> dict | None:
@@ -277,7 +272,6 @@ def convert(
 ) -> WhiteboardResult:
     """Photo -> `attachments/<name>.whiteboard.drawio`. Never raises."""
     from .engines.ollama_vision import ask
-    from .preflight import IMAGE_EXTENSIONS, _writable, attachment_paths
 
     spec_dir = Path(spec_dir)
     env = settings.project_env(project_dir) if env is None else env
@@ -329,7 +323,7 @@ def convert(
         + "\n"
         + "\n".join(e.label for e in diagram.edges if e.label)
     )
-    if _threat(labels) != "safe":
+    if threat(labels, source="whiteboard") != "safe":
         return WhiteboardResult(status="injection")
 
     target = image.with_name(image.stem + SUFFIX)
@@ -341,7 +335,7 @@ def convert(
                 )
         except OSError:
             return WhiteboardResult(status="write-failed")
-    if not _writable(target, spec_dir):
+    if not writable(target, spec_dir):
         return WhiteboardResult(status="write-failed")
     data = to_drawio(diagram, f"{image.name} (vision model — verify)")
     try:
