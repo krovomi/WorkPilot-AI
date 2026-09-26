@@ -2476,6 +2476,42 @@
 			"task_class": "Classe de tâche",
 			"coverage": "Couverture (0–2)",
 			"risk": "Risque (0–2)"
+		},
+		"card": {
+			"title": "Second avis JEV",
+			"subtitle": "Service externe TypeSafe, facultatif : il classe la tâche et note la couverture et le risque du diff avant le planning et la QA. Sans lui, le workflow continue normalement.",
+			"state": {
+				"ready": "prêt",
+				"unknown": "état inconnu",
+				"disabled": "désactivé",
+				"workflow_bypass": "contourné ici",
+				"offline": "hors-ligne",
+				"missing_key": "clé API manquante"
+			},
+			"historyNote": "Dernière évaluation · révision {{revision}} · indicatif, n'approuve rien.",
+			"lastBypassed": "Dernier passage : {{reason}}.",
+			"noRunYet": "Aucune évaluation encore : elle apparaîtra ici après le prochain planning.",
+			"forWorkflow": "Pour « {{workflow}} » :",
+			"modes": {
+				"inherit": "Réglage global",
+				"enabled": "Activé",
+				"bypass": "Contourné"
+			},
+			"addKey": "Ajouter la clé API",
+			"settings": "Réglages JEV",
+			"offlineHint": "Le mode hors-ligne strict est actif : JEV n'est jamais appelé, quel que soit ce réglage.",
+			"scale": {
+				"coverage": {
+					"0": "faible",
+					"1": "partielle",
+					"2": "bonne"
+				},
+				"risk": {
+					"0": "faible",
+					"1": "modéré",
+					"2": "élevé"
+				}
+			}
 		}
 	}
 }

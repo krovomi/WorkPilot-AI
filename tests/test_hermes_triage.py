@@ -48,6 +48,13 @@ from learning_loop.hermes_triage import (  # noqa: E402
 CATALOGUE = "version: 1.1.0\nauthor: community\nlicense: MIT\n"
 
 
+@pytest.fixture(autouse=True)
+def _no_brain(tmp_path, monkeypatch):
+    """A kept skill is filed in the brain (`hermes.brain_link`): never in the
+    brain of whoever runs the suite."""
+    monkeypatch.setenv("WORKPILOT_BRAIN_DIR", str(tmp_path / "absent-brain"))
+
+
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
     """A checkout that declares the same hermes scope this repository does."""

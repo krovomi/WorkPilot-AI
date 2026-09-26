@@ -74,7 +74,6 @@ import {
 } from "../ui/dialog-maximize";
 import { Progress } from "../ui/progress";
 import { ScrollArea } from "../ui/scroll-area";
-import { Separator } from "../ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
 	Tooltip,
@@ -94,21 +93,13 @@ import { TaskFailureBanner } from "./TaskFailureBanner";
 import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask, resumeTask } from "../../stores/task-store";
-import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
-import { HermesLearningCard } from "./HermesLearningCard";
-import { BrainTaskCard } from "./BrainTaskCard";
-import { RtkSavingsCard } from "./RtkSavingsCard";
 import {
 	shouldShowArchitectureDelta,
 	useArchitectureDelta,
 } from "../../stores/architecture-delta-store";
 import { TaskArchitectureDelta } from "./TaskArchitectureDelta";
-import { DocumentInsightsCard } from "./DocumentInsightsCard";
 import { TaskChangeGraph } from "./TaskChangeGraph";
-import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
-import { WorkflowProfileCard } from "./WorkflowProfileCard";
-import { SpecInterviewBanner } from "./SpecInterviewDialog";
-import { TaskMetadata as TaskMetadataComponent } from "./TaskMetadata";
+import { TaskOverview } from "./TaskOverview";
 import { TaskReview } from "./TaskReview";
 import { TaskSubtasks } from "./TaskSubtasks";
 import { TaskVisualProof } from "./TaskVisualProof";
@@ -1312,120 +1303,58 @@ function TaskDetailModalContent({
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
 									<ScrollArea className="h-full">
-										<div className="p-5 space-y-5 overflow-x-hidden max-w-full">
-											{/* Spec interview - clarify the spec before planning */}
-											<SpecInterviewBanner task={task} />
-
-											{/* Provider × LLM × Effort prerequisite for imported/duplicated tasks */}
-											<ExecutionFormulaBanner task={task} />
-
-											{/* What the chosen effort level actually runs, before it runs */}
-											<WorkflowProfileCard
-												task={task}
-												projectPath={
-													taskProject?.path ?? activeProject?.path
-												}
-											/>
-
-											{/* What the spec had to guess, and what the plan
-											    does not build. Renders nothing when there is
-											    neither. */}
-											<SpecTraceabilityCard
-												task={task}
-												projectPath={
-													taskProject?.path ?? activeProject?.path
-												}
-											/>
-
-											{/* Ce que les agents liront des pièces jointes
-											    (schémas, captures) et les ADR qui s'imposent.
-											    Ne s'affiche pas quand il n'y a ni l'un ni
-											    l'autre. */}
-											<DocumentInsightsCard
-												task={task}
-												projectPath={
-													taskProject?.path ?? activeProject?.path
-												}
-											/>
-
-											{/* La boucle d'apprentissage hermes : ce qu'il a
-											    appris ailleurs, déposé dans la file de revue.
-											    Ne s'affiche pas quand hermes n'est pas installé. */}
-											<HermesLearningCard />
-
-											{/* rtk : ce que la condensation de sortie a
-											    économisé sur ce projet. Ne s'affiche pas
-											    quand rtk n'est pas installé — la découverte
-											    se fait dans les Réglages. */}
-											<RtkSavingsCard
-												projectPath={
-													taskProject?.path ?? activeProject?.path
-												}
-											/>
-
-											{/* Le cerveau partagé : ce que cette tâche lui a
-											    appris, et les règles que ses agents proposent.
-											    Ne s'affiche que quand il y a quelque chose —
-											    la découverte se fait dans les Réglages. */}
-											<BrainTaskCard
-												task={task}
-												projectPath={
-													taskProject?.path ?? activeProject?.path
-												}
-											/>
-
-											{/* Metadata */}
-											<TaskMetadataComponent task={task} />
-
-											{/* Human Review Section */}
-											{state.needsReview && (
-												<>
-													<Separator />
-													<TaskReview
-														task={task}
-														feedback={state.feedback}
-														isSubmitting={state.isSubmitting}
-														worktreeStatus={state.worktreeStatus}
-														worktreeDiff={state.worktreeDiff}
-														isLoadingWorktree={state.isLoadingWorktree}
-														isMerging={state.isMerging}
-														isDiscarding={state.isDiscarding}
-														showDiscardDialog={state.showDiscardDialog}
-														showDiffDialog={state.showDiffDialog}
-														workspaceError={state.workspaceError}
-														stageOnly={state.stageOnly}
-														stagedSuccess={state.stagedSuccess}
-														stagedProjectPath={state.stagedProjectPath}
-														suggestedCommitMessage={
-															state.suggestedCommitMessage
-														}
-														mergePreview={state.mergePreview}
-														isLoadingPreview={state.isLoadingPreview}
-														showConflictDialog={state.showConflictDialog}
-														onFeedbackChange={state.setFeedback}
-														onReject={handleReject}
-														images={state.feedbackImages}
-														onImagesChange={state.setFeedbackImages}
-														onMerge={handleMerge}
-														onDiscard={handleDiscard}
-														onShowDiscardDialog={state.setShowDiscardDialog}
-														onShowDiffDialog={state.setShowDiffDialog}
-														onStageOnlyChange={state.setStageOnly}
-														onShowConflictDialog={state.setShowConflictDialog}
-														onLoadMergePreview={state.loadMergePreview}
-														onClose={handleClose}
-														onReviewAgain={state.handleReviewAgain}
-														showPRDialog={state.showPRDialog}
-														isCreatingPR={state.isCreatingPR}
-														onShowPRDialog={state.setShowPRDialog}
-														onCreatePR={handleCreatePR}
-														onRefreshDiff={state.refreshWorktreeDiff}
-														isCompleting={state.isCompleting}
-														onComplete={handleComplete}
-													/>
-												</>
-											)}
-										</div>
+										{/* Rangée par la question que se pose la personne :
+										    à traiter, la tâche, le plan, la mémoire. */}
+										<TaskOverview
+											task={task}
+											projectPath={taskProject?.path ?? activeProject?.path}
+											review={
+												state.needsReview ? (
+												<TaskReview
+													task={task}
+													feedback={state.feedback}
+													isSubmitting={state.isSubmitting}
+													worktreeStatus={state.worktreeStatus}
+													worktreeDiff={state.worktreeDiff}
+													isLoadingWorktree={state.isLoadingWorktree}
+													isMerging={state.isMerging}
+													isDiscarding={state.isDiscarding}
+													showDiscardDialog={state.showDiscardDialog}
+													showDiffDialog={state.showDiffDialog}
+													workspaceError={state.workspaceError}
+													stageOnly={state.stageOnly}
+													stagedSuccess={state.stagedSuccess}
+													stagedProjectPath={state.stagedProjectPath}
+													suggestedCommitMessage={
+														state.suggestedCommitMessage
+													}
+													mergePreview={state.mergePreview}
+													isLoadingPreview={state.isLoadingPreview}
+													showConflictDialog={state.showConflictDialog}
+													onFeedbackChange={state.setFeedback}
+													onReject={handleReject}
+													images={state.feedbackImages}
+													onImagesChange={state.setFeedbackImages}
+													onMerge={handleMerge}
+													onDiscard={handleDiscard}
+													onShowDiscardDialog={state.setShowDiscardDialog}
+													onShowDiffDialog={state.setShowDiffDialog}
+													onStageOnlyChange={state.setStageOnly}
+													onShowConflictDialog={state.setShowConflictDialog}
+													onLoadMergePreview={state.loadMergePreview}
+													onClose={handleClose}
+													onReviewAgain={state.handleReviewAgain}
+													showPRDialog={state.showPRDialog}
+													isCreatingPR={state.isCreatingPR}
+													onShowPRDialog={state.setShowPRDialog}
+													onCreatePR={handleCreatePR}
+													onRefreshDiff={state.refreshWorktreeDiff}
+													isCompleting={state.isCompleting}
+													onComplete={handleComplete}
+												/>
+												) : undefined
+											}
+										/>
 									</ScrollArea>
 								</TabsContent>
 

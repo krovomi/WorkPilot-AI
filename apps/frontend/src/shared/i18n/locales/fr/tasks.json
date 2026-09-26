@@ -1551,5 +1551,26 @@
 			"shared": "Ajouté des deux côtés : {{items}}.",
 			"handles": "{{from}} traite {{to}}."
 		}
+	},
+	"overview": {
+		"nav": "Sections de la vue d'ensemble",
+		"sections": {
+			"review": {
+				"title": "À traiter",
+				"hint": "La tâche attend votre revue : relisez, testez, puis mergez ou demandez des changements."
+			},
+			"task": {
+				"title": "La tâche",
+				"hint": "Ce qui est demandé : description, critères d'acceptation, contexte."
+			},
+			"plan": {
+				"title": "Plan d'exécution",
+				"hint": "Ce que les agents vont faire, avec quel effort, et ce qu'ils liront."
+			},
+			"learning": {
+				"title": "Mémoire & apprentissage",
+				"hint": "Ce que le système retient — et ce qui attend votre décision."
+			}
+		}
 	}
 }
