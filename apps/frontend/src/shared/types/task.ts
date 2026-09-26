@@ -361,6 +361,13 @@ export interface TaskMetadata {
 	 */
 	blockedBy?: string[];
 	acceptanceCriteria?: string[]; // What defines "done"
+	/**
+	 * Set when the user emptied the criteria list while the description states
+	 * some: without it the section would read them back from the description on
+	 * the next render, and "delete them all" would silently undo itself. `[]`
+	 * alone cannot say it — roadmap and tracker imports write `[]` by default.
+	 */
+	ignoreDescriptionCriteria?: boolean;
 	extraNote?: string; // Free-form note added on the Kanban card; injected
 	// into requirements.json as additional_context for every pipeline phase.
 
