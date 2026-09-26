@@ -1203,7 +1203,9 @@
 			"adrs": "{{count}} ADR acceptée",
 			"adrs_other": "{{count}} ADR acceptées",
 			"flagged": "{{count}} signalée",
-			"flagged_other": "{{count}} signalées"
+			"flagged_other": "{{count}} signalées",
+			"secrets": "{{count}} secret masqué",
+			"secrets_other": "{{count}} secrets masqués"
 		},
 		"attachments": {
 			"title": "Pièces jointes"
@@ -1218,20 +1220,27 @@
 			"text": "texte",
 			"image": "image",
 			"document": "document",
-			"skipped": "ignoré"
+			"skipped": "ignoré",
+			"redacted": "masquée",
+			"withheld": "retenue"
 		},
 		"detail": {
 			"diagram": "schéma {{engine}} lu depuis sa source : {{nodes}} éléments, {{edges}} flèches",
 			"text": "texte lu tel quel",
-			"ocr": "transcrit par l'OCR local",
+			"ocr": "transcrit par OCR ({{engine}})",
 			"image": "remise aux agents comme image ({{reason}})",
 			"document": "converti par les agents avec le skill de documents",
 			"skipped": "non lu ({{reason}})",
-			"flagged": "texte retiré du prompt : il ressemble à une instruction adressée à l'agent"
+			"flagged": "texte retiré du prompt : il ressemble à une instruction adressée à l'agent",
+			"described": "décrit par un modèle de vision local ({{engine}})",
+			"redacted": "secret à l'écran ({{kinds}}) : les agents reçoivent une copie où il est masqué",
+			"withheld": "non transmise aux agents : elle montre un secret impossible à masquer ({{kinds}})",
+			"withheldInjection": "non transmise aux agents : un texte de l'image ressemble à une instruction qui leur est adressée",
+			"secretsInText": "secrets masqués dans le texte ({{kinds}})"
 		},
 		"reason": {
 			"disabled": "OCR local désactivé",
-			"no-engine": "Tesseract n'est pas installé",
+			"no-engine": "aucun moteur d'OCR installé (Tesseract par défaut)",
 			"timeout": "OCR trop long",
 			"failed": "échec de l'OCR",
 			"empty": "aucun texte trouvé",
@@ -1239,7 +1248,20 @@
 			"unreadable": "fichier illisible",
 			"no-diagram": "aucun schéma embarqué",
 			"unsupported": "format non pris en charge",
-			"unknown": "raison inconnue"
+			"unknown": "raison inconnue",
+			"airgap": "OCR cloud refusé : le projet est en mode hors-ligne strict",
+			"no-project": "OCR cloud refusé : aucune politique de projet à vérifier",
+			"deferred": "lue par le moteur de vision ou cloud au moment du build",
+			"not-installed": "moteur d'OCR non installé",
+			"not-configured": "moteur d'OCR non configuré",
+			"unknown-engine": "nom de moteur d'OCR inconnu",
+			"remote-host": "le modèle de vision tourne sur une autre machine",
+			"model-not-installed": "modèle de vision absent d'Ollama",
+			"server-unreachable": "Ollama n'est pas démarré",
+			"secret-no-boxes": "le moteur n'a donné aucune position à masquer",
+			"secret-no-pillow": "Pillow n'est pas installé pour le masquer",
+			"redaction-failed": "la copie masquée n'a pas pu être écrite",
+			"secret-scan-unavailable": "les secrets n'ont pas pu être vérifiés"
 		}
 	},
 	"changeGraph": {
