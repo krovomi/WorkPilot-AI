@@ -52,6 +52,15 @@ DEFAULT_PDF_MAX_PAGES = 20
 
 def project_env(project_dir: Path | None) -> dict[str, str]:
     """The environment, with `.workpilot/.env` underneath it."""
+    return read_keys(project_dir, _KEYS)
+
+
+def read_keys(project_dir: Path | None, keys: tuple[str, ...]) -> dict[str, str]:
+    """`keys` from `.workpilot/.env`, a real environment variable winning.
+
+    Only the keys asked for: the file also holds every integration's token,
+    and a reader that loads them all hands a Jira token to an OCR engine.
+    """
     values: dict[str, str] = {}
     if project_dir is not None:
         path = Path(project_dir) / ".workpilot" / ".env"
@@ -64,9 +73,9 @@ def project_env(project_dir: Path | None) -> dict[str, str]:
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key, raw = line.split("=", 1)
-            if key.strip() in _KEYS:
+            if key.strip() in keys:
                 values[key.strip()] = raw.strip().strip("\"'")
-    for key in _KEYS:
+    for key in keys:
         if key in os.environ:
             values[key] = os.environ[key]
     return values

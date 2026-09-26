@@ -11,7 +11,8 @@ import type {
 } from "../../../shared/types";
 import type { AgentManager } from "../../agent";
 import { projectStore } from "../../project-store";
-import { createSpecForIssue } from "./spec-utils";
+import { attachGitLabIssueImages } from "../shared/issue-attachments";
+import { createSpecForIssue, gitlabSpecDir } from "./spec-utils";
 import type { GitLabAPIIssue, GitLabAPINote } from "./types";
 import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 
@@ -195,6 +196,15 @@ export function registerInvestigateIssue(
 					);
 					return;
 				}
+
+				await attachGitLabIssueImages(
+					config.token,
+					config.instanceUrl,
+					config.project,
+					issue.description,
+					issue.iid,
+					gitlabSpecDir(project, task.specId),
+				);
 
 				// Phase 4: Complete
 				sendProgress(getMainWindow, project.id, {

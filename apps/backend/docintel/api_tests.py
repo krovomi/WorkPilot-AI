@@ -664,6 +664,10 @@ def exchanges_from_attachments(spec_dir: Path) -> list[ApiExchange]:
     for doc in result.documents:
         if doc.threat != "safe" or doc.status in ("withheld", "diagram"):
             continue
+        if doc.engine == "figma":
+            # A mockup's labels, not a request: `POST /orders` on a button is
+            # not an HTTP call anybody captured.
+            continue
         text = full_text(doc, Path(spec_dir))
         if not text:
             continue

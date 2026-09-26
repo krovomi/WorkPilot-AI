@@ -83,6 +83,7 @@ import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 import { registerIdeationHandlers } from "./ideation-handlers";
 import { registerInsightsHandlers } from "./insights-handlers";
+import { registerFigmaHandlers } from "./figma-handlers";
 import { registerJiraHandlers } from "./jira-handlers";
 import { registerLearningLoopHandlers } from "./learning-loop-handlers";
 import { registerLinearHandlers } from "./linear-handlers";
@@ -345,6 +346,7 @@ export function setupIpcHandlers(
 
 	// Jira integration handlers
 	registerJiraHandlers(agentManager, getMainWindow);
+	registerFigmaHandlers();
 
 	// GitHub integration handlers
 	registerGithubHandlers(agentManager, getMainWindow);

@@ -69,7 +69,9 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "brain_recall",
         "description": "Rappel graph-first : nœuds du graphe qui correspondent, leurs voisins et leur "
-        "frontmatter — sans ouvrir les fichiers. À appeler AVANT brain_read_note.",
+        "frontmatter — sans ouvrir les fichiers. Trouve aussi une image du vault (capture, "
+        "schéma) par son texte lu en local : la ligne qui correspond est dans `match`. "
+        "À appeler AVANT brain_read_note.",
         "inputSchema": _schema(
             {
                 "query": {**_STR, "description": "le sujet cherché"},

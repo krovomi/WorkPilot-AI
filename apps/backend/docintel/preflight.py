@@ -26,7 +26,7 @@ import logging
 import re
 from pathlib import Path
 
-from . import pdf, redact, settings
+from . import figma, pdf, redact, settings
 from .diagnostics import diagnose
 from .diagrams import parse_diagram, render_diagram
 from .files import (
@@ -37,9 +37,10 @@ from .files import (
 from .files import clean as _clean
 from .files import threat as _threat
 from .files import writable as _writable
+from .knowledge import record_validated
 from .models import DocintelResult, ExtractedDocument
 from .ocr import OcrBox, OcrOutcome, ocr_image
-from .spec_drafts import SourceText, refresh
+from .spec_drafts import SourceText, load_drafts, refresh
 from .stacktrace import RepoIndex
 from .tables import RuleTable, tables_from_boxes, tables_from_text
 from .whiteboard import is_generated
@@ -217,6 +218,14 @@ def _extract(
                 described=is_generated(data),
             )
             return doc, None
+
+    if figma.is_figma_file(path):
+        # A linked Figma mockup: labels by frame, read as the structured text
+        # it is — never handed to the HTTP-capture reader as "some JSON".
+        document = figma.read_figma(data.decode("utf-8", errors="replace"))
+        if document is None:
+            return _doc(relative, "skipped", reason="invalid-figma")
+        return _doc(relative, "text", engine="figma", text=figma.render_figma(document))
 
     if suffix in TEXT_EXTENSIONS:
         text = data.decode("utf-8", errors="replace").strip()
@@ -499,6 +508,9 @@ def run_preflight(
         result.documents.append(doc)
     if persist:
         _refresh_drafts(spec_dir, sources, project_dir)
+        # A whiteboard diagram a person saved since the last build is
+        # validated knowledge; the note is only rewritten when it changed.
+        record_validated(spec_dir, project_dir, load_drafts(spec_dir))
     return _persist(spec_dir, result) if persist else result
 
 

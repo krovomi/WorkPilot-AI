@@ -151,6 +151,7 @@ export type ProjectSettingsSection =
 	| "general"
 	| "azure-devops"
 	| "jira"
+	| "figma"
 	| "cicd"
 	| "github"
 	| "gitlab"
@@ -219,6 +220,7 @@ const createSettingsThemes = (t: {
 				type: "app",
 			},
 			{ id: "jira", icon: JiraIcon, label: "Jira", type: "project" },
+			{ id: "figma", icon: Palette, label: "Figma", type: "project" },
 			{ id: "linear", icon: Zap, label: "Linear", type: "project" },
 			{
 				id: "memory",

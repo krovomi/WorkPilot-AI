@@ -13,6 +13,7 @@ import { useDocintelStore } from "../../stores/docintel-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { AttachmentDraftsPanel } from "./AttachmentDraftsPanel";
+import { FigmaLinkRow } from "./FigmaLinkRow";
 
 export interface DocumentInsightsCardProps {
 	readonly task: Task;
@@ -47,8 +48,12 @@ export interface DocumentInsightsCardProps {
  * dans le code (vérifiés sur total), et chaque appel HTTP joint (Postman,
  * OpenAPI, capture) devenu un test d'intégration, avec sa destination.
  *
+ * Quand le projet a un jeton Figma, elle offre aussi de lier une maquette : ses
+ * frames et leurs libellés sont lus par l'API et joints à la tâche.
+ *
  * Elle ne s'affiche que quand elle a quelque chose à dire : ni pièce jointe, ni
- * ADR, ni trace, ni schéma à confronter au code, pas de carte.
+ * ADR, ni trace, ni schéma à confronter au code, ni maquette à lier, pas de
+ * carte.
  */
 export function DocumentInsightsCard({
 	task,
@@ -84,6 +89,7 @@ export function DocumentInsightsCard({
 	const sequences = data.sequences ?? [];
 	const apiTests = data.apiTests ?? [];
 	const codeChecks = erd !== null || sequences.length > 0 || apiTests.length > 0;
+	const figmaReady = data.figma?.configured === true;
 	const diagnosed =
 		documents.filter((doc) => doc.diagnosis).length + (fromDescription ? 1 : 0);
 
@@ -92,7 +98,8 @@ export function DocumentInsightsCard({
 		binding.length === 0 &&
 		proposed.length === 0 &&
 		!fromDescription &&
-		!codeChecks
+		!codeChecks &&
+		!figmaReady
 	) {
 		return null;
 	}
@@ -156,6 +163,8 @@ export function DocumentInsightsCard({
 			{/* Ce que les pièces jointes proposent : exigences, critères, tableaux
 			    de règles, schéma d'un tableau blanc. Rien quand rien n'est à proposer. */}
 			<AttachmentDraftsPanel task={task} projectPath={projectPath} />
+
+			{figmaReady && <FigmaLinkRow task={task} projectPath={projectPath} />}
 
 			{expanded && (
 				<div className="space-y-3 border-t border-border p-3">
