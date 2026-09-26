@@ -551,7 +551,9 @@ def mockup_sources(
             and doc.threat == "safe"
             and doc.status in ("text", "redacted")
         ):
-            labels = labels_from_text(doc.text)
+            # The record's text was masked when it was written; masked again
+            # here because `result.json` is a file on disk, not a promise.
+            labels = _mask_all(labels_from_text(doc.text)) or []
         else:
             try:
                 fresh, boxes = read_screen(

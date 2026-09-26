@@ -748,3 +748,37 @@ def test_one_capture_that_raises_is_a_reason(project, spec_dir, ocr, monkeypatch
         "captures/task/web--orders.png": "read",
     }
     assert any(f["kind"] == "untranslated-key" for f in record.findings)
+
+
+def test_a_mockup_read_from_the_record_is_masked_again(project, spec_dir, ocr):
+    """`result.json` is a file on disk: a secret written into it by hand, or
+    by a version that did not mask, never reaches a label."""
+    key = "AKIA" + "IOSFODNN7EXAMPLE"
+    ocr({"task/web--orders": "Mes commandes"})
+    capture(spec_dir, "task", "web--orders")
+    (spec_dir / "attachments" / "mockup-orders.png").write_bytes(png())
+    record_dir = spec_dir / "docintel"
+    record_dir.mkdir()
+    (record_dir / "result.json").write_text(
+        json.dumps(
+            {
+                "documents": [
+                    {
+                        "path": "attachments/mockup-orders.png",
+                        "status": "text",
+                        "text": f"Mes commandes\nCle {key}",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    visual_qa.run_visual_qa(spec_dir, project)
+    assert key not in visual_qa.record_path(spec_dir).read_text(encoding="utf-8")
+
+
+def test_the_qa_loop_imports_the_visual_qa_steps_at_module_level():
+    from qa import loop
+
+    assert loop.run_visual_qa is not None
+    assert loop.write_visual_qa_report is not None

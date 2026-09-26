@@ -52,6 +52,8 @@ from .report import (
     has_recurring_issues,
     is_no_test_project,
     record_iteration,
+    run_visual_qa,
+    write_visual_qa_report,
 )
 from .reviewer import run_qa_agent_session
 
@@ -557,8 +559,6 @@ async def run_qa_validation_loop(
 
         # What the captures of the running app show — OCR'd before the
         # reviewer's prompt is built, so the section it reads is current.
-        from .report import run_visual_qa, write_visual_qa_report
-
         if (visual := run_visual_qa(spec_dir, project_dir)) is not None:
             print(
                 "🖼  Visual QA: "
