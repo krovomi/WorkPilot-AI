@@ -77,3 +77,14 @@ it("jumps to a section from the navigation bar", () => {
 	within(nav).getByRole("button", { name: /Execution plan/ }).click();
 	expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
 });
+
+it("keeps the navigation bar outside the scrolling area, so it never scrolls away", () => {
+	show.plan = false;
+	show.learning = false;
+	render(<TaskOverview task={task} />);
+	const nav = screen.getByRole("navigation", { name: "Overview sections" });
+	expect(nav.closest("[data-radix-scroll-area-viewport]")).toBeNull();
+	expect(screen.getByText("the description").closest("[data-radix-scroll-area-viewport]")).not.toBeNull();
+	// Rendered even with a single section: a bar that appears later pushes the content down.
+	expect(within(nav).getByRole("button", { name: /The task/ })).toBeInTheDocument();
+});

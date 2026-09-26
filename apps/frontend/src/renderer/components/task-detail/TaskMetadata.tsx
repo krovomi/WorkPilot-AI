@@ -20,7 +20,16 @@ import {
 	Users,
 	Wrench,
 } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+	type KeyboardEvent,
+	type MouseEvent,
+	useEffect,
+	useId,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
@@ -46,6 +55,7 @@ import {
 	toCriteria,
 	toDrafts,
 } from "./acceptance-criteria-draft";
+import { extractAcceptanceCriteriaFromDescription } from "../../../shared/utils/acceptance-criteria";
 import { TaskBlockers } from "./TaskBlockers";
 
 // Schéma de sanitization personnalisé permettant les styles inline
@@ -108,6 +118,8 @@ const CategoryIcon: Record<TaskCategory, typeof Target> = {
 
 interface TaskMetadataProps {
 	readonly task: Task;
+	/** Faux pendant qu'un agent tourne : description et critères en lecture seule. */
+	readonly editable?: boolean;
 }
 
 // Height threshold for collapsing long descriptions (~8 lines)
@@ -147,8 +159,9 @@ const CustomTableComponent = (props: any) => {
 	);
 };
 
-export function TaskMetadata({ task }: TaskMetadataProps) {
+export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 	const { t } = useTranslation(["tasks", "errors"]);
+	const { toast } = useToast();
 	const formatRelativeTime = useFormatRelativeTime();
 	const [isExpanded, setIsExpanded] = useState(true); // Start expanded by default
 	const [hasOverflow, setHasOverflow] = useState(false);
@@ -165,6 +178,55 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 		}
 		return task.description;
 	})();
+
+	// Édition en place : l'encart de la description est le champ. Une
+	// description en erreur JSON n'est pas un texte à éditer — c'est un message
+	// qui décrit un fichier illisible, et l'enregistrer l'écrirait dans la spec.
+	const [isEditingDescription, setIsEditingDescription] = useState(false);
+	const canEditDescription =
+		editable && !task.description?.startsWith(JSON_ERROR_PREFIX);
+
+	// Un agent qui démarre pendant l'édition referme l'éditeur sans écrire.
+	useEffect(() => {
+		if (!canEditDescription) setIsEditingDescription(false);
+	}, [canEditDescription]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a new task closes the editor
+	useEffect(() => {
+		setIsEditingDescription(false);
+	}, [task.id]);
+
+	const startEditingDescription = () => {
+		if (canEditDescription) setIsEditingDescription(true);
+	};
+
+	// Un clic sur l'encart ouvre l'éditeur — sauf s'il visait un lien, le
+	// bouton « Afficher plus », ou s'il terminait une sélection de texte :
+	// copier une phrase de la description ne doit pas la transformer en champ.
+	const onDescriptionClick = (event: MouseEvent<HTMLElement>) => {
+		if (!canEditDescription) return;
+		const target = event.target as HTMLElement;
+		if (target.closest("a, button, input, textarea, summary, img")) return;
+		const selection = globalThis.getSelection?.();
+		if (selection && !selection.isCollapsed && selection.toString().trim()) return;
+		setIsEditingDescription(true);
+	};
+
+	const saveDescription = async (next: string): Promise<boolean> => {
+		const ok = await persistUpdateTask(task.id, { description: next });
+		if (ok) {
+			setIsEditingDescription(false);
+			// La description a changé de taille : on réévalue le repli.
+			setUserManuallyExpanded(false);
+		} else {
+			toast({
+				title: t("tasks:inlineEdit.saveErrorTitle"),
+				description: t("tasks:inlineEdit.descriptionSaveError"),
+				variant: "destructive",
+			});
+		}
+		return ok;
+	};
 
 	// Détecter si le contenu est du HTML pur (commence par une balise HTML)
 	const isHtmlContent = displayDescription?.trim().startsWith("<") || false;
@@ -449,106 +511,48 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 
 	return (
 		<div className="space-y-5">
-			{/* Compact Metadata Bar: Classification + Timeline */}
-			<div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border">
-				{/* Classification Badges - Left */}
-				{hasClassification && (
-					<div className="flex flex-wrap items-center gap-1.5">
-						{/* Category */}
-						{task.metadata?.category && (
-							<Badge
-								variant="outline"
-								className={cn(
-									"text-xs",
-									TASK_CATEGORY_COLORS[task.metadata.category],
-								)}
-							>
-								{CategoryIcon[task.metadata.category] &&
-									(() => {
-										const Icon = CategoryIcon[task.metadata.category];
-										return <Icon className="h-3 w-3 mr-1" />;
-									})()}
-								{TASK_CATEGORY_LABELS[task.metadata.category]}
-							</Badge>
-						)}
-						{/* Priority */}
-						{task.metadata?.priority && (
-							<Badge
-								variant="outline"
-								className={cn(
-									"text-xs",
-									TASK_PRIORITY_COLORS[task.metadata.priority],
-								)}
-							>
-								{TASK_PRIORITY_LABELS[task.metadata.priority]}
-							</Badge>
-						)}
-						{/* Complexity */}
-						{task.metadata?.complexity && (
-							<Badge
-								variant="outline"
-								className={cn(
-									"text-xs",
-									TASK_COMPLEXITY_COLORS[task.metadata.complexity],
-								)}
-							>
-								{TASK_COMPLEXITY_LABELS[task.metadata.complexity]}
-							</Badge>
-						)}
-						{/* Impact */}
-						{task.metadata?.impact && (
-							<Badge
-								variant="outline"
-								className={cn(
-									"text-xs",
-									TASK_IMPACT_COLORS[task.metadata.impact],
-								)}
-							>
-								{TASK_IMPACT_LABELS[task.metadata.impact]}
-							</Badge>
-						)}
-						{/* Security Severity */}
-						{task.metadata?.securitySeverity && (
-							<Badge
-								variant="outline"
-								className={cn(
-									"text-xs",
-									TASK_IMPACT_COLORS[task.metadata.securitySeverity],
-								)}
-							>
-								<Shield className="h-3 w-3 mr-1" />
-								{task.metadata.securitySeverity}
-							</Badge>
-						)}
-						{/* Source Type */}
-						{task.metadata?.sourceType && (
-							<Badge variant="secondary" className="text-xs">
-								{task.metadata.sourceType === "ideation" &&
-								task.metadata.ideationType
-									? IDEATION_TYPE_LABELS[task.metadata.ideationType] ||
-										task.metadata.ideationType
-									: task.metadata.sourceType}
-							</Badge>
-						)}
-					</div>
+			{/* Description : l'encart de la tâche. Un clic l'ouvre en édition ;
+			    classification et dates sont son pied, pas une barre à part. */}
+			<div
+				className={cn(
+					"group/desc relative max-w-full overflow-hidden rounded-lg border bg-muted/30 transition-colors",
+					isEditingDescription
+						? "border-primary/50 ring-2 ring-primary/15"
+						: "border-border/60",
+					canEditDescription && !isEditingDescription && "hover:border-primary/40",
 				)}
-
-				{/* Timeline - Right */}
-				<div className="flex items-center gap-4 text-xs text-muted-foreground">
-					<span className="flex items-center gap-1.5">
-						<Clock className="h-3 w-3" />
-						{t("tasks:metadata.created")} {formatRelativeTime(task.createdAt)}
-					</span>
-					<span className="text-border">•</span>
-					<span>
-						{t("tasks:metadata.updated")} {formatRelativeTime(task.updatedAt)}
-					</span>
+			>
+				<div className="flex items-center justify-between gap-2 px-4 pt-3">
+					<h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+						{t("tasks:metadata.description")}
+					</h3>
+					{canEditDescription && !isEditingDescription && (
+						<button
+							type="button"
+							onClick={startEditingDescription}
+							className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground opacity-60 transition-opacity hover:bg-muted hover:text-foreground group-hover/desc:opacity-100 focus-visible:opacity-100"
+						>
+							<Pencil className="h-3 w-3" aria-hidden />
+							{t("tasks:metadata.descriptionEdit")}
+						</button>
+					)}
 				</div>
-			</div>
 
-			{/* Description - Primary Content */}
-			{displayDescription && (
-				<div className="bg-muted/30 rounded-lg px-4 py-3 border border-border/50 overflow-hidden max-w-full">
+				{isEditingDescription ? (
+					<DescriptionEditor
+						initial={task.description ?? ""}
+						onSave={saveDescription}
+						onCancel={() => setIsEditingDescription(false)}
+					/>
+				) : displayDescription ? (
+					// biome-ignore lint/a11y/useKeyWithClickEvents: the "Modifier" button above is the keyboard path; this is the pointer shortcut
+					// biome-ignore lint/a11y/noStaticElementInteractions: same — a role=button here would nest the description's own links
+					// biome-ignore lint/a11y/noNoninteractiveElementInteractions: same
+					<div
+						className={cn("px-4 pb-3 pt-1", canEditDescription && "cursor-text")}
+						onClick={onDescriptionClick}
+						title={canEditDescription ? t("tasks:metadata.descriptionClickHint") : undefined}
+					>
 					{/* Content container with conditional max-height */}
 					<div className="relative">
 						<div
@@ -688,8 +692,118 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 							</Button>
 						</div>
 					)}
+					</div>
+				) : canEditDescription ? (
+					<button
+						type="button"
+						onClick={startEditingDescription}
+						className="mx-4 mb-3 mt-1 flex w-[calc(100%-2rem)] items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-4 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+					>
+						<Pencil className="h-3.5 w-3.5" aria-hidden />
+						{t("tasks:metadata.descriptionAdd")}
+					</button>
+				) : (
+					<p className="px-4 pb-3 pt-1 text-sm italic text-muted-foreground">
+						{t("tasks:metadata.descriptionEmpty")}
+					</p>
+				)}
+
+				<div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 bg-background/30 px-4 py-2">
+					{hasClassification ? (
+						<div className="flex flex-wrap items-center gap-1.5">
+							{/* Category */}
+							{task.metadata?.category && (
+								<Badge
+									variant="outline"
+									className={cn(
+										"text-xs",
+										TASK_CATEGORY_COLORS[task.metadata.category],
+									)}
+								>
+									{CategoryIcon[task.metadata.category] &&
+										(() => {
+											const Icon = CategoryIcon[task.metadata.category];
+											return <Icon className="h-3 w-3 mr-1" />;
+										})()}
+									{TASK_CATEGORY_LABELS[task.metadata.category]}
+								</Badge>
+							)}
+							{/* Priority */}
+							{task.metadata?.priority && (
+								<Badge
+									variant="outline"
+									className={cn(
+										"text-xs",
+										TASK_PRIORITY_COLORS[task.metadata.priority],
+									)}
+								>
+									{TASK_PRIORITY_LABELS[task.metadata.priority]}
+								</Badge>
+							)}
+							{/* Complexity */}
+							{task.metadata?.complexity && (
+								<Badge
+									variant="outline"
+									className={cn(
+										"text-xs",
+										TASK_COMPLEXITY_COLORS[task.metadata.complexity],
+									)}
+								>
+									{TASK_COMPLEXITY_LABELS[task.metadata.complexity]}
+								</Badge>
+							)}
+							{/* Impact */}
+							{task.metadata?.impact && (
+								<Badge
+									variant="outline"
+									className={cn(
+										"text-xs",
+										TASK_IMPACT_COLORS[task.metadata.impact],
+									)}
+								>
+									{TASK_IMPACT_LABELS[task.metadata.impact]}
+								</Badge>
+							)}
+							{/* Security Severity */}
+							{task.metadata?.securitySeverity && (
+								<Badge
+									variant="outline"
+									className={cn(
+										"text-xs",
+										TASK_IMPACT_COLORS[task.metadata.securitySeverity],
+									)}
+								>
+									<Shield className="h-3 w-3 mr-1" />
+									{task.metadata.securitySeverity}
+								</Badge>
+							)}
+							{/* Source Type */}
+							{task.metadata?.sourceType && (
+								<Badge variant="secondary" className="text-xs">
+									{task.metadata.sourceType === "ideation" &&
+									task.metadata.ideationType
+										? IDEATION_TYPE_LABELS[task.metadata.ideationType] ||
+											task.metadata.ideationType
+										: t(`tasks:metadata.source.${task.metadata.sourceType}`, {
+												defaultValue: task.metadata.sourceType,
+											})}
+								</Badge>
+							)}
+						</div>
+					) : null}
+
+					<div className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
+						<Clock className="h-3 w-3" aria-hidden />
+						<span>
+							{t("tasks:metadata.created")} {formatRelativeTime(task.createdAt)}
+						</span>
+						<span aria-hidden>·</span>
+						<span>
+							{t("tasks:metadata.updated")} {formatRelativeTime(task.updatedAt)}
+						</span>
+					</div>
 				</div>
-			)}
+			</div>
 
 			{/* Secondary Details */}
 			{task.metadata && (
@@ -775,7 +889,7 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 					)}
 
 					{/* Acceptance Criteria — always visible, editable */}
-					<AcceptanceCriteriaSection task={task} />
+					<AcceptanceCriteriaSection task={task} editable={editable} />
 
 					{/* Extra note — editable, persisted as additional_context */}
 					<ExtraNoteSection task={task} />
@@ -809,6 +923,99 @@ export function TaskMetadata({ task }: TaskMetadataProps) {
 						)}
 				</div>
 			)}
+		</div>
+	);
+}
+
+interface DescriptionEditorProps {
+	readonly initial: string;
+	readonly onSave: (next: string) => Promise<boolean>;
+	readonly onCancel: () => void;
+}
+
+/**
+ * La description en texte brut — Markdown, ou le HTML qu'un tracker a fourni.
+ *
+ * Le champ grandit avec son contenu jusqu'à une hauteur raisonnable : une
+ * description se relit en entier avant d'être enregistrée, et un textarea de
+ * cinq lignes sur un texte de quarante oblige à le faire à travers une fente.
+ * Ctrl/Cmd+Entrée enregistre, Échap annule — sans fermer le dialogue.
+ * Une description vidée n'est pas enregistrée : c'est le seul champ que la
+ * création de tâche exige.
+ */
+function DescriptionEditor({ initial, onSave, onCancel }: DescriptionEditorProps) {
+	const { t } = useTranslation(["tasks"]);
+	const [draft, setDraft] = useState(initial);
+	const [saving, setSaving] = useState(false);
+	const area = useRef<HTMLTextAreaElement>(null);
+
+	useLayoutEffect(() => {
+		const node = area.current;
+		if (!node) return;
+		node.focus();
+		node.setSelectionRange(node.value.length, node.value.length);
+	}, []);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the height follows the text
+	useLayoutEffect(() => {
+		const node = area.current;
+		if (!node) return;
+		node.style.height = "auto";
+		node.style.height = `${Math.min(node.scrollHeight + 2, 480)}px`;
+	}, [draft]);
+
+	const trimmed = draft.trim();
+	const unchanged = trimmed === initial.trim();
+
+	const save = async () => {
+		if (!trimmed || saving) return;
+		if (unchanged) {
+			onCancel();
+			return;
+		}
+		setSaving(true);
+		const ok = await onSave(trimmed);
+		if (!ok) setSaving(false);
+	};
+
+	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+		if (event.key === "Escape") {
+			event.preventDefault();
+			event.stopPropagation();
+			onCancel();
+		} else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+			event.preventDefault();
+			void save();
+		}
+	};
+
+	return (
+		<div className="space-y-2 px-4 pb-3 pt-1">
+			<Textarea
+				ref={area}
+				value={draft}
+				onChange={(e) => setDraft(e.target.value)}
+				onKeyDown={onKeyDown}
+				disabled={saving}
+				placeholder={t("tasks:metadata.descriptionPlaceholder")}
+				aria-label={t("tasks:metadata.description")}
+				className="min-h-[140px] resize-y font-mono text-sm leading-relaxed"
+			/>
+			<div className="flex items-center justify-between gap-2">
+				<span className="text-xs text-muted-foreground">
+					{trimmed
+						? t("tasks:inlineEdit.descriptionHelp")
+						: t("tasks:inlineEdit.descriptionRequired")}
+				</span>
+				<div className="flex gap-1.5">
+					<Button size="sm" variant="ghost" onClick={onCancel} disabled={saving}>
+						{t("tasks:inlineEdit.cancel")}
+					</Button>
+					<Button size="sm" onClick={() => void save()} disabled={saving || !trimmed}>
+						{saving ? t("tasks:inlineEdit.saving") : t("tasks:inlineEdit.save")}
+					</Button>
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -887,12 +1094,31 @@ function AcceptanceCriteriaList({ criteria }: AcceptanceCriteriaListProps) {
 
 interface AcceptanceCriteriaSectionProps {
 	readonly task: Task;
+	readonly editable: boolean;
 }
 
-function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
+/**
+ * Les critères d'acceptation : ceux de `task_metadata.json`, sinon ceux que la
+ * description énonce dans sa propre section.
+ *
+ * Une tâche écrite à la main met très souvent ses critères *dans* la
+ * description, sous un titre « Critères d'acceptation » : le champ dédié
+ * restait vide, et la rubrique affichait « aucun critère » sous un texte qui en
+ * listait cinq. Ceux qu'on lit dans la description sont montrés comme tels —
+ * une lecture, pas un enregistrement — avec de quoi les enregistrer d'un clic ;
+ * rien n'est écrit dans le fichier tant que personne ne l'a demandé.
+ */
+function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSectionProps) {
 	const { t } = useTranslation(["tasks"]);
 	const { toast } = useToast();
-	const initialCriteria = task.metadata?.acceptanceCriteria ?? [];
+	const storedCriteria = task.metadata?.acceptanceCriteria ?? [];
+	const describedCriteria = useMemo(
+		() => extractAcceptanceCriteriaFromDescription(task.description),
+		[task.description],
+	);
+	const fromDescription =
+		storedCriteria.length === 0 && describedCriteria.length > 0;
+	const initialCriteria = fromDescription ? describedCriteria : storedCriteria;
 
 	// Extract ADO work item ID from "ADO-603226" format
 	const adoWorkItemId = task.metadata?.azureDevOpsIdentifier
@@ -902,6 +1128,18 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 
 	const [open, setOpen] = useState(initialCriteria.length > 0);
 	const [isEditing, setIsEditing] = useState(false);
+	const [isAdopting, setIsAdopting] = useState(false);
+
+	// Des critères qui apparaissent (description enregistrée, synchro) ouvrent
+	// la rubrique : une rubrique repliée sur cinq critères ne les montre pas.
+	const hasCriteria = initialCriteria.length > 0;
+	useEffect(() => {
+		if (hasCriteria) setOpen(true);
+	}, [hasCriteria]);
+
+	useEffect(() => {
+		if (!editable) setIsEditing(false);
+	}, [editable]);
 	const [mode, setMode] = useState<AcEditorMode>("list");
 	const [drafts, setDrafts] = useState<CriterionDraft[]>(() =>
 		ensureAtLeastOne(toDrafts(initialCriteria)),
@@ -919,16 +1157,35 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 	// task refresh, kanban poll, etc.) would silently wipe what the user has
 	// been typing and lock `isDirty` to false, making the "Enregistrer" button
 	// uncliquable.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `initialCriteria` is derived from these two
 	useEffect(() => {
 		if (isEditing) return;
-		const fresh = task.metadata?.acceptanceCriteria ?? [];
-		setDrafts(ensureAtLeastOne(toDrafts(fresh)));
-	}, [task.metadata?.acceptanceCriteria, isEditing]);
+		setDrafts(ensureAtLeastOne(toDrafts(initialCriteria)));
+	}, [task.metadata?.acceptanceCriteria, describedCriteria, isEditing]);
 
 	// Ce qui serait enregistré, quel que soit le mode où l'on se trouve.
 	const edited = mode === "list" ? toCriteria(drafts) : toCriteria(textToDrafts(text));
 
-	const isDirty = !sameCriteria(edited, initialCriteria);
+	// Des critères lus dans la description ne sont pas encore enregistrés :
+	// les enregistrer tels quels est un changement.
+	const isDirty = fromDescription || !sameCriteria(edited, initialCriteria);
+
+	const adoptFromDescription = async () => {
+		setIsAdopting(true);
+		const ok = await persistUpdateTask(task.id, {
+			metadata: { acceptanceCriteria: describedCriteria },
+		});
+		setIsAdopting(false);
+		if (ok) {
+			setSavedAt(Date.now());
+		} else {
+			toast({
+				title: t("tasks:metadata.acSaveErrorTitle"),
+				description: t("tasks:metadata.acSaveErrorDesc"),
+				variant: "destructive",
+			});
+		}
+	};
 
 	const switchMode = (next: AcEditorMode) => {
 		if (next === mode) return;
@@ -1020,6 +1277,11 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 							{initialCriteria.length}
 						</Badge>
 					)}
+					{fromDescription && (
+						<span className="ml-1 normal-case tracking-normal text-[11px] font-normal text-info">
+							{t("tasks:metadata.acFromDescription")}
+						</span>
+					)}
 				</button>
 			</CollapsibleTrigger>
 			<CollapsibleContent>
@@ -1081,6 +1343,11 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 					</>
 				) : (
 					<>
+						{fromDescription && (
+							<p className="mb-2 text-xs text-muted-foreground">
+								{t("tasks:metadata.acFromDescriptionHint")}
+							</p>
+						)}
 						{initialCriteria.length > 0 ? (
 							<AcceptanceCriteriaList criteria={initialCriteria} />
 						) : (
@@ -1089,15 +1356,30 @@ function AcceptanceCriteriaSection({ task }: AcceptanceCriteriaSectionProps) {
 							</p>
 						)}
 						<div className="flex items-center gap-3 flex-wrap">
-							<button
-								type="button"
-								onClick={startEditing}
-								className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-							>
-								<Pencil className="h-3 w-3" />
-								{t("tasks:metadata.acEdit")}
-							</button>
-							{isAdoTask && (
+							{editable && fromDescription && (
+								<button
+									type="button"
+									onClick={adoptFromDescription}
+									disabled={isAdopting}
+									className="flex items-center gap-1 text-xs text-info hover:text-info/80 transition-colors disabled:opacity-50"
+								>
+									<Check className="h-3 w-3" aria-hidden />
+									{isAdopting
+										? t("tasks:metadata.acSaving")
+										: t("tasks:metadata.acAdopt")}
+								</button>
+							)}
+							{editable && (
+								<button
+									type="button"
+									onClick={startEditing}
+									className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+								>
+									<Pencil className="h-3 w-3" />
+									{t("tasks:metadata.acEdit")}
+								</button>
+							)}
+							{isAdoTask && editable && (
 								<button
 									type="button"
 									onClick={handleSyncFromAdo}

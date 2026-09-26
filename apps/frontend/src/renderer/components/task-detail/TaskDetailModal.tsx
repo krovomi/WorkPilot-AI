@@ -73,7 +73,6 @@ import {
 	useDialogMaximize,
 } from "../ui/dialog-maximize";
 import { Progress } from "../ui/progress";
-import { ScrollArea } from "../ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
 	Tooltip,
@@ -99,6 +98,7 @@ import {
 } from "../../stores/architecture-delta-store";
 import { TaskArchitectureDelta } from "./TaskArchitectureDelta";
 import { TaskChangeGraph } from "./TaskChangeGraph";
+import { EditableTaskTitle } from "./EditableTaskTitle";
 import { TaskOverview } from "./TaskOverview";
 import { TaskReview } from "./TaskReview";
 import { TaskSubtasks } from "./TaskSubtasks";
@@ -1047,9 +1047,13 @@ function TaskDetailModalContent({
 						<div className="p-5 pb-4 border-b border-border shrink-0">
 							<div className="flex items-start justify-between gap-4">
 								<div className="flex-1 min-w-0 overflow-hidden">
-									<DialogPrimitive.Title className="text-xl font-semibold leading-tight text-foreground truncate">
-										{cleanTitleForDisplay(task.title)}
-									</DialogPrimitive.Title>
+									<EditableTaskTitle
+										task={task}
+										displayTitle={cleanTitleForDisplay(task.title)}
+										editable={!(state.isRunning && !state.isStuck)}
+										as={DialogPrimitive.Title}
+										className="text-xl font-semibold leading-tight text-foreground"
+									/>
 									<DialogPrimitive.Description asChild>
 										<div className="mt-2.5 flex items-center gap-2 flex-wrap">
 											<Badge variant="outline" className="text-xs font-mono">
@@ -1302,60 +1306,61 @@ function TaskDetailModalContent({
 									value="overview"
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
-									<ScrollArea className="h-full">
-										{/* Rangée par la question que se pose la personne :
-										    à traiter, la tâche, le plan, la mémoire. */}
-										<TaskOverview
-											task={task}
-											projectPath={taskProject?.path ?? activeProject?.path}
-											review={
-												state.needsReview ? (
-												<TaskReview
-													task={task}
-													feedback={state.feedback}
-													isSubmitting={state.isSubmitting}
-													worktreeStatus={state.worktreeStatus}
-													worktreeDiff={state.worktreeDiff}
-													isLoadingWorktree={state.isLoadingWorktree}
-													isMerging={state.isMerging}
-													isDiscarding={state.isDiscarding}
-													showDiscardDialog={state.showDiscardDialog}
-													showDiffDialog={state.showDiffDialog}
-													workspaceError={state.workspaceError}
-													stageOnly={state.stageOnly}
-													stagedSuccess={state.stagedSuccess}
-													stagedProjectPath={state.stagedProjectPath}
-													suggestedCommitMessage={
-														state.suggestedCommitMessage
-													}
-													mergePreview={state.mergePreview}
-													isLoadingPreview={state.isLoadingPreview}
-													showConflictDialog={state.showConflictDialog}
-													onFeedbackChange={state.setFeedback}
-													onReject={handleReject}
-													images={state.feedbackImages}
-													onImagesChange={state.setFeedbackImages}
-													onMerge={handleMerge}
-													onDiscard={handleDiscard}
-													onShowDiscardDialog={state.setShowDiscardDialog}
-													onShowDiffDialog={state.setShowDiffDialog}
-													onStageOnlyChange={state.setStageOnly}
-													onShowConflictDialog={state.setShowConflictDialog}
-													onLoadMergePreview={state.loadMergePreview}
-													onClose={handleClose}
-													onReviewAgain={state.handleReviewAgain}
-													showPRDialog={state.showPRDialog}
-													isCreatingPR={state.isCreatingPR}
-													onShowPRDialog={state.setShowPRDialog}
-													onCreatePR={handleCreatePR}
-													onRefreshDiff={state.refreshWorktreeDiff}
-													isCompleting={state.isCompleting}
-													onComplete={handleComplete}
-												/>
-												) : undefined
-											}
-										/>
-									</ScrollArea>
+									{/* La vue d'ensemble possède sa zone de défilement : sa barre de
+									    raccourcis reste au-dessus, immobile. */}
+									{/* Rangée par la question que se pose la personne :
+									    à traiter, la tâche, le plan, la mémoire. */}
+									<TaskOverview
+										task={task}
+										projectPath={taskProject?.path ?? activeProject?.path}
+										review={
+											state.needsReview ? (
+											<TaskReview
+												task={task}
+												feedback={state.feedback}
+												isSubmitting={state.isSubmitting}
+												worktreeStatus={state.worktreeStatus}
+												worktreeDiff={state.worktreeDiff}
+												isLoadingWorktree={state.isLoadingWorktree}
+												isMerging={state.isMerging}
+												isDiscarding={state.isDiscarding}
+												showDiscardDialog={state.showDiscardDialog}
+												showDiffDialog={state.showDiffDialog}
+												workspaceError={state.workspaceError}
+												stageOnly={state.stageOnly}
+												stagedSuccess={state.stagedSuccess}
+												stagedProjectPath={state.stagedProjectPath}
+												suggestedCommitMessage={
+													state.suggestedCommitMessage
+												}
+												mergePreview={state.mergePreview}
+												isLoadingPreview={state.isLoadingPreview}
+												showConflictDialog={state.showConflictDialog}
+												onFeedbackChange={state.setFeedback}
+												onReject={handleReject}
+												images={state.feedbackImages}
+												onImagesChange={state.setFeedbackImages}
+												onMerge={handleMerge}
+												onDiscard={handleDiscard}
+												onShowDiscardDialog={state.setShowDiscardDialog}
+												onShowDiffDialog={state.setShowDiffDialog}
+												onStageOnlyChange={state.setStageOnly}
+												onShowConflictDialog={state.setShowConflictDialog}
+												onLoadMergePreview={state.loadMergePreview}
+												onClose={handleClose}
+												onReviewAgain={state.handleReviewAgain}
+												showPRDialog={state.showPRDialog}
+												isCreatingPR={state.isCreatingPR}
+												onShowPRDialog={state.setShowPRDialog}
+												onCreatePR={handleCreatePR}
+												onRefreshDiff={state.refreshWorktreeDiff}
+												isCompleting={state.isCompleting}
+												onComplete={handleComplete}
+											/>
+											) : undefined
+										}
+										editable={!(state.isRunning && !state.isStuck)}
+									/>
 								</TabsContent>
 
 								{/* Subtasks Tab */}

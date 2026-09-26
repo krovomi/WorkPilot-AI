@@ -2923,6 +2923,29 @@ décide seule de s'afficher, et la plupart ne rendent rien quand elles n'ont rie
 section) plutôt que recopiée : dix règles d'affichage dupliquées ici seraient dix
 occasions de se tromper.
 
+**La barre de raccourcis ne défile pas.** Elle était `sticky` dans la zone qui
+défile, sous un parent en `overflow-x-hidden` — qui devient alors un conteneur
+de défilement immobile, et le `sticky` un élément ordinaire. `TaskOverview`
+possède désormais sa zone de défilement et pose la barre au-dessus ; elle est
+toujours rendue (une barre qui apparaît quand une carte asynchrone arrive pousse
+le contenu), et le raccourci de la section lue est allumé.
+
+**Le titre et la description se modifient là où on les lit.** Un clic sur le
+titre de l'en-tête (`EditableTaskTitle`) ou sur l'encart de la description
+l'ouvre en champ ; Entrée (titre) ou Ctrl+Entrée (description) enregistre, Échap
+annule sans fermer le dialogue. Un titre vidé n'est jamais envoyé — le main
+process en inventerait un depuis la description — et rien n'est modifiable
+pendant qu'un agent tourne, la même règle que le crayon. Classification et dates
+sont le pied de l'encart, pas une barre à part entre deux filets.
+
+**Des critères écrits dans la description sont des critères.** Quand
+`acceptanceCriteria` est vide, `extractAcceptanceCriteriaFromDescription`
+(`shared/utils/acceptance-criteria.ts`) lit la section « Critères
+d'acceptation » de la description — titre HTML ou Markdown, ligne en gras, ou
+ligne réduite au libellé — jusqu'au titre suivant. La rubrique les montre comme
+*lus dans la description* et offre de les enregistrer ; rien n'est écrit dans
+`task_metadata.json` sans ce clic.
+
 **JEV a sa carte** (`TaskJevCard` → `jev/JevStatus.tsx`). Il était rendu à
 l'intérieur du profil d'exécution, au-dessus de son titre, en une ligne d'état
 brute. La carte dit ce qu'est JEV, dans quel état il sera à la prochaine

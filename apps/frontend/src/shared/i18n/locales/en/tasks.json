@@ -586,6 +586,27 @@
 			"missingHint": "That task no longer exists; the prerequisite is ignored.",
 			"saveErrorTitle": "Could not save",
 			"saveErrorDesc": "The prerequisites could not be saved."
+		},
+		"description": "Description",
+		"descriptionEdit": "Edit",
+		"descriptionClickHint": "Click to edit the description",
+		"descriptionAdd": "Add a description",
+		"descriptionEmpty": "No description.",
+		"descriptionPlaceholder": "Describe what is expected — Markdown supported.",
+		"acFromDescription": "read from the description",
+		"acFromDescriptionHint": "These criteria come from the description's \"Acceptance criteria\" section. Save them to pin them in task_metadata.json.",
+		"acAdopt": "Save as criteria",
+		"source": {
+			"ideation": "Ideation",
+			"manual": "Manual",
+			"imported": "Imported",
+			"insights": "Insights",
+			"roadmap": "Roadmap",
+			"linear": "Linear",
+			"github": "GitHub",
+			"gitlab": "GitLab",
+			"visual-canvas": "Visual canvas",
+			"tech-debt": "Tech debt"
 		}
 	},
 	"images": {
@@ -1572,5 +1593,17 @@
 				"hint": "What the system remembers — and what is waiting for your decision."
 			}
 		}
+	},
+	"inlineEdit": {
+		"save": "Save",
+		"saving": "Saving…",
+		"cancel": "Cancel",
+		"saveErrorTitle": "Save failed",
+		"titleSaveError": "The title could not be saved.",
+		"descriptionSaveError": "The description could not be saved.",
+		"titleLabel": "Task title",
+		"titleHint": "Click to edit the title",
+		"descriptionHelp": "Ctrl+Enter to save · Esc to cancel",
+		"descriptionRequired": "The description cannot be empty."
 	}
 }

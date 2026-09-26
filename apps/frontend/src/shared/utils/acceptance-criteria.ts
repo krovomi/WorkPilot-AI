@@ -187,3 +187,105 @@ export function formatAcceptanceCriteriaMarkdown(criteria: string[]): string {
 	}
 	return lines.join("\n");
 }
+
+/**
+ * The acceptance criteria a description states in its own section.
+ *
+ * A task typed by hand — or imported from a tracker whose dedicated field was
+ * empty — very often carries its criteria *inside* the description, under a
+ * "Critères d'acceptation" heading. `TaskMetadata.acceptanceCriteria` stays
+ * empty in that case, so the dedicated section read "no criteria" while the
+ * text right above it listed five.
+ *
+ * The section starts at a heading (HTML `h1`-`h6`, Markdown `#`), a bold line
+ * (`**Critères d'acceptation**`) or a line that is nothing but the label
+ * (`Critères d'acceptation :`), and ends at the next heading or the next line
+ * that reads as another section's label (short, not a list item, ending with a
+ * colon). What is between is one criterion per non-empty line, bullet markers
+ * removed.
+ *
+ * DOM-free for the same reason as `stripAcceptanceCriteriaSection`: nothing
+ * here may assume a browser. Returns `[]` when no section is found — this is a
+ * reading, never a guess.
+ */
+export function extractAcceptanceCriteriaFromDescription(
+	description: string | undefined,
+): string[] {
+	if (!description?.trim()) return [];
+	const lines = descriptionToLines(description);
+
+	const start = lines.findIndex(isAcceptanceCriteriaLabel);
+	if (start === -1) return [];
+
+	const criteria: string[] = [];
+	for (const raw of lines.slice(start + 1)) {
+		const line = raw.trim();
+		if (!line) continue;
+		if (MD_HEADING.test(line) || isSectionLabel(line)) break;
+		const text = stripListMarker(line);
+		if (text) criteria.push(text);
+	}
+	return criteria;
+}
+
+const MD_HEADING = /^\s{0,3}#{1,6}\s+/;
+// Stricter than the tracker reading above: a digit counts as a marker only
+// when followed by "." or ")" — "3 tentatives maximum" is not a numbered list.
+const LIST_MARKER = /^\s*(?:[-*+•‣▪–—]|\d+[.)]|\[[ xX]\])\s+/;
+const AC_LABEL = [AC_HEADING_LABELS[0], AC_HEADING_LABELS[1]] as const;
+// `\b` is ASCII-only: after « donné » it never matches, hence the lookahead.
+const SCENARIO_LINE =
+	/^\s*(?:sc[ée]nario|given|when|then|and|but|[ée]tant donn[ée]e?s?|quand|alors|et|mais)(?=[\s:,]|$)/iu;
+
+function stripListMarker(line: string): string {
+	let text = line;
+	// "- [ ] critère" : both the bullet and the checkbox.
+	while (LIST_MARKER.test(text)) text = text.replace(LIST_MARKER, "");
+	return text.trim();
+}
+
+/** HTML or Markdown → lines, headings kept as Markdown `#` lines. */
+function descriptionToLines(description: string): string[] {
+	if (!description.trimStart().startsWith("<")) {
+		return description.split(/\r?\n/);
+	}
+	const text = decodeHtmlEntities(
+		stripHtmlTags(
+			description
+				.replace(/<h([1-6])\b[^>]*>/gi, (_m, level) => `\n${"#".repeat(Number(level))} `)
+				.replace(/<\s*br\s*\/?>/gi, "\n")
+				.replace(/<li\b[^>]*>/gi, "\n- ")
+				.replace(/<\/(?:li|p|div|h[1-6]|tr|ul|ol)>/gi, "\n"),
+		),
+	);
+	return text.split(/\r?\n/);
+}
+
+function unwrapLabel(line: string): string {
+	return line
+		.replace(MD_HEADING, "")
+		.replace(/[*_`]+/g, "")
+		.replace(/\s*:\s*$/, "")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function isAcceptanceCriteriaLabel(raw: string): boolean {
+	const line = raw.trim();
+	if (!line || LIST_MARKER.test(line)) return false;
+	const label = unwrapLabel(line);
+	if (MD_HEADING.test(line)) {
+		return AC_HEADING_LABELS.some((re) => re.test(label));
+	}
+	// Not a heading: the line must be the label and nothing else, so that a
+	// sentence *mentioning* the criteria does not open a section.
+	return label.length <= 40 && AC_LABEL.some((re) => {
+		const m = label.match(re);
+		return m !== null && m.index === 0 && label.length - m[0].length <= 8;
+	});
+}
+
+function isSectionLabel(line: string): boolean {
+	if (LIST_MARKER.test(line) || SCENARIO_LINE.test(line)) return false;
+	return line.length <= 60 && /:\s*(?:\*\*)?\s*$/.test(line) && /^\*{0,2}[^\s*]/.test(line);
+}
