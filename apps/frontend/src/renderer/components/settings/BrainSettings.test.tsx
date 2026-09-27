@@ -119,6 +119,30 @@ it("shows the backend's refusal", async () => {
 	expect(await screen.findByRole("alert")).toHaveTextContent(/inside your home folder/);
 });
 
+it("says a Windows path is accepted when the backend runs under WSL", async () => {
+	mockFetchSettings.mockResolvedValue({
+		ok: true,
+		data: {
+			settings: {
+				...base,
+				wsl: true,
+				homeRoots: ["/home/me", "/mnt/c/Users/Me"],
+			},
+		},
+	});
+	render(<BrainSettings />);
+	expect(await screen.findByTestId("brain-wsl-hint")).toHaveTextContent(
+		/Windows path is accepted.*\/home\/me · \/mnt\/c\/Users\/Me/,
+	);
+});
+
+it("says nothing about WSL elsewhere", async () => {
+	mockFetchSettings.mockResolvedValue({ ok: true, data: { settings: base } });
+	render(<BrainSettings />);
+	await screen.findByLabelText("Brain folder (Obsidian vault)");
+	expect(screen.queryByTestId("brain-wsl-hint")).toBeNull();
+});
+
 it("does not pretend to choose the folder when the environment does", async () => {
 	mockFetchSettings.mockResolvedValue({
 		ok: true,

@@ -184,6 +184,13 @@ export function BrainSettings() {
 						? t("brain:settings.envOverride", { variable: settings.envVariable })
 						: t("brain:settings.folderHint")}
 				</p>
+				{settings.wsl && !envLocked && (
+					<p className="text-xs text-muted-foreground" data-testid="brain-wsl-hint">
+						{t("brain:settings.wslHint", {
+							roots: (settings.homeRoots ?? []).join(" · "),
+						})}
+					</p>
+				)}
 			</div>
 
 			<div className="space-y-2">
