@@ -1340,6 +1340,10 @@ export interface BrainSettings {
 	readonly obsidianVault: boolean;
 	readonly notes: number;
 	readonly proposals: number;
+	/** The backend runs under WSL: a Windows path is accepted and converted. */
+	readonly wsl?: boolean;
+	/** The folders a brain may live under (the Windows profile too, under WSL). */
+	readonly homeRoots?: readonly string[];
 }
 
 export interface BrainSettingsUpdate {
