@@ -58,6 +58,7 @@
 		"connecting": "Connexion…",
 		"sync": "Synchroniser maintenant",
 		"syncing": "Synchronisation…",
+		"wslHint": "Sous WSL, un chemin Windows est accepté (C:\\Users\\…\\MonVault) et converti en chemin /mnt/…. Dossiers autorisés : {{roots}}.",
 		"envOverride": "Le dossier est imposé par la variable d'environnement {{variable}}.",
 		"saved": "Cerveau connecté.",
 		"error": "Échec : {{error}}",

@@ -42,6 +42,7 @@ from .memories import discover
 from .notes import iter_notes
 from .sync import git_available, normalize_remote, remote_url
 from .vault import Brain
+from .wsl import automount_root, home_roots, is_wsl, to_wsl_path
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,17 @@ def _refused() -> bool:
     return server_mode_roots() is not None
 
 
+def _strictly_under(path: str, root: str) -> bool:
+    """Whether *path* is inside *root*, *root* itself excluded.
+
+    A Windows drive mounted under WSL is case-insensitive, so ``C:\\users\\x``
+    typed by hand is the profile ``/mnt/c/Users/X`` and is compared as such.
+    """
+    if root.startswith(automount_root()):
+        path, root = path.casefold(), root.casefold()
+    return path.startswith(root.rstrip(os.sep) + os.sep)
+
+
 def _home_path(raw: str) -> tuple[Path | None, str | None]:
     """*raw* as an absolute folder under the home directory, or an error code.
 
@@ -99,10 +111,15 @@ def _home_path(raw: str) -> tuple[Path | None, str | None]:
     separator, in one condition: the home directory itself is refused too — a
     brain whose notes are every Markdown file a person owns is not a choice
     anyone makes on purpose.
+
+    Under WSL, a Windows spelling (``C:\\Users\\…``) is converted to the path
+    this process opens (``/mnt/c/Users/…``), and the Windows profile counts as
+    a home directory too (`brain.wsl`).
     """
-    home = os.path.normpath(os.path.abspath(os.path.expanduser("~")))
-    full = os.path.normpath(os.path.abspath(os.path.expanduser(raw.strip())))
-    if not full.startswith(home + os.sep):
+    full = os.path.normpath(
+        os.path.abspath(os.path.expanduser(to_wsl_path(raw.strip())))
+    )
+    if not any(_strictly_under(full, home) for home in home_roots()):
         return None, "outside-home"
     if os.path.isfile(full):
         return None, "is-file"
@@ -224,6 +241,8 @@ def settings_view() -> dict:
         "obsidianVault": brain.is_obsidian_vault,
         "notes": sum(1 for _ in iter_notes(brain.root)) if exists else 0,
         "proposals": len(brain.proposals()) if exists else 0,
+        "wsl": is_wsl(),
+        "homeRoots": home_roots(),
     }
 
 

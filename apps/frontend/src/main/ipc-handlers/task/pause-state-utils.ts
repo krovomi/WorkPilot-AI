@@ -18,6 +18,13 @@ import { appLog } from "../../app-logger";
  * the resume looks like it silently did nothing.
  */
 
+/**
+ * The reason recorded on a pause WorkPilot took itself because it was closing
+ * while the build ran (see `interrupted-runs.ts`). The next launch resumes
+ * exactly these; a pause without a reason is the user's and stays a pause.
+ */
+export const APP_SHUTDOWN_PAUSE_REASON = "app_shutdown";
+
 export interface PauseStateRecord {
 	enabled: boolean;
 	paused_at: string | null;
@@ -25,6 +32,7 @@ export interface PauseStateRecord {
 	paused_subtask_id: string | null;
 	provider?: string | null;
 	model?: string | null;
+	reason?: string | null;
 }
 
 /**

@@ -24,7 +24,6 @@ import {
 } from "../../../shared/constants";
 import { isAnthropicNativeVersionedModelId } from "../../../shared/constants/models";
 import type { TaskEvent } from "../../../shared/state-machines/task-machine";
-import { relaunchEventFor } from "../../../shared/state-machines";
 import type {
 	ImageAttachment,
 	IPCResult,
@@ -66,11 +65,19 @@ import {
 } from "./plan-file-utils";
 import {
 	clearPauseState,
-	existingSpecDirs,
 	type PauseStateRecord,
 	writePauseState,
 } from "./pause-state-utils";
 import { findTaskAndProject } from "./shared";
+import {
+	allSpecDirs,
+	convertTaskMetadataToSpecCreation,
+	currentPausePhase,
+	getSpecPaths,
+	leaveFailureStateForRelaunch,
+	readPersistedSessionId,
+	resumePausedTask,
+} from "./resume-task";
 import { extractPrCreationError } from "./pr-error-utils";
 import { stripHtml } from "../shared/sanitize";
 import {
@@ -142,62 +149,6 @@ function recordReviewVerdictForLearning(
 			err,
 		);
 	}
-}
-
-/**
- * Convert TaskMetadata to SpecCreationMetadata for spec creation
- * This handles the type incompatibility between the two metadata types
- */
-// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-function convertTaskMetadataToSpecCreation(metadata?: any): any {
-	if (!metadata) return undefined;
-
-	return {
-		requireReviewBeforeCoding: metadata.requireReviewBeforeCoding,
-		provider:
-			metadata.phaseProviders?.planning ||
-			metadata.phaseProviders?.spec ||
-			metadata.provider,
-		isAutoProfile: metadata.isAutoProfile,
-		phaseModels: convertPhaseModelConfig(metadata.phaseModels),
-		phaseThinking: convertPhaseThinkingConfig(metadata.phaseThinking),
-		model: metadata.model,
-		thinkingLevel: metadata.thinkingLevel,
-		useWorktree: metadata.useWorktree,
-		useLocalBranch: metadata.useLocalBranch,
-		tddMode: metadata.tddMode,
-		mobileTargets: metadata.mobileTargets,
-	};
-}
-
-/**
- * Convert PhaseModelConfig (string-based) to SpecCreationMetadata format (literal union)
- */
-// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-function convertPhaseModelConfig(phaseModels?: any): any {
-	if (!phaseModels) return undefined;
-
-	return {
-		spec: phaseModels.spec || "sonnet",
-		planning: phaseModels.planning || "sonnet",
-		coding: phaseModels.coding || "sonnet",
-		qa: phaseModels.qa || "sonnet",
-	};
-}
-
-/**
- * Convert PhaseThinkingConfig to SpecCreationMetadata format
- */
-// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-function convertPhaseThinkingConfig(phaseThinking?: any): any {
-	if (!phaseThinking) return undefined;
-
-	return {
-		spec: phaseThinking.spec || "medium",
-		planning: phaseThinking.planning || "medium",
-		coding: phaseThinking.coding || "medium",
-		qa: phaseThinking.qa || "medium",
-	};
 }
 
 /**
@@ -534,53 +485,6 @@ function determineStartEvent(
 
 	// Fresh start
 	return { type: "PLANNING_STARTED" };
-}
-
-/**
- * The SDK session id the backend persisted for this task, if any.
- *
- * `<specDir>/.session.json` is written by the Python side on every session, and
- * handing it back as AUTO_CLAUDE_RESUME_SESSION_ID makes the SDK rehydrate that
- * transcript instead of starting cold. Best-effort by design: a task that has
- * never run, a truncated file or a missing field all mean "start fresh", which
- * is what a resume did before this existed — never a reason to refuse the
- * resume itself.
- */
-function readPersistedSessionId(specDir: string): string | undefined {
-	const sessionFile = path.join(specDir, ".session.json");
-	if (!existsSync(sessionFile)) return undefined;
-	try {
-		const parsed = JSON.parse(readFileSync(sessionFile, "utf-8")) as {
-			session_id?: string;
-		};
-		return parsed.session_id || undefined;
-	} catch (err) {
-		appLog.warn(`[readPersistedSessionId] Could not read ${sessionFile}:`, err);
-		return undefined;
-	}
-}
-
-/**
- * Leave the failure state, and let the next run's events through.
- *
- * Two halves, both owed by every relaunch that is not TASK_START. The event
- * (see `relaunchEventFor`) is what clears the review reason and the
- * `errorMessage` the failure banner renders. Resetting the sequence counter is
- * the other: every restarted backend numbers its events from zero, and
- * `isNewSequence` drops anything below the last number it saw — so without it
- * the resumed run's phases reached nobody and the panel stayed frozen on the
- * state it had failed in.
- */
-function leaveFailureStateForRelaunch(
-	taskId: string,
-	task: Task,
-	project: Project,
-): void {
-	const event = relaunchEventFor(taskStateManager.getCurrentState(taskId), task);
-	if (event) {
-		taskStateManager.handleUiEvent(taskId, event, task, project);
-	}
-	taskStateManager.resetForNewRun(taskId);
 }
 
 /**
@@ -2892,24 +2796,6 @@ print(json.dumps(result))
 	}
 
 	/**
-	 * Get spec directory paths
-	 */
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	function getSpecPaths(task: any, project: any) {
-		const specsBaseDir = getSpecsDir(project.autoBuildPath);
-		const specDir =
-			task.specsPath || path.join(project.path, specsBaseDir, task.specId);
-
-		const mainSpecDir = path.join(project.path, specsBaseDir, task.specId);
-		const worktreePath = findTaskWorktree(project.path, task.specId);
-		const worktreeSpecDir = worktreePath
-			? path.join(worktreePath, specsBaseDir, task.specId)
-			: null;
-
-		return { specDir, mainSpecDir, worktreeSpecDir, specsBaseDir };
-	}
-
-	/**
 	 * Get all plan file paths that need updating
 	 */
 	function getPlanPaths(
@@ -3104,10 +2990,10 @@ print(json.dumps(result))
 			}>) {
 				if (phase.subtasks && Array.isArray(phase.subtasks)) {
 					for (const subtask of phase.subtasks) {
-						// Reset in_progress subtasks to pending
-						if (subtask.status === "in_progress") {
-							resetSubtask(subtask, "in_progress");
-						}
+						// An in_progress subtask is left alone: it is the one the
+						// dead process was on, and the backend reopens it at start
+						// (reopen_interrupted_subtasks) keeping what it recorded, so
+						// the next session continues it instead of starting it over.
 						// Reset failed subtasks to pending
 						if (subtask.status === "failed") {
 							resetSubtask(subtask, "failed");
@@ -3308,6 +3194,11 @@ print(json.dumps(result))
 						baseBranch,
 						useWorktree: task.metadata?.useWorktree,
 						useLocalBranch: task.metadata?.useLocalBranch,
+						tddMode: task.metadata?.tddMode,
+						mobileTargets: task.metadata?.mobileTargets,
+						// A stuck task is one whose process died mid-session: pick
+						// that session back up, as a resume does.
+						resumeSessionId: readPersistedSessionId(specDirForWatcher),
 					},
 					project.id,
 				);
@@ -3406,51 +3297,6 @@ print(json.dumps(result))
 	);
 
 	/**
-	 * The phase a running task is in, as the backend would name it.
-	 *
-	 * Recorded on the pause so the resume can say where it will pick up, and so
-	 * the backend's checkpoint prints the phase the user actually paused rather
-	 * than guessing from whichever loop noticed the flag first.
-	 */
-	function currentPausePhase(
-		task: Task,
-		specPaths: ReturnType<typeof getSpecPaths>,
-	): string {
-		switch (task.executionProgress?.phase) {
-			case "planning":
-				// "planning" covers two different backends: the spec pipeline,
-				// which runs before any plan exists, and the planner agent, which
-				// writes one. The plan file is what tells them apart.
-				return existsSync(
-					path.join(specPaths.specDir, AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN),
-				)
-					? "planning"
-					: "spec";
-			case "qa_review":
-				return "qa_review";
-			case "qa_fixing":
-				return "qa_fixing";
-			default:
-				return task.status === "ai_review" ? "qa_review" : "coding";
-		}
-	}
-
-	/**
-	 * Every spec directory copy of this task — main project and worktree.
-	 *
-	 * The running backend reads the pause flag from its *own* copy, which for a
-	 * worktree build is the one inside the worktree. Writing only the main one
-	 * is how a pause could be requested and never noticed.
-	 */
-	function allSpecDirs(specPaths: ReturnType<typeof getSpecPaths>): string[] {
-		return existingSpecDirs([
-			specPaths.specDir,
-			specPaths.mainSpecDir,
-			specPaths.worktreeSpecDir,
-		]);
-	}
-
-	/**
 	 * Pause task execution, at whatever phase it is in.
 	 *
 	 * The flag goes to `pause_state.json`, not into `implementation_plan.json`:
@@ -3530,80 +3376,18 @@ print(json.dumps(result))
 	);
 
 	/**
-	 * Resume a paused task from where it stopped.
-	 *
-	 * Clearing the flag is all the phase routing this needs: `run.py` re-enters
-	 * the pipeline and reads what is on disk — no plan means planning runs
-	 * again, an incomplete plan means coding resumes at the first unfinished
-	 * subtask, a complete one means QA. Naming a phase here would be a second
-	 * opinion about a question the spec directory already answers.
+	 * Resume a paused task from where it stopped. See `resumePausedTask`, which
+	 * is also what resumes, at launch, the tasks WorkPilot was running when it
+	 * was closed.
 	 */
-	ipcMain.handle(
-		"TASK_RESUME",
-		async (_, taskId: string): Promise<IPCResult> => {
-			try {
-				const { task, project } = findTaskAndProject(taskId);
-				if (!task || !project) {
-					return { success: false, error: "Task not found" };
-				}
-
-				const specPaths = getSpecPaths(task, project);
-				const specDirs = allSpecDirs(specPaths);
-				if (specDirs.length === 0) {
-					return { success: false, error: "Spec directory not found" };
-				}
-
-				const pausedPhase = task.metadata?.paused?.paused_phase;
-				clearPauseState(specDirs, getPlanPaths(specPaths, project).all, {
-					provider: task.metadata?.provider ?? null,
-					model: task.metadata?.model ?? null,
-				});
-
-				projectStore.invalidateTasksCache(project.id);
-
-				// A resume is a relaunch: drop the previous run's failure and let
-				// the new run's events through. See leaveFailureStateForRelaunch.
-				leaveFailureStateForRelaunch(taskId, task, project);
-
-				const baseBranch =
-					task.metadata?.baseBranch || project.settings?.mainBranch;
-
-				agentManager.startTaskExecution(
-					taskId,
-					project.path,
-					task.specId,
-					{
-						parallel: false,
-						workers: 1,
-						baseBranch,
-						useWorktree: task.metadata?.useWorktree,
-						useLocalBranch: task.metadata?.useLocalBranch,
-						// Pick the transcript back up rather than re-deriving it. The
-						// phase the pause interrupted is re-entered from the spec
-						// directory either way — what this adds is the reasoning of
-						// the session that was interrupted, so "Reprendre" continues
-						// the analysis instead of paying for it twice. Single-shot on
-						// the backend (create_client pops the variable), so only the
-						// first session of the resumed run rehydrates.
-						resumeSessionId: readPersistedSessionId(specPaths.specDir),
-					},
-					project.id,
-				);
-
-				appLog.info(
-					`[TASK_RESUME] Task ${taskId} resumed (paused during ${pausedPhase ?? "unknown phase"})`,
-				);
-
-				return {
-					success: true,
-					data: { taskId, resumed: true, resumedPhase: pausedPhase ?? null },
-				};
-			} catch (error) {
-				appLog.error("[TASK_RESUME] Error:", error);
-				return { success: false, error: String(error) };
-			}
-		},
-	);
+	ipcMain.handle("TASK_RESUME", async (_, taskId: string): Promise<IPCResult> => {
+		try {
+			return await resumePausedTask(agentManager, taskId);
+		} catch (error) {
+			appLog.error("[TASK_RESUME] Error:", error);
+			return { success: false, error: String(error) };
+		}
+	});
 
 	// Provider switching mid-task is handled by TASK_RESUME_WITH_PROVIDER
 	// (marker + conversation replay). The former TASK_SWITCH_PROVIDER handler

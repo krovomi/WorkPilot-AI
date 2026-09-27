@@ -217,6 +217,62 @@ def _read_current_subtask_id(spec_dir: Path) -> str | None:
         return None
 
 
+def _session_id_of(raw_msg: Any) -> str | None:
+    """The SDK session id a raw Claude SDK message carries, if any.
+
+    The init ``SystemMessage`` carries it in ``data``; ``ResultMessage`` (and
+    stream events) carry it as an attribute.
+    """
+    sid = getattr(raw_msg, "session_id", None)
+    if not sid:
+        data = getattr(raw_msg, "data", None)
+        if isinstance(data, dict):
+            sid = data.get("session_id")
+    return sid if isinstance(sid, str) and sid else None
+
+
+def _persist_session_marker(
+    spec_dir: Path,
+    session_id: str,
+    *,
+    provider: str,
+    model: str | None,
+    phase: str,
+    subtype: str | None = None,
+) -> None:
+    """Write ``.session.json`` — the pointer the Kanban hands back on resume.
+
+    Written as soon as the session id is known, then again when the session
+    ends. It used to be written only at the end, so an application closed in
+    the middle of a session left a pointer to the *previous* session: the
+    resume rehydrated a transcript that was not the one interrupted, often one
+    from another phase. ``provider`` is recorded because only a Claude SDK
+    session id can be rehydrated by the SDK; the frontend ignores the others.
+    Best-effort: a marker that cannot be written never fails a session.
+    """
+    try:
+        import json as _json
+
+        state = {
+            "session_id": session_id,
+            "subtype": subtype,
+            "model": model,
+            "phase": phase,
+            "provider": provider,
+        }
+        (spec_dir / ".session.json").write_text(
+            _json.dumps(state, indent=2), encoding="utf-8"
+        )
+        logger.debug(
+            "[session] Persisted session_id=%s (%s, subtype=%s)",
+            session_id,
+            provider,
+            subtype,
+        )
+    except Exception as e:
+        logger.debug("[session] Could not persist session_id: %s", e)
+
+
 # Cap on how many historical messages we re-inject into a new session.
 # Above this the resume preamble dominates the prompt and the very next query
 # trips "Prompt is too long" — replaying 1000+ turns is also useless context-
@@ -1213,9 +1269,26 @@ async def run_agent_session(
         response_text = ""
         _sdk_result_msg = None  # Captures ResultMessage (cost/usage) when emitted
         debug("session", "Starting to receive response stream...")
+        _session_marker_written = False
         async for msg in client.receive_response():
             msg_type = type(msg).__name__
             message_count += 1
+
+            # Point the resume marker at THIS session as soon as it has an id,
+            # so an application closed mid-session resumes it and not the
+            # previous one.
+            if not _session_marker_written:
+                _early_sid = _session_id_of(msg)
+                if _early_sid:
+                    _persist_session_marker(
+                        spec_dir,
+                        _early_sid,
+                        provider="claude",
+                        model=getattr(getattr(client, "options", None), "model", None),
+                        phase=phase.value,
+                        subtype="running",
+                    )
+                    _session_marker_written = True
             debug_detailed(
                 "session",
                 f"Received message #{message_count}",
@@ -1475,31 +1548,16 @@ async def run_agent_session(
         # cards that hit max_turns/max_budget_usd. Best-effort: never fail
         # the session just because we couldn't write the marker file.
         if _sdk_result_msg is not None:
-            try:
-                _sid = getattr(_sdk_result_msg, "session_id", None)
-                if _sid:
-                    import json as _json
-
-                    _state_path = spec_dir / ".session.json"
-                    _state = {
-                        "session_id": _sid,
-                        "subtype": getattr(_sdk_result_msg, "subtype", None),
-                        "model": getattr(
-                            getattr(client, "options", None), "model", None
-                        ),
-                        "phase": phase.value,
-                    }
-                    _state_path.write_text(
-                        _json.dumps(_state, indent=2), encoding="utf-8"
-                    )
-                    logger.debug(
-                        "[session] Persisted session_id=%s subtype=%s to %s",
-                        _sid,
-                        _state["subtype"],
-                        _state_path,
-                    )
-            except Exception as _se:
-                logger.debug("[session] Could not persist session_id: %s", _se)
+            _sid = _session_id_of(_sdk_result_msg)
+            if _sid:
+                _persist_session_marker(
+                    spec_dir,
+                    _sid,
+                    provider="claude",
+                    model=getattr(getattr(client, "options", None), "model", None),
+                    phase=phase.value,
+                    subtype=getattr(_sdk_result_msg, "subtype", None),
+                )
 
         # Record token usage from the SDK ResultMessage (best-effort)
         if _sdk_result_msg is not None and _record_usage is not None:
@@ -1846,10 +1904,27 @@ async def _run_agent_client_session(
     # different provider than the one that originally produced the transcript.
     # If the last assistant message ended on an un-dispatched tool_use, append
     # a directive nudging the LLM to redo it.
-    await _maybe_replay_conversation(client, spec_dir, provider, log_model, phase.value)
-    message = _maybe_inject_pending_tool_use_note(
-        message, spec_dir, provider, log_model
-    )
+    #
+    # Not when the Claude SDK is rehydrating the interrupted session itself: it
+    # already holds those turns, and the log replayed on top would repeat them.
+    _native_resume = False
+    try:
+        _native_resume = bool(client.resumes_native_session())
+    except Exception:
+        _native_resume = False
+    if _native_resume:
+        debug(
+            "session",
+            "Claude SDK resumes the interrupted session natively — "
+            "conversation log replay skipped",
+        )
+    else:
+        await _maybe_replay_conversation(
+            client, spec_dir, provider, log_model, phase.value
+        )
+        message = _maybe_inject_pending_tool_use_note(
+            message, spec_dir, provider, log_model
+        )
 
     try:
         # Persist the initial user message before the network call so a process
@@ -1884,8 +1959,24 @@ async def _run_agent_client_session(
         _hot_swap_pending = False  # set when a live provider/model swap is detected
         debug("session", "Starting to receive response stream...")
 
+        _session_marker_written = False
         async for agent_msg in client.receive_response():  # noqa: SIM113 — result msg needs post-loop handling
             message_count += 1
+
+            # Same as the raw SDK path: the marker names this session from its
+            # first message, not from its last.
+            if not _session_marker_written:
+                _early_sid = getattr(client, "last_session_id", None)
+                if isinstance(_early_sid, str) and _early_sid:
+                    _persist_session_marker(
+                        spec_dir,
+                        _early_sid,
+                        provider=provider,
+                        model=log_model,
+                        phase=phase.value,
+                        subtype="running",
+                    )
+                    _session_marker_written = True
             debug_detailed(
                 "session",
                 f"Received message #{message_count}",
@@ -2111,28 +2202,16 @@ async def _run_agent_client_session(
         # the provider-agnostic factory (i.e. nearly every flow today).
         _agent_session_id = getattr(client, "last_session_id", None)
         if _agent_session_id:
-            try:
-                import json as _json_session
-
-                _state_path = spec_dir / ".session.json"
-                _state = {
-                    "session_id": _agent_session_id,
-                    "subtype": getattr(
-                        getattr(client, "last_result_msg", None), "subtype", None
-                    ),
-                    "model": getattr(client, "model", None),
-                    "phase": phase.value,
-                }
-                _state_path.write_text(
-                    _json_session.dumps(_state, indent=2), encoding="utf-8"
-                )
-                logger.debug(
-                    "[session] Persisted session_id=%s (AgentClient) to %s",
-                    _agent_session_id,
-                    _state_path,
-                )
-            except Exception as _se:
-                logger.debug("[session] AgentClient session_id persist failed: %s", _se)
+            _persist_session_marker(
+                spec_dir,
+                _agent_session_id,
+                provider=provider,
+                model=getattr(client, "model", None),
+                phase=phase.value,
+                subtype=getattr(
+                    getattr(client, "last_result_msg", None), "subtype", None
+                ),
+            )
 
         # Record token usage from AgentClient (best-effort via duck typing)
         if _record_usage is not None:

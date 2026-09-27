@@ -1070,7 +1070,12 @@ de laisser derrière lui un cerveau vide.
 
 **Deux garde-fous, parce que l'API locale est joignable depuis un navigateur.**
 Le dossier choisi reste sous le répertoire personnel : un endpoint qui crée un
-dépôt git là où on le lui dit écrit dans `/etc` pour qui le demande. Et un
+dépôt git là où on le lui dit écrit dans `/etc` pour qui le demande. Sous
+WSL, « le répertoire personnel » est aussi le profil Windows (`brain/wsl.py`) :
+le backend est un processus Linux, le vault de l'Obsidian Windows vit sous
+`C:\Users\<nom>`, et `C:\…` comme `\\wsl$\<distro>\…` sont lus comme le chemin
+que ce processus ouvre (`/mnt/c/…`, racine d'`/etc/wsl.conf`). Le reste du
+lecteur reste refusé — `C:\Windows` est précisément l'endroit visé. Et un
 distant est un distant (`sync.normalize_remote`) : `utilisateur/dépôt` pour
 GitHub, sinon https, ssh, `git@hôte:`, file ou un chemin. Une valeur qui commence
 par `-` est une option pour `git clone` (`--upload-pack=…` lance un programme) et
@@ -2772,6 +2777,43 @@ transcript (single-shot — `create_client` pops the variable, so only the first
 session of the resumed run replays it). For every other provider it is
 `conversation.<provider>-<model>.jsonl`, which `_maybe_replay_conversation`
 already replayed on every session start.
+
+The two channels are never both open. `.session.json` is written from the
+session's **first** message (the SDK's init message), not only from its last —
+written at the end, a session killed halfway left the pointer on the session
+*before* it, often another phase's, and the resume rehydrated the wrong
+transcript. It records its `provider`, and the frontend hands back a Claude id
+only (a Codex thread id in the Claude SDK fails the session). `create_client`
+drops a resume whose transcript is not under `<CLAUDE_CONFIG_DIR>/projects/`
+(another profile, another machine) rather than fail on it, and a
+`ClaudeAgentClient` that *is* rehydrating natively skips the log replay
+(`resumes_native_session`) — the SDK already holds those turns.
+
+**Closing the application is a pause, opening it is the resume.** Quitting used
+to kill every agent and leave the card `in_progress` with nothing behind it; a
+minute later it read "stuck", and the stuck recovery reset the subtask in
+progress to `pending`, deleted what it had recorded and restarted without the
+session — the phase from the top, on every provider. `before-quit` now calls
+`pauseRunningTasksForShutdown` (`ipc-handlers/task/interrupted-runs.ts`) before
+`killAll`: the Pause button's own `pause_state.json`, in every spec directory
+copy, with `reason: "app_shutdown"`. At launch, once the profile manager is up
+and the window has loaded, `resumeTasksInterruptedByAppExit` resumes those — and
+the tasks persisted `in_progress`/`ai_review` with no process behind them, which
+is what a crash, a forced kill or an OS shutdown that never delivered
+`before-quit` leaves. A pause the **user** asked for has no reason and stays a
+pause. Both go through `resumePausedTask` (`resume-task.ts`), the Reprendre
+button's path, which sends a task with no `spec.md` back to the spec pipeline
+(it skips every artefact it already wrote) — `run.py` refuses that directory.
+
+**The interrupted subtask is continued, not skipped.** `get_next_subtask` picks
+`pending` work only, so a subtask the dead process had marked `in_progress` was
+passed over — or, when it was the last, the build reported "no pending
+subtasks" and halted with the work unfinished. The coder loop is sequential, so
+when a build process starts nothing else is running: `reopen_interrupted_subtasks`
+(`core/progress.py`) puts every `in_progress` subtask back to `pending`,
+keeping what it recorded, and marks it `interrupted_at`. The next session's
+prompt then carries `interrupted_subtask_directive` — look at `git diff`, the
+work already on disk is not to be redone — on top of the replayed transcript.
 
 **A model that is new to a phase inherits it.** The conversation log is
 per-(provider, model) on purpose — switch away and back, and a model resumes

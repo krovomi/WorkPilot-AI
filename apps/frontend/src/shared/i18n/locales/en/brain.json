@@ -58,6 +58,7 @@
 		"connecting": "Connecting…",
 		"sync": "Sync now",
 		"syncing": "Syncing…",
+		"wslHint": "Under WSL, a Windows path is accepted (C:\\Users\\…\\MyVault) and converted to its /mnt/… path. Allowed folders: {{roots}}.",
 		"envOverride": "The folder is set by the {{variable}} environment variable.",
 		"saved": "Brain connected.",
 		"error": "Failed: {{error}}",
