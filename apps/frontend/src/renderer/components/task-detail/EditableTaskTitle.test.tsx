@@ -108,3 +108,36 @@ it("does not reopen or refocus a field when a failed save finishes after a task 
 	expect(screen.queryByRole("textbox")).toBeNull();
 	expect(screen.getByRole("heading")).toHaveTextContent("Autre tâche");
 });
+
+it("keeps the next task's field disabled until its own save finishes, whatever the old one does", async () => {
+	const first: { settle?: (ok: boolean) => void } = {};
+	const second: { settle?: (ok: boolean) => void } = {};
+	persist
+		.mockReturnValueOnce(new Promise<boolean>((resolve) => { first.settle = resolve; }))
+		.mockReturnValueOnce(new Promise<boolean>((resolve) => { second.settle = resolve; }));
+	const { rerender } = render(
+		<EditableTaskTitle task={task} displayTitle={task.title} editable as={Title} />,
+	);
+	fireEvent.click(screen.getByRole("button", { name: /Exporter en CSV/ }));
+	fireEvent.change(screen.getByRole("textbox", { name: "Task title" }), { target: { value: "A2" } });
+	fireEvent.keyDown(screen.getByRole("textbox", { name: "Task title" }), { key: "Enter" });
+
+	const other = { id: "t2", title: "Autre tâche" } as unknown as Task;
+	rerender(<EditableTaskTitle task={other} displayTitle={other.title} editable as={Title} />);
+	// The old save no longer holds this field disabled.
+	fireEvent.click(screen.getByRole("button", { name: /Autre tâche/ }));
+	const field = screen.getByRole("textbox", { name: "Task title" });
+	expect(field).not.toBeDisabled();
+	fireEvent.change(field, { target: { value: "B2" } });
+	fireEvent.keyDown(field, { key: "Enter" });
+	expect(field).toBeDisabled();
+
+	// The old save finishing must not re-enable the field mid-save.
+	first.settle?.(true);
+	await waitFor(() => expect(persist).toHaveBeenCalledTimes(2));
+	await Promise.resolve();
+	expect(screen.getByRole("textbox", { name: "Task title" })).toBeDisabled();
+
+	second.settle?.(false);
+	await waitFor(() => expect(screen.getByRole("textbox", { name: "Task title" })).not.toBeDisabled());
+});

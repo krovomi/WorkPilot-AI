@@ -57,6 +57,10 @@ export function EditableTaskTitle({
 	// tâche ne touche plus au champ quand il se termine.
 	const shownTask = useRef(task.id);
 	shownTask.current = task.id;
+	// Le numéro du dernier enregistrement lancé : seul celui-là rend la main au
+	// champ. Sans lui, l'enregistrement d'une tâche quittée, en se terminant,
+	// réactivait le champ de la suivante pendant qu'elle s'enregistrait.
+	const saveSeq = useRef(0);
 
 	useEffect(() => {
 		if (!editing) setDraft(displayTitle);
@@ -80,6 +84,9 @@ export function EditableTaskTitle({
 	useEffect(() => {
 		settled.current = true;
 		setEditing(false);
+		// Un enregistrement de la tâche quittée ne tient plus ce champ en attente.
+		saveSeq.current += 1;
+		setSaving(false);
 	}, [task.id]);
 
 	const open = () => {
@@ -104,6 +111,8 @@ export function EditableTaskTitle({
 			return;
 		}
 		const savedTask = task.id;
+		saveSeq.current += 1;
+		const seq = saveSeq.current;
 		setSaving(true);
 		let ok = false;
 		try {
@@ -112,8 +121,9 @@ export function EditableTaskTitle({
 			ok = false;
 		} finally {
 			// Toujours rendu au champ : un enregistrement refusé ne doit pas
-			// laisser un titre gelé en lecture seule.
-			setSaving(false);
+			// laisser un titre gelé en lecture seule — mais seulement par le
+			// dernier enregistrement lancé.
+			if (saveSeq.current === seq) setSaving(false);
 		}
 		const stillShown = shownTask.current === savedTask;
 		if (ok) {
