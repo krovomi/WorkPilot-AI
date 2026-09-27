@@ -689,6 +689,23 @@ def _brain_mcp_tools() -> tuple[str, ...]:
     return MCP_TOOL_NAMES
 
 
+def _claude_transcript_exists(session_id: str, config_dir: str | None) -> bool:
+    """Whether the Claude SDK has an on-disk transcript for ``session_id``.
+
+    The SDK keeps one JSONL per session under
+    ``<CLAUDE_CONFIG_DIR or ~/.claude>/projects/<encoded cwd>/``. The cwd
+    encoding is the SDK's own business, so every project directory is looked
+    at: a session id is a UUID, it names one file.
+    """
+    if not session_id or any(sep in session_id for sep in ("/", "\\", "..")):
+        return False
+    base = Path(config_dir).expanduser() if config_dir else Path.home() / ".claude"
+    try:
+        return any((base / "projects").glob(f"*/{session_id}.jsonl"))
+    except OSError:
+        return False
+
+
 def create_client(
     project_dir: Path,
     spec_dir: Path,
@@ -1485,14 +1502,33 @@ def create_client(
     # "Continuing implementation… / Prompt is too long" cascade once the
     # transcript grew past the model's context window.
     # See: code.claude.com/docs/en/agent-sdk/sessions
-    _resume_id = resume or os.environ.get("AUTO_CLAUDE_RESUME_SESSION_ID")
-    if _resume_id:
-        options_kwargs["resume"] = _resume_id
-        logger.info(f"Resuming Claude SDK session: {_resume_id}")
+    _env_resume_id = os.environ.get("AUTO_CLAUDE_RESUME_SESSION_ID")
+    _resume_id = resume or _env_resume_id
+    if _env_resume_id:
         # Pop the env var so the NEXT iteration creates a fresh session instead
         # of re-replaying the same transcript. Explicit `resume=` kwargs still
         # work — they're per-call, not process-wide.
         os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
+    if (
+        _resume_id
+        and not resume
+        and not _claude_transcript_exists(_resume_id, config_dir)
+    ):
+        # A pointer the SDK cannot open fails the session outright ("No
+        # conversation found"). The id handed down on a resume can come from
+        # another profile's CLAUDE_CONFIG_DIR, another machine, or a session
+        # killed before its transcript was written — in all of those the
+        # conversation log replay (every provider) is what carries the
+        # context, and it only runs when the SDK is NOT resuming.
+        logger.info(
+            "Claude SDK transcript for session %s not found — resuming from the "
+            "conversation log instead",
+            _resume_id,
+        )
+        _resume_id = None
+    if _resume_id:
+        options_kwargs["resume"] = _resume_id
+        logger.info(f"Resuming Claude SDK session: {_resume_id}")
 
     # Permission mode hardening for read-only phases. "plan" lets Claude
     # explore and reason but refuses every write/exec tool call — a strong
