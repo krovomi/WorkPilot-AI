@@ -65,7 +65,7 @@ class ContextBuilder:
             task: Description of the task
             services: List of service names to search (None = auto-detect)
             keywords: Additional keywords to search for
-            include_graph_hints: Whether to include historical hints from Graphiti
+            include_graph_hints: Whether to include historical hints from the shared brain
 
         Returns:
             TaskContext with relevant files and patterns
@@ -126,7 +126,7 @@ class ContextBuilder:
                         fetch_graph_hints(task, str(self.project_dir))
                     )
             except Exception:
-                # Graphiti is optional - fail gracefully
+                # Hints are optional - fail gracefully
                 graph_hints = []
 
         # Enrich context with structural dependency graph (Feature 28)
@@ -169,7 +169,7 @@ class ContextBuilder:
             task: Description of the task
             services: List of service names to search (None = auto-detect)
             keywords: Additional keywords to search for
-            include_graph_hints: Whether to include historical hints from Graphiti
+            include_graph_hints: Whether to include historical hints from the shared brain
 
         Returns:
             TaskContext with relevant files and patterns

@@ -60,8 +60,9 @@ propre dict `agents` : **il gagne sur les défauts**.
 | `learning_loop/` | extrait les patterns succès/échec des builds, les injecte dans les prompts |
 | `learning_loop/observe.py` | la phase `observe` : écrit sous `skills/_proposed/`, ne touche jamais un pack |
 | `learning_loop/replay.py` | replay A/B sur les épisodes dorés — la porte que `tests/skills_eval/` exécute |
-| `mem_search/` | récupération par paliers (index ~100 tokens → timeline → détail par ID) |
+| `mem_search/` | récupération par paliers (index ~100 tokens → timeline → détail par ID), vault compris (`BrainSource`) |
 | `brain/` | le cerveau partagé entre agents : vault Obsidian, `graph.json` Graphify, sync git, serveur MCP `workpilot-brain` (`runners/brain_runner.py`, `runners/brain_mcp.py`) |
+| `brain/project_memory.py` + `memory/store.py` | **la seule mémoire** : ce que les builds apprennent, dans le vault. `memory/`, `agents/memory_manager.py` et les outils `record_*` passent par là ; Graphiti n'est plus un magasin |
 | `libdocs/` | phase `docs` : télécharge via Context7 la doc des bibliothèques dont le dépôt n'a aucun exemple, avant le planning |
 | `mobile/` | apps smartphone : `stacks` (Android/Apple/Flutter/RN/MAUI/KMP/Capacitor + commandes), `devices` (émulateurs et simulateurs réels), `readiness` (constructible ici ?), `prompt` (la section donnée à chaque phase) |
 | `continuous_ai/daemon.py` | boucle de polling par module, avec plafond de coût journalier |

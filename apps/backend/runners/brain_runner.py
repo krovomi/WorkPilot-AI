@@ -57,6 +57,7 @@ ACTIONS = (
     "ingest",
     "bridge",
     "connect",
+    "import-legacy",
     "watch",
     "serve",
 )
@@ -104,6 +105,19 @@ def run(args: argparse.Namespace) -> dict:
         report = ingest(brain.root, project, _names(args))
         result = brain.after_write("brain: ingest agent memories")
         return {"success": True, **report.to_dict(), "sync": result.to_dict()}
+    if action == "import-legacy":
+        # What builds learned before the vault was the one memory:
+        # <project>/.workpilot/specs/*/memory/, worktrees included.
+        from brain.project_memory import has_legacy_memory, import_legacy_spec_memory
+
+        root = project or Path.cwd()
+        specs = sorted({p.parent for p in root.glob("**/.workpilot/specs/*/memory")})
+        reports = [
+            import_legacy_spec_memory(spec, root, brain=brain)
+            for spec in specs
+            if has_legacy_memory(spec)
+        ]
+        return {"success": True, "specs": reports}
     if action in ("bridge", "connect") and not brain.exists:
         raise ValueError(f"no brain at {brain.root} — run --action init first")
     if action == "bridge":

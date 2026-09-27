@@ -61,7 +61,7 @@ class PhaseExecutor:
         """Retrieve graph hints for all enabled ideation types in parallel.
 
         This phase runs concurrently with context gathering to fetch
-        historical insights from Graphiti without slowing down the pipeline.
+        historical insights from the shared brain without slowing down the pipeline.
 
         Returns:
             IdeationPhaseResult with graph hints data
@@ -80,16 +80,16 @@ class PhaseExecutor:
                 retries=0,
             )
 
-        # Check if Graphiti is enabled
-        from graphiti_providers import is_graphiti_enabled
+        # Hints come from the shared brain; nothing to ask when memory is off
+        from memory.store import is_memory_enabled
 
-        if not is_graphiti_enabled():
-            print_status("Graphiti not enabled, skipping graph hints", "info")
+        if not is_memory_enabled():
+            print_status("Memory is off, skipping graph hints", "info")
             with open(hints_file, "w", encoding="utf-8") as f:
                 json.dump(
                     {
                         "enabled": False,
-                        "reason": "Graphiti not configured",
+                        "reason": "Memory is off (BRAIN_ENABLED=false)",
                         "hints_by_type": {},
                         "created_at": datetime.now().isoformat(),
                     },
@@ -106,7 +106,7 @@ class PhaseExecutor:
                 retries=0,
             )
 
-        print_status("Querying Graphiti for ideation hints...", "progress")
+        print_status("Querying the shared brain for ideation hints...", "progress")
 
         # Fetch hints for all enabled types in parallel
         hint_tasks = [

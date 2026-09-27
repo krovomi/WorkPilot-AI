@@ -24,6 +24,7 @@ sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 from mem_search import (  # noqa: E402
     INDEX_TOKEN_BUDGET,
+    BrainSource,
     MemoryRecord,
     MemoryRef,
     MemorySearch,
@@ -322,10 +323,12 @@ def test_a_project_with_no_memory_yet_returns_an_empty_index(tmp_path: Path):
 
 
 def test_patterns_are_preferred_over_task_logs(project: Path):
-    """A distilled pattern answers the question; a task log points at it."""
+    """A distilled pattern answers the question; the brain holds what the builds
+    learned; a task log points at where the answer might be."""
     sources = default_sources(project)
     assert isinstance(sources[0], PatternSource)
-    assert isinstance(sources[1], TaskLogSource)
+    assert isinstance(sources[1], BrainSource)
+    assert isinstance(sources[2], TaskLogSource)
 
 
 def test_a_corrupt_store_does_not_break_the_search(project: Path):

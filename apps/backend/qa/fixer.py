@@ -14,10 +14,10 @@ from typing import Any, Union
 
 # Memory integration for cross-session learning
 try:
-    from agents.memory_manager import get_graphiti_context, save_session_memory
+    from agents.memory_manager import get_memory_context, save_session_memory
 except ImportError:
 
-    def get_graphiti_context(*args, **kwargs):
+    async def get_memory_context(*args, **kwargs):
         return ""
 
     def save_session_memory(*args, **kwargs):
@@ -217,7 +217,7 @@ async def run_qa_fixer_session(
     debug_detailed("qa_fixer", "Loaded QA fixer prompt", prompt_length=len(prompt))
 
     # Retrieve memory context for fixer (past fixes, patterns, gotchas)
-    fixer_memory_context = await get_graphiti_context(
+    fixer_memory_context = await get_memory_context(
         spec_dir,
         project_dir,
         {
@@ -818,9 +818,9 @@ async def _process_fixer_result(
 
     fixer_discoveries = {
         "files_understood": {},
-        "patterns_found": [
-            f"QA fixer session {fix_session}: Applied fixes from QA_FIX_REQUEST.md"
-        ],
+        # A session log line is not a pattern: filed as one, it was recalled
+        # as a "learned pattern" by every later session of the project.
+        "patterns_found": [],
         "gotchas_encountered": [],
     }
 

@@ -1,5 +1,8 @@
 """
-Graphiti integration for retrieving graph hints during roadmap generation.
+What the shared brain already knows, as hints for roadmap generation.
+
+The project's memory in the Obsidian vault (`brain.project_memory`) — the one
+store every feature reads. It used to be Graphiti, when it was switched on.
 """
 
 import json
@@ -7,14 +10,14 @@ from datetime import datetime
 from pathlib import Path
 
 from debug import debug, debug_error, debug_success
-from graphiti_providers import get_graph_hints, is_graphiti_enabled
+from memory.store import get_graph_hints, is_memory_enabled
 from ui import print_status
 
 from .models import RoadmapPhaseResult
 
 
 class GraphHintsProvider:
-    """Provides graph-based hints for roadmap generation using Graphiti."""
+    """Provides hints for roadmap generation from the shared brain."""
 
     def __init__(self, output_dir: Path, project_dir: Path, refresh: bool = False):
         self.output_dir = output_dir
@@ -23,7 +26,7 @@ class GraphHintsProvider:
         self.hints_file = output_dir / "graph_hints.json"
 
     async def retrieve_hints(self) -> RoadmapPhaseResult:
-        """Retrieve graph hints for roadmap generation from Graphiti (if enabled).
+        """Retrieve hints for roadmap generation from the shared brain.
 
         This is a lightweight integration - hints are optional and cached.
         """
@@ -40,16 +43,16 @@ class GraphHintsProvider:
                 "graph_hints", True, [str(self.hints_file)], [], 0
             )
 
-        if not is_graphiti_enabled():
-            debug("roadmap_graph", "Graphiti not enabled, creating placeholder")
-            print_status("Graphiti not enabled, skipping graph hints", "info")
+        if not is_memory_enabled():
+            debug("roadmap_graph", "Memory is off, creating placeholder")
+            print_status("Memory is off, skipping graph hints", "info")
             self._create_disabled_hints_file()
             return RoadmapPhaseResult(
                 "graph_hints", True, [str(self.hints_file)], [], 0
             )
 
-        debug("roadmap_graph", "Querying Graphiti for roadmap insights")
-        print_status("Querying Graphiti for roadmap insights...", "progress")
+        debug("roadmap_graph", "Querying the shared brain for roadmap insights")
+        print_status("Querying the shared brain for roadmap insights...", "progress")
 
         try:
             hints = await get_graph_hints(
@@ -80,12 +83,12 @@ class GraphHintsProvider:
             )
 
     def _create_disabled_hints_file(self):
-        """Create a hints file indicating Graphiti is disabled."""
+        """Create a hints file indicating memory is off."""
         with open(self.hints_file, "w", encoding="utf-8") as f:
             json.dump(
                 {
                     "enabled": False,
-                    "reason": "Graphiti not configured",
+                    "reason": "Memory is off (BRAIN_ENABLED=false)",
                     "hints": [],
                     "created_at": datetime.now().isoformat(),
                 },

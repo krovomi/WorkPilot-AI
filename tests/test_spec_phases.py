@@ -344,7 +344,7 @@ class TestPhaseHistoricalContext:
         mock_ui_module,
         mock_spec_validator,
     ):
-        """Historical context phase handles disabled Graphiti."""
+        """Historical context phase handles memory turned off."""
         executor = PhaseExecutor(
             project_dir=temp_dir,
             spec_dir=spec_dir,
@@ -355,11 +355,12 @@ class TestPhaseHistoricalContext:
             ui_module=mock_ui_module,
         )
 
-        with patch("graphiti_providers.is_graphiti_enabled", return_value=False):
+        with patch("memory.store.is_memory_enabled", return_value=False):
             result = await executor.phase_historical_context()
 
         assert result.success is True
-        assert (spec_dir / "graph_hints.json").exists()
+        hints = json.loads((spec_dir / "graph_hints.json").read_text(encoding="utf-8"))
+        assert hints["enabled"] is False
 
 
 class TestPhaseRequirements:

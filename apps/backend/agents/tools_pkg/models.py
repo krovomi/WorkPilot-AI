@@ -504,7 +504,7 @@ def get_required_mcp_servers(
     Handles dynamic server selection:
     - "browser" → electron (if is_electron) or puppeteer (if is_web_frontend)
     - "linear" → only if in mcp_servers_optional AND linear_enabled is True
-    - "graphiti" → only if GRAPHITI_MCP_URL is set
+    - "graphiti" → never by default: the shared brain is the one memory
     - Respects per-project MCP config overrides from .workpilot/.env
     - Applies per-agent ADD/REMOVE overrides from AGENT_MCP_<agent>_ADD/REMOVE
 
@@ -562,9 +562,11 @@ def get_required_mcp_servers(
                 if str(puppeteer_enabled).lower() == "true":
                     servers.append("puppeteer")
 
-    # Filter graphiti if not enabled
-    if "graphiti" in servers and not os.environ.get("GRAPHITI_MCP_URL"):
-        servers = [s for s in servers if s != "graphiti"]
+    # The Graphiti MCP server was a second memory an agent could write to,
+    # beside the vault every other surface reads. The shared brain's own server
+    # (added just below) is the memory now; AGENT_MCP_<agent>_ADD=graphiti is
+    # still honoured for someone who asks for it by name.
+    servers = [s for s in servers if s != "graphiti"]
 
     # The shared brain reaches every agent that has tools at all, in every
     # feature, the moment a brain exists on this machine (`brain/runtime.py`).

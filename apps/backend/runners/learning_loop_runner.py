@@ -93,11 +93,12 @@ async def record_outcome(
     )
     emit_status(f"Recorded outcome '{verdict}' for {spec_id}")
 
-    # Best-effort: also store in Graphiti so get_similar_task_outcomes works
+    # Best-effort: also file it in the project's memory (the shared brain),
+    # so get_similar_task_outcomes finds it for the next task
     try:
-        from memory.graphiti_helpers import get_graphiti_memory
+        from memory.store import get_project_memory
 
-        memory = await get_graphiti_memory(spec_dir, Path(project_dir))
+        memory = get_project_memory(spec_dir, Path(project_dir))
         if memory is not None:
             try:
                 await memory.save_task_outcome(
@@ -108,7 +109,7 @@ async def record_outcome(
             finally:
                 await memory.close()
     except Exception as e:
-        emit_status(f"Graphiti outcome save skipped: {e}")
+        emit_status(f"Brain outcome save skipped: {e}")
 
     return spec_dir
 

@@ -7,7 +7,6 @@ export { AuthChoiceStep } from "./AuthChoiceStep";
 export { CompletionStep } from "./CompletionStep";
 export { FirstSpecStep } from "./FirstSpecStep";
 // Legacy export for backward compatibility
-export { GraphitiStep } from "./GraphitiStep";
 export { MemoryStep } from "./MemoryStep";
 export { OAuthStep } from "./OAuthStep";
 export { OllamaModelSelector } from "./OllamaModelSelector";
