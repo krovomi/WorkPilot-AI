@@ -880,6 +880,11 @@ class SavedCapture:
     path: str = ""
 
 
+#: Every format `_image_kind` recognises: a capture saved in one replaces the
+#: same screen saved in another.
+_CAPTURE_EXTENSIONS = ("png", "jpg")
+
+
 def _image_kind(data: bytes) -> str:
     if data.startswith(_PNG):
         return "png"
@@ -906,9 +911,14 @@ def save_capture(
     never taken from the request — so a second capture of the same screen
     replaces the first, and a base and a task capture of one route pair up.
     """
-    if side not in SIDES:
+    # The constants, not the request's strings: from here on nothing the
+    # client sent reaches a path except through `slug`, and the final path is
+    # checked to stay under its directory once normalised.
+    side = next((s for s in SIDES if s == side), "")
+    if not side:
         return SavedCapture("invalid-side")
-    if platform not in PLATFORMS:
+    platform = next((p for p in PLATFORMS if p == platform), "")
+    if not platform:
         return SavedCapture("invalid-platform")
     if len(data) > MAX_CAPTURE_BYTES:
         return SavedCapture("too-large")
@@ -923,24 +933,28 @@ def save_capture(
     name = f"{platform}--{slug(route) or 'screen'}" + (
         f"--{slug(locale)}" if locale else ""
     )
-    target = Path(spec_dir) / CAPTURES_DIR / side / f"{name}.{kind}"
-    if not writable(target, Path(spec_dir)):
+    root = os.path.realpath(os.path.join(spec_dir, CAPTURES_DIR, side))
+    resolved = os.path.realpath(os.path.join(root, f"{name}.{kind}"))
+    if not resolved.startswith(root + os.sep):
         return SavedCapture("unwritable")
+    target = Path(resolved)
+    if not writable(target, Path(os.path.realpath(spec_dir))):
+        return SavedCapture("unwritable")
+    partial = target.with_name(f".{target.name}.partial")
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         # Written beside the target and moved over it: a write that fails
         # leaves the previous capture of this screen in place, and only a
         # capture that landed replaces one saved in the other format.
-        partial = target.with_name(f".{target.name}.partial")
         partial.write_bytes(data)
         os.replace(partial, target)
     except OSError:
-        partial = target.with_name(f".{target.name}.partial")
         if partial.is_file() and not partial.is_symlink():
             partial.unlink(missing_ok=True)
         return SavedCapture("unwritable")
-    for stale in target.parent.glob(f"{name}.*"):
-        if stale != target and stale.is_file() and not stale.is_symlink():
+    for other in _CAPTURE_EXTENSIONS:
+        stale = target.with_suffix(f".{other}")
+        if other != kind and stale.is_file() and not stale.is_symlink():
             try:
                 stale.unlink()
             except OSError:
@@ -964,7 +978,7 @@ def save_capture(
         "capturedAt": _now(),
     }
     _write_manifest(Path(spec_dir), entry)
-    return SavedCapture("saved", target.relative_to(spec_dir).as_posix())
+    return SavedCapture("saved", f"{CAPTURES_DIR}/{side}/{target.name}")
 
 
 def _write_manifest(spec_dir: Path, entry: dict) -> None:

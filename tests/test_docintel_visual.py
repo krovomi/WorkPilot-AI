@@ -667,6 +667,7 @@ def _rendered_screen(target: Path, lines: list[str]) -> None:
     image_mod = pytest.importorskip("PIL.Image")
     draw_mod = pytest.importorskip("PIL.ImageDraw")
     font_mod = pytest.importorskip("PIL.ImageFont")
+    font = None
     try:
         font = font_mod.truetype("DejaVuSans.ttf", 28)
     except OSError:
