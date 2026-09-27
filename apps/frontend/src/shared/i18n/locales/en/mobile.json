@@ -43,5 +43,11 @@
 		"android": "Android",
 		"ios": "Apple (iOS)",
 		"badgeTitle": "Mobile target: {{platforms}}"
+	},
+	"review": {
+		"send": "Send to visual review",
+		"hint": "Keep this frame as a capture: QA reads it by OCR (which screen, crash or sign-in screen, raw keys, cut labels)",
+		"sent": "Frame kept for the visual review",
+		"failed": "The frame could not be kept: {{error}}"
 	}
 }

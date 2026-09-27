@@ -7,8 +7,8 @@ name, and every text layer's exact characters. Reading that is the
 "structured first" rule applied to the one design tool with an API.
 
 **The contract with the visual review** (the mockup / rendering comparison is
-another module's job) is one file per linked mockup,
-``<spec_dir>/attachments/<name>.figma.json``::
+`visual_qa.py`'s job, through `labels.load_figma`) is one file per linked
+mockup, ``<spec_dir>/attachments/<name>.figma.json``::
 
     {"source": "figma", "file_key": "…",
      "frames": [{"id": "…", "name": "…", "texts": ["Libellé 1", "…"]}]}

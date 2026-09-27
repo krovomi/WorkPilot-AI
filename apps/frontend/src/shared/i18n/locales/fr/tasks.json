@@ -1627,5 +1627,67 @@
 		"titleHint": "Cliquez pour modifier le titre",
 		"descriptionHelp": "Ctrl+Entrée pour enregistrer · Échap pour annuler",
 		"descriptionRequired": "La description ne peut pas être vide."
+	},
+	"visualReview": {
+		"title": "Revue visuelle",
+		"subtitle": "Ce que montrent les captures de l'application, lues par OCR avant la revue QA",
+		"notRead": "Des captures attendent : lisez-les pour vérifier clés, langues, libellés coupés et maquette",
+		"pending_one": "{{count}} capture pas encore lue",
+		"pending_other": "{{count}} captures pas encore lues",
+		"read": "Lire les captures",
+		"expand": "Détails",
+		"collapse": "Masquer",
+		"error": "Revue visuelle indisponible : {{error}}",
+		"findings": "Constats",
+		"diffs": "Changé à l'écran (base → tâche)",
+		"mockups": "Maquette face au rendu",
+		"more_one": "… et {{count}} autre constat",
+		"more_other": "… et {{count}} autres constats",
+		"diffSummary": "{{changed}} modifié(s), {{added}} apparu(s), {{removed}} disparu(s)",
+		"changed": "Modifié",
+		"added": "Apparu",
+		"removed": "Disparu",
+		"missing": "Absent du rendu :",
+		"coverage": "— {{percent}} % de ses libellés trouvés ({{matched}}/{{total}})",
+		"ocrCaveat": "Lu par OCR, qui peut se tromper : vérifiez chaque constat sur la capture. Les textes affichés sont ceux des écrans.",
+		"mockupKind": {
+			"figma": "Cadre Figma",
+			"image": "Image de maquette"
+		},
+		"severity": {
+			"high": "Élevé",
+			"medium": "Moyen",
+			"low": "Faible"
+		},
+		"badge": {
+			"captures_one": "{{count}} capture",
+			"captures_other": "{{count}} captures",
+			"high_one": "{{count}} élevé",
+			"high_other": "{{count}} élevés",
+			"medium_one": "{{count}} moyen",
+			"medium_other": "{{count}} moyens",
+			"low_one": "{{count}} faible",
+			"low_other": "{{count}} faibles",
+			"diffs_one": "{{count}} écran modifié",
+			"diffs_other": "{{count}} écrans modifiés"
+		},
+		"kind": {
+			"untranslated-key": "Clé de traduction affichée",
+			"interpolation": "Variable non remplacée",
+			"language": "Écran dans une autre langue",
+			"foreign-label": "Libellé dans une autre langue",
+			"truncated": "Libellé tronqué",
+			"ellipsis": "Peut-être tronqué",
+			"clipped": "Coupé au bord",
+			"overflow": "Débordement de mise en page",
+			"crash": "Écran de crash",
+			"error-page": "Page d'erreur",
+			"login": "Écran de connexion au lieu de la fonctionnalité",
+			"blank": "Écran vide",
+			"expected-screen": "Écran attendu non affiché",
+			"mockup-missing": "Libellé de la maquette absent",
+			"mockup-near": "Diffère de la maquette",
+			"placeholder": "Texte provisoire"
+		}
 	}
 }

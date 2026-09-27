@@ -26,6 +26,7 @@ from .api_tests import draft_tests
 from .conformance import check_conformance
 from .diagnostics import summary
 from .erd import check_erd
+from .files import project_of
 from .preflight import run_preflight
 from .sequence import check_sequences
 from .spec_drafts import decide, load_drafts
@@ -34,13 +35,6 @@ from .whiteboard import convert
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/docintel", tags=["docintel"])
-
-
-def project_of(spec_dir: Path) -> Path | None:
-    """`<project>/.workpilot/specs/<id>` -> `<project>`, or None."""
-    if spec_dir.parent.name == "specs" and spec_dir.parent.parent.name == ".workpilot":
-        return spec_dir.parent.parent.parent
-    return None
 
 
 def _code_checks(project: Path, spec_dir: Path) -> dict:
@@ -345,4 +339,127 @@ def figma_link(body: FigmaRequest):
         return {"success": True, "result": result.to_dict()}
     except Exception:  # noqa: BLE001
         logger.exception("docintel figma import failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+# ---------------------------------------------------------------------------
+# Visual QA: captures of the running app, read by OCR (lot E)
+# ---------------------------------------------------------------------------
+
+#: A data URI is ~4/3 the image: the cap of `visual_qa.MAX_CAPTURE_BYTES`.
+MAX_DATA_URI_CHARS = 14 * 1024 * 1024
+
+
+class CaptureRequest(SpecAddress):
+    #: ``base`` (the base branch) or ``task`` (the task's worktree).
+    side: str
+    #: ``data:image/png;base64,…`` — the frame the webview or the device gave.
+    image: str = Field(max_length=MAX_DATA_URI_CHARS)
+    platform: str = "web"
+    source: str = "manual"
+    url: str = Field("", max_length=2000)
+    locale: str = Field("", max_length=20)
+    label: str = Field("", max_length=200)
+    expected: list[str] = Field(default_factory=list, max_length=40)
+
+
+def _visual_payload(spec_dir: Path, project: Path | None) -> dict:
+    """The persisted record, and the captures a run would read now.
+
+    The record is *read*, not recomputed: OCR of every capture is not what
+    opening a panel costs. The capture list is recomputed — a listing of a few
+    directories — so the card can say a capture is waiting to be read.
+    """
+    from .visual_qa import collect_captures, load_visual_qa
+
+    record = load_visual_qa(spec_dir)
+    captures = [c.to_dict() for c in collect_captures(spec_dir, project)]
+    reviewed = {
+        (c.get("origin"), c.get("path")) for c in (record.captures if record else [])
+    }
+    return {
+        "success": True,
+        "record": record.to_dict() if record else None,
+        "counts": record.counts() if record else None,
+        "captures": captures,
+        "pending": sum(1 for c in captures if (c["origin"], c["path"]) not in reviewed),
+    }
+
+
+@router.get("/visual")
+def visual(
+    spec_dir: str | None = Query(None),
+    project_dir: str | None = Query(None),
+    spec_id: str | None = Query(None),
+):
+    """What the captures of this task showed, as the QA reviewer reads it."""
+    resolved, error = _resolve(
+        SpecAddress(spec_dir=spec_dir, project_dir=project_dir, spec_id=spec_id)
+    )
+    if error:
+        return error
+    try:
+        return _visual_payload(resolved, project_of(resolved))
+    except Exception:  # noqa: BLE001
+        logger.exception("docintel visual QA read failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+@router.post("/visual/run")
+def visual_run(address: SpecAddress):
+    """Read the captures now — what the QA loop does, on request."""
+    resolved, error = _resolve(address)
+    if error:
+        return error
+    try:
+        from .visual_qa import run_visual_qa
+
+        project = project_of(resolved)
+        run_visual_qa(resolved, project, persist=True)
+        return _visual_payload(resolved, project)
+    except Exception:  # noqa: BLE001
+        logger.exception("docintel visual QA run failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+@router.post("/captures")
+def capture(body: CaptureRequest):
+    """Keep a frame of the running app as a capture of this task.
+
+    The file name is the server's — built from the route, the platform and the
+    locale — and the directory is `captures/<side>/` of the resolved spec: the
+    request says *what* the frame shows, never where it goes.
+    """
+    import base64
+    import binascii
+
+    resolved, error = _resolve(body)
+    if error:
+        return error
+    header, _, encoded = body.image.partition(",")
+    if not header.startswith("data:image/") or ";base64" not in header:
+        return {"success": False, "error": "Not an image.", "reason": "invalid-image"}
+    try:
+        data = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        return {"success": False, "error": "Not an image.", "reason": "invalid-image"}
+    try:
+        from .visual_qa import save_capture
+
+        saved = save_capture(
+            resolved,
+            data,
+            side=body.side,
+            platform=body.platform,
+            source=body.source,
+            url=body.url,
+            locale=body.locale,
+            label=body.label,
+            expected=body.expected,
+        )
+        if saved.status != "saved":
+            return {"success": False, "error": saved.status, "reason": saved.status}
+        return {**_visual_payload(resolved, project_of(resolved)), "saved": saved.path}
+    except Exception:  # noqa: BLE001
+        logger.exception("docintel capture failed")
         return {"success": False, "error": "An internal error has occurred."}

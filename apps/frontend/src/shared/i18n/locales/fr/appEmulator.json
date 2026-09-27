@@ -93,6 +93,12 @@
 			"page": "page ajoutée par la tâche",
 			"launchProfile": "profil de lancement du projet",
 			"apiDocs": "documentation d'API du framework"
-		}
+		},
+		"capture": "Garder cet écran pour la revue visuelle",
+		"captured": {
+			"task": "Capturé pour la revue (tâche)",
+			"base": "Capturé pour la revue (branche de base)"
+		},
+		"captureFailed": "La capture n'a pas pu être enregistrée : {{error}}"
 	}
 }

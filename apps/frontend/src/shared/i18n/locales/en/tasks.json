@@ -1627,5 +1627,67 @@
 		"titleHint": "Click to edit the title",
 		"descriptionHelp": "Ctrl+Enter to save · Esc to cancel",
 		"descriptionRequired": "The description cannot be empty."
+	},
+	"visualReview": {
+		"title": "Visual review",
+		"subtitle": "What the captures of the running app show, read by OCR before the QA review",
+		"notRead": "Captures are waiting: read them to check keys, languages, cut labels and the mockup",
+		"pending_one": "{{count}} capture not read yet",
+		"pending_other": "{{count}} captures not read yet",
+		"read": "Read the captures",
+		"expand": "Details",
+		"collapse": "Hide",
+		"error": "Visual review unavailable: {{error}}",
+		"findings": "Findings",
+		"diffs": "Changed on screen (base → task)",
+		"mockups": "Mockup against the render",
+		"more_one": "… and {{count}} more finding",
+		"more_other": "… and {{count}} more findings",
+		"diffSummary": "{{changed}} changed, {{added}} added, {{removed}} removed",
+		"changed": "Changed",
+		"added": "Added",
+		"removed": "Removed",
+		"missing": "Missing on the render:",
+		"coverage": "— {{percent}}% of its labels found ({{matched}}/{{total}})",
+		"ocrCaveat": "Read by OCR, which can misread: check each finding on the capture. The texts shown are what the screens displayed.",
+		"mockupKind": {
+			"figma": "Figma frame",
+			"image": "Mockup image"
+		},
+		"severity": {
+			"high": "High",
+			"medium": "Medium",
+			"low": "Low"
+		},
+		"badge": {
+			"captures_one": "{{count}} capture",
+			"captures_other": "{{count}} captures",
+			"high_one": "{{count}} high",
+			"high_other": "{{count}} high",
+			"medium_one": "{{count}} medium",
+			"medium_other": "{{count}} medium",
+			"low_one": "{{count}} low",
+			"low_other": "{{count}} low",
+			"diffs_one": "{{count}} screen changed",
+			"diffs_other": "{{count}} screens changed"
+		},
+		"kind": {
+			"untranslated-key": "Translation key shown",
+			"interpolation": "Unresolved placeholder",
+			"language": "Screen in another language",
+			"foreign-label": "Label in another language",
+			"truncated": "Truncated label",
+			"ellipsis": "Possibly truncated",
+			"clipped": "Cut at the edge",
+			"overflow": "Layout overflow",
+			"crash": "Crash screen",
+			"error-page": "Error page",
+			"login": "Sign-in screen instead of the feature",
+			"blank": "Blank screen",
+			"expected-screen": "Expected screen not shown",
+			"mockup-missing": "Mockup label missing",
+			"mockup-near": "Differs from the mockup",
+			"placeholder": "Placeholder text"
+		}
 	}
 }

@@ -916,6 +916,140 @@ export function linkFigmaMockup(
 	);
 }
 
+/* -------------------------------------------------------------------------
+ * Docintel visual QA — the captures of the running app, read by OCR
+ *
+ *   GET  /api/docintel/visual        the persisted record + the captures now
+ *   POST /api/docintel/visual/run    read the captures now (what QA does)
+ *   POST /api/docintel/captures      keep a frame as a capture of the task
+ *
+ * See `docintel/visual_qa.py`. Every text in the record is screen text read
+ * by OCR — shown, never interpreted.
+ * ---------------------------------------------------------------------- */
+
+export type VisualSeverity = "high" | "medium" | "low";
+export type CaptureSide = "base" | "task" | "store";
+export type CapturePlatform = "web" | "android" | "ios" | "desktop";
+
+export interface VisualFinding {
+	kind: string;
+	severity: VisualSeverity;
+	text: string;
+	detail: string;
+	capture: string;
+}
+
+export interface VisualCapture {
+	path: string;
+	origin: "spec" | "visual-proof" | "store";
+	side: CaptureSide;
+	platform: CapturePlatform;
+	route: string;
+	locale: string;
+	source: string;
+	label: string;
+	key: string;
+	reading?: { status: string; reason: string; labels: string[] };
+	screen?: { language: string; kind: string; locale: string };
+}
+
+export interface VisualDiff {
+	key: string;
+	route: string;
+	locale: string;
+	platform: CapturePlatform;
+	base: string;
+	task: string;
+	changed: { before: string; after: string; similarity: number }[];
+	added: string[];
+	removed: string[];
+	unchanged: number;
+}
+
+export interface VisualMockup {
+	source: string;
+	kind: "figma" | "image";
+	status: string;
+	reason?: string;
+	frame?: string;
+	capture?: string;
+	coverage?: number;
+	matched?: number;
+	total?: number;
+	missing?: string[];
+	near?: { expected: string; rendered: string; similarity: number }[];
+	frames?: number;
+}
+
+export interface VisualQaRecord {
+	captures: VisualCapture[];
+	findings: VisualFinding[];
+	diffs: VisualDiff[];
+	mockups: VisualMockup[];
+	skipped: string;
+	generated_at: string;
+}
+
+export interface VisualQaPayload {
+	record: VisualQaRecord | null;
+	counts: Record<VisualSeverity, number> | null;
+	/** Captures a run would read now (a directory listing, no OCR). */
+	captures: VisualCapture[];
+	/** Captures not in the record yet: a run would read them. */
+	pending: number;
+	saved?: string;
+}
+
+export interface CaptureInput {
+	side: "base" | "task";
+	/** `data:image/png;base64,…` */
+	image: string;
+	platform?: CapturePlatform;
+	source?: "emulator" | "device-runner" | "manual";
+	url?: string;
+	locale?: string;
+	label?: string;
+}
+
+export function fetchVisualQa(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<VisualQaPayload>> {
+	return _get<VisualQaPayload>("/api/docintel/visual", specAddress(query), signal);
+}
+
+export function runVisualQa(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<VisualQaPayload>> {
+	return _post<VisualQaPayload>(
+		"/api/docintel/visual/run",
+		specAddress(query),
+		signal,
+	);
+}
+
+export function saveCapture(
+	query: SpecTraceabilityQuery,
+	input: CaptureInput,
+	signal?: AbortSignal,
+): Promise<ApiResult<VisualQaPayload>> {
+	return _post<VisualQaPayload>(
+		"/api/docintel/captures",
+		{
+			...specAddress(query),
+			side: input.side,
+			image: input.image,
+			platform: input.platform ?? "web",
+			source: input.source ?? "manual",
+			url: input.url ?? "",
+			locale: input.locale ?? "",
+			label: input.label ?? "",
+		},
+		signal,
+	);
+}
+
 export async function fetchWorkflowProfile(
 	query: WorkflowProfileQuery,
 	signal?: AbortSignal,

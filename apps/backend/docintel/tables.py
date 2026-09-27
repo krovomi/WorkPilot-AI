@@ -270,7 +270,18 @@ def tables_from_text(text: str) -> list[RuleTable]:
 # ---------------------------------------------------------------------------
 
 
-def _row_cells(words: list[OcrBox], gap: float) -> list[tuple[int, int, str]]:
+def char_gap(boxes: tuple[OcrBox, ...] | list[OcrBox]) -> float:
+    """About two character widths: the gap that separates two cells of a row.
+
+    Shared with `labels.py`, which splits a toolbar into its buttons the same
+    way a table row is split into its cells.
+    """
+    widths = sorted(b.width / max(len(b.text), 1) for b in boxes if b.text.strip())
+    char_width = widths[len(widths) // 2] if widths else 8.0
+    return char_width * 2.2
+
+
+def row_cells(words: list[OcrBox], gap: float) -> list[tuple[int, int, str]]:
     """(left, right, text) cells: words joined while the gap between them is small."""
     cells: list[tuple[int, int, str]] = []
     for box in sorted(words, key=lambda b: b.left):
@@ -295,10 +306,8 @@ def tables_from_boxes(
     """
     if not boxes:
         return []
-    widths = sorted(b.width / max(len(b.text), 1) for b in boxes if b.text.strip())
-    char_width = widths[len(widths) // 2] if widths else 8.0
-    gap = char_width * 2.2
-    tolerance = char_width * 4
+    gap = char_gap(boxes)
+    tolerance = gap / 2.2 * 4
 
     by_line: dict[int, list[OcrBox]] = {}
     for box in boxes:
@@ -311,7 +320,7 @@ def tables_from_boxes(
     ordered = sorted(by_line)
     index = 0
     while index < len(ordered):
-        header = _row_cells(by_line[ordered[index]], gap)
+        header = row_cells(by_line[ordered[index]], gap)
         if len(header) < 2:
             index += 1
             continue
@@ -319,7 +328,7 @@ def tables_from_boxes(
         rows: list[list[str]] = []
         end = index + 1
         while end < len(ordered) and ordered[end] == ordered[end - 1] + 1:
-            cells = _row_cells(by_line[ordered[end]], gap)
+            cells = row_cells(by_line[ordered[end]], gap)
             if not _aligned(starts, [left for left, _, _ in cells], int(tolerance)):
                 break
             rows.append([t for _, _, t in cells])

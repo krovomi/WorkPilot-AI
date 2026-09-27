@@ -594,3 +594,68 @@ def is_no_test_project(spec_dir: Path, project_dir: Path) -> bool:
         return False
 
     return True
+
+
+# =============================================================================
+# VISUAL QA (docintel lot E)
+# =============================================================================
+
+
+def run_visual_qa(spec_dir: Path, project_dir: Path) -> dict[str, int] | None:
+    """OCR the task's captures before the reviewer reads them. Never raises.
+
+    The record lands in `<spec_dir>/docintel/visual_qa.json`, which is what
+    the reviewer's prompt (`docintel_section`) and `write_visual_qa_report`
+    read. A capture whose file did not change is not read again, so running
+    this before every QA pass costs one `stat` per capture after the first.
+    Returns the finding counts, or None when there was nothing to review.
+    """
+    try:
+        from docintel.visual_qa import run_visual_qa as _run
+
+        record = _run(spec_dir, project_dir)
+    except Exception:  # noqa: BLE001 - visual QA never stops a review
+        return None
+    if record.skipped:
+        return None
+    return record.counts()
+
+
+def write_visual_qa_report(spec_dir: Path) -> bool:
+    """Put the visual QA findings into `qa_report.md`, between their markers.
+
+    The reviewer writes the report and may or may not quote the OCR evidence;
+    this makes it part of the report either way, replaced in place on every
+    pass so the section describes the captures as they are now. Never raises.
+    """
+    try:
+        from docintel.visual_qa import (
+            REPORT_END,
+            REPORT_START,
+            load_visual_qa,
+            report_markdown,
+        )
+
+        record = load_visual_qa(spec_dir)
+        section = report_markdown(record) if record is not None else ""
+        report = spec_dir / "qa_report.md"
+        if report.is_symlink():
+            return False
+        try:
+            current = report.read_text(encoding="utf-8")
+        except OSError:
+            current = ""
+        if REPORT_START in current and REPORT_END in current:
+            head, rest = current.split(REPORT_START, 1)
+            tail = rest.split(REPORT_END, 1)[1]
+            updated = head.rstrip() + ("\n\n" + section if section else "") + tail
+        elif section:
+            updated = (current.rstrip() + "\n\n" if current.strip() else "") + section
+        else:
+            return False
+        if updated == current:
+            return False
+        report.write_text(updated.rstrip() + "\n", encoding="utf-8")
+        return True
+    except Exception:  # noqa: BLE001 - the report is the reviewer's first
+        return False

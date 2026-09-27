@@ -21,6 +21,7 @@ import {
 	stopAppEmulator,
 	useAppEmulatorStore,
 } from "../../stores/app-emulator-store";
+import { useDocintelVisualStore } from "../../stores/docintel-visual-store";
 import { ResponsivePreview } from "../app-emulator/ResponsivePreview";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -30,6 +31,21 @@ interface TaskEmulatorProps {
 	taskId: string;
 	project?: Project;
 	worktreePath?: string;
+	/** La spec de la tâche : sans elle, pas de capture pour la revue visuelle. */
+	specId?: string;
+}
+
+/**
+ * De quel côté est l'écran capturé : le serveur tourne dans le worktree de la
+ * tâche, ou dans le dépôt lui-même — la branche de base. C'est ce qui permet
+ * à la revue de comparer la même route avant et après.
+ */
+export function captureSide(
+	configProjectDir: string | undefined,
+	worktreePath: string | null,
+): "base" | "task" {
+	if (!worktreePath || !configProjectDir) return "base";
+	return isConfigForProject(configProjectDir, worktreePath) ? "task" : "base";
 }
 
 /** L'étiquette qui dit d'où vient la route proposée. */
@@ -63,6 +79,7 @@ export function TaskEmulator({
 	taskId,
 	project,
 	worktreePath,
+	specId,
 }: TaskEmulatorProps) {
 	const { t } = useTranslation(["appEmulator", "tasks"]);
 	const [browserError, setBrowserError] = useState<string | null>(null);
@@ -93,6 +110,11 @@ export function TaskEmulator({
 	const setConfig = useAppEmulatorStore((state) => state.setConfig);
 	const setUrl = useAppEmulatorStore((state) => state.setUrl);
 	const setStatus = useAppEmulatorStore((state) => state.setStatus);
+	const saveCapture = useDocintelVisualStore((state) => state.capture);
+	const capturing = useDocintelVisualStore(
+		(state) => state.byTask[taskId]?.busy === "capturing",
+	);
+	const [captureNote, setCaptureNote] = useState<string | null>(null);
 
 	useEffect(() => {
 		setResolvedWorktreePath(worktreePath ?? null);
@@ -164,6 +186,25 @@ export function TaskEmulator({
 			cancelled = true;
 		};
 	}, [taskId]);
+
+	const handleCapture = useCallback(
+		async (image: string, shownUrl: string) => {
+			if (!project?.path || !specId) return;
+			const side = captureSide(config?.projectDir, resolvedWorktreePath);
+			const saved = await saveCapture(
+				taskId,
+				{ projectDir: project.path, specId },
+				{ side, image, url: shownUrl, platform: "web", source: "emulator" },
+			);
+			const failure = useDocintelVisualStore.getState().byTask[taskId]?.error;
+			setCaptureNote(
+				saved
+					? t(`appEmulator:preview.captured.${side}`)
+					: t("appEmulator:preview.captureFailed", { error: failure ?? "" }),
+			);
+		},
+		[config?.projectDir, project?.path, resolvedWorktreePath, saveCapture, specId, t, taskId],
+	);
 
 	const isLoading = phase === "detecting" || phase === "starting";
 	const isRunning = phase === "running";
@@ -371,6 +412,11 @@ export function TaskEmulator({
 					{browserError}
 				</p>
 			)}
+			{captureNote && (
+				<p role="status" className="shrink-0 px-3 py-1 text-xs text-muted-foreground">
+					{captureNote}
+				</p>
+			)}
 			<div className="flex-1 min-h-0 overflow-hidden">
 				{canPreview && url ? (
 					<ResponsivePreview
@@ -380,6 +426,8 @@ export function TaskEmulator({
 						candidates={landingCandidates}
 						restoredUrl={previewUrl}
 						onNavigate={handlePreviewNavigate}
+						onCapture={project?.path && specId ? handleCapture : undefined}
+						capturing={capturing}
 					/>
 				) : (
 					<div className="flex h-full flex-col">

@@ -18,6 +18,14 @@ MAX_FILES = 25
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 
 
+def project_of(spec_dir: Path) -> Path | None:
+    """`<project>/.workpilot/specs/<id>` -> `<project>`, or None."""
+    spec_dir = Path(spec_dir)
+    if spec_dir.parent.name == "specs" and spec_dir.parent.parent.name == ".workpilot":
+        return spec_dir.parent.parent.parent
+    return None
+
+
 def inside(path: Path, root: Path) -> bool:
     try:
         path.resolve().relative_to(root.resolve())

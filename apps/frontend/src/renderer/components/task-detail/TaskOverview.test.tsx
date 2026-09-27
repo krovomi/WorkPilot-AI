@@ -23,6 +23,7 @@ vi.mock("./WorkflowProfileCard", () => ({
 vi.mock("./TaskJevCard", () => ({ TaskJevCard: () => null }));
 vi.mock("./SpecTraceabilityCard", () => ({ SpecTraceabilityCard: () => null }));
 vi.mock("./DocumentInsightsCard", () => ({ DocumentInsightsCard: () => null }));
+vi.mock("./VisualReviewCard", () => ({ VisualReviewCard: () => null }));
 vi.mock("./HermesLearningCard", () => ({
 	HermesLearningCard: () => (show.learning ? <p>hermes inbox</p> : null),
 }));

@@ -55,6 +55,9 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   docintel/whiteboard.py photo de tableau blanc -> .drawio éditable, par le modèle de vision local seulement
   docintel/figma.py    lien Figma -> attachments/<nom>.figma.json (frames et libellés, par l'API), contrat de la revue visuelle
   docintel/knowledge.py ce qu'une personne a validé dans la carte -> knowledge/ du cerveau partagé
+  docintel/visual_qa.py captures de l'app (émulateur, Visual Proof, appareil, store) lues par OCR avant la revue QA
+  docintel/screens.py  clés i18n brutes, langue, libellés tronqués, écran de crash / erreur / connexion
+  docintel/labels.py   libellés comparés avec tolérance (distance d'édition), diff base -> tâche, maquette .figma.json
   rtk/                 proxy rtk : la sortie des commandes condensée avant qu'un modèle la lise
   watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt
