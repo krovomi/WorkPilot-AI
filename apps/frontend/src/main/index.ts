@@ -73,6 +73,10 @@ import {
 	initializeClaudeProfileManager,
 } from "./claude-profile-manager";
 import { preWarmToolCache } from "./cli-tool-manager";
+import {
+	pauseRunningTasksForShutdown,
+	resumeTasksInterruptedByAppExit,
+} from "./ipc-handlers/task/interrupted-runs";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
 import {
@@ -927,6 +931,26 @@ function validateAndMigrateAutoBuildPath(
 
 // ... (rest of the code remains the same)
 
+/**
+ * Resume, once, the Kanban builds that were running when WorkPilot last
+ * stopped — closed, crashed or killed. See `interrupted-runs.ts`.
+ */
+function resumeInterruptedTasksWhenReady(): void {
+	const manager = agentManager;
+	if (!manager) return;
+	const run = () => {
+		resumeTasksInterruptedByAppExit(manager).catch((error) => {
+			console.warn("[main] Could not resume interrupted tasks:", error);
+		});
+	};
+	const webContents = mainWindow?.webContents;
+	if (webContents?.isLoading()) {
+		webContents.once("did-finish-load", run);
+	} else {
+		run();
+	}
+}
+
 // Initialize profile manager and handle migrated profiles
 async function initializeProfileManager() {
 	try {
@@ -1167,6 +1191,11 @@ async function main() {
 	// Initialize profile manager and handle migrated profiles
 	await initializeProfileManager();
 
+	// The builds the last exit interrupted continue where they stopped. After
+	// the profile manager (Claude builds need their credentials) and once the
+	// window has loaded, so the resumed runs' events reach the Kanban.
+	resumeInterruptedTasksWhenReady();
+
 	// Initialize app updater based on environment
 	initializeAppUpdaterIfNeeded();
 
@@ -1247,8 +1276,11 @@ app.on("before-quit", (event) => {
 	// Perform async cleanup, then allow quit to proceed
 	(async () => {
 		try {
-			// Kill all running agent processes
+			// Kill all running agent processes — after recording which Kanban
+			// builds were running, so the next launch resumes them where they
+			// stopped instead of leaving them "stuck" (interrupted-runs.ts).
 			if (agentManager) {
+				pauseRunningTasksForShutdown(agentManager);
 				await agentManager.killAll();
 			}
 

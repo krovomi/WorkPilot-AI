@@ -24,6 +24,7 @@ from core.build_signals import BuildHalted, BuildPaused
 from core.client import create_agent_client
 from core.llm_optimization import should_inline_file_context
 from core.pause_state import is_paused, read_pause_state
+from core.progress import interrupted_subtask_directive, reopen_interrupted_subtasks
 from core.task_event import TaskEventEmitter
 from core.workflow_logger import workflow_logger
 from qa.criteria import save_implementation_plan
@@ -873,6 +874,16 @@ async def run_autonomous_agent(
     # Check if this is a fresh start or continuation
     first_run = is_first_run(spec_dir)
 
+    # A subtask left `in_progress` belongs to the process that stopped before
+    # this one started (application closed, crash, pause). Reopen it so it is
+    # continued rather than skipped — and so its prompt says it is half done.
+    if not first_run:
+        reopened = reopen_interrupted_subtasks(spec_dir)
+        if reopened:
+            print_status(
+                f"Resuming interrupted subtask(s): {', '.join(reopened)}", "info"
+            )
+
     # The declarative workflow's verdict on the two phases this loop owns.
     # Resolved once: the loop runs many iterations and the profile does not
     # change between them, and re-reading it per iteration would make the
@@ -1661,6 +1672,12 @@ async def run_autonomous_agent(
                     + "\n\n"
                     + prompt
                 )
+
+            # Interrupted mid-subtask: the replayed transcript shows what the
+            # previous session did, this says its end was not a conclusion.
+            resume_directive = interrupted_subtask_directive(next_subtask)
+            if resume_directive:
+                prompt += "\n\n" + resume_directive
 
             # Load and append relevant file context — only when the
             # (provider, effort) pair benefits from inlining. Claude agents

@@ -482,6 +482,88 @@ def get_next_subtask(spec_dir: Path) -> dict | None:
         return None
 
 
+#: Set on a subtask a previous process was in the middle of when it stopped.
+#: Read by the coder to tell the next session that the work is half done, and
+#: kept afterwards: a later retry of the same subtask starts from the same
+#: half-finished working tree.
+INTERRUPTED_AT_KEY = "interrupted_at"
+
+
+def reopen_interrupted_subtasks(spec_dir: Path) -> list[str]:
+    """Hand the subtasks a dead process left `in_progress` back to the loop.
+
+    Called once, when a build process starts. The coder loop is sequential, so
+    at that moment no session is running: a subtask still marked `in_progress`
+    is one the previous process was working on when the application was
+    closed, crashed or was paused. `get_next_subtask` only picks `pending`
+    work, so without this the interrupted subtask was skipped for the next one
+    — or, when it was the last, the build reported "no pending subtasks" and
+    halted with the work unfinished. The only other way out, the Kanban's
+    stuck-task recovery, reset it to `pending` and deleted what it had
+    recorded, which is starting the subtask over.
+
+    This keeps everything the subtask carried and marks it `interrupted_at`, so
+    the next session is told to continue from the working tree rather than
+    redo it. Returns the ids reopened; best-effort, an unreadable plan reopens
+    nothing.
+    """
+    plan_file = spec_dir / "implementation_plan.json"
+    try:
+        with open(plan_file, encoding="utf-8") as f:
+            plan = json.load(f)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return []
+    if not isinstance(plan, dict):
+        return []
+
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc).isoformat()
+    reopened: list[str] = []
+    for phase in plan.get("phases") or []:
+        if not isinstance(phase, dict):
+            continue
+        for subtask in phase.get("subtasks", phase.get("chunks", [])) or []:
+            if isinstance(subtask, dict) and subtask.get("status") == "in_progress":
+                subtask["status"] = "pending"
+                subtask[INTERRUPTED_AT_KEY] = now
+                reopened.append(str(subtask.get("id", "?")))
+
+    if not reopened:
+        return []
+    try:
+        from core.file_utils import write_json_atomic
+
+        write_json_atomic(plan_file, plan)
+    except OSError as e:
+        logger.warning("Could not reopen interrupted subtasks in %s: %s", plan_file, e)
+        return []
+    return reopened
+
+
+def interrupted_subtask_directive(subtask: dict) -> str:
+    """The prompt paragraph for a subtask resumed after an interruption.
+
+    Empty for a subtask that was never interrupted. The transcript of the
+    interrupted session is replayed separately (conversation log, every
+    provider); this says what the transcript cannot: that its end is not a
+    conclusion, and that the files it wrote are already on disk.
+    """
+    if not subtask.get(INTERRUPTED_AT_KEY):
+        return ""
+    return (
+        "## RESUMING AN INTERRUPTED SUBTASK\n\n"
+        "A previous session was working on this subtask when the run was "
+        "interrupted (the application was closed, crashed or was paused). "
+        "Whatever it already changed is still in the working tree.\n\n"
+        "1. Run `git status` and `git diff` first to see what is already done.\n"
+        "2. Continue from there. Do not rewrite or revert work that is already "
+        "correct, and do not start the subtask over.\n"
+        "3. Finish the remaining steps, verify, commit, and mark the subtask "
+        "completed as usual."
+    )
+
+
 def format_duration(seconds: float) -> str:
     """Format a duration in human-readable form."""
     if seconds < 60:
