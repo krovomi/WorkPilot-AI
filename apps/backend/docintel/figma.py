@@ -216,6 +216,22 @@ def _airgapped(policy_paths: tuple[Path, ...]) -> bool:
         return True
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect instead of following it.
+
+    `urllib` copies a request's custom headers onto the request that follows a
+    redirect, whatever its host: a 3xx from the API would carry
+    ``X-Figma-Token`` wherever ``Location`` points. The REST API answers
+    directly, so a redirect is reported (``http-3xx``) rather than followed.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def fetch_file(file_key: str, token: str, node_ids: list[str]) -> dict:
     """The file (or the linked nodes) from the REST API. Raises on failure."""
     url = f"{API_BASE}/files/{file_key}"
@@ -224,7 +240,7 @@ def fetch_file(file_key: str, token: str, node_ids: list[str]) -> dict:
     request = urllib.request.Request(  # noqa: S310 - https, constant host
         url, headers={"X-Figma-Token": token, "Accept": "application/json"}
     )
-    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+    with _OPENER.open(request, timeout=30) as response:
         body = response.read(MAX_RESPONSE_BYTES + 1)
     if len(body) > MAX_RESPONSE_BYTES:
         raise OverflowError("too-large")

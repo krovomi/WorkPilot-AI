@@ -217,3 +217,38 @@ def test_a_hand_written_file_is_read_through_the_same_shape(project, spec_dir):
     assert by_path["mock.figma.json"].engine == "figma"
     assert "- Bonjour" in by_path["mock.figma.json"].text
     assert by_path["broken.figma.json"].reason == "invalid-figma"
+
+
+def test_a_redirect_is_refused_and_the_token_never_follows_it(
+    project, spec_dir, monkeypatch
+):
+    """A 3xx from the API is reported, never followed with X-Figma-Token."""
+    import http.server
+    import threading
+
+    seen: list[str] = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen.append(self.path)
+            if self.path.startswith("/v1/"):
+                self.send_response(302)
+                self.send_header("Location", "/elsewhere")
+            else:
+                self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args):
+            return
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setattr(
+            figma, "API_BASE", f"http://127.0.0.1:{server.server_port}/v1"
+        )
+        result = figma.import_figma(spec_dir, project, URL)
+    finally:
+        server.shutdown()
+    assert result.status == "http-302"
+    assert seen and all(path.startswith("/v1/") for path in seen)
