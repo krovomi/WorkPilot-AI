@@ -141,3 +141,29 @@ it("keeps the next task's field disabled until its own save finishes, whatever t
 	second.settle?.(false);
 	await waitFor(() => expect(screen.getByRole("textbox", { name: "Task title" })).not.toBeDisabled());
 });
+
+it("does not close a field reopened on the same task by a save started before a round trip", async () => {
+	const pending: { settle?: (ok: boolean) => void } = {};
+	persist.mockReturnValueOnce(
+		new Promise<boolean>((resolve) => {
+			pending.settle = resolve;
+		}),
+	);
+	const { rerender } = render(
+		<EditableTaskTitle task={task} displayTitle={task.title} editable as={Title} />,
+	);
+	fireEvent.click(screen.getByRole("button", { name: /Exporter en CSV/ }));
+	fireEvent.change(screen.getByRole("textbox", { name: "Task title" }), { target: { value: "A2" } });
+	fireEvent.keyDown(screen.getByRole("textbox", { name: "Task title" }), { key: "Enter" });
+
+	const other = { id: "t2", title: "Autre tâche" } as unknown as Task;
+	rerender(<EditableTaskTitle task={other} displayTitle={other.title} editable as={Title} />);
+	rerender(<EditableTaskTitle task={task} displayTitle={task.title} editable as={Title} />);
+	fireEvent.click(screen.getByRole("button", { name: /Exporter en CSV/ }));
+	expect(screen.getByRole("textbox", { name: "Task title" })).toBeInTheDocument();
+
+	pending.settle?.(true);
+	await waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
+	await Promise.resolve();
+	expect(screen.getByRole("textbox", { name: "Task title" })).toBeInTheDocument();
+});

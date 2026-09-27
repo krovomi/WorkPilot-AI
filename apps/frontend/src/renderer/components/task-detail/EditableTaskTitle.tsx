@@ -53,13 +53,10 @@ export function EditableTaskTitle({
 	// Entrée enregistre puis le champ perd le focus : sans ce drapeau, le blur
 	// qui suit relancerait un second enregistrement du même texte.
 	const settled = useRef(false);
-	// La tâche affichée *maintenant* : un enregistrement lancé sur une autre
-	// tâche ne touche plus au champ quand il se termine.
-	const shownTask = useRef(task.id);
-	shownTask.current = task.id;
-	// Le numéro du dernier enregistrement lancé : seul celui-là rend la main au
-	// champ. Sans lui, l'enregistrement d'une tâche quittée, en se terminant,
-	// réactivait le champ de la suivante pendant qu'elle s'enregistrait.
+	// Le numéro du dernier enregistrement lancé : seul celui-là agit sur le
+	// champ en se terminant (le rendre, le fermer, y remettre le focus).
+	// Changer de tâche l'incrémente aussi, si bien qu'un aller-retour A → B → A
+	// ne rend pas au champ rouvert sur A l'issue d'un enregistrement d'avant.
 	const saveSeq = useRef(0);
 
 	useEffect(() => {
@@ -110,13 +107,12 @@ export function EditableTaskTitle({
 			cancel();
 			return;
 		}
-		const savedTask = task.id;
 		saveSeq.current += 1;
 		const seq = saveSeq.current;
 		setSaving(true);
 		let ok = false;
 		try {
-			ok = await persistUpdateTask(savedTask, { title: next });
+			ok = await persistUpdateTask(task.id, { title: next });
 		} catch {
 			ok = false;
 		} finally {
@@ -125,7 +121,7 @@ export function EditableTaskTitle({
 			// dernier enregistrement lancé.
 			if (saveSeq.current === seq) setSaving(false);
 		}
-		const stillShown = shownTask.current === savedTask;
+		const stillShown = saveSeq.current === seq;
 		if (ok) {
 			if (stillShown) setEditing(false);
 			return;
