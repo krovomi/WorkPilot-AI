@@ -4,6 +4,7 @@ import {
 	type KeyboardEvent,
 	type ReactNode,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -77,8 +78,11 @@ export function EditableTaskTitle({
 
 	// Le dialogue navigue d'une tâche à l'autre sans démonter ce composant : un
 	// champ encore ouvert enregistrerait le titre de l'une sous l'id de l'autre.
+	// Layout, pas effect : l'invalidation a lieu dans le commit même qui affiche
+	// la nouvelle tâche, avant qu'un enregistrement en vol puisse se terminer et
+	// agir sur un champ qui ne lui appartient plus.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: only a new task closes the field
-	useEffect(() => {
+	useLayoutEffect(() => {
 		settled.current = true;
 		setEditing(false);
 		// Un enregistrement de la tâche quittée ne tient plus ce champ en attente.
