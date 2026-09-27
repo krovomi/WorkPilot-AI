@@ -960,7 +960,8 @@ def save_capture(
             except OSError:
                 # The new capture is written; an old one left beside it is
                 # read as a second capture of the screen, not an error.
-                logger.debug("docintel: could not remove %s", stale)
+                # Its name is built from the request: not repeated in a log.
+                logger.debug("docintel: could not remove a stale capture")
 
     entry = {
         "file": f"{side}/{target.name}",
