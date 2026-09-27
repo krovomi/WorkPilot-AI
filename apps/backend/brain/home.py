@@ -130,14 +130,18 @@ def brain_dir() -> Path:
     """``WORKPILOT_BRAIN_DIR``, else the folder chosen in Settings, else the default.
 
     The variable wins because it is how the MCP server WorkPilot registers in
-    another agent's configuration says which brain it serves.
+    another agent's configuration says which brain it serves. Under WSL, a
+    Windows spelling of either (``C:\\Users\\…\\Vault``) is read as the
+    ``/mnt/c/…`` path this process opens (`brain.wsl.to_wsl_path`).
     """
+    from .wsl import to_wsl_path
+
     override = os.environ.get(BRAIN_ENV, "").strip()
     if override:
-        return Path(override).expanduser()
+        return Path(to_wsl_path(override)).expanduser()
     configured = read_config().get("path")
     if isinstance(configured, str) and configured.strip():
-        return Path(configured).expanduser()
+        return Path(to_wsl_path(configured)).expanduser()
     return default_brain_dir()
 
 
