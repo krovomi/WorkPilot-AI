@@ -1,8 +1,8 @@
 """Three-layer retrieval: an index you can afford, details you ask for.
 
-WorkPilot already has three memories. `task_logger/` captures what happened,
-`integrations/graphiti/` holds the knowledge graph, `learning_loop/` distils
-patterns. What it has never had is a way to *look* at them that does not cost a
+WorkPilot keeps three records. `task_logger/` captures what happened, the shared
+brain (the Obsidian vault) holds what the builds learned, `learning_loop/`
+distils patterns. What it has never had is a way to *look* at them that does not cost a
 context window: the existing readers return whole records, so an agent asking
 "have we hit this before?" pays for every candidate in order to discard most of
 them.

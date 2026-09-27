@@ -113,7 +113,7 @@ from .base import (
     RESUME_FILE,
     sanitize_error_message,
 )
-from .memory_manager import debug_memory_system_status, get_graphiti_context
+from .memory_manager import debug_memory_system_status, get_memory_context
 from .session import (
     is_prompt_too_long_error,
     post_session_processing,
@@ -1391,9 +1391,9 @@ async def run_autonomous_agent(
             if planning_retry_context:
                 prompt += "\n\n" + planning_retry_context
 
-            # Retrieve Graphiti memory context for planning phase
-            # This gives the planner knowledge of previous patterns, gotchas, and insights
-            planner_context = await get_graphiti_context(
+            # Project memory from the shared brain for the planning phase:
+            # previous patterns, gotchas and session insights of this project
+            planner_context = await get_memory_context(
                 spec_dir,
                 project_dir,
                 {
@@ -1403,7 +1403,7 @@ async def run_autonomous_agent(
             )
             if planner_context:
                 prompt += "\n\n" + planner_context
-                print_status("Graphiti memory context loaded for planner", "success")
+                print_status("Project memory loaded for planner", "success")
 
             # The plan decides which APIs the subtasks will call. A planner
             # that knows the current signatures plans against them.
@@ -1701,13 +1701,13 @@ async def run_autonomous_agent(
                     )
                 )
 
-            # Retrieve and append Graphiti memory context (if enabled)
-            graphiti_context = await get_graphiti_context(
+            # Project memory from the shared brain, for this subtask
+            memory_context = await get_memory_context(
                 spec_dir, project_dir, next_subtask
             )
-            if graphiti_context:
-                prompt += "\n\n" + graphiti_context
-                print_status("Graphiti memory context loaded", "success")
+            if memory_context:
+                prompt += "\n\n" + memory_context
+                print_status("Project memory loaded", "success")
 
             # Documentation downloaded before the build, as paths rather than
             # inlined pages: the agent reads the one its subtask is about.

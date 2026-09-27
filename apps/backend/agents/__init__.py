@@ -7,15 +7,17 @@ Modular agent system for autonomous coding.
 This module provides:
 - run_autonomous_agent: Main coder agent loop
 - run_followup_planner: Follow-up planner for completed specs
-- Memory management (Graphiti + file-based fallback)
+- Memory management (the shared brain: one Obsidian vault)
 - Session management and post-processing
 - Utility functions for git and plan management
 
 Uses lazy imports to avoid circular dependencies.
 """
 
-# Explicit import required by CodeQL static analysis
-# (CodeQL doesn't recognize __getattr__ dynamic exports)
+# Explicit imports required by CodeQL static analysis
+# (CodeQL doesn't recognize __getattr__ dynamic exports). memory_manager reads
+# only the memory store, which imports nothing from agents: no cycle.
+from .memory_manager import get_memory_context
 from .utils import sync_spec_to_source
 
 __all__ = [
@@ -24,6 +26,7 @@ __all__ = [
     "run_followup_planner",
     # Memory
     "debug_memory_system_status",
+    "get_memory_context",
     "get_graphiti_context",
     "save_session_memory",
     "save_session_to_graphiti",
@@ -55,6 +58,7 @@ def __getattr__(name):
         return run_autonomous_agent
     elif name in (
         "debug_memory_system_status",
+        "get_memory_context",
         "get_graphiti_context",
         "save_session_memory",
         "save_session_to_graphiti",
@@ -62,6 +66,7 @@ def __getattr__(name):
         from .memory_manager import (
             debug_memory_system_status,
             get_graphiti_context,
+            get_memory_context,
             save_session_memory,
             save_session_to_graphiti,
         )

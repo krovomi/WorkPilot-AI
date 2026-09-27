@@ -1,6 +1,9 @@
 """
 Memory loading utilities for bug prediction.
-Loads historical data from gotchas, patterns, and attempt history.
+
+Gotchas and patterns come from the project's memory in the shared brain (the
+one store); the attempt history is the recovery state ``services/recovery.py``
+keeps in ``<spec_dir>/memory/``.
 """
 
 import json
@@ -18,60 +21,35 @@ class MemoryLoader:
             memory_dir: Path to the memory directory (e.g., specs/001/memory/)
         """
         self.memory_dir = Path(memory_dir)
-        self.gotchas_file = self.memory_dir / "gotchas.md"
-        self.patterns_file = self.memory_dir / "patterns.md"
         self.history_file = self.memory_dir / "attempt_history.json"
 
     def load_gotchas(self) -> list[str]:
         """
-        Load gotchas from previous sessions.
+        Gotchas the project's builds recorded, from the shared brain.
 
         Returns:
             List of gotcha strings
         """
-        if not self.gotchas_file.exists():
-            return []
-
-        gotchas = []
-        content = self.gotchas_file.read_text(encoding="utf-8")
-
-        # Parse markdown list items
-        for line in content.split("\n"):
-            line = line.strip()
-            if line.startswith("-") or line.startswith("*"):
-                gotcha = line.lstrip("-*").strip()
-                if gotcha:
-                    gotchas.append(gotcha)
-
-        return gotchas
+        memory = self._project_memory()
+        return memory.load_gotchas() if memory else []
 
     def load_patterns(self) -> list[str]:
         """
-        Load successful patterns from previous sessions.
+        Patterns the project's builds recorded, from the shared brain.
 
         Returns:
-            List of pattern strings with format "Pattern Name: detail"
+            List of pattern strings
         """
-        if not self.patterns_file.exists():
-            return []
+        memory = self._project_memory()
+        return memory.load_patterns() if memory else []
 
-        patterns = []
-        content = self.patterns_file.read_text(encoding="utf-8")
+    def _project_memory(self):
+        try:
+            from memory.store import get_project_memory
 
-        # Parse markdown sections
-        current_pattern = None
-        for line in content.split("\n"):
-            line = line.strip()
-            if line.startswith("##"):
-                # Pattern heading
-                current_pattern = line.lstrip("#").strip()
-            elif line and current_pattern:
-                # Pattern detail
-                if line.startswith("-") or line.startswith("*"):
-                    detail = line.lstrip("-*").strip()
-                    patterns.append(f"{current_pattern}: {detail}")
-
-        return patterns
+            return get_project_memory(self.memory_dir.parent)
+        except Exception:  # noqa: BLE001 - a prediction never fails on memory
+            return None
 
     def load_attempt_history(self) -> list[dict]:
         """

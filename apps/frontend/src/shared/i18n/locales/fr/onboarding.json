@@ -82,8 +82,8 @@
 		}
 	},
 	"memory": {
-		"title": "Mémoire",
-		"description": "Configurer la mémoire persistante entre sessions pour les agents",
+		"title": "Cerveau partagé",
+		"description": "Là où WorkPilot garde ce qu'il apprend : un seul vault Obsidian que lisent tous les agents",
 		"contextDescription": "La mémoire WorkPilot AI aide à retenir le contexte entre vos sessions de code",
 		"enableMemory": "Activer la mémoire",
 		"enableMemoryDescription": "Mémoire persistante entre sessions utilisant LadybugDB (base de données intégrée)",
@@ -128,7 +128,9 @@
 		"modelRecommendation": "Recommandé : qwen3-embedding:4b (équilibré), :8b (qualité), :0.6b (rapide)",
 		"notRunning": "Non démarré",
 		"ollamaConfig": "Configuration Ollama",
-		"voyageEmbeddingModel": "Modèle d'embedding"
+		"voyageEmbeddingModel": "Modèle d'embedding",
+		"brainExplanation": "Tout ce que les builds apprennent — conventions, pièges, rôle de chaque fichier, ce qu'a fait chaque session — est écrit dans un seul vault Obsidian, que lisent tous les agents (ceux de WorkPilot, Claude Code, Codex, Hermes…). Rien à configurer : le vault est créé au premier build. Branchez un vault existant, ou un distant git pour le synchroniser entre machines, si vous le souhaitez.",
+		"continue": "Continuer"
 	},
 	"completion": {
 		"title": "Vous êtes prêt !",

@@ -8,7 +8,7 @@ Features:
 - Automatic test execution and failure detection
 - Intelligent failure analysis and fix generation
 - Configurable retry limits (default: 5 attempts)
-- Learning from common errors using Graphiti memory
+- Learning from common errors using the project's memory (the shared brain)
 - Comprehensive success tracking and metrics
 - Human escalation after max attempts
 
@@ -26,10 +26,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    from agents.memory_manager import get_graphiti_context, save_session_memory
+    from agents.memory_manager import get_memory_context, save_session_memory
 except ImportError:
     # Fallback if memory manager not available
-    def get_graphiti_context(*args, **kwargs):
+    async def get_memory_context(*args, **kwargs):
         # Fallback implementation when memory manager is not available
         # Return empty context string to prevent crashes in environments without memory management
         return ""
@@ -644,7 +644,7 @@ The automated tests have failed. Please analyze the test output below and apply 
                 "description": "Analyzing common test failure patterns for auto-fix",
                 "id": f"auto_fix_{self.spec_dir.name}",
             }
-            memory_context = await get_graphiti_context(
+            memory_context = await get_memory_context(
                 self.spec_dir, self.project_dir, task_data
             )
 

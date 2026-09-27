@@ -964,7 +964,7 @@ async def post_session_processing(
             logger.warning(f"Insight extraction failed: {e}")
             extracted_insights = None
 
-        # Save session memory (Graphiti=primary, file-based=fallback)
+        # Save session memory to the shared brain (the one store)
         try:
             save_success, storage_type = await save_session_memory(
                 spec_dir=spec_dir,
@@ -976,14 +976,13 @@ async def post_session_processing(
                 discoveries=extracted_insights,
             )
             if save_success:
-                if storage_type == "graphiti":
-                    print_status("Session saved to Graphiti memory", "success")
-                else:
-                    print_status(
-                        "Session saved to file-based memory (fallback)", "info"
-                    )
-            else:
-                print_status("Failed to save session memory", "warning")
+                print_status(
+                    f"Session saved to the shared brain ({storage_type})", "success"
+                )
+            elif storage_type == "none":
+                print_status(
+                    "Session memory not saved (memory is off or failed)", "warning"
+                )
         except Exception as e:
             logger.warning(f"Error saving session memory: {e}")
             print_status("Memory save failed", "warning")

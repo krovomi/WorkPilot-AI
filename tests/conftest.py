@@ -1184,3 +1184,20 @@ def worktree_manager(temp_project_dir):
     from core.worktree import WorktreeManager
 
     return WorktreeManager(temp_project_dir, base_branch="main")
+
+
+# ── The shared brain is never the developer's ──────────────────────────
+#
+# Memory is the vault now (`brain/project_memory.py`), and the first memory
+# write on a machine without one creates it. A test that saves a session, a
+# gotcha or a review finding must do that in a temporary directory — never in
+# the ``~/.workpilot/brain`` of whoever runs the suite. Tests that want a brain
+# set ``WORKPILOT_BRAIN_DIR`` themselves; monkeypatch overrides this default.
+
+
+@pytest.fixture(autouse=True)
+def _isolated_brain(tmp_path_factory, monkeypatch):
+    base = tmp_path_factory.mktemp("brain-isolation")
+    monkeypatch.setenv("WORKPILOT_BRAIN_DIR", str(base / "brain"))
+    monkeypatch.setenv("WORKPILOT_BRAIN_CONFIG", str(base / "brain.json"))
+    monkeypatch.setenv("WORKPILOT_BRAIN_HOME", str(base / "home"))

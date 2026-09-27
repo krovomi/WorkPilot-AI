@@ -3,7 +3,7 @@ Insight Extractor
 =================
 
 Automatically extracts structured insights from completed coding sessions.
-Runs after each session to capture rich, actionable knowledge for Graphiti memory.
+Runs after each session to capture rich, actionable knowledge for the project's memory (the shared brain).
 
 Uses the Claude Agent SDK (same as the rest of the system) for extraction.
 Falls back to generic insights if extraction fails (never blocks the build).
