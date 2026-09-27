@@ -437,6 +437,12 @@ export interface TaskMetadata {
 		paused_subtask_id: string | null;
 		provider?: string | null;
 		model?: string | null;
+		/**
+		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
+		 * when WorkPilot was closed while it ran — the next launch resumes those
+		 * on its own, and only those.
+		 */
+		reason?: string | null;
 	};
 
 	// Abandon status — the task was set aside (e.g. the product owner no longer
@@ -528,6 +534,12 @@ export interface ImplementationPlan {
 		paused_subtask_id: string | null;
 		provider?: string | null;
 		model?: string | null;
+		/**
+		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
+		 * when WorkPilot was closed while it ran — the next launch resumes those
+		 * on its own, and only those.
+		 */
+		reason?: string | null;
 	};
 }
 

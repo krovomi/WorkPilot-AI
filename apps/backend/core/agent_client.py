@@ -461,6 +461,15 @@ class AgentClient(ABC):
         """Return the provider identifier (e.g., 'claude', 'copilot')."""
         ...
 
+    def resumes_native_session(self) -> bool:
+        """Whether the provider itself rehydrates an earlier session.
+
+        Only the Claude SDK does (``resume=<session_id>``); every other client
+        gets its context back from the conversation log, replayed through
+        :meth:`resume`.
+        """
+        return False
+
     async def resume(self, history: list[AgentMessage]) -> None:
         """Preload a conversation history before the next query() call.
 
@@ -597,6 +606,15 @@ class ClaudeAgentClient(AgentClient):
         # Optional history queued by resume() for the next query() call.
         self._resumed_history: list[AgentMessage] = []
 
+    def resumes_native_session(self) -> bool:
+        """True when the SDK was told to rehydrate an earlier session.
+
+        The SDK then already holds that transcript, and replaying the
+        conversation log on top of it would hand the model the same turns twice.
+        """
+        options = getattr(self._client, "options", None)
+        return bool(getattr(options, "resume", None))
+
     async def query(self, prompt: str) -> None:
         # Reset per-query observables so callers always see fresh data.
         self.last_result_msg = None
@@ -618,6 +636,16 @@ class ClaudeAgentClient(AgentClient):
         to work during the migration period.
         """
         async for raw_msg in self._client.receive_response():
+            # The init SystemMessage names the session before any work is
+            # done; session.py persists it right away so a run interrupted
+            # mid-session can be resumed on that session, not the one before.
+            if self.last_session_id is None:
+                _data = getattr(raw_msg, "data", None)
+                _sid = getattr(raw_msg, "session_id", None) or (
+                    _data.get("session_id") if isinstance(_data, dict) else None
+                )
+                if isinstance(_sid, str) and _sid:
+                    self.last_session_id = _sid
             # Snapshot the ResultMessage for post-loop consumers (usage,
             # session_id persistence). This is the only place we can see it
             # on the AgentClient path — without it, the Kanban "Reprendre"
