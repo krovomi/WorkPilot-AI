@@ -43,5 +43,11 @@
 		"android": "Android",
 		"ios": "Apple (iOS)",
 		"badgeTitle": "Cible mobile : {{platforms}}"
+	},
+	"review": {
+		"send": "Envoyer à la revue visuelle",
+		"hint": "Garder cette image comme capture : la QA la lit par OCR (quel écran, crash ou connexion, clés brutes, libellés coupés)",
+		"sent": "Image gardée pour la revue visuelle",
+		"failed": "L'image n'a pas pu être gardée : {{error}}"
 	}
 }

@@ -52,6 +52,8 @@ from .report import (
     has_recurring_issues,
     is_no_test_project,
     record_iteration,
+    run_visual_qa,
+    write_visual_qa_report,
 )
 from .reviewer import run_qa_agent_session
 
@@ -555,6 +557,15 @@ async def run_qa_validation_loop(
         except Exception:  # noqa: BLE001 - never break QA on a hot-swap hiccup
             pass
 
+        # What the captures of the running app show — OCR'd before the
+        # reviewer's prompt is built, so the section it reads is current.
+        if (visual := run_visual_qa(spec_dir, project_dir)) is not None:
+            print(
+                "🖼  Visual QA: "
+                f"{visual['high']} high, {visual['medium']} medium, "
+                f"{visual['low']} low finding(s) read from the captures"
+            )
+
         # Run QA reviewer with phase-specific model and thinking budget
         qa_model = get_phase_model(spec_dir, "qa", model)
         qa_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
@@ -651,6 +662,7 @@ async def run_qa_validation_loop(
             response = str(e)
 
         iteration_duration = time_module.time() - iteration_start
+        write_visual_qa_report(spec_dir)
         debug(
             "qa_loop",
             "QA reviewer session completed",

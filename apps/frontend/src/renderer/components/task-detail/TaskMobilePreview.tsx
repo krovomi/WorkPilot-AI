@@ -1,6 +1,7 @@
 import {
 	AlertTriangle,
 	Camera,
+	ScanText,
 	Loader2,
 	Play,
 	RefreshCw,
@@ -19,6 +20,7 @@ import {
 	stopMobileSession,
 	useMobileStore,
 } from "../../stores/mobile-store";
+import { useDocintelVisualStore } from "../../stores/docintel-visual-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
@@ -27,6 +29,8 @@ interface TaskMobilePreviewProps {
 	taskId: string;
 	project?: Project;
 	worktreePath?: string;
+	/** The task's spec: without it, a frame cannot be kept for the review. */
+	specId?: string;
 }
 
 /** Phases during which no new action should be started. */
@@ -50,6 +54,7 @@ export function TaskMobilePreview({
 	taskId,
 	project,
 	worktreePath,
+	specId,
 }: TaskMobilePreviewProps) {
 	const { t } = useTranslation(["mobile", "common"]);
 	const [resolvedWorktreePath, setResolvedWorktreePath] = useState<
@@ -117,6 +122,30 @@ export function TaskMobilePreview({
 		if (!canLaunch) return;
 		await launchMobileApp(projectDir);
 	}, [canLaunch, projectDir]);
+
+	const saveCapture = useDocintelVisualStore((state) => state.capture);
+	const [reviewNote, setReviewNote] = useState<string | null>(null);
+	// The frame of the device, kept as a capture the visual QA reads by OCR:
+	// which screen is shown, a crash or sign-in screen, raw keys, cut labels.
+	// On the task's worktree it is the task's screen; on the repository itself,
+	// the base branch's.
+	const canReview = Boolean(screenshot && specId && project?.path && platform);
+	const handleSendToReview = useCallback(async () => {
+		if (!screenshot || !specId || !project?.path || !platform) return;
+		const side = resolvedWorktreePath ? "task" : "base";
+		const saved = await saveCapture(
+			taskId,
+			{ projectDir: project.path, specId },
+			{ side, image: screenshot, platform, source: "device-runner" },
+		);
+		setReviewNote(
+			saved
+				? t("mobile:review.sent")
+				: t("mobile:review.failed", {
+						error: useDocintelVisualStore.getState().byTask[taskId]?.error ?? "",
+					}),
+		);
+	}, [platform, project?.path, resolvedWorktreePath, saveCapture, screenshot, specId, t, taskId]);
 
 	const handleRefreshDevices = useCallback(async () => {
 		if (!projectDir) return;
@@ -259,7 +288,24 @@ export function TaskMobilePreview({
 						<Camera className="mr-2 h-4 w-4" />
 						{t("mobile:actions.capture")}
 					</Button>
+					{specId && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => void handleSendToReview()}
+							disabled={!canReview}
+							title={t("mobile:review.hint")}
+						>
+							<ScanText className="mr-2 h-4 w-4" />
+							{t("mobile:review.send")}
+						</Button>
+					)}
 				</div>
+				{reviewNote && (
+					<p role="status" className="text-xs text-muted-foreground">
+						{reviewNote}
+					</p>
+				)}
 
 				{devices.length === 0 && unavailableReason && (
 					<p className="text-xs text-warning">{unavailableReason}</p>

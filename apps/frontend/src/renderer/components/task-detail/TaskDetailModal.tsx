@@ -1428,6 +1428,7 @@ function TaskDetailModalContent({
 										taskId={task.id}
 										project={taskProject ?? activeProject}
 										worktreePath={state.worktreeStatus?.worktreePath}
+										specId={task.specId}
 									/>
 								</TabsContent>
 
@@ -1442,6 +1443,7 @@ function TaskDetailModalContent({
 										taskId={task.id}
 										project={taskProject ?? activeProject}
 										worktreePath={state.worktreeStatus?.worktreePath}
+										specId={task.specId}
 									/>
 								</TabsContent>
 

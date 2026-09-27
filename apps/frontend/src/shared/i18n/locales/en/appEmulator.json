@@ -93,6 +93,12 @@
 			"page": "page added by the task",
 			"launchProfile": "project launch profile",
 			"apiDocs": "framework API docs"
-		}
+		},
+		"capture": "Keep this screen for the visual review",
+		"captured": {
+			"task": "Captured for the review (task)",
+			"base": "Captured for the review (base branch)"
+		},
+		"captureFailed": "The capture could not be saved: {{error}}"
 	}
 }

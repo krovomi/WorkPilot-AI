@@ -1388,6 +1388,9 @@ apps/backend/docintel/
   whiteboard.py a whiteboard photo -> an editable .drawio, through the local vision model only
   figma.py      a Figma link -> attachments/<name>.figma.json (frames and labels, through the API)
   knowledge.py  what a person validated in the card, filed in the shared brain's knowledge/
+  labels.py     a screen's labels: normalised, compared by edit distance, diffed; lot F's .figma.json
+  screens.py    what a screen's text says: raw i18n keys, language, truncation, crash / error / sign-in
+  visual_qa.py  the captures of the running app, OCR'd before QA review -> docintel/visual_qa.json
   preflight.py  attachments -> <spec_dir>/docintel/result.json + extracted/*.md
   prompt.py     the prompt sections
   api.py        GET /api/docintel/ — recomputed, nothing written
@@ -1520,9 +1523,10 @@ node, or the file's pages, and every visible text layer in order — and writes
 {"source": "figma", "file_key": "…", "frames": [{"id": "…", "name": "…", "texts": ["Libellé 1", "…"]}]}
 ```
 
-That shape is a **contract** with the visual review, which reads every
-`*.figma.json` among the attachments as the structured source of the mockup /
-rendering comparison; nothing is added to it, because a field only one reader
+That shape is a **contract** with the visual review (`visual_qa.py`, through
+`labels.load_figma`), which reads every `*.figma.json` among the attachments as
+the structured source of the mockup / rendering comparison, ahead of any OCR of
+a mockup image; nothing is added to it, because a field only one reader
 understands is how two readers of one file start to disagree. What is written
 has been protected first, since later phases read the file as it is: every
 label masked by the secret patterns, and each frame scanned by
@@ -1784,6 +1788,103 @@ What reaches a prompt from this is built from the repository's own paths and
 from symbols matched by character classes that admit no sentence; a message a
 tool printed (a CI error's text) is quoted inside the attachment fence, as data.
 Text flagged by `injection_guard` is never diagnosed at all.
+
+**What the screens show is reviewed too (lot E).** The QA reviewer judged a
+change from its diff and its tests; what a person would *see* reached it as
+pixels at best. Three defects show on a screen and nowhere else, and no test
+catches them because each test runs in one locale and asserts one string: a
+translation key displayed as is, a language that is not the screen's, a label
+cut by its container. `visual_qa.py` reads every capture of the running
+application through the same OCR chain as an attachment (`preflight.read_screen`
+— local engines, the airgap refusal, secrets masked, `injection_guard`) and
+`screens.py` checks each one. Before every QA pass `qa/loop.py` calls
+`qa/report.run_visual_qa`; the record lands in `<spec_dir>/docintel/visual_qa.json`,
+`docintel_section` hands it to the reviewer (and to the fixer after it) fenced
+as data, and `write_visual_qa_report` puts the same lines into `qa_report.md`
+between markers, replaced in place on every pass — the report carries the
+evidence whether or not the reviewer quoted it. A capture whose file did not
+change is not read again, so a QA loop of ten passes pays the OCR once.
+
+| Where a capture comes from | How it is found |
+|---|---|
+| the App Emulator's preview, the device frame (`TaskMobilePreview`) | `POST /api/docintel/captures` writes `captures/{base,task}/<platform>--<route>--<locale>.png` and a manifest entry |
+| `device-runner` | its prompt names the same directory and the same file name |
+| Visual Proof | the run `task_metadata.json` → `visualProof` names, under `visual-proofs/<spec>/<run>/` |
+| the store listing | fastlane's `screenshots/<locale>/` and `metadata/android/<locale>/images/` |
+
+**Every path is a key, never a path to open.** The capture endpoint takes an
+image and says what it shows — side, route, locale; the file name is built by
+the server, so a second capture of a screen replaces the first and a base and
+a task capture of one route pair up. A Visual Proof `relativePath` read back
+from `task_metadata.json` contributes its *file name*, looked up in the listing
+of the run's own directory. No listing follows a link.
+
+**The side is a fact, not a choice.** The emulator's server runs in the task's
+worktree or in the repository itself, and that decides `task` or `base`
+(`captureSide` in `TaskEmulator`). A base and a task capture of the same route
+are diffed label by label — changed, added, removed — which is what a reviewer
+of the pull request wants to look at first.
+
+**The same label, tolerantly.** OCR reads `Enregistrer` as `Enreqistrer`, drops
+an accent, glues a colon to the word; a diff that reported that as a change
+would be always full and read by nobody. `labels.normalize_label` removes what
+never carries meaning on a screen (case, accents, punctuation, a trailing
+ellipsis) without folding a non-Latin script to nothing, and one edit on a label
+of six letters or more is an OCR slip. A rewording is paired by edit similarity,
+or when one label extends the other word for word (`Annuler` → `Annuler la
+commande`). A toolbar Tesseract returns as one line is split into its buttons
+where the gap between words is wide — `tables.row_cells`, the split a table
+row already uses, not a second one.
+
+**A key is found in every stack's spelling, and a URL is not one.** i18next
+`namespace:section.key`, ngx-translate `HOME.TITLE`, dotted keys, Spring
+`???key???`, Rails `[missing "…" translation]`, Android `@string/…`, and the
+unresolved placeholders (`{{name}}`, ICU `{count}`, `${x}`, `{0}`, `%s`). A
+token is a key only when a developer would have written it — an underscore, a
+camelCase hump, three segments — and never when it ends in a file extension or
+a TLD: a detector that flagged `www.example.com` would be switched off in a week.
+
+**A language is judged on evidence only.** A lexicon per language (function
+words and the words interfaces are made of), with every word two languages
+share removed from both. A screen needs three words of evidence and twice the
+runner-up's score; below that it has no language and nothing is drawn from it.
+The locale is the capture's (the manifest, the URL's `/fr/` or `?lang=`, the
+store directory); without one, the screen's own dominant language stands in,
+and three English buttons on a French screen are reported as mixed.
+
+**Which screen it is.** A crash dialog (Android, iOS, React Native's red box,
+Flutter), an error page (ASP.NET, Spring's Whitelabel, a Django traceback,
+Express's `Cannot GET`), a sign-in wall, a blank screen. A capture of a login
+page is not evidence the feature works — the reviewer is told to write "not
+verified on screen", never "verified" — unless the route is a login route.
+
+**Mockup against render: structured first.** A `*.figma.json` attachment —
+lot F's contract, `{"source": "figma", "file_key", "frames": [{"id", "name",
+"texts"}]}`, and nothing looser — is read as data; its texts are masked and
+scanned like any attachment. A mockup *image* (named so: `mockup`, `maquette`,
+`wireframe`, `design`…, because the screenshot of the bug being fixed is not
+what to build) is OCR'd only when no Figma file says it better. Each frame is
+held against the task capture that shows most of it; in a file with several
+frames, a frame no capture shows a third of is another screen of the product
+and is counted, not reported. A label near but not equal is `mockup-near`
+(low), one absent is `mockup-missing` (medium).
+
+**OCR is evidence, not a verdict.** Every finding carries a severity (a crash
+or an error page high, a raw key, a wrong language or a cut label medium, a
+foreign word or an ellipsis low), and the reviewer is told to open the capture
+before reporting it. A capture whose text `injection_guard` flags is withheld
+whole; labels built from OCR boxes are masked again, and taken from the masked
+text instead when the screen showed a secret, because a key split across two
+boxes would slip past a per-box mask. The store auditor reads the same record
+for the listing's screenshots, with placeholder text (`Lorem ipsum`, `TODO`) as
+a store-listing finding.
+
+`VisualReviewCard`, in the task panel, shows the counts, the findings, what
+changed on screen from base to task, and each mockup's coverage; it offers to
+read captures that are waiting (`POST /api/docintel/visual/run`, the QA loop's
+own step on request) and renders nothing when the task has no capture.
+`GET /api/docintel/visual` reads the record and *lists* the captures — OCR of a
+dozen screens is not what opening a panel costs.
 
 **In the Kanban.** `DocumentInsightsCard` says, before the build, what each
 attachment will become (diagram, OCR text and the engine that read it, image,
