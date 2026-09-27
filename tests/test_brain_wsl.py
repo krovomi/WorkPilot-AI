@@ -38,7 +38,15 @@ def home(tmp_path, monkeypatch):
 
 @pytest.fixture
 def under_wsl(tmp_path, monkeypatch):
-    """WSL, with drives under ``<tmp>/mnt/`` and a Windows profile ``Thomas``."""
+    """WSL, with drives under ``<tmp>/mnt/`` and a Windows profile ``Thomas``.
+
+    A simulation of a Linux process, so it only runs where one can: on a
+    Windows runner ``~`` is ``USERPROFILE`` and paths are not POSIX, which is
+    precisely the situation in which the module converts nothing (see
+    `test_nothing_is_converted_outside_wsl`, which runs everywhere).
+    """
+    if sys.platform == "win32":
+        pytest.skip("WSL is a Linux process; a Windows runner cannot simulate it")
     mount = tmp_path / "mnt"
     profile = mount / "c" / "Users" / "Thomas"
     profile.mkdir(parents=True)
@@ -50,6 +58,15 @@ def under_wsl(tmp_path, monkeypatch):
     monkeypatch.setattr(wsl, "windows_home", lambda: str(profile))
     monkeypatch.setenv("WSL_DISTRO_NAME", "Ubuntu")
     return mount
+
+
+def test_windows_and_macos_are_never_wsl(monkeypatch):
+    wsl.is_wsl.cache_clear()
+    monkeypatch.setattr(wsl.sys, "platform", "win32")
+    try:
+        assert wsl.is_wsl() is False
+    finally:
+        wsl.is_wsl.cache_clear()
 
 
 def test_nothing_is_converted_outside_wsl(monkeypatch):
