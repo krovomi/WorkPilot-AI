@@ -55,7 +55,8 @@ def is_wsl() -> bool:
     for probe in ("/proc/sys/kernel/osrelease", "/proc/version"):
         try:
             with open(probe, encoding="utf-8", errors="replace") as handle:
-                if "microsoft" in handle.read().lower():
+                # one line of kernel text; bounded all the same
+                if "microsoft" in handle.read(4096).lower():
                     return True
         except OSError:
             continue
