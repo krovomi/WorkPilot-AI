@@ -359,7 +359,7 @@ class TestPhaseHistoricalContext:
             result = await executor.phase_historical_context()
 
         assert result.success is True
-        hints = json.loads((spec_dir / "graph_hints.json").read_text())
+        hints = json.loads((spec_dir / "graph_hints.json").read_text(encoding="utf-8"))
         assert hints["enabled"] is False
 
 

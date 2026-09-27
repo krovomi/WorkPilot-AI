@@ -136,15 +136,25 @@ async def get_memory_context(
             content = item.get("content", "")[:500]
             sections.append(f"- **[{item.get('type', 'note')}]** {content}\n")
 
-    if session_history:
+    session_lines: list[str] = []
+    for session in session_history[:2]:
+        num = session.get("session_number", "?")
+        recommendations = session.get("recommendations_for_next_session") or []
+        worked = session.get("what_worked") or []
+        failed = session.get("what_failed") or []
+        if recommendations:
+            session_lines.append(f"**Session {num} recommendations:**")
+            session_lines.extend(f"- {rec}" for rec in recommendations[:3])
+        elif worked or failed:
+            session_lines.append(f"**Session {num}:**")
+            session_lines.extend(f"- worked: {item}" for item in worked[:2])
+            session_lines.extend(f"- failed: {item}" for item in failed[:2])
+        else:
+            continue
+        session_lines.append("")
+    if session_lines:
         sections.append("### Recent Session Insights\n")
-        for session in session_history[:2]:
-            recommendations = session.get("recommendations_for_next_session") or []
-            if recommendations:
-                num = session.get("session_number", "?")
-                sections.append(f"**Session {num} recommendations:**")
-                sections.extend(f"- {rec}" for rec in recommendations[:3])
-                sections.append("")
+        sections.extend(session_lines)
 
     if len(sections) == 2:
         return None
