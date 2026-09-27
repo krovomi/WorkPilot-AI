@@ -4,6 +4,7 @@ import {
 	type KeyboardEvent,
 	type ReactNode,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -53,10 +54,11 @@ export function EditableTaskTitle({
 	// Entrée enregistre puis le champ perd le focus : sans ce drapeau, le blur
 	// qui suit relancerait un second enregistrement du même texte.
 	const settled = useRef(false);
-	// La tâche affichée *maintenant* : un enregistrement lancé sur une autre
-	// tâche ne touche plus au champ quand il se termine.
-	const shownTask = useRef(task.id);
-	shownTask.current = task.id;
+	// Le numéro du dernier enregistrement lancé : seul celui-là agit sur le
+	// champ en se terminant (le rendre, le fermer, y remettre le focus).
+	// Changer de tâche l'incrémente aussi, si bien qu'un aller-retour A → B → A
+	// ne rend pas au champ rouvert sur A l'issue d'un enregistrement d'avant.
+	const saveSeq = useRef(0);
 
 	useEffect(() => {
 		if (!editing) setDraft(displayTitle);
@@ -76,10 +78,16 @@ export function EditableTaskTitle({
 
 	// Le dialogue navigue d'une tâche à l'autre sans démonter ce composant : un
 	// champ encore ouvert enregistrerait le titre de l'une sous l'id de l'autre.
+	// Layout, pas effect : l'invalidation a lieu dans le commit même qui affiche
+	// la nouvelle tâche, avant qu'un enregistrement en vol puisse se terminer et
+	// agir sur un champ qui ne lui appartient plus.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: only a new task closes the field
-	useEffect(() => {
+	useLayoutEffect(() => {
 		settled.current = true;
 		setEditing(false);
+		// Un enregistrement de la tâche quittée ne tient plus ce champ en attente.
+		saveSeq.current += 1;
+		setSaving(false);
 	}, [task.id]);
 
 	const open = () => {
@@ -103,19 +111,21 @@ export function EditableTaskTitle({
 			cancel();
 			return;
 		}
-		const savedTask = task.id;
+		saveSeq.current += 1;
+		const seq = saveSeq.current;
 		setSaving(true);
 		let ok = false;
 		try {
-			ok = await persistUpdateTask(savedTask, { title: next });
+			ok = await persistUpdateTask(task.id, { title: next });
 		} catch {
 			ok = false;
 		} finally {
 			// Toujours rendu au champ : un enregistrement refusé ne doit pas
-			// laisser un titre gelé en lecture seule.
-			setSaving(false);
+			// laisser un titre gelé en lecture seule — mais seulement par le
+			// dernier enregistrement lancé.
+			if (saveSeq.current === seq) setSaving(false);
 		}
-		const stillShown = shownTask.current === savedTask;
+		const stillShown = saveSeq.current === seq;
 		if (ok) {
 			if (stillShown) setEditing(false);
 			return;
