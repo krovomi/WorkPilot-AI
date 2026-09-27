@@ -1055,7 +1055,12 @@ de laisser derrière lui un cerveau vide.
 
 **Deux garde-fous, parce que l'API locale est joignable depuis un navigateur.**
 Le dossier choisi reste sous le répertoire personnel : un endpoint qui crée un
-dépôt git là où on le lui dit écrit dans `/etc` pour qui le demande. Et un
+dépôt git là où on le lui dit écrit dans `/etc` pour qui le demande. Sous
+WSL, « le répertoire personnel » est aussi le profil Windows (`brain/wsl.py`) :
+le backend est un processus Linux, le vault de l'Obsidian Windows vit sous
+`C:\Users\<nom>`, et `C:\…` comme `\\wsl$\<distro>\…` sont lus comme le chemin
+que ce processus ouvre (`/mnt/c/…`, racine d'`/etc/wsl.conf`). Le reste du
+lecteur reste refusé — `C:\Windows` est précisément l'endroit visé. Et un
 distant est un distant (`sync.normalize_remote`) : `utilisateur/dépôt` pour
 GitHub, sinon https, ssh, `git@hôte:`, file ou un chemin. Une valeur qui commence
 par `-` est une option pour `git clone` (`--upload-pack=…` lance un programme) et
