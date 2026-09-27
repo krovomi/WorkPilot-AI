@@ -1523,9 +1523,10 @@ node, or the file's pages, and every visible text layer in order — and writes
 {"source": "figma", "file_key": "…", "frames": [{"id": "…", "name": "…", "texts": ["Libellé 1", "…"]}]}
 ```
 
-That shape is a **contract** with the visual review, which reads every
-`*.figma.json` among the attachments as the structured source of the mockup /
-rendering comparison; nothing is added to it, because a field only one reader
+That shape is a **contract** with the visual review (`visual_qa.py`, through
+`labels.load_figma`), which reads every `*.figma.json` among the attachments as
+the structured source of the mockup / rendering comparison, ahead of any OCR of
+a mockup image; nothing is added to it, because a field only one reader
 understands is how two readers of one file start to disagree. What is written
 has been protected first, since later phases read the file as it is: every
 label masked by the secret patterns, and each frame scanned by
