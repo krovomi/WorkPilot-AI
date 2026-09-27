@@ -42,7 +42,7 @@ class TestCLIStreamingIntegration:
             patch("cli.build_commands._run_deterministic_gates"),
             patch("cli.build_commands._run_workflow_phases"),
             patch(
-                "agents.coder.get_graphiti_context",
+                "agents.coder.get_memory_context",
                 new_callable=AsyncMock,
                 return_value=None,
             ),

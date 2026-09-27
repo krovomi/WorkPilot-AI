@@ -306,6 +306,32 @@ def task(project_dir: str = "", spec_id: str = "") -> dict:
     return {"success": True, "learning": task_learning(project, spec_id.strip())}
 
 
+@router.get("/memories")
+def memories(project_dir: str = "", query: str = "", limit: int = 20) -> dict:
+    """The project's memory, from the vault (`project_memory`): the Memories tab.
+
+    The one place the desktop reads what the builds learned. The project is a
+    *name* read out of the path, never a directory opened — the same rule as
+    ``/task``. With ``query``, the notes ranked against it; without, the most
+    recent first.
+    """
+    if _refused():
+        return _DESKTOP_ONLY
+    from .learn import project_name_from
+    from .project_memory import list_memories, search_memories
+
+    project = project_name_from(project_dir)
+    if not project:
+        return {"success": False, "error": "project_dir is required"}
+    limit = max(1, min(int(limit or 20), 200))
+    if query.strip():
+        return {
+            "success": True,
+            "results": search_memories(project, query, limit=limit),
+        }
+    return {"success": True, "memories": list_memories(project, limit=limit)}
+
+
 @router.post("/instruction")
 def instruction(request: InstructionRequest) -> dict:
     """A person activates, or turns down, an instruction an agent proposed."""

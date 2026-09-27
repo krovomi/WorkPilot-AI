@@ -22,8 +22,8 @@ class RequirementsPhaseMixin:
     """Mixin for requirements and research phase methods."""
 
     async def phase_historical_context(self) -> PhaseResult:
-        """Retrieve historical context from Graphiti knowledge graph (if enabled)."""
-        from graphiti_providers import get_graph_hints, is_graphiti_enabled
+        """Retrieve what the shared brain knows about this task (the project's memory)."""
+        from memory.store import get_graph_hints, is_memory_enabled
 
         hints_file = self.spec_dir / "graph_hints.json"
 
@@ -36,19 +36,17 @@ class RequirementsPhaseMixin:
             )
             return PhaseResult("historical_context", True, [str(hints_file)], [], 0)
 
-        if not is_graphiti_enabled():
-            self.ui.print_status(
-                "Graphiti not enabled, skipping historical context", "info"
-            )
+        if not is_memory_enabled():
+            self.ui.print_status("Memory is off, skipping historical context", "info")
             self.task_logger.log(
-                "Knowledge graph not configured, skipping",
+                "Memory is off (BRAIN_ENABLED=false), skipping",
                 LogEntryType.INFO,
                 LogPhase.PLANNING,
             )
             validator.create_empty_hints(
                 self.spec_dir,
                 enabled=False,
-                reason="Graphiti not configured",
+                reason="Memory is off (BRAIN_ENABLED=false)",
             )
             return PhaseResult("historical_context", True, [str(hints_file)], [], 0)
 
@@ -71,7 +69,7 @@ class RequirementsPhaseMixin:
             )
             return PhaseResult("historical_context", True, [str(hints_file)], [], 0)
 
-        self.ui.print_status("Querying Graphiti knowledge graph...", "progress")
+        self.ui.print_status("Querying the shared brain...", "progress")
         self.task_logger.log(
             "Searching knowledge graph for relevant context...",
             LogEntryType.INFO,
@@ -83,6 +81,7 @@ class RequirementsPhaseMixin:
                 query=task_query,
                 project_id=str(self.project_dir),
                 max_results=10,
+                spec_dir=self.spec_dir,
             )
 
             # Save hints to file

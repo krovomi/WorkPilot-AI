@@ -6,64 +6,35 @@ Session Memory System
 Persists learnings between autonomous coding sessions to avoid rediscovering
 codebase patterns, gotchas, and insights.
 
-Architecture Decision:
-    Memory System Hierarchy:
+One store: the shared Obsidian vault
+------------------------------------
 
-    PRIMARY: Graphiti (when GRAPHITI_ENABLED=true)
-        - Graph-based knowledge storage with LadybugDB (embedded Kuzu database)
-        - Semantic search across sessions
-        - Cross-project context retrieval
-        - Rich relationship modeling
+Everything a build learns is written to the WorkPilot Brain — the Obsidian
+vault every agent reads (`brain.project_memory`):
 
-    FALLBACK: File-based (when Graphiti is disabled)
-        - Zero external dependencies (no database required)
-        - Human-readable files for debugging and inspection
-        - Guaranteed availability (no network/service failures)
-        - Simple backup and version control integration
+    <brain>/knowledge/projects/<project>/memory/
+        ├── codebase/<file>.md          # what a file is for
+        ├── patterns/<slug>.md          # code patterns to follow
+        ├── gotchas/<slug>.md           # pitfalls to avoid
+        ├── outcomes/<slug>.md          # how an approach went, and why
+        └── sessions/<spec>/session-NNN.md
 
-    The agent.py orchestrator uses save_session_memory() which:
-    1. Tries Graphiti first if enabled
-    2. Falls back to file-based if Graphiti is disabled or fails
+It used to be Graphiti when ``GRAPHITI_ENABLED`` was set and JSON/Markdown files
+under ``<spec_dir>/memory/`` otherwise; the spec files still found on disk are
+imported into the vault on first use and set aside. Memory is per *project*,
+not per spec: the next task on the same project starts from what this one
+learned.
 
-    This ensures memory is ALWAYS saved, regardless of configuration.
-
-Each spec has its own memory directory:
-    auto-claude/specs/001-feature/memory/
-        ├── codebase_map.json      # Key files and their purposes
-        ├── patterns.md            # Code patterns to follow
-        ├── gotchas.md             # Pitfalls to avoid
-        └── session_insights/
-            ├── session_001.json   # What session 1 learned
-            └── session_002.json   # What session 2 learned
-
-Public API:
-    # Graphiti helpers
-    - is_graphiti_memory_enabled() -> bool
-
-    # Directory management
-    - get_memory_dir(spec_dir) -> Path
-    - get_session_insights_dir(spec_dir) -> Path
-    - clear_memory(spec_dir) -> None
-
-    # Session insights
-    - save_session_insights(spec_dir, session_num, insights) -> None
-    - load_all_insights(spec_dir) -> list[dict]
-
-    # Codebase map
-    - update_codebase_map(spec_dir, discoveries) -> None
-    - load_codebase_map(spec_dir) -> dict[str, str]
-
-    # Patterns and gotchas
-    - append_pattern(spec_dir, pattern) -> None
-    - load_patterns(spec_dir) -> list[str]
-    - append_gotcha(spec_dir, gotcha) -> None
-    - load_gotchas(spec_dir) -> list[str]
-
-    # Summary
-    - get_memory_summary(spec_dir) -> dict
+Public API (unchanged):
+    - get_project_memory(spec_dir, project_dir=None) -> ProjectMemory | None
+    - is_memory_enabled() / is_graphiti_memory_enabled() -> bool
+    - save_session_insights / load_all_insights
+    - update_codebase_map / load_codebase_map
+    - append_pattern / load_patterns / append_gotcha / load_gotchas
+    - get_memory_summary
+    - get_memory_dir / get_session_insights_dir / clear_memory (legacy path only)
 """
 
-# Graphiti integration
 # Codebase map
 from .codebase_map import load_codebase_map, update_codebase_map
 from .graphiti_helpers import is_graphiti_memory_enabled
@@ -81,12 +52,15 @@ from .patterns import (
 
 # Session insights
 from .sessions import load_all_insights, save_session_insights
+from .store import get_project_memory, is_memory_enabled
 
 # Summary utilities
 from .summary import get_memory_summary
 
 __all__ = [
-    # Graphiti helpers
+    # The store
+    "get_project_memory",
+    "is_memory_enabled",
     "is_graphiti_memory_enabled",
     # Directory management
     "get_memory_dir",

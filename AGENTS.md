@@ -40,6 +40,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   mem_search/          lecture de la mémoire par paliers (skill mem-search)
   brain/               le cerveau partagé : vault Obsidian + graph.json Graphify + git, servi en MCP à tous les agents
   brain/images.py      les images du vault lues par OCR local, en cache par empreinte, retrouvées par brain_recall
+  brain/project_memory.py LA mémoire des builds (pièges, conventions, sessions) : le vault est le seul magasin
   libdocs/             docs des bibliothèques que le dépôt n'illustre pas, avant le build
   docintel/            pièces jointes (draw.io, Excalidraw, captures OCR) et ADR, avant le build
   docintel/engines/    moteurs OCR interchangeables (Tesseract, PaddleOCR, docTR, vision Ollama, Azure)

@@ -19,7 +19,7 @@ WorkPilot AI is an autonomous multi-agent coding framework that plans, builds, a
   - [Where the implementation plan actually is](#where-the-implementation-plan-actually-is)
   - [Requirement Traceability](#requirement-traceability)
   - [spec-kit projects](#spec-kit-projects)
-  - [Memory System (Graphiti)](#memory-system-graphiti)
+  - [Memory System (the shared brain)](#memory-system-the-shared-brain)
   - [Skills System](#skills-system)
   - [Memory Search (mem-search)](#memory-search-mem-search)
   - [Le cerveau partagé (Obsidian + Graphify + MCP)](#le-cerveau-partagé-obsidian--graphify--mcp)
@@ -84,7 +84,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Azure DevOps/Jira Integration** — Import work items, sync statuses
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks
-- **Memory System** — Graphiti-based knowledge graph retains insights across sessions
+- **Memory System** — one Obsidian vault (the shared brain) keeps what every build learns, read by every agent
 - **Isolated Workspaces** — Git worktree isolation for every build; AI-powered semantic merge
 - **Self-Healing** — Incident response system with CI/CD failure analysis, proactive monitoring, and production responder
 - **Pixel Office** — Multi-agent coordination visualization with task queue UI
@@ -144,7 +144,7 @@ WorkPilot-AI/
 │   │   ├── context/                  # Task context building, semantic search
 │   │   ├── runners/                  # 66 standalone runners (spec, roadmap, insights, github, self-healing, etc.)
 │   │   ├── services/                 # Background services, recovery orchestration
-│   │   ├── integrations/             # graphiti/, linear, github, windsurf_proxy
+│   │   ├── integrations/             # linear, github, windsurf_proxy (graphiti/: legacy, no longer a memory)
 │   │   ├── project/                  # Project analysis, security profiles
 │   │   ├── merge/                    # Intent-aware semantic merge for parallel agents
 │   │   └── prompts/                  # Agent system prompts (.md)
@@ -502,9 +502,22 @@ The document goes in whole rather than as extracted rules: a `MUST` quoted out
 of its section loses the scope that qualified it, and a sentence about what the
 project *used* to require would be quoted as current law.
 
-### Memory System (Graphiti)
+### Memory System (the shared brain)
 
-Graph-based semantic memory in `integrations/graphiti/`. Configured through the Electron app's onboarding/settings UI (CLI users can alternatively set `GRAPHITI_ENABLED=true` in `.env-files/.env`). See [shared_docs/CONFIGURATION.md](../shared_docs/CONFIGURATION.md) for details.
+There is **one** memory: the shared Obsidian vault described in
+[Le cerveau partagé](#le-cerveau-partagé-obsidian--graphify--mcp). What a build
+learns — gotchas, patterns, what each file is for, what each session did — is
+written there by `brain/project_memory.py`, and every reader asks it. See
+*La mémoire des builds, dans le vault* below for the layout and the rules.
+
+It used to be three. Graphiti / LadybugDB was the "primary" store when
+`GRAPHITI_ENABLED` was set, files under `<spec_dir>/memory/` the "fallback"
+otherwise, and the vault held what agents wrote themselves — so the coder, the
+`get_session_context` tool, the Memories tab and the MCP server each read a
+different one, and a gotcha recorded by one surface was invisible to the next.
+`GRAPHITI_ENABLED` no longer selects a store, and no agent gets the Graphiti MCP
+server by default (`AGENT_MCP_<agent>_ADD=graphiti` still adds it for someone
+who asks by name). `integrations/graphiti/` remains only as legacy code.
 
 ### Skills System
 
@@ -857,6 +870,7 @@ format Graphify, un dépôt git synchronisé, servi par un serveur MCP.
   instructions/<slug>.md         une instruction partagée par note — `agents:` dit qui la suit
   knowledge/<slug>.md            décisions, faits, emplacements
   knowledge/projects/<p>/builds/ une note par tâche du Kanban, et ce qu'on y a appris
+  knowledge/projects/<p>/memory/ LA mémoire des builds : pièges, conventions, fichiers, sessions
   agents/<agent>/…               instantanés des mémoires propres à chaque agent
   skills/graph-first-recall/     le skill de rappel graph-first, semé à l'init
   .workpilot-brain/brain.json    le marqueur : ce dossier est un cerveau (versionné)
@@ -875,6 +889,7 @@ format Graphify, un dépôt git synchronisé, servi par un serveur MCP.
 | `vault.py` | `Brain`, le seul objet qu'appellent MCP, CLI et HTTP |
 | `runtime.py` | le branchement sur **toutes** les features de WorkPilot |
 | `learn.py` | ce que WorkPilot enregistre lui-même : chaque build, chaque merge |
+| `project_memory.py` | **la** mémoire des builds (pièges, conventions, fichiers, sessions) — le seul magasin, lu et écrit par toutes les features |
 | `images.py` | les images du vault lues par docintel (source d'un schéma, sinon OCR local), en cache par empreinte |
 
 ```bash
@@ -1147,11 +1162,14 @@ Codex, hermes…) écrivent en son nom, sans cette restriction. Pour activer ou
 refuser une proposition : `--action proposals`, puis `--action promote` ou
 `--action reject` avec `--path` ; ou bien changer `status:` dans Obsidian.
 
-**Actif seulement quand un cerveau existe.** `BRAIN_ENABLED` vaut `true` par
-défaut ; sans cerveau sur disque, chaque point d'entrée répond en un `is_file`
-et n'ajoute rien — pas de serveur lancé, pas de section de prompt, pas d'outil.
-L'allumer, c'est lancer `--action init` : une décision de la personne sur
-l'endroit où vit sa connaissance et le distant où elle est poussée.
+**Actif seulement quand un cerveau existe — et il existe dès qu'un build a
+appris quelque chose.** `BRAIN_ENABLED` vaut `true` par défaut ; sans cerveau
+sur disque, chaque point d'entrée *de lecture* répond en un `is_file` et
+n'ajoute rien — pas de serveur lancé, pas de section de prompt, pas d'outil.
+La première *écriture* de mémoire (voir ci-dessous) crée un cerveau local, sans
+distant : rien ne quitte la machine tant qu'une personne n'a pas branché un
+vault ou un dépôt dans les Réglages, et c'est là que reste la décision.
+`BRAIN_ENABLED=false` coupe la mémoire ; il ne l'envoie plus ailleurs.
 
 | Variable | Défaut | Rôle |
 |---|---|---|
@@ -1170,10 +1188,53 @@ exposent la même chose au desktop ; comme `hermes/api.py`, le routeur est refus
 en mode serveur — le cerveau vit dans le répertoire personnel de la machine qui
 exécute le backend.
 
+#### La mémoire des builds, dans le vault (`project_memory.py`)
+
+Ce qu'un build apprend sur un projet vit sous
+`knowledge/projects/<projet>/memory/`, une note Obsidian par fait :
+
+| Dossier | Une note par | Écrit par |
+|---|---|---|
+| `gotchas/` | piège, et sa solution quand on la connaît | outil `record_gotcha`, fin de session, revues de PR (GitHub, GitLab, Azure DevOps — critiques et hautes seulement) |
+| `patterns/` | convention à suivre, et où elle s'applique | fin de session, extracteur d'insights |
+| `codebase/` | fichier du projet : à quoi il sert | outil `record_discovery`, extracteur d'insights |
+| `outcomes/` | sous-tâche : l'approche, et pourquoi elle a marché ou non | extracteur d'insights, learning loop |
+| `sessions/<spec>/` | session de code ou de QA | `save_session_memory` |
+
+Le frontmatter porte `memory:` (le type), `project:`, `spec:` et `tasks:`, et
+chaque note est liée au hub du projet et à la note de build de la tâche : la
+carte `BrainTaskCard`, `brain_recall` et Obsidian lisent donc exactement ce que
+le coder lit. **La mémoire est par projet, pas par spec** : la tâche suivante du
+même projet part de ce que celle-ci a appris.
+
+**L'API est celle qu'avaient les appelants.** `ProjectMemory` répond aux
+méthodes de `GraphitiMemory` (`save_gotcha`, `get_patterns_and_gotchas`,
+`get_session_history`, `close`…) ; `memory.store.get_project_memory` est la
+seule porte, et `memory.graphiti_helpers.get_graphiti_memory` n'en est plus
+qu'un alias. Coder, QA reviewer, QA fixer, auto-fix, outils des agents,
+pipeline de spec, idéation, roadmap, context builder, runners de revue,
+`mem_search` (`BrainSource`) et l'onglet Mémoires (`GET /api/brain/memories`)
+passent tous par là.
+
+**Une synchronisation par session, pas par note.** Les notes sont écrites par
+`Brain.write(sync=False)` ; `close()` committe, tire et pousse une fois. Chaque
+texte passe par l'expurgation des secrets du cerveau, et tout est écrit en
+non fiable (`knowledge/` seulement) : ce sont des données, pas des règles.
+
+**Rien n'est perdu à la mise à jour.** Les anciens fichiers de
+`<spec_dir>/memory/` (`codebase_map.json`, `patterns.md`, `gotchas.md`,
+`session_insights/`) sont importés au premier usage de la mémoire de la spec,
+puis rangés dans `<spec_dir>/memory.migrated-to-brain/` — jamais par-dessus un
+premier import. L'état de reprise que `services/recovery.py` garde dans le même
+dossier (`attempt_history.json`, `build_commits.json`) est de l'état
+d'exécution, pas de la connaissance : il reste où il est. Pour tout importer
+d'un coup : `brain_runner.py --action import-legacy --project-dir <projet>`.
+
 ### Memory Search (`mem-search`)
 
-Three-layer progressive retrieval over the memories that already exist — `task_logger`
-traces and `learning_loop` patterns — so an agent can ask "have we hit this before?"
+Three-layer progressive retrieval over the records that already exist — `learning_loop`
+patterns, the project's memory in the shared brain (`BrainSource`, read from the
+vault's `graph.json`) and `task_logger` traces — so an agent can ask "have we hit this before?"
 without paying for every candidate to discard most of them.
 
 ```python
@@ -3803,10 +3864,11 @@ cd src/connectors/grepai && python grepai_launcher.py
 
 **Memory System Issues:**
 ```bash
-# Check Graphiti status
-python -c "from integrations.graphiti.client import check_connection; print(check_connection())"
-# Enable via environment if needed
-export GRAPHITI_ENABLED=true
+# Where is the shared brain, and what does it hold?
+python apps/backend/runners/brain_runner.py --action status
+# Import what builds learned before the vault was the one memory
+python apps/backend/runners/brain_runner.py --action import-legacy --project-dir .
+# Memory is on unless BRAIN_ENABLED=false
 ```
 
 **Performance Issues:**

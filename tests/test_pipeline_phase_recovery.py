@@ -25,7 +25,7 @@ def pipeline(monkeypatch, temp_git_repo):
             return "ollama"
 
     monkeypatch.setattr(coder, "create_agent_client", lambda *a, **kw: Client())
-    monkeypatch.setattr(coder, "get_graphiti_context", AsyncMock(return_value=None))
+    monkeypatch.setattr(coder, "get_memory_context", AsyncMock(return_value=None))
     monkeypatch.setattr(coder, "load_subtask_context", lambda *a, **kw: {})
     monkeypatch.setattr(coder, "AUTO_CONTINUE_DELAY_SECONDS", 0)
     monkeypatch.setattr(coder, "wait_for_auth_resume", AsyncMock())

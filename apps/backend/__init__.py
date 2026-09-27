@@ -9,7 +9,7 @@ This package provides:
 - Autonomous agent execution for building features from specs
 - Workspace isolation via git worktrees
 - QA validation loops
-- Memory management (Graphiti + file-based)
+- Memory management (the shared brain: one Obsidian vault)
 - Linear integration for project management
 
 Quick Start:

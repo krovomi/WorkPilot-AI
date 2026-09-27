@@ -6,7 +6,7 @@ Gathers project context including:
 - Existing features
 - Target audience
 - Planned features
-- Graph hints from Graphiti
+- Hints from the shared brain (the project's memory in the vault)
 """
 
 import json
@@ -20,7 +20,7 @@ from debug import (
     debug_success,
     debug_warning,
 )
-from graphiti_providers import get_graph_hints, is_graphiti_enabled
+from memory.store import get_graph_hints, is_memory_enabled
 
 
 class ProjectAnalyzer:
@@ -120,11 +120,11 @@ class ProjectAnalyzer:
         return context
 
     async def get_graph_hints(self, ideation_type: str) -> list[dict]:
-        """Get graph hints for a specific ideation type from Graphiti.
+        """Get hints for a specific ideation type from the shared brain.
 
         This runs in parallel with ideation agents to provide historical context.
         """
-        if not is_graphiti_enabled():
+        if not is_memory_enabled():
             return []
 
         # Create a query based on ideation type

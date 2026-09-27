@@ -15,7 +15,7 @@ from typing import Any, Union
 
 # Memory integration for cross-session learning
 from agents.agent_audit import audit_event
-from agents.memory_manager import get_graphiti_context, save_session_memory
+from agents.memory_manager import get_memory_context, save_session_memory
 from core.agent_client import AgentClient, ContentBlockType
 
 try:
@@ -254,7 +254,7 @@ async def run_qa_agent_session(
     )
 
     # Retrieve memory context for QA (past patterns, gotchas, validation insights)
-    qa_memory_context = await get_graphiti_context(
+    qa_memory_context = await get_memory_context(
         spec_dir,
         project_dir,
         {
@@ -265,7 +265,7 @@ async def run_qa_agent_session(
     if qa_memory_context:
         prompt += "\n\n" + qa_memory_context
         print("✓ Memory context loaded for QA reviewer")
-        debug_success("qa_reviewer", "Graphiti memory context loaded for QA")
+        debug_success("qa_reviewer", "Project memory loaded for QA")
 
     # Learning Loop: inject patterns learned from previous builds (qa_review phase)
     try:

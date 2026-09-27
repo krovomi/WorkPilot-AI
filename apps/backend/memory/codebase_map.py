@@ -3,26 +3,19 @@
 Codebase Map Management
 =======================
 
-Functions for managing the codebase map that tracks file purposes.
+What each file of the project is for — one note per file in the vault
+(``knowledge/projects/<project>/memory/codebase/``), shared by every spec of
+the project and every agent connected to the brain.
 """
 
-import json
-import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
-from .graphiti_helpers import get_graphiti_memory, is_graphiti_memory_enabled, run_async
-from .paths import get_memory_dir
-
-logger = logging.getLogger(__name__)
+from .store import get_project_memory, remember
 
 
 def update_codebase_map(spec_dir: Path, discoveries: dict[str, str]) -> None:
     """
-    Update the codebase map with newly discovered file purposes.
-
-    This function merges new discoveries with existing ones. If a file path
-    already exists, its purpose will be updated.
+    Record newly discovered file purposes. An existing file's note is updated.
 
     Args:
         spec_dir: Path to spec directory
@@ -32,71 +25,24 @@ def update_codebase_map(spec_dir: Path, discoveries: dict[str, str]) -> None:
                 "src/models/user.py": "User database model"
             }
     """
-    memory_dir = get_memory_dir(spec_dir)
-    map_file = memory_dir / "codebase_map.json"
+    if not discoveries:
+        return
 
-    # Load existing map or create new
-    if map_file.exists():
-        try:
-            with open(map_file, encoding="utf-8") as f:
-                codebase_map = json.load(f)
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-            codebase_map = {}
-    else:
-        codebase_map = {}
+    def write(memory) -> bool:
+        wrote = False
+        for path, purpose in discoveries.items():
+            wrote |= memory.record_discovery(str(path), str(purpose))
+        return wrote
 
-    # Update with new discoveries
-    codebase_map.update(discoveries)
-
-    # Add metadata
-    if "_metadata" not in codebase_map:
-        codebase_map["_metadata"] = {}
-
-    codebase_map["_metadata"]["last_updated"] = datetime.now(timezone.utc).isoformat()
-    codebase_map["_metadata"]["total_files"] = len(
-        [k for k in codebase_map.keys() if k != "_metadata"]
-    )
-
-    # Write back
-    with open(map_file, "w", encoding="utf-8") as f:
-        json.dump(codebase_map, f, indent=2, sort_keys=True)
-
-    # Also save to Graphiti if enabled
-    if is_graphiti_memory_enabled() and discoveries:
-        try:
-            graphiti = run_async(get_graphiti_memory(spec_dir))
-            if graphiti:
-                run_async(graphiti.save_codebase_discoveries(discoveries))
-                run_async(graphiti.close())
-                logger.info("Codebase discoveries also saved to Graphiti")
-        except Exception as e:
-            logger.warning(f"Graphiti codebase save failed: {e}")
+    remember(spec_dir, write)
 
 
 def load_codebase_map(spec_dir: Path) -> dict[str, str]:
     """
-    Load the codebase map.
-
-    Args:
-        spec_dir: Path to spec directory
+    Load the project's codebase map.
 
     Returns:
-        Dictionary mapping file paths to their purposes.
-        Returns empty dict if no map exists.
+        Dictionary mapping file paths to their purposes (empty when none).
     """
-    memory_dir = get_memory_dir(spec_dir)
-    map_file = memory_dir / "codebase_map.json"
-
-    if not map_file.exists():
-        return {}
-
-    try:
-        with open(map_file, encoding="utf-8") as f:
-            codebase_map = json.load(f)
-
-        # Remove metadata before returning
-        codebase_map.pop("_metadata", None)
-        return codebase_map
-
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return {}
+    memory = get_project_memory(spec_dir)
+    return memory.load_codebase_map() if memory else {}

@@ -79,10 +79,15 @@ def _auto(var: str) -> bool:
 class WriteResult:
     rel: str
     created: bool
-    sync: SyncResult
+    sync: SyncResult | None
+    """``None`` when the caller deferred the sync (``Brain.write(sync=False)``)."""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"path": self.rel, "created": self.created, "sync": self.sync.to_dict()}
+        return {
+            "path": self.rel,
+            "created": self.created,
+            "sync": self.sync.to_dict() if self.sync else None,
+        }
 
 
 class Brain:
@@ -246,6 +251,8 @@ class Brain:
         path: str | None = None,
         trusted: bool = True,
         task: str | None = None,
+        meta: dict[str, Any] | None = None,
+        sync: bool = True,
     ) -> WriteResult:
         """Create or update a note, then sync. An existing note keeps its frontmatter.
 
@@ -255,6 +262,12 @@ class Brain:
         demand, read as data — and may *propose* a new instruction; it may not
         touch an instruction in force, a skill every agent loads, an agent's
         memory snapshot or the brain's own files.
+
+        ``meta`` adds frontmatter fields the caller owns (``memory``,
+        ``project``…). ``sync=False`` writes the note and nothing else: the
+        caller batches several notes and ends with one ``after_write`` — a
+        session that records ten discoveries is one commit, not ten pushes.
+        The graph is rebuilt on the next read regardless, since it is stale.
         """
         folder = kind_dir(self.root, kind).name
         rel = Path(path) if path else Path(folder) / f"{slugify(title)}.md"
@@ -274,7 +287,11 @@ class Brain:
                     "an instruction in the brain is changed by a person; "
                     "propose a new one with brain_remember"
                 )
-        meta: dict[str, Any] = {} if created else dict(read_note(self.root, rel).meta)
+        note_meta: dict[str, Any] = (
+            {} if created else dict(read_note(self.root, rel).meta)
+        )
+        note_meta.update(meta or {})
+        meta = note_meta
         if is_instruction and created:
             meta["status"] = "active" if trusted else "proposed"
         meta.setdefault("kind", kind)
@@ -303,6 +320,8 @@ class Brain:
         if extra:
             text += "\n## Liens\n\n" + "\n".join(f"- {item}" for item in extra) + "\n"
         write_note(self.root, Note(path=rel, meta=meta, body=text))
+        if not sync:
+            return WriteResult(rel.as_posix(), created, None)
         verb = "add" if created else "update"
         who = f" ({agent})" if agent else ""
         return WriteResult(
