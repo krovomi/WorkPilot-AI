@@ -800,3 +800,17 @@ def test_a_failed_replacement_keeps_the_previous_capture(spec_dir, monkeypatch):
     )
     assert again.status == "unwritable"
     assert saved.read_bytes() == before
+
+
+def test_a_failed_record_write_keeps_the_previous_record(spec_dir, monkeypatch):
+    target = visual_qa.record_path(spec_dir)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text('{"captures": []}', encoding="utf-8")
+
+    def refuse(*_a, **_k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(visual_qa.os, "replace", refuse)
+    visual_qa._persist(spec_dir, visual_qa.VisualQaRecord(skipped="no-captures"))
+    assert target.read_text(encoding="utf-8") == '{"captures": []}'
+    assert not list(target.parent.glob(".*.partial"))

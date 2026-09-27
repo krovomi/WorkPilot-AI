@@ -860,11 +860,32 @@ def _persist(spec_dir: Path, record: VisualQaRecord) -> None:
         return
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            json.dumps(record.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8"
+        _replace_text(
+            target, json.dumps(record.to_dict(), indent=2, ensure_ascii=False)
         )
     except OSError:
         logger.debug("docintel: could not persist %s", target, exc_info=True)
+
+
+def _replace_text(target: Path, text: str) -> None:
+    """Write ``text`` to ``target`` all at once, or not at all.
+
+    The record and the manifest are read by the Kanban while a QA pass writes
+    them; a reader that lands between truncation and the last byte would get
+    half a JSON document and report the task as having no captures. A partial
+    file beside the target, then ``os.replace``, leaves the previous version in
+    place until the new one is complete.
+    """
+    partial = target.with_name(f".{target.name}.partial")
+    try:
+        partial.write_text(text, encoding="utf-8")
+        os.replace(partial, target)
+    except OSError:
+        try:
+            partial.unlink(missing_ok=True)
+        except OSError:
+            logger.debug("docintel: could not remove a partial write")
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -989,13 +1010,13 @@ def _write_manifest(spec_dir: Path, entry: dict) -> None:
     entries = [e for f, e in _manifest(spec_dir).items() if f != entry["file"]]
     entries.append(entry)
     try:
-        target.write_text(
+        _replace_text(
+            target,
             json.dumps(
                 {"captures": entries[-MAX_MANIFEST_ENTRIES:]},
                 indent=2,
                 ensure_ascii=False,
             ),
-            encoding="utf-8",
         )
     except OSError:
         logger.debug("docintel: could not write the capture manifest", exc_info=True)
