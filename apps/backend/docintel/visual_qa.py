@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import struct
 from dataclasses import asdict, dataclass, field
@@ -927,12 +928,25 @@ def save_capture(
         return SavedCapture("unwritable")
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        for stale in target.parent.glob(f"{name}.*"):
-            if stale != target and stale.is_file() and not stale.is_symlink():
-                stale.unlink()
-        target.write_bytes(data)
+        # Written beside the target and moved over it: a write that fails
+        # leaves the previous capture of this screen in place, and only a
+        # capture that landed replaces one saved in the other format.
+        partial = target.with_name(f".{target.name}.partial")
+        partial.write_bytes(data)
+        os.replace(partial, target)
     except OSError:
+        partial = target.with_name(f".{target.name}.partial")
+        if partial.is_file() and not partial.is_symlink():
+            partial.unlink(missing_ok=True)
         return SavedCapture("unwritable")
+    for stale in target.parent.glob(f"{name}.*"):
+        if stale != target and stale.is_file() and not stale.is_symlink():
+            try:
+                stale.unlink()
+            except OSError:
+                # The new capture is written; an old one left beside it is
+                # read as a second capture of the screen, not an error.
+                logger.debug("docintel: could not remove %s", stale)
 
     entry = {
         "file": f"{side}/{target.name}",

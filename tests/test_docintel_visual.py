@@ -782,3 +782,20 @@ def test_the_qa_loop_imports_the_visual_qa_steps_at_module_level():
 
     assert loop.run_visual_qa is not None
     assert loop.write_visual_qa_report is not None
+
+
+def test_a_failed_replacement_keeps_the_previous_capture(spec_dir, monkeypatch):
+    first = visual_qa.save_capture(spec_dir, png(), side="task", url="http://h/orders")
+    assert first.status == "saved"
+    saved = spec_dir / first.path
+    before = saved.read_bytes()
+
+    def refuse(*_a, **_k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(visual_qa.os, "replace", refuse)
+    again = visual_qa.save_capture(
+        spec_dir, png(width=20), side="task", url="http://h/orders"
+    )
+    assert again.status == "unwritable"
+    assert saved.read_bytes() == before
