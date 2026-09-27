@@ -1532,7 +1532,9 @@ smuggles nothing past it) as text, engine `figma`, and it is never taken for an
 HTTP capture: `api_capture` and `api_tests` skip it by name and by `source`. The
 token is `FIGMA_ACCESS_TOKEN` in `.workpilot/.env`, written by the main process
 through a write-only channel (Settings → Figma) that answers "configured" and
-never the value; it is sent to `api.figma.com` only, a constant, while the link
+never the value; it is sent to `api.figma.com` only, a constant — and a
+redirect is refused rather than followed, because `urllib` would carry the
+token to whatever host `Location` names — while the link
 gives a file key and node ids matched by character class — the host of the
 link is checked on the parsed URL, not searched in the string. A Figma call is
 a cloud call, so it is refused under `airgapStrict` like a cloud OCR engine.
