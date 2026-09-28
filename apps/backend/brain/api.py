@@ -111,6 +111,16 @@ def _strictly_under(path: str, root: str) -> bool:
     return path.startswith(root.rstrip(os.sep) + os.sep)
 
 
+def _placement_refusal(path: str, roots: list[str]) -> str | None:
+    """Why a brain may not live at *path* (absolute), or ``None``."""
+    verdict = windows_folder_verdict(path)
+    if verdict is not None:
+        return None if verdict == "ok" else "windows-system"
+    if not any(_strictly_under(path, root) for root in roots):
+        return "outside-home"
+    return None
+
+
 def _home_path(raw: str) -> tuple[Path | None, str | None]:
     """*raw* as an absolute folder under the home directory, or an error code.
 
@@ -122,18 +132,20 @@ def _home_path(raw: str) -> tuple[Path | None, str | None]:
     Under WSL, a Windows spelling (``C:\\Repository\\…``) is converted to the
     path this process opens (``/mnt/c/Repository/…``), and a folder of a
     Windows drive is accepted unless it is the drive's root or a system folder
-    (`brain.wsl.windows_folder_verdict`).
+    (`brain.wsl.windows_folder_verdict`). Both rules are applied to the path as
+    typed and as resolved, so a symbolic link cannot carry the brain past them.
     """
     full = os.path.normpath(
         os.path.abspath(os.path.expanduser(to_wsl_path(raw.strip())))
     )
-    verdict = windows_folder_verdict(full)
-    if verdict is not None and verdict != "ok":
-        return None, "windows-system"
-    if verdict is None and not any(
-        _strictly_under(full, home) for home in home_roots()
-    ):
-        return None, "outside-home"
+    roots = home_roots()
+    # Judged as typed and as resolved: a link under an accepted folder must not
+    # lead to ``C:\\Windows`` or ``/etc``.
+    code = _placement_refusal(full, roots) or _placement_refusal(
+        os.path.realpath(full), [os.path.realpath(root) for root in roots]
+    )
+    if code:
+        return None, code
     if os.path.isfile(full):
         return None, "is-file"
     return Path(full), None

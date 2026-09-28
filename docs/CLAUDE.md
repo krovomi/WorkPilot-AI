@@ -1076,8 +1076,10 @@ WSL, le backend est un processus Linux et le vault de l'Obsidian Windows vit sur
 `C:\…` comme `\\wsl$\<distro>\…` comme le chemin que ce processus ouvre
 (`/mnt/c/…`, racine d'`/etc/wsl.conf`) et accepte un dossier d'un lecteur
 Windows, sauf sa racine, les dossiers système (`Windows`, `Program Files`,
-`ProgramData`…) et `Users` hors du profil de la personne (`windows-system`) —
-ceux-là sont précisément les endroits visés. Le sélecteur s'ouvre sur le profil
+`ProgramData`…) et `Users` hors du profil de la personne — tout `Users` quand
+le profil est inconnu (`windows-system`) : ceux-là sont précisément les endroits
+visés. Le chemin est jugé tel que saisi **et** résolu, pour qu'un lien
+symbolique ne mène pas à `C:\Windows` ni à `/etc`. Le sélecteur s'ouvre sur le profil
 (`browseRoot`), faute de quoi une boîte GTK lancée depuis WSL ne montre aucun
 lecteur Windows. Et un
 distant est un distant (`sync.normalize_remote`) : `utilisateur/dépôt` pour

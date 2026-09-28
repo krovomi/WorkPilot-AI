@@ -204,10 +204,10 @@ def windows_folder_verdict(path: str) -> str | None:
     """
     if not is_wsl():
         return None
-    root = automount_root()
-    if not path.startswith(root):
+    rest = _under_mount(path)
+    if rest is None:
         return None
-    match = _MOUNTED.match(path[len(root) :])
+    match = _MOUNTED.match(rest)
     if not match:
         return None
     parts = [part for part in (match.group("rest") or "").split("/") if part]
@@ -219,13 +219,28 @@ def windows_folder_verdict(path: str) -> str | None:
     if top == "users":
         if len(parts) < 3 or parts[1].casefold() in _SHARED_PROFILES:
             return "windows-system"
-        # Another person's profile is theirs, when the machine says whose is ours.
+        # Only the person's own profile, and only when the machine says whose
+        # it is: without that answer, ``Users\\<anyone>`` would be accepted.
         profile = windows_home()
-        if profile:
-            own = profile.casefold().rstrip("/") + "/"
-            if not path.casefold().startswith(own):
-                return "windows-system"
+        if not profile or not any(
+            path.casefold().startswith(own.casefold().rstrip("/") + "/")
+            for own in {profile, os.path.realpath(profile)}
+        ):
+            return "windows-system"
     return "ok"
+
+
+def _under_mount(path: str) -> str | None:
+    """*path* relative to the drive mount root, or ``None`` when it is elsewhere.
+
+    The root is tried as configured and resolved, so a path already passed
+    through ``realpath`` is judged by the same rule as the one typed.
+    """
+    root = automount_root()
+    for candidate in dict.fromkeys((root, os.path.realpath(root).rstrip("/") + "/")):
+        if path.startswith(candidate):
+            return path[len(candidate) :]
+    return None
 
 
 def browse_root() -> str | None:

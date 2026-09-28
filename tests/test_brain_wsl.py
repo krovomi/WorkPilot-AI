@@ -162,10 +162,25 @@ def test_a_linux_folder_outside_home_stays_refused(home, under_wsl):
     assert api._home_path("/etc/brain") == (None, "outside-home")
 
 
-def test_users_is_judged_without_a_known_profile(home, under_wsl, monkeypatch):
+def test_users_is_refused_without_a_known_profile(home, under_wsl, monkeypatch):
     monkeypatch.setattr(wsl, "windows_home", lambda: None)
-    assert api._home_path("C:\\Users\\Anyone\\Vault")[1] is None
-    assert api._home_path("C:\\Users\\Default\\Vault")[1] == "windows-system"
+    assert api._home_path("C:\\Users\\Anyone\\Vault") == (None, "windows-system")
+    assert api._home_path("C:\\Repository\\Vault")[1] is None
+
+
+def test_a_link_to_a_system_folder_is_refused(home, under_wsl):
+    repo = under_wsl / "c" / "Repository"
+    repo.mkdir()
+    (repo / "vault").symlink_to(under_wsl / "c" / "Windows")
+    assert api._home_path(str(repo / "vault")) == (None, "windows-system")
+    assert api._home_path("C:\\Repository\\vault\\Sub") == (None, "windows-system")
+
+
+def test_a_link_out_of_the_home_is_refused(home, under_wsl, tmp_path):
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (home / "vault").symlink_to(outside)
+    assert api._home_path(str(home / "vault")) == (None, "outside-home")
 
 
 def test_the_picker_opens_on_the_profile_then_drive_c(under_wsl, monkeypatch):
