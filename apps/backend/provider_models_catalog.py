@@ -668,6 +668,10 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
         }
     """
     provider = (provider or "").strip().lower()
+    if provider == "openai-codex":
+        from codex_models import codex_model_catalog
+
+        return codex_model_catalog()
     provider = {
         "claude": "anthropic",
         "gemini": "google",

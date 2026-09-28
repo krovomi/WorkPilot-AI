@@ -29,6 +29,23 @@ import { TaskPauseControls } from "./TaskPauseControls";
 
 const fakeStoreState = { settings: {}, profiles: [] };
 
+it("replaces a stale Claude model when the task provider is OpenAI", async () => {
+	const resume = vi.fn().mockResolvedValue({ success: true });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+	const task = {
+		id: "stale-provider",
+		metadata: { provider: "openai", model: "opus" },
+	} as Task;
+	renderControls({ task, isPaused: true, isRunning: false });
+	const button = screen.getByRole("button", { name: /resume with this llm/i });
+	await waitFor(() => expect(button).toBeEnabled());
+	fireEvent.click(button);
+	await waitFor(() => expect(resume).toHaveBeenCalled());
+	expect(resume.mock.calls[0][1]).toBe("openai");
+	expect(resume.mock.calls[0][2]).toMatch(/^gpt-/);
+});
+
 function makeTask(): Task {
 	return {
 		id: "task-1",
@@ -79,8 +96,11 @@ describe("TaskPauseControls", () => {
 
 vi.mock("../../../shared/utils/providers", () => ({
 	getStaticProviders: async () => ({
-		providers: [{ name: "ollama", label: "Ollama" }],
-		status: { ollama: true },
+		providers: [
+			{ name: "ollama", label: "Ollama" },
+			{ name: "openai", label: "OpenAI" },
+		],
+		status: { ollama: true, openai: true },
 	}),
 }));
 afterEach(() => vi.unstubAllGlobals());

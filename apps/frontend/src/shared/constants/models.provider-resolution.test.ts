@@ -24,6 +24,18 @@ describe("getModelTier", () => {
 });
 
 describe("resolveModelForProviderCatalog", () => {
+	it("never introduces an API-only model into a restricted Codex catalog", () => {
+		const catalog = [{ value: "gpt-5.5", tier: "flagship" as const }];
+		expect(resolveModelForProviderCatalog("sonnet", catalog, "openai")).toBe(
+			"gpt-5.5",
+		);
+		expect(resolveModelForProviderCatalog("gpt-5.5", catalog, "openai")).toBe(
+			"gpt-5.5",
+		);
+		expect(
+			resolveModelForProviderCatalog("gpt-5.5-mini", catalog, "openai"),
+		).toBe("gpt-5.5");
+	});
 	const openai = getModelsForProvider("openai");
 	const anthropic = getModelsForProvider("anthropic");
 
