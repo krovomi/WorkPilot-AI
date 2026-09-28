@@ -765,13 +765,22 @@ export function registerSettingsHandlers(
 
 	ipcMain.handle(
 		IPC_CHANNELS.DIALOG_SELECT_DIRECTORY,
-		async (): Promise<string | null> => {
+		async (
+			_,
+			options?: { title?: string; defaultPath?: string },
+		): Promise<string | null> => {
 			const mainWindow = getMainWindow();
 			if (!mainWindow) return null;
 
 			const result = await dialog.showOpenDialog(mainWindow, {
 				properties: ["openDirectory"],
-				title: "Select Project Directory",
+				title:
+					typeof options?.title === "string" && options.title
+						? options.title
+						: "Select Project Directory",
+				...(typeof options?.defaultPath === "string" && options.defaultPath
+					? { defaultPath: options.defaultPath }
+					: {}),
 			});
 
 			if (result.canceled || result.filePaths.length === 0) {

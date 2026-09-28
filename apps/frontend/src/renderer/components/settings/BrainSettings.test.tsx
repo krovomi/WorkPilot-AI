@@ -132,7 +132,39 @@ it("says a Windows path is accepted when the backend runs under WSL", async () =
 	});
 	render(<BrainSettings />);
 	expect(await screen.findByTestId("brain-wsl-hint")).toHaveTextContent(
-		/Windows path is accepted.*\/home\/me · \/mnt\/c\/Users\/Me/,
+		/folder on a Windows drive is accepted/,
+	);
+});
+
+it("opens the folder picker on the Windows drive under WSL", async () => {
+	mockFetchSettings.mockResolvedValue({
+		ok: true,
+		data: {
+			settings: { ...base, wsl: true, browseRoot: "/mnt/c/Users/Me" },
+		},
+	});
+	render(<BrainSettings />);
+	fireEvent.click(await screen.findByRole("button", { name: /Browse/ }));
+	await waitFor(() =>
+		expect(window.electronAPI.selectDirectory).toHaveBeenCalledWith(
+			expect.objectContaining({ defaultPath: "/mnt/c/Users/Me" }),
+		),
+	);
+});
+
+it("explains a refused Windows system folder", async () => {
+	mockFetchSettings.mockResolvedValue({
+		ok: true,
+		data: { settings: { ...base, wsl: true } },
+	});
+	mockSaveSettings.mockResolvedValue({ ok: false, error: "windows-system" });
+	render(<BrainSettings />);
+	fireEvent.change(await screen.findByLabelText("Brain folder (Obsidian vault)"), {
+		target: { value: "C:\\Windows\\Vault" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: /Save and connect/ }));
+	expect(await screen.findByRole("alert")).toHaveTextContent(
+		/This Windows folder is refused/,
 	);
 });
 
