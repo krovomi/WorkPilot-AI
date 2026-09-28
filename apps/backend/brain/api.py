@@ -138,17 +138,23 @@ def _home_path(raw: str) -> tuple[Path | None, str | None]:
     full = os.path.normpath(
         os.path.abspath(os.path.expanduser(to_wsl_path(raw.strip())))
     )
+    real_full = os.path.realpath(full)
     roots = home_roots()
     # Judged as typed and as resolved: a link under an accepted folder must not
     # lead to ``C:\\Windows`` or ``/etc``.
     code = _placement_refusal(full, roots) or _placement_refusal(
-        os.path.realpath(full), [os.path.realpath(root) for root in roots]
+        real_full, [os.path.realpath(root) for root in roots]
     )
     if code:
         return None, code
-    if os.path.isfile(full):
-        return None, "is-file"
-    return Path(full), None
+
+    target = Path(full)
+    try:
+        if target.is_file() or (target.is_symlink() and target.resolve().is_file()):
+            return None, "is-file"
+    except OSError:
+        return None, "outside-home"
+    return target, None
 
 
 def _checked_remote(value: str | None) -> tuple[str | None, str | None]:
