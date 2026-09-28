@@ -5,6 +5,7 @@
  * generated from the backend registry and are only an offline fallback.
  */
 import { useCallback, useSyncExternalStore } from "react";
+import { useSettingsStore } from "../stores/settings-store";
 import {
 	dedupeModelCatalog,
 	getModelsForProvider,
@@ -85,6 +86,18 @@ function prepareModels(
 	live: readonly CatalogModel[],
 	source: CatalogSource,
 ): CatalogModel[] {
+	if (provider === "openai-codex") {
+		return live.length
+			? [...live]
+			: [
+					{
+						value: "gpt-5.5",
+						label: "GPT-5.5",
+						tier: "flagship",
+						supportsThinking: true,
+					},
+				];
+	}
 	const fallback = getModelsForProvider(provider);
 	const merged = dedupeModelCatalog<CatalogModel>([...live, ...fallback]);
 	if (provider === "anthropic") return sortClaudeCatalog(merged);
@@ -106,7 +119,9 @@ function stateFor(provider: string): CatalogState {
 				source: "static",
 				fetchedAt: null,
 				error: null,
-				loading: false,
+				// Do not migrate a saved Codex choice against the offline fallback
+				// before its account inventory has been read for the first time.
+				loading: provider === "openai-codex",
 			},
 			listeners: new Set(),
 			checkedAt: 0,
@@ -212,7 +227,8 @@ function subscribe(provider: string, listener: () => void) {
 export function useProviderModelCatalog(
 	provider: string,
 ): ProviderModelCatalog {
-	const key = normalize(provider.trim().toLowerCase());
+	const authMode = useSettingsStore((s) => s.settings.globalOpenAIAuthMode);
+	const key = catalogKey(provider, authMode);
 	const snapshot = useSyncExternalStore(
 		useCallback((listener) => subscribe(key, listener), [key]),
 		useCallback(() => stateFor(key).snapshot, [key]),
@@ -236,15 +252,26 @@ export async function fetchProviderModelCatalog(
 	provider: string,
 	force = false,
 ): Promise<Omit<ProviderModelCatalog, "refresh">> {
-	const key = normalize(provider.trim().toLowerCase());
+	const key = catalogKey(
+		provider,
+		useSettingsStore.getState().settings.globalOpenAIAuthMode,
+	);
 	await load(key, force);
 	return stateFor(key).snapshot;
 }
 
 /** Invalidate after a provider configuration or local inventory changes. */
 export function refreshProviderModelCatalog(provider: string): void {
-	const key = normalize(provider.trim().toLowerCase());
+	const key = catalogKey(
+		provider,
+		useSettingsStore.getState().settings.globalOpenAIAuthMode,
+	);
 	const state = stateFor(key);
 	state.checkedAt = 0;
 	if (state.listeners.size) void load(key, true);
+}
+
+function catalogKey(provider: string, authMode: string | undefined): string {
+	const key = normalize(provider.trim().toLowerCase());
+	return key === "openai" && authMode === "codex-cli" ? "openai-codex" : key;
 }

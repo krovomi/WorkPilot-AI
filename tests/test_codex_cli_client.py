@@ -143,6 +143,24 @@ def test_resume_targets_exact_thread_id(tmp_path: Path) -> None:
     ]
 
 
+def test_resume_applies_selected_model_and_effort(tmp_path: Path) -> None:
+    args = build_codex_exec_args(
+        executable="codex",
+        project_dir=tmp_path,
+        model="gpt-5.5",
+        reasoning_effort="high",
+        prompt="continue",
+        thread_id="thread-123",
+    )
+    assert args[args.index("--model") + 1] == "gpt-5.5"
+    assert 'model_reasoning_effort="high"' in args
+
+
+def test_client_repairs_legacy_mini(tmp_path: Path) -> None:
+    client = CodexCliAgentClient(model="gpt-5.5-mini", project_dir=str(tmp_path))
+    assert client.model == "gpt-5.5"
+
+
 @pytest.mark.asyncio
 async def test_stream_translates_final_message_usage_and_thread(tmp_path: Path) -> None:
     process = _FakeProcess(

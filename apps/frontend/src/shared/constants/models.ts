@@ -369,14 +369,20 @@ export function resolveModelForProviderCatalog(
 	if (!value) return value;
 	const valid = new Set(liveCatalog.map((m) => m.value));
 	if (valid.has(value)) return value;
+	// Older profiles mapped GPT-5.5 tasks to this API-only tier fallback.
+	if (provider === "openai" && value === "gpt-5.5-mini" && valid.has("gpt-5.5"))
+		return "gpt-5.5";
 	const canonical = resolveCatalogModelValue(value, liveCatalog);
 	if (valid.has(canonical)) return canonical;
 
 	// Not offered by this provider → map to an equivalent-tier model.
-	const staticCatalog = getModelsForProvider(provider);
+	const staticCatalog = getModelsForProvider(provider).filter((m) =>
+		valid.has(m.value),
+	);
 	const tier = getModelTier(value);
 	const sameTier = tier
-		? staticCatalog.find((m) => m.tier === tier)?.value
+		? (liveCatalog.find((m) => m.tier === tier)?.value ??
+			staticCatalog.find((m) => m.tier === tier)?.value)
 		: undefined;
 	const flagship =
 		liveCatalog.find((m) => m.tier === "flagship")?.value ??
