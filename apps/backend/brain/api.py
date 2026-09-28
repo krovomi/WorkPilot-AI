@@ -329,7 +329,7 @@ def _save_settings(request: SettingsRequest) -> dict:
             code = _clone_error(str(result["error"]))
             detail = _git_detail(str(result["error"]))
             logger.warning("brain: clone failed (%s): %s", code, detail)
-            return {**_refusal(code), "detail": detail}
+            return _refusal(code)
         summary = {
             "cloned": result.get("cloned") is True,
             "adopted": result.get("adopted") is True,
