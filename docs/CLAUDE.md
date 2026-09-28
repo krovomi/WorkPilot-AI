@@ -1071,11 +1071,17 @@ de laisser derrière lui un cerveau vide.
 **Deux garde-fous, parce que l'API locale est joignable depuis un navigateur.**
 Le dossier choisi reste sous le répertoire personnel : un endpoint qui crée un
 dépôt git là où on le lui dit écrit dans `/etc` pour qui le demande. Sous
-WSL, « le répertoire personnel » est aussi le profil Windows (`brain/wsl.py`) :
-le backend est un processus Linux, le vault de l'Obsidian Windows vit sous
-`C:\Users\<nom>`, et `C:\…` comme `\\wsl$\<distro>\…` sont lus comme le chemin
-que ce processus ouvre (`/mnt/c/…`, racine d'`/etc/wsl.conf`). Le reste du
-lecteur reste refusé — `C:\Windows` est précisément l'endroit visé. Et un
+WSL, le backend est un processus Linux et le vault de l'Obsidian Windows vit sur
+`C:` — sous le profil ou ailleurs, `C:\Repository\…` compris. `brain/wsl.py` lit
+`C:\…` comme `\\wsl$\<distro>\…` comme le chemin que ce processus ouvre
+(`/mnt/c/…`, racine d'`/etc/wsl.conf`) et accepte un dossier d'un lecteur
+Windows, sauf sa racine, les dossiers système (`Windows`, `Program Files`,
+`ProgramData`…) et `Users` hors du profil de la personne — tout `Users` quand
+le profil est inconnu (`windows-system`) : ceux-là sont précisément les endroits
+visés. Le chemin est jugé tel que saisi **et** résolu, pour qu'un lien
+symbolique ne mène pas à `C:\Windows` ni à `/etc`. Le sélecteur s'ouvre sur le profil
+(`browseRoot`), faute de quoi une boîte GTK lancée depuis WSL ne montre aucun
+lecteur Windows. Et un
 distant est un distant (`sync.normalize_remote`) : `utilisateur/dépôt` pour
 GitHub, sinon https, ssh, `git@hôte:`, file ou un chemin. Une valeur qui commence
 par `-` est une option pour `git clone` (`--upload-pack=…` lance un programme) et

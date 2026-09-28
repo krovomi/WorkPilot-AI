@@ -122,10 +122,77 @@ def test_the_drive_is_case_insensitive(home, under_wsl):
 
 @pytest.mark.parametrize(
     "raw",
-    ["C:\\Windows\\System32", "C:\\Users\\Thomas", "C:\\Users\\Other\\Vault", "C:\\"],
+    [
+        "C:\\Repository\\Perso\\WorkPilot-AI-Vault",
+        "c:/repository/perso/vault",
+        "D:\\Notes\\Vault",
+    ],
 )
-def test_the_rest_of_the_drive_stays_refused(home, under_wsl, raw):
-    assert api._home_path(raw) == (None, "outside-home")
+def test_a_folder_outside_the_profile_is_accepted(home, under_wsl, raw):
+    target, code = api._home_path(raw)
+    assert code is None and target is not None
+
+
+def test_the_mounted_spelling_of_such_a_folder_is_accepted(home, under_wsl):
+    raw = str(under_wsl / "c" / "Repository" / "Perso" / "WorkPilot-AI-Vault")
+    target, code = api._home_path(raw)
+    assert code is None and str(target) == raw
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "C:\\",
+        "D:",
+        "C:\\Windows\\System32",
+        "C:\\windows\\Vault",
+        "C:\\Program Files\\Vault",
+        "C:\\ProgramData\\Vault",
+        "C:\\Users",
+        "C:\\Users\\Thomas",
+        "C:\\Users\\Public\\Vault",
+        "C:\\Users\\Other\\Vault",
+    ],
+)
+def test_system_folders_and_other_profiles_stay_refused(home, under_wsl, raw):
+    assert api._home_path(raw) == (None, "windows-system")
+
+
+def test_a_linux_folder_outside_home_stays_refused(home, under_wsl):
+    assert api._home_path("/etc/brain") == (None, "outside-home")
+
+
+def test_users_is_refused_without_a_known_profile(home, under_wsl, monkeypatch):
+    monkeypatch.setattr(wsl, "windows_home", lambda: None)
+    assert api._home_path("C:\\Users\\Anyone\\Vault") == (None, "windows-system")
+    assert api._home_path("C:\\Repository\\Vault")[1] is None
+
+
+def test_a_link_to_a_system_folder_is_refused(home, under_wsl):
+    repo = under_wsl / "c" / "Repository"
+    repo.mkdir()
+    (repo / "vault").symlink_to(under_wsl / "c" / "Windows")
+    assert api._home_path(str(repo / "vault")) == (None, "windows-system")
+    assert api._home_path("C:\\Repository\\vault\\Sub") == (None, "windows-system")
+
+
+def test_a_link_out_of_the_home_is_refused(home, under_wsl, tmp_path):
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (home / "vault").symlink_to(outside)
+    assert api._home_path(str(home / "vault")) == (None, "outside-home")
+
+
+def test_the_picker_opens_on_the_profile_then_drive_c(under_wsl, monkeypatch):
+    assert wsl.browse_root() == str(under_wsl / "c" / "Users" / "Thomas")
+    monkeypatch.setattr(wsl, "windows_home", lambda: None)
+    assert wsl.browse_root() == str(under_wsl / "c")
+
+
+def test_no_drive_verdict_outside_wsl(monkeypatch):
+    monkeypatch.setattr(wsl, "is_wsl", lambda: False)
+    assert wsl.windows_folder_verdict("/mnt/c/Windows") is None
+    assert wsl.browse_root() is None
 
 
 def test_the_linux_home_still_works(home, under_wsl):
@@ -161,9 +228,10 @@ def test_the_api_plugs_a_windows_folder_and_says_it_runs_under_wsl(home, under_w
     )
     assert settings["wsl"] is True
     assert str(under_wsl / "c" / "Users" / "Thomas") in settings["homeRoots"]
+    assert settings["browseRoot"] == str(under_wsl / "c" / "Users" / "Thomas")
 
     refused = client.post(
         "/api/brain/settings", json={"path": "C:\\Windows\\Temp", "connect": False}
     ).json()
-    assert refused["code"] == "outside-home"
+    assert refused["code"] == "windows-system"
     assert not os.path.exists(under_wsl / "c" / "Windows" / "Temp")

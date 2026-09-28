@@ -33,6 +33,7 @@ import { Switch } from "../ui/switch";
 /** The backend answers with a code; the sentence is the UI's to write. */
 const ERROR_KEYS: Record<string, string> = {
 	"outside-home": "brain:settings.errors.outsideHome",
+	"windows-system": "brain:settings.errors.windowsSystem",
 	"is-file": "brain:settings.errors.isFile",
 	"invalid-remote": "brain:settings.errors.invalidRemote",
 	"env-locked": "brain:settings.errors.envLocked",
@@ -110,7 +111,13 @@ export function BrainSettings() {
 	const remoteChanged = remote.trim() !== (settings.remote ?? "");
 
 	const browse = async () => {
-		const picked = await globalThis.electronAPI.selectDirectory();
+		// Under WSL the dialog opens on the Linux home, which lists no Windows
+		// drive: start where a Windows vault lives unless a folder is chosen.
+		const start = settings.folderExists ? settings.path : settings.browseRoot;
+		const picked = await globalThis.electronAPI.selectDirectory({
+			title: t("brain:settings.browseTitle"),
+			...(start ? { defaultPath: start } : {}),
+		});
 		if (picked) setPath(picked);
 	};
 
@@ -186,9 +193,7 @@ export function BrainSettings() {
 				</p>
 				{settings.wsl && !envLocked && (
 					<p className="text-xs text-muted-foreground" data-testid="brain-wsl-hint">
-						{t("brain:settings.wslHint", {
-							roots: (settings.homeRoots ?? []).join(" · "),
-						})}
+						{t("brain:settings.wslHint")}
 					</p>
 				)}
 			</div>

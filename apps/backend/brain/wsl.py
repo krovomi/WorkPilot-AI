@@ -14,11 +14,16 @@ at ``C:\\Users\\<name>\\…`` — which that process reaches as
 
 This module answers both, and only under WSL: a Windows spelling is converted
 to the path this process can open (the same answer ``wslpath -u`` gives, from
-``/etc/wsl.conf``'s automount root, without a subprocess), and the Windows
-user profile counts as a home directory — it *is* the same person's home, on
-the same machine. Nothing else under ``/mnt`` does: the rule exists so that a
-page open in a browser cannot have the backend create a git repository
-wherever it names, and ``/mnt/c/Windows`` is exactly such a place.
+``/etc/wsl.conf``'s automount root, without a subprocess), and a folder of a
+mounted Windows drive is the person's own (`windows_folder_verdict`).
+
+Not only the profile: a vault kept at ``C:\\Repository\\Perso\\Vault`` is as
+much the person's as one under ``C:\\Users\\<name>``, and on Windows that is
+where people keep repositories. What stays refused is what the rule exists
+for — a page open in a browser having the backend create a git repository
+wherever it names: the drive's root, the system folders (``Windows``,
+``Program Files``, ``ProgramData``…), and ``Users`` outside a user's own
+folder.
 """
 
 from __future__ import annotations
@@ -36,6 +41,8 @@ __all__ = [
     "to_wsl_path",
     "windows_home",
     "home_roots",
+    "windows_folder_verdict",
+    "browse_root",
 ]
 
 _DRIVE = re.compile(r"^(?P<drive>[A-Za-z]):(?:[\\/](?P<rest>.*))?$")
@@ -153,3 +160,99 @@ def home_roots() -> list[str]:
     if extra and extra not in roots:
         roots.append(extra)
     return roots
+
+
+_SYSTEM_FOLDERS = frozenset(
+    name.casefold()
+    for name in (
+        "Windows",
+        "Program Files",
+        "Program Files (x86)",
+        "ProgramData",
+        "$Recycle.Bin",
+        "$WinREAgent",
+        "$Windows.~BT",
+        "$Windows.~WS",
+        "System Volume Information",
+        "Recovery",
+        "Boot",
+        "PerfLogs",
+        "Config.Msi",
+        "MSOCache",
+        "Documents and Settings",
+    )
+)
+"""Top-level folders of a drive that belong to Windows, not to the person."""
+
+_SHARED_PROFILES = frozenset(
+    name.casefold() for name in ("Default", "Default User", "All Users", "Public")
+)
+"""Folders of ``Users`` that are nobody's own profile."""
+
+_MOUNTED = re.compile(r"^(?P<drive>[a-z])(?:/(?P<rest>.*))?$", re.I)
+
+
+def windows_folder_verdict(path: str) -> str | None:
+    """Whether *path*, already absolute, is a folder of a Windows drive a person owns.
+
+    ``None`` when *path* is not on a mounted Windows drive (or this is not
+    WSL): the caller's own rule applies. Otherwise ``"ok"``, or the reason it
+    is refused: ``"drive-root"`` for ``C:\\`` itself, ``"windows-system"`` for
+    a system folder or ``Users`` outside one person's own folder (the profile
+    itself included, for the reason the Linux home is refused: a brain whose
+    notes are every Markdown file a person owns is chosen by nobody).
+    """
+    if not is_wsl():
+        return None
+    rest = _under_mount(path)
+    if rest is None:
+        return None
+    match = _MOUNTED.match(rest)
+    if not match:
+        return None
+    parts = [part for part in (match.group("rest") or "").split("/") if part]
+    if not parts:
+        return "drive-root"
+    top = parts[0].casefold()
+    if top in _SYSTEM_FOLDERS:
+        return "windows-system"
+    if top == "users":
+        if len(parts) < 3 or parts[1].casefold() in _SHARED_PROFILES:
+            return "windows-system"
+        # Only the person's own profile, and only when the machine says whose
+        # it is: without that answer, ``Users\\<anyone>`` would be accepted.
+        profile = windows_home()
+        if not profile or not any(
+            path.casefold().startswith(own.casefold().rstrip("/") + "/")
+            for own in {profile, os.path.realpath(profile)}
+        ):
+            return "windows-system"
+    return "ok"
+
+
+def _under_mount(path: str) -> str | None:
+    """*path* relative to the drive mount root, or ``None`` when it is elsewhere.
+
+    The root is tried as configured and resolved, so a path already passed
+    through ``realpath`` is judged by the same rule as the one typed.
+    """
+    root = automount_root()
+    for candidate in dict.fromkeys((root, os.path.realpath(root).rstrip("/") + "/")):
+        if path.startswith(candidate):
+            return path[len(candidate) :]
+    return None
+
+
+def browse_root() -> str | None:
+    """Where a folder picker should open under WSL: the profile, else drive C.
+
+    A GTK dialog started from WSL opens on the Linux home and lists no Windows
+    drive, so a vault kept on ``C:`` looks unreachable from it.
+    """
+    if not is_wsl():
+        return None
+    profile = windows_home()
+    if profile:
+        return profile
+    drive = automount_root() + "c"
+    return drive if os.path.isdir(drive) else None

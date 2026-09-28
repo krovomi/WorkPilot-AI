@@ -1344,6 +1344,8 @@ export interface BrainSettings {
 	readonly wsl?: boolean;
 	/** The folders a brain may live under (the Windows profile too, under WSL). */
 	readonly homeRoots?: readonly string[];
+	/** Where the folder picker opens under WSL: the Windows profile, else drive C. */
+	readonly browseRoot?: string | null;
 }
 
 export interface BrainSettingsUpdate {
