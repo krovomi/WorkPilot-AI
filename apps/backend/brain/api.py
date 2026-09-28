@@ -42,7 +42,14 @@ from .memories import discover
 from .notes import iter_notes
 from .sync import git_available, normalize_remote, remote_url
 from .vault import Brain
-from .wsl import automount_root, home_roots, is_wsl, to_wsl_path
+from .wsl import (
+    automount_root,
+    browse_root,
+    home_roots,
+    is_wsl,
+    to_wsl_path,
+    windows_folder_verdict,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,14 +119,20 @@ def _home_path(raw: str) -> tuple[Path | None, str | None]:
     brain whose notes are every Markdown file a person owns is not a choice
     anyone makes on purpose.
 
-    Under WSL, a Windows spelling (``C:\\Users\\…``) is converted to the path
-    this process opens (``/mnt/c/Users/…``), and the Windows profile counts as
-    a home directory too (`brain.wsl`).
+    Under WSL, a Windows spelling (``C:\\Repository\\…``) is converted to the
+    path this process opens (``/mnt/c/Repository/…``), and a folder of a
+    Windows drive is accepted unless it is the drive's root or a system folder
+    (`brain.wsl.windows_folder_verdict`).
     """
     full = os.path.normpath(
         os.path.abspath(os.path.expanduser(to_wsl_path(raw.strip())))
     )
-    if not any(_strictly_under(full, home) for home in home_roots()):
+    verdict = windows_folder_verdict(full)
+    if verdict is not None and verdict != "ok":
+        return None, "windows-system"
+    if verdict is None and not any(
+        _strictly_under(full, home) for home in home_roots()
+    ):
         return None, "outside-home"
     if os.path.isfile(full):
         return None, "is-file"
@@ -243,6 +256,7 @@ def settings_view() -> dict:
         "proposals": len(brain.proposals()) if exists else 0,
         "wsl": is_wsl(),
         "homeRoots": home_roots(),
+        "browseRoot": browse_root(),
     }
 
 

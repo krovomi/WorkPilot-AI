@@ -118,7 +118,11 @@ export interface ProjectAPI {
 	) => Promise<IPCResult<ClaudeAuthResult>>;
 
 	// Dialog Operations
-	selectDirectory: () => Promise<string | null>;
+	/** `defaultPath` is where the dialog opens — under WSL, a Windows drive the Linux home does not list. */
+	selectDirectory: (options?: {
+		title?: string;
+		defaultPath?: string;
+	}) => Promise<string | null>;
 	selectFiles: (options?: {
 		title?: string;
 		defaultPath?: string;
@@ -440,8 +444,13 @@ export const createProjectAPI = (): ProjectAPI => ({
 		ipcRenderer.invoke(IPC_CHANNELS.ENV_INVOKE_CLAUDE_SETUP, projectId),
 
 	// Dialog Operations
-	selectDirectory: (): Promise<string | null> =>
-		ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY),
+	selectDirectory: (options?: {
+		title?: string;
+		defaultPath?: string;
+	}): Promise<string | null> =>
+		options
+			? ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY, options)
+			: ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY),
 
 	selectFiles: (options?: {
 		title?: string;
