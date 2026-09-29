@@ -154,6 +154,7 @@ def test_resume_applies_selected_model_and_effort(tmp_path: Path) -> None:
     )
     assert args[args.index("--model") + 1] == "gpt-5.5"
     assert 'model_reasoning_effort="high"' in args
+    assert args[-1] == "-"
 
 
 def test_client_repairs_legacy_mini(tmp_path: Path) -> None:

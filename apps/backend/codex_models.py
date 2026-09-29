@@ -39,7 +39,9 @@ def codex_model_catalog() -> dict[str, Any]:
                 }
             )
     except (OSError, ValueError, AttributeError, TypeError):
-        pass
+        # The CLI cache is optional and can be partially written during refresh.
+        # Discard partial results and use the conservative fallback below.
+        models = []
     return {
         "provider": "openai-codex",
         "models": models

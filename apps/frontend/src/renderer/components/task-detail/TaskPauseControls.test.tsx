@@ -9,7 +9,13 @@
  * étapes non démarrées se configurent via les sélecteurs LLM de chaque phase).
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+	act,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom";
 import "../../../shared/i18n";
@@ -103,7 +109,10 @@ vi.mock("../../../shared/utils/providers", () => ({
 		status: { ollama: true, openai: true },
 	}),
 }));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	vi.useRealTimers();
+});
 it("keeps the downloaded phase model and sends its exact ID when resuming", async () => {
 	const model = "gemma4:12b-it-q4_K_M";
 	vi.stubGlobal(
@@ -139,6 +148,7 @@ it("keeps the downloaded phase model and sends its exact ID when resuming", asyn
 });
 
 it("names the paused task and takes its model from the official library", async () => {
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 	const resume = vi.fn().mockResolvedValue({ success: true });
 	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
 	vi.stubGlobal(
@@ -171,7 +181,13 @@ it("names the paused task and takes its model from the official library", async 
 	// Nothing is typed: the id can only come from the library listing.
 	expect(screen.queryByRole("textbox", { name: "Model ID" })).toBeNull();
 
-	const option = await screen.findByRole("option", { name: "gemma4:12b" });
+	// Flush provider loading before advancing the library search debounce.
+	await act(async () => {});
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(250);
+	});
+	vi.useRealTimers();
+	const option = screen.getByRole("option", { name: "gemma4:12b" });
 	fireEvent.click(option);
 
 	await waitFor(() => expect(button).toBeEnabled());

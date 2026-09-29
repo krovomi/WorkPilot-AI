@@ -24,6 +24,25 @@ describe("getModelTier", () => {
 });
 
 describe("resolveModelForProviderCatalog", () => {
+	it("uses the static provider tier when discovery returns no models", () => {
+		expect(
+			getModelTier(resolveModelForProviderCatalog("sonnet", [], "openai")),
+		).toBe("standard");
+	});
+	it("preserves a custom model when neither catalog is known", () => {
+		expect(
+			resolveModelForProviderCatalog("my-model", [], "private-server"),
+		).toBe("my-model");
+	});
+	it("returns the first restricted model when no capability tier matches", () => {
+		expect(
+			resolveModelForProviderCatalog(
+				"sonnet",
+				[{ value: "account-model" }],
+				"openai",
+			),
+		).toBe("account-model");
+	});
 	it("never introduces an API-only model into a restricted Codex catalog", () => {
 		const catalog = [{ value: "gpt-5.5", tier: "flagship" as const }];
 		expect(resolveModelForProviderCatalog("sonnet", catalog, "openai")).toBe(

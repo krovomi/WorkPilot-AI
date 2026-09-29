@@ -367,6 +367,12 @@ export function resolveModelForProviderCatalog(
 	provider: string,
 ): string {
 	if (!value) return value;
+	if (!liveCatalog.length) {
+		const fallback = getModelsForProvider(provider);
+		return fallback.length
+			? resolveModelForProviderCatalog(value, fallback, provider)
+			: value;
+	}
 	const valid = new Set(liveCatalog.map((m) => m.value));
 	if (valid.has(value)) return value;
 	// Older profiles mapped GPT-5.5 tasks to this API-only tier fallback.
