@@ -51,11 +51,22 @@ if (staged.length === 0) {
 
 function run(name, cmd, args, cwd, env) {
 	console.log(`[staged-tests] ${name}: ${cmd} ${args.join(" ")}`);
+	const testEnv = { ...process.env, ...(env || {}) };
+	// Git exports these while running hooks. Tests create their own temporary
+	// repositories: inheriting the hook's index/worktree would make their
+	// commits mutate the real checkout instead of those fixtures.
+	for (const key of [
+		"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+		"GIT_PREFIX", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+		"GIT_IMPLICIT_WORK_TREE",
+	]) {
+		delete testEnv[key];
+	}
 	const res = spawnSync(cmd, args, {
 		cwd,
 		stdio: "inherit",
 		shell: IS_WINDOWS,
-		env: { ...process.env, ...(env || {}) },
+		env: testEnv,
 	});
 	return res.status === 0;
 }

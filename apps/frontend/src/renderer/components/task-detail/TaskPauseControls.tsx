@@ -6,7 +6,11 @@ import {
 import { Info, Loader2, Pause, Play, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { THINKING_LEVELS } from "../../../shared/constants/models";
+import {
+	THINKING_LEVELS,
+	resolveModelForProviderCatalog,
+	getModelTier,
+} from "../../../shared/constants/models";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import type { Task } from "../../../shared/types";
 import type { ThinkingLevel } from "../../../shared/types/settings";
@@ -83,7 +87,6 @@ export function TaskPauseControls({
 	// is a row in the catalogue, and forwarding it asks the server to pull an
 	// image literally called "custom".
 	const [searchingModel, setSearchingModel] = useState(false);
-	const resumeModel = selectedModel.trim();
 	// A task already saved with the sentinel opens the search on its own: the
 	// row is already the Select's value, so re-picking it fires no change and
 	// there would be no way out of the state the old free-text field left
@@ -144,9 +147,24 @@ export function TaskPauseControls({
 
 	const { models, loading: catalogLoading } =
 		useProviderModelCatalog(selectedProvider);
+	// Keep custom/local IDs, but never inject a known foreign model into this
+	// provider's picker. Codex's account inventory is authoritative.
+	const resumeModel =
+		selectedModel &&
+		!isCustomModelSentinel(selectedModel) &&
+		!isLocalProvider(selectedProvider) &&
+		(getModelTier(selectedModel) ||
+			(selectedProvider === "openai" &&
+				settings.globalOpenAIAuthMode === "codex-cli"))
+			? resolveModelForProviderCatalog(
+					selectedModel.trim(),
+					models,
+					selectedProvider,
+				)
+			: selectedModel.trim();
 	const { options: modelOptions, value: modelValue } = buildModelSelectOptions(
 		models,
-		selectedModel,
+		resumeModel,
 		{},
 		isLocalProvider(selectedProvider),
 	);

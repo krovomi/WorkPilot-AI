@@ -1,9 +1,34 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useProviderModelCatalog } from "./useProviderModelCatalog";
+import { useSettingsStore } from "../stores/settings-store";
 afterEach(() => {
+	useSettingsStore.setState((state) => ({
+		settings: { ...state.settings, globalOpenAIAuthMode: "api-key" },
+	}));
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
+});
+
+it("uses the Codex account inventory without merging OpenAI API models", async () => {
+	useSettingsStore.setState((state) => ({
+		settings: { ...state.settings, globalOpenAIAuthMode: "codex-cli" },
+	}));
+	const fetchMock = vi.fn().mockResolvedValue({
+		ok: true,
+		headers: new Headers({ "content-type": "application/json" }),
+		json: async () => ({
+			source: "cache",
+			models: [{ value: "gpt-5.5", label: "GPT-5.5" }],
+		}),
+	});
+	vi.stubGlobal("fetch", fetchMock);
+	const { result } = renderHook(() => useProviderModelCatalog("openai"));
+	await waitFor(() => expect(result.current.source).toBe("cache"));
+	expect(fetchMock.mock.calls[0][0]).toContain(
+		"/providers/models/openai-codex/catalog",
+	);
+	expect(result.current.models.map((m) => m.value)).toEqual(["gpt-5.5"]);
 });
 it("does not retain previous-provider live models while the new catalog loads", async () => {
 	const fetchMock = vi

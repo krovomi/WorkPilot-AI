@@ -15,6 +15,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+from codex_models import resolve_codex_model
 from core.agent_client import (
     AgentClient,
     AgentMessage,
@@ -67,22 +68,21 @@ def build_codex_exec_args(
     del project_dir, prompt
 
     if thread_id:
-        return [
+        args = [
             executable,
             "exec",
             "resume",
             _validated_option(thread_id, "thread id"),
             "--json",
-            "-",
         ]
-
-    args = [
-        executable,
-        "exec",
-        "--json",
-        "--sandbox",
-        "workspace-write",
-    ]
+    else:
+        args = [
+            executable,
+            "exec",
+            "--json",
+            "--sandbox",
+            "workspace-write",
+        ]
     if model:
         args.extend(["--model", _validated_option(model, "model")])
     if reasoning_effort:
@@ -157,7 +157,7 @@ class CodexCliAgentClient(AgentClient):
         executable: str | None = None,
         process_factory: _ProcessFactory | None = None,
     ) -> None:
-        self.model = model or "default"
+        self.model = resolve_codex_model(model) or "default"
         self.system_prompt = system_prompt
         self._project_dir = str(Path(project_dir))
         self._agent_type = agent_type
