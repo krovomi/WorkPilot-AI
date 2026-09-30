@@ -1395,6 +1395,17 @@ not expose is inert, a missing entry for the one it does expose is silent failur
 
 ### New models without a pull request
 
+ChatGPT-authenticated Codex is separate from the OpenAI API registry.
+`codex_models.py` queries `codex app-server` through `core/codex_catalog_rpc.py`
+using the backend's PATH and CODEX_HOME, then caches discovery for 15 minutes.
+Explicit refresh bypasses that cache; the Codex sidebar refresh/update actions
+also refresh model selectors. Discovery never starts an agent turn or reads
+OAuth credentials. On failure it returns the local `models_cache.json` with an
+error, or the conservative static fallback; strict offline mode never starts
+discovery. An old CLI can expose fewer models than the desktop Codex app:
+update the CLI through the sidebar before expecting newly released models.
+Do not merge the API registry into this account-specific inventory.
+
 The dropdowns used to learn about a release in one of two ways: the provider's
 own `/v1/models`, which needs an API key, or a line added to
 `models_registry.py`. Most users have no key — Claude runs on a Claude Code

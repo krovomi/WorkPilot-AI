@@ -3,8 +3,18 @@
 import json
 import logging
 import os
+import subprocess
+import threading
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from core.codex_catalog_rpc import discover_models as _discover_models
+from core.offline_policy import airgap_status
+
+_catalog_lock = threading.Lock()
+_catalogs: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
 
 
 def resolve_codex_model(model: str | None) -> str | None:
@@ -17,13 +27,22 @@ def resolve_codex_model(model: str | None) -> str | None:
     return model
 
 
-def codex_model_catalog() -> dict[str, Any]:
-    """Use the CLI inventory when available, with a conservative offline fallback."""
+def _cached_catalog() -> dict[str, Any]:
+    """Read only the current runtime's non-secret cache as an offline fallback."""
     home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
     models = []
+    fetched_at = None
     try:
         with (home / "models_cache.json").open(encoding="utf-8") as handle:
             data = json.load(handle)
+        timestamp = data.get("fetched_at")
+        if isinstance(timestamp, str):
+            try:
+                fetched_at = datetime.fromisoformat(
+                    timestamp.replace("Z", "+00:00")
+                ).timestamp()
+            except ValueError:
+                fetched_at = None
         for entry in data.get("models", []):
             if not isinstance(entry, dict) or entry.get("visibility") != "list":
                 continue
@@ -54,6 +73,43 @@ def codex_model_catalog() -> dict[str, Any]:
             }
         ],
         "source": "cache" if models else "static",
-        "fetchedAt": None,
+        "fetchedAt": fetched_at if models else None,
         "error": None,
     }
+
+
+def codex_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
+    """Discover account models without starting a turn or reading credentials.
+
+    Cache successful discovery for 15 minutes, failures for 30 seconds. Explicit
+    refresh (including after a CLI update) always bypasses this process cache.
+    """
+    if airgap_status(Path.cwd())["airgapStrict"]:
+        return _cached_catalog()
+    key = (
+        str(Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")),
+        os.environ.get("PATH", ""),
+    )
+    with _catalog_lock:
+        cached = _catalogs.get(key)
+        if not force_refresh and cached and time.monotonic() < cached[0]:
+            return cached[1]
+        try:
+            models = _discover_models()
+            result = {
+                "provider": "openai-codex",
+                "models": models,
+                "source": "live",
+                "fetchedAt": time.time(),
+                "error": None,
+            }
+            ttl = 15 * 60
+        except (OSError, ValueError, TimeoutError, subprocess.SubprocessError):
+            result = _cached_catalog()
+            # Never expose CLI stderr or account details through the catalog API.
+            result["error"] = (
+                "Codex model discovery unavailable; using the local fallback. Check or update Codex CLI and refresh."
+            )
+            ttl = 30
+        _catalogs[key] = (time.monotonic() + ttl, result)
+        return result

@@ -10,6 +10,7 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCliStatus } from "@/contexts/CliStatusContext";
+import { refreshProviderModelCatalog } from "@/hooks/useProviderModelCatalog";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -79,6 +80,7 @@ export function CodexCliStatusBadge({
 
 	const handleRefresh = () => {
 		refreshCodex();
+		refreshProviderModelCatalog("openai-codex");
 	};
 
 	// Run `npm install -g @openai/codex@latest` silently in the main process.
@@ -99,6 +101,7 @@ export function CodexCliStatusBadge({
 			}
 
 			await refreshCodex();
+			refreshProviderModelCatalog("openai-codex");
 			// Belt-and-suspenders: on Windows, the freshly-written `codex.cmd` can take
 			// a moment to be visible to `execFile`. Refresh a second time after a short
 			// delay so the sidebar picks up the new version reliably.
