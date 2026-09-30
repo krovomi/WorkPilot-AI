@@ -134,8 +134,10 @@ phases:
 
   - id: qa
     impl: workpilot/qa-loop
-    min_effort: low
-    description: The existing QA reviewer/fixer loop.
+    always: true
+    description: >-
+      The existing QA reviewer/fixer loop. A reasoning effort of none reduces
+      model thinking, not validation: completed coding still requires QA.
 
   - id: adversarial-review
     impl: bmad/bmad-review

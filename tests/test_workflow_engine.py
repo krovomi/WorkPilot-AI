@@ -133,13 +133,19 @@ class TestEffortPruning:
             )
 
     def test_the_cheapest_level_runs_only_what_cannot_be_skipped(self, workflow):
-        """Coding, the hard gate, and the two near-free phases. Nothing else.
+        """Coding, QA, the hard gate, and the two near-free phases.
 
         `docs` is in that set for the same reason `observe` is: it spends no
         API call, so no effort level saves anything by dropping it.
         """
         profile = resolve_profile(workflow, "none", changed_files=[])
-        assert set(profile.phase_ids) == {"docs", "coding", "verify", "observe"}
+        assert set(profile.phase_ids) == {"docs", "coding", "qa", "verify", "observe"}
+
+    @pytest.mark.parametrize("effort", EFFORT_ORDER)
+    def test_validation_survives_every_reasoning_effort(self, workflow, effort):
+        profile = resolve_profile(workflow, effort, changed_files=[])
+        assert profile.will_run("qa")
+        assert profile.phase_ids.index("coding") < profile.phase_ids.index("qa")
 
     def test_ultrathink_buys_the_second_opinion(self, workflow):
         """What the top level is for: a reading that did not write the code.
