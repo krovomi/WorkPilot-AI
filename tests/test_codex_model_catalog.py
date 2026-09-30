@@ -117,11 +117,9 @@ def test_codex_missing_cache_has_no_api_only_fallback(monkeypatch, tmp_path):
 
 
 def test_legacy_mini_is_repaired_only_for_codex():
-    from codex_models import resolve_codex_model
-
-    assert resolve_codex_model("gpt-5.5-mini") == "gpt-5.5"
-    assert resolve_codex_model("gpt-5.5") == "gpt-5.5"
-    assert resolve_codex_model("future-custom-id") == "future-custom-id"
+    assert codex_models.resolve_codex_model("gpt-5.5-mini") == "gpt-5.5"
+    assert codex_models.resolve_codex_model("gpt-5.5") == "gpt-5.5"
+    assert codex_models.resolve_codex_model("future-custom-id") == "future-custom-id"
 
 
 def test_corrupt_codex_cache_stays_separate_from_api(monkeypatch, tmp_path):
