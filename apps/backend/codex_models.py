@@ -12,9 +12,10 @@ from typing import Any
 
 from core.codex_catalog_rpc import discover_models as _discover_models
 from core.offline_policy import airgap_status
+from core.platform import find_executable
 
 _catalog_lock = threading.Lock()
-_catalogs: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+_catalogs: dict[tuple[str, str, str, int, int], tuple[float, dict[str, Any]]] = {}
 
 
 def resolve_codex_model(model: str | None) -> str | None:
@@ -86,9 +87,25 @@ def codex_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
     """
     if airgap_status(Path.cwd())["airgapStrict"]:
         return _cached_catalog()
+    # A CLI update can unlock new account models even while PATH stays identical.
+    # Resolve symlinks so replacing a package-manager target also invalidates it.
+    executable = find_executable("codex")
+    cli_path = ""
+    modified_at = size = 0
+    if executable:
+        try:
+            resolved = Path(executable).resolve()
+            stat = resolved.stat()
+            cli_path = str(resolved)
+            modified_at, size = stat.st_mtime_ns, stat.st_size
+        except OSError:
+            cli_path = executable
     key = (
         str(Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")),
         os.environ.get("PATH", ""),
+        cli_path,
+        modified_at,
+        size,
     )
     with _catalog_lock:
         cached = _catalogs.get(key)

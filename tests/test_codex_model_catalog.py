@@ -127,3 +127,21 @@ def test_corrupt_codex_cache_stays_separate_from_api(monkeypatch, tmp_path):
     (tmp_path / "models_cache.json").write_text("not json", encoding="utf-8")
     result = catalog.list_models("openai-codex")
     assert [m["value"] for m in result["models"]] == ["gpt-5.5"]
+
+
+def test_cli_replacement_invalidates_inventory_without_manual_refresh(
+    monkeypatch, tmp_path
+):
+    executable = tmp_path / "codex"
+    executable.write_text("old-cli", encoding="utf-8")
+    monkeypatch.setattr(
+        codex_models, "find_executable", lambda _: str(executable), raising=False
+    )
+    discover = Mock(
+        side_effect=[[{"value": "gpt-5.6-sol"}], [{"value": "gpt-6.1-sol"}]]
+    )
+    monkeypatch.setattr(codex_models, "_discover_models", discover)
+    catalog.list_models("openai-codex")
+    executable.write_text("updated-cli-with-new-models", encoding="utf-8")
+    assert catalog.list_models("openai-codex")["models"] == [{"value": "gpt-6.1-sol"}]
+    assert discover.call_count == 2
