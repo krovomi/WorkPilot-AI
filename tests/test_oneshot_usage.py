@@ -200,7 +200,8 @@ def test_a_provider_with_no_adapter_is_refused_when_the_caller_asked(monkeypatch
     )
 
     assert result == ""
-    assert built == []  # nothing ran
+    assert len(built) == 1
+    assert built[0][0] == "mistral"
     assert "mistral" in reported[0]["message"]
 
 
