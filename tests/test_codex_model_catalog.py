@@ -1,4 +1,4 @@
-"""Codex account models must not be mixed with the OpenAI API catalog."""
+"""Codex account and configured OpenAI API models share a routed selector."""
 
 import json
 from unittest.mock import Mock
@@ -87,7 +87,9 @@ def test_refresh_failure_reports_cache_fallback(monkeypatch, tmp_path):
     assert "credential-shaped" not in result["error"]
 
 
-def test_codex_catalog_uses_cli_inventory(monkeypatch, tmp_path):
+def test_codex_catalog_combines_api_models_only_when_api_key_exists(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("CODEX_HOME", str(tmp_path))
     (tmp_path / "models_cache.json").write_text(
         json.dumps(
@@ -108,6 +110,86 @@ def test_codex_catalog_uses_cli_inventory(monkeypatch, tmp_path):
     assert [m["value"] for m in result["models"]] == ["gpt-5.5"]
     assert result["source"] == "cache"
 
+    monkeypatch.setattr(
+        catalog,
+        "_api_key_for",
+        lambda provider: "secret" if provider == "openai" else None,
+    )
+    monkeypatch.setattr(
+        catalog,
+        "_FETCHERS",
+        {
+            **catalog._FETCHERS,
+            "openai": lambda: [
+                {"value": "gpt-4.1-mini", "label": "GPT-4.1 mini", "tier": "fast"},
+                {"value": "gpt-5.4-mini", "label": "GPT-5.4 mini", "tier": "fast"},
+                {"value": "gpt-5.5", "label": "API GPT-5.5", "tier": "standard"},
+            ],
+        },
+    )
+    combined = catalog.list_models("openai-codex", force_refresh=True)
+    assert [m["value"] for m in combined["models"]] == [
+        "gpt-5.5",
+        "gpt-4.1-mini",
+        "gpt-5.4-mini",
+    ]
+    assert combined["models"][0]["label"] == "GPT-5.5"
+
+
+def test_codex_catalog_never_adds_api_models_without_api_key(monkeypatch):
+    monkeypatch.setattr(catalog, "_api_key_for", lambda _: None)
+    codex = {
+        "provider": "openai-codex",
+        "models": [{"value": "gpt-5.5"}],
+        "source": "live",
+        "fetchedAt": 1,
+        "error": None,
+    }
+    monkeypatch.setattr(codex_models, "codex_model_catalog", lambda **_: codex)
+    monkeypatch.setitem(
+        catalog._FETCHERS, "openai", lambda: [{"value": "gpt-4.1-mini"}]
+    )
+    assert catalog.list_models("openai-codex")["models"] == [{"value": "gpt-5.5"}]
+
+
+def test_codex_small_models_are_fast_and_keep_exact_id(monkeypatch, tmp_path):
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    small = {
+        "value": "gpt-5.5-mini",
+        "label": "GPT-5.5 mini",
+        "tier": "fast",
+        "supportsThinking": True,
+    }
+    monkeypatch.setattr(codex_models, "_discover_models", lambda: [small])
+
+    result = catalog.list_models("openai-codex", force_refresh=True)
+
+    assert result["models"] == [small]
+    assert codex_models.resolve_codex_model("gpt-5.5-mini") == "gpt-5.5-mini"
+
+
+def test_codex_cache_classifies_small_models_as_fast(monkeypatch, tmp_path):
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    (tmp_path / "models_cache.json").write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "slug": "gpt-5.5-mini",
+                        "display_name": "GPT-5.5 mini",
+                        "visibility": "list",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = codex_models._cached_catalog()
+
+    assert result["models"][0]["value"] == "gpt-5.5-mini"
+    assert result["models"][0]["tier"] == "fast"
+
 
 def test_codex_missing_cache_has_no_api_only_fallback(monkeypatch, tmp_path):
     monkeypatch.setenv("CODEX_HOME", str(tmp_path))
@@ -117,7 +199,7 @@ def test_codex_missing_cache_has_no_api_only_fallback(monkeypatch, tmp_path):
 
 
 def test_legacy_mini_is_repaired_only_for_codex():
-    assert codex_models.resolve_codex_model("gpt-5.5-mini") == "gpt-5.5"
+    assert codex_models.resolve_codex_model("gpt-5.5-mini") == "gpt-5.5-mini"
     assert codex_models.resolve_codex_model("gpt-5.5") == "gpt-5.5"
     assert codex_models.resolve_codex_model("future-custom-id") == "future-custom-id"
 

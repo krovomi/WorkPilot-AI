@@ -748,19 +748,22 @@ class WorktreeManager:
 
         # Diff stats
         result = self._run_git(
-            ["diff", "--shortstat", f"{self.base_branch}...HEAD"], cwd=worktree_path
+            ["diff", "--numstat", f"{self.base_branch}...HEAD"], cwd=worktree_path
         )
-        if result.returncode == 0 and result.stdout.strip():
-            # Parse: "3 files changed, 50 insertions(+), 10 deletions(-)"
-            match = re.search(r"(\d+) files? changed", result.stdout)
-            if match:
-                stats["files_changed"] = int(match.group(1))
-            match = re.search(r"(\d+) insertions?", result.stdout)
-            if match:
-                stats["additions"] = int(match.group(1))
-            match = re.search(r"(\d+) deletions?", result.stdout)
-            if match:
-                stats["deletions"] = int(match.group(1))
+        if result.returncode == 0:
+            # --numstat is a machine-readable, locale-independent format:
+            # additions<TAB>deletions<TAB>path (one row per changed file).
+            for line in result.stdout.splitlines():
+                columns = line.split("\t", 2)
+                if len(columns) != 3:
+                    continue
+                additions, deletions, _file_path = columns
+
+                # Binary files are reported as "-" for both counts.
+                if additions.isdecimal():
+                    stats["additions"] += int(additions)
+                if deletions.isdecimal():
+                    stats["deletions"] += int(deletions)
 
         return stats
 
