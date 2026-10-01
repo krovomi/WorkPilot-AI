@@ -80,7 +80,7 @@ httpx[http2]>=0.28.1
 # any environment that did not happen to pull aiohttp in transitively.
 aiohttp>=3.14.3
 h2>=4.4.1  # HTTP/2 support for Windsurf gRPC proxy
-sqlalchemy>=2.0.54
+sqlalchemy>=2.1.1
 psutil>=7.2.2
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK
@@ -92,7 +92,7 @@ msrest>=0.7.1           # Required by azure-devops SDK
 defusedxml>=0.7.1
 
 # Anthropic SDK for Claude API integration
-anthropic>=1.7.0
+anthropic>=1.8.0
 
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:
