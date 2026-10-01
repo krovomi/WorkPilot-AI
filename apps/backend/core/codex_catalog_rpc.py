@@ -112,7 +112,21 @@ def discover_models() -> list[dict[str, Any]]:
                 models[model] = {
                     "value": model,
                     "label": label if isinstance(label, str) and label else model,
-                    "tier": "flagship",
+                    "tier": (
+                        "fast"
+                        if any(
+                            marker in f"{model} {label or ''}".lower()
+                            for marker in ("mini", "nano", "small", "fast", "lite")
+                        )
+                        else (
+                            "flagship"
+                            if any(
+                                marker in f"{model} {label or ''}".lower()
+                                for marker in ("pro", "opus", "flagship")
+                            )
+                            else "standard"
+                        )
+                    ),
                     "supportsThinking": bool(entry.get("supportedReasoningEfforts")),
                 }
             cursor = result.get("nextCursor")

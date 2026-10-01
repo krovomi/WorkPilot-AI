@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from core.agent_client import ContentBlockType, MessageRole
+from core.agent_client import ContentBlockType, MessageRole, OpenAIAgentClient
 from core.codex_cli_client import (
     CodexCliAgentClient,
     CodexCliAuthenticationError,
@@ -159,7 +159,27 @@ def test_resume_applies_selected_model_and_effort(tmp_path: Path) -> None:
 
 def test_client_repairs_legacy_mini(tmp_path: Path) -> None:
     client = CodexCliAgentClient(model="gpt-5.5-mini", project_dir=str(tmp_path))
-    assert client.model == "gpt-5.5"
+    assert client.model == "gpt-5.5-mini"
+
+
+def test_codex_model_404_has_actionable_message() -> None:
+    from core.codex_cli_client import _codex_error
+
+    error = _codex_error(
+        "unexpected status 404 Not Found: The model `gpt-5.5` does not exist "
+        "or you do not have access to it."
+    )
+    assert "Refresh the Codex model catalog" in str(error)
+    assert "Codex's default" in str(error)
+
+
+def test_oneshot_implicit_model_uses_codex_default(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+
+    from core.oneshot import _resolve_model
+
+    assert _resolve_model("openai", None, None) == "default"
+    assert _resolve_model("openai", "gpt-5.5", None) == "gpt-5.5"
 
 
 @pytest.mark.asyncio
@@ -221,6 +241,52 @@ async def test_terminal_error_event_is_reported(
 
     with pytest.raises(CodexCliAuthenticationError, match="authentication error"):
         _ = [message async for message in client.receive_response()]
+
+
+@pytest.mark.asyncio
+async def test_unavailable_model_retries_once_with_codex_default(
+    tmp_path: Path,
+) -> None:
+    processes = [
+        _FakeProcess(
+            [
+                _event(
+                    "turn.failed",
+                    message="unexpected status 404 Not Found: The model `gpt-5.5` "
+                    "does not exist or you do not have access to it.",
+                )
+            ]
+        ),
+        _FakeProcess(
+            [
+                _event(
+                    "item.completed",
+                    item={"id": "i1", "type": "agent_message", "text": "done"},
+                ),
+                _event("turn.completed", usage={}),
+            ]
+        ),
+    ]
+    calls: list[tuple[str, ...]] = []
+
+    async def process_factory(*args: str, **kwargs: object) -> _FakeProcess:
+        calls.append(args)
+        return processes.pop(0)
+
+    client = CodexCliAgentClient(
+        model="gpt-5.5",
+        project_dir=str(tmp_path),
+        executable="codex",
+        process_factory=process_factory,
+    )
+    await client.query("work")
+
+    messages = [message async for message in client.receive_response()]
+
+    assert messages[-1].content[0].text == "done"
+    assert "--model" in calls[0]
+    assert "--model" not in calls[1]
+    assert client.model == "default"
 
 
 @pytest.mark.asyncio
@@ -349,18 +415,38 @@ def test_oneshot_rest_default_model_is_not_forced_on_codex(
     tmp_path: Path, monkeypatch
 ) -> None:
     monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+    monkeypatch.setattr(
+        "core.codex_cli_client.openai_model_uses_api_key", lambda _: True
+    )
 
     client = _build_client(
         provider="openai",
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         system_prompt=None,
         project_dir=str(tmp_path),
         spec_dir=None,
         max_turns=1,
     )
 
-    assert isinstance(client, CodexCliAgentClient)
-    assert client.model == "default"
+    assert isinstance(client, OpenAIAgentClient)
+    assert client.model == "gpt-4.1-mini"
+
+
+def test_oneshot_compatible_provider_uses_its_api_key(monkeypatch):
+    from core.agent_client import CompatibleProviderAgentClient
+
+    monkeypatch.setenv("MISTRAL_API_KEY", "mistral-key")
+    client = _build_client(
+        provider="mistral",
+        model="mistral-small-latest",
+        system_prompt="Be concise.",
+        project_dir=None,
+        spec_dir=None,
+        max_turns=1,
+    )
+    assert isinstance(client, CompatibleProviderAgentClient)
+    assert client._api_key == "mistral-key"
+    assert client.provider_name() == "mistral"
 
 
 @pytest.mark.asyncio
