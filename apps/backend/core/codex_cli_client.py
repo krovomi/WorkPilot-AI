@@ -139,6 +139,19 @@ def _codex_error(value: object) -> CodexCliError:
         return CodexCliAuthenticationError(
             "Codex CLI authentication error. Run 'codex login' and try again."
         )
+    if (
+        "404" in lowered
+        and "model" in lowered
+        and any(
+            marker in lowered
+            for marker in ("does not exist", "do not have access", "not found")
+        )
+    ):
+        return CodexCliError(
+            "Codex CLI rejected the selected model (404). Refresh the Codex model "
+            "catalog in Settings and choose a model available to this account, "
+            "or clear the model override to use Codex's default."
+        )
     return CodexCliError(f"Codex CLI failed: {safe_text}")
 
 

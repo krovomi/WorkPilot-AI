@@ -103,6 +103,14 @@ def _model_from_task(spec_dir: Path | None) -> str | None:
 def _resolve_model(provider: str, explicit: str | None, spec_dir: Path | None) -> str:
     if explicit:
         return explicit
+    if provider == "openai":
+        # Codex ChatGPT auth has its own account-specific model inventory. Let
+        # Codex CLI pick its account default instead of sending the API-only
+        # cheap default (gpt-4o-mini) used by one-shot utilities.
+        from core.codex_cli_client import openai_uses_codex_cli
+
+        if openai_uses_codex_cli():
+            return "default"
     default = _DEFAULT_MODELS.get(provider)
     if default:
         return default
@@ -345,6 +353,7 @@ async def oneshot_completion(
         else _resolve_active_provider(spec_path)
     )
     resolved_model = _resolve_model(resolved_provider, model, spec_path)
+    client_model = None if resolved_model == "default" else resolved_model
 
     logger.info(
         "[oneshot] provider=%s model=%s (context=%s)",
@@ -377,7 +386,7 @@ async def oneshot_completion(
 
     client = _build_client(
         resolved_provider,
-        resolved_model,
+        client_model,
         system_prompt,
         project_dir,
         spec_dir,
