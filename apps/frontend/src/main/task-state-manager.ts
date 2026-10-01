@@ -39,12 +39,10 @@ interface TaskContextEntry {
 
 const TERMINAL_EVENTS = new Set<string>([
 	"QA_PASSED",
-	"PLANNING_COMPLETE",
 	"PLANNING_FAILED",
 	"CODING_FAILED",
 	"QA_MAX_ITERATIONS",
 	"QA_AGENT_ERROR",
-	"ALL_SUBTASKS_DONE",
 ]);
 
 export class TaskStateManager {

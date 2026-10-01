@@ -554,13 +554,15 @@ describe("TaskStateManager", () => {
 			// Process exits with code 0 - should NOT transition to error
 			manager.handleProcessExited(mockTask.id, 0, mockTask, mockProject);
 
-			// PLANNING_COMPLETE is a terminal event, so handleProcessExited should skip entirely
-			// Task should remain in plan_review
+			// A successful spec-only run may end at the requested review checkpoint.
+			// Its code-0 exit is harmless even though planning completion itself is
+			// not a process-terminal event.
 			expect(manager.getCurrentState(mockTask.id)).toBe("plan_review");
 		});
 
-		it("should treat PLANNING_COMPLETE as a terminal event", () => {
-			// PLANNING_COMPLETE should prevent handleProcessExited from running
+		it("should report a failed build process after planning completed", () => {
+			// Planning completion advances the same process into coding; it does not
+			// mean that process has finished.
 			const planningStarted = {
 				type: "PLANNING_STARTED",
 				taskId: mockTask.id,
@@ -600,11 +602,63 @@ describe("TaskStateManager", () => {
 			// XState should be in coding (no review required)
 			expect(manager.getCurrentState(mockTask.id)).toBe("coding");
 
-			// Process exits with code 1 - should still skip because PLANNING_COMPLETE is terminal
+			// A non-zero exit after the planning event means coding failed to proceed.
 			manager.handleProcessExited(mockTask.id, 1, mockTask, mockProject);
 
-			// Task should remain in coding, NOT transition to error
-			expect(manager.getCurrentState(mockTask.id)).toBe("coding");
+			expect(manager.getCurrentState(mockTask.id)).toBe("error");
+		});
+
+		it("should continue exit handling after ALL_SUBTASKS_DONE while QA is pending", () => {
+			manager.handleTaskEvent(
+				mockTask.id,
+				{
+					type: "PLANNING_STARTED",
+					taskId: mockTask.id,
+					specId: mockTask.specId,
+					projectId: mockProject.id,
+					timestamp: new Date().toISOString(),
+					eventId: "evt-1",
+					sequence: 0,
+				},
+				mockTask,
+				mockProject,
+			);
+			manager.handleTaskEvent(
+				mockTask.id,
+				{
+					type: "PLANNING_COMPLETE",
+					taskId: mockTask.id,
+					specId: mockTask.specId,
+					projectId: mockProject.id,
+					timestamp: new Date().toISOString(),
+					eventId: "evt-2",
+					sequence: 1,
+					hasSubtasks: true,
+					subtaskCount: 1,
+					requireReviewBeforeCoding: false,
+				},
+				mockTask,
+				mockProject,
+			);
+			manager.handleTaskEvent(
+				mockTask.id,
+				{
+					type: "ALL_SUBTASKS_DONE",
+					taskId: mockTask.id,
+					specId: mockTask.specId,
+					projectId: mockProject.id,
+					timestamp: new Date().toISOString(),
+					eventId: "evt-3",
+					sequence: 2,
+					totalCount: 1,
+				},
+				mockTask,
+				mockProject,
+			);
+
+			expect(manager.getCurrentState(mockTask.id)).toBe("qa_review");
+			manager.handleProcessExited(mockTask.id, 1, mockTask, mockProject);
+			expect(manager.getCurrentState(mockTask.id)).toBe("error");
 		});
 	});
 
