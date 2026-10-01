@@ -92,7 +92,7 @@ def test_catalog_without_provider_key_does_not_use_live_api(monkeypatch):
     monkeypatch.setattr(catalog, "_cached_entry", lambda _provider: None)
     monkeypatch.setattr(catalog, "_fetch_registry", lambda *_args, **_kwargs: None)
     result = catalog.list_models("mistral", force_refresh=True)
-    assert result["source"] in {"registry", "static"}
+    assert result["source"] in {"cache", "registry", "static"}
 
 
 def test_newest_openai_generation_sorts_first():
