@@ -1,7 +1,6 @@
 """Read Codex's non-secret account model inventory, never the API catalog."""
 
 import json
-import logging
 import os
 import subprocess
 import threading
@@ -19,13 +18,17 @@ _catalogs: dict[tuple[str, str, str, int, int], tuple[float, dict[str, Any]]] = 
 
 
 def resolve_codex_model(model: str | None) -> str | None:
-    """Repair the legacy API-tier fallback persisted by WorkPilot profiles."""
-    if model == "gpt-5.5-mini":
-        logging.getLogger(__name__).warning(
-            "Replacing legacy gpt-5.5-mini with gpt-5.5 for Codex ChatGPT authentication"
-        )
-        return "gpt-5.5"
+    """Preserve Codex account model IDs, including small/fast models."""
     return model
+
+
+def _model_tier(model: str, label: str = "") -> str:
+    name = f"{model} {label}".lower()
+    if any(marker in name for marker in ("mini", "nano", "small", "fast", "lite")):
+        return "fast"
+    if any(marker in name for marker in ("pro", "opus", "flagship")):
+        return "flagship"
+    return "standard"
 
 
 def _cached_catalog() -> dict[str, Any]:
@@ -54,7 +57,7 @@ def _cached_catalog() -> dict[str, Any]:
                 {
                     "value": slug,
                     "label": entry.get("display_name") or slug,
-                    "tier": "flagship",
+                    "tier": _model_tier(slug, entry.get("display_name") or ""),
                     "supportsThinking": True,
                 }
             )

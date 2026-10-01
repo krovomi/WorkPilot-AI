@@ -1714,6 +1714,7 @@ def _resolve_active_provider(
         "copilot": "copilot",
         "openai": "openai",
         "google": "google",
+        "gemini": "google",
         "ollama": "ollama",
         "meta": "meta",
         "mistral": "mistral",
@@ -1805,6 +1806,7 @@ def _resolve_active_provider(
         "copilot",
         "openai",
         "google",
+        "gemini",
         "ollama",
         "meta",
         "mistral",
@@ -2290,7 +2292,11 @@ def create_agent_client(
 
     elif provider == "openai":
         from core.agent_client import OpenAIAgentClient
-        from core.codex_cli_client import CodexCliAgentClient, openai_uses_codex_cli
+        from core.codex_cli_client import (
+            CodexCliAgentClient,
+            openai_model_uses_api_key,
+            openai_uses_codex_cli,
+        )
         from core.llm_optimization import (
             build_base_system_prompt,
             openai_prompt_cache_key,
@@ -2318,7 +2324,9 @@ def create_agent_client(
         )
         prompt_cache_key = openai_prompt_cache_key(spec_dir, agent_type)
 
-        if openai_uses_codex_cli():
+        if openai_uses_codex_cli() and not openai_model_uses_api_key(
+            resolved_openai_model
+        ):
             logger.info(
                 "[create_agent_client] Using CodexCliAgentClient "
                 "(model=%s, agent_type=%s, reasoning_effort=%s)",
@@ -2333,6 +2341,12 @@ def create_agent_client(
                 agent_type=agent_type,
                 reasoning_effort=reasoning_effort,
                 thread_id=resume,
+            )
+
+        if openai_uses_codex_cli():
+            logger.info(
+                "[create_agent_client] Routing API-only model through OpenAI API (model=%s)",
+                resolved_openai_model,
             )
 
         logger.info(
@@ -2378,6 +2392,24 @@ def create_agent_client(
         return GoogleAgentClient(
             model=resolved_gemini_model,
             system_prompt=gemini_system_prompt,
+            max_turns=50,
+            project_dir=str(project_dir),
+            agent_type=agent_type,
+            spec_dir=str(spec_dir),
+        )
+
+    elif provider == "gemini":
+        from core.agent_client import GoogleAgentClient
+        from core.llm_optimization import build_base_system_prompt
+
+        gemini_prompt = system_prompt or build_base_system_prompt(
+            project_dir, tool_use_hint=True
+        )
+        if not system_prompt:
+            gemini_prompt = _inject_domain_addendum(gemini_prompt, agent_type, spec_dir)
+        return GoogleAgentClient(
+            model=model or "gemini-2.5-pro",
+            system_prompt=gemini_prompt,
             max_turns=50,
             project_dir=str(project_dir),
             agent_type=agent_type,
@@ -2450,9 +2482,52 @@ def create_agent_client(
             spec_dir=str(spec_dir),
         )
 
+    elif provider in ("mistral", "deepseek", "grok"):
+        from core.agent_client import CompatibleProviderAgentClient
+        from core.llm_optimization import build_base_system_prompt
+        from provider_models_catalog import _api_key_for
+
+        config = {}
+        try:
+            from src.connectors.llm_config import load_provider_config
+
+            config = load_provider_config(provider) or {}
+        except Exception:  # noqa: BLE001 - environment credentials still work
+            pass
+        api_key = _api_key_for(provider)
+        if not api_key:
+            raise ValueError(f"No API key configured for {provider}")
+        base_urls = {
+            "mistral": "https://api.mistral.ai",
+            "deepseek": "https://api.deepseek.com",
+            "grok": "https://api.x.ai",
+        }
+        base_url = (
+            os.environ.get(f"{provider.upper()}_BASE_URL")
+            or config.get("base_url")
+            or base_urls[provider]
+        )
+        provider_prompt = system_prompt or build_base_system_prompt(
+            project_dir, tool_use_hint=True
+        )
+        if not system_prompt:
+            provider_prompt = _inject_domain_addendum(
+                provider_prompt, agent_type, spec_dir
+            )
+        return CompatibleProviderAgentClient(
+            provider=provider,
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            system_prompt=provider_prompt,
+            project_dir=str(project_dir),
+            agent_type=agent_type,
+            spec_dir=str(spec_dir),
+        )
+
     else:
-        # No agentic adapter for this provider (mistral, deepseek, grok, meta,
-        # aws, cursor, custom). The task still runs — on the Claude SDK — but
+        # No agentic adapter for this provider (meta, aws, cursor, custom). The
+        # task still runs — on the Claude SDK — but
         # that is a real limitation, not a detail, so say so where the user can
         # see it instead of in a log line nobody reads. capabilities/providers.yaml
         # is the record of which providers are in this state.
