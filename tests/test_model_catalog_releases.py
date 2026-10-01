@@ -9,7 +9,17 @@ from apps.backend import provider_models_catalog as catalog
 @pytest.mark.parametrize(
     ("provider", "ids"),
     [
-        ("openai", ["gpt-6-astra", "gpt-5.6-sol", "gpt-7", "o5"]),
+        (
+            "openai",
+            [
+                "gpt-6-astra",
+                "gpt-5.6-sol",
+                "gpt-7",
+                "o5",
+                "gpt-4.1-mini",
+                "gpt-4.1-nano",
+            ],
+        ),
         ("anthropic", ["claude-opus-5", "claude-sonnet-5", "claude-fable-5-1"]),
     ],
 )
@@ -25,7 +35,64 @@ def test_discovers_new_generations(monkeypatch, provider, ids):
     )
     entries = catalog._FETCHERS[provider]()
     assert {m["value"] for m in entries} == set(ids)
-    assert all(m["supportsThinking"] for m in entries)
+    assert all(
+        m["supportsThinking"]
+        for m in entries
+        if m["value"] not in {"gpt-4.1-mini", "gpt-4.1-nano"}
+    )
+    if provider == "openai":
+        assert all(
+            not m["supportsThinking"]
+            for m in entries
+            if m["value"] in {"gpt-4.1-mini", "gpt-4.1-nano"}
+        )
+
+
+@pytest.mark.parametrize(
+    "provider", ["anthropic", "google", "mistral", "deepseek", "grok"]
+)
+def test_api_key_catalog_exposes_live_small_model_when_available(monkeypatch, provider):
+    monkeypatch.setattr(catalog, "_api_key_for", lambda _provider: "configured-key")
+    small_by_provider = {
+        "anthropic": {
+            "value": "claude-haiku-5",
+            "label": "Claude Haiku 5",
+            "tier": "fast",
+        },
+        "google": {
+            "value": "gemini-3-flash",
+            "label": "Gemini 3 Flash",
+            "tier": "fast",
+        },
+        "mistral": {
+            "value": "mistral-small-latest",
+            "label": "Mistral Small",
+            "tier": "fast",
+        },
+        "deepseek": {
+            "value": "deepseek-chat",
+            "label": "DeepSeek Chat",
+            "tier": "standard",
+        },
+        "grok": {"value": "grok-4-fast", "label": "Grok 4 Fast", "tier": "fast"},
+    }
+    monkeypatch.setitem(
+        catalog._FETCHERS, provider, lambda: [small_by_provider[provider]]
+    )
+    monkeypatch.setattr(catalog, "_cached_entry", lambda _provider: None)
+    monkeypatch.setattr(catalog, "_fetch_registry", lambda *_args, **_kwargs: None)
+    result = catalog.list_models(provider, force_refresh=True)
+    assert result["source"] == "live"
+    assert result["models"][0]["value"] == small_by_provider[provider]["value"]
+
+
+def test_catalog_without_provider_key_does_not_use_live_api(monkeypatch):
+    monkeypatch.setitem(catalog._FETCHERS, "mistral", lambda: [])
+    monkeypatch.setattr(catalog, "_api_key_for", lambda _provider: None)
+    monkeypatch.setattr(catalog, "_cached_entry", lambda _provider: None)
+    monkeypatch.setattr(catalog, "_fetch_registry", lambda *_args, **_kwargs: None)
+    result = catalog.list_models("mistral", force_refresh=True)
+    assert result["source"] in {"registry", "static"}
 
 
 def test_newest_openai_generation_sorts_first():

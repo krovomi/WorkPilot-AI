@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from core.agent_client import ContentBlockType, MessageRole
+from core.agent_client import ContentBlockType, MessageRole, OpenAIAgentClient
 from core.codex_cli_client import (
     CodexCliAgentClient,
     CodexCliAuthenticationError,
@@ -415,18 +415,38 @@ def test_oneshot_rest_default_model_is_not_forced_on_codex(
     tmp_path: Path, monkeypatch
 ) -> None:
     monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+    monkeypatch.setattr(
+        "core.codex_cli_client.openai_model_uses_api_key", lambda _: True
+    )
 
     client = _build_client(
         provider="openai",
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         system_prompt=None,
         project_dir=str(tmp_path),
         spec_dir=None,
         max_turns=1,
     )
 
-    assert isinstance(client, CodexCliAgentClient)
-    assert client.model == "default"
+    assert isinstance(client, OpenAIAgentClient)
+    assert client.model == "gpt-4.1-mini"
+
+
+def test_oneshot_compatible_provider_uses_its_api_key(monkeypatch):
+    from core.agent_client import CompatibleProviderAgentClient
+
+    monkeypatch.setenv("MISTRAL_API_KEY", "mistral-key")
+    client = _build_client(
+        provider="mistral",
+        model="mistral-small-latest",
+        system_prompt="Be concise.",
+        project_dir=None,
+        spec_dir=None,
+        max_turns=1,
+    )
+    assert isinstance(client, CompatibleProviderAgentClient)
+    assert client._api_key == "mistral-key"
+    assert client.provider_name() == "mistral"
 
 
 @pytest.mark.asyncio

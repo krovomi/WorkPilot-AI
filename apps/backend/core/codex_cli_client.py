@@ -45,6 +45,29 @@ def openai_uses_codex_cli() -> bool:
     return os.environ.get("OPENAI_AUTH_MODE", "api-key").strip().lower() == "codex-cli"
 
 
+def openai_model_uses_api_key(model: str | None) -> bool:
+    """Route API-only model IDs through OpenAI when Codex auth is selected."""
+    if not model or not openai_uses_codex_cli():
+        return False
+    try:
+        from provider_models_catalog import _api_key_for, list_models
+
+        if not _api_key_for("openai"):
+            return False
+        codex_ids = {
+            item.get("value") for item in list_models("openai-codex").get("models", [])
+        }
+        if model in codex_ids:
+            return False
+        api_catalog = list_models("openai")
+        return api_catalog.get("source") in {"live", "cache"} and any(
+            item.get("value") == model for item in api_catalog.get("models", [])
+        )
+    except Exception as exc:  # noqa: BLE001 - routing must fall back to Codex
+        logger.debug("Could not classify OpenAI model route: %s", type(exc).__name__)
+        return False
+
+
 def _validated_option(value: str, label: str) -> str:
     """Reject option values that could alter a Windows launcher command."""
     if not _SAFE_OPTION_VALUE.fullmatch(value):
