@@ -153,9 +153,10 @@ def collect_diff(
 
     evidence = DiffEvidence(available=True)
     for line in stat.stdout.splitlines():
-        additions, deletions, separator, _file_path = line.partition("\t")
-        if not separator:
+        columns = line.split("\t", 2)
+        if len(columns) != 3:
             continue
+        additions, deletions, _file_path = columns
         evidence.files_changed += 1
         # Binary files are reported as "-" for both counts.
         if additions.isdecimal():

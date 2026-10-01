@@ -754,10 +754,11 @@ class WorktreeManager:
             # --numstat is a machine-readable, locale-independent format:
             # additions<TAB>deletions<TAB>path (one row per changed file).
             for line in result.stdout.splitlines():
-                additions, deletions, separator, _file_path = line.partition("\t")
-                if not separator:
+                columns = line.split("\t", 2)
+                if len(columns) != 3:
                     continue
-                stats["files_changed"] += 1
+                additions, deletions, _file_path = columns
+
                 # Binary files are reported as "-" for both counts.
                 if additions.isdecimal():
                     stats["additions"] += int(additions)
