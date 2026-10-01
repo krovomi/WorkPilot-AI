@@ -159,7 +159,27 @@ def test_resume_applies_selected_model_and_effort(tmp_path: Path) -> None:
 
 def test_client_repairs_legacy_mini(tmp_path: Path) -> None:
     client = CodexCliAgentClient(model="gpt-5.5-mini", project_dir=str(tmp_path))
-    assert client.model == "gpt-5.5"
+    assert client.model == "gpt-5.5-mini"
+
+
+def test_codex_model_404_has_actionable_message() -> None:
+    from core.codex_cli_client import _codex_error
+
+    error = _codex_error(
+        "unexpected status 404 Not Found: The model `gpt-5.5` does not exist "
+        "or you do not have access to it."
+    )
+    assert "Refresh the Codex model catalog" in str(error)
+    assert "Codex's default" in str(error)
+
+
+def test_oneshot_implicit_model_uses_codex_default(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+
+    from core.oneshot import _resolve_model
+
+    assert _resolve_model("openai", None, None) == "default"
+    assert _resolve_model("openai", "gpt-5.5", None) == "gpt-5.5"
 
 
 @pytest.mark.asyncio
