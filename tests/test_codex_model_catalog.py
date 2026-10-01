@@ -109,6 +109,45 @@ def test_codex_catalog_uses_cli_inventory(monkeypatch, tmp_path):
     assert result["source"] == "cache"
 
 
+def test_codex_small_models_are_fast_and_keep_exact_id(monkeypatch, tmp_path):
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    small = {
+        "value": "gpt-5.5-mini",
+        "label": "GPT-5.5 mini",
+        "tier": "fast",
+        "supportsThinking": True,
+    }
+    monkeypatch.setattr(codex_models, "_discover_models", lambda: [small])
+
+    result = catalog.list_models("openai-codex", force_refresh=True)
+
+    assert result["models"] == [small]
+    assert codex_models.resolve_codex_model("gpt-5.5-mini") == "gpt-5.5-mini"
+
+
+def test_codex_cache_classifies_small_models_as_fast(monkeypatch, tmp_path):
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    (tmp_path / "models_cache.json").write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "slug": "gpt-5.5-mini",
+                        "display_name": "GPT-5.5 mini",
+                        "visibility": "list",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = codex_models._cached_catalog()
+
+    assert result["models"][0]["value"] == "gpt-5.5-mini"
+    assert result["models"][0]["tier"] == "fast"
+
+
 def test_codex_missing_cache_has_no_api_only_fallback(monkeypatch, tmp_path):
     monkeypatch.setenv("CODEX_HOME", str(tmp_path))
     result = catalog.list_models("openai-codex")
@@ -117,7 +156,7 @@ def test_codex_missing_cache_has_no_api_only_fallback(monkeypatch, tmp_path):
 
 
 def test_legacy_mini_is_repaired_only_for_codex():
-    assert codex_models.resolve_codex_model("gpt-5.5-mini") == "gpt-5.5"
+    assert codex_models.resolve_codex_model("gpt-5.5-mini") == "gpt-5.5-mini"
     assert codex_models.resolve_codex_model("gpt-5.5") == "gpt-5.5"
     assert codex_models.resolve_codex_model("future-custom-id") == "future-custom-id"
 
