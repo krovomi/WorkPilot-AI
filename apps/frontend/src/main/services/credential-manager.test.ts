@@ -133,6 +133,28 @@ describe("CredentialManager provider override (per-page choice)", () => {
 		expect(env.OPENAI_API_KEY).toBeUndefined();
 	});
 
+	it("injects a globally configured Grok key into task environments", () => {
+		vi.mocked(readSettingsFile).mockReturnValue({
+			selectedProvider: "grok",
+			globalGrokApiKey: "grok-key",
+		});
+		const env = new CredentialManager().getEnvironmentVariables();
+		expect(env.GROK_API_KEY).toBe("grok-key");
+	});
+
+	it.each([
+		["deepseek", "globalDeepSeekApiKey", "DEEPSEEK_API_KEY", "https://api.deepseek.com"],
+		["grok", "globalGrokApiKey", "GROK_API_KEY", "https://api.x.ai"],
+	])("injects %s key for a task override", (provider, setting, envName) => {
+		vi.mocked(readSettingsFile).mockReturnValue({
+			selectedProvider: "openai",
+			[setting]: "provider-key",
+		});
+		const env = new CredentialManager().getEnvironmentVariables(provider);
+		expect(env.SELECTED_LLM_PROVIDER).toBe(provider);
+		expect(env[envName]).toBe("provider-key");
+	});
+
 	it("canonicalises anthropic to claude so the backend routes to the SDK", () => {
 		vi.mocked(readSettingsFile).mockReturnValue({
 			selectedProvider: "openai",

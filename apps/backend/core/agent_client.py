@@ -1982,6 +1982,9 @@ class OpenAIAgentClient(AgentClient):
         reasoning_effort: str | None = None,
         prompt_cache_key: str | None = None,
         spec_dir: str | None = None,
+        api_key: str | None = None,
+        api_base: str | None = None,
+        provider: str = "openai",
     ):
         import os as _os
 
@@ -2003,8 +2006,11 @@ class OpenAIAgentClient(AgentClient):
         # automatic-prompt-cache shard. Both omitted from payload when None.
         self._reasoning_effort = reasoning_effort
         self._prompt_cache_key = prompt_cache_key
-        self._api_key: str = _os.environ.get("OPENAI_API_KEY", "")
-        self._api_base = "https://api.openai.com/v1/chat/completions"
+        self._api_key: str = (
+            api_key if api_key is not None else _os.environ.get("OPENAI_API_KEY", "")
+        )
+        self._api_base = api_base or "https://api.openai.com/v1/chat/completions"
+        self._provider_name = provider
         self._pending_query: str | None = None
         self._http_client: Any = None
         self._tool_executor: Any = None
@@ -2382,7 +2388,7 @@ class OpenAIAgentClient(AgentClient):
         }
 
     def provider_name(self) -> str:
-        return "openai"
+        return self._provider_name
 
     @staticmethod
     def _is_connection_error(exc: Exception) -> bool:
@@ -2461,11 +2467,49 @@ class GoogleAgentClient(OpenAIAgentClient):
             prompt_cache_key=None,
             spec_dir=spec_dir,
         )
-        self._api_key = _os.environ.get("GEMINI_API_KEY") or _os.environ.get(
-            "GOOGLE_API_KEY", ""
-        )
+        self._api_key = _os.environ.get("GOOGLE_API_KEY", "")
         self._api_base = (
             "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        )
+        self._provider_name = "google"
+
+    def provider_name(self) -> str:
+        return "google"
+
+
+class CompatibleProviderAgentClient(OpenAIAgentClient):
+    """Agent client for providers exposing OpenAI-compatible chat completions."""
+
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        api_key: str,
+        base_url: str,
+        system_prompt: str | None = None,
+        max_turns: int = 50,
+        project_dir: str | None = None,
+        agent_type: str = "coder",
+        spec_dir: str | None = None,
+    ):
+        endpoint = base_url.rstrip("/")
+        if not endpoint.endswith("/chat/completions"):
+            endpoint += (
+                "/v1/chat/completions"
+                if not endpoint.endswith("/v1")
+                else "/chat/completions"
+            )
+        super().__init__(
+            model=model,
+            system_prompt=system_prompt,
+            max_turns=max_turns,
+            project_dir=project_dir,
+            agent_type=agent_type,
+            spec_dir=spec_dir,
+            api_key=api_key,
+            api_base=endpoint,
+            provider=provider,
         )
 
 

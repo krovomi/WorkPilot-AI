@@ -4327,21 +4327,20 @@ export function registerWorktreeHandlers(
 						try {
 							const diffResult = await execFileAsync(
 								getToolPath("git"),
-								["diff", "--shortstat", `${baseBranch}...HEAD`],
+								["diff", "--numstat", `${baseBranch}...HEAD`],
 								{
 									cwd: entryPath,
 									encoding: "utf-8",
 								},
 							);
-							const diffStat = (diffResult.stdout as string).trim();
-
-							const filesMatch = diffStat.match(/(\d+) files? changed/);
-							const addMatch = diffStat.match(/(\d+) insertions?/);
-							const delMatch = diffStat.match(/(\d+) deletions?/);
-
-							if (filesMatch) filesChanged = parseInt(filesMatch[1], 10) || 0;
-							if (addMatch) additions = parseInt(addMatch[1], 10) || 0;
-							if (delMatch) deletions = parseInt(delMatch[1], 10) || 0;
+							for (const line of (diffResult.stdout as string).split(/\r?\n/)) {
+								const [added, deleted, filePath] = line.split("\t", 3);
+								if (!filePath) continue;
+								filesChanged += 1;
+								// Git reports binary files with "-" instead of line counts.
+								if (/^\d+$/.test(added)) additions += Number(added);
+								if (/^\d+$/.test(deleted)) deletions += Number(deleted);
+							}
 						} catch {
 							// Ignore diff errors
 						}
