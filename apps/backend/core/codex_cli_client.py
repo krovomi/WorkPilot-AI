@@ -12,6 +12,7 @@ import logging
 import os
 import re
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import aclosing
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,29 @@ class CodexCliAuthenticationError(CodexCliError):
 def openai_uses_codex_cli() -> bool:
     """Return whether OpenAI execution should reuse the Codex CLI session."""
     return os.environ.get("OPENAI_AUTH_MODE", "api-key").strip().lower() == "codex-cli"
+
+
+def openai_model_uses_api_key(model: str | None) -> bool:
+    """Route API-only model IDs through OpenAI when Codex auth is selected."""
+    if not model or not openai_uses_codex_cli():
+        return False
+    try:
+        from provider_models_catalog import _api_key_for, list_models
+
+        if not _api_key_for("openai"):
+            return False
+        codex_ids = {
+            item.get("value") for item in list_models("openai-codex").get("models", [])
+        }
+        if model in codex_ids:
+            return False
+        api_catalog = list_models("openai")
+        return api_catalog.get("source") in {"live", "cache"} and any(
+            item.get("value") == model for item in api_catalog.get("models", [])
+        )
+    except Exception as exc:  # noqa: BLE001 - routing must fall back to Codex
+        logger.debug("Could not classify OpenAI model route: %s", type(exc).__name__)
+        return False
 
 
 def _validated_option(value: str, label: str) -> str:
@@ -250,6 +274,27 @@ class CodexCliAgentClient(AgentClient):
 
         prompt = self._compose_prompt(self._pending_query)
         self._pending_query = None
+        try:
+            async with aclosing(self._receive_response_attempt(prompt)) as attempt:
+                async for message in attempt:
+                    yield message
+        except CodexCliError as error:
+            if self.model == "default" or "selected model (404)" not in str(error):
+                raise
+            rejected_model = self.model
+            self.model = "default"
+            logger.warning(
+                "[CodexCliAgentClient] Model %s is unavailable; retrying once "
+                "with the Codex CLI default",
+                rejected_model,
+            )
+            async with aclosing(self._receive_response_attempt(prompt)) as attempt:
+                async for message in attempt:
+                    yield message
+
+    async def _receive_response_attempt(
+        self, prompt: str
+    ) -> AsyncIterator[AgentMessage]:
         final_message_seen = False
 
         try:

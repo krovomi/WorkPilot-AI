@@ -24,15 +24,15 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from collections.abc import Callable
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 # Providers `_build_client` drives itself, without borrowing another vendor's
-# SDK. Anything outside this set has no agentic adapter — mistral, deepseek,
-# grok, meta, aws, cursor, custom — and `create_agent_client` runs it on Claude
-# instead, which `capabilities/providers.yaml` records as `degrades_to`.
+# SDK. Providers outside `_DIRECT_PROVIDERS` need the task context to use their
+# agent client, or fall back to Claude when no project context exists.
 #
 # For a build that is the right trade: the task runs. For a caller that is
 # *comparing* providers it is the wrong one, because the answer comes back
@@ -46,6 +46,9 @@ _DIRECT_PROVIDERS = frozenset(
         "openai",
         "windsurf",
         "google",
+        "mistral",
+        "deepseek",
+        "grok",
         "ollama",
         "local",
         "lmstudio",
@@ -65,9 +68,13 @@ _DEFAULT_MODELS = {
     "claude": "claude-haiku-4-5",
     "anthropic": "claude-haiku-4-5",
     "copilot": "gpt-4o-mini",
-    "openai": "gpt-4o-mini",
+    "openai": "gpt-4.1-mini",
     "windsurf": "claude-3.5-haiku",
     "google": "gemini-2.0-flash",
+    "gemini": "gemini-2.0-flash",
+    "mistral": "mistral-small-latest",
+    "deepseek": "deepseek-chat",
+    "grok": "grok-4-fast",
 }
 _FALLBACK_MODEL = "claude-haiku-4-5"
 
@@ -103,13 +110,23 @@ def _model_from_task(spec_dir: Path | None) -> str | None:
 def _resolve_model(provider: str, explicit: str | None, spec_dir: Path | None) -> str:
     if explicit:
         return explicit
+    if provider in ("mistral", "deepseek", "grok"):
+        return (
+            _DEFAULT_MODELS.get(provider)
+            or _model_from_task(spec_dir)
+            or _FALLBACK_MODEL
+        )
     if provider == "openai":
-        # Codex ChatGPT auth has its own account-specific model inventory. Let
-        # Codex CLI pick its account default instead of sending the API-only
-        # cheap default (gpt-4o-mini) used by one-shot utilities.
-        from core.codex_cli_client import openai_uses_codex_cli
+        # Codex ChatGPT auth has its own account-specific model inventory. A
+        # configured API key allows the cheap OpenAI API default instead.
+        from core.codex_cli_client import (
+            openai_model_uses_api_key,
+            openai_uses_codex_cli,
+        )
 
-        if openai_uses_codex_cli():
+        if openai_uses_codex_cli() and not openai_model_uses_api_key(
+            _DEFAULT_MODELS["openai"]
+        ):
             return "default"
     default = _DEFAULT_MODELS.get(provider)
     if default:
@@ -199,9 +216,13 @@ def _build_client(
 
     if provider == "openai":
         from core.agent_client import OpenAIAgentClient
-        from core.codex_cli_client import CodexCliAgentClient, openai_uses_codex_cli
+        from core.codex_cli_client import (
+            CodexCliAgentClient,
+            openai_model_uses_api_key,
+            openai_uses_codex_cli,
+        )
 
-        if openai_uses_codex_cli():
+        if openai_uses_codex_cli() and not openai_model_uses_api_key(model):
             return CodexCliAgentClient(
                 model=None if model == _DEFAULT_MODELS["openai"] else model,
                 system_prompt=system_prompt,
@@ -211,6 +232,36 @@ def _build_client(
 
         return OpenAIAgentClient(
             model=model,
+            system_prompt=system_prompt,
+            max_turns=max_turns,
+            project_dir=cwd,
+            agent_type="commit_message",
+        )
+
+    if provider in ("mistral", "deepseek", "grok"):
+        from core.agent_client import CompatibleProviderAgentClient
+        from provider_models_catalog import _api_key_for
+
+        from src.connectors.llm_config import load_provider_config
+
+        config = load_provider_config(provider) or {}
+        key = _api_key_for(provider)
+        if not key:
+            raise ValueError(f"No API key configured for {provider}")
+        base_url = (
+            os.environ.get(f"{provider.upper()}_BASE_URL")
+            or config.get("base_url")
+            or {
+                "mistral": "https://api.mistral.ai",
+                "deepseek": "https://api.deepseek.com",
+                "grok": "https://api.x.ai",
+            }[provider]
+        )
+        return CompatibleProviderAgentClient(
+            provider=provider,
+            model=model,
+            api_key=key,
+            base_url=base_url,
             system_prompt=system_prompt,
             max_turns=max_turns,
             project_dir=cwd,
@@ -228,7 +279,7 @@ def _build_client(
             agent_type="commit_message",
         )
 
-    if provider == "google":
+    if provider in ("google", "gemini"):
         from core.agent_client import GoogleAgentClient
 
         return GoogleAgentClient(
