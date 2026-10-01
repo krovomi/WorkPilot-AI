@@ -12,6 +12,7 @@ import logging
 import os
 import re
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import aclosing
 from pathlib import Path
 from typing import Any
 
@@ -250,6 +251,27 @@ class CodexCliAgentClient(AgentClient):
 
         prompt = self._compose_prompt(self._pending_query)
         self._pending_query = None
+        try:
+            async with aclosing(self._receive_response_attempt(prompt)) as attempt:
+                async for message in attempt:
+                    yield message
+        except CodexCliError as error:
+            if self.model == "default" or "selected model (404)" not in str(error):
+                raise
+            rejected_model = self.model
+            self.model = "default"
+            logger.warning(
+                "[CodexCliAgentClient] Model %s is unavailable; retrying once "
+                "with the Codex CLI default",
+                rejected_model,
+            )
+            async with aclosing(self._receive_response_attempt(prompt)) as attempt:
+                async for message in attempt:
+                    yield message
+
+    async def _receive_response_attempt(
+        self, prompt: str
+    ) -> AsyncIterator[AgentMessage]:
         final_message_seen = False
 
         try:

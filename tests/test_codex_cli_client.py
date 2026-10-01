@@ -244,6 +244,52 @@ async def test_terminal_error_event_is_reported(
 
 
 @pytest.mark.asyncio
+async def test_unavailable_model_retries_once_with_codex_default(
+    tmp_path: Path,
+) -> None:
+    processes = [
+        _FakeProcess(
+            [
+                _event(
+                    "turn.failed",
+                    message="unexpected status 404 Not Found: The model `gpt-5.5` "
+                    "does not exist or you do not have access to it.",
+                )
+            ]
+        ),
+        _FakeProcess(
+            [
+                _event(
+                    "item.completed",
+                    item={"id": "i1", "type": "agent_message", "text": "done"},
+                ),
+                _event("turn.completed", usage={}),
+            ]
+        ),
+    ]
+    calls: list[tuple[str, ...]] = []
+
+    async def process_factory(*args: str, **kwargs: object) -> _FakeProcess:
+        calls.append(args)
+        return processes.pop(0)
+
+    client = CodexCliAgentClient(
+        model="gpt-5.5",
+        project_dir=str(tmp_path),
+        executable="codex",
+        process_factory=process_factory,
+    )
+    await client.query("work")
+
+    messages = [message async for message in client.receive_response()]
+
+    assert messages[-1].content[0].text == "done"
+    assert "--model" in calls[0]
+    assert "--model" not in calls[1]
+    assert client.model == "default"
+
+
+@pytest.mark.asyncio
 async def test_nonzero_exit_reports_sanitized_stderr(tmp_path: Path) -> None:
     process = _FakeProcess([], ["not logged in"], returncode=1)
     client = CodexCliAgentClient(
