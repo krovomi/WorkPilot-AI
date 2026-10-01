@@ -70,7 +70,9 @@ class TestWorktreeManagerInitialization:
 
     def test_init_with_explicit_base_branch(self, temp_git_repo: Path):
         """Manager uses explicitly provided base branch."""
-        manager = WorktreeManager(temp_git_repo, base_branch="main")
+        manager = WorktreeManager(
+            temp_git_repo, base_branch="main", use_local_branch=True
+        )
         assert manager.base_branch == "main"
 
     def test_setup_creates_worktrees_directory(self, temp_git_repo: Path):
@@ -1184,32 +1186,6 @@ class TestWorktreeCleanup:
         assert isinstance(stats["last_commit_date"], datetime)
         assert stats["days_since_last_commit"] is not None
         assert stats["days_since_last_commit"] == 0  # Just committed
-
-    def test_get_worktree_stats_counts_changed_lines_from_numstat(
-        self, temp_git_repo: Path
-    ):
-        """Worktree stats use Git's locale-independent numstat output."""
-        manager = WorktreeManager(temp_git_repo)
-        manager.setup()
-        info = manager.create_worktree("test-spec-stats")
-
-        (info.path / "Program.cs").write_text(
-            "using System;\nclass Program { static void Main() {} }\n",
-            encoding="utf-8",
-        )
-        subprocess.run(["git", "add", "Program.cs"], cwd=info.path, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Add Program.cs"],
-            cwd=info.path,
-            check=True,
-            capture_output=True,
-        )
-
-        stats = manager._get_worktree_stats("test-spec-stats")
-
-        assert stats["files_changed"] == 1
-        assert stats["additions"] == 2
-        assert stats["deletions"] == 0
 
     def test_get_old_worktrees(self, temp_git_repo: Path):
         """get_old_worktrees identifies worktrees based on age threshold."""

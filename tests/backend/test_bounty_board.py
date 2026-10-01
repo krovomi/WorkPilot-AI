@@ -408,7 +408,7 @@ def test_collect_diff_counts_binary_files_without_locale_dependent_text(
     git_project: Path,
 ):
     """Binary --numstat rows still count as changed files with zero line counts."""
-    (git_project / "image.bin").write_bytes(b"before")
+    (git_project / "image.bin").write_bytes(b"\x00\x01before")
     subprocess.run(["git", "add", "image.bin"], cwd=git_project, check=True)
     subprocess.run(
         ["git", "commit", "-m", "Add binary file"],
@@ -416,7 +416,7 @@ def test_collect_diff_counts_binary_files_without_locale_dependent_text(
         check=True,
         capture_output=True,
     )
-    (git_project / "image.bin").write_bytes(b"after")
+    (git_project / "image.bin").write_bytes(b"\x00\x02after")
 
     diff = collect_diff(git_project, "HEAD~1")
 
