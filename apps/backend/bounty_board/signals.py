@@ -145,20 +145,24 @@ def collect_diff(
     # empty diff — the single worst way this could be unfair.
     _run_git(["add", "-A", "-N"], cwd=worktree)
 
-    stat = _run_git(["diff", "--shortstat", base_ref], cwd=worktree)
+    stat = _run_git(["diff", "--numstat", base_ref], cwd=worktree)
     if stat.returncode != 0:
         return DiffEvidence(
             unavailable_reason=f"git diff against {base_ref} failed: {stat.stderr.strip()[:200]}"
         )
 
     evidence = DiffEvidence(available=True)
-    text = stat.stdout
-    if match := re.search(r"(\d+) files? changed", text):
-        evidence.files_changed = int(match.group(1))
-    if match := re.search(r"(\d+) insertions?", text):
-        evidence.insertions = int(match.group(1))
-    if match := re.search(r"(\d+) deletions?", text):
-        evidence.deletions = int(match.group(1))
+    for line in stat.stdout.splitlines():
+        columns = line.split("\t", 2)
+        if len(columns) != 3:
+            continue
+        additions, deletions, _file_path = columns
+        evidence.files_changed += 1
+        # Binary files are reported as "-" for both counts.
+        if additions.isdecimal():
+            evidence.insertions += int(additions)
+        if deletions.isdecimal():
+            evidence.deletions += int(deletions)
 
     patch = _run_git(["diff", base_ref], cwd=worktree, timeout=120)
     if patch.returncode == 0:
