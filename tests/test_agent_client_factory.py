@@ -38,6 +38,7 @@ if "claude_agent_sdk" not in sys.modules:
 from core.agent_client import (
     AgentClient,
     ClaudeAgentClient,
+    CompatibleProviderAgentClient,
     CopilotAgentClient,
     LocalAgentClient,
     OpenAIAgentClient,
@@ -215,6 +216,62 @@ class TestCreateAgentClient:
         )
 
         assert isinstance(client, OpenAIAgentClient)
+
+    def test_openai_codex_mode_routes_api_only_model_to_api(
+        self, tmp_path, monkeypatch
+    ):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("OPENAI_AUTH_MODE", "codex-cli")
+        monkeypatch.setattr(
+            "core.codex_cli_client.openai_model_uses_api_key", lambda model: True
+        )
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gpt-4.1-mini",
+            provider="openai",
+        )
+        assert isinstance(client, OpenAIAgentClient)
+
+    @pytest.mark.parametrize(
+        ("provider", "model"),
+        [
+            ("mistral", "mistral-small-latest"),
+            ("deepseek", "deepseek-chat"),
+            ("grok", "grok-4-fast"),
+        ],
+    )
+    def test_openai_compatible_provider_uses_own_api_adapter(
+        self, provider, model, tmp_path, monkeypatch
+    ):
+        from core.client import create_agent_client
+
+        monkeypatch.setenv(f"{provider.upper()}_API_KEY", "provider-key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model=model,
+            provider=provider,
+        )
+        assert isinstance(client, CompatibleProviderAgentClient)
+        assert client.provider_name() == provider
+        assert client.model == model
+        assert client._api_key == "provider-key"
+
+    def test_gemini_alias_uses_google_agent_client(self, tmp_path, monkeypatch):
+        from core.agent_client import GoogleAgentClient
+        from core.client import create_agent_client
+
+        monkeypatch.setenv("GOOGLE_API_KEY", "google-key")
+        client = create_agent_client(
+            project_dir=tmp_path,
+            spec_dir=tmp_path,
+            model="gemini-3-flash",
+            provider="gemini",
+        )
+        assert isinstance(client, GoogleAgentClient)
+        assert client.provider_name() == "google"
 
     @patch("core.client._get_cached_project_data")
     @patch("core.client.load_project_mcp_config")

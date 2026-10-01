@@ -1557,6 +1557,7 @@ export class CredentialManager extends EventEmitter {
 					grok: ["globalGrokApiKey"],
 					meta: ["globalMetaApiKey"],
 					aws: ["globalAWSApiKey"],
+					windsurf: ["globalWindsurfApiKey"],
 				};
 				const envVarMap: Record<string, string> = {
 					openai: "OPENAI_API_KEY",
@@ -1567,11 +1568,13 @@ export class CredentialManager extends EventEmitter {
 					grok: "GROK_API_KEY",
 					meta: "META_API_KEY",
 					aws: "AWS_ACCESS_KEY_ID",
+					windsurf: "WINDSURF_API_KEY",
 				};
 				const baseUrlMap: Record<string, string> = {
 					openai: "OPENAI_BASE_URL",
 					mistral: "MISTRAL_BASE_URL",
 					deepseek: "DEEPSEEK_BASE_URL",
+					grok: "GROK_BASE_URL",
 					meta: "META_BASE_URL",
 					aws: "AWS_BEDROCK_ENDPOINT",
 				};
@@ -1763,6 +1766,7 @@ export class CredentialManager extends EventEmitter {
 
 			case "grok":
 				env.GROK_API_KEY = apiKey;
+				if (baseUrl) env.GROK_BASE_URL = baseUrl;
 				break;
 
 			case "meta":

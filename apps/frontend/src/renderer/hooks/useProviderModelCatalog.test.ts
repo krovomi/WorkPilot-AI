@@ -10,7 +10,7 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-it("uses the Codex account inventory without merging OpenAI API models", async () => {
+it("loads the combined server catalog for Codex mode", async () => {
 	useSettingsStore.setState((state) => ({
 		settings: { ...state.settings, globalOpenAIAuthMode: "codex-cli" },
 	}));
@@ -19,7 +19,11 @@ it("uses the Codex account inventory without merging OpenAI API models", async (
 		headers: new Headers({ "content-type": "application/json" }),
 		json: async () => ({
 			source: "cache",
-			models: [{ value: "gpt-5.5", label: "GPT-5.5" }],
+			models: [
+				{ value: "gpt-5.5", label: "GPT-5.5" },
+				{ value: "gpt-4.1-mini", label: "GPT-4.1 mini", tier: "fast" },
+				{ value: "gpt-5.4-mini", label: "GPT-5.4 mini", tier: "fast" },
+			],
 		}),
 	});
 	vi.stubGlobal("fetch", fetchMock);
@@ -28,7 +32,11 @@ it("uses the Codex account inventory without merging OpenAI API models", async (
 	expect(fetchMock.mock.calls[0][0]).toContain(
 		"/providers/models/openai-codex/catalog",
 	);
-	expect(result.current.models.map((m) => m.value)).toEqual(["gpt-5.5"]);
+	expect(result.current.models.map((m) => m.value)).toEqual([
+		"gpt-5.5",
+		"gpt-4.1-mini",
+		"gpt-5.4-mini",
+	]);
 });
 it("does not retain previous-provider live models while the new catalog loads", async () => {
 	const fetchMock = vi

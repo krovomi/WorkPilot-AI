@@ -78,22 +78,22 @@ lmstudio:
 # ---------------------------------------------------------------------------
 
 mistral:
-  adapter: null
+  adapter: CompatibleProviderAgentClient
   subagents: none
   effort: none
-  degrades_to: claude
+  degrades_to: null
 
 deepseek:
-  adapter: null
+  adapter: CompatibleProviderAgentClient
   subagents: none
   effort: none
-  degrades_to: claude
+  degrades_to: null
 
 grok:
-  adapter: null
+  adapter: CompatibleProviderAgentClient
   subagents: none
   effort: none
-  degrades_to: claude
+  degrades_to: null
 
 meta:
   adapter: null

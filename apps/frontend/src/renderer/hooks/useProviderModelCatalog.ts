@@ -267,7 +267,8 @@ export function refreshProviderModelCatalog(provider: string): void {
 
 function catalogKey(provider: string, authMode: string | undefined): string {
 	const key = normalize(provider.trim().toLowerCase());
-	return key === "openai" && authMode === "codex-cli" ? "openai-codex" : key;
+	if (key === "openai" && authMode === "codex-cli") return "openai-codex";
+	return key;
 }
 
 function catalogKeyFromSettings(provider: string): string {

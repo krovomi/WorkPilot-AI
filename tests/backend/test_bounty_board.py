@@ -656,7 +656,7 @@ def test_a_provider_without_an_adapter_never_reaches_a_client(
     asyncio.run(runner_module.default_contestant_runner(c, "spec", tmp_path))
 
     assert c.status == "error"
-    assert "no agentic adapter" in (c.error or "")
+    assert "a provider with no adapter must not be dispatched" in (c.error or "")
     assert c.completed_at is not None
 
 
