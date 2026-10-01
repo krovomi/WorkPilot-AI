@@ -70,7 +70,9 @@ class TestWorktreeManagerInitialization:
 
     def test_init_with_explicit_base_branch(self, temp_git_repo: Path):
         """Manager uses explicitly provided base branch."""
-        manager = WorktreeManager(temp_git_repo, base_branch="main")
+        manager = WorktreeManager(
+            temp_git_repo, base_branch="main", use_local_branch=True
+        )
         assert manager.base_branch == "main"
 
     def test_setup_creates_worktrees_directory(self, temp_git_repo: Path):

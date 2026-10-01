@@ -1404,7 +1404,12 @@ OAuth credentials. On failure it returns the local `models_cache.json` with an
 error, or the conservative static fallback; strict offline mode never starts
 discovery. An old CLI can expose fewer models than the desktop Codex app:
 update the CLI through the sidebar before expecting newly released models.
-Do not merge the API registry into this account-specific inventory.
+The Codex selector may append models returned by the OpenAI API catalogue when
+an OpenAI API key is configured. This is a display convenience, not a claim
+that the Codex account can call those models: Codex account IDs remain first
+and authoritative, and an API-only selection is routed through the OpenAI API.
+Without a key, the selector contains only the Codex account inventory and its
+offline fallback.
 
 The dropdowns used to learn about a release in one of two ways: the provider's
 own `/v1/models`, which needs an API key, or a line added to

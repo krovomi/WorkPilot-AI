@@ -184,9 +184,12 @@ def test_a_provider_with_no_adapter_is_refused_when_the_caller_asked(monkeypatch
     from core import oneshot
 
     built = []
-    monkeypatch.setattr(
-        oneshot, "_build_client", lambda *a, **k: built.append(a) or FakeClient(None)
-    )
+
+    def mock_build(*a, **k):
+        built.append(a)
+        raise ValueError("No adapter found for provider mistral")
+
+    monkeypatch.setattr(oneshot, "_build_client", mock_build)
     reported = []
 
     result = asyncio.run(
@@ -200,7 +203,9 @@ def test_a_provider_with_no_adapter_is_refused_when_the_caller_asked(monkeypatch
     )
 
     assert result == ""
-    assert built == []  # nothing ran
+    assert len(built) == 1
+    assert built[0][0] == "mistral"
+    assert len(reported) == 1
     assert "mistral" in reported[0]["message"]
 
 
