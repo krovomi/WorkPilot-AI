@@ -1254,12 +1254,6 @@ function TaskDetailModalContent({
 										})}
 									</TabsTrigger>
 									<TabsTrigger
-										value="changeGraph"
-										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-									>
-										{t("tasks:changeGraph.tab")}
-									</TabsTrigger>
-									<TabsTrigger
 										value="logs"
 										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
 									>
@@ -1273,6 +1267,12 @@ function TaskDetailModalContent({
 											{t("tasks:files.tab")}
 										</TabsTrigger>
 									)}
+									<TabsTrigger
+										value="changeGraph"
+										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+									>
+										{t("tasks:changeGraph.tab")}
+									</TabsTrigger>
 									<TabsTrigger
 										value="visualProof"
 										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
