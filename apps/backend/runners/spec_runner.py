@@ -288,10 +288,17 @@ Examples:
     # _get_active_provider() picks it up throughout the entire spec creation pipeline
     # (AgentRunner, SpecOrchestrator, etc.) even when the frontend credential manager
     # did not inject it (e.g. settings.json.selectedProvider is null).
-    if args.provider and args.provider not in ("anthropic", "claude"):
+    # Anthropic is propagated too, as "claude": the task named it, and leaving
+    # the variable alone would let the app's default provider — inherited from
+    # Electron — run a spec the task asked Claude to write.
+    if args.provider:
         import os as _os
 
-        _os.environ["SELECTED_LLM_PROVIDER"] = args.provider
+        _os.environ["SELECTED_LLM_PROVIDER"] = (
+            "claude"
+            if args.provider.lower() in ("anthropic", "claude")
+            else args.provider
+        )
         debug(
             "spec_runner",
             f"Injected SELECTED_LLM_PROVIDER={args.provider} into environment from --provider arg",

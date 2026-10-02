@@ -1680,6 +1680,63 @@ def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) 
     return _resolve_active_provider(spec_dir, consume=consume)[0]
 
 
+# Every spelling a provider arrives under, mapped to the name the client
+# factory branches on. Shared by `_resolve_active_provider` and
+# `create_agent_client`, so "anthropic" written by the frontend reaches the
+# Claude branch instead of the degraded fallback.
+_PROVIDER_ALIASES: dict[str, str] = {
+    "anthropic": "claude",
+    "claude": "claude",
+    "copilot": "copilot",
+    "openai": "openai",
+    "google": "google",
+    "gemini": "google",
+    "ollama": "ollama",
+    "meta": "meta",
+    "mistral": "mistral",
+    "deepseek": "deepseek",
+    "grok": "grok",
+    "aws": "aws",
+    "windsurf": "windsurf",
+    "cursor": "cursor",
+    "custom": "custom",
+}
+
+
+def _locked_task_provider(spec_dir: Path) -> str | None:
+    """The task-wide provider of a task whose engine is locked, else None.
+
+    Never raises: an unreadable file is an unlocked task, and the usual
+    resolution order answers.
+    """
+    try:
+        import json as _json
+
+        metadata_path = spec_dir / "task_metadata.json"
+        if not metadata_path.exists():
+            return None
+        with open(metadata_path, encoding="utf-8") as f:
+            meta = _json.load(f)
+        if not isinstance(meta, dict) or not meta.get("engineLocked"):
+            return None
+        provider = str(meta.get("provider") or "").lower().strip()
+        return provider or None
+    except Exception:
+        logger.debug("Could not read the task engine lock", exc_info=True)
+        return None
+
+
+def _normalize_provider_name(provider: str) -> str:
+    """Lower-case a provider name and fold "anthropic" into "claude".
+
+    Only that alias is folded here: "gemini" keeps its own branch in
+    `create_agent_client`, and an unknown name must reach the degraded path
+    unchanged so its log line names it.
+    """
+    name = provider.lower().strip()
+    return "claude" if name == "anthropic" else name
+
+
 def _resolve_active_provider(
     spec_dir: Path | None = None, *, consume: bool = True
 ) -> tuple[str, bool]:
@@ -1694,8 +1751,12 @@ def _resolve_active_provider(
     decision somebody took or filling a blank nobody filled.
 
     Resolution order:
+    -1. task_metadata.json `provider` when the task's engine is locked
+        (`engineLocked`): the task owns its provider, nothing global wins
     0. RESUME_WITH_PROVIDER marker file (single-shot, "Reprendre avec X")
     1. Provider selected via IPC (from frontend UI selection)
+    1.5. SELECTED_LLM_PROVIDER environment variable
+    1.7. task_metadata.json `provider` (unlocked, legacy tasks)
     2. AUTO_CLAUDE_PROVIDER environment variable
     3. Project-level _AUTO_CLAUDE_DIR/.env → AI_PROVIDER key
     4. Default: "claude"
@@ -1708,23 +1769,25 @@ def _resolve_active_provider(
         …) and whether any source actually named it.
     """
     # Provider name mapping (shared across all resolution strategies)
-    provider_mapping = {
-        "anthropic": "claude",
-        "claude": "claude",
-        "copilot": "copilot",
-        "openai": "openai",
-        "google": "google",
-        "gemini": "google",
-        "ollama": "ollama",
-        "meta": "meta",
-        "mistral": "mistral",
-        "deepseek": "deepseek",
-        "grok": "grok",
-        "aws": "aws",
-        "windsurf": "windsurf",
-        "cursor": "cursor",
-        "custom": "custom",
-    }
+    provider_mapping = _PROVIDER_ALIASES
+
+    # A task that owns its engine answers before anything else: the provider
+    # was chosen for this task, at creation or on a resume, and neither the
+    # default provider (SELECTED_LLM_PROVIDER, inherited from the app) nor a
+    # leftover marker from an older resume path may replace it.
+    if spec_dir:
+        locked = _locked_task_provider(Path(spec_dir))
+        if locked:
+            if consume:
+                (Path(spec_dir) / RESUME_WITH_PROVIDER_FILE).unlink(missing_ok=True)
+            mapped_locked = provider_mapping.get(locked, locked)
+            logger.info(
+                "[_get_active_provider] Resolved from the task's own engine: "
+                "'%s' -> '%s'",
+                locked,
+                mapped_locked,
+            )
+            return mapped_locked, True
 
     # 0. Highest priority: explicit "resume with X" marker written by the
     # frontend when the user picked a different provider from the paused-task
@@ -2147,6 +2210,8 @@ def create_agent_client(
     provider_chosen = provider is not None
     if provider is None:
         provider, provider_chosen = _resolve_active_provider(spec_dir)
+    else:
+        provider = _normalize_provider_name(provider)
 
     from core.offline_policy import local_endpoint, resolve_offline_route
 
