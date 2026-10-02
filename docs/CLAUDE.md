@@ -131,6 +131,7 @@ the backend one second later, over a service it never talks to.
 
 ## Project Structure
 
+```
 WorkPilot-AI/
 ├── apps/
 │   ├── backend/                      # Python backend/CLI — ALL agent logic
@@ -179,6 +180,7 @@ WorkPilot-AI/
 ├── shared_docs/                      # Long-form reference (configuration, architecture)
 ├── tests/                            # Backend test suite
 └── scripts/                          # Build and utility scripts
+```
 
 ## Commands Quick Reference
 
