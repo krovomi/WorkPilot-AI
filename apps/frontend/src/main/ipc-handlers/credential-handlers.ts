@@ -247,6 +247,27 @@ async function pnpmCanInstallGlobally(): Promise<boolean> {
 }
 
 /**
+ * Which package manager installed the `codex` that PATH resolves to, judged
+ * from its real path. `undefined` when none is found or the path says nothing.
+ */
+async function detectCodexOwner(): Promise<"pnpm" | "npm" | undefined> {
+	try {
+		const locator = isWindows() ? "where" : "which";
+		const probe = await execFileAsync(locator, ["codex"], {
+			encoding: "utf-8",
+			timeout: 5000,
+			windowsHide: true,
+		});
+		const first = probe.stdout.split(/\r?\n/).find((l) => l.trim());
+		if (!first) return undefined;
+		const real = await fs.realpath(first.trim()).catch(() => first.trim());
+		return /pnpm/i.test(first) || /pnpm/i.test(real) ? "pnpm" : "npm";
+	} catch {
+		return undefined;
+	}
+}
+
+/**
  * Install or update @openai/codex globally.
  *
  * pnpm when it is set up, npm otherwise. npm needs no equivalent of
@@ -261,7 +282,11 @@ async function runCodexUpdate(): Promise<{
 	stdout: string;
 	stderr: string;
 }> {
-	const usePnpm = await pnpmCanInstallGlobally();
+	// The manager that owns the `codex` found on PATH wins: installing with the
+	// other one succeeds, writes to a different prefix, and leaves the binary the
+	// app actually runs on its old version.
+	const owner = await detectCodexOwner();
+	const usePnpm = owner ? owner === "pnpm" : await pnpmCanInstallGlobally();
 	const manager = usePnpm ? "pnpm" : "npm";
 
 	try {
@@ -608,6 +633,18 @@ export function registerCredentialHandlers(): void {
 					latest,
 					isOutdated,
 				});
+
+				// The install command exiting 0 proves nothing about the binary the
+				// app runs: report it as a failure instead of a silent no-op.
+				if (isOutdated) {
+					return {
+						success: false,
+						version,
+						latest,
+						isOutdated,
+						error: `Codex CLI is still at ${version} after the update (latest: ${latest}). The \`codex\` on your PATH is probably managed by another package manager; update it from a terminal.`,
+					};
+				}
 
 				return { success: true, version, latest, isOutdated };
 			} catch (error) {
