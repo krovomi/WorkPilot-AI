@@ -131,6 +131,7 @@ the backend one second later, over a service it never talks to.
 
 ## Project Structure
 
+```
 WorkPilot-AI/
 ├── apps/
 │   ├── backend/                      # Python backend/CLI — ALL agent logic
@@ -179,6 +180,7 @@ WorkPilot-AI/
 ├── shared_docs/                      # Long-form reference (configuration, architecture)
 ├── tests/                            # Backend test suite
 └── scripts/                          # Build and utility scripts
+```
 
 ## Commands Quick Reference
 
@@ -1394,6 +1396,22 @@ unpinned, so both names are allowlisted — an entry for a tool the running serv
 not expose is inert, a missing entry for the one it does expose is silent failure.
 
 ### New models without a pull request
+
+ChatGPT-authenticated Codex is separate from the OpenAI API registry.
+`codex_models.py` queries `codex app-server` through `core/codex_catalog_rpc.py`
+using the backend's PATH and CODEX_HOME, then caches discovery for 15 minutes.
+Explicit refresh bypasses that cache; the Codex sidebar refresh/update actions
+also refresh model selectors. Discovery never starts an agent turn or reads
+OAuth credentials. On failure it returns the local `models_cache.json` with an
+error, or the conservative static fallback; strict offline mode never starts
+discovery. An old CLI can expose fewer models than the desktop Codex app:
+update the CLI through the sidebar before expecting newly released models.
+The Codex selector may append models returned by the OpenAI API catalogue when
+an OpenAI API key is configured. This is a display convenience, not a claim
+that the Codex account can call those models: Codex account IDs remain first
+and authoritative, and an API-only selection is routed through the OpenAI API.
+Without a key, the selector contains only the Codex account inventory and its
+offline fallback.
 
 The dropdowns used to learn about a release in one of two ways: the provider's
 own `/v1/models`, which needs an API key, or a line added to

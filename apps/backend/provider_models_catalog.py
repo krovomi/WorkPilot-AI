@@ -65,11 +65,12 @@ STATIC_FALLBACK: dict[str, list[dict[str, Any]]] = provider_catalog()
 # Filtering rules — strict allow-list per provider
 # ---------------------------------------------------------------------------
 
-# OpenAI: modern chat / reasoning families (May 2026: GPT-5.5, GPT-5.2, GPT-5,
+# OpenAI: modern chat / reasoning families (GPT-4.1 small variants, GPT-5+,
 # o-series). Excludes embeddings, TTS, Whisper, image, moderations, gpt-3.5,
 # gpt-4-turbo, search/transcribe/realtime variants.
 _OPENAI_KEEP = re.compile(
-    r"^(gpt-(?:[5-9]|\d{2,})(?:\.\d+)?|gpt-4\.1|o\d+|chatgpt-4o)(-|$)", re.IGNORECASE
+    r"^(gpt-(?:[5-9]|\d{2,})(?:\.\d+)?|gpt-4\.1|gpt-4o-mini|o\d+|chatgpt-4o)(-|$)",
+    re.IGNORECASE,
 )
 _OPENAI_DROP = re.compile(
     r"(embedding|whisper|tts|dall-?e|moderation|audio|realtime|transcribe|search|image"
@@ -236,7 +237,25 @@ def _api_key_for(provider: str) -> str | None:
         logger.debug("llm_config unavailable: %s", e)
         return None
     cfg = load_provider_config(provider) or {}
+    aliases = {
+        "claude": ("anthropic",),
+        "anthropic": ("claude",),
+        "gemini": ("google",),
+        "google": ("gemini",),
+    }
     key = cfg.get("api_key") or os.environ.get(f"{provider.upper()}_API_KEY")
+    for alias in aliases.get(provider, ()):
+        if not key:
+            key = (load_provider_config(alias) or {}).get("api_key")
+    if not key and provider in aliases:
+        key = next(
+            (
+                os.environ.get(f"{alias.upper()}_API_KEY")
+                for alias in aliases[provider]
+                if os.environ.get(f"{alias.upper()}_API_KEY")
+            ),
+            None,
+        )
     return key.strip() if isinstance(key, str) and key.strip() else None
 
 
@@ -404,9 +423,24 @@ def _fetch_openai_compatible(
     key = _api_key_for(provider)
     if not key:
         return []
+    configured = {}
+    try:
+        from src.connectors.llm_config import load_provider_config
+
+        configured = load_provider_config(provider) or {}
+    except Exception:  # noqa: BLE001 - optional custom API base
+        pass
+    if configured.get("base_url"):
+        base_url = str(configured["base_url"]).rstrip("/")
+    if base_url.endswith("/v1"):
+        models_url = f"{base_url}/models"
+    elif base_url.endswith("/v1/models"):
+        models_url = base_url
+    else:
+        models_url = f"{base_url.rstrip('/')}/v1/models"
     with httpx.Client(timeout=HTTP_TIMEOUT) as client:
         resp = client.get(
-            f"{base_url.rstrip('/')}/v1/models",
+            models_url,
             headers={"Authorization": f"Bearer {key}"},
         )
     resp.raise_for_status()
@@ -431,18 +465,28 @@ def _fetch_openai_compatible(
 
 def _fetch_mistral() -> list[dict[str, Any]]:
     return _fetch_openai_compatible(
-        "mistral", "https://api.mistral.ai", _MISTRAL_KEEP, _MISTRAL_DROP
+        "mistral",
+        os.environ.get("MISTRAL_BASE_URL", "https://api.mistral.ai"),
+        _MISTRAL_KEEP,
+        _MISTRAL_DROP,
     )
 
 
 def _fetch_deepseek() -> list[dict[str, Any]]:
     return _fetch_openai_compatible(
-        "deepseek", "https://api.deepseek.com", _DEEPSEEK_KEEP
+        "deepseek",
+        os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        _DEEPSEEK_KEEP,
     )
 
 
 def _fetch_grok() -> list[dict[str, Any]]:
-    return _fetch_openai_compatible("grok", "https://api.x.ai", _GROK_KEEP, _GROK_DROP)
+    return _fetch_openai_compatible(
+        "grok",
+        os.environ.get("GROK_BASE_URL", "https://api.x.ai"),
+        _GROK_KEEP,
+        _GROK_DROP,
+    )
 
 
 def _local_llm_root(provider: str = "ollama") -> str:
@@ -671,7 +715,28 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
     if provider == "openai-codex":
         from codex_models import codex_model_catalog
 
-        return codex_model_catalog()
+        codex_catalog = codex_model_catalog(force_refresh=force_refresh)
+        if not _api_key_for("openai"):
+            return codex_catalog
+
+        # Keep Codex account IDs first and authoritative. API-only models can
+        # be displayed alongside them when an API key exists; the client
+        # factory routes those IDs to the API client.
+        api_catalog = list_models("openai", force_refresh=force_refresh)
+        if api_catalog.get("source") not in {"live", "cache"}:
+            return codex_catalog
+        seen = {m.get("value") for m in codex_catalog.get("models", [])}
+        combined = list(codex_catalog.get("models", []))
+        combined.extend(
+            model
+            for model in api_catalog.get("models", [])
+            if model.get("value") not in seen
+        )
+        return {**codex_catalog, "models": combined}
+    if provider in {"anthropic", "claude"}:
+        provider = "anthropic"
+    elif provider in {"google", "gemini"}:
+        provider = "google"
     provider = {
         "claude": "anthropic",
         "gemini": "google",

@@ -404,6 +404,28 @@ def test_a_newly_created_file_counts_as_a_change(git_project: Path):
     assert "new_feature.py" in diff.patch
 
 
+def test_collect_diff_counts_binary_files_without_locale_dependent_text(
+    git_project: Path,
+):
+    """Binary --numstat rows still count as changed files with zero line counts."""
+    (git_project / "image.bin").write_bytes(b"\x00\x01before")
+    subprocess.run(["git", "add", "image.bin"], cwd=git_project, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Add binary file"],
+        cwd=git_project,
+        check=True,
+        capture_output=True,
+    )
+    (git_project / "image.bin").write_bytes(b"\x00\x02after")
+
+    diff = collect_diff(git_project, "HEAD~1")
+
+    assert diff.available
+    assert diff.files_changed == 1
+    assert diff.insertions == 0
+    assert diff.deletions == 0
+
+
 def test_an_untouched_worktree_is_an_empty_diff(git_project: Path):
     diff = collect_diff(git_project, "HEAD")
     assert diff.available
@@ -634,7 +656,7 @@ def test_a_provider_without_an_adapter_never_reaches_a_client(
     asyncio.run(runner_module.default_contestant_runner(c, "spec", tmp_path))
 
     assert c.status == "error"
-    assert "no agentic adapter" in (c.error or "")
+    assert "a provider with no adapter must not be dispatched" in (c.error or "")
     assert c.completed_at is not None
 
 
