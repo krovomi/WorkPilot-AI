@@ -303,8 +303,7 @@
 	},
 	"providerSelector": {
 		"updateFailed": "Unable to change provider",
-		"taskUpdateFailed": "Updating {{count}} task(s) failed. Select the provider again to retry.",
-		"label": "AI Provider",
+		"label": "Default provider",
 		"placeholder": "-- Choose a provider --",
 		"status": {
 			"ok": "OK",

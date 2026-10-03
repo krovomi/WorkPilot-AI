@@ -126,9 +126,22 @@ class AgentRunner:
             )
 
         # Determine which provider to use
-        from core.client import _get_active_provider
+        from core.client import _get_active_provider, _normalize_provider_name
+        from phase_config import get_phase_provider, is_engine_locked
 
-        active_provider = _get_active_provider(self.spec_dir)
+        # A task that owns its engine names the spec phase's provider itself;
+        # the task-wide provider `_get_active_provider` returns may belong to
+        # another phase.
+        locked_provider = (
+            get_phase_provider(self.spec_dir, phase="spec")
+            if is_engine_locked(self.spec_dir)
+            else None
+        )
+        active_provider = (
+            _normalize_provider_name(locked_provider)
+            if locked_provider
+            else _get_active_provider(self.spec_dir)
+        )
         debug("agent_runner", f"Active provider resolved: {active_provider}")
 
         # Create client with thinking budget

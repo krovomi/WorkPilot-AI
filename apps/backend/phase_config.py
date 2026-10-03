@@ -256,6 +256,11 @@ class TaskMetadataConfig(TypedDict, total=False):
     phaseProviders: PhaseProviderConfig
     model: str
     thinkingLevel: str
+    # The task owns its engine: provider, model and effort per phase were
+    # chosen for this task and nothing global (the default provider, an
+    # inherited SELECTED_LLM_PROVIDER) may replace them. Written by the
+    # frontend at creation, edit, resume and hot-swap.
+    engineLocked: bool
 
 
 Phase = Literal["spec", "planning", "coding", "qa"]
@@ -579,8 +584,17 @@ def _resolve_cli_model(cli_model: str | None) -> str | None:
 def _resolve_auto_profile_model(
     metadata: TaskMetadataConfig, phase: Phase, cli_provider: str | None
 ) -> str | None:
-    """Resolve model from auto profile configuration."""
-    if not metadata.get("isAutoProfile") or not metadata.get("phaseModels"):
+    """Resolve model from auto profile configuration.
+
+    A task whose engine is locked reads its per-phase model the same way: the
+    model was chosen for that phase, whatever profile produced it. A locked
+    task missing one phase falls through to its single model rather than to
+    the Claude default, which would pair a Claude id with another provider.
+    """
+    if not metadata.get("phaseModels"):
+        return None
+    locked = bool(metadata.get("engineLocked"))
+    if not metadata.get("isAutoProfile") and not locked:
         return None
 
     phase_models = metadata["phaseModels"]
@@ -589,7 +603,11 @@ def _resolve_auto_profile_model(
         or _metadata_phase_provider(metadata, phase)
         or metadata.get("provider")
     )
-    model = phase_models.get(phase, DEFAULT_PHASE_MODELS[phase])
+    model = phase_models.get(phase)
+    if not model:
+        if locked:
+            return None
+        model = DEFAULT_PHASE_MODELS[phase]
     return _resolve_provider_model(model, provider)
 
 
@@ -602,6 +620,14 @@ def _resolve_single_model(
 
     provider = cli_provider or metadata.get("provider")
     return _resolve_provider_model(metadata["model"], provider)
+
+
+def is_engine_locked(spec_dir: Path | None) -> bool:
+    """Whether the task in `spec_dir` owns its provider/model/effort."""
+    if not spec_dir:
+        return False
+    metadata = load_task_metadata(Path(spec_dir))
+    return bool(metadata and metadata.get("engineLocked"))
 
 
 def _resolve_complexity_routing(
