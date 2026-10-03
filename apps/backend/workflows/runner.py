@@ -68,6 +68,8 @@ __all__ = [
     "execution_phase_for",
     "SKILL_PHASE_AGENTS",
     "find_skill_body",
+    "phase_provider",
+    "CUSTOM_EXECUTORS",
     "skill_requires",
     "phases_between",
     "run_skill_phase",
@@ -135,6 +137,7 @@ CONFIG_PHASE = {
     "spec-conformance": "qa",
     "store-readiness": "qa",
     "verify": "qa",
+    "verify-replay": "qa",
     # Architecture mapping runs after QA and describes the system topology changes.
     "architecture-map": "qa",
 }
@@ -202,7 +205,10 @@ SKILL_PHASE_AGENTS = {
     "review": "pr_reviewer",
     "adversarial-review": "pr_reviewer",
     "spec-conformance": "spec_validation",
-    "verify": "qa_reviewer",
+    # The verification loop drives the app and may fix it: `verifier` writes,
+    # like `qa_fixer`, and gets the `verify_*` tools on every provider.
+    "verify": "verifier",
+    "verify-replay": "verifier",
 }
 _DEFAULT_AGENT = "analyzer"
 
@@ -343,7 +349,7 @@ def phases_between(profile, *, after: str | None, before: str | None) -> list:
 
 
 def find_skill_body(
-    repo_root: Path, pack: str, skill: str
+    repo_root: Path, pack: str, skill: str, provider: str | None = None
 ) -> tuple[str, Path, dict] | None:
     """The procedure text of a skill, where it was read from, and its `requires`.
 
@@ -362,8 +368,12 @@ def find_skill_body(
     step reads a file under `_bmad/`, and the session spent itself searching
     for a tree that was never there. `skill_requires` is what lets the caller
     ask the question the build could not ask on its behalf.
+
+    ``provider`` selects the skill's provider overlays (`providers/*.md`, see
+    `skills_registry.overlays`): the body returned is the one *that* provider
+    should follow. A skill without overlays reads exactly as before.
     """
-    from skills_registry.frontmatter import parse_frontmatter
+    from skills_registry.overlays import resolve_skill_file
 
     candidates = [
         repo_root / ".agents" / "skills" / skill / "SKILL.md",
@@ -373,12 +383,19 @@ def find_skill_body(
         try:
             if not path.is_file():
                 continue
-            meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
+            resolved = resolve_skill_file(path, provider)
         except (OSError, ValueError) as exc:
             logger.debug("could not read %s: %s", path, exc)
             continue
-        if body.strip():
-            return body, path, _requires_of(meta)
+        if resolved.body.strip():
+            if resolved.overlays:
+                logger.debug(
+                    "skill %s specialised for %s by %s",
+                    skill,
+                    provider,
+                    ", ".join(resolved.overlays),
+                )
+            return resolved.body, path, _requires_of(resolved.meta)
     return None
 
 
@@ -647,6 +664,34 @@ def _run_ui_design_system(resolved, ctx: PhaseContext) -> PhaseOutcome:
 _DETERMINISTIC_RUNNERS = {"ui-design-system": _run_ui_design_system}
 
 
+def phase_provider(spec_dir: Path, config_phase: str) -> tuple[str | None, str]:
+    """``(explicit, effective)`` provider for a phase.
+
+    ``explicit`` is what the task configured for this phase (or for the whole
+    task) — handed to `create_agent_client` so a per-phase choice is honoured,
+    the way `qa/loop.py` and the planner already honour it. Skill phases used
+    to pass nothing, so a review configured for Ollama ran on whatever the
+    project defaulted to. ``effective`` is what will actually run, read
+    without consuming the resume marker; it picks the skill's overlays.
+    """
+    explicit: str | None = None
+    try:
+        from phase_config import get_phase_provider
+
+        explicit = get_phase_provider(spec_dir, phase=config_phase)
+    except Exception as exc:  # noqa: BLE001 - absent config is not an error
+        logger.debug("no phase provider for %s: %s", config_phase, exc)
+    if explicit:
+        return explicit, explicit
+    try:
+        from core.client import peek_active_provider
+
+        return None, peek_active_provider(spec_dir)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("could not peek the active provider: %s", exc)
+        return None, "claude"
+
+
 async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     """Run one skill-backed phase. Never raises."""
     phase = resolved.phase
@@ -657,7 +702,13 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
         # The engine is a subprocess; keep the event loop free while it runs.
         return await asyncio.to_thread(deterministic, resolved, ctx)
 
-    found = find_skill_body(ctx.repo_root, phase.pack, phase.skill)
+    if phase.id in CUSTOM_EXECUTORS:
+        return await CUSTOM_EXECUTORS[phase.id](resolved, ctx)
+
+    config_phase = CONFIG_PHASE.get(phase.id, _DEFAULT_CONFIG_PHASE)
+    explicit_provider, provider = phase_provider(ctx.spec_dir, config_phase)
+
+    found = find_skill_body(ctx.repo_root, phase.pack, phase.skill, provider)
     if found is None:
         return PhaseOutcome(
             phase.id,
@@ -703,7 +754,6 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     log_phase = getattr(LogPhase, log_phase_for(phase.id), LogPhase.CODING)
     _announce(phase.id)
 
-    config_phase = CONFIG_PHASE.get(phase.id, _DEFAULT_CONFIG_PHASE)
     agent_type = phase.agent or SKILL_PHASE_AGENTS.get(phase.id, _DEFAULT_AGENT)
 
     # `fresh-context` means exactly this: the session must not rehydrate a
@@ -737,6 +787,7 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
             max_thinking_tokens=get_phase_thinking_budget(ctx.spec_dir, config_phase),
             use_subagents=subagents_allowed(resolved.dispatch),
             roster=phase.roster,
+            provider=explicit_provider,
         )
         prompt = _build_prompt(resolved, body, ctx)
         if jev_advice:
@@ -776,6 +827,47 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
         detail=(f"→ {output_path.name}" if output_path else ""),
         output_path=output_path,
     )
+
+
+async def _run_verify_loop(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `verify` phase: `verify.phase`, imported when it runs."""
+    try:
+        from verify.phase import run_verify_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_verify_phase(resolved, ctx)
+
+
+async def _run_verify_replay(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `verify-replay` phase: `verify.replay`, no model involved."""
+    try:
+        from verify.replay import run_replay_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_replay_phase(resolved, ctx)
+
+
+# Skill phases whose procedure is *driven* by WorkPilot's Python rather than
+# handed to a single one-shot session. `verify` names its skill like any other
+# phase — that is what the provider overlays and the slash command read — but
+# launching the application, reading its logs, looping a fixer while the error
+# count falls and tracing performance are deterministic steps every provider
+# must get identically, so the loop owns them and the skill drives only the
+# part a model is needed for. Keyed by phase id, for the reason
+# `BUILTIN_EXECUTORS` is.
+CUSTOM_EXECUTORS = {"verify": _run_verify_loop, "verify-replay": _run_verify_replay}
 
 
 async def run_skill_phases(

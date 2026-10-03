@@ -83,13 +83,13 @@ class TestPhaseWindows:
         ]
         # `design-check` sits between `coding` and `qa` in the file and is
         # absent here on purpose: `gates.run_deterministic_gates` runs it.
-        assert [r.id for r in mid] == ["review"]
+        assert [r.id for r in mid] == ["review", "verify"]
         assert [r.id for r in post] == [
             "adversarial-review",
             "spec-conformance",
             "store-readiness",
             "architecture-map",
-            "verify",
+            "verify-replay",
         ]
 
     def test_a_pack_with_two_phases_is_split_by_phase_not_by_pack(self, workflow):
@@ -178,13 +178,13 @@ class TestPhaseWindows:
 
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
-        assert [r.id for r in mid] == ["review"]
+        assert [r.id for r in mid] == ["review", "verify"]
         assert [r.id for r in post] == [
             "adversarial-review",
             "spec-conformance",
             "store-readiness",
             "architecture-map",
-            "verify",
+            "verify-replay",
         ]
 
     def test_phases_owned_by_another_executor_are_stepped_over(self, workflow):
@@ -217,9 +217,11 @@ class TestPhaseWindows:
         # `analyze` is bought at medium; `ui-design-system` runs no model, so
         # no effort level has anything to save by dropping it.
         assert [r.id for r in planned] == ["ui-design-system"]
-        assert mid == []
-        # `verify` is a hard gate: never pruned, at any level.
-        assert [r.id for r in post] == ["verify"]
+        # `verify` is a hard gate: never pruned, at any level. It runs before
+        # QA so the reviewer judges code already seen running.
+        assert [r.id for r in mid] == ["verify"]
+        # Its replay costs no token, so no level drops it either.
+        assert [r.id for r in post] == ["verify-replay"]
 
     def test_every_builtin_phase_named_here_exists_in_the_workflow(self, workflow):
         declared = {p.id for p in workflow.phases}
@@ -476,14 +478,17 @@ class TestRunSkillPhase:
     ):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen, response="Tests: pass")
-        _write_skill(tmp_path, "verification-before-completion", "Run the suite.")
+        _write_skill(tmp_path, "bmad-review", "Read the diff.")
 
-        profile = profile_at(workflow, "high")
-        verify = next(r for r in profile.run if r.id == "verify")
-        outcome = asyncio.run(run_skill_phase(verify, self._ctx(tmp_path)))
+        # `verify` is driven by the verification loop (`CUSTOM_EXECUTORS`);
+        # an ordinary skill phase is what this pins: its report is kept where
+        # the next reader looks.
+        profile = profile_at(workflow, "ultrathink")
+        phase = next(r for r in profile.run if r.id == "adversarial-review")
+        outcome = asyncio.run(run_skill_phase(phase, self._ctx(tmp_path)))
 
         assert outcome.output_path is not None
-        assert outcome.output_path.name == "verify.md"
+        assert outcome.output_path.name == "adversarial-review.md"
         assert "Tests: pass" in outcome.output_path.read_text(encoding="utf-8")
 
 

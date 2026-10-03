@@ -107,6 +107,25 @@ def _server_id(entry: dict[str, Any], index: int) -> str:
     return _sanitize(str(raw)) or f"server{index}"
 
 
+def _field(obj: Any, *names: str) -> Any:
+    """The first of ``names`` present on ``obj`` (attribute or key).
+
+    The `mcp` package renamed its fields to snake_case in 2.0
+    (`inputSchema` -> `input_schema`, `isError` -> `is_error`,
+    `structuredContent` -> `structured_content`), and it arrives here
+    unpinned, through `claude-agent-sdk`. Reading only the 1.x spelling made
+    every bridged tool schema-less and every tool error read as a success on a
+    2.x install — so both spellings are read.
+    """
+    for name in names:
+        value = getattr(obj, name, None)
+        if value is None and isinstance(obj, dict):
+            value = obj.get(name)
+        if value is not None:
+            return value
+    return None
+
+
 def _result_to_text(result: Any) -> str:
     """Flatten an MCP CallToolResult into plain text for the agent transcript."""
     content = getattr(result, "content", None)
@@ -114,7 +133,7 @@ def _result_to_text(result: Any) -> str:
         content = result.get("content")
     if not content:
         # Some servers return structured content only.
-        structured = getattr(result, "structuredContent", None)
+        structured = _field(result, "structuredContent", "structured_content")
         if structured is not None:
             try:
                 return json.dumps(structured, ensure_ascii=False)
@@ -183,7 +202,7 @@ class MCPToolManager:
                     if not tname:
                         continue
                     full = f"{MCP_TOOL_PREFIX}{sid}__{_sanitize(tname)}"
-                    schema = getattr(tool, "inputSchema", None) or {
+                    schema = _field(tool, "inputSchema", "input_schema") or {
                         "type": "object",
                         "properties": {},
                     }
@@ -241,7 +260,7 @@ class MCPToolManager:
     async def call(self, name: str, arguments: dict[str, Any]) -> str:
         session, real = self._route[name]
         result = await session.call_tool(real, arguments or {})
-        if getattr(result, "isError", False):
+        if _field(result, "isError", "is_error"):
             return f"MCP tool error: {_result_to_text(result) or name}"
         return _result_to_text(result)
 

@@ -153,6 +153,31 @@ CHROME_DEVTOOLS_TOOLS = [
     # Network
     "mcp__chrome-devtools__list_network_requests",  # List network requests
     "mcp__chrome-devtools__get_network_request",  # Get specific network request
+    # Performance — the trace the verification loop keeps as evidence
+    "mcp__chrome-devtools__performance_start_trace",  # Record a trace (reload + auto-stop)
+    "mcp__chrome-devtools__performance_stop_trace",  # Stop a running trace, summary of LCP/CLS
+    "mcp__chrome-devtools__performance_analyze_insight",  # Detail of one trace insight
+    "mcp__chrome-devtools__lighthouse_audit",  # Accessibility / best-practices / SEO scores
+]
+
+# The verification loop's own server (`verify/mcp_server.py`, `workpilot-verify`):
+# launch the app, drive it, call its endpoints, trace it, record the evidence.
+# The same tools reach the providers without MCP in-process (`verify.tools`).
+VERIFY_TOOLS = [
+    f"mcp__workpilot-verify__{name}"
+    for name in (
+        "verify_detect",
+        "verify_launch",
+        "verify_logs",
+        "verify_stop",
+        "verify_browser",
+        "verify_screenshot",
+        "verify_perf_trace",
+        "verify_endpoints",
+        "verify_call_endpoint",
+        "verify_device",
+        "verify_record",
+    )
 ]
 
 # =============================================================================
@@ -294,6 +319,28 @@ AGENT_CONFIGS = {
             TOOL_GET_BUILD_PROGRESS,
             TOOL_UPDATE_QA_STATUS,
             TOOL_RECORD_GOTCHA,
+        ],
+        "thinking_default": "medium",
+    },
+    # The verification loop's driver (`verify/loop.py`): runs the app the task
+    # changed, drives it to the new state, calls the changed endpoints, and may
+    # fix what it finds — so it writes, like `qa_fixer`, and is not one of the
+    # read-only phases. `verify` is its own server; `browser` and
+    # `chrome-devtools` stay available for a session that prefers them.
+    "verifier": {
+        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
+        "mcp_servers": [
+            "context7",
+            "workpilot",
+            "verify",
+            "browser",
+            "chrome-devtools",
+        ],
+        "mcp_servers_optional": [],
+        "auto_claude_tools": [
+            TOOL_GET_BUILD_PROGRESS,
+            TOOL_RECORD_GOTCHA,
+            TOOL_GET_SESSION_CONTEXT,
         ],
         "thinking_default": "medium",
     },
@@ -476,6 +523,8 @@ def _map_mcp_server_name(
         "electron": "electron",
         "puppeteer": "puppeteer",
         "chrome-devtools": "chrome-devtools",
+        "verify": "verify",
+        "workpilot-verify": "verify",
         "workpilot": "workpilot",
         "github": "github",
         "brave-search": "brave-search",

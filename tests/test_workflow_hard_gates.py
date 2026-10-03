@@ -21,7 +21,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
-from workflows.hard_gates import HardGateReport, HardGateResult  # noqa: E402
+from workflows.hard_gates import (  # noqa: E402
+    APP_VERIFIED,
+    HardGateReport,
+    HardGateResult,
+    gate_names,
+)
 
 from workflows import (  # noqa: E402
     evaluate_hard_gates,
@@ -42,13 +47,17 @@ def _profile(effort="medium"):
 def test_the_workflow_declares_a_hard_gate():
     """If this stops being true, the rest of the file tests nothing."""
     gates = [p.hard_gate for p in WORKFLOW.phases if p.hard_gate]
-    assert gates == ["tests-pass"]
+    assert gates == ["tests-pass,app-verified"]
+    assert gate_names(gates[0]) == ["tests-pass", "app-verified"]
 
 
 @pytest.mark.parametrize("effort", ["none", "low", "medium", "high", "ultrathink"])
 def test_the_gate_is_evaluated_at_every_effort_level(tmp_path: Path, effort: str):
     report = evaluate_hard_gates(_profile(effort), tmp_path, tests_passed=True)
-    assert [r.phase_id for r in report.results] == ["verify"], effort
+    assert [(r.phase_id, r.gate) for r in report.results] == [
+        ("verify", "tests-pass"),
+        ("verify", "app-verified"),
+    ], effort
 
 
 # ── the three outcomes ────────────────────────────────────────────────────────
@@ -153,3 +162,55 @@ def test_the_gate_and_observe_cannot_disagree(tmp_path: Path):
         recorded = ExternalSignal.TESTS_PASSED in signals
         assert gate_held is value
         assert recorded is (value is True)
+
+
+# ── app-verified: the verification loop's record ─────────────────────────────
+
+
+def _write_record(spec_dir: Path, status: str, reason: str = "") -> None:
+    import json
+
+    (spec_dir / "verify").mkdir(parents=True, exist_ok=True)
+    (spec_dir / "verify" / "verify.json").write_text(
+        json.dumps({"status": status, "reason": reason, "score": 88}), encoding="utf-8"
+    )
+
+
+def _app_gate(report):
+    return next(r for r in report.results if r.gate == APP_VERIFIED)
+
+
+def test_no_verification_record_is_unknown_not_a_failure(tmp_path: Path):
+    report = evaluate_hard_gates(_profile(), tmp_path, tests_passed=True)
+    gate = _app_gate(report)
+    assert gate.held is None
+    assert "did not run" in gate.detail
+    assert not report.blocking
+
+
+def test_a_passing_verification_holds_the_gate(tmp_path: Path):
+    _write_record(tmp_path, "pass")
+    gate = _app_gate(evaluate_hard_gates(_profile(), tmp_path, tests_passed=True))
+    assert gate.held is True
+    assert "88" in gate.detail
+
+
+def test_a_failed_verification_blocks(tmp_path: Path):
+    _write_record(tmp_path, "fail", "2 error(s) left")
+    report = evaluate_hard_gates(_profile(), tmp_path, tests_passed=True)
+    assert _app_gate(report).held is False
+    assert report.blocking
+    assert "2 error(s) left" in _app_gate(report).detail
+
+
+@pytest.mark.parametrize("status", ["unknown", "not-applicable", "disabled"])
+def test_an_undecided_verification_never_blocks(tmp_path: Path, status: str):
+    _write_record(tmp_path, status, "nothing to launch")
+    report = evaluate_hard_gates(_profile(), tmp_path, tests_passed=True)
+    assert _app_gate(report).held is None
+    assert not report.blocking
+
+
+def test_gate_names_ignore_spacing_and_empties():
+    assert gate_names(" tests-pass , app-verified ,") == ["tests-pass", "app-verified"]
+    assert gate_names(None) == []

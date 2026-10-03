@@ -63,6 +63,8 @@ _PHASE_BY_AGENT: dict[str, str] = {
     "pr_finding_validator": "qa_review",
     # Repairing it.
     "qa_fixer": "qa_fixing",
+    # Seeing it run: the verification loop fixes what the launch shows.
+    "verifier": "qa_fixing",
 }
 
 

@@ -34,10 +34,41 @@ __all__ = [
     "HardGateResult",
     "HardGateReport",
     "evaluate_hard_gates",
+    "gate_names",
     "TESTS_PASS",
+    "APP_VERIFIED",
 ]
 
 TESTS_PASS = "tests-pass"
+
+# The verification loop's verdict (`verify/record.py`): the application the
+# task changed was launched, showed no error, and reached the changed state.
+# Read from `<spec_dir>/verify/verify.json`, the one record every reader
+# shares; a replay after QA that regressed has already turned it to `fail`.
+APP_VERIFIED = "app-verified"
+
+
+def gate_names(declared: str | None) -> list[str]:
+    """``"tests-pass,app-verified"`` -> ``["tests-pass", "app-verified"]``."""
+    return [g.strip() for g in str(declared or "").split(",") if g.strip()]
+
+
+def _app_verified(spec_dir: Path) -> tuple[bool | None, str]:
+    try:
+        from verify.record import load_record
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return None, f"the verification module is unavailable: {exc}"
+    record = load_record(Path(spec_dir) / "verify")
+    if record is None:
+        return None, "no verification record — the verify phase did not run"
+    status = record.get("status")
+    reason = str(record.get("reason") or "")
+    if status == "pass":
+        score = record.get("score")
+        return True, f"score {score}/100" if score is not None else ""
+    if status == "fail":
+        return False, reason or "the verification failed"
+    return None, f"{status}" + (f" — {reason}" if reason else "")
 
 
 @dataclass(frozen=True)
@@ -100,35 +131,43 @@ def evaluate_hard_gates(profile, spec_dir: Path, *, tests_passed: bool | None = 
     report = HardGateReport()
     try:
         for resolved in profile.run:
-            gate = resolved.phase.hard_gate
-            if not gate:
-                continue
-            if gate == TESTS_PASS:
-                report.results.append(
-                    HardGateResult(
-                        phase_id=resolved.id,
-                        gate=gate,
-                        held=tests_passed,
-                        detail=(
-                            ""
-                            if tests_passed
-                            else "the QA report does not record a passing test run"
-                            if tests_passed is None
-                            else "the QA report records failing tests"
-                        ),
-                    )
-                )
-            else:
-                # An unknown gate name is reported, never silently satisfied.
-                # A typo in `workflow.yaml` must not switch a gate off.
-                report.results.append(
-                    HardGateResult(
-                        phase_id=resolved.id,
-                        gate=gate,
-                        held=None,
-                        detail=f"unknown gate {gate!r} — nothing evaluates it",
-                    )
-                )
+            for gate in gate_names(resolved.phase.hard_gate):
+                _evaluate_one(report, resolved, gate, spec_dir, tests_passed)
     except Exception as exc:  # noqa: BLE001 - a gate reports, it does not crash
         logger.warning("hard gate evaluation failed: %s", exc)
     return report
+
+
+def _evaluate_one(report, resolved, gate: str, spec_dir: Path, tests_passed) -> None:
+    """One named gate of one phase, appended to ``report``."""
+    if gate == APP_VERIFIED:
+        held, detail = _app_verified(spec_dir)
+        report.results.append(
+            HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
+        )
+    elif gate == TESTS_PASS:
+        report.results.append(
+            HardGateResult(
+                phase_id=resolved.id,
+                gate=gate,
+                held=tests_passed,
+                detail=(
+                    ""
+                    if tests_passed
+                    else "the QA report does not record a passing test run"
+                    if tests_passed is None
+                    else "the QA report records failing tests"
+                ),
+            )
+        )
+    else:
+        # An unknown gate name is reported, never silently satisfied.
+        # A typo in `workflow.yaml` must not switch a gate off.
+        report.results.append(
+            HardGateResult(
+                phase_id=resolved.id,
+                gate=gate,
+                held=None,
+                detail=f"unknown gate {gate!r} — nothing evaluates it",
+            )
+        )

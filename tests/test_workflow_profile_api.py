@@ -71,7 +71,7 @@ class TestResolution:
         res = ask(project, effort="low")
         verify = next(p for p in res["profile"]["phases"] if p["id"] == "verify")
         assert verify["runs"] is True
-        assert verify["hardGate"] == "tests-pass"
+        assert verify["hardGate"] == "tests-pass,app-verified"
 
     def test_a_degradation_is_reported_not_hidden(self, project, monkeypatch):
         import types

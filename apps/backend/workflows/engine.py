@@ -63,7 +63,12 @@ BUILTIN_PACKS = frozenset({"workpilot"})
 # preflight. It runs ui-ux-pro-max's local engine (`uiux.preflight`) between
 # planning and coding — no model, no network — so it costs nothing at any
 # effort level, and the runner executes it rather than opening a session.
-DETERMINISTIC_PHASES = frozenset({"design-check", "ui-design-system"})
+#
+# `verify-replay` replays the verification after QA without a model (launch,
+# recorded scenario, recorded endpoint calls): no token at any effort level, so
+# never pruned. It has no pack `gate` command, so `run_deterministic_gates`
+# steps over it; the runner's `CUSTOM_EXECUTORS` runs it in its window.
+DETERMINISTIC_PHASES = frozenset({"design-check", "ui-design-system", "verify-replay"})
 
 _SKIP_EFFORT = "effort"
 _SKIP_UNTOUCHED = "untouched"

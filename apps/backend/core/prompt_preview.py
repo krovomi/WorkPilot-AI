@@ -165,5 +165,6 @@ def _phase_for(agent_type: str) -> str:
         "coder": "coding",
         "qa_reviewer": "qa",
         "qa_fixer": "qa",
+        "verifier": "qa",
         "documenter": "coding",
     }.get(agent_type, "coding")
