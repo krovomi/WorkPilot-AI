@@ -2,6 +2,34 @@ import { describe, expect, it } from "vitest";
 import { buildSpecModelArgs } from "./spec-launch-config";
 
 describe("spec launch arguments", () => {
+	it("reads the spec phase of a task that owns its engine", () => {
+		expect(
+			buildSpecModelArgs({
+				engineLocked: true,
+				isAutoProfile: true,
+				provider: "openai",
+				phaseModels: {
+					spec: "gpt-5",
+					planning: "qwen3-coder:30b",
+					coding: "qwen3-coder:30b",
+					qa: "qwen3:8b",
+				},
+				phaseThinking: {
+					spec: "high",
+					planning: "low",
+					coding: "low",
+					qa: "low",
+				},
+			}),
+		).toEqual([
+			"--provider",
+			"openai",
+			"--model",
+			"gpt-5",
+			"--thinking-level",
+			"high",
+		]);
+	});
 	it("uses the visible planning selection for an old divergent task", () => {
 		expect(
 			buildSpecModelArgs({
