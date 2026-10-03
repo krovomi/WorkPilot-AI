@@ -1831,7 +1831,7 @@ print(json.dumps(result))
 			const specPaths = getSpecPaths(task, project);
 			const specDirs = allSpecDirs(specPaths);
 
-			let keepSession = true;
+			let keepSession: boolean;
 			try {
 				const settings = readSettingsFile() as EngineSeedSettings | undefined;
 				const current = taskEngineFromMetadata(
