@@ -104,12 +104,17 @@ export function currentPausePhase(
 export function convertTaskMetadataToSpecCreation(metadata?: any): any {
 	if (!metadata) return undefined;
 
+	// The spec pipeline runs the task's spec phase. A locked task always names
+	// it; a legacy one fell back on planning, which wrote the spec's phase key
+	// for it in the per-phase dropdowns.
 	return {
 		requireReviewBeforeCoding: metadata.requireReviewBeforeCoding,
-		provider:
-			metadata.phaseProviders?.planning ||
-			metadata.phaseProviders?.spec ||
-			metadata.provider,
+		provider: metadata.engineLocked
+			? metadata.phaseProviders?.spec || metadata.provider
+			: metadata.phaseProviders?.planning ||
+				metadata.phaseProviders?.spec ||
+				metadata.provider,
+		engineLocked: metadata.engineLocked,
 		isAutoProfile: metadata.isAutoProfile,
 		phaseModels: convertPhaseModelConfig(metadata.phaseModels),
 		phaseThinking: convertPhaseThinkingConfig(metadata.phaseThinking),
@@ -228,6 +233,14 @@ export async function resumePausedTask(
 	agentManager: AgentManager,
 	taskId: string,
 	projectId?: string,
+	options: {
+		/**
+		 * Hand the persisted Claude session back to the SDK. False when the
+		 * resumed phase changed engine away from Claude: that transcript belongs
+		 * to another model, and the conversation log carries the context.
+		 */
+		keepSession?: boolean;
+	} = {},
 ): Promise<
 	IPCResult<{
 		taskId: string;
@@ -294,7 +307,10 @@ export async function resumePausedTask(
 				// when the SDK has no transcript for it, in which case the
 				// conversation log carries the context like for every other
 				// provider.
-				resumeSessionId: readPersistedSessionId(specPaths.specDir),
+				resumeSessionId:
+					options.keepSession === false
+						? undefined
+						: readPersistedSessionId(specPaths.specDir),
 			},
 			project.id,
 		);

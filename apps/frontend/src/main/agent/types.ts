@@ -86,6 +86,9 @@ export interface TaskExecutionOptions {
 
 export interface SpecCreationMetadata {
 	requireReviewBeforeCoding?: boolean;
+	// The task owns its engine: the spec phase's provider, model and effort
+	// are read as such (see shared/utils/task-engine.ts).
+	engineLocked?: boolean;
 	// Per-task TDD override. true -> force strict TDD, false -> force disabled,
 	// undefined -> inherit project default. Injected as TDD_MODE env at spawn time.
 	tddMode?: boolean;

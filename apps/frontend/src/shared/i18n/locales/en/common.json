@@ -637,7 +637,12 @@
 		"copilotPremiumResetOn": "Resets on {{date}}",
 		"copilotPremiumOverageHint": "Beyond the quota, requests will be billed as overage.",
 		"copilotPlanLabel": "Plan",
-		"copilotOrganizationLabel": "Organization"
+		"copilotOrganizationLabel": "Organization",
+		"lensAria": "Provider shown by the usage badges",
+		"lensAuto": "Automatic",
+		"lensAutoWith": "Automatic ({{provider}})",
+		"lensRunning": "{{provider}} — running",
+		"lensTooltip": "Which provider's usage the badges show. Automatic follows the tasks in progress. This changes nothing about what a task runs on."
 	},
 	"oauth": {
 		"enterCode": "Manual Code Entry (Fallback)",

@@ -72,7 +72,9 @@ export function UsageIndicator() {
 	// Deduplication: track in-flight fetch to prevent concurrent API calls (429 rate limits)
 	const pendingFetchRef = useRef<Promise<void> | null>(null);
 	const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const { selectedProvider } = useProviderContext();
+	// The provider the usage badges observe: the running tasks', unless the
+	// person picked one (UsageLensSelector). Not the default provider.
+	const { usageProvider: selectedProvider } = useProviderContext();
 
 	/**
 	 * Helper function to get initials from a profile name

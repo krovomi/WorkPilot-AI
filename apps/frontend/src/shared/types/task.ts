@@ -15,6 +15,16 @@ import type {
 import type { MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
 
+/** One phase's engine: provider × model × effort (see shared/utils/task-engine.ts). */
+export interface EngineTrio {
+	provider: string;
+	model: string;
+	effort: ThinkingLevel;
+}
+
+/** A task's engine, phase by phase. */
+export type TaskEngine = Record<"spec" | "planning" | "coding" | "qa", EngineTrio>;
+
 export type TaskStatus =
 	| "backlog"
 	| "queue"
@@ -236,6 +246,8 @@ export interface TaskDraft {
 	// Auto profile - per-phase configuration
 	phaseModels?: PhaseModelConfig;
 	phaseThinking?: PhaseThinkingConfig;
+	// The task's engine as chosen in the wizard (shared/utils/task-engine.ts).
+	engine?: TaskEngine;
 	images: ImageAttachment[];
 	referencedFiles: ReferencedFile[];
 	requireReviewBeforeCoding?: boolean;
@@ -410,6 +422,10 @@ export interface TaskMetadata {
 	phaseModels?: PhaseModelConfig; // Per-phase model configuration
 	phaseThinking?: PhaseThinkingConfig; // Per-phase thinking configuration
 	phaseProviders?: PhaseProviderConfig; // Per-phase LLM provider configuration
+	// The task owns its engine (see shared/utils/task-engine.ts): the fields
+	// above were chosen for this task, and nothing global — the default
+	// provider in Settings — replaces them at start, resume or QA.
+	engineLocked?: boolean;
 
 	// Formula Lab — the Provider × LLM × Effort "formula" the user picked for
 	// this ticket before development. Drives the compact kanban badge and seeds

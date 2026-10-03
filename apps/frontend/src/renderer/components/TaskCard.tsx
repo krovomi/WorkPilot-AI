@@ -84,6 +84,7 @@ import { SyncFromBranchDialog } from "./task-detail/task-review/SyncFromBranchDi
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
+import { TaskEngineChip } from "./task-engine/TaskEngineChip";
 import { FormulaBadge } from "./formula-lab/FormulaBadge";
 import { Checkbox } from "./ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -1052,6 +1053,23 @@ const isDeleteAreaMouseDown = (e: React.MouseEvent, rect: DOMRect): boolean => {
 };
 
 // Custom comparator for React.memo - only re-render when relevant task data changes
+/** Whether the fields the engine chip reads are unchanged. */
+function sameEngineFields(
+	prev: Task["metadata"],
+	next: Task["metadata"],
+): boolean {
+	return (
+		prev?.provider === next?.provider &&
+		prev?.model === next?.model &&
+		prev?.thinkingLevel === next?.thinkingLevel &&
+		prev?.appliedFormula?.appliedAt === next?.appliedFormula?.appliedAt &&
+		JSON.stringify(prev?.phaseProviders) ===
+			JSON.stringify(next?.phaseProviders) &&
+		JSON.stringify(prev?.phaseModels) === JSON.stringify(next?.phaseModels) &&
+		JSON.stringify(prev?.phaseThinking) === JSON.stringify(next?.phaseThinking)
+	);
+}
+
 function taskCardPropsAreEqual(
 	prevProps: TaskCardProps,
 	nextProps: TaskCardProps,
@@ -1101,6 +1119,8 @@ function taskCardPropsAreEqual(
 		prevTask.metadata?.complexity === nextTask.metadata?.complexity &&
 		prevTask.metadata?.archivedAt === nextTask.metadata?.archivedAt &&
 		prevTask.metadata?.prUrl === nextTask.metadata?.prUrl &&
+		// The engine chip: a resume on another LLM changes only these.
+		sameEngineFields(prevTask.metadata, nextTask.metadata) &&
 		// Check if any subtask statuses changed (compare all subtasks)
 		prevTask.subtasks.every(
 			(s, i) => s.status === nextTask.subtasks[i]?.status,
@@ -1548,6 +1568,9 @@ export const TaskCard = memo(function TaskCard({
 							<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
 								<Clock className="h-3 w-3" />
 								<span>{relativeTime}</span>
+								{!task.metadata?.appliedFormula && (
+									<TaskEngineChip task={task} />
+								)}
 								<FormulaBadge
 									task={task}
 									projectPath={currentProject?.path}

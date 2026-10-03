@@ -1350,10 +1350,13 @@ async def run_autonomous_agent(
         # per-phase provider is configured we pass None and let
         # create_agent_client() resolve the provider as before (IPC marker,
         # env, task-wide metadata.provider), preserving existing behavior.
+        # A task that owns its engine (`engineLocked`) always names the phase's
+        # provider, whatever the subprocess inherited as SELECTED_LLM_PROVIDER.
         _metadata = load_task_metadata(spec_dir)
         phase_provider = (
             get_phase_provider(spec_dir, phase=current_phase)
-            if _metadata and _metadata.get("phaseProviders")
+            if _metadata
+            and (_metadata.get("phaseProviders") or _metadata.get("engineLocked"))
             else None
         )
         # `dispatch` finally reaches execution. The coding phase declares

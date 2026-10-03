@@ -9,11 +9,19 @@ import {
 	initializeClaudeProfileManager,
 } from "../claude-profile-manager";
 import { ensureOllamaReady } from "../services/ollama-portable";
+import { projectStore } from "../project-store";
 import { readSettingsFile } from "../settings-utils";
+import type { EnginePhase } from "../../shared/utils/task-engine";
 import { AgentEvents } from "./agent-events";
 import { AgentProcessManager } from "./agent-process";
 import { AgentQueueManager } from "./agent-queue";
 import { buildSpecModelArgs } from "./spec-launch-config";
+import {
+	planTaskProviders,
+	readTaskMetadataFor,
+	taskEngineFromMetadata,
+	type TaskProviderPlan,
+} from "./task-provider-env";
 import { AgentState } from "./agent-state";
 import { applyMobileTargets, applyTddOverride } from "./env-utils";
 import type {
@@ -50,15 +58,39 @@ export class AgentManager extends EventEmitter {
 	> = new Map();
 
 	/**
-	 * Returns true if Claude OAuth auth is required for the current active provider.
-	 * Non-Claude providers (Windsurf, OpenAI, Copilot, etc.) manage their own auth.
+	 * Returns true if Claude OAuth auth is required.
+	 * A Kanban task answers from its own engine: Claude is required as soon as
+	 * one of its phases runs on Claude. Without a task, the default provider
+	 * decides. Non-Claude providers (Windsurf, OpenAI, Copilot, etc.) manage
+	 * their own auth.
 	 */
-	private requiresClaudeAuth(): boolean {
+	private requiresClaudeAuth(plan?: TaskProviderPlan): boolean {
+		if (plan) return plan.usesClaude;
 		const settings = readSettingsFile();
 		const provider = (
 			settings?.selectedProvider as string | undefined
 		)?.toLowerCase();
 		return !provider || provider === "claude" || provider === "anthropic";
+	}
+
+	/**
+	 * The providers of the task about to run, read from its task_metadata.json
+	 * (written by TASK_CREATE before any process starts). Undefined when the
+	 * task has no metadata yet, which keeps the default-provider behaviour.
+	 */
+	private taskProviderPlan(
+		location: { projectPath: string; specId?: string; specDir?: string },
+		startPhase: EnginePhase,
+	): TaskProviderPlan | undefined {
+		const metadata = readTaskMetadataFor(location);
+		if (!metadata) return undefined;
+		const project = projectStore
+			.getProjects()
+			.find((p) => p.path === location.projectPath);
+		return planTaskProviders(
+			taskEngineFromMetadata(metadata, undefined, project?.settings?.provider),
+			startPhase,
+		);
 	}
 
 	/**
@@ -68,15 +100,22 @@ export class AgentManager extends EventEmitter {
 	 * task (the agent will then surface the friendly "Ollama ne répond pas" hint).
 	 * Does NOT pull models (that stays an explicit user action in the provider UI).
 	 */
-	private async ensureLocalServerIfNeeded(metadata?: {
-		provider?: string;
-	}): Promise<void> {
+	private async ensureLocalServerIfNeeded(
+		metadata?: {
+			provider?: string;
+		},
+		plan?: TaskProviderPlan,
+	): Promise<void> {
 		try {
 			const settings = readSettingsFile();
 			const provider = (
 				metadata?.provider || (settings?.selectedProvider as string | undefined)
 			)?.toLowerCase();
-			if (provider !== "ollama") return;
+			// A task starts the local server when any of its phases uses it.
+			const usesOllama = plan
+				? plan.providers.some((p) => p.toLowerCase() === "ollama")
+				: provider === "ollama";
+			if (!usesOllama) return;
 			const baseUrl =
 				((settings?.globalOllamaApiUrl as string) || "").trim() ||
 				"http://localhost:11434";
@@ -249,7 +288,14 @@ export class AgentManager extends EventEmitter {
 			);
 			return;
 		}
-		if (this.requiresClaudeAuth() && !profileManager.hasValidAuth()) {
+		const providerPlan = this.taskProviderPlan(
+			{ projectPath, specDir },
+			"spec",
+		);
+		if (
+			this.requiresClaudeAuth(providerPlan) &&
+			!profileManager.hasValidAuth()
+		) {
 			this.emit(
 				"error",
 				taskId,
@@ -355,7 +401,7 @@ export class AgentManager extends EventEmitter {
 		});
 
 		// Auto-start the local Ollama server if that's the active provider.
-		await this.ensureLocalServerIfNeeded(metadata);
+		await this.ensureLocalServerIfNeeded(metadata, providerPlan);
 
 		// Note: This is spec-creation but it chains to task-execution via run.py
 		await this.processManager.spawnProcess(
@@ -365,6 +411,7 @@ export class AgentManager extends EventEmitter {
 			combinedEnv,
 			"task-execution",
 			projectId,
+			providerPlan,
 		);
 	}
 
@@ -395,7 +442,14 @@ export class AgentManager extends EventEmitter {
 			);
 			return;
 		}
-		if (this.requiresClaudeAuth() && !profileManager.hasValidAuth()) {
+		const providerPlan = this.taskProviderPlan(
+			{ projectPath, specId },
+			"coding",
+		);
+		if (
+			this.requiresClaudeAuth(providerPlan) &&
+			!profileManager.hasValidAuth()
+		) {
 			this.emit(
 				"error",
 				taskId,
@@ -506,7 +560,7 @@ export class AgentManager extends EventEmitter {
 			: combinedEnv;
 
 		// Auto-start the local Ollama server if that's the active provider.
-		await this.ensureLocalServerIfNeeded();
+		await this.ensureLocalServerIfNeeded(undefined, providerPlan);
 
 		await this.processManager.spawnProcess(
 			taskId,
@@ -515,6 +569,7 @@ export class AgentManager extends EventEmitter {
 			spawnEnv,
 			"task-execution",
 			projectId,
+			providerPlan,
 		);
 	}
 
@@ -570,7 +625,8 @@ export class AgentManager extends EventEmitter {
 		];
 
 		// Auto-start the local Ollama server if that's the active provider.
-		await this.ensureLocalServerIfNeeded();
+		const providerPlan = this.taskProviderPlan({ projectPath, specId }, "qa");
+		await this.ensureLocalServerIfNeeded(undefined, providerPlan);
 
 		await this.processManager.spawnProcess(
 			taskId,
@@ -579,6 +635,7 @@ export class AgentManager extends EventEmitter {
 			combinedEnv,
 			"qa-process",
 			projectId,
+			providerPlan,
 		);
 	}
 

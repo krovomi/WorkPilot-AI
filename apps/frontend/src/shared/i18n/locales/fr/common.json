@@ -640,7 +640,12 @@
 		"copilotPremiumResetOn": "Reset le {{date}}",
 		"copilotPremiumOverageHint": "Au-delà du quota, les requêtes seront facturées en heures supplémentaires.",
 		"copilotPlanLabel": "Plan",
-		"copilotOrganizationLabel": "Organisation"
+		"copilotOrganizationLabel": "Organisation",
+		"lensAria": "Fournisseur affiché par les badges de consommation",
+		"lensAuto": "Automatique",
+		"lensAutoWith": "Automatique ({{provider}})",
+		"lensRunning": "{{provider}} — en cours",
+		"lensTooltip": "La consommation de quel fournisseur les badges affichent. Automatique suit les tâches en cours. Cela ne change rien au moteur d'une tâche."
 	},
 	"oauth": {
 		"enterCode": "Saisie de code manuelle (Fallback)",

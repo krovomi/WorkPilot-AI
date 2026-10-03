@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/stores/project-store";
 import { AuthStatusIndicator } from "./AuthStatusIndicator";
 import { useProviderContext } from "./ProviderContext";
+import { UsageLensSelector } from "./UsageLensSelector";
 import { SortableProjectTab } from "./SortableProjectTab";
 import { UsageIndicator } from "./UsageIndicator";
 import { Button } from "./ui/button";
@@ -36,7 +37,9 @@ export function ProjectTabBar({
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const [canScrollLeft, setCanScrollLeft] = useState(false);
 	const [canScrollRight, setCanScrollRight] = useState(false);
-	const { selectedProvider } = useProviderContext();
+	// The provider the usage badges observe: the running tasks', unless the
+	// person picked one (UsageLensSelector). Not the default provider.
+	const { usageProvider: selectedProvider } = useProviderContext();
 	const missingPaths = useProjectStore((state) => state.missingPaths);
 	const repathProjectAction = useProjectStore((state) => state.repathProject);
 
@@ -307,6 +310,7 @@ export function ProjectTabBar({
 			)}
 
 			<div className="flex items-center gap-2 px-4 py-1 shrink-0">
+				<UsageLensSelector />
 				<AuthStatusIndicator />
 				<UsageIndicator />
 				{/* Usage Warning Badge (shown when usage >= 90%) */}

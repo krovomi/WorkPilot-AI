@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { buildEngineMetadata, uniformEngine } from "../../shared/utils/task-engine";
 import type {
 	Formula,
 	FormulaMatrix,
@@ -178,20 +179,11 @@ export function buildAppliedFormulaMetadata(
 		perTokenBilled: formula.per_token_billed,
 		appliedAt: new Date().toISOString(),
 	};
-	const level = effort as ThinkingLevel;
+	// A formula is an engine for the whole task, and the task owns it.
 	return {
-		isAutoProfile: true,
-		provider,
-		model,
-		thinkingLevel: level,
-		phaseProviders: {
-			spec: provider,
-			planning: provider,
-			coding: provider,
-			qa: provider,
-		},
-		phaseModels: { spec: model, planning: model, coding: model, qa: model },
-		phaseThinking: { spec: level, planning: level, coding: level, qa: level },
+		...buildEngineMetadata(
+			uniformEngine({ provider, model, effort: effort as ThinkingLevel }),
+		),
 		appliedFormula: applied,
 	};
 }

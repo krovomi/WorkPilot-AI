@@ -71,11 +71,17 @@ export interface TaskAPI {
 	checkTaskRunning: (taskId: string) => Promise<IPCResult<boolean>>;
 	resumePausedTask: (taskId: string) => Promise<IPCResult>;
 	resumeTaskSession: (taskId: string) => Promise<IPCResult>;
+	/**
+	 * Resume a paused task on another engine. `scope` "remaining" (default)
+	 * applies it to the paused phase and every phase after it, "phase" to the
+	 * paused phase only.
+	 */
 	resumeTaskWithProvider: (
 		taskId: string,
 		providerName: string,
 		model?: string,
 		effort?: string,
+		scope?: "remaining" | "phase",
 	) => Promise<IPCResult>;
 	resetTaskConversation: (taskId: string) => Promise<IPCResult>;
 	resetTask: (taskId: string) => Promise<IPCResult<Task>>;
@@ -386,6 +392,7 @@ export const createTaskAPI = (): TaskAPI => ({
 		providerName: string,
 		model?: string,
 		effort?: string,
+		scope?: "remaining" | "phase",
 	): Promise<IPCResult> =>
 		ipcRenderer.invoke(
 			IPC_CHANNELS.TASK_RESUME_WITH_PROVIDER,
@@ -393,6 +400,7 @@ export const createTaskAPI = (): TaskAPI => ({
 			providerName,
 			model,
 			effort,
+			scope,
 		),
 
 	resetTaskConversation: (taskId: string): Promise<IPCResult> =>

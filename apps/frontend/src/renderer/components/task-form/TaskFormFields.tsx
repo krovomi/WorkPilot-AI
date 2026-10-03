@@ -154,6 +154,12 @@ interface TaskFormFieldsProps {
 	 *  - "all" (default): single page (used by the creation wizard).
 	 */
 	section?: "all" | "content" | "engine";
+	/**
+	 * The task's engine editor (task-engine/TaskEngineEditor). When given, it
+	 * replaces the provider select and the agent profile selector: the engine
+	 * is chosen per task, phase by phase, provider included.
+	 */
+	engineSlot?: ReactNode;
 
 	/** Optional children to render after description (e.g., @ mention highlight overlay) */
 	children?: ReactNode;
@@ -209,6 +215,7 @@ export function TaskFormFields({
 	onError,
 	idPrefix = "",
 	section = "all",
+	engineSlot,
 	children,
 	onFileReferenceDrop,
 }: TaskFormFieldsProps) {
@@ -642,6 +649,8 @@ export function TaskFormFields({
 						</div>
 					)}
 
+					{engineSlot ?? (
+						<>
 					{/* Provider selection (per task) — drives the model catalog below */}
 					{onProviderChange && (
 						<div className="space-y-2">
@@ -690,6 +699,8 @@ export function TaskFormFields({
 						onPhaseThinkingChange={onPhaseThinkingChange}
 						disabled={disabled}
 					/>
+						</>
+					)}
 				</div>
 
 				{/* Content group (continued, page 1) */}

@@ -1689,5 +1689,17 @@
 			"mockup-near": "Differs from the mockup",
 			"placeholder": "Placeholder text"
 		}
+	},
+	"engine": {
+		"taskWide": "Engine for the whole task",
+		"ownedByTask": "Saved on this task only. Changing the default provider in Settings, or another task's engine, never changes it.",
+		"perPhase": "Advanced: one engine per phase",
+		"mixed": "Mixed",
+		"loadingModels": "Loading models…",
+		"notConfiguredOption": "{{provider}} (not configured)",
+		"notConfiguredWarning": "{{provider}} is not configured on this machine. Add its account in Settings → AI Accounts, or pick another provider.",
+		"chipMixed": "{{provider}} · mixed",
+		"chipAria": "Task engine: {{engine}}",
+		"onlyResumedPhase": "Only for the resumed phase ({{phase}}) — the following phases keep their engine"
 	}
 }
