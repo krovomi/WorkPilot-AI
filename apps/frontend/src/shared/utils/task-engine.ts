@@ -1,10 +1,9 @@
-import type { TaskMetadata } from "../types";
+import type { EngineTrio, TaskEngine, TaskMetadata } from "../types";
 import type {
 	AppSettings,
 	PhaseModelConfig,
 	PhaseProviderConfig,
 	PhaseThinkingConfig,
-	ThinkingLevel,
 } from "../types/settings";
 import { buildGlobalProviderMetadataUpdate } from "./task-thinking";
 
@@ -25,13 +24,7 @@ import { buildGlobalProviderMetadataUpdate } from "./task-thinking";
 export const ENGINE_PHASES = ["spec", "planning", "coding", "qa"] as const;
 export type EnginePhase = (typeof ENGINE_PHASES)[number];
 
-export interface EngineTrio {
-	provider: string;
-	model: string;
-	effort: ThinkingLevel;
-}
-
-export type TaskEngine = Record<EnginePhase, EngineTrio>;
+export type { EngineTrio, TaskEngine };
 
 /** Settings needed to seed an engine: the default provider and its presets. */
 export type EngineSeedSettings = Pick<
