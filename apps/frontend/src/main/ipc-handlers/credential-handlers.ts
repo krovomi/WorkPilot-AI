@@ -178,7 +178,11 @@ function runShellCommand(
 	args: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
 	return new Promise((resolve, reject) => {
-		const child = spawn(cmd, args, {
+		// With a shell (Windows), an argument holding a space would be split.
+		const shellArgs = isWindows()
+			? args.map((a) => (/\s/.test(a) ? `"${a}"` : a))
+			: args;
+		const child = spawn(cmd, shellArgs, {
 			shell: isWindows(),
 			windowsHide: true,
 			env: { ...process.env, CI: "1" },
@@ -285,9 +289,19 @@ async function detectCodexInstall(): Promise<CodexInstall | undefined> {
 		if (nm > 0) {
 			const nodeModulesDir = segments.slice(0, nm + 1).join(path.sep);
 			// Unix: <prefix>/lib/node_modules — Windows: <prefix>/node_modules.
-			npmPrefix = isWindows()
-				? path.dirname(nodeModulesDir)
-				: path.dirname(path.dirname(nodeModulesDir));
+			// A layout that does not match is left to npm's own default rather
+			// than guessed at.
+			const parent = path.dirname(nodeModulesDir);
+			const candidate = isWindows()
+				? parent
+				: path.basename(parent) === "lib"
+					? path.dirname(parent)
+					: undefined;
+			// The prefix reaches a shell on Windows (npm is a .cmd): refuse
+			// anything that is not a plain path.
+			if (candidate && !/["&|<>^%\r\n]/.test(candidate)) {
+				npmPrefix = candidate;
+			}
 		}
 		return { binPath, owner: "npm", npmPrefix };
 	} catch {
