@@ -29,6 +29,7 @@ task-observer = "latest"
 claude-mem = "latest"
 hermes = "latest"
 hermes-learned = "latest"
+ui-ux-pro-max = "latest"   # UI/UX design intelligence (Basic) — contextual: only UI tasks pay for it
 
 # Add one and run `pnpm run skills:build` to pull it into this repo's palette.
 

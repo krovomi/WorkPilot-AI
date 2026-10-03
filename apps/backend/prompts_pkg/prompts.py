@@ -521,6 +521,24 @@ def docintel_section(project_dir: Path, spec_dir: Path | None = None) -> str:
         return ""
 
 
+def uiux_section(
+    spec_dir: Path | None, subtask: dict | None = None, *, role: str = "coder"
+) -> str:
+    """The design system of a UI task (ui-ux-pro-max), or nothing.
+
+    Public and single like the three above: the coder (per subtask), the QA
+    reviewer and the workflow's skill phases read the identical section. Empty
+    on a task — or a subtask — that does not touch the interface, which is what
+    keeps a backend task from paying for it.
+    """
+    try:
+        from uiux import uiux_section as _section
+
+        return _section(spec_dir, subtask, role=role)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def get_qa_reviewer_prompt(spec_dir: Path, project_dir: Path) -> str:
     """
     Load the QA reviewer prompt with project-specific MCP tools dynamically injected.
@@ -642,6 +660,12 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     # diff against the spec text cannot see.
     if documents := docintel_section(project_dir, spec_dir):
         spec_context += documents + "\n\n---\n\n"
+
+    # The design system the coder was told to build against, and upstream's
+    # pre-delivery checklist, so the UI files of the diff are judged against
+    # the same palette and rules. Empty when the task is not about the UI.
+    if design := uiux_section(spec_dir, role="qa"):
+        spec_context += design + "\n\n---\n\n"
 
     # Find injection point in base prompt (after PHASE 4, before PHASE 5)
     injection_marker = (

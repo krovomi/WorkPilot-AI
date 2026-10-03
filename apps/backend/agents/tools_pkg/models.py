@@ -14,6 +14,7 @@ the Claude Agent SDK client. Tool lists are organized by category:
 """
 
 import os
+from pathlib import Path
 
 # =============================================================================
 # Base Tools (Built-in Claude Code tools)
@@ -465,6 +466,9 @@ def _map_mcp_server_name(
     mappings = {
         "brain": "brain",
         "workpilot-brain": "brain",
+        "uiux": "uiux",
+        "workpilot-uiux": "uiux",
+        "ui-ux-pro-max": "uiux",
         "context7": "context7",
         "graphiti-memory": "graphiti",
         "graphiti": "graphiti",
@@ -497,6 +501,7 @@ def get_required_mcp_servers(
     project_capabilities: dict | None = None,
     linear_enabled: bool = False,
     mcp_config: dict | None = None,
+    spec_dir: Path | str | None = None,
 ) -> list[str]:
     """
     Get MCP servers required for this agent type.
@@ -583,6 +588,22 @@ def get_required_mcp_servers(
             import logging
 
             logging.getLogger(__name__).debug("shared brain not offered: %s", exc)
+
+    # ui-ux-pro-max (`uiux/integration.py`): the same "every agent with tools"
+    # rule as the brain, narrowed to the task — offered only when the build's
+    # preflight said this task touches the interface. A backend task declares
+    # no server and pays for no tool definition. Before the overrides, so
+    # AGENT_MCP_<agent>_REMOVE=uiux works.
+    if config.get("tools") and "uiux" not in servers:
+        try:
+            from uiux.integration import active_for as uiux_active
+
+            if uiux_active(spec_dir):
+                servers.append("uiux")
+        except Exception as exc:  # noqa: BLE001 - optional design data never blocks an agent
+            import logging
+
+            logging.getLogger(__name__).debug("ui-ux-pro-max not offered: %s", exc)
 
     # Filter chrome-devtools if not enabled (default: disabled)
     if "chrome-devtools" in servers:

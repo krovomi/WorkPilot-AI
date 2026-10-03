@@ -67,6 +67,24 @@ phases:
       the Kanban default and was handed a `test-runner` — before a line of
       code exists. The roster is context billed on every turn.
 
+  - id: ui-design-system
+    impl: ui-ux-pro-max/ui-ux-pro-max
+    when: &ui_surface touches("**/*.tsx,**/*.jsx,**/*.vue,**/*.svelte,**/*.astro,**/*.html,**/*.css,**/*.scss,**/*.sass,**/*.less,**/*.razor,**/*.cshtml,**/*.xaml,**/*.axaml,**/*.swift,**/*.dart,**/*.fxml,**/res/layout/**,**/res/values/**")
+    description: >-
+      Interfaces seulement, et sans modèle : le moteur local de ui-ux-pro-max
+      (BM25 en Python standard, sans réseau) fixe le design system de la tâche
+      avant que le code n'existe. Le `design-system/<projet>/MASTER.md` du
+      projet fait foi quand il existe ; sinon un design system est généré et
+      écrit dans le worktree — il arrive dans le diff, une personne le relit,
+      et la tâche UI suivante le relit au lieu d'en inventer un autre.
+
+      Les règles du stack touché (React, Next.js, WPF, WinUI, Avalonia,
+      SwiftUI, Compose, Flutter…) s'y ajoutent. Le coder ne les reçoit que sur
+      les sous-tâches dont les fichiers sont UI ; `frontend-design` et la QA
+      jugent contre le même design system. Déterministe et gratuit : jamais
+      élagué par l'effort. La liste de fichiers est celle de
+      `apps/backend/uiux/surface.py`, et un test garde les deux identiques.
+
   - id: mobile-design
     impl: mobile/mobile-design-review
     min_effort: medium
@@ -83,7 +101,7 @@ phases:
   - id: frontend-design
     impl: impeccable/impeccable
     min_effort: medium
-    when: &frontend_surface touches("**/*.tsx,**/*.jsx,**/*.css,**/*.scss,**/*.vue,**/*.svelte,**/*.astro,**/*.html,**/*.less,**/*.sass")
+    when: &frontend_surface touches("**/*.tsx,**/*.jsx,**/*.css,**/*.scss,**/*.vue,**/*.svelte,**/*.astro,**/*.html,**/*.less,**/*.sass,**/*.razor,**/*.cshtml")
     dispatch: fresh-context
     description: >-
       Interfaces web, et avant le codage pour exactement la raison que

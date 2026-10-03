@@ -32,6 +32,7 @@ skills/
 | `tooling` | toolchain-agnostic: building MCP servers, driving web apps under test |
 | `comms` | business communication and brand guidelines |
 | `bmad` | BMAD Method v6, vendored by `scripts/vendor_bmad.py` and pinned in `skills/bmad/VENDOR.json` — the skills are committed, the `_bmad/` runtime they read is installed per project by `skills:bootstrap` |
+| `ui-ux-pro-max` | UI/UX design data (Basic edition, MIT): design system generator and the rules of 22 UI stacks, searched locally. Vendored and committed by `scripts/vendor_ui_ux_pro_max.py` (one path rewritten for portability, receipt in `VENDOR.json`); read by `apps/backend/uiux/` only on tasks that touch the interface |
 | `superpowers`, `mattpocock`, `impeccable`, `task-observer` | upstream packs, fetched on demand; only their `pack.json` is committed |
 | `claude-mem`, `hermes` | declared **optional** — see below |
 

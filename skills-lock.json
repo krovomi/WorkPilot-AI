@@ -60,6 +60,11 @@
 			"version": "1.0.0",
 			"source": "local",
 			"path": "skills/tooling"
+		},
+		"ui-ux-pro-max": {
+			"version": "2.15.0",
+			"source": "nextlevelbuilder/ui-ux-pro-max-skill",
+			"path": "skills/ui-ux-pro-max"
 		}
 	},
 	"skills": {
@@ -823,6 +828,14 @@
 				"dotnet": ">=10.0"
 			}
 		},
+		"ui-ux-pro-max": {
+			"kind": "skill",
+			"pack": "ui-ux-pro-max",
+			"packVersion": "2.15.0",
+			"source": "skills/ui-ux-pro-max/ui-ux-pro-max/SKILL.md",
+			"contentSha256": "42502ab84c9bf61039c155a5904a6f78c226814d1d735ffc3b9768b878d8b789",
+			"targets": {}
+		},
 		"webapp-testing": {
 			"kind": "skill",
 			"pack": "tooling",
@@ -1158,6 +1171,51 @@
 		".agents/skills/systematic-debugging/SKILL.md",
 		".agents/skills/testcontainers-integration/SKILL.md",
 		".agents/skills/testcontainers-integration/reference.md",
+		".agents/skills/ui-ux-pro-max/LICENSE",
+		".agents/skills/ui-ux-pro-max/SKILL.md",
+		".agents/skills/ui-ux-pro-max/data/app-interface.csv",
+		".agents/skills/ui-ux-pro-max/data/catalog-summary.json",
+		".agents/skills/ui-ux-pro-max/data/charts.csv",
+		".agents/skills/ui-ux-pro-max/data/colors.csv",
+		".agents/skills/ui-ux-pro-max/data/data-provenance.json",
+		".agents/skills/ui-ux-pro-max/data/google-fonts.csv",
+		".agents/skills/ui-ux-pro-max/data/icons.csv",
+		".agents/skills/ui-ux-pro-max/data/landing.csv",
+		".agents/skills/ui-ux-pro-max/data/motion.csv",
+		".agents/skills/ui-ux-pro-max/data/products.csv",
+		".agents/skills/ui-ux-pro-max/data/react-performance.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/angular.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/astro.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/avalonia.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/flutter.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/html-tailwind.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/javafx.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/jetpack-compose.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/laravel.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/nextjs.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/nuxt-ui.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/nuxtjs.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/react-native.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/react.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/shadcn.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/svelte.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/swiftui.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/threejs.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/uno.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/uwp.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/vue.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/winui.csv",
+		".agents/skills/ui-ux-pro-max/data/stacks/wpf.csv",
+		".agents/skills/ui-ux-pro-max/data/styles.csv",
+		".agents/skills/ui-ux-pro-max/data/typography.csv",
+		".agents/skills/ui-ux-pro-max/data/ui-reasoning.csv",
+		".agents/skills/ui-ux-pro-max/data/ux-guidelines.csv",
+		".agents/skills/ui-ux-pro-max/references/pro-rules.md",
+		".agents/skills/ui-ux-pro-max/references/quick-reference.md",
+		".agents/skills/ui-ux-pro-max/scripts/core.py",
+		".agents/skills/ui-ux-pro-max/scripts/design_system.py",
+		".agents/skills/ui-ux-pro-max/scripts/reasoning_contract.py",
+		".agents/skills/ui-ux-pro-max/scripts/search.py",
 		".agents/skills/webapp-testing/SKILL.md",
 		".agents/skills/webapp-testing/scripts/with_server.py",
 		".claude-plugin/marketplace.json",
@@ -1250,6 +1308,7 @@
 		".gemini/commands/spike.toml",
 		".gemini/commands/systematic-debugging.toml",
 		".gemini/commands/testcontainers-integration.toml",
+		".gemini/commands/ui-ux-pro-max.toml",
 		".gemini/commands/webapp-testing.toml"
 	]
 }

@@ -1452,3 +1452,75 @@ export async function syncBrain(
 export function obsidianUri(absPath: string): string {
 	return `obsidian://open?path=${encodeURIComponent(absPath)}`;
 }
+
+/* -------------------------------------------------------------------------
+ * UI/UX — ui-ux-pro-max: is this task about the interface, which design system
+ * ---------------------------------------------------------------------- */
+
+export type UiUxVerdict = "ui" | "not-ui" | "unknown";
+export type UiUxOverride = "auto" | "force" | "skip";
+
+export interface UiUxRelevance {
+	verdict: UiUxVerdict;
+	/** Stable code: planned-ui-files, description, no-ui-stack, override-force… */
+	reason: string;
+	detail: string;
+	plannedFiles: string[] | null;
+	uiFiles: string[];
+	override: UiUxOverride;
+}
+
+export interface UiUxRecord {
+	/** ready | skipped | not-installed | failed | withheld */
+	status: string;
+	relevance: UiUxRelevance;
+	source: "project" | "generated" | null;
+	masterPath: string | null;
+	masterWritten: boolean;
+	guide: string | null;
+	toolkit: string | null;
+	reasons: string[];
+}
+
+export interface UiUxDesign {
+	colors: { role: string; hex: string }[];
+	heading?: string;
+	body?: string;
+	style?: string;
+	pattern?: string;
+}
+
+export interface UiUxTaskPayload {
+	installed: boolean;
+	reason: string | null;
+	/** What the build's preflight wrote; null before the first build. */
+	record: UiUxRecord | null;
+	/** Before a build: the verdict the next build would reach, recomputed. */
+	forecast: UiUxRelevance | null;
+	design: UiUxDesign | null;
+}
+
+function specParams(query: SpecTraceabilityQuery): Record<string, string> {
+	const params: Record<string, string> = {};
+	if (query.specDir) params.spec_dir = query.specDir;
+	if (query.projectDir) params.project_dir = query.projectDir;
+	if (query.specId) params.spec_id = query.specId;
+	return params;
+}
+
+export async function fetchUiUxTask(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<UiUxTaskPayload>> {
+	return _get<UiUxTaskPayload>("/api/uiux/task", specParams(query), signal);
+}
+
+export async function setUiUxOverride(
+	query: SpecTraceabilityQuery,
+	mode: UiUxOverride,
+): Promise<ApiResult<UiUxTaskPayload>> {
+	return _post<UiUxTaskPayload>("/api/uiux/override", {
+		...specParams(query),
+		mode,
+	});
+}

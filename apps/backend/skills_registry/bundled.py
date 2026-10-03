@@ -9,19 +9,28 @@ from typing import Any
 
 from .frontmatter import parse_frontmatter
 
-BUNDLED_SKILLS = ("convert-documents-to-markdown",)
+BUNDLED_SKILLS = ("convert-documents-to-markdown", "ui-ux-pro-max")
+
+
+def bundled_skill_dirs(name: str) -> tuple[Path, ...]:
+    """Where an allowlisted skill's directory may be: a release, then a checkout.
+
+    Its scripts and data travel with it — `uiux` runs the bundled engine from
+    there — so callers need the directory, not only the SKILL.md.
+    """
+    if name not in BUNDLED_SKILLS:
+        return ()
+    module = Path(__file__).resolve()
+    return (
+        module.parent / "bundled" / name,
+        module.parents[3] / ".agents" / "skills" / name,
+    )
 
 
 def load_bundled_skill(name: str) -> tuple[dict[str, Any], str] | None:
     """Read an allowlisted skill in a release or a source checkout."""
-    if name not in BUNDLED_SKILLS:
-        return None
-    module = Path(__file__).resolve()
-    candidates = (
-        module.parent / "bundled" / name / "SKILL.md",
-        module.parents[3] / ".agents" / "skills" / name / "SKILL.md",
-    )
-    for path in candidates:
+    for directory in bundled_skill_dirs(name):
+        path = directory / "SKILL.md"
         try:
             meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
         except OSError:

@@ -47,6 +47,7 @@ not run says so, and `succeeded` is None rather than True.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
@@ -103,6 +104,13 @@ BUILTIN_EXECUTORS = frozenset({"docs", "planning", "coding", "qa"})
 # reached through the one door that test does not watch.
 _ELSEWHERE = frozenset({"design-check", "observe"})
 
+# Phases that run in their window like a skill phase, but by WorkPilot's own
+# Python and with no session: `ui-design-system` settles the task's design
+# system with ui-ux-pro-max's local engine (`uiux.preflight`). Unlike the
+# gates above it belongs to a window — the coder reads what it wrote — so it is
+# returned by `phases_between` and dispatched by `run_skill_phase`.
+DETERMINISTIC_EXECUTORS = frozenset({"ui-design-system"})
+
 # A workflow phase id -> the phase_config vocabulary it resolves model and
 # effort under. `phase_config` knows four phases; the workflow declares eleven.
 # Rather than invent a fifth config phase per new workflow phase — which would
@@ -118,6 +126,8 @@ CONFIG_PHASE = {
     # nothing has been built yet for it to judge.
     "mobile-design": "planning",
     "frontend-design": "planning",
+    # No model runs in it; listed so its log entries land under planning.
+    "ui-design-system": "planning",
     "coding": "coding",
     "review": "qa",
     "qa": "qa",
@@ -448,6 +458,23 @@ def _mobile(project_dir: Path) -> str:
         return ""
 
 
+def _uiux(spec_dir: Path, phase_id: str) -> str:
+    """`prompts.uiux_section`, deferred for the same reason as the above.
+
+    The design system `ui-design-system` settled, for the phases that judge or
+    shape an interface: `frontend-design` designs against it instead of beside
+    it, and a reviewer holds the diff to it. Empty on every task that is not
+    about the interface.
+    """
+    role = "qa" if CONFIG_PHASE.get(phase_id) == "qa" else "phase"
+    try:
+        from prompts import uiux_section
+
+        return uiux_section(spec_dir, role=role)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
     """The procedure, plus the minimum context needed to apply it.
 
@@ -503,6 +530,10 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
     if documents := _docintel(ctx.project_dir, ctx.spec_dir):
         lines += ["", "---", "", documents]
 
+    # The design system of a UI task (ui-ux-pro-max). Empty off the interface.
+    if design := _uiux(ctx.spec_dir, phase.id):
+        lines += ["", "---", "", design]
+
     lines += [
         "",
         "---",
@@ -557,10 +588,74 @@ def _announce(phase_id: str) -> None:
         logger.debug("could not announce phase %s: %s", phase_id, exc)
 
 
+def _run_ui_design_system(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """`ui-design-system`: the design system the coder will build against.
+
+    No session: `uiux.preflight` asks ui-ux-pro-max's local engine, writes
+    `<spec_dir>/uiux/`, and — on a UI task of a project with no design system
+    yet — `design-system/<project>/MASTER.md` into the worktree.
+    """
+    phase = resolved.phase
+    try:
+        from uiux.preflight import run_preflight
+
+        result = run_preflight(
+            ctx.project_dir, ctx.spec_dir, planned_files=ctx.changed_files
+        )
+    except Exception as exc:  # noqa: BLE001 - a preflight never fails a build
+        return PhaseOutcome(phase.id, phase.impl, resolved.dispatch, None, str(exc))
+
+    relevance = result.relevance
+    if result.status == "skipped":
+        return PhaseOutcome(
+            phase.id,
+            phase.impl,
+            resolved.dispatch,
+            True,
+            detail=f"not a UI task ({relevance.reason})",
+        )
+    if result.status in ("not-installed", "failed"):
+        return PhaseOutcome(
+            phase.id,
+            phase.impl,
+            resolved.dispatch,
+            None,
+            detail="; ".join(result.reasons) or result.status,
+        )
+    parts = []
+    if result.source == "project":
+        parts.append(f"project's {result.master_path}")
+    elif result.master_written:
+        parts.append(f"generated -> {result.master_path}")
+    else:
+        parts.append("generated")
+    if result.guide:
+        parts.append(f"{result.guide} guidelines")
+    if result.status == "withheld":
+        parts.append("MASTER.md withheld by injection_guard")
+    output = Path(ctx.spec_dir) / "uiux" / "design-system.md"
+    return PhaseOutcome(
+        phase.id,
+        phase.impl,
+        resolved.dispatch,
+        True,
+        detail=", ".join(parts),
+        output_path=output if output.is_file() else None,
+    )
+
+
+_DETERMINISTIC_RUNNERS = {"ui-design-system": _run_ui_design_system}
+
+
 async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     """Run one skill-backed phase. Never raises."""
     phase = resolved.phase
     impl = phase.impl
+
+    deterministic = _DETERMINISTIC_RUNNERS.get(phase.id)
+    if deterministic is not None:
+        # The engine is a subprocess; keep the event loop free while it runs.
+        return await asyncio.to_thread(deterministic, resolved, ctx)
 
     found = find_skill_body(ctx.repo_root, phase.pack, phase.skill)
     if found is None:

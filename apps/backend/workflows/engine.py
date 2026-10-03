@@ -38,6 +38,7 @@ __all__ = [
     "ResolvedPhase",
     "ExecutionProfile",
     "MissingImpl",
+    "narrow_to_forecast",
     "resolve_profile",
     "validate_impls",
     "DETERMINISTIC_PHASES",
@@ -57,7 +58,12 @@ BUILTIN_PACKS = frozenset({"workpilot"})
 # exempted from effort pruning it should obey, and handed to
 # `run_deterministic_gates`, which would have run the detector twice and
 # reported the same verdict under two phase ids.
-DETERMINISTIC_PHASES = frozenset({"design-check"})
+#
+# `ui-design-system` is the other kind of deterministic phase: not a gate but a
+# preflight. It runs ui-ux-pro-max's local engine (`uiux.preflight`) between
+# planning and coding — no model, no network — so it costs nothing at any
+# effort level, and the runner executes it rather than opening a session.
+DETERMINISTIC_PHASES = frozenset({"design-check", "ui-design-system"})
 
 _SKIP_EFFORT = "effort"
 _SKIP_UNTOUCHED = "untouched"
@@ -155,9 +161,17 @@ def _touched(globs: tuple[str, ...], changed_files: list[str] | None) -> bool:
         return True
     for path in changed_files:
         normalised = str(path).replace("\\", "/")
+        name = Path(normalised).name
         for pattern in globs:
-            if fnmatch.fnmatch(normalised, pattern) or fnmatch.fnmatch(
-                Path(normalised).name, pattern
+            # `**/x` names `x` at the root too: fnmatch's `*` wants a
+            # separator, so `fnmatch("App.tsx", "**/*.tsx")` is False, and a
+            # change to the root `App.tsx` or `index.html` used to skip every
+            # frontend phase.
+            bare = pattern[3:] if pattern.startswith("**/") else None
+            if (
+                fnmatch.fnmatch(normalised, pattern)
+                or fnmatch.fnmatch(name, pattern)
+                or (bare is not None and fnmatch.fnmatch(normalised, bare))
             ):
                 return True
     return False
@@ -215,6 +229,36 @@ def resolve_profile(
         profile.run.append(_degrade(phase, supports_subagents))
 
     return profile
+
+
+def narrow_to_forecast(
+    profile: ExecutionProfile, changed_files: list[str] | None
+) -> ExecutionProfile:
+    """The same profile, with the conditional phases the forecast does not touch
+    moved to ``skipped``.
+
+    The profile a build starts with was resolved before anything was planned,
+    so every `when: touches(...)` phase was kept on "unknown — run". Once the
+    plan names its files (`workflows.forecast.planned_files`), the phases that
+    run *before* the code exists can be decided on that forecast. This only
+    ever removes: a phase effort pruned stays pruned, and ``None`` — no
+    forecast — returns the profile unchanged.
+    """
+    if not changed_files:
+        return profile
+    narrowed = ExecutionProfile(
+        workflow=profile.workflow,
+        effort=profile.effort,
+        provider=profile.provider,
+        skipped=list(profile.skipped),
+        declared=profile.declared,
+    )
+    for resolved in profile.run:
+        if _touched(resolved.phase.when_globs, changed_files):
+            narrowed.run.append(resolved)
+        else:
+            narrowed.skipped.append((resolved.phase, _SKIP_UNTOUCHED))
+    return narrowed
 
 
 @dataclass(frozen=True)

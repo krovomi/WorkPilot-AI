@@ -191,6 +191,14 @@
 				"to": "backend/skills_registry/bundled/convert-documents-to-markdown"
 			},
 			{
+				"from": "../../.agents/skills/ui-ux-pro-max",
+				"to": "backend/skills_registry/bundled/ui-ux-pro-max",
+				"filter": [
+					"!**/__pycache__",
+					"!**/*.pyc"
+				]
+			},
+			{
 				"from": "resources/icon.ico",
 				"to": "icon.ico"
 			},

@@ -285,6 +285,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",
+        # Whether a task touches the interface, and the override a person sets
+        # on it. Addressed like docintel, so it answers to the same domain.
+        "uiux": "task",
         "workflow_profile": "task",
         "slash_commands": "agent",
         "parallel_variations": "lab",

@@ -2528,5 +2528,13 @@
 				}
 			}
 		}
+	},
+	"uiux": {
+		"title": "Intelligence de design UI/UX (ui-ux-pro-max)",
+		"description": "Sur les tâches qui touchent l'interface, un design system (palette, typographie, style) et les règles du stack UI sont donnés au coder, aux phases de design et à la QA. Données locales, sans réseau, sans token. Les tâches backend ne le paient jamais.",
+		"enabled": "Utiliser sur les tâches UI",
+		"enabledHint": "Décidé par tâche d'après les fichiers du plan ; la carte Kanban permet d'écarter une tâche.",
+		"persistMaster": "Écrire le design system dans le projet",
+		"persistMasterHint": "Quand le projet n'en a pas, design-system/<projet>/MASTER.md est ajouté au diff de la tâche pour que les tâches UI suivantes le réutilisent."
 	}
 }

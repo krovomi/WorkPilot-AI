@@ -33,6 +33,7 @@ def get_allowed_tools(
     project_capabilities: dict | None = None,
     linear_enabled: bool = False,
     mcp_config: dict | None = None,
+    spec_dir=None,
 ) -> list[str]:
     """
     Get the list of allowed tools for a specific agent type.
@@ -68,6 +69,7 @@ def get_allowed_tools(
         project_capabilities,
         linear_enabled,
         mcp_config,
+        spec_dir=spec_dir,
     )
 
     # Add workpilot tools ONLY if the MCP server is available
@@ -112,6 +114,10 @@ def _get_mcp_tools_for_servers(servers: list[str]) -> list[str]:
             from brain.runtime import MCP_TOOL_NAMES
 
             tools.extend(MCP_TOOL_NAMES)
+        elif server == "uiux":
+            from uiux.integration import MCP_TOOL_NAMES as UIUX_TOOL_NAMES
+
+            tools.extend(UIUX_TOOL_NAMES)
         # workpilot tools are already added via config["auto_claude_tools"]
 
     return tools

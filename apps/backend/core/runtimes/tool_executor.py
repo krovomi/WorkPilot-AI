@@ -137,6 +137,12 @@ class ToolExecutor:
             )
         elif tool_name == "create_directory":
             return await self._create_directory(_pick_arg(arguments, *dir_aliases))
+        elif _is_uiux_tool(tool_name):
+            # ui-ux-pro-max: the same tools the Claude SDK reaches over MCP,
+            # offered only on a task whose preflight said it is about the UI.
+            from uiux.integration import execute_tool as uiux_execute
+
+            return await uiux_execute(tool_name, arguments, self.project_dir)
         elif _is_brain_tool(tool_name):
             # The shared brain: the same tools the Claude SDK reaches over MCP,
             # executed in-process for every other provider.
@@ -415,6 +421,25 @@ def _is_brain_tool(name: str) -> bool:
         return False
 
 
+def _is_uiux_tool(name: str) -> bool:
+    try:
+        from uiux.integration import is_uiux_tool
+
+        return is_uiux_tool(name)
+    except Exception:  # noqa: BLE001 - optional design data never breaks dispatch
+        return False
+
+
+def _uiux_tool_definitions(spec_dir: str | Path | None) -> list[dict[str, Any]]:
+    """ui-ux-pro-max's tools, when this task's preflight said it is a UI task."""
+    try:
+        from uiux.integration import tool_definitions
+
+        return tool_definitions(spec_dir)
+    except Exception:  # noqa: BLE001 - optional design data never breaks a session
+        return []
+
+
 def _brain_tool_definitions() -> list[dict[str, Any]]:
     """The shared brain's tools, when a brain exists on this machine."""
     try:
@@ -425,12 +450,16 @@ def _brain_tool_definitions() -> list[dict[str, Any]]:
         return []
 
 
-def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
+def get_tool_definitions(
+    agent_type: str, spec_dir: str | Path | None = None
+) -> list[dict[str, Any]]:
     """
     Get tool definitions for a specific agent type.
 
     Args:
         agent_type: Type of agent (e.g., 'coder', 'planner')
+        spec_dir: The task's spec directory, when there is one — it decides
+            whether the ui-ux-pro-max tools are offered
 
     Returns:
         List of tool definitions
@@ -563,4 +592,5 @@ def get_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
 
     # Every agent type, like `create_client` does for the Claude SDK.
     base_tools.extend(_brain_tool_definitions())
+    base_tools.extend(_uiux_tool_definitions(spec_dir))
     return base_tools

@@ -77,6 +77,7 @@ class TestPhaseWindows:
         assert [r.id for r in pre] == ["brainstorm", "spec"]
         assert [r.id for r in planned] == [
             "analyze",
+            "ui-design-system",
             "mobile-design",
             "frontend-design",
         ]
@@ -213,7 +214,9 @@ class TestPhaseWindows:
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
         assert pre == []
-        assert planned == []  # `analyze` is bought at medium
+        # `analyze` is bought at medium; `ui-design-system` runs no model, so
+        # no effort level has anything to save by dropping it.
+        assert [r.id for r in planned] == ["ui-design-system"]
         assert mid == []
         # `verify` is a hard gate: never pruned, at any level.
         assert [r.id for r in post] == ["verify"]
