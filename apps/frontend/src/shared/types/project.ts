@@ -436,6 +436,17 @@ export interface ProjectEnvConfig {
 		rtkModelFacing?: boolean;
 	};
 
+	// UI/UX design intelligence (ui-ux-pro-max). Not an MCP toggle either: the
+	// server it offers is decided per task, by whether the task touches the
+	// interface. These two switches decide whether it may run at all, and
+	// whether a generated design system is written into the worktree.
+	uiux?: {
+		/** Use ui-ux-pro-max on UI tasks - default: true. Backend tasks never pay for it. */
+		enabled?: boolean;
+		/** Write `design-system/<project>/MASTER.md` when the project has none - default: true. */
+		persistMaster?: boolean;
+	};
+
 	// Channel Notifications (task done → PR ready announcement)
 	// Microsoft Teams
 	teamsNotificationsEnabled?: boolean;

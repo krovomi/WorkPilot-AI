@@ -682,6 +682,13 @@ class _NoSubagents(Exception):
     """
 
 
+def _uiux_mcp_tools() -> tuple[str, ...]:
+    """ui-ux-pro-max's MCP tool names, for the permission allowlist."""
+    from uiux.integration import MCP_TOOL_NAMES
+
+    return MCP_TOOL_NAMES
+
+
 def _brain_mcp_tools() -> tuple[str, ...]:
     """The shared brain's MCP tool names, for the permission allowlist."""
     from brain.runtime import MCP_TOOL_NAMES
@@ -873,6 +880,7 @@ def create_client(
         project_capabilities,
         linear_enabled,
         mcp_config,
+        spec_dir=spec_dir,
     )
 
     # Get required MCP servers for this agent type
@@ -883,6 +891,7 @@ def create_client(
         project_capabilities,
         linear_enabled,
         mcp_config,
+        spec_dir=spec_dir,
     )
 
     # Check if Graphiti MCP is enabled (already filtered by get_required_mcp_servers)
@@ -995,6 +1004,11 @@ def create_client(
                     if "brain" in required_servers
                     else []
                 ),
+                *(
+                    [f"{tool}(*)" for tool in _uiux_mcp_tools()]
+                    if "uiux" in required_servers
+                    else []
+                ),
                 *[f"{tool}(*)" for tool in browser_tools_permissions],
             ],
         },
@@ -1032,6 +1046,8 @@ def create_client(
         mcp_servers_list.append("graphiti-memory (knowledge graph)")
     if "brain" in required_servers:
         mcp_servers_list.append("workpilot-brain (shared brain)")
+    if "uiux" in required_servers:
+        mcp_servers_list.append("workpilot-uiux (ui-ux-pro-max design data)")
     if "workpilot" in required_servers and auto_claude_tools_enabled:
         mcp_servers_list.append(f"workpilot ({agent_type} tools)")
     if mcp_servers_list:
@@ -1211,6 +1227,14 @@ def create_client(
         mcp_servers[SERVER_KEY] = mcp_server_config(
             task=task_ref(project_dir, spec_dir)
         )
+
+    # ui-ux-pro-max (`uiux/integration.py`): offered only on a task whose
+    # preflight said it touches the interface.
+    if "uiux" in required_servers:
+        from uiux.integration import SERVER_KEY as UIUX_SERVER_KEY
+        from uiux.integration import mcp_server_config as uiux_server_config
+
+        mcp_servers[UIUX_SERVER_KEY] = uiux_server_config(project_dir)
 
     # Add custom workpilot MCP server if required and available
     if "workpilot" in required_servers and auto_claude_tools_enabled:
@@ -2221,7 +2245,11 @@ def create_agent_client(
 
         mcp_config = load_project_mcp_config(project_dir)
         allowed_tools_list = get_allowed_tools(
-            agent_type, project_capabilities, _is_linear_enabled(), mcp_config
+            agent_type,
+            project_capabilities,
+            _is_linear_enabled(),
+            mcp_config,
+            spec_dir=spec_dir,
         )
 
         return CopilotAgentClient(

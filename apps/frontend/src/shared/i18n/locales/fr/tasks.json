@@ -1689,5 +1689,40 @@
 			"mockup-near": "Diffère de la maquette",
 			"placeholder": "Texte provisoire"
 		}
+	},
+	"uiux": {
+		"title": "Design system UI/UX",
+		"guide": "règles {{guide}}",
+		"state": {
+			"planned": "Prochain build",
+			"ready": "Prêt",
+			"withheld": "Retenu",
+			"skipped": "Écarté",
+			"failed": "N'a pas pu tourner",
+			"notInstalled": "Non installé"
+		},
+		"reason": {
+			"planned-ui-files": "Le plan touche l'interface : {{detail}}",
+			"planned-no-ui-files": "Le plan ne touche aucun fichier d'interface.",
+			"description": "La description parle de l'interface ({{detail}}) ; le plan le confirmera.",
+			"description-not-ui": "La description ne parle pas de l'interface.",
+			"no-ui-stack": "Ce projet n'a pas de toolkit UI.",
+			"override-force": "Appliqué à cette tâche par vous.",
+			"override-skip": "Écarté pour cette tâche par vous : ni design system, ni outils UI.",
+			"disabled": "Désactivé dans Réglages → Outils des agents.",
+			"no-signal": "Rien pour décider pour l'instant.",
+			"unknown": "Décidé d'après les fichiers de la tâche."
+		},
+		"master": {
+			"project": "Le design system du projet est utilisé tel quel : {{path}}",
+			"generated": "Généré pour cette tâche et écrit dans {{path}} — il fait partie du diff à relire."
+		},
+		"withheld": "Le MASTER.md du projet a été retenu : une analyse de sécurité a signalé son contenu.",
+		"style": "Style : {{style}}",
+		"fonts": "Polices : {{heading}} / {{body}}",
+		"actions": {
+			"skip": "Écarter pour cette tâche",
+			"auto": "Décider automatiquement"
+		}
 	}
 }

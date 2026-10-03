@@ -84,6 +84,21 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _bundled_files(root: Path) -> list[Path]:
+    """Every file that travels with a skill — minus interpreter caches.
+
+    A skill whose scripts were run in place (by a test, a person, or the
+    pipeline itself) grows a `__pycache__/` that is a fact about one machine's
+    Python, not part of the skill: copying it into every harness mirror makes
+    the lockfile and `skills:check` depend on which interpreter last ran it.
+    """
+    return [
+        p
+        for p in root.rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc"
+    ]
+
+
 def content_hash(src: SkillSource) -> str:
     """A stable hash over everything that travels with the skill.
 
@@ -97,7 +112,7 @@ def content_hash(src: SkillSource) -> str:
         return h.hexdigest()
     # Path ordering and separators differ on Windows; hashes must not.
     for f in sorted(
-        (p for p in src.dir.rglob("*") if p.is_file()),
+        _bundled_files(src.dir),
         key=lambda p: p.relative_to(src.dir).as_posix(),
     ):
         h.update(f.relative_to(src.dir).as_posix().encode("utf-8"))
@@ -223,7 +238,7 @@ def plan_build(
                 base = Path(harness.skills_path) / src.name
                 plan.files[base / "SKILL.md"] = document
                 # Bundled resources travel with the skill.
-                for extra in sorted(p for p in src.dir.rglob("*") if p.is_file()):
+                for extra in sorted(_bundled_files(src.dir)):
                     if extra.name == "SKILL.md" and extra.parent == src.dir:
                         continue
                     plan.copies[base / extra.relative_to(src.dir)] = extra

@@ -29,6 +29,7 @@ import { SpecInterviewBanner } from "./SpecInterviewDialog";
 import { SpecTraceabilityCard } from "./SpecTraceabilityCard";
 import { TaskJevCard } from "./TaskJevCard";
 import { TaskMetadata } from "./TaskMetadata";
+import { UiUxDesignCard } from "./UiUxDesignCard";
 import { WorkflowProfileCard } from "./WorkflowProfileCard";
 
 export type OverviewSectionId = "review" | "task" | "plan" | "learning";
@@ -219,6 +220,9 @@ export function TaskOverview({
 						<TaskJevCard task={task} projectPath={projectPath} />
 						<SpecTraceabilityCard task={task} projectPath={projectPath} />
 						<DocumentInsightsCard task={task} projectPath={projectPath} />
+						{/* Le design system d'une tâche qui touche l'interface
+						    (ui-ux-pro-max). Rien sur une tâche backend. */}
+						<UiUxDesignCard task={task} projectPath={projectPath} />
 						{/* Ce que montrent les captures de l'application, lues par OCR :
 						    clés brutes, langue, libellés coupés, base → tâche, maquette.
 						    Rien sans capture. */}

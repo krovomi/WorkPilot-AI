@@ -403,6 +403,11 @@ def _record_merge_in_brain(project_dir: Path, spec_name: str) -> None:
 
         if rel := record_merge(project_dir, spec_name):
             print(f"  brain: merge recorded in {rel}")
+
+        from uiux.knowledge import record_merged_design_system
+
+        if rel := record_merged_design_system(project_dir, spec_name):
+            print(f"  brain: design system filed in {rel}")
     except Exception as exc:  # noqa: BLE001 - never fail a merge over bookkeeping
         debug_warning(MODULE, f"Brain merge record skipped: {exc}")
 

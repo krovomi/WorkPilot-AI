@@ -69,6 +69,12 @@
 			"source": "./skills/tooling",
 			"version": "1.0.0",
 			"description": "Toolchain-agnostic engineering skills: building MCP servers, driving web apps under test."
+		},
+		{
+			"name": "workpilot-ui-ux-pro-max",
+			"source": "./skills/ui-ux-pro-max",
+			"version": "2.15.0",
+			"description": "UI/UX design intelligence (Basic edition): a design system generator and stack-specific UI guidelines searched locally by a stdlib BM25 engine — no network, no model, no token."
 		}
 	]
 }
