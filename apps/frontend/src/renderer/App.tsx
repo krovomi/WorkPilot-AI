@@ -401,7 +401,6 @@ import { OnboardingWizard } from "./components/onboarding";
 import { ProjectTabBar } from "./components/ProjectTabBar";
 import { ProviderContextProvider } from "./components/ProviderContext";
 import { PageLlmSelector } from "./components/PageLlmSelector";
-import { ProviderSelector } from "./components/ProviderSelector";
 import { VersionWarningModal } from "./components/VersionWarningModal";
 import { VoiceControlDialog } from "./components/voice-control";
 import { ViewStateProvider } from "./contexts/ViewStateContext";
@@ -815,8 +814,6 @@ export function App() {
 	);
 
 	// State global pour provider LLM actif et modèles associés
-	const [_providers, setProviders] = useState<string[]>([]);
-	const [selectedProvider, setSelectedProvider] = useState<string>("");
 
 	// Initial load
 	useEffect(() => {
@@ -1628,53 +1625,6 @@ export function App() {
 		}
 	};
 
-	// Récupère la liste des providers au chargement
-	useEffect(() => {
-		const controller = new AbortController();
-		const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-		fetch(`${backendUrl}/providers`, { signal: controller.signal })
-			.then((res) => {
-				if (!res.ok) {
-					throw new Error(`HTTP ${res.status}`);
-				}
-				// Check if response is actually JSON
-				const contentType = res.headers.get("content-type");
-				if (!contentType?.includes("application/json")) {
-					throw new Error("Response is not JSON");
-				}
-				return res.json();
-			})
-			.then((data) => {
-				// data.providers is an array of objects {name, label, description}
-				const providerNames: string[] = (data.providers || []).map(
-					(p: unknown) =>
-						typeof p === "object" && p !== null && "name" in p
-							? (p as { name: string }).name
-							: String(p),
-				);
-				setProviders(providerNames);
-				// Sélectionne automatiquement 'claude' si présent
-				if (!selectedProvider && providerNames.includes("claude")) {
-					setSelectedProvider("claude");
-				} else if (!selectedProvider && providerNames.length > 0) {
-					setSelectedProvider(providerNames[0]);
-				}
-			})
-			.catch((err) => {
-				if (err?.name === "AbortError") return;
-				// Don't log loudly if backend is not available - this is expected in some setups
-				if (err.message === "Response is not JSON") {
-					console.info(
-						"[App] Backend providers API not available - running without provider management",
-					);
-				} else {
-					console.error("Failed to fetch providers:", err);
-				}
-				setProviders([]);
-			});
-		return () => controller.abort();
-	}, [selectedProvider]);
-
 	const getKanbanContent = () => {
 		if (isLoadingTasks && tasks.length === 0) {
 			return <KanbanSkeleton />;
@@ -1721,24 +1671,16 @@ export function App() {
 
 							{/* Main content */}
 							<div className="flex flex-1 flex-col overflow-hidden">
-								{/* Ligne sticky avec ProviderSelector et bouton "Claude Code" placée juste sous les tabs projets */}
+								{/* Ligne sticky placée juste sous les tabs projets. Il n'y a plus
+								    de fournisseur global ici : chaque tâche du Kanban possède son
+								    moteur, le fournisseur par défaut vit dans Paramètres → Agent,
+								    et les badges de consommation ont leur propre sélecteur. */}
 								<div className="flex items-center justify-between gap-3 px-2.5 py-2 border-b border-border bg-background sticky top-0 z-30">
 									<div className="flex items-center flex-1 min-w-0">
-										{/* Le choix propre à la page : il prime sur la liste à
-										    droite, et n'apparaît que sur une page qui sait
+										{/* Le choix propre à la page : il prime sur le fournisseur
+										    par défaut, et n'apparaît que sur une page qui sait
 										    l'exécuter. */}
 										<PageLlmSelector page={activeView} />
-									</div>
-									<div className="shrink-0">
-										<ProviderSelector
-											applyToExistingTasks
-											selected={selectedProvider}
-											setSelected={setSelectedProvider}
-											onOpenAccountsSettings={() => {
-												setSettingsInitialSection("accounts");
-												setIsSettingsDialogOpen(true);
-											}}
-										/>
 									</div>
 								</div>
 

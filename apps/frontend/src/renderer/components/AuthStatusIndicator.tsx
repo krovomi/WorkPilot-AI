@@ -72,7 +72,9 @@ const OAUTH_FALLBACK = {
 export function AuthStatusIndicator() {
 	const { profiles, activeProfileId } = useSettingsStore();
 	const { t } = useTranslation(["common"]);
-	const { selectedProvider } = useProviderContext();
+	// The provider the usage badges observe: the running tasks', unless the
+	// person picked one (UsageLensSelector). Not the default provider.
+	const { usageProvider: selectedProvider } = useProviderContext();
 
 	// Track GitHub CLI status for Copilot provider
 	const [githubStatus, setGithubStatus] = useState<{

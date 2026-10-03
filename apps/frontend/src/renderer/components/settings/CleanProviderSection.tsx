@@ -671,8 +671,13 @@ export function CleanProviderSection({
 	}, [isOpen, providers.length, autoTestConfiguredProviders, providers]);
 
 	const handleProviderActivated = async (providerId: string) => {
-		// 1. Update ProviderContext so UI components (UsageIndicator, etc.) reflect the new provider
+		// Activating a card sets the default provider: the one new tasks start
+		// from and features without a selector of their own use. Existing tasks
+		// keep their own engine.
+		// 1. Update ProviderContext and the settings store, as the selector in
+		//    Settings → Agent does, so both show the same default.
 		setContextProvider(providerId);
+		useSettingsStore.getState().updateSettings({ selectedProvider: providerId });
 		// 2. Persist to localStorage so ProviderSelector restores it on next mount
 		localStorage.setItem("selectedProvider", providerId);
 		// 3. Notify backend so SELECTED_LLM_PROVIDER is set for agent processes
