@@ -28,6 +28,7 @@ import { getAugmentedEnv } from "../env-utils";
 import { buildMemoryEnvVars } from "../memory-env-builder";
 import { isWindows, killProcessGracefully } from "../platform";
 import { projectStore } from "../project-store";
+import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
 import {
 	getConfiguredPythonPath,
@@ -234,6 +235,7 @@ export class AgentProcessManager {
 
 	private setupProcessEnvironment(
 		extraEnv: Record<string, string>,
+		taskProviders?: TaskProviderPlan,
 	): NodeJS.ProcessEnv {
 		// Get best available Claude profile environment (automatically handles rate limits)
 		const profileResult = getBestAvailableProfileEnv();
@@ -268,9 +270,13 @@ export class AgentProcessManager {
 		const ghCliEnv = this.detectAndSetCliPath("gh");
 		const glabCliEnv = this.detectAndSetCliPath("glab");
 
-		// Get active provider credentials (e.g., WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
-		// This ensures non-Claude providers get their credentials injected into the subprocess
-		const providerEnv = credentialManager.getEnvironmentVariables();
+		// Get provider credentials (e.g., WINDSURF_API_KEY, SELECTED_LLM_PROVIDER).
+		// A Kanban task names its own providers (task-engine.ts): the credentials
+		// of each of them, never those of the app's default provider. Any other
+		// process keeps the active provider's.
+		const providerEnv = taskProviders
+			? buildTaskProviderEnv(taskProviders)
+			: credentialManager.getEnvironmentVariables();
 		appLog.info("[AgentProcess] Provider env vars from CredentialManager:", {
 			SELECTED_LLM_PROVIDER: providerEnv.SELECTED_LLM_PROVIDER || "(not set)",
 			hasWindsurfApiKey: !!providerEnv.WINDSURF_API_KEY,
@@ -283,10 +289,13 @@ export class AgentProcessManager {
 		// When using a non-Claude provider (e.g., OpenAI, Mistral), clear Claude/Anthropic
 		// auth env vars so Claude Code CLI doesn't authenticate to Anthropic and then reject
 		// provider-specific model names (e.g., gpt-4o is unknown to Anthropic).
-		const nonClaudeProvider =
-			providerEnv.SELECTED_LLM_PROVIDER &&
-			!["claude", "anthropic"].includes(providerEnv.SELECTED_LLM_PROVIDER) &&
-			providerEnv.SELECTED_LLM_PROVIDER !== "copilot"; // copilot uses its own gh CLI auth
+		// A task keeps Claude's auth as soon as one of its phases runs on Claude.
+		const nonClaudeProvider = taskProviders
+			? !taskProviders.usesClaude &&
+				!taskProviders.providers.includes("copilot")
+			: providerEnv.SELECTED_LLM_PROVIDER &&
+				!["claude", "anthropic"].includes(providerEnv.SELECTED_LLM_PROVIDER) &&
+				providerEnv.SELECTED_LLM_PROVIDER !== "copilot"; // copilot uses its own gh CLI auth
 		const claudeAuthClearVars: Record<string, undefined> = nonClaudeProvider
 			? {
 					CLAUDE_CODE_OAUTH_TOKEN: undefined,
@@ -790,6 +799,7 @@ export class AgentProcessManager {
 		extraEnv: Record<string, string> = {},
 		processType: ProcessType = "task-execution",
 		projectId?: string,
+		taskProviders?: TaskProviderPlan,
 	): Promise<void> {
 		const isSpecRunner = processType === "spec-creation";
 		this.killProcess(taskId);
@@ -812,19 +822,26 @@ export class AgentProcessManager {
 		// (SSO token from state.vscdb or API key) and doesn't need Claude OAuth tokens.
 		// Use getEnvironmentVariables() as the source of truth since it handles all
 		// fallback paths (activeCredential, globalWindsurfApiKey in settings, etc.)
-		const providerCheckRaw = credentialManager.getEnvironmentVariables();
+		//
+		// A Kanban task answers from its own engine: the refresh is skipped only
+		// when none of its phases runs on Claude.
+		const providerCheckRaw = taskProviders
+			? buildTaskProviderEnv(taskProviders)
+			: credentialManager.getEnvironmentVariables();
 		// If Claude Code OAuth is active (agentConfigDir set) and windsurf is being injected
 		// only via the globalWindsurfApiKey fallback (no explicit windsurf activeCredential),
 		// treat it as a Claude provider so OAuth token refresh still happens.
 		const isWindsurfViaFallback =
+			!taskProviders &&
 			providerCheckRaw.SELECTED_LLM_PROVIDER === "windsurf" &&
 			credentialManager.getActiveCredential()?.provider !== "windsurf";
 		const providerCheck = isWindsurfViaFallback ? {} : providerCheckRaw;
 		const selectedLlmProvider =
 			providerCheck.SELECTED_LLM_PROVIDER?.toLowerCase();
-		const isNonClaudeProvider =
-			selectedLlmProvider &&
-			!["anthropic", "claude"].includes(selectedLlmProvider);
+		const isNonClaudeProvider = taskProviders
+			? !taskProviders.usesClaude
+			: selectedLlmProvider &&
+				!["anthropic", "claude"].includes(selectedLlmProvider);
 
 		if (isNonClaudeProvider) {
 			appLog.info(
@@ -896,7 +913,7 @@ export class AgentProcessManager {
 			}
 		}
 
-		const env = this.setupProcessEnvironment(extraEnv);
+		const env = this.setupProcessEnvironment(extraEnv, taskProviders);
 
 		// CRITICAL: Mark this profile's token as "in use" by an agent process.
 		// While marked, the UsageMonitor's ensureValidToken() will SKIP refresh for this

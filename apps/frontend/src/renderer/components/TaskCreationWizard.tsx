@@ -23,6 +23,13 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+	buildEngineMetadata,
+	defaultEngineProvider,
+	seedEngine,
+	type TaskEngine,
+} from "../../shared/utils/task-engine";
+import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
+import {
 	DEFAULT_AGENT_PROFILES,
 	DEFAULT_PHASE_MODELS,
 	DEFAULT_PHASE_THINKING,
@@ -56,7 +63,6 @@ import {
 	saveDraft,
 } from "../stores/task-store";
 import { FileAutocomplete } from "./FileAutocomplete";
-import { useProviderContext } from "./ProviderContext";
 import { TaskFileExplorerDrawer } from "./TaskFileExplorerDrawer";
 import {
 	type CriterionDraft,
@@ -88,7 +94,6 @@ export function TaskCreationWizard({
 }: TaskCreationWizardProps) {
 	const { t } = useTranslation(["tasks", "common"]);
 	const { settings } = useSettingsStore();
-	const { selectedProvider } = useProviderContext();
 	const selectedProfile =
 		DEFAULT_AGENT_PROFILES.find(
 			(p) => p.id === settings.selectedAgentProfile,
@@ -119,6 +124,23 @@ export function TaskCreationWizard({
 		const project = projects.find((p) => p.id === projectId);
 		return project?.path ?? null;
 	}, [projects, projectId]);
+	const projectProvider = useMemo(
+		() => projects.find((p) => p.id === projectId)?.settings?.provider,
+		[projects, projectId],
+	);
+	// The engine this task will own: provider × model × effort per phase.
+	// Seeded from the project's provider, else the default provider in
+	// Settings; once created, nothing global changes it.
+	const seedTaskEngine = useCallback(
+		(): TaskEngine =>
+			seedEngine(settings, defaultEngineProvider(settings, projectProvider)),
+		[settings, projectProvider],
+	);
+	const [engine, setEngine] = useState<TaskEngine>(seedTaskEngine);
+	// Read through a ref by the open/reset effect below: a Settings change
+	// while the dialog is open must not reset the form the person is filling.
+	const seedTaskEngineRef = useRef(seedTaskEngine);
+	seedTaskEngineRef.current = seedTaskEngine;
 
 	// Build branch options using shared utility - groups by local/remote with type indicators
 	const branchOptions = useMemo(() => {
@@ -235,6 +257,7 @@ export function TaskCreationWizard({
 						selectedProfile.phaseThinking ||
 						DEFAULT_PHASE_THINKING,
 				);
+				setEngine(draft.engine ?? seedTaskEngineRef.current());
 				setImages(draft.images);
 				setReferencedFiles(draft.referencedFiles ?? []);
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
@@ -276,6 +299,7 @@ export function TaskCreationWizard({
 						selectedProfile.phaseThinking ||
 						DEFAULT_PHASE_THINKING,
 				);
+				setEngine(seedTaskEngineRef.current());
 				setImages([]);
 				setReferencedFiles([]);
 				setRequireReviewBeforeCoding(false);
@@ -367,6 +391,7 @@ export function TaskCreationWizard({
 			thinkingLevel,
 			phaseModels,
 			phaseThinking,
+			engine,
 			images,
 			referencedFiles,
 			requireReviewBeforeCoding,
@@ -389,6 +414,7 @@ export function TaskCreationWizard({
 			thinkingLevel,
 			phaseModels,
 			phaseThinking,
+			engine,
 			images,
 			referencedFiles,
 			requireReviewBeforeCoding,
@@ -584,17 +610,9 @@ export function TaskCreationWizard({
 			if (priority) metadata.priority = priority;
 			if (complexity) metadata.complexity = complexity;
 			if (impact) metadata.impact = impact;
-			// Always include the active LLM provider so the backend knows which provider to use
-			const activeProvider =
-				selectedProvider || settings.selectedProvider || "anthropic";
-			metadata.provider = activeProvider;
-			if (model) metadata.model = model;
-			if (thinkingLevel) metadata.thinkingLevel = thinkingLevel;
-			if (phaseModels && phaseThinking) {
-				metadata.isAutoProfile = profileId === "auto";
-				metadata.phaseModels = phaseModels;
-				metadata.phaseThinking = phaseThinking;
-			}
+			// The task owns its engine from the start: every phase's provider,
+			// model and effort, locked so nothing global replaces them later.
+			Object.assign(metadata, buildEngineMetadata(engine));
 			if (images.length > 0) metadata.attachedImages = images;
 			if (allReferencedFiles.length > 0)
 				metadata.referencedFiles = allReferencedFiles;
@@ -660,6 +678,7 @@ export function TaskCreationWizard({
 				selectedProfile.phaseThinking ||
 				DEFAULT_PHASE_THINKING,
 		);
+		setEngine(seedTaskEngine());
 		setImages([]);
 		setReferencedFiles([]);
 		setRequireReviewBeforeCoding(false);
@@ -836,6 +855,14 @@ export function TaskCreationWizard({
 					descriptionRef={descriptionRef}
 					title={title}
 					onTitleChange={setTitle}
+					engineSlot={
+						<TaskEngineEditor
+							engine={engine}
+							onChange={setEngine}
+							idPrefix="new-task-engine"
+							disabled={isCreating}
+						/>
+					}
 					profileId={profileId}
 					model={model}
 					thinkingLevel={thinkingLevel}

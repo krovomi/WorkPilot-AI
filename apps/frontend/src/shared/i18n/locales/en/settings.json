@@ -609,8 +609,8 @@
 		"reverseChronological": "Reverse-chronological (newest first)"
 	},
 	"general": {
-		"providerSection": "AI Provider",
-		"providerSectionDescription": "Choose the AI provider to use for autonomous tasks. The model list below updates automatically.",
+		"providerSection": "Default provider",
+		"providerSectionDescription": "The provider new Kanban tasks start from, and the one used by features without a selector of their own (titles, auto-fix, test generation…). Each task keeps its own provider, model and effort: changing this never modifies an existing task.",
 		"otherAgentSettings": "Other Agent Settings",
 		"otherAgentSettingsDescription": "Additional agent configuration options",
 		"agentFramework": "Agent Framework",

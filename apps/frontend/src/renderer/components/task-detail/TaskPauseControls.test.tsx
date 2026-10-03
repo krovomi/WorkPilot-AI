@@ -130,7 +130,13 @@ it("keeps the downloaded phase model and sends its exact ID when resuming", asyn
 	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
 	const task = {
 		id: "task-local",
-		metadata: { provider: "ollama", phaseModels: { coding: model } },
+		// The effort shown is the task's own; without one it would come from the
+		// provider's presets in Settings.
+		metadata: {
+			provider: "ollama",
+			phaseModels: { coding: model },
+			thinkingLevel: "medium",
+		},
 	} as unknown as Task;
 	renderControls({ task, isPaused: true, isRunning: false });
 	await waitFor(() => expect(screen.getByText(model)).toBeInTheDocument());
@@ -143,8 +149,34 @@ it("keeps the downloaded phase model and sends its exact ID when resuming", asyn
 			"ollama",
 			model,
 			"medium",
+			"remaining",
 		),
 	);
+});
+
+it("applies the change to the paused phase only when asked", async () => {
+	const resume = vi.fn().mockResolvedValue({ success: true });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+	const task = {
+		id: "only-phase",
+		metadata: {
+			provider: "openai",
+			model: "gpt-5",
+			thinkingLevel: "high",
+			paused: { enabled: true, paused_phase: "coding" },
+		},
+	} as unknown as Task;
+	renderControls({ task, isPaused: true, isRunning: false });
+	const checkbox = await screen.findByRole("checkbox");
+	fireEvent.click(checkbox);
+	const button = screen.getByRole("button", { name: /resume with this llm/i });
+	await waitFor(() => expect(button).toBeEnabled());
+	fireEvent.click(button);
+	await waitFor(() => expect(resume).toHaveBeenCalled());
+	expect(resume.mock.calls[0][1]).toBe("openai");
+	expect(resume.mock.calls[0][3]).toBe("high");
+	expect(resume.mock.calls[0][4]).toBe("phase");
 });
 
 it("names the paused task and takes its model from the official library", async () => {
@@ -168,7 +200,7 @@ it("names the paused task and takes its model from the official library", async 
 	const task = {
 		id: "custom-task",
 		title: "Repair checkout",
-		metadata: { provider: "ollama", model: "custom" },
+		metadata: { provider: "ollama", model: "custom", thinkingLevel: "medium" },
 	} as Task;
 	renderControls({ task, isPaused: true, isRunning: false });
 	expect(screen.getByText("Repair checkout")).toBeInTheDocument();
@@ -198,6 +230,7 @@ it("names the paused task and takes its model from the official library", async 
 			"ollama",
 			"gemma4:12b",
 			"medium",
+			"remaining",
 		),
 	);
 });

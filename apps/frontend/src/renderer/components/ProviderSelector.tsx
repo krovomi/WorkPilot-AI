@@ -10,8 +10,6 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsStore } from "@/stores/settings-store";
-import { applyProviderToTasks } from "../lib/apply-provider-to-tasks";
-import { useTaskStore } from "../stores/task-store";
 import { useProviderContext } from "./ProviderContext";
 import {
 	AlertDialog,
@@ -301,7 +299,6 @@ function capitalize(str: string) {
 }
 
 interface ProviderSelectorProps {
-	applyToExistingTasks?: boolean;
 	selected?: string;
 	setSelected?: (provider: string) => void;
 	onOpenAccountsSettings?: () => void;
@@ -309,7 +306,6 @@ interface ProviderSelectorProps {
 
 // Ce composant synchronise le provider sélectionné via ProviderContext pour un usage temps réel dans UsageIndicator et AuthStatusIndicator
 export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
-	applyToExistingTasks = false,
 	selected: selectedProp = "",
 	setSelected: setSelectedProp = () => {
 		/* noop */
@@ -421,7 +417,6 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 			return;
 		}
 		if (isApplying) return;
-		const tasks = [...useTaskStore.getState().tasks];
 		setIsApplying(true);
 
 		// Communicate the provider selection to the backend
@@ -444,16 +439,8 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 			}
 
 			useSettingsStore.getState().updateSettings({ selectedProvider: value });
-			if (applyToExistingTasks) {
-				const failed = await applyProviderToTasks(tasks, value, settings);
-				if (failed.length)
-					toast({
-						title: t("dialogs:providerSelector.taskUpdateFailed", {
-							count: failed.length,
-						}),
-						variant: "destructive",
-					});
-			}
+			// The default provider seeds new tasks only. A task owns its engine
+			// (shared/utils/task-engine.ts) and is never rewritten from here.
 
 			// Notifier immédiatement les composants du changement de provider
 			globalThis.dispatchEvent(

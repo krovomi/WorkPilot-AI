@@ -1724,5 +1724,16 @@
 			"skip": "Écarter pour cette tâche",
 			"auto": "Décider automatiquement"
 		}
+	"engine": {
+		"taskWide": "Moteur de toute la tâche",
+		"ownedByTask": "Enregistré sur cette tâche uniquement. Changer le fournisseur par défaut dans les Paramètres, ou le moteur d'une autre tâche, ne le modifie jamais.",
+		"perPhase": "Avancé : un moteur par phase",
+		"mixed": "Mixte",
+		"loadingModels": "Chargement des modèles…",
+		"notConfiguredOption": "{{provider}} (non configuré)",
+		"notConfiguredWarning": "{{provider}} n'est pas configuré sur cette machine. Ajoutez son compte dans Paramètres → Comptes IA, ou choisissez un autre fournisseur.",
+		"chipMixed": "{{provider}} · mixte",
+		"chipAria": "Moteur de la tâche : {{engine}}",
+		"onlyResumedPhase": "Seulement pour la phase reprise ({{phase}}) — les phases suivantes gardent leur moteur"
 	}
 }
