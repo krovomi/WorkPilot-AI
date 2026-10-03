@@ -24,6 +24,7 @@ shown to be right either.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -50,8 +51,7 @@ EVENTS_FILE = "events.jsonl"
 REPORT_FILE = "report.md"
 VERSION = 1
 
-#: Statuses a record can carry.
-STATUSES = ("pass", "fail", "unknown", "not-applicable", "disabled", "running")
+logger = logging.getLogger(__name__)
 
 _BLOCKING_KINDS = {
     "crash",
@@ -118,7 +118,9 @@ def save_record(base: Path, record: dict) -> Path:
     try:
         (base / REPORT_FILE).write_text(render_report(record), encoding="utf-8")
     except OSError:
-        pass
+        # verify.json is the record; report.md is its readable rendering and
+        # is rewritten on the next save.
+        logger.debug("verify: could not write %s", REPORT_FILE)
     return target
 
 
@@ -418,4 +420,6 @@ def persist_plan_summary(spec_dir: Path, record: dict) -> None:
         )
         os.replace(partial, path)
     except OSError:
-        pass
+        # The card's badge is a convenience: the record in verify/ stays the
+        # source the task panel reads.
+        logger.debug("verify: could not update the plan summary in %s", path)

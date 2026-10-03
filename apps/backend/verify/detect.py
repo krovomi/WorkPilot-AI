@@ -402,7 +402,8 @@ def _jvm_target(directory: Path, project_dir: Path) -> Target | None:
             try:
                 text += manifest.read_text(encoding="utf-8", errors="replace")
             except OSError:
-                pass
+                # Unreadable manifest: detect from the other one, or not at all.
+                continue
     if "spring-boot" not in text:
         return None
     if pom.exists():

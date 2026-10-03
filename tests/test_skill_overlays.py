@@ -124,6 +124,13 @@ class TestResolve:
         )
         return skill
 
+    def test_a_provider_name_never_leaves_providers_dir(self, tmp_path):
+        skill = self._skill(tmp_path)
+        (tmp_path / "secret.md").write_text("## Browser\n\nLEAK\n", encoding="utf-8")
+        body, applied = resolve_skill_body(skill, "../../secret")
+        assert "LEAK" not in body
+        assert all("/" not in name and ".." not in name for name in applied)
+
     def test_no_overlay_dir_is_the_base(self, tmp_path):
         skill = tmp_path / "plain"
         skill.mkdir()
@@ -183,3 +190,28 @@ class TestRealSkill:
             body, applied = resolve_skill_body(skill, provider)
             assert "## Report" in body, provider
             assert applied, provider
+
+
+class TestSlashCommandNames:
+    """The Kanban command bar joins a command name to a directory."""
+
+    def test_names_are_names_not_paths(self):
+        from slash_commands.api import _valid_command_name
+
+        assert _valid_command_name("verify")
+        assert _valid_command_name("bmad/brainstorm")
+        assert _valid_command_name("ns:cmd")
+        assert not _valid_command_name("../verify")
+        assert not _valid_command_name("skills/../../etc")
+        assert not _valid_command_name("/etc/passwd")
+
+    def test_a_traversing_name_resolves_nothing(self, tmp_path):
+        from slash_commands.api import _resolve_command_body
+
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "SKILL.md").write_text("---\nname: x\n---\nLEAK\n", encoding="utf-8")
+        proj = tmp_path / "proj"
+        (proj / ".agents" / "skills").mkdir(parents=True)
+        body = _resolve_command_body(proj, "../../../outside")
+        assert body is None or "LEAK" not in body

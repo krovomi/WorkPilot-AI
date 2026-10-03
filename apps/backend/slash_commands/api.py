@@ -35,6 +35,7 @@ Security:
 from __future__ import annotations
 
 import logging
+import os
 import re
 import sys
 from pathlib import Path
@@ -54,6 +55,14 @@ router = APIRouter()
 # Matches both built-in commands like "compact" / "clear" and filesystem
 # commands like "bmad-agent-bmm-dev".
 _COMMAND_NAME_RE = re.compile(r"^[a-zA-Z0-9_./:-]{1,128}$")
+
+
+def _valid_command_name(command: str) -> bool:
+    """A command name, never a path: ``ns/cmd`` and ``ns:cmd`` are names,
+    ``../x`` and ``/etc/x`` would be joined to a directory and leave it."""
+    if not isinstance(command, str) or not _COMMAND_NAME_RE.match(command):
+        return False
+    return not command.startswith("/") and ".." not in command.split("/")
 
 
 def _safe_project_dir(raw: str) -> Path:
@@ -188,13 +197,17 @@ def _skill_body_for_provider(proj: Path, skill_md: Path) -> str:
     """
     from skills_registry.overlays import resolve_skill_file
 
+    root = os.path.realpath(proj / _AGNOSTIC_SKILLS_SUBDIR)
+    real = os.path.realpath(skill_md)
+    if not real.startswith(root + os.sep):
+        raise ValueError("skill outside the project's skills directory")
     try:
         from core.client import peek_active_provider
 
         provider = peek_active_provider(proj)
     except Exception:  # noqa: BLE001 - no provider config means the default
         provider = None
-    return resolve_skill_file(skill_md, provider).body
+    return resolve_skill_file(Path(real), provider).body
 
 
 def _resolve_command_body(proj: Path, command: str) -> str | None:
@@ -210,6 +223,8 @@ def _resolve_command_body(proj: Path, command: str) -> str | None:
     any provider can execute. Returns None when no definition is found (the
     caller then degrades to the SDK slash-command resolver).
     """
+    if not _valid_command_name(command):
+        return None
     candidates = [
         proj / _AGNOSTIC_SKILLS_SUBDIR / command / "SKILL.md",
         proj / ".claude" / "commands" / f"{command}.md",
@@ -319,7 +334,7 @@ def get_slash_command_body(
     command flows through the normal task pipeline (planning, plan-approval,
     conversation). Resolution mirrors `_resolve_command_body`.
     """
-    if not _COMMAND_NAME_RE.match(command):
+    if not _valid_command_name(command):
         raise HTTPException(
             status_code=400, detail=f"invalid command name: {command!r}"
         )
@@ -515,7 +530,7 @@ async def run_slash_command(payload: Annotated[dict, Body()]):
             status_code=400,
             detail="project_dir and command are required",
         )
-    if not _COMMAND_NAME_RE.match(command):
+    if not _valid_command_name(command):
         raise HTTPException(
             status_code=400, detail=f"invalid command name: {command!r}"
         )

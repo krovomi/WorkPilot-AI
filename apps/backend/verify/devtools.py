@@ -26,15 +26,12 @@ from __future__ import annotations
 
 import asyncio
 import glob
-import logging
 import os
 import re
 import shutil
 from pathlib import Path
 
 from .perf import PerfResult, from_summary, page_score, parse_lighthouse_summary
-
-logger = logging.getLogger(__name__)
 
 __all__ = ["BrowserSession", "chrome_executable", "devtools_server_config"]
 

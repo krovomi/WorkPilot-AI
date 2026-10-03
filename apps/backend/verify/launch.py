@@ -20,7 +20,6 @@ prompt. Its contract:
 
 from __future__ import annotations
 
-import logging
 import os
 import re
 import subprocess
@@ -35,8 +34,6 @@ from core.platform import is_windows, split_command
 from .detect import Target, free_port
 from .errors import VerifyError, collect_errors
 from .state import is_alive, live_process, save_process, stop_process
-
-logger = logging.getLogger(__name__)
 
 __all__ = ["LaunchResult", "launch", "probe", "read_log", "LOGS_DIRNAME"]
 
@@ -93,7 +90,7 @@ def read_log(path: Path | str, tail_bytes: int = _LOG_TAIL_BYTES) -> str:
             handle.seek(0, os.SEEK_END)
             size = handle.tell()
             handle.seek(max(0, size - tail_bytes))
-            return handle.read().decode("utf-8", errors="replace")
+            return handle.read(tail_bytes).decode("utf-8", errors="replace")
     except OSError:
         return ""
 

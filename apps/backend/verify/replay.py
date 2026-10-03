@@ -18,7 +18,6 @@ from the one record.
 from __future__ import annotations
 
 import asyncio
-import logging
 import re
 import time
 from pathlib import Path
@@ -28,8 +27,6 @@ from .launch import launch
 from .record import load_record, persist_plan_summary, save_record
 from .settings import load_settings
 from .state import stop_all, work_dir
-
-logger = logging.getLogger(__name__)
 
 __all__ = ["run_replay", "run_replay_phase"]
 

@@ -76,6 +76,9 @@ SDK_FAMILY = "_sdk"
 EXECUTOR_FAMILY = "_executor"
 
 _APPEND_MARKER = "<!-- append -->"
+
+#: An overlay name is a file stem in ``providers/``, never a path.
+_OVERLAY_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$")
 _HEADING = re.compile(r"^##\s+(?P<title>.+?)\s*#*\s*$")
 _FENCE = re.compile(r"^\s*(```|~~~)")
 
@@ -252,10 +255,13 @@ def resolve_skill_file(skill_md: Path, provider: str | None) -> ResolvedSkill:
     skill_name = str(meta.get("name") or skill_md.parent.name)
     overlay_dir = skill_md.parent / OVERLAY_DIRNAME
     applied: list[str] = []
-    if overlay_dir.is_dir():
+    if overlay_dir.is_dir() and not overlay_dir.is_symlink():
+        root = overlay_dir.resolve()
         for name in overlay_chain(provider):
-            path = overlay_dir / f"{name}.md"
-            if not path.is_file():
+            if not _OVERLAY_NAME.match(name):
+                continue
+            path = (root / f"{name}.md").resolve()
+            if path.parent != root or not path.is_file():
                 continue
             overlay = _read_overlay(path, skill_name)
             if overlay is None:

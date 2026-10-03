@@ -121,7 +121,8 @@ def _utf8(stream):
     try:
         stream.reconfigure(encoding="utf-8", errors="replace", newline="\n")
     except (AttributeError, ValueError):
-        pass
+        # Not a TextIOWrapper (a test's StringIO), or already in use: keep it.
+        return stream
     return stream
 
 

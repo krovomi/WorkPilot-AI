@@ -229,7 +229,9 @@ async def _launch_and_fix(
         try:
             (spec_dir / FIX_REQUEST_FILE).write_text(request, encoding="utf-8")
         except OSError:
-            pass
+            # The fixer also receives the request in its prompt; the file is
+            # only the copy a person can open afterwards.
+            options.log(f"verify: could not write {FIX_REQUEST_FILE}")
         options.log(
             f"verify: {count} error(s) in {target.name} — fixer round {round_no}"
         )
@@ -520,7 +522,9 @@ async def run_verify_loop(
     try:
         (base / EVENTS_FILE).unlink(missing_ok=True)
     except OSError:
-        pass
+        # A stale event log is folded into this run's record at worst; the
+        # verification itself does not depend on removing it.
+        options.log(f"verify: could not clear {EVENTS_FILE}")
     detection: Detection = detect_targets(project, options.changed_files)
     if not detection.applicable:
         return _finish("not-applicable", detection.reason)

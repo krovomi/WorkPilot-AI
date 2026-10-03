@@ -65,7 +65,9 @@ def _write(base: Path, data: dict) -> None:
         partial.write_text(json.dumps(data, indent=2), encoding="utf-8")
         os.replace(partial, target)
     except OSError:
-        pass
+        # Without the state file another process cannot reuse the app; this
+        # one still owns it and stops it at teardown.
+        return
 
 
 def is_alive(pid: int | None) -> bool:
