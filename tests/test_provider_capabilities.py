@@ -52,11 +52,19 @@ class TestMatrix:
     def test_everything_else_does_not(self, name):
         assert not get_provider_capabilities(name).supports_subagents
 
-    @pytest.mark.parametrize("name", ["mistral", "deepseek", "grok", "meta"])
+    @pytest.mark.parametrize("name", ["meta", "aws", "cursor", "custom"])
     def test_adapterless_providers_declare_what_they_degrade_to(self, name):
         caps = get_provider_capabilities(name)
         assert not caps.has_adapter
         assert caps.degrades_to == "claude"
+
+    @pytest.mark.parametrize("name", ["mistral", "deepseek", "grok"])
+    def test_openai_compatible_providers_run_on_their_own_adapter(self, name):
+        # They used to degrade to Claude; they now have a client of their own,
+        # so there is nothing left to degrade to.
+        caps = get_provider_capabilities(name)
+        assert caps.has_adapter
+        assert caps.degrades_to is None
 
     def test_an_unlisted_provider_gets_the_conservative_answer(self):
         # Assuming a capability a provider lacks fails confusingly at run time;

@@ -186,8 +186,10 @@ def test_a_provider_with_no_adapter_is_refused_when_the_caller_asked(monkeypatch
     built = []
 
     def mock_build(*a, **k):
+        # The refusal comes first: no client may be built for a provider that
+        # would be answered by another vendor's model.
         built.append(a)
-        raise ValueError("No adapter found for provider mistral")
+        raise AssertionError("a client was built for an adapterless provider")
 
     monkeypatch.setattr(oneshot, "_build_client", mock_build)
     reported = []
@@ -195,18 +197,17 @@ def test_a_provider_with_no_adapter_is_refused_when_the_caller_asked(monkeypatch
     result = asyncio.run(
         oneshot.oneshot_completion(
             "hello",
-            provider="mistral",
-            model="mistral-large",
+            provider="meta",
+            model="llama-3.3",
             require_provider=True,
             on_error=reported.append,
         )
     )
 
     assert result == ""
-    assert len(built) == 1
-    assert built[0][0] == "mistral"
+    assert built == []
     assert len(reported) == 1
-    assert "mistral" in reported[0]["message"]
+    assert "meta" in reported[0]["message"]
 
 
 def test_the_same_provider_still_runs_when_the_caller_did_not_ask(monkeypatch):
@@ -223,7 +224,17 @@ def test_the_same_provider_still_runs_when_the_caller_did_not_ask(monkeypatch):
 def test_every_provider_that_drives_itself_passes_the_gate():
     from core import oneshot
 
-    for provider in ("claude", "anthropic", "openai", "copilot", "google", "ollama"):
+    for provider in (
+        "claude",
+        "anthropic",
+        "openai",
+        "copilot",
+        "google",
+        "ollama",
+        "mistral",
+        "deepseek",
+        "grok",
+    ):
         assert oneshot.drives_itself(provider)
-    for provider in ("mistral", "deepseek", "grok", "meta", "aws", "cursor", ""):
+    for provider in ("meta", "aws", "cursor", "custom", ""):
         assert not oneshot.drives_itself(provider)

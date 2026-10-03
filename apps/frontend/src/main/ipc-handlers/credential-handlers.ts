@@ -178,7 +178,11 @@ function runShellCommand(
 	args: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
 	return new Promise((resolve, reject) => {
-		const child = spawn(cmd, args, {
+		// With a shell (Windows), an argument holding a space would be split.
+		const shellArgs = isWindows()
+			? args.map((a) => (/\s/.test(a) ? `"${a}"` : a))
+			: args;
+		const child = spawn(cmd, shellArgs, {
 			shell: isWindows(),
 			windowsHide: true,
 			env: { ...process.env, CI: "1" },
@@ -246,11 +250,25 @@ async function pnpmCanInstallGlobally(): Promise<boolean> {
 	}
 }
 
+interface CodexInstall {
+	/** First `codex` on PATH, as the app resolves it. */
+	binPath: string;
+	owner: "pnpm" | "npm";
+	/** npm only: the global prefix that actually contains the package. */
+	npmPrefix?: string;
+}
+
 /**
- * Which package manager installed the `codex` that PATH resolves to, judged
- * from its real path. `undefined` when none is found or the path says nothing.
+ * Where the `codex` that PATH resolves to really lives, and who owns it.
+ *
+ * The owner is judged from the real path. For npm the prefix is read from that
+ * same path (`<prefix>/lib/node_modules/@openai/codex`), because `npm install -g`
+ * writes to the prefix of whichever npm runs it — and a desktop-launched app
+ * often has a different node/npm (nvm, system) than the one that put `codex` on
+ * PATH. Installing with `--prefix` targets the copy the app really executes.
+ * `undefined` when no `codex` is found.
  */
-async function detectCodexOwner(): Promise<"pnpm" | "npm" | undefined> {
+async function detectCodexInstall(): Promise<CodexInstall | undefined> {
 	try {
 		const locator = isWindows() ? "where" : "which";
 		const probe = await execFileAsync(locator, ["codex"], {
@@ -260,8 +278,32 @@ async function detectCodexOwner(): Promise<"pnpm" | "npm" | undefined> {
 		});
 		const first = probe.stdout.split(/\r?\n/).find((l) => l.trim());
 		if (!first) return undefined;
-		const real = await fs.realpath(first.trim()).catch(() => first.trim());
-		return /pnpm/i.test(first) || /pnpm/i.test(real) ? "pnpm" : "npm";
+		const binPath = first.trim();
+		const real = await fs.realpath(binPath).catch(() => binPath);
+		if (/pnpm/i.test(binPath) || /pnpm/i.test(real)) {
+			return { binPath, owner: "pnpm" };
+		}
+		const segments = real.split(path.sep);
+		const nm = segments.lastIndexOf("node_modules");
+		let npmPrefix: string | undefined;
+		if (nm > 0) {
+			const nodeModulesDir = segments.slice(0, nm + 1).join(path.sep);
+			// Unix: <prefix>/lib/node_modules — Windows: <prefix>/node_modules.
+			// A layout that does not match is left to npm's own default rather
+			// than guessed at.
+			const parent = path.dirname(nodeModulesDir);
+			const candidate = isWindows()
+				? parent
+				: path.basename(parent) === "lib"
+					? path.dirname(parent)
+					: undefined;
+			// The prefix reaches a shell on Windows (npm is a .cmd): refuse
+			// anything that is not a plain path.
+			if (candidate && !/["&|<>^%\r\n]/.test(candidate)) {
+				npmPrefix = candidate;
+			}
+		}
+		return { binPath, owner: "npm", npmPrefix };
 	} catch {
 		return undefined;
 	}
@@ -285,14 +327,20 @@ async function runCodexUpdate(): Promise<{
 	// The manager that owns the `codex` found on PATH wins: installing with the
 	// other one succeeds, writes to a different prefix, and leaves the binary the
 	// app actually runs on its old version.
-	const owner = await detectCodexOwner();
-	const usePnpm = owner ? owner === "pnpm" : await pnpmCanInstallGlobally();
+	const install = await detectCodexInstall();
+	const usePnpm = install
+		? install.owner === "pnpm"
+		: await pnpmCanInstallGlobally();
 	const manager = usePnpm ? "pnpm" : "npm";
+	const prefixArgs =
+		!usePnpm && install?.npmPrefix ? ["--prefix", install.npmPrefix] : [];
+	console.warn("[Codex CLI] Resolved install:", install, "manager:", manager);
 
 	try {
 		const result = await runShellCommand(manager, [
 			"install",
 			"-g",
+			...prefixArgs,
 			"@openai/codex@latest",
 		]);
 		return {
@@ -642,7 +690,7 @@ export function registerCredentialHandlers(): void {
 						version,
 						latest,
 						isOutdated,
-						error: `Codex CLI is still at ${version} after the update (latest: ${latest}). The \`codex\` on your PATH is probably managed by another package manager; update it from a terminal.`,
+						error: `Codex CLI is still at ${version} after the update (latest: ${latest}). The \`codex\` used by the app is ${(await detectCodexInstall())?.binPath ?? "unknown"}; it is probably not managed by npm or pnpm (brew, cargo, standalone binary…). Update it the way it was installed.`,
 					};
 				}
 
