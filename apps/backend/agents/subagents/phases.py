@@ -85,6 +85,8 @@ PHASE_ALIASES: dict[str, str] = {
     # Judging finished work against acceptance criteria.
     "qa_reviewer": "qa",
     "qa_fixer": "qa",
+    # Running the app the task changed and judging what it shows.
+    "verifier": "qa",
     "qa": "qa",
     # Deciding what to do before anything is written. `impact_analyzer` belongs
     # here rather than in "review": its question is blast radius, which is what

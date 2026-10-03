@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+	applyVerifyLoop,
 	applyMobileTargets,
 	applyTddOverride,
 	getOAuthModeClearVars,
@@ -198,5 +199,16 @@ describe("applyMobileTargets", () => {
 		const env = { OTHER: "x" };
 		applyMobileTargets(env, ["ios"]);
 		expect(env).toEqual({ OTHER: "x" });
+	});
+});
+
+describe("applyVerifyLoop", () => {
+	it("passes a card's explicit choice to the backend", () => {
+		expect(applyVerifyLoop({ A: "1" }, true)).toEqual({ A: "1", WORKPILOT_VERIFY_LOOP: "true" });
+		expect(applyVerifyLoop({ A: "1" }, false)).toEqual({ A: "1", WORKPILOT_VERIFY_LOOP: "false" });
+	});
+
+	it("inherits the project default when the card says nothing", () => {
+		expect(applyVerifyLoop({ A: "1", WORKPILOT_VERIFY_LOOP: "true" }, undefined)).toEqual({ A: "1" });
 	});
 });

@@ -91,6 +91,24 @@ export function applyMobileTargets(
 	return { ...env, WORKPILOT_MOBILE_TARGETS: targets.join(",") };
 }
 
+/**
+ * Apply a per-task verification-loop choice onto a combined environment map.
+ *
+ * The backend reads `WORKPILOT_VERIFY_LOOP` (`verify/settings.py`) before the
+ * project's `VERIFY_ENABLED`: `true`/`false` from a card that said so, nothing
+ * when the card inherits the project default. The input map is never mutated.
+ */
+export function applyVerifyLoop(
+	env: Record<string, string>,
+	verifyLoop?: boolean,
+): Record<string, string> {
+	if (verifyLoop === undefined) {
+		const { WORKPILOT_VERIFY_LOOP: _omit, ...rest } = env;
+		return rest;
+	}
+	return { ...env, WORKPILOT_VERIFY_LOOP: verifyLoop ? "true" : "false" };
+}
+
 export function applyTddOverride(
 	env: Record<string, string>,
 	tddMode?: boolean,

@@ -86,6 +86,10 @@ class ExternalSignal(str, Enum):
     QA_CLEAN = "qa_clean"
     DETECTOR_CLEAN = "detector_clean"
     PR_MERGED = "pr_merged"
+    #: The verification loop launched the app and saw the change working
+    #: (`verify/`, record status ``pass``). Measured by WorkPilot, not
+    #: reported by the agent that wrote the code.
+    RUNTIME_VERIFIED = "runtime_verified"
 
 
 class RejectionReason(str, Enum):

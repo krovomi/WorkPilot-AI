@@ -139,7 +139,14 @@ class TestEffortPruning:
         API call, so no effort level saves anything by dropping it.
         """
         profile = resolve_profile(workflow, "none", changed_files=[])
-        assert set(profile.phase_ids) == {"docs", "coding", "qa", "verify", "observe"}
+        assert set(profile.phase_ids) == {
+            "docs",
+            "coding",
+            "verify",
+            "qa",
+            "verify-replay",
+            "observe",
+        }
 
     @pytest.mark.parametrize("effort", EFFORT_ORDER)
     def test_validation_survives_every_reasoning_effort(self, workflow, effort):

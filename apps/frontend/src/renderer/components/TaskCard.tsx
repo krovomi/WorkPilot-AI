@@ -22,6 +22,8 @@ import {
 	Play,
 	RotateCcw,
 	Shield,
+	ShieldAlert,
+	ShieldCheck,
 	Smartphone,
 	Square,
 	Target,
@@ -594,6 +596,32 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				</Badge>
 			) : null}
 
+			{/* The verification loop's verdict: the app was launched and seen
+			    working, or it was and something is still broken. Only those
+			    two — "not verified" on every card would be a badge nobody reads. */}
+			{task.verification?.status === "pass" || task.verification?.status === "fail" ? (
+				<Badge
+					variant="outline"
+					className={cn(
+						"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
+						task.verification.status === "pass"
+							? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+							: "bg-destructive/10 text-destructive border-destructive/30",
+					)}
+					title={task.verification.reason || undefined}
+				>
+					{task.verification.status === "pass" ? (
+						<ShieldCheck className="h-2.5 w-2.5" />
+					) : (
+						<ShieldAlert className="h-2.5 w-2.5" />
+					)}
+					{t(`tasks:verify.cardBadge.${task.verification.status}`)}
+					{task.verification.status === "pass" &&
+						typeof task.verification.score === "number" &&
+						` · ${task.verification.score}`}
+				</Badge>
+			) : null}
+
 			{/* Category badge with icon */}
 			{task.metadata?.category && (
 				<Badge
@@ -1121,6 +1149,8 @@ function taskCardPropsAreEqual(
 		prevTask.metadata?.prUrl === nextTask.metadata?.prUrl &&
 		// The engine chip: a resume on another LLM changes only these.
 		sameEngineFields(prevTask.metadata, nextTask.metadata) &&
+		prevTask.verification?.status === nextTask.verification?.status &&
+		prevTask.verification?.score === nextTask.verification?.score &&
 		// Check if any subtask statuses changed (compare all subtasks)
 		prevTask.subtasks.every(
 			(s, i) => s.status === nextTask.subtasks[i]?.status,

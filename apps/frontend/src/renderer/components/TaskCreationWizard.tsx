@@ -200,6 +200,7 @@ export function TaskCreationWizard({
 
 	// TDD override (per-task) - default false (inherit project setting)
 	const [tddMode, setTddMode] = useState(false);
+	const [verifyLoop, setVerifyLoop] = useState(true);
 	// Empty is the default and means "every platform the project has":
 	// a card that names none on a mobile repo is not asking for none.
 	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>([]);
@@ -262,6 +263,7 @@ export function TaskCreationWizard({
 				setReferencedFiles(draft.referencedFiles ?? []);
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
+				setVerifyLoop(draft.verifyLoop ?? true);
 				setMobileTargets(draft.mobileTargets ?? []);
 				setAcceptanceCriteria(
 					ensureAtLeastOne(toDrafts(draft.acceptanceCriteria ?? [])),
@@ -396,6 +398,7 @@ export function TaskCreationWizard({
 			referencedFiles,
 			requireReviewBeforeCoding,
 			tddMode,
+			verifyLoop,
 			mobileTargets,
 			acceptanceCriteria: toCriteria(acceptanceCriteria),
 			extraNote,
@@ -419,6 +422,7 @@ export function TaskCreationWizard({
 			referencedFiles,
 			requireReviewBeforeCoding,
 			tddMode,
+			verifyLoop,
 			mobileTargets,
 			acceptanceCriteria,
 			extraNote,
@@ -618,6 +622,8 @@ export function TaskCreationWizard({
 				metadata.referencedFiles = allReferencedFiles;
 			if (requireReviewBeforeCoding) metadata.requireReviewBeforeCoding = true;
 			if (tddMode) metadata.tddMode = true;
+			// Only an explicit "off" is stored: absent means the project default.
+			if (!verifyLoop) metadata.verifyLoop = false;
 			if (mobileTargets.length > 0) metadata.mobileTargets = mobileTargets;
 			const criteria = toCriteria(acceptanceCriteria);
 			if (criteria.length > 0) metadata.acceptanceCriteria = criteria;
@@ -893,6 +899,8 @@ export function TaskCreationWizard({
 					onRequireReviewChange={setRequireReviewBeforeCoding}
 					tddMode={tddMode}
 					onTddModeChange={setTddMode}
+					verifyLoop={verifyLoop}
+					onVerifyLoopChange={setVerifyLoop}
 					mobileTargets={mobileTargets}
 					onMobileTargetsChange={setMobileTargets}
 					disabled={isCreating}

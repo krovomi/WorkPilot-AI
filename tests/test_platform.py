@@ -32,6 +32,7 @@ from core.platform import (
     is_unix,
     is_windows,
     requires_shell,
+    split_command,
     validate_cli_path,
     with_executable_extension,
 )
@@ -1142,3 +1143,50 @@ class TestExecutableExtensionEdgeCases:
         # The function checks os.path.splitext which would see '.11' as extension
         # So it won't add .exe
         assert result == "python3.11"  # Keeps as-is since it has an extension
+
+
+# ============================================================================
+# split_command: a detected command as argv, never through a shell
+# ============================================================================
+
+
+class TestSplitCommand:
+    """`verify` and `mobile` launch detected commands without ``shell=True``."""
+
+    @patch("core.platform.is_windows", return_value=False)
+    def test_posix_split_keeps_quoted_paths(self, _):
+        assert split_command('dotnet run --project "src/My Api/Api.csproj"') == [
+            "dotnet",
+            "run",
+            "--project",
+            "src/My Api/Api.csproj",
+        ]
+
+    @patch("core.platform.is_windows", return_value=False)
+    def test_posix_shell_syntax_is_not_interpreted(self, _):
+        # `;` is an argument, not a second command.
+        assert split_command("npm run dev; rm -rf /") == [
+            "npm",
+            "run",
+            "dev;",
+            "rm",
+            "-rf",
+            "/",
+        ]
+
+    @patch("core.platform.get_comspec_path", return_value="cmd.exe")
+    @patch("core.platform.is_windows", return_value=True)
+    def test_windows_wrapper_in_cwd_runs_through_cmd(self, _win, _comspec, tmp_path):
+        (tmp_path / "gradlew.bat").write_text("@echo off\n", encoding="utf-8")
+        argv = split_command("./gradlew installDebug", tmp_path)
+        assert argv[:4] == ["cmd.exe", "/d", "/s", "/c"]
+        assert "gradlew.bat" in argv[4] and argv[4].endswith(" installDebug")
+
+    @patch("core.platform.shutil.which", return_value=None)
+    @patch("core.platform.is_windows", return_value=True)
+    def test_windows_unresolved_program_is_left_as_named(self, _win, _which, tmp_path):
+        assert split_command('dotnet build "src/My App/App.csproj"', tmp_path) == [
+            "dotnet",
+            "build",
+            "src/My App/App.csproj",
+        ]

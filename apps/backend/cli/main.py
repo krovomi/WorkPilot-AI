@@ -97,6 +97,7 @@ Examples:
   # Status checks
   python workpilot/run.py --spec 001 --review-status  # Check human review status
   python workpilot/run.py --spec 001 --qa-status      # Check QA validation status
+  python workpilot/run.py --spec 001 --verify         # Launch the app and prove the change works
 
 Prerequisites:
   1. Authenticate: Run 'claude' and type '/login'
@@ -249,6 +250,11 @@ Environment Variables:
         "--qa",
         action="store_true",
         help="Run QA validation loop on a completed build",
+    )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Launch the task's app, fix what breaks, drive it to the change and measure it (verification loop)",
     )
     parser.add_argument(
         "--qa-status",
@@ -942,6 +948,17 @@ def _run_cli(argv=None, jev_run=None) -> None:
     if args.qa:
         handle_qa_command(
             jev_run=jev_run,
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            model=model,
+            verbose=args.verbose,
+        )
+        return
+
+    if args.verify:
+        from .verify_commands import handle_verify_command
+
+        handle_verify_command(
             project_dir=project_dir,
             spec_dir=spec_dir,
             model=model,

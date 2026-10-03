@@ -322,6 +322,22 @@ export function GeneralSettings({
 								}
 							/>
 						</div>
+						<div className="flex items-center justify-between pt-2">
+							<div className="space-y-0.5">
+								<Label className="font-normal text-foreground">
+									{t("projectSections.general.verifyLoop")}
+								</Label>
+								<p className="text-xs text-muted-foreground">
+									{t("projectSections.general.verifyLoopDescription")}
+								</p>
+							</div>
+							<Switch
+								checked={settings.verifyLoop ?? true}
+								onCheckedChange={(checked) =>
+									setSettings({ ...settings, verifyLoop: checked })
+								}
+							/>
+						</div>
 					</section>
 
 					<Separator />

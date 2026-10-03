@@ -28,6 +28,8 @@ export interface ProjectSettings {
 	useClaudeMd?: boolean;
 	/** Enforce strict TDD (Red-Green-Refactor) when the agent implements tasks (default: false) */
 	tddMode?: boolean;
+	/** Run the verification loop after coding (launch, fix, drive, measure) (default: true) */
+	verifyLoop?: boolean;
 	/** Maximum parallel tasks allowed (default: 3) */
 	maxParallelTasks?: number;
 	/** Description utilisateur du projet (optionnel) */

@@ -337,6 +337,16 @@ class IncidentResponderOrchestrator:
             incident.status = HealingStatus.QA_RUNNING
             operation.complete_step(step, "completed", "QA validation passed")
 
+            # Step 3b: the fixed app, launched — the verification loop's
+            # deterministic half (no fixer, no driving session). A healing PR
+            # for an app that no longer starts is the incident's next incident.
+            verdict = await self._verify_runtime(operation)
+            if verdict == "fail":
+                incident.status = HealingStatus.FAILED
+                incident.error_message = "the app failed its runtime verification"
+                operation.finalize(success=False)
+                return
+
             # Step 4: Create PR
             if self.auto_create_pr:
                 step = operation.add_step("Creating pull request")
@@ -365,6 +375,46 @@ class IncidentResponderOrchestrator:
             # authored on Telegram or a cron job somewhere WorkPilot was not
             # watching, and this incident's outcome says nothing about it.
             self._observe_with_hermes(operation)
+
+    async def _verify_runtime(self, operation: HealingOperation) -> str:
+        """Launch the project's app and read the verdict (`verify.loop`).
+
+        Returns the record's status. Never raises: a verification that cannot
+        run is ``unknown`` and blocks nothing; only a measured failure does.
+        """
+        try:
+            from verify.loop import LoopOptions, run_verify_loop
+        except ImportError as exc:
+            logger.debug("verification unavailable: %s", exc)
+            return "unknown"
+        step = operation.add_step("Verifying the app runs")
+        try:
+            record = await run_verify_loop(
+                self.project_dir,
+                None,
+                None,
+                LoopOptions(effort="low", drive=False, mobile_build=False),
+            )
+        except Exception as exc:  # noqa: BLE001 - a verification reports
+            operation.complete_step(step, "skipped", f"could not verify: {exc}")
+            return "unknown"
+        status = str(record.get("status") or "unknown")
+        reason = str(record.get("reason") or "")
+        score = record.get("score")
+        if status == "pass":
+            detail = "app launched clean" + (
+                f", score {score}/100" if score is not None else ""
+            )
+            operation.complete_step(step, "completed", detail)
+        elif status == "fail":
+            operation.complete_step(
+                step, "failed", reason or "the app failed its verification"
+            )
+        else:
+            operation.complete_step(
+                step, "skipped", f"{status}" + (f" — {reason}" if reason else "")
+            )
+        return status
 
     def _observe_with_hermes(self, operation: HealingOperation) -> None:
         """Turn the hermes learning cycle, and record what it filed.

@@ -39,6 +39,8 @@ _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     # Runs a full agent session with read/write/web tools rooted at a project.
     ("POST", "/api/slash-commands/run"): "agent.execute",
+    # Launches the task's app and may run fixer and verifier sessions.
+    ("POST", "/api/verify/run"): "agent.execute",
     # Executes arbitrary submitted code in the playground sandbox.
     ("POST", "/api/code-playground/run"): "agent.execute",
     # Starts and stops orchestration sessions.

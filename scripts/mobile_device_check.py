@@ -25,70 +25,23 @@ product's own was wrong, which is the failure this is meant to catch.
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
-import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 from mobile import detect_stack, list_devices  # noqa: E402
+from mobile.launch import build_and_run, capture_frame, launch_app  # noqa: E402
+from mobile.launch import (
+    is_png as _is_png,  # noqa: E402,F401 - the frame check, kept by name
+)
 from mobile.readiness import doctor  # noqa: E402
 from mobile.stacks import ANDROID, IOS, MobilePlatform  # noqa: E402
-from mobile.toolchain import find_tool  # noqa: E402
-
-# A cold emulator boots in about a minute; a first Gradle build pulls the whole
-# Android toolchain and can take several.
-BOOT_TIMEOUT = 300
-BUILD_TIMEOUT = 1800
 
 
 def say(label: str, value: str = "") -> None:
     print(f"{label:<22}{value}" if value else label, flush=True)
-
-
-def run(command: list[str] | str, cwd: Path | None = None, timeout: int = 300) -> int:
-    """Run a command, streaming nothing and echoing what failed."""
-    shell = isinstance(command, str)
-    printed = command if shell else " ".join(command)
-    say("  $", printed)
-    try:
-        completed = subprocess.run(  # noqa: S602 - the command comes from our own detector
-            command,
-            cwd=str(cwd) if cwd else None,
-            shell=shell,
-            timeout=timeout,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        say("  ! failed", str(exc))
-        return 1
-    return completed.returncode
-
-
-def capture(command: list[str], timeout: int = 60) -> tuple[int, str]:
-    try:
-        completed = subprocess.run(  # noqa: S603 - fixed argv
-            command, capture_output=True, text=True, timeout=timeout, check=False
-        )
-    except (OSError, subprocess.SubprocessError):
-        return 1, ""
-    return completed.returncode, completed.stdout
-
-
-def _is_png(path: Path) -> bool:
-    """Whether a real image landed, rather than an empty or truncated file.
-
-    A non-zero exit code is not enough: adb happily exits 0 having written
-    nothing when the device goes away mid-capture, and an empty
-    `device-frame.png` uploads as an artifact that looks like a success.
-    """
-    try:
-        with path.open("rb") as handle:
-            return handle.read(8) == b"\x89PNG\r\n\x1a\n"
-    except OSError:
-        return False
 
 
 def report_plan(project_dir: Path, platform: MobilePlatform | None) -> tuple:
@@ -126,71 +79,30 @@ def report_plan(project_dir: Path, platform: MobilePlatform | None) -> tuple:
 
 
 def launch(stack, platform: MobilePlatform, device, project_dir: Path) -> int:
-    """Build, install, start, and capture a frame. Returns an exit code."""
-    commands = stack.commands_for(platform)
-    if not commands.run:
-        say("ERROR", f"no run command known for {platform}")
-        return 1
+    """Build, install, start, and capture a frame. Returns an exit code.
 
-    root = Path(stack.project_dir or project_dir)
-
+    The steps are `mobile.launch`'s — the same ones the verification loop
+    runs — so this proof exercises the product's code path, not a copy.
+    """
     print()
     say(f"building for {platform}")
-    if run(commands.run, cwd=root, timeout=BUILD_TIMEOUT) != 0:
+    say("  $", stack.commands_for(platform).run or "(none)")
+    built, output = build_and_run(stack, platform, project_dir)
+    if not built:
         say("ERROR", "the run command the detector produced failed")
+        if output:
+            print(output[-2000:])
         return 1
 
-    if platform == ANDROID:
-        adb = find_tool("adb") or "adb"
-        if stack.package_id:
-            say("launching", stack.package_id)
-            run(
-                [
-                    adb,
-                    "-s",
-                    device.id,
-                    "shell",
-                    "monkey",
-                    "-p",
-                    stack.package_id,
-                    "-c",
-                    "android.intent.category.LAUNCHER",
-                    "1",
-                ]
-            )
-            # The activity needs a moment to draw; a frame captured too early
-            # is a screenshot of the launcher, which looks like a failed launch.
-            time.sleep(5)
+    if stack.package_id:
+        say("launching", stack.package_id)
+    launched, detail = launch_app(stack, platform, device.id)
+    if not launched:
+        say("  ! launch", detail)
 
-        say("capturing frame")
-        # Straight to the file, in binary, once. `capture()` decodes stdout as
-        # UTF-8, and `screencap -p` emits a PNG — its first byte is 0x89, which
-        # is not valid UTF-8, so probing the exit code that way raised
-        # UnicodeDecodeError after the app had already launched. Nor is there
-        # anything to probe: running the command twice to check it worked and
-        # then to keep the output captures two different frames.
-        frame = Path("device-frame.png")
-        with frame.open("wb") as handle:
-            proc = subprocess.run(  # noqa: S603 - fixed argv
-                [adb, "-s", device.id, "exec-out", "screencap", "-p"],
-                stdout=handle,
-                check=False,
-            )
-        if proc.returncode != 0 or not _is_png(frame):
-            say("ERROR", "no readable frame was captured")
-            return 1
-        say("frame", f"{frame} ({frame.stat().st_size} bytes)")
-        return 0
-
-    xcrun = find_tool("xcrun") or "xcrun"
     say("capturing frame")
     frame = Path("device-frame.png")
-    if run([xcrun, "simctl", "io", device.id, "screenshot", str(frame)]) != 0:
-        say("ERROR", "could not capture a frame")
-        return 1
-    # simctl writes the file itself and can exit 0 having written nothing
-    # useful, so the same check applies on this side.
-    if not _is_png(frame):
+    if not capture_frame(platform, device.id, frame):
         say("ERROR", "no readable frame was captured")
         return 1
     say("frame", f"{frame} ({frame.stat().st_size} bytes)")

@@ -1778,7 +1778,9 @@
 			"useClaudeMd": "Utiliser CLAUDE.md",
 			"useClaudeMdDescription": "Inclure les instructions CLAUDE.md dans le contexte de l'agent",
 			"tddMode": "Mode TDD",
-			"tddModeDescription": "Imposer le TDD strict (Red-Green-Refactor) : l'agent écrit le test, le voit échouer, puis implémente"
+			"tddModeDescription": "Imposer le TDD strict (Red-Green-Refactor) : l'agent écrit le test, le voit échouer, puis implémente",
+			"verifyLoop": "Boucle de vérification",
+			"verifyLoopDescription": "Après le code, lancer l'application, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures). Chaque tâche peut la désactiver."
 		},
 		"github": {
 			"authenticatedAs": "Authentifié en tant que {{username}}",

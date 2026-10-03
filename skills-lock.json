@@ -836,6 +836,14 @@
 			"contentSha256": "42502ab84c9bf61039c155a5904a6f78c226814d1d735ffc3b9768b878d8b789",
 			"targets": {}
 		},
+		"verify": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/verify/SKILL.md",
+			"contentSha256": "60a9038ab5b65724857c68541f4aa74a1591fa6b6f3a7d00e666821f2d18a9be",
+			"targets": {}
+		},
 		"webapp-testing": {
 			"kind": "skill",
 			"pack": "tooling",
@@ -1216,6 +1224,11 @@
 		".agents/skills/ui-ux-pro-max/scripts/design_system.py",
 		".agents/skills/ui-ux-pro-max/scripts/reasoning_contract.py",
 		".agents/skills/ui-ux-pro-max/scripts/search.py",
+		".agents/skills/verify/SKILL.md",
+		".agents/skills/verify/providers/_executor.md",
+		".agents/skills/verify/providers/_sdk.md",
+		".agents/skills/verify/providers/copilot.md",
+		".agents/skills/verify/providers/ollama.md",
 		".agents/skills/webapp-testing/SKILL.md",
 		".agents/skills/webapp-testing/scripts/with_server.py",
 		".claude-plugin/marketplace.json",
@@ -1309,6 +1322,7 @@
 		".gemini/commands/systematic-debugging.toml",
 		".gemini/commands/testcontainers-integration.toml",
 		".gemini/commands/ui-ux-pro-max.toml",
+		".gemini/commands/verify.toml",
 		".gemini/commands/webapp-testing.toml"
 	]
 }
