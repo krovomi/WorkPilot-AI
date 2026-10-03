@@ -76,6 +76,7 @@ from prompts import (
     docintel_section,
     is_first_run,
     mobile_section,
+    uiux_section,
 )
 from recovery import RecoveryManager
 from security.constants import PROJECT_DIR_ENV_VAR
@@ -1050,7 +1051,31 @@ async def run_autonomous_agent(
         if profile is None:
             return
         try:
-            from workflows import PhaseContext, run_skill_phases
+            from workflows.engine import narrow_to_forecast
+            from workflows.forecast import planned_files
+
+            from workflows import PhaseContext, phases_between, run_skill_phases
+
+            # The profile was resolved before planning, with no change set, so
+            # every conditional phase in this window read "unknown — run".
+            # The plan now names its files: narrow the profile to that
+            # forecast, which is what keeps `frontend-design`, `mobile-design`
+            # and `ui-design-system` off a backend task. No forecast keeps the
+            # profile as it was.
+            window_profile = narrow_to_forecast(profile, planned_files(spec_dir))
+            kept = {
+                r.id
+                for r in phases_between(
+                    window_profile, after="planning", before="coding"
+                )
+            }
+            for resolved in phases_between(profile, after="planning", before="coding"):
+                if resolved.id not in kept:
+                    print_status(
+                        f"Workflow phase {resolved.id} skipped: "
+                        "the plan touches none of its files",
+                        "info",
+                    )
 
             ctx = PhaseContext(
                 project_dir=project_dir,
@@ -1062,7 +1087,7 @@ async def run_autonomous_agent(
                 verbose=verbose,
             )
             run = await run_skill_phases(
-                profile, ctx, after="planning", before="coding"
+                window_profile, ctx, after="planning", before="coding"
             )
             if summary := run.describe():
                 print("\n" + summary)
@@ -1735,6 +1760,14 @@ async def run_autonomous_agent(
             mobile = mobile_section(project_dir)
             if mobile:
                 prompt += "\n\n" + mobile
+
+            # The opposite of the two above, deliberately: the design system
+            # goes to the subtasks whose declared files are on the interface,
+            # and to none other — a full-stack task pays for it on its front
+            # end only, a backend task never (`uiux.prompt`).
+            design = uiux_section(spec_dir, next_subtask)
+            if design:
+                prompt += "\n\n" + design
 
             # Add concurrency error context if recovering from 400 error
             if concurrency_error_context:

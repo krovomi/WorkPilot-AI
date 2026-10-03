@@ -2525,5 +2525,13 @@
 				}
 			}
 		}
+	},
+	"uiux": {
+		"title": "UI/UX design intelligence (ui-ux-pro-max)",
+		"description": "On tasks that touch the interface, a design system (palette, typography, style) and the rules of the UI stack are given to the coder, the design phases and QA. Local data, no network, no token. Backend tasks never pay for it.",
+		"enabled": "Use on UI tasks",
+		"enabledHint": "Decided per task from the plan's files; Kanban card to set a task aside.",
+		"persistMaster": "Write the design system into the project",
+		"persistMasterHint": "When the project has none, design-system/<project>/MASTER.md is added to the task's diff so the next UI tasks reuse it."
 	}
 }

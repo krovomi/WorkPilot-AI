@@ -554,6 +554,19 @@ export function registerEnvHandlers(
 			}
 		}
 
+		// ui-ux-pro-max. Same file, same reason: `uiux/settings.py` reads it,
+		// and the environment still wins over it.
+		if (config.uiux) {
+			if (config.uiux.enabled !== undefined) {
+				existingVars.UIUX_ENABLED = config.uiux.enabled ? "true" : "false";
+			}
+			if (config.uiux.persistMaster !== undefined) {
+				existingVars.UIUX_PERSIST_MASTER = config.uiux.persistMaster
+					? "true"
+					: "false";
+			}
+		}
+
 		// Per-agent MCP overrides (add/remove MCPs from specific agents)
 		if (config.agentMcpOverrides) {
 			// First, clear any existing AGENT_MCP_* entries
@@ -1093,6 +1106,13 @@ ${existingVars.GRAPHITI_DB_PATH ? `GRAPHITI_DB_PATH=${existingVars.GRAPHITI_DB_P
 			config.tokenSavings = {
 				rtkEnabled: vars.RTK_ENABLED?.toLowerCase() !== "false",
 				rtkModelFacing: vars.RTK_MODEL_FACING?.toLowerCase() !== "false",
+			};
+
+			// ui-ux-pro-max — both default true: relevance is decided per
+			// task, and a backend task gets nothing whatever these say.
+			config.uiux = {
+				enabled: vars.UIUX_ENABLED?.toLowerCase() !== "false",
+				persistMaster: vars.UIUX_PERSIST_MASTER?.toLowerCase() !== "false",
 			};
 
 			// Parse per-agent MCP overrides (AGENT_MCP_<agent>_ADD/REMOVE)

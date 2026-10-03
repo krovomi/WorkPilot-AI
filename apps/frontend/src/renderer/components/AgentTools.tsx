@@ -58,6 +58,7 @@ import { useSettingsStore } from "../stores/settings-store";
 import { CustomMcpDialog } from "./CustomMcpDialog";
 import { McpServerSettingsDialog } from "./McpServerSettingsDialog";
 import { TokenSavingsSettings } from "./settings/TokenSavingsSettings";
+import { UiUxSettings } from "./settings/UiUxSettings";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -1211,6 +1212,27 @@ export function AgentTools() {
 		[selectedProjectId, envConfig],
 	);
 
+	// ui-ux-pro-max — same shape as updateTokenSavings, its own key.
+	const updateUiux = useCallback(
+		async (key: keyof NonNullable<ProjectEnvConfig["uiux"]>, value: boolean) => {
+			if (!selectedProjectId || !envConfig) return;
+
+			const newUiux = { ...envConfig.uiux, [key]: value };
+
+			setEnvConfig((prev) => (prev ? { ...prev, uiux: newUiux } : null));
+
+			try {
+				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
+					uiux: newUiux,
+				});
+			} catch (error) {
+				console.error("Failed to update ui-ux-pro-max config:", error);
+				setEnvConfig((prev) => (prev ? { ...prev, uiux: envConfig.uiux } : null));
+			}
+		},
+		[selectedProjectId, envConfig],
+	);
+
 	// Handle adding an MCP to an agent
 	const handleAddMcp = useCallback(
 		async (agentId: string, mcpId: string) => {
@@ -1856,6 +1878,10 @@ export function AgentTools() {
 									projectPath={selectedProject?.path}
 									onUpdate={updateTokenSavings}
 								/>
+
+								{/* ui-ux-pro-max — le design system des tâches qui touchent
+								    l'interface. Toujours visible, comme rtk. */}
+								<UiUxSettings uiux={envConfig?.uiux} onUpdate={updateUiux} />
 
 								{/* Custom MCP Servers Section */}
 								<div className="pt-4 border-t border-border">

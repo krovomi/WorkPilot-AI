@@ -2079,6 +2079,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import docintel router: {e}")
 
+# --- UI/UX API (ui-ux-pro-max: is this task about the interface, which design system) ---
+try:
+    from uiux.api import router as uiux_router
+
+    _mount(uiux_router, "uiux")
+except ImportError as e:
+    print(f"Warning: Could not import uiux router: {e}")
+
 # --- Slash Commands API (Kanban Quick-Command bar: list + run .claude/commands) ---
 try:
     from slash_commands.api import router as slash_commands_router

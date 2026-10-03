@@ -1690,6 +1690,41 @@
 			"placeholder": "Placeholder text"
 		}
 	},
+	"uiux": {
+		"title": "UI/UX design system",
+		"guide": "{{guide}} guidelines",
+		"state": {
+			"planned": "Next build",
+			"ready": "Ready",
+			"withheld": "Withheld",
+			"skipped": "Set aside",
+			"failed": "Could not run",
+			"notInstalled": "Not installed"
+		},
+		"reason": {
+			"planned-ui-files": "The plan touches the interface: {{detail}}",
+			"planned-no-ui-files": "The plan touches no interface file.",
+			"description": "The description talks about the interface ({{detail}}); the plan will confirm it.",
+			"description-not-ui": "The description does not talk about the interface.",
+			"no-ui-stack": "This project has no UI toolkit.",
+			"override-force": "Applied to this task by you.",
+			"override-skip": "Set aside for this task by you: no design system, no UI tools.",
+			"disabled": "Turned off in Settings → Agent Tools.",
+			"no-signal": "Nothing to decide from yet.",
+			"unknown": "Decided from the task's files."
+		},
+		"master": {
+			"project": "The project's own design system is used as is: {{path}}",
+			"generated": "Generated for this task and written to {{path}} — it is part of the diff to review."
+		},
+		"withheld": "The project's MASTER.md was withheld: a security scan flagged its content.",
+		"style": "Style: {{style}}",
+		"fonts": "Fonts: {{heading}} / {{body}}",
+		"actions": {
+			"skip": "Skip for this task",
+			"auto": "Decide automatically"
+		}
+	},
 	"engine": {
 		"taskWide": "Engine for the whole task",
 		"ownedByTask": "Saved on this task only. Changing the default provider in Settings, or another task's engine, never changes it.",

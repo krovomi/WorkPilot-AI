@@ -61,6 +61,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   docintel/labels.py   libellés comparés avec tolérance (distance d'édition), diff base -> tâche, maquette .figma.json
   rtk/                 proxy rtk : la sortie des commandes condensée avant qu'un modèle la lise
   watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
+  uiux/                ui-ux-pro-max : design system + règles du stack UI, seulement sur les tâches qui touchent l'interface
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt
   architecture_visualizer/ carte d'architecture archify du projet, et son delta par tâche
   bounty_board/        N modèles sur une même spec : worktrees, preuves mesurées, juge anonyme

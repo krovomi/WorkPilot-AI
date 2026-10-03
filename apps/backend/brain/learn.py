@@ -71,6 +71,9 @@ SURFACES = frozenset(
         # What a person validated in the docintel card: accepted requirements,
         # rule tables they kept, a whiteboard diagram they saved in draw.io.
         "docintel",
+        # The project's design system (ui-ux-pro-max), once a person merged
+        # the task that brought or changed `design-system/<p>/MASTER.md`.
+        "uiux",
     }
 )
 

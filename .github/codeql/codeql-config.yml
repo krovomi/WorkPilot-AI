@@ -57,12 +57,23 @@ name: WorkPilot AI
 # covered it; this paragraph is so that the exclusion still names what it
 # excludes.
 #
+# `skills/ui-ux-pro-max` is vendored and committed on the same terms: the
+# Basic edition of nextlevelbuilder/ui-ux-pro-max-skill, pinned to a tag by
+# `scripts/vendor_ui_ux_pro_max.py`, attested by its `tree_sha256` and verified
+# by that script's `--check`. Its one emitted copy, `.agents/skills/ui-ux-pro-max`,
+# is the same bytes written by `skills:build`, so it is excluded with it. The
+# first alerts it drew — a local CodeQL could not prove initialised (it is
+# assigned and read under the same `search_domain == "landing"` condition) and
+# an unused module constant — are upstream's to change, not ours to patch.
+#
 # The remaining entries are packs `skills:bootstrap` fetches on demand. They
 # are gitignored, so they only exist on a developer's checkout — but when they
 # do, they are third-party trees on the same terms.
 paths-ignore:
   - apps/backend/vendor/**
   - skills/bmad/**
+  - skills/ui-ux-pro-max/**
+  - .agents/skills/ui-ux-pro-max/**
   - skills/superpowers/**
   - skills/mattpocock/**
   - skills/impeccable/**
