@@ -35,7 +35,14 @@ describe("runningProvidersKey", () => {
 		const tasks = [
 			task({ status: "backlog", metadata: { provider: "openai" } }),
 			task({
-				metadata: { provider: "mistral", paused: { enabled: true } },
+				metadata: {
+					provider: "mistral",
+					paused: {
+						enabled: true,
+						paused_at: null,
+						paused_subtask_id: null,
+					},
+				},
 			}),
 		];
 		expect(runningProvidersKey(tasks)).toBe("");
