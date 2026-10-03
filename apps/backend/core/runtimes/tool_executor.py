@@ -151,6 +151,18 @@ class ToolExecutor:
             return await execute_tool(
                 tool_name, arguments, task=task_ref(self.project_dir, self.spec_dir)
             )
+        elif _is_verify_tool(tool_name):
+            # The verification loop's tools: the same ones the Claude SDK
+            # reaches over the `workpilot-verify` MCP server, executed here so
+            # Copilot, OpenAI, Gemini, Ollama… drive the app identically.
+            from verify.tools import execute_tool as execute_verify_tool
+
+            return await execute_verify_tool(
+                tool_name,
+                arguments,
+                project_dir=self.project_dir,
+                spec_dir=self.spec_dir,
+            )
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 
@@ -440,6 +452,30 @@ def _uiux_tool_definitions(spec_dir: str | Path | None) -> list[dict[str, Any]]:
         return []
 
 
+def _is_verify_tool(name: str) -> bool:
+    try:
+        from verify.tools import is_verify_tool
+
+        return is_verify_tool(name)
+    except Exception:  # noqa: BLE001 - an optional feature never breaks dispatch
+        return False
+
+
+#: The agent types that drive a verification and get the `verify_*` tools.
+VERIFY_AGENT_TYPES = frozenset({"verifier"})
+
+
+def _verify_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
+    if agent_type not in VERIFY_AGENT_TYPES:
+        return []
+    try:
+        from verify.tools import tool_definitions
+
+        return tool_definitions()
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def _brain_tool_definitions() -> list[dict[str, Any]]:
     """The shared brain's tools, when a brain exists on this machine."""
     try:
@@ -593,4 +629,6 @@ def get_tool_definitions(
     # Every agent type, like `create_client` does for the Claude SDK.
     base_tools.extend(_brain_tool_definitions())
     base_tools.extend(_uiux_tool_definitions(spec_dir))
+    # The verifier, like `create_client` gives it the `workpilot-verify` server.
+    base_tools.extend(_verify_tool_definitions(agent_type))
     return base_tools

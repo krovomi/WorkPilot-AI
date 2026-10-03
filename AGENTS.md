@@ -63,6 +63,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   watermarks/          les caractères invisibles retirés de chaque fichier généré, avant écriture
   uiux/                ui-ux-pro-max : design system + règles du stack UI, seulement sur les tâches qui touchent l'interface
   mobile/              apps smartphone : stack Android/Apple, appareils, chaîne d'outils, prompt
+  verify/              la boucle /verify : lancer l'app, erreurs → correction, état confirmé, trace perf, preuve
   architecture_visualizer/ carte d'architecture archify du projet, et son delta par tâche
   bounty_board/        N modèles sur une même spec : worktrees, preuves mesurées, juge anonyme
   vendor/archify/      le renderer archify vendorisé et épinglé (scripts/vendor_archify.py)

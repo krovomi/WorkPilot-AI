@@ -647,7 +647,11 @@ class TestPhaseRosters:
             REPO_ROOT / "workflows" / "feature-build" / "workflow.yaml"
         )
         declared = {p.id: p.roster for p in workflow.phases if p.roster}
-        assert declared == {"analyze": "planner", "spec-conformance": "qa"}
+        assert declared == {
+            "analyze": "planner",
+            "verify": "qa",
+            "spec-conformance": "qa",
+        }
 
 
 class TestWiredIn:

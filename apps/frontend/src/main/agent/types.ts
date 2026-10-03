@@ -77,6 +77,9 @@ export interface TaskExecutionOptions {
 	// Per-task TDD override. true -> force strict TDD, false -> force disabled,
 	// undefined -> inherit project default. Injected as TDD_MODE env at spawn time.
 	tddMode?: boolean;
+	// Per-task verification loop override (`apps/backend/verify/`). Injected
+	// as WORKPILOT_VERIFY_LOOP; undefined inherits the project default.
+	verifyLoop?: boolean;
 	// Which smartphone platforms this task targets ("android", "ios"). Injected
 	// as WORKPILOT_MOBILE_TARGETS at spawn time, which is what narrows the
 	// planner's, the coder's and QA's platform rules to the ones asked for.
@@ -92,6 +95,9 @@ export interface SpecCreationMetadata {
 	// Per-task TDD override. true -> force strict TDD, false -> force disabled,
 	// undefined -> inherit project default. Injected as TDD_MODE env at spawn time.
 	tddMode?: boolean;
+	// Per-task verification loop override (`apps/backend/verify/`). Injected
+	// as WORKPILOT_VERIFY_LOOP; undefined inherits the project default.
+	verifyLoop?: boolean;
 	// LLM provider (anthropic, openai, copilot, google, mistral, deepseek, grok, meta, aws, ollama)
 	provider?: string;
 	// Auto profile - phase-based model and thinking configuration

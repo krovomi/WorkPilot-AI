@@ -88,6 +88,9 @@ class BuildOutcome:
     tests_passed: bool | None = None
     detector_clean: bool | None = None
     pr_merged: bool | None = None
+    app_verified: bool | None = None
+    """The verification loop's verdict: True on ``pass``, False on ``fail``,
+    None when it did not run or could not decide."""
     language: str = ""
     workflow: str = ""
 
@@ -148,6 +151,8 @@ def signals_from_outcome(outcome: BuildOutcome) -> list[ExternalSignal]:
         signals.append(ExternalSignal.DETECTOR_CLEAN)
     if outcome.pr_merged:
         signals.append(ExternalSignal.PR_MERGED)
+    if outcome.app_verified:
+        signals.append(ExternalSignal.RUNTIME_VERIFIED)
     return signals
 
 

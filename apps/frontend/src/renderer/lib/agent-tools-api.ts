@@ -1524,3 +1524,159 @@ export async function setUiUxOverride(
 		mode,
 	});
 }
+
+// ─── Verification loop (`apps/backend/verify/api.py`) ─────────────────────────
+//
+// The record keeps the backend's snake_case: it is a measured document read
+// as-is by the card and the tab, and renaming forty fields one way here and
+// the other way in Python is how two shapes of one record start.
+
+export type VerifyStatus =
+	| "pass"
+	| "fail"
+	| "unknown"
+	| "not-applicable"
+	| "disabled"
+	| "running";
+
+export interface VerifyError {
+	kind: string;
+	message: string;
+	file?: string;
+	line?: number | null;
+	source?: string;
+}
+
+export interface VerifyTarget {
+	name: string;
+	kind: "web-frontend" | "desktop" | "mobile" | "backend-api" | string;
+	framework?: string;
+	root?: string;
+	url?: string;
+	touched?: boolean;
+	origin?: string;
+	launch?: {
+		status?: string;
+		command?: string;
+		url?: string;
+		seconds?: number;
+		detail?: string;
+		exit_code?: number | null;
+	};
+	errors: VerifyError[];
+}
+
+export interface VerifyRound {
+	round: number;
+	target: string;
+	errors_before: number;
+	errors_after: number | null;
+	fixed: boolean;
+	note?: string;
+}
+
+export interface VerifyEndpoint {
+	method: string;
+	path: string;
+	status: number | null;
+	expected: number[];
+	ok: boolean;
+	latency_ms: number | null;
+	schema_ok: boolean | null;
+	problems: string[];
+	outcome: string;
+	note?: string;
+	response_excerpt?: string;
+}
+
+export interface VerifyPerf {
+	url: string;
+	lcp_ms: number | null;
+	cls: number | null;
+	fcp_ms: number | null;
+	tbt_ms: number | null;
+	inp_ms: number | null;
+	score: number | null;
+	scored_on: string[];
+	engine: string;
+	measured: boolean;
+	reason?: string;
+}
+
+export interface VerifyMobile {
+	platform: string;
+	status: string;
+	device?: string;
+	startup_ms?: number | null;
+	jank?: Record<string, number>;
+	detail?: string;
+	errors: VerifyError[];
+}
+
+export interface VerifyRecord {
+	status: VerifyStatus;
+	reason: string;
+	score: number | null;
+	started_at?: number;
+	finished_at?: number | null;
+	provider?: string;
+	effort?: string;
+	targets: VerifyTarget[];
+	rounds: VerifyRound[];
+	scenario: Array<{ action: string; url?: string; text?: string; value?: string; note?: string }>;
+	confirmations: Array<{ state?: string; evidence?: string; url?: string }>;
+	endpoints: VerifyEndpoint[];
+	perf: VerifyPerf[];
+	lighthouse: Record<string, number>;
+	latency: { count?: number; p50_ms?: number; p95_ms?: number; max_ms?: number };
+	mobile: VerifyMobile[];
+	screenshots: Array<{ index: number; label: string; platform: string; url: string }>;
+	findings: Array<{ severity: string; kind?: string; message: string }>;
+	browser?: { engine: string; reasons: string[] };
+	replay?: { status: string; problems?: string[]; reason?: string };
+}
+
+export interface VerifySettings {
+	enabled: boolean;
+	maxRounds: number;
+	perfTrace: boolean;
+	allowMutations: boolean;
+	browser: string;
+	decidedBy: string;
+}
+
+export interface VerifyPayload {
+	record: VerifyRecord | null;
+	settings?: VerifySettings;
+}
+
+export function fetchVerify(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<VerifyPayload>> {
+	return _get<VerifyPayload>("/api/verify/", specAddress(query), signal);
+}
+
+export function runVerify(
+	query: SpecTraceabilityQuery,
+	options: { effort?: string } = {},
+	signal?: AbortSignal,
+): Promise<ApiResult<VerifyPayload>> {
+	return _post<VerifyPayload>(
+		"/api/verify/run",
+		{ ...specAddress(query), ...(options.effort ? { effort: options.effort } : {}) },
+		signal,
+	);
+}
+
+/** The URL of one screenshot the record names — by index, never by path. */
+export function verifyScreenshotUrl(
+	query: SpecTraceabilityQuery,
+	index: number,
+): string {
+	const qs = new URLSearchParams({
+		...specAddress(query),
+		index: String(index),
+	}).toString();
+	return `${backendUrl()}/api/verify/screenshot?${qs}`;
+}

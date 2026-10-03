@@ -402,6 +402,18 @@ def _record_build_in_brain(
         debug_warning("run.py", f"Brain record skipped: {exc}")
 
 
+def _app_verified(spec_dir: Path) -> bool | None:
+    """The verification record's verdict, as the learning loop reads it."""
+    try:
+        from verify.record import load_record
+
+        record = load_record(spec_dir / "verify")
+    except Exception:  # noqa: BLE001 - absent evidence is None, never False
+        return None
+    status = (record or {}).get("status")
+    return True if status == "pass" else False if status == "fail" else None
+
+
 def _run_observe_phase(
     spec_dir: Path,
     *,
@@ -440,6 +452,9 @@ def _run_observe_phase(
             # gate that did not execute as clean would manufacture exactly the
             # corroboration the promotion rules refuse to invent.
             detector_clean=detector_clean,
+            # The verification loop's measured verdict — None when it did not
+            # run, could not launch anything, or the environment blocked it.
+            app_verified=_app_verified(spec_dir),
             workflow=profile.workflow,
             # Left empty until now, which quietly defeated the point of
             # keying ledgers by language: every project's lessons landed in

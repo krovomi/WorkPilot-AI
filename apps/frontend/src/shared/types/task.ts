@@ -252,6 +252,7 @@ export interface TaskDraft {
 	referencedFiles: ReferencedFile[];
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
+	verifyLoop?: boolean;
 	mobileTargets?: MobilePlatform[];
 	acceptanceCriteria?: string[];
 	extraNote?: string;
@@ -413,6 +414,11 @@ export interface TaskMetadata {
 	// true -> force strict TDD, false -> force disabled, undefined -> inherit project default.
 	tddMode?: boolean;
 
+	// Verification loop override (per-task). false -> skip the `verify` phase,
+	// true -> force it, undefined -> inherit the project default. Injected as
+	// WORKPILOT_VERIFY_LOOP at spawn time.
+	verifyLoop?: boolean;
+
 	// Agent configuration (from agent profile or manual selection)
 	provider?: string; // Active LLM provider (e.g. 'anthropic', 'openai', 'google', 'ollama', ...)
 	model?: string; // Model ID to use (supports multi-provider) - used when not auto profile
@@ -490,6 +496,11 @@ export interface Task {
 	 * the state the user has to open a terminal to get out of.
 	 */
 	errorMessage?: string;
+	/**
+	 * The verification loop's verdict (`apps/backend/verify/`), persisted in
+	 * the plan so the card can show it without a request per card.
+	 */
+	verification?: TaskVerificationSummary;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -503,6 +514,14 @@ export interface Task {
 	prUrl?: string; // URL of the PR created automatically when task is completed
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+/** What the card needs to know about the task's last verification. */
+export interface TaskVerificationSummary {
+	status: "pass" | "fail" | "unknown" | "not-applicable" | "disabled" | "running";
+	score?: number | null;
+	reason?: string;
+	at?: number | null;
 }
 
 // Implementation Plan (from auto-claude)
@@ -522,6 +541,8 @@ export interface ImplementationPlan {
 	reviewReason?: ReviewReason;
 	/** Failure detail persisted alongside the status that needs explaining. */
 	errorMessage?: string;
+	/** Written by the verification loop (`verify/record.py::persist_plan_summary`). */
+	verification?: TaskVerificationSummary;
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;

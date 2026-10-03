@@ -539,6 +539,20 @@ def uiux_section(
         return ""
 
 
+def verify_section(spec_dir: Path | None) -> str:
+    """The runtime verification's record (`verify.prompt`), for QA.
+
+    Empty when no verification ran. Never raises: a missing section never stops
+    a phase.
+    """
+    try:
+        from verify.prompt import verify_section as _section
+
+        return _section(spec_dir)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def get_qa_reviewer_prompt(spec_dir: Path, project_dir: Path) -> str:
     """
     Load the QA reviewer prompt with project-specific MCP tools dynamically injected.
@@ -667,6 +681,12 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     if design := uiux_section(spec_dir, role="qa"):
         spec_context += design + "\n\n---\n\n"
 
+    # The app this task changed, launched and driven before review: what it
+    # printed, the state it reached, the endpoints it answered. Evidence the
+    # reviewer can cite instead of redoing — and a failure it must report.
+    if verification := verify_section(spec_dir):
+        spec_context += verification + "\n\n---\n\n"
+
     # Find injection point in base prompt (after PHASE 4, before PHASE 5)
     injection_marker = (
         "<!-- PROJECT-SPECIFIC VALIDATION TOOLS WILL BE INJECTED HERE -->"
@@ -722,6 +742,8 @@ The project root is: `{project_dir}`
 ---
 
 """
+    if verification := verify_section(spec_dir):
+        spec_context += verification + "\n\n---\n\n"
     return spec_context + base_prompt
 
 

@@ -75,7 +75,16 @@ MANIFEST_FILE = "manifest.json"
 RECORD_FILE = "visual_qa.json"
 SIDES = ("base", "task")
 PLATFORMS = ("web", "android", "ios", "desktop")
-SOURCES = ("emulator", "visual-proof", "device-runner", "manual", "store-listing")
+SOURCES = (
+    "emulator",
+    "visual-proof",
+    "device-runner",
+    "manual",
+    "store-listing",
+    # The verification loop (`verify/`): the screens it confirmed, filed where
+    # the visual review reads every other capture.
+    "verifier",
+)
 MAX_CAPTURES = 24
 MAX_STORE_CAPTURES = 12
 MAX_MANIFEST_ENTRIES = 200

@@ -50,7 +50,12 @@ class TestTheEngineIsOnByDefault:
             assert profile.effort == "none"
             assert profile.will_run("qa")
             assert profile.phase_ids.index("coding") < profile.phase_ids.index("qa")
-            assert profile.phase_ids.index("qa") < profile.phase_ids.index("verify")
+            # The verification runs before QA (the reviewer gets its evidence)
+            # and is replayed after it, without a model.
+            assert profile.phase_ids.index("verify") < profile.phase_ids.index("qa")
+            assert profile.phase_ids.index("qa") < profile.phase_ids.index(
+                "verify-replay"
+            )
 
     def test_an_unset_flag_resolves_a_profile(self, tmp_path, monkeypatch):
         monkeypatch.delenv("WORKPILOT_WORKFLOW_ENGINE", raising=False)

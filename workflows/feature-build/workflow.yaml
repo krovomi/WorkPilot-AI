@@ -150,6 +150,33 @@ phases:
       A reviewer that did not write the code. At low effort the coding phase's
       own self-review is what there is.
 
+  - id: verify
+    impl: tooling/verify
+    agent: verifier
+    roster: qa
+    dispatch: fresh-context
+    hard_gate: tests-pass,app-verified
+    description: >-
+      La boucle de vérification : lancer l'application que la tâche a
+      modifiée, constater qu'aucune erreur n'apparaît, corriger et relancer
+      tant que le nombre d'erreurs baisse, amener l'app jusqu'à l'état
+      modifié (clics, ou appels des endpoints créés/modifiés avec leurs
+      payloads) et le confirmer, tracer la performance via Chrome DevTools
+      MCP, garder captures et score comme preuve. Frontend web/desktop,
+      application mobile (émulateur Android / simulateur iOS), API.
+
+      Jamais élaguée : « ça avait l'air bien » n'est pas une preuve, quel que
+      soit le budget. À effort `low`, seule la partie déterministe tourne
+      (lancement, erreurs, correctifs bornés, trace, captures, endpoints
+      appelés depuis le schéma) ; à partir de `medium`, une session
+      `verifier` pilote l'app jusqu'au changement. Placée avant la QA pour
+      que la revue juge un code déjà vu tournant, preuve en main.
+
+      Exécutée par `verify.loop` (`CUSTOM_EXECUTORS`), pas par une session
+      unique : ce qui est déterministe est identique pour chaque
+      fournisseur, et le skill est spécialisé par ses surcharges
+      `providers/*.md`. `tests-pass` reste lu dans le rapport de QA.
+
   - id: qa
     impl: workpilot/qa-loop
     always: true
@@ -245,12 +272,16 @@ phases:
       architectural » et rend la main pour zéro jeton — comme `docs` avec sa
       préflight.
 
-  - id: verify
-    impl: superpowers/verification-before-completion
-    hard_gate: tests-pass
+  - id: verify-replay
+    impl: tooling/verify
     description: >-
-      Never pruned at any effort. Whether the tests pass is not a budget
-      decision, and "it looked right" is not evidence.
+      La vérification rejouée sans modèle après la QA : mêmes cibles
+      relancées, même scénario rejoué (chaque clic vise l'élément décrit,
+      pas son uid), mêmes appels d'endpoints, état confirmé recherché sur la
+      page. Ignorée quand l'arbre de travail n'a pas changé depuis la
+      vérification. Un échec passe le rapport à `fail` (« régression après
+      la QA ») : le gate `app-verified` et le badge du Kanban le lisent.
+      Zéro jeton, donc jamais élaguée.
 
   - id: observe
     impl: task-observer/task-observer

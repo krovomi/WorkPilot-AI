@@ -123,6 +123,7 @@ export function convertTaskMetadataToSpecCreation(metadata?: any): any {
 		useWorktree: metadata.useWorktree,
 		useLocalBranch: metadata.useLocalBranch,
 		tddMode: metadata.tddMode,
+		verifyLoop: metadata.verifyLoop,
 		mobileTargets: metadata.mobileTargets,
 	};
 }
@@ -297,6 +298,7 @@ export async function resumePausedTask(
 				useWorktree: task.metadata?.useWorktree,
 				useLocalBranch: task.metadata?.useLocalBranch,
 				tddMode: task.metadata?.tddMode,
+				verifyLoop: task.metadata?.verifyLoop,
 				mobileTargets: task.metadata?.mobileTargets,
 				// Pick the transcript back up rather than re-deriving it. The
 				// phase the pause interrupted is re-entered from the spec

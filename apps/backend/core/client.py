@@ -639,6 +639,7 @@ _DOMAIN_ROLE_BY_AGENT_TYPE = {
     "planner": "planner",
     "qa_reviewer": "reviewer",
     "qa_fixer": "reviewer",
+    "verifier": "reviewer",
     "documenter": "documenter",
 }
 
@@ -1103,7 +1104,14 @@ def create_client(
     if "chrome-devtools" in required_servers:
         # Chrome DevTools MCP for browser automation via Chrome DevTools Protocol
         # Connects to a running Chrome instance or launches a new one
-        chrome_devtools_args = ["-y", "chrome-devtools-mcp@latest"]
+        # A developer's local pages have no business reaching Google's CrUX API
+        # or its usage statistics: both are on by default upstream.
+        chrome_devtools_args = [
+            "-y",
+            "chrome-devtools-mcp@latest",
+            "--no-usage-statistics",
+            "--no-performance-crux",
+        ]
         # Check if we should connect to an existing browser (e.g., app emulator)
         chrome_devtools_port = mcp_config.get(
             "CHROME_DEVTOOLS_PORT",
@@ -1235,6 +1243,17 @@ def create_client(
         from uiux.integration import mcp_server_config as uiux_server_config
 
         mcp_servers[UIUX_SERVER_KEY] = uiux_server_config(project_dir)
+
+    # The verification loop's tools (`verify/mcp_server.py`) for the session
+    # that drives the app: the same `verify_*` tools the other providers get
+    # in-process from `tool_executor`. The build owns the apps it launched, so
+    # the server is told to leave them running when the session ends.
+    if "verify" in required_servers:
+        from verify import mcp_server_config as verify_server_config
+
+        mcp_servers["workpilot-verify"] = verify_server_config(
+            project_dir, spec_dir, keep_apps=True
+        )
 
     # Add custom workpilot MCP server if required and available
     if "workpilot" in required_servers and auto_claude_tools_enabled:
@@ -1590,6 +1609,7 @@ def create_client(
             "documenter": "medium",
             "qa_reviewer": "high",
             "qa_fixer": "high",
+            "verifier": "high",
             "validation": "high",
             "planner": "xhigh",
             "architect": "xhigh",
@@ -2099,6 +2119,7 @@ _EFFORT_PHASE: dict[str, str] = {
     "qa": "qa",
     "qa_reviewer": "qa",
     "qa_fixer": "qa",
+    "verifier": "qa",
     "spec_writer": "spec",
     "spec_gatherer": "spec",
 }

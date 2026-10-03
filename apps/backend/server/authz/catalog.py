@@ -288,6 +288,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # Whether a task touches the interface, and the override a person sets
         # on it. Addressed like docintel, so it answers to the same domain.
         "uiux": "task",
+        # The verification loop's record and its re-run. Desktop-only like
+        # docintel; the re-run launches the app and agents (`agent.execute`).
+        "verify": "qa",
         "workflow_profile": "task",
         "slash_commands": "agent",
         "parallel_variations": "lab",

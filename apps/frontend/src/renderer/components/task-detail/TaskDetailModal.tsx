@@ -107,6 +107,8 @@ import { TaskWarnings } from "./TaskWarnings";
 import { SyncFromBranchDialog } from "./task-review/SyncFromBranchDialog";
 import { TaskEmulator } from "./TaskEmulator";
 import { TaskMobilePreview } from "./TaskMobilePreview";
+import { TaskVerify } from "./TaskVerify";
+import { hasVerifyRecord, useVerifyStore } from "../../stores/verify-store";
 
 interface TaskDetailModalProps {
 	readonly open: boolean;
@@ -544,6 +546,18 @@ function TaskDetailModalContent({
 	// architectural, or whose comparison found nothing, gets no trigger.
 	const architectureDelta = useArchitectureDelta(task.id, task.specsPath);
 	const showArchitectureTab = shouldShowArchitectureDelta(architectureDelta);
+	// The verification record decides whether its tab exists, for the same
+	// reason: a task that was never verified gets no empty tab.
+	const verifyProjectPath = taskProject?.path ?? activeProject?.path;
+	const loadVerify = useVerifyStore((s) => s.load);
+	const clearVerify = useVerifyStore((s) => s.clear);
+	const verifyEntry = useVerifyStore((s) => s.byTask[task.id]);
+	const showVerifyTab = hasVerifyRecord(verifyEntry);
+	useEffect(() => {
+		if (!verifyProjectPath) return;
+		void loadVerify(task.id, { projectDir: verifyProjectPath, specId: task.specId });
+		return () => clearVerify(task.id);
+	}, [task.id, task.specId, verifyProjectPath, loadVerify, clearVerify]);
 	const progressPercent = calculateProgress(task.subtasks);
 	// "Done" = completed or blocked (a blocked subtask, e.g. a manual e2e test,
 	// is handled by the build and counts toward completion — matches the backend).
@@ -1291,6 +1305,14 @@ function TaskDetailModalContent({
 									>
 										{t("mobile:preview.tab")}
 									</TabsTrigger>
+									{showVerifyTab && (
+										<TabsTrigger
+											value="verify"
+											className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
+										>
+											{t("tasks:verify.tab")}
+										</TabsTrigger>
+									)}
 									{showArchitectureTab && (
 										<TabsTrigger
 											value="architecture"
@@ -1313,6 +1335,9 @@ function TaskDetailModalContent({
 									<TaskOverview
 										task={task}
 										projectPath={taskProject?.path ?? activeProject?.path}
+										onOpenVerify={
+											showVerifyTab ? () => state.setActiveTab("verify") : undefined
+										}
 										review={
 											state.needsReview ? (
 											<TaskReview
@@ -1446,6 +1471,18 @@ function TaskDetailModalContent({
 										specId={task.specId}
 									/>
 								</TabsContent>
+
+								{/* The verification loop: launch, fixes, confirmed state,
+								    endpoints, performance, screenshots. Hidden until a
+								    verification has run. */}
+								{showVerifyTab && (
+									<TabsContent
+										value="verify"
+										className="flex-1 min-h-0 overflow-y-auto mt-0"
+									>
+										<TaskVerify task={task} projectPath={verifyProjectPath} />
+									</TabsContent>
+								)}
 
 								{/* What this task changed in the system's topology. The
 								    trigger is hidden when the delta has nothing to say, so

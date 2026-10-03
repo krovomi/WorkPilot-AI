@@ -766,7 +766,9 @@
 			"useClaudeMd": "Use CLAUDE.md",
 			"useClaudeMdDescription": "Include CLAUDE.md instructions in agent context",
 			"tddMode": "TDD Mode",
-			"tddModeDescription": "Enforce strict TDD (Red-Green-Refactor): the agent writes the test, watches it fail, then implements"
+			"tddModeDescription": "Enforce strict TDD (Red-Green-Refactor): the agent writes the test, watches it fail, then implements",
+			"verifyLoop": "Verification loop",
+			"verifyLoopDescription": "After coding, launch the app, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots). Cards can override it."
 		},
 		"autoBuild": {
 			"title": "WorkPilot AI Integration",

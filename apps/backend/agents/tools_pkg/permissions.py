@@ -22,6 +22,7 @@ from .models import (
     GRAPHITI_MCP_TOOLS,
     LINEAR_TOOLS,
     PUPPETEER_TOOLS,
+    VERIFY_TOOLS,
     get_agent_config,
     get_required_mcp_servers,
 )
@@ -110,6 +111,8 @@ def _get_mcp_tools_for_servers(servers: list[str]) -> list[str]:
             tools.extend(PUPPETEER_TOOLS)
         elif server == "chrome-devtools":
             tools.extend(CHROME_DEVTOOLS_TOOLS)
+        elif server == "verify":
+            tools.extend(VERIFY_TOOLS)
         elif server == "brain":
             from brain.runtime import MCP_TOOL_NAMES
 

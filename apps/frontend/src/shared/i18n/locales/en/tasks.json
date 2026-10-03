@@ -1736,5 +1736,118 @@
 		"chipMixed": "{{provider}} · mixed",
 		"chipAria": "Task engine: {{engine}}",
 		"onlyResumedPhase": "Only for the resumed phase ({{phase}}) — the following phases keep their engine"
+	},
+	"verify": {
+		"title": "Verification loop",
+		"status": {
+			"pass": "Verified",
+			"fail": "Failed",
+			"unknown": "Not verified",
+			"not-applicable": "Not applicable",
+			"disabled": "Off",
+			"running": "Running"
+		},
+		"subtitle": {
+			"pass": "The app was launched, showed no error and reached the changed state.",
+			"fail": "The app was launched and something is still broken.",
+			"unknown": "The change could not be verified on a running app.",
+			"not-applicable": "Nothing to launch in this project.",
+			"disabled": "The verification loop is turned off for this task.",
+			"running": "Verification in progress…"
+		},
+		"badge": {
+			"score": "score {{score}}/100",
+			"rounds_one": "{{count}} fix round ({{fixed}} effective)",
+			"rounds_other": "{{count}} fix rounds ({{fixed}} effective)",
+			"endpoints": "{{ok}}/{{count}} endpoints OK",
+			"errors_one": "{{count}} error left",
+			"errors_other": "{{count}} errors left"
+		},
+		"replayFailed": "The replay after QA found a regression.",
+		"error": "Verification unavailable: {{error}}",
+		"rerun": "Run verification",
+		"rerunQuick": "Quick run (no agent)",
+		"running": "Verifying…",
+		"details": "Details",
+		"tab": "Verification",
+		"empty": "No verification has run for this task yet.",
+		"noErrors": "No error left.",
+		"learnedRecipe": "learned launch",
+		"round": "Round {{round}}",
+		"roundErrors": "{{before}} → {{after}} error(s)",
+		"evidence": "evidence: {{evidence}}",
+		"notMeasured": "not measured",
+		"schemaOk": "valid",
+		"schemaKo": "invalid",
+		"ms": "{{value}} ms",
+		"latency": "API latency: p50 {{p50}} ms, p95 {{p95}} ms over {{count}} call(s)",
+		"scoredOn": "Score based on: {{metrics}}",
+		"startup": "cold start {{value}} ms",
+		"screenshotAlt": "Verification screenshot",
+		"noBrowser": "No browser could be used: {{reasons}}",
+		"sections": {
+			"launch": "Launch & errors",
+			"rounds": "Fix rounds",
+			"confirmed": "Confirmed state",
+			"endpoints": "Endpoints",
+			"performance": "Performance (Chrome DevTools)",
+			"mobile": "Devices",
+			"screenshots": "Screenshots",
+			"scenario": "Scenario (replayed after QA)",
+			"findings": "Findings"
+		},
+		"kind": {
+			"web-frontend": "web front end",
+			"desktop": "desktop",
+			"mobile": "mobile",
+			"backend-api": "API"
+		},
+		"launch": {
+			"ready": "running",
+			"reused": "running",
+			"exited": "crashed",
+			"timeout": "timed out",
+			"refused": "not launched",
+			"unknown": "unknown"
+		},
+		"table": {
+			"call": "Call",
+			"expected": "Expected",
+			"got": "Got",
+			"schema": "Payload",
+			"latency": "Latency"
+		},
+		"outcome": {
+			"called": "called",
+			"auth": "auth required",
+			"skipped-mutation": "skipped (mutation)",
+			"refused": "refused",
+			"unreachable": "unreachable"
+		},
+		"metrics": {
+			"score": "Score"
+		},
+		"lighthouse": {
+			"accessibility": "Accessibility",
+			"best-practices": "Best practices",
+			"seo": "SEO"
+		},
+		"mobileStatus": {
+			"verified": "verified",
+			"failed": "failed",
+			"blocked": "cannot be built here",
+			"no-device": "no device"
+		},
+		"form": {
+			"label": "Verification loop",
+			"inherit": "Project default",
+			"on": "On",
+			"off": "Off",
+			"hint": "Launch the app after coding, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots)."
+		},
+		"cardBadge": {
+			"pass": "Verified",
+			"fail": "Verify failed"
+		}
 	}
 }

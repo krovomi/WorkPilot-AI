@@ -236,6 +236,7 @@ export function TaskEditDialog({
 
 	// TDD override (per-task)
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
+	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
 	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>(
 		task.metadata?.mobileTargets ?? [],
 	);
@@ -292,6 +293,7 @@ export function TaskEditDialog({
 				task.metadata?.requireReviewBeforeCoding ?? false,
 			);
 			setTddMode(task.metadata?.tddMode ?? false);
+			setVerifyLoop(task.metadata?.verifyLoop ?? true);
 			setMobileTargets(task.metadata?.mobileTargets ?? []);
 			const openedEngine = engineForTask();
 			setEngine(openedEngine);
@@ -397,6 +399,7 @@ export function TaskEditDialog({
 				requireReviewBeforeCoding !==
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
+				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
 				!sameTargets(mobileTargets, task.metadata?.mobileTargets) ||
 				JSON.stringify(images) !==
 					JSON.stringify(task.metadata?.attachedImages || []);
@@ -431,6 +434,9 @@ export function TaskEditDialog({
 		}
 		if (tddMode !== (task.metadata?.tddMode ?? false)) {
 			metadataUpdates.tddMode = tddMode;
+		}
+		if (verifyLoop !== (task.metadata?.verifyLoop ?? true)) {
+			metadataUpdates.verifyLoop = verifyLoop;
 		}
 
 		if (isDuplicate) {
@@ -602,6 +608,8 @@ export function TaskEditDialog({
 				onMobileTargetsChange={setMobileTargets}
 				tddMode={tddMode}
 				onTddModeChange={setTddMode}
+				verifyLoop={verifyLoop}
+				onVerifyLoopChange={setVerifyLoop}
 				disabled={isSaving}
 				error={error}
 				onError={setError}

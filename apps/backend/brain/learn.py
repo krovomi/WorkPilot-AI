@@ -74,6 +74,9 @@ SURFACES = frozenset(
         # The project's design system (ui-ux-pro-max), once a person merged
         # the task that brought or changed `design-system/<p>/MASTER.md`.
         "uiux",
+        # The verification loop (`verify/`): how the app was launched, what
+        # broke and was fixed, the performance measured, the endpoints called.
+        "verify",
     }
 )
 

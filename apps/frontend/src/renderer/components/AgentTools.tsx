@@ -223,6 +223,25 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 		mcp_optional: ["linear", "electron", "puppeteer"],
 		settingsSource: { type: "phase", phase: "qa" },
 	},
+	verifier: {
+		label: "Verifier",
+		description:
+			"Runs the verification loop: launches the app, fixes what breaks, drives it to the change, traces performance (Chrome DevTools MCP).",
+		category: "qa",
+		tools: [
+			"Read",
+			"Glob",
+			"Grep",
+			"Write",
+			"Edit",
+			"Bash",
+			"WebFetch",
+			"WebSearch",
+		],
+		mcp_servers: ["context7", "auto-claude", "workpilot-verify"],
+		mcp_optional: ["electron", "puppeteer", "chrome-devtools"],
+		settingsSource: { type: "phase", phase: "qa" },
+	},
 
 	// Utility Phases - use feature settings
 	pr_reviewer: {

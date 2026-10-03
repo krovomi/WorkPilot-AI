@@ -82,14 +82,39 @@ class TestEvidence:
 
 
 @dataclass
+class RuntimeEvidence:
+    """The verification loop's verdict on a contestant's worktree (`verify/`).
+
+    Deterministic only — the app launched, its logs read, the touched
+    endpoints called from the schema, a trace measured — and no fixer: a
+    contestant is judged on what it left, not on what a fixer would make of
+    it. ``status`` is the record's (``pass``, ``fail``, ``unknown``,
+    ``not-applicable``, ``disabled``) or ``skipped``.
+    """
+
+    status: str = "skipped"
+    score: int | None = None
+    reason: str = ""
+
+    @property
+    def conclusive(self) -> bool:
+        return self.status in ("pass", "fail")
+
+
+@dataclass
 class Evidence:
     """Everything measurable about one contestant's worktree."""
 
     diff: DiffEvidence = field(default_factory=DiffEvidence)
     tests: TestEvidence = field(default_factory=TestEvidence)
+    runtime: RuntimeEvidence = field(default_factory=RuntimeEvidence)
 
     def to_dict(self) -> dict:
-        payload = {"diff": asdict(self.diff), "tests": asdict(self.tests)}
+        payload = {
+            "diff": asdict(self.diff),
+            "tests": asdict(self.tests),
+            "runtime": asdict(self.runtime),
+        }
         # The patch is the judge's input, not the UI's: it can be megabytes and
         # the archive on disk is read back by the Kanban.
         payload["diff"].pop("patch", None)
@@ -340,6 +365,42 @@ async def collect_evidence(
             diff=diff, tests=TestEvidence(status="no-change", command=test_command)
         )
 
-    return Evidence(
-        diff=diff, tests=await run_tests(worktree, test_command, timeout_s=timeout_s)
+    tests = await run_tests(worktree, test_command, timeout_s=timeout_s)
+    return Evidence(diff=diff, tests=tests, runtime=await collect_runtime(worktree))
+
+
+async def collect_runtime(worktree: Path) -> RuntimeEvidence:
+    """Launch the contestant's app and read the verdict. Never raises.
+
+    Sequential, like the test suites, for the same reason: N apps racing for
+    the same ports measure the contention. `VERIFY_ENABLED=false` (or the
+    project's switch) skips it, and a skipped criterion is renormalised away.
+    """
+    try:
+        from verify.loop import LoopOptions, run_verify_loop
+        from verify.settings import load_settings
+    except ImportError as exc:
+        return RuntimeEvidence(status="skipped", reason=f"unavailable: {exc}")
+    if not load_settings(worktree).enabled:
+        return RuntimeEvidence(status="skipped", reason="verification turned off")
+    try:
+        from verify.git import changed_files
+
+        record = await run_verify_loop(
+            worktree,
+            None,
+            None,
+            LoopOptions(
+                effort="low",
+                drive=False,
+                mobile_build=False,
+                changed_files=changed_files(worktree),
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 - a criterion reports, it never crashes the board
+        return RuntimeEvidence(status="unknown", reason=str(exc)[:200])
+    return RuntimeEvidence(
+        status=str(record.get("status") or "unknown"),
+        score=record.get("score"),
+        reason=str(record.get("reason") or "")[:200],
     )

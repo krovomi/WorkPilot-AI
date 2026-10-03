@@ -65,6 +65,8 @@ propre dict `agents` : **il gagne sur les défauts**.
 | `brain/project_memory.py` + `memory/store.py` | **la seule mémoire** : ce que les builds apprennent, dans le vault. `memory/`, `agents/memory_manager.py` et les outils `record_*` passent par là ; Graphiti n'est plus un magasin |
 | `libdocs/` | phase `docs` : télécharge via Context7 la doc des bibliothèques dont le dépôt n'a aucun exemple, avant le planning |
 | `mobile/` | apps smartphone : `stacks` (Android/Apple/Flutter/RN/MAUI/KMP/Capacitor + commandes), `devices` (émulateurs et simulateurs réels), `readiness` (constructible ici ?), `prompt` (la section donnée à chaque phase) |
+| `verify/` | la boucle de vérification (`/verify`) : `detect`, `launch`, `errors`, `devtools` (Chrome DevTools MCP piloté en Python), `endpoints`, `loop`, `replay` ; outils `verify_*` servis par `tool_executor` et par le serveur MCP `workpilot-verify` |
+| `skills_registry/overlays.py` | un skill surchargé par fournisseur : base → `providers/_sdk|_executor.md` → `providers/<fournisseur>.md`, fusion par section |
 | `continuous_ai/daemon.py` | boucle de polling par module, avec plafond de coût journalier |
 | `self_healing/` | surveillance, checks de santé, remédiation |
 | `task_logger/` | capture structurée de toutes les traces d'exécution |
