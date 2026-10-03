@@ -1177,7 +1177,7 @@ class TestSplitCommand:
     @patch("core.platform.get_comspec_path", return_value="cmd.exe")
     @patch("core.platform.is_windows", return_value=True)
     def test_windows_wrapper_in_cwd_runs_through_cmd(self, _win, _comspec, tmp_path):
-        (tmp_path / "gradlew.bat").write_text("@echo off\n")
+        (tmp_path / "gradlew.bat").write_text("@echo off\n", encoding="utf-8")
         argv = split_command("./gradlew installDebug", tmp_path)
         assert argv[:4] == ["cmd.exe", "/d", "/s", "/c"]
         assert "gradlew.bat" in argv[4] and argv[4].endswith(" installDebug")
