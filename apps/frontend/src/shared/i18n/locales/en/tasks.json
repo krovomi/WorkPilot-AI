@@ -1724,6 +1724,7 @@
 			"skip": "Skip for this task",
 			"auto": "Decide automatically"
 		}
+	},
 	"engine": {
 		"taskWide": "Engine for the whole task",
 		"ownedByTask": "Saved on this task only. Changing the default provider in Settings, or another task's engine, never changes it.",
