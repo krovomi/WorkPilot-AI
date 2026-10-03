@@ -106,6 +106,9 @@ class TestGates:
             "qa_clean",
             "detector_clean",
             "pr_merged",
+            # Measured by WorkPilot's verification loop, not reported by the
+            # agent that wrote the code.
+            "runtime_verified",
         }
 
 

@@ -127,7 +127,9 @@ class TestResolve:
     def test_no_overlay_dir_is_the_base(self, tmp_path):
         skill = tmp_path / "plain"
         skill.mkdir()
-        (skill / "SKILL.md").write_text("---\nname: plain\n---\nBody.\n")
+        (skill / "SKILL.md").write_text(
+            "---\nname: plain\n---\nBody.\n", encoding="utf-8"
+        )
         body, applied = resolve_skill_body(skill, "ollama")
         assert body.strip() == "Body." and applied == ()
 
@@ -151,7 +153,8 @@ class TestResolve:
     def test_overlay_for_another_skill_is_ignored(self, tmp_path):
         skill = self._skill(tmp_path)
         (skill / "providers" / "openai.md").write_text(
-            "---\nextends: other\n---\n## Report\n\nHijacked.\n"
+            "---\nextends: other\n---\n## Report\n\nHijacked.\n",
+            encoding="utf-8",
         )
         body, applied = resolve_skill_body(skill, "openai")
         assert "Hijacked." not in body and "openai" not in applied

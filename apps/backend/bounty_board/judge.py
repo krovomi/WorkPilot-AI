@@ -56,6 +56,10 @@ logger = logging.getLogger(__name__)
 WEIGHT_TESTS = 55.0
 WEIGHT_SPEC_FIT = 35.0
 WEIGHT_EFFICIENCY = 10.0
+# The verification loop's verdict on the worktree: the app launched clean and
+# its touched endpoints answered. Between spec fit and efficiency — it is
+# measured, like the tests, but says less about the spec than the judge does.
+WEIGHT_RUNTIME = 20.0
 
 # Differences below these thresholds are measurement noise, not performance.
 # Two agent sessions that finish 200 ms apart did not perform differently, and
@@ -132,6 +136,29 @@ def _tests_criterion(evidence: Evidence) -> Criterion:
         f"suite failed ({tests.failed} failing)" if tests.failed else "suite failed"
     )
     return Criterion("tests", WEIGHT_TESTS, 0.0, detail)
+
+
+def _runtime_criterion(evidence: Evidence) -> Criterion:
+    runtime = getattr(evidence, "runtime", None)
+    if runtime is None or not runtime.conclusive:
+        detail = (runtime.reason if runtime and runtime.reason else None) or (
+            f"app not verified ({runtime.status})" if runtime else "app not verified"
+        )
+        return Criterion("runtime", WEIGHT_RUNTIME, None, detail)
+    if runtime.status == "fail":
+        # Like a failing suite: the evidence exists and it is bad.
+        return Criterion(
+            "runtime",
+            WEIGHT_RUNTIME,
+            0.0,
+            runtime.reason or "the app failed its verification",
+        )
+    # A clean launch is most of the value; the measured score refines it.
+    value = 0.7 + 0.3 * (runtime.score / 100.0) if runtime.score is not None else 1.0
+    detail = "app verified" + (
+        f", score {runtime.score}/100" if runtime.score is not None else ""
+    )
+    return Criterion("runtime", WEIGHT_RUNTIME, min(1.0, value), detail)
 
 
 def _spec_fit_criterion(rating: SpecFitRating | None) -> Criterion:
@@ -369,18 +396,19 @@ def score_contestant(
     tests = _tests_criterion(evidence)
     fit = _spec_fit_criterion(spec_fit)
     efficiency = _efficiency_criterion(contestant, best_duration_ms, best_cost_usd)
-    criteria = [tests, fit, efficiency]
+    runtime = _runtime_criterion(evidence)
+    criteria = [tests, fit, runtime, efficiency]
 
     # Efficiency is a tiebreaker and never a verdict. On its own it says only
     # that a contestant was quick, and "quick" was most of what the previous
     # board was really measuring — a run where nothing else could be checked
     # must report that, not crown whoever returned first.
-    if not tests.measured and not fit.measured:
+    if not tests.measured and not fit.measured and not runtime.measured:
         return Verdict(
             score=0.0,
             criteria=criteria,
             rationale="nothing measurable: "
-            + "; ".join(f"{c.name}: {c.detail}" for c in (tests, fit)),
+            + "; ".join(f"{c.name}: {c.detail}" for c in (tests, fit, runtime)),
             disqualified_reason="no signal could be measured",
         )
 
@@ -474,6 +502,7 @@ def summarize_criteria(contestants: list[Contestant]) -> dict[str, Any]:
         "weights": {
             "tests": WEIGHT_TESTS,
             "spec_fit": WEIGHT_SPEC_FIT,
+            "runtime": WEIGHT_RUNTIME,
             "efficiency": WEIGHT_EFFICIENCY,
         },
         "note": "Weights are renormalised over the criteria that had evidence.",

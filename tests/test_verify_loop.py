@@ -149,12 +149,19 @@ def test_the_loop_fixes_launches_calls_and_records(project):
     assert record["score"] is not None
 
     # What the next task inherits, and what everyone reads.
-    recipe = json.loads((root / ".workpilot" / "verify" / "recipe.json").read_text())
+    recipe = json.loads(
+        (root / ".workpilot" / "verify" / "recipe.json").read_text(encoding="utf-8")
+    )
     assert "{port}" in recipe["targets"]["fastapi"]["command"]
-    plan = json.loads((spec / "implementation_plan.json").read_text())
+    plan = json.loads((spec / "implementation_plan.json").read_text(encoding="utf-8"))
     assert plan["verification"]["status"] == "pass"
     assert load_record(spec / "verify")["status"] == "pass"
-    assert (spec / "verify" / "report.md").read_text().rstrip().endswith("Verify: pass")
+    assert (
+        (spec / "verify" / "report.md")
+        .read_text(encoding="utf-8")
+        .rstrip()
+        .endswith("Verify: pass")
+    )
     # Nothing is left running.
     assert load_state(spec / "verify")["processes"] == {}
 
@@ -217,6 +224,6 @@ def test_turned_off_for_the_task(project, monkeypatch):
 
 def test_nothing_to_launch_is_not_applicable(tmp_path, monkeypatch):
     monkeypatch.setenv("BRAIN_ENABLED", "false")
-    (tmp_path / "lib.py").write_text("x = 1\n")
+    (tmp_path / "lib.py").write_text("x = 1\n", encoding="utf-8")
     record = asyncio.run(run_verify_loop(tmp_path, None, None, LoopOptions()))
     assert record["status"] == "not-applicable"

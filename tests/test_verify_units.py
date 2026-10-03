@@ -466,3 +466,130 @@ class TestTools:
         assert "verify" in AGENT_CONFIGS["verifier"]["mcp_servers"]
         assert set(_get_mcp_tools_for_servers(["verify"])) == set(VERIFY_TOOLS)
         assert {t.rsplit("__", 1)[1] for t in VERIFY_TOOLS} == TOOL_NAMES
+
+
+# ── the MCP server, the HTTP API, the Bounty Board criterion ────────────────
+
+
+class TestMcpServer:
+    def test_initialize_and_list(self, tmp_path):
+        import asyncio as _asyncio
+
+        from verify.mcp_server import handle
+
+        init = _asyncio.run(
+            handle(tmp_path, None, {"id": 1, "method": "initialize", "params": {}})
+        )
+        assert init["result"]["serverInfo"]["name"] == "workpilot-verify"
+        listed = _asyncio.run(handle(tmp_path, None, {"id": 2, "method": "tools/list"}))
+        assert {t["name"] for t in listed["result"]["tools"]} == TOOL_NAMES
+
+    def test_a_tool_call_answers_and_errors_are_flagged(self, tmp_path):
+        import asyncio as _asyncio
+
+        from verify.mcp_server import handle
+
+        detect = _asyncio.run(
+            handle(
+                tmp_path,
+                None,
+                {
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {"name": "verify_detect", "arguments": {}},
+                },
+            )
+        )
+        assert json.loads(detect["result"]["content"][0]["text"])["applicable"] is False
+        refused = _asyncio.run(
+            handle(
+                tmp_path,
+                None,
+                {
+                    "id": 4,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "verify_launch",
+                        "arguments": {"command": "rm -rf /"},
+                    },
+                },
+            )
+        )
+        assert refused["result"]["isError"] is True
+
+
+class TestApi:
+    def test_the_record_is_served_without_paths(self, tmp_path):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from verify.api import router
+        from verify.record import new_record, save_record
+
+        spec = tmp_path / ".workpilot" / "specs" / "001-x"
+        record = new_record(status="pass", finished_at=1.0)
+        shot = spec / "verify" / "screenshots" / "a.png"
+        shot.parent.mkdir(parents=True)
+        shot.write_bytes(b"\x89PNG\r\n\x1a\n0000")
+        record["screenshots"] = [{"path": str(shot), "label": "saved"}]
+        save_record(spec / "verify", record)
+
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+        params = {"project_dir": str(tmp_path), "spec_id": "001-x"}
+        body = client.get("/api/verify/", params=params).json()
+        assert body["success"] and body["record"]["status"] == "pass"
+        assert body["record"]["screenshots"] == [
+            {"index": 0, "label": "saved", "platform": "web", "url": ""}
+        ]
+        assert str(tmp_path) not in json.dumps(body["record"])
+        image = client.get("/api/verify/screenshot", params={**params, "index": 0})
+        assert image.status_code == 200 and image.content.startswith(b"\x89PNG")
+        assert (
+            client.get(
+                "/api/verify/screenshot", params={**params, "index": 5}
+            ).status_code
+            == 404
+        )
+
+    def test_a_screenshot_outside_the_spec_is_refused(self, tmp_path):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from verify.api import router
+        from verify.record import new_record, save_record
+
+        spec = tmp_path / ".workpilot" / "specs" / "001-x"
+        outside = tmp_path / "secret.png"
+        outside.write_bytes(b"\x89PNG\r\n\x1a\n")
+        record = new_record(status="pass", screenshots=[{"path": str(outside)}])
+        save_record(spec / "verify", record)
+        app = FastAPI()
+        app.include_router(router)
+        response = TestClient(app).get(
+            "/api/verify/screenshot",
+            params={"project_dir": str(tmp_path), "spec_id": "001-x", "index": 0},
+        )
+        assert response.status_code == 404
+
+
+class TestBountyRuntime:
+    def _verdict(self, runtime):
+        from bounty_board.judge import score_contestant
+        from bounty_board.models import Contestant
+        from bounty_board.signals import Evidence, TestEvidence
+
+        contestant = Contestant(
+            id="a", label="A", provider="ollama", model="m", status="completed"
+        )
+        evidence = Evidence(tests=TestEvidence(status="passed"), runtime=runtime)
+        return score_contestant(contestant, evidence, None, 0.0, 0.0)
+
+    def test_a_failed_app_costs_points_an_unknown_one_does_not(self):
+        from bounty_board.signals import RuntimeEvidence
+
+        passed = self._verdict(RuntimeEvidence(status="pass", score=100))
+        failed = self._verdict(RuntimeEvidence(status="fail", reason="crashed"))
+        unknown = self._verdict(RuntimeEvidence(status="unknown"))
+        assert passed.score > failed.score
+        assert unknown.breakdown()["runtime"] is None
+        assert failed.breakdown()["runtime"] == 0.0
