@@ -21,6 +21,7 @@ import { useHermesStore } from "../../stores/hermes-store";
 import { ScrollArea } from "../ui/scroll-area";
 import { BrainTaskCard } from "./BrainTaskCard";
 import { DocumentInsightsCard } from "./DocumentInsightsCard";
+import { VerifyLoopCard } from "./VerifyLoopCard";
 import { VisualReviewCard } from "./VisualReviewCard";
 import { ExecutionFormulaBanner } from "./ExecutionFormulaBanner";
 import { HermesLearningCard } from "./HermesLearningCard";
@@ -41,6 +42,8 @@ export interface TaskOverviewProps {
 	readonly review?: ReactNode;
 	/** Titre, description et critères modifiables en place (faux pendant un run). */
 	readonly editable?: boolean;
+	/** Ouvre l'onglet « Vérification », quand le modal en propose un. */
+	readonly onOpenVerify?: () => void;
 }
 
 /**
@@ -85,6 +88,7 @@ export function TaskOverview({
 	projectPath,
 	review,
 	editable = true,
+	onOpenVerify,
 }: TaskOverviewProps) {
 	const { t } = useTranslation(["tasks"]);
 	const [present, setPresent] = useState<Record<OverviewSectionId, boolean>>({
@@ -227,6 +231,9 @@ export function TaskOverview({
 						    clés brutes, langue, libellés coupés, base → tâche, maquette.
 						    Rien sans capture. */}
 						<VisualReviewCard task={task} projectPath={projectPath} />
+						{/* La boucle de vérification : l'app lancée, corrigée, amenée
+						    jusqu'au changement et mesurée. Rien tant qu'elle n'a pas tourné. */}
+						<VerifyLoopCard task={task} projectPath={projectPath} onOpenDetails={onOpenVerify} />
 					</OverviewSection>
 
 					<OverviewSection taskId={task.id} id="learning" icon={BrainCircuit} tone="violet" onPresence={report}>

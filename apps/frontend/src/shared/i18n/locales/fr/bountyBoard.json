@@ -50,6 +50,7 @@
 	"criteria": {
 		"tests": "tests",
 		"spec_fit": "conformité spec",
+		"runtime": "exécution",
 		"efficiency": "efficacité",
 		"notMeasured": "non mesuré",
 		"notMeasuredHint": "Aucune preuve pour ce critère — son poids a été redistribué sur les autres."

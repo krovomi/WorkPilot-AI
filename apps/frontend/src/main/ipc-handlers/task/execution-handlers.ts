@@ -531,6 +531,7 @@ export function registerTaskExecutionHandlers(
 			useWorktree: task.metadata?.useWorktree,
 			useLocalBranch: task.metadata?.useLocalBranch,
 			tddMode: task.metadata?.tddMode,
+			verifyLoop: task.metadata?.verifyLoop,
 			mobileTargets: task.metadata?.mobileTargets,
 			enableStreaming: options?.enableStreaming ?? true,
 			streamingSessionId: options?.streamingSessionId ?? taskId,
@@ -2888,6 +2889,7 @@ print(json.dumps(result))
 						useWorktree: task.metadata?.useWorktree,
 						useLocalBranch: task.metadata?.useLocalBranch,
 						tddMode: task.metadata?.tddMode,
+						verifyLoop: task.metadata?.verifyLoop,
 						mobileTargets: task.metadata?.mobileTargets,
 						// A stuck task is one whose process died mid-session: pick
 						// that session back up, as a resume does.

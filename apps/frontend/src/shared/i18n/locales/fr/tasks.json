@@ -1736,5 +1736,118 @@
 		"chipMixed": "{{provider}} · mixte",
 		"chipAria": "Moteur de la tâche : {{engine}}",
 		"onlyResumedPhase": "Seulement pour la phase reprise ({{phase}}) — les phases suivantes gardent leur moteur"
+	},
+	"verify": {
+		"title": "Boucle de vérification",
+		"status": {
+			"pass": "Vérifié",
+			"fail": "Échec",
+			"unknown": "Non vérifié",
+			"not-applicable": "Non applicable",
+			"disabled": "Désactivée",
+			"running": "En cours"
+		},
+		"subtitle": {
+			"pass": "L'application a été lancée, sans erreur, jusqu'à l'état modifié.",
+			"fail": "L'application a été lancée et quelque chose est encore cassé.",
+			"unknown": "Le changement n'a pas pu être vérifié sur une application lancée.",
+			"not-applicable": "Rien à lancer dans ce projet.",
+			"disabled": "La boucle de vérification est désactivée pour cette tâche.",
+			"running": "Vérification en cours…"
+		},
+		"badge": {
+			"score": "score {{score}}/100",
+			"rounds_one": "{{count}} tour de correction ({{fixed}} efficace)",
+			"rounds_other": "{{count}} tours de correction ({{fixed}} efficaces)",
+			"endpoints": "{{ok}}/{{count}} endpoints conformes",
+			"errors_one": "{{count}} erreur restante",
+			"errors_other": "{{count}} erreurs restantes"
+		},
+		"replayFailed": "Le rejeu après la QA a trouvé une régression.",
+		"error": "Vérification indisponible : {{error}}",
+		"rerun": "Lancer la vérification",
+		"rerunQuick": "Vérification rapide (sans agent)",
+		"running": "Vérification…",
+		"details": "Détails",
+		"tab": "Vérification",
+		"empty": "Aucune vérification n'a encore eu lieu pour cette tâche.",
+		"noErrors": "Aucune erreur restante.",
+		"learnedRecipe": "lancement appris",
+		"round": "Tour {{round}}",
+		"roundErrors": "{{before}} → {{after}} erreur(s)",
+		"evidence": "preuve : {{evidence}}",
+		"notMeasured": "non mesuré",
+		"schemaOk": "conforme",
+		"schemaKo": "non conforme",
+		"ms": "{{value}} ms",
+		"latency": "Latence de l'API : p50 {{p50}} ms, p95 {{p95}} ms sur {{count}} appel(s)",
+		"scoredOn": "Score calculé sur : {{metrics}}",
+		"startup": "démarrage à froid {{value}} ms",
+		"screenshotAlt": "Capture de la vérification",
+		"noBrowser": "Aucun navigateur n'a pu être utilisé : {{reasons}}",
+		"sections": {
+			"launch": "Lancement et erreurs",
+			"rounds": "Tours de correction",
+			"confirmed": "État confirmé",
+			"endpoints": "Endpoints",
+			"performance": "Performance (Chrome DevTools)",
+			"mobile": "Appareils",
+			"screenshots": "Captures",
+			"scenario": "Scénario (rejoué après la QA)",
+			"findings": "Constats"
+		},
+		"kind": {
+			"web-frontend": "front web",
+			"desktop": "bureau",
+			"mobile": "mobile",
+			"backend-api": "API"
+		},
+		"launch": {
+			"ready": "lancée",
+			"reused": "lancée",
+			"exited": "plantée",
+			"timeout": "délai dépassé",
+			"refused": "non lancée",
+			"unknown": "inconnu"
+		},
+		"table": {
+			"call": "Appel",
+			"expected": "Attendu",
+			"got": "Obtenu",
+			"schema": "Payload",
+			"latency": "Latence"
+		},
+		"outcome": {
+			"called": "appelé",
+			"auth": "authentification requise",
+			"skipped-mutation": "ignoré (mutation)",
+			"refused": "refusé",
+			"unreachable": "injoignable"
+		},
+		"metrics": {
+			"score": "Score"
+		},
+		"lighthouse": {
+			"accessibility": "Accessibilité",
+			"best-practices": "Bonnes pratiques",
+			"seo": "SEO"
+		},
+		"mobileStatus": {
+			"verified": "vérifié",
+			"failed": "en échec",
+			"blocked": "non constructible ici",
+			"no-device": "aucun appareil"
+		},
+		"form": {
+			"label": "Boucle de vérification",
+			"inherit": "Défaut du projet",
+			"on": "Activée",
+			"off": "Désactivée",
+			"hint": "Lancer l'application après le code, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures)."
+		},
+		"cardBadge": {
+			"pass": "Vérifié",
+			"fail": "Vérif. en échec"
+		}
 	}
 }

@@ -50,6 +50,7 @@
 	"criteria": {
 		"tests": "tests",
 		"spec_fit": "spec fit",
+		"runtime": "runtime",
 		"efficiency": "efficiency",
 		"notMeasured": "not measured",
 		"notMeasuredHint": "No evidence for this criterion — its weight was redistributed over the others."

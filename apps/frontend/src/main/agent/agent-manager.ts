@@ -23,7 +23,7 @@ import {
 	type TaskProviderPlan,
 } from "./task-provider-env";
 import { AgentState } from "./agent-state";
-import { applyMobileTargets, applyTddOverride } from "./env-utils";
+import { applyMobileTargets, applyTddOverride, applyVerifyLoop } from "./env-utils";
 import type {
 	RoadmapConfig,
 	SpecCreationMetadata,
@@ -339,12 +339,15 @@ export class AgentManager extends EventEmitter {
 		}
 
 		// Get combined environment variables
-		const combinedEnv = applyMobileTargets(
-			applyTddOverride(
-				this.processManager.getCombinedEnv(projectPath),
-				metadata?.tddMode,
+		const combinedEnv = applyVerifyLoop(
+			applyMobileTargets(
+				applyTddOverride(
+					this.processManager.getCombinedEnv(projectPath),
+					metadata?.tddMode,
+				),
+				metadata?.mobileTargets,
 			),
-			metadata?.mobileTargets,
+			metadata?.verifyLoop,
 		);
 
 		// spec_runner.py will auto-start run.py after spec creation completes
@@ -489,12 +492,15 @@ export class AgentManager extends EventEmitter {
 		}
 
 		// Get combined environment variables
-		const combinedEnv = applyMobileTargets(
-			applyTddOverride(
-				this.processManager.getCombinedEnv(projectPath),
-				options.tddMode,
+		const combinedEnv = applyVerifyLoop(
+			applyMobileTargets(
+				applyTddOverride(
+					this.processManager.getCombinedEnv(projectPath),
+					options.tddMode,
+				),
+				options.mobileTargets,
 			),
-			options.mobileTargets,
+			options.verifyLoop,
 		);
 
 		const args = [runPath, "--spec", specId, "--project-dir", projectPath];

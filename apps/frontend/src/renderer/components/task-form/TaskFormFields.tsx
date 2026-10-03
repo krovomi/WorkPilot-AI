@@ -134,6 +134,9 @@ interface TaskFormFieldsProps {
 	// TDD override (per-task)
 	tddMode: boolean;
 	onTddModeChange: (tdd: boolean) => void;
+	/** The verification loop for this task; omitted, the field is not shown. */
+	verifyLoop?: boolean;
+	onVerifyLoopChange?: (enabled: boolean) => void;
 	/** Smartphone platforms this task targets. Empty means "whatever the project has". */
 	mobileTargets: MobilePlatform[];
 	onMobileTargetsChange: (targets: MobilePlatform[]) => void;
@@ -208,6 +211,8 @@ export function TaskFormFields({
 	onRequireReviewChange,
 	tddMode,
 	onTddModeChange,
+	verifyLoop,
+	onVerifyLoopChange,
 	mobileTargets,
 	onMobileTargetsChange,
 	disabled = false,
@@ -788,6 +793,30 @@ export function TaskFormFields({
 							</p>
 						</div>
 					</div>
+
+					{/* Verification loop: after coding, launch the app, fix what
+					    breaks, drive it to the change and measure it. On unless the
+					    card or the project turns it off. */}
+					{onVerifyLoopChange && (
+						<div className="flex items-start gap-3 p-4 rounded-lg border border-border bg-muted/30">
+							<Checkbox
+								id={`${prefix}verify-loop`}
+								checked={verifyLoop !== false}
+								onCheckedChange={(checked) => onVerifyLoopChange(checked === true)}
+								disabled={disabled}
+								className="mt-0.5"
+							/>
+							<div className="flex-1 space-y-1">
+								<Label
+									htmlFor={`${prefix}verify-loop`}
+									className="text-sm font-medium text-foreground cursor-pointer"
+								>
+									{t("tasks:verify.form.label")}
+								</Label>
+								<p className="text-xs text-muted-foreground">{t("tasks:verify.form.hint")}</p>
+							</div>
+						</div>
+					)}
 
 					{/* Smartphone targets. Checking neither is the default and means
 				    "every platform the project has" — the agents narrow to what

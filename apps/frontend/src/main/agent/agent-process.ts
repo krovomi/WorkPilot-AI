@@ -707,6 +707,12 @@ export class AgentProcessManager {
 			if (project.settings.tddMode) {
 				env.TDD_MODE = "true";
 			}
+
+			// Verification loop (on by default): the project can turn it off;
+			// a card's own choice (WORKPILOT_VERIFY_LOOP) still wins.
+			if (project.settings.verifyLoop === false) {
+				env.VERIFY_ENABLED = "false";
+			}
 		}
 
 		return env;

@@ -798,6 +798,11 @@ export class ProjectStore {
 					plan.errorMessage.length > 0 && {
 						errorMessage: plan.errorMessage,
 					}),
+				// The verification loop's verdict, for the card's badge.
+				...(plan?.verification &&
+					typeof plan.verification.status === "string" && {
+						verification: plan.verification,
+					}),
 				...(executionProgress && { executionProgress }),
 				stagedInMainProject,
 				stagedAt,
