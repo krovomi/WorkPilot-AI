@@ -18,6 +18,8 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from core.platform import split_command
+
 from .stacks import ANDROID, MobilePlatform, MobileStack
 from .toolchain import find_tool
 
@@ -73,12 +75,13 @@ def is_png(path: Path) -> bool:
 def _run(
     command: list[str] | str, cwd: Path | None = None, timeout: int = 300
 ) -> tuple[int, str]:
-    shell = isinstance(command, str)
+    # A detected command is a string with no shell syntax: split it rather
+    # than hand it to a shell.
+    argv = split_command(command, cwd) if isinstance(command, str) else command
     try:
-        completed = subprocess.run(  # noqa: S602,S603 - commands from our own detector
-            command,
+        completed = subprocess.run(  # noqa: S603 - commands from our own detector
+            argv,
             cwd=str(cwd) if cwd else None,
-            shell=shell,
             timeout=timeout,
             check=False,
             capture_output=True,

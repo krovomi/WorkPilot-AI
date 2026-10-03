@@ -497,6 +497,42 @@ def build_windows_command(cli_path: str, args: list[str]) -> list[str]:
     return [cli_path] + args
 
 
+def split_command(command: str, cwd: str | Path | None = None) -> list[str]:
+    """A command line as an argv list, without handing it to a shell.
+
+    For a detected launch command (``./gradlew installDebug``, ``npm run dev``)
+    that uses no shell syntax. On Windows the program is resolved the way the
+    shell would (``gradlew`` → ``gradlew.bat`` in ``cwd``, ``npx`` → ``npx.cmd``
+    on PATH) and a ``.cmd``/``.bat`` goes through ``build_windows_command``.
+    """
+    import shlex
+
+    if not is_windows():
+        return shlex.split(command)
+    argv = [
+        part[1:-1] if len(part) > 1 and part[0] == part[-1] == '"' else part
+        for part in shlex.split(command, posix=False)
+    ]
+    if not argv:
+        return argv
+    program = argv[0]
+    base = Path(cwd) if cwd else Path.cwd()
+    candidates = [program]
+    if not os.path.splitext(program)[1]:
+        candidates += [program + ext for ext in (".exe", ".cmd", ".bat")]
+    resolved = None
+    for name in candidates:
+        local = base / name
+        if local.is_file():
+            resolved = str(local)
+            break
+        found = shutil.which(name)
+        if found:
+            resolved = found
+            break
+    return build_windows_command(resolved or program, argv[1:])
+
+
 # ============================================================================
 # Environment Variables
 # ============================================================================

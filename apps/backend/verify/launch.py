@@ -23,13 +23,14 @@ from __future__ import annotations
 import logging
 import os
 import re
-import shlex
 import subprocess
 import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+from core.platform import is_windows, split_command
 
 from .detect import Target, free_port
 from .errors import VerifyError, collect_errors
@@ -134,11 +135,11 @@ def _popen(command: str, cwd: Path, env: dict[str, str], log) -> subprocess.Pope
         "stderr": subprocess.STDOUT,
         "stdin": subprocess.DEVNULL,
     }
-    if os.name == "nt":  # pragma: no cover - Windows leg
+    if is_windows():  # pragma: no cover - Windows leg
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
-        return subprocess.Popen(command, shell=True, **kwargs)  # noqa: S602 - detected command
-    kwargs["start_new_session"] = True
-    return subprocess.Popen(shlex.split(command), **kwargs)  # noqa: S603 - detected command
+    else:
+        kwargs["start_new_session"] = True
+    return subprocess.Popen(split_command(command, cwd), **kwargs)  # noqa: S603 - detected command
 
 
 def launch(
