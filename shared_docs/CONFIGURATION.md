@@ -276,6 +276,24 @@ is taken so the user knows the output is not live data:
   currently returns empty/mock payloads for every endpoint. Treat it as a
   scaffold until a real database-backed implementation lands.
 
+## Verification loop (`verify`)
+
+The runtime verification phase (`apps/backend/verify/`, see
+[docs/CLAUDE.md](../docs/CLAUDE.md#verification-loop-verify)) reads these from
+the backend environment, then from `.workpilot/.env`:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `VERIFY_ENABLED` | `true` | Master switch. The project setting "Verification loop" writes `false`. |
+| `WORKPILOT_VERIFY_LOOP` | — | Per-task override (`true`/`false`), sent by the Kanban. |
+| `VERIFY_MAX_ROUNDS` | 5 | Ceiling on launch → fix rounds; the loop also stops after two rounds without progress. |
+| `VERIFY_LAUNCH_TIMEOUT` | 120 | Seconds to wait for the launched app to answer. |
+| `VERIFY_PERF_TRACE` | `true` | Chrome DevTools performance trace and Lighthouse audit. |
+| `VERIFY_ALLOW_MUTATIONS` | `true` | Call mutating endpoints (POST/PUT/PATCH/DELETE) on the dev server the loop launched. |
+| `VERIFY_PERF_REGRESSION` | 10 | Score drop, in points, against the per-route baseline reported as a regression. |
+| `VERIFY_BROWSER` | `auto` | `auto` (chrome-devtools-mcp, then Playwright), `devtools`, `playwright`, `off`. |
+| `VERIFY_CHROME_PATH` | — | A specific Chrome/Chromium binary. |
+
 ## Local generation deadlines
 
 Ollama native chat requests have independent limits, in seconds, configured in the backend process environment:
