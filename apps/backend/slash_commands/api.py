@@ -178,6 +178,25 @@ def _runtime_is_present(meta: dict[str, Any], project_dir: Path) -> bool:
     return ok
 
 
+def _skill_body_for_provider(proj: Path, skill_md: Path) -> str:
+    """The SKILL.md body specialised for the project's active provider.
+
+    Read through `skills_registry.overlays`, so `/verify` fired from the
+    Kanban on Ollama reads the Ollama overlay and on Claude the SDK one. The
+    provider is *peeked*, never consumed: resolving a body is not starting a
+    run.
+    """
+    from skills_registry.overlays import resolve_skill_file
+
+    try:
+        from core.client import peek_active_provider
+
+        provider = peek_active_provider(proj)
+    except Exception:  # noqa: BLE001 - no provider config means the default
+        provider = None
+    return resolve_skill_file(skill_md, provider).body
+
+
 def _resolve_command_body(proj: Path, command: str) -> str | None:
     """Return the prompt body for `command` from the agnostic source.
 
@@ -196,16 +215,23 @@ def _resolve_command_body(proj: Path, command: str) -> str | None:
         proj / ".claude" / "commands" / f"{command}.md",
         Path.home() / ".claude" / "commands" / f"{command}.md",
     ]
-    for path in candidates:
+    for index, path in enumerate(candidates):
         try:
-            if path.is_file():
+            if not path.is_file():
+                continue
+            if index == 0:
+                # An agnostic skill may carry provider overlays
+                # (`providers/*.md`): the body is the one the provider that
+                # will execute it should follow.
+                body = _skill_body_for_provider(proj, path)
+            else:
                 _, body = _parse_frontmatter(
                     path.read_text(encoding="utf-8", errors="replace")
                 )
-                body = body.strip()
-                if body:
-                    return body
-        except OSError:
+            body = body.strip()
+            if body:
+                return body
+        except (OSError, ValueError):
             continue
     bundled = load_bundled_skill(command)
     return bundled[1] if bundled is not None else None
