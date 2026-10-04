@@ -53,10 +53,7 @@ AGENT_TYPES = ("general", "analysis", "coding", "verification")
 
 # The project brief is shared with the context-aware snippets runner; it lives
 # in ``core.project_brief`` and is re-exported here, where callers found it.
-from core.project_brief import (  # noqa: E402,F401 — re-exported
-    CONTEXT_BUDGET,
-    gather_project_context,
-)
+from core.project_brief import gather_project_context  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Output

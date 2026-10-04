@@ -40,6 +40,7 @@ def task_summary(spec_dir: Path) -> str:
         if isinstance(text, str) and text.strip():
             return text.strip()[:_SUMMARY_CHARS]
     except (OSError, ValueError):
+        # No requirements.json, or not JSON: the head of spec.md says it too.
         pass
     try:
         spec = (spec_dir / "spec.md").read_text(encoding="utf-8", errors="replace")

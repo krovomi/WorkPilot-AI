@@ -390,4 +390,3 @@ def test_the_optimizer_still_exposes_the_shared_brief():
     from core import project_brief
 
     assert module.gather_project_context is project_brief.gather_project_context
-    assert module.CONTEXT_BUDGET == project_brief.CONTEXT_BUDGET
