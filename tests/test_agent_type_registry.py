@@ -232,3 +232,11 @@ class TestInsightExtraction:
     def test_a_non_object_answer_is_none(self, monkeypatch, tmp_path):
         result, _ = self._run(monkeypatch, tmp_path, "[1, 2, 3]")
         assert result is None
+
+    def test_an_unparseable_answer_is_none_not_an_exception(
+        self, monkeypatch, tmp_path
+    ):
+        """json.loads raises RecursionError on deep nesting; the contract is None."""
+        nested = "[" * 200_000 + "]" * 200_000
+        result, _ = self._run(monkeypatch, tmp_path, nested)
+        assert result is None

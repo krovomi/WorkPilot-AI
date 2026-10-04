@@ -393,9 +393,15 @@ async def run_insight_extraction(
         )
         return None
 
-    from spec.plan_recovery import extract_json_document
+    # Parsing stays inside the "None if failed" contract: json.loads raises
+    # RecursionError on a deeply nested answer, which ValueError does not cover.
+    try:
+        from spec.plan_recovery import extract_json_document
 
-    extracted = extract_json_document(output)
+        extracted = extract_json_document(output)
+    except Exception as e:
+        logger.warning(f"Insight extraction output could not be parsed: {e}")
+        return None
     if not isinstance(extracted, dict):
         logger.warning("Insight extraction did not return a JSON object")
         return None
