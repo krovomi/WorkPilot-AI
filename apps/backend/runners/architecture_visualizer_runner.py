@@ -8,8 +8,9 @@ Three actions, one code path each:
     it. This is what the Architecture page runs.
 ``--action delta``
     Author the "after" model for one task, starting from the baseline so the
-    component ids survive, and compare the two. This is what the workflow phase
-    and the Kanban's regenerate button run.
+    component ids survive, and compare the two. This is what the Kanban's
+    regenerate button runs; the `architecture-map` workflow phase runs the same
+    `archify.task_delta.run_task_delta` inside the build.
 ``--action doctor``
     Whether archify can run here, and what is missing. Costs no API call and no
     subprocess beyond `node --version`, so the UI can ask on every panel open.
@@ -36,20 +37,24 @@ sys.path.insert(0, str(backend_path))
 
 from architecture_visualizer.archify import (  # noqa: E402
     ArchifyUnavailable,
-    assess,
     authoring,
     check,
-    compare_models,
     doctor,
 )
 from architecture_visualizer.archify import delta as delta_module  # noqa: E402
 from architecture_visualizer.archify import ir as ir_module  # noqa: E402
 
-SENTINEL = "__ARCH_VIZ_RESULT__:"
+# The baseline's location has one definition, shared with the workflow phase:
+# two spellings of `.workpilot/architecture/` would be two answers to "does this
+# project have a model yet".
+from architecture_visualizer.archify.task_delta import (  # noqa: E402
+    BASELINE_HTML,
+    BASELINE_SPEC,
+    baseline_dir,
+    run_task_delta,
+)
 
-#: Under `<project>/.workpilot/architecture/`.
-BASELINE_SPEC = "baseline.arch.json"
-BASELINE_HTML = "baseline.html"
+SENTINEL = "__ARCH_VIZ_RESULT__:"
 
 
 def emit(payload: dict) -> None:
@@ -58,10 +63,6 @@ def emit(payload: dict) -> None:
 
 def say(message: str) -> None:
     print(message, flush=True)
-
-
-def baseline_dir(project_dir: Path) -> Path:
-    return project_dir / ".workpilot" / "architecture"
 
 
 # --------------------------------------------------------------------------- #
@@ -180,74 +181,37 @@ async def action_delta(
     thinking: str | None,
     force: bool,
 ) -> dict:
-    baseline_path = baseline_dir(project_dir) / BASELINE_SPEC
-    if not baseline_path.is_file():
-        status = delta_module.write_status(
-            spec_dir,
-            delta_module.DeltaStatus(
-                status=delta_module.STATUS_NO_BASELINE,
-                reason=(
-                    "this project has no architecture model yet — generate one "
-                    "from the Architecture page to compare against"
-                ),
-            ),
-        )
-        return {"status": "success", "action": "delta", "delta": status.to_dict()}
+    """The Delta tab's regenerate button: `task_delta.run_task_delta`, printed.
 
-    if not force:
-        significance = assess(changed_files, baseline_path)
-        if not significance.significant:
-            status = delta_module.write_status(
-                spec_dir,
-                delta_module.DeltaStatus(
-                    status=delta_module.STATUS_NOT_SIGNIFICANT,
-                    reason=significance.reason,
-                ),
-            )
-            say(f"No architectural change: {significance.reason}")
-            return {"status": "success", "action": "delta", "delta": status.to_dict()}
-        say(f"Mapping this task: {significance.reason}")
-
-    head_path = delta_module.directory(spec_dir) / delta_module.HEAD_SPEC
-    baseline = ir_module.load(baseline_path)
-
-    session = _make_session(project_dir, spec_dir, model, thinking)
-    authored = await authoring.author(
-        session=session,
-        project_dir=project_dir,
-        spec_path=head_path,
-        # The head model's own artifact is a by-product: what the card shows is
-        # the comparison. Rendering it anyway is what proves the model is sound
-        # before it is compared against anything.
-        artifact_path=delta_module.directory(spec_dir) / "head.html",
-        baseline=baseline,
-        task_summary=task_summary,
+    The pipeline lives in `task_delta` so the `architecture-map` workflow phase
+    runs the same one; this only turns its answer into the sentinel payload.
+    """
+    status = await run_task_delta(
+        project_dir,
+        spec_dir,
+        session=_make_session(project_dir, spec_dir, model, thinking),
         changed_files=changed_files,
+        task_summary=task_summary,
+        force=force,
         progress=say,
     )
-    if not authored.ok:
-        status = delta_module.write_status(
-            spec_dir,
-            delta_module.DeltaStatus(
-                status=delta_module.STATUS_FAILED, reason=authored.error
-            ),
-        )
-        return {
-            "status": "error",
-            "action": "delta",
-            "error": authored.error,
-            "diagnostics": authored.diagnostics,
-            "delta": status.to_dict(),
-        }
+    if status.status in (
+        delta_module.STATUS_NO_BASELINE,
+        delta_module.STATUS_NOT_SIGNIFICANT,
+    ):
+        return {"status": "success", "action": "delta", "delta": status.to_dict()}
 
-    say("Comparing against the baseline…")
-    status = compare_models(spec_dir, baseline_path, head_path, project_dir)
-    return {
-        "status": "success" if status.status == delta_module.STATUS_MAPPED else "error",
+    mapped = status.status == delta_module.STATUS_MAPPED
+    payload: dict = {
+        "status": "success" if mapped else "error",
         "action": "delta",
-        "error": "" if status.status == delta_module.STATUS_MAPPED else status.reason,
-        "delta": status.to_dict(),
+        "error": "" if mapped else status.reason,
     }
+    if status.diagnostics is not None:
+        # Authoring is what failed: the diagnostics are the part worth reading.
+        payload["diagnostics"] = status.diagnostics
+    payload["delta"] = status.to_dict()
+    return payload
 
 
 # --------------------------------------------------------------------------- #

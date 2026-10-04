@@ -130,6 +130,11 @@ PHASE_ALIASES: dict[str, str] = {
     "merge_resolver": "solo",
     # One snippet in, one rewritten snippet out (migration/llm_transformer.py).
     "migration": "solo",
+    # Writes one archify model from evidence already in its prompt; Python
+    # validates and renders it. Unmapped, every authoring round — the
+    # Architecture page's and the `architecture-map` phase's — was handed a
+    # code-reviewer and a test-runner it has no use for.
+    "architecture_visualizer": "solo",
 }
 
 
