@@ -1,0 +1,825 @@
+# Audit WorkPilot AI — cahier de nettoyage et d'optimisation
+
+| | |
+|---|---|
+| **Commit audité** | `b46a031` (`develop`, après PR #292) — comparé à l'audit précédent sur `7057b28` |
+| **Date** | 3 octobre 2026 |
+| **Compagnon visuel** | [`WorkPilot-architecture.html`](WorkPilot-architecture.html) — schémas interactifs, simulateur Kanban, inventaire filtrable |
+| **Objet** | Corriger les features cassées, supprimer le code mort et les doublons, réduire le coût en tokens et en mémoire, **sans retirer une seule feature utilisée** |
+
+Ce document est un **cahier de tâches pour agents de code**. Chaque tâche est autonome : problème,
+preuve (`fichier:ligne`), étapes, ce qu'il faut préserver, critères d'acceptation et commandes de
+vérification. Les tâches sont regroupées en **lots** ; un lot = une PR vers `develop`. Les lots d'une
+même priorité sont parallélisables sauf dépendance indiquée.
+
+Tous les chemins backend sont relatifs à `apps/backend/`, tous les chemins frontend à
+`apps/frontend/src/`, sauf mention contraire.
+
+---
+
+## 0. Mode d'emploi pour l'agent qui prend une tâche
+
+### 0.1 Règles non négociables (reprises de `docs/CLAUDE.md`, qui fait foi)
+
+- **PR vers `develop`**, jamais `main`. Un lot = une PR, titre `chore(cleanup): …` ou `fix(…): …`.
+- **Claude Agent SDK uniquement** : jamais `anthropic.Anthropic()` ; toujours `create_client()` /
+  `create_agent_client()` de `core.client`.
+- **i18n** : tout texte visible passe par `react-i18next`, clés ajoutées (ou retirées) dans `en/*.json`
+  **et** `fr/*.json`.
+- **Abstraction plateforme** : jamais `process.platform` ; `main/platform/` ou `core/platform/`.
+- **Versions d'outils épinglées** : ruff `0.15.7`, Biome `2.5.11`.
+- **Pas d'estimation de durée** dans les PR ou la doc.
+- Le provider d'un endpoint se lit avec `core.client.peek_active_provider`, jamais
+  `_get_active_provider` (voir F13/F25).
+
+### 0.2 Principe de suppression
+
+1. **Prouver l'absence d'appelant avant de supprimer** (méthodes en §0.3). Une recherche textuelle ne
+   suffit pas pour le frontend : confirmer avec `npx knip` (ou `npx ts-prune`) puis `pnpm run typecheck`.
+2. **Une feature visible ne disparaît jamais en silence.** Si une page de la barre latérale est cassée
+   (ex. F21), la tâche est « câbler **ou** retirer avec son entrée Sidebar, son store, son API preload,
+   ses clés i18n et son runner » — et la PR le dit.
+3. **Supprimer le test avec le code qu'il teste**, jamais un test qui couvre du code vivant.
+4. **Migrer avant de supprimer** quand des appelants existent (shims, Graphiti).
+5. Ne pas mélanger un nettoyage et un changement de comportement dans le même commit.
+
+### 0.3 Méthodes de preuve utilisées par cet audit (réutilisables)
+
+```bash
+# Backend : agent_type utilisés mais non enregistrés (F1)
+cd apps/backend && python3 - <<'EOF'
+import ast, os, re
+src = open('agents/tools_pkg/models.py').read()
+keys = next([k.value for k in n.value.keys] for n in ast.walk(ast.parse(src))
+            if isinstance(n, ast.Assign) and any(getattr(t, 'id', None) == 'AGENT_CONFIGS' for t in n.targets))
+for root, dirs, files in os.walk('.'):
+    if any(p in root for p in ('vendor', '__pycache__', 'tests')): continue
+    for f in files:
+        if f.endswith('.py'):
+            s = open(os.path.join(root, f), encoding='utf-8').read()
+            for m in re.finditer(r'agent_type\s*=\s*["\']([a-z_]+)["\']', s):
+                if m.group(1) not in keys:
+                    print(m.group(1), os.path.join(root, f), s[:m.start()].count('\n') + 1)
+EOF
+
+# Backend : un module a-t-il un importeur ? (remplacer NOM)
+grep -rnE "^\s*(from|import) NOM(\.| |$)" --include=*.py apps/backend tests src scripts
+grep -rn "NOM" apps/frontend/src --include=*.ts   # runners lancés par chemin
+
+# Frontend : importeurs stricts d'un fichier (remplacer Base)
+grep -rnE "(from|import\(|require\()\s*[\"'][^\"']*/Base(\.tsx?)?[\"']" apps/frontend/src \
+  | grep -v -E "\.test\.|__tests__|__mocks__"
+
+# Profil réel d'un build, par effort (F2, F15)
+cd apps/backend && python3 -c "
+import sys; sys.path.insert(0, '.')
+from pathlib import Path
+from workflows.spec import load_workflow
+from workflows.engine import resolve_profile
+wf = load_workflow(Path('../../workflows/feature-build/workflow.yaml'))
+for e in ['none', 'low', 'medium', 'high', 'ultrathink']:
+    print(e, [r.phase.id for r in resolve_profile(wf, effort=e, provider='claude').run])"
+
+# Roster réellement servi (F5, F9)
+cd apps/backend && python3 -c "
+import sys; sys.path.insert(0, '.')
+from agents.subagents import resolve
+from agents.subagents.pr_review import pr_review_agents
+ua = pr_review_agents(lambda n: 'x', lambda p, w=None: p)
+print(sorted(resolve('pr_orchestrator_parallel', project_dir='.', user_agents=ua)))"
+```
+
+### 0.4 Vérifications avant chaque PR
+
+```bash
+# Backend
+ruff check apps/backend/ tests/ src/ utils/ && ruff format --check apps/backend/ tests/ src/ utils/
+pytest tests/ -q -x            # ou les fichiers ciblés indiqués dans la tâche
+python3 scripts/skills_cli.py build --check   # si skills/ ou .workpilot/skills.toml change
+
+# Frontend
+cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
+```
+
+---
+
+## 1. Vue d'ensemble des lots
+
+| Lot | Priorité | Thème | Constats | Dépend de |
+|---|---|---|---|---|
+| L1 | P0 | Features cassées (backend) | F1, F24 | — |
+| L2 | P0 | Phase architecture-map | F20 | L1 (test AST) conseillé |
+| L3 | P0 | Features cassées (frontend) | F21, F22 | — |
+| L4 | P1 | Contexte de développement | F23, F18 | — |
+| L5 | P1 | Droits et rosters minimaux | F4, F5, F9, F16 | L1 |
+| L6 | P1 | Pipeline payé = pipeline exécuté | F2, F3, F15, F35 | — |
+| L7 | P2 | Une seule mémoire | F6, F7, F14, F34 | L1 (insight_extractor) |
+| L8 | P2 | Code mort frontend | F28, F25 (front) | L3 |
+| L9 | P2 | Code mort backend | F29, F30, F32, F33, F25 (back) | — |
+| L10 | P3 | Tokens à haut effort | F10, F11, F17 | L6 |
+| L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
+| L12 | P3 | Gouvernance | F12, F13 | L9 (F25) pour F13 |
+| L13 | P4 | Surface produit | F19 | tous |
+
+Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L10, L11, L12 → L13.
+
+### Chiffres de référence (pour mesurer les gains)
+
+| Mesure | Valeur à `b46a031` | Cible |
+|---|---|---|
+| `docs/CLAUDE.md` chargé à chaque session Claude Code | 268 Ko (~67 k tokens) | < 20 Ko |
+| agent_types non enregistrés | 7 | 0 |
+| Références Graphiti/LadybugDB hors `integrations/graphiti` | 214 (45 fichiers) | 0 |
+| Fichiers frontend sans importeur de production | 57 (~16,5 k lignes) | 0 |
+| Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) | 0 |
+| Shims racine `apps/backend/*.py` | 25 | 0 (hors points d'entrée) |
+| Prompts orphelins | 11 (~51 Ko) | 0 |
+| Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) | 0 |
+| Sous-agents du plus gros roster | 9 | ≤ 7 |
+| Sessions qui relisent le diff à ultrathink | jusqu'à 7 | ≤ 4 |
+| Détecteurs de pile | ≥ 11 | 1 façade |
+| Écritures par merge | 4 magasins | 1 événement |
+
+---
+
+## 2. Tâches détaillées
+
+### Lot L1 — Features cassées côté backend (P0)
+
+#### F1 · Sept features LLM échouent en silence : `agent_type` absent d'`AGENT_CONFIGS`
+
+- **Sévérité** critique · **statut** ouvert depuis l'audit précédent · **vérifié** (reproduit)
+- **Preuve** : `get_agent_config("insight_extractor")` lève `ValueError: Unknown agent type`
+  (`agents/tools_pkg/models.py:476-495`). Appelants :
+  `agents/impact_analyzer.py:305`, `architecture/ai_reviewer.py:76`, `migration/llm_transformer.py:75`,
+  `analysis/insight_extractor.py:379`, `learning_loop/service.py:110`,
+  `context_mesh/mesh_service.py:266`, `live_companion/analyzer.py:122`. Les sept attrapent l'exception
+  et journalisent un avertissement ; l'extracteur d'insights, seul écrivain prévu de
+  `patterns/`, `codebase/` et `outcomes/` dans le vault, ne produit donc rien.
+- **Étapes**
+  1. Ajouter sept entrées dans `AGENT_CONFIGS` (`agents/tools_pkg/models.py`), en suivant le modèle
+     des entrées voisines (`analyzer`, `insights`, `pr_reviewer`) :
+     - `insight_extractor`, `learning_analyzer`, `context_mesh_analyzer`, `live_companion_analyzer` :
+       `BASE_READ_TOOLS`, `mcp_servers: []`, `thinking_default: "low"`.
+     - `impact_analyzer`, `architecture_reviewer` : `BASE_READ_TOOLS + WEB_TOOLS`,
+       `mcp_servers: ["context7"]`, `thinking_default: "medium"` / `"high"`.
+     - `migration` : lire `migration/llm_transformer.py` — si le modèle écrit lui-même les fichiers,
+       `BASE_READ_TOOLS + BASE_WRITE_TOOLS` ; sinon lecture seule. `thinking_default: "medium"`.
+  2. `PHASE_ALIASES` (`agents/subagents/phases.py:84`) les route déjà (sauf `migration` → ajouter
+     `"migration": "solo"` ou `"kanban"` selon l'usage réel).
+  3. Ajouter `tests/test_agent_type_registry.py` : parcourir l'AST de `apps/backend` (hors `vendor/`,
+     tests), collecter chaque littéral `agent_type="…"` **et** chaque appel à `create_client` /
+     `create_agent_client` / `create_agent_runtime`, et vérifier (a) que l'appel nomme un
+     `agent_type`, (b) que celui-ci est une clé d'`AGENT_CONFIGS`. Ce test couvre aussi F24.
+- **À préserver** : le comportement fonctionnel des sept features ; seules leurs permissions deviennent explicites.
+- **Acceptation** : `get_agent_config` réussit pour les sept ; le nouveau test passe ; `tests/test_agent_configs.py`
+  et `tests/test_subagents_coverage.py` passent (mettre à jour `test_known_agent_types_exist` si besoin).
+- **Vérification** : `pytest tests/test_agent_configs.py tests/test_subagents_coverage.py tests/test_agent_type_registry.py -q`.
+
+#### F24 · La Roadmap tourne sous l'agent `coder`
+
+- **Sévérité** moyenne · **nouveau** · **vérifié** (AST : seul appel de fabrique sans `agent_type`)
+- **Preuve** : `runners/roadmap/executor.py:130` appelle `self.create_client(...)` (= `create_agent_client`,
+  `runners/roadmap/orchestrator.py:61`) sans `agent_type` ; le défaut `coder` (`core/client.py:721,2179`)
+  donne Write, Edit, Bash et le roster Kanban (test-runner). Les configs `roadmap_discovery` et
+  `competitor_analysis` (lecture + Web + Context7) n'ont aucun appelant.
+- **Étapes** : ajouter un paramètre `agent_type` à l'exécuteur de roadmap, passer `roadmap_discovery`
+  pour la découverte et les features, `competitor_analysis` pour l'analyse concurrentielle
+  (`runners/roadmap/competitor_analyzer.py`). Ajouter les deux à `PHASE_ALIASES` → `"research"`.
+- **À préserver** : la génération de roadmap et ses fichiers de sortie (`.workpilot/roadmap/`).
+- **Acceptation** : le test AST de F1 passe ; une génération de roadmap produit les mêmes artefacts.
+- **Vérification** : `pytest tests/test_roadmap_validation.py -q` + lancement manuel de la page Roadmap.
+
+### Lot L2 — La phase `architecture-map` produit la carte (P0)
+
+#### F20 · La phase `architecture-map` du build ne produit pas la carte
+
+- **Sévérité** haute · **nouveau** · **lu**
+- **Preuve** : `architecture-map` n'est ni dans `SKILL_PHASE_AGENTS` (`workflows/runner.py:198-212`) ni
+  dans `CUSTOM_EXECUTORS` (`workflows/runner.py:870`). `run_skill_phase` l'exécute donc sous
+  `_DEFAULT_AGENT = "analyzer"` (l.213, 757) : `BASE_READ_TOOLS` seulement, pas de `Write`. Le
+  `SKILL.md` (`skills/tooling/architecture-map/SKILL.md`) annonce « le pipeline autour de toi exécute
+  `validate`, `deliver` et `compare` » ; ce pipeline n'existe que dans
+  `runners/architecture_visualizer_runner.py --action delta`, déclenché uniquement par le bouton
+  Regenerate (`main/ipc-handlers/architecture-visualizer-handlers.ts:85`). Ni `significance.assess`
+  (censé décider à zéro token), ni archify : la réponse texte est écrite dans
+  `<spec_dir>/workflow/architecture-map.md` (`_write_output`, l.573) et l'onglet Delta reste vide.
+- **Étapes**
+  1. Extraire l'orchestration de l'action `delta` de `runners/architecture_visualizer_runner.py` dans
+     une fonction de module (ex. `architecture_visualizer/archify/delta.py:run_task_delta(project_dir,
+     spec_dir, changed_files, provider, model)`), que le runner CLI appelle désormais.
+  2. Ajouter `async def _run_architecture_map(resolved, ctx)` dans `workflows/runner.py` qui appelle
+     cette fonction via `asyncio.to_thread` si elle est synchrone ; l'enregistrer dans
+     `CUSTOM_EXECUTORS`. `significance.assess` passe en premier et renvoie « not-significant » sans
+     session quand rien d'architectural n'a changé.
+  3. Ajouter `"architecture-map": "architecture_visualizer"` à `SKILL_PHASE_AGENTS` (filet de sécurité).
+  4. Corriger la description de la phase dans `docs/CLAUDE.md` si elle diverge encore.
+- **À préserver** : la page Architecture, le bouton Regenerate, `TaskArchitectureDelta` et ses six états.
+- **Acceptation** : un build à effort `medium` qui touche un composant écrit `<spec_dir>/architecture/`
+  (record de delta) ; un build qui ne touche rien d'architectural n'ouvre **aucune** session.
+- **Vérification** : `pytest tests/test_architecture_map tests/test_workflow_runner.py -q` + un test
+  nouveau qui monkeypatch le runner et vérifie que `CUSTOM_EXECUTORS["architecture-map"]` est appelé.
+
+### Lot L3 — Features cassées côté frontend (P0)
+
+#### F21 · Context-aware snippets : feature visible, cassée de bout en bout
+
+- **Sévérité** haute · **nouveau** · **lu**
+- **Preuve**
+  - La page est dans la barre latérale : `renderer/components/Sidebar.tsx:109,143,208`
+    (`ContextAwareSnippetsDialog`, vue `context-aware-snippets`).
+  - Le store appelle `globalThis.electronAPI.generateContextAwareSnippet`
+    (`renderer/stores/context-aware-snippets-store.ts:157`) → `ipcRenderer.invoke("context-aware-snippets:generate")`
+    (`preload/api/modules/context-aware-snippets-api.ts`).
+  - `setupContextAwareSnippetsHandlers` (`main/ipc-handlers/context-aware-snippets-handlers.ts:9`)
+    **n'est appelé nulle part** : aucun handler n'est enregistré.
+  - Le runner `apps/backend/runners/context_aware_snippets_runner.py:20-28` importe
+    `core.context_manager`, `services.project_analyzer` et `memory.bmad_memory`, **qui n'existent pas**
+    (seul `src/memory/bmad_memory.py` existe, à la racine du dépôt, hors du chemin) : `_AVAILABLE = False`.
+- **Décision produit à prendre (à demander au mainteneur si l'agent ne peut pas trancher)**
+  - **Câbler** : enregistrer les handlers dans `main/ipc-handlers/index.ts` (comme les autres
+    `setup*Handlers`), réécrire les imports du runner vers des modules existants
+    (`project.analyzer` / `project/stack_detector.py`, `brain/project_memory.py` via
+    `memory.store.get_project_memory`), construire l'agent via `create_agent_client(agent_type=…)`.
+  - **Retirer** : supprimer l'entrée Sidebar, `ContextAwareSnippetsDialog`, le store, l'API preload,
+    `context-aware-snippets-service.ts`, les handlers, le runner, les clés i18n (FR + EN), l'entrée
+    dans `stores/global-listeners.ts`, et `src/memory/bmad_memory.py` s'il n'a plus d'usage.
+- **Acceptation** : soit la génération produit un snippet de bout en bout (test manuel + test du runner),
+  soit `grep -rn "context-aware-snippets\|ContextAwareSnippet" apps/` ne renvoie plus rien.
+
+#### F22 · Quatre API preload appellent des canaux IPC sans handler
+
+- **Sévérité** moyenne · **nouveau** · **vérifié** (comparaison invoke/handle)
+- **Preuve**
+  - `scan-ollama-models`, `download-ollama-model` : `preload/api/project-api.ts:545,551` ; aucun
+    `ipcMain.handle` (les canaux réels sont `OLLAMA_LIST_MODELS` / `OLLAMA_PULL_MODEL`).
+  - `claude:profileInitialize`, `terminal:oauthCodeSubmit` : `preload/api/terminal-api.ts:541,660`,
+    constantes `shared/constants/ipc.ts:151,164`, `ipc-namespaces.ts:145` ; handlers retirés
+    (`main/ipc-handlers/terminal-handlers.ts:406,439`).
+  - Aucun appelant dans le renderer hors `renderer/lib/mocks/*`.
+- **Étapes** : supprimer les quatre méthodes preload, leurs types, constantes et mocks. Ajouter un test
+  Vitest qui, à partir des sources du preload et du main, vérifie que chaque canal invoqué a un
+  `ipcMain.handle`/`on` dans un fichier de handlers effectivement importé.
+- **À préserver** : les canaux `OLLAMA_*` réels.
+- **Vérification** : `pnpm run typecheck && pnpm test`.
+
+### Lot L4 — Contexte de développement (P1)
+
+#### F23 · `docs/CLAUDE.md` (268 Ko, ~67 k tokens) chargé dans chaque session Claude Code
+
+- **Sévérité** haute · **nouveau** · **vérifié** (`wc -c docs/CLAUDE.md` = 268 082 ; +23 Ko depuis `7057b28`)
+- **Preuve** : `CLAUDE.md` importe `@AGENTS.md` (8 Ko) et `@docs/CLAUDE.md` (4 294 lignes). Toute
+  session Claude Code sur ce dépôt — y compris un build de WorkPilot par WorkPilot, puisque le SDK
+  charge `CLAUDE.md` du projet via `setting_sources` — paie ~69 k tokens avant la première question.
+  Le fichier mêle règles normatives (« Critical Rules », une page) et justifications de conception
+  (tout le reste : brain, hermes, docintel, rtk, watermarks, uiux, verify, bounty board…).
+- **Étapes**
+  1. Créer `shared_docs/architecture/` et y déplacer chaque section de justification, **une feature par
+     fichier** (`brain.md`, `hermes.md`, `docintel.md`, `rtk.md`, `watermarks.md`, `uiux.md`,
+     `verify.md`, `bounty-board.md`, `workflows.md`, `pause-resume.md`, `offline-mode.md`,
+     `frontend-task-panel.md`…). Contenu déplacé tel quel (pas de réécriture dans cette PR).
+  2. Réduire `docs/CLAUDE.md` à : règles critiques, structure du dépôt, commandes, et **une table**
+     « feature → fichier de justification » avec une phrase par feature. Cible < 20 Ko.
+  3. Mettre à jour les ancres citées ailleurs (`AGENTS.md`, `README.md`, prompts qui citent des sections).
+  4. Ajouter un test (pytest) qui échoue si `docs/CLAUDE.md` dépasse 25 Ko.
+- **À préserver** : toutes les règles normatives ; l'accès à chaque justification par lien.
+- **Acceptation** : `wc -c docs/CLAUDE.md` < 20 480 ; aucun lien mort (`grep -o "shared_docs/architecture/[a-z-]*\.md"` → fichiers existants).
+
+#### F18 · Dérives de documentation lues par les agents
+
+- **Sévérité** basse · **aggravé** · **lu**
+- **À corriger**
+  - `apps/backend/AGENTS.md:35-37` : `agents/kanban_subagents.py`, `planner_subagents.py`,
+    `qa_subagents.py` n'existent plus → pointer vers `agents/subagents/phases.py`, `pr_review.py`, `mobile.py`.
+  - `AGENTS.md` (table « Skills, agents et workflows ») : les miroirs `.claude/skills/`, `.github/skills/`,
+    `.cursor/skills/` ne sont pas émis (`capabilities/harnesses.yaml` : seuls `agnostic` et `gemini` ont
+    `default: true`) → le dire.
+  - `docs/CLAUDE.md` : mistral/deepseek/grok « pilotés par le SDK Claude » (sections Arena et Bounty
+    Board) alors que `capabilities/providers.yaml` leur donne `CompatibleProviderAgentClient` ;
+    `pty-daemon.ts` présenté comme gestionnaire de PTY (jamais démarré, F28) ; `significance.assess`
+    décrit comme décidant dans la phase architecture-map (faux tant que F20 n'est pas corrigé).
+  - `learning_loop/pattern_storage.py:4` : documente `.workpilot/learning/patterns.json`, écrit
+    `.workpilot/learning_loop/patterns.json` (l.25-26).
+  - `hooks/precommit.py:219` : documente `.workpilot/generational-tests/`, le code écrit `generational_tests`.
+  - `spec/complexity.py:54` : commentaire sur Graphiti.
+- **Garde-fou** : test pytest qui extrait des `AGENTS.md` chaque chemin entre backticks finissant par
+  `.py`, `.ts`, `.tsx`, `.md` ou `/` et vérifie qu'il existe.
+
+### Lot L5 — Droits et rosters minimaux (P1)
+
+#### F4 · Toutes les phases LLM du pipeline de spec tournent sous `spec_writer`
+
+- **Sévérité** haute · **ouvert** · **lu**
+- **Preuve** : `spec/pipeline/agent_runner.py:176` et `:212` fixent `agent_type="spec_writer"` quel que
+  soit le prompt. #290 a ajouté la résolution du provider de la phase spec (l.126-145), pas l'agent_type.
+  Le chercheur (`spec_researcher.md`) n'a pas Context7 ; le critique (`spec_critic.md`) reçoit
+  Write/Edit/Bash et la réflexion `high` au lieu de lecture seule `ultrathink`.
+- **Étapes**
+  1. Dans `AgentRunner`, une table `PROMPT_AGENT_TYPES = {"spec_researcher.md": "spec_researcher",
+     "spec_critic.md": "spec_critic", "spec_gatherer.md": "spec_gatherer", "complexity_assessor.md":
+     "spec_writer", …}` avec repli `spec_writer` ; l'utiliser aux deux appels.
+  2. Après migration, supprimer les configs restées sans appelant (`spec_discovery`, `spec_context` ;
+     vérifier aussi la table de `core/client.py:1585-1606`).
+- **À préserver** : contenu des prompts, ordre des phases, logs et transcript (`test_spec_logs_and_factory_use_the_same_configuration`).
+- **Vérification** : `pytest tests/test_spec_agent_configuration.py tests/test_spec_pipeline.py -q`.
+
+#### F5 · Les orchestrateurs de revue PR portent 9 et 7 sous-agents
+
+- **Sévérité** haute · **ouvert** · **vérifié** (`resolve()` renvoie 9 entrées)
+- **Preuve** : `pr_orchestrator_parallel` / `pr_followup_parallel` absents de `PHASE_ALIASES`
+  (`agents/subagents/phases.py:84-127`) → roster Kanban (code-reviewer, test-runner, spec-explorer)
+  ajouté aux 6 spécialistes (`runners/github/services/parallel_orchestrator_reviewer.py:741`) ou aux
+  3+1 du suivi (`parallel_followup_reviewer.py:541`). `_apply_cap` (MAX_ROSTER = 7) s'applique l.194,
+  **avant** `roster.update(user_agents)` l.197.
+- **Étapes** : ajouter `"pr_orchestrator_parallel": "solo"` et `"pr_followup_parallel": "solo"` ;
+  appliquer `_apply_cap` après la fusion, en protégeant les clés de `user_agents`.
+- **Acceptation** : `resolve('pr_orchestrator_parallel', user_agents=6 spécialistes)` → 6 entrées.
+- **Vérification** : `pytest tests/test_subagents_coverage.py tests/test_subagents_registry.py -q`
+  (mettre à jour `test_only_the_ordinary_card_falls_through_to_kanban` si nécessaire).
+
+#### F9 · Rosters Kanban servis à des agents qui n'en ont pas l'usage
+
+- **Sévérité** moyenne · **ouvert** · **vérifié**
+- **Preuve** : `architecture_visualizer`, `analysis`, `batch_analysis`, `batch_validation`,
+  `competitor_analysis`, `roadmap_discovery` tombent sur `kanban` (`phases.py:485`). Sur un projet mobile,
+  `resolve()` ajoute `device-runner` et `store-readiness-auditor` à **tout** roster, `solo` compris
+  (`agents/subagents/__init__.py:174-190`).
+- **Étapes** : aliaser `analysis`, `batch_*`, `competitor_analysis`, `roadmap_discovery` → `research` ;
+  `architecture_visualizer` → `solo` ; dans `resolve()`, n'appliquer `overlay.extra_agents` que si le
+  roster de phase est non vide.
+- **À préserver** : les spécialistes mobiles sur coder, QA, verifier et les phases mobiles.
+
+#### F16 · L'overlay langage ne spécialise pas le testeur de la QA ni du verifier
+
+- **Sévérité** basse · **ouvert** · **lu**
+- **Preuve** : `agents/subagents/__init__.py:180-184` ne spécialise que `test-runner` ; `qa-test-evidence`
+  (rosters `qa` de `qa_reviewer`, `qa_fixer` et, depuis #292, `verifier`) redécouvre le framework.
+- **Étapes** : appliquer `_specialise_test_runner` aussi à `qa-test-evidence` (même `LanguageOverlay`).
+
+### Lot L6 — Pipeline payé = pipeline exécuté (P1)
+
+#### F2 · Cinq phases du workflow pointent encore vers des packs vides
+
+- **Sévérité** haute · **partiel** (verify corrigé, profil honnête) · **vérifié** (`validate_impls`)
+- **Preuve** : `validate_impls` signale `brainstorm` (superpowers/brainstorming), `frontend-design`
+  et `design-check` (impeccable/impeccable), `coding` (superpowers/test-driven-development), `review`
+  (mattpocock/code-review), `observe` (task-observer). Les packs `skills/{superpowers,impeccable,
+  mattpocock,task-observer,claude-mem}` ne contiennent que `pack.json`. `design-check` tourne quand
+  même via la commande `gate` de `skills/impeccable/pack.json` (`npx --yes impeccable detect --json`) ;
+  `observe` est exécuté par `learning_loop/observe.py` (impl décorative).
+- **Étapes** (une décision par pack, documentée dans la PR)
+  1. `superpowers` : vendoriser **seulement** `brainstorming` et `test-driven-development` (script
+     `scripts/vendor_pack.py` existant, résultat committé comme `ui-ux-pro-max`), ou écrire leurs
+     équivalents natifs sous `skills/tooling/`.
+  2. `mattpocock/code-review` : vendoriser, ou remplacer par la revue à lentilles de F11.
+  3. `impeccable` : vendoriser `impeccable/SKILL.md` ou appliquer F35.
+  4. `observe` : changer l'impl en `workpilot/observe` (pack builtin), retirer `task-observer` de `[packs]`.
+  5. Test : toute phase non élaguée à `medium` a une implémentation résoluble (`validate_impls` vide).
+- **À préserver** : les phases déclarées et leur position.
+- **Vérification** : `pytest tests/test_workflow_engine.py tests/test_workflow_runner.py tests/test_workflow_profile_api.py -q` ;
+  `python3 scripts/skills_cli.py build --check`.
+
+#### F3 · Les phases BMAD ne tournent presque jamais, et « spec » double le pipeline de spec
+
+- **Sévérité** haute · **ouvert** · **lu**
+- **Preuve** : `.agents/skills/bmad-prd/SKILL.md:8` (`requires.runtime: _bmad/scripts/resolve_customization.py`),
+  l.23 (`_bmad/scripts/memlog.py`) ; même `_bmad/` à la racine de WorkPilot ne contient que
+  `resolve_customization.py`. Phases `spec` (medium), `adversarial-review`, `spec-conformance` (ultrathink).
+- **Étapes** : supprimer la phase `spec` de `workflows/feature-build/workflow.yaml` (le pipeline de spec
+  a déjà produit `spec.md`) ; remplacer `adversarial-review` et `spec-conformance` par des lentilles de
+  la revue unique (F11), via un skill natif sans runtime. Mettre à jour `SKILL_PHASE_AGENTS`,
+  `CONFIG_PHASE` et les tests de fenêtres (`test_every_skill_phase_belongs_to_a_window`).
+- **À préserver** : les 50 skills BMAD dans la palette / barre de commandes pour les projets qui ont `_bmad/`.
+
+#### F15 · Effort `none` : planning annoncé élagué, exécuté quand même
+
+- **Sévérité** basse · **atténué** (avertissement `agents/coder.py:904-913`)
+- **Étape** : retirer `min_effort: low` de la phase `planning` dans `workflow.yaml` (le profil devient exact).
+
+#### F35 · `frontend-design` et `ui-design-system` visent la même chose avant le coding
+
+- **Sévérité** basse · **nouveau** · **lu**
+- **Preuve** : sur une tâche web, `ui-design-system` (déterministe, gratuit) fixe le design system, puis
+  `frontend-design` (impeccable, vide sur un clone) ouvre une session `pr_reviewer` pour dire « ce qu'il faut viser ».
+- **Étape** : si impeccable n'est pas vendorisé (F2), adosser `frontend-design` au design system
+  ui-ux-pro-max (impl `ui-ux-pro-max/ui-ux-pro-max` en mode revue) ou retirer la phase au profit de
+  `ui-design-system` + `design-check`.
+
+### Lot L7 — Une seule mémoire (P2)
+
+#### F6 · ~12,6 k lignes Graphiti / LadybugDB encore câblées, et en hausse
+
+- **Sévérité** haute · **aggravé** (214 références dans 45 fichiers contre 181) · **lu**
+- **Inventaire** (voir aussi l'annexe A)
+
+  | Zone | Fichiers |
+  |---|---|
+  | Backend, paquet | `integrations/graphiti/` (7 593 l.) |
+  | Backend, CLI / runners | `query_memory.py` (762), `runners/memory_lifecycle_runner.py` (254), `runners/team_sync_runner.py` (197), `scripts/test_memory_save.py` |
+  | Backend, ponts | `graphiti_config.py`, `graphiti_providers.py` (shims), `memory/graphiti_helpers.py`, `context/graphiti_integration.py`, `runners/github/services/deep_context_provider.py:407`, `cli/utils.py` (13 réf.), `core/client.py` (19), `agents/tools_pkg/models.py` (21), `provider_api.py` (9) |
+  | Dépendances | `requirements.txt:29-38` : `real_ladybug`, `graphiti-core` (+ `pandas`, `pywin32` pour eux) |
+  | Frontend | `main/memory-service.ts` (861), canaux `MEMORY_*` / `GRAPHITI_*` de `main/ipc-handlers/memory-handlers.ts`, `team-sync-handlers.ts` (502), `memory-lifecycle-handlers.ts` (325), `renderer/stores/memory-lifecycle-store.ts` (193), `renderer/components/memory/TeamSyncPanel.tsx` (580, déjà orphelin), `renderer/components/onboarding/MemoryStep.tsx` (64), `preload/api/modules/team-sync-api.ts`, locales `teamSync.json` |
+  | Tests | `tests/test_graphiti.py`, `tests/test_graphiti_search.py` |
+
+- **Étapes** (dans cet ordre, un commit chacune)
+  1. **Extraire les 11 canaux `OLLAMA_*`** (`OLLAMA_CHECK_STATUS` … `OLLAMA_ACTIVE_PULLS`,
+     `memory-handlers.ts:692-1278`) dans un nouveau `main/ipc-handlers/ollama-handlers.ts`, enregistré
+     dans `ipc-handlers/index.ts`. Aucun changement de comportement.
+  2. Migrer les appelants de `memory.graphiti_helpers.get_graphiti_memory` vers
+     `memory.store.get_project_memory` (même API, `ProjectMemory`).
+  3. Supprimer Team Sync et Memory lifecycle (runners, handlers, store, pages, preload, i18n) : le
+     partage d'équipe est couvert par le distant git du cerveau (`brain/sync.py`).
+  4. Supprimer `MemoryStep` de l'assistant d'onboarding.
+  5. Supprimer `integrations/graphiti/`, `query_memory.py`, les shims, `memory-service.ts`, les canaux
+     `MEMORY_*`/`GRAPHITI_*`, les entrées `graphiti` d'`AGENT_CONFIGS`/`_map_mcp_server_name`, les tests
+     Graphiti et les dépendances.
+- **À préserver** : la gestion des modèles Ollama, l'onglet Mémoires (`GET /api/brain/memories`),
+  `brain/project_memory.py`, l'import des anciens fichiers `<spec_dir>/memory/` (`import-legacy`).
+- **Acceptation** : `grep -rn -i "graphiti\|ladybug" apps/ src/ tests/ --include=*.py --include=*.ts --include=*.tsx`
+  ne renvoie que des mentions historiques documentées ; `pip install -r apps/backend/requirements.txt`
+  n'installe plus `graphiti-core`.
+- **Vérification** : `pytest tests/test_brain*.py tests/test_brain_project_memory.py -q` ; `pnpm run typecheck && pnpm test`.
+
+#### F7 · Deux magasins de « patterns » injectés dans le même prompt
+
+- **Sévérité** moyenne · **ouvert** · **lu**
+- **Preuve** : `prompts_pkg/prompt_generator.py:506,586`, `qa/reviewer.py:272`, `qa/fixer.py:235`,
+  `runners/github/services/pr_review_engine.py:70`, `ideation/generator.py:60` lisent
+  `learning_loop.prompt_injection` (`.workpilot/learning_loop/patterns.json`) à côté de
+  `get_memory_context` (vault). Le context mesh lit le second magasin.
+- **Étapes** : faire écrire `learning_loop/pattern_storage.py` dans le vault
+  (`knowledge/projects/<p>/memory/patterns/`, avec preuves en frontmatter) via `brain.project_memory` ;
+  un seul injecteur plafonné en tokens ; migrer `patterns.json` au premier lancement ; adapter
+  `context_mesh` pour lire le vault.
+- **À préserver** : les gates de promotion et le replay A/B du learning loop.
+
+#### F14 · Un merge écrit dans quatre magasins
+
+- **Preuve** : `cli/workspace_commands.py:45` (usage_tracker), `:374-392` (learning_loop),
+  `:395-410` (brain + `uiux.knowledge.record_merged_design_system`) ; `scheduling/dashboard_metrics.py:383`
+  tient un cinquième compteur.
+- **Étape** : un événement `merge` publié une fois (ex. `services/hooks/hook_service.py`), des abonnés
+  enregistrés par feature.
+
+#### F34 · ~60 sous-dossiers `.workpilot/` dont des doublons de nommage
+
+- **Doublons** : `learning` (`learning_loop/conventions.py`) / `learning_loop` ; `memory`
+  (`memory_lifecycle_runner`) / `memories` (Graphiti) — disparaissent avec F6 ; `quality`
+  (`review/quality_integration.py`) / `quality-rules` (`review/quality_custom_rules.py`) ;
+  `generational_tests` (écrit) / `generational-tests` (documenté seulement).
+- **Étape** : un nom par feature, migration au premier lancement (déplacer, ne pas supprimer).
+
+### Lot L8 — Code mort frontend (P2)
+
+#### F28 · 57 fichiers frontend sans importeur de production (~16,5 k lignes)
+
+- **Sévérité** moyenne · **nouveau** · **vérifié** (recherche stricte des `import`/`import()`/`require`)
+- **Liste** : annexe A.1. Points d'attention :
+  - **`main/terminal/pty-daemon.ts`** (586 l.) n'est pas une entrée de `apps/frontend/electron.vite.config.ts:65`
+    (seul `src/main/index.ts` l'est) alors que `pty-daemon-client.ts:130` lance `pty-daemon.js` ; et
+    `ptyDaemonClient` n'est utilisé que pour `shutdown()` (`main/index.ts:1294`). Supprimer daemon +
+    client + appel, puis corriger la section Terminal de `docs/CLAUDE.md`.
+  - **`shared/types/providers.generated.ts`** est produit par `scripts/generate-provider-types.js` et
+    importé par personne : supprimer le script et sa sortie, ou importer le type là où les providers
+    sont typés à la main.
+  - Six fichiers ne sont importés que par leurs tests (`AccountSettings.tsx`, `ProfileList.tsx`,
+    `ProfileBadge.tsx`, `ProjectInitModal.tsx`, `use-profile-swap-notifications.ts`,
+    `sdk-session-recovery-coordinator.ts`) : supprimer le test avec le fichier.
+  - Les stores devenus orphelins après suppression d'un composant (ex. `auto-refactor-store.ts`) suivent.
+- **Étapes** : `npx knip --include files,exports` pour confirmer ; supprimer **par famille** (UsageIndicator*,
+  *ProviderSection, multiconnector, dialogs, lib/, main/) ; retirer les clés i18n devenues inutilisées.
+- **À préserver** : les variantes montées (`UsageIndicator.tsx`, `CleanProviderSection.tsx`,
+  `GitHubCopilotAuthTerminal.tsx`, `task-log-service.ts`).
+- **Vérification** : `pnpm run typecheck && pnpm run lint && pnpm test && pnpm run build`.
+
+#### F25 (frontend) · `ResumeWithProviderDropdown.tsx`
+
+- Supprimer `renderer/components/task-detail/ResumeWithProviderDropdown.tsx` (204 l.) : importé par
+  personne, remplacé par `TaskPauseControls` (#290).
+
+### Lot L9 — Code mort backend (P2)
+
+#### F29 · Paquets et modules backend sans importeur (~6,7 k lignes)
+
+- **Sévérité** moyenne · **nouveau** · **lu** (aucun `import`, aucun lancement par chemin depuis le
+  frontend, les scripts ou la CI)
+- **Liste** : annexe A.2. Points d'attention :
+  - `core/agent_client/` est un répertoire **sans `__init__.py`** masqué par le module
+    `core/agent_client.py` : `optimized_copilot_agent_client.py` est inatteignable par construction.
+  - `sandbox/` n'est importé que par ses propres tests (`sandbox/test_*.py`) : supprimer ensemble.
+  - `runners/time_travel_runner.py` : le time travel est servi par `replay/api.py` (`get_time_travel_engine`).
+- **Vérification** : `pytest tests/ -q`, `ruff check apps/backend/`.
+
+#### F30 · 25 shims de compatibilité à la racine du backend
+
+- **Preuve** : `apps/backend/{agent,client,prompts,progress,debug,worktree,workspace,qa_loop,recovery,…}.py`
+  réexportent un module rangé ailleurs (`from core.agent import *`…).
+- **Étapes**
+  1. Supprimer maintenant les 4 sans importeur : `azure_devops_integration.py`, `client.py`,
+     `critique.py`, `linear_config.py`.
+  2. Pour les autres, codemod d'imports (`from debug import` → `from core.debug import`, etc.), un shim
+     par commit, du plus utilisé au moins utilisé : `debug` (58 imports), `progress` (32),
+     `graphiti_config` (32, avec F6), `worktree` (15), `graphiti_providers` (15, avec F6),
+     `project_analyzer` (13), `prompts` (9), `agent`/`recovery` (8), `linear_updater`/`workspace` (7)…
+- **Précaution** : `worktree.py` et `insight_extractor.py` ne sont pas de simples réexports : ils chargent
+  leur cible par `importlib` pour **éviter** `core/__init__.py` et `analysis/__init__.py`, qui importent
+  des modules lourds. Les migrer seulement après avoir rendu ces `__init__` paresseux (imports différés),
+  sinon le temps de démarrage des runners augmente.
+- **À préserver** : les points d'entrée lancés par le frontend (`run.py`, `start_backend.py`,
+  `provider_api.py`, `websocket_server.py`, `commit_message.py` si lancé par chemin — vérifier avec
+  `grep -rn "<nom>.py" apps/frontend/src`).
+
+#### F32 · Deux arbres `src/connectors` et un second registre de providers
+
+- **Preuve** : `src/connectors/llm_*.py` (1 769 l.) découverts dynamiquement par
+  `src/connectors/llm_discovery.py` (`cli/main.py:547-555`, `provider_api.py:165-181`) doublent
+  `capabilities/providers.yaml` + `models_registry.py` ; `src/connectors/llm_anthropic.py:19` instancie
+  `anthropic.Anthropic()` (règle critique). `apps/backend/src/connectors/llm_anthropic_usage.py` ne se
+  résout que parce que `start_backend.py:114` ajoute `apps/backend/src` au `sys.path` ; lancé autrement,
+  `provider_api.py:1721` tombe dans son `except ImportError`.
+- **Étapes** : déplacer `llm_anthropic_usage.py` dans `core/` (import normal) et retirer le hack de
+  `sys.path` ; faire lire `--list-providers` et `provider_api` dans `providers.yaml`/`models_registry` ;
+  supprimer les `llm_*.py` sans autre lecteur, puis `tests/test_llm_provider.py` /
+  `test_llm_providers_concrets.py` s'ils ne couvrent plus que ces fichiers.
+- **À préserver** : les connecteurs `jira/`, `azure_devops/`, `postman/`, `notifications/`, `grepai/`,
+  `figma_connector.py`, et `src/connectors/llm_config.py:load_provider_config` tant qu'il est lu
+  (`core/model_info.py`, `core/agent_client.py:2591`, `core/client.py:2606`).
+
+#### F33 · Fichiers ponctuels et historiques
+
+- `utils/` (29 fichiers, 3 719 l.) : scripts de diagnostic et de correction ponctuelle, référencés nulle
+  part mais lintés par `.github/workflows/lint.yml:82` → archiver (branche `archive/utils` ou wiki) puis
+  supprimer, et retirer `utils/` de la commande ruff.
+- `docs/pr-1575-fixes.md`, `docs/superpowers/plans/`, `docs/superpowers/specs/` : comptes rendus et
+  plans datés → archiver.
+- `shared_docs/FEATURE_IDEAS.md` (203 Ko) + `FEATURE_IMPROVEMENTS_AND_NEW_IDEAS.md` (208 Ko) : fusionner
+  ou convertir en issues, puis supprimer.
+- `docs/CHANGELOG.md` (107 Ko) à côté de `CHANGELOG.md` (14 Ko) : un seul changelog
+  (vérifier lequel `scripts/bump-version.js` et la release mettent à jour).
+- `apps/backend/scripts/test_memory_save.py` (Graphiti, avec F6) ; `.security-reports/` (vide) ;
+  `runners/github/test_context_gatherer.py` à la racine du dépôt → `tests/`.
+
+#### F25 (backend) · Le marqueur `RESUME_WITH_PROVIDER` n'a plus d'écrivain
+
+- **Preuve** : depuis #290, `TASK_RESUME_WITH_PROVIDER` écrit le moteur dans `task_metadata.json` et
+  **supprime** le marqueur (`main/ipc-handlers/task/execution-handlers.ts:1891`) ; `crud-handlers.ts:828`
+  et `execution-handlers.ts:2005` le suppriment aussi ; aucun code ne l'écrit.
+- **Étapes** : garder la lecture **une version** (tâches mises en pause avant la mise à jour), puis
+  retirer `_consume_resume_with_provider_marker`, `RESUME_WITH_PROVIDER_FILE`, le paramètre `consume`
+  de `_get_active_provider` (`core/client.py:1647-1717,1841`) et les commentaires associés
+  (`agents/coder.py:1279,1715`, `workflows/api.py:23`, `cli/build_commands.py:169`, `cli/utils.py:171`).
+  `peek_active_provider` peut alors devenir un alias, puis disparaître.
+- **Vérification** : `pytest tests/test_task_engine_lock.py tests/test_phase_provider_resolution.py apps/backend/core/test_resume_with_provider.py -q`
+  (adapter le dernier une fois le marqueur retiré).
+
+### Lot L10 — Tokens à haut effort (P3)
+
+#### F10 · Prompts volumineux et onze prompts orphelins
+
+- **Orphelins** (aucune référence par nom dans le code, le YAML ou le frontend ; annexe A.3) :
+  `github/pr_orchestrator.md` (14,6 Ko), `coder_recovery.md` (8,9), `intent_templates.md`,
+  `environment_cloner.md`, `performance_profiler.md`, `github/issue_analyzer.md` (cité en commentaire
+  seulement), `documentation_agent.md`, `code_migration.md`, `multi_repo_planner.md`,
+  `breaking_change_detector.md`, `browser_agent.md` — ~51 Ko. Vérifier les chargements dynamiques
+  (`grep -rn "prompts_dir\|load_prompt\|\.md\"" apps/backend`) avant suppression ; mettre à jour la table
+  des prompts de `docs/CLAUDE.md`.
+- **Gros prompts vivants** : `coder.md` 35 Ko (~8,8 k tokens), `planner.md` 33 Ko,
+  `github/pr_parallel_orchestrator.md` 33 Ko, `complexity_assessor.md` 21 Ko.
+  - Découper `coder.md` en noyau + modules chargés selon la pile détectée.
+  - N'appeler `complexity_assessor` que si `ComplexityAnalyzer` (heuristique, `spec/complexity.py`) a
+    une confiance faible.
+
+#### F11 · Jusqu'à sept sessions relisent le même diff
+
+- **Preuve** : `self_review` (par sous-tâche), `review`, `verify` (session `verifier` ≥ medium,
+  `verify/loop.py:573-590`), `qa_reviewer` (+ `qa-acceptance-checker`), `adversarial-review`,
+  `spec-conformance`, `architecture-map` (F20).
+- **Étape** : une phase de revue unique à **lentilles** (qualité, sécurité, adversariale, conformité aux
+  critères) dont l'effort choisit le nombre ; `verify` garde son rôle de preuve d'exécution ; la QA
+  reste la décision.
+
+#### F17 · Plafond de QA à 50 itérations
+
+- `qa/loop.py:153` (`MAX_QA_ITERATIONS = 50`) : rendre le plafond dépendant de l'effort ou d'un budget
+  de coût par tâche ; garder l'escalade humaine sur problème récurrent.
+
+### Lot L11 — Consolidation (P3)
+
+#### F8 · Sous-agents qui répondent à la même question, déclarés à cinq endroits
+
+- Couples : security-auditor / security-reviewer ; code-reviewer / quality-reviewer ; test-runner /
+  qa-test-evidence ; evidence-collector / finding-validator (déclaré deux fois :
+  `agents/subagents/pr_review.py` et `parallel_followup_reviewer.py:262`) ; spec-explorer /
+  codebase-surveyor / architecture-analyst ; store-readiness-auditor / mobile-release-manager ;
+  net-architect / bmad-net-architect ; performance-analyst / bmad-performance-analyst.
+- Les trois sous-agents du suivi PR sont déclarés en ligne (`parallel_followup_reviewer.py:222-262`).
+- **Étape** : ~14 définitions, toutes dans `agents/subagents/` ; rosters par nom ; les agents des packs
+  `skills/dotnet/agents/` et `skills/mobile/agents/` dédoublonnés.
+
+#### F26 · Au moins onze détecteurs de pile
+
+- `project/stack_detector.py`, `project/framework_detector.py`, `agents/subagents/__init__.py:48`
+  (`detect_languages`), `docintel/api_tests.py:86`, `spec/validation_strategy.py:131`,
+  `runners/pipeline_generator_runner.py:59`, `runners/flaky_tests_runner.py:301`,
+  `runners/app_emulator_runner.py:23`, `uiux/stack.py:267`, `mobile/stacks.py`, `test_generation/stack_aware.py`.
+- **Étape** : une façade `project/stack.py` (langages, frameworks, UI, mobile, API, tests) adossée à
+  `StackDetector` + `FrameworkDetector`, avec `mobile.stacks` et `uiux.stack` comme sous-modules ;
+  migrer d'abord `detect_languages`, `detect_api_stack`, `validation_strategy`, `pipeline_generator`,
+  `flaky_tests`.
+
+#### F27 · Cinq listes de globs « surface »
+
+- `workflows/feature-build/workflow.yaml` : `&ui_surface`, `&frontend_surface`, la liste mobile
+  recopiée dans `mobile-design` **et** `store-readiness` (sans ancre), la liste d'`architecture-map` ;
+  `uiux/surface.py` duplique `&ui_surface` (gardé égal par `tests/test_uiux.py`).
+- **Étape** : ancre `&mobile_surface` ; documenter ou supprimer l'écart ui/frontend ; générer
+  `UI_GLOBS` depuis le YAML (ou l'inverse).
+
+#### F31 · Tests dispersés et deux configurations pytest contradictoires
+
+- 125 `test_*.py` dans `apps/backend` hors `tests/` (dont 5 à la racine du backend :
+  `test_e2e_provider_switch_resume.py`, `test_model_info_provider.py`, `test_ollama_tool_capability.py`,
+  `test_provider_models_catalog_ollama.py`, `test_validated_keys_db.py`).
+- `pytest.ini` (racine) collecte `tests`, `apps/backend`, `src` ; `apps/backend/pyproject.toml:4`
+  déclare `testpaths = ["tests"]`, dossier inexistant.
+- **Étape** : déplacer vers `tests/<paquet>/` (git mv, imports ajustés), une seule configuration.
+
+#### F36 · Fichiers géants
+
+- `core/agent_client.py` (5 532 l. : tous les adaptateurs) → `core/agent_clients/<provider>.py` avec
+  réexport depuis `core/agent_client.py` le temps de migrer ;
+  `main/ipc-handlers/task/worktree-handlers.ts` (5 665), `main/claude-profile/usage-monitor.ts` (4 609),
+  `renderer/components/KanbanBoard.tsx` (4 297, index local `kanban/AGENTS.md`),
+  `renderer/components/api-explorer/ApiExplorer.tsx` (3 707), `main/ipc-handlers/github/pr-handlers.ts`
+  (3 480), `core/worktree.py` (3 382) → découper par responsabilité, interfaces publiques inchangées.
+
+### Lot L12 — Gouvernance (P3)
+
+#### F12 · `hermes-learned` listé dans `[packs]` contre la règle documentée
+
+- `.workpilot/skills.toml` liste `hermes-learned = "latest"` et `claude-mem = "latest"`. La doc fait de
+  l'absence de `hermes-learned` la barrière qui empêche un skill écrit par un agent d'atteindre les
+  harness sans relecture.
+- **Étape** : retirer les deux lignes ; `python3 scripts/skills_cli.py build` ; ajouter un test qui
+  interdit `hermes-learned` dans `[packs]`.
+
+#### F13 · La barre de commandes résout encore son provider avec `_get_active_provider`
+
+- `slash_commands/api.py:417` (exécution) ; la résolution des surcharges l.205 utilise déjà
+  `peek_active_provider`. Remplacer ; disparaît de toute façon avec F25.
+
+### Lot L13 — Surface produit (P4)
+
+#### F19 · Surface produit très large
+
+- 78 vues dans la barre latérale (`renderer/components/Sidebar.tsx:176`), 120 stores, 110 modules IPC
+  (178 fichiers), 69 runners, 113 paquets backend, ~433 k lignes TS/TSX et ~349 k lignes Python hors tests.
+- **Étape** : instrumenter l'usage par vue (le registre `stores/activity-store.ts` existe), décider avec
+  le mainteneur des pages à regrouper ou à déplacer derrière un mécanisme de plugins. Aucune
+  suppression sans donnée d'usage.
+
+---
+
+## Annexe A — Inventaire des fichiers candidats
+
+### A.1 Frontend (F28 ; F25 ; F21) — à confirmer par `knip` avant suppression
+
+| Fichier (`apps/frontend/src/…`) | Lignes | Preuve | Action |
+|---|---:|---|---|
+| `renderer/components/UsageIndicatorAgnostic.tsx` | 558 | aucun importeur | supprimer |
+| `renderer/components/UsageIndicatorDumb.tsx` | 550 | aucun importeur | supprimer |
+| `renderer/components/UsageIndicatorSimple.tsx` | 482 | aucun importeur | supprimer |
+| `renderer/components/settings/ImprovedProviderSection.tsx` | 261 | aucun importeur | supprimer |
+| `renderer/components/settings/SophisticatedProviderSection.tsx` | 326 | aucun importeur | supprimer |
+| `renderer/components/settings/ThemedProviderSection.tsx` | 401 | aucun importeur | supprimer |
+| `renderer/components/settings/multiconnector/*` (5 fichiers) | 759 | aucun importeur | supprimer |
+| `renderer/components/settings/AccountSettings.tsx` | 2 227 | test seul | supprimer + test |
+| `renderer/components/settings/ProfileList.tsx` | 349 | test seul | supprimer + test |
+| `renderer/components/settings/LlmRouterSettings.tsx` | 380 | aucun importeur | confirmer, supprimer |
+| `renderer/components/settings/CopilotAuthTerminal.tsx` | 358 | aucun importeur | supprimer |
+| `renderer/components/hooks/HooksDialog.tsx` | 1 189 | aucun importeur | confirmer, supprimer |
+| `renderer/components/SDKRateLimitModal.tsx` | 596 | commentaire seul | confirmer, supprimer |
+| `renderer/components/RateLimitModal.tsx` | 474 | commentaire seul | confirmer, supprimer |
+| `renderer/components/AppUpdateNotification.tsx` | 365 | aucun importeur | confirmer, supprimer |
+| `renderer/components/StreamingTest.tsx` | 256 | test manuel | supprimer |
+| `renderer/components/ReferencedFilesSection.tsx` | 190 | aucun importeur | supprimer |
+| `renderer/components/AgentProfiles.tsx` | 149 | aucun importeur | supprimer |
+| `renderer/components/AuthFailureModal.tsx` | 136 | commentaire seul | confirmer, supprimer |
+| `renderer/components/ProfileBadge.tsx` | 150 | test seul | supprimer + test |
+| `renderer/components/ProjectInitModal.tsx` | 117 | test seul | supprimer + test |
+| `renderer/components/ProactiveSwapListener.tsx` | 96 | aucun importeur | supprimer |
+| `renderer/components/FolderExplorer.tsx` | 56 | aucun importeur | supprimer |
+| `renderer/components/auth/Can.tsx` | 30 | aucun importeur | supprimer |
+| `renderer/components/auto-refactor/AutoRefactorDialog.tsx` | 523 | commentaire du store seul | confirmer, supprimer (+ store) |
+| `renderer/components/azure-devops-import/AzureDevOpsDragProvider.tsx`, `AzureDevOpsDropZone.tsx` | 216 | aucun importeur | supprimer |
+| `renderer/components/cost-predictor/CostPredictorDialog.tsx` | 233 | aucun importeur | confirmer, supprimer |
+| `renderer/components/decision-logger/DecisionTimeline.tsx` | 323 | aucun importeur | confirmer, supprimer |
+| `renderer/components/documentation-agent/DocumentationAgentDashboard.tsx` | 312 | aucun importeur | confirmer, supprimer |
+| `renderer/components/memory/TeamSyncPanel.tsx` | 580 | aucun importeur, Graphiti | supprimer (lot L7) |
+| `renderer/components/task-detail/ResumeWithProviderDropdown.tsx` | 204 | aucun importeur | supprimer (F25) |
+| `renderer/components/task-detail/TaskDetailModalHandlers.tsx` | 212 | aucun importeur | supprimer |
+| `renderer/components/task-detail/task-review/TerminalDropdown.tsx` | 55 | aucun importeur | supprimer |
+| `renderer/components/ui/sheet.tsx` | 130 | aucun importeur | supprimer |
+| `renderer/components/workspace/AddWorkspaceModal.tsx` | 320 | aucun importeur | confirmer, supprimer |
+| `renderer/hooks/use-profile-swap-notifications.ts` | 195 | test seul | supprimer + test |
+| `renderer/lib/flow-controller.ts`, `scroll-controller.ts` | 287 | aucun importeur | supprimer |
+| `renderer/lib/webgl-context-manager.ts` | 205 | aucun importeur | supprimer |
+| `renderer/lib/terminal-font-settings-verification.ts` | 92 | aucun importeur | supprimer |
+| `renderer/lib/compose-refs-fix.ts` | 85 | aucun importeur | supprimer |
+| `renderer/test-logger.ts` | 16 | aucun importeur | supprimer |
+| `shared/types/providers.generated.ts` | 55 | généré, jamais importé | supprimer (+ `scripts/generate-provider-types.js`) ou utiliser |
+| `shared/utils/powershell-color-support.ts` | 102 | aucun importeur | supprimer |
+| `examples/colored-logs-example.ts` | 57 | exemple | supprimer |
+| `main/terminal/pty-daemon.ts` (+ `pty-daemon-client.ts`) | 586 | pas une entrée de build ; client jamais connecté | supprimer + appel `shutdown()` |
+| `main/services/sdk-session-recovery-coordinator.ts` | 568 | test seul | confirmer, supprimer + test |
+| `main/log-service.ts` | 364 | aucun importeur | supprimer |
+| `main/fs-utils.ts` | 155 | aucun importeur | supprimer |
+| `main/copilot-cli-utils.ts` | 86 | aucun importeur | supprimer |
+| `main/ipc-handlers/renderer-log-handler.ts` | 60 | jamais enregistré | supprimer |
+| `main/ipc-handlers/context-aware-snippets-handlers.ts` | 77 | jamais enregistré | câbler ou retirer (F21) |
+| preload : `scanOllamaModels`, `downloadOllamaModel`, `initializeClaudeProfile`, `submitOAuthCode` | — | canaux sans handler | supprimer (F22) |
+
+### A.2 Backend (F29 ; F21 ; F32)
+
+| Fichier (`apps/backend/…` sauf mention) | Lignes | Preuve | Action |
+|---|---:|---|---|
+| `planner_lib/` | 939 | aucun import | supprimer |
+| `prediction/` | 1 055 | aucun import | supprimer |
+| `sandbox/` | 1 102 | importé par ses tests seulement | supprimer + tests |
+| `core/agent_client/optimized_copilot_agent_client.py` | 481 | répertoire masqué par `core/agent_client.py` | supprimer |
+| `core/runtimes/optimized_copilot_runtime.py` | 381 | aucun import | supprimer |
+| `migration/models_fixed.py` | 326 | aucun import | supprimer |
+| `runners/github/services/review_tools.py` | 619 | aucun import | supprimer |
+| `runners/github/multi_repo.py` | 512 | aucun import (`multi_repo_runner` est autre chose) | supprimer |
+| `streaming/integration_example.py` | 255 | exemple | supprimer |
+| `runners/github/validator_example.py` | 221 | exemple | supprimer |
+| `runners/github/bot_detection_example.py` | 154 | exemple | supprimer |
+| `runners/jira/jira_work_items_example.py` | 140 | exemple | supprimer |
+| `runners/time_travel_runner.py` | 227 | jamais lancé ; `replay/api.py` sert le time travel | supprimer |
+| `core/output_schemas.py` | 162 | aucun import | supprimer |
+| `cli/quality_commands.py` | 146 | aucun import | supprimer |
+| `runners/context_aware_snippets_runner.py` | — | importe 3 modules inexistants | câbler ou retirer (F21) |
+| `src/connectors/llm_*.py` (racine du dépôt, 13 fichiers) | 1 769 | second registre ; `anthropic.Anthropic()` | migrer puis supprimer (F32) |
+
+### A.3 Prompts orphelins (F10)
+
+| Fichier (`apps/backend/prompts/…`) | Octets |
+|---|---:|
+| `github/pr_orchestrator.md` | 14 649 |
+| `coder_recovery.md` | 8 858 |
+| `intent_templates.md` | 4 391 |
+| `environment_cloner.md` | 3 971 |
+| `performance_profiler.md` | 3 070 |
+| `github/issue_analyzer.md` | 3 020 |
+| `documentation_agent.md` | 2 877 |
+| `code_migration.md` | 2 871 |
+| `multi_repo_planner.md` | 2 733 |
+| `breaking_change_detector.md` | 2 308 |
+| `browser_agent.md` | 2 251 |
+
+### A.4 Shims racine `apps/backend/*.py` (F30)
+
+| Shim | Importeurs | Cible |
+|---|---:|---|
+| `azure_devops_integration.py`, `client.py`, `critique.py`, `linear_config.py` | 0 | supprimer |
+| `debug.py` | 58 | `core.debug` |
+| `progress.py` | 32 | `core.progress` |
+| `graphiti_config.py`, `graphiti_providers.py` | 32, 15 | lot L7 |
+| `worktree.py` | 15 | `core.worktree` (chargé par importlib, voir F30) |
+| `project_analyzer.py` | 13 | `project` |
+| `prompts.py` | 9 | `prompts_pkg.prompts` |
+| `agent.py`, `recovery.py` | 8, 8 | `core.agent`, `services.recovery` |
+| `linear_updater.py`, `workspace.py` | 7, 7 | `integrations.linear.updater`, `core.workspace` |
+| `auto_claude_tools.py` | 6 | `agents.tools_pkg` |
+| `qa_loop.py`, `phase_event.py` | 4, 4 | `qa`, `core.phase_event` |
+| `prompt_generator.py`, `risk_classifier.py` | 3, 3 | `prompts_pkg.prompt_generator`, `analysis.risk_classifier` |
+| `ci_discovery.py`, `scan_secrets.py`, `analyzer.py` | 2 chacun | `analysis.ci_discovery`, `security.scan_secrets`, `analysis.analyzer` |
+| `insight_extractor.py`, `linear_integration.py`, `security_scanner.py` | 1 chacun | `analysis.insight_extractor` (chargé par importlib, voir F30), `integrations.linear.integration`, `analysis.security_scanner` |
+
+### A.5 Documentation et scripts (F33)
+
+| Chemin | Taille | Action |
+|---|---:|---|
+| `utils/` (29 fichiers) | 3 719 lignes | archiver puis supprimer ; retirer de `lint.yml:82` |
+| `shared_docs/FEATURE_IDEAS.md` | 203 Ko | fusionner / convertir en issues |
+| `shared_docs/FEATURE_IMPROVEMENTS_AND_NEW_IDEAS.md` | 208 Ko | idem |
+| `docs/CHANGELOG.md` | 107 Ko | fusionner avec `CHANGELOG.md` |
+| `docs/pr-1575-fixes.md` | 9 Ko | archiver |
+| `docs/superpowers/plans/`, `docs/superpowers/specs/` | 112 Ko | archiver |
+| `apps/backend/scripts/test_memory_save.py` | — | supprimer (lot L7) |
+| `.security-reports/` | vide | supprimer |
+| `runners/github/test_context_gatherer.py` (racine) | — | déplacer dans `tests/` |
+
+---
+
+## Annexe B — Ce qui a changé depuis l'audit précédent (`7057b28` → `b46a031`)
+
+| PR | Changement | Effet sur les constats |
+|---|---|---|
+| #288, #289 | Installation / mise à jour de Codex CLI par le bon gestionnaire de paquets | aucun |
+| #290 | Chaque tâche possède son moteur (provider × LLM × effort, par phase) | F4 inchangé (provider oui, agent_type non) ; F13 partiel ; **F25** nouveau (marqueur sans écrivain) |
+| #291 | ui-ux-pro-max sur les tâches UI uniquement | F14 aggravé (4e écriture) ; **F27**, **F35** nouveaux ; `narrow_to_forecast` réduit les phases conditionnelles sur les tâches backend (gain) |
+| #292 | Boucle `/verify` pour tous les providers | F2 partiellement corrigé ; F11 aggravé ; F16 étendu ; F23 aggravé (+370 lignes de doc) |
+
+Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
+F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
