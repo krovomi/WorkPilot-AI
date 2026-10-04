@@ -8,6 +8,16 @@ from pathlib import Path
 
 from debug import debug, debug_detailed, debug_error, debug_success
 
+# Which AGENT_CONFIGS entry each roadmap prompt runs under. Without a name the
+# factory falls back to `coder` — Edit, the Kanban roster with a test-runner —
+# for work that reads a project and writes one JSON file.
+PROMPT_AGENT_TYPES = {
+    "roadmap_discovery.md": "roadmap_discovery",
+    "roadmap_features.md": "roadmap_discovery",
+    "competitor_analysis.md": "competitor_analysis",
+}
+DEFAULT_AGENT_TYPE = "roadmap_discovery"
+
 
 class ScriptExecutor:
     """Executes Python scripts with proper error handling and output capture."""
@@ -131,6 +141,7 @@ class AgentExecutor:
             self.project_dir,
             self.output_dir,
             self.model,
+            agent_type=PROMPT_AGENT_TYPES.get(prompt_file, DEFAULT_AGENT_TYPE),
             max_thinking_tokens=self.thinking_budget,
         )
 

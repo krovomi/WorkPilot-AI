@@ -107,7 +107,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 
 | Lot | Priorité | Thème | Constats | Dépend de |
 |---|---|---|---|---|
-| L1 | P0 | Features cassées (backend) | F1, F24 | — |
+| L1 | P0 | Features cassées (backend) — **fait** | F1, F24 | — |
 | L2 | P0 | Phase architecture-map | F20 | L1 (test AST) conseillé |
 | L3 | P0 | Features cassées (frontend) | F21, F22 | — |
 | L4 | P1 | Contexte de développement | F23, F18 | — |
@@ -128,7 +128,7 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 | Mesure | Valeur à `b46a031` | Cible |
 |---|---|---|
 | `docs/CLAUDE.md` chargé à chaque session Claude Code | 268 Ko (~67 k tokens) | < 20 Ko |
-| agent_types non enregistrés | 7 | 0 |
+| agent_types non enregistrés | 7 (0 après le lot L1) | 0 |
 | Références Graphiti/LadybugDB hors `integrations/graphiti` | 214 (45 fichiers) | 0 |
 | Fichiers frontend sans importeur de production | 57 (~16,5 k lignes) | 0 |
 | Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) | 0 |
@@ -149,6 +149,11 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 #### F1 · Sept features LLM échouent en silence : `agent_type` absent d'`AGENT_CONFIGS`
 
 - **Sévérité** critique · **statut** ouvert depuis l'audit précédent · **vérifié** (reproduit)
+- **Corrigé par le lot L1.** Les sept entrées sont dans `AGENT_CONFIGS`, gardées par
+  `tests/test_agent_type_registry.py`. La correction a révélé un second défaut :
+  `run_insight_extraction` (`analysis/insight_extractor.py`) lançait la session puis ne renvoyait
+  rien, si bien que même un `agent_type` valide n'aurait jamais alimenté la mémoire ; elle renvoie
+  désormais l'objet JSON lu par `spec.plan_recovery.extract_json_document`.
 - **Preuve** : `get_agent_config("insight_extractor")` lève `ValueError: Unknown agent type`
   (`agents/tools_pkg/models.py:476-495`). Appelants :
   `agents/impact_analyzer.py:305`, `architecture/ai_reviewer.py:76`, `migration/llm_transformer.py:75`,
@@ -179,6 +184,11 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 #### F24 · La Roadmap tourne sous l'agent `coder`
 
 - **Sévérité** moyenne · **nouveau** · **vérifié** (AST : seul appel de fabrique sans `agent_type`)
+- **Corrigé par le lot L1**, avec une correction de la recommandation ci-dessous : les trois prompts
+  Roadmap exigent que l'agent **crée** son fichier de sortie (outil Write ou `cat > … << 'EOF'`), et la
+  phase vérifie qu'il existe. `roadmap_discovery` et `competitor_analysis` n'avaient ni Write ni Bash :
+  les utiliser tels quels aurait cassé la Roadmap. Ils reçoivent désormais `Write` et `Bash` (pas
+  `Edit`), et `runners/roadmap/executor.py:PROMPT_AGENT_TYPES` nomme la config de chaque prompt.
 - **Preuve** : `runners/roadmap/executor.py:130` appelle `self.create_client(...)` (= `create_agent_client`,
   `runners/roadmap/orchestrator.py:61`) sans `agent_type` ; le défaut `coder` (`core/client.py:721,2179`)
   donne Write, Edit, Bash et le roster Kanban (test-runner). Les configs `roadmap_discovery` et
