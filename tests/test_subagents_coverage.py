@@ -54,6 +54,9 @@ KNOWN_AGENT_TYPES = {
     "pr_template_filler",
     "spec_compaction",
     "merge_resolver",
+    "migration",
+    "roadmap_discovery",
+    "competitor_analysis",
 }
 
 
@@ -74,6 +77,9 @@ class TestRoutingIsDeliberate:
             ("spec_writer", "spec"),
             ("commit_message", "solo"),
             ("merge_resolver", "solo"),
+            ("migration", "solo"),
+            ("roadmap_discovery", "research"),
+            ("competitor_analysis", "research"),
         ],
     )
     def test_agent_type_routes_to_its_phase(self, agent_type: str, phase: str):
