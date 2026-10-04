@@ -220,7 +220,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 
   <div class="figures">
     <div class="fig"><b>29</b><span>agent_types enregistrés</span><em>+1 (verifier)</em></div>
-    <div class="fig bad"><b>7</b><span>agent_types utilisés mais non enregistrés</span><em>inchangé</em></div>
+    <div class="fig bad"><b>7</b><span>agent_types utilisés mais non enregistrés</span><em>à b46a031 · corrigé par le lot L1</em></div>
     <div class="fig"><b>19</b><span>phases du workflow</span><em>+2 (ui-design-system, verify-replay)</em></div>
     <div class="fig"><b>84</b><span>skills émis dans <code>.agents/skills</code></span><em>+2</em></div>
     <div class="fig warn"><b>5</b><span>packs déclarés sans SKILL.md</span><em>+ hermes-learned absent</em></div>
@@ -960,8 +960,8 @@ const SUBS=[
 
 /* ---------- 06 constats ---------- */
 const FINDINGS=[
- {id:"F1",sev:"crit",cat:"bug",st:"ouvert",v:"vérifié",t:"Sept features LLM échouent en silence : agent_type absent d'AGENT_CONFIGS",
-  c:"<code>impact_analyzer</code>, <code>architecture_reviewer</code>, <code>migration</code>, <code>insight_extractor</code>, <code>learning_analyzer</code>, <code>context_mesh_analyzer</code>, <code>live_companion_analyzer</code> sont passés à la fabrique mais absents du registre (29 entrées). <code>get_agent_config</code> lève <code>ValueError: Unknown agent type</code> (reproduit au commit b46a031). Les appelants attrapent et journalisent : l'extracteur d'insights, seul écrivain prévu de patterns/, codebase/ et outcomes/ dans le vault, ne produit rien. <code>PHASE_ALIASES</code> leur attribue pourtant déjà un roster.",
+ {id:"F1",sev:"crit",cat:"bug",st:"résolu",v:"vérifié",t:"Sept features LLM échouent en silence : agent_type absent d'AGENT_CONFIGS",
+  c:"<b>Corrigé par le lot L1</b> : les sept entrées existent, gardées par <code>tests/test_agent_type_registry.py</code> ; <code>run_insight_extraction</code>, qui ne renvoyait jamais le résultat de sa session, renvoie désormais l'objet JSON. — <code>impact_analyzer</code>, <code>architecture_reviewer</code>, <code>migration</code>, <code>insight_extractor</code>, <code>learning_analyzer</code>, <code>context_mesh_analyzer</code>, <code>live_companion_analyzer</code> sont passés à la fabrique mais absents du registre (29 entrées). <code>get_agent_config</code> lève <code>ValueError: Unknown agent type</code> (reproduit au commit b46a031). Les appelants attrapent et journalisent : l'extracteur d'insights, seul écrivain prévu de patterns/, codebase/ et outcomes/ dans le vault, ne produit rien. <code>PHASE_ALIASES</code> leur attribue pourtant déjà un roster.",
   p:"agents/impact_analyzer.py:305 · architecture/ai_reviewer.py:76 · migration/llm_transformer.py:75 · analysis/insight_extractor.py:379 · learning_loop/service.py:110 · context_mesh/mesh_service.py:266 · live_companion/analyzer.py:122 · agents/tools_pkg/models.py:476-495",
   r:"Ajouter les sept entrées (lecture seule + brain pour les analyseurs ; lecture + écriture pour migration). Ajouter un test qui parcourt l'AST du backend, collecte chaque littéral <code>agent_type=…</code> et chaque appel de fabrique, et vérifie que l'agent_type est nommé et présent dans <code>AGENT_CONFIGS</code>.",
   g:"Sept features restaurées ; la mémoire du vault réellement alimentée.",k:"Le comportement fonctionnel des sept features ; seules leurs permissions deviennent explicites."},
@@ -1064,8 +1064,8 @@ const FINDINGS=[
   p:"CLAUDE.md · docs/CLAUDE.md (4 294 lignes) · AGENTS.md (8 Ko)",
   r:"Garder dans docs/CLAUDE.md les règles et la carte (< 20 Ko) ; déplacer chaque section « pourquoi » dans <code>shared_docs/architecture/&lt;feature&gt;.md</code>, référencée par chemin et lue à la demande. Ajouter un test de taille.",
   g:"~60 k tokens par session de développement ; cache plus stable.",k:"Toutes les règles critiques, et l'accès à chaque justification par lien."},
- {id:"F24",sev:"moy",cat:"tokens",st:"nouveau",v:"vérifié",t:"La Roadmap tourne sous l'agent coder",
-  c:"<code>runners/roadmap/executor.py:130</code> appelle <code>create_client</code> sans agent_type : le défaut <code>coder</code> s'applique (Write, Edit, Bash, Web, roster Kanban avec test-runner). C'est le seul appel de fabrique du backend sans agent_type (vérifié par AST). Les configurations <code>roadmap_discovery</code> et <code>competitor_analysis</code> (lecture + Web + Context7) ne sont utilisées par personne.",
+ {id:"F24",sev:"moy",cat:"tokens",st:"résolu",v:"vérifié",t:"La Roadmap tourne sous l'agent coder",
+  c:"<b>Corrigé par le lot L1</b>, avec une correction : les prompts Roadmap créent leur fichier de sortie, donc <code>roadmap_discovery</code> et <code>competitor_analysis</code> reçoivent Write et Bash (pas Edit) ; l'exécuteur nomme la config de chaque prompt. — <code>runners/roadmap/executor.py:130</code> appelle <code>create_client</code> sans agent_type : le défaut <code>coder</code> s'applique (Write, Edit, Bash, Web, roster Kanban avec test-runner). C'est le seul appel de fabrique du backend sans agent_type (vérifié par AST). Les configurations <code>roadmap_discovery</code> et <code>competitor_analysis</code> (lecture + Web + Context7) ne sont utilisées par personne.",
   p:"runners/roadmap/executor.py:130 · runners/roadmap/orchestrator.py:61 · core/client.py:721,2179",
   r:"Passer <code>agent_type=roadmap_discovery</code> (et <code>competitor_analysis</code> pour l'analyse concurrentielle) ; intégrer le cas au test de F1.",g:"Droits minimaux, roster adapté.",k:"La génération de roadmap."},
  {id:"F25",sev:"moy",cat:"code mort",st:"nouveau",v:"lu",t:"Le marqueur RESUME_WITH_PROVIDER n'a plus d'écrivain",
@@ -1114,7 +1114,7 @@ const FINDINGS=[
   c:"<code>core/agent_client.py</code> 5 532 lignes (tous les adaptateurs), <code>worktree-handlers.ts</code> 5 665, <code>usage-monitor.ts</code> 4 609, <code>KanbanBoard.tsx</code> 4 297, <code>ApiExplorer.tsx</code> 3 707, <code>pr-handlers.ts</code> 3 480, <code>core/worktree.py</code> 3 382.",
   p:"voir liste",r:"Un adaptateur par fichier (<code>core/agent_clients/&lt;provider&gt;.py</code>) ; handlers découpés par canal.",g:"Contexte d'agent plus petit à chaque lecture, revues plus faciles.",k:"Interfaces publiques inchangées."}];
 const PLAN=[
- ["P0","Features cassées","Enregistrer les 7 agent_types + test AST ; brancher architecture-map sur le pipeline archify ; câbler ou retirer Context-aware snippets ; retirer les 4 API preload mortes ; agent_type de la Roadmap","F1, F20, F21, F22, F24","Features restaurées, mémoire alimentée"],
+ ["P0","Features cassées","Fait pour F1 et F24 (lot L1). Restent : brancher architecture-map sur le pipeline archify ; câbler ou retirer Context-aware snippets ; retirer les 4 API preload mortes","F20, F21, F22, F1, F24","Features restaurées, mémoire alimentée"],
  ["P1","Contexte de développement","Réduire docs/CLAUDE.md aux règles (< 20 Ko), justifications dans shared_docs/architecture/","F23","~60 k tokens par session"],
  ["P1","Droits et rosters minimaux","agent_type par prompt dans le pipeline de spec ; alias PR → solo et plafond après fusion ; alias manquants ; overlay mobile hors solo","F4, F5, F9","Tokens par tour, permissions minimales"],
  ["P1","Pipeline payé = pipeline exécuté","Vendoriser ou remplacer superpowers/impeccable/mattpocock ; supprimer la phase spec BMAD ; planning sans min_effort ; frontend-design adossé à ui-ux-pro-max","F2, F3, F15, F35","Profil exact, sessions en moins"],
@@ -1229,7 +1229,7 @@ const PRS=[
  ["#290","feat(kanban) : chaque tâche possède son moteur (provider × LLM × effort, par phase)","task-engine.ts, task-provider-env.ts, TaskEngineEditor/Chip, EngineTrioPicker, UsageLensSelector ; _resolve_active_provider lit la tâche avant tout ; AgentRunner prend le provider de la phase spec ; la liste « Fournisseur IA » passe dans Paramètres → Agent ; applyProviderToTasks supprimé ; le marqueur RESUME_WITH_PROVIDER n'est plus écrit.","F4 (inchangé), F13, F25 (nouveau)"],
  ["#291","feat(uiux) : données ui-ux-pro-max sur les tâches UI uniquement, pour tous les providers","Pack vendorisé, phase déterministe ui-design-system, serveur MCP uiux réservé aux tâches UI, section de prompt par sous-tâche UI, MASTER.md classé dans le cerveau au merge. narrow_to_forecast : les phases conditionnelles sont décidées sur les fichiers du plan (gain sur toutes les tâches backend) ; _touched reconnaît un fichier racine.","F14 (aggravé), F27, F35 (nouveaux)"],
  ["#292","feat(verify) : boucle de vérification runtime (/verify) pour tous les providers","Phase verify native avant la QA, agent verifier, verify-replay, serveur MCP verify, mécanisme de surcharges de skill par provider (overlays.py), hard_gates en liste, mobile/launch.py, apprentissage (recette, baseline). Une session de plus relit le diff ; +370 lignes dans docs/CLAUDE.md.","F2 (partiel), F11 (aggravé), F16, F23"]];
-const EVO={F1:"Inchangé : toujours 7 agent_types absents (re-vérifié).",F2:"verify corrigé (tooling/verify) ; le profil signale les manques. Restent 5 phases.",F3:"Inchangé.",F4:"#290 ajoute le provider de phase, pas l'agent_type.",F5:"Inchangé (9 et 7, re-mesuré).",F6:"214 références au lieu de 181 ; dépendances toujours installées.",F7:"Inchangé.",F8:"Inchangé.",F9:"Inchangé ; verifier, lui, est bien aliasé sur qa.",F10:"Inchangé ; liste des orphelins re-mesurée (11, ~51 Ko).",F11:"Une session verifier s'ajoute ; architecture-map compte aussi (F20).",F12:"Inchangé.",F13:"La résolution des surcharges utilise peek ; l'exécution non.",F14:"uiux.knowledge ajoute une 4e écriture.",F15:"Avertissement explicite au lancement.",F16:"S'étend au verifier (roster qa).",F17:"Inchangé.",F18:"Nouvelles dérives (miroirs, pty-daemon, architecture-map).",F19:"Chiffres re-mesurés (78 vues, 178 fichiers IPC)."};
+const EVO={F1:"Inchangé à b46a031 (7 agent_types absents) ; corrigé ensuite par le lot L1.",F2:"verify corrigé (tooling/verify) ; le profil signale les manques. Restent 5 phases.",F3:"Inchangé.",F4:"#290 ajoute le provider de phase, pas l'agent_type.",F5:"Inchangé (9 et 7, re-mesuré).",F6:"214 références au lieu de 181 ; dépendances toujours installées.",F7:"Inchangé.",F8:"Inchangé.",F9:"Inchangé ; verifier, lui, est bien aliasé sur qa.",F10:"Inchangé ; liste des orphelins re-mesurée (11, ~51 Ko).",F11:"Une session verifier s'ajoute ; architecture-map compte aussi (F20).",F12:"Inchangé.",F13:"La résolution des surcharges utilise peek ; l'exécution non.",F14:"uiux.knowledge ajoute une 4e écriture.",F15:"Avertissement explicite au lancement.",F16:"S'étend au verifier (roster qa).",F17:"Inchangé.",F18:"Nouvelles dérives (miroirs, pty-daemon, architecture-map).",F19:"Chiffres re-mesurés (78 vues, 178 fichiers IPC)."};
 
 /* ---------- rendu ---------- */
 const SEVTAG={crit:'<span class="tag crit">critique</span>',haute:'<span class="tag warn">haute</span>',moy:'<span class="tag info">moyenne</span>',basse:'<span class="tag mute">basse</span>'};
@@ -1293,7 +1293,7 @@ function init(){
 
   // 08
   const counts={};FINDINGS.forEach(f=>counts[f.st]=(counts[f.st]||0)+1);
-  $("#evo-figs").innerHTML=[["nouveau","nouveaux constats"],["aggravé","aggravés"],["partiel","partiellement corrigés"],["atténué","atténués"],["ouvert","toujours ouverts"]].map(([k,l])=>`<div class="fig${k==="aggravé"?" bad":k==="nouveau"?" warn":""}"><b>${counts[k]||0}</b><span>${l}</span></div>`).join("");
+  $("#evo-figs").innerHTML=[["nouveau","nouveaux constats"],["aggravé","aggravés"],["partiel","partiellement corrigés"],["atténué","atténués"],["ouvert","toujours ouverts"],["résolu","corrigés depuis (lot L1)"]].map(([k,l])=>`<div class="fig${k==="aggravé"?" bad":k==="nouveau"?" warn":""}"><b>${counts[k]||0}</b><span>${l}</span></div>`).join("");
   table("#t-prs",PRS,r=>`<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td></tr>`);
   table("#t-evo",FINDINGS.filter(f=>EVO[f.id]),f=>`<tr><td><button class="fref" type="button" data-f="${f.id}">${f.id}</button> ${esc(f.t)}</td><td>${STTAG[f.st]}</td><td>${esc(EVO[f.id])}</td></tr>`);
 }
@@ -1306,7 +1306,7 @@ function renderFindings(){
 function initFindingFilters(){
   fs="all";fst="all";fc="all";
   chips("#f-sev",[["all","Toutes"],["crit","Critique"],["haute","Haute"],["moy","Moyenne"],["basse","Basse"]],{initial:"all",onChange:v=>{fs=v;renderFindings()}});
-  chips("#f-st",[["all","Tous"],["nouveau","Nouveau"],["aggravé","Aggravé"],["ouvert","Ouvert"],["partiel","Partiel"],["atténué","Atténué"]],{initial:"all",onChange:v=>{fst=v;renderFindings()}});
+  chips("#f-st",[["all","Tous"],["nouveau","Nouveau"],["aggravé","Aggravé"],["ouvert","Ouvert"],["partiel","Partiel"],["atténué","Atténué"],["résolu","Résolu"]],{initial:"all",onChange:v=>{fst=v;renderFindings()}});
   chips("#f-cat",[["all","Toutes"]].concat([...new Set(FINDINGS.map(f=>f.cat))].map(c=>[c,c])),{initial:"all",onChange:v=>{fc=v;renderFindings()}});
 }
 function goFinding(id){

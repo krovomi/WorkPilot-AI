@@ -444,17 +444,82 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "low",
     },
+    # The analysers below were passed to the factory under these names but had
+    # no entry here, so `get_agent_config` raised, every caller caught it, and
+    # the feature logged a warning and produced nothing — the insight extractor
+    # among them, the one writer of patterns/, codebase/ and outcomes/ in the
+    # project memory. Each one reads what it is given and answers in text the
+    # caller parses, so read-only is the whole permission.
+    "impact_analyzer": {
+        # agents/impact_analyzer.py — blast radius of a finished change.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
+    "architecture_reviewer": {
+        # architecture/ai_reviewer.py — the prompt runs `git diff` and the
+        # caller reads the verdict back from `<spec_dir>/architecture_report.json`,
+        # so it needs Bash and Write. Not Edit: a reviewer does not touch code.
+        "tools": BASE_READ_TOOLS + ["Write", "Bash"],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "high",
+    },
+    "insight_extractor": {
+        # analysis/insight_extractor.py — runs after every coding session on a
+        # fast model, everything it needs is in the prompt, output is one JSON
+        # object. Haiku does not take extended thinking.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
+    "learning_analyzer": {
+        # learning_loop/service.py — build records in, JSON patterns out.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
+    "context_mesh_analyzer": {
+        # context_mesh/mesh_service.py — cross-project summaries in, findings out.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
+    "live_companion_analyzer": {
+        # live_companion/analyzer.py — one changed file in, suggestions out;
+        # fires on file events, so it stays cheap.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "low",
+    },
+    "migration": {
+        # migration/llm_transformer.py — before/after code in, improved code
+        # out as text; the transformer writes the file, not the model.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
     # ═══════════════════════════════════════════════════════════════════════
     # ROADMAP & IDEATION
     # ═══════════════════════════════════════════════════════════════════════
+    # The roadmap prompts end with "create <file>.json in the Output Directory"
+    # — with the Write tool or a `cat > … << 'EOF'` heredoc — and the phase
+    # checks the file exists afterwards. So both need Write and Bash; neither
+    # needs Edit. Until the executor named them, the roadmap ran as `coder`.
     "roadmap_discovery": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS + WEB_TOOLS + ["Write", "Bash"],
         "mcp_servers": ["context7"],
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
     "competitor_analysis": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS + WEB_TOOLS + ["Write", "Bash"],
         "mcp_servers": ["context7"],  # WebSearch for competitor research
         "auto_claude_tools": [],
         "thinking_default": "high",

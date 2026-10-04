@@ -108,6 +108,10 @@ PHASE_ALIASES: dict[str, str] = {
     "context_mesh_analyzer": "research",
     "learning_analyzer": "research",
     "live_companion_analyzer": "research",
+    # The roadmap reads a project to decide what to build next: research, not a
+    # build card. It ran as `coder` until the executor named its agent_type.
+    "roadmap_discovery": "research",
+    "competitor_analysis": "research",
     # Writing or questioning the spec, while there is still no code to point at.
     "spec_writer": "spec",
     "spec_gatherer": "spec",
@@ -124,6 +128,8 @@ PHASE_ALIASES: dict[str, str] = {
     "pr_template_filler": "solo",
     "spec_compaction": "solo",
     "merge_resolver": "solo",
+    # One snippet in, one rewritten snippet out (migration/llm_transformer.py).
+    "migration": "solo",
 }
 
 

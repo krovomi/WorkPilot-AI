@@ -362,33 +362,50 @@ async def run_insight_extraction(
     # Ensure SDK can find the token
     ensure_claude_code_oauth_token()
 
-    get_extraction_model()
     prompt = _build_extraction_prompt(inputs)
 
-    # Use current directory if project_dir not specified
-
     try:
-        # Migration vers runtime provider-agnostique
-        phase_model = get_extraction_model()
-        phase_thinking_budget = None  # À adapter si besoin
-        config = None
         runtime = create_agent_runtime(
-            spec_dir=None,  # À adapter selon le contexte réel
+            spec_dir=None,
             phase="insight_extraction",
             project_dir=project_dir,
             agent_type="insight_extractor",
             cli_provider=None,
-            cli_model=phase_model,
-            cli_thinking=phase_thinking_budget,
-            config=config,
+            cli_model=get_extraction_model(),
+            cli_thinking=None,
+            config=None,
         )
-
-        # Utilisation : await runtime.run_session(prompt)
-        await runtime.run_session(prompt)
-
+        result = await runtime.run_session(prompt)
     except Exception as e:
         logger.warning(f"Insight extraction failed: {e}")
         return None
+
+    # The session ran and its answer used to be dropped here: the function fell
+    # off the end, every caller saw None, and the project memory only ever got
+    # the generic insights. The prompt asks for one JSON object; models wrap it
+    # in a fence or a sentence often enough that the plan recovery's extractor
+    # is the right reader.
+    output = getattr(result, "output", None)
+    if not output:
+        logger.warning(
+            "Insight extraction returned no output: %s",
+            getattr(result, "error", None) or "empty response",
+        )
+        return None
+
+    # Parsing stays inside the "None if failed" contract: json.loads raises
+    # RecursionError on a deeply nested answer, which ValueError does not cover.
+    try:
+        from spec.plan_recovery import extract_json_document
+
+        extracted = extract_json_document(output)
+    except Exception as e:
+        logger.warning(f"Insight extraction output could not be parsed: {e}")
+        return None
+    if not isinstance(extracted, dict):
+        logger.warning("Insight extraction did not return a JSON object")
+        return None
+    return extracted
 
 
 # =============================================================================
