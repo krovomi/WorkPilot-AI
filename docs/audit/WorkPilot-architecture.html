@@ -1,0 +1,1329 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas WorkPilot AI</title>
+<meta name="description" content="Audit d'architecture de WorkPilot AI au commit b46a031 : mémoire, skills par provider, pipeline Kanban, agents, constats et plan de nettoyage.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..800&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Mise en page : rail de navigation à gauche (onglets en haut sur mobile), une vue à la fois ;
+   chaque vue = résumé → schéma cliquable → panneau de détail → tableau exhaustif. */
+:root{
+  --bg:#eef1f3; --panel:#ffffff; --ink:#17202b; --muted:#5a6675; --line:#cfd6dd; --line-soft:#e2e7eb;
+  --accent:#0b6b73; --accent-soft:#d6ecec; --accent-ink:#06474d;
+  --crit:#b3261e; --crit-soft:#f7dedb; --warn:#9a5b00; --warn-soft:#f6e8cf; --ok:#1d6b3a; --ok-soft:#d9eedf; --legacy:#7a6a8c; --legacy-soft:#ebe5f1;
+  --node:#f7f9fa; --node-line:#9fadb9; --edge:#8796a4;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --r:6px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151b; --panel:#171e26; --ink:#e3e8ed; --muted:#9aa7b4; --line:#2c3743; --line-soft:#222c36;
+  --accent:#5cc4c9; --accent-soft:#163a3e; --accent-ink:#9fe3e6;
+  --crit:#ff8a80; --crit-soft:#3d1c1a; --warn:#f0b65a; --warn-soft:#3a2c14; --ok:#7fd49a; --ok-soft:#173225; --legacy:#c2b0d6; --legacy-soft:#2c2436;
+  --node:#1d2630; --node-line:#46566a; --edge:#5f7184; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151b; --panel:#171e26; --ink:#e3e8ed; --muted:#9aa7b4; --line:#2c3743; --line-soft:#222c36;
+  --accent:#5cc4c9; --accent-soft:#163a3e; --accent-ink:#9fe3e6;
+  --crit:#ff8a80; --crit-soft:#3d1c1a; --warn:#f0b65a; --warn-soft:#3a2c14; --ok:#7fd49a; --ok-soft:#173225; --legacy:#c2b0d6; --legacy-soft:#2c2436;
+  --node:#1d2630; --node-line:#46566a; --edge:#5f7184; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--f-body);overflow-x:hidden}
+code,.mono{font-family:var(--f-mono);font-size:.84em;overflow-wrap:anywhere}
+a{color:var(--accent)}
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+nav.rail{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:24px 16px;border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;gap:20px}
+.brand{font-family:var(--f-display);font-stretch:85%;font-weight:800;font-size:22px;letter-spacing:.01em;line-height:1.1}
+.brand small{display:block;font-family:var(--f-mono);font-weight:400;font-size:11px;color:var(--muted);letter-spacing:.04em;margin-top:6px}
+.tabs{display:flex;flex-direction:column;gap:2px}
+.tabs button{all:unset;cursor:pointer;padding:9px 10px;border-radius:var(--r);font-weight:600;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.tabs button:hover{background:var(--line-soft);color:var(--ink)}
+.tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent-ink)}
+.tabs button:focus-visible,.chip:focus-visible,select:focus-visible,.node:focus-visible,summary:focus-visible,.btn:focus-visible,.step:focus-visible,.fref:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tabs .k{font-family:var(--f-mono);font-size:11px;font-weight:400;opacity:.8}
+.rail .foot{margin-top:auto;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:10px}
+main{padding-block:28px 64px;padding-inline:clamp(16px,4vw,48px);min-width:0}
+section.view{display:flex;flex-direction:column;gap:22px;max-width:1240px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1,h2,h3{font-family:var(--f-display);font-stretch:88%;text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(28px,3.4vw,40px);font-weight:800}
+h2{font-size:22px;font-weight:700}
+h3{font-size:16px;font-weight:700;font-stretch:100%}
+p{margin:0;max-width:72ch}
+.lede{font-size:18px;color:var(--muted);max-width:80ch}
+.figures{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.fig{padding:14px 16px;display:flex;flex-direction:column;gap:2px;box-shadow:1px 0 0 var(--line),0 1px 0 var(--line)}
+.fig b{font-family:var(--f-display);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.fig span{font-size:13px;color:var(--muted)}
+.fig em{font-style:normal;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.fig.bad b{color:var(--crit)} .fig.warn b{color:var(--warn)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.controls{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end}
+.ctl{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ctl>label,.ctl>.lbl,.lbl{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:14px;background:var(--panel);color:var(--ink)}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.btn{all:unset;cursor:pointer;border:1px solid var(--accent);color:var(--accent-ink);background:var(--accent-soft);border-radius:var(--r);padding:6px 12px;font-size:14px;font-weight:600}
+.btn:hover{background:var(--accent);color:var(--panel)}
+input[type="search"],select{font:inherit;font-size:14px;padding:5px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);max-width:100%}
+.diagram-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+.diagram-wrap svg{display:block;min-width:980px;width:100%;height:auto}
+.split{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.detail{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto}
+.detail .empty{color:var(--muted);font-size:14px}
+.detail h3{font-size:18px}
+.detail ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.detail p{font-size:14px}
+.tag{display:inline-block;font-family:var(--f-mono);font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.tag.crit{color:var(--crit);background:var(--crit-soft)} .tag.warn{color:var(--warn);background:var(--warn-soft)}
+.tag.ok{color:var(--ok);background:var(--ok-soft)} .tag.legacy{color:var(--legacy);background:var(--legacy-soft)}
+.tag.info{color:var(--accent-ink);background:var(--accent-soft)} .tag.mute{color:var(--muted)}
+.fref{all:unset;cursor:pointer;font-family:var(--f-mono);font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--accent);color:var(--accent-ink);background:var(--accent-soft);margin:0 4px 4px 0;display:inline-block}
+.fref:hover{background:var(--accent);color:var(--panel)}
+/* SVG */
+.lane-bg{fill:var(--bg);opacity:.55}
+.lane-t{fill:var(--muted);font:700 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase}
+.node rect{fill:var(--node);stroke:var(--node-line);stroke-width:1}
+.node text{fill:var(--ink);font:600 12.5px var(--f-body)}
+.node text.sub{fill:var(--muted);font:400 10.5px var(--f-mono)}
+.node{cursor:pointer;transition:opacity .15s}
+.node:hover rect{stroke:var(--accent);stroke-width:1.6}
+.node.k-legacy rect{fill:var(--legacy-soft);stroke:var(--legacy);stroke-dasharray:4 3}
+.node.k-broken rect{fill:var(--crit-soft);stroke:var(--crit);stroke-dasharray:4 3}
+.node.k-store rect{fill:var(--accent-soft);stroke:var(--accent)}
+.node.k-new rect{fill:var(--ok-soft);stroke:var(--ok)}
+.node.k-group{cursor:default}
+.node.k-group rect{fill:none;stroke:var(--accent);stroke-dasharray:2 4}
+.node.k-group text{fill:var(--accent-ink);font:700 11px var(--f-mono);letter-spacing:.06em}
+.node.k-missing rect{fill:var(--warn-soft);stroke:var(--warn);stroke-dasharray:4 3}
+.node.k-hub rect{fill:var(--ink);stroke:var(--ink)} .node.k-hub text{fill:var(--panel)} .node.k-hub text.sub{fill:var(--panel);opacity:.8}
+.node.sel rect{stroke:var(--accent);stroke-width:2.4}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.2;opacity:.7;transition:opacity .15s}
+.edge.k-legacy{stroke:var(--legacy);stroke-dasharray:5 4}
+.edge.k-broken{stroke:var(--crit);stroke-dasharray:5 4}
+.edge.k-read{stroke-dasharray:2 3}
+.edge.k-missing{stroke:var(--warn);stroke-dasharray:5 4}
+svg.focus .node{opacity:.22} svg.focus .edge{opacity:.06}
+svg.focus .node.on{opacity:1} svg.focus .edge.on{opacity:1;stroke-width:2;stroke:var(--accent)}
+svg.focus .edge.on.k-broken{stroke:var(--crit)} svg.focus .edge.on.k-legacy{stroke:var(--legacy)} svg.focus .edge.on.k-missing{stroke:var(--warn)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:22px;height:0;border-top:2px solid var(--edge);vertical-align:middle;margin-right:6px}
+.legend i.dash{border-top-style:dashed} .legend i.l{border-color:var(--legacy)} .legend i.b{border-color:var(--crit)} .legend i.m{border-color:var(--warn)} .legend i.r{border-top-style:dotted}
+.legend s{display:inline-block;width:14px;height:10px;border-radius:2px;vertical-align:middle;margin-right:6px;text-decoration:none;border:1px solid var(--node-line);background:var(--node)}
+.legend s.st{background:var(--accent-soft);border-color:var(--accent)} .legend s.lg{background:var(--legacy-soft);border-color:var(--legacy)} .legend s.br{background:var(--crit-soft);border-color:var(--crit)} .legend s.ms{background:var(--warn-soft);border-color:var(--warn)} .legend s.nw{background:var(--ok-soft);border-color:var(--ok)}
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line-soft)}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--bg);position:sticky;top:0}
+tbody tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+td.wrap code{white-space:normal}
+td.n{font-variant-numeric:tabular-nums;text-align:right}
+tr.grp td{background:var(--bg);font-family:var(--f-display);font-weight:700;font-stretch:90%;font-size:15px}
+/* pipeline */
+.pipe{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden}
+.step{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line-soft);align-items:start;cursor:pointer}
+.step:last-child{border-bottom:0}
+.step:hover{background:var(--bg)}
+.step .win{font-family:var(--f-mono);font-size:11px;color:var(--muted);padding-top:3px}
+.step .nm{font-weight:700}
+.step .meta{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:2px}
+.step.st-skip,.step.st-na{opacity:.55}
+.step.st-skip .nm{text-decoration:line-through;text-decoration-thickness:1px}
+.step.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.stage-h{padding:9px 14px;background:var(--bg);font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);border-bottom:1px solid var(--line-soft)}
+.sumline{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:14px}
+.sumline b{font-variant-numeric:tabular-nums}
+/* findings */
+.finding{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden}
+.finding summary{list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center}
+.finding summary::-webkit-details-marker{display:none}
+.finding .sev{width:8px;align-self:stretch;border-radius:4px}
+.finding.s-crit .sev{background:var(--crit)} .finding.s-haute .sev{background:var(--warn)} .finding.s-moy .sev{background:var(--accent)} .finding.s-basse .sev{background:var(--node-line)}
+.finding .t{font-weight:700}
+.finding .tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.finding .body{padding:0 14px 14px 34px;display:grid;gap:10px;font-size:15px;margin:0}
+.finding .body dt{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.finding .body dd{margin:2px 0 0}
+.finding.flash{outline:2px solid var(--accent)}
+.flist{display:flex;flex-direction:column;gap:8px}
+.mach{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px}
+.mach span.s{border:1px solid var(--line);border-radius:4px;padding:3px 8px;background:var(--panel)}
+.mach span.s.h{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
+.mach span.a{color:var(--muted)}
+.note{font-size:13px;color:var(--muted)}
+.callout{border-left:3px solid var(--warn);background:var(--warn-soft);padding:10px 14px;border-radius:0 var(--r) var(--r) 0;font-size:14px}
+.callout.c{border-color:var(--crit);background:var(--crit-soft)}
+.callout.o{border-color:var(--ok);background:var(--ok-soft)}
+ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.theme{display:flex;gap:4px;flex-wrap:wrap}
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  nav.rail{position:sticky;top:0;height:auto;flex-direction:column;gap:10px;padding:12px 16px;z-index:5;border-right:0;border-bottom:1px solid var(--line)}
+  .tabs{flex-direction:row;overflow-x:auto;gap:4px}
+  .tabs button{white-space:nowrap}
+  .tabs .k,.rail .foot{display:none}
+  .split{grid-template-columns:minmax(0,1fr)}
+  .detail{position:static;max-height:none}
+  .step{grid-template-columns:minmax(0,1fr) auto}
+  .step .win{grid-column:1/-1;padding:0}
+  .finding summary{grid-template-columns:auto minmax(0,1fr)}
+  .finding .tags{grid-column:2;justify-content:flex-start}
+  .finding .body{padding-left:14px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media print{
+  nav.rail{display:none} .shell{display:block} main{padding:0}
+  section.view[hidden]{display:flex!important} section.view{break-before:page}
+  .finding .body{display:grid} .detail{position:static;max-height:none}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+<nav class="rail" aria-label="Vues">
+  <div class="brand">Atlas WorkPilot&nbsp;AI<small>audit d'architecture · commit b46a031 (PR #292)<br>comparé à 7057b28 · 3 oct. 2026</small></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-v="synthese" aria-selected="true">Synthèse<span class="k">01</span></button>
+    <button role="tab" data-v="memoire">Mémoire<span class="k">02</span></button>
+    <button role="tab" data-v="skills">Skills × providers<span class="k">03</span></button>
+    <button role="tab" data-v="kanban">Tâches Kanban<span class="k">04</span></button>
+    <button role="tab" data-v="agents">Agents &amp; sous-agents<span class="k">05</span></button>
+    <button role="tab" data-v="audit">Constats &amp; plan<span class="k">06</span></button>
+    <button role="tab" data-v="nettoyage">Nettoyage<span class="k">07</span></button>
+    <button role="tab" data-v="evolutions">Évolutions<span class="k">08</span></button>
+  </div>
+  <div class="foot">
+    <span>Tout est cliquable : nœuds, étapes, constats. Chaque affirmation cite son fichier. Les chiffres sont mesurés sur le dépôt, pas recopiés de la doc.</span>
+    <div><span class="lbl">Thème</span><div class="theme chips" id="theme-pick"></div></div>
+    <span>Cahier de tâches pour agents : <code>docs/audit/AUDIT-NETTOYAGE.md</code></span>
+  </div>
+</nav>
+
+<main>
+<!-- ============ 01 SYNTHÈSE ============ -->
+<section class="view" id="v-synthese">
+  <div class="eyebrow">01 · Vue macroscopique</div>
+  <h1>Ce que WorkPilot AI exécute réellement</h1>
+  <p class="lede">Une application Electron pilote un backend Python ; toute interaction LLM passe par une seule fabrique (<code>core/client.py</code>) qui choisit le provider, les outils, les serveurs MCP et le roster de sous-agents. Depuis l'audit précédent, chaque tâche possède son moteur par phase (#290), les tâches UI reçoivent un design system (#291) et l'application modifiée est lancée et vérifiée avant la QA (#292). Cette page a été reconstruite en relisant et en exécutant le code au commit <code>b46a031</code>.</p>
+
+  <div class="figures">
+    <div class="fig"><b>29</b><span>agent_types enregistrés</span><em>+1 (verifier)</em></div>
+    <div class="fig bad"><b>7</b><span>agent_types utilisés mais non enregistrés</span><em>inchangé</em></div>
+    <div class="fig"><b>19</b><span>phases du workflow</span><em>+2 (ui-design-system, verify-replay)</em></div>
+    <div class="fig"><b>84</b><span>skills émis dans <code>.agents/skills</code></span><em>+2</em></div>
+    <div class="fig warn"><b>5</b><span>packs déclarés sans SKILL.md</span><em>+ hermes-learned absent</em></div>
+    <div class="fig"><b>15</b><span>providers dans la matrice</span></div>
+    <div class="fig bad"><b>268 Ko</b><span><code>docs/CLAUDE.md</code> chargé à chaque session</span><em>+23 Ko</em></div>
+    <div class="fig bad"><b>~12,6 k</b><span>lignes Graphiti / LadybugDB</span><em>214 réf. (181 avant)</em></div>
+    <div class="fig warn"><b>~27 k</b><span>lignes sans appelant (hors Graphiti)</span><em>voir 07 · Nettoyage</em></div>
+    <div class="fig"><b>78</b><span>vues dans la barre latérale</span></div>
+    <div class="fig"><b>120 · 178</b><span>stores Zustand · fichiers IPC</span></div>
+    <div class="fig"><b>113 · 69</b><span>paquets backend · runners</span></div>
+  </div>
+
+  <div class="split">
+    <div class="card">
+      <h2>Topologie générale</h2>
+      <div class="legend"><span><s></s>composant</span><span><s class="nw"></s>nouveau depuis 7057b28</span><span><s class="st"></s>magasin / données</span><span><s class="lg"></s>hérité</span><span><i></i>appel</span><span><i class="r"></i>lecture</span></div>
+      <div class="diagram-wrap"><svg id="d-macro" role="img" aria-label="Topologie de WorkPilot AI"></svg></div>
+    </div>
+    <aside class="card detail" id="p-macro"><p class="empty">Cliquez un bloc du schéma pour voir son rôle, ses fichiers et les constats qui le concernent.</p></aside>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Les six constats qui pèsent le plus</h2>
+      <ol class="prio">
+        <li><b>Sept features LLM échouent toujours en silence</b> (<button class="fref" data-f="F1">F1</button>) : leur <code>agent_type</code> n'existe pas ; l'extracteur d'insights, qui devait nourrir la mémoire, en fait partie.</li>
+        <li><b>Deux features visibles ne produisent rien</b> : la phase <code>architecture-map</code> tourne sous un agent en lecture seule sans le pipeline archify (<button class="fref" data-f="F20">F20</button>) ; la page Context-aware snippets n'a pas de handler IPC et son runner importe des modules inexistants (<button class="fref" data-f="F21">F21</button>).</li>
+        <li><b>~67 k tokens de doc chargés à chaque session</b> : <code>docs/CLAUDE.md</code> est importé par <code>CLAUDE.md</code> (<button class="fref" data-f="F23">F23</button>).</li>
+        <li><b>Une partie du pipeline payé ne s'exécute pas</b> : cinq phases pointent vers des packs vides, trois vers BMAD qui exige <code>_bmad/</code> (<button class="fref" data-f="F2">F2</button> <button class="fref" data-f="F3">F3</button>).</li>
+        <li><b>La mémoire « unique » a encore des voisines</b> : Graphiti en hausse, deux magasins de patterns, quatre écritures par merge (<button class="fref" data-f="F6">F6</button> <button class="fref" data-f="F7">F7</button> <button class="fref" data-f="F14">F14</button>).</li>
+        <li><b>~27 k lignes sans appelant</b>, hors Graphiti : 57 fichiers frontend (~16,5 k), 3 paquets et 12 modules backend (~6,7 k), <code>utils/</code> (3,7 k) ; plus 11 prompts orphelins et 4 shims sans importeur (<button class="fref" data-f="F28">F28</button> <button class="fref" data-f="F29">F29</button> <button class="fref" data-f="F33">F33</button>).</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2>Ce qui est déjà sain (et l'est resté)</h2>
+      <ul class="plain">
+        <li>Une seule fabrique de clients ; la matrice <code>capabilities/providers.yaml</code> décide sous-agents, effort et famille de surcharges de skill.</li>
+        <li>Les nouvelles features réutilisent l'existant : <code>verify</code> s'appuie sur <code>AppEmulatorRunner</code>, <code>mobile.stacks</code>, <code>docintel</code> ; <code>uiux</code> sur le cerveau et la prévision du plan.</li>
+        <li>Les phases conditionnelles sont maintenant décidées sur les fichiers prévus par le plan (<code>narrow_to_forecast</code>) : une tâche backend ne paie plus les phases web.</li>
+        <li>Le profil affiché signale les implémentations manquantes (CLI et carte <code>WorkflowProfileCard</code>).</li>
+        <li>rtk, watermarks, read_guard, cerveau, uiux et verify sont branchés une fois : fabrique pour le SDK Claude, <code>tool_executor</code> pour les autres providers.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 MÉMOIRE ============ -->
+<section class="view" id="v-memoire" hidden>
+  <div class="eyebrow">02 · Mémoire · Hermes · Obsidian</div>
+  <h1>Qui écrit, qui lit, et où</h1>
+  <p class="lede">Le cerveau partagé (vault Obsidian + <code>graph.json</code> Graphify + git) reste désigné comme la seule mémoire. Deux nouveaux écrivains s'y ajoutent (vérification runtime, design system), à côté de trois magasins actifs hors du vault et d'un magasin hérité encore branché. Choisissez une feature pour isoler son chemin.</p>
+
+  <div class="controls">
+    <div class="ctl"><span class="lbl">Feature ou page</span><div class="chips" id="mem-filter"></div></div>
+  </div>
+  <div class="split">
+    <div class="card">
+      <div class="legend"><span><s></s>feature / porte</span><span><s class="nw"></s>nouveau</span><span><s class="st"></s>magasin</span><span><s class="lg"></s>hérité (Graphiti)</span><span><s class="br"></s>cassé</span><span><i></i>écrit</span><span><i class="r"></i>lit</span><span><i class="dash b"></i>appel qui échoue</span><span><i class="dash l"></i>chemin hérité</span></div>
+      <div class="diagram-wrap"><svg id="d-mem" role="img" aria-label="Flux de mémoire"></svg></div>
+    </div>
+    <aside class="card detail" id="p-mem"><p class="empty">Cliquez un nœud : son rôle, ses fichiers, ce qu'il lit et écrit.</p></aside>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Le cycle hermes, pas à pas</h2>
+      <div class="mach">
+        <span class="s">~/.hermes skills</span><span class="a">→</span><span class="s">hermes_ingest</span><span class="a">→</span><span class="s">hermes_triage (4 raisons de rejet)</span><span class="a">→</span><span class="s h">skills/_proposed/</span><span class="a">→</span><span class="s">hermes_adopt (HERMES_AUTO_ADOPT)</span><span class="a">→</span><span class="s h">skills/hermes-learned/</span><span class="a">→</span><span class="s">brain_link → knowledge/hermes/</span>
+      </div>
+      <p>Ouvert par cinq surfaces déclarées (<code>hermes/loop.py:58</code>) : <b>build</b> (phase observe), <b>kanban</b> (panneau de tâche, au plus toutes les 15 min), <b>cli</b>, <b>self-healing</b> (fin d'incident), <b>github</b> (déclarée, toujours aucun appelant).</p>
+      <div class="callout"><b>Garde-fou contourné par la configuration</b> (<button class="fref" data-f="F12">F12</button>). La doc fait de l'absence de <code>hermes-learned</code> dans <code>[packs]</code> la barrière qui empêche un skill écrit par un agent d'atteindre les harness sans relecture. <code>.workpilot/skills.toml</code> le liste toujours ; le premier skill adopté sera émis partout.</div>
+    </div>
+    <div class="card">
+      <h2>Ce que reçoit un prompt de codage</h2>
+      <p>Pour une sous-tâche, <code>agents/coder.py</code> et <code>prompts_pkg/prompt_generator.py:506</code> empilent :</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Section</th><th>Source</th><th>Magasin</th></tr></thead>
+        <tbody>
+          <tr><td>Contexte de sous-tâche</td><td><code>load_subtask_context</code></td><td>specs</td></tr>
+          <tr><td>Patterns, pièges, 3 dernières sessions</td><td><code>get_memory_context</code></td><td>vault</td></tr>
+          <tr><td>Patterns appris (succès / échec)</td><td><code>get_learning_context("coding")</code></td><td><code>patterns.json</code></td></tr>
+          <tr><td>Instructions partagées, rappel graph-first</td><td><code>brain.runtime.awareness_section</code></td><td>vault</td></tr>
+          <tr><td>Docs de bibliothèques</td><td><code>_docs_section</code> (libdocs)</td><td>docs-cache</td></tr>
+          <tr><td>Design system (sous-tâches UI seulement)</td><td><code>uiux_section</code></td><td>worktree · MASTER.md</td></tr>
+          <tr><td>Constitution spec-kit, ADR, pièces jointes, mobile</td><td><code>constitution / docintel / mobile_section</code></td><td>projet</td></tr>
+        </tbody></table></div>
+      <p class="note">Deux canaux de « patterns » dans le même prompt (vault et <code>patterns.json</code>), sans budget de tokens commun (<button class="fref" data-f="F7">F7</button>).</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Tous les magasins sur disque, par feature</h2>
+    <p class="note">Sous-dossiers de <code>&lt;projet&gt;/.workpilot/</code> écrits par le backend (nombre de références dans le code, mesuré). Filtrez :</p>
+    <div class="controls"><div class="ctl"><label for="store-q">Recherche</label><input id="store-q" type="search" placeholder="ex. learning, verify, github"></div></div>
+    <div class="tbl"><table id="t-stores"><thead><tr><th>Dossier</th><th class="n">Réf.</th><th>Écrit par</th><th>Nature</th><th>Remarque</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ============ 03 SKILLS ============ -->
+<section class="view" id="v-skills" hidden>
+  <div class="eyebrow">03 · Skills à travers les providers</div>
+  <h1>D'un SKILL.md jusqu'au modèle</h1>
+  <p class="lede">Une source (<code>skills/&lt;pack&gt;/</code>), un constructeur (<code>scripts/skills_cli.py</code>), des sorties par harness, puis huit façons dont un skill atteint un agent à l'exécution. Nouveauté #292 : un skill peut porter des surcharges par provider (<code>providers/_sdk.md</code>, <code>_executor.md</code>, <code>ollama.md</code>…) fusionnées section par section par <code>skills_registry/overlays.py</code>.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">Provider</span><div class="chips" id="prov-filter"></div></div>
+  </div>
+  <div class="split">
+    <div class="card">
+      <div class="legend"><span><s class="st"></s>sortie générée</span><span><s class="nw"></s>nouveau</span><span><s class="ms"></s>pack déclaré mais vide</span><span><s class="lg"></s>miroir désactivé</span><span><i></i>flux</span><span><i class="dash m"></i>flux sans contenu</span></div>
+      <div class="diagram-wrap"><svg id="d-skills" role="img" aria-label="Chemin des skills"></svg></div>
+    </div>
+    <aside class="card detail" id="p-skills"></aside>
+  </div>
+
+  <div class="card">
+    <h2>Matrice providers × capacités</h2>
+    <div class="tbl"><table id="t-prov"><thead><tr><th>Provider</th><th>Adaptateur</th><th>Sous-agents</th><th>Effort</th><th>Dispatch du coding</th><th>Famille de surcharge</th><th>Skills reçus</th><th>Outils exécutés par</th><th>Remarque</th></tr></thead><tbody></tbody></table></div>
+    <p class="note">Source : <code>capabilities/providers.yaml</code>, <code>agents/subagents/__init__.py:resolve</code>, <code>workflows/engine.py:_degrade</code>, <code>skills_registry/overlays.py:87-150</code>, <code>core/client.py</code>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Packs et skills émis</h2>
+    <div class="controls"><div class="ctl"><span class="lbl">Pack</span><div class="chips" id="pack-filter"></div></div></div>
+    <div class="tbl"><table id="t-packs"><thead><tr><th>Pack</th><th class="n">SKILL.md</th><th>Statut</th><th>Utilisé par le pipeline</th><th>Skills</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ============ 04 KANBAN ============ -->
+<section class="view" id="v-kanban" hidden>
+  <div class="eyebrow">04 · Gestion des tâches du Kanban</div>
+  <h1>Simulateur d'exécution d'une carte</h1>
+  <p class="lede">Réglez les paramètres d'une carte : le simulateur rejoue <code>spec/complexity.py</code>, <code>workflows/engine.py:resolve_profile</code> (vérifié sur les 5 niveaux d'effort), <code>narrow_to_forecast</code>, <code>workflows/runner.py</code>, <code>verify/loop.py</code> et <code>agents/subagents/resolve</code>. Pour chaque étape : l'agent, son provider, ses outils, ses sous-agents, le skill chargé et ce qui s'exécute réellement.</p>
+
+  <div class="card">
+    <div class="controls" id="sim-controls"></div>
+    <div class="sumline" id="sim-sum"></div>
+  </div>
+  <div class="split">
+    <div class="pipe" id="sim-pipe"></div>
+    <aside class="card detail" id="p-sim"><p class="empty">Cliquez une étape pour voir l'agent, ses outils, ses serveurs MCP, son roster et les fichiers concernés.</p></aside>
+  </div>
+
+  <div class="card">
+    <h2>Cycle de vie d'une carte</h2>
+    <div class="mach">
+      <span class="s">backlog</span><span class="a">→</span><span class="s">queue</span><span class="a">→</span><span class="s h">planning</span><span class="a">→</span><span class="s">plan_review (gate humaine)</span><span class="a">→</span><span class="s h">coding</span><span class="a">→</span><span class="s h">verify</span><span class="a">→</span><span class="s h">qa_review</span><span class="a">⇄</span><span class="s h">qa_fixing</span><span class="a">→</span><span class="s">human_review</span><span class="a">→</span><span class="s">creating_pr</span><span class="a">→</span><span class="s">pr_created</span><span class="a">→</span><span class="s">done</span>
+    </div>
+    <p class="note">États de <code>shared/state-machines/task-machine.ts</code>. Colonnes : backlog, queue, in_progress, ai_review, human_review, build_failed, pr_created, done, error. <code>human_review</code> porte une raison : completed, errors, qa_rejected, plan_review, prompt_too_long. Le moteur (provider × modèle × effort par phase) est porté par <code>task_metadata.json</code> (<code>engineLocked</code>) et affiché par <code>TaskEngineChip</code>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Matrice exhaustive des cas couverts</h2>
+    <p class="note">Chaque groupe est une dimension indépendante d'une carte ; leur produit donne tous les cas de figure. Filtrez par dimension.</p>
+    <div class="controls"><div class="ctl"><span class="lbl">Dimension</span><div class="chips" id="case-filter"></div></div></div>
+    <div class="tbl"><table id="t-cases"><thead><tr><th>Valeur</th><th>Ce qui s'exécute</th><th>Agents / sous-agents</th><th>Skills / prompts</th><th>Mémoire</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ============ 05 AGENTS ============ -->
+<section class="view" id="v-agents" hidden>
+  <div class="eyebrow">05 · Registre</div>
+  <h1>Agents, rosters et sous-agents</h1>
+  <p class="lede">Un <code>agent_type</code> fixe les outils, les serveurs MCP et le niveau de réflexion (<code>agents/tools_pkg/models.py</code>). Il choisit aussi, via <code>PHASE_ALIASES</code>, un roster de sous-agents (<code>agents/subagents/phases.py:84</code>). Tout ce qui n'est pas aliasé tombe sur le roster Kanban. Une phase skill sans agent déclaré tourne sous <code>analyzer</code> (<code>workflows/runner.py:213</code>).</p>
+  <div class="controls"><div class="ctl"><span class="lbl">Afficher</span><div class="chips" id="ag-filter"></div></div></div>
+  <div class="tbl"><table id="t-agents"><thead><tr><th>agent_type</th><th>Outils</th><th>MCP</th><th>Réflexion</th><th>Roster</th><th>Utilisé par</th><th>État</th></tr></thead><tbody></tbody></table></div>
+  <p class="note">* <code>brain</code> est ajouté à tout agent qui a des outils quand un cerveau existe (<code>models.py</code>, <code>get_required_mcp_servers</code>) ; <code>uiux</code> l'est aussi, mais seulement sur une tâche que le préflight juge UI. <code>chrome-devtools</code> est filtré tant que <code>CHROME_DEVTOOLS_MCP_ENABLED</code> est faux.</p>
+
+  <div class="card">
+    <h2>Catalogue des sous-agents, regroupés par rôle</h2>
+    <p class="note">Les groupes rassemblent les définitions qui répondent à la même question. Une ligne par définition ; la colonne « Source » dit où elle est déclarée (5 sources différentes).</p>
+    <div class="tbl"><table id="t-sub"><thead><tr><th>Sous-agent</th><th>Outils</th><th>Modèle</th><th>Source</th><th>Atteint par</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ============ 06 AUDIT ============ -->
+<section class="view" id="v-audit" hidden>
+  <div class="eyebrow">06 · Constats et plan d'optimisation</div>
+  <h1>Ce qu'il faut corriger, supprimer ou fusionner</h1>
+  <p class="lede">Chaque constat cite son fichier et sa ligne. « Vérifié » signifie reproduit en exécutant le code du dépôt ; « lu » signifie établi par lecture et recherche. Le statut compare au commit <code>7057b28</code>. Le plan est ordonné par priorité, sans estimation de durée.</p>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">Sévérité</span><div class="chips" id="f-sev"></div></div>
+    <div class="ctl"><span class="lbl">Statut</span><div class="chips" id="f-st"></div></div>
+    <div class="ctl"><span class="lbl">Catégorie</span><div class="chips" id="f-cat"></div></div>
+    <div class="ctl"><span class="lbl">Exporter</span><button class="btn" type="button" id="f-export">Constats en Markdown (.md)</button></div>
+  </div>
+  <div class="sumline" id="f-count"></div>
+  <div class="flist" id="f-list"></div>
+
+  <div class="card">
+    <h2>Plan par priorité</h2>
+    <p class="note">Chaque ligne est un lot indépendant (une PR vers <code>develop</code>). Le détail exécutable de chaque lot est dans <code>docs/audit/AUDIT-NETTOYAGE.md</code>.</p>
+    <div class="tbl"><table id="t-plan"><thead><tr><th>Priorité</th><th>Lot</th><th>Action</th><th>Constats</th><th>Gain attendu</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ============ 07 NETTOYAGE ============ -->
+<section class="view" id="v-nettoyage" hidden>
+  <div class="eyebrow">07 · Inventaire de nettoyage</div>
+  <h1>Les fichiers qu'on peut retirer sans perdre une feature</h1>
+  <p class="lede">Chaque ligne a été établie par une recherche d'importeurs (AST Python, imports TypeScript stricts, chemins lancés par le main process, workflows CI). « Supprimer » : aucun appelant de production. « Câbler ou retirer » : une feature visible existe, la décision est produit. « Migrer » : des appelants existent, ils doivent d'abord changer de chemin.</p>
+  <div class="figures" id="clean-figs"></div>
+  <div class="controls">
+    <div class="ctl"><span class="lbl">Zone</span><div class="chips" id="clean-zone"></div></div>
+    <div class="ctl"><label for="clean-q">Recherche</label><input id="clean-q" type="search" placeholder="ex. Usage, graphiti, prompts"></div>
+  </div>
+  <div class="sumline" id="clean-sum"></div>
+  <div class="tbl"><table id="t-clean"><thead><tr><th>Zone</th><th>Chemin</th><th class="n">Lignes</th><th>Preuve</th><th>Action</th><th>Constat</th></tr></thead><tbody></tbody></table></div>
+  <div class="callout">Avant toute suppression frontend, confirmer avec <code>npx knip</code> (ou <code>ts-prune</code>) puis <code>pnpm run typecheck</code> et <code>pnpm test</code> : un import dynamique construit à l'exécution échappe à une recherche textuelle.</div>
+</section>
+
+<!-- ============ 08 ÉVOLUTIONS ============ -->
+<section class="view" id="v-evolutions" hidden>
+  <div class="eyebrow">08 · Depuis l'audit précédent (7057b28 → b46a031)</div>
+  <h1>Ce que les PR #288 à #292 ont changé</h1>
+  <p class="lede">273 fichiers modifiés, +37 515 / −1 267 lignes. Trois features structurantes et deux correctifs d'installation de Codex CLI. Ci-dessous, leur effet sur chaque constat de l'audit précédent.</p>
+  <div class="figures" id="evo-figs"></div>
+  <div class="tbl"><table id="t-prs"><thead><tr><th>PR</th><th>Changement</th><th>Effet sur l'architecture</th><th>Constats touchés</th></tr></thead><tbody></tbody></table></div>
+  <div class="card">
+    <h2>Statut des 19 constats de l'audit précédent</h2>
+    <div class="tbl"><table id="t-evo"><thead><tr><th>Constat</th><th>Statut</th><th>Ce qui a changé</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+</main>
+</div>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+/* ---------- moteur de schéma ---------- */
+function drawDiagram(svg,spec,onPick){
+  svg.innerHTML="";svg.setAttribute("viewBox",`0 0 ${spec.w} ${spec.h}`);
+  const defs=el("defs",{},svg);const m=el("marker",{id:svg.id+"-a",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},defs);
+  el("path",{d:"M0,0 L10,5 L0,10 z",fill:"var(--edge)"},m);
+  (spec.lanes||[]).forEach(l=>{el("rect",{x:l.x,y:8,width:l.w,height:spec.h-16,rx:6,class:"lane-bg"},svg);const t=el("text",{x:l.x+10,y:26,class:"lane-t"},svg);t.textContent=l.label});
+  const N={};spec.nodes.forEach(n=>N[n.id]=n);
+  const gE=el("g",{},svg),gN=el("g",{},svg);
+  const edges=spec.edges.map(([a,b,k])=>{const A=N[a],B=N[b];if(!A||!B){console.warn("arête inconnue",a,b);return null}
+    let x1,y1,x2,y2,d;
+    if(B.x>=A.x+A.w-4){x1=A.x+A.w;y1=A.y+A.h/2;x2=B.x;y2=B.y+B.h/2;const dx=Math.max(30,(x2-x1)/2);d=`M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`}
+    else if(A.x>=B.x+B.w-4){x1=A.x;y1=A.y+A.h/2;x2=B.x+B.w;y2=B.y+B.h/2;const dx=Math.max(30,(x1-x2)/2);d=`M${x1},${y1} C${x1-dx},${y1} ${x2+dx},${y2} ${x2},${y2}`}
+    else{const down=B.y>A.y;x1=A.x+A.w/2;y1=down?A.y+A.h:A.y;x2=B.x+B.w/2;y2=down?B.y:B.y+B.h;const dy=(y2-y1)/2;d=`M${x1},${y1} C${x1},${y1+dy} ${x2},${y2-dy} ${x2},${y2}`}
+    const p=el("path",{d,class:"edge"+(k?" k-"+k:""),"marker-end":`url(#${svg.id}-a)`},gE);p.dataset.a=a;p.dataset.b=b;return p}).filter(Boolean);
+  spec.nodes.forEach(n=>{const isGroup=n.kind==="group";
+    const g=el("g",{class:"node"+(n.kind?" k-"+n.kind:"")},gN);g.dataset.id=n.id;
+    if(!isGroup){g.setAttribute("tabindex","0");g.setAttribute("role","button");g.setAttribute("aria-label",n.label+(n.sub?" — "+n.sub:""))}
+    el("rect",{x:n.x,y:n.y,width:n.w,height:n.h,rx:5},g);
+    if(isGroup){const t=el("text",{x:n.x+8,y:n.y+15},g);t.textContent=n.label}
+    else{const ty=n.sub?n.y+n.h/2-3:n.y+n.h/2+4;const t=el("text",{x:n.x+10,y:ty},g);t.textContent=n.label;
+      if(n.sub){const s=el("text",{x:n.x+10,y:ty+14,class:"sub"},g);s.textContent=n.sub}
+      g.addEventListener("click",()=>onPick(n));g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onPick(n)}})}
+  });
+  return {
+    focus(ids,sel){svg.classList.toggle("focus",!!ids);$$(".node",svg).forEach(g=>{g.classList.toggle("on",!!ids&&ids.has(g.dataset.id));g.classList.toggle("sel",g.dataset.id===sel)});
+      edges.forEach(p=>p.classList.toggle("on",!!ids&&ids.has(p.dataset.a)&&ids.has(p.dataset.b)))},
+    neighbours(id){const s=new Set([id]);edges.forEach(p=>{if(p.dataset.a===id)s.add(p.dataset.b);if(p.dataset.b===id)s.add(p.dataset.a)});return s}
+  };
+}
+const frefs=ids=>(ids||[]).map(f=>`<button class="fref" type="button" data-f="${f}">${f}</button>`).join("");
+function detailHTML(n){
+  let h=`<div>${n.tag||""}</div><h3>${esc(n.label)}</h3>`;
+  if(n.sub)h+=`<p class="note">${esc(n.sub)}</p>`;
+  if(n.info)h+=`<p>${n.info}</p>`;
+  if(n.files)h+=`<div><div class="lbl">Fichiers</div><ul>${n.files.map(f=>`<li><code>${esc(f)}</code></li>`).join("")}</ul></div>`;
+  if(n.notes)h+=`<ul>${n.notes.map(x=>`<li>${x}</li>`).join("")}</ul>`;
+  if(n.f)h+=`<div><div class="lbl">Constats liés</div><div>${frefs(n.f)}</div></div>`;
+  return h;
+}
+function chips(container,items,{multi=false,initial,onChange}){
+  const c=$(container);c.innerHTML="";let state=multi?new Set(initial||[]):initial;
+  items.forEach(([v,label])=>{const b=document.createElement("button");b.className="chip";b.type="button";b.textContent=label;b.dataset.v=v;
+    b.setAttribute("aria-pressed",String(multi?state.has(v):state===v));
+    b.addEventListener("click",()=>{if(multi){state.has(v)?state.delete(v):state.add(v)}else{state=(state===v&&items[0][0]!==v)?items[0][0]:v}
+      $$(".chip",c).forEach(x=>x.setAttribute("aria-pressed",String(multi?state.has(x.dataset.v):state===x.dataset.v)));onChange(state)});c.appendChild(b)});
+  onChange(state);
+}
+function table(sel,rows,fn){$(sel+" tbody").innerHTML=rows.map(fn).join("")}
+
+/* ---------- 01 macro ---------- */
+const MACRO={w:1180,h:560,lanes:[{x:10,w:250,label:"Desktop (Electron)"},{x:280,w:250,label:"Backend Python"},{x:550,w:300,label:"Fabrique & moteur"},{x:870,w:300,label:"Providers & services"}],
+nodes:[
+ {id:"ui",x:24,y:44,w:222,h:46,label:"Renderer React",sub:"78 vues · 120 stores Zustand",info:"Kanban, panneau de tâche et 78 vues de la barre latérale. Les écouteurs IPC sont enregistrés une seule fois (<code>stores/global-listeners.ts</code>). 57 fichiers n'ont aucun importeur.",files:["apps/frontend/src/renderer/components/Sidebar.tsx","apps/frontend/src/renderer/stores/"],f:["F19","F28","F21"]},
+ {id:"kanban",x:24,y:100,w:222,h:46,label:"Kanban + panneau de tâche",sub:"cartes, revue, émulateur, vérif.",info:"Crée la tâche, lance <code>run.py</code> via le main process, affiche les phases émises par le backend, la carte <code>VerifyLoopCard</code>, l'onglet Vérification et <code>UiUxDesignCard</code>."},
+ {id:"engine",x:24,y:156,w:222,h:46,kind:"new",label:"task-engine.ts",sub:"moteur par phase · engineLocked",info:"#290 : Fournisseur × LLM × effort par phase (spec, planification, code, QA), écrit dans <code>task_metadata.json</code>. <code>task-provider-env.ts</code> injecte les identifiants de chaque provider des phases ; <code>_resolve_active_provider</code> lit la tâche avant tout. Le marqueur <code>RESUME_WITH_PROVIDER</code> n'est plus écrit.",files:["apps/frontend/src/shared/utils/task-engine.ts","apps/frontend/src/main/agent/task-provider-env.ts","apps/backend/phase_config.py"],f:["F25"]},
+ {id:"main",x:24,y:212,w:222,h:46,label:"Main process",sub:"110 modules IPC (178 fichiers)",info:"Lance les runners Python, gère profils Claude, terminaux PTY, worktrees. Quatre API preload appellent des canaux sans handler.",files:["apps/frontend/src/main/ipc-handlers/","apps/frontend/src/main/agent/agent-process.ts"],f:["F22","F36"]},
+ {id:"pagellm",x:24,y:268,w:222,h:46,label:"page-llm.ts",sub:"provider × modèle × effort",info:"Résout la formule d'une page : page → réglages → défauts. 8 pages ont une formule propre ; les autres suivent le fournisseur par défaut (Paramètres → Agent).",files:["apps/frontend/src/shared/utils/page-llm.ts"]},
+ {id:"legacyfe",x:24,y:334,w:222,h:46,kind:"legacy",label:"Services mémoire hérités",sub:"memory-service.ts · team-sync",info:"~3 700 lignes front pour LadybugDB/Graphiti : memory-service (861), canaux MEMORY_*/GRAPHITI_* de memory-handlers (qui héberge aussi les 11 canaux OLLAMA_* à garder), team-sync-handlers (502), memory-lifecycle (325 + store 193), TeamSyncPanel (580, déjà orphelin), MemoryStep.",tag:'<span class="tag legacy">hérité</span>',f:["F6"]},
+ {id:"run",x:294,y:44,w:222,h:46,label:"run.py · cli/build_commands",sub:"enchaîne les phases d'un build",files:["apps/backend/run.py","apps/backend/cli/build_commands.py"]},
+ {id:"specrun",x:294,y:100,w:222,h:46,label:"spec_runner",sub:"complexité → phases de spec",info:"Toutes les phases LLM tournent sous <code>spec_writer</code> ; depuis #290 le provider est celui de la phase spec de la tâche.",files:["apps/backend/runners/spec_runner.py","apps/backend/spec/pipeline/agent_runner.py"],f:["F4"]},
+ {id:"runners",x:294,y:156,w:222,h:46,label:"69 runners",sub:"1 par feature/page",info:"Un runner par page (idéation, roadmap, PR, self-healing…). Chacun construit son agent via la fabrique ; la Roadmap oublie son agent_type et tourne en coder.",files:["apps/backend/runners/"],f:["F24","F21"]},
+ {id:"api",x:294,y:212,w:222,h:46,label:"FastAPI :9000",sub:"provider_api.py (2 194 l.)",info:"Monte les routeurs : slash-commands, brain, hermes, docintel, workflow-profile, traceability, uiux, verify…"},
+ {id:"preflight",x:294,y:268,w:222,h:46,label:"Préflights sans LLM",sub:"libdocs · docintel · mobile · uiux",info:"Avant le planning ou le coding : docs des bibliothèques (Context7), pièces jointes (OCR local), détection mobile, design system (<code>ui-design-system</code>, moteur BM25 local). Aucun appel modèle."},
+ {id:"verifyb",x:294,y:324,w:222,h:46,kind:"new",label:"verify/ · boucle runtime",sub:"lancer · erreurs · preuve · replay",info:"#292 : lance l'application modifiée, lit les erreurs, corrige tant que leur nombre baisse, conduit l'app jusqu'à l'état visé (session <code>verifier</code> à effort ≥ medium), trace la performance, garde captures et score. Réutilise <code>AppEmulatorRunner</code>, <code>mobile.stacks</code>, <code>docintel</code>.",files:["apps/backend/verify/loop.py","apps/backend/verify/tools.py","apps/backend/verify/mcp_server.py"],f:["F11"]},
+ {id:"graphiti",x:294,y:400,w:222,h:46,kind:"legacy",label:"integrations/graphiti",sub:"7 593 lignes · 214 réf. ailleurs",info:"Ancienne mémoire. Retirée des serveurs MCP par défaut mais encore importée par team_sync, memory_lifecycle, query_memory, deep_context_provider, cli/utils et 40 autres fichiers. <code>real_ladybug</code> et <code>graphiti-core</code> restent dans <code>requirements.txt</code>.",tag:'<span class="tag legacy">hérité</span>',f:["F6"]},
+ {id:"wf",x:564,y:44,w:272,h:46,label:"Moteur de workflow",sub:"workflows/feature-build · 19 phases",info:"Phases élaguées par effort, conditionnées par les fichiers (prévus par le plan puis réels), dégradées selon le provider. 5 phases pointent vers des packs vides.",files:["apps/backend/workflows/engine.py","apps/backend/workflows/runner.py","apps/backend/workflows/forecast.py"],f:["F2","F3","F20"]},
+ {id:"factory",x:564,y:110,w:272,h:56,kind:"hub",label:"core/client.py",sub:"create_client · create_agent_client",info:"LA fabrique. Résout modèle, outils (<code>AGENT_CONFIGS</code>), serveurs MCP (brain, uiux, verify…), roster de sous-agents, hooks (rtk, watermarks, read_guard, sécurité). Les adaptateurs vivent dans <code>core/agent_client.py</code> (5 532 lignes).",files:["apps/backend/core/client.py","apps/backend/core/agent_client.py","apps/backend/agents/tools_pkg/models.py"],f:["F1","F36"]},
+ {id:"roster",x:564,y:182,w:132,h:46,label:"Rosters",sub:"subagents/",files:["apps/backend/agents/subagents/"],f:["F5","F8","F9"]},
+ {id:"prompts",x:704,y:182,w:132,h:46,label:"Prompts",sub:"704 Ko · 62 .md",files:["apps/backend/prompts/"],f:["F10"]},
+ {id:"skills",x:564,y:244,w:272,h:46,kind:"store",label:".agents/skills",sub:"84 skills · généré par skills_cli",files:["skills/","scripts/skills_cli.py"],f:["F2","F12"]},
+ {id:"hooks",x:564,y:300,w:272,h:46,label:"Hooks transverses",sub:"rtk · watermarks · read_guard · bash_security",info:"Enregistrés une fois dans la fabrique (SDK Claude) et dans <code>tool_executor</code> (autres providers)."},
+ {id:"uiux",x:564,y:356,w:272,h:46,kind:"new",label:"uiux/ · ui-ux-pro-max",sub:"design system · tâches UI seulement",info:"#291 : pertinence décidée sur fichiers (override → plan → description), préflight déterministe, section de prompt sur les sous-tâches UI, serveur MCP <code>workpilot-uiux</code> offert seulement aux agents d'une tâche UI, MASTER.md classé dans le cerveau au merge.",files:["apps/backend/uiux/","skills/ui-ux-pro-max/"],f:["F27","F35","F14"]},
+ {id:"brain",x:564,y:420,w:272,h:56,kind:"store",label:"Cerveau partagé",sub:"vault Obsidian · graph.json · git",info:"Mémoire des builds, instructions partagées, connaissances. Servi en MCP à tous les agents qui ont des outils.",files:["apps/backend/brain/"],f:["F7"]},
+ {id:"ll",x:564,y:492,w:272,h:46,kind:"store",label:"learning_loop/patterns.json",sub:"second magasin de patterns",files:["apps/backend/learning_loop/pattern_storage.py"],f:["F7"]},
+ {id:"p_claude",x:884,y:44,w:272,h:46,label:"Claude SDK",sub:"sous-agents natifs · hooks SDK"},
+ {id:"p_copilot",x:884,y:100,w:272,h:46,label:"Copilot",sub:"sous-agents natifs (convertis)"},
+ {id:"p_api",x:884,y:156,w:272,h:46,label:"OpenAI · Google · Windsurf",sub:"pas de sous-agents · tool_executor"},
+ {id:"p_local",x:884,y:212,w:272,h:46,label:"Ollama · LM Studio · local",sub:"LocalAgentClient · airgap"},
+ {id:"p_compat",x:884,y:268,w:272,h:46,label:"Mistral · DeepSeek · Grok",sub:"CompatibleProviderAgentClient",f:["F18"]},
+ {id:"p_deg",x:884,y:324,w:272,h:46,label:"Meta · AWS · Cursor · Custom",sub:"pas d'adaptateur → SDK Claude"},
+ {id:"mcp",x:884,y:400,w:272,h:56,label:"Serveurs MCP",sub:"workpilot · brain · uiux · verify · docintel…",info:"Pour le SDK Claude : serveurs stdio. Pour les autres providers, brain, uiux et verify sont exécutés en processus par <code>tool_executor</code>."},
+ {id:"ext",x:884,y:472,w:272,h:46,label:"Agents externes",sub:"Claude Code · Codex · hermes · Gemini…",info:"Lisent <code>.agents/skills</code>, se branchent sur les serveurs MCP. Claude Code charge aussi <code>CLAUDE.md</code> → <code>docs/CLAUDE.md</code> (268 Ko) à chaque session.",f:["F23"]}
+],
+edges:[["ui","main"],["kanban","main"],["kanban","engine"],["engine","main"],["pagellm","main"],["legacyfe","graphiti","legacy"],["main","run"],["main","specrun"],["main","runners"],["main","api"],["run","preflight"],["run","wf"],["wf","verifyb"],["verifyb","factory"],["specrun","factory"],["runners","factory"],["api","factory"],["wf","factory"],["factory","roster","read"],["factory","prompts","read"],["wf","skills","read"],["factory","hooks"],["wf","uiux"],["factory","uiux","read"],["factory","p_claude"],["factory","p_copilot"],["factory","p_api"],["factory","p_local"],["factory","p_compat"],["factory","p_deg"],["factory","mcp"],["mcp","brain"],["factory","brain","read"],["factory","ll","read"],["runners","graphiti","legacy"],["ext","mcp"]]};
+
+/* ---------- 02 mémoire ---------- */
+const MEM={w:1180,h:780,lanes:[{x:10,w:240,label:"Features"},{x:270,w:250,label:"Portes d'accès"},{x:540,w:330,label:"Magasins"},{x:890,w:280,label:"Consommateurs"}],
+nodes:[
+ {id:"f_build",x:22,y:44,w:216,h:40,label:"Build Kanban",sub:"planner · coder · QA",info:"Lit la mémoire du projet avant chaque session, écrit pièges et découvertes pendant, une note de session et une note de build à la fin.",files:["agents/memory_manager.py:57","cli/build_commands.py:374","agents/tools_pkg/tools/memory.py"]},
+ {id:"f_spec",x:22,y:94,w:216,h:40,label:"Pipeline de spec",sub:"phase historical_context",info:"Écrit <code>graph_hints.json</code> à partir du cerveau (<code>memory.store.get_graph_hints</code>).",files:["spec/phases/requirements_phases.py:24"]},
+ {id:"f_merge",x:22,y:144,w:216,h:40,label:"Merge d'une tâche",sub:"Kanban / run.py --merge",info:"Quatre écritures pour un même événement : usage_tracker, learning_loop.record_merge_outcome, brain.record_merge, uiux.knowledge (MASTER.md).",files:["cli/workspace_commands.py:374-410"],f:["F14"]},
+ {id:"f_verify",x:22,y:194,w:216,h:40,kind:"new",label:"Boucle /verify",sub:"#292 · lancement · perf",info:"Garde la commande de lancement qui a marché, la performance par route, transforme une panne de lancement corrigée en piège et classe le verdict du build dans le cerveau.",files:["verify/learn.py"]},
+ {id:"f_uiux",x:22,y:244,w:216,h:40,kind:"new",label:"ui-ux-pro-max",sub:"#291 · design system",info:"Écrit <code>design-system/&lt;projet&gt;/MASTER.md</code> dans le worktree (relu dans le diff), puis le classe dans le cerveau au merge.",files:["uiux/preflight.py","uiux/knowledge.py:38"]},
+ {id:"f_insight",x:22,y:294,w:216,h:40,kind:"broken",label:"Extracteur d'insights",sub:"agent_type non enregistré",info:"Censé écrire patterns/, codebase/ et outcomes/ dans le vault. <code>agent_type=insight_extractor</code> absent d'<code>AGENT_CONFIGS</code> → ValueError attrapée (<code>analysis/insight_extractor.py:379</code>). Reproduit avec <code>get_agent_config</code>.",tag:'<span class="tag crit">cassé · vérifié</span>',f:["F1"]},
+ {id:"f_pr",x:22,y:344,w:216,h:40,label:"Revues PR / MR",sub:"GitHub · GitLab · ADO",info:"Lit le contexte du learning loop (<code>pr_review_engine.py:70</code>), enregistre les constats critiques comme pièges, et interroge encore Graphiti via <code>deep_context_provider.py:407</code>.",f:["F6"]},
+ {id:"f_idea",x:22,y:394,w:216,h:40,label:"Idéation · Roadmap · Insights",sub:"pages",info:"Lisent <code>context_for_agent</code> (learning loop) et le cerveau via MCP ; peuvent écrire via <code>POST /api/brain/learn</code>.",files:["ideation/generator.py:60","runners/roadmap/graph_integration.py"]},
+ {id:"f_doc",x:22,y:444,w:216,h:40,label:"Carte Docintel",sub:"décisions d'une personne",files:["docintel/knowledge.py"]},
+ {id:"f_heal",x:22,y:494,w:216,h:40,label:"Self-healing",sub:"fin d'incident",files:["self_healing/incident_responder/orchestrator.py"]},
+ {id:"f_hermes",x:22,y:544,w:216,h:40,label:"hermes-agent",sub:"Telegram · cron · terminal",info:"Écrit ses propres skills dans <code>~/.hermes</code>, hors de WorkPilot."},
+ {id:"f_human",x:22,y:594,w:216,h:40,label:"Une personne",sub:"édite dans Obsidian",info:"Active ou refuse les règles proposées (<code>status:</code>), édite les notes. <code>--action watch</code> pousse sans attendre un agent."},
+ {id:"f_ext",x:22,y:644,w:216,h:40,label:"Agents externes",sub:"Claude Code · Codex · Gemini…",info:"Branchés par <code>connect</code> (MCP) et <code>bridge</code> (bloc dans leur mémoire globale). Écrivent au nom de la personne, sans restriction."},
+ {id:"f_legacy",x:22,y:704,w:216,h:40,kind:"legacy",label:"Pages héritées",sub:"Team Sync · Memory lifecycle",info:"TeamSyncPanel (orphelin), MemoryLifecycleSection, MemoryStep d'onboarding, memory-service.ts : tous parlent à Graphiti / LadybugDB.",tag:'<span class="tag legacy">hérité</span>',f:["F6"]},
+
+ {id:"g_pm",x:282,y:60,w:226,h:42,label:"get_project_memory",sub:"memory/store.py → ProjectMemory",files:["memory/store.py","brain/project_memory.py"]},
+ {id:"g_learn",x:282,y:140,w:226,h:42,label:"brain/learn.py",sub:"record_build · record_merge · record",info:"SURFACES : build, merge, kanban, insights, ideation, roadmap, github, self-healing, docintel, verify, uiux."},
+ {id:"g_mcp",x:282,y:220,w:226,h:42,label:"MCP workpilot-brain",sub:"11 outils + tool_executor",info:"brain_recall, brain_read_note, brain_write_note, brain_remember, brain_instructions, brain_skill, brain_status, brain_sync, query_graph, get_node, shortest_path. Agents WorkPilot = origine non fiable : knowledge/ et propositions seulement."},
+ {id:"g_ll",x:282,y:300,w:226,h:42,label:"learning_loop",sub:"observe · patterns · prompt_injection",info:"observe compte désormais un verify mesuré comme signal externe <code>runtime_verified</code>.",files:["learning_loop/pattern_storage.py:25","learning_loop/prompt_injection.py","learning_loop/observe.py"],f:["F7"]},
+ {id:"g_hloop",x:282,y:380,w:226,h:42,label:"hermes/loop.run_cycle",sub:"ingest → triage → adopt",files:["hermes/loop.py","learning_loop/hermes_*.py"],f:["F12"]},
+ {id:"g_conn",x:282,y:460,w:226,h:42,label:"connect · bridge · ingest",sub:"brain/connect.py · memories.py",files:["brain/connect.py","brain/memories.py","brain/agents.py"]},
+ {id:"g_tlog",x:282,y:540,w:226,h:42,label:"task_logger",sub:"traces d'exécution",files:["task_logger/"]},
+ {id:"g_vlearn",x:282,y:620,w:226,h:42,kind:"new",label:"verify/learn.py",sub:"recette · baseline · piège · note",files:["verify/learn.py:8-11,65-170"]},
+ {id:"g_graphiti",x:282,y:704,w:226,h:42,kind:"legacy",label:"integrations/graphiti",sub:"team_sync · lifecycle · query",tag:'<span class="tag legacy">hérité</span>',f:["F6"]},
+
+ {id:"vault",x:550,y:40,w:310,h:388,kind:"group",label:"VAULT OBSIDIAN · ~/.workpilot/brain"},
+ {id:"s_mem",x:562,y:62,w:286,h:42,kind:"store",label:"knowledge/projects/<p>/memory/",sub:"gotchas · patterns · codebase · outcomes · sessions"},
+ {id:"s_builds",x:562,y:116,w:286,h:42,kind:"store",label:"knowledge/projects/<p>/builds/",sub:"une note par tâche (verdict QA, fichiers)"},
+ {id:"s_know",x:562,y:170,w:286,h:42,kind:"store",label:"knowledge/",sub:"+ hermes/ · docintel/ · uiux/ · verify/"},
+ {id:"s_instr",x:562,y:224,w:286,h:42,kind:"store",label:"instructions/",sub:"active · proposed (validées par une personne)"},
+ {id:"s_agents",x:562,y:278,w:286,h:42,kind:"store",label:"agents/<agent>/",sub:"instantanés des mémoires d'agents"},
+ {id:"s_graph",x:562,y:332,w:286,h:42,kind:"store",label:"graphify-out/graph.json",sub:"dérivé · + ocr-cache des images"},
+ {id:"s_git",x:562,y:384,w:286,h:34,label:"git : commit → pull → push",sub:""},
+ {id:"s_patterns",x:550,y:444,w:310,h:42,kind:"store",label:".workpilot/learning_loop/patterns.json",sub:"patterns succès/échec, par projet"},
+ {id:"s_traces",x:550,y:496,w:310,h:42,kind:"store",label:".workpilot/specs/*/ logs",sub:"traces task_logger · verify/ · uiux/"},
+ {id:"s_verify",x:550,y:548,w:310,h:42,kind:"new",label:".workpilot/verify/",sub:"recipe.json · baseline.json"},
+ {id:"s_prop",x:550,y:600,w:310,h:42,kind:"store",label:"skills/_proposed · hermes-learned",sub:"candidats de skills"},
+ {id:"s_hermes",x:550,y:652,w:150,h:42,kind:"store",label:"~/.hermes",sub:"skills · .usage.json"},
+ {id:"s_lady",x:710,y:652,w:150,h:42,kind:"legacy",label:"LadybugDB",sub:"~/.workpilot/memories"},
+ {id:"s_master",x:550,y:704,w:310,h:42,kind:"new",label:"design-system/<p>/MASTER.md",sub:"dans le worktree, donc dans le diff"},
+
+ {id:"c_prompt",x:902,y:62,w:256,h:42,label:"Prompts planner/coder/QA",sub:"get_memory_context + learning"},
+ {id:"c_aware",x:902,y:130,w:256,h:42,label:"Prompt système (tous providers)",sub:"awareness_section"},
+ {id:"c_recall",x:902,y:198,w:256,h:42,label:"Rappel à la demande",sub:"brain_recall · query_graph"},
+ {id:"c_ms",x:902,y:266,w:256,h:42,label:"mem-search",sub:"index ~100 tokens → détail"},
+ {id:"c_ui",x:902,y:334,w:256,h:42,label:"UI de la tâche",sub:"BrainTaskCard · HermesLearningCard"},
+ {id:"c_tab",x:902,y:402,w:256,h:42,label:"Onglet Mémoires",sub:"GET /api/brain/memories"},
+ {id:"c_mesh",x:902,y:470,w:256,h:42,label:"Context mesh",sub:"patterns.json de tous les projets"},
+ {id:"c_bridge",x:902,y:538,w:256,h:42,label:"Mémoire globale des agents",sub:"bloc workpilot-brain"},
+ {id:"c_pal",x:902,y:606,w:256,h:42,label:"Palette de skills",sub:"si le pack est listé"},
+ {id:"c_verify",x:902,y:674,w:256,h:42,kind:"new",label:"Prochain verify · tâche UI suivante",sub:"recette réutilisée · régression perf"}
+],
+edges:[
+ ["f_build","g_pm"],["f_build","g_learn"],["f_build","g_mcp"],["f_build","g_ll"],["f_build","g_tlog"],["f_build","g_hloop"],
+ ["f_spec","g_pm","read"],["f_merge","g_learn"],["f_merge","g_ll"],["f_verify","g_vlearn"],["f_uiux","g_learn"],["f_uiux","s_master"],["f_insight","g_pm","broken"],["f_insight","g_ll","broken"],
+ ["f_pr","g_pm"],["f_pr","g_ll","read"],["f_pr","g_graphiti","legacy"],["f_idea","g_mcp"],["f_idea","g_ll","read"],["f_idea","g_learn"],
+ ["f_doc","g_learn"],["f_heal","g_hloop"],["f_hermes","s_hermes"],["f_human","s_instr"],["f_human","s_know"],["f_ext","g_conn"],["f_ext","g_mcp"],["f_legacy","g_graphiti","legacy"],
+ ["g_pm","s_mem"],["g_learn","s_builds"],["g_learn","s_know"],["g_mcp","s_know"],["g_mcp","s_instr"],["g_mcp","s_graph","read"],
+ ["g_ll","s_patterns"],["g_ll","s_prop"],["g_hloop","s_hermes","read"],["g_hloop","s_prop"],["g_hloop","s_know"],["g_conn","s_agents"],["g_conn","s_instr"],["g_tlog","s_traces"],["g_graphiti","s_lady","legacy"],
+ ["g_vlearn","s_verify"],["g_vlearn","s_mem"],["g_vlearn","s_know"],
+ ["s_mem","c_prompt","read"],["s_patterns","c_prompt","read"],["s_instr","c_aware","read"],["s_graph","c_recall","read"],["s_graph","c_ms","read"],["s_patterns","c_ms","read"],["s_traces","c_ms","read"],["s_graph","c_ui","read"],["s_prop","c_ui","read"],["s_mem","c_tab","read"],["s_patterns","c_mesh","read"],["s_instr","c_bridge","read"],["s_prop","c_pal","read"],["s_verify","c_verify","read"],["s_master","c_verify","read"]
+]};
+const MEM_FEATURES=[
+ ["all","Tout"],["build","Build Kanban"],["spec","Pipeline de spec"],["merge","Merge"],["verify","Boucle /verify"],["uiux","ui-ux-pro-max"],["pr","Revues PR"],["idea","Idéation · Roadmap · Insights"],["doc","Docintel"],["heal","Self-healing"],["hermes","hermes"],["ext","Agents externes"],["human","Obsidian"],["insight","Extracteur d'insights"],["legacy","Pages héritées"],["ms","mem-search"]];
+const MEM_SETS={
+ build:"f_build g_pm g_learn g_mcp g_ll g_tlog g_hloop s_mem s_builds s_know s_instr s_graph s_patterns s_traces s_prop s_hermes c_prompt c_aware c_recall c_ui",
+ spec:"f_spec g_pm s_mem c_prompt",
+ merge:"f_merge g_learn g_ll s_builds s_know s_patterns s_prop",
+ verify:"f_verify g_vlearn s_verify s_mem s_know c_verify c_prompt c_recall",
+ uiux:"f_uiux g_learn s_know s_master c_verify c_recall",
+ pr:"f_pr g_pm g_ll g_graphiti s_mem s_patterns s_prop s_lady c_prompt",
+ idea:"f_idea g_mcp g_ll g_learn s_know s_instr s_graph s_patterns s_builds c_recall c_aware",
+ doc:"f_doc g_learn s_know s_builds c_recall s_graph",
+ heal:"f_heal g_hloop s_hermes s_prop s_know c_ui c_pal",
+ hermes:"f_hermes s_hermes g_hloop s_prop s_know c_ui c_pal",
+ ext:"f_ext g_conn g_mcp s_agents s_instr s_know s_graph c_bridge c_recall",
+ human:"f_human s_instr s_know s_graph c_aware c_bridge c_recall",
+ insight:"f_insight g_pm g_ll s_mem s_patterns",
+ legacy:"f_legacy g_graphiti s_lady f_pr",
+ ms:"c_ms s_graph s_patterns s_traces g_mcp"};
+const MEM_DESC={all:"Toutes les écritures et lectures.",build:"Un build lit la mémoire du projet et les patterns appris avant chaque session, écrit pièges, découvertes et sessions pendant, puis une note de build, des candidats de skills et le cycle hermes à la fin.",spec:"La phase historical_context lit le cerveau et écrit graph_hints.json.",merge:"Quatre écritures pour un même merge (F14).",verify:"La vérification garde sa recette de lancement et sa baseline de performance dans .workpilot/verify, transforme une panne corrigée en piège, et classe son verdict sous knowledge/projects/<p>/verify.",uiux:"Le design system est écrit dans le worktree (relu dans le diff), puis classé dans le cerveau au merge ; la tâche UI suivante le relit au lieu d'en inventer un autre.",pr:"Lit le learning loop, écrit les constats critiques comme pièges, et interroge encore Graphiti.",idea:"Lecture MCP du cerveau et du learning loop ; écriture via POST /api/brain/learn.",doc:"Ce qu'une personne a validé dans la carte devient knowledge/projects/<p>/docintel.",heal:"Fin d'incident : cycle hermes surface self-healing.",hermes:"hermes écrit dans ~/.hermes ; le cycle trie, propose, adopte et classe dans knowledge/hermes.",ext:"Les agents externes lisent et écrivent par MCP et reçoivent un bloc bridge dans leur mémoire globale.",human:"Une personne active les règles proposées et édite le vault dans Obsidian.",insight:"Chemin prévu, actuellement cassé (F1).",legacy:"Chemins hérités vers Graphiti / LadybugDB (F6).",ms:"mem-search lit trois sources : graph.json du vault, patterns.json, traces task_logger."};
+const STORES=[
+ ["specs",74,"toutes les features (spec, plan, QA, journaux, verify/, uiux/, architecture/)","état de tâche",""],["github",30,"revues PR, issues, auto-fix","cache / état",""],["worktrees",25,"isolation des builds","worktrees git",""],["skills",12,"skills.toml, ADOPTED.json","config",""],["audit-trail",11,"audit","journal",""],["gitlab",7,"revues MR","cache",""],["environment",7,"cloneur d'environnement","état",""],["continuous-ai",7,"démon continu","état",""],["verify",5,"verify/learn.py","recette, baseline perf","nouveau (#292)"],["migration",5,"migration de code","état",""],["guardrails",5,"garde-fous","règles",""],["cost_data",5,"intelligence de coût","métriques",""],["architecture",5,"carte archify","modèle",""],["roadmap",4,"roadmap","artefact",""],["memories",4,"Graphiti / LadybugDB","mémoire","hérité (F6)"],["learning_loop",4,"learning_loop/pattern_storage.py","patterns","second magasin de patterns (F7)"],["tech_debt",3,"dette technique","rapport",""],["team_sync",3,"Team Sync","mémoire","hérité (F6)"],["replays",3,"agent replay","traces",""],["insights",3,"insights","sessions",""],["ideation",3,"idéation","artefact",""],["carbon-ledger",3,"carbon profiler","métriques",""],["browser-agent",3,"browser agent","artefact",""],["agent-opinions",3,"consensus arbiter","artefact",""],["templates",2,"scheduling/task_templates.py","modèles de tâches",""],["recordings",2,"streaming/session_recorder.py","enregistrements",""],["pipelines",2,"pipeline_generator_runner","artefact",""],["learning",2,"learning_loop/conventions.py","conventions","doublon de nommage avec learning_loop ; la docstring de pattern_storage y pointe à tort (F34)"],["generational_tests",2,"tests générationnels","archive","doublon : precommit documente generational-tests (F34)"],["generational-tests",1,"hooks/precommit.py:219 (doc)","—","n'existe que dans un commentaire (F34)"],["intent",2,"intent/learner.py","état",""],["env-snapshots",2,"env_snapshot_runner","instantanés",""],["dashboard_snapshot",2,"core/usage_tracker.py","métriques",""],["context_mesh",2,"context mesh","mémoire cross-projets",""],["brain",2,"brain_runner / brain_mcp","pointeur","le vault vit dans ~/.workpilot/brain"],["azure-devops",2,"intégration ADO","cache",""],["analyzer",2,"ai_analyzer/claude_client.py","cache",""],["agent_health",2,"santé des agents","métriques",""],["agent-runs",2,"exécutions d'agents","traces",""],["agent-debugger",2,"debugger d'agent","traces",""],["worktree-config",1,"cli/workspace_commands.py","config",""],["spec_templates",1,"modèles de spec","config",""],["server-repos",1,"server/config.py","mode serveur",""],["self-healing",1,"self-healing","état",""],["refinement-histories",1,"spec_refinement_runner","historique",""],["quality",1,"review/quality_integration.py","rapports","doublon de nommage avec quality-rules (F34)"],["quality-rules",1,"review/quality_custom_rules.py","règles","(F34)"],["prompts",1,"injection_guard_runner","journal",""],["profiles",1,"core/auth.py","profils",""],["offline-mode",1,"mode hors-ligne","politique",""],["ml-cache",1,"review/quality_ml.py","cache",""],["memory",1,"memory_lifecycle_runner","mémoire","hérité (fallback fichier) ; voisin de memories (F34)"],["incidents",1,"self-healing","état",""],["dependency_graph",1,"blast radius","cache",""],["conventions",1,"learning_loop/conventions.py","mémoire",""],["bounty",1,"Bounty Board","état",""],["baselines",1,"merge/file_evolution/tracker.py","instantanés",""],["architecture_rules",1,"architecture/config.py","règles",""],["api-contract-baseline",1,"api_watcher_runner","baseline",""],["ai_cache",1,"ai_analyzer/runner.py","cache",""],["docs-cache",1,"libdocs","cache 14 j",""]];
+
+/* ---------- 03 skills ---------- */
+const SK={w:1180,h:560,lanes:[{x:10,w:220,label:"Sources"},{x:245,w:200,label:"Construction"},{x:460,w:220,label:"Sorties"},{x:695,w:240,label:"Consommation"},{x:950,w:220,label:"Providers"}],
+nodes:[
+ {id:"p_bmad",x:20,y:44,w:200,h:38,label:"bmad",sub:"50 skills · exige _bmad/",info:"BMAD v6.12.0. Les phases <code>spec</code>, <code>adversarial-review</code>, <code>spec-conformance</code> exigent <code>_bmad/scripts/resolve_customization.py</code> (et <code>memlog.py</code> pour bmad-prd) dans le projet cible.",f:["F3"]},
+ {id:"p_hermes",x:20,y:90,w:200,h:38,label:"hermes",sub:"12 skills"},
+ {id:"p_tool",x:20,y:136,w:200,h:38,label:"tooling",sub:"7 · verify, spec-analyze…",info:"spec-analyze, architecture-map, mem-search, convert-documents-to-markdown, webapp-testing, mcp-builder, <b>verify</b> (avec surcharges <code>providers/_sdk.md</code>, <code>_executor.md</code>, <code>copilot.md</code>, <code>ollama.md</code>)."},
+ {id:"p_dotnet",x:20,y:182,w:200,h:38,label:"dotnet",sub:"6 skills + 5 agents"},
+ {id:"p_mobile",x:20,y:228,w:200,h:38,label:"mobile",sub:"6 skills + 4 agents"},
+ {id:"p_comms",x:20,y:274,w:200,h:38,label:"comms",sub:"2 skills"},
+ {id:"p_uiux",x:20,y:320,w:200,h:38,kind:"new",label:"ui-ux-pro-max",sub:"1 skill + données BM25 (vendorisé)",info:"#291 : skill et jeu de données vendorisés (<code>scripts/vendor_ui_ux_pro_max.py</code>, VENDOR.json). Le moteur <code>search.py</code> tourne en sous-processus avec l'interpréteur du backend.",f:["F35"]},
+ {id:"p_opt",x:20,y:366,w:200,h:56,kind:"missing",label:"superpowers · impeccable",sub:"mattpocock · task-observer · claude-mem",info:"Cinq packs listés dans <code>skills.toml</code> mais présents uniquement sous forme de <code>pack.json</code> : 0 SKILL.md. Ils se vendorisent à la demande (<code>skills:bootstrap</code>). Cinq phases du workflow pointent vers eux.",tag:'<span class="tag warn">vide sur un clone</span>',f:["F2","F12"]},
+ {id:"p_reg",x:20,y:440,w:200,h:42,label:"Registre Python",sub:"agents/subagents/ (14 + 6 PR + 2 mobile)",f:["F8"]},
+ {id:"p_bund",x:20,y:492,w:200,h:42,label:"skills_registry/bundled",sub:"convert-documents-to-markdown"},
+ {id:"b_cli",x:255,y:150,w:180,h:70,kind:"hub",label:"skills_cli.py build",sub:"pack-pin · requires · collision",info:"Seul écrivain des sorties. CI : <code>pnpm run skills:check</code> échoue sur toute dérive.",files:["scripts/skills_cli.py","apps/backend/skills_registry/"]},
+ {id:"b_lock",x:255,y:240,w:180,h:42,label:"skills.toml · lock",sub:"ce que le dépôt veut",f:["F12"]},
+ {id:"b_ovl",x:255,y:300,w:180,h:46,kind:"new",label:"overlays.py",sub:"base → famille → provider",info:"#292 : <code>SKILL.md</code> → <code>providers/_sdk.md</code> (Claude et ce qui dégrade vers Claude) ou <code>_executor.md</code> (tool_executor) → <code>providers/&lt;provider&gt;.md</code>. Fusion par section ; <code>&lt;!-- append --&gt;</code> étend au lieu de remplacer. Lu par le runner de workflow et la barre de commandes.",files:["apps/backend/skills_registry/overlays.py"]},
+ {id:"b_agents",x:255,y:440,w:180,h:42,label:"skills_registry/agents.py",sub:"traduit les noms d'outils"},
+ {id:"o_agn",x:470,y:60,w:200,h:42,kind:"store",label:".agents/skills",sub:"84 skills (agnostique)"},
+ {id:"o_gem",x:470,y:116,w:200,h:42,kind:"store",label:".gemini/commands",sub:"92 fichiers TOML"},
+ {id:"o_off",x:470,y:172,w:200,h:52,kind:"legacy",label:".claude · .github · .cursor",sub:"miroirs désactivés (0)",info:"<code>harnesses.yaml</code> : seuls agnostic et gemini sont actifs par défaut. AGENTS.md présente pourtant ces miroirs comme existants (F18).",f:["F18"]},
+ {id:"o_agents",x:470,y:440,w:200,h:42,kind:"store",label:".agents/agents",sub:"28 définitions"},
+ {id:"r_slash",x:705,y:44,w:220,h:44,label:"Barre de commandes Kanban",sub:"/api/slash-commands → coder",info:"Le corps du skill est résolu côté serveur, surcharge de provider comprise (<code>peek_active_provider</code>), puis exécuté par <code>create_agent_client(agent_type=coder)</code> — provider résolu par <code>_get_active_provider</code> (l.417).",files:["slash_commands/api.py:193-240,400-430"],f:["F13","F25"]},
+ {id:"r_phase",x:705,y:98,w:220,h:44,label:"Phases skill du workflow",sub:"corps du SKILL.md = prompt",files:["workflows/runner.py:run_skill_phase"],f:["F20"]},
+ {id:"r_meth",x:705,y:152,w:220,h:44,label:"Méthodologie du coding",sub:"chemin du SKILL.md cité",info:"<code>coding</code> déclare superpowers/test-driven-development : le chemin est cité dans le prompt, jamais collé. Absent sur un clone → rien n'est cité ; le profil le signale désormais.",f:["F2"]},
+ {id:"r_det",x:705,y:206,w:220,h:44,kind:"new",label:"Phases déterministes",sub:"ui-design-system · verify(-replay)",info:"Exécutées par du Python, sans session : <code>uiux.preflight</code>, <code>verify.loop</code> (partie déterministe), <code>verify.replay</code>."},
+ {id:"r_base",x:705,y:260,w:220,h:44,label:"Prompt système de base",sub:"skill bundled inline",files:["core/llm_optimization.py:106"]},
+ {id:"r_sdk",x:705,y:314,w:220,h:44,label:"SDK : setting_sources",sub:".claude/ + CLAUDE.md du projet cible",info:"Le SDK Claude charge CLAUDE.md, règles et skills de <code>.claude/</code> du projet construit. Quand WorkPilot se construit lui-même, cela inclut <code>docs/CLAUDE.md</code> (268 Ko).",files:["core/client.py"],f:["F23"]},
+ {id:"r_roster",x:705,y:368,w:220,h:44,label:"Roster de sous-agents",sub:"resolve() par phase",f:["F5","F9"]},
+ {id:"r_mcp",x:705,y:422,w:220,h:44,kind:"new",label:"Outils uiux_* · verify_*",sub:"MCP (Claude) / en processus (autres)",info:"Mêmes outils, deux transports : serveurs stdio <code>workpilot-uiux</code> / <code>workpilot-verify</code> pour le SDK Claude, <code>tool_executor</code> pour Copilot, OpenAI, Gemini, Ollama…"},
+ {id:"r_ext",x:705,y:490,w:220,h:44,label:"Harness externes",sub:"Copilot · Codex · Cursor · Gemini CLI · hermes"},
+ {id:"factory",x:960,y:44,w:200,h:46,kind:"hub",label:"core/client.py",sub:"create_agent_client"},
+ {id:"pv_claude",x:960,y:110,w:200,h:40,label:"Claude",sub:"natif · _sdk"},
+ {id:"pv_copilot",x:960,y:160,w:200,h:40,label:"Copilot",sub:"natif (converti) · _executor"},
+ {id:"pv_openai",x:960,y:210,w:200,h:40,label:"OpenAI",sub:"séquentiel · _executor"},
+ {id:"pv_google",x:960,y:260,w:200,h:40,label:"Google",sub:"séquentiel · _executor"},
+ {id:"pv_local",x:960,y:310,w:200,h:40,label:"Ollama / LM Studio",sub:"séquentiel · airgap · _executor"},
+ {id:"pv_windsurf",x:960,y:360,w:200,h:40,label:"Windsurf",sub:"séquentiel · tool hint"},
+ {id:"pv_compat",x:960,y:410,w:200,h:40,label:"Mistral · DeepSeek · Grok",sub:"compatible · _executor"},
+ {id:"pv_deg",x:960,y:460,w:200,h:40,label:"Meta · AWS · Cursor · Custom",sub:"→ SDK Claude · _sdk"}
+],
+edges:[["p_bmad","b_cli"],["p_hermes","b_cli"],["p_tool","b_cli"],["p_dotnet","b_cli"],["p_mobile","b_cli"],["p_comms","b_cli"],["p_uiux","b_cli"],["p_opt","b_cli","missing"],["b_lock","b_cli","read"],["p_reg","b_agents"],["p_dotnet","b_agents"],["p_mobile","b_agents"],["p_reg","r_roster"],["p_bund","r_base"],["p_uiux","r_det"],["p_uiux","r_mcp"],
+ ["b_cli","o_agn"],["b_cli","o_gem"],["b_cli","o_off","legacy"],["b_agents","o_agents"],["o_agn","b_ovl","read"],
+ ["o_agn","r_slash","read"],["o_agn","r_phase","read"],["o_agn","r_meth","read"],["o_agn","r_ext","read"],["o_gem","r_ext","read"],["o_agents","r_ext","read"],["b_ovl","r_slash"],["b_ovl","r_phase"],
+ ["r_slash","factory"],["r_phase","factory"],["r_meth","factory"],["r_det","factory"],["r_base","factory"],["r_roster","factory"],["r_mcp","factory"],["r_sdk","pv_claude"],
+ ["factory","pv_claude"],["factory","pv_copilot"],["factory","pv_openai"],["factory","pv_google"],["factory","pv_local"],["factory","pv_windsurf"],["factory","pv_compat"],["factory","pv_deg"],["pv_deg","pv_claude"]]};
+const PROVIDERS=[
+ {id:"claude",nm:"Claude",node:"pv_claude",adapter:"ClaudeAgentClient",sub:"natifs",effort:"thinking_budget",dispatch:"subagent-per-task",fam:"_sdk",skills:"slash · phases · méthodologie · base · setting_sources · roster · MCP uiux/verify",tools:"SDK (hooks natifs)",note:"Seul provider qui charge aussi <code>.claude/</code> et <code>CLAUDE.md</code> du projet cible."},
+ {id:"copilot",nm:"Copilot",node:"pv_copilot",adapter:"CopilotAgentClient",sub:"natifs (AgentDefinition → SubagentDefinition)",effort:"thinking_budget",dispatch:"subagent-per-task",fam:"_executor + copilot.md",skills:"slash · phases · méthodologie · base · roster · uiux/verify en processus",tools:"client Copilot",note:""},
+ {id:"openai",nm:"OpenAI",node:"pv_openai",adapter:"OpenAIAgentClient",sub:"aucun",effort:"reasoning_effort",dispatch:"sequential-reset",fam:"_executor",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor (rtk, watermarks, brain, uiux, verify)",note:"Roster omis (<code>resolve</code> renvoie None). Codex CLI possible pour l'auth ChatGPT."},
+ {id:"google",nm:"Google",node:"pv_google",adapter:"GoogleAgentClient",sub:"aucun",effort:"thinking_budget",dispatch:"sequential-reset",fam:"_executor",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor",note:""},
+ {id:"local",nm:"Ollama / LM Studio / local",node:"pv_local",adapter:"LocalAgentClient",sub:"aucun",effort:"aucun",dispatch:"sequential-reset",fam:"_executor + ollama.md",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor",note:"Cible du mode hors-ligne ; un modèle sans appel d'outil est écarté."},
+ {id:"windsurf",nm:"Windsurf",node:"pv_windsurf",adapter:"WindsurfAgentClient",sub:"aucun",effort:"aucun",dispatch:"sequential-reset",fam:"_executor",skills:"slash · phases · méthodologie · base (+ tool hint)",tools:"gRPC IDE ou REST",note:""},
+ {id:"compat",nm:"Mistral · DeepSeek · Grok",node:"pv_compat",adapter:"CompatibleProviderAgentClient",sub:"aucun",effort:"aucun",dispatch:"sequential-reset",fam:"_executor",skills:"slash · phases · méthodologie · base · uiux/verify en processus",tools:"tool_executor",note:"<span class=\"tag warn\">doc divergente</span> docs/CLAUDE.md (Arena, Bounty Board) dit qu'ils dégradent vers Claude ; <code>providers.yaml</code> leur donne un adaptateur (F18)."},
+ {id:"deg",nm:"Meta · AWS · Cursor · Custom",node:"pv_deg",adapter:"aucun → SDK Claude",sub:"aucun (natifs via Claude)",effort:"aucun (AWS : thinking)",dispatch:"subagent-per-task sur Claude",fam:"_sdk + <provider>.md",skills:"comme Claude",tools:"SDK Claude",note:"Refusés par l'Arena et le Bounty Board (une victoire serait attribuée au mauvais éditeur)."}];
+const PACKS=[
+ ["bmad",50,"vendorisé","spec, adversarial-review, spec-conformance (si _bmad/ présent)","bmad-prd, bmad-review, bmad-walkthrough, bmad-create-prd, bmad-code-review, bmad-quick-dev, bmad-party-mode… (50)"],
+ ["hermes",12,"vendorisé","aucun","systematic-debugging, spike, sdlc-review, simplify-code, python-debugpy, node-inspect-debugger, claude-code, codex, opencode, github, computer-use, codebase-inspection"],
+ ["tooling",7,"natif WorkPilot","analyze, verify, verify-replay (architecture-map : voir F20)","spec-analyze, architecture-map, mem-search, convert-documents-to-markdown, webapp-testing, mcp-builder, verify (+4 surcharges provider)"],
+ ["ui-ux-pro-max",1,"vendorisé (#291)","ui-design-system","ui-ux-pro-max (+ données BM25 : 22 stacks, styles, palettes, typographies, 119 règles UX)"],
+ ["dotnet",6,"natif","aucun (overlay .NET passe par le registre)","net-developer, net-advanced, akka-net-patterns, aspire-orchestration, benchmark-dotnet, testcontainers-integration · agents : net-architect, bmad-net-architect, performance-analyst, bmad-performance-analyst, dotnet-framework-48-expert"],
+ ["mobile",6,"natif","mobile-design, store-readiness","android-developer, ios-developer, cross-platform-mobile, mobile-design-review, mobile-device-testing, mobile-store-readiness · agents : android-engineer, ios-engineer, mobile-architect, mobile-release-manager"],
+ ["comms",2,"natif","aucun","brand-guidelines, business-comms"],
+ ["superpowers",0,"pack.json seul","brainstorm, coding (méthodologie)","—"],
+ ["impeccable",0,"pack.json seul","frontend-design (design-check passe par la commande gate npx)","—"],
+ ["mattpocock",0,"pack.json seul","review","—"],
+ ["task-observer",0,"pack.json seul","observe (exécuté ailleurs, impl décorative)","—"],
+ ["claude-mem",0,"pack.json seul","aucun (déclaré optionnel, pourtant listé)","—"],
+ ["hermes-learned",0,"dossier absent","aucun — ne devrait pas être listé (F12)","—"]];
+
+/* ---------- 04 Kanban : simulateur ---------- */
+const CFG={
+ spec_writer:{tools:"Read Glob Grep Write Edit Bash",mcp:"brain*",think:"high",roster:"spec"},
+ spec_critic:{tools:"Read Glob Grep",mcp:"brain*",think:"ultrathink",roster:"spec"},
+ spec_validation:{tools:"Read Glob Grep",mcp:"brain*",think:"high",roster:"spec"},
+ planner:{tools:"Read Glob Grep Write Edit Bash WebFetch WebSearch",mcp:"context7 · workpilot · brain* · uiux* (+linear)",think:"high",roster:"planner"},
+ coder:{tools:"Read Glob Grep Write Edit Bash WebFetch WebSearch",mcp:"context7 · workpilot · brain* · uiux* (+chrome-devtools, +linear)",think:"none",roster:"kanban"},
+ verifier:{tools:"Read Glob Grep Write Edit Bash WebFetch WebSearch",mcp:"context7 · workpilot · verify · browser · chrome-devtools* · brain* · uiux*",think:"medium",roster:"qa"},
+ qa_reviewer:{tools:"Read Glob Grep Write Edit Bash WebFetch WebSearch",mcp:"context7 · workpilot · brain* · uiux* · electron|puppeteer · chrome-devtools*",think:"high",roster:"qa"},
+ qa_fixer:{tools:"Read Glob Grep Write Edit Bash WebFetch WebSearch",mcp:"context7 · workpilot · brain* · uiux* · electron|puppeteer · chrome-devtools*",think:"medium",roster:"qa"},
+ pr_reviewer:{tools:"Read Glob Grep WebFetch WebSearch",mcp:"context7 · brain* · uiux*",think:"high",roster:"review"},
+ analyzer:{tools:"Read Glob Grep",mcp:"brain*",think:"low",roster:"research"},
+ architecture_visualizer:{tools:"Read Glob Grep Write",mcp:"brain*",think:"high",roster:"kanban"},
+ commit_message:{tools:"—",mcp:"—",think:"low",roster:"solo"},
+ pr_template_filler:{tools:"Read Glob Grep",mcp:"brain*",think:"low",roster:"solo"},
+ merge_resolver:{tools:"—",mcp:"—",think:"low",roster:"solo"}};
+const ROSTERS={kanban:["code-reviewer","test-runner","spec-explorer"],planner:["architecture-analyst","dependency-tracer"],qa:["qa-acceptance-checker","qa-test-evidence"],review:["security-auditor","regression-hunter","test-coverage-auditor"],research:["codebase-surveyor","evidence-collector"],spec:["prior-art-finder","constraint-collector"],solo:[]};
+const EFF=["none","low","medium","high","ultrathink"];
+const ge=(a,b)=>EFF.indexOf(a)>=EFF.indexOf(b);
+const EMPTY_PACKS=["superpowers","impeccable","mattpocock"];
+const sim={complexity:"standard",effort:"medium",provider:"claude",engine:"uniform",touch:new Set(["front","back"]),target:"web",attach:"none",lang:"dotnet",qa:"ok",opt:false,bmad:false};
+const provInfo=p=>PROVIDERS.find(x=>x.id===p);
+const nativeSub=p=>["claude","copilot","deg"].includes(p);
+function provFor(kind){return sim.engine==="mixed"&&kind!=="coding"?"claude":sim.provider}
+function rosterFor(name,p){if(!nativeSub(p))return [];const r=[...(ROSTERS[name]||[])];
+  if(sim.touch.has("mobile"))r.push("device-runner","store-readiness-auditor");return r}
+function attachInfo(){return {none:"",shot:"Capture → OCR local (Tesseract par défaut), secrets masqués ou image repeinte/retenue, injection_guard.",drawio:"draw.io / Excalidraw lus comme structure (boîtes, flèches) ; conformance avec le graphe de modules.",pdf:"PDF scanné → pages rendues → OCR → propositions d'exigences FR-### (validées par une personne).",trace:"Trace de pile → fichier:ligne du dépôt (stacktrace.py) ; section « Where it broke ».",http:"Postman / OpenAPI / .http / curl → brouillon de test d'intégration dans la pile du projet.",figma:"Lien Figma → attachments/<nom>.figma.json, contrat de la revue visuelle."}[sim.attach]}
+function buildSteps(){
+  const s=[];const step=o=>s.push(o);
+  const front=sim.touch.has("front"),mobile=sim.touch.has("mobile"),back=sim.touch.has("back");
+  const code=front||mobile||back, ui=front||mobile;
+  const phase=o=>{let st="run",why="";
+    if(o.min&&!ge(sim.effort,o.min)&&!o.det){st="skip";why=`élaguée : effort < ${o.min}`}
+    else if(o.when&&!o.when()){st="skip";why="aucun fichier concerné (prévision du plan, narrow_to_forecast)"}
+    else if(o.pack&&EMPTY_PACKS.includes(o.pack)&&!sim.opt){st="noop";why=`pas de SKILL.md pour ${o.impl} → phase vide`}
+    else if(o.pack==="bmad"&&!sim.bmad){st="noop";why="_bmad/ absent du projet cible → phase refusée"}
+    step({...o,status:st,why})};
+  // A · spec
+  step({stage:"A · Création de la spec (spec_runner)"});
+  step({win:"préflight",nm:"Évaluation de la complexité",status:"run",agent:"spec_writer",prov:"spec",prompt:"complexity_assessor.md (21 Ko) ou heuristique ComplexityAnalyzer",info:`Résultat simulé : <b>${sim.complexity}</b>. Le prompt de 21 Ko sert une classification en trois valeurs que l'heuristique par mots-clés produit déjà (F10).`,files:["spec/complexity.py","prompts/complexity_assessor.md"],f:["F10"]});
+  step({win:"spec",nm:"discovery",status:"run",kind:"script",info:"Indexe le projet (project_index.json). Sans LLM.",files:["spec/phases/discovery_phases.py:22"]});
+  step({win:"spec",nm:"historical_context",status:"run",kind:"script",mem:"lit le cerveau → graph_hints.json",info:"Lit ce que le cerveau sait de la tâche. Sauté si BRAIN_ENABLED=false.",files:["spec/phases/requirements_phases.py:24"]});
+  if(sim.complexity==="simple"){
+    step({win:"spec",nm:"quick_spec",status:"run",agent:"spec_writer",prov:"spec",prompt:"spec_quick.md",files:["spec/phases/spec_phases.py:21"]});
+  }else{
+    step({win:"spec",nm:"requirements",status:"run",kind:"script",info:"requirements.json depuis la description / l'entretien de spec."});
+    step({win:"spec",nm:"research",status:sim.complexity==="complex"?"run":"skip",why:sim.complexity==="complex"?"":"standard : seulement si needs_research",agent:"spec_writer",prov:"spec",prompt:"spec_researcher.md",warn:"La config spec_researcher (context7) n'est jamais utilisée : la phase tourne sous spec_writer (F4).",files:["spec/pipeline/agent_runner.py:176,212"],f:["F4"]});
+    step({win:"spec",nm:"context",status:"run",kind:"script",info:"context.json (recherche sémantique)."});
+    step({win:"spec",nm:"spec_writing",status:"run",agent:"spec_writer",prov:"spec",prompt:"spec_writer.md (13,6 Ko)",files:["spec/phases/spec_phases.py:125"]});
+    step({win:"spec",nm:"self_critique",status:sim.complexity==="complex"?"run":"skip",why:sim.complexity==="complex"?"":"complex uniquement",agent:"spec_writer",prov:"spec",prompt:"spec_critic.md",warn:"Le critique devrait être en lecture seule et en ultrathink (spec_critic) ; il tourne avec les droits d'écriture et la réflexion de spec_writer (F4).",files:["spec/pipeline/agent_runner.py:176,212"],f:["F4"]});
+    step({win:"spec",nm:"planning (dans la spec)",status:"run",agent:"spec_writer",prov:"spec",prompt:"planner.md (33 Ko)",info:"Pour standard et complex, le plan est écrit ici ; le planning du build est alors sauté (plan déjà présent).",files:["spec/phases/planning_phases.py:81"]});
+  }
+  step({win:"spec",nm:"validation",status:"run",agent:"spec_writer",prov:"spec",prompt:"validation_fixer.md si erreurs",info:"Valide spec.md / implementation_plan.json ; traçabilité FR-### calculée (traceability.json). Récupération du plan (plan_recovery.py) en cas de format inattendu.",files:["spec/phases/planning_phases.py:254","spec/traceability.py","spec/plan_recovery.py"]});
+  if(sim.complexity!=="simple")step({win:"gate",nm:"plan_review (gate humaine)",status:"run",kind:"human",info:"La carte passe en human_review / plan_review jusqu'à approbation."});
+  // B · build
+  step({stage:"B · Build (run.py → workflow feature-build, 19 phases)"});
+  step({win:"avant planning",nm:"docs",impl:"workpilot/libdocs",status:"run",kind:"script",info:"Docs Context7 des bibliothèques sans exemple dans le dépôt. Sans LLM. Toujours exécuté.",files:["libdocs/preflight.py"]});
+  step({win:"avant planning",nm:"docintel (préflight)",status:sim.attach==="none"?"skip":"run",why:sim.attach==="none"?"aucune pièce jointe ni trace dans la description":"",kind:"script",info:attachInfo(),files:["docintel/preflight.py"]});
+  phase({win:"avant planning",nm:"brainstorm",impl:"superpowers/brainstorming",pack:"superpowers",min:"high",agent:"spec_critic",prov:"spec",dispatch:"inline",info:"Questionne le design avant tout code. Procédure interactive, exécutée ici sans interlocuteur.",f:["F2"]});
+  phase({win:"avant planning",nm:"spec",impl:"bmad/bmad-prd",pack:"bmad",min:"medium",agent:"spec_writer",prov:"spec",warn:"Fait doublon avec le pipeline de spec (A), qui a déjà écrit spec.md (F3).",f:["F3"]});
+  if(sim.complexity==="simple"){
+    const pruned=!ge(sim.effort,"low");
+    step({win:"planning",nm:"planning",impl:"workpilot/planner",status:pruned?"forced":"run",why:pruned?"élaguée dans le profil, exécutée quand même faute de plan (agents/coder.py:904)":"",agent:"planner",prov:"planning",builtin:true,info:"Le planner écrit implementation_plan.json (prompt planner.md, 33 Ko). Validation, récupération (plan_recovery), traçabilité.",files:["agents/planner.py","prompts/planner.md"],f:pruned?["F15"]:null});
+  }else{
+    step({win:"planning",nm:"planning",impl:"workpilot/planner",status:"skip",why:"plan déjà écrit par le pipeline de spec (is_first_run faux)",builtin:true,files:["agents/coder.py:876"]});
+  }
+  phase({win:"planning → coding",nm:"analyze",impl:"tooling/spec-analyze",min:"medium",agent:"spec_validation",roster:"planner",prov:"planning",dispatch:"fresh-context",info:"Lit spec.md et le plan ensemble ; cite traceability.json. Lecture seule, roster planner."});
+  phase({win:"planning → coding",nm:"ui-design-system",impl:"ui-ux-pro-max/ui-ux-pro-max",det:true,when:()=>ui,kind:"script",info:"Déterministe, sans réseau : MASTER.md du projet s'il existe (scanné par injection_guard), sinon design system généré et écrit dans le worktree ; règles du stack touché ajoutées. Le serveur MCP uiux est alors offert à tous les agents de la tâche.",files:["uiux/preflight.py","uiux/relevance.py","workflows/runner.py:608"]});
+  phase({win:"planning → coding",nm:"mobile-design",impl:"mobile/mobile-design-review",min:"medium",when:()=>mobile,agent:"pr_reviewer",prov:"planning",dispatch:"fresh-context"});
+  phase({win:"planning → coding",nm:"frontend-design",impl:"impeccable/impeccable",pack:"impeccable",min:"medium",when:()=>front,agent:"pr_reviewer",prov:"planning",dispatch:"fresh-context",warn:"Recoupe ui-design-system, qui vient de fixer le design system (F35).",f:["F2","F35"]});
+  const cp=provFor("coding"),cnative=nativeSub(cp);
+  step({win:"coding",nm:"coding",impl:"superpowers/test-driven-development",status:"run",agent:"coder",prov:"coding",builtin:true,dispatch:cnative?"subagent-per-task":"sequential-reset",
+    warn:(!sim.opt?"Méthodologie TDD absente : rien n'est cité dans le prompt (le profil le signale). ":"")+(!cnative?"Provider sans sous-agents : sous-tâches en séquence avec remise à zéro du contexte.":""),
+    info:`Une session par sous-tâche. Prompt coder.md (35 Ko) + contexte de sous-tâche + mémoire + patterns + docs + ADR/pièces jointes${ui?" + design system (sous-tâches UI)":""}${mobile?" + section mobile":""}. Auto-revue (agents/self_review.py) en fin de sous-tâche. Overlay langage <b>${esc(sim.lang)}</b> injecté dans test-runner.`,files:["agents/coder.py","prompts/coder.md","agents/self_review.py"],f:["F10"]});
+  phase({win:"coding → verify",nm:"design-check",impl:"impeccable (npx impeccable detect)",det:true,when:()=>front,kind:"script",info:"59 règles locales, jamais élaguée. Passe par la commande gate de pack.json (npx, réseau), même sans SKILL.md.",files:["workflows/gates.py","skills/impeccable/pack.json"]});
+  phase({win:"coding → verify",nm:"review",impl:"mattpocock/code-review",pack:"mattpocock",min:"medium",agent:"pr_reviewer",prov:"qa",dispatch:"fresh-context",f:["F2","F11"]});
+  // verify
+  const vSession=sim.target!=="none"&&!["none","low"].includes(sim.effort);
+  const tinfo={web:"Frontend web : lancement, console et réseau, snapshot → clic, captures desktop + mobile, score Lighthouse.",desktop:"Desktop Electron : même chose via --remote-debugging-port.",mobile:"Mobile : émulateur Android / simulateur iOS (iOS seulement sur macOS), frame et temps de lancement.",api:"API : endpoints touchés par le diff, appelés avec des payloads construits depuis le schéma OpenAPI ; réponses validées, latences p50/p95.",none:""}[sim.target];
+  if(sim.target==="none"){
+    step({win:"verify",nm:"verify",impl:"tooling/verify",status:"na",why:"not-applicable : aucune cible lançable (bibliothèque, CLI)",kind:"script",info:"Ni succès ni échec ; la porte app-verified est « unknown » et ne bloque pas.",files:["verify/loop.py","workflows/hard_gates.py"]});
+  }else{
+    step({win:"verify",nm:"verify",impl:"tooling/verify",status:"run",agent:vSession?"verifier":null,kind:vSession?null:"script",prov:"qa",roster:"qa",dispatch:"fresh-context",
+      info:`${tinfo} Partie déterministe à tout effort (lancement, erreurs, correctifs bornés par le progrès, trace, preuves) ; ${vSession?"<b>session verifier</b> pour conduire l'app jusqu'à l'état visé":"pas de session verifier à cet effort"}. Porte dure <code>tests-pass,app-verified</code>. Surcharge de skill : <code>${esc(provInfo(provFor("qa")).fam)}</code>.`,
+      mem:".workpilot/verify/recipe.json · baseline.json · piège · knowledge/projects/<p>/verify",files:["verify/loop.py:70,573-590","verify/phase.py","workflows/runner.py:832-870"],f:vSession?["F11","F16"]:null});
+  }
+  const qaInfo={ok:"QA approuve au premier passage.",reject:"QA rejette → QA_FIX_REQUEST.md → qa_fixer → nouvelle revue, jusqu'à approbation.",recur:"Le même problème revient 3 fois → escalade humaine (human_review / qa_rejected).",cap:"Plafond MAX_QA_ITERATIONS = 50 passes reviewer + fixer (F17)."}[sim.qa];
+  step({win:"qa",nm:"qa_reviewer",impl:"workpilot/qa-loop",status:"run",agent:"qa_reviewer",prov:"qa",builtin:true,info:"Reçoit le record de vérification (verify_section) et la revue visuelle (OCR des captures). "+qaInfo,prompt:"qa_reviewer.md (16,7 Ko) + learning qa_review",files:["qa/loop.py:153","qa/reviewer.py"],f:sim.qa==="cap"?["F17"]:null});
+  step({win:"qa",nm:"qa_fixer",status:sim.qa==="ok"?"skip":"run",why:sim.qa==="ok"?"QA approuvée":"",agent:"qa_fixer",prov:"qa",builtin:true,prompt:"qa_fixer.md (12,5 Ko)",files:["qa/fixer.py"]});
+  phase({win:"après qa",nm:"adversarial-review",impl:"bmad/bmad-review",pack:"bmad",min:"ultrathink",agent:"pr_reviewer",prov:"qa",dispatch:"fresh-context",f:["F3","F11"]});
+  phase({win:"après qa",nm:"spec-conformance",impl:"bmad/bmad-walkthrough",pack:"bmad",min:"ultrathink",agent:"spec_validation",roster:"qa",prov:"qa",dispatch:"fresh-context",warn:"Même question que qa-acceptance-checker dans la QA (F3).",f:["F3"]});
+  phase({win:"après qa",nm:"store-readiness",impl:"mobile/mobile-store-readiness",min:"medium",when:()=>mobile,agent:"pr_reviewer",prov:"qa",dispatch:"fresh-context"});
+  phase({win:"après qa",nm:"architecture-map",impl:"tooling/architecture-map",min:"medium",when:()=>code,agent:"analyzer",prov:"qa",dispatch:"fresh-context",warn:"Exécutée par run_skill_phase sous analyzer (lecture seule, sans Write) : ni significance.assess, ni validate/deliver/compare. Le texte part dans workflow/architecture-map.md ; le delta n'existe que via le bouton Regenerate (F20).",files:["workflows/runner.py:198-213,757","runners/architecture_visualizer_runner.py"],f:["F20"]});
+  const replay=sim.target!=="none"&&sim.qa!=="ok";
+  step({win:"après qa",nm:"verify-replay",impl:"tooling/verify",status:sim.target==="none"?"skip":(replay?"run":"skip"),why:sim.target==="none"?"rien n'a été vérifié":(replay?"":"arbre inchangé depuis la vérification → coût nul"),kind:"script",info:"Rejoue sans modèle les endpoints et le scénario enregistrés quand la QA a modifié le code ; un succès devient « régressé après QA » s'ils ne tiennent plus.",files:["verify/replay.py"]});
+  step({win:"après qa",nm:"observe",impl:"task-observer/task-observer",status:"run",kind:"script",mem:"skills/_proposed + cycle hermes (surface build) + signal runtime_verified",info:"Exécuté par learning_loop/observe.py, pas par le skill (impl décorative, F2). Écrit des candidats, ne modifie jamais un skill.",files:["learning_loop/observe.py"],f:["F2"]});
+  step({win:"fin",nm:"Note de build dans le cerveau",status:"run",kind:"script",mem:"knowledge/projects/<p>/builds/<spec>.md",files:["cli/build_commands.py:374"]});
+  // C · sortie
+  step({stage:"C · Sortie"});
+  step({win:"sortie",nm:"Merge local (worktree → branche)",status:"run",agent:"merge_resolver",prov:"coding",info:"Merge sémantique ; merge_resolver en cas de conflit. Puis 4 écritures : usage, learning_loop, brain, uiux knowledge (F14).",files:["merge/ai_resolver/","cli/workspace_commands.py:374-410"],f:["F14"]});
+  step({win:"sortie",nm:"Création de PR",status:"run",agent:"pr_template_filler",prov:"coding",info:"commit_message + pr_template_filler. PR vers develop.",files:["agents/pr_template_filler.py"]});
+  step({win:"sortie",nm:"CI rouge → colonne build_failed",status:"run",kind:"script",info:"Self-healing CI/CD : lecture des codes d'erreur (cicd_mode.py), incident, cycle hermes surface self-healing.",files:["self_healing/incident_responder/cicd_mode.py"]});
+  return s;
+}
+function renderSim(){
+  const steps=buildSteps();const pipe=$("#sim-pipe");pipe.innerHTML="";const c={run:0,skip:0,noop:0,forced:0,na:0};let llm=0;const subs=new Set();
+  const TAG={run:'<span class="tag ok">exécutée</span>',skip:'<span class="tag mute">sautée</span>',noop:'<span class="tag warn">vide</span>',forced:'<span class="tag warn">forcée</span>',na:'<span class="tag mute">n/a</span>'};
+  steps.forEach(st=>{if(st.stage){const h=document.createElement("div");h.className="stage-h";h.textContent=st.stage;pipe.appendChild(h);return}
+    c[st.status]=(c[st.status]||0)+1;
+    const p=st.prov?provFor(st.prov):null;
+    const cfg=st.agent?CFG[st.agent]:null;const roster=st.agent?rosterFor(st.roster||(cfg&&cfg.roster)||"kanban",p):[];
+    if(["run","forced"].includes(st.status)&&st.agent){llm++;roster.forEach(r=>subs.add(r))}
+    const d=document.createElement("div");d.className="step st-"+st.status;d.tabIndex=0;d.setAttribute("role","button");
+    const kind=st.kind==="script"?"sans LLM":st.kind==="human"?"humain":st.agent?`agent <code>${st.agent}</code>`:"";
+    d.innerHTML=`<div class="win">${esc(st.win)}</div><div style="min-width:0"><div class="nm">${esc(st.nm)}</div><div class="meta">${kind?`<span>${kind}</span>`:""}${st.agent&&p?`<span>${esc(provInfo(p).nm)}</span>`:""}${st.impl?`<span><code>${esc(st.impl)}</code></span>`:""}${st.dispatch?`<span>${esc(st.dispatch)}</span>`:""}${roster.length?`<span>${roster.length} sous-agent${roster.length>1?"s":""}</span>`:""}${st.why?`<span>${esc(st.why)}</span>`:""}</div></div><div>${TAG[st.status]}</div>`;
+    const pick=()=>{$$(".step",pipe).forEach(x=>x.classList.remove("sel"));d.classList.add("sel");
+      let h=`<div>${TAG[st.status]}</div><h3>${esc(st.nm)}</h3>`;
+      if(st.why)h+=`<p><b>Pourquoi :</b> ${esc(st.why)}</p>`;
+      if(st.info)h+=`<p>${st.info}</p>`;
+      if(st.warn)h+=`<div class="callout">${st.warn}</div>`;
+      if(cfg)h+=`<div class="tbl"><table><tbody><tr><th>agent_type</th><td><code>${st.agent}</code></td></tr><tr><th>Provider</th><td>${esc(provInfo(p).nm)} · ${esc(provInfo(p).adapter)}</td></tr><tr><th>Outils</th><td>${cfg.tools}</td></tr><tr><th>MCP</th><td>${cfg.mcp}</td></tr><tr><th>Réflexion</th><td>${cfg.think}</td></tr><tr><th>Roster</th><td>${roster.length?roster.map(r=>`<code>${r}</code>`).join(", "):(nativeSub(p)?"aucun (solo)":"omis : provider sans sous-agents")}</td></tr></tbody></table></div>`;
+      if(st.prompt)h+=`<p><b>Prompt :</b> ${st.prompt}</p>`;
+      if(st.impl)h+=`<p><b>Skill :</b> <code>${esc(st.impl)}</code></p>`;
+      if(st.mem)h+=`<p><b>Mémoire :</b> ${esc(st.mem)}</p>`;
+      if(st.files)h+=`<ul>${st.files.map(f=>`<li><code>${esc(f)}</code></li>`).join("")}</ul>`;
+      if(st.f)h+=`<div><div class="lbl">Constats liés</div>${frefs(st.f)}</div>`;
+      if(cfg)h+=`<p class="note">* brain : ajouté à tout agent qui a des outils quand un cerveau existe ; uiux : seulement si la tâche est UI.</p>`;
+      $("#p-sim").innerHTML=h};
+    d.addEventListener("click",pick);d.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick()}});pipe.appendChild(d)});
+  const names=k=>provInfo(provFor(k)).nm.split(" ")[0];
+  $("#sim-sum").innerHTML=`<span><b>${c.run+c.forced}</b> étapes exécutées</span><span><b>${c.skip+c.na}</b> sautées</span><span style="color:var(--warn)"><b>${c.noop}</b> vides (skill ou runtime absent)</span><span><b>${llm}</b> types de session d'agent</span><span><b>${subs.size}</b> sous-agents distincts proposés</span><span>Moteur : spec <b>${esc(names("spec"))}</b> · planif. <b>${esc(names("planning"))}</b> · code <b>${esc(names("coding"))}</b> · QA <b>${esc(names("qa"))}</b></span>`;
+}
+function simControls(){
+  const host=$("#sim-controls");host.innerHTML="";
+  const mk=(id,label,items,get,set,multi)=>{const w=document.createElement("div");w.className="ctl";w.innerHTML=`<span class="lbl">${label}</span><div class="chips" id="${id}"></div>`;host.appendChild(w);
+    chips("#"+id,items,{multi,initial:get(),onChange:v=>{set(v);renderSim()}})};
+  mk("c-cx","Complexité de la spec",[["simple","Simple"],["standard","Standard"],["complex","Complexe"]],()=>sim.complexity,v=>sim.complexity=v);
+  mk("c-ef","Effort",EFF.map(e=>[e,e]),()=>sim.effort,v=>sim.effort=v);
+  mk("c-pv","Provider du code",PROVIDERS.map(p=>[p.id,p.nm.split(" ")[0]]),()=>sim.provider,v=>sim.provider=v);
+  mk("c-en","Moteur de la tâche",[["uniform","Uniforme"],["mixed","Mixte : spec/planif./QA sur Claude"]],()=>sim.engine,v=>sim.engine=v);
+  mk("c-tc","Fichiers prévus par le plan",[["front","Front web"],["mobile","Mobile"],["back","Backend"],["docs","Docs seuls"]],()=>[...sim.touch],v=>sim.touch=v,true);
+  mk("c-tg","Cible runtime (verify)",[["web","Web"],["desktop","Desktop"],["mobile","Mobile"],["api","API"],["none","Aucune"]],()=>sim.target,v=>sim.target=v);
+  mk("c-at","Pièce jointe",[["none","Aucune"],["shot","Capture"],["drawio","draw.io"],["pdf","PDF scanné"],["trace","Trace de pile"],["http","Postman / OpenAPI"],["figma","Figma"]],()=>sim.attach,v=>sim.attach=v);
+  mk("c-qa","Issue de la QA",[["ok","Approuvée"],["reject","Rejet → fix"],["recur","Récurrent → humain"],["cap","Plafond 50"]],()=>sim.qa,v=>sim.qa=v);
+  mk("c-lg","Langage détecté",[["dotnet",".NET"],["python","Python"],["typescript","TS / JS"],["java","Java / Kotlin"],["go","Go"],["rust","Rust"]],()=>sim.lang,v=>sim.lang=v);
+  mk("c-op","Packs optionnels vendorisés",[["no","Non (clone frais)"],["yes","Oui"]],()=>sim.opt?"yes":"no",v=>sim.opt=v==="yes");
+  mk("c-bm","_bmad/ dans le projet cible",[["no","Non"],["yes","Oui"]],()=>sim.bmad?"yes":"no",v=>sim.bmad=v==="yes");
+}
+const CASES=[
+ ["origine","Origine de la tâche",[
+  ["Carte créée à la main","Pipeline de spec complet ; entretien de spec optionnel (SpecInterviewBanner, 3-5 questions sur 9 axes) ; moteur choisi dans TaskEngineEditor","spec_writer (toutes phases)","spec_*.md","historical_context lit le cerveau"],
+  ["Import d'issue GitHub / GitLab","Images de l'issue téléchargées dans attachments/ (hôte de l'instance uniquement), description nettoyée + injection_guard","+ issue_analyzer (runner GitHub)","—","note de build sous le projet"],
+  ["Import Jira","Pièces jointes images via le main process (token jamais dans le renderer)","idem","—","idem"],
+  ["Import Azure DevOps","Images inline converties en pièces jointes","idem","—","idem"],
+  ["Linear","Mise à jour d'issue si update_linear_with_tasks","+ MCP linear (planner, coder, QA)","—","—"]]],
+ ["complexite","Complexité de la spec",[
+  ["simple","discovery → historical_context → quick_spec → validation ; planning dans le build","spec_writer, puis planner","spec_quick.md, planner.md","graph_hints"],
+  ["standard","+ requirements → (research si signalé) → context → spec_writing → planning → validation","spec_writer ×4-5 ; roster spec","spec_writer.md, planner.md","graph_hints"],
+  ["complex","+ research → self_critique","spec_writer ×6 (le critique compris, F4)","spec_researcher.md, spec_critic.md","graph_hints"]]],
+ ["effort","Effort (workflow, vérifié par resolve_profile)",[
+  ["none","docs · ui-design-system* · coding · design-check* · verify (déterministe) · qa · verify-replay · observe ; planning forcé si pas de plan","coder, qa_reviewer/fixer","coder.md, qa_*.md","lecture mémoire + note de build"],
+  ["low","+ planning","+ planner","+ planner.md","idem"],
+  ["medium","+ spec (BMAD) · analyze · mobile-design* · frontend-design* · review · store-readiness* · architecture-map* ; verify ouvre une session verifier","+ spec_validation, pr_reviewer ×n, verifier, analyzer","+ bmad-prd, spec-analyze, impeccable, code-review, verify…","+ recette et baseline verify"],
+  ["high","+ brainstorm","+ spec_critic","+ superpowers/brainstorming","idem"],
+  ["ultrathink","+ adversarial-review · spec-conformance","+ pr_reviewer, spec_validation (roster qa)","+ bmad-review, bmad-walkthrough","idem"],
+  ["(*)","Conditionnelle aux fichiers : décidée sur les fichiers prévus par le plan (narrow_to_forecast), puis sur le diff réel","—","—","—"]]],
+ ["moteur","Moteur de la tâche (#290)",[
+  ["Uniforme","Les quatre phases (spec, planification, code, QA) sur le même provider × modèle × effort","agent et roster suivent ce provider","surcharge de skill de ce provider","conversation.<provider>-<model>.jsonl"],
+  ["Une formule par phase","task-provider-env.ts injecte les identifiants de chaque provider utilisé ; SELECTED_LLM_PROVIDER = phase de départ ; _resolve_active_provider lit la tâche avant tout","agent et roster suivent le provider de la phase","surcharge par phase (verify)","journal par (provider, modèle)"],
+  ["Changement à la reprise","Portée « phase reprise » ou « phases suivantes » ; écrit dans chaque copie de task_metadata.json ; relance par resumePausedTask","—","—","le nouveau modèle hérite du journal de la même phase"],
+  ["Tâche créée avant #290","ensureTaskEngine migre une fois (engineLocked) ; le marqueur RESUME_WITH_PROVIDER n'est plus écrit (F25)","—","—","—"],
+  ["Fournisseur par défaut","Paramètres → Agent : amorce les nouvelles tâches et les pages sans formule propre, ne modifie jamais une tâche existante","—","—","—"]]],
+ ["provider","Provider",PROVIDERS.map(p=>[p.nm,`Adaptateur ${p.adapter} ; coding en ${p.dispatch}`,`sous-agents : ${p.sub}`,`${p.skills} · surcharge ${p.fam}`,p.id==="claude"||p.id==="deg"?"MCP brain natif":"brain exécuté en processus (tool_executor)"])],
+ ["fichiers","Fichiers touchés",[
+  ["Front web (*.tsx, *.vue, *.css…)","ui-design-system (déterministe) + frontend-design (avant coding) + design-check (après) ; design system dans les sous-tâches UI ; MCP uiux pour tous les agents","pr_reviewer","ui-ux-pro-max, impeccable","MASTER.md → knowledge/…/uiux au merge"],
+  ["Mobile (Gradle, Swift, Dart, XAML…)","ui-design-system (.swift/.dart/.xaml) + mobile-design + store-readiness ; overlay mobile (device-runner, store-readiness-auditor) ajouté à tous les rosters, solo compris (F9)","pr_reviewer + 2 sous-agents protégés","mobile-*","—"],
+  ["Code backend","architecture-map (session analyzer, F20)","analyzer","architecture-map","rien dans spec_dir/architecture (F20)"],
+  ["Docs seuls","phases conditionnelles sautées","—","—","—"]]],
+ ["runtime","Cible runtime (verify, #292)",[
+  ["Frontend web","Lancement, console et réseau, snapshot → clic → remplissage, captures desktop + mobile, score Lighthouse","verifier (≥ medium), fixer de vérification","tooling/verify + surcharge provider","recipe.json, baseline.json, note verify"],
+  ["Desktop (Electron)","Même chose via --remote-debugging-port","idem","idem","idem"],
+  ["Mobile","Boot → build → install → launch → frame (mobile/launch.py) ; iOS seulement sur macOS","idem + device-runner","idem + mobile-device-testing","captures classées pour la revue visuelle"],
+  ["API","Endpoints du diff (OpenAPI de l'app lancée) appelés avec payloads issus du schéma ; réponses validées ; p50/p95","idem","idem","baseline de latence"],
+  ["Aucune (bibliothèque, CLI)","not-applicable : ni succès ni échec, porte app-verified « unknown »","—","—","—"]]],
+ ["langage","Langage détecté",[
+  [".NET","test-runner reçoit dotnet test / format ; conformance .csproj ; ORM EF Core","test-runner spécialisé","net-* (palette)","—"],
+  ["Python","pytest -x, ruff","idem","—","—"],["TypeScript / JS","vitest / jest, workspaces npm/pnpm","idem","—","—"],["Java / Kotlin","Maven / Gradle","idem","—","—"],["Go · Rust","go test · cargo test","idem","—","—"],
+  ["Remarque","L'overlay ne spécialise que test-runner : qa-test-evidence (QA, verifier) reste générique (F16)","—","—","—"]]],
+ ["pj","Pièces jointes (docintel)",[
+  ["Capture d'écran","OCR local, secrets masqués / image repeinte / retenue","—","—","—"],["draw.io / Excalidraw / C4","Structure lue ; règles de dépendance","—","—","—"],["ERD (draw.io, DBML, Mermaid)","Comparé au mapping ORM","—","—","—"],["PDF scanné / cahier des charges","OCR → propositions FR-### validées par une personne","—","—","décisions → knowledge/…/docintel"],["Tableau de règles","Test paramétré par langage","—","—","idem"],["Trace de pile / log CI","fichier:ligne, codes d'erreur","—","—","—"],["Postman / OpenAPI / .http","Brouillon de test d'intégration","—","—","—"],["Figma","frames et libellés → contrat de revue visuelle","—","—","—"],["Photo de tableau blanc","→ .drawio par modèle de vision local","—","—","idem"]]],
+ ["runtimepk","Packs et runtimes",[
+  ["Clone frais (packs optionnels absents)","brainstorm, frontend-design, review : vides ; méthodologie TDD non citée ; le profil le signale","—","—","—"],
+  ["Packs vendorisés","Les mêmes phases s'exécutent","—","superpowers, impeccable, mattpocock","—"],
+  ["_bmad/ absent du projet cible","spec, adversarial-review, spec-conformance refusées","—","—","—"],
+  ["node absent","architecture-map refusée (requires: node)","—","—","—"],
+  ["Chrome absent / pas de npx","verify : étapes navigateur « unknown » (jamais 0)","—","—","—"]]],
+ ["qa","Issue de la QA",[
+  ["Approuvée","human_review / completed ; verify-replay sans coût","qa_reviewer","qa_reviewer.md","session QA enregistrée"],
+  ["Rejetée","qa_fixer puis nouvelle revue ; verify-replay rejoue le scénario","qa_fixer","qa_fixer.md + learning qa_fixing","pièges enregistrés"],
+  ["Problème récurrent (3×)","escalade humaine","—","—","—"],
+  ["3 erreurs consécutives / plafond 50","arrêt","—","—","—"]]],
+ ["interruption","Interruptions",[
+  ["Pause","pause_state.json ; points de contrôle coder, QA, spec","—","—","—"],
+  ["Fermeture de l'app","pause app_shutdown → reprise au lancement","—","—","—"],
+  ["Crash / arrêt forcé","in_progress sans processus → reprise ; sous-tâche réouverte (interrupted_at)","—","directive « ne pas refaire »","transcript rejoué"],
+  ["Changement de provider","TASK_RESUME_WITH_PROVIDER réécrit le moteur ; le nouveau modèle hérite du journal de la même phase","—","—","conversation.<provider>-<model>.jsonl"],
+  ["Prompt trop long","human_review / prompt_too_long ; journal archivé","—","—","—"]]],
+ ["sortie","Sortie",[
+  ["Merge local","merge sémantique ; merge_resolver en conflit","merge_resolver","—","usage + learning_loop + brain + uiux (4 écritures, F14)"],
+  ["PR","commit_message + pr_template_filler ; cible develop","commit_message, pr_template_filler","pr_template_filler.md","—"],
+  ["CI rouge","colonne build_failed ; self-healing cicd","incident responder","incident_cicd_analyzer.md","cycle hermes self-healing"]]]];
+
+/* ---------- 05 agents ---------- */
+const AGENTS=[
+ ["spec_gatherer","R+Web","—","medium","spec","aucun : le pipeline de spec passe tout en spec_writer (F4)","dead"],
+ ["spec_researcher","R+Web","context7","medium","kanban (non aliasé)","aucun (F4)","dead"],
+ ["spec_writer","R+W+Bash","—","high","spec","toutes les phases LLM du pipeline de spec ; phase spec","ok"],
+ ["spec_critic","R","—","ultrathink","spec","phase brainstorm","ok"],
+ ["spec_discovery","R+Web","—","medium","kanban","cité dans une table de client.py:1586, jamais instancié","dead"],
+ ["spec_context","R","—","medium","kanban","idem (client.py:1585)","dead"],
+ ["spec_validation","R","—","high","spec (roster: planner / qa par phase)","phases analyze, spec-conformance","ok"],
+ ["spec_compaction","R+W","—","medium","solo","compaction de spec","ok"],
+ ["planner","R+W+Web","context7 · workpilot (+linear)","high","planner","planification","ok"],
+ ["coder","R+W+Web","context7 · workpilot · chrome-devtools* (+linear)","none","kanban","codage, barre de commandes ; Roadmap par défaut (F24)","ok"],
+ ["qa_reviewer","R+W+Web","context7 · workpilot · electron|puppeteer · chrome-devtools*","high","qa","QA","ok"],
+ ["qa_fixer","R+W+Web","idem","medium","qa","QA","ok"],
+ ["verifier","R+W+Web","context7 · workpilot · verify · browser · chrome-devtools*","medium","qa","phases verify / verify-replay (verify.loop) — nouveau #292","ok"],
+ ["insights","R+Web","—","none","research","page Insights","ok"],
+ ["analyzer","R","—","low","research","AI analyzer ; défaut des phases skill non mappées → architecture-map (F20)","miswired"],
+ ["architecture_visualizer","R+Write","—","high","kanban (non aliasé)","runner archify (bouton Regenerate) — jamais par le build (F20)","roster"],
+ ["merge_resolver","—","—","low","solo","merge IA","ok"],
+ ["commit_message","—","—","low","solo","messages de commit","ok"],
+ ["pr_template_filler","R","—","low","solo","création de PR","ok"],
+ ["pr_reviewer","R+Web","context7","high","review","revue PR ; phases mobile-design, frontend-design, review, adversarial-review, store-readiness","ok"],
+ ["pr_orchestrator_parallel","R+Web","context7","high","kanban + 6 PR = 9","revue PR parallèle (F5)","roster"],
+ ["pr_followup_parallel","R+Web","context7","high","kanban + 4 = 7","revue de suivi (F5)","roster"],
+ ["pr_finding_validator","R","—","medium","review","validation de constats","ok"],
+ ["analysis","R+Web","context7","medium","kanban","aucun appelant littéral trouvé","dead"],
+ ["batch_analysis","R+Web","—","low","kanban","runners/github/batch_issues.py:162 (F9)","roster"],
+ ["batch_validation","R","—","low","kanban","runners/github/batch_validator.py:241 (F9)","roster"],
+ ["roadmap_discovery","R+Web","context7","high","kanban","aucun : la Roadmap tourne en coder (F24)","dead"],
+ ["competitor_analysis","R+Web","context7","high","kanban","aucun (F24)","dead"],
+ ["ideation","R+Web","—","high","research","idéation","ok"],
+ ["impact_analyzer","—","—","—","planner (alias)","agents/impact_analyzer.py:305 (F1)","missing"],
+ ["architecture_reviewer","—","—","—","review (alias)","architecture/ai_reviewer.py:76 (F1)","missing"],
+ ["migration","—","—","—","kanban","migration/llm_transformer.py:75 (F1)","missing"],
+ ["insight_extractor","—","—","—","research (alias)","analysis/insight_extractor.py:379 (F1)","missing"],
+ ["learning_analyzer","—","—","—","research (alias)","learning_loop/service.py:110 (F1)","missing"],
+ ["context_mesh_analyzer","—","—","—","research (alias)","context_mesh/mesh_service.py:266 (F1)","missing"],
+ ["live_companion_analyzer","—","—","—","research (alias)","live_companion/analyzer.py:122 (F1)","missing"]];
+const SUBS=[
+ ["Revue de code générale",[["code-reviewer","R","sonnet","phases.py · kanban","coder, rosters non aliasés"],["quality-reviewer","R","—","pr_review.py","orchestrateur PR"]]],
+ ["Sécurité",[["security-auditor","R","sonnet","phases.py · review","pr_reviewer"],["security-reviewer","R","—","pr_review.py","orchestrateur PR"]]],
+ ["Exécution des tests",[["test-runner","Bash R","inherit","phases.py · kanban","coder (+ overlay langage/mobile)"],["qa-test-evidence","Bash R","inherit","phases.py · qa","qa_reviewer/fixer, verifier (pas d'overlay, F16)"]]],
+ ["Vérifier une affirmation",[["evidence-collector","R","sonnet","phases.py · research","idéation, insights"],["finding-validator","R","—","pr_review.py + parallel_followup_reviewer.py:262","PR (déclaré 2×)"]]],
+ ["Cartographier le code",[["spec-explorer","R","—","phases.py · kanban","coder"],["codebase-surveyor","R","sonnet","phases.py · research","idéation"],["architecture-analyst","R","sonnet","phases.py · planner","planner, analyze"]]],
+ ["Impact / régression",[["dependency-tracer","R","sonnet","phases.py · planner","planner"],["regression-hunter","R","sonnet","phases.py · review","pr_reviewer"]]],
+ ["Couverture / critères",[["test-coverage-auditor","R","sonnet","phases.py · review","pr_reviewer"],["qa-acceptance-checker","R","sonnet","phases.py · qa","QA, verifier, spec-conformance"]]],
+ ["Spec",[["prior-art-finder","R","sonnet","phases.py · spec","spec_writer, spec_validation"],["constraint-collector","R","sonnet","phases.py · spec","idem"]]],
+ ["Revue PR spécialisée",[["logic-reviewer","R","—","pr_review.py","orchestrateur PR"],["codebase-fit-reviewer","R","—","pr_review.py","orchestrateur PR"],["ai-triage-reviewer","R","—","pr_review.py","orchestrateur PR"],["resolution-verifier","R","—","parallel_followup_reviewer.py:222 (inline)","suivi PR"],["new-code-reviewer","R","—","parallel_followup_reviewer.py:236 (inline)","suivi PR"],["comment-analyzer","R","—","parallel_followup_reviewer.py:249 (inline)","suivi PR"]]],
+ ["Mobile",[["device-runner","Bash R","—","subagents/mobile.py","tous les rosters d'un projet mobile (solo compris, F9)"],["store-readiness-auditor","R","—","subagents/mobile.py","idem"],["mobile-release-manager","—","—","skills/mobile/agents","harness externes uniquement"],["mobile-architect · android-engineer · ios-engineer","—","—","skills/mobile/agents","harness externes uniquement"]]],
+ [".NET",[["net-architect","—","—","skills/dotnet/agents","harness externes uniquement"],["bmad-net-architect","—","—","skills/dotnet/agents","idem (doublon de net-architect)"],["performance-analyst","—","—","skills/dotnet/agents","idem"],["bmad-performance-analyst","—","—","skills/dotnet/agents","idem (doublon)"]]]];
+
+/* ---------- 06 constats ---------- */
+const FINDINGS=[
+ {id:"F1",sev:"crit",cat:"bug",st:"ouvert",v:"vérifié",t:"Sept features LLM échouent en silence : agent_type absent d'AGENT_CONFIGS",
+  c:"<code>impact_analyzer</code>, <code>architecture_reviewer</code>, <code>migration</code>, <code>insight_extractor</code>, <code>learning_analyzer</code>, <code>context_mesh_analyzer</code>, <code>live_companion_analyzer</code> sont passés à la fabrique mais absents du registre (29 entrées). <code>get_agent_config</code> lève <code>ValueError: Unknown agent type</code> (reproduit au commit b46a031). Les appelants attrapent et journalisent : l'extracteur d'insights, seul écrivain prévu de patterns/, codebase/ et outcomes/ dans le vault, ne produit rien. <code>PHASE_ALIASES</code> leur attribue pourtant déjà un roster.",
+  p:"agents/impact_analyzer.py:305 · architecture/ai_reviewer.py:76 · migration/llm_transformer.py:75 · analysis/insight_extractor.py:379 · learning_loop/service.py:110 · context_mesh/mesh_service.py:266 · live_companion/analyzer.py:122 · agents/tools_pkg/models.py:476-495",
+  r:"Ajouter les sept entrées (lecture seule + brain pour les analyseurs ; lecture + écriture pour migration). Ajouter un test qui parcourt l'AST du backend, collecte chaque littéral <code>agent_type=…</code> et chaque appel de fabrique, et vérifie que l'agent_type est nommé et présent dans <code>AGENT_CONFIGS</code>.",
+  g:"Sept features restaurées ; la mémoire du vault réellement alimentée.",k:"Le comportement fonctionnel des sept features ; seules leurs permissions deviennent explicites."},
+ {id:"F2",sev:"haute",cat:"pipeline",st:"partiel",v:"vérifié",t:"Cinq phases du workflow pointent encore vers des packs vides",
+  c:"Corrigé depuis l'audit : <code>verify</code> utilise <code>tooling/verify</code> (natif) et le profil signale les implémentations manquantes (bannière CLI, carte <code>WorkflowProfileCard</code>). Restent sans SKILL.md sur un clone : <code>brainstorm</code> (superpowers/brainstorming), <code>frontend-design</code> (impeccable), la méthodologie TDD de <code>coding</code>, <code>review</code> (mattpocock/code-review) et <code>observe</code> (task-observer, impl décorative : c'est <code>learning_loop/observe.py</code> qui tourne). <code>design-check</code> tourne quand même via la commande <code>gate</code> de <code>pack.json</code> (npx, réseau).",
+  p:"skills/{superpowers,impeccable,mattpocock,task-observer,claude-mem}/pack.json · workflows/runner.py:710-722 · workflows/engine.py:279 · cli/build_commands.py:186-194",
+  r:"Pack par pack : vendoriser et committer les quatre skills réellement utilisés (comme archify et ui-ux-pro-max), ou les remplacer par des skills natifs <code>tooling/</code>. Remplacer l'impl d'<code>observe</code> par <code>workpilot/observe</code>. Test : toute phase conservée à <code>medium</code> a une implémentation résoluble.",
+  g:"Le pipeline payé à un effort donné est celui qui s'exécute.",k:"Les phases brainstorm, frontend-design, review restent déclarées ; seule leur source change."},
+ {id:"F3",sev:"haute",cat:"doublon",st:"ouvert",v:"lu",t:"Les phases BMAD ne tournent presque jamais, et « spec » double le pipeline de spec",
+  c:"<code>bmad-prd</code>, <code>bmad-review</code>, <code>bmad-walkthrough</code> exigent <code>_bmad/scripts/resolve_customization.py</code> dans le projet construit ; <code>bmad-prd</code> appelle aussi <code>_bmad/scripts/memlog.py</code>. Hors projet BMAD, les trois phases sont refusées ; même WorkPilot n'embarque que <code>resolve_customization.py</code>. Quand <code>spec</code> tourne, elle réécrit un PRD après que le pipeline de spec a produit <code>spec.md</code> ; <code>spec-conformance</code> refait le travail de <code>qa-acceptance-checker</code>.",
+  p:"workflows/feature-build/workflow.yaml (spec, adversarial-review, spec-conformance) · .agents/skills/bmad-prd/SKILL.md:8,23,29 · _bmad/scripts/",
+  r:"Retirer la phase <code>spec</code>. Porter la lentille adversariale et la conformité comme options de la QA finale (F11), via un skill natif sans dépendance de runtime.",
+  g:"Moins de sessions ultrathink ; plus de phase fantôme.",k:"Les 50 skills BMAD dans la barre de commandes pour les projets qui ont _bmad/."},
+ {id:"F4",sev:"haute",cat:"tokens",st:"ouvert",v:"lu",t:"Toutes les phases LLM du pipeline de spec tournent sous spec_writer",
+  c:"<code>AgentRunner</code> fixe <code>agent_type=spec_writer</code> pour chaque prompt (l.176 et 212). #290 y a ajouté le provider de la phase spec, pas le bon agent_type. Le chercheur ne reçoit pas Context7 ; le critique, prévu en lecture seule à ultrathink (<code>spec_critic</code>), reçoit Write/Edit/Bash et la réflexion high. <code>spec_gatherer</code>, <code>spec_researcher</code>, <code>spec_discovery</code>, <code>spec_context</code> restent des configurations mortes.",
+  p:"spec/pipeline/agent_runner.py:126-145,176,212 · agents/tools_pkg/models.py (entrées spec_*) · core/client.py:1585-1606",
+  r:"Table <code>prompt → agent_type</code> dans <code>AgentRunner</code> (spec_researcher.md → spec_researcher, spec_critic.md → spec_critic, spec_gatherer.md → spec_gatherer…). Supprimer ensuite les configurations restées sans appelant.",
+  g:"Droits minimaux, Context7 pour la recherche, réflexion adaptée au critique.",k:"Le contenu des prompts de spec et l'ordre des phases."},
+ {id:"F5",sev:"haute",cat:"tokens",st:"ouvert",v:"vérifié",t:"Les orchestrateurs de revue PR portent 9 et 7 sous-agents",
+  c:"<code>pr_orchestrator_parallel</code> : 9 sous-agents (6 spécialistes + code-reviewer, test-runner avec Bash, spec-explorer) ; <code>pr_followup_parallel</code> : 7. Aucun des deux n'est dans <code>PHASE_ALIASES</code>, et <code>_apply_cap</code> (MAX_ROSTER = 7) est appliqué l.194, avant la fusion des agents de l'appelant l.197. Reproduit avec <code>resolve()</code>.",
+  p:"agents/subagents/__init__.py:186-197 · agents/subagents/phases.py:84-127 · runners/github/services/parallel_orchestrator_reviewer.py:741 · parallel_followup_reviewer.py:541",
+  r:"Aliaser les deux types vers <code>solo</code> (l'appelant fournit son roster) et appliquer le plafond après fusion, en protégeant les agents de l'appelant.",
+  g:"Trois descriptions de sous-agents en moins à chaque tour de revue.",k:"Les 6 spécialistes PR et les 3 du suivi."},
+ {id:"F6",sev:"haute",cat:"mémoire",st:"aggravé",v:"lu",t:"~12,6 k lignes Graphiti / LadybugDB encore câblées, et en hausse",
+  c:"214 références dans 45 fichiers backend hors du package (181 à l'audit précédent). Restent : <code>integrations/graphiti</code> (7 593 l.), <code>query_memory.py</code> (762), <code>memory_lifecycle_runner</code> (254), <code>team_sync_runner</code> (197), les shims <code>graphiti_config</code>/<code>graphiti_providers</code>, <code>memory/graphiti_helpers</code>, <code>context/graphiti_integration</code>, <code>scripts/test_memory_save.py</code> ; côté front <code>memory-service.ts</code> (861), les canaux MEMORY_*/GRAPHITI_* de <code>memory-handlers.ts</code>, <code>team-sync-handlers</code> (502), <code>memory-lifecycle-handlers</code> (325) et son store (193), <code>TeamSyncPanel</code> (580, déjà orphelin), <code>MemoryStep</code> d'onboarding, les locales <code>teamSync.json</code>. <code>requirements.txt</code> installe toujours <code>real_ladybug</code> et <code>graphiti-core</code>.",
+  p:"apps/backend/integrations/graphiti/ · apps/backend/query_memory.py · runners/memory_lifecycle_runner.py · runners/team_sync_runner.py · runners/github/services/deep_context_provider.py:407 · apps/backend/requirements.txt:29-38 · apps/frontend/src/main/memory-service.ts · main/ipc-handlers/memory-handlers.ts:481-1278",
+  r:"1) Déplacer les 11 canaux OLLAMA_* de <code>memory-handlers.ts</code> dans un <code>ollama-handlers.ts</code>. 2) Migrer les appelants de <code>get_graphiti_memory</code> vers <code>memory.store.get_project_memory</code>. 3) Supprimer le package, les runners Team Sync / Memory lifecycle, les pages, l'étape d'onboarding, les clés i18n et les dépendances.",
+  g:"~12,6 k lignes, dépendances lourdes (Kuzu, embeddings), surface UI.",k:"La gestion des modèles Ollama (canaux OLLAMA_*), l'onglet Mémoires (servi par /api/brain/memories)."},
+ {id:"F7",sev:"moy",cat:"mémoire",st:"ouvert",v:"lu",t:"Deux magasins de « patterns » injectés dans le même prompt",
+  c:"Le prompt d'une sous-tâche reçoit <code>get_memory_context</code> (vault : patterns, pièges, sessions) et <code>get_learning_context</code> (<code>.workpilot/learning_loop/patterns.json</code>), plus la section awareness et l'outil brain_recall. Aucun budget commun ; le context mesh lit le second magasin, pas le premier.",
+  p:"prompts_pkg/prompt_generator.py:506,586 · qa/reviewer.py:272 · qa/fixer.py:235 · runners/github/services/pr_review_engine.py:70 · ideation/generator.py:60",
+  r:"Faire écrire le learning loop dans le vault (patterns/ avec preuves) et n'avoir qu'un injecteur, plafonné en tokens.",
+  g:"Moins de tokens par sous-tâche, une seule vérité.",k:"Les patterns appris et leur promotion par preuves (A/B replay)."},
+ {id:"F8",sev:"moy",cat:"doublon",st:"ouvert",v:"lu",t:"Sous-agents qui répondent à la même question, déclarés à cinq endroits",
+  c:"security-auditor / security-reviewer ; code-reviewer / quality-reviewer ; test-runner / qa-test-evidence ; evidence-collector / finding-validator (déclaré deux fois) ; spec-explorer / codebase-surveyor / architecture-analyst ; store-readiness-auditor / mobile-release-manager ; net-architect / bmad-net-architect ; performance-analyst / bmad-performance-analyst. Les trois sous-agents du suivi PR sont encore déclarés en ligne.",
+  p:"agents/subagents/phases.py · agents/subagents/pr_review.py · runners/github/services/parallel_followup_reviewer.py:222-262 · skills/dotnet/agents/ · skills/mobile/agents/",
+  r:"Ramener à ~14 définitions, toutes dans le registre ; les rosters les référencent par nom.",
+  g:"Maintenance ; descriptions plus courtes par tour.",k:"Chaque rôle couvert aujourd'hui."},
+ {id:"F9",sev:"moy",cat:"tokens",st:"ouvert",v:"vérifié",t:"Rosters Kanban servis à des agents qui n'en ont pas l'usage",
+  c:"architecture_visualizer, analysis, batch_analysis, batch_validation, competitor_analysis, roadmap_discovery n'ont pas d'alias : ils reçoivent code-reviewer, test-runner (Bash) et spec-explorer (reproduit). Sur un projet mobile, <code>resolve()</code> ajoute device-runner et store-readiness-auditor à tout roster, <code>solo</code> compris (l.186).",
+  p:"agents/subagents/phases.py:84 · agents/subagents/__init__.py:174-190",
+  r:"Compléter <code>PHASE_ALIASES</code> (research pour les analyseurs, solo pour l'auteur archify) ; n'appliquer l'overlay mobile qu'aux rosters non vides.",
+  g:"Tokens par tour.",k:"Les spécialistes mobiles sur les phases qui touchent l'app."},
+ {id:"F10",sev:"moy",cat:"tokens",st:"ouvert",v:"lu",t:"Prompts volumineux et onze prompts orphelins",
+  c:"Aucune référence par nom (code, YAML, front) pour 11 prompts (~51 Ko) : github/pr_orchestrator (14,6 Ko), coder_recovery (8,9), intent_templates, environment_cloner, performance_profiler, github/issue_analyzer, documentation_agent, code_migration, multi_repo_planner, breaking_change_detector, browser_agent. Les plus gros prompts vivants : coder.md 35 Ko (~8,8 k tokens), planner.md 33 Ko, github/pr_parallel_orchestrator 33 Ko, complexity_assessor 21 Ko pour une classification en trois valeurs que l'heuristique produit déjà.",
+  p:"apps/backend/prompts/ · spec/complexity.py",
+  r:"Supprimer les orphelins (après grep final, y compris chargements dynamiques). Découper coder.md en noyau + modules par pile. N'appeler complexity_assessor que quand l'heuristique est peu confiante.",
+  g:"Tokens d'entrée (le cache aide, mais pas au premier tour de chaque session).",k:"Le contenu des prompts vivants."},
+ {id:"F11",sev:"moy",cat:"tokens",st:"aggravé",v:"lu",t:"Jusqu'à sept sessions relisent le même diff",
+  c:"self_review (par sous-tâche), review, verify (session verifier à effort ≥ medium, nouveau), qa_reviewer + qa-acceptance-checker, adversarial-review, spec-conformance, architecture-map (session analyzer, F20). À ultrathink, jusqu'à sept sessions relisent le diff complet, dont cinq en contexte frais.",
+  p:"agents/self_review.py · workflows/feature-build/workflow.yaml · verify/loop.py:573-590",
+  r:"Un passage de revue unique à lentilles (qualité, sécurité, adversariale, conformité) choisies par l'effort, puis la QA ; verify garde son rôle de preuve d'exécution.",
+  g:"Sessions en moins à haut effort, sans perte de couverture.",k:"Chaque lentille de revue existante."},
+ {id:"F12",sev:"moy",cat:"gouvernance",st:"ouvert",v:"lu",t:"hermes-learned listé dans [packs] contre la règle documentée",
+  c:"La doc fait de l'absence de ce pack dans <code>[packs]</code> la barrière qui empêche un skill écrit par un agent d'atteindre les harness sans relecture. La ligne est présente ; <code>claude-mem</code>, documenté optionnel, l'est aussi.",
+  p:".workpilot/skills.toml ([packs]) · docs/CLAUDE.md (hermes-agent)",
+  r:"Retirer <code>hermes-learned</code> et <code>claude-mem</code> de <code>[packs]</code> ; ajouter un test qui l'interdit.",
+  g:"Rétablit la barrière humaine.",k:"L'adoption automatique dans skills/hermes-learned (qui ne doit simplement pas être émise)."},
+ {id:"F13",sev:"moy",cat:"bug",st:"partiel",v:"lu",t:"La barre de commandes résout encore son provider avec _get_active_provider",
+  c:"La résolution des surcharges de skill utilise désormais <code>peek_active_provider</code> (l.205), mais l'exécution (<code>_run_with_agent</code>, l.417) appelle toujours <code>_get_active_provider</code>. Sans effet tant que plus rien n'écrit le marqueur de reprise (F25), mais deux résolutions dans la même requête.",
+  p:"slash_commands/api.py:198-207,411-417",
+  r:"Remplacer par <code>peek_active_provider</code> (ou par la résolution commune issue de F25).",g:"Cohérence.",k:"L'exécution des commandes sur le provider actif."},
+ {id:"F14",sev:"basse",cat:"doublon",st:"aggravé",v:"lu",t:"Un merge écrit dans quatre magasins",
+  c:"<code>core/usage_tracker.record_merge</code>, <code>learning_loop.observe.record_merge_outcome</code>, <code>brain.learn.record_merge</code> et, depuis #291, <code>uiux.knowledge.record_merged_design_system</code>, pour le même événement. <code>scheduling/dashboard_metrics.record_merge</code> tient un cinquième compteur.",
+  p:"cli/workspace_commands.py:45,374-410 · services/hooks/hook_service.py",
+  r:"Un événement « merge » publié une fois, des abonnés enregistrés (usage, learning, brain, uiux).",g:"Cohérence, un seul point d'extension.",k:"Les quatre effets du merge."},
+ {id:"F15",sev:"basse",cat:"doc",st:"atténué",v:"vérifié",t:"Effort none : planning annoncé élagué, exécuté quand même",
+  c:"<code>planning</code> a <code>min_effort: low</code> ; à none le profil l'élague, puis le coder le lance faute de plan. Un avertissement explicite le dit désormais.",
+  p:"workflows/feature-build/workflow.yaml (planning) · agents/coder.py:904-913",
+  r:"Retirer <code>min_effort</code> de planning.",g:"Profil exact.",k:"—"},
+ {id:"F16",sev:"basse",cat:"qualité",st:"ouvert",v:"lu",t:"L'overlay langage ne spécialise pas le testeur de la QA ni du verifier",
+  c:"Seul <code>test-runner</code> reçoit les commandes de la pile ; <code>qa-test-evidence</code> (rosters de la QA et, depuis #292, du verifier) redécouvre le framework à chaque passe.",
+  p:"agents/subagents/__init__.py:180-186",r:"Spécialiser les deux.",g:"Moins de tours de découverte.",k:"—"},
+ {id:"F17",sev:"basse",cat:"tokens",st:"ouvert",v:"lu",t:"Plafond de QA à 50 itérations",
+  c:"L'escalade sur problème récurrent (3×) protège la plupart des cas ; le plafond absolu reste 50 paires reviewer/fixer à réflexion high/medium.",
+  p:"qa/loop.py:153",r:"Plafond configurable par effort, ou budget en coût par tâche.",g:"Coût maximal borné.",k:"L'escalade humaine."},
+ {id:"F18",sev:"basse",cat:"doc",st:"aggravé",v:"lu",t:"Dérives de documentation lues par les agents",
+  c:"<code>apps/backend/AGENTS.md:35-37</code> cite kanban_subagents.py, planner_subagents.py, qa_subagents.py (supprimés) ; <code>AGENTS.md</code> présente les miroirs <code>.claude/.github/.cursor/skills</code> comme existants (non émis) ; <code>docs/CLAUDE.md</code> dit que mistral/deepseek/grok dégradent vers Claude (Arena, Bounty Board), que <code>pty-daemon.ts</code> gère les PTY (jamais démarré, F28) et que <code>significance.assess</code> décide dans la phase architecture-map (faux dans le build, F20) ; <code>pattern_storage.py:4</code> documente <code>.workpilot/learning/</code> ; <code>hooks/precommit.py:219</code> documente <code>generational-tests</code> ; <code>spec/complexity.py:54</code> parle encore de Graphiti.",
+  p:"apps/backend/AGENTS.md · AGENTS.md · docs/CLAUDE.md · learning_loop/pattern_storage.py:4 · hooks/precommit.py:219 · spec/complexity.py:54",
+  r:"Corriger les index ; ajouter un test qui vérifie que chaque chemin cité en backticks dans les AGENTS.md existe.",g:"Les agents lisent ces fichiers : une doc fausse coûte des tours.",k:"—"},
+ {id:"F19",sev:"basse",cat:"surface",st:"ouvert",v:"lu",t:"Surface produit très large",
+  c:"78 vues dans la barre latérale, 120 stores, 110 modules IPC (178 fichiers), 69 runners, 113 paquets backend, ~433 k lignes TS/TSX et ~349 k lignes Python hors tests. Plusieurs pages ne sont reliées à aucun runner LLM ni à la mémoire.",
+  p:"renderer/components/Sidebar.tsx:176",r:"Mesurer l'usage (activity-store le permet), puis regrouper ou retirer derrière un mécanisme de plugins.",g:"Temps de build, tests, maintenance.",k:"Toute page utilisée."},
+ {id:"F20",sev:"haute",cat:"bug",st:"nouveau",v:"lu",t:"La phase architecture-map du build ne produit pas la carte",
+  c:"Dans le workflow, <code>architecture-map</code> n'est ni dans <code>SKILL_PHASE_AGENTS</code> ni dans <code>CUSTOM_EXECUTORS</code> : <code>run_skill_phase</code> l'exécute sous l'agent par défaut <code>analyzer</code> (Read/Glob/Grep, sans Write). Le SKILL.md dit « tu écris un fichier JSON, le pipeline autour de toi exécute validate, deliver et compare » — ce pipeline n'existe que dans <code>runners/architecture_visualizer_runner.py --action delta</code>, déclenché uniquement par le bouton Regenerate. Ni <code>significance.assess</code> (censé décider à zéro token), ni archify : la réponse texte part dans <code>&lt;spec&gt;/workflow/architecture-map.md</code> et l'onglet Delta reste vide.",
+  p:"workflows/runner.py:198-213 (SKILL_PHASE_AGENTS), 757, 870 (CUSTOM_EXECUTORS) · skills/tooling/architecture-map/SKILL.md · runners/architecture_visualizer_runner.py · architecture_visualizer/archify/significance.py · frontend main/ipc-handlers/architecture-visualizer-handlers.ts:85",
+  r:"Ajouter <code>architecture-map</code> à <code>CUSTOM_EXECUTORS</code>, branché sur le chemin delta du runner (significance → authoring → validate/deliver/compare) avec l'agent_type <code>architecture_visualizer</code>. Test : un build qui touche un composant produit <code>&lt;spec&gt;/architecture/</code>.",
+  g:"Une session analyzer inutile en moins par build à effort ≥ medium ; la carte promise apparaît.",k:"La page Architecture et le bouton Regenerate."},
+ {id:"F21",sev:"haute",cat:"bug",st:"nouveau",v:"lu",t:"Context-aware snippets : feature visible, cassée de bout en bout",
+  c:"La page est dans la barre latérale (<code>Sidebar.tsx:109,143,208</code>) et le store appelle <code>electronAPI.generateContextAwareSnippet</code>. Mais <code>setupContextAwareSnippetsHandlers</code> n'est appelé nulle part : <code>context-aware-snippets:generate</code> n'a pas de handler. Et le runner importe <code>core.context_manager</code>, <code>services.project_analyzer</code> et <code>memory.bmad_memory</code>, qui n'existent pas : <code>_AVAILABLE</code> vaut toujours False.",
+  p:"apps/frontend/src/main/ipc-handlers/context-aware-snippets-handlers.ts:9 · main/context-aware-snippets-service.ts · preload/api/modules/context-aware-snippets-api.ts · apps/backend/runners/context_aware_snippets_runner.py:20-28",
+  r:"Décision produit : câbler (enregistrer les handlers, réécrire les imports du runner vers des modules existants comme <code>project.analyzer</code> et <code>brain/project_memory</code>) ou retirer la page, son store, son API preload, ses clés i18n et le runner.",
+  g:"Une feature qui marche, ou ~1 k lignes en moins.",k:"Si conservée : la génération de snippets par type."},
+ {id:"F22",sev:"moy",cat:"code mort",st:"nouveau",v:"vérifié",t:"Quatre API preload appellent des canaux IPC sans handler",
+  c:"<code>scan-ollama-models</code> et <code>download-ollama-model</code> (<code>preload/api/project-api.ts:545,551</code>) n'ont aucun <code>ipcMain.handle</code> (les vrais canaux sont OLLAMA_LIST_MODELS / OLLAMA_PULL_MODEL). <code>claude:profileInitialize</code> et <code>terminal:oauthCodeSubmit</code> restent exposés (<code>terminal-api.ts:541,660</code>) alors que leurs handlers ont été retirés (<code>terminal-handlers.ts:406,439</code>). Aucun appelant dans le renderer, hors mocks.",
+  p:"apps/frontend/src/preload/api/project-api.ts:545,551 · preload/api/terminal-api.ts:541,660 · main/ipc-handlers/terminal-handlers.ts:406,439 · shared/constants/ipc.ts:151,164",
+  r:"Supprimer les quatre méthodes, leurs constantes et leurs mocks. Ajouter un test : chaque canal invoqué par le preload a un handler enregistré.",g:"API honnête.",k:"Les canaux OLLAMA_* réels."},
+ {id:"F23",sev:"haute",cat:"tokens",st:"nouveau",v:"vérifié",t:"docs/CLAUDE.md (268 Ko, ~67 k tokens) chargé dans chaque session Claude Code",
+  c:"<code>CLAUDE.md</code> importe <code>@AGENTS.md</code> et <code>@docs/CLAUDE.md</code> : toute session Claude Code sur ce dépôt — y compris un build de WorkPilot par WorkPilot via <code>setting_sources</code> — paie ~69 k tokens de contexte avant la première question. Le fichier a pris +23 Ko depuis l'audit précédent (verify, uiux, moteur de tâche). Il mêle règles normatives (une page) et justifications de conception (le reste).",
+  p:"CLAUDE.md · docs/CLAUDE.md (4 294 lignes) · AGENTS.md (8 Ko)",
+  r:"Garder dans docs/CLAUDE.md les règles et la carte (< 20 Ko) ; déplacer chaque section « pourquoi » dans <code>shared_docs/architecture/&lt;feature&gt;.md</code>, référencée par chemin et lue à la demande. Ajouter un test de taille.",
+  g:"~60 k tokens par session de développement ; cache plus stable.",k:"Toutes les règles critiques, et l'accès à chaque justification par lien."},
+ {id:"F24",sev:"moy",cat:"tokens",st:"nouveau",v:"vérifié",t:"La Roadmap tourne sous l'agent coder",
+  c:"<code>runners/roadmap/executor.py:130</code> appelle <code>create_client</code> sans agent_type : le défaut <code>coder</code> s'applique (Write, Edit, Bash, Web, roster Kanban avec test-runner). C'est le seul appel de fabrique du backend sans agent_type (vérifié par AST). Les configurations <code>roadmap_discovery</code> et <code>competitor_analysis</code> (lecture + Web + Context7) ne sont utilisées par personne.",
+  p:"runners/roadmap/executor.py:130 · runners/roadmap/orchestrator.py:61 · core/client.py:721,2179",
+  r:"Passer <code>agent_type=roadmap_discovery</code> (et <code>competitor_analysis</code> pour l'analyse concurrentielle) ; intégrer le cas au test de F1.",g:"Droits minimaux, roster adapté.",k:"La génération de roadmap."},
+ {id:"F25",sev:"moy",cat:"code mort",st:"nouveau",v:"lu",t:"Le marqueur RESUME_WITH_PROVIDER n'a plus d'écrivain",
+  c:"Depuis #290, <code>TASK_RESUME_WITH_PROVIDER</code> écrit le moteur dans <code>task_metadata.json</code> et supprime le marqueur (<code>execution-handlers.ts:1891</code>) ; <code>crud-handlers.ts:828</code> et <code>execution-handlers.ts:2005</code> le suppriment aussi. Plus rien ne l'écrit. Restent la consommation à usage unique (<code>core/client.py:1647-1700</code>), la distinction <code>peek_active_provider</code> / <code>_get_active_provider</code>, des commentaires dans coder.py, workflows/api.py, cli/build_commands.py, cli/utils.py, et <code>ResumeWithProviderDropdown.tsx</code> (204 l.), importé par personne.",
+  p:"core/client.py:1647-1717,1841 · apps/frontend/src/main/ipc-handlers/task/execution-handlers.ts:1891,2005 · crud-handlers.ts:828 · renderer/components/task-detail/ResumeWithProviderDropdown.tsx",
+  r:"Supprimer ResumeWithProviderDropdown.tsx maintenant. Garder la lecture du marqueur une version (tâches mises en pause avant la mise à jour), puis retirer marqueur, consume/peek et commentaires.",
+  g:"Une résolution de provider au lieu de deux.",k:"Le changement de provider à la reprise (TaskPauseControls)."},
+ {id:"F26",sev:"moy",cat:"doublon",st:"nouveau",v:"lu",t:"Au moins onze détecteurs de pile",
+  c:"<code>project/stack_detector</code>, <code>project/framework_detector</code>, <code>agents/subagents.detect_languages</code>, <code>docintel/api_tests.detect_api_stack</code>, <code>spec/validation_strategy.detect_project_type</code>, <code>runners/pipeline_generator_runner.detect_project_stack</code>, <code>runners/flaky_tests_runner._detect_languages</code>, <code>runners/app_emulator_runner.detect_project_type</code>, <code>uiux/stack.detect_ui_stack</code>, <code>mobile/stacks.detect_stack</code>, <code>test_generation/stack_aware</code>. docs/CLAUDE.md appelle stack_detector « le seul détecteur de langage du dépôt ».",
+  p:"voir liste",r:"Une façade <code>project.stack</code> (langages, frameworks, UI, mobile, API, tests) adossée à stack_detector + framework_detector ; les autres modules la lisent. Commencer par detect_languages, detect_api_stack, validation_strategy, pipeline_generator, flaky_tests.",
+  g:"Une réponse à « quel projet est-ce ? ».",k:"Les spécificités mobile (mobile.stacks) et UI (uiux.stack) comme sous-modules."},
+ {id:"F27",sev:"basse",cat:"doublon",st:"nouveau",v:"lu",t:"Cinq listes de globs « surface »",
+  c:"<code>workflow.yaml</code> déclare <code>&amp;ui_surface</code> (ui-design-system), <code>&amp;frontend_surface</code> (frontend-design, design-check), la liste mobile recopiée à l'identique dans mobile-design et store-readiness (sans ancre), une liste pour architecture-map ; <code>uiux/surface.py</code> duplique &amp;ui_surface (un test garde les deux égaux).",
+  p:"workflows/feature-build/workflow.yaml · apps/backend/uiux/surface.py · tests/test_uiux.py",
+  r:"Une ancre pour la liste mobile ; dériver frontend_surface de ui_surface ou documenter l'écart ; générer l'une des deux copies depuis l'autre.",g:"Pas de surface oubliée.",k:"—"},
+ {id:"F28",sev:"moy",cat:"code mort",st:"nouveau",v:"vérifié",t:"57 fichiers frontend sans importeur de production (~16,5 k lignes)",
+  c:"Contrôle strict des import/require/import() : 57 fichiers, dont 6 importés seulement par leurs tests. Familles : 3 variantes UsageIndicator (1 590 l.), 3 variantes *ProviderSection (988), settings/multiconnector/* (759), AccountSettings.tsx (2 227, tests seuls), HooksDialog.tsx (1 189), SDKRateLimitModal + RateLimitModal (1 070), AutoRefactorDialog, CostPredictorDialog, DecisionTimeline, DocumentationAgentDashboard, StreamingTest, TeamSyncPanel… ; côté main : log-service.ts, fs-utils.ts, copilot-cli-utils.ts, renderer-log-handler.ts, sdk-session-recovery-coordinator.ts (568), pty-daemon.ts (586 : pas une entrée de build, <code>ptyDaemonClient</code> ne sert qu'à <code>shutdown()</code>). <code>providers.generated.ts</code> est produit par <code>scripts/generate-provider-types.js</code> et importé par personne.",
+  p:"voir 07 · Nettoyage (liste complète) · apps/frontend/electron.vite.config.ts:65 · main/terminal/pty-daemon-client.ts:130 · main/index.ts:1294",
+  r:"Confirmer avec <code>npx knip</code> + <code>pnpm run typecheck</code>, puis supprimer par familles (une PR chacune). Pour pty-daemon : retirer daemon + client + l'appel shutdown, et corriger docs/CLAUDE.md.",
+  g:"~16,5 k lignes, temps de typecheck et de lint.",k:"Les variantes réellement montées (UsageIndicator, CleanProviderSection, GitHubCopilotAuthTerminal…)."},
+ {id:"F29",sev:"moy",cat:"code mort",st:"nouveau",v:"lu",t:"Paquets et modules backend sans importeur (~6,7 k lignes)",
+  c:"<code>planner_lib/</code> (939), <code>prediction/</code> (1 055), <code>sandbox/</code> (1 102, tests internes seulement), <code>core/agent_client/optimized_copilot_agent_client.py</code> (481 : répertoire sans __init__ masqué par <code>core/agent_client.py</code>, donc inatteignable), <code>core/runtimes/optimized_copilot_runtime.py</code> (381), <code>migration/models_fixed.py</code> (326), quatre <code>*_example.py</code> (770), <code>core/output_schemas.py</code> (162), <code>runners/github/services/review_tools.py</code> (619), <code>runners/github/multi_repo.py</code> (512), <code>cli/quality_commands.py</code> (146), <code>runners/time_travel_runner.py</code> (227, doublon de <code>replay/api.py</code>).",
+  p:"voir 07 · Nettoyage",r:"Supprimer après grep final (backend, frontend, scripts, workflows CI).",g:"~6,7 k lignes.",k:"Time travel (servi par replay/api.py)."},
+ {id:"F30",sev:"basse",cat:"structure",st:"nouveau",v:"lu",t:"25 shims de compatibilité à la racine du backend",
+  c:"<code>agent.py</code>, <code>client.py</code>, <code>prompts.py</code>, <code>progress.py</code>, <code>debug.py</code>, <code>worktree.py</code>, <code>workspace.py</code>, <code>qa_loop.py</code>, <code>recovery.py</code>… réexportent un module rangé ailleurs. Quatre n'ont aucun importeur (azure_devops_integration, client, critique, linear_config) ; les autres totalisent ~250 imports, dont debug (58), progress (32), graphiti_config (32).",
+  p:"apps/backend/*.py",r:"Supprimer les quatre maintenant ; migrer les imports par codemod puis supprimer, un shim par commit. Attention : <code>worktree.py</code> et <code>insight_extractor.py</code> chargent leur cible par importlib pour éviter des <code>__init__</code> lourds — rendre ceux-ci paresseux d'abord. Les points d'entrée (run.py, start_backend.py, provider_api.py, websocket_server.py) restent.",g:"Un chemin d'import par module.",k:"Les points d'entrée lancés par le frontend."},
+ {id:"F31",sev:"basse",cat:"structure",st:"nouveau",v:"lu",t:"Tests dispersés et deux configurations pytest contradictoires",
+  c:"125 fichiers <code>test_*.py</code> vivent dans <code>apps/backend</code> hors de <code>tests/</code> (dont 5 à la racine du backend), plus <code>runners/github/test_context_gatherer.py</code> à la racine du dépôt. <code>pytest.ini</code> collecte <code>tests</code>, <code>apps/backend</code> et <code>src</code> ; <code>apps/backend/pyproject.toml</code> déclare <code>testpaths = [\"tests\"]</code>, un dossier qui n'existe pas.",
+  p:"pytest.ini · apps/backend/pyproject.toml:1-8 · apps/backend/**/test_*.py",
+  r:"Déplacer vers <code>tests/&lt;paquet&gt;/</code> ; une seule configuration pytest.",g:"Collecte prévisible, CI plus simple.",k:"Tous les tests (déplacés, pas supprimés)."},
+ {id:"F32",sev:"basse",cat:"structure",st:"nouveau",v:"lu",t:"Deux arbres src/connectors et un second registre de providers",
+  c:"<code>src/connectors/llm_*.py</code> (1 769 l., découverte dynamique par <code>llm_discovery</code>) double <code>providers.yaml</code> + <code>models_registry.py</code> ; <code>llm_anthropic.py:19</code> instancie <code>anthropic.Anthropic()</code>, ce que la règle critique interdit. <code>apps/backend/src/connectors/llm_anthropic_usage.py</code> ne se résout que parce que <code>start_backend.py:114</code> ajoute <code>apps/backend/src</code> au <code>sys.path</code> ; lancé autrement, <code>provider_api.py:1721</code> tombe dans son <code>except ImportError</code>.",
+  p:"src/connectors/ · apps/backend/src/connectors/ · apps/backend/start_backend.py:114 · provider_api.py:165-181,1721 · cli/main.py:547-555",
+  r:"Faire de <code>providers.yaml</code>/<code>models_registry</code> la seule source ; déplacer <code>llm_anthropic_usage</code> dans <code>apps/backend/core/</code> ; supprimer les <code>llm_*.py</code> que seul <code>--list-providers</code> lit.",g:"Un registre, plus d'appel Anthropic direct.",k:"Connecteurs Jira, Azure DevOps, Postman, notifications, grepai, Figma."},
+ {id:"F33",sev:"basse",cat:"code mort",st:"nouveau",v:"lu",t:"Fichiers ponctuels et historiques",
+  c:"<code>utils/</code> : 29 fichiers, 3 719 lignes (fix_*, *diagnostic*, direct_test, create_copilot_profile_clean…), référencés nulle part mais lintés par la CI ; <code>docs/pr-1575-fixes.md</code> ; <code>docs/superpowers/plans|specs</code> (plans datés) ; <code>shared_docs/FEATURE_IDEAS.md</code> + <code>FEATURE_IMPROVEMENTS_AND_NEW_IDEAS.md</code> (411 Ko) ; <code>docs/CHANGELOG.md</code> (107 Ko) à côté de <code>CHANGELOG.md</code> ; <code>apps/backend/scripts/test_memory_save.py</code> (Graphiti) ; <code>.security-reports/</code> vide.",
+  p:"utils/ · docs/ · shared_docs/ · .github/workflows/lint.yml:82",
+  r:"Archiver dans une branche ou un wiki, puis supprimer ; garder un seul CHANGELOG.",g:"Recherche et contexte d'agent plus propres.",k:"README, CONTRIBUTING, RELEASE, CONFIGURATION."},
+ {id:"F34",sev:"basse",cat:"mémoire",st:"nouveau",v:"lu",t:"~60 sous-dossiers .workpilot/ dont des doublons de nommage",
+  c:"<code>learning</code> et <code>learning_loop</code> ; <code>memory</code> et <code>memories</code> (tous deux Graphiti) ; <code>quality</code> et <code>quality-rules</code> ; <code>generational_tests</code> (écrit) et <code>generational-tests</code> (documenté).",
+  p:"voir 02 · Mémoire, table des magasins",r:"Fusionner sous un nom par feature ; migration au premier lancement.",g:"Lisibilité, nettoyage.",k:"Les données existantes (migrées)."},
+ {id:"F35",sev:"basse",cat:"doublon",st:"nouveau",v:"lu",t:"frontend-design et ui-design-system visent la même chose avant le coding",
+  c:"Sur une tâche web, <code>ui-design-system</code> fixe le design system (déterministe, gratuit) puis <code>frontend-design</code> (impeccable, vide sur un clone) ouvre une session pour dire « ce qu'il faut viser ».",
+  p:"workflows/feature-build/workflow.yaml",r:"Si impeccable n'est pas vendorisé : adosser frontend-design au design system ui-ux-pro-max, ou le retirer au profit de ui-design-system + design-check.",g:"Une session en moins par tâche web.",k:"Le design system et la détection impeccable."},
+ {id:"F36",sev:"basse",cat:"structure",st:"nouveau",v:"lu",t:"Fichiers géants",
+  c:"<code>core/agent_client.py</code> 5 532 lignes (tous les adaptateurs), <code>worktree-handlers.ts</code> 5 665, <code>usage-monitor.ts</code> 4 609, <code>KanbanBoard.tsx</code> 4 297, <code>ApiExplorer.tsx</code> 3 707, <code>pr-handlers.ts</code> 3 480, <code>core/worktree.py</code> 3 382.",
+  p:"voir liste",r:"Un adaptateur par fichier (<code>core/agent_clients/&lt;provider&gt;.py</code>) ; handlers découpés par canal.",g:"Contexte d'agent plus petit à chaque lecture, revues plus faciles.",k:"Interfaces publiques inchangées."}];
+const PLAN=[
+ ["P0","Features cassées","Enregistrer les 7 agent_types + test AST ; brancher architecture-map sur le pipeline archify ; câbler ou retirer Context-aware snippets ; retirer les 4 API preload mortes ; agent_type de la Roadmap","F1, F20, F21, F22, F24","Features restaurées, mémoire alimentée"],
+ ["P1","Contexte de développement","Réduire docs/CLAUDE.md aux règles (< 20 Ko), justifications dans shared_docs/architecture/","F23","~60 k tokens par session"],
+ ["P1","Droits et rosters minimaux","agent_type par prompt dans le pipeline de spec ; alias PR → solo et plafond après fusion ; alias manquants ; overlay mobile hors solo","F4, F5, F9","Tokens par tour, permissions minimales"],
+ ["P1","Pipeline payé = pipeline exécuté","Vendoriser ou remplacer superpowers/impeccable/mattpocock ; supprimer la phase spec BMAD ; planning sans min_effort ; frontend-design adossé à ui-ux-pro-max","F2, F3, F15, F35","Profil exact, sessions en moins"],
+ ["P2","Une seule mémoire","Retirer Graphiti / LadybugDB (OLLAMA_* préservés) ; fusionner les magasins de patterns ; événement merge unique ; dossiers .workpilot/ renommés","F6, F7, F14, F34","~12,6 k lignes, une vérité"],
+ ["P2","Code mort","RESUME_WITH_PROVIDER ; 57 fichiers frontend ; paquets/modules backend ; shims ; second registre de providers ; utils/ et docs historiques","F25, F28, F29, F30, F32, F33","~27 k lignes"],
+ ["P3","Tokens à haut effort","Revue unique à lentilles ; découper coder.md ; supprimer les prompts orphelins ; plafond QA par effort","F10, F11, F17","Sessions et tokens à ultrathink"],
+ ["P3","Consolidation","Sous-agents dans le registre (~14) ; overlay du testeur QA ; façade project.stack ; globs de surface ; tests sous tests/ ; fichiers géants","F8, F16, F26, F27, F31, F36","Maintenance"],
+ ["P3","Gouvernance et doc","Retirer hermes-learned / claude-mem de [packs] ; peek_active_provider ; index de doc corrigés","F12, F13, F18","Barrière humaine, doc exacte"],
+ ["P4","Surface","Mesurer l'usage des pages et regrouper en plugins","F19","Surface et coût de maintenance"]];
+
+/* ---------- 07 nettoyage ---------- */
+const CLEAN=[
+ ["Frontend","renderer/components/UsageIndicatorAgnostic.tsx",558,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/UsageIndicatorDumb.tsx",550,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/UsageIndicatorSimple.tsx",482,"aucun importeur (UsageIndicator.tsx est la version montée)","supprimer","F28"],
+ ["Frontend","renderer/components/settings/ImprovedProviderSection.tsx",261,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/settings/SophisticatedProviderSection.tsx",326,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/settings/ThemedProviderSection.tsx",401,"aucun importeur (CleanProviderSection est montée)","supprimer","F28"],
+ ["Frontend","renderer/components/settings/multiconnector/ (5 fichiers)",759,"AccountConnectorCard, AccountForm, AccountList, PriorityOrder, connectorLogos : aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/settings/AccountSettings.tsx",2227,"importé seulement par son test","confirmer puis supprimer (+ test)","F28"],
+ ["Frontend","renderer/components/settings/ProfileList.tsx",349,"importé seulement par son test","confirmer puis supprimer (+ test)","F28"],
+ ["Frontend","renderer/components/settings/LlmRouterSettings.tsx",380,"aucun importeur","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/components/settings/CopilotAuthTerminal.tsx",358,"aucun importeur (GitHubCopilotAuthTerminal est la version montée)","supprimer","F28"],
+ ["Frontend","renderer/components/hooks/HooksDialog.tsx",1189,"aucun importeur","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/components/SDKRateLimitModal.tsx",596,"cité seulement en commentaire","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/components/RateLimitModal.tsx",474,"cité seulement en commentaire","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/components/AppUpdateNotification.tsx",365,"aucun importeur","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/components/StreamingTest.tsx",256,"composant de test manuel","supprimer","F28"],
+ ["Frontend","renderer/components/ReferencedFilesSection.tsx",190,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/AgentProfiles.tsx",149,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/AuthFailureModal.tsx",136,"cité seulement en commentaire","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/components/ProfileBadge.tsx",150,"importé seulement par son test","supprimer (+ test)","F28"],
+ ["Frontend","renderer/components/ProjectInitModal.tsx",117,"importé seulement par son test","supprimer (+ test)","F28"],
+ ["Frontend","renderer/components/ProactiveSwapListener.tsx",96,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/FolderExplorer.tsx",56,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/auth/Can.tsx",30,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/auto-refactor/AutoRefactorDialog.tsx",523,"cité seulement dans un commentaire du store","confirmer puis supprimer (+ store si orphelin)","F28"],
+ ["Frontend","renderer/components/azure-devops-import/AzureDevOps{DragProvider,DropZone}.tsx",216,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/cost-predictor/CostPredictorDialog.tsx",233,"aucun importeur","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/components/decision-logger/DecisionTimeline.tsx",323,"aucun importeur","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/components/documentation-agent/DocumentationAgentDashboard.tsx",312,"aucun importeur","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/components/memory/TeamSyncPanel.tsx",580,"aucun importeur ; parle à Graphiti","supprimer (lot F6)","F6"],
+ ["Frontend","renderer/components/task-detail/ResumeWithProviderDropdown.tsx",204,"aucun importeur ; remplacé par TaskPauseControls (#290)","supprimer","F25"],
+ ["Frontend","renderer/components/task-detail/TaskDetailModalHandlers.tsx",212,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/task-detail/task-review/TerminalDropdown.tsx",55,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/ui/sheet.tsx",130,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/components/workspace/AddWorkspaceModal.tsx",320,"aucun importeur","confirmer puis supprimer","F28"],
+ ["Frontend","renderer/hooks/use-profile-swap-notifications.ts",195,"importé seulement par son test","supprimer (+ test)","F28"],
+ ["Frontend","renderer/lib/{flow,scroll}-controller.ts",287,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/lib/webgl-context-manager.ts",205,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/lib/terminal-font-settings-verification.ts",92,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/lib/compose-refs-fix.ts",85,"aucun importeur","supprimer","F28"],
+ ["Frontend","renderer/test-logger.ts",16,"aucun importeur","supprimer","F28"],
+ ["Frontend","shared/types/providers.generated.ts",55,"généré par scripts/generate-provider-types.js, importé par personne","supprimer (+ script) ou l'utiliser","F28"],
+ ["Frontend","shared/utils/powershell-color-support.ts",102,"aucun importeur","supprimer","F28"],
+ ["Frontend","examples/colored-logs-example.ts",57,"exemple","supprimer","F28"],
+ ["Frontend","main/terminal/pty-daemon.ts",586,"pas une entrée electron.vite ; le client ne se connecte jamais","supprimer avec pty-daemon-client.ts + appel shutdown","F28"],
+ ["Frontend","main/services/sdk-session-recovery-coordinator.ts",568,"importé seulement par son test","confirmer puis supprimer (+ test)","F28"],
+ ["Frontend","main/log-service.ts",364,"aucun importeur (task-log-service est la version utilisée)","supprimer","F28"],
+ ["Frontend","main/fs-utils.ts",155,"aucun importeur","supprimer","F28"],
+ ["Frontend","main/copilot-cli-utils.ts",86,"aucun importeur","supprimer","F28"],
+ ["Frontend","main/ipc-handlers/renderer-log-handler.ts",60,"jamais enregistré","supprimer","F28"],
+ ["Frontend","main/ipc-handlers/context-aware-snippets-handlers.ts",77,"jamais enregistré ; la page l'appelle","câbler ou retirer avec la feature","F21"],
+ ["Frontend","preload : scanOllamaModels, downloadOllamaModel, initializeClaudeProfile, submitOAuthCode",0,"canaux sans handler","supprimer méthodes, constantes, mocks","F22"],
+ ["Backend","apps/backend/planner_lib/",939,"aucun import","supprimer","F29"],
+ ["Backend","apps/backend/prediction/",1055,"aucun import","supprimer","F29"],
+ ["Backend","apps/backend/sandbox/",1102,"seuls ses propres tests l'importent","supprimer (+ tests)","F29"],
+ ["Backend","apps/backend/core/agent_client/optimized_copilot_agent_client.py",481,"répertoire masqué par core/agent_client.py","supprimer","F29"],
+ ["Backend","apps/backend/core/runtimes/optimized_copilot_runtime.py",381,"aucun import","supprimer","F29"],
+ ["Backend","apps/backend/migration/models_fixed.py",326,"aucun import","supprimer","F29"],
+ ["Backend","apps/backend/runners/github/services/review_tools.py",619,"aucun import","supprimer","F29"],
+ ["Backend","apps/backend/runners/github/multi_repo.py",512,"aucun import (multi_repo_runner est autre chose)","supprimer","F29"],
+ ["Backend","apps/backend/streaming/integration_example.py",255,"exemple","supprimer","F29"],
+ ["Backend","apps/backend/runners/github/validator_example.py",221,"exemple","supprimer","F29"],
+ ["Backend","apps/backend/runners/github/bot_detection_example.py",154,"exemple","supprimer","F29"],
+ ["Backend","apps/backend/runners/jira/jira_work_items_example.py",140,"exemple","supprimer","F29"],
+ ["Backend","apps/backend/runners/time_travel_runner.py",227,"jamais lancé ; replay/api.py sert le time travel","supprimer","F29"],
+ ["Backend","apps/backend/core/output_schemas.py",162,"aucun import","supprimer","F29"],
+ ["Backend","apps/backend/cli/quality_commands.py",146,"aucun import","supprimer","F29"],
+ ["Backend","apps/backend/runners/context_aware_snippets_runner.py",0,"importe 3 modules inexistants","câbler ou retirer","F21"],
+ ["Backend","src/connectors/llm_*.py (13 fichiers)",1769,"second registre de providers ; llm_anthropic instancie anthropic.Anthropic()","migrer vers providers.yaml puis supprimer","F32"],
+ ["Shims","apps/backend/{azure_devops_integration,client,critique,linear_config}.py",87,"0 importeur","supprimer","F30"],
+ ["Shims","apps/backend/debug.py",40,"58 imports","migrer vers core.debug puis supprimer","F30"],
+ ["Shims","apps/backend/progress.py",36,"32 imports","migrer vers core.progress puis supprimer","F30"],
+ ["Shims","apps/backend/graphiti_config.py · graphiti_providers.py",6,"32 + 15 imports, Graphiti","supprimer avec le lot F6","F6"],
+ ["Shims","apps/backend/worktree.py · workspace.py",114,"15 + 7 imports","migrer puis supprimer","F30"],
+ ["Shims","apps/backend/project_analyzer.py",106,"13 imports","migrer puis supprimer","F30"],
+ ["Shims","apps/backend/{prompts,agent,recovery,linear_updater,auto_claude_tools,qa_loop,phase_event,prompt_generator,risk_classifier,ci_discovery,scan_secrets,analyzer,insight_extractor,linear_integration,security_scanner}.py",440,"1 à 9 imports chacun","migrer puis supprimer, un par commit","F30"],
+ ["Prompts","prompts/github/pr_orchestrator.md",14649,"aucune référence (octets)","supprimer","F10"],
+ ["Prompts","prompts/coder_recovery.md",8858,"aucune référence (octets)","supprimer","F10"],
+ ["Prompts","prompts/{intent_templates,environment_cloner,performance_profiler,documentation_agent,code_migration,multi_repo_planner,breaking_change_detector,browser_agent}.md",24534,"aucune référence (octets)","supprimer","F10"],
+ ["Prompts","prompts/github/issue_analyzer.md",3020,"cité seulement en commentaire (continuous_ai/issue_responder.py:336)","supprimer","F10"],
+ ["Hérité Graphiti","apps/backend/integrations/graphiti/",7593,"214 réf. hors paquet","supprimer après migration des appelants","F6"],
+ ["Hérité Graphiti","apps/backend/query_memory.py",762,"CLI LadybugDB","supprimer","F6"],
+ ["Hérité Graphiti","apps/backend/runners/{memory_lifecycle,team_sync}_runner.py",451,"pages Team Sync / Memory lifecycle","supprimer avec les pages","F6"],
+ ["Hérité Graphiti","apps/backend/scripts/test_memory_save.py",0,"script de test Graphiti","supprimer","F6"],
+ ["Hérité Graphiti","main/memory-service.ts",861,"service LadybugDB","supprimer","F6"],
+ ["Hérité Graphiti","main/ipc-handlers/memory-handlers.ts (MEMORY_*, GRAPHITI_*)",500,"héberge aussi OLLAMA_* (à garder)","extraire OLLAMA_* puis supprimer le reste","F6"],
+ ["Hérité Graphiti","main/ipc-handlers/{team-sync,memory-lifecycle}-handlers.ts + memory-lifecycle-store.ts",1020,"pages héritées","supprimer","F6"],
+ ["Hérité Graphiti","renderer/components/onboarding/MemoryStep.tsx",64,"étape d'onboarding Graphiti","supprimer de l'assistant","F6"],
+ ["Docs & scripts","utils/ (29 fichiers)",3719,"référencés nulle part ; lintés par lint.yml:82","archiver puis supprimer","F33"],
+ ["Docs & scripts","shared_docs/FEATURE_IDEAS.md + FEATURE_IMPROVEMENTS_AND_NEW_IDEAS.md",0,"411 Ko d'idées, recoupées","archiver (wiki / issues)","F33"],
+ ["Docs & scripts","docs/CHANGELOG.md",0,"107 Ko, doublon de CHANGELOG.md","fusionner","F33"],
+ ["Docs & scripts","docs/pr-1575-fixes.md · docs/superpowers/",0,"comptes rendus et plans datés","archiver","F33"],
+ ["Docs & scripts","runners/github/test_context_gatherer.py (racine du dépôt)",0,"test isolé hors tests/","déplacer dans tests/","F31"],
+ ["Docs & scripts",".security-reports/",0,"dossier vide","supprimer","F33"]];
+
+/* ---------- 08 évolutions ---------- */
+const PRS=[
+ ["#288","fix(codex-cli) : mise à jour par le gestionnaire de paquets qui possède le codex du PATH, vérifiée","Hors périmètre de l'audit (installation de Codex CLI).","—"],
+ ["#289","fix(codex-cli) : installer Codex dans le préfixe npm du binaire réellement utilisé","Hors périmètre de l'audit.","—"],
+ ["#290","feat(kanban) : chaque tâche possède son moteur (provider × LLM × effort, par phase)","task-engine.ts, task-provider-env.ts, TaskEngineEditor/Chip, EngineTrioPicker, UsageLensSelector ; _resolve_active_provider lit la tâche avant tout ; AgentRunner prend le provider de la phase spec ; la liste « Fournisseur IA » passe dans Paramètres → Agent ; applyProviderToTasks supprimé ; le marqueur RESUME_WITH_PROVIDER n'est plus écrit.","F4 (inchangé), F13, F25 (nouveau)"],
+ ["#291","feat(uiux) : données ui-ux-pro-max sur les tâches UI uniquement, pour tous les providers","Pack vendorisé, phase déterministe ui-design-system, serveur MCP uiux réservé aux tâches UI, section de prompt par sous-tâche UI, MASTER.md classé dans le cerveau au merge. narrow_to_forecast : les phases conditionnelles sont décidées sur les fichiers du plan (gain sur toutes les tâches backend) ; _touched reconnaît un fichier racine.","F14 (aggravé), F27, F35 (nouveaux)"],
+ ["#292","feat(verify) : boucle de vérification runtime (/verify) pour tous les providers","Phase verify native avant la QA, agent verifier, verify-replay, serveur MCP verify, mécanisme de surcharges de skill par provider (overlays.py), hard_gates en liste, mobile/launch.py, apprentissage (recette, baseline). Une session de plus relit le diff ; +370 lignes dans docs/CLAUDE.md.","F2 (partiel), F11 (aggravé), F16, F23"]];
+const EVO={F1:"Inchangé : toujours 7 agent_types absents (re-vérifié).",F2:"verify corrigé (tooling/verify) ; le profil signale les manques. Restent 5 phases.",F3:"Inchangé.",F4:"#290 ajoute le provider de phase, pas l'agent_type.",F5:"Inchangé (9 et 7, re-mesuré).",F6:"214 références au lieu de 181 ; dépendances toujours installées.",F7:"Inchangé.",F8:"Inchangé.",F9:"Inchangé ; verifier, lui, est bien aliasé sur qa.",F10:"Inchangé ; liste des orphelins re-mesurée (11, ~51 Ko).",F11:"Une session verifier s'ajoute ; architecture-map compte aussi (F20).",F12:"Inchangé.",F13:"La résolution des surcharges utilise peek ; l'exécution non.",F14:"uiux.knowledge ajoute une 4e écriture.",F15:"Avertissement explicite au lancement.",F16:"S'étend au verifier (roster qa).",F17:"Inchangé.",F18:"Nouvelles dérives (miroirs, pty-daemon, architecture-map).",F19:"Chiffres re-mesurés (78 vues, 178 fichiers IPC)."};
+
+/* ---------- rendu ---------- */
+const SEVTAG={crit:'<span class="tag crit">critique</span>',haute:'<span class="tag warn">haute</span>',moy:'<span class="tag info">moyenne</span>',basse:'<span class="tag mute">basse</span>'};
+const STTAG={ouvert:'<span class="tag mute">ouvert</span>',partiel:'<span class="tag info">partiel</span>',aggravé:'<span class="tag crit">aggravé</span>',atténué:'<span class="tag ok">atténué</span>',nouveau:'<span class="tag warn">nouveau</span>',résolu:'<span class="tag ok">résolu</span>'};
+let showView=()=>{};
+function init(){
+  // vues
+  showView=v=>{$$(".view").forEach(s=>s.hidden=s.id!=="v-"+v);$$(".tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.v===v)));store.set("atlas-tab",v)};
+  $$(".tabs button").forEach(b=>b.addEventListener("click",()=>{showView(b.dataset.v);try{history.replaceState(null,"","#"+b.dataset.v)}catch(e){}window.scrollTo(0,0)}));
+  let start=(location.hash||"").slice(1);if(!$("#v-"+start))start=store.get("atlas-tab")||"synthese";if(!$("#v-"+start))start="synthese";showView(start);
+  // thème
+  chips("#theme-pick",[["auto","Auto"],["light","Clair"],["dark","Sombre"]],{initial:store.get("atlas-theme")||"auto",onChange:v=>{if(v==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",v);store.set("atlas-theme",v)}});
+  // renvois vers les constats
+  document.addEventListener("click",e=>{const b=e.target.closest(".fref");if(b)goFinding(b.dataset.f)});
+
+  // 01
+  const dm=drawDiagram($("#d-macro"),MACRO,n=>{dm.focus(dm.neighbours(n.id),n.id);$("#p-macro").innerHTML=detailHTML(n)});
+  // 02
+  const dmem=drawDiagram($("#d-mem"),MEM,n=>{dmem.focus(dmem.neighbours(n.id),n.id);$("#p-mem").innerHTML=detailHTML(n)});
+  chips("#mem-filter",MEM_FEATURES,{initial:"all",onChange:v=>{if(v==="all"){dmem.focus(null);$("#p-mem").innerHTML=`<p class="empty">${MEM_DESC.all} Cliquez un nœud ou choisissez une feature.</p>`;return}
+    const ids=new Set(MEM_SETS[v].split(" "));dmem.focus(ids);$("#p-mem").innerHTML=`<h3>${esc(MEM_FEATURES.find(x=>x[0]===v)[1])}</h3><p>${esc(MEM_DESC[v])}</p><ul>${[...ids].map(i=>{const n=MEM.nodes.find(x=>x.id===i);return n?`<li>${esc(n.label)}</li>`:""}).join("")}</ul>`}});
+  const renderStores=q=>table("#t-stores",STORES.filter(r=>!q||r.join(" ").toLowerCase().includes(q.toLowerCase())),r=>`<tr><td><code>.workpilot/${esc(r[0])}</code></td><td class="n">${r[1]}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${r[4]?`<span class="tag ${/hérité/.test(r[4])?"legacy":/nouveau/.test(r[4])?"ok":"warn"}" style="white-space:normal">${esc(r[4])}</span>`:""}</td></tr>`);
+  renderStores("");$("#store-q").addEventListener("input",e=>renderStores(e.target.value));
+
+  // 03
+  const dsk=drawDiagram($("#d-skills"),SK,n=>{dsk.focus(dsk.neighbours(n.id),n.id);$("#p-skills").innerHTML=detailHTML(n)});
+  const provPaths={claude:"r_sdk r_roster r_mcp",copilot:"r_roster r_mcp",deg:"r_roster r_mcp pv_claude",openai:"r_mcp",google:"r_mcp",local:"r_mcp",compat:"r_mcp",windsurf:""};
+  chips("#prov-filter",[["all","Tous"]].concat(PROVIDERS.map(p=>[p.id,p.nm])),{initial:"all",onChange:v=>{
+    if(v==="all"){dsk.focus(null);$("#p-skills").innerHTML=`<p class="empty">Choisissez un provider pour voir par où les skills lui parviennent, ou cliquez un nœud.</p>`;return}
+    const p=provInfo(v);const ids=new Set(("p_bmad p_hermes p_tool p_dotnet p_mobile p_comms p_uiux p_opt p_reg p_bund b_cli b_lock b_ovl b_agents o_agn r_slash r_phase r_meth r_det r_base factory "+p.node+" "+(provPaths[v]||"")).split(" ").filter(Boolean));
+    dsk.focus(ids,p.node);
+    $("#p-skills").innerHTML=`<h3>${esc(p.nm)}</h3><div class="tbl"><table><tbody><tr><th>Adaptateur</th><td>${esc(p.adapter)}</td></tr><tr><th>Sous-agents</th><td>${esc(p.sub)}</td></tr><tr><th>Effort</th><td>${esc(p.effort)}</td></tr><tr><th>Coding</th><td>${esc(p.dispatch)}</td></tr><tr><th>Surcharge</th><td><code>${esc(p.fam)}</code></td></tr><tr><th>Skills reçus</th><td>${esc(p.skills)}</td></tr><tr><th>Outils</th><td>${esc(p.tools)}</td></tr></tbody></table></div>${p.note?`<p>${p.note}</p>`:""}`}});
+  table("#t-prov",PROVIDERS,p=>`<tr><td><b>${esc(p.nm)}</b></td><td><code>${esc(p.adapter)}</code></td><td>${esc(p.sub)}</td><td>${esc(p.effort)}</td><td>${esc(p.dispatch)}</td><td><code>${esc(p.fam)}</code></td><td>${esc(p.skills)}</td><td>${esc(p.tools)}</td><td>${p.note}</td></tr>`);
+  chips("#pack-filter",[["all","Tous"],["used","Utilisés par le pipeline"],["empty","Vides"]],{initial:"all",onChange:v=>table("#t-packs",PACKS.filter(r=>v==="all"||(v==="empty"?r[1]===0:!/^aucun/.test(r[3]))),r=>`<tr><td><b>${esc(r[0])}</b></td><td class="n">${r[1]}</td><td>${r[1]===0?`<span class="tag warn">${esc(r[2])}</span>`:`<span class="tag ok">${esc(r[2])}</span>`}</td><td>${esc(r[3])}</td><td style="min-width:260px">${esc(r[4])}</td></tr>`)});
+
+  // 04
+  simControls();renderSim();
+  chips("#case-filter",[["all","Toutes"]].concat(CASES.map(c=>[c[0],c[1]])),{initial:"all",onChange:v=>{
+    $("#t-cases tbody").innerHTML=CASES.filter(c=>v==="all"||c[0]===v).map(c=>`<tr class="grp"><td colspan="5">${esc(c[1])}</td></tr>`+c[2].map(r=>`<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td></tr>`).join("")).join("")}});
+
+  // 05
+  const AST={ok:'<span class="tag ok">ok</span>',dead:'<span class="tag mute">inutilisé</span>',roster:'<span class="tag warn">roster inadapté</span>',missing:'<span class="tag crit">non enregistré</span>',miswired:'<span class="tag crit">mal câblé</span>'};
+  chips("#ag-filter",[["all","Tous"],["missing","Non enregistrés"],["miswired","Mal câblés"],["dead","Inutilisés"],["roster","Roster inadapté"],["ok","Sains"]],{initial:"all",onChange:v=>table("#t-agents",AGENTS.filter(r=>v==="all"||r[6]===v),r=>`<tr><td><code>${esc(r[0])}</code></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td>${esc(r[5])}</td><td>${AST[r[6]]}</td></tr>`)});
+  $("#t-sub tbody").innerHTML=SUBS.map(g=>`<tr class="grp"><td colspan="5">${esc(g[0])}${g[1].length>1?` <span class="tag warn">${g[1].length} définitions</span>`:""}</td></tr>`+g[1].map(r=>`<tr><td><code>${esc(r[0])}</code></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td></tr>`).join("")).join("");
+
+  // 06
+  initFindingFilters();
+  table("#t-plan",PLAN,r=>`<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${r[3].split(", ").map(f=>`<button class="fref" type="button" data-f="${f}">${f}</button>`).join("")}</td><td>${esc(r[4])}</td></tr>`);
+  $("#f-export").addEventListener("click",exportMarkdown);
+
+  // 07
+  const zones=[...new Set(CLEAN.map(r=>r[0]))];
+  const sumLines=rows=>rows.reduce((a,r)=>a+(r[0]==="Prompts"?0:r[2]),0);
+  $("#clean-figs").innerHTML=zones.map(z=>{const rows=CLEAN.filter(r=>r[0]===z);const v=z==="Prompts"?`${Math.round(rows.reduce((a,r)=>a+r[2],0)/1024)} Ko`:sumLines(rows).toLocaleString("fr-FR");return `<div class="fig"><b>${v}</b><span>${esc(z)} · ${rows.length} entrée${rows.length>1?"s":""}</span></div>`}).join("");
+  let cz="all",cq="";
+  const renderClean=()=>{const rows=CLEAN.filter(r=>(cz==="all"||r[0]===cz)&&(!cq||r.join(" ").toLowerCase().includes(cq.toLowerCase())));
+    $("#clean-sum").innerHTML=`<span><b>${rows.length}</b> entrées</span><span><b>${sumLines(rows).toLocaleString("fr-FR")}</b> lignes de code concernées (hors prompts et docs)</span>`;
+    table("#t-clean",rows,r=>`<tr><td>${esc(r[0])}</td><td class="wrap"><code>${esc(r[1])}</code></td><td class="n">${r[2]?(r[0]==="Prompts"?`${(r[2]/1024).toFixed(1).replace(".",",")} Ko`:r[2].toLocaleString("fr-FR")):"—"}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td><button class="fref" type="button" data-f="${r[5]}">${r[5]}</button></td></tr>`)};
+  chips("#clean-zone",[["all","Toutes"]].concat(zones.map(z=>[z,z])),{initial:"all",onChange:v=>{cz=v;renderClean()}});
+  $("#clean-q").addEventListener("input",e=>{cq=e.target.value;renderClean()});
+
+  // 08
+  const counts={};FINDINGS.forEach(f=>counts[f.st]=(counts[f.st]||0)+1);
+  $("#evo-figs").innerHTML=[["nouveau","nouveaux constats"],["aggravé","aggravés"],["partiel","partiellement corrigés"],["atténué","atténués"],["ouvert","toujours ouverts"]].map(([k,l])=>`<div class="fig${k==="aggravé"?" bad":k==="nouveau"?" warn":""}"><b>${counts[k]||0}</b><span>${l}</span></div>`).join("");
+  table("#t-prs",PRS,r=>`<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td></tr>`);
+  table("#t-evo",FINDINGS.filter(f=>EVO[f.id]),f=>`<tr><td><button class="fref" type="button" data-f="${f.id}">${f.id}</button> ${esc(f.t)}</td><td>${STTAG[f.st]}</td><td>${esc(EVO[f.id])}</td></tr>`);
+}
+let fs="all",fst="all",fc="all";
+function renderFindings(){
+  const list=FINDINGS.filter(f=>(fs==="all"||f.sev===fs)&&(fst==="all"||f.st===fst)&&(fc==="all"||f.cat===fc));
+  $("#f-count").innerHTML=`<span><b>${list.length}</b> constat${list.length>1?"s":""} affiché${list.length>1?"s":""} sur ${FINDINGS.length}</span>`;
+  $("#f-list").innerHTML=list.map(f=>`<details class="finding s-${f.sev}" id="find-${f.id}"><summary><span class="sev"></span><span class="t">${f.id} · ${esc(f.t)}</span><span class="tags">${SEVTAG[f.sev]}${STTAG[f.st]}<span class="tag mute">${esc(f.cat)}</span><span class="tag ${f.v==="vérifié"?"ok":"mute"}">${f.v}</span></span></summary><dl class="body"><div><dt>Constat</dt><dd>${f.c}</dd></div><div><dt>Preuve</dt><dd><code style="white-space:normal">${esc(f.p)}</code></dd></div><div><dt>Recommandation</dt><dd>${f.r}</dd></div><div><dt>À préserver</dt><dd>${esc(f.k)}</dd></div><div><dt>Gain</dt><dd>${esc(f.g)}</dd></div></dl></details>`).join("");
+}
+function initFindingFilters(){
+  fs="all";fst="all";fc="all";
+  chips("#f-sev",[["all","Toutes"],["crit","Critique"],["haute","Haute"],["moy","Moyenne"],["basse","Basse"]],{initial:"all",onChange:v=>{fs=v;renderFindings()}});
+  chips("#f-st",[["all","Tous"],["nouveau","Nouveau"],["aggravé","Aggravé"],["ouvert","Ouvert"],["partiel","Partiel"],["atténué","Atténué"]],{initial:"all",onChange:v=>{fst=v;renderFindings()}});
+  chips("#f-cat",[["all","Toutes"]].concat([...new Set(FINDINGS.map(f=>f.cat))].map(c=>[c,c])),{initial:"all",onChange:v=>{fc=v;renderFindings()}});
+}
+function goFinding(id){
+  showView("audit");initFindingFilters();
+  const d=document.getElementById("find-"+id);if(!d)return;
+  d.open=true;d.classList.add("flash");d.scrollIntoView({block:"start"});setTimeout(()=>d.classList.remove("flash"),1600);
+}
+function exportMarkdown(){
+  const txt=h=>{const t=document.createElement("div");t.innerHTML=h;return t.textContent.replace(/\s+/g," ").trim()};
+  const sev={crit:"critique",haute:"haute",moy:"moyenne",basse:"basse"};
+  let md="# Atlas WorkPilot AI — constats (commit b46a031)\n\nExport généré depuis docs/audit/WorkPilot-architecture.html. Le cahier de tâches détaillé est docs/audit/AUDIT-NETTOYAGE.md.\n\n## Plan par priorité\n\n| Priorité | Lot | Action | Constats |\n|---|---|---|---|\n";
+  PLAN.forEach(r=>{md+=`| ${r[0]} | ${r[1]} | ${r[2]} | ${r[3]} |\n`});
+  md+="\n## Constats\n";
+  FINDINGS.forEach(f=>{md+=`\n### ${f.id} · ${f.t}\n\n- Sévérité : ${sev[f.sev]} · statut : ${f.st} · catégorie : ${f.cat} · ${f.v}\n- Constat : ${txt(f.c)}\n- Preuve : ${f.p}\n- Recommandation : ${txt(f.r)}\n- À préserver : ${f.k}\n- Gain : ${f.g}\n`});
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([md],{type:"text/markdown;charset=utf-8"}));a.download="workpilot-constats.md";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+init();
+</script>
+</body>
+</html>
