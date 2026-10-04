@@ -732,6 +732,14 @@ export const IPC_CHANNELS = {
 	PROMPT_OPTIMIZER_ERROR: "promptOptimizer:error", // Error event (main -> renderer)
 	PROMPT_OPTIMIZER_COMPLETE: "promptOptimizer:complete", // Optimization complete (main -> renderer)
 
+	// Context-Aware Snippets operations
+	CONTEXT_AWARE_SNIPPETS_GENERATE: "context-aware-snippets:generate", // Start a generation (invoke: started, or why not)
+	CONTEXT_AWARE_SNIPPETS_CANCEL: "context-aware-snippets:cancel", // Cancel the running generation
+	CONTEXT_AWARE_SNIPPETS_STREAM_CHUNK: "context-aware-snippets:stream-chunk", // Streaming model text (main -> renderer)
+	CONTEXT_AWARE_SNIPPETS_STATUS: "context-aware-snippets:status", // Status code (main -> renderer)
+	CONTEXT_AWARE_SNIPPETS_ERROR: "context-aware-snippets:error", // Coded error (main -> renderer)
+	CONTEXT_AWARE_SNIPPETS_COMPLETE: "context-aware-snippets:complete", // Structured result (main -> renderer)
+
 	// Learning Loop operations
 	LEARNING_LOOP_GET_PATTERNS: "learningLoop:getPatterns",
 	LEARNING_LOOP_GET_SUMMARY: "learningLoop:getSummary",

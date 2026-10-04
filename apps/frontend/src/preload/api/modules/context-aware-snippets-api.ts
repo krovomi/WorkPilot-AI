@@ -1,129 +1,88 @@
 import { ipcRenderer } from "electron";
-import type { ContextAwareSnippetResult } from "../../../main/context-aware-snippets-service";
+import { IPC_CHANNELS } from "../../../shared/constants";
+import type {
+	ContextAwareSnippetResult,
+	ContextAwareSnippetsError,
+	ContextAwareSnippetsStartResult,
+	ContextAwareSnippetsStatus,
+	SnippetType,
+} from "../../../shared/types/context-aware-snippets";
 import { createIpcListener, type IpcListenerCleanup } from "./ipc-utils";
 
 /**
  * Context-Aware Snippets API
  *
- * Provides access to context-aware snippet generation functionality
- * from the renderer process.
+ * The renderer names the project by id; the main process resolves its path,
+ * its Python and its backend. There is no `configure` any more: it let the
+ * renderer choose which executable the main process would spawn.
  */
-
 export interface ContextAwareSnippetsAPI {
 	generateContextAwareSnippet: (
-		projectDir: string,
-		snippetType:
-			| "component"
-			| "function"
-			| "class"
-			| "hook"
-			| "utility"
-			| "api"
-			| "test",
+		projectId: string,
+		snippetType: SnippetType,
 		description: string,
 		language?: string,
-		model?: string,
-		thinkingLevel?: string,
-	) => Promise<{ success: boolean; error?: string }>;
+	) => Promise<ContextAwareSnippetsStartResult>;
 	cancelSnippetGeneration: () => Promise<{
 		success: boolean;
 		cancelled?: boolean;
-		error?: string;
 	}>;
-	configureSnippetsService: (
-		pythonPath?: string,
-		autoBuildSourcePath?: string,
-	) => Promise<{ success: boolean; error?: string }>;
 	// Chaque abonnement rend sa fonction de desabonnement, comme partout
-	// ailleurs dans ce dossier. Ils rendaient `void`, et les quatre
-	// `removeSnippet*Listener` qui devaient compenser passaient a
-	// `removeListener` une fleche fraichement creee, qui ne pouvait
-	// correspondre a celle enregistree par `on` : aucun des deux chemins ne
-	// liberait quoi que ce soit, et le store rouvrait un ecouteur a chaque
-	// generation. Ces quatre methodes sont parties avec le probleme.
+	// ailleurs dans ce dossier.
 	onSnippetStreamChunk: (
 		callback: (chunk: string) => void,
 	) => IpcListenerCleanup;
-	onSnippetStatus: (callback: (status: string) => void) => IpcListenerCleanup;
-	onSnippetError: (callback: (error: string) => void) => IpcListenerCleanup;
+	onSnippetStatus: (
+		callback: (status: ContextAwareSnippetsStatus) => void,
+	) => IpcListenerCleanup;
+	onSnippetError: (
+		callback: (error: ContextAwareSnippetsError) => void,
+	) => IpcListenerCleanup;
 	onSnippetComplete: (
 		callback: (result: ContextAwareSnippetResult) => void,
 	) => IpcListenerCleanup;
 }
 
 export const createContextAwareSnippetsAPI = (): ContextAwareSnippetsAPI => ({
-	generateContextAwareSnippet: async (
-		projectDir: string,
-		snippetType:
-			| "component"
-			| "function"
-			| "class"
-			| "hook"
-			| "utility"
-			| "api"
-			| "test",
+	generateContextAwareSnippet: (
+		projectId: string,
+		snippetType: SnippetType,
 		description: string,
 		language?: string,
-		model?: string,
-		thinkingLevel?: string,
-	): Promise<{ success: boolean; error?: string }> => {
-		return await ipcRenderer.invoke("context-aware-snippets:generate", {
-			projectDir,
+	): Promise<ContextAwareSnippetsStartResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.CONTEXT_AWARE_SNIPPETS_GENERATE, {
+			projectId,
 			snippetType,
 			description,
 			language,
-			model,
-			thinkingLevel,
-		});
-	},
+		}),
 
-	cancelSnippetGeneration: async (): Promise<{
+	cancelSnippetGeneration: (): Promise<{
 		success: boolean;
 		cancelled?: boolean;
-		error?: string;
-	}> => {
-		return await ipcRenderer.invoke("context-aware-snippets:cancel");
-	},
-
-	configureSnippetsService: async (
-		pythonPath?: string,
-		autoBuildSourcePath?: string,
-	): Promise<{ success: boolean; error?: string }> => {
-		return await ipcRenderer.invoke("context-aware-snippets:configure", {
-			pythonPath,
-			autoBuildSourcePath,
-		});
-	},
+	}> => ipcRenderer.invoke(IPC_CHANNELS.CONTEXT_AWARE_SNIPPETS_CANCEL),
 
 	onSnippetStreamChunk: (callback: (chunk: string) => void) =>
-		createIpcListener<[string]>("context-aware-snippets:stream-chunk", callback),
+		createIpcListener<[string]>(
+			IPC_CHANNELS.CONTEXT_AWARE_SNIPPETS_STREAM_CHUNK,
+			callback,
+		),
 
-	onSnippetStatus: (callback: (status: string) => void) =>
-		createIpcListener<[string]>("context-aware-snippets:status", callback),
+	onSnippetStatus: (callback: (status: ContextAwareSnippetsStatus) => void) =>
+		createIpcListener<[ContextAwareSnippetsStatus]>(
+			IPC_CHANNELS.CONTEXT_AWARE_SNIPPETS_STATUS,
+			callback,
+		),
 
-	onSnippetError: (callback: (error: string) => void) =>
-		createIpcListener<[string]>("context-aware-snippets:error", callback),
+	onSnippetError: (callback: (error: ContextAwareSnippetsError) => void) =>
+		createIpcListener<[ContextAwareSnippetsError]>(
+			IPC_CHANNELS.CONTEXT_AWARE_SNIPPETS_ERROR,
+			callback,
+		),
 
 	onSnippetComplete: (callback: (result: ContextAwareSnippetResult) => void) =>
 		createIpcListener<[ContextAwareSnippetResult]>(
-			"context-aware-snippets:complete",
+			IPC_CHANNELS.CONTEXT_AWARE_SNIPPETS_COMPLETE,
 			callback,
 		),
 });
-
-// Export individual functions for backward compatibility
-export const generateContextAwareSnippet =
-	createContextAwareSnippetsAPI().generateContextAwareSnippet;
-export const cancelSnippetGeneration =
-	createContextAwareSnippetsAPI().cancelSnippetGeneration;
-export const configureSnippetsService =
-	createContextAwareSnippetsAPI().configureSnippetsService;
-export const onSnippetStreamChunk =
-	createContextAwareSnippetsAPI().onSnippetStreamChunk;
-export const onSnippetStatus = createContextAwareSnippetsAPI().onSnippetStatus;
-export const onSnippetError = createContextAwareSnippetsAPI().onSnippetError;
-export const onSnippetComplete =
-	createContextAwareSnippetsAPI().onSnippetComplete;
-
-// Note: This module exports functions that are integrated into the main ElectronAPI
-// The contextBridge exposure is handled in the main preload/index.ts file
