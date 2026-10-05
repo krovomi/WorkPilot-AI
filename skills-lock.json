@@ -9,12 +9,14 @@
 		"bmad": {
 			"version": "6.12.0",
 			"source": "bmad-code-org/bmad-method",
-			"path": "skills/bmad"
+			"path": "skills/bmad",
+			"upstreamTreeSha": "d0fbe003c0cc7826e1bbe0334256ee023a482050"
 		},
 		"claude-mem": {
 			"version": "0.0.1",
 			"source": "thedotmack/claude-mem",
-			"path": "skills/claude-mem"
+			"path": "skills/claude-mem",
+			"upstreamTreeSha": "d085d97ca025207efa6480523eb23c8e19f3dfb6"
 		},
 		"comms": {
 			"version": "1.0.0",
@@ -29,17 +31,20 @@
 		"hermes": {
 			"version": "0.0.1",
 			"source": "NousResearch/hermes-agent",
-			"path": "skills/hermes"
+			"path": "skills/hermes",
+			"upstreamTreeSha": "de52358e8f1890a05686ad156fe8814d2b6c4553"
 		},
 		"impeccable": {
 			"version": "0.0.1",
 			"source": "pbakaus/impeccable",
-			"path": "skills/impeccable"
+			"path": "skills/impeccable",
+			"upstreamTreeSha": "b2ef7930c467a319889ae240dcea84d4f4674949"
 		},
 		"mattpocock": {
 			"version": "0.0.1",
 			"source": "mattpocock/skills",
-			"path": "skills/mattpocock"
+			"path": "skills/mattpocock",
+			"upstreamTreeSha": "c18bc3c417bb8c97fe2581c4013b3077956e82db"
 		},
 		"mobile": {
 			"version": "1.0.0",
@@ -49,12 +54,14 @@
 		"superpowers": {
 			"version": "0.0.1",
 			"source": "obra/superpowers",
-			"path": "skills/superpowers"
+			"path": "skills/superpowers",
+			"upstreamTreeSha": "a29cb0f1f5600c82888f61eb6832025b3d9d3677"
 		},
 		"task-observer": {
 			"version": "0.0.1",
 			"source": "rebelytics/one-skill-to-rule-them-all",
-			"path": "skills/task-observer"
+			"path": "skills/task-observer",
+			"upstreamTreeSha": "963b634e5a837d7698d0dd406f5fa866e45a5635"
 		},
 		"tooling": {
 			"version": "1.0.0",
@@ -64,7 +71,8 @@
 		"ui-ux-pro-max": {
 			"version": "2.15.0",
 			"source": "nextlevelbuilder/ui-ux-pro-max-skill",
-			"path": "skills/ui-ux-pro-max"
+			"path": "skills/ui-ux-pro-max",
+			"upstreamTreeSha": "0041561a8accf20fcd186de04689c74377db8c16"
 		}
 	},
 	"skills": {

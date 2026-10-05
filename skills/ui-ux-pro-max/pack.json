@@ -1,6 +1,6 @@
 {
 	"name": "ui-ux-pro-max",
-	"version": "2.15.0",
+	"version": "2.15.1",
 	"description": "UI/UX design intelligence (Basic edition): a design system generator and stack-specific UI guidelines searched locally by a stdlib BM25 engine — no network, no model, no token.",
 	"targets": {},
 	"source": "nextlevelbuilder/ui-ux-pro-max-skill",

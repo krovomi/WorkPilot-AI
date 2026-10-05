@@ -53,7 +53,7 @@
 		"scripts/search.py": "8373e2dd2d560d9853ec116140de0e0d5bee45a6abe5e041173c84e1c36a7f87"
 	},
 	"upstream_path": ".claude/skills/ui-ux-pro-max",
-	"vendored_at": "2026-10-02T18:10:55Z",
+	"vendored_at": "2026-10-05T16:47:06Z",
 	"vendored_by": "scripts/vendor_ui_ux_pro_max.py",
 	"rewritten": [
 		"SKILL.md (plugin path -> <skill-dir>, Portability section)"
