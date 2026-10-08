@@ -3,7 +3,7 @@
 # Earlier versions had 400 errors when tool_use blocks had partial failures
 # Utiliser le nom correct du package (tiret) pour l'installation via pip
 claude-agent-sdk>=0.2.157
-python-dotenv>=1.2.3
+python-dotenv>=1.2.4
 
 # Local multilingual Kanban dictation (explicit model download from the UI).
 faster-whisper>=1.2.1
