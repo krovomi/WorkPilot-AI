@@ -290,7 +290,9 @@ def test_an_empty_answer_is_none(runner):
 
 def write(path: Path, text: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    # `newline="\n"`: the runner filters samples by size on disk, and Windows
+    # would otherwise write "\r\n" and push a fixture past SAMPLE_MAX_BYTES.
+    path.write_text(text, encoding="utf-8", newline="\n")
     return path
 
 
