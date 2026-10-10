@@ -176,8 +176,8 @@ def detect_project_stack(project_dir: Path) -> dict:
                 stack["package_managers"].append("pnpm")
             if (project_dir / "yarn.lock").exists():
                 stack["package_managers"].append("yarn")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to parse package.json in %s: %s", project_dir, exc)
 
     if (project_dir / "requirements.txt").exists() or (
         project_dir / "pyproject.toml"
