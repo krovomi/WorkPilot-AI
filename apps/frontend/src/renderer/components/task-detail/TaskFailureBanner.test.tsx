@@ -47,6 +47,25 @@ describe("TaskFailureBanner", () => {
 		expect(screen.getByRole("alert")).toBeInTheDocument();
 	});
 
+	it("shows a QA that could not conclude as a warning, not a failure", () => {
+		// The build is complete and reviewable; a red "this task failed" next
+		// to a 100% bar read as a blocking error.
+		render(
+			<TaskFailureBanner
+				task={makeTask({
+					reviewReason: "qa_unverified",
+					errorMessage:
+						"The QA agent failed 3 time(s) in a row on review pass 3.",
+				})}
+			/>,
+		);
+
+		expect(screen.getByRole("status")).toBeInTheDocument();
+		expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+		expect(screen.getByText(/failed 3 time\(s\) in a row/)).toBeInTheDocument();
+		expect(screen.queryByText("This task failed")).not.toBeInTheDocument();
+	});
+
 	it("renders nothing for a task that finished normally", () => {
 		const { container } = render(
 			<TaskFailureBanner task={makeTask({ reviewReason: "completed" })} />,
