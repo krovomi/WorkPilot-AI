@@ -1157,7 +1157,60 @@
 		"detectedSource": "Source",
 		"detectedVersion": "Version",
 		"featureModelSettings": "Paramètres de modèle par fonctionnalité",
-		"featureModelSettingsDescription": "Modèle et niveau de réflexion pour Insights, Idéation et Roadmap",
+		"featureModelSettingsDescription": "Modèle et niveau de réflexion de chaque fonctionnalité qui lance un agent hors du Kanban. Le sélecteur propre à une page passe avant.",
+		"features": {
+			"insights": {
+				"label": "Chat Insights",
+				"description": "Posez des questions sur votre code"
+			},
+			"ideation": {
+				"label": "Idéation",
+				"description": "Génère des idées de fonctionnalités et d'améliorations"
+			},
+			"roadmap": {
+				"label": "Roadmap",
+				"description": "Construit des roadmaps produit stratégiques"
+			},
+			"natural-language-git": {
+				"label": "Git en langage naturel",
+				"description": "Exécute des commandes Git décrites en langage naturel"
+			},
+			"githubIssues": {
+				"label": "Issues GitHub",
+				"description": "Tri et étiquetage automatiques des issues"
+			},
+			"githubPrs": {
+				"label": "Revue de PR GitHub",
+				"description": "Revue de pull requests assistée par IA"
+			},
+			"utility": {
+				"label": "Utilitaires",
+				"description": "Messages de commit et résolution des conflits de fusion"
+			},
+			"promptOptimizer": {
+				"label": "Optimiseur de prompts",
+				"description": "Améliore vos prompts avec le contexte du projet"
+			},
+			"testGenerator": {
+				"label": "Agent de génération de tests",
+				"description": "Génération de tests et analyse de couverture assistées par IA"
+			},
+			"codeReview": {
+				"label": "Agent de revue de code",
+				"description": "Revue de code et analyse de qualité assistées par IA"
+			},
+			"voiceControl": {
+				"label": "Commande vocale",
+				"description": "Commandes de développement à la voix"
+			}
+		},
+		"thinkingLevels": {
+			"none": "Aucun",
+			"low": "Faible",
+			"medium": "Moyen",
+			"high": "Élevé",
+			"ultrathink": "Ultra Think"
+		},
 		"gitPath": "Chemin Git",
 		"gitPathDescription": "Chemin vers l'exécutable Git (laisser vide pour la détection automatique)",
 		"gitPathPlaceholder": "git (par défaut)",

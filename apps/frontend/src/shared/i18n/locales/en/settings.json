@@ -619,7 +619,60 @@
 		"aiTerminalNaming": "AI Terminal Naming",
 		"aiTerminalNamingDescription": "Automatically name terminals based on commands",
 		"featureModelSettings": "Feature Model Settings",
-		"featureModelSettingsDescription": "Model and thinking level for Insights, Ideation, and Roadmap",
+		"featureModelSettingsDescription": "Model and thinking level for each feature that runs an agent outside the Kanban. A page's own selector takes precedence.",
+		"features": {
+			"insights": {
+				"label": "Insights Chat",
+				"description": "Ask questions about your codebase"
+			},
+			"ideation": {
+				"label": "Ideation",
+				"description": "Generate feature ideas and improvements"
+			},
+			"roadmap": {
+				"label": "Roadmap",
+				"description": "Create strategic feature roadmaps"
+			},
+			"natural-language-git": {
+				"label": "Natural Language Git",
+				"description": "Execute Git commands using natural language"
+			},
+			"githubIssues": {
+				"label": "GitHub Issues",
+				"description": "Automated issue triage and labeling"
+			},
+			"githubPrs": {
+				"label": "GitHub PR Review",
+				"description": "AI-powered pull request reviews"
+			},
+			"utility": {
+				"label": "Utility",
+				"description": "Commit messages and merge conflict resolution"
+			},
+			"promptOptimizer": {
+				"label": "Prompt Optimizer",
+				"description": "AI-powered prompt enhancement with project context"
+			},
+			"testGenerator": {
+				"label": "Test Generation Agent",
+				"description": "AI-powered test generation and coverage analysis"
+			},
+			"codeReview": {
+				"label": "Code Review Agent",
+				"description": "AI-powered code review and quality analysis"
+			},
+			"voiceControl": {
+				"label": "Voice Control",
+				"description": "Voice-activated development commands"
+			}
+		},
+		"thinkingLevels": {
+			"none": "None",
+			"low": "Low",
+			"medium": "Medium",
+			"high": "High",
+			"ultrathink": "Ultra Think"
+		},
 		"model": "Model",
 		"thinkingLevel": "Thinking Level",
 		"paths": "Paths",
