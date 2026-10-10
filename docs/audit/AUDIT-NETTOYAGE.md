@@ -125,7 +125,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
 | L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L6, L5, L14, L4, L15, L16, L17 (faits) → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L4, L5, L6, L14, L15, L16, L17 (faits) → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
