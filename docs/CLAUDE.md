@@ -39,7 +39,10 @@ every provider: `create_client` and `create_simple_client` pass `undeclared_buil
 `disallowed_tools`, `ToolExecutor(agent_type=…)` offers and runs only what the type declares,
 and Codex runs `--sandbox read-only` for a type that neither writes nor runs commands. A prompt
 that uses a tool its type does not declare fails `tests/test_agent_tool_declarations.py`:
-declare the tool, do not lean on the settings file's blanket grants.
+declare the tool, do not lean on the settings file's blanket grants. Only `core/client.py` and
+`core/simple_client.py` build `ClaudeAgentOptions`; the simple client has no hooks and refuses a
+type declaring `Write`, `Edit` or `Bash`. Outside the SDK, commands, writes and MCP servers pass
+the SDK's own checks.
 
 **PR target** — Always target the `develop` branch for PRs to krovomi/WorkPilot-AI, NOT `main`.
 
