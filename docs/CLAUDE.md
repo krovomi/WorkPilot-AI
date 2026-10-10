@@ -71,7 +71,7 @@ WorkPilot-AI/
 │           ├── main/                 # Electron main process
 │           │   ├── agent/            # Agent queue, process, state, events
 │           │   ├── claude-profile/   # Multi-profile credentials, token refresh, usage
-│           │   ├── terminal/         # PTY daemon, lifecycle, Claude integration
+│           │   ├── terminal/         # PTY manager, lifecycle, Claude integration
 │           │   ├── platform/         # Cross-platform abstraction
 │           │   ├── ipc-handlers/     # 106 handler modules by domain
 │           │   ├── services/         # Profile service, credentials, page LLM config

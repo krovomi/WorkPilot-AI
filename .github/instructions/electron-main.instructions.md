@@ -18,15 +18,14 @@ description: 'Conventions Electron main process WorkPilot AI : IPC handlers, ser
 2. Channels nommés via constantes de `apps/frontend/src/shared/constants/ipc.ts` ou `ipc-namespaces.ts`. **Jamais** de string littéral.
 3. Tout type de réponse IPC est dans `apps/frontend/src/shared/types/ipc.ts`.
 4. Logs via `app-logger.ts` — pas de `console.log` en prod.
-5. Lecture de fichiers projet : passer par `fs-utils.ts` (sandboxing).
-6. Aucune exécution shell sans validation (`security.ts` côté backend).
-7. Hot-reload via `electron-vite` ; les services doivent être idempotents au reload.
+5. Aucune exécution shell sans validation (`security.ts` côté backend).
+6. Hot-reload via `electron-vite` ; les services doivent être idempotents au reload.
 
 ## Sections clés (gros services)
 
 | Fichier | Rôle |
 |---|---|
-| `agent-manager.ts` | Lifecycle des agents (start/stop/status) |
+| `agent/agent-manager.ts` | Lifecycle des agents (start/stop/status) |
 | `terminal-manager.ts` | Sessions PTY multi-terminal |
 | `task-state-manager.ts` | Source de vérité tâches côté main |
 | `file-watcher.ts` | chokidar wrappers |
@@ -40,5 +39,5 @@ description: 'Conventions Electron main process WorkPilot AI : IPC handlers, ser
 ## Anti-patterns
 
 - Importer du code `renderer/` dans `main/` — interdit (Electron isolation).
-- Modifier le filesystem hors `fs-utils.ts` ou `worktree-paths.ts`.
+- Calculer un chemin de worktree hors `worktree-paths.ts`.
 - Créer un handler IPC sans le déclarer dans `ipc-namespaces.ts`.
