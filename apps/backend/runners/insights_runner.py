@@ -325,9 +325,10 @@ async def run_with_sdk(
     fallback (used for Claude, and if the provider-agnostic path fails).
     """
     try:
-        from core.client import _get_active_provider
+        from core.client import peek_active_provider
 
-        active_provider = _get_active_provider(Path(project_dir).resolve())
+        # Peeked: a chat turn is not the session a "resume with X" was for.
+        active_provider = peek_active_provider(Path(project_dir).resolve())
     except Exception:
         active_provider = "claude"
 
