@@ -209,9 +209,23 @@ def _extract_text(msg) -> str:
     return text
 
 
-def _claude_client(model: str, system_prompt: str | None, project_dir: str | None):
+def _claude_client(
+    model: str,
+    system_prompt: str | None,
+    project_dir: str | None,
+    thinking_level: str | None = None,
+):
     from core.agent_client import ClaudeAgentClient
     from core.simple_client import create_simple_client
+
+    # Without a level the agent type's own default applies (``None``). With one,
+    # "none" has no budget and must say 0: ``None`` would mean "the default"
+    # again, and a page set to no thinking would think at the default level.
+    max_thinking_tokens = None
+    if thinking_level:
+        from phase_config import get_thinking_budget
+
+        max_thinking_tokens = get_thinking_budget(thinking_level) or 0
 
     sdk = create_simple_client(
         agent_type="commit_message",  # text-only, no tools
@@ -219,6 +233,7 @@ def _claude_client(model: str, system_prompt: str | None, project_dir: str | Non
         system_prompt=system_prompt,
         cwd=Path(project_dir) if project_dir else None,
         max_turns=1,
+        max_thinking_tokens=max_thinking_tokens,
     )
     return ClaudeAgentClient(sdk)
 
@@ -232,6 +247,7 @@ def _build_client(
     max_turns: int,
     *,
     chosen: bool = False,
+    thinking_level: str | None = None,
 ):
     cwd = str(Path(project_dir).resolve()) if project_dir else None
     from core.offline_policy import local_endpoint, resolve_offline_route
@@ -250,7 +266,7 @@ def _build_client(
     )
 
     if provider in ("claude", "anthropic"):
-        return _claude_client(model, system_prompt, project_dir)
+        return _claude_client(model, system_prompt, project_dir, thinking_level)
 
     if provider == "copilot":
         from core.agent_client import CopilotAgentClient
@@ -415,6 +431,7 @@ async def oneshot_completion(
     on_error: Callable[[dict], None] | None = None,
     on_usage: Callable[[dict], None] | None = None,
     require_provider: bool = False,
+    thinking_level: str | None = None,
 ) -> str:
     """Run a single text completion against the active provider; return the text.
 
@@ -443,6 +460,10 @@ async def oneshot_completion(
     reported nothing: a caller that needs a number then knows it is estimating,
     instead of being handed a zero it cannot tell from a measurement. Local
     clients legitimately report ``cost_usd: 0.0`` — that is a measurement.
+
+    ``thinking_level`` — ``none`` / ``low`` / ``medium`` / ``high`` /
+    ``ultrathink``, the effort a page chose. Applied on Claude, the one
+    one-shot client with a thinking budget; ``None`` keeps the default.
     """
     from core.client import _resolve_active_provider
 
@@ -493,6 +514,7 @@ async def oneshot_completion(
         spec_dir,
         max_turns,
         chosen=provider_chosen,
+        thinking_level=thinking_level,
     )
 
     text = ""
