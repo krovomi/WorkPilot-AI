@@ -150,8 +150,13 @@ rules in `agents.subagents.resolve`:
 - **The cap (seven) counts the caller's agents.** It used to run before they were
   merged. Generic defaults go first; nothing the caller named is ever dropped.
 - **An overlay specialises a roster, it does not start one.** Language and mobile
-  overlays fold the project's commands into `test-runner` and `qa-test-evidence`, and
-  the mobile specialists join only a phase that has a roster of its own.
+  overlays fold the project's commands into `test-runner`, and the mobile specialists
+  join only a phase that has a roster of its own.
+- **One definition per role, rosters by name.** `phases.SPECS` and `ROSTERS`,
+  `pr_review.PR_SPECIALISTS` and `PR_ROSTERS`, `mobile.MOBILE_SPECS`. A role two
+  rosters share is one definition: the QA's `qa-test-evidence` was the board's
+  `test-runner`, and `spec-explorer` / `codebase-surveyor` were `architecture-analyst`
+  in other words (lot L11).
 
 The live PR review runs its specialists as sessions of their own, under
 `pr_reviewer`, and passes `roster="solo"`: a specialist is a leaf of the fan-out, not

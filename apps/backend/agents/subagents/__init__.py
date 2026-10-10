@@ -48,10 +48,11 @@ __all__ = ["resolve", "merge_with_user_agents", "detect_languages", "MAX_ROSTER"
 MAX_ROSTER = 7
 
 #: The roles that run the project's tests, and so learn its commands from the
-#: overlays: the build's `test-runner` and the QA roster's `qa-test-evidence`
-#: (`qa_reviewer`, `qa_fixer`, `verifier`). The second one used to rediscover
-#: the framework on every QA pass the first had already been told about.
-_TEST_ROLES = ("test-runner", "qa-test-evidence")
+#: overlays. One since lot L11: the QA roster (`qa_reviewer`, `qa_fixer`,
+#: `verifier`) carried a `qa-test-evidence` that was the board's `test-runner`
+#: under another prompt, and it used to rediscover the framework on every QA
+#: pass the build's runner had already been told about.
+_TEST_ROLES = ("test-runner",)
 
 # Stack detection touches the filesystem; the answer does not change during a
 # run, and create_client is called once per phase.

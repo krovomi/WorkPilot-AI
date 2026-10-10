@@ -37,10 +37,11 @@ class TestPhaseDefaults:
     """The generic roster must be exactly what the three old modules returned."""
 
     def test_coder_roster_unchanged(self):
+        # `spec-explorer` folded into `architecture-analyst` (lot L11).
         assert set(phase_defaults("coder")) == {
             "code-reviewer",
             "test-runner",
-            "spec-explorer",
+            "architecture-analyst",
         }
 
     def test_planner_roster_unchanged(self):
@@ -51,9 +52,10 @@ class TestPhaseDefaults:
 
     @pytest.mark.parametrize("agent_type", ["qa", "qa_reviewer", "qa_fixer"])
     def test_qa_roster_unchanged(self, agent_type):
+        # `qa-test-evidence` was the board's `test-runner` under another prompt.
         assert set(phase_defaults(agent_type)) == {
             "qa-acceptance-checker",
-            "qa-test-evidence",
+            "test-runner",
         }
 
     def test_unknown_agent_type_falls_through_to_the_board_roster(self):
@@ -61,6 +63,15 @@ class TestPhaseDefaults:
 
     def test_planner_does_not_carry_qa_subagents(self):
         assert not set(phase_defaults("planner")) & set(phase_defaults("qa"))
+
+    def test_a_role_shared_by_two_rosters_is_one_definition(self):
+        """Rosters list names; the definition behind a name is the same object."""
+        from agents.subagents.phases import ROSTERS, SPECS, all_specs
+
+        named = {name for roster in ROSTERS.values() for name in roster}
+        assert named == set(SPECS), "a spec no roster names, or a name with no spec"
+        rosters = all_specs()
+        assert rosters["kanban"]["test-runner"] is rosters["qa"]["test-runner"]
 
 
 class TestLanguageMatching:
@@ -157,7 +168,7 @@ class TestSpecialisation:
             "[project]\nname='x'\n", encoding="utf-8"
         )
         roster = resolve(agent_type, project_dir=tmp_path)
-        section = self._overlay_section(roster["qa-test-evidence"].prompt)
+        section = self._overlay_section(roster["test-runner"].prompt)
         assert "pytest -x" in section and "### python" in section
         before = phase_defaults(agent_type)["qa-acceptance-checker"].prompt
         assert roster["qa-acceptance-checker"].prompt == before
@@ -372,6 +383,40 @@ class TestPRReviewRoster:
             "pr_orchestrator_parallel", project_dir=tmp_path, user_agents=self._build()
         )
         assert set(roster) == set(self._build())
+
+    def test_the_follow_up_specialists_live_in_the_registry(self):
+        """They were declared inline in the runner, `finding-validator` a second
+        time with its own wording."""
+        from agents.subagents.pr_review import PR_FOLLOWUP_SPECIALISTS, pr_review_agents
+
+        assert [s.name for s in PR_FOLLOWUP_SPECIALISTS] == [
+            "resolution-verifier",
+            "new-code-reviewer",
+            "comment-analyzer",
+            "finding-validator",
+        ]
+        roster = pr_review_agents(
+            lambda name: f"PROMPT BODY for {name}",
+            lambda prompt, fallback: f"[wd] {prompt or fallback}",
+            roster="pr-followup",
+        )
+        assert roster["finding-validator"].description == (
+            self._build()["finding-validator"].description
+        )
+        source = (
+            REPO_ROOT
+            / "apps/backend/runners/github/services/parallel_followup_reviewer.py"
+        ).read_text(encoding="utf-8")
+        assert 'roster="pr-followup"' in source
+        assert "AgentDefinition(" not in source, (
+            "a definition is being declared inline again"
+        )
+
+    def test_every_followup_prompt_file_exists(self):
+        from agents.subagents.pr_review import PR_FOLLOWUP_SPECIALISTS
+
+        prompts = REPO_ROOT / "apps/backend/prompts/github"
+        assert all((prompts / s.prompt_file).is_file() for s in PR_FOLLOWUP_SPECIALISTS)
 
     def test_the_follow_up_carries_its_four_and_nothing_else(self, tmp_path):
         from claude_agent_sdk import AgentDefinition
