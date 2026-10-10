@@ -1,16 +1,17 @@
 import { create } from "zustand";
+import type {
+	ContextAwareSnippetResult,
+	ContextAwareSnippetsError,
+	ContextAwareSnippetsStatus,
+	SnippetType,
+} from "../../shared/types/context-aware-snippets";
 
-/**
- * Result of context-aware snippet generation (matches backend ContextAwareSnippetResult)
- */
-export interface ContextAwareSnippetResult {
-	snippet: string;
-	language: string;
-	description: string;
-	context_used: string[];
-	adaptations: string[];
-	reasoning: string;
-}
+export type {
+	ContextAwareSnippetResult,
+	ContextAwareSnippetsError,
+	ContextAwareSnippetsStatus,
+	SnippetType,
+} from "../../shared/types/context-aware-snippets";
 
 export type ContextAwareSnippetsPhase =
 	| "idle"
@@ -18,22 +19,16 @@ export type ContextAwareSnippetsPhase =
 	| "complete"
 	| "error";
 
-export type SnippetType =
-	| "component"
-	| "function"
-	| "class"
-	| "hook"
-	| "utility"
-	| "api"
-	| "test";
-
 interface ContextAwareSnippetsState {
 	// State
 	phase: ContextAwareSnippetsPhase;
-	status: string;
+	status: ContextAwareSnippetsStatus | "";
 	streamingOutput: string;
 	result: ContextAwareSnippetResult | null;
+	/** Technical detail of the failure (string: read by the activity bridge). */
 	error: string | null;
+	/** Code of the failure, translated by the dialog. */
+	errorCode: string | null;
 	isOpen: boolean;
 	snippetType: SnippetType;
 	description: string;
@@ -48,10 +43,10 @@ interface ContextAwareSnippetsState {
 	) => void;
 	closeDialog: () => void;
 	setPhase: (phase: ContextAwareSnippetsPhase) => void;
-	setStatus: (status: string) => void;
+	setStatus: (status: ContextAwareSnippetsStatus | "") => void;
 	appendStreamingOutput: (chunk: string) => void;
 	setResult: (result: ContextAwareSnippetResult) => void;
-	setError: (error: string) => void;
+	setError: (error: ContextAwareSnippetsError | string) => void;
 	setSnippetType: (snippetType: SnippetType) => void;
 	setDescription: (description: string) => void;
 	setLanguage: (language: string) => void;
@@ -59,14 +54,20 @@ interface ContextAwareSnippetsState {
 	reset: () => void;
 }
 
-const initialState = {
+/** The part of the state that belongs to one run, not to the form. */
+const runState = {
 	phase: "idle" as ContextAwareSnippetsPhase,
-	status: "",
+	status: "" as ContextAwareSnippetsStatus | "",
 	streamingOutput: "",
 	result: null,
 	error: null,
+	errorCode: null,
+};
+
+const initialState = {
+	...runState,
 	isOpen: false,
-	snippetType: "component" as const,
+	snippetType: "component" as SnippetType,
 	description: "",
 	language: "",
 	autoDetectLanguage: true,
@@ -76,29 +77,37 @@ export const useContextAwareSnippetsStore = create<ContextAwareSnippetsState>(
 	(set) => ({
 		...initialState,
 
+		/**
+		 * Open on a form. A run in flight is never clobbered: the dialog reopens
+		 * on it, since the work goes on in the main process whether or not
+		 * anyone is looking.
+		 */
 		openDialog: (snippetType = "component", description = "", language = "") =>
-			set({
-				isOpen: true,
-				snippetType,
-				description,
-				language,
-				autoDetectLanguage: !language,
-				phase: "idle",
-				status: "",
-				streamingOutput: "",
-				result: null,
-				error: null,
-			}),
+			set((state) =>
+				state.phase === "generating"
+					? { isOpen: true }
+					: {
+							...runState,
+							isOpen: true,
+							snippetType,
+							description,
+							language,
+							autoDetectLanguage: !language,
+						},
+			),
 
+		/**
+		 * Closing hides the dialog; it does not throw the work away. A run keeps
+		 * going (the sidebar badge reports it) and a finished snippet is still
+		 * there when the dialog is reopened. Only a failed or untouched run is
+		 * reset.
+		 */
 		closeDialog: () =>
-			set({
-				isOpen: false,
-				phase: "idle",
-				status: "",
-				streamingOutput: "",
-				result: null,
-				error: null,
-			}),
+			set((state) =>
+				state.phase === "generating" || state.phase === "complete"
+					? { isOpen: false }
+					: { ...runState, isOpen: false },
+			),
 
 		setPhase: (phase) => set({ phase }),
 
@@ -113,13 +122,20 @@ export const useContextAwareSnippetsStore = create<ContextAwareSnippetsState>(
 			set({
 				result,
 				phase: "complete",
+				status: "",
 			}),
 
 		setError: (error) =>
-			set({
-				error,
-				phase: "error",
-			}),
+			set(
+				typeof error === "string"
+					? { error, errorCode: "generic", phase: "error", status: "" }
+					: {
+							error: error.message,
+							errorCode: error.code || "generic",
+							phase: "error",
+							status: "",
+						},
+			),
 
 		setSnippetType: (snippetType) => set({ snippetType }),
 
@@ -134,87 +150,127 @@ export const useContextAwareSnippetsStore = create<ContextAwareSnippetsState>(
 	}),
 );
 
+const isGenerating = () =>
+	useContextAwareSnippetsStore.getState().phase === "generating";
+
 /**
- * Start snippet generation via IPC
+ * Start snippet generation via IPC.
+ *
+ * The invoke is awaited: a request the main process refuses (unknown project,
+ * no backend, no Python) or that never reaches it (no handler, preload
+ * missing) used to leave the spinner turning for ever, because nothing caught
+ * the rejection and no error event would ever follow.
  */
-export function startSnippetGeneration(projectId: string): void {
-	const store = useContextAwareSnippetsStore.getState();
-	const { snippetType, description, language, autoDetectLanguage } = store;
+export async function startSnippetGeneration(projectId: string): Promise<void> {
+	const { snippetType, description, language, autoDetectLanguage } =
+		useContextAwareSnippetsStore.getState();
 
 	if (!description.trim()) return;
 
-	// Reset streaming state
-	store.setPhase("generating");
-	store.setStatus("");
-	store.appendStreamingOutput(""); // Clear by setting fresh state
 	useContextAwareSnippetsStore.setState({
-		streamingOutput: "",
-		error: null,
-		result: null,
+		...runState,
+		phase: "generating",
+		status: "context",
 	});
 
-	// Send generation request via IPC
-	globalThis.electronAPI.generateContextAwareSnippet(
-		projectId,
-		snippetType,
-		description,
-		autoDetectLanguage ? undefined : language,
-	);
+	try {
+		const response = await globalThis.electronAPI.generateContextAwareSnippet(
+			projectId,
+			snippetType,
+			description,
+			autoDetectLanguage ? undefined : language || undefined,
+		);
+		if (!response?.success && isGenerating()) {
+			useContextAwareSnippetsStore
+				.getState()
+				.setError(response?.error ?? { code: "generic", message: "" });
+		}
+	} catch (error) {
+		if (isGenerating()) {
+			useContextAwareSnippetsStore.getState().setError({
+				code: "ipc_failed",
+				message: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+}
+
+/**
+ * Stop the running generation and go back to the form, inputs kept.
+ */
+export function cancelSnippetGeneration(): void {
+	if (!isGenerating()) return;
+	useContextAwareSnippetsStore.setState({ ...runState });
+	// The run is already forgotten here; a failed cancel changes nothing the
+	// user can act on.
+	try {
+		void globalThis.electronAPI
+			.cancelSnippetGeneration?.()
+			?.catch(() => undefined);
+	} catch {
+		// No preload (browser preview): nothing is running to cancel.
+	}
+}
+
+/**
+ * Back to the form after a result or a failure, to adjust and generate again.
+ */
+export function resetSnippetRun(): void {
+	if (isGenerating()) return;
+	useContextAwareSnippetsStore.setState({ ...runState });
 }
 
 /**
  * Setup IPC listeners for context-aware snippets events.
- * Call this once when the app initializes.
+ * Registered once for the life of the window by `global-listeners.ts`.
  * Returns a cleanup function to unsubscribe all listeners.
  */
 export function setupContextAwareSnippetsListeners(): () => void {
 	const store = () => useContextAwareSnippetsStore.getState();
 
-	// Listen for streaming chunks
+	// Events of a run the user cancelled can still be in flight.
 	const unsubChunk = globalThis.electronAPI.onSnippetStreamChunk(
 		(chunk: string) => {
-			store().appendStreamingOutput(chunk);
+			if (isGenerating()) store().appendStreamingOutput(chunk);
 		},
 	);
 
-	// Listen for status updates
 	const unsubStatus = globalThis.electronAPI.onSnippetStatus(
-		(status: string) => {
-			store().setStatus(status);
+		(status: ContextAwareSnippetsStatus) => {
+			if (isGenerating()) store().setStatus(status);
 		},
 	);
 
-	// Listen for errors
-	const unsubError = globalThis.electronAPI.onSnippetError((error: string) => {
-		store().setError(error);
-	});
+	const unsubError = globalThis.electronAPI.onSnippetError(
+		(error: ContextAwareSnippetsError | string) => {
+			if (isGenerating()) store().setError(error);
+		},
+	);
 
-	// Listen for completion with structured result
 	const unsubComplete = globalThis.electronAPI.onSnippetComplete(
 		(result: ContextAwareSnippetResult) => {
-			store().setResult(result);
+			if (isGenerating()) store().setResult(result);
 		},
 	);
 
 	return () => {
-		// Only call cleanup functions if they exist and are functions
-		if (typeof unsubChunk === "function") unsubChunk();
-		if (typeof unsubStatus === "function") unsubStatus();
-		if (typeof unsubError === "function") unsubError();
-		if (typeof unsubComplete === "function") unsubComplete();
+		unsubChunk();
+		unsubStatus();
+		unsubError();
+		unsubComplete();
 	};
 }
 
 /**
- * Cancel active snippet generation
+ * Open from the sidebar. A run in flight or a snippet not yet copied is shown
+ * again rather than wiped: it is what the sidebar badge pointed at.
  */
-export function cancelSnippetGeneration(): void {
-	globalThis.electronAPI.cancelSnippetGeneration();
-}
-
-// Helper function to open dialog
 export const openContextAwareSnippetsDialog = () => {
 	const store = useContextAwareSnippetsStore.getState();
+	if (store.phase === "generating" || store.phase === "complete") {
+		useContextAwareSnippetsStore.setState({ isOpen: true });
+		return;
+	}
 	store.reset();
 	store.openDialog("component", "", "");
 };

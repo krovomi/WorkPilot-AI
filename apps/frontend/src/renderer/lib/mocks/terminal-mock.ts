@@ -134,9 +134,4 @@ export const terminalMock = {
 	onTerminalOAuthCodeNeeded: () => () => {
 		/* noop */
 	},
-
-	// OAuth code submission
-	submitOAuthCode: async () => ({
-		success: true,
-	}),
 };

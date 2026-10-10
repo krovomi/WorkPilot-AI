@@ -17,7 +17,7 @@ What breaks a consumer of a skill pack
 Not the prose. What consumers depend on is:
 
 * **a skill existing under its name** — a `workflow.yaml` phase says
-  `superpowers/test-driven-development`, and a command palette lists it. A
+  `tooling/tdd-cycle`, and a command palette lists it. A
   removal or rename breaks both.
 * **it still resolving where it used to** — tightening `targets` or adding a
   `requires` removes the skill from projects that had it, which is a removal

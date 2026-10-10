@@ -168,6 +168,47 @@ class TestTheRoster:
         for role in MOBILE_ROLES:
             assert role in capped
 
+    @pytest.mark.parametrize(
+        "agent_type", ["coder", "qa_reviewer", "qa_fixer", "verifier", "pr_reviewer"]
+    )
+    def test_the_phases_that_build_review_or_verify_keep_the_specialists(
+        self, android_app, agent_type
+    ):
+        """`pr_reviewer` is the agent the `mobile-design` and `store-readiness`
+        workflow phases run under."""
+        from agents.subagents import resolve
+        from agents.subagents.phases import sdk_available
+
+        if not sdk_available():
+            pytest.skip("claude_agent_sdk not installed")
+        roster = resolve(agent_type, project_dir=android_app)
+        assert set(MOBILE_ROLES) <= set(roster)
+
+    @pytest.mark.parametrize(
+        "agent_type", ["commit_message", "architecture_visualizer", "merge_resolver"]
+    )
+    def test_a_solo_call_stays_solo_on_a_phone_project(self, android_app, agent_type):
+        """An overlay specialises a roster; it does not start one. A commit
+        message on an Android project was handed a device-runner."""
+        from agents.subagents import resolve
+        from agents.subagents.phases import sdk_available
+
+        if not sdk_available():
+            pytest.skip("claude_agent_sdk not installed")
+        assert resolve(agent_type, project_dir=android_app) is None
+
+    def test_the_pr_orchestrator_gets_no_mobile_extras(self, android_app):
+        from agents.subagents import resolve
+        from agents.subagents.phases import sdk_available
+
+        if not sdk_available():
+            pytest.skip("claude_agent_sdk not installed")
+        mine = {"security-reviewer": object(), "finding-validator": object()}
+        roster = resolve(
+            "pr_orchestrator_parallel", project_dir=android_app, user_agents=mine
+        )
+        assert set(roster) == set(mine)
+
     def test_the_device_runner_may_run_commands_and_the_auditor_may_not(
         self, flutter_app
     ):

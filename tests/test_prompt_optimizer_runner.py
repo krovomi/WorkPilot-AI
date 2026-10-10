@@ -196,4 +196,6 @@ def test_context_is_bounded(runner, tmp_path):
     (tmp_path / "README.md").write_text("x" * 50_000, encoding="utf-8")
     (tmp_path / "AGENTS.md").write_text("y" * 50_000, encoding="utf-8")
 
-    assert len(runner.gather_project_context(tmp_path)) <= runner.CONTEXT_BUDGET + 5
+    from core.project_brief import CONTEXT_BUDGET
+
+    assert len(runner.gather_project_context(tmp_path)) <= CONTEXT_BUDGET + 5
