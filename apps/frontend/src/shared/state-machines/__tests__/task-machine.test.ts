@@ -260,7 +260,7 @@ describe("taskMachine", () => {
 			expect(snapshot.context.reviewReason).toBe("errors");
 		});
 
-		it("should transition to error on QA_AGENT_ERROR", () => {
+		it("should hand a complete build whose QA could not conclude to human review", () => {
 			const events: TaskEvent[] = [
 				{ type: "PLANNING_STARTED" },
 				{
@@ -273,9 +273,12 @@ describe("taskMachine", () => {
 				{ type: "QA_AGENT_ERROR", iteration: 1, consecutiveErrors: 3 },
 			];
 
+			// QA runs after coding is done: its agent failing leaves finished
+			// work unverified, not a failed task.
 			const snapshot = runEvents(events);
-			expect(snapshot.value).toBe("error");
-			expect(snapshot.context.reviewReason).toBe("errors");
+			expect(snapshot.value).toBe("human_review");
+			expect(snapshot.context.reviewReason).toBe("qa_unverified");
+			expect(snapshot.context.error).toContain("failed 3 time(s)");
 		});
 
 		it("should allow recovery from error via USER_RESUMED", () => {
@@ -647,10 +650,6 @@ describe("taskMachine", () => {
 				from: "qa_review",
 				event: { type: "QA_MAX_ITERATIONS", iteration: 50, maxIterations: 50 },
 			},
-			{
-				from: "qa_fixing",
-				event: { type: "QA_AGENT_ERROR", iteration: 3, consecutiveErrors: 3 },
-			},
 		];
 
 		for (const { from, event } of failures) {
@@ -697,6 +696,19 @@ describe("taskMachine", () => {
 				"The QA agent failed 3 time(s) in a row on review pass 3. Last error: Agent session error: overloaded",
 			);
 		});
+
+		for (const from of ["qa_review", "qa_fixing"]) {
+			it(`keeps a QA agent failure from ${from} out of the error state`, () => {
+				const snapshot = runEvents(
+					[{ type: "QA_AGENT_ERROR", iteration: 3, consecutiveErrors: 3 }],
+					from,
+				);
+
+				expect(snapshot.value).toBe("human_review");
+				expect(snapshot.context.reviewReason).toBe("qa_unverified");
+				expect(snapshot.context.error?.trim()).toBeTruthy();
+			});
+		}
 
 		it("clears the message when the user relaunches", () => {
 			const snapshot = runEvents(

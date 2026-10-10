@@ -48,10 +48,15 @@ export type TaskOrderState = Record<TaskStatus, string[]>;
 //                     limit; retrying with the same context will never succeed.
 //                     User should reset the conversation or switch to a provider
 //                     with a larger context window.
+// - 'qa_unverified': The build completed but the QA agent could not reach a
+//                    verdict (it crashed, or never recorded its sign-off). The
+//                    code is there; only the automatic validation is missing.
+//                    A warning to review by hand, not a failure.
 export type ReviewReason =
 	| "completed"
 	| "errors"
 	| "qa_rejected"
+	| "qa_unverified"
 	| "plan_review"
 	| "stopped"
 	| "prompt_too_long";
