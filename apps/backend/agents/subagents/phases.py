@@ -148,7 +148,6 @@ PHASE_ALIASES: dict[str, str] = {
     "migration": "solo",
     # The one-shot features that built their own SDK options until lot L16:
     # one request in the prompt, one answer out as text, no tool.
-    "voice_command": "solo",
     "git_command": "solo",
     "code_playground": "solo",
     "linear_updater": "solo",
