@@ -11,11 +11,6 @@
 			"source": "bmad-code-org/bmad-method",
 			"path": "skills/bmad"
 		},
-		"claude-mem": {
-			"version": "0.0.1",
-			"source": "thedotmack/claude-mem",
-			"path": "skills/claude-mem"
-		},
 		"comms": {
 			"version": "1.0.0",
 			"source": "local",
