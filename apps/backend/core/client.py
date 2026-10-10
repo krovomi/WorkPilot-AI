@@ -143,6 +143,7 @@ from agents.tools_pkg import (
     get_allowed_tools,
     get_required_mcp_servers,
     is_tools_available,
+    undeclared_builtin_tools,
 )
 from skills_registry.providers import get_provider_capabilities
 
@@ -1596,6 +1597,15 @@ def create_client(
     # Read-only phases run in permission mode "plan" (READ_ONLY_AGENT_TYPES).
     if agent_type in READ_ONLY_AGENT_TYPES and "permission_mode" not in options_kwargs:
         options_kwargs["permission_mode"] = "plan"
+
+    # What a type does not declare, it does not have. `allowed_tools` only
+    # auto-approves, and the settings file above allows Write, Edit and
+    # `Bash(*)` to every type, so until this line a declaration was a wish:
+    # a `pr_reviewer` reading a hostile diff could write and run commands.
+    # `disallowed_tools` removes the tool from the model's context and wins
+    # over allow rules, which is why the settings file can stay shared.
+    if denied := undeclared_builtin_tools(agent_type):
+        options_kwargs["disallowed_tools"] = denied
 
     # Reasoning effort, gated on Opus 4.x (only Opus models support this param).
     # Docs recommend "xhigh" on Opus 4.7 for coding/agentic tasks; cheaper
