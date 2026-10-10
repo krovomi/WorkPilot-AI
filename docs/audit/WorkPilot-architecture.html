@@ -513,7 +513,7 @@ nodes:[
  {id:"pagellm",x:24,y:268,w:222,h:46,label:"page-llm.ts",sub:"provider × modèle × effort",info:"Résout la formule d'une page : page → réglages → défauts. 8 pages ont une formule propre ; les autres suivent le fournisseur par défaut (Paramètres → Agent).",files:["apps/frontend/src/shared/utils/page-llm.ts"]},
  {id:"legacyfe",x:24,y:334,w:222,h:46,kind:"legacy",label:"Services mémoire hérités",sub:"memory-service.ts · team-sync",info:"~3 700 lignes front pour LadybugDB/Graphiti : memory-service (861), canaux MEMORY_*/GRAPHITI_* de memory-handlers (qui héberge aussi les 11 canaux OLLAMA_* à garder), team-sync-handlers (502), memory-lifecycle (325 + store 193), TeamSyncPanel (580, déjà orphelin), MemoryStep.",tag:'<span class="tag legacy">hérité</span>',f:["F6"]},
  {id:"run",x:294,y:44,w:222,h:46,label:"run.py · cli/build_commands",sub:"enchaîne les phases d'un build",files:["apps/backend/run.py","apps/backend/cli/build_commands.py"]},
- {id:"specrun",x:294,y:100,w:222,h:46,label:"spec_runner",sub:"complexité → phases de spec",info:"Toutes les phases LLM tournent sous <code>spec_writer</code> ; depuis #290 le provider est celui de la phase spec de la tâche.",files:["apps/backend/runners/spec_runner.py","apps/backend/spec/pipeline/agent_runner.py"],f:["F4"]},
+ {id:"specrun",x:294,y:100,w:222,h:46,label:"spec_runner",sub:"complexité → phases de spec",info:"Chaque prompt tourne sous la config qui accorde ce qu'il utilise (<code>PROMPT_AGENT_TYPES</code>, lot L5) : <code>spec_researcher</code>, <code>spec_self_critique</code>, sinon <code>spec_writer</code>. Depuis #290 le provider est celui de la phase spec de la tâche.",files:["apps/backend/runners/spec_runner.py","apps/backend/spec/pipeline/agent_runner.py"],f:["F4"]},
  {id:"runners",x:294,y:156,w:222,h:46,label:"69 runners",sub:"1 par feature/page",info:"Un runner par page (idéation, roadmap, PR, self-healing…). Chacun construit son agent via la fabrique ; la Roadmap oublie son agent_type et tourne en coder.",files:["apps/backend/runners/"],f:["F24","F21"]},
  {id:"api",x:294,y:212,w:222,h:46,label:"FastAPI :9000",sub:"provider_api.py (2 194 l.)",info:"Monte les routeurs : slash-commands, brain, hermes, docintel, workflow-profile, traceability, uiux, verify…"},
  {id:"preflight",x:294,y:268,w:222,h:46,label:"Préflights sans LLM",sub:"libdocs · docintel · mobile · uiux",info:"Avant le planning ou le coding : docs des bibliothèques (Context7), pièces jointes (OCR local), détection mobile, design system (<code>ui-design-system</code>, moteur BM25 local). Aucun appel modèle."},
@@ -738,10 +738,10 @@ function buildSteps(){
     step({win:"spec",nm:"quick_spec",status:"run",agent:"spec_writer",prov:"spec",prompt:"spec_quick.md",files:["spec/phases/spec_phases.py:21"]});
   }else{
     step({win:"spec",nm:"requirements",status:"run",kind:"script",info:"requirements.json depuis la description / l'entretien de spec."});
-    step({win:"spec",nm:"research",status:sim.complexity==="complex"?"run":"skip",why:sim.complexity==="complex"?"":"standard : seulement si needs_research",agent:"spec_writer",prov:"spec",prompt:"spec_researcher.md",warn:"La config spec_researcher (context7) n'est jamais utilisée : la phase tourne sous spec_writer (F4).",files:["spec/pipeline/agent_runner.py:176,212"],f:["F4"]});
+    step({win:"spec",nm:"research",status:sim.complexity==="complex"?"run":"skip",why:sim.complexity==="complex"?"":"standard : seulement si needs_research",agent:"spec_researcher",prov:"spec",prompt:"spec_researcher.md",info:"Context7 et le web pour valider chaque intégration, écriture de research.json (lot L5).",files:["spec/pipeline/agent_runner.py:176,212"],f:["F4"]});
     step({win:"spec",nm:"context",status:"run",kind:"script",info:"context.json (recherche sémantique)."});
     step({win:"spec",nm:"spec_writing",status:"run",agent:"spec_writer",prov:"spec",prompt:"spec_writer.md (13,6 Ko)",files:["spec/phases/spec_phases.py:125"]});
-    step({win:"spec",nm:"self_critique",status:sim.complexity==="complex"?"run":"skip",why:sim.complexity==="complex"?"":"complex uniquement",agent:"spec_writer",prov:"spec",prompt:"spec_critic.md",warn:"Le critique devrait être en lecture seule et en ultrathink (spec_critic) ; il tourne avec les droits d'écriture et la réflexion de spec_writer (F4).",files:["spec/pipeline/agent_runner.py:176,212"],f:["F4"]});
+    step({win:"spec",nm:"self_critique",status:sim.complexity==="complex"?"run":"skip",why:sim.complexity==="complex"?"":"complex uniquement",agent:"spec_self_critique",prov:"spec",prompt:"spec_critic.md",info:"Corrige spec.md et écrit critique_report.json, avec Context7 (lot L5).",files:["spec/pipeline/agent_runner.py:176,212"],f:["F4"]});
     step({win:"spec",nm:"planning (dans la spec)",status:"run",agent:"spec_writer",prov:"spec",prompt:"planner.md (33 Ko)",info:"Pour standard et complex, le plan est écrit ici ; le planning du build est alors sauté (plan déjà présent).",files:["spec/phases/planning_phases.py:81"]});
   }
   step({win:"spec",nm:"validation",status:"run",agent:"spec_writer",prov:"spec",prompt:"validation_fixer.md si erreurs",info:"Valide spec.md / implementation_plan.json ; traçabilité FR-### calculée (traceability.json). Récupération du plan (plan_recovery.py) en cas de format inattendu.",files:["spec/phases/planning_phases.py:254","spec/traceability.py","spec/plan_recovery.py"]});
@@ -843,7 +843,7 @@ const CASES=[
  ["complexite","Complexité de la spec",[
   ["simple","discovery → historical_context → quick_spec → validation ; planning dans le build","spec_writer, puis planner","spec_quick.md, planner.md","graph_hints"],
   ["standard","+ requirements → (research si signalé) → context → spec_writing → planning → validation","spec_writer ×4-5 ; roster spec","spec_writer.md, planner.md","graph_hints"],
-  ["complex","+ research → self_critique","spec_writer ×6 (le critique compris, F4)","spec_researcher.md, spec_critic.md","graph_hints"]]],
+  ["complex","+ research → self_critique","spec_writer ×4, spec_researcher, spec_self_critique (lot L5)","spec_researcher.md, spec_critic.md","graph_hints"]]],
  ["effort","Effort (workflow, vérifié par resolve_profile)",[
   ["none","docs · ui-design-system* · coding · design-check* · verify (déterministe) · qa · verify-replay · observe ; planning forcé si pas de plan","coder, qa_reviewer/fixer","coder.md, qa_*.md","lecture mémoire + note de build"],
   ["low","+ planning","+ planner","+ planner.md","idem"],
@@ -860,7 +860,7 @@ const CASES=[
  ["provider","Provider",PROVIDERS.map(p=>[p.nm,`Adaptateur ${p.adapter} ; coding en ${p.dispatch}`,`sous-agents : ${p.sub}`,`${p.skills} · surcharge ${p.fam}`,p.id==="claude"||p.id==="deg"?"MCP brain natif":"brain exécuté en processus (tool_executor)"])],
  ["fichiers","Fichiers touchés",[
   ["Front web (*.tsx, *.vue, *.css…)","ui-design-system (déterministe) + frontend-design (avant coding) + design-check (après) ; design system dans les sous-tâches UI ; MCP uiux pour tous les agents","pr_reviewer","ui-ux-pro-max, impeccable","MASTER.md → knowledge/…/uiux au merge"],
-  ["Mobile (Gradle, Swift, Dart, XAML…)","ui-design-system (.swift/.dart/.xaml) + mobile-design + store-readiness ; overlay mobile (device-runner, store-readiness-auditor) ajouté à tous les rosters, solo compris (F9)","pr_reviewer + 2 sous-agents protégés","mobile-*","—"],
+  ["Mobile (Gradle, Swift, Dart, XAML…)","ui-design-system (.swift/.dart/.xaml) + mobile-design + store-readiness ; overlay mobile (device-runner, store-readiness-auditor) ajouté aux rosters de phase non vides (lot L5)","pr_reviewer + 2 sous-agents protégés","mobile-*","—"],
   ["Code backend","architecture-map (session analyzer, F20)","analyzer","architecture-map","rien dans spec_dir/architecture (F20)"],
   ["Docs seuls","phases conditionnelles sautées","—","—","—"]]],
  ["runtime","Cible runtime (verify, #292)",[
@@ -872,7 +872,7 @@ const CASES=[
  ["langage","Langage détecté",[
   [".NET","test-runner reçoit dotnet test / format ; conformance .csproj ; ORM EF Core","test-runner spécialisé","net-* (palette)","—"],
   ["Python","pytest -x, ruff","idem","—","—"],["TypeScript / JS","vitest / jest, workspaces npm/pnpm","idem","—","—"],["Java / Kotlin","Maven / Gradle","idem","—","—"],["Go · Rust","go test · cargo test","idem","—","—"],
-  ["Remarque","L'overlay ne spécialise que test-runner : qa-test-evidence (QA, verifier) reste générique (F16)","—","—","—"]]],
+  ["Remarque","L'overlay spécialise test-runner et qa-test-evidence (QA, verifier) — lot L5","—","—","—"]]],
  ["pj","Pièces jointes (docintel)",[
   ["Capture d'écran","OCR local, secrets masqués / image repeinte / retenue","—","—","—"],["draw.io / Excalidraw / C4","Structure lue ; règles de dépendance","—","—","—"],["ERD (draw.io, DBML, Mermaid)","Comparé au mapping ORM","—","—","—"],["PDF scanné / cahier des charges","OCR → propositions FR-### validées par une personne","—","—","décisions → knowledge/…/docintel"],["Tableau de règles","Test paramétré par langage","—","—","idem"],["Trace de pile / log CI","fichier:ligne, codes d'erreur","—","—","—"],["Postman / OpenAPI / .http","Brouillon de test d'intégration","—","—","—"],["Figma","frames et libellés → contrat de revue visuelle","—","—","—"],["Photo de tableau blanc","→ .drawio par modèle de vision local","—","—","idem"]]],
  ["runtimepk","Packs et runtimes",[
@@ -899,12 +899,11 @@ const CASES=[
 
 /* ---------- 05 agents ---------- */
 const AGENTS=[
- ["spec_gatherer","R+Web","—","medium","spec","aucun : le pipeline de spec passe tout en spec_writer (F4)","dead"],
- ["spec_researcher","R+Web","context7","medium","kanban (non aliasé)","aucun (F4)","dead"],
- ["spec_writer","R+W+Bash","—","high","spec","toutes les phases LLM du pipeline de spec ; phase spec","ok"],
+ ["spec_gatherer","R+Web","—","medium","spec","aucun appelant ; spec_gatherer.md non chargé (lot L9)","dead"],
+ ["spec_researcher","R+W+Web","context7","medium","spec","phase research du pipeline de spec (lot L5)","ok"],
+ ["spec_writer","R+W+Bash","—","high","spec","phases LLM du pipeline de spec hors research et self_critique","ok"],
  ["spec_critic","R","—","ultrathink","spec","phase brainstorm","ok"],
- ["spec_discovery","R+Web","—","medium","kanban","cité dans une table de client.py:1586, jamais instancié","dead"],
- ["spec_context","R","—","medium","kanban","idem (client.py:1585)","dead"],
+ ["spec_self_critique","R+W","context7","high","spec","phase self_critique du pipeline de spec (lot L5)","ok"],
  ["spec_validation","R","—","high","spec (roster: planner / qa par phase)","phases analyze, spec-conformance","ok"],
  ["spec_compaction","R+W","—","medium","solo","compaction de spec","ok"],
  ["planner","R+W+Web","context7 · workpilot (+linear)","high","planner","planification","ok"],
@@ -919,12 +918,12 @@ const AGENTS=[
  ["commit_message","—","—","low","solo","messages de commit","ok"],
  ["pr_template_filler","R","—","low","solo","création de PR","ok"],
  ["pr_reviewer","R+Web","context7","high","review","revue PR ; phases mobile-design, frontend-design, review, adversarial-review, store-readiness","ok"],
- ["pr_orchestrator_parallel","R+Web","context7","high","kanban + 6 PR = 9","revue PR parallèle (F5)","roster"],
- ["pr_followup_parallel","R+Web","context7","high","kanban + 4 = 7","revue de suivi (F5)","roster"],
+ ["pr_orchestrator_parallel","R+Web","context7","high","solo + 6 PR = 6","revue PR parallèle ; _create_sdk_client mort (lot L9)","ok"],
+ ["pr_followup_parallel","R+Web","context7","high","solo + 4 = 4","revue de suivi","ok"],
  ["pr_finding_validator","R","—","medium","review","validation de constats","ok"],
- ["analysis","R+Web","context7","medium","kanban","aucun appelant littéral trouvé","dead"],
- ["batch_analysis","R+Web","—","low","kanban","runners/github/batch_issues.py:162 (F9)","roster"],
- ["batch_validation","R","—","low","kanban","runners/github/batch_validator.py:241 (F9)","roster"],
+ ["analysis","R+Web","context7","medium","research","aucun appelant littéral trouvé (lot L9)","dead"],
+ ["batch_analysis","R+Web","—","low","research","runners/github/batch_issues.py:162 (create_simple_client)","ok"],
+ ["batch_validation","R","—","low","research","runners/github/batch_validator.py:241 (create_simple_client)","ok"],
  ["roadmap_discovery","R+Web","context7","high","kanban","aucun : la Roadmap tourne en coder (F24)","dead"],
  ["competitor_analysis","R+Web","context7","high","kanban","aucun (F24)","dead"],
  ["ideation","R+Web","—","high","research","idéation","ok"],
@@ -938,14 +937,14 @@ const AGENTS=[
 const SUBS=[
  ["Revue de code générale",[["code-reviewer","R","sonnet","phases.py · kanban","coder, rosters non aliasés"],["quality-reviewer","R","—","pr_review.py","orchestrateur PR"]]],
  ["Sécurité",[["security-auditor","R","sonnet","phases.py · review","pr_reviewer"],["security-reviewer","R","—","pr_review.py","orchestrateur PR"]]],
- ["Exécution des tests",[["test-runner","Bash R","inherit","phases.py · kanban","coder (+ overlay langage/mobile)"],["qa-test-evidence","Bash R","inherit","phases.py · qa","qa_reviewer/fixer, verifier (pas d'overlay, F16)"]]],
+ ["Exécution des tests",[["test-runner","Bash R","inherit","phases.py · kanban","coder (+ overlay langage/mobile)"],["qa-test-evidence","Bash R","inherit","phases.py · qa","qa_reviewer/fixer, verifier (+ overlay langage/mobile, lot L5)"]]],
  ["Vérifier une affirmation",[["evidence-collector","R","sonnet","phases.py · research","idéation, insights"],["finding-validator","R","—","pr_review.py + parallel_followup_reviewer.py:262","PR (déclaré 2×)"]]],
  ["Cartographier le code",[["spec-explorer","R","—","phases.py · kanban","coder"],["codebase-surveyor","R","sonnet","phases.py · research","idéation"],["architecture-analyst","R","sonnet","phases.py · planner","planner, analyze"]]],
  ["Impact / régression",[["dependency-tracer","R","sonnet","phases.py · planner","planner"],["regression-hunter","R","sonnet","phases.py · review","pr_reviewer"]]],
  ["Couverture / critères",[["test-coverage-auditor","R","sonnet","phases.py · review","pr_reviewer"],["qa-acceptance-checker","R","sonnet","phases.py · qa","QA, verifier, spec-conformance"]]],
  ["Spec",[["prior-art-finder","R","sonnet","phases.py · spec","spec_writer, spec_validation"],["constraint-collector","R","sonnet","phases.py · spec","idem"]]],
  ["Revue PR spécialisée",[["logic-reviewer","R","—","pr_review.py","orchestrateur PR"],["codebase-fit-reviewer","R","—","pr_review.py","orchestrateur PR"],["ai-triage-reviewer","R","—","pr_review.py","orchestrateur PR"],["resolution-verifier","R","—","parallel_followup_reviewer.py:222 (inline)","suivi PR"],["new-code-reviewer","R","—","parallel_followup_reviewer.py:236 (inline)","suivi PR"],["comment-analyzer","R","—","parallel_followup_reviewer.py:249 (inline)","suivi PR"]]],
- ["Mobile",[["device-runner","Bash R","—","subagents/mobile.py","tous les rosters d'un projet mobile (solo compris, F9)"],["store-readiness-auditor","R","—","subagents/mobile.py","idem"],["mobile-release-manager","—","—","skills/mobile/agents","harness externes uniquement"],["mobile-architect · android-engineer · ios-engineer","—","—","skills/mobile/agents","harness externes uniquement"]]],
+ ["Mobile",[["device-runner","Bash R","—","subagents/mobile.py","rosters de phase non vides d'un projet mobile (lot L5)"],["store-readiness-auditor","R","—","subagents/mobile.py","idem"],["mobile-release-manager","—","—","skills/mobile/agents","harness externes uniquement"],["mobile-architect · android-engineer · ios-engineer","—","—","skills/mobile/agents","harness externes uniquement"]]],
  [".NET",[["net-architect","—","—","skills/dotnet/agents","harness externes uniquement"],["bmad-net-architect","—","—","skills/dotnet/agents","idem (doublon de net-architect)"],["performance-analyst","—","—","skills/dotnet/agents","idem"],["bmad-performance-analyst","—","—","skills/dotnet/agents","idem (doublon)"]]]];
 
 /* ---------- 06 constats ---------- */
@@ -965,13 +964,13 @@ const FINDINGS=[
   p:"workflows/feature-build/workflow.yaml (spec, adversarial-review, spec-conformance) · .agents/skills/bmad-prd/SKILL.md:8,23,29 · _bmad/scripts/",
   r:"Retirer la phase <code>spec</code>. Porter la lentille adversariale et la conformité comme options de la QA finale (F11), via un skill natif sans dépendance de runtime.",
   g:"Moins de sessions ultrathink ; plus de phase fantôme.",k:"Les 50 skills BMAD dans la barre de commandes pour les projets qui ont _bmad/."},
- {id:"F4",sev:"haute",cat:"tokens",st:"ouvert",v:"lu",t:"Toutes les phases LLM du pipeline de spec tournent sous spec_writer",
-  c:"<code>AgentRunner</code> fixe <code>agent_type=spec_writer</code> pour chaque prompt (l.176 et 212). #290 y a ajouté le provider de la phase spec, pas le bon agent_type. Le chercheur ne reçoit pas Context7 ; le critique, prévu en lecture seule à ultrathink (<code>spec_critic</code>), reçoit Write/Edit/Bash et la réflexion high. <code>spec_gatherer</code>, <code>spec_researcher</code>, <code>spec_discovery</code>, <code>spec_context</code> restent des configurations mortes.",
+ {id:"F4",sev:"haute",cat:"tokens",st:"résolu",v:"vérifié",t:"Toutes les phases LLM du pipeline de spec tournent sous spec_writer",
+  c:"<b>Corrigé par le lot L5</b>, avec une correction de la recommandation : basculer le chercheur et le critique en lecture seule aurait cassé les deux phases sans bruit (ils écrivent <code>research.json</code>, réécrivent <code>spec.md</code> ; sans fichier, <code>create_minimal_*</code> le remplace et la phase rend un succès, F39), et l'agent_type ne change pas la réflexion dans ce pipeline. <code>PROMPT_AGENT_TYPES</code> : <code>spec_researcher.md</code> → <code>spec_researcher</code> (+ écriture), <code>spec_critic.md</code> → <code>spec_self_critique</code> (écriture + Context7) ; <code>spec_critic</code> reste le relecteur en lecture seule de <code>brainstorm</code> ; <code>spec_discovery</code> et <code>spec_context</code> supprimés. Un test vérifie que la config de chaque prompt accorde ce qu'il utilise. Constat d'origine : <code>AgentRunner</code> fixe <code>agent_type=spec_writer</code> pour chaque prompt (l.176 et 212). #290 y a ajouté le provider de la phase spec, pas le bon agent_type. Le chercheur ne reçoit pas Context7 ; le critique, prévu en lecture seule à ultrathink (<code>spec_critic</code>), reçoit Write/Edit/Bash et la réflexion high. <code>spec_gatherer</code>, <code>spec_researcher</code>, <code>spec_discovery</code>, <code>spec_context</code> restent des configurations mortes.",
   p:"spec/pipeline/agent_runner.py:126-145,176,212 · agents/tools_pkg/models.py (entrées spec_*) · core/client.py:1585-1606",
   r:"Table <code>prompt → agent_type</code> dans <code>AgentRunner</code> (spec_researcher.md → spec_researcher, spec_critic.md → spec_critic, spec_gatherer.md → spec_gatherer…). Supprimer ensuite les configurations restées sans appelant.",
   g:"Droits minimaux, Context7 pour la recherche, réflexion adaptée au critique.",k:"Le contenu des prompts de spec et l'ordre des phases."},
- {id:"F5",sev:"haute",cat:"tokens",st:"ouvert",v:"vérifié",t:"Les orchestrateurs de revue PR portent 9 et 7 sous-agents",
-  c:"<code>pr_orchestrator_parallel</code> : 9 sous-agents (6 spécialistes + code-reviewer, test-runner avec Bash, spec-explorer) ; <code>pr_followup_parallel</code> : 7. Aucun des deux n'est dans <code>PHASE_ALIASES</code>, et <code>_apply_cap</code> (MAX_ROSTER = 7) est appliqué l.194, avant la fusion des agents de l'appelant l.197. Reproduit avec <code>resolve()</code>.",
+ {id:"F5",sev:"haute",cat:"tokens",st:"résolu",v:"vérifié",t:"Les orchestrateurs de revue PR portent 9 et 7 sous-agents",
+  c:"<b>Corrigé par le lot L5</b> : alias <code>solo</code> pour les deux orchestrateurs ; le plafond s'applique après la fusion et ne retire jamais un agent de l'appelant (orchestrateur → 6, suivi → 4). <code>_create_sdk_client</code> n'est appelé nulle part ; le chemin vivant lance chaque spécialiste sous <code>pr_reviewer</code>, qui portait le roster review en plus : il passe désormais <code>roster='solo'</code>. Constat d'origine : <code>pr_orchestrator_parallel</code> : 9 sous-agents (6 spécialistes + code-reviewer, test-runner avec Bash, spec-explorer) ; <code>pr_followup_parallel</code> : 7. Aucun des deux n'est dans <code>PHASE_ALIASES</code>, et <code>_apply_cap</code> (MAX_ROSTER = 7) est appliqué l.194, avant la fusion des agents de l'appelant l.197. Reproduit avec <code>resolve()</code>.",
   p:"agents/subagents/__init__.py:186-197 · agents/subagents/phases.py:84-127 · runners/github/services/parallel_orchestrator_reviewer.py:741 · parallel_followup_reviewer.py:541",
   r:"Aliaser les deux types vers <code>solo</code> (l'appelant fournit son roster) et appliquer le plafond après fusion, en protégeant les agents de l'appelant.",
   g:"Trois descriptions de sous-agents en moins à chaque tour de revue.",k:"Les 6 spécialistes PR et les 3 du suivi."},
@@ -990,8 +989,8 @@ const FINDINGS=[
   p:"agents/subagents/phases.py · agents/subagents/pr_review.py · runners/github/services/parallel_followup_reviewer.py:222-262 · skills/dotnet/agents/ · skills/mobile/agents/",
   r:"Ramener à ~14 définitions, toutes dans le registre ; les rosters les référencent par nom.",
   g:"Maintenance ; descriptions plus courtes par tour.",k:"Chaque rôle couvert aujourd'hui."},
- {id:"F9",sev:"moy",cat:"tokens",st:"ouvert",v:"vérifié",t:"Rosters Kanban servis à des agents qui n'en ont pas l'usage",
-  c:"architecture_visualizer, analysis, batch_analysis, batch_validation, competitor_analysis, roadmap_discovery n'ont pas d'alias : ils reçoivent code-reviewer, test-runner (Bash) et spec-explorer (reproduit). Sur un projet mobile, <code>resolve()</code> ajoute device-runner et store-readiness-auditor à tout roster, <code>solo</code> compris (l.186).",
+ {id:"F9",sev:"moy",cat:"tokens",st:"résolu",v:"vérifié",t:"Rosters Kanban servis à des agents qui n'en ont pas l'usage",
+  c:"<b>Corrigé par le lot L5</b> (roadmap, concurrents et archify l'étaient par L1/L2) : <code>analysis</code> et <code>batch_*</code> → research ; les spécialistes mobiles ne rejoignent qu'un roster de phase non vide. Invariant : toute entrée d'<code>AGENT_CONFIGS</code> hors <code>coder</code> nomme son roster. Constat d'origine : architecture_visualizer, analysis, batch_analysis, batch_validation, competitor_analysis, roadmap_discovery n'ont pas d'alias : ils reçoivent code-reviewer, test-runner (Bash) et spec-explorer (reproduit). Sur un projet mobile, <code>resolve()</code> ajoute device-runner et store-readiness-auditor à tout roster, <code>solo</code> compris (l.186).",
   p:"agents/subagents/phases.py:84 · agents/subagents/__init__.py:174-190",
   r:"Compléter <code>PHASE_ALIASES</code> (research pour les analyseurs, solo pour l'auteur archify) ; n'appliquer l'overlay mobile qu'aux rosters non vides.",
   g:"Tokens par tour.",k:"Les spécialistes mobiles sur les phases qui touchent l'app."},
@@ -1022,8 +1021,8 @@ const FINDINGS=[
   c:"<b>Corrigé par le lot L6</b> : <code>min_effort</code> retiré de planning ; none et low exécutent les mêmes phases et le profil le dit. Constat d'origine : <code>planning</code> a <code>min_effort: low</code> ; à none le profil l'élague, puis le coder le lance faute de plan. Un avertissement explicite le dit désormais.",
   p:"workflows/feature-build/workflow.yaml (planning) · agents/coder.py:904-913",
   r:"Retirer <code>min_effort</code> de planning.",g:"Profil exact.",k:"—"},
- {id:"F16",sev:"basse",cat:"qualité",st:"ouvert",v:"lu",t:"L'overlay langage ne spécialise pas le testeur de la QA ni du verifier",
-  c:"Seul <code>test-runner</code> reçoit les commandes de la pile ; <code>qa-test-evidence</code> (rosters de la QA et, depuis #292, du verifier) redécouvre le framework à chaque passe.",
+ {id:"F16",sev:"basse",cat:"qualité",st:"résolu",v:"vérifié",t:"L'overlay langage ne spécialise pas le testeur de la QA ni du verifier",
+  c:"<b>Corrigé par le lot L5</b> : <code>test-runner</code> et <code>qa-test-evidence</code> reçoivent les commandes de la pile. Constat d'origine : Seul <code>test-runner</code> reçoit les commandes de la pile ; <code>qa-test-evidence</code> (rosters de la QA et, depuis #292, du verifier) redécouvre le framework à chaque passe.",
   p:"agents/subagents/__init__.py:180-186",r:"Spécialiser les deux.",g:"Moins de tours de découverte.",k:"—"},
  {id:"F17",sev:"basse",cat:"tokens",st:"ouvert",v:"lu",t:"Plafond de QA à 50 itérations",
   c:"L'escalade sur problème récurrent (3×) protège la plupart des cas ; le plafond absolu reste 50 paires reviewer/fixer à réflexion high/medium.",
@@ -1110,12 +1109,21 @@ const FINDINGS=[
  {id:"F38",sev:"haute",cat:"pipeline",st:"résolu",v:"vérifié",t:"Les rapports des phases skill ne sont lus par personne",
   c:"Trouvé et <b>corrigé pendant le lot L6</b>. <code>run_skill_phase</code> écrit <code>&lt;spec_dir&gt;/workflow/&lt;phase&gt;.md</code> ; seul <code>workflow/verify.md</code> était relu. Le planner, le coder et le QA reviewer travaillaient sans ce que brainstorm, analyze, mobile-design et review avaient trouvé : sessions payées, sortie inutilisée. <code>workflows/handoff.py</code> remet chaque rapport au consommateur intégré suivant dans l'ordre déclaré (planning, coding, qa), nettoyé, scanné par injection_guard, borné et clôturé comme données.",
   p:"workflows/runner.py (_write_output) · workflows/handoff.py · agents/coder.py (planner, sous-tâches) · prompts_pkg/prompts.py (get_qa_reviewer_prompt)",
-  r:"Fait. Reste : les phases après la QA (store-readiness) n'ont pas de consommateur dans le build, et aucun rapport n'est affiché dans l'UI.",g:"Chaque session de phase payée est lue.",k:"Les rapports sur disque, inchangés."}];
+  r:"Fait. Reste : les phases après la QA (store-readiness) n'ont pas de consommateur dans le build, et aucun rapport n'est affiché dans l'UI.",g:"Chaque session de phase payée est lue.",k:"Les rapports sur disque, inchangés."},
+ {id:"F39",sev:"moy",cat:"bug",st:"nouveau",v:"lu",t:"Une phase de spec qui n'a pas écrit son fichier rend un succès",
+  c:"Trouvé pendant le lot L5. Quand l'agent n'a pas produit <code>research.json</code> ou <code>critique_report.json</code>, <code>create_minimal_research</code> / <code>create_minimal_critique</code> écrivent un fichier minimal et la phase rend un succès : rien ne distingue « rien à signaler » de « rien n'a été fait ».",
+  p:"spec/phases/requirements_phases.py:230-235 · spec/phases/spec_phases.py:431-445",
+  r:"Garder le fichier minimal, mais le marquer (<code>placeholder: true</code>, raison), l'avertir dans le journal et le montrer sur la carte de la tâche.",g:"Un échec de phase visible.",k:"Un pipeline de spec qui avance quand la recherche n'a rien à dire."},
+ {id:"F40",sev:"haute",cat:"droits",st:"nouveau",v:"lu",t:"allowed_tools n'est pas une barrière pour les types hors lecture seule",
+  c:"Trouvé pendant le lot L5, à vérifier sur le SDK épinglé. <code>create_client</code> ne passe qu'<code>allowed_tools</code>, et le fichier de réglages qu'il écrit autorise Write, Edit, Bash, WebFetch et WebSearch à tous les types en <code>acceptEdits</code>. Seul <code>permission_mode=\"plan\"</code> (<code>READ_ONLY_AGENT_TYPES</code>) est une barrière garantie ; hors SDK, <code>tool_executor</code> donne <code>write_file</code> et <code>run_command</code> à tous.",
+  p:"core/client.py (security_settings, allowed_tools, READ_ONLY_AGENT_TYPES) · core/runtimes/tool_executor.py",
+  r:"Vérifier ce qu'un agent hors <code>allowed_tools</code> peut appeler ; si besoin, passer <code>disallowed_tools</code> et dériver le fichier de réglages de la config du type ; idem dans <code>tool_executor</code>.",g:"Des droits par type qui sont des droits.",k:"bash_security_hook, le garde d'écriture, le garde de lecture docintel."}];
 const PLAN=[
  ["P0","Features cassées","Fait : F1 et F24 (lot L1), F20 (lot L2), F21 câblé et F22 (lot L3)","F1, F24, F20, F21, F22","Features restaurées, mémoire alimentée"],
  ["P1","Événements IPC perdus","Relais main → renderer par getMainWindow ; API d'ouverture de dossier ; parité IPC étendue au pont générique","F37","Progression visible sur six pages"],
  ["P1","Contexte de développement","Réduire docs/CLAUDE.md aux règles (< 20 Ko), justifications dans shared_docs/architecture/","F23","~60 k tokens par session"],
- ["P1","Droits et rosters minimaux","agent_type par prompt dans le pipeline de spec ; alias PR → solo et plafond après fusion ; alias manquants ; overlay mobile hors solo","F4, F5, F9","Tokens par tour, permissions minimales"],
+ ["P1","Droits et rosters minimaux","Fait (lot L5) : agent_type par prompt dans le pipeline de spec ; alias PR → solo et plafond après fusion ; spécialistes PR en feuilles ; overlay mobile hors solo ; qa-test-evidence spécialisé","F4, F5, F9, F16","Tokens par tour, permissions minimales"],
+ ["P1","Droits effectifs et succès silencieux","Vérifier puis restreindre les outils au-delà de la lecture seule ; marquer les fichiers de phase de remplacement","F39, F40","Droits réels, échecs visibles"],
  ["P1","Pipeline payé = pipeline exécuté","Fait (lot L6) : skills natifs tooling/ ; phases spec, frontend-design, adversarial-review et spec-conformance retirées au profit d'une revue à lentilles ; planning sans min_effort ; rapports de phase remis à l'agent suivant","F2, F3, F15, F35, F38","Profil exact, sessions en moins"],
  ["P2","Une seule mémoire","Retirer Graphiti / LadybugDB (OLLAMA_* préservés) ; fusionner les magasins de patterns ; événement merge unique ; dossiers .workpilot/ renommés","F6, F7, F14, F34","~12,6 k lignes, une vérité"],
  ["P2","Code mort","RESUME_WITH_PROVIDER ; 57 fichiers frontend ; paquets/modules backend ; shims ; second registre de providers ; utils/ et docs historiques","F25, F28, F29, F30, F32, F33","~27 k lignes"],

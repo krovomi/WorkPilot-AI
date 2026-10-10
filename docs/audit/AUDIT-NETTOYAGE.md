@@ -111,7 +111,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L2 | P0 | Phase architecture-map — **fait** | F20 | L1 (test AST) conseillé |
 | L3 | P0 | Features cassées (frontend) — **fait** | F21, F22 | — |
 | L4 | P1 | Contexte de développement | F23, F18 | — |
-| L5 | P1 | Droits et rosters minimaux | F4, F5, F9, F16 | L1 |
+| L5 | P1 | Droits et rosters minimaux — **fait** | F4, F5, F9, F16 | L1 |
 | L6 | P1 | Pipeline payé = pipeline exécuté — **fait** | F2, F3, F15, F35, F38 | — |
 | L7 | P2 | Une seule mémoire | F6, F7, F14, F34 | L1 (insight_extractor) |
 | L8 | P2 | Code mort frontend | F28, F25 (front) | L3 |
@@ -121,8 +121,9 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L12 | P3 | Gouvernance | F12, F13 | L9 (F25) pour F13 |
 | L13 | P4 | Surface produit | F19 | tous |
 | L14 | P1 | Événements et appels IPC perdus en silence | F37 | — |
+| L15 | P1 | Droits effectifs et succès silencieux | F39, F40 | L5 |
 
-Ordre recommandé : L1, L2, L3, L6 (faits) → L4, L14 en parallèle → L5 → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L6, L5 (faits) → L4, L14, L15 en parallèle → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -136,7 +137,7 @@ Ordre recommandé : L1, L2, L3, L6 (faits) → L4, L14 en parallèle → L5 → 
 | Shims racine `apps/backend/*.py` | 25 | 0 (hors points d'entrée) |
 | Prompts orphelins | 11 (~51 Ko) | 0 |
 | Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
-| Sous-agents du plus gros roster | 9 | ≤ 7 |
+| Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) | ≤ 7 |
 | Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) | ≤ 4 |
 | Détecteurs de pile | ≥ 11 | 1 façade |
 | Écritures par merge | 4 magasins | 1 événement |
@@ -345,54 +346,68 @@ Ordre recommandé : L1, L2, L3, L6 (faits) → L4, L14 en parallèle → L5 → 
 
 ### Lot L5 — Droits et rosters minimaux (P1)
 
+**Fait.** Chaque prompt du pipeline de spec tourne sous une config qui accorde ce qu'il utilise, le
+plafond de roster compte les agents de l'appelant, un roster vide le reste sur un projet mobile, et
+le testeur de la QA connaît la pile du projet. Le plus gros roster passe de 9 à 7 entrées (6 pour
+l'orchestrateur de PR). Trois prescriptions de ce cahier étaient fausses ; elles sont corrigées
+ci-dessous plutôt que suivies.
+
 #### F4 · Toutes les phases LLM du pipeline de spec tournent sous `spec_writer`
 
-- **Sévérité** haute · **ouvert** · **lu**
-- **Preuve** : `spec/pipeline/agent_runner.py:176` et `:212` fixent `agent_type="spec_writer"` quel que
-  soit le prompt. #290 a ajouté la résolution du provider de la phase spec (l.126-145), pas l'agent_type.
-  Le chercheur (`spec_researcher.md`) n'a pas Context7 ; le critique (`spec_critic.md`) reçoit
-  Write/Edit/Bash et la réflexion `high` au lieu de lecture seule `ultrathink`.
-- **Étapes**
-  1. Dans `AgentRunner`, une table `PROMPT_AGENT_TYPES = {"spec_researcher.md": "spec_researcher",
-     "spec_critic.md": "spec_critic", "spec_gatherer.md": "spec_gatherer", "complexity_assessor.md":
-     "spec_writer", …}` avec repli `spec_writer` ; l'utiliser aux deux appels.
-  2. Après migration, supprimer les configs restées sans appelant (`spec_discovery`, `spec_context` ;
-     vérifier aussi la table de `core/client.py:1585-1606`).
-- **À préserver** : contenu des prompts, ordre des phases, logs et transcript (`test_spec_logs_and_factory_use_the_same_configuration`).
-- **Vérification** : `pytest tests/test_spec_agent_configuration.py tests/test_spec_pipeline.py -q`.
+- **Corrigé par le lot L5**, avec une correction du cahier.
+- **Ce que le cahier prescrivait** : basculer le chercheur et le critique vers `spec_researcher` et
+  `spec_critic`, en lecture seule. Les deux phases auraient cassé **sans bruit** : `spec_researcher.md`
+  écrit `research.json` par heredoc, `spec_critic.md` réécrit `spec.md` (`sed -i`) et écrit
+  `critique_report.json`. Sans fichier, `create_minimal_research` / `create_minimal_critique` le
+  remplacent et la phase rend un succès (F39). La mention « réflexion `high` au lieu de `ultrathink` »
+  était fausse aussi : dans ce pipeline le budget est calculé une fois et passé explicitement
+  (`spec/pipeline/orchestrator.py:175`) ; l'`agent_type` ne le change pas.
+- **Le vrai défaut** était l'inverse : les deux prompts appellent `mcp__context7__*` et le web, que
+  `spec_writer` n'accorde pas. La recherche « validait » de mémoire.
+- **Correction** :
+  - `AgentRunner` lit `PROMPT_AGENT_TYPES` (repli `spec_writer`) aux deux appels.
+  - `spec_researcher` reçoit les outils d'écriture.
+  - Nouveau type `spec_self_critique` (écriture + Context7) pour `spec_critic.md`. `spec_critic` reste
+    le relecteur en lecture seule de la phase `brainstorm`.
+  - `spec_discovery` et `spec_context`, sans appelant, sont supprimés, y compris du panneau Agent
+    Tools.
+  - L'ensemble lecture seule devient `core.client.READ_ONLY_AGENT_TYPES`, lu par les tests au lieu
+    d'une copie.
+- **Garde-fou** : `tests/test_spec_agent_configuration.py` lit chaque prompt depuis son point
+  d'appel et vérifie que sa config accorde ce qu'il utilise (shell, `Write`, Context7, web) et
+  n'est pas en lecture seule. Le test échoue sur l'ancien mapping comme sur celui du cahier.
 
 #### F5 · Les orchestrateurs de revue PR portent 9 et 7 sous-agents
 
-- **Sévérité** haute · **ouvert** · **vérifié** (`resolve()` renvoie 9 entrées)
-- **Preuve** : `pr_orchestrator_parallel` / `pr_followup_parallel` absents de `PHASE_ALIASES`
-  (`agents/subagents/phases.py:84-127`) → roster Kanban (code-reviewer, test-runner, spec-explorer)
-  ajouté aux 6 spécialistes (`runners/github/services/parallel_orchestrator_reviewer.py:741`) ou aux
-  3+1 du suivi (`parallel_followup_reviewer.py:541`). `_apply_cap` (MAX_ROSTER = 7) s'applique l.194,
-  **avant** `roster.update(user_agents)` l.197.
-- **Étapes** : ajouter `"pr_orchestrator_parallel": "solo"` et `"pr_followup_parallel": "solo"` ;
-  appliquer `_apply_cap` après la fusion, en protégeant les clés de `user_agents`.
-- **Acceptation** : `resolve('pr_orchestrator_parallel', user_agents=6 spécialistes)` → 6 entrées.
-- **Vérification** : `pytest tests/test_subagents_coverage.py tests/test_subagents_registry.py -q`
-  (mettre à jour `test_only_the_ordinary_card_falls_through_to_kanban` si nécessaire).
+- **Corrigé par le lot L5**, avec une correction de la preuve.
+- **Preuve corrigée** : `_create_sdk_client` (9 entrées) n'est appelé nulle part, c'est du code mort
+  (lot L9). Le chemin vivant lance chaque spécialiste comme une session à part sous `pr_reviewer`,
+  qui portait le roster `review` en plus des autres spécialistes : un fan-out dans le fan-out. Le
+  suivi (`pr_followup_parallel`, 4 + 3 = 7) était vivant.
+- **Correction** :
+  - `pr_orchestrator_parallel` et `pr_followup_parallel` → `solo`.
+  - `_apply_cap` tourne après la fusion des agents de l'appelant, et ne retire jamais une entrée
+    qu'il a nommée.
+  - Les sessions spécialistes passent `roster="solo"`.
+- **Acceptation** : `resolve('pr_orchestrator_parallel', user_agents=6)` → 6 entrées ; le suivi → 4.
 
 #### F9 · Rosters Kanban servis à des agents qui n'en ont pas l'usage
 
-- **Sévérité** moyenne · **ouvert** · **vérifié**
-- **Preuve** : `architecture_visualizer`, `analysis`, `batch_analysis`, `batch_validation`,
-  `competitor_analysis`, `roadmap_discovery` tombent sur `kanban` (`phases.py:485`). Sur un projet mobile,
-  `resolve()` ajoute `device-runner` et `store-readiness-auditor` à **tout** roster, `solo` compris
-  (`agents/subagents/__init__.py:174-190`).
-- **Étapes** : aliaser `analysis`, `batch_*`, `competitor_analysis`, `roadmap_discovery` → `research` ;
-  `architecture_visualizer` → `solo` ; dans `resolve()`, n'appliquer `overlay.extra_agents` que si le
-  roster de phase est non vide.
-- **À préserver** : les spécialistes mobiles sur coder, QA, verifier et les phases mobiles.
+- **Corrigé par le lot L5.** `roadmap_discovery`, `competitor_analysis` et `architecture_visualizer`
+  l'étaient déjà (lots L1 et L2).
+- **Correction** :
+  - `analysis`, `batch_analysis` et `batch_validation` → `research`. C'est de la couverture : ils
+    passent par `create_simple_client`, qui ne compose pas de roster.
+  - Le défaut vivant était l'ajout des spécialistes mobiles à **tout** roster. Ils ne rejoignent
+    désormais qu'une phase qui a un roster : un `commit_message` sur un projet Android reste vide,
+    tandis que coder, QA, verifier et `pr_reviewer` (phases mobiles) les gardent.
+- **Invariant** : `test_every_agent_config_names_its_roster`. Toute entrée d'`AGENT_CONFIGS` hors
+  `coder` nomme son roster ; la liste tenue à la main en avait manqué neuf.
 
 #### F16 · L'overlay langage ne spécialise pas le testeur de la QA ni du verifier
 
-- **Sévérité** basse · **ouvert** · **lu**
-- **Preuve** : `agents/subagents/__init__.py:180-184` ne spécialise que `test-runner` ; `qa-test-evidence`
-  (rosters `qa` de `qa_reviewer`, `qa_fixer` et, depuis #292, `verifier`) redécouvre le framework.
-- **Étapes** : appliquer `_specialise_test_runner` aussi à `qa-test-evidence` (même `LanguageOverlay`).
+- **Corrigé par le lot L5.** `_TEST_ROLES = ("test-runner", "qa-test-evidence")` : les deux
+  reçoivent les commandes de la pile (langage et mobile), et les deux sont protégés du plafond.
 
 ### Lot L6 — Pipeline payé = pipeline exécuté (P1)
 
@@ -557,6 +572,11 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
     `core/agent_client.py` : `optimized_copilot_agent_client.py` est inatteignable par construction.
   - `sandbox/` n'est importé que par ses propres tests (`sandbox/test_*.py`) : supprimer ensemble.
   - `runners/time_travel_runner.py` : le time travel est servi par `replay/api.py` (`get_time_travel_engine`).
+  - Trouvés pendant le lot L5 :
+    - les configs `spec_gatherer` et `analysis` n'ont aucun appelant, et `spec_gatherer.md` n'est
+      chargé par rien (`requirements.json` est construit en Python) ;
+    - `ParallelOrchestratorReviewer._create_sdk_client` et `_define_specialist_agents` ne sont
+      appelés nulle part.
 - **Vérification** : `pytest tests/ -q`, `ruff check apps/backend/`.
 
 #### F30 · 25 shims de compatibilité à la racine du backend
@@ -747,6 +767,40 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
 - **À préserver** : les six pages concernées et le bouton du créateur de plugins.
 - **Vérification** : un test par relais (fenêtre factice, événement reçu) ; `pnpm run typecheck && pnpm test`.
 
+### Lot L15 — Droits effectifs et succès silencieux (P1)
+
+#### F39 · Une phase de spec qui n'a pas écrit son fichier rend un succès
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant le lot L5) · **lu**
+- **Preuve** : `requirements_phases.py:230-235` (`create_minimal_research`) et `spec_phases.py:431-445`
+  (`create_minimal_critique`). Quand l'agent n'a pas produit `research.json` ou
+  `critique_report.json`, un fichier minimal est écrit et la phase rend `success=True`. Le log ne
+  distingue pas « rien à signaler » de « rien n'a été fait ».
+- **Étapes** : garder le fichier minimal pour ne pas bloquer le pipeline, mais le marquer
+  (`"placeholder": true`, la raison), le journaliser en avertissement et le montrer à la carte de la
+  tâche.
+- **À préserver** : un pipeline de spec qui avance quand la recherche n'a rien à dire.
+
+#### F40 · `allowed_tools` n'est pas une barrière pour les types hors lecture seule
+
+- **Sévérité** haute · **nouveau** (trouvé pendant le lot L5) · **lu**, **à vérifier** sur le SDK
+- **Preuve** :
+  - `create_client` ne passe qu'`allowed_tools` (`core/client.py`), et aucun `disallowed_tools`.
+  - Le fichier de réglages qu'il écrit autorise `Write(./**)`, `Edit(./**)`, `Bash(*)`,
+    `WebFetch(*)` et `WebSearch(*)` à **tous** les types, en `defaultMode: acceptEdits`.
+  - Dans le SDK, `allowed_tools` dit ce qui est approuvé sans demande, pas ce qui existe. Seul
+    `permission_mode="plan"` (`READ_ONLY_AGENT_TYPES`) est une barrière garantie.
+  - Les fournisseurs hors SDK donnent `write_file` et `run_command` à tous les types
+    (`tool_executor.py`).
+- **Étapes** :
+  1. Vérifier sur le SDK épinglé ce qu'un agent hors `allowed_tools` peut appeler.
+  2. Si la liste n'est pas restrictive, passer `disallowed_tools` (complément d'`AGENT_CONFIGS`) et
+     dériver le fichier de réglages de la config du type au lieu d'une liste commune.
+  3. Faire de même dans `tool_executor`.
+- **À préserver** : `bash_security_hook`, le garde d'écriture et le garde de lecture docintel.
+- **Vérification** : un test par type qui construit les options et vérifie qu'un outil absent de la
+  config n'est ni autorisé ni approuvé.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -892,4 +946,4 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6) ; F37 trouvé pendant L3, F38 pendant L6.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5.

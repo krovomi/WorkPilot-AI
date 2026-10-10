@@ -291,6 +291,24 @@ Working examples: `agents/planner.py`, `agents/coder.py`, `qa/reviewer.py`, `qa/
 | **Roadmap** | roadmap_discovery.md, roadmap_features.md, competitor_analysis.md |
 | **GitHub** | issue_analyzer.md, issue_triager.md, pr_reviewer.md, pr_orchestrator.md, pr_parallel_orchestrator.md, pr_finding_validator.md, pr_template_filler.md, pr_ai_triage.md, pr_codebase_fit_agent.md, + 9 more |
 
+**A spec prompt runs under the config its work needs.** Every LLM phase of the
+spec pipeline used to run as `spec_writer`, whatever the prompt.
+`spec/pipeline/agent_runner.py::PROMPT_AGENT_TYPES` now names the two that need
+more:
+
+| Prompt | `agent_type` | Why |
+|---|---|---|
+| `spec_researcher.md` | `spec_researcher` | checks each integration against Context7 and the web — `spec_writer` has neither — and writes `research.json` |
+| `spec_critic.md` | `spec_self_critique` | rewrites `spec.md` and writes `critique_report.json`, checking library claims against Context7 |
+| everything else | `spec_writer` | they write files, and `planner.md` / `spec_quick.md` ask for the `Write` tool non-Claude providers only expose under `planner` and `spec_writer` |
+
+A read-only config is the wrong fix for a prompt that writes its output, and the
+failure is silent: with no file on disk the phase stands a placeholder in
+(`create_minimal_research`, `create_minimal_critique`) and reports success.
+`spec_critic` itself stays read-only — it is what the workflow's `brainstorm` runs
+under. `tests/test_spec_agent_configuration.py` reads each prompt the pipeline
+runs from its call site and checks its config grants what the prompt uses.
+
 Duplicate detection and issue auto-fix are listed as features above but are not
 prompt-driven: `runners/github/duplicates.py` compares embeddings, and
 `runners/github/orchestrator.py` drives `auto_fix_issue`. The
@@ -2625,7 +2643,7 @@ python scripts/mobile_device_check.py --project-dir ../my-app --launch
 
 | Where | What |
 |---|---|
-| `agents/subagents/mobile.py` | `device-runner` (installs and launches, reports; the only roster entry that touches a device) and `store-readiness-auditor` (read-only; the rules Apple and Google reject on). Both are protected from the roster cap — they are the only entries that know the project is a phone app. |
+| `agents/subagents/mobile.py` | `device-runner` (installs and launches, reports; the only roster entry that touches a device) and `store-readiness-auditor` (read-only; the rules Apple and Google reject on). Both are protected from the roster cap — they are the only entries that know the project is a phone app — and added only to a phase that has a roster: coder, QA, verifier and the `pr_reviewer` the mobile workflow phases run under keep them, a `solo` call (a commit message) stays empty. |
 | `workflows/feature-build/workflow.yaml` | `mobile-design` before coding, `store-readiness` after QA. Both conditional on mobile files being touched, both `fresh-context`, both read-only. |
 | `skills/mobile/` | the procedures: `android-developer`, `ios-developer`, `cross-platform-mobile`, `mobile-design-review`, `mobile-device-testing`, `mobile-store-readiness`, plus four agent definitions. |
 
@@ -3039,7 +3057,22 @@ the acceptance audit is a lens of `review` rather than a pass after QA. An unkno
 workflow file should cost the right specialists, not the build.
 
 This matters beyond tidiness — the roster is context the parent pays for on **every
-turn**, so a mismatched roster is not merely unhelpful, it is billed.
+turn**, so a mismatched roster is not merely unhelpful, it is billed. Hence three
+rules in `agents/subagents/resolve`:
+
+- **Every `AGENT_CONFIGS` entry but `coder` names its roster** in `PHASE_ALIASES`
+  (`test_every_agent_config_names_its_roster`). The PR orchestrators fell through to
+  the Kanban roster and carried a code-reviewer, a test-runner and a spec-explorer on
+  top of the specialists they bring; they are `solo` now.
+- **The cap (seven) counts the caller's agents.** It used to run before they were
+  merged. Generic defaults go first; nothing the caller named is ever dropped.
+- **An overlay specialises a roster, it does not start one.** Language and mobile
+  overlays fold the project's commands into `test-runner` and `qa-test-evidence`, and
+  the mobile specialists join only a phase that has a roster of its own.
+
+The live PR review runs its specialists as sessions of their own, under
+`pr_reviewer`, and passes `roster="solo"`: a specialist is a leaf of the fan-out, not
+a second fan-out.
 
 Two rules the resolver enforces and that are easy to break:
 
