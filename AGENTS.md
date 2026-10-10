@@ -4,6 +4,7 @@ Point d'entrée pour tout agent de code (Copilot, Codex, Cursor, Amp, Gemini, Cl
 Ce fichier est un **index de navigation**, pas un manuel : il dit où regarder, pas quoi penser.
 
 > **Règles normatives** : [`docs/CLAUDE.md`](docs/CLAUDE.md). En cas de contradiction, `docs/CLAUDE.md` fait foi.
+> **Justifications de conception** : [`shared_docs/architecture/`](shared_docs/architecture/), une feature par fichier, indexées par `docs/CLAUDE.md`.
 > **Configuration** : [`shared_docs/CONFIGURATION.md`](shared_docs/CONFIGURATION.md) · **Contribution** : [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)
 
 ## Ce qu'est le produit
