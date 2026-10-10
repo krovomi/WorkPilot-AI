@@ -146,6 +146,56 @@ def _resolve_model(provider: str, explicit: str | None, spec_dir: Path | None) -
     return _model_from_task(spec_dir) or _FALLBACK_MODEL
 
 
+class ProviderReportedError(RuntimeError):
+    """An API failure the provider delivered as a message instead of raising.
+
+    The Claude CLI turns a failed API call into an assistant message of its own
+    ("There's an issue with the selected model (x). It may not exist or you may
+    not have access to it.") tagged with ``error``. Read as text, that sentence
+    became the completion: the prompt optimizer showed it as the optimized
+    prompt, with "no changes needed".
+    """
+
+    def __init__(self, kind: str, message: str) -> None:
+        super().__init__(message or kind)
+        self.kind = kind
+
+
+def _provider_reported_error(msg) -> ProviderReportedError | None:
+    """The failure carried by ``msg``, when the Claude SDK flagged one."""
+    raw = getattr(msg, "raw", None)
+    if type(raw).__name__ != "AssistantMessage":
+        return None
+    kind = getattr(raw, "error", None)
+    if not isinstance(kind, str) or not kind:
+        return None
+    return ProviderReportedError(kind, _extract_text(msg).strip())
+
+
+def _error_code(error: Exception, message: str) -> str:
+    from core.error_details import (
+        AUTH,
+        MODEL_UNAVAILABLE,
+        PROVIDER_UNAVAILABLE,
+        QUOTA,
+        RATE_LIMIT,
+        classify,
+    )
+
+    if isinstance(error, ProviderReportedError):
+        code = {
+            "authentication_failed": AUTH,
+            "billing_error": QUOTA,
+            "rate_limit": RATE_LIMIT,
+            "server_error": PROVIDER_UNAVAILABLE,
+            "model_not_found": MODEL_UNAVAILABLE,
+        }.get(error.kind)
+        if code:
+            return code
+        return classify(error.kind, message)
+    return classify(type(error).__name__, message)
+
+
 def _extract_text(msg) -> str:
     """Collect plain text from a provider-agnostic AgentMessage."""
     from core.agent_client import ContentBlockType
@@ -451,6 +501,9 @@ async def oneshot_completion(
             async with client:
                 await client.query(prompt)
                 async for msg in client.receive_response():
+                    reported = _provider_reported_error(msg)
+                    if reported is not None:
+                        raise reported
                     delta = _extract_text(msg)
                     if not delta:
                         continue
@@ -470,13 +523,18 @@ async def oneshot_completion(
                 "[oneshot] provider completion failed (%s)", type(error).__name__
             )
             if on_error is not None:
-                from core.error_details import ErrorDetail, classify
+                from core.error_details import ErrorDetail
 
                 message = str(error).strip() or type(error).__name__
+                label = (
+                    error.kind
+                    if isinstance(error, ProviderReportedError)
+                    else type(error).__name__
+                )
                 detail = ErrorDetail(
                     message=message,
-                    code=classify(type(error).__name__, message),
-                    details=f"{type(error).__name__}: {message}",
+                    code=_error_code(error, message),
+                    details=f"{label}: {message}",
                     provider=resolved_provider,
                     model=resolved_model,
                 )
