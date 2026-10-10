@@ -108,8 +108,8 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | Lot | Priorité | Thème | Constats | Dépend de |
 |---|---|---|---|---|
 | L1 | P0 | Features cassées (backend) — **fait** | F1, F24 | — |
-| L2 | P0 | Phase architecture-map | F20 | L1 (test AST) conseillé |
-| L3 | P0 | Features cassées (frontend) | F21, F22 | — |
+| L2 | P0 | Phase architecture-map — **fait** | F20 | L1 (test AST) conseillé |
+| L3 | P0 | Features cassées (frontend) — **fait** | F21, F22 | — |
 | L4 | P1 | Contexte de développement | F23, F18 | — |
 | L5 | P1 | Droits et rosters minimaux | F4, F5, F9, F16 | L1 |
 | L6 | P1 | Pipeline payé = pipeline exécuté | F2, F3, F15, F35 | — |
@@ -120,8 +120,9 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
 | L12 | P3 | Gouvernance | F12, F13 | L9 (F25) pour F13 |
 | L13 | P4 | Surface produit | F19 | tous |
+| L14 | P1 | Événements et appels IPC perdus en silence | F37 | — |
 
-Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3 (faits) → L4, L14 en parallèle → L5, L6 → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -204,6 +205,17 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 
 #### F20 · La phase `architecture-map` du build ne produit pas la carte
 
+- **Corrigé par le lot L2.** Le pipeline d'`action_delta` vit dans
+  `architecture_visualizer/archify/task_delta.py::run_task_delta` (le runner CLI y délègue) ;
+  `archify/phase.py::run_architecture_map_phase` est l'exécuteur de la phase (`CUSTOM_EXECUTORS`),
+  qui crée ses sessions d'authoring sous `architecture_visualizer` via `verify.phase.make_agent_runner`.
+  `significance.assess` passe en premier : un changement non significatif n'ouvre aucune session.
+  `PhaseContext` porte `source_project_dir` (la baseline vit sous le `.workpilot/` du projet principal,
+  absent du worktree) et `source_spec_dir` (le record est écrit dans le spec_dir que lit le Kanban, car il
+  référence ses artefacts par chemin absolu) ; une synchronisation après la fenêtre post-QA ramène
+  `workflow/`, `verify/` et le modèle de tête dans le spec principal. `architecture_visualizer` reçoit le
+  roster `solo`. Tests : `tests/test_architecture_map/test_task_delta.py`.
+
 - **Sévérité** haute · **nouveau** · **lu**
 - **Preuve** : `architecture-map` n'est ni dans `SKILL_PHASE_AGENTS` (`workflows/runner.py:198-212`) ni
   dans `CUSTOM_EXECUTORS` (`workflows/runner.py:870`). `run_skill_phase` l'exécute donc sous
@@ -234,6 +246,14 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 
 #### F21 · Context-aware snippets : feature visible, cassée de bout en bout
 
+- **Corrigé par le lot L3 — câblé** (décision du mainteneur : garder la feature). Runner réécrit sur
+  `core.oneshot.oneshot_completion` (tous providers), contexte projet réel (`core/project_brief.py`,
+  extrait de `prompt_optimizer_runner` qui le ré-exporte), réponse JSON lue par
+  `spec.plan_recovery.extract_json_document`. Service et handlers sur le modèle de prompt-optimizer
+  (`registerContextAwareSnippetsHandlers`, enregistré dans `ipc-handlers/index.ts`) ; canal
+  `configure` (le renderer choisissait l'exécutable Python) supprimé ; le store ne tourne plus à vide sur
+  un échec ; badge d'activité dans la barre latérale. Tests : runner, service, store.
+
 - **Sévérité** haute · **nouveau** · **lu**
 - **Preuve**
   - La page est dans la barre latérale : `renderer/components/Sidebar.tsx:109,143,208`
@@ -258,6 +278,14 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
   soit `grep -rn "context-aware-snippets\|ContextAwareSnippet" apps/` ne renvoie plus rien.
 
 #### F22 · Quatre API preload appellent des canaux IPC sans handler
+
+- **Corrigé par le lot L3 — cinq canaux, pas quatre** : `azureDevOps:getProjects`
+  (`getAzureDevOpsProjects`) était dans le même cas. Les cinq méthodes, leurs constantes et leurs mocks
+  sont supprimés. `ipc-channel-parity.test.ts` exige un handler, dans un fichier réellement importé par
+  `main/index.ts`, pour chaque canal invoqué par le preload ; `handler-registration.test.ts` voit
+  désormais aussi les `setup*Handler(s)`. `renderer-log-handler.ts` (jamais enregistré) est supprimé
+  plutôt qu'enregistré : le logger du renderer ne filtre rien et aurait inondé le journal du main. Reste
+  hors de ce test : les appels du renderer par le pont générique (`shell:openPath`, voir F37).
 
 - **Sévérité** moyenne · **nouveau** · **vérifié** (comparaison invoke/handle)
 - **Preuve**
@@ -688,6 +716,26 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
   le mainteneur des pages à regrouper ou à déplacer derrière un mécanisme de plugins. Aucune
   suppression sans donnée d'usage.
 
+### Lot L14 — Événements et appels IPC perdus en silence (P1)
+
+#### F37 · Six features n'envoient jamais leurs événements de progression au renderer
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant le lot L3) · **vérifié** (lecture)
+- **Preuve**
+  - Les relais d'événements de `code-playground`, `performance-profiler`, `code-migration`,
+    `auto-refactor`, `architecture-visualizer` et `documentation-agent` lisent `global.mainWindow` /
+    `globalThis.mainWindow` (`main/ipc-handlers/*-handlers.ts`) ; `main/index.ts` ne l'affecte qu'à
+    `null` (l.558), jamais à la fenêtre : ces relais n'envoient rien.
+  - `setupAutoRefactorEventForwarding` (`auto-refactor-handlers.ts:70`) n'est appelé nulle part.
+  - `PluginCreatorWizard.tsx:587` invoque `shell:openPath` par le pont générique : aucun handler, et
+    aucune API preload n'ouvre un dossier arbitraire (`openExternal` refuse `file:`).
+- **Étapes** : faire passer ces relais par `getMainWindow` (le paramètre que reçoivent déjà les
+  `register*Handlers`) ou `safeSendToRenderer`, appeler `setupAutoRefactorEventForwarding`, et ajouter
+  une API dédiée « ouvrir le dossier » validée côté main (chemin sous le projet) ou retirer le bouton.
+  Étendre `ipc-channel-parity.test.ts` aux appels `electronAPI.invoke/send("…")` du renderer.
+- **À préserver** : les six pages concernées et le bouton du créateur de plugins.
+- **Vérification** : un test par relais (fenêtre factice, événement reçu) ; `pnpm run typecheck && pnpm test`.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -745,9 +793,9 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 | `main/log-service.ts` | 364 | aucun importeur | supprimer |
 | `main/fs-utils.ts` | 155 | aucun importeur | supprimer |
 | `main/copilot-cli-utils.ts` | 86 | aucun importeur | supprimer |
-| `main/ipc-handlers/renderer-log-handler.ts` | 60 | jamais enregistré | supprimer |
-| `main/ipc-handlers/context-aware-snippets-handlers.ts` | 77 | jamais enregistré | câbler ou retirer (F21) |
-| preload : `scanOllamaModels`, `downloadOllamaModel`, `initializeClaudeProfile`, `submitOAuthCode` | — | canaux sans handler | supprimer (F22) |
+| ~~`main/ipc-handlers/renderer-log-handler.ts`~~ | 60 | jamais enregistré | **supprimé (L3)** |
+| `main/ipc-handlers/context-aware-snippets-handlers.ts` | 77 | jamais enregistré | **câblé (L3), conservé** |
+| ~~preload : `scanOllamaModels`, `downloadOllamaModel`, `initializeClaudeProfile`, `submitOAuthCode`, `getAzureDevOpsProjects`~~ | — | canaux sans handler | **supprimés (L3)** |
 
 ### A.2 Backend (F29 ; F21 ; F32)
 
@@ -768,7 +816,7 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 | `runners/time_travel_runner.py` | 227 | jamais lancé ; `replay/api.py` sert le time travel | supprimer |
 | `core/output_schemas.py` | 162 | aucun import | supprimer |
 | `cli/quality_commands.py` | 146 | aucun import | supprimer |
-| `runners/context_aware_snippets_runner.py` | — | importe 3 modules inexistants | câbler ou retirer (F21) |
+| `runners/context_aware_snippets_runner.py` | — | importait 3 modules inexistants | **réécrit (L3), conservé** |
 | `src/connectors/llm_*.py` (racine du dépôt, 13 fichiers) | 1 769 | second registre ; `anthropic.Anthropic()` | migrer puis supprimer (F32) |
 
 ### A.3 Prompts orphelins (F10)
@@ -833,3 +881,4 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3) ; F37 trouvé pendant L3.
