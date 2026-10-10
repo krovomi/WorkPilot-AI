@@ -25,7 +25,6 @@ from .prompt_generator import (
 # Import all functions from prompts
 from .prompts import (
     get_architecture_reviewer_prompt,
-    get_coding_prompt,
     get_followup_planner_prompt,
     get_planner_prompt,
     get_qa_fixer_prompt,
@@ -43,7 +42,6 @@ __all__ = [
     "format_context_for_prompt",
     # prompts functions
     "get_planner_prompt",
-    "get_coding_prompt",
     "get_followup_planner_prompt",
     "get_qa_reviewer_prompt",
     "get_qa_fixer_prompt",
