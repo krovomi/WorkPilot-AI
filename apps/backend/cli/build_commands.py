@@ -664,7 +664,7 @@ def handle_build_command(
         get_base_branch_from_metadata,
         get_use_local_branch_from_metadata,
     )
-    from qa_loop import is_qa_approved, run_qa_validation_loop, should_run_qa
+    from qa import is_qa_approved, run_qa_validation_loop, should_run_qa
 
     from .utils import print_banner, validate_environment
 

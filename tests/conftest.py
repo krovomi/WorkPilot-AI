@@ -149,7 +149,6 @@ _PROTECTED_PACKAGES = [
     "analysis",
     # QA system
     "qa",
-    "qa_loop",
     # Integrations
     "integrations",
     # Utilities
@@ -161,12 +160,11 @@ _PROTECTED_PACKAGES = [
 # Modules that must always be evicted (even if they're real ModuleType objects)
 # because they import from protected packages at module level and their bound
 # names become stale after a protected package mock is cleaned up.
-# For example, qa_loop.get_iteration_history was bound to mock_qa.get_iteration_history
-# when qa was a MagicMock; evicting qa_loop forces a fresh re-import with real bindings.
+# For example, qa.loop.get_iteration_history was bound to mock_qa.get_iteration_history
+# when qa was a MagicMock; evicting qa.loop forces a fresh re-import with real bindings.
 # qa.criteria imports from `progress` which is frequently mocked; evicting it lets
 # test files that mock progress get the correct is_build_complete binding.
 _DEPENDENT_EVICT = {
-    "qa_loop",
     "qa.criteria",
     "qa.report",
     "qa.loop",

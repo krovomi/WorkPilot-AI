@@ -32,7 +32,6 @@ def main():
         backend_dir / "qa" / "auto_fix_loop.py",
         backend_dir / "qa" / "auto_fix_metrics.py",
         backend_dir / "qa" / "__init__.py",
-        backend_dir / "qa_loop.py",
         backend_dir / "cli" / "qa_commands.py",
         backend_dir / "cli" / "main.py",
     ]
