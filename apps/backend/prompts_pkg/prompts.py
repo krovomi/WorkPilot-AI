@@ -553,6 +553,24 @@ def verify_section(spec_dir: Path | None) -> str:
         return ""
 
 
+def workflow_reports_section(
+    spec_dir: Path | None, consumer: str, *, inline: bool = True
+) -> str:
+    """What the skill phases before `consumer` reported (`workflows.handoff`).
+
+    `consumer` is `planning`, `coding` or `qa`. Public and single like the
+    sections above: the planner, every coder subtask and the QA reviewer read
+    it, and each skill phase's report is otherwise read by nobody. Empty when
+    no such phase ran. Never raises.
+    """
+    try:
+        from workflows.handoff import handoff_section
+
+        return handoff_section(spec_dir, consumer, inline=inline)
+    except Exception:  # noqa: BLE001 - a missing section never stops a phase
+        return ""
+
+
 def get_qa_reviewer_prompt(spec_dir: Path, project_dir: Path) -> str:
     """
     Load the QA reviewer prompt with project-specific MCP tools dynamically injected.
@@ -680,6 +698,12 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     # the same palette and rules. Empty when the task is not about the UI.
     if design := uiux_section(spec_dir, role="qa"):
         spec_context += design + "\n\n---\n\n"
+
+    # What the review phase found, from a reader that did not write the code.
+    # Claims to verify, not verdicts: this reviewer still decides. Without it,
+    # the review session was paid for and its report read by nobody.
+    if reports := workflow_reports_section(spec_dir, "qa"):
+        spec_context += reports + "\n\n---\n\n"
 
     # The app this task changed, launched and driven before review: what it
     # printed, the state it reached, the endpoints it answered. Evidence the

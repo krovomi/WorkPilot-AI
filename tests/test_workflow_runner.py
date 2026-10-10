@@ -524,7 +524,13 @@ def _write_skill(
 def _install_fake_agent_stack(
     monkeypatch, seen: dict, *, status="complete", response="done"
 ):
-    import core.client as core_client
+    import importlib
+
+    # The module `from core.client import …` resolves, i.e. `sys.modules`. A
+    # test elsewhere that swaps that entry leaves the `core.client` package
+    # attribute on the old module, and `import core.client as x` returns the
+    # attribute: patching it would leave the runner on the real client.
+    core_client = importlib.import_module("core.client")
 
     class _FakeClient:
         async def __aenter__(self):
@@ -547,8 +553,7 @@ def _install_fake_agent_stack(
 
     monkeypatch.setattr(core_client, "create_agent_client", _fake_create)
 
-    import agents.session as agent_session
-
+    agent_session = importlib.import_module("agents.session")
     monkeypatch.setattr(agent_session, "run_agent_session", _fake_session)
 
 
