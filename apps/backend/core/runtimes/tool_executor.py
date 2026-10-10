@@ -6,9 +6,11 @@ Handles execution of tools during agent sessions.
 """
 
 import asyncio
+import fnmatch
 import json
 import logging
 import os
+import re
 import signal
 from pathlib import Path
 from typing import Any
@@ -58,6 +60,74 @@ def _as_bool(value: Any) -> bool:
     return bool(value)
 
 
+#: Executor tool -> the declarations (`AGENT_CONFIGS[...]["tools"]`) that
+#: grant it. A tool absent from this table is not gated: reading a file,
+#: listing a directory, and the brain, ui-ux and verify tools, which decide
+#: their own audience.
+#:
+#: This is the non-Claude half of `undeclared_builtin_tools`. The executor used
+#: to offer `write_file` and `run_command` to every agent type and to run any
+#: name a model sent, so a `pr_reviewer` reading a hostile pull request on
+#: Copilot, OpenAI or a local model could write files and run commands.
+EXECUTOR_GRANTS: dict[str, tuple[str, ...]] = {
+    "write_file": ("Write", "Edit"),
+    "Write": ("Write", "Edit"),
+    "create_directory": ("Write", "Edit"),
+    "run_command": ("Bash",),
+    "search_files": ("Grep",),
+    "find_files": ("Glob",),
+}
+
+
+def executor_may_use(agent_type: str | None, tool_name: str) -> bool:
+    """Whether `agent_type` may be offered — and may run — `tool_name`.
+
+    ``None``, or a type nobody registered, is permissive: that is a test or a
+    caller outside the product (every product agent_type is registered), and
+    the executor built from a bare project directory keeps working as before.
+    """
+    grants = EXECUTOR_GRANTS.get(tool_name)
+    if grants is None or agent_type is None:
+        return True
+    from agents.tools_pkg.permissions import declared_tools
+
+    declared = declared_tools(agent_type)
+    if declared is None:
+        return True
+    return any(grant in declared for grant in grants)
+
+
+#: Directories a search never descends into: dependencies, caches and VCS
+#: internals, where a match is noise and the walk is most of the cost.
+_SEARCH_SKIP_DIRS = frozenset(
+    {
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".tox",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+    }
+)
+_SEARCH_MAX_FILE_BYTES = 1_000_000
+_SEARCH_MAX_RESULTS = 200
+_SEARCH_LINE_CHARS = 300
+
+
+def _glob_matches(relative: str, pattern: str) -> bool:
+    """`fnmatch` on a posix relative path, where `**/x` also names a root `x`."""
+    name = relative.rsplit("/", 1)[-1]
+    bare = pattern[3:] if pattern.startswith("**/") else None
+    return (
+        fnmatch.fnmatch(relative, pattern)
+        or fnmatch.fnmatch(name, pattern)
+        or (bare is not None and fnmatch.fnmatch(relative, bare))
+    )
+
+
 class ToolExecutor:
     """Executes tools for agent sessions."""
 
@@ -66,8 +136,13 @@ class ToolExecutor:
         project_dir: str,
         working_directory: str | None = None,
         spec_dir: str | Path | None = None,
+        agent_type: str | None = None,
     ):
         self.command_timeout = float(os.environ.get("LOCAL_COMMAND_TIMEOUT", "120"))
+        # Whose rights `execute` enforces. ``None`` keeps the executor
+        # permissive, which is what a bare `ToolExecutor(project_dir)` — the
+        # terminal, the tests — has always been.
+        self.agent_type = agent_type
         self.project_dir = Path(project_dir).resolve()
         # Only for the watermark ledger, and optional because only a build has
         # one: the terminal and the insights runtimes construct an executor from
@@ -114,6 +189,22 @@ class ToolExecutor:
         cmd_aliases = ("command", "cmd", "shell_command", "script", "commandline")
         cwd_aliases = ("cwd", "working_directory", "directory", "dir")
 
+        # The gate sits here, not only in the definitions a client offers:
+        # native `tool_calls` are not filtered against what was offered, so a
+        # model that names `run_command` would otherwise get it run. Refused as
+        # a result, not an exception, so the model reads why and carries on.
+        if not executor_may_use(self.agent_type, tool_name):
+            logger.info(
+                "tool %s refused: agent type %s does not declare it",
+                tool_name,
+                self.agent_type,
+            )
+            return (
+                f"Tool '{tool_name}' is not available to this agent "
+                f"({self.agent_type}): its role does not include it. "
+                "Work with the tools you were given."
+            )
+
         if tool_name == "read_file":
             return await self._read_file(_pick_arg(arguments, *path_aliases))
         elif tool_name in ("write_file", "Write"):  # "Write" = planner alias
@@ -125,6 +216,17 @@ class ToolExecutor:
                         arguments, "EmptyFile", "empty_file", "empty", default=False
                     )
                 ),
+            )
+        elif tool_name == "search_files":
+            return await self._search_files(
+                _pick_arg(arguments, "pattern", "regex", "query"),
+                _pick_arg(arguments, *dir_aliases, default="."),
+                _pick_arg(arguments, "glob", "include", "file_pattern"),
+            )
+        elif tool_name == "find_files":
+            return await self._find_files(
+                _pick_arg(arguments, "pattern", "glob", "name"),
+                _pick_arg(arguments, *dir_aliases, default="."),
             )
         elif tool_name == "list_files":
             return await self._list_files(
@@ -313,6 +415,79 @@ class ToolExecutor:
             return sorted(files)
         except Exception as e:
             raise RuntimeError(f"Error listing files in {directory}: {e}")
+
+    def _walk_files(self, directory: str):
+        """(posix path relative to the project, absolute path) of every file
+        under `directory`, inside the project, links never followed."""
+        root = self._resolve_within_project(directory)
+        if not root.is_dir():
+            raise FileNotFoundError(f"Directory not found: {directory}")
+        for current, dirnames, filenames in os.walk(root, followlinks=False):
+            dirnames[:] = sorted(
+                d
+                for d in dirnames
+                if d not in _SEARCH_SKIP_DIRS
+                and not os.path.islink(os.path.join(current, d))
+            )
+            for filename in sorted(filenames):
+                full = Path(current) / filename
+                if full.is_symlink():
+                    continue
+                yield full.relative_to(self.project_dir).as_posix(), full
+
+    async def _search_files(
+        self, pattern: str | None, directory: str = ".", glob: str | None = None
+    ) -> str:
+        """Lines matching a regular expression — the executor's Grep.
+
+        Read-only by construction, so a reviewer that declares Grep and no
+        shell can still search the project it reviews: without it, taking
+        `run_command` away would have taken search with it.
+        """
+        if not pattern:
+            raise ValueError("pattern is required for search_files")
+        try:
+            regex = re.compile(pattern)
+        except re.error as e:
+            raise ValueError(f"Invalid regular expression {pattern!r}: {e}")
+        results: list[str] = []
+        for relative, full in self._walk_files(directory):
+            if glob and not _glob_matches(relative, glob):
+                continue
+            try:
+                if full.stat().st_size > _SEARCH_MAX_FILE_BYTES:
+                    continue
+                raw = full.read_bytes()
+            except OSError:
+                continue
+            if b"\0" in raw[:8192]:
+                continue  # binary
+            text = raw.decode("utf-8", errors="replace")
+            for number, line in enumerate(text.splitlines(), start=1):
+                if regex.search(line):
+                    results.append(f"{relative}:{number}: {line[:_SEARCH_LINE_CHARS]}")
+                    if len(results) >= _SEARCH_MAX_RESULTS:
+                        results.append(
+                            f"(stopped at {_SEARCH_MAX_RESULTS} matches; narrow the "
+                            "pattern, the directory or the glob)"
+                        )
+                        return "\n".join(results)
+        return "\n".join(results) if results else "(no matches found)"
+
+    async def _find_files(self, pattern: str | None, directory: str = ".") -> str:
+        """Files whose project-relative path matches a glob — the executor's Glob."""
+        if not pattern:
+            raise ValueError("pattern is required for find_files")
+        found: list[str] = []
+        for relative, _full in self._walk_files(directory):
+            if _glob_matches(relative, pattern):
+                found.append(relative)
+                if len(found) >= _SEARCH_MAX_RESULTS:
+                    found.append(
+                        f"(stopped at {_SEARCH_MAX_RESULTS} files; narrow the pattern)"
+                    )
+                    break
+        return "\n".join(found) if found else "(no files found)"
 
     async def _create_directory(self, path: str | None) -> str:
         """Create a directory (and parents)."""
@@ -549,6 +724,45 @@ def get_tool_definitions(
             },
         },
         {
+            "name": "search_files",
+            "description": "Search the project's text files for a regular expression. Returns path:line: text for each match. Read-only.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Regular expression to search for",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Directory to search in",
+                        "default": ".",
+                    },
+                    "glob": {
+                        "type": "string",
+                        "description": "Only search files matching this glob, e.g. **/*.py",
+                    },
+                },
+                "required": ["pattern"],
+            },
+        },
+        {
+            "name": "find_files",
+            "description": "Find files whose path matches a glob, e.g. **/*.cs or src/**/test_*.py. Read-only.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Glob pattern"},
+                    "directory": {
+                        "type": "string",
+                        "description": "Directory to search in",
+                        "default": ".",
+                    },
+                },
+                "required": ["pattern"],
+            },
+        },
+        {
             "name": "run_command",
             "description": "Run a non-interactive shell command with a time limit. Quote paths containing spaces. Use read_file to read files.",
             "parameters": {
@@ -631,4 +845,6 @@ def get_tool_definitions(
     base_tools.extend(_uiux_tool_definitions(spec_dir))
     # The verifier, like `create_client` gives it the `workpilot-verify` server.
     base_tools.extend(_verify_tool_definitions(agent_type))
-    return base_tools
+    # Only what the type declares (`EXECUTOR_GRANTS`): a reviewer is offered
+    # no `write_file` and no `run_command`, and `execute` refuses them too.
+    return [tool for tool in base_tools if executor_may_use(agent_type, tool["name"])]

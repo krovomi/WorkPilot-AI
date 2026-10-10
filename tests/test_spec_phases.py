@@ -1165,3 +1165,202 @@ class TestPhaseWorkflow:
 
         # Verify UI print_status was called
         assert mock_ui_module.print_status.called
+
+
+class TestPlaceholdersAreSaid:
+    """A phase whose agent produced nothing says so (audit F39).
+
+    The researcher and the critic used to get a placeholder file written for
+    them and report success, exactly like a phase that did its job — and the
+    placeholder was permanent: a resumed build skipped the phase because the
+    file existed, and the critique placeholder claimed `no_issues_found`.
+    """
+
+    @staticmethod
+    def _executor(temp_dir, spec_dir, agent_fn, validator, logger, ui):
+        return PhaseExecutor(
+            project_dir=temp_dir,
+            spec_dir=spec_dir,
+            task_description="Test task",
+            spec_validator=validator,
+            run_agent_fn=agent_fn,
+            task_logger=logger,
+            ui_module=ui,
+        )
+
+    @pytest.mark.asyncio
+    async def test_research_with_no_file_is_a_marked_placeholder(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "requirements.json").write_text("{}", encoding="utf-8")
+        agent = AsyncMock(return_value=(True, "done"))  # succeeds, writes nothing
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_research()
+
+        assert result.success is True
+        assert result.warnings and "placeholder" in result.warnings[0]
+        research = json.loads((spec_dir / "research.json").read_text(encoding="utf-8"))
+        assert research["placeholder"] is True
+
+    @pytest.mark.asyncio
+    async def test_research_that_failed_every_attempt_says_so(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "requirements.json").write_text("{}", encoding="utf-8")
+        agent = AsyncMock(return_value=(False, "boom"))
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_research()
+
+        assert result.success is True  # the pipeline moves on
+        assert result.retries == MAX_RETRIES
+        assert result.warnings and len(result.errors) == MAX_RETRIES
+
+    @pytest.mark.asyncio
+    async def test_a_resumed_build_researches_again_over_a_placeholder(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "requirements.json").write_text("{}", encoding="utf-8")
+        (spec_dir / "research.json").write_text(
+            json.dumps({"placeholder": True, "research_skipped": True}),
+            encoding="utf-8",
+        )
+
+        async def researches(*args, **kwargs):
+            (spec_dir / "research.json").write_text(
+                json.dumps({"integrations_researched": ["x"]}), encoding="utf-8"
+            )
+            return (True, "done")
+
+        agent = AsyncMock(side_effect=researches)
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_research()
+
+        assert agent.called, "the placeholder was taken for a result"
+        assert result.warnings == []
+
+    @pytest.mark.asyncio
+    async def test_a_critique_with_no_report_does_not_claim_no_issues(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "spec.md").write_text("# Spec", encoding="utf-8")
+        agent = AsyncMock(return_value=(True, "done"))  # writes no report
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_self_critique()
+
+        assert result.success is True
+        assert result.warnings and "placeholder" in result.warnings[0]
+        report = json.loads(
+            (spec_dir / "critique_report.json").read_text(encoding="utf-8")
+        )
+        assert report["placeholder"] is True
+        assert report["no_issues_found"] is False
+
+    @pytest.mark.asyncio
+    async def test_a_resumed_build_critiques_again_over_a_placeholder(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "spec.md").write_text("# Spec", encoding="utf-8")
+        (spec_dir / "critique_report.json").write_text(
+            json.dumps({"placeholder": True, "no_issues_found": True}),
+            encoding="utf-8",
+        )
+        agent = AsyncMock(return_value=(True, "done"))
+        await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_self_critique()
+
+        assert agent.called
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_report_is_critiqued_again_not_crashed_on(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        (spec_dir / "spec.md").write_text("# Spec", encoding="utf-8")
+        (spec_dir / "critique_report.json").write_text("{not json", encoding="utf-8")
+        agent = AsyncMock(return_value=(True, "done"))
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            agent,
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_self_critique()
+
+        assert agent.called
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_a_quick_spec_without_a_plan_says_the_plan_is_a_stand_in(
+        self, temp_dir, spec_dir, mock_task_logger, mock_ui_module, mock_spec_validator
+    ):
+        async def writes_spec_only(*args, **kwargs):
+            (spec_dir / "spec.md").write_text("# Spec", encoding="utf-8")
+            return (True, "done")
+
+        result = await self._executor(
+            temp_dir,
+            spec_dir,
+            AsyncMock(side_effect=writes_spec_only),
+            mock_spec_validator(),
+            mock_task_logger,
+            mock_ui_module,
+        ).phase_quick_spec()
+
+        assert result.success is True
+        assert result.warnings and "stand-in" in result.warnings[0]
+
+
+class TestPhaseNotes:
+    def test_a_successful_phase_owes_its_warnings_and_its_errors(self):
+        from apps.backend.spec.phases import phase_notes
+
+        result = PhaseResult(
+            "research", True, [], ["Attempt 1: failed"], 1, warnings=["placeholder"]
+        )
+        assert phase_notes("research", result) == [
+            "research: placeholder",
+            "research: Attempt 1: failed",
+        ]
+
+    def test_a_clean_phase_owes_nothing(self):
+        from apps.backend.spec.phases import phase_notes
+
+        assert phase_notes("research", PhaseResult("research", True, [], [], 0)) == []
+
+    def test_the_orchestrator_logs_them_as_warnings(self):
+        """Wired where the loop handles a successful result."""
+        source = (
+            Path(__file__).parent.parent / "apps/backend/spec/pipeline/orchestrator.py"
+        ).read_text(encoding="utf-8")
+        assert "phase_notes(phase_name, result)" in source
+        assert "LogEntryType.WARNING" in source

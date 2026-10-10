@@ -530,7 +530,12 @@ AGENT_CONFIGS = {
         "thinking_default": "high",
     },
     "ideation": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        # Every ideation prompt writes its `<type>_ideas.json` to disk (the
+        # phase executor validates the file), and three of them explore and
+        # write with shell heredocs. It ran on the `Bash(*)` / `Write(./**)`
+        # grants of the settings file; those no longer decide what a type
+        # may do (see `undeclared_builtin_tools`), so the config says it.
+        "tools": BASE_READ_TOOLS + WEB_TOOLS + ["Write", "Bash"],
         "mcp_servers": [],
         "auto_claude_tools": [],
         "thinking_default": "high",

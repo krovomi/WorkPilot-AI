@@ -218,6 +218,23 @@ class SpecOrchestrator:
                 return False, response
             # Pause-and-resume succeeded — loop to retry the same phase.
 
+    @staticmethod
+    def _report_phase_warnings(phase_name: str, result, task_logger) -> None:
+        """What a successful phase stood in for, where a person reads it.
+
+        A phase that wrote a placeholder because its agent produced nothing,
+        or that succeeded after failed attempts, reported exactly what a phase
+        that did its job reports: `result.errors` of a successful result were
+        dropped, and nothing reached the task log. Each one is now a warning
+        entry in the planning log (the Logs tab renders it), and on the
+        console.
+        """
+        from ..phases.models import phase_notes
+
+        for message in phase_notes(phase_name, result):
+            print_status(message, "warning")
+            task_logger.log(message, LogEntryType.WARNING, LogPhase.PLANNING)
+
     async def _store_phase_summary(self, phase_name: str) -> None:
         """Summarize and store phase output for subsequent phases.
 
@@ -442,6 +459,7 @@ class SpecOrchestrator:
 
             # Store summary for subsequent phases (compaction)
             if result.success:
+                self._report_phase_warnings(phase_name, result, task_logger)
                 await self._store_phase_summary(phase_name)
 
             if not result.success:

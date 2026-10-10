@@ -25,7 +25,11 @@ import logging
 import os
 from pathlib import Path
 
-from agents.tools_pkg import get_agent_config, get_default_thinking_level
+from agents.tools_pkg import (
+    get_agent_config,
+    get_default_thinking_level,
+    undeclared_builtin_tools,
+)
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
 
 # BUG FIX: Monkey-patch SDK message parser to handle unknown message types
@@ -136,6 +140,13 @@ def create_simple_client(
         "cwd": str(cwd.resolve()) if cwd else None,
         "env": sdk_env,
     }
+
+    # A simple client loads the user's and the project's own settings files,
+    # whose allow rules can grant what the type does not declare: deny it,
+    # as `create_client` does. `commit_message` and `merge_resolver` declare
+    # no tool at all.
+    if denied := undeclared_builtin_tools(agent_type):
+        options_kwargs["disallowed_tools"] = denied
 
     # Only add max_thinking_tokens if not None (Haiku doesn't support extended thinking)
     if max_thinking_tokens is not None:

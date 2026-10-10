@@ -126,6 +126,52 @@ def _get_mcp_tools_for_servers(servers: list[str]) -> list[str]:
     return tools
 
 
+#: The built-in tools whose use is a capability an agent type must declare —
+#: changing files, running commands, reaching the network — each with the
+#: declaration that grants it. `MultiEdit` and `NotebookEdit` ride on `Edit`.
+#: Reading (Read, Glob, Grep) is not guarded: every type with tools reads.
+GUARDED_TOOLS: dict[str, str] = {
+    "Write": "Write",
+    "Edit": "Edit",
+    "MultiEdit": "Edit",
+    "NotebookEdit": "Edit",
+    "Bash": "Bash",
+    "WebFetch": "WebFetch",
+    "WebSearch": "WebSearch",
+}
+
+
+def declared_tools(agent_type: str) -> frozenset[str] | None:
+    """What an agent type declares, or ``None`` for a type nobody registered.
+
+    ``None`` is permissive on purpose: every `agent_type` the product passes is
+    registered (`test_every_literal_agent_type_is_registered` walks the AST for them),
+    so an unknown one is a test or a caller outside the product, and refusing
+    it everything would break those rather than protect anything.
+    """
+    config = AGENT_CONFIGS.get(agent_type)
+    if config is None:
+        return None
+    return frozenset(config.get("tools", []))
+
+
+def undeclared_builtin_tools(agent_type: str) -> list[str]:
+    """The guarded built-in tools `agent_type` does not declare.
+
+    This is what makes a declaration a right rather than a wish. The SDK's
+    `allowed_tools` only auto-approves: a tool missing from it stays callable,
+    and the settings file `create_client` writes grants Write, Edit and
+    `Bash(*)` to every type. `disallowed_tools` removes a tool from the model's
+    context and wins over those allow rules, so it is the list `create_client`
+    passes; the non-Claude tool executor derives its own gate from the same
+    declaration (`declared_tools`).
+    """
+    declared = declared_tools(agent_type)
+    if declared is None:
+        return []
+    return [tool for tool, grant in GUARDED_TOOLS.items() if grant not in declared]
+
+
 def get_all_agent_types() -> list[str]:
     """
     Get all registered agent types.

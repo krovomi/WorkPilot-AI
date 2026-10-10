@@ -55,13 +55,20 @@ from .models import (
     get_required_mcp_servers,
     is_electron_mcp_enabled,
 )
-from .permissions import get_all_agent_types, get_allowed_tools
+from .permissions import (
+    declared_tools,
+    get_all_agent_types,
+    get_allowed_tools,
+    undeclared_builtin_tools,
+)
 from .registry import create_auto_claude_mcp_server, is_tools_available
 
 __all__ = [
     # Main API
     "create_auto_claude_mcp_server",
     "get_allowed_tools",
+    "declared_tools",
+    "undeclared_builtin_tools",
     "is_tools_available",
     # Agent configuration registry
     "AGENT_CONFIGS",

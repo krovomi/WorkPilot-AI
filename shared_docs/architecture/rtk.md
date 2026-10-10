@@ -49,9 +49,11 @@ that is about to run a test suite.
 
 **The hook never decides permissions.** rtk's own shell hook returns
 `permissionDecision: "allow"` next to the rewrite, which is right for a person
-at a terminal and wrong here twice over: WorkPilot already grants `Bash(*)` in
-its settings file and gates the real decision on `bash_security_hook` and the
-guardrails. A third hook voting "allow" while only knowing about bytes is a
+at a terminal and wrong here twice over: whether an agent has the shell at all
+is its declaration's answer (`create_client` denies `Bash` to every type that
+does not declare it — see [agent-tool-rights.md](agent-tool-rights.md)), and the
+command itself is judged by `bash_security_hook` and the guardrails. A third hook
+voting "allow" while only knowing about bytes is a
 second opinion on a settled question. So the hook returns `updatedInput` and
 nothing else — it changes what a command prints, never whether it runs. rtk's
 own deny rules are treated the same way: the command is left alone and

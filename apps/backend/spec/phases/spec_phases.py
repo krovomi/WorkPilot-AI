@@ -56,13 +56,26 @@ Create:
             )
 
             if success and spec_file.exists():
-                # Create minimal plan if agent didn't
+                # Create minimal plan if agent didn't — and say so: the plan
+                # is then one subtask holding the task description, not a plan
+                # anybody wrote.
+                warnings = []
                 if not plan_file.exists():
                     writer.create_minimal_plan(self.spec_dir, self.task_description)
+                    warnings.append(
+                        "implementation_plan.json is a minimal stand-in: the "
+                        "quick-spec agent wrote spec.md but no plan"
+                    )
+                    self.ui.print_status(warnings[0], "warning")
 
                 self.ui.print_status("Quick spec created", "success")
                 return PhaseResult(
-                    "quick_spec", True, [str(spec_file), str(plan_file)], [], attempt
+                    "quick_spec",
+                    True,
+                    [str(spec_file), str(plan_file)],
+                    [],
+                    attempt,
+                    warnings=warnings,
                 )
 
             errors.append(f"Attempt {attempt + 1}: Quick spec agent failed")
@@ -381,16 +394,16 @@ The task is complete when:
                 "self_critique", False, [], ["spec.md does not exist"], 0
             )
 
-        if critique_file.exists():
-            with open(critique_file, encoding="utf-8") as f:
-                critique = json.load(f)
-                if critique.get("issues_fixed", False) or critique.get(
-                    "no_issues_found", False
-                ):
-                    self.ui.print_status("Self-critique already completed", "success")
-                    return PhaseResult(
-                        "self_critique", True, [str(critique_file)], [], 0
-                    )
+        if critique_file.exists() and not validator.is_placeholder(critique_file):
+            try:
+                critique = json.loads(critique_file.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                critique = {}
+            if critique.get("issues_fixed", False) or critique.get(
+                "no_issues_found", False
+            ):
+                self.ui.print_status("Self-critique already completed", "success")
+                return PhaseResult("self_critique", True, [str(critique_file)], [], 0)
 
         errors = []
         for attempt in range(MAX_RETRIES):
@@ -432,16 +445,31 @@ Output critique_report.json with:
                 if not critique_file.exists():
                     validator.create_minimal_critique(
                         self.spec_dir,
-                        reason="Agent completed without explicit issues",
+                        reason="Agent completed without writing critique_report.json",
+                        placeholder=True,
                     )
 
                 result = self.spec_validator.validate_spec_document()
                 if result.valid:
-                    self.ui.print_status(
-                        "Self-critique completed, spec is valid", "success"
-                    )
+                    warnings = []
+                    if validator.is_placeholder(critique_file):
+                        warnings.append(
+                            "critique_report.json is a placeholder: the critic "
+                            "wrote no report, so whether it found or fixed "
+                            "anything is unknown"
+                        )
+                        self.ui.print_status(warnings[0], "warning")
+                    else:
+                        self.ui.print_status(
+                            "Self-critique completed, spec is valid", "success"
+                        )
                     return PhaseResult(
-                        "self_critique", True, [str(critique_file)], [], attempt
+                        "self_critique",
+                        True,
+                        [str(critique_file)],
+                        [],
+                        attempt,
+                        warnings=warnings,
                     )
                 else:
                     self.ui.print_status(
@@ -453,10 +481,18 @@ Output critique_report.json with:
             else:
                 errors.append(f"Attempt {attempt + 1}: Critique agent failed")
 
+        reason = "Critique failed after retries"
         validator.create_minimal_critique(
-            self.spec_dir,
-            reason="Critique failed after retries",
+            self.spec_dir, reason=reason, placeholder=True
+        )
+        self.ui.print_status(
+            f"critique_report.json is a placeholder: {reason}", "warning"
         )
         return PhaseResult(
-            "self_critique", True, [str(critique_file)], errors, MAX_RETRIES
+            "self_critique",
+            True,
+            [str(critique_file)],
+            errors,
+            MAX_RETRIES,
+            warnings=[f"critique_report.json is a placeholder: {reason}"],
         )

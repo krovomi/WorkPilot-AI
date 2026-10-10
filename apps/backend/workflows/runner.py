@@ -216,10 +216,16 @@ OUTPUT_DIRNAME = "workflow"
 # concatenate silently, so a wrapped paragraph and a forgotten comma look
 # exactly alike to a reader and to CodeQL. Naming them removes the ambiguity
 # and keeps the prompt body a list of one element per line.
+#
+# Every skill phase runs under a read-only agent type, and `_write_output`
+# saves the answer to `workflow/<id>.md` itself. "Write the file" asked for a
+# tool the phase does not have, and a model told to write and unable to spends
+# its turns trying.
 _REPORTING = (
     "End your turn with a written result: what you did, what you found, and"
     " whether the phase's objective was met. If the procedure asks you to"
-    " produce a document, write the file and say where it is."
+    " produce a document, put it in your answer: the phase saves your answer"
+    " as its report."
 )
 
 # The hard gate reads this line out of the phase's report. Stating the exact

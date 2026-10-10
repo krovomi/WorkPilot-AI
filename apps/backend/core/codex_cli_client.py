@@ -75,6 +75,27 @@ def _validated_option(value: str, label: str) -> str:
     return value
 
 
+#: The two sandboxes an agent type can be given. Codex brings its own tools,
+#: so the executor's per-type gate never sees its calls; the sandbox is the
+#: one lever, and it is chosen from the same declaration (`codex_sandbox_for`).
+CODEX_SANDBOXES = ("workspace-write", "read-only")
+
+
+def codex_sandbox_for(agent_type: str) -> str:
+    """`read-only` for a type that declares neither writing nor the shell.
+
+    A `pr_reviewer` run on Codex used to get `workspace-write` like a coder.
+    An unregistered type keeps `workspace-write`, as the executor keeps such a
+    type permissive.
+    """
+    from agents.tools_pkg.permissions import declared_tools
+
+    declared = declared_tools(agent_type)
+    if declared is None or declared & {"Write", "Edit", "Bash"}:
+        return "workspace-write"
+    return "read-only"
+
+
 def build_codex_exec_args(
     *,
     executable: str,
@@ -83,6 +104,7 @@ def build_codex_exec_args(
     reasoning_effort: str | None,
     prompt: str,
     thread_id: str | None,
+    sandbox: str = "workspace-write",
 ) -> list[str]:
     """Build a shell-free Codex command; the prompt is always sent on stdin."""
     # Both values are deliberately excluded from launcher arguments. ``cwd``
@@ -105,7 +127,7 @@ def build_codex_exec_args(
             "exec",
             "--json",
             "--sandbox",
-            "workspace-write",
+            sandbox if sandbox in CODEX_SANDBOXES else "workspace-write",
         ]
     if model:
         args.extend(["--model", _validated_option(model, "model")])
@@ -251,6 +273,7 @@ class CodexCliAgentClient(AgentClient):
             reasoning_effort=self._reasoning_effort,
             prompt=prompt,
             thread_id=self.thread_id,
+            sandbox=codex_sandbox_for(self._agent_type),
         )
         command = build_windows_command(logical_args[0], logical_args[1:])
         process = await self._process_factory(

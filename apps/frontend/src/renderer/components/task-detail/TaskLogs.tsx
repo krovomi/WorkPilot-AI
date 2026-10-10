@@ -2387,6 +2387,16 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 		);
 	}
 
+	if (entry.type === "warning") {
+		return (
+			<div className="flex items-start gap-2 text-xs text-warning bg-warning/10 rounded-md px-2 py-1">
+				<AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+				<span className="break-words flex-1">{content}</span>
+				<SubphaseBadge />
+			</div>
+		);
+	}
+
 	if (entry.type === "info") {
 		return (
 			<div className="flex items-start gap-2 text-xs text-info bg-info/10 rounded-md px-2 py-1">
