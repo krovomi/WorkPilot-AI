@@ -116,6 +116,11 @@ PHASE_ALIASES: dict[str, str] = {
     "spec_writer": "spec",
     "spec_gatherer": "spec",
     "spec_critic": "spec",
+    # The two spec prompts that run under their own config
+    # (spec/pipeline/agent_runner.py); they ran under `spec_writer` before and
+    # keep the roster they had.
+    "spec_researcher": "spec",
+    "spec_self_critique": "spec",
     # Reading a spec and a plan against each other. Unmapped, this fell through
     # to "kanban" and was handed a `test-runner` by a phase that runs before a
     # line of code exists. A workflow phase that wants another roster says so
