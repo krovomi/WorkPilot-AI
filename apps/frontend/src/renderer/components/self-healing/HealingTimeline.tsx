@@ -9,6 +9,7 @@ const stepStatusColors: Record<string, string> = {
 	completed: "bg-green-500",
 	running: "bg-blue-500 animate-pulse",
 	failed: "bg-red-500",
+	skipped: "bg-amber-500",
 	pending: "bg-gray-500",
 };
 
@@ -21,6 +22,12 @@ export function HealingTimeline({ operation }: HealingTimelineProps) {
 	if (operation.success) {
 		statusColor = "bg-green-500/20 text-green-400";
 		statusText = t("selfHealing:resolved");
+	} else if (
+		operation.completed_at &&
+		operation.incident?.status === "escalated"
+	) {
+		statusColor = "bg-amber-500/20 text-amber-400";
+		statusText = t("selfHealing:needsReview");
 	} else if (operation.completed_at) {
 		statusColor = "bg-red-500/20 text-red-400";
 		statusText = t("selfHealing:failed");
@@ -62,6 +69,11 @@ export function HealingTimeline({ operation }: HealingTimelineProps) {
 								<span className="text-sm text-(--text-primary)">
 									{step.name}
 								</span>
+								{step.status === "skipped" && (
+									<span className="text-xs text-amber-400">
+										{t("selfHealing:stepSkipped")}
+									</span>
+								)}
 							</div>
 							{step.detail && (
 								<p className="text-xs text-(--text-tertiary) mt-0.5">

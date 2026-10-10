@@ -8,6 +8,8 @@ Unified coordinator for all three self-healing modes:
 - Proactive Mode: Fragility analysis and preventive testing
 
 Manages the healing lifecycle: detection -> analysis -> fix -> QA -> PR.
+Only detection, analysis and the runtime verification run today: fix, QA and
+PR are reported `skipped` and the incident is escalated to a person (F48).
 Persists incidents and operations to JSON for dashboard display.
 """
 
@@ -35,12 +37,49 @@ from .production_mode import ProductionMode
 
 logger = logging.getLogger(__name__)
 
+# The steps the pipeline names but does not run yet (F48). They used to read
+# `completed` — "QA validation passed", "PR created" — with no agent, no QA and
+# no PR behind them, and the incident came out healed. Until a fixer session
+# (`core.client.create_agent_client` in a worktree), the QA loop and the
+# worktree manager's PR creation are wired here, each is reported `skipped`
+# with its reason, and the incident goes to a person: a step that did nothing
+# never reads `completed`.
+FIX_NOT_RUN = "not run: no fixer session is wired to the healing pipeline yet"
+QA_NOT_RUN = "not run: there is no fix to validate"
+PR_NOT_RUN = "not run: there is no fix to propose"
+NEEDS_A_PERSON = (
+    "No fix was generated: the healing pipeline analyses an incident but does "
+    "not run a fixer yet, so a person has to take it from here."
+)
+
+# The statuses the placeholder pipeline left behind on an incident it claimed
+# to have healed: `pr_created`, or `qa_running` when PR creation was off.
+_CLAIMED_HEALED = (HealingStatus.PR_CREATED, HealingStatus.QA_RUNNING)
+
+
+def _reopen_claimed_heal(incident: Incident) -> None:
+    """Undo what the placeholder pipeline claimed on an incident stored before F48.
+
+    It named a branch, ``self-healing/<id>``, that nothing ever created, and
+    marked the incident healed. Nothing has ever set ``fix_pr_url``, so that
+    branch name without a PR is its signature. The branch name goes; a claimed
+    heal becomes an escalation. An incident a person dismissed stays resolved,
+    and one that failed stays failed: those verdicts were not the placeholder's.
+    """
+    if incident.fix_pr_url or incident.fix_branch != f"self-healing/{incident.id}":
+        return
+    incident.fix_branch = None
+    if incident.status in _CLAIMED_HEALED:
+        incident.status = HealingStatus.ESCALATED
+        incident.resolved_at = None
+        incident.error_message = NEEDS_A_PERSON
+
 
 class IncidentResponderOrchestrator:
     """Unified orchestrator for the Self-Healing Codebase + Incident Responder system.
 
-    Coordinates all three modes and manages the complete healing lifecycle
-    from incident detection through to PR creation.
+    Coordinates all three modes and manages the healing lifecycle from
+    incident detection to escalation; fix, QA and PR are not wired yet (F48).
     """
 
     def __init__(
@@ -290,12 +329,13 @@ class IncidentResponderOrchestrator:
     async def _run_healing_pipeline(
         self, operation: HealingOperation, incident: Incident
     ) -> None:
-        """Run the full healing pipeline for an incident.
+        """Run the healing pipeline for an incident.
 
-        Steps: analyze -> fix -> QA -> PR
+        Steps: analyze -> fix -> QA -> verify -> PR
 
-        The actual agent execution is delegated to the mode-specific
-        build_agent_prompt() + the runtime system.
+        Analysis builds the mode-specific prompt and the runtime verification
+        launches the app; fix, QA and PR are not wired, so they are reported
+        `skipped` and the incident ends `escalated`, never resolved (F48).
         """
         try:
             # Step 1: Analyze
@@ -319,27 +359,18 @@ class IncidentResponderOrchestrator:
                 step, "completed", f"Prompt built ({len(prompt)} chars)"
             )
 
-            # Step 2: Create worktree and apply fix
-            step = operation.add_step("Generating fix in isolated worktree")
-            incident.status = HealingStatus.FIXING
-
-            # The actual fix generation happens via the agent runtime.
-            # The orchestrator prepares the context and delegates to the
-            # agent session system (create_agent_runtime + run_agent_session).
-            # This is a placeholder for the pipeline integration point.
-            incident.fix_branch = f"self-healing/{incident.id}"
-            operation.complete_step(
-                step, "completed", f"Fix branch: {incident.fix_branch}"
+            # Steps 2 and 3: fix and QA. Nothing runs the prompt yet, so
+            # there is no branch to name and no result to validate.
+            self._skip_step(
+                operation, "Generating fix in isolated worktree", FIX_NOT_RUN
             )
+            self._skip_step(operation, "Running QA validation", QA_NOT_RUN)
 
-            # Step 3: QA validation
-            step = operation.add_step("Running QA validation")
-            incident.status = HealingStatus.QA_RUNNING
-            operation.complete_step(step, "completed", "QA validation passed")
-
-            # Step 3b: the fixed app, launched — the verification loop's
-            # deterministic half (no fixer, no driving session). A healing PR
-            # for an app that no longer starts is the incident's next incident.
+            # Step 3b: the app, launched — the verification loop's
+            # deterministic half (no fixer, no driving session). With no fix
+            # applied it checks the checkout as it stands: an app that no
+            # longer starts is the first thing the person taking the incident
+            # needs to know.
             verdict = await self._verify_runtime(operation)
             if verdict == "fail":
                 incident.status = HealingStatus.FAILED
@@ -347,16 +378,18 @@ class IncidentResponderOrchestrator:
                 operation.finalize(success=False)
                 return
 
-            # Step 4: Create PR
+            # Step 4: PR. Shown only when the user asked for one, so the
+            # timeline says why there is none.
             if self.auto_create_pr:
-                step = operation.add_step("Creating pull request")
-                incident.status = HealingStatus.PR_CREATED
-                operation.complete_step(step, "completed", "PR created")
+                self._skip_step(operation, "Creating pull request", PR_NOT_RUN)
 
-            # Finalize
-            incident.resolved_at = _now_iso()
-            operation.finalize(success=True)
-            logger.info(f"Healing pipeline completed for incident {incident.id}")
+            # Nothing was fixed, so nothing is resolved.
+            incident.status = HealingStatus.ESCALATED
+            incident.error_message = NEEDS_A_PERSON
+            operation.finalize(success=False)
+            logger.info(
+                f"Incident {incident.id} analysed; no fixer is wired, escalated"
+            )
 
         except Exception as e:
             logger.error(f"Healing pipeline failed for incident {incident.id}: {e}")
@@ -375,6 +408,12 @@ class IncidentResponderOrchestrator:
             # authored on Telegram or a cron job somewhere WorkPilot was not
             # watching, and this incident's outcome says nothing about it.
             self._observe_with_hermes(operation)
+
+    @staticmethod
+    def _skip_step(operation: HealingOperation, name: str, reason: str) -> None:
+        """Record a step the pipeline names but did not run, with why."""
+        step = operation.add_step(name)
+        operation.complete_step(step, "skipped", reason)
 
     async def _verify_runtime(self, operation: HealingOperation) -> str:
         """Launch the project's app and read the verdict (`verify.loop`).
@@ -502,6 +541,8 @@ class IncidentResponderOrchestrator:
             try:
                 data = json.loads(incidents_file.read_text(encoding="utf-8"))
                 self._incidents = [Incident.from_dict(d) for d in data]
+                for incident in self._incidents:
+                    _reopen_claimed_heal(incident)
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Failed to load incidents: {e}")
 

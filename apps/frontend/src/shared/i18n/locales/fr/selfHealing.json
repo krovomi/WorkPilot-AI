@@ -16,6 +16,8 @@
 	"healingOperation": "Opération de réparation",
 	"inProgress": "En cours",
 	"failed": "Échoué",
+	"needsReview": "À examiner",
+	"stepSkipped": "Non exécutée",
 	"duration": "Durée",
 
 	"fix": "Corriger",
@@ -28,7 +30,7 @@
 	"autoFix": "Correction automatique des régressions",
 	"autoCreatePR": "Création automatique de PR",
 	"noIncidents": "Aucun incident CI/CD détecté",
-	"cicdDescription": "Quand les tests cassent après un push, l'agent analyse le diff, identifie la régression et génère un fix automatiquement.",
+	"cicdDescription": "Quand les tests cassent après un push, un incident est ouvert avec le diff du commit et les tests en échec. La correction automatique n'est pas encore branchée : l'incident est remonté pour examen.",
 
 	"connectedSources": "Sources de monitoring",
 	"connected": "Connecté",

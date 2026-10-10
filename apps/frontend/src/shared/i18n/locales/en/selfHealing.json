@@ -16,6 +16,8 @@
 	"healingOperation": "Healing Operation",
 	"inProgress": "In Progress",
 	"failed": "Failed",
+	"needsReview": "Needs review",
+	"stepSkipped": "Skipped",
 	"duration": "Duration",
 
 	"fix": "Fix",
@@ -28,7 +30,7 @@
 	"autoFix": "Auto-fix regressions",
 	"autoCreatePR": "Auto-create PRs",
 	"noIncidents": "No CI/CD incidents detected",
-	"cicdDescription": "When tests break after a push, the agent analyzes the diff, identifies the regression, and generates a fix automatically.",
+	"cicdDescription": "When tests break after a push, an incident is opened with the commit's diff and the failing tests. Automatic fixing is not wired yet: the incident is escalated for review.",
 
 	"connectedSources": "Monitoring Sources",
 	"connected": "Connected",
