@@ -157,6 +157,8 @@ Agent Replay est maintenant intégré dans WorkPilot AI ! Rejouez, débuguez et 
 
 Le Self-Healing Codebase est maintenant intégré dans WorkPilot AI ! Trois modes autonomes pour surveiller, détecter et corriger automatiquement les problèmes.
 
+> **État actuel (audit F48, lot L17)** : la détection, l'analyse (prompt construit) et la vérification au lancement de l'app tournent. La génération du fix, la QA et la PR ne sont pas encore câblées : le pipeline les affiche `skipped` avec leur raison et l'incident est remonté (`escalated`) à une personne, jamais marqué réparé. Les flux ci-dessous décrivent la cible.
+
 ##### 🚀 Accès au système
 
 1. **Navigation** : Dans la barre latérale, cliquez sur **"💓 Self-Healing"** dans le groupe "Core"
