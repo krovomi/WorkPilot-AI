@@ -121,9 +121,10 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L12 | P3 | Gouvernance | F12, F13 | L9 (F25) pour F13 |
 | L13 | P4 | Surface produit | F19 | tous |
 | L14 | P1 | Événements et appels IPC perdus en silence | F37 | — |
-| L15 | P1 | Droits effectifs et succès silencieux | F39, F40 | L5 |
+| L15 | P1 | Droits effectifs et succès silencieux — **fait** | F39, F40 | L5 |
+| L16 | P1 | Droits hors de `create_client` | F41, F42, F43, F44, F45 | L15 |
 
-Ordre recommandé : L1, L2, L3, L6, L5 (faits) → L4, L14, L15 en parallèle → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L6, L5, L15 (faits) → L4, L14, L16 en parallèle → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -359,7 +360,7 @@ ci-dessous plutôt que suivies.
   `spec_critic`, en lecture seule. Les deux phases auraient cassé **sans bruit** : `spec_researcher.md`
   écrit `research.json` par heredoc, `spec_critic.md` réécrit `spec.md` (`sed -i`) et écrit
   `critique_report.json`. Sans fichier, `create_minimal_research` / `create_minimal_critique` le
-  remplacent et la phase rend un succès (F39). La mention « réflexion `high` au lieu de `ultrathink` »
+  remplacent et la phase rendait un succès (F39, corrigé par L15). La mention « réflexion `high` au lieu de `ultrathink` »
   était fausse aussi : dans ce pipeline le budget est calculé une fois et passé explicitement
   (`spec/pipeline/orchestrator.py:176`) ; l'`agent_type` ne le change pas.
 - **Le vrai défaut** était l'inverse : les deux prompts appellent `mcp__context7__*` et le web, que
@@ -769,37 +770,139 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
 
 ### Lot L15 — Droits effectifs et succès silencieux (P1)
 
+**Fait.** Un type d'agent n'a plus que les outils qu'il déclare, sur le SDK Claude comme chez les
+fournisseurs hors SDK, et les déclarations disent ce que les prompts utilisent. Une phase de spec
+qui n'a rien produit le dit, dans son fichier et dans le journal de la tâche, et la reprise la
+rejoue. Les droits construits hors de `create_client` sont le lot L16.
+
 #### F39 · Une phase de spec qui n'a pas écrit son fichier rend un succès
 
-- **Sévérité** moyenne · **nouveau** (trouvé pendant le lot L5) · **lu**
-- **Preuve** : `requirements_phases.py:230-235` (`create_minimal_research`) et `spec_phases.py:431-445`
-  (`create_minimal_critique`). Quand l'agent n'a pas produit `research.json` ou
-  `critique_report.json`, un fichier minimal est écrit et la phase rend `success=True`. Le log ne
-  distingue pas « rien à signaler » de « rien n'a été fait ».
-- **Étapes** : garder le fichier minimal pour ne pas bloquer le pipeline, mais le marquer
-  (`"placeholder": true`, la raison), le journaliser en avertissement et le montrer à la carte de la
-  tâche.
-- **À préserver** : un pipeline de spec qui avance quand la recherche n'a rien à dire.
+- **Corrigé par le lot L15.**
+- **Ce que le cahier ne voyait pas** :
+  - le remplaçant était **permanent** : la reprise sautait la recherche dès que `research.json`
+    existait ;
+  - la critique de remplacement affirmait `no_issues_found: true`, l'indicateur même que lit la
+    reprise ;
+  - l'orchestrateur jetait les `errors` d'un résultat réussi, pour toutes les phases ;
+  - le journal des tâches n'avait aucun type « avertissement ».
+- **Correction** :
+  - `create_minimal_research` / `create_minimal_critique(placeholder=True)` marquent le fichier
+    (`"placeholder": true`, la raison). Un remplaçant de critique ne dit plus `no_issues_found`.
+    `validator.is_placeholder` lit la marque ; un fichier illisible compte comme un remplaçant.
+  - La recherche et l'autocritique posent la marque sur les deux branches (« l'agent n'a rien
+    écrit », « échec après essais »). La reprise rejoue une phase dont le fichier est un
+    remplaçant. Le `json.load` de la critique ne fait plus tomber la phase sur un rapport illisible.
+  - `PhaseResult.warnings`. `phase_notes` réunit avertissements et erreurs d'une phase réussie,
+    `orchestrator._report_phase_warnings` les écrit en `LogEntryType.WARNING` (phase de
+    planification) et les imprime. Le `create_minimal_plan` silencieux de la spec rapide aussi.
+  - Frontend : `TaskLogEntryType` reçoit `"warning"`, rendu en ligne ambre dans l'onglet Journaux.
+- **Écart avec le cahier** : la carte de la tâche n'affiche rien. Le journal suffit pour lire ce
+  qu'une phase n'a pas fait ; un badge sur la carte demanderait un champ persisté que rien ne porte
+  encore.
+- **Garde-fou** : `tests/test_spec_phases.py` (`TestPlaceholdersAreSaid`, `TestPhaseNotes`) et
+  `TaskLogs.warning.test.tsx`.
 
 #### F40 · `allowed_tools` n'est pas une barrière pour les types hors lecture seule
 
-- **Sévérité** haute · **nouveau** (trouvé pendant le lot L5) · **lu**, **à vérifier** sur le SDK
-- **Preuve** :
-  - `create_client` ne passe qu'`allowed_tools` (`core/client.py`), et aucun `disallowed_tools`.
-  - Le fichier de réglages qu'il écrit autorise `Write(./**)`, `Edit(./**)`, `Bash(*)`,
-    `WebFetch(*)` et `WebSearch(*)` à **tous** les types, en `defaultMode: acceptEdits`.
-  - Dans le SDK, `allowed_tools` dit ce qui est approuvé sans demande, pas ce qui existe. Seul
-    `permission_mode="plan"` (`READ_ONLY_AGENT_TYPES`) est une barrière garantie.
-  - Les fournisseurs hors SDK donnent `write_file` et `run_command` à tous les types
-    (`tool_executor.py`).
-- **Étapes** :
-  1. Vérifier sur le SDK épinglé ce qu'un agent hors `allowed_tools` peut appeler.
-  2. Si la liste n'est pas restrictive, passer `disallowed_tools` (complément d'`AGENT_CONFIGS`) et
-     dériver le fichier de réglages de la config du type au lieu d'une liste commune.
-  3. Faire de même dans `tool_executor`.
-- **À préserver** : `bash_security_hook`, le garde d'écriture et le garde de lecture docintel.
-- **Vérification** : un test par type qui construit les options et vérifie qu'un outil absent de la
-  config n'est ni autorisé ni approuvé.
+- **Corrigé par le lot L15.** Vérifié sur le SDK épinglé (claude-agent-sdk 0.2.163) :
+  `allowed_tools` approuve d'avance et ne retire rien, `disallowed_tools` retire l'outil du contexte
+  du modèle et l'emporte sur les règles `allow` du fichier de réglages.
+- **Ce que le cahier ne voyait pas** :
+  - côté hors SDK, `ToolExecutor.execute` exécutait n'importe quel nom envoyé par le modèle, même un
+    outil jamais offert ;
+  - Codex lançait toujours `--sandbox workspace-write` ;
+  - les déclarations étaient fausses **dans l'autre sens** : `ideation` écrit son JSON et explore
+    par heredoc avec une config qui ne déclarait que lecture et web, le skill `review-lenses`
+    demandait `git diff` à une phase sans shell, et `_REPORTING` demandait à toutes les phases
+    skill, en lecture seule, d'« écrire le fichier ». Appliquer les déclarations sans les corriger
+    aurait cassé l'idéation en silence.
+- **Ce que le cahier prescrivait et qui n'est pas fait** : dériver le fichier de réglages de la
+  config du type. Il est partagé par répertoire de projet et réécrit à chaque appel ; un fichier par
+  client aurait été un second mécanisme pour la même question. Le refus l'emporte sur lui.
+- **Correction** :
+  - Déclarations : `ideation` déclare `Write` et `Bash`, pas `Edit`. `review-lenses` lit les
+    fichiers listés au lieu de `git diff`. `_REPORTING` dit que la réponse est le rapport.
+    `_TOOL_USE_HINT` ne promet plus `write_file` ni `run_command`.
+  - `agents/tools_pkg/permissions.py` : `GUARDED_TOOLS`, `declared_tools`,
+    `undeclared_builtin_tools`. Un type inconnu reste permissif (le test AST du lot L1 garantit
+    qu'aucun n'atteint la production).
+  - SDK : `create_client` et `create_simple_client` passent `disallowed_tools`.
+    `READ_ONLY_AGENT_TYPES` gardent le mode `plan` en plus.
+  - Hors SDK : `get_tool_definitions(agent_type)` n'offre `write_file`, `Write` et
+    `create_directory` qu'à un type qui déclare `Write` ou `Edit`, et `run_command` qu'à un type qui
+    déclare `Bash`. `ToolExecutor(agent_type=…).execute` refuse les mêmes outils par nom, avec un
+    message renvoyé au modèle. Copilot, OpenAI (et ses héritiers), Windsurf et LiteLLM passent leur
+    type.
+  - Deux outils en lecture seule remplacent la recherche par le shell : `search_files` (regex) et
+    `find_files` (glob), offerts à un type qui déclare `Grep` ou `Glob`, confinés au projet, sans
+    lien, bornés à 200 résultats et 1 Mo par fichier.
+  - Codex : `codex_sandbox_for` donne `read-only` à un type qui ne déclare ni `Write`, ni `Edit`,
+    ni `Bash`.
+- **Mesuré** : `pr_reviewer` perd `Write`, `Edit`, `MultiEdit`, `NotebookEdit` et `Bash` ; `coder`
+  ne perd rien ; `commit_message` perd tout ; `architecture_visualizer` garde `Write`.
+- **Garde-fous** :
+  - `tests/test_agent_tool_rights.py` : options capturées par type, invariant sur tous les
+    `AGENT_CONFIGS`, offre et refus de l'exécuteur, recherche, sandbox Codex.
+  - `tests/test_agent_tool_declarations.py` : chaque prompt et chaque `SKILL.md` qu'un type
+    charge, tenu à sa déclaration (shell, `Write`, Context7, web).
+
+### Lot L16 — Droits hors de `create_client` (P1)
+
+Trouvés pendant L15 : ce que le lot n'a pas touché parce que ces chemins ne passent ni par
+`create_client` ni par la déclaration d'un type.
+
+#### F41 · Huit constructions de `ClaudeAgentOptions` hors de `create_client`
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `runners/insights_runner.py:436`, `runners/voice_control_runner.py:77` et `:270`,
+  `integrations/linear/updater.py:144`, `runners/natural_language_git_runner.py:127`,
+  `runners/code_playground_runner.py:184`, `runners/github/services/followup_reviewer.py:708`,
+  `agents/tools_pkg/__init__.py:25`. Aucun ne passe `disallowed_tools`, ni les hooks de sécurité de
+  `create_client` ; leur `allowed_tools` n'est qu'une approbation.
+- **Étapes** : passer par `create_client` (ou `create_simple_client`) avec un `agent_type`
+  enregistré ; à défaut, appeler `undeclared_builtin_tools` et poser les hooks.
+- **Garde-fou** : un test qui interdit `ClaudeAgentOptions(` hors de `core/client.py` et
+  `core/simple_client.py`.
+
+#### F42 · Le pont MCP hors SDK offre tous les serveurs personnalisés à tous les types
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `OpenAIAgentClient.__aenter__` (`core/agent_client.py:2082-2100`) charge
+  `load_mcp_server_configs` (`CUSTOM_MCP_SERVERS`) et ajoute tous leurs outils, quel que soit le
+  type. Côté SDK, `create_client` n'ajoute un serveur personnalisé que si `get_required_mcp_servers`
+  le retient pour ce type (`AGENT_MCP_<type>_ADD`, `core/client.py:1286-1293`).
+- **Étapes** : filtrer les serveurs du pont par `get_required_mcp_servers(agent_type, …)`, la même
+  réponse que le SDK.
+
+#### F43 · `run_command` n'a aucun validateur de sécurité hors SDK
+
+- **Sévérité** haute · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `ToolExecutor._run_command` (`core/runtimes/tool_executor.py:504`) exécute la commande
+  en shell ; son docstring dit « the command itself is not sanitized ». Côté SDK,
+  `bash_security_hook` juge chaque commande contre la liste autorisée du projet.
+- **Étapes** : appeler le même validateur (`security/`) avant `create_subprocess_shell`, et
+  renvoyer son refus au modèle comme le fait déjà le refus d'outil non déclaré.
+- **À préserver** : la réécriture rtk, qui doit rester appliquée après la validation de la
+  commande déballée (`unwrap_rtk_prefixes`).
+
+#### F44 · La reprise Codex n'a pas de sandbox
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `build_codex_exec_args` (`core/codex_cli_client.py`) ne passe `--sandbox` que sans
+  `thread_id` ; `codex exec resume` hérite du réglage de l'utilisateur. Un `pr_reviewer` repris
+  peut donc écrire. `test_codex_cli_client` fige l'absence de drapeau.
+- **Étapes** : vérifier quel réglage `codex exec resume` accepte (`--sandbox` ou
+  `-c sandbox_mode=…`) sur la version installée, le passer, mettre à jour le test.
+
+#### F45 · Copilot demande `implementation_plan.json` à toute session qui peut écrire
+
+- **Sévérité** basse · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `has_write_tool` (`core/agent_client.py:1235`) vaut pour tout type à qui `Write` ou
+  `write_file` est offert, et les deux relances (`:1280-1290`, `:1695-1702`) exigent
+  `implementation_plan.json`. Depuis L15, un type en lecture seule n'est plus relancé ; un `coder`,
+  un `qa_fixer` ou l'idéation le sont encore, vers le mauvais fichier.
+- **Étapes** : relancer seulement `planner` et `spec_writer`, ou nommer le fichier de sortie que la
+  session attend.
 
 ---
 
@@ -946,4 +1049,4 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F39 et F40 (L15) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15.

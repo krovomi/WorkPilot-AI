@@ -275,6 +275,44 @@ async with client:
 
 Working examples: `agents/planner.py`, `agents/coder.py`, `qa/reviewer.py`, `qa/fixer.py`, `spec/`
 
+#### An agent has the tools it declares
+
+`AGENT_CONFIGS[agent_type]["tools"]` used to be a wish. On the Claude SDK,
+`allowed_tools` only *auto-approves*: a tool missing from it stays callable,
+and the `.claude_settings.json` `create_client` writes grants `Write`, `Edit`
+and `Bash(*)` to every type. Outside the SDK, `get_tool_definitions` offered
+`write_file` and `run_command` to everyone, and `ToolExecutor.execute` ran any
+name a model sent, offered or not. A `pr_reviewer` reading an untrusted pull
+request could write files and run commands on every provider.
+
+A declaration is now a right, on both halves of the product, from one answer —
+`agents/tools_pkg/permissions.py`:
+
+| Where | What it does with an undeclared tool |
+|---|---|
+| `undeclared_builtin_tools(agent_type)` | the guarded built-ins (`Write`; `Edit`, `MultiEdit`, `NotebookEdit` riding on `Edit`; `Bash`; `WebFetch`, `WebSearch`) the type does not declare. Reading is not guarded |
+| `create_client`, `create_simple_client` | pass that list as `disallowed_tools`: the tool leaves the model's context, and the denial wins over the settings file's allow rules. `READ_ONLY_AGENT_TYPES` keep `permission_mode="plan"` on top |
+| `get_tool_definitions(agent_type)` | offers `write_file`, `Write`, `create_directory` only to a type declaring `Write` or `Edit`, `run_command` only to one declaring `Bash` |
+| `ToolExecutor(agent_type=…).execute` | refuses the same tools by name, answering the model with an error rather than raising — the one point that also covers a native `tool_call` nobody offered. Every client passes its `agent_type` |
+| `codex_sandbox_for(agent_type)` | `--sandbox read-only` for a type declaring none of `Write`, `Edit`, `Bash`; `workspace-write` otherwise |
+
+A read-only type outside the SDK would have lost all search along with
+`run_command`, so the executor gained two read-only tools, offered to a type
+declaring `Grep` or `Glob`: `search_files` (a regex over the project's text
+files) and `find_files` (a glob). Both stay inside the project, follow no link,
+skip `.git`, dependencies, binaries and files over 1 MB, and stop at 200
+results.
+
+An unregistered `agent_type` stays permissive on every row: every type the
+product passes is registered (`test_every_literal_agent_type_is_registered`),
+so an unknown one is a test or an outside caller. The other direction is held
+too: `tests/test_agent_tool_declarations.py` reads the prompts and skill bodies
+each type is run with and fails when one uses a tool its type does not declare
+— a heredoc or a `bash` block needs `Bash`, "the `Write` tool" needs `Write`,
+`mcp__context7__` needs the Context7 server. That is how `ideation` came to
+declare the `Write` and `Bash` its prompts had always used, under the settings
+file's blanket grant.
+
 ### Agent Prompts (`apps/backend/prompts/`)
 
 37 root-level prompts + 18 GitHub-specific prompts in `prompts/github/`.
@@ -303,11 +341,25 @@ more:
 | everything else | `spec_writer` | they write files, and `planner.md` / `spec_quick.md` ask for the `Write` tool non-Claude providers only expose under `planner` and `spec_writer` |
 
 A read-only config is the wrong fix for a prompt that writes its output, and the
-failure is silent: with no file on disk the phase stands a placeholder in
-(`create_minimal_research`, `create_minimal_critique`) and reports success.
+failure used to be silent: with no file on disk the phase stood a placeholder in
+(`create_minimal_research`, `create_minimal_critique`) and reported success.
 `spec_critic` itself stays read-only — it is what the workflow's `brainstorm` runs
 under. `tests/test_spec_agent_configuration.py` reads each prompt the pipeline
 runs from its call site and checks its config grants what the prompt uses.
+
+**A phase that produced nothing says so.** The pipeline still moves on when the
+researcher or the critic writes no file, or fails every attempt — what changed
+is that nothing pretends otherwise:
+
+| Where | What it says |
+|---|---|
+| the file | `"placeholder": true` (`validator.is_placeholder`; an unreadable file counts as one). A placeholder critique no longer claims `no_issues_found: true` — nobody looked |
+| the resume | a resumed build runs research and self-critique again over a placeholder, where it used to skip them because a file existed |
+| `PhaseResult.warnings` | the reason, beside the `errors` a successful result may carry |
+| the task log | `orchestrator._report_phase_warnings` writes each one (`phase_notes`) as a `LogEntryType.WARNING` entry of the planning phase, rendered as an amber row in the Logs tab. The orchestrator used to drop the `errors` of a successful result |
+
+The quick spec's `create_minimal_plan` stand-in is reported the same way. The
+task card itself shows nothing yet: the Logs tab is where the warning is read.
 
 Duplicate detection and issue auto-fix are listed as features above but are not
 prompt-driven: `runners/github/duplicates.py` compares embeddings, and
@@ -2080,9 +2132,10 @@ that is about to run a test suite.
 
 **The hook never decides permissions.** rtk's own shell hook returns
 `permissionDecision: "allow"` next to the rewrite, which is right for a person
-at a terminal and wrong here twice over: WorkPilot already grants `Bash(*)` in
-its settings file and gates the real decision on `bash_security_hook` and the
-guardrails. A third hook voting "allow" while only knowing about bytes is a
+at a terminal and wrong here twice over: whether an agent has the shell at all
+is its declaration's answer (`create_client` denies `Bash` to every type that
+does not declare it — see *An agent has the tools it declares*), and the
+command itself is judged by `bash_security_hook` and the guardrails. A third hook voting "allow" while only knowing about bytes is a
 second opinion on a settled question. So the hook returns `updatedInput` and
 nothing else — it changes what a command prints, never whether it runs. rtk's
 own deny rules are treated the same way: the command is left alone and
