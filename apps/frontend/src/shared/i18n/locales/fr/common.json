@@ -1095,6 +1095,7 @@
 			"successTitle": "Plugin créé !",
 			"successDesc": "Votre plugin « {{name}} » a été généré avec succès.",
 			"openFolder": "Ouvrir le dossier",
+			"openFolderFailed": "Impossible d’ouvrir le dossier du plugin",
 			"done": "Terminé"
 		}
 	},

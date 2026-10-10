@@ -120,11 +120,11 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
 | L12 | P3 | Gouvernance | F12, F13 | L9 (F25) pour F13 |
 | L13 | P4 | Surface produit | F19 | tous |
-| L14 | P1 | Événements et appels IPC perdus en silence | F37 | — |
+| L14 | P1 | Événements et appels IPC perdus en silence — **fait** | F37 | — |
 | L15 | P1 | Droits effectifs et succès silencieux — **fait** | F39, F40 | L5 |
 | L16 | P1 | Droits hors de `create_client` | F41, F42, F43, F44, F45 | L15 |
 
-Ordre recommandé : L1, L2, L3, L6, L5, L15 (faits) → L4, L14, L16 en parallèle → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L6, L5, L14, L15 (faits) → L4, L16 en parallèle → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
