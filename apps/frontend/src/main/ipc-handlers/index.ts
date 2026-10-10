@@ -96,6 +96,7 @@ import { registerMemoryLifecycleHandlers } from "./memory-lifecycle-handlers";
 import { registerMultiRepoHandlers } from "./multi-repo-handlers";
 import { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 import { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
+import { registerOllamaHandlers } from "./ollama-handlers";
 import { registerPairProgrammingHandlers } from "./pair-programming-handlers";
 import {
 	registerPerformanceProfilerHandlers,
@@ -216,6 +217,7 @@ export { registerMemoryLifecycleHandlers } from "./memory-lifecycle-handlers";
 export { registerMultiRepoHandlers } from "./multi-repo-handlers";
 export { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 export { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
+export { registerOllamaHandlers } from "./ollama-handlers";
 export { registerPairProgrammingHandlers } from "./pair-programming-handlers";
 export {
 	registerPerformanceProfilerHandlers,
@@ -358,6 +360,9 @@ export function setupIpcHandlers(
 
 	// Memory & infrastructure handlers (for Graphiti/LadybugDB)
 	registerMemoryHandlers();
+
+	// Ollama handlers (detection, installation, model downloads)
+	registerOllamaHandlers();
 
 	// App auto-update handlers
 	registerAppUpdateHandlers();

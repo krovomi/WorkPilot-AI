@@ -90,7 +90,7 @@ vi.mock("node:fs", async (importOriginal) => {
 });
 
 import { IPC_CHANNELS } from "../../../shared/constants";
-import { registerMemoryHandlers } from "../memory-handlers";
+import { registerOllamaHandlers } from "../ollama-handlers";
 
 /**
  * The vitest electron mock tracks "open" windows on the class so
@@ -153,7 +153,7 @@ beforeEach(() => {
 	tempDir = mkdtempSync(path.join(tmpdir(), "workpilot-pull-"));
 	spawnLog = path.join(tempDir, "spawns.log");
 	writeFileSync(spawnLog, "");
-	registerMemoryHandlers();
+	registerOllamaHandlers();
 });
 
 afterEach(() => {
