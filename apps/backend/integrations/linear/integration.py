@@ -378,11 +378,11 @@ Linear integration is enabled but not yet initialized.
 During the planner session, create a Linear project and sync issues.
 
 Available Linear MCP tools:
-- `mcp__linear-server__list_teams` - List available teams
-- `mcp__linear-server__create_project` - Create a new project
-- `mcp__linear-server__create_issue` - Create issues for subtasks
-- `mcp__linear-server__update_issue` - Update issue status
-- `mcp__linear-server__create_comment` - Add session comments
+- `mcp__linear__list_teams` - List available teams
+- `mcp__linear__create_project` - Create a new project
+- `mcp__linear__create_issue` - Create issues for subtasks
+- `mcp__linear__update_issue` - Update issue status
+- `mcp__linear__create_comment` - Add session comments
 """
 
         lines = [
@@ -452,12 +452,12 @@ Linear integration is ENABLED. After creating the implementation plan:
 
 ### Step 1: Find the Team
 ```
-Use mcp__linear-server__list_teams to find your team ID
+Use mcp__linear__list_teams to find your team ID
 ```
 
 ### Step 2: Create the Project
 ```
-Use mcp__linear-server__create_project with:
+Use mcp__linear__create_project with:
 - team: Your team ID
 - name: The feature/spec name
 - description: Brief summary from spec.md
@@ -467,7 +467,7 @@ Save the project ID to .linear_project.json
 ### Step 3: Create Issues for Each Subtask
 For each subtask in implementation_plan.json:
 ```
-Use mcp__linear-server__create_issue with:
+Use mcp__linear__create_issue with:
 - team: Your team ID
 - project: The project ID
 - title: "[subtask-id] Description"
@@ -479,7 +479,7 @@ Save the subtask_id -> issue_id mapping to .linear_project.json
 
 ### Step 4: Create META Issue
 ```
-Use mcp__linear-server__create_issue with:
+Use mcp__linear__create_issue with:
 - title: "[META] Build Progress Tracker"
 - description: "Session summaries and overall progress tracking"
 ```
@@ -530,19 +530,19 @@ This subtask is linked to Linear issue: `{issue_id}`
 ### At Session Start
 Update the issue status to "In Progress":
 ```
-mcp__linear-server__update_issue(id="{issue_id}", state="In Progress")
+mcp__linear__update_issue(id="{issue_id}", state="In Progress")
 ```
 
 ### During Work
 Add comments for significant progress or blockers:
 ```
-mcp__linear-server__create_comment(issueId="{issue_id}", body="...")
+mcp__linear__create_comment(issueId="{issue_id}", body="...")
 ```
 
 ### On Completion
 Update status to "Done":
 ```
-mcp__linear-server__update_issue(id="{issue_id}", state="Done")
+mcp__linear__update_issue(id="{issue_id}", state="Done")
 ```
 
 ### Session Summary
