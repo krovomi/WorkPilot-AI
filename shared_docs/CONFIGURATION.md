@@ -279,7 +279,7 @@ is taken so the user knows the output is not live data:
 ## Verification loop (`verify`)
 
 The runtime verification phase (`apps/backend/verify/`, see
-[docs/CLAUDE.md](../docs/CLAUDE.md#verification-loop-verify)) reads these from
+[architecture/verify.md](architecture/verify.md#verification-loop-verify)) reads these from
 the backend environment, then from `.workpilot/.env`:
 
 | Variable | Default | Meaning |

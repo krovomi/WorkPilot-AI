@@ -72,9 +72,7 @@ lmstudio:
   degrades_to: null
 
 # ---------------------------------------------------------------------------
-# No agentic adapter yet. Selecting one of these runs the task on the Claude
-# SDK. That is a real limitation, not a configuration detail, so it is stated
-# here and traced into the task feed at run time.
+# OpenAI-compatible endpoints, driven by CompatibleProviderAgentClient.
 # ---------------------------------------------------------------------------
 
 mistral:
@@ -94,6 +92,12 @@ grok:
   subagents: none
   effort: none
   degrades_to: null
+
+# ---------------------------------------------------------------------------
+# No agentic adapter yet. Selecting one of these runs the task on the Claude
+# SDK. That is a real limitation, not a configuration detail, so it is stated
+# here and traced into the task feed at run time.
+# ---------------------------------------------------------------------------
 
 meta:
   adapter: null

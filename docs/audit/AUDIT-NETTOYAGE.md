@@ -110,7 +110,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L1 | P0 | Features cassées (backend) — **fait** | F1, F24 | — |
 | L2 | P0 | Phase architecture-map — **fait** | F20 | L1 (test AST) conseillé |
 | L3 | P0 | Features cassées (frontend) — **fait** | F21, F22 | — |
-| L4 | P1 | Contexte de développement | F23, F18 | — |
+| L4 | P1 | Contexte de développement — **fait** | F23, F18 | — |
 | L5 | P1 | Droits et rosters minimaux — **fait** | F4, F5, F9, F16 | L1 |
 | L6 | P1 | Pipeline payé = pipeline exécuté — **fait** | F2, F3, F15, F35, F38 | — |
 | L7 | P2 | Une seule mémoire | F6, F7, F14, F34 | L1 (insight_extractor) |
@@ -123,7 +123,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L14 | P1 | Événements et appels IPC perdus en silence — **fait** | F37 | — |
 | L15 | P1 | Droits effectifs et succès silencieux | F39, F40 | L5 |
 
-Ordre recommandé : L1, L2, L3, L6, L5, L14 (faits) → L4, L15 en parallèle → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L6, L5, L14, L4 (faits) → L15 → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 

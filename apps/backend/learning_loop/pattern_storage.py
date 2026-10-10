@@ -1,7 +1,7 @@
 """
 Pattern Storage for the Autonomous Agent Learning Loop.
 
-Reads/writes learning patterns to `.workpilot/learning/patterns.json`.
+Reads/writes learning patterns to `.workpilot/learning_loop/patterns.json`.
 Handles deduplication by merging similar patterns and increasing confidence.
 """
 

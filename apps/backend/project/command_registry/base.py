@@ -106,7 +106,7 @@ BASE_COMMANDS: set[str] = {
     # (`rtk gain`, `rtk discover`) ever reach the allowlist under this name:
     # `security.parser` unwraps `rtk <command>` to `<command>` first, so a
     # proxied command is judged as itself and this entry cannot become a way
-    # in for anything else. See docs/CLAUDE.md, "Token savings (rtk)".
+    # in for anything else. See shared_docs/architecture/rtk.md.
     "rtk",
     # Process management (with validation in security.py)
     "ps",

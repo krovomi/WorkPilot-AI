@@ -1,7 +1,7 @@
 """The verification loop: launch the app the task changed and prove it works.
 
 See `loop.py` for the loop, `tools.py` for the `verify_*` tools every provider
-gets, and `docs/CLAUDE.md` → *Verification loop (verify)* for the design.
+gets, and `shared_docs/architecture/verify.md` for the design.
 """
 
 from __future__ import annotations
