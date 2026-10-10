@@ -432,6 +432,12 @@ Report findings with specific file paths, line numbers, and code evidence.
                     "schema": SpecialistResponse.model_json_schema(),
                 },
                 provider=provider,
+                # The specialist *is* the fan-out: SPECIALIST_CONFIGS run side
+                # by side. Under `pr_reviewer` each one also carried the review
+                # roster — a security reviewer handed its own security-auditor
+                # — a nested fan-out billed on every turn of every session.
+                # `pr_review.py` designed them as leaves.
+                roster="solo",
             )
 
             async with client:

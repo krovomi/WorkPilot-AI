@@ -680,15 +680,11 @@
 		},
 		"spec_critic": {
 			"label": "Critique de spec",
-			"description": "Auto-critique par analyse approfondie"
+			"description": "Relecture en lecture seule avant la planification (phase brainstorm)"
 		},
-		"spec_discovery": {
-			"label": "Découverte de spec",
-			"description": "Découverte et analyse initiale du projet"
-		},
-		"spec_context": {
-			"label": "Contexte de spec",
-			"description": "Construit le contexte à partir du code existant"
+		"spec_self_critique": {
+			"label": "Auto-critique de spec",
+			"description": "Trouve les problèmes de la spec et les corrige dans spec.md"
 		},
 		"spec_validation": {
 			"label": "Validation de spec",

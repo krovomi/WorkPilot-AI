@@ -620,18 +620,8 @@ class TestPhaseRosters:
         """`roster:` exists so a read-only phase keeps its specialists AND its
         read-only config. Reaching them via `agent:` would have traded one for
         the other."""
-        readonly = {
-            "analyzer",
-            "spec_critic",
-            "spec_validation",
-            "spec_context",
-            "spec_discovery",
-            "pr_reviewer",
-            "pr_orchestrator_parallel",
-            "insights",
-        }
-        client = (REPO_ROOT / "apps/backend/core/client.py").read_text(encoding="utf-8")
-        assert '"spec_validation",' in client, "the read-only set moved"
+        from core.client import READ_ONLY_AGENT_TYPES as readonly
+
         for phase, agent_type, _ in self._rows():
             if phase.roster:
                 assert agent_type in readonly or phase.id == "verify", (

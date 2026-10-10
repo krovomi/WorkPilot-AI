@@ -24,6 +24,28 @@ from task_logger import (
 # The import chain: spec.pipeline -> agent_runner -> core.client -> agents.tools_pkg -> spec.validate_pkg
 # By deferring the import, we break the circular dependency.
 
+#: The prompts that need tools `spec_writer` does not grant. Both call
+#: Context7 and the web to check what the spec claims about a library, and both
+#: write their own file (`research.json`, and `spec.md` rewritten plus
+#: `critique_report.json`), so their configs grant writing too: a config
+#: without it does not stop the phase, it makes `create_minimal_*` stand in for
+#: the file and the phase report success over nothing.
+#:
+#: Every other prompt run here — `complexity_assessor.md`, `spec_quick.md`,
+#: `spec_writer.md`, `planner.md`, `validation_fixer.md` — writes files and needs
+#: nothing more, and `planner.md` and `spec_quick.md` ask for the `Write` tool
+#: that `core/runtimes/tool_executor.py` exposes to non-Claude providers only
+#: under `planner` and `spec_writer`. So `spec_writer` stays their answer.
+PROMPT_AGENT_TYPES = {
+    "spec_researcher.md": "spec_researcher",
+    "spec_critic.md": "spec_self_critique",
+}
+
+
+def agent_type_for(prompt_file: str) -> str:
+    """The `AGENT_CONFIGS` entry a spec prompt runs under."""
+    return PROMPT_AGENT_TYPES.get(prompt_file, "spec_writer")
+
 
 class AgentRunner:
     """Manages agent execution with logging and error handling."""
@@ -144,11 +166,14 @@ class AgentRunner:
         )
         debug("agent_runner", f"Active provider resolved: {active_provider}")
 
+        agent_type = agent_type_for(prompt_file)
+
         # Create client with thinking budget
         # Log model/CWD prominently so issues are visible in task console
         debug(
             "agent_runner",
             "Creating agent client",
+            agent_type=agent_type,
             model=self.model,
             thinking_budget=thinking_budget,
             project_dir=str(self.project_dir),
@@ -173,7 +198,7 @@ class AgentRunner:
                 project_dir=self.project_dir,
                 spec_dir=self.spec_dir,
                 model=self.model,
-                agent_type="spec_writer",
+                agent_type=agent_type,
                 provider=active_provider,
                 max_thinking_tokens=thinking_budget,
             )
@@ -209,7 +234,7 @@ class AgentRunner:
             project_dir=self.project_dir,
             spec_dir=self.spec_dir,
             model=self.model,
-            agent_type="spec_writer",  # Use spec_writer type for spec creation
+            agent_type=agent_type,
             max_thinking_tokens=thinking_budget,
         )
 

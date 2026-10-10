@@ -1631,15 +1631,11 @@
 		},
 		"spec_critic": {
 			"label": "Spec Critic",
-			"description": "Self-critique using deep analysis"
+			"description": "Read-only review before planning (brainstorm phase)"
 		},
-		"spec_discovery": {
-			"label": "Spec Discovery",
-			"description": "Initial project discovery and analysis"
-		},
-		"spec_context": {
-			"label": "Spec Context",
-			"description": "Builds context from existing codebase"
+		"spec_self_critique": {
+			"label": "Spec Self-Critique",
+			"description": "Finds the spec's issues and fixes them in spec.md"
 		},
 		"spec_validation": {
 			"label": "Spec Validation",
