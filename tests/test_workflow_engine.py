@@ -24,7 +24,9 @@ from workflows import (  # noqa: E402
     EFFORT_ORDER,
     WorkflowError,
     load_workflow,
+    pack_inventory,
     resolve_profile,
+    validate_impls,
 )
 
 WORKFLOW_PATH = REPO_ROOT / "workflows" / "feature-build" / "workflow.yaml"
@@ -44,7 +46,11 @@ def write_workflow(tmp_path: Path, body: str) -> Path:
 class TestSpecParsing:
     def test_the_shipped_workflow_loads(self, workflow):
         assert workflow.name == "feature-build"
-        assert [p.id for p in workflow.phases][:3] == ["docs", "brainstorm", "spec"]
+        assert [p.id for p in workflow.phases][:3] == [
+            "docs",
+            "brainstorm",
+            "planning",
+        ]
 
     def test_every_phase_names_an_implementation(self, workflow):
         for phase in workflow.phases:
@@ -115,22 +121,29 @@ class TestEffortPruning:
         top = resolve_profile(workflow, "ultrathink", changed_files=[])
         assert set(low.phase_ids) < set(top.phase_ids)
 
-    def test_each_level_buys_something_the_one_below_did_not(self, workflow):
-        """The dial has to be monotone *and* strict.
+    def test_each_level_runs_what_the_one_below_does_and_says_what_it_adds(
+        self, workflow
+    ):
+        """The dial is monotone, and the steps are pinned so a change is seen.
 
-        A top level identical to the one below it is worse than not offering
-        it: the user pays for ultrathink, sees the same plan, and has no way to
-        tell that the setting did nothing.
+        Two steps buy no *phase*, and the profile says so rather than inventing
+        one. `low` differs from `none` by thinking budget only: planning runs
+        at every level, because a build cannot code without a plan — the
+        profile that showed it skipped at `none` described a build that does
+        not exist. `ultrathink` differs from `high` inside `review`, whose
+        adversarial lens only it buys: one review with more lenses, rather
+        than a second pass after QA that no fixer ever read.
         """
-        profiles = [
-            (level, set(resolve_profile(workflow, level, changed_files=[]).phase_ids))
+        sets = {
+            level: set(resolve_profile(workflow, level, changed_files=[]).phase_ids)
             for level in EFFORT_ORDER
-        ]
-        for (lower, below), (higher, above) in zip(profiles, profiles[1:]):
-            assert below < above, (
-                f"effort {higher!r} runs the same phases as {lower!r} — "
-                f"the setting buys nothing"
-            )
+        }
+        for lower, higher in zip(EFFORT_ORDER, EFFORT_ORDER[1:]):
+            assert sets[lower] <= sets[higher], f"{higher!r} dropped a phase"
+        assert sets["low"] - sets["none"] == set()
+        assert sets["medium"] - sets["low"] == {"analyze", "review"}
+        assert sets["high"] - sets["medium"] == {"brainstorm"}
+        assert sets["ultrathink"] - sets["high"] == set()
 
     def test_the_cheapest_level_runs_only_what_cannot_be_skipped(self, workflow):
         """Coding, QA, the hard gate, and the two near-free phases.
@@ -141,6 +154,7 @@ class TestEffortPruning:
         profile = resolve_profile(workflow, "none", changed_files=[])
         assert set(profile.phase_ids) == {
             "docs",
+            "planning",
             "coding",
             "verify",
             "qa",
@@ -154,22 +168,29 @@ class TestEffortPruning:
         assert profile.will_run("qa")
         assert profile.phase_ids.index("coding") < profile.phase_ids.index("qa")
 
-    def test_ultrathink_buys_the_second_opinion(self, workflow):
-        """What the top level is for: a reading that did not write the code.
+    @pytest.mark.parametrize("effort", ["medium", "high", "ultrathink"])
+    def test_the_review_reads_with_a_fresh_context_before_qa(self, workflow, effort):
+        """A reading that did not write the code, while a fixer can still act.
 
-        Both passes run in a fresh context, so neither inherits the reasoning
-        it is supposed to attack.
+        Fresh context, so it inherits none of the reasoning it judges; before
+        `qa`, because a review declared after it is read by nobody.
         """
-        profile = resolve_profile(workflow, "ultrathink", changed_files=[])
-        assert profile.will_run("adversarial-review")
-        assert profile.will_run("spec-conformance")
-        for phase_id in ("adversarial-review", "spec-conformance"):
-            resolved = next(r for r in profile.run if r.id == phase_id)
-            assert resolved.dispatch == "fresh-context"
+        profile = resolve_profile(workflow, effort, changed_files=[])
+        review = next(r for r in profile.run if r.id == "review")
+        assert review.dispatch == "fresh-context"
+        assert profile.phase_ids.index("review") < profile.phase_ids.index("qa")
 
-        below = resolve_profile(workflow, "high", changed_files=[])
-        assert not below.will_run("adversarial-review")
-        assert not below.will_run("spec-conformance")
+    def test_the_top_level_buys_the_adversarial_lens(self):
+        """What ultrathink pays for now lives in the review skill's lens table.
+
+        The column order is `medium | high | ultrathink`; the adversarial lens
+        is ticked in the last one only.
+        """
+        body = (REPO_ROOT / "skills/tooling/review-lenses/SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        assert "| `medium` | `high` | `ultrathink` |" in body
+        assert "| 4. Adversariale | | | ✔ |" in body
 
     def test_expensive_phases_only_appear_where_they_earn_it(self, workflow):
         assert not resolve_profile(workflow, "low", changed_files=[]).will_run(
@@ -195,21 +216,19 @@ class TestEffortPruning:
         assert profile.will_run("design-check"), f"pruned at effort {effort!r}"
 
     @pytest.mark.parametrize("effort", EFFORT_ORDER)
-    def test_the_detector_is_never_pruned_but_the_guidance_is(self, workflow, effort):
-        """The same pack ships one phase that costs nothing and one that does.
+    def test_a_frontend_change_is_framed_and_graded_at_every_level(
+        self, workflow, effort
+    ):
+        """What to aim for before coding, and the grade after it — both free.
 
-        `design-check` runs 59 local rules, so no effort level saves anything
-        by skipping it. `frontend-design` is a model reading design procedure
-        and obeys `min_effort` like every other skill phase — which it could
-        not while determinism was keyed by the pack they share.
+        `ui-design-system` settles the design system with a local engine and
+        `design-check` runs 59 local rules: no effort level saves anything by
+        skipping either, so a web change gets both at `none` as at
+        `ultrathink`.
         """
         profile = resolve_profile(workflow, effort, changed_files=["src/App.tsx"])
+        assert profile.will_run("ui-design-system"), f"pruned at {effort!r}"
         assert profile.will_run("design-check"), f"detector pruned at {effort!r}"
-
-        # Asked of the engine's own comparator rather than a hardcoded list,
-        # so raising the phase's `min_effort` moves the test with it.
-        bought = effort_at_least(effort, "medium")
-        assert profile.will_run("frontend-design") is bought
 
     def test_skips_carry_a_reason(self, workflow):
         profile = resolve_profile(workflow, "low", changed_files=[])
@@ -273,3 +292,35 @@ class TestDescribe:
         assert "verify" in text
         assert "brainstorm" in text and "skipped" in text
         assert "sequential-reset" in text
+
+
+class TestImplementations:
+    """Every phase the profile shows has something on disk that runs it.
+
+    A phase whose skill is not on a fresh clone is printed in the profile and
+    answered "could not run" by the runner: the user is shown, and pays for,
+    a pipeline that does not execute. Checked against the packs this
+    repository commits, so a pack that is only fetched on demand cannot hold
+    a phase of the default workflow.
+    """
+
+    @pytest.mark.parametrize("effort", EFFORT_ORDER)
+    def test_no_phase_that_runs_misses_its_implementation(self, workflow, effort):
+        from skills_registry.packs import load_packs
+
+        available, gated = pack_inventory(load_packs(REPO_ROOT / "skills"))
+        profile = resolve_profile(workflow, effort, changed_files=None)
+        missing = [
+            f"{m.phase_id}: {m.reason}"
+            for m in validate_impls(workflow, available, gated=gated)
+            if profile.will_run(m.phase_id)
+        ]
+        assert missing == []
+
+    def test_a_gate_is_the_implementation_of_a_deterministic_phase(self, workflow):
+        """`design-check` runs impeccable's `gate` command, not a skill."""
+        missing = validate_impls(workflow, {"impeccable": set()}, gated={"impeccable"})
+        assert "design-check" not in {m.phase_id for m in missing}
+
+        ungated = validate_impls(workflow, {"impeccable": set()})
+        assert "design-check" in {m.phase_id for m in ungated}

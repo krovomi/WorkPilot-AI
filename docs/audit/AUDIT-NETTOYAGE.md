@@ -108,11 +108,11 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | Lot | Priorité | Thème | Constats | Dépend de |
 |---|---|---|---|---|
 | L1 | P0 | Features cassées (backend) — **fait** | F1, F24 | — |
-| L2 | P0 | Phase architecture-map | F20 | L1 (test AST) conseillé |
-| L3 | P0 | Features cassées (frontend) | F21, F22 | — |
-| L4 | P1 | Contexte de développement | F23, F18 | — |
-| L5 | P1 | Droits et rosters minimaux | F4, F5, F9, F16 | L1 |
-| L6 | P1 | Pipeline payé = pipeline exécuté | F2, F3, F15, F35 | — |
+| L2 | P0 | Phase architecture-map — **fait** | F20 | L1 (test AST) conseillé |
+| L3 | P0 | Features cassées (frontend) — **fait** | F21, F22 | — |
+| L4 | P1 | Contexte de développement — **fait** | F23, F18 | — |
+| L5 | P1 | Droits et rosters minimaux — **fait** | F4, F5, F9, F16 | L1 |
+| L6 | P1 | Pipeline payé = pipeline exécuté — **fait** | F2, F3, F15, F35, F38 | — |
 | L7 | P2 | Une seule mémoire | F6, F7, F14, F34 | L1 (insight_extractor) |
 | L8 | P2 | Code mort frontend | F28, F25 (front) | L3 |
 | L9 | P2 | Code mort backend | F29, F30, F32, F33, F25 (back) | — |
@@ -120,8 +120,11 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
 | L12 | P3 | Gouvernance | F12, F13 | L9 (F25) pour F13 |
 | L13 | P4 | Surface produit | F19 | tous |
+| L14 | P1 | Événements et appels IPC perdus en silence — **fait** | F37 | — |
+| L15 | P1 | Droits effectifs et succès silencieux — **fait** | F39, F40 | L5 |
+| L16 | P1 | Droits hors de `create_client` | F41, F42, F43, F44, F45 | L15 |
 
-Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L6, L5, L14, L4, L15 (faits) → L16 → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -134,9 +137,9 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 | Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) | 0 |
 | Shims racine `apps/backend/*.py` | 25 | 0 (hors points d'entrée) |
 | Prompts orphelins | 11 (~51 Ko) | 0 |
-| Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) | 0 |
-| Sous-agents du plus gros roster | 9 | ≤ 7 |
-| Sessions qui relisent le diff à ultrathink | jusqu'à 7 | ≤ 4 |
+| Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
+| Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) | ≤ 7 |
+| Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) | ≤ 4 |
 | Détecteurs de pile | ≥ 11 | 1 façade |
 | Écritures par merge | 4 magasins | 1 événement |
 
@@ -204,6 +207,17 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 
 #### F20 · La phase `architecture-map` du build ne produit pas la carte
 
+- **Corrigé par le lot L2.** Le pipeline d'`action_delta` vit dans
+  `architecture_visualizer/archify/task_delta.py::run_task_delta` (le runner CLI y délègue) ;
+  `archify/phase.py::run_architecture_map_phase` est l'exécuteur de la phase (`CUSTOM_EXECUTORS`),
+  qui crée ses sessions d'authoring sous `architecture_visualizer` via `verify.phase.make_agent_runner`.
+  `significance.assess` passe en premier : un changement non significatif n'ouvre aucune session.
+  `PhaseContext` porte `source_project_dir` (la baseline vit sous le `.workpilot/` du projet principal,
+  absent du worktree) et `source_spec_dir` (le record est écrit dans le spec_dir que lit le Kanban, car il
+  référence ses artefacts par chemin absolu) ; une synchronisation après la fenêtre post-QA ramène
+  `workflow/`, `verify/` et le modèle de tête dans le spec principal. `architecture_visualizer` reçoit le
+  roster `solo`. Tests : `tests/test_architecture_map/test_task_delta.py`.
+
 - **Sévérité** haute · **nouveau** · **lu**
 - **Preuve** : `architecture-map` n'est ni dans `SKILL_PHASE_AGENTS` (`workflows/runner.py:198-212`) ni
   dans `CUSTOM_EXECUTORS` (`workflows/runner.py:870`). `run_skill_phase` l'exécute donc sous
@@ -234,6 +248,14 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 
 #### F21 · Context-aware snippets : feature visible, cassée de bout en bout
 
+- **Corrigé par le lot L3 — câblé** (décision du mainteneur : garder la feature). Runner réécrit sur
+  `core.oneshot.oneshot_completion` (tous providers), contexte projet réel (`core/project_brief.py`,
+  extrait de `prompt_optimizer_runner` qui le ré-exporte), réponse JSON lue par
+  `spec.plan_recovery.extract_json_document`. Service et handlers sur le modèle de prompt-optimizer
+  (`registerContextAwareSnippetsHandlers`, enregistré dans `ipc-handlers/index.ts`) ; canal
+  `configure` (le renderer choisissait l'exécutable Python) supprimé ; le store ne tourne plus à vide sur
+  un échec ; badge d'activité dans la barre latérale. Tests : runner, service, store.
+
 - **Sévérité** haute · **nouveau** · **lu**
 - **Preuve**
   - La page est dans la barre latérale : `renderer/components/Sidebar.tsx:109,143,208`
@@ -258,6 +280,14 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
   soit `grep -rn "context-aware-snippets\|ContextAwareSnippet" apps/` ne renvoie plus rien.
 
 #### F22 · Quatre API preload appellent des canaux IPC sans handler
+
+- **Corrigé par le lot L3 — cinq canaux, pas quatre** : `azureDevOps:getProjects`
+  (`getAzureDevOpsProjects`) était dans le même cas. Les cinq méthodes, leurs constantes et leurs mocks
+  sont supprimés. `ipc-channel-parity.test.ts` exige un handler, dans un fichier réellement importé par
+  `main/index.ts`, pour chaque canal invoqué par le preload ; `handler-registration.test.ts` voit
+  désormais aussi les `setup*Handler(s)`. `renderer-log-handler.ts` (jamais enregistré) est supprimé
+  plutôt qu'enregistré : le logger du renderer ne filtre rien et aurait inondé le journal du main. Reste
+  hors de ce test : les appels du renderer par le pont générique (`shell:openPath`, voir F37).
 
 - **Sévérité** moyenne · **nouveau** · **vérifié** (comparaison invoke/handle)
 - **Preuve**
@@ -317,103 +347,128 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 
 ### Lot L5 — Droits et rosters minimaux (P1)
 
+**Fait.** Chaque prompt du pipeline de spec tourne sous une config qui accorde ce qu'il utilise, le
+plafond de roster compte les agents de l'appelant, un roster vide le reste sur un projet mobile, et
+le testeur de la QA connaît la pile du projet. Le plus gros roster passe de 9 à 7 entrées (6 pour
+l'orchestrateur de PR). Trois prescriptions de ce cahier étaient fausses ; elles sont corrigées
+ci-dessous plutôt que suivies.
+
 #### F4 · Toutes les phases LLM du pipeline de spec tournent sous `spec_writer`
 
-- **Sévérité** haute · **ouvert** · **lu**
-- **Preuve** : `spec/pipeline/agent_runner.py:176` et `:212` fixent `agent_type="spec_writer"` quel que
-  soit le prompt. #290 a ajouté la résolution du provider de la phase spec (l.126-145), pas l'agent_type.
-  Le chercheur (`spec_researcher.md`) n'a pas Context7 ; le critique (`spec_critic.md`) reçoit
-  Write/Edit/Bash et la réflexion `high` au lieu de lecture seule `ultrathink`.
-- **Étapes**
-  1. Dans `AgentRunner`, une table `PROMPT_AGENT_TYPES = {"spec_researcher.md": "spec_researcher",
-     "spec_critic.md": "spec_critic", "spec_gatherer.md": "spec_gatherer", "complexity_assessor.md":
-     "spec_writer", …}` avec repli `spec_writer` ; l'utiliser aux deux appels.
-  2. Après migration, supprimer les configs restées sans appelant (`spec_discovery`, `spec_context` ;
-     vérifier aussi la table de `core/client.py:1585-1606`).
-- **À préserver** : contenu des prompts, ordre des phases, logs et transcript (`test_spec_logs_and_factory_use_the_same_configuration`).
-- **Vérification** : `pytest tests/test_spec_agent_configuration.py tests/test_spec_pipeline.py -q`.
+- **Corrigé par le lot L5**, avec une correction du cahier.
+- **Ce que le cahier prescrivait** : basculer le chercheur et le critique vers `spec_researcher` et
+  `spec_critic`, en lecture seule. Les deux phases auraient cassé **sans bruit** : `spec_researcher.md`
+  écrit `research.json` par heredoc, `spec_critic.md` réécrit `spec.md` (`sed -i`) et écrit
+  `critique_report.json`. Sans fichier, `create_minimal_research` / `create_minimal_critique` le
+  remplacent et la phase rendait un succès (F39, corrigé par L15). La mention « réflexion `high` au lieu de `ultrathink` »
+  était fausse aussi : dans ce pipeline le budget est calculé une fois et passé explicitement
+  (`spec/pipeline/orchestrator.py:176`) ; l'`agent_type` ne le change pas.
+- **Le vrai défaut** était l'inverse : les deux prompts appellent `mcp__context7__*` et le web, que
+  `spec_writer` n'accorde pas. La recherche « validait » de mémoire.
+- **Correction** :
+  - `AgentRunner` lit `PROMPT_AGENT_TYPES` (repli `spec_writer`) aux deux appels.
+  - `spec_researcher` reçoit les outils d'écriture.
+  - Nouveau type `spec_self_critique` (écriture + Context7) pour `spec_critic.md`. `spec_critic` reste
+    le relecteur en lecture seule de la phase `brainstorm`.
+  - `spec_discovery` et `spec_context`, sans appelant, sont supprimés, y compris du panneau Agent
+    Tools.
+  - L'ensemble lecture seule devient `core.client.READ_ONLY_AGENT_TYPES`, lu par les tests au lieu
+    d'une copie.
+- **Garde-fou** : `tests/test_spec_agent_configuration.py` lit chaque prompt depuis son point
+  d'appel et vérifie que sa config accorde ce qu'il utilise (shell, `Write`, Context7, web) et
+  n'est pas en lecture seule. Le test échoue sur l'ancien mapping comme sur celui du cahier.
 
 #### F5 · Les orchestrateurs de revue PR portent 9 et 7 sous-agents
 
-- **Sévérité** haute · **ouvert** · **vérifié** (`resolve()` renvoie 9 entrées)
-- **Preuve** : `pr_orchestrator_parallel` / `pr_followup_parallel` absents de `PHASE_ALIASES`
-  (`agents/subagents/phases.py:84-127`) → roster Kanban (code-reviewer, test-runner, spec-explorer)
-  ajouté aux 6 spécialistes (`runners/github/services/parallel_orchestrator_reviewer.py:741`) ou aux
-  3+1 du suivi (`parallel_followup_reviewer.py:541`). `_apply_cap` (MAX_ROSTER = 7) s'applique l.194,
-  **avant** `roster.update(user_agents)` l.197.
-- **Étapes** : ajouter `"pr_orchestrator_parallel": "solo"` et `"pr_followup_parallel": "solo"` ;
-  appliquer `_apply_cap` après la fusion, en protégeant les clés de `user_agents`.
-- **Acceptation** : `resolve('pr_orchestrator_parallel', user_agents=6 spécialistes)` → 6 entrées.
-- **Vérification** : `pytest tests/test_subagents_coverage.py tests/test_subagents_registry.py -q`
-  (mettre à jour `test_only_the_ordinary_card_falls_through_to_kanban` si nécessaire).
+- **Corrigé par le lot L5**, avec une correction de la preuve.
+- **Preuve corrigée** : `_create_sdk_client` (9 entrées) n'est appelé nulle part, c'est du code mort
+  (lot L9). Le chemin vivant lance chaque spécialiste comme une session à part sous `pr_reviewer`,
+  qui portait le roster `review` en plus des autres spécialistes : un fan-out dans le fan-out. Le
+  suivi (`pr_followup_parallel`, 4 + 3 = 7) était vivant.
+- **Correction** :
+  - `pr_orchestrator_parallel` et `pr_followup_parallel` → `solo`.
+  - `_apply_cap` tourne après la fusion des agents de l'appelant, et ne retire jamais une entrée
+    qu'il a nommée.
+  - Les sessions spécialistes passent `roster="solo"`.
+- **Acceptation** : `resolve('pr_orchestrator_parallel', user_agents=6)` → 6 entrées ; le suivi → 4.
 
 #### F9 · Rosters Kanban servis à des agents qui n'en ont pas l'usage
 
-- **Sévérité** moyenne · **ouvert** · **vérifié**
-- **Preuve** : `architecture_visualizer`, `analysis`, `batch_analysis`, `batch_validation`,
-  `competitor_analysis`, `roadmap_discovery` tombent sur `kanban` (`phases.py:485`). Sur un projet mobile,
-  `resolve()` ajoute `device-runner` et `store-readiness-auditor` à **tout** roster, `solo` compris
-  (`agents/subagents/__init__.py:174-190`).
-- **Étapes** : aliaser `analysis`, `batch_*`, `competitor_analysis`, `roadmap_discovery` → `research` ;
-  `architecture_visualizer` → `solo` ; dans `resolve()`, n'appliquer `overlay.extra_agents` que si le
-  roster de phase est non vide.
-- **À préserver** : les spécialistes mobiles sur coder, QA, verifier et les phases mobiles.
+- **Corrigé par le lot L5.** `roadmap_discovery`, `competitor_analysis` et `architecture_visualizer`
+  l'étaient déjà (lots L1 et L2).
+- **Correction** :
+  - `analysis`, `batch_analysis` et `batch_validation` → `research`. C'est de la couverture : ils
+    passent par `create_simple_client`, qui ne compose pas de roster.
+  - Le défaut vivant était l'ajout des spécialistes mobiles à **tout** roster. Ils ne rejoignent
+    désormais qu'une phase qui a un roster : un `commit_message` sur un projet Android reste vide,
+    tandis que coder, QA, verifier et `pr_reviewer` (phases mobiles) les gardent.
+- **Invariant** : `test_every_agent_config_names_its_roster`. Toute entrée d'`AGENT_CONFIGS` hors
+  `coder` nomme son roster ; la liste tenue à la main en avait manqué neuf.
 
 #### F16 · L'overlay langage ne spécialise pas le testeur de la QA ni du verifier
 
-- **Sévérité** basse · **ouvert** · **lu**
-- **Preuve** : `agents/subagents/__init__.py:180-184` ne spécialise que `test-runner` ; `qa-test-evidence`
-  (rosters `qa` de `qa_reviewer`, `qa_fixer` et, depuis #292, `verifier`) redécouvre le framework.
-- **Étapes** : appliquer `_specialise_test_runner` aussi à `qa-test-evidence` (même `LanguageOverlay`).
+- **Corrigé par le lot L5.** `_TEST_ROLES = ("test-runner", "qa-test-evidence")` : les deux
+  reçoivent les commandes de la pile (langage et mobile), et les deux sont protégés du plafond.
 
 ### Lot L6 — Pipeline payé = pipeline exécuté (P1)
 
+**Fait.** Le profil affiché est ce qui s'exécute, et chaque phase skill qui tourne est lue par
+l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementations` dans
+`tests/test_workflow_engine.py`) ; le workflow passe de 19 à 15 phases déclarées.
+
 #### F2 · Cinq phases du workflow pointent encore vers des packs vides
 
-- **Sévérité** haute · **partiel** (verify corrigé, profil honnête) · **vérifié** (`validate_impls`)
-- **Preuve** : `validate_impls` signale `brainstorm` (superpowers/brainstorming), `frontend-design`
-  et `design-check` (impeccable/impeccable), `coding` (superpowers/test-driven-development), `review`
-  (mattpocock/code-review), `observe` (task-observer). Les packs `skills/{superpowers,impeccable,
-  mattpocock,task-observer,claude-mem}` ne contiennent que `pack.json`. `design-check` tourne quand
-  même via la commande `gate` de `skills/impeccable/pack.json` (`npx --yes impeccable detect --json`) ;
-  `observe` est exécuté par `learning_loop/observe.py` (impl décorative).
-- **Étapes** (une décision par pack, documentée dans la PR)
-  1. `superpowers` : vendoriser **seulement** `brainstorming` et `test-driven-development` (script
-     `scripts/vendor_pack.py` existant, résultat committé comme `ui-ux-pro-max`), ou écrire leurs
-     équivalents natifs sous `skills/tooling/`.
-  2. `mattpocock/code-review` : vendoriser, ou remplacer par la revue à lentilles de F11.
-  3. `impeccable` : vendoriser `impeccable/SKILL.md` ou appliquer F35.
-  4. `observe` : changer l'impl en `workpilot/observe` (pack builtin), retirer `task-observer` de `[packs]`.
-  5. Test : toute phase non élaguée à `medium` a une implémentation résoluble (`validate_impls` vide).
-- **À préserver** : les phases déclarées et leur position.
-- **Vérification** : `pytest tests/test_workflow_engine.py tests/test_workflow_runner.py tests/test_workflow_profile_api.py -q` ;
-  `python3 scripts/skills_cli.py build --check`.
+- **Corrigé par le lot L6.** Skills natifs sous `skills/tooling/`, sans vendorisation (aucune
+  licence amont déclarée) : `coding` → `tooling/tdd-cycle`, `brainstorm` →
+  `tooling/brainstorm-approaches` (non interactif), `review` → `tooling/review-lenses`. `observe` →
+  `workpilot/observe` (exécuté par `learning_loop/observe.py`) et le pack `task-observer` est retiré
+  de `[packs]`. `design-check` garde `impeccable/impeccable` : `validate_impls` reçoit les packs à
+  `gate` (`engine.pack_inventory`), et une phase déterministe dont le pack déclare une gate est
+  implémentée par elle. `superpowers`, `mattpocock`, `impeccable` et `claude-mem` restent opt-in.
 
 #### F3 · Les phases BMAD ne tournent presque jamais, et « spec » double le pipeline de spec
 
-- **Sévérité** haute · **ouvert** · **lu**
-- **Preuve** : `.agents/skills/bmad-prd/SKILL.md:8` (`requires.runtime: _bmad/scripts/resolve_customization.py`),
-  l.23 (`_bmad/scripts/memlog.py`) ; même `_bmad/` à la racine de WorkPilot ne contient que
-  `resolve_customization.py`. Phases `spec` (medium), `adversarial-review`, `spec-conformance` (ultrathink).
-- **Étapes** : supprimer la phase `spec` de `workflows/feature-build/workflow.yaml` (le pipeline de spec
-  a déjà produit `spec.md`) ; remplacer `adversarial-review` et `spec-conformance` par des lentilles de
-  la revue unique (F11), via un skill natif sans runtime. Mettre à jour `SKILL_PHASE_AGENTS`,
-  `CONFIG_PHASE` et les tests de fenêtres (`test_every_skill_phase_belongs_to_a_window`).
-- **À préserver** : les 50 skills BMAD dans la palette / barre de commandes pour les projets qui ont `_bmad/`.
+- **Corrigé par le lot L6.** `spec`, `adversarial-review` et `spec-conformance` sont retirées du
+  workflow. Leur intention devient des lentilles de `review-lenses`, choisies par l'effort :
+  correction et tests et sécurité à `medium`, conformité aux critères d'acceptation et à
+  `traceability.json` à `high`, lecture adversariale à `ultrathink`. La revue tourne avant la QA,
+  là où un fixer peut encore agir ; les deux passes retirées tournaient après. C'est l'amorce de F11.
+  Les 50 skills BMAD restent dans la palette pour les projets qui ont `_bmad/`.
 
 #### F15 · Effort `none` : planning annoncé élagué, exécuté quand même
 
-- **Sévérité** basse · **atténué** (avertissement `agents/coder.py:904-913`)
-- **Étape** : retirer `min_effort: low` de la phase `planning` dans `workflow.yaml` (le profil devient exact).
+- **Corrigé par le lot L6.** `min_effort: low` est retiré de `planning`. Le profil dit désormais
+  que `none` et `low` exécutent les mêmes phases, et c'est vrai : ils diffèrent par le budget de
+  réflexion. De même `high` et `ultrathink`, qui diffèrent par les lentilles de la revue. Le test
+  de l'échelle d'effort épingle ces marches au lieu d'exiger une phase de plus à chaque niveau.
 
 #### F35 · `frontend-design` et `ui-design-system` visent la même chose avant le coding
 
-- **Sévérité** basse · **nouveau** · **lu**
-- **Preuve** : sur une tâche web, `ui-design-system` (déterministe, gratuit) fixe le design system, puis
-  `frontend-design` (impeccable, vide sur un clone) ouvre une session `pr_reviewer` pour dire « ce qu'il faut viser ».
-- **Étape** : si impeccable n'est pas vendorisé (F2), adosser `frontend-design` au design system
-  ui-ux-pro-max (impl `ui-ux-pro-max/ui-ux-pro-max` en mode revue) ou retirer la phase au profit de
-  `ui-design-system` + `design-check`.
+- **Corrigé par le lot L6.** `frontend-design` est retirée : son skill n'était jamais sur le disque,
+  et sa sortie n'aurait été lue par personne. `ui-design-system` (déterministe) fixe la cible avant
+  le code, `design-check` (gate impeccable) note le code après. L'ancre `&frontend_surface` est
+  désormais définie sur `design-check`.
+
+#### F38 · Les rapports des phases skill ne sont lus par personne
+
+- **Sévérité** haute · **nouveau** (trouvé pendant le lot L6) · **corrigé par le lot L6**
+- **Preuve** : `run_skill_phase` écrit `<spec_dir>/workflow/<phase>.md`. Seul `workflow/verify.md`
+  était relu (`build_commands._tests_went_green`). Aucun prompt de planner, de coder ou de QA ne
+  lisait les rapports de `brainstorm`, `analyze`, `mobile-design` ou `review` : chaque session était
+  payée, et sa sortie n'était utilisée par personne.
+- **Correction** : `workflows/handoff.py`. La règle découle de l'ordre déclaré, sans table : un
+  rapport va au consommateur intégré suivant.
+  - `planning` reçoit le rapport en ligne dans le prompt du planner.
+  - `coding` reçoit l'en-tête et le chemin dans chaque sous-tâche, pour borner le coût.
+  - `qa` reçoit le rapport en ligne dans le prompt du QA reviewer, avec la consigne de vérifier
+    chaque constat.
+  - Le texte est nettoyé, scanné par `injection_guard` (seul `blocked` retient), borné à 4 000 et
+    8 000 caractères, et clôturé comme données.
+  - Les phases qui ont déjà leur lecteur (`verify`, `ui-design-system`, `architecture-map`) ne sont
+    pas transmises deux fois.
+  - Le QA fixer n'est pas consommateur : il travaille sur la décision du reviewer.
+- **Reste ouvert** : les phases déclarées après `qa` (`store-readiness`) n'ont pas de consommateur
+  dans le build ; leur rapport n'est pas affiché dans l'UI.
 
 ### Lot L7 — Une seule mémoire (P2)
 
@@ -518,6 +573,11 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
     `core/agent_client.py` : `optimized_copilot_agent_client.py` est inatteignable par construction.
   - `sandbox/` n'est importé que par ses propres tests (`sandbox/test_*.py`) : supprimer ensemble.
   - `runners/time_travel_runner.py` : le time travel est servi par `replay/api.py` (`get_time_travel_engine`).
+  - Trouvés pendant le lot L5 :
+    - les configs `spec_gatherer` et `analysis` n'ont aucun appelant, et `spec_gatherer.md` n'est
+      chargé par rien (`requirements.json` est construit en Python) ;
+    - `ParallelOrchestratorReviewer._create_sdk_client` et `_define_specialist_agents` ne sont
+      appelés nulle part.
 - **Vérification** : `pytest tests/ -q`, `ruff check apps/backend/`.
 
 #### F30 · 25 shims de compatibilité à la racine du backend
@@ -688,6 +748,162 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
   le mainteneur des pages à regrouper ou à déplacer derrière un mécanisme de plugins. Aucune
   suppression sans donnée d'usage.
 
+### Lot L14 — Événements et appels IPC perdus en silence (P1)
+
+#### F37 · Six features n'envoient jamais leurs événements de progression au renderer
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant le lot L3) · **vérifié** (lecture)
+- **Preuve**
+  - Les relais d'événements de `code-playground`, `performance-profiler`, `code-migration`,
+    `auto-refactor`, `architecture-visualizer` et `documentation-agent` lisent `global.mainWindow` /
+    `globalThis.mainWindow` (`main/ipc-handlers/*-handlers.ts`) ; `main/index.ts` ne l'affecte qu'à
+    `null` (l.558), jamais à la fenêtre : ces relais n'envoient rien.
+  - `setupAutoRefactorEventForwarding` (`auto-refactor-handlers.ts:70`) n'est appelé nulle part.
+  - `PluginCreatorWizard.tsx:587` invoque `shell:openPath` par le pont générique : aucun handler, et
+    aucune API preload n'ouvre un dossier arbitraire (`openExternal` refuse `file:`).
+- **Étapes** : faire passer ces relais par `getMainWindow` (le paramètre que reçoivent déjà les
+  `register*Handlers`) ou `safeSendToRenderer`, appeler `setupAutoRefactorEventForwarding`, et ajouter
+  une API dédiée « ouvrir le dossier » validée côté main (chemin sous le projet) ou retirer le bouton.
+  Étendre `ipc-channel-parity.test.ts` aux appels `electronAPI.invoke/send("…")` du renderer.
+- **À préserver** : les six pages concernées et le bouton du créateur de plugins.
+- **Vérification** : un test par relais (fenêtre factice, événement reçu) ; `pnpm run typecheck && pnpm test`.
+
+### Lot L15 — Droits effectifs et succès silencieux (P1)
+
+**Fait.** Un type d'agent n'a plus que les outils qu'il déclare, sur le SDK Claude comme chez les
+fournisseurs hors SDK, et les déclarations disent ce que les prompts utilisent. Une phase de spec
+qui n'a rien produit le dit, dans son fichier et dans le journal de la tâche, et la reprise la
+rejoue. Les droits construits hors de `create_client` sont le lot L16.
+
+#### F39 · Une phase de spec qui n'a pas écrit son fichier rend un succès
+
+- **Corrigé par le lot L15.**
+- **Ce que le cahier ne voyait pas** :
+  - le remplaçant était **permanent** : la reprise sautait la recherche dès que `research.json`
+    existait ;
+  - la critique de remplacement affirmait `no_issues_found: true`, l'indicateur même que lit la
+    reprise ;
+  - l'orchestrateur jetait les `errors` d'un résultat réussi, pour toutes les phases ;
+  - le journal des tâches n'avait aucun type « avertissement ».
+- **Correction** :
+  - `create_minimal_research` / `create_minimal_critique(placeholder=True)` marquent le fichier
+    (`"placeholder": true`, la raison). Un remplaçant de critique ne dit plus `no_issues_found`.
+    `validator.is_placeholder` lit la marque ; un fichier illisible compte comme un remplaçant.
+  - La recherche et l'autocritique posent la marque sur les deux branches (« l'agent n'a rien
+    écrit », « échec après essais »). La reprise rejoue une phase dont le fichier est un
+    remplaçant. Le `json.load` de la critique ne fait plus tomber la phase sur un rapport illisible.
+  - `PhaseResult.warnings`. `phase_notes` réunit avertissements et erreurs d'une phase réussie,
+    `orchestrator._report_phase_warnings` les écrit en `LogEntryType.WARNING` (phase de
+    planification) et les imprime. Le `create_minimal_plan` silencieux de la spec rapide aussi.
+  - Frontend : `TaskLogEntryType` reçoit `"warning"`, rendu en ligne ambre dans l'onglet Journaux.
+- **Écart avec le cahier** : la carte de la tâche n'affiche rien. Le journal suffit pour lire ce
+  qu'une phase n'a pas fait ; un badge sur la carte demanderait un champ persisté que rien ne porte
+  encore.
+- **Garde-fou** : `tests/test_spec_phases.py` (`TestPlaceholdersAreSaid`, `TestPhaseNotes`) et
+  `TaskLogs.warning.test.tsx`.
+
+#### F40 · `allowed_tools` n'est pas une barrière pour les types hors lecture seule
+
+- **Corrigé par le lot L15.** Vérifié sur le SDK épinglé (claude-agent-sdk 0.2.163) :
+  `allowed_tools` approuve d'avance et ne retire rien, `disallowed_tools` retire l'outil du contexte
+  du modèle et l'emporte sur les règles `allow` du fichier de réglages.
+- **Ce que le cahier ne voyait pas** :
+  - côté hors SDK, `ToolExecutor.execute` exécutait n'importe quel nom envoyé par le modèle, même un
+    outil jamais offert ;
+  - Codex lançait toujours `--sandbox workspace-write` ;
+  - les déclarations étaient fausses **dans l'autre sens** : `ideation` écrit son JSON et explore
+    par heredoc avec une config qui ne déclarait que lecture et web, le skill `review-lenses`
+    demandait `git diff` à une phase sans shell, et `_REPORTING` demandait à toutes les phases
+    skill, en lecture seule, d'« écrire le fichier ». Appliquer les déclarations sans les corriger
+    aurait cassé l'idéation en silence.
+- **Ce que le cahier prescrivait et qui n'est pas fait** : dériver le fichier de réglages de la
+  config du type. Il est partagé par répertoire de projet et réécrit à chaque appel ; un fichier par
+  client aurait été un second mécanisme pour la même question. Le refus l'emporte sur lui.
+- **Correction** :
+  - Déclarations : `ideation` déclare `Write` et `Bash`, pas `Edit`. `review-lenses` lit les
+    fichiers listés au lieu de `git diff`. `_REPORTING` dit que la réponse est le rapport.
+    `_TOOL_USE_HINT` ne promet plus `write_file` ni `run_command`.
+  - `agents/tools_pkg/permissions.py` : `GUARDED_TOOLS`, `declared_tools`,
+    `undeclared_builtin_tools`. Un type inconnu reste permissif (le test AST du lot L1 garantit
+    qu'aucun n'atteint la production).
+  - SDK : `create_client` et `create_simple_client` passent `disallowed_tools`.
+    `READ_ONLY_AGENT_TYPES` gardent le mode `plan` en plus.
+  - Hors SDK : `get_tool_definitions(agent_type)` n'offre `write_file`, `Write` et
+    `create_directory` qu'à un type qui déclare `Write` ou `Edit`, et `run_command` qu'à un type qui
+    déclare `Bash`. `ToolExecutor(agent_type=…).execute` refuse les mêmes outils par nom, avec un
+    message renvoyé au modèle. Copilot, OpenAI (et ses héritiers), Windsurf et LiteLLM passent leur
+    type.
+  - Deux outils en lecture seule remplacent la recherche par le shell : `search_files` (regex) et
+    `find_files` (glob), offerts à un type qui déclare `Grep` ou `Glob`, confinés au projet, sans
+    lien, bornés à 200 résultats et 1 Mo par fichier.
+  - Codex : `codex_sandbox_for` donne `read-only` à un type qui ne déclare ni `Write`, ni `Edit`,
+    ni `Bash`.
+- **Mesuré** : `pr_reviewer` perd `Write`, `Edit`, `MultiEdit`, `NotebookEdit` et `Bash` ; `coder`
+  ne perd rien ; `commit_message` perd tout ; `architecture_visualizer` garde `Write`.
+- **Garde-fous** :
+  - `tests/test_agent_tool_rights.py` : options capturées par type, invariant sur tous les
+    `AGENT_CONFIGS`, offre et refus de l'exécuteur, recherche, sandbox Codex.
+  - `tests/test_agent_tool_declarations.py` : chaque prompt et chaque `SKILL.md` qu'un type
+    charge, tenu à sa déclaration (shell, `Write`, Context7, web).
+
+### Lot L16 — Droits hors de `create_client` (P1)
+
+Trouvés pendant L15 : ce que le lot n'a pas touché parce que ces chemins ne passent ni par
+`create_client` ni par la déclaration d'un type.
+
+#### F41 · Huit constructions de `ClaudeAgentOptions` hors de `create_client`
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `runners/insights_runner.py:436`, `runners/voice_control_runner.py:77` et `:270`,
+  `integrations/linear/updater.py:144`, `runners/natural_language_git_runner.py:127`,
+  `runners/code_playground_runner.py:184`, `runners/github/services/followup_reviewer.py:708`,
+  `agents/tools_pkg/__init__.py:25`. Aucun ne passe `disallowed_tools`, ni les hooks de sécurité de
+  `create_client` ; leur `allowed_tools` n'est qu'une approbation.
+- **Étapes** : passer par `create_client` (ou `create_simple_client`) avec un `agent_type`
+  enregistré ; à défaut, appeler `undeclared_builtin_tools` et poser les hooks.
+- **Garde-fou** : un test qui interdit `ClaudeAgentOptions(` hors de `core/client.py` et
+  `core/simple_client.py`.
+
+#### F42 · Le pont MCP hors SDK offre tous les serveurs personnalisés à tous les types
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `OpenAIAgentClient.__aenter__` (`core/agent_client.py:2082-2100`) charge
+  `load_mcp_server_configs` (`CUSTOM_MCP_SERVERS`) et ajoute tous leurs outils, quel que soit le
+  type. Côté SDK, `create_client` n'ajoute un serveur personnalisé que si `get_required_mcp_servers`
+  le retient pour ce type (`AGENT_MCP_<type>_ADD`, `core/client.py:1286-1293`).
+- **Étapes** : filtrer les serveurs du pont par `get_required_mcp_servers(agent_type, …)`, la même
+  réponse que le SDK.
+
+#### F43 · `run_command` n'a aucun validateur de sécurité hors SDK
+
+- **Sévérité** haute · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `ToolExecutor._run_command` (`core/runtimes/tool_executor.py:504`) exécute la commande
+  en shell ; son docstring dit « the command itself is not sanitized ». Côté SDK,
+  `bash_security_hook` juge chaque commande contre la liste autorisée du projet.
+- **Étapes** : appeler le même validateur (`security/`) avant `create_subprocess_shell`, et
+  renvoyer son refus au modèle comme le fait déjà le refus d'outil non déclaré.
+- **À préserver** : la réécriture rtk, qui doit rester appliquée après la validation de la
+  commande déballée (`unwrap_rtk_prefixes`).
+
+#### F44 · La reprise Codex n'a pas de sandbox
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `build_codex_exec_args` (`core/codex_cli_client.py`) ne passe `--sandbox` que sans
+  `thread_id` ; `codex exec resume` hérite du réglage de l'utilisateur. Un `pr_reviewer` repris
+  peut donc écrire. `test_codex_cli_client` fige l'absence de drapeau.
+- **Étapes** : vérifier quel réglage `codex exec resume` accepte (`--sandbox` ou
+  `-c sandbox_mode=…`) sur la version installée, le passer, mettre à jour le test.
+
+#### F45 · Copilot demande `implementation_plan.json` à toute session qui peut écrire
+
+- **Sévérité** basse · **nouveau** (trouvé pendant L15) · **lu**
+- **Preuve** : `has_write_tool` (`core/agent_client.py:1235`) vaut pour tout type à qui `Write` ou
+  `write_file` est offert, et les deux relances (`:1280-1290`, `:1695-1702`) exigent
+  `implementation_plan.json`. Depuis L15, un type en lecture seule n'est plus relancé ; un `coder`,
+  un `qa_fixer` ou l'idéation le sont encore, vers le mauvais fichier.
+- **Étapes** : relancer seulement `planner` et `spec_writer`, ou nommer le fichier de sortie que la
+  session attend.
+
 ---
 
 ## Annexe A — Inventaire des fichiers candidats
@@ -745,9 +961,9 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 | `main/log-service.ts` | 364 | aucun importeur | supprimer |
 | `main/fs-utils.ts` | 155 | aucun importeur | supprimer |
 | `main/copilot-cli-utils.ts` | 86 | aucun importeur | supprimer |
-| `main/ipc-handlers/renderer-log-handler.ts` | 60 | jamais enregistré | supprimer |
-| `main/ipc-handlers/context-aware-snippets-handlers.ts` | 77 | jamais enregistré | câbler ou retirer (F21) |
-| preload : `scanOllamaModels`, `downloadOllamaModel`, `initializeClaudeProfile`, `submitOAuthCode` | — | canaux sans handler | supprimer (F22) |
+| ~~`main/ipc-handlers/renderer-log-handler.ts`~~ | 60 | jamais enregistré | **supprimé (L3)** |
+| `main/ipc-handlers/context-aware-snippets-handlers.ts` | 77 | jamais enregistré | **câblé (L3), conservé** |
+| ~~preload : `scanOllamaModels`, `downloadOllamaModel`, `initializeClaudeProfile`, `submitOAuthCode`, `getAzureDevOpsProjects`~~ | — | canaux sans handler | **supprimés (L3)** |
 
 ### A.2 Backend (F29 ; F21 ; F32)
 
@@ -768,7 +984,7 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 | `runners/time_travel_runner.py` | 227 | jamais lancé ; `replay/api.py` sert le time travel | supprimer |
 | `core/output_schemas.py` | 162 | aucun import | supprimer |
 | `cli/quality_commands.py` | 146 | aucun import | supprimer |
-| `runners/context_aware_snippets_runner.py` | — | importe 3 modules inexistants | câbler ou retirer (F21) |
+| `runners/context_aware_snippets_runner.py` | — | importait 3 modules inexistants | **réécrit (L3), conservé** |
 | `src/connectors/llm_*.py` (racine du dépôt, 13 fichiers) | 1 769 | second registre ; `anthropic.Anthropic()` | migrer puis supprimer (F32) |
 
 ### A.3 Prompts orphelins (F10)
@@ -833,3 +1049,4 @@ Ordre recommandé : L1, L3, L4 en parallèle → L2, L5, L6 → L7, L8, L9 → L
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F39 et F40 (L15) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15.

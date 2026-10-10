@@ -595,37 +595,33 @@ class TestPhaseRosters:
             )
 
     def test_a_phase_that_precedes_the_code_gets_no_test_runner(self):
-        before_code = {"brainstorm", "spec", "analyze"}
+        before_code = {"brainstorm", "analyze"}
         for phase, _, names in self._rows():
             if phase.id in before_code:
                 assert "test-runner" not in names, (
                     f"{phase.id} runs before any code is written"
                 )
 
-    def test_spec_conformance_gets_the_subagent_it_names(self):
+    def test_the_acceptance_checker_reaches_the_phase_before_qa(self):
+        """`roster: qa` on `verify` hands it `qa-acceptance-checker`.
+
+        The acceptance audit used to be a separate ultrathink phase after QA,
+        where nothing it found reached a fixer; `verify` and the review's
+        conformance lens now ask the question before QA decides.
+        """
         for phase, _, names in self._rows():
-            if phase.id == "spec-conformance":
+            if phase.id == "verify":
                 assert "qa-acceptance-checker" in names
                 break
         else:  # pragma: no cover - the phase is declared
-            pytest.fail("spec-conformance is not declared")
+            pytest.fail("verify is not declared")
 
     def test_the_roster_never_widens_permissions(self):
         """`roster:` exists so a read-only phase keeps its specialists AND its
         read-only config. Reaching them via `agent:` would have traded one for
         the other."""
-        readonly = {
-            "analyzer",
-            "spec_critic",
-            "spec_validation",
-            "spec_context",
-            "spec_discovery",
-            "pr_reviewer",
-            "pr_orchestrator_parallel",
-            "insights",
-        }
-        client = (REPO_ROOT / "apps/backend/core/client.py").read_text(encoding="utf-8")
-        assert '"spec_validation",' in client, "the read-only set moved"
+        from core.client import READ_ONLY_AGENT_TYPES as readonly
+
         for phase, agent_type, _ in self._rows():
             if phase.roster:
                 assert agent_type in readonly or phase.id == "verify", (
@@ -647,11 +643,7 @@ class TestPhaseRosters:
             REPO_ROOT / "workflows" / "feature-build" / "workflow.yaml"
         )
         declared = {p.id: p.roster for p in workflow.phases if p.roster}
-        assert declared == {
-            "analyze": "planner",
-            "verify": "qa",
-            "spec-conformance": "qa",
-        }
+        assert declared == {"analyze": "planner", "verify": "qa"}
 
 
 class TestWiredIn:

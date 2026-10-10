@@ -77,6 +77,7 @@ from prompts import (
     is_first_run,
     mobile_section,
     uiux_section,
+    workflow_reports_section,
 )
 from recovery import RecoveryManager
 from security.constants import PROJECT_DIR_ENV_VAR
@@ -1059,8 +1060,8 @@ async def run_autonomous_agent(
             # The profile was resolved before planning, with no change set, so
             # every conditional phase in this window read "unknown — run".
             # The plan now names its files: narrow the profile to that
-            # forecast, which is what keeps `frontend-design`, `mobile-design`
-            # and `ui-design-system` off a backend task. No forecast keeps the
+            # forecast, which is what keeps `mobile-design` and
+            # `ui-design-system` off a backend task. No forecast keeps the
             # profile as it was.
             window_profile = narrow_to_forecast(profile, planned_files(spec_dir))
             kept = {
@@ -1455,6 +1456,14 @@ async def run_autonomous_agent(
                 prompt += "\n\n" + planner_documents
                 print_status("ADRs and task attachments applied to planning", "success")
 
+            # The approaches `brainstorm` compared before planning. Its report
+            # was written to the spec's workflow/ directory and read by nobody
+            # until handed over here (`workflows.handoff`).
+            planner_reports = workflow_reports_section(spec_dir, "planning")
+            if planner_reports:
+                prompt += "\n\n" + planner_reports
+                print_status("Earlier phase reports handed to the planner", "success")
+
             # A phone application has no dev server and no URL: the plan has to
             # say which platform each subtask is verified on, and on a machine
             # without the toolchain for one of them, that it is not. A planner
@@ -1754,6 +1763,13 @@ async def run_autonomous_agent(
             documents = docintel_section(project_dir, spec_dir)
             if documents:
                 prompt += "\n\n" + documents
+
+            # What `analyze` and `mobile-design` found between planning and
+            # coding — each report's head and path rather than its body, since
+            # this section is paid on every subtask (`workflows.handoff`).
+            reports = workflow_reports_section(spec_dir, "coding", inline=False)
+            if reports:
+                prompt += "\n\n" + reports
 
             # Same reasoning as the constitution: the platform rules apply to
             # every subtask, not to the one that happens to mention a device.

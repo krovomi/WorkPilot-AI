@@ -11,6 +11,7 @@ through it:
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -148,6 +149,19 @@ class TestSpecialisation:
         before = phase_defaults("coder")["code-reviewer"].prompt
         assert resolve("coder", project_dir=tmp_path)["code-reviewer"].prompt == before
 
+    @pytest.mark.parametrize("agent_type", ["qa_reviewer", "qa_fixer", "verifier"])
+    def test_the_qa_test_collector_learns_the_stack_too(self, tmp_path, agent_type):
+        """It runs the same suite the build's test-runner was told about, and
+        used to rediscover the framework on every QA pass."""
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname='x'\n", encoding="utf-8"
+        )
+        roster = resolve(agent_type, project_dir=tmp_path)
+        section = self._overlay_section(roster["qa-test-evidence"].prompt)
+        assert "pytest -x" in section and "### python" in section
+        before = phase_defaults(agent_type)["qa-acceptance-checker"].prompt
+        assert roster["qa-acceptance-checker"].prompt == before
+
 
 class TestCallerPrecedence:
     def test_caller_overrides_a_default_of_the_same_name(self, tmp_path):
@@ -165,6 +179,30 @@ class TestCallerPrecedence:
         extra = AgentDefinition(description="x", prompt="x", tools=["Read"])
         roster = resolve("coder", project_dir=tmp_path, user_agents={"bespoke": extra})
         assert "bespoke" in roster and "code-reviewer" in roster
+
+    def test_the_cap_counts_the_callers_agents(self, tmp_path):
+        """Applied before the merge, the cap let six caller agents sit on top
+        of a full roster. The generic defaults go; nothing the caller named."""
+        from claude_agent_sdk import AgentDefinition
+
+        mine = {
+            f"mine-{i}": AgentDefinition(description="x", prompt="x", tools=["Read"])
+            for i in range(6)
+        }
+        roster = resolve("coder", project_dir=tmp_path, user_agents=mine)
+        assert len(roster) == MAX_ROSTER
+        assert set(mine) <= set(roster)
+        assert "test-runner" in roster, "the specialised role is never shed"
+
+    def test_a_roster_of_caller_agents_only_is_kept_whole(self, tmp_path):
+        """Above the cap only because the caller named every entry."""
+        from claude_agent_sdk import AgentDefinition
+
+        mine = {
+            f"mine-{i}": AgentDefinition(description="x", prompt="x", tools=["Read"])
+            for i in range(MAX_ROSTER + 1)
+        }
+        assert resolve("commit_message", project_dir=tmp_path, user_agents=mine) == mine
 
     def test_no_defaults_and_no_caller_agents_yields_none(self, tmp_path, monkeypatch):
         import agents.subagents as mod
@@ -325,6 +363,44 @@ class TestPRReviewRoster:
             if not (prompts / s.prompt_file).is_file()
         ]
         assert not missing, f"specs name prompt files that do not exist: {missing}"
+
+    def test_the_orchestrator_carries_its_specialists_and_nothing_else(self, tmp_path):
+        """It fell through to the Kanban roster: nine entries, three of them
+        a code-reviewer, a test-runner and a spec-explorer on top of six
+        reviewers."""
+        roster = resolve(
+            "pr_orchestrator_parallel", project_dir=tmp_path, user_agents=self._build()
+        )
+        assert set(roster) == set(self._build())
+
+    def test_the_follow_up_carries_its_four_and_nothing_else(self, tmp_path):
+        from claude_agent_sdk import AgentDefinition
+
+        four = {
+            name: AgentDefinition(description=name, prompt=name, tools=["Read"])
+            for name in (
+                "resolution-verifier",
+                "new-code-reviewer",
+                "comment-analyzer",
+                "finding-validator",
+            )
+        }
+        roster = resolve("pr_followup_parallel", project_dir=tmp_path, user_agents=four)
+        assert set(roster) == set(four)
+
+    def test_each_live_specialist_session_is_a_leaf(self):
+        """The live path runs the specialists as sessions of their own, under
+        `pr_reviewer`; without `roster="solo"` each one carried the review
+        roster beside the other specialists — a fan-out inside a fan-out."""
+        source = (
+            REPO_ROOT
+            / "apps/backend/runners/github/services/parallel_orchestrator_reviewer.py"
+        ).read_text(encoding="utf-8")
+        start = source.index("async def _run_specialist_session")
+        end = re.compile(r"\n    (async )?def ").search(source, start + 1).start()
+        body = source[start:end]
+        assert 'agent_type="pr_reviewer"' in body
+        assert 'roster="solo"' in body
 
 
 class TestProviderDegradationReachesTheClient:

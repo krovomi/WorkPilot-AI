@@ -9,6 +9,7 @@ from .engine import (
     ExecutionProfile,
     MissingImpl,
     ResolvedPhase,
+    pack_inventory,
     resolve_profile,
     validate_impls,
 )
@@ -47,6 +48,7 @@ __all__ = [
     "effort_preamble",
     "evaluate_hard_gates",
     "load_workflow",
+    "pack_inventory",
     "phases_between",
     "resolve_profile",
     "run_deterministic_gates",
