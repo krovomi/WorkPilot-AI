@@ -49,7 +49,6 @@ KNOWN_AGENT_TYPES = {
     "learning_analyzer",
     "live_companion_analyzer",
     "spec_writer",
-    "spec_gatherer",
     "commit_message",
     "pr_template_filler",
     "spec_compaction",
@@ -85,7 +84,6 @@ class TestRoutingIsDeliberate:
             # The PR orchestrators bring their own specialists.
             ("pr_orchestrator_parallel", "solo"),
             ("pr_followup_parallel", "solo"),
-            ("analysis", "research"),
             ("batch_analysis", "research"),
             ("batch_validation", "research"),
             ("spec_researcher", "spec"),

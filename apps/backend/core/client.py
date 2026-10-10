@@ -761,7 +761,7 @@ def create_client(
         spec_dir: Directory containing the spec (for settings file)
         model: Claude model to use
         agent_type: Agent type identifier from AGENT_CONFIGS
-                   (e.g., 'coder', 'planner', 'qa_reviewer', 'spec_gatherer')
+                   (e.g., 'coder', 'planner', 'qa_reviewer', 'spec_writer')
         max_thinking_tokens: Token budget for extended thinking (None = disabled)
                             - ultrathink: 16000 (spec creation)
                             - high: 10000 (QA review)
@@ -1619,7 +1619,6 @@ def create_client(
     if "opus" in (model or "").lower():
         _effort_map = {
             "explorer": "low",
-            "spec_gatherer": "low",
             "lint": "low",
             "status": "low",
             "documenter": "medium",
@@ -2137,7 +2136,6 @@ _EFFORT_PHASE: dict[str, str] = {
     "qa_fixer": "qa",
     "verifier": "qa",
     "spec_writer": "spec",
-    "spec_gatherer": "spec",
     "spec_researcher": "spec",
     "spec_self_critique": "spec",
 }

@@ -88,7 +88,7 @@ class TestDomainAddendum:
         (tmp_path / "requirements.json").write_text(
             json.dumps({"domain": "fintech"}), encoding="utf-8"
         )
-        snap = build_prompt_preview(tmp_path, tmp_path, agent_type="spec_gatherer")
+        snap = build_prompt_preview(tmp_path, tmp_path, agent_type="spec_writer")
         assert snap.domain_addendum_included is False
 
 

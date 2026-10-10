@@ -213,12 +213,6 @@ AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
     # SPEC CREATION PHASES (Minimal tools, fast startup)
     # ═══════════════════════════════════════════════════════════════════════
-    "spec_gatherer": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": [],  # No MCP needed - just reads project
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
     "spec_researcher": {
         # spec_researcher.md checks each integration against Context7 and the
         # web, then writes research.json with a heredoc — so Bash and Write
@@ -452,12 +446,6 @@ AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
     # ANALYSIS PHASES
     # ═══════════════════════════════════════════════════════════════════════
-    "analysis": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7"],
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
     "batch_analysis": {
         "tools": BASE_READ_TOOLS + WEB_TOOLS,
         "mcp_servers": [],

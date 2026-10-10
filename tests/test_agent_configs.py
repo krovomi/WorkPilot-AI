@@ -45,7 +45,6 @@ class TestAgentConfigs:
 
         expected_types = [
             # Spec phases
-            "spec_gatherer",
             "spec_researcher",
             "spec_writer",
             "spec_critic",
@@ -145,11 +144,11 @@ class TestGetAgentConfig:
 class TestGetRequiredMcpServers:
     """Tests for get_required_mcp_servers() function."""
 
-    def test_spec_gatherer_has_no_mcp_servers(self):
-        """spec_gatherer should not require any MCP servers."""
+    def test_spec_writer_has_no_mcp_servers(self):
+        """spec_writer should not require any MCP servers."""
         from agents.tools_pkg.models import get_required_mcp_servers
 
-        servers = get_required_mcp_servers("spec_gatherer")
+        servers = get_required_mcp_servers("spec_writer")
         assert servers == []
 
     def test_spec_researcher_has_context7(self):

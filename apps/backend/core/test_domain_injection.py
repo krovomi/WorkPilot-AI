@@ -37,8 +37,8 @@ class TestInjectDomainAddendum:
 
     def test_no_change_when_unknown_agent_type(self, tmp_path: Path) -> None:
         _seed_spec_with_domain(tmp_path, "fintech")
-        result = _inject_domain_addendum(BASE, "spec_gatherer", tmp_path)
-        # spec_gatherer not in role map → no addendum.
+        result = _inject_domain_addendum(BASE, "spec_writer", tmp_path)
+        # spec_writer not in role map → no addendum.
         assert result == BASE
 
     def test_no_change_when_no_requirements_file(self, tmp_path: Path) -> None:

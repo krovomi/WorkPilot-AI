@@ -122,12 +122,10 @@ PHASE_ALIASES: dict[str, str] = {
     # Issue analysis and batching. They run through `create_simple_client`,
     # which composes no roster today; the entry says which one they want the
     # day they move to `create_client`.
-    "analysis": "research",
     "batch_analysis": "research",
     "batch_validation": "research",
     # Writing or questioning the spec, while there is still no code to point at.
     "spec_writer": "spec",
-    "spec_gatherer": "spec",
     "spec_critic": "spec",
     # The two spec prompts that run under their own config
     # (spec/pipeline/agent_runner.py); they ran under `spec_writer` before and

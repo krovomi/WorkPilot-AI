@@ -59,7 +59,6 @@ class TestPhaseRouting:
             ("qa_reviewer", "qa"),
             ("qa_fixer", "qa"),
             ("spec_writer", "spec"),
-            ("spec_gatherer", "spec"),
         ],
     )
     def test_known_agents_map_to_their_phase(self, agent_type: str, phase: str):
