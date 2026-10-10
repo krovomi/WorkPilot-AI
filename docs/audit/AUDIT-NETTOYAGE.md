@@ -123,8 +123,9 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L14 | P1 | Événements et appels IPC perdus en silence — **fait** | F37 | — |
 | L15 | P1 | Droits effectifs et succès silencieux — **fait** | F39, F40 | L5 |
 | L16 | P1 | Droits hors de `create_client` | F41, F42, F43, F44, F45 | L15 |
+| L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L6, L5, L14, L4, L15 (faits) → L16 → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L6, L5, L14, L4, L15, L17 (faits) → L16 → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -903,6 +904,55 @@ Trouvés pendant L15 : ce que le lot n'a pas touché parce que ces chemins ne pa
   un `qa_fixer` ou l'idéation le sont encore, vers le mauvais fichier.
 - **Étapes** : relancer seulement `planner` et `spec_writer`, ou nommer le fichier de sortie que la
   session attend.
+
+### Lot L17 — Le self-healing ne revendique que ce qu'il fait (P1)
+
+**Fait.** Le pipeline de réparation d'incident ne dit plus avoir généré un fix, validé une QA ni
+ouvert une PR : ces étapes sont `skipped` avec leur raison, l'incident finit `escalated` et
+l'opération n'est pas un succès. Choix du mainteneur : arrêter de revendiquer plutôt que câbler,
+le câblage étant un chantier à part (décrit ci-dessous).
+
+#### F48 · Le pipeline de self-healing marque « réparé » un incident auquel rien n'a été fait
+
+- **Sévérité** haute · **nouveau** · **corrigé par le lot L17**
+- **Preuve** (avant correction) : `self_healing/incident_responder/orchestrator.py`,
+  `_run_healing_pipeline`. « Generating fix in isolated worktree » passait `completed` sans lancer
+  d'agent (« This is a placeholder for the pipeline integration point ») et posait seulement
+  `incident.fix_branch = "self-healing/<id>"`, une branche qu'aucune commande git ne créait.
+  « Running QA validation » passait `completed` avec « QA validation passed » sans rien valider,
+  « Creating pull request » `completed` avec « PR created » sans PR. Puis `resolved_at` et
+  `finalize(success=True)`. Seule `_verify_runtime` travaillait. Le tableau de bord comptait
+  l'incident résolu et l'opération comme un fix automatique (`auto_fix_rate`).
+- **Ce que le cahier ne voyait pas** :
+  - aucun chemin n'a jamais écrit `fix_pr_url` : tout incident `pr_created` déjà sur disque vient
+    du remplaçant, et le restait après la correction si rien ne le rouvrait ;
+  - « Auto-create PRs » désactivé, l'incident restait `qa_running` avec un `resolved_at` ;
+  - la description de l'onglet CI/CD promettait « génère un fix automatiquement » ;
+  - `HealingStep.status` côté frontend ignorait `skipped`, que `_verify_runtime` écrivait déjà.
+- **Correction** :
+  - `_skip_step` : fix, QA et PR sont `skipped` avec leur raison (`FIX_NOT_RUN`, `QA_NOT_RUN`,
+    `PR_NOT_RUN`), sans `fix_branch` inventée. L'incident finit `escalated` (le statut « une
+    personne doit reprendre » qui existait déjà), `error_message = NEEDS_A_PERSON`, sans
+    `resolved_at`, et `finalize(success=False)`.
+  - `_reopen_claimed_heal`, au chargement : un incident qui porte `self-healing/<id>` sans
+    `fix_pr_url` perd cette branche ; s'il était `pr_created` ou `qa_running`, il redevient
+    `escalated`. Un incident écarté par une personne reste résolu, un échec reste un échec.
+  - Runner : « No fix applied » suivi de la raison de l'incident, au lieu de « Healing failed ».
+  - Frontend : `HealingStep.status` reçoit `skipped` (pastille et libellé ambre
+    `selfHealing:stepSkipped`) ; une opération escaladée affiche `selfHealing:needsReview` au lieu
+    de « Échoué » ; la carte d'un incident escaladé dit pourquoi ; `cicdDescription` dit ce qui
+    tourne. Clés en `en` et `fr`.
+- **Préservé** : la détection des trois modes et leurs `build_agent_prompt`, la vérification à
+  l'exécution (un échec rend toujours l'incident `failed`), le cycle hermes dans le `finally`.
+- **Pour câbler plus tard** : une session de correction par `core.client.create_agent_client`
+  (`agent_type` enregistré, `coder` ou `qa_fixer`) dans un worktree ; la boucle QA
+  (`qa/loop.py`) exige un `spec_dir` dont le plan a toutes ses sous-tâches terminées, donc une spec
+  par incident ; la PR par `WorktreeManager.push_branch` puis `create_pull_request`. Chaque étape
+  câblée remplace son `_skip_step` et n'écrit `completed` que sur un résultat obtenu.
+- **Garde-fous** : `tests/test_self_healing_pipeline.py` (aucune étape `completed` hors analyse,
+  vérification et hermes, dans les trois modes ; incident escaladé, aucun fix compté ; incidents
+  stockés avant la correction rouverts ; hermes toujours observé) et
+  `renderer/components/self-healing/HealingTimeline.test.tsx`.
 
 ---
 
