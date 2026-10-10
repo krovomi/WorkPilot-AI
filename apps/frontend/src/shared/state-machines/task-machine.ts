@@ -41,7 +41,13 @@ export type TaskEvent =
 			attemptCount: number;
 	  }
 	| { type: "QA_MAX_ITERATIONS"; iteration: number; maxIterations: number }
-	| { type: "QA_AGENT_ERROR"; iteration: number; consecutiveErrors: number }
+	| {
+			type: "QA_AGENT_ERROR";
+			iteration: number;
+			consecutiveErrors: number;
+			/** The last pass's own error, as the backend reported it. */
+			error?: string;
+	  }
 	| {
 			type: "PROCESS_EXITED";
 			exitCode: number;
@@ -289,7 +295,11 @@ export const taskMachine = createMachine(
 						case "QA_MAX_ITERATIONS":
 							return `QA gave up after ${event.maxIterations} review passes without approving the build.`;
 						case "QA_AGENT_ERROR":
-							return `The QA agent failed ${event.consecutiveErrors} time(s) in a row on review pass ${event.iteration}.`;
+							// Without the backend's reason the count is all the
+							// user gets, and it does not say what to fix.
+							return `The QA agent failed ${event.consecutiveErrors} time(s) in a row on review pass ${event.iteration}.${
+								event.error ? ` Last error: ${event.error}` : ""
+							}`;
 						case "PROCESS_EXITED":
 							// The last resort: the backend stopped without saying
 							// why. Naming the exit code is still strictly better
