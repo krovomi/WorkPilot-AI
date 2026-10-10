@@ -1649,7 +1649,7 @@ class TestWorktreeIsolation:
 
     def test_multiple_worktrees_have_separate_branches(self, test_env):
         """Multiple worktrees for different specs have separate branches."""
-        from worktree import WorktreeManager
+        from core.worktree import WorktreeManager
 
         _, _, project_dir = test_env
 
@@ -1676,7 +1676,7 @@ class TestWorktreeIsolation:
 
     def test_changes_in_one_worktree_dont_affect_another(self, test_env):
         """Changes made in one worktree don't affect other worktrees."""
-        from worktree import WorktreeManager
+        from core.worktree import WorktreeManager
 
         _, _, project_dir = test_env
 
@@ -1727,7 +1727,7 @@ class TestWorktreeIsolation:
 
     def test_concurrent_worktree_operations_dont_conflict(self, test_env):
         """Concurrent operations on different worktrees don't cause conflicts."""
-        from worktree import WorktreeManager
+        from core.worktree import WorktreeManager
 
         _, _, project_dir = test_env
 
@@ -1767,7 +1767,7 @@ class TestWorktreeIsolation:
 
     def test_worktree_isolation_with_spec_directories(self, test_env):
         """Worktrees properly isolate spec-related directories."""
-        from worktree import WorktreeManager
+        from core.worktree import WorktreeManager
 
         _, _, project_dir = test_env
 
@@ -1809,7 +1809,7 @@ class TestWorktreeIsolation:
 
     def test_worktree_can_be_removed_without_affecting_others(self, test_env):
         """Removing one worktree doesn't affect other worktrees."""
-        from worktree import WorktreeManager
+        from core.worktree import WorktreeManager
 
         _, _, project_dir = test_env
 
@@ -1859,7 +1859,7 @@ class TestWorktreeIsolation:
 
     def test_worktree_merge_isolation(self, test_env):
         """Merging one worktree doesn't affect other worktrees."""
-        from worktree import WorktreeManager
+        from core.worktree import WorktreeManager
 
         _, _, project_dir = test_env
 
@@ -1914,7 +1914,7 @@ class TestWorktreeIsolation:
 
     def test_get_or_create_worktree_returns_existing(self, test_env):
         """get_or_create_worktree returns existing worktree instead of creating new."""
-        from worktree import WorktreeManager
+        from core.worktree import WorktreeManager
 
         _, _, project_dir = test_env
 
