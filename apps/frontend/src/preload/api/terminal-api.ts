@@ -142,7 +142,6 @@ export interface TerminalAPI {
 			profileName: string;
 		}) => void,
 	) => () => void;
-	submitOAuthCode: (terminalId: string, code: string) => Promise<IPCResult>;
 	onTerminalClaudeBusy: (
 		callback: (id: string, isBusy: boolean) => void,
 	) => () => void;
@@ -176,7 +175,6 @@ export interface TerminalAPI {
 		terminalId: string,
 		profileId: string,
 	) => Promise<IPCResult>;
-	initializeClaudeProfile: (profileId: string) => Promise<IPCResult>;
 	setClaudeProfileToken: (
 		profileId: string,
 		token: string,
@@ -536,13 +534,6 @@ export const createTerminalAPI = (): TerminalAPI => ({
 		};
 	},
 
-	submitOAuthCode: (terminalId: string, code: string): Promise<IPCResult> =>
-		ipcRenderer.invoke(
-			IPC_CHANNELS.TERMINAL_OAUTH_CODE_SUBMIT,
-			terminalId,
-			code,
-		),
-
 	onTerminalClaudeBusy: (
 		callback: (id: string, isBusy: boolean) => void,
 	): (() => void) => {
@@ -655,9 +646,6 @@ export const createTerminalAPI = (): TerminalAPI => ({
 			terminalId,
 			profileId,
 		),
-
-	initializeClaudeProfile: (profileId: string): Promise<IPCResult> =>
-		ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_PROFILE_INITIALIZE, profileId),
 
 	setClaudeProfileToken: (
 		profileId: string,

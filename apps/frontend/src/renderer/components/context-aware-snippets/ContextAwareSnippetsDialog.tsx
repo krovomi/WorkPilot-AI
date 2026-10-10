@@ -1,14 +1,31 @@
-import { Check, Code, Copy, Loader2, RotateCcw, Zap } from "lucide-react";
+import {
+	AlertTriangle,
+	Check,
+	ChevronDown,
+	Code,
+	Copy,
+	Loader2,
+	Plus,
+	RotateCcw,
+	Zap,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { SNIPPET_TYPES } from "../../../shared/types/context-aware-snippets";
 import type { ContextAwareSnippetResult } from "../../stores/context-aware-snippets-store";
 import {
 	cancelSnippetGeneration,
+	resetSnippetRun,
 	startSnippetGeneration,
 	useContextAwareSnippetsStore,
 } from "../../stores/context-aware-snippets-store";
 import { useProjectStore } from "../../stores/project-store";
 import { Button } from "../ui/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "../ui/collapsible";
 import {
 	Dialog,
 	DialogContent,
@@ -28,16 +45,6 @@ import {
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
 
-const SNIPPET_TYPES = [
-	"component",
-	"function",
-	"class",
-	"hook",
-	"utility",
-	"api",
-	"test",
-] as const;
-
 const COMMON_LANGUAGES = [
 	"javascript",
 	"typescript",
@@ -50,6 +57,27 @@ const COMMON_LANGUAGES = [
 	"php",
 	"ruby",
 ];
+
+/** Error codes with their own sentence; anything else reads as `generic`. */
+const KNOWN_ERROR_CODES = new Set([
+	"auth",
+	"rate_limit",
+	"quota",
+	"network",
+	"timeout",
+	"provider_unavailable",
+	"provider_error",
+	"empty_response",
+	"invalid_response",
+	"empty_description",
+	"invalid_input",
+	"runner_missing",
+	"python_missing",
+	"project_not_found",
+	"spawn_failed",
+	"process_failed",
+	"ipc_failed",
+]);
 
 /**
  * ContextAwareSnippetsDialog — AI-powered context-aware code snippet generator.
@@ -81,6 +109,7 @@ export function ContextAwareSnippetsDialog({
 		streamingOutput,
 		result,
 		error,
+		errorCode,
 		snippetType,
 		description,
 		language,
@@ -89,23 +118,24 @@ export function ContextAwareSnippetsDialog({
 		setDescription,
 		setLanguage,
 		setAutoDetectLanguage,
-		reset,
 	} = useContextAwareSnippetsStore();
 
 	const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
 
-	// Auto-scroll streaming output
+	// Follow the text as it is written.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll on each new chunk
 	useEffect(() => {
 		if (streamOutputRef.current) {
 			streamOutputRef.current.scrollTop = streamOutputRef.current.scrollHeight;
 		}
-	}, []);
+	}, [streamingOutput]);
 
 	const handleGenerate = useCallback(() => {
 		if (!selectedProjectId) return;
 		if (!description.trim()) return;
 
-		startSnippetGeneration(selectedProjectId);
+		// Failures are reported through the store; nothing to await here.
+		void startSnippetGeneration(selectedProjectId);
 	}, [selectedProjectId, description]);
 
 	const handleCopy = useCallback(
@@ -128,23 +158,16 @@ export function ContextAwareSnippetsDialog({
 		cancelSnippetGeneration();
 	}, []);
 
+	// Back to the form, inputs kept, to adjust and generate again.
 	const handleTryAgain = useCallback(() => {
-		reset();
-		useContextAwareSnippetsStore.setState({
-			isOpen: true,
-			snippetType,
-			description,
-			language,
-			autoDetectLanguage,
-		});
-	}, [reset, snippetType, description, language, autoDetectLanguage]);
+		resetSnippetRun();
+	}, []);
 
+	// Closing does not stop a run: it goes on in the main process, the sidebar
+	// badge reports it, and reopening the dialog shows it again.
 	const handleClose = useCallback(() => {
-		if (phase === "generating") {
-			handleCancel();
-		}
 		closeDialog();
-	}, [closeDialog, phase, handleCancel]);
+	}, [closeDialog]);
 
 	const isGenerating = phase === "generating";
 	const isComplete = phase === "complete";
@@ -296,14 +319,12 @@ export function ContextAwareSnippetsDialog({
 							<div className="flex items-center gap-2 text-sm text-muted-foreground">
 								<Loader2 className="h-4 w-4 animate-spin text-primary" />
 								<span>
-									{status || t("contextAwareSnippets:status.analyzing")}
+									{t(`contextAwareSnippets:status.${status || "context"}`)}
 								</span>
 							</div>
-							<div className="flex items-center gap-2">
-								<Button variant="outline" size="sm" onClick={handleCancel}>
-									{t("contextAwareSnippets:actions.cancel")}
-								</Button>
-							</div>
+							<p className="text-xs text-muted-foreground">
+								{t("contextAwareSnippets:status.backgroundHint")}
+							</p>
 							{streamingOutput && (
 								<div className="space-y-1">
 									<Label className="text-xs text-muted-foreground">
@@ -321,16 +342,7 @@ export function ContextAwareSnippetsDialog({
 					)}
 
 					{/* Error state */}
-					{isError && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
-							<p className="text-sm font-medium text-destructive">
-								{t("contextAwareSnippets:status.error")}
-							</p>
-							<p className="text-sm text-destructive/80">
-								{error || t("contextAwareSnippets:errors.generic")}
-							</p>
-						</div>
-					)}
+					{isError && <ErrorView code={errorCode} detail={error} t={t} />}
 
 					{/* Result */}
 					{isComplete && result && (
@@ -364,9 +376,14 @@ export function ContextAwareSnippetsDialog({
 
 					{/* Generating state */}
 					{isGenerating && (
-						<Button variant="outline" onClick={handleCancel}>
-							{t("contextAwareSnippets:actions.cancel")}
-						</Button>
+						<>
+							<Button variant="ghost" onClick={handleCancel}>
+								{t("contextAwareSnippets:actions.cancel")}
+							</Button>
+							<Button variant="outline" onClick={handleClose}>
+								{t("contextAwareSnippets:actions.runInBackground")}
+							</Button>
+						</>
 					)}
 
 					{/* Error state */}
@@ -387,6 +404,14 @@ export function ContextAwareSnippetsDialog({
 						<>
 							<Button variant="outline" onClick={handleClose}>
 								{t("contextAwareSnippets:actions.close")}
+							</Button>
+							<Button
+								variant="outline"
+								onClick={handleTryAgain}
+								className="gap-2"
+							>
+								<Plus className="h-4 w-4" />
+								{t("contextAwareSnippets:actions.newSnippet")}
 							</Button>
 							<Button
 								onClick={() => handleCopy(result.snippet)}
@@ -413,6 +438,49 @@ export function ContextAwareSnippetsDialog({
 }
 
 /**
+ * A failure, in the user's language, with the technical detail underneath.
+ */
+function ErrorView({
+	code,
+	detail,
+	t,
+}: {
+	readonly code: string | null;
+	readonly detail: string | null;
+	readonly t: (key: string) => string;
+}) {
+	const key = code && KNOWN_ERROR_CODES.has(code) ? code : "generic";
+	return (
+		<div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+			<div className="flex items-start gap-2">
+				<AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+				<div className="space-y-1">
+					<p className="text-sm font-medium text-destructive">
+						{t("contextAwareSnippets:status.error")}
+					</p>
+					<p className="text-sm text-foreground/80">
+						{t(`contextAwareSnippets:errors.codes.${key}`)}
+					</p>
+				</div>
+			</div>
+			{detail && (
+				<Collapsible>
+					<CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+						<ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+						{t("contextAwareSnippets:errors.details")}
+					</CollapsibleTrigger>
+					<CollapsibleContent>
+						<pre className="mt-2 max-h-[160px] overflow-auto rounded-md bg-background/60 p-2 text-xs font-mono whitespace-pre-wrap wrap-break-word">
+							{detail}
+						</pre>
+					</CollapsibleContent>
+				</Collapsible>
+			)}
+		</div>
+	);
+}
+
+/**
  * Renders the generated snippet result with context information
  */
 function ResultView({
@@ -433,7 +501,8 @@ function ResultView({
 				<div className="flex items-center justify-between">
 					<Label className="text-sm font-medium flex items-center gap-2">
 						<Code className="h-4 w-4" />
-						{t("contextAwareSnippets:result.snippet")} ({result.language})
+						{t("contextAwareSnippets:result.snippet")}
+						{result.language && ` (${result.language})`}
 					</Label>
 					<Button
 						variant="ghost"

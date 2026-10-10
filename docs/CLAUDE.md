@@ -2467,6 +2467,8 @@ apps/backend/architecture_visualizer/archify/
   authoring.py     write a model, repair while repairing helps
   significance.py  is this task worth mapping? (paths only, no API call)
   delta.py         compare two models; the six states the UI can be in
+  task_delta.py    one task's delta, end to end: baseline, significance, author, compare
+  phase.py         the `architecture-map` workflow phase, on task_delta
   ../../runners/architecture_visualizer_runner.py   --action map | delta | doctor
 ```
 
@@ -2501,17 +2503,32 @@ validated.
 
 **In the Kanban.** The `architecture-map` phase runs after `qa` — the map must
 describe the code QA corrected, not the code that was written — in a fresh
-context, at `min_effort: medium`. Two filters gate it, and it needs both:
-`when: touches(...)` is a glob and can only say "a `.ts` changed", which is most
-tasks, so `significance.assess` decides inside the phase, from paths alone and
-before any API call, whether the changed files touch a modelled component's
-sources or draw an area the model does not describe yet. Under the threshold the
-phase records "no architectural change" and returns for zero tokens — the same
-shape as `docs` and its libdocs preflight.
+context, at `min_effort: medium`. It is **not** a skill session. It used to be
+one: the read-only default agent answered in prose, nothing asked
+`significance`, nothing ran archify, and the Delta tab stayed empty on every
+build. `archify/phase.py` is its executor (`CUSTOM_EXECUTORS`, like `verify`),
+and it runs `task_delta.run_task_delta` — the function the tab's regenerate
+button runs through `--action delta`, so the two cannot drift. Two filters gate
+it, and it needs both: `when: touches(...)` is a glob and can only say "a `.ts`
+changed", which is most tasks, so `significance.assess` decides inside the
+phase, from paths alone and before any API call, whether the changed files touch
+a modelled component's sources or draw an area the model does not describe yet.
+Under the threshold the phase records "no architectural change" and returns
+before a session is opened — the same shape as `docs` and its libdocs
+preflight. Only authoring the head model needs one, under
+`architecture_visualizer`, on the provider the task configured for QA.
 
 The record lands in `<spec_dir>/architecture/` — the spec directory, not the
 worktree, because the worktree is removed at merge and "what did this task
-change" is asked after the merge. `TaskArchitectureDelta` renders the counts and
+change" is asked after the merge. An isolated build makes that three
+directories, because the worktree lacks two things (`PhaseContext.source_*`):
+the baseline, which `.workpilot/` being gitignored keeps in the main project;
+and a spec directory that outlives it. `delta.status.json` names its artifact by
+absolute path, so the answer is written straight into the main spec directory,
+while the head model — written by the session, which may only write in the
+worktree — stays in the worktree's copy and is synced back with the other
+post-QA reports (`_sync_spec_back`, after the post-QA window; the QA sync runs
+before it). `TaskArchitectureDelta` renders the counts and
 the Before/Delta/After, and **renders nothing at all** for `not-significant` or a
 mapped delta whose counters are zero; `shouldShowArchitectureDelta` gates the tab
 trigger on the same predicate, so those states never produce a tab. A tab that
@@ -2904,7 +2921,8 @@ little else.
 
 | Phase | Who runs it |
 |---|---|
-| `brainstorm`, `spec`, `analyze`, `frontend-design`, `review`, `adversarial-review`, `spec-conformance`, `verify` | the engine (`workflows/runner.py`), as one-shot skill sessions |
+| `brainstorm`, `spec`, `analyze`, `frontend-design`, `review`, `adversarial-review`, `spec-conformance` | the engine (`workflows/runner.py`), as one-shot skill sessions |
+| `verify`, `verify-replay`, `architecture-map` | the engine, through a dedicated executor (`CUSTOM_EXECUTORS`): Python drives the deterministic steps and opens a session only where a model is needed — `verify/phase.py`, `verify/replay.py` (no model at all), `architecture_visualizer/archify/phase.py` |
 | `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
 | `mobile-design` and `store-readiness` | the engine (`workflows/runner.py`), when the task touches mobile files |

@@ -12,18 +12,4 @@
  * All handlers are registered through the main registerContextHandlers function.
  */
 
-import type { BrowserWindow } from "electron";
-import { registerContextHandlers } from "./context";
-
-export { registerContextHandlers };
-
-/**
- * Register all context-related IPC handlers
- *
- * @param getMainWindow - Function that returns the main BrowserWindow instance
- */
-export function setupContextHandlers(
-	getMainWindow: () => BrowserWindow | null,
-): void {
-	registerContextHandlers(getMainWindow);
-}
+export { registerContextHandlers } from "./context";

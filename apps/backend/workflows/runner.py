@@ -209,6 +209,11 @@ SKILL_PHASE_AGENTS = {
     # like `qa_fixer`, and gets the `verify_*` tools on every provider.
     "verify": "verifier",
     "verify-replay": "verifier",
+    # Run by its own executor (`CUSTOM_EXECUTORS`), which authors under this
+    # agent. Listed anyway so that, were the phase ever to reach the one-shot
+    # path, it would run under the agent allowed to write the model rather
+    # than the read-only default.
+    "architecture-map": "architecture_visualizer",
 }
 _DEFAULT_AGENT = "analyzer"
 
@@ -267,6 +272,14 @@ class PhaseContext:
     changed_files: list[str] | None = None
     task_logger: object | None = None
     jev_run: object | None = None
+    # In an isolated build `project_dir` and `spec_dir` are the worktree and its
+    # copy of the spec. These are the main project and its spec directory; None
+    # means "the same as above" — a direct build, or a caller whose window has
+    # no phase that needs them. A phase needs them for what a worktree does not
+    # carry (`.workpilot/` is gitignored) and for what must outlive it: the
+    # Kanban reads the main spec directory, and the worktree is removed at merge.
+    source_project_dir: Path | None = None
+    source_spec_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -859,6 +872,21 @@ async def _run_verify_replay(resolved, ctx: PhaseContext) -> PhaseOutcome:
     return await run_replay_phase(resolved, ctx)
 
 
+async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `architecture-map` phase: `archify.phase`, imported when it runs."""
+    try:
+        from architecture_visualizer.archify.phase import run_architecture_map_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_architecture_map_phase(resolved, ctx)
+
+
 # Skill phases whose procedure is *driven* by WorkPilot's Python rather than
 # handed to a single one-shot session. `verify` names its skill like any other
 # phase — that is what the provider overlays and the slash command read — but
@@ -867,7 +895,16 @@ async def _run_verify_replay(resolved, ctx: PhaseContext) -> PhaseOutcome:
 # must get identically, so the loop owns them and the skill drives only the
 # part a model is needed for. Keyed by phase id, for the reason
 # `BUILTIN_EXECUTORS` is.
-CUSTOM_EXECUTORS = {"verify": _run_verify_loop, "verify-replay": _run_verify_replay}
+#
+# `architecture-map` is the same shape: the significance pass, archify's
+# validate/deliver/compare and the record the Delta tab reads are Python; only
+# authoring the head model needs a session. As a one-shot session it answered
+# in prose, mapped nothing, and left the tab empty.
+CUSTOM_EXECUTORS = {
+    "verify": _run_verify_loop,
+    "verify-replay": _run_verify_replay,
+    "architecture-map": _run_architecture_map,
+}
 
 
 async def run_skill_phases(

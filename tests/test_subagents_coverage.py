@@ -57,6 +57,7 @@ KNOWN_AGENT_TYPES = {
     "migration",
     "roadmap_discovery",
     "competitor_analysis",
+    "architecture_visualizer",
 }
 
 
@@ -78,6 +79,7 @@ class TestRoutingIsDeliberate:
             ("commit_message", "solo"),
             ("merge_resolver", "solo"),
             ("migration", "solo"),
+            ("architecture_visualizer", "solo"),
             ("roadmap_discovery", "research"),
             ("competitor_analysis", "research"),
         ],

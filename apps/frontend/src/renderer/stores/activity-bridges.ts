@@ -5,6 +5,7 @@ import { useApiWatcherStore } from "./api-watcher-store";
 import { useCarbonProfilerStore } from "./carbon-profiler-store";
 import { useCodePlaygroundStore } from "./code-playground-store";
 import { useComplianceStore } from "./compliance-store";
+import { useContextAwareSnippetsStore } from "./context-aware-snippets-store";
 import { useContextMeshStore } from "./context-mesh-store";
 import { useDocDriftStore } from "./doc-drift-store";
 import { useFlakyTestsStore } from "./flaky-tests-store";
@@ -46,6 +47,10 @@ export function setupActivityBridges(): () => void {
 		bridgePhaseActivity(useCarbonProfilerStore, "carbon-profiler"),
 		bridgePhaseActivity(useCodePlaygroundStore, "code-playground"),
 		bridgePhaseActivity(useComplianceStore, "compliance"),
+		bridgePhaseActivity(
+			useContextAwareSnippetsStore,
+			"context-aware-snippets",
+		),
 		bridgePhaseActivity(useContextMeshStore, "context-mesh"),
 		bridgePhaseActivity(useDocDriftStore, "doc-drift"),
 		bridgePhaseActivity(useFlakyTestsStore, "flaky-tests"),
