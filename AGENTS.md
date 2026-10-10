@@ -84,10 +84,10 @@ docs/ shared_docs/     documentation
 | Chemin | Rôle |
 |---|---|
 | `.agents/skills/<nom>/SKILL.md` | **source lue en production** par la barre de commandes du Kanban, quel que soit le LLM |
-| `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | miroirs par harness |
+| `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | miroirs par harness, **non émis par défaut** : seuls `agnostic` et `gemini` ont `default: true` dans `capabilities/harnesses.yaml` |
 | `.gemini/commands/*.toml` | miroir Gemini CLI |
 | `apps/backend/agents/subagents/` | **la** source des sous-agents : défauts de phase, overlays langage, spécialistes de PR |
-| `.agents/agents/`, `.github/agents/`, `.codex/agents/` | sorties générées depuis ce registre, noms d'outils traduits par harness |
+| `.agents/agents/`, `.github/agents/`, `.codex/agents/` | sorties générées depuis ce registre, noms d'outils traduits par harness (seul `.agents/agents/` est émis par défaut) |
 
 Le frontmatter d'un skill se lit **toujours** via `skills_registry.frontmatter.parse_frontmatter`.
 Les champs propres à WorkPilot vivent sous `metadata.workpilot` (pack, version, targets,

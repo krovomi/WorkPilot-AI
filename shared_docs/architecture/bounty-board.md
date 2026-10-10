@@ -112,9 +112,10 @@ just chose. Only the board's other providers are layered on.
 UI offers had no effect on anything. It is added to the brief, never
 substituted for it.
 
-**A provider with no agentic adapter never takes the field.** mistral, deepseek,
-grok, meta, aws, cursor and custom are driven by the Claude SDK
-(`capabilities/providers.yaml`, `degrades_to`) — the right trade for a build,
+**A provider with no agentic adapter never takes the field.** meta, aws, cursor
+and custom are driven by the Claude SDK (`capabilities/providers.yaml`,
+`degrades_to`) — mistral, deepseek and grok have their own
+(`CompatibleProviderAgentClient`) and do take it. That fallback is the right trade for a build,
 since the task runs, and the wrong one for a contest, where a win would be
 recorded under the name of a vendor that never saw the prompt. It is the Arena's
 `require_provider` rule, word for word, and `bounty_board/runner.py` applies it

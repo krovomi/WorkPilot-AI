@@ -13,7 +13,7 @@ open standard so the same file works across Claude Code, Copilot, Codex, Cursor 
 | Path | Role |
 |---|---|
 | `.agents/skills/<name>/SKILL.md` | The source read in production. Provider- and IDE-agnostic. |
-| `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | Per-harness mirrors |
+| `.claude/skills/`, `.github/skills/`, `.cursor/skills/` | Per-harness mirrors, **not emitted by default**: only `agnostic` and `gemini` have `default: true` in `capabilities/harnesses.yaml` |
 | `.gemini/commands/*.toml` | Gemini CLI mirror |
 
 A skill name is the output key — `.agents/skills/<name>/` — so two packs providing the

@@ -49,9 +49,10 @@ serveur éteint : il répond par le catalogue hors ligne, où rien n'est install
 donc il ne présente personne au lieu de trente-cinq modèles que la machine n'a
 pas.
 
-**Un fournisseur sans adaptateur propre n'entre pas.** mistral, deepseek, grok,
-meta, aws, cursor et custom sont servis par le SDK Claude
-(`capabilities/providers.yaml`, `degrades_to`) : c'est le bon compromis pour un
+**Un fournisseur sans adaptateur propre n'entre pas.** meta, aws, cursor et
+custom sont servis par le SDK Claude (`capabilities/providers.yaml`,
+`degrades_to`) — mistral, deepseek et grok ont le leur
+(`CompatibleProviderAgentClient`) et entrent. Servir par le SDK Claude est le bon compromis pour un
 build — la tâche tourne — et le mauvais ici, puisqu'une victoire serait
 enregistrée au nom d'un éditeur qui n'a jamais vu le prompt. Deux barrières, et
 elles ne disent pas la même chose : `oneshot_completion(require_provider=True)`
