@@ -117,6 +117,58 @@ describe("resolvePageLlm — l'ordre établi", () => {
 		expect(resolved.modelSource).toBe("page");
 	});
 
+	it("n'envoie pas à Claude un modèle Ollama resté derrière un changement de fournisseur", () => {
+		// Ollama + gemma4 choisis sur la page, puis Claude : « claude · gemma4 ».
+		const resolved = resolvePageLlm(
+			base({
+				pageLlmOverrides: {
+					"prompt-optimizer": {
+						provider: "anthropic",
+						model: "gemma4:12b-it-q4_K_M",
+					},
+				},
+			}),
+			"prompt-optimizer",
+		);
+		expect(resolved.provider).toBe("claude");
+		expect(
+			getModelsForProvider("claude").map((model) => model.value),
+		).toContain(resolved.model);
+		expect(resolved.modelSource).not.toBe("page");
+	});
+
+	it("écarte aussi un modèle de page orphelin quand le fournisseur par défaut change", () => {
+		const resolved = resolvePageLlm(
+			base({
+				selectedProvider: "claude",
+				pageLlmOverrides: {
+					"prompt-optimizer": { model: "gemma4:12b-it-q4_K_M" },
+				},
+			}),
+			"prompt-optimizer",
+		);
+		expect(resolved.model).not.toBe("gemma4:12b-it-q4_K_M");
+		expect(
+			getModelsForProvider("claude").map((model) => model.value),
+		).toContain(resolved.model);
+	});
+
+	it("garde un tag Ollama tiré à la main sur une page Ollama", () => {
+		const resolved = resolvePageLlm(
+			base({
+				pageLlmOverrides: {
+					"prompt-optimizer": {
+						provider: "ollama",
+						model: "gemma4:12b-it-q4_K_M",
+					},
+				},
+			}),
+			"prompt-optimizer",
+		);
+		expect(resolved.model).toBe("gemma4:12b-it-q4_K_M");
+		expect(resolved.modelSource).toBe("page");
+	});
+
 	it("répond pour chaque page déclarée", () => {
 		for (const page of PAGE_LLM_PAGES) {
 			const resolved = resolvePageLlm(base(), page);
@@ -214,6 +266,53 @@ describe("setPageLlmOverride", () => {
 		);
 		expect(next.insights).toBeUndefined();
 		expect(next.roadmap).toEqual({ thinking: "low" });
+	});
+
+	it("retire le modèle de la page quand son fournisseur change", () => {
+		const next = setPageLlmOverride(
+			{ insights: { provider: "ollama", model: "gemma4:12b", thinking: "low" } },
+			"insights",
+			{ provider: "anthropic" },
+		);
+		expect(next.insights).toEqual({ provider: "anthropic", thinking: "low" });
+	});
+
+	it("retire le modèle de la page quand elle revient au fournisseur des réglages", () => {
+		const next = setPageLlmOverride(
+			{ insights: { provider: "ollama", model: "gemma4:12b" } },
+			"insights",
+			{ provider: undefined },
+			"ollama",
+		);
+		expect(next.insights).toBeUndefined();
+	});
+
+	it("garde le modèle quand le fournisseur ne change pas", () => {
+		const next = setPageLlmOverride(
+			{ insights: { model: "gemma4:12b" } },
+			"insights",
+			{ provider: "ollama" },
+			"ollama",
+		);
+		expect(next.insights).toEqual({ provider: "ollama", model: "gemma4:12b" });
+	});
+
+	it("épingle le fournisseur hérité sur un modèle choisi", () => {
+		const next = setPageLlmOverride(undefined, "insights", { model: "gemma4:12b" }, "ollama");
+		expect(next.insights).toEqual({ provider: "ollama", model: "gemma4:12b" });
+	});
+
+	it("n'épingle rien quand la page nomme déjà son fournisseur", () => {
+		const next = setPageLlmOverride(
+			{ insights: { provider: "anthropic" } },
+			"insights",
+			{ model: "claude-opus-4-8" },
+			"ollama",
+		);
+		expect(next.insights).toEqual({
+			provider: "anthropic",
+			model: "claude-opus-4-8",
+		});
 	});
 
 	it("ne touche pas l'objet reçu", () => {
