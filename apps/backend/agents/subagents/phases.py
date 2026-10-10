@@ -148,6 +148,13 @@ PHASE_ALIASES: dict[str, str] = {
     "merge_resolver": "solo",
     # One snippet in, one rewritten snippet out (migration/llm_transformer.py).
     "migration": "solo",
+    # The one-shot features that built their own SDK options until lot L16:
+    # one request in the prompt, one answer out as text, no tool.
+    "voice_command": "solo",
+    "git_command": "solo",
+    "code_playground": "solo",
+    "linear_updater": "solo",
+    "pr_followup_reviewer": "solo",
     # Writes one archify model from evidence already in its prompt; Python
     # validates and renders it. Unmapped, every authoring round — the
     # Architecture page's and the `architecture-map` phase's — was handed a
