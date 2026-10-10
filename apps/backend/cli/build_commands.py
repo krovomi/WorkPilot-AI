@@ -290,8 +290,18 @@ def _phase_context(
     model: str,
     verbose: bool,
     changed_files: list[str] | None,
+    *,
+    source_project_dir: Path | None = None,
+    source_spec_dir: Path | None = None,
 ):
-    """Assemble what a skill phase needs, or None when the engine is off."""
+    """Assemble what a skill phase needs, or None when the engine is off.
+
+    ``project_dir`` / ``spec_dir`` are where the phase works — the worktree in
+    an isolated build. ``source_project_dir`` / ``source_spec_dir`` are the
+    main project and the spec directory the Kanban reads: `architecture-map`
+    finds the baseline under the first (`.workpilot/` is gitignored, so no
+    worktree has one) and records its answer in the second.
+    """
     if profile is None:
         return None
     try:
@@ -305,6 +315,8 @@ def _phase_context(
             effort=profile.effort,
             verbose=verbose,
             changed_files=changed_files,
+            source_project_dir=source_project_dir,
+            source_spec_dir=source_spec_dir,
         )
     except Exception as exc:  # noqa: BLE001 - never block a build
         from debug import debug_warning
@@ -341,6 +353,30 @@ def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None)
 
         debug_warning("run.py", f"Workflow phases skipped: {exc}")
         return None
+
+
+def _sync_spec_back(spec_dir: Path, source_spec_dir: Path | None, moment: str) -> None:
+    """Copy the worktree's spec directory back to the main one. Never raises.
+
+    The phases after `qa` write into the worktree's copy of the spec —
+    `workflow/*.md`, `verify/`, `architecture/` — and the only sync used to
+    run *before* them, at the end of QA. What they wrote stayed in a directory
+    the Kanban does not read and the merge deletes. `sync_spec_to_source`
+    copies subdirectories too, and does nothing in a direct build, where the
+    two directories are one.
+    """
+    if source_spec_dir is None:
+        return
+    try:
+        from agents.utils import sync_spec_to_source
+        from debug import debug_info
+
+        if sync_spec_to_source(spec_dir, source_spec_dir):
+            debug_info("run.py", f"Spec directory synced to main project {moment}")
+    except Exception as exc:  # noqa: BLE001 - a copy never fails a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Spec sync {moment} skipped: {exc}")
 
 
 def _project_dir(spec_dir: Path) -> Path:
@@ -819,7 +855,14 @@ def handle_build_command(
         # — which is the point: what the effort level buys is now the phases
         # that actually run, not a line in a printed plan.
         _pre_ctx = _phase_context(
-            _profile, working_dir, spec_dir, model, verbose, changed_files=None
+            _profile,
+            working_dir,
+            spec_dir,
+            model,
+            verbose,
+            changed_files=None,
+            source_project_dir=project_dir,
+            source_spec_dir=source_spec_dir,
         )
         if _pre_ctx is not None:
             _pre_ctx.jev_run = jev_run
@@ -882,7 +925,14 @@ def handle_build_command(
             else None
         )
         _post_ctx = _phase_context(
-            _post_profile, working_dir, spec_dir, model, verbose, _changed
+            _post_profile,
+            working_dir,
+            spec_dir,
+            model,
+            verbose,
+            _changed,
+            source_project_dir=project_dir,
+            source_spec_dir=source_spec_dir,
         )
 
         # `design-check`. The workflow declares it immediately after `coding`
@@ -983,6 +1033,12 @@ def handle_build_command(
         # that was asked for, and `verify` checks the work before the build
         # claims to be done.
         _run_workflow_phases(_post_profile, _post_ctx, after="qa", before=None)
+
+        # Those phases wrote into the worktree's copy of the spec, after the
+        # QA sync above. Without this second copy their reports — and the
+        # architecture delta's head model — never reach the spec directory the
+        # Kanban reads, and are deleted with the worktree at merge.
+        _sync_spec_back(spec_dir, source_spec_dir, "after the post-QA phases")
 
         # Hard gates. `verify` declares `hard_gate: tests-pass`, which until
         # now only kept the phase out of the effort pruner — nothing checked

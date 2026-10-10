@@ -54,6 +54,7 @@ import {
 	setupCodePlaygroundEventForwarding,
 } from "./code-playground-handlers";
 import { setupConflictPredictorHandlers } from "./conflict-predictor-handlers";
+import { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-handlers";
 import { registerContextHandlers } from "./context-handlers";
 import { registerContextMeshHandlers } from "./context-mesh-handlers";
 import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
@@ -175,6 +176,7 @@ export {
 	setupCodePlaygroundEventForwarding,
 } from "./code-playground-handlers";
 export { setupConflictPredictorHandlers } from "./conflict-predictor-handlers";
+export { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-handlers";
 export { registerContextHandlers } from "./context-handlers";
 export { registerContextMeshHandlers } from "./context-mesh-handlers";
 export { registerCopilotCliHandlers } from "./copilot-cli-handlers";
@@ -386,6 +388,9 @@ export function setupIpcHandlers(
 
 	// Prompt Optimizer handlers
 	registerPromptOptimizerHandlers(getMainWindow);
+
+	// Context-Aware Snippets handlers
+	registerContextAwareSnippetsHandlers(getMainWindow);
 
 	// Credential Manager handlers (centralized auth and usage management)
 	registerCredentialHandlers();
