@@ -56,6 +56,11 @@ class DeltaStatus:
     artifact: str | None = None
     receipt: str | None = None
     generated_at: str = ""
+    diagnostics: list[dict] | None = None
+    """The authoring loop's unresolved diagnostics, when authoring is what
+    failed; None otherwise. Carried for the caller that prints them (the
+    runner's CLI payload) and deliberately not written to disk: the record
+    holds the sentence a person reads, not twenty diagnostics."""
 
     @property
     def has_changes(self) -> bool:

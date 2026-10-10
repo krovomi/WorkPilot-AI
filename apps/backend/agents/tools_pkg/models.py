@@ -213,7 +213,11 @@ AGENT_CONFIGS = {
         "thinking_default": "medium",
     },
     "spec_researcher": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        # spec_researcher.md checks each integration against Context7 and the
+        # web, then writes research.json with a heredoc — so Bash and Write
+        # too. Without them the phase does not fail: a placeholder file stands
+        # in for the research and the phase reports success.
+        "tools": BASE_READ_TOOLS + WEB_TOOLS + BASE_WRITE_TOOLS,
         "mcp_servers": ["context7"],  # Needs docs lookup
         "auto_claude_tools": [],
         "thinking_default": "medium",
@@ -225,22 +229,23 @@ AGENT_CONFIGS = {
         "thinking_default": "high",
     },
     "spec_critic": {
+        # Read-only on purpose: the workflow's `brainstorm` phase runs under it
+        # (workflows/runner.py), and a reviewer who can rewrite the document
+        # ends up reviewing their own. The spec pipeline's self-critique, which
+        # does rewrite spec.md, runs under `spec_self_critique`.
         "tools": BASE_READ_TOOLS,
         "mcp_servers": [],  # Self-critique, no external tools
         "auto_claude_tools": [],
         "thinking_default": "ultrathink",
     },
-    "spec_discovery": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": [],
+    "spec_self_critique": {
+        # spec_critic.md: find the spec's issues *and fix them* — spec.md is
+        # rewritten in place and critique_report.json written with a heredoc —
+        # checking each library claim against Context7 on the way.
+        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS,
+        "mcp_servers": ["context7"],
         "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
-    "spec_context": {
-        "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
+        "thinking_default": "high",
     },
     "spec_validation": {
         "tools": BASE_READ_TOOLS,
@@ -525,7 +530,12 @@ AGENT_CONFIGS = {
         "thinking_default": "high",
     },
     "ideation": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        # Every ideation prompt writes its `<type>_ideas.json` to disk (the
+        # phase executor validates the file), and three of them explore and
+        # write with shell heredocs. It ran on the `Bash(*)` / `Write(./**)`
+        # grants of the settings file; those no longer decide what a type
+        # may do (see `undeclared_builtin_tools`), so the config says it.
+        "tools": BASE_READ_TOOLS + WEB_TOOLS + ["Write", "Bash"],
         "mcp_servers": [],
         "auto_claude_tools": [],
         "thinking_default": "high",

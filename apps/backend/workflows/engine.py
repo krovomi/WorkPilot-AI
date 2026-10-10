@@ -39,6 +39,7 @@ __all__ = [
     "ExecutionProfile",
     "MissingImpl",
     "narrow_to_forecast",
+    "pack_inventory",
     "resolve_profile",
     "validate_impls",
     "DETERMINISTIC_PHASES",
@@ -276,12 +277,39 @@ class MissingImpl:
     reason: str
 
 
+def pack_inventory(packs) -> tuple[dict[str, set[str]], frozenset[str]]:
+    """What `validate_impls` checks a workflow against, from loaded packs.
+
+    The skills each pack provides, and the packs whose implementation is a
+    `gate` command rather than a skill — the same field
+    `gates.run_deterministic_gates` executes. One helper for the three callers
+    (the build banner, the profile API, `skills:workflow`), so they cannot
+    disagree about what "installed" means.
+    """
+    packs = list(packs)
+    available = {p.name: {s.name for s in p.skills()} for p in packs}
+    gated = frozenset(
+        p.name for p in packs if (getattr(p, "gate", None) or {}).get("command")
+    )
+    return available, gated
+
+
 def validate_impls(
-    workflow: Workflow, available: dict[str, set[str]]
+    workflow: Workflow,
+    available: dict[str, set[str]],
+    *,
+    gated: frozenset[str] | set[str] = frozenset(),
 ) -> list[MissingImpl]:
     """Report phases whose implementation cannot be found.
 
-    ``available`` maps pack name to the skill names it provides.
+    ``available`` maps pack name to the skill names it provides; ``gated``
+    names the packs that declare a `gate` command (`pack_inventory` builds
+    both).
+
+    A deterministic phase whose pack declares a gate is implemented by that
+    gate — `design-check` runs impeccable's detector without any skill on
+    disk — so it is not reported. Reporting it sent people to bootstrap a pack
+    the phase did not need.
 
     Reported, never fatal. Several packs are vendored on demand, so a fresh
     clone legitimately has phases it cannot run yet; the answer is to tell the
@@ -291,6 +319,8 @@ def validate_impls(
     missing: list[MissingImpl] = []
     for phase in workflow.phases:
         if phase.pack in BUILTIN_PACKS:
+            continue
+        if phase.id in DETERMINISTIC_PHASES and phase.pack in gated:
             continue
         skills = available.get(phase.pack)
         if skills is None:
