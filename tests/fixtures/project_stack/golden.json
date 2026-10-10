@@ -1,0 +1,667 @@
+{
+ "android-native": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [],
+  "languages": [
+   "java/kotlin"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "java/kotlin"
+   ],
+   "package_managers": [
+    "gradle"
+   ],
+   "test_runners": []
+  },
+  "mobile": [
+   "android-native",
+   [
+    "android"
+   ]
+  ],
+  "project_type": "unknown",
+  "report": [
+   [
+    "Java / Kotlin",
+    "mvn test (Surefire emits JUnit XML) or gradle test"
+   ]
+  ],
+  "tech_languages": [
+   "kotlin"
+  ],
+  "ui": [
+   [
+    "android-native",
+    "jetpack-compose",
+    "."
+   ]
+  ]
+ },
+ "django-req": {
+  "api": [
+   "django",
+   "python"
+  ],
+  "frameworks": [
+   "django"
+  ],
+  "languages": [
+   "python"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "python"
+   ],
+   "package_managers": [
+    "pip"
+   ],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "python_api",
+  "report": [
+   [
+    "Python",
+    "pytest --junitxml=test-results/junit.xml"
+   ]
+  ],
+  "tech_languages": [
+   "python"
+  ],
+  "ui": []
+ },
+ "dotnet-api": {
+  "api": [
+   "aspnetcore",
+   "csharp"
+  ],
+  "frameworks": [],
+  "languages": [
+   "c#"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "c#"
+   ],
+   "package_managers": [
+    "nuget"
+   ],
+   "test_runners": [
+    "dotnet test"
+   ]
+  },
+  "mobile": null,
+  "project_type": "unknown",
+  "report": [
+   [
+    "C# / .NET",
+    "dotnet test --logger trx"
+   ]
+  ],
+  "tech_languages": [
+   "csharp"
+  ],
+  "ui": []
+ },
+ "electron": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [
+   "react",
+   "electron"
+  ],
+  "languages": [
+   "javascript/typescript"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [
+    "react"
+   ],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "javascript/typescript"
+   ],
+   "package_managers": [
+    "npm"
+   ],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "electron",
+  "report": [
+   [
+    "JavaScript / TypeScript",
+    "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)"
+   ]
+  ],
+  "tech_languages": [
+   "javascript"
+  ],
+  "ui": [
+   [
+    "react",
+    "react",
+    "."
+   ]
+  ]
+ },
+ "empty": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [],
+  "languages": [],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [],
+   "package_managers": [],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "unknown",
+  "report": [],
+  "tech_languages": [],
+  "ui": []
+ },
+ "express-api": {
+  "api": [
+   "node",
+   "typescript"
+  ],
+  "frameworks": [
+   "express"
+  ],
+  "languages": [
+   "javascript/typescript"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "javascript/typescript"
+   ],
+   "package_managers": [
+    "npm"
+   ],
+   "test_runners": [
+    "jest"
+   ]
+  },
+  "mobile": null,
+  "project_type": "nodejs",
+  "report": [
+   [
+    "JavaScript / TypeScript",
+    "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)"
+   ]
+  ],
+  "tech_languages": [
+   "javascript"
+  ],
+  "ui": []
+ },
+ "fastapi": {
+  "api": [
+   "fastapi",
+   "python"
+  ],
+  "frameworks": [
+   "fastapi"
+  ],
+  "languages": [
+   "python"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": true,
+   "has_docker_compose": false,
+   "languages": [
+    "python"
+   ],
+   "package_managers": [
+    "uv/poetry/pip"
+   ],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "python_api",
+  "report": [
+   [
+    "Python",
+    "pytest --junitxml=test-results/junit.xml"
+   ]
+  ],
+  "tech_languages": [
+   "python"
+  ],
+  "ui": []
+ },
+ "flutter": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [
+   "flutter"
+  ],
+  "languages": [],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [],
+   "package_managers": [],
+   "test_runners": []
+  },
+  "mobile": [
+   "flutter",
+   [
+    "android",
+    "ios"
+   ]
+  ],
+  "project_type": "unknown",
+  "report": [],
+  "tech_languages": [
+   "dart"
+  ],
+  "ui": [
+   [
+    "flutter",
+    "flutter",
+    "."
+   ]
+  ]
+ },
+ "go-api": {
+  "api": [
+   "go",
+   "go"
+  ],
+  "frameworks": [],
+  "languages": [
+   "go"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [
+    "github_actions"
+   ],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "go"
+   ],
+   "package_managers": [
+    "go mod"
+   ],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "go",
+  "report": [
+   [
+    "Go",
+    "gotestsum --junitfile test-results/junit.xml"
+   ]
+  ],
+  "tech_languages": [
+   "go"
+  ],
+  "ui": []
+ },
+ "nextjs": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [
+   "nextjs",
+   "react",
+   "jest",
+   "playwright"
+  ],
+  "languages": [
+   "javascript/typescript"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [
+    "nextjs",
+    "react"
+   ],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "javascript/typescript"
+   ],
+   "package_managers": [
+    "npm",
+    "yarn"
+   ],
+   "test_runners": [
+    "jest",
+    "playwright"
+   ]
+  },
+  "mobile": null,
+  "project_type": "nextjs",
+  "report": [
+   [
+    "JavaScript / TypeScript",
+    "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)"
+   ]
+  ],
+  "tech_languages": [
+   "javascript"
+  ],
+  "ui": [
+   [
+    "nextjs",
+    "nextjs",
+    "."
+   ]
+  ]
+ },
+ "python-cli": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [],
+  "languages": [
+   "python"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "python"
+   ],
+   "package_managers": [
+    "uv/poetry/pip"
+   ],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "python_cli",
+  "report": [
+   [
+    "Python",
+    "pytest --junitxml=test-results/junit.xml"
+   ]
+  ],
+  "tech_languages": [
+   "python"
+  ],
+  "ui": []
+ },
+ "react-vite": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [
+   "react",
+   "vitest"
+  ],
+  "languages": [
+   "javascript/typescript"
+  ],
+  "manifest": {
+   "build_scripts": [
+    "vite build"
+   ],
+   "existing_ci": [],
+   "frameworks": [
+    "react"
+   ],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "javascript/typescript"
+   ],
+   "package_managers": [
+    "npm",
+    "pnpm"
+   ],
+   "test_runners": [
+    "vitest",
+    "vitest run"
+   ]
+  },
+  "mobile": null,
+  "project_type": "react_spa",
+  "report": [
+   [
+    "JavaScript / TypeScript",
+    "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)"
+   ]
+  ],
+  "tech_languages": [
+   "javascript",
+   "typescript"
+  ],
+  "ui": [
+   [
+    "react",
+    "react",
+    "."
+   ]
+  ]
+ },
+ "ruby": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [
+   "rails"
+  ],
+  "languages": [],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [],
+   "package_managers": [],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "ruby",
+  "report": [
+   [
+    "Ruby",
+    "rspec --format RspecJunitFormatter --out test-results/junit.xml"
+   ]
+  ],
+  "tech_languages": [
+   "ruby"
+  ],
+  "ui": []
+ },
+ "rust": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [],
+  "languages": [
+   "rust"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [
+    "gitlab_ci"
+   ],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "rust"
+   ],
+   "package_managers": [
+    "cargo"
+   ],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "rust",
+  "report": [
+   [
+    "Rust",
+    "cargo nextest run --profile ci (emits JUnit)"
+   ]
+  ],
+  "tech_languages": [
+   "rust"
+  ],
+  "ui": []
+ },
+ "spring": {
+  "api": [
+   "spring",
+   "java"
+  ],
+  "frameworks": [],
+  "languages": [
+   "java/kotlin"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "java/kotlin"
+   ],
+   "package_managers": [
+    "maven"
+   ],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "unknown",
+  "report": [
+   [
+    "Java / Kotlin",
+    "mvn test (Surefire emits JUnit XML) or gradle test"
+   ]
+  ],
+  "tech_languages": [
+   "java"
+  ],
+  "ui": []
+ },
+ "static-html": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [],
+  "languages": [],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [],
+   "package_managers": [],
+   "test_runners": []
+  },
+  "mobile": null,
+  "project_type": "html_css",
+  "report": [],
+  "tech_languages": [],
+  "ui": []
+ },
+ "wpf": {
+  "api": [
+   "",
+   ""
+  ],
+  "frameworks": [],
+  "languages": [
+   "c#"
+  ],
+  "manifest": {
+   "build_scripts": [],
+   "existing_ci": [],
+   "frameworks": [],
+   "has_docker": false,
+   "has_docker_compose": false,
+   "languages": [
+    "c#"
+   ],
+   "package_managers": [
+    "nuget"
+   ],
+   "test_runners": [
+    "dotnet test"
+   ]
+  },
+  "mobile": null,
+  "project_type": "unknown",
+  "report": [
+   [
+    "C# / .NET",
+    "dotnet test --logger trx"
+   ]
+  ],
+  "tech_languages": [
+   "csharp"
+  ],
+  "ui": [
+   [
+    "wpf",
+    "wpf",
+    "."
+   ]
+  ]
+ }
+}

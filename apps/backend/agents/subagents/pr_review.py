@@ -1,10 +1,14 @@
-"""The PR-review specialists, moved out of the runner that declared them.
+"""The PR-review specialists, moved out of the runners that declared them.
 
-`runners/github/services/parallel_orchestrator_reviewer.py` built these six
-`AgentDefinition`s inline — the fourth place in the repo where subagents were
-declared, and the one nothing else could see. A roster the registry does not
-know about cannot be specialised by language, cannot be emitted to a harness
-directory, and cannot be capped alongside the rest.
+`runners/github/services/parallel_orchestrator_reviewer.py` built six
+`AgentDefinition`s inline, and `parallel_followup_reviewer.py` four more — one
+of them a second `finding-validator` with its own description. A roster the
+registry does not know about cannot be specialised by language, cannot be
+emitted to a harness directory, and cannot be capped alongside the rest.
+
+Every specialist is declared once, in `PR_SPECIALISTS`, and each review names
+the ones it carries in `PR_ROSTERS` — the same "definitions by name, rosters
+as lists of names" shape `phases.py` uses.
 
 Two things distinguish this roster from the phase defaults in `phases.py` and
 shape the interface below.
@@ -32,7 +36,14 @@ from .phases import sdk_available
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["PR_REVIEW_SPECIALISTS", "SpecialistSpec", "pr_review_agents"]
+__all__ = [
+    "PR_FOLLOWUP_SPECIALISTS",
+    "PR_REVIEW_SPECIALISTS",
+    "PR_ROSTERS",
+    "PR_SPECIALISTS",
+    "SpecialistSpec",
+    "pr_review_agents",
+]
 
 # Read-only, deliberately. A reviewer that can edit the code it is reviewing
 # stops being a reviewer.
@@ -50,7 +61,7 @@ class SpecialistSpec:
     tools: tuple[str, ...] = tuple(_REVIEW_TOOLS)
 
 
-PR_REVIEW_SPECIALISTS: tuple[SpecialistSpec, ...] = (
+_SPECS: tuple[SpecialistSpec, ...] = (
     SpecialistSpec(
         name="security-reviewer",
         prompt_file="pr_security_agent.md",
@@ -106,27 +117,96 @@ PR_REVIEW_SPECIALISTS: tuple[SpecialistSpec, ...] = (
         ),
         fallback="You are an AI triage expert. Validate AI comments.",
     ),
+    # Shared by both reviews. The follow-up declared its own copy, worded for
+    # "unresolved" findings; one description now covers both inputs.
     SpecialistSpec(
         name="finding-validator",
         prompt_file="pr_finding_validator.md",
         description=(
-            "Finding validation specialist. Re-investigates findings to validate "
-            "they are actually real issues, not false positives. "
+            "Finding validation specialist. Re-investigates findings — new ones "
+            "from the other specialists, or previous ones still marked unresolved "
+            "— to validate they are actually real issues, not false positives. "
             "Reads the ACTUAL CODE at the finding location with fresh eyes. "
-            "CRITICAL: Invoke for ALL findings after specialist agents complete. "
+            "CRITICAL: Invoke for ALL such findings once the specialist agents "
+            "(or resolution-verifier) have reported. "
             "Can confirm findings as valid OR dismiss them as false positives. "
             "Use Read, Grep, and Glob to check for mitigations the original agent missed."
         ),
         fallback="You validate whether findings are real issues.",
     ),
+    # The follow-up review's own three, declared inline in
+    # `parallel_followup_reviewer.py` until lot L11.
+    SpecialistSpec(
+        name="resolution-verifier",
+        prompt_file="pr_followup_resolution_agent.md",
+        description=(
+            "Resolution verification specialist. Use to verify whether previous "
+            "findings have been addressed. Analyzes diffs to determine if issues "
+            "are truly fixed, partially fixed, or still unresolved. "
+            "Invoke when: There are previous findings to verify."
+        ),
+        fallback="You verify whether previous findings are resolved.",
+    ),
+    SpecialistSpec(
+        name="new-code-reviewer",
+        prompt_file="pr_followup_newcode_agent.md",
+        description=(
+            "New code analysis specialist. Reviews code added since last review "
+            "for security, logic, quality issues, and regressions. "
+            "Invoke when: There are substantial code changes (>50 lines diff) or "
+            "changes to security-sensitive areas."
+        ),
+        fallback="You review new code for issues.",
+    ),
+    SpecialistSpec(
+        name="comment-analyzer",
+        prompt_file="pr_followup_comment_agent.md",
+        description=(
+            "Comment and feedback analyst. Processes contributor comments and "
+            "AI tool reviews (CodeRabbit, Cursor, Gemini, etc.) to identify "
+            "unanswered questions and valid concerns. "
+            "Invoke when: There are comments or formal reviews since last review."
+        ),
+        fallback="You analyze comments and feedback.",
+    ),
+)
+
+#: Every PR specialist, by name. Declared once whatever the number of reviews
+#: that carry it.
+PR_SPECIALISTS: dict[str, SpecialistSpec] = {spec.name: spec for spec in _SPECS}
+
+#: Which specialists each review carries, by name.
+PR_ROSTERS: dict[str, tuple[str, ...]] = {
+    "pr-review": (
+        "security-reviewer",
+        "quality-reviewer",
+        "logic-reviewer",
+        "codebase-fit-reviewer",
+        "ai-triage-reviewer",
+        "finding-validator",
+    ),
+    "pr-followup": (
+        "resolution-verifier",
+        "new-code-reviewer",
+        "comment-analyzer",
+        "finding-validator",
+    ),
+}
+
+PR_REVIEW_SPECIALISTS: tuple[SpecialistSpec, ...] = tuple(
+    PR_SPECIALISTS[name] for name in PR_ROSTERS["pr-review"]
+)
+PR_FOLLOWUP_SPECIALISTS: tuple[SpecialistSpec, ...] = tuple(
+    PR_SPECIALISTS[name] for name in PR_ROSTERS["pr-followup"]
 )
 
 
 def pr_review_agents(
     load_prompt: Callable[[str], str | None],
     with_working_dir: Callable[[str | None, str], str],
+    roster: str = "pr-review",
 ) -> dict[str, Any]:
-    """Build the roster for one review.
+    """Build the roster for one review — ``roster`` names a `PR_ROSTERS` entry.
 
     ``load_prompt`` reads a file from `prompts/github/`; ``with_working_dir``
     prefixes a prompt with the worktree the review is running in. Both are
@@ -147,5 +227,5 @@ def pr_review_agents(
             tools=list(spec.tools),
             model="inherit",
         )
-        for spec in PR_REVIEW_SPECIALISTS
+        for spec in (PR_SPECIALISTS[name] for name in PR_ROSTERS[roster])
     }

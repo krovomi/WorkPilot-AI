@@ -70,7 +70,10 @@ A task judged not-UI gets no prompt section, no MCP server, no tool definition
 **A phase between planning and coding, with no session.** `ui-design-system`
 is declared in `workflow.yaml` after `analyze` and before `mobile-design`,
 with `when: *ui_surface` — the anchor holds exactly
-`uiux.surface.UI_GLOBS`, and `tests/test_uiux.py` keeps the two equal. It is in
+`uiux.surface.UI_GLOBS` — `scripts/sync_surface_globs.py` writes it from
+Python, and `tests/test_uiux.py` keeps the two equal. `design-check`'s
+`&frontend_surface` is a deliberate subset (impeccable reads web markup only),
+and `mobile-design` / `store-readiness` share one `&mobile_surface`. It is in
 `DETERMINISTIC_PHASES` (never pruned: it saves nothing to drop it) and in the
 runner's `DETERMINISTIC_EXECUTORS`, so `run_skill_phase` calls
 `uiux.preflight.run_preflight` instead of opening a session.
