@@ -63,8 +63,42 @@ except ImportError:
     _REPLAY_AVAILABLE = False
     _get_replay_recorder = None  # type: ignore[assignment]
 
+import json
 import re
+import time
 from datetime import datetime, timezone
+
+# How a failed pass reads. The loop classifies the message (`classify_qa_error`)
+# to tell the next pass what actually went wrong: every error used to be
+# reported back as "you did NOT update implementation_plan.json", including the
+# ones where the agent had updated it and broken the JSON, or where the session
+# itself had failed — so the retry fixed nothing and the third pass failed the
+# same way.
+QA_ERROR_NO_SIGNOFF = "QA agent did not update implementation_plan.json"
+QA_ERROR_INVALID_PLAN = "QA agent left implementation_plan.json as invalid JSON"
+QA_ERROR_SIGNOFF_WRITE = "Failed to write qa_signoff"
+
+# `SIGN-OFF: APPROVED`, `Status: REJECTED`, `Verdict: APPROVED`. Matched after
+# markdown emphasis is stripped: the prompt's own templates bold the label
+# (`**SIGN-OFF**: APPROVED`, `**Status**: REJECTED`), and the `**` between the
+# label and the colon defeated every pattern.
+_VERDICT_RE = re.compile(
+    r"\b(?:SIGN[\-\s]*OFF|STATUS|VERDICT)\s*:\s*(APPROVED|REJECTED)\b"
+)
+_MARKDOWN_EMPHASIS_RE = re.compile(r"[*_`]")
+
+# The files the reviewer writes its verdict into besides the plan, in the order
+# they are trusted.
+_SESSION_REPORT_FILES = ("qa_report.md", "QA_FIX_REQUEST.md")
+
+
+def classify_qa_error(message: str) -> str:
+    """The kind of a QA error message, for the next pass's self-correction."""
+    if message.startswith(QA_ERROR_INVALID_PLAN):
+        return "invalid_implementation_plan_json"
+    if message.startswith((QA_ERROR_NO_SIGNOFF, QA_ERROR_SIGNOFF_WRITE)):
+        return "missing_implementation_plan_update"
+    return "session_error"
 
 
 def _extract_verdict_from_response(response_text: str) -> str | None:
@@ -80,24 +114,13 @@ def _extract_verdict_from_response(response_text: str) -> str | None:
     if not response_text:
         return None
 
-    text_upper = response_text.upper()
+    text_upper = _MARKDOWN_EMPHASIS_RE.sub("", response_text).upper()
 
-    # Look for explicit sign-off patterns
-    # Pattern: "SIGN-OFF: APPROVED" or "Sign-off: REJECTED"
-    signoff_match = re.search(
-        r"SIGN[\-\s]*OFF\s*:\s*(APPROVED|REJECTED)",
-        text_upper,
-    )
-    if signoff_match:
-        return signoff_match.group(1).lower()
-
-    # Pattern: "Status: APPROVED" or "Status: REJECTED"
-    status_match = re.search(
-        r"STATUS\s*:\s*(APPROVED|REJECTED)",
-        text_upper,
-    )
-    if status_match:
-        return status_match.group(1).lower()
+    # The last explicit verdict wins: the agent states its own at the end, and
+    # may quote the previous pass's ("the last status: REJECTED") on the way.
+    verdicts = _VERDICT_RE.findall(text_upper)
+    if verdicts:
+        return verdicts[-1].lower()
 
     # Pattern: "QA VALIDATION COMPLETE" + "APPROVED ✓" or "REJECTED ✗"
     if "QA VALIDATION COMPLETE" in text_upper:
@@ -107,6 +130,69 @@ def _extract_verdict_from_response(response_text: str) -> str | None:
             return "rejected"
 
     return None
+
+
+def _verdict_from_session_reports(spec_dir: Path, since: float) -> str | None:
+    """The verdict in a report the reviewer wrote during this session.
+
+    The prompt has the reviewer write `qa_report.md` (and `QA_FIX_REQUEST.md`
+    when it rejects) before it updates the plan, and the session can end
+    between the two. A file older than `since` belongs to a previous pass.
+    """
+    for name in _SESSION_REPORT_FILES:
+        path = spec_dir / name
+        try:
+            if path.stat().st_mtime < since:
+                continue
+            verdict = _extract_verdict_from_response(
+                path.read_text(encoding="utf-8", errors="replace")
+            )
+        except OSError:
+            continue
+        if verdict:
+            return verdict
+    return None
+
+
+def _read_plan_text(spec_dir: Path) -> str | None:
+    """implementation_plan.json as it is on disk, or None when unreadable."""
+    try:
+        return (spec_dir / "implementation_plan.json").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _plan_json_error(spec_dir: Path) -> str | None:
+    """Why implementation_plan.json does not parse; None when it does or is absent.
+
+    `load_implementation_plan` answers None for both a missing file and a
+    broken one, which made a plan the reviewer had edited into invalid JSON
+    read as a plan it had never touched.
+    """
+    plan_file = spec_dir / "implementation_plan.json"
+    if not plan_file.exists():
+        return None
+    try:
+        json.loads(plan_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        return f"{e.msg} at line {e.lineno} column {e.colno}"
+    except (OSError, UnicodeDecodeError) as e:
+        return str(e)
+    return None
+
+
+def _restore_plan(spec_dir: Path, plan_before: str | None) -> bool:
+    """Put back the plan as it was before the session, if that copy parses."""
+    if plan_before is None:
+        return False
+    try:
+        json.loads(plan_before)
+        (spec_dir / "implementation_plan.json").write_text(
+            plan_before, encoding="utf-8"
+        )
+    except (json.JSONDecodeError, OSError):
+        return False
+    return True
 
 
 def _programmatic_qa_signoff(
@@ -149,6 +235,27 @@ def _programmatic_qa_signoff(
         return False
 
     return save_implementation_plan(spec_dir, plan)
+
+
+def _what_went_wrong(error_type: str | None) -> str:
+    """The self-correction paragraph for the kind of error the last pass hit."""
+    if error_type == "invalid_implementation_plan_json":
+        return (
+            "You edited `implementation_plan.json` but left it as invalid JSON, so "
+            "the framework could not read your `qa_signoff`. The copy from before "
+            "your session has been restored. Read the file again and edit only the "
+            "`qa_signoff` field; do not rewrite the rest of the plan."
+        )
+    if error_type == "session_error":
+        return (
+            "The session ended on an error before any verdict was recorded. This "
+            "is not a mistake in the file: run the review again and record your "
+            "verdict as soon as you have it."
+        )
+    return (
+        "You did NOT update the `implementation_plan.json` file with the required "
+        "`qa_signoff` object."
+    )
 
 
 # =============================================================================
@@ -291,6 +398,7 @@ async def run_qa_agent_session(
             error_type=previous_error.get("error_type"),
             consecutive_errors=previous_error.get("consecutive_errors"),
         )
+        what_went_wrong = _what_went_wrong(previous_error.get("error_type"))
         prompt += f"""
 
 ---
@@ -304,7 +412,7 @@ The previous QA session failed with the following error:
 
 ### What Went Wrong
 
-You did NOT update the `implementation_plan.json` file with the required `qa_signoff` object.
+{what_went_wrong}
 
 ### Required Action
 
@@ -349,6 +457,8 @@ After completing your QA review, you MUST:
 
 3. **Use the Edit tool or Write tool** to update the file. The file path is:
    `{spec_dir}/implementation_plan.json`
+   Change only the `qa_signoff` field and keep the file valid JSON: no comments,
+   no trailing commas, every other field left exactly as it is.
 
 ### FAILURE TO DO THIS WILL CAUSE ANOTHER ERROR
 
@@ -360,6 +470,11 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
         print(
             f"\n⚠️  Retry with self-correction context (attempt {previous_error.get('consecutive_errors', 1) + 1})"
         )
+
+    # What the plan held before the reviewer touched it, so an edit that
+    # breaks its JSON can be undone instead of failing every following pass.
+    plan_before = _read_plan_text(spec_dir)
+    session_started_at = time.time()
 
     # ── Provider-agnostic path (OpenAI, Windsurf, Copilot, Google, etc.) ──
     if isinstance(client, AgentClient):
@@ -375,6 +490,8 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
             tool_count,
             _rr,
             _rs_id,
+            plan_before=plan_before,
+            session_started_at=session_started_at,
         )
 
     # ── Claude SDK path (backward compatible) ──
@@ -622,6 +739,8 @@ This is attempt {previous_error.get("consecutive_errors", 1) + 1}. If you fail t
             message_count,
             tool_count,
             result_error=result_error,
+            plan_before=plan_before,
+            session_started_at=session_started_at,
         )
 
         if _rr and _rs_id:
@@ -667,6 +786,8 @@ async def _run_qa_agent_client_session(
     tool_count: int,
     _rr: Any,
     _rs_id: Any,
+    plan_before: str | None = None,
+    session_started_at: float | None = None,
 ) -> tuple[str, str]:
     """
     Provider-agnostic QA reviewer session using normalized AgentMessage stream.
@@ -876,6 +997,8 @@ async def _run_qa_agent_client_session(
             message_count,
             tool_count,
             result_error=None,
+            plan_before=plan_before,
+            session_started_at=session_started_at,
         )
 
         if _rr and _rs_id:
@@ -917,6 +1040,8 @@ async def _process_qa_result(
     message_count: int,
     tool_count: int,
     result_error: str | None = None,
+    plan_before: str | None = None,
+    session_started_at: float | None = None,
 ) -> tuple[str, str]:
     """
     Shared post-processing logic for QA reviewer sessions.
@@ -926,7 +1051,26 @@ async def _process_qa_result(
 
     Used by both the Claude SDK path and the AgentClient path.
     """
-    status = get_qa_signoff_status(spec_dir)
+    plan_error = _plan_json_error(spec_dir)
+    if plan_error:
+        # The reviewer's edit broke the plan. Left as is, every later pass
+        # reads nothing, and so does the rest of the pipeline: put the copy
+        # from before the session back, and take the verdict from the
+        # reviewer's text or reports below. Whatever qa_signoff the restored
+        # copy holds is the previous pass's, never this one's.
+        restored = _restore_plan(spec_dir, plan_before)
+        debug_error(
+            "qa_reviewer",
+            f"implementation_plan.json is invalid JSON after the session: {plan_error}",
+            restored=restored,
+        )
+        print(
+            f"\n⚠️  implementation_plan.json is invalid JSON ({plan_error})"
+            + ("; restored the copy from before the session." if restored else ".")
+        )
+        status = None
+    else:
+        status = get_qa_signoff_status(spec_dir)
     debug(
         "qa_reviewer",
         "QA session completed",
@@ -1011,8 +1155,11 @@ async def _process_qa_result(
         print("Treating as human escalation (manual verification required).")
         return ("human_escalation", response_text)
 
-    # Agent didn't update the file — try to extract verdict from response
+    # Agent didn't update the file — try to extract verdict from response,
+    # then from the reports it wrote during this session
     extracted_verdict = _extract_verdict_from_response(response_text)
+    if not extracted_verdict and session_started_at is not None:
+        extracted_verdict = _verdict_from_session_reports(spec_dir, session_started_at)
 
     if extracted_verdict:
         debug(
@@ -1041,7 +1188,9 @@ async def _process_qa_result(
             "qa_reviewer",
             "Failed to programmatically write qa_signoff",
         )
-        return ("error", "Failed to write qa_signoff")
+        if plan_error:
+            return ("error", f"{QA_ERROR_INVALID_PLAN} ({plan_error})")
+        return ("error", QA_ERROR_SIGNOFF_WRITE)
 
     # Agent didn't update the status and no clear verdict in response
     debug_error(
@@ -1055,6 +1204,9 @@ async def _process_qa_result(
     if result_error:
         return ("error", f"Agent session error: {result_error}")
 
+    if plan_error:
+        return ("error", f"{QA_ERROR_INVALID_PLAN} ({plan_error})")
+
     error_details = []
     if message_count == 0:
         error_details.append("No messages received from agent")
@@ -1063,7 +1215,7 @@ async def _process_qa_result(
     if not response_text:
         error_details.append("Agent produced no output")
 
-    error_msg = "QA agent did not update implementation_plan.json"
+    error_msg = QA_ERROR_NO_SIGNOFF
     if error_details:
         error_msg += f" ({'; '.join(error_details)})"
 
