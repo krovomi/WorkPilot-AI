@@ -62,7 +62,13 @@ except ImportError:
     TaskEventEmitter = None
 
 try:
-    from debug import debug, debug_error, debug_section, debug_success, debug_warning
+    from core.debug import (
+        debug,
+        debug_error,
+        debug_section,
+        debug_success,
+        debug_warning,
+    )
 except ImportError:
 
     def debug(*args, **kwargs):

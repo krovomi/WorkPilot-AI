@@ -685,7 +685,7 @@ def _run_cli(argv=None, jev_run=None) -> None:
     args = parse_args(argv) if argv is not None else parse_args()
 
     # Import debug functions after environment setup
-    from debug import debug, debug_error, debug_section, debug_success
+    from core.debug import debug, debug_error, debug_section, debug_success
 
     debug_section("run.py", "Starting WorkPilot AI Framework")
     debug("run.py", "Arguments parsed", args=vars(args))

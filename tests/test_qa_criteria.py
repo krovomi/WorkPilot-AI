@@ -42,7 +42,7 @@ _mocked_module_names = [
     "phase_config",
     "phase_event",
     # Logging & utilities
-    "debug",
+    "core.debug",
     "ui",
     "progress",
     "task_logger",

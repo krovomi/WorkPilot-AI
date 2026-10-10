@@ -25,7 +25,7 @@ from core.agent_client import (
     MessageRole,
 )
 from core.conversation_log import append_message as _log_append_message
-from debug import debug, debug_detailed, debug_error, debug_section, debug_success
+from core.debug import debug, debug_detailed, debug_error, debug_section, debug_success
 from insight_extractor import extract_session_insights
 from linear_updater import (
     linear_subtask_completed,

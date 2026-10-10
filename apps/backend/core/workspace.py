@@ -37,7 +37,7 @@ from worktree import WorktreeManager
 
 # Import debug utilities
 try:
-    from debug import (
+    from core.debug import (
         debug,
         debug_detailed,
         debug_error,

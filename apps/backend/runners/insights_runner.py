@@ -19,14 +19,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # trigger graphiti_core -> real_ladybug -> pywintypes import chain (ACS-253)
 from cli.utils import import_dotenv
 from core.auth import ensure_claude_code_oauth_token, get_auth_token
-from core.dependency_validator import validate_platform_dependencies
-from debug import (
+from core.debug import (
     debug,
     debug_detailed,
     debug_error,
     debug_section,
     debug_success,
 )
+from core.dependency_validator import validate_platform_dependencies
 from learning import ExplanationLevel, LearningMode, LearningModeConfig
 from phase_config import get_thinking_budget, resolve_model_id
 
