@@ -67,7 +67,9 @@ def test_verdict_survives_the_prompts_own_markdown(text, verdict):
 def test_invalid_plan_is_restored_and_the_verdict_still_recorded(spec_dir):
     plan_file = spec_dir / "implementation_plan.json"
     before = plan_file.read_text(encoding="utf-8")
-    plan_file.write_text('{"feature": "x", "qa_signoff": {"status": "approved",}}')
+    plan_file.write_text(
+        '{"feature": "x", "qa_signoff": {"status": "approved",}}', encoding="utf-8"
+    )
 
     status, _ = _process(
         spec_dir,
@@ -85,7 +87,7 @@ def test_invalid_plan_is_restored_and_the_verdict_still_recorded(spec_dir):
 def test_invalid_plan_without_verdict_says_so(spec_dir):
     plan_file = spec_dir / "implementation_plan.json"
     before = plan_file.read_text(encoding="utf-8")
-    plan_file.write_text("{ not json")
+    plan_file.write_text("{ not json", encoding="utf-8")
 
     status, message = _process(
         spec_dir, "I edited the plan.", plan_before=before, session_started_at=0.0
@@ -107,12 +109,14 @@ def test_verdict_read_from_the_report_written_this_session(spec_dir):
     status, _ = _process(spec_dir, "", session_started_at=started)
 
     assert status == "rejected"
-    plan = json.loads((spec_dir / "implementation_plan.json").read_text())
+    plan = json.loads(
+        (spec_dir / "implementation_plan.json").read_text(encoding="utf-8")
+    )
     assert plan["qa_signoff"]["status"] == "rejected"
 
 
 def test_a_previous_passs_report_is_not_this_passs_verdict(spec_dir):
-    (spec_dir / "qa_report.md").write_text("**SIGN-OFF**: APPROVED")
+    (spec_dir / "qa_report.md").write_text("**SIGN-OFF**: APPROVED", encoding="utf-8")
 
     status, message = _process(spec_dir, "", session_started_at=time.time() + 60)
 
