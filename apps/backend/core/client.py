@@ -714,6 +714,26 @@ def _claude_transcript_exists(session_id: str, config_dir: str | None) -> bool:
         return False
 
 
+# Permission mode hardening for read-only phases. "plan" lets Claude explore and
+# reason but refuses every write/exec tool call — a strong defense-in-depth
+# complement to the tools allowlist. Only for agent types that have no business
+# modifying files; a prompt that has to write its output (the spec researcher,
+# the spec self-critique) must never be mapped onto one of these, or its phase
+# reports success over a placeholder file. Module-level so tests read the set
+# the client applies instead of a copy of it.
+# See: code.claude.com/docs/en/agent-sdk/permissions
+READ_ONLY_AGENT_TYPES = frozenset(
+    {
+        "analyzer",
+        "spec_critic",
+        "spec_validation",
+        "pr_reviewer",
+        "pr_orchestrator_parallel",
+        "insights",
+    }
+)
+
+
 def create_client(
     project_dir: Path,
     spec_dir: Path,
@@ -1573,22 +1593,8 @@ def create_client(
         options_kwargs["resume"] = _resume_id
         logger.info(f"Resuming Claude SDK session: {_resume_id}")
 
-    # Permission mode hardening for read-only phases. "plan" lets Claude
-    # explore and reason but refuses every write/exec tool call — a strong
-    # defense-in-depth complement to the tools allowlist. We only enable it
-    # for phases that have no business modifying files anyway.
-    # See: code.claude.com/docs/en/agent-sdk/permissions
-    _readonly_phases = {
-        "analyzer",
-        "spec_critic",
-        "spec_validation",
-        "spec_context",
-        "spec_discovery",
-        "pr_reviewer",
-        "pr_orchestrator_parallel",
-        "insights",
-    }
-    if agent_type in _readonly_phases and "permission_mode" not in options_kwargs:
+    # Read-only phases run in permission mode "plan" (READ_ONLY_AGENT_TYPES).
+    if agent_type in READ_ONLY_AGENT_TYPES and "permission_mode" not in options_kwargs:
         options_kwargs["permission_mode"] = "plan"
 
     # Reasoning effort, gated on Opus 4.x (only Opus models support this param).
@@ -2122,6 +2128,8 @@ _EFFORT_PHASE: dict[str, str] = {
     "verifier": "qa",
     "spec_writer": "spec",
     "spec_gatherer": "spec",
+    "spec_researcher": "spec",
+    "spec_self_critique": "spec",
 }
 _DEFAULT_EFFORT_PHASE = "coding"
 
