@@ -74,7 +74,7 @@ WorkPilot-AI/
 │           │   ├── terminal/         # PTY daemon, lifecycle, Claude integration
 │           │   ├── platform/         # Cross-platform abstraction
 │           │   ├── ipc-handlers/     # 106 handler modules by domain
-│           │   ├── services/         # SDK session recovery, profile service
+│           │   ├── services/         # Profile service, credentials, page LLM config
 │           │   └── changelog/        # Changelog generation and formatting
 │           ├── preload/              # Electron preload scripts (electronAPI bridge)
 │           ├── renderer/             # React UI
