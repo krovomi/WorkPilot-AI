@@ -84,13 +84,15 @@ phases:
       SwiftUI, Compose, Flutter…) s'y ajoutent. Le coder ne les reçoit que sur
       les sous-tâches dont les fichiers sont UI ; la QA juge contre le même
       design system, et `design-check` note le code une fois écrit. Déterministe et gratuit : jamais
-      élagué par l'effort. La liste de fichiers est celle de
-      `apps/backend/uiux/surface.py`, et un test garde les deux identiques.
+      élagué par l'effort. La liste de fichiers est `UI_GLOBS` de
+      `apps/backend/uiux/surface.py` : `scripts/sync_surface_globs.py` réécrit
+      cette ligne depuis Python, et `tests/test_uiux.py` échoue si elles
+      divergent.
 
   - id: mobile-design
     impl: mobile/mobile-design-review
     min_effort: medium
-    when: touches("**/AndroidManifest.xml,**/*.gradle.kts,**/*.gradle,**/*.kt,**/*.swift,**/Info.plist,**/*.xcodeproj/**,**/*.xcworkspace/**,**/pubspec.yaml,**/*.dart,**/*.xaml,**/capacitor.config.*,**/PrivacyInfo.xcprivacy,**/*.entitlements")
+    when: &mobile_surface touches("**/AndroidManifest.xml,**/*.gradle.kts,**/*.gradle,**/*.kt,**/*.swift,**/Info.plist,**/*.xcodeproj/**,**/*.xcworkspace/**,**/pubspec.yaml,**/*.dart,**/*.xaml,**/capacitor.config.*,**/PrivacyInfo.xcprivacy,**/*.entitlements")
     dispatch: fresh-context
     description: >-
       Applications smartphone uniquement. Ce qu'`impeccable` vérifie sur le web
@@ -113,7 +115,13 @@ phases:
     impl: impeccable/impeccable
     when: &frontend_surface touches("**/*.tsx,**/*.jsx,**/*.css,**/*.scss,**/*.vue,**/*.svelte,**/*.astro,**/*.html,**/*.less,**/*.sass,**/*.razor,**/*.cshtml")
     description: >-
-      Frontend only. impeccable's 59 detector rules run locally with no API
+      Frontend only, and narrower than `&ui_surface` on purpose: impeccable's
+      detectors read HTML, CSS and JSX-like markup, so XAML/AXAML, SwiftUI,
+      Flutter, FXML and Android `res/` — interfaces `ui-design-system` does
+      cover — would open the gate on files it has no rule for.
+      `tests/test_uiux.py` holds this list to a subset of `UI_GLOBS`.
+
+      impeccable's 59 detector rules run locally with no API
       call, so this is never pruned by effort — skipping it would save nothing.
       The implementation is the pack's `gate` command (`skills/impeccable/
       pack.json`), not a skill: nothing has to be bootstrapped for it to run.
@@ -177,7 +185,7 @@ phases:
   - id: store-readiness
     impl: mobile/mobile-store-readiness
     min_effort: medium
-    when: touches("**/AndroidManifest.xml,**/*.gradle.kts,**/*.gradle,**/*.kt,**/*.swift,**/Info.plist,**/*.xcodeproj/**,**/*.xcworkspace/**,**/pubspec.yaml,**/*.dart,**/*.xaml,**/capacitor.config.*,**/PrivacyInfo.xcprivacy,**/*.entitlements")
+    when: *mobile_surface
     dispatch: fresh-context
     description: >-
       Ce sur quoi le Play Store et l'App Store rejettent, et qu'aucun test du

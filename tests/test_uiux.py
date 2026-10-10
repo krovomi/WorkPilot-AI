@@ -191,7 +191,25 @@ class TestSurface:
         text = WORKFLOW.read_text(encoding="utf-8")
         match = re.search(r'&ui_surface touches\("([^"]+)"\)', text)
         assert match, "workflow.yaml declares no &ui_surface anchor"
-        assert tuple(match.group(1).split(",")) == UI_GLOBS
+        assert tuple(match.group(1).split(",")) == UI_GLOBS, (
+            "run `python3 scripts/sync_surface_globs.py` to rewrite the anchor"
+        )
+
+    def test_the_frontend_gate_is_a_subset_of_the_ui_surface(self):
+        """`design-check` is narrower on purpose, never wider (see its description)."""
+        text = WORKFLOW.read_text(encoding="utf-8")
+        match = re.search(r'&frontend_surface touches\("([^"]+)"\)', text)
+        assert match, "workflow.yaml declares no &frontend_surface anchor"
+        assert set(match.group(1).split(",")) <= set(UI_GLOBS)
+
+    def test_both_mobile_phases_share_one_list(self):
+        workflow = load_workflow(WORKFLOW)
+        by_id = {p.id: p for p in workflow.phases}
+        assert by_id["mobile-design"].when_globs == by_id["store-readiness"].when_globs
+        assert by_id["mobile-design"].when_globs
+        text = WORKFLOW.read_text(encoding="utf-8")
+        assert text.count("&mobile_surface touches(") == 1
+        assert text.count("**/AndroidManifest.xml") == 1
 
 
 class TestRootFilesMatch:
