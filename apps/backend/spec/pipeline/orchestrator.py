@@ -63,7 +63,7 @@ class SpecOrchestrator:
         model: str = "sonnet",  # Shorthand - resolved via API Profile if configured
         thinking_level: str = "medium",  # Thinking level for extended thinking
         complexity_override: str | None = None,  # Force a specific complexity
-        use_ai_assessment: bool = True,  # Use AI for complexity assessment (vs heuristics)
+        use_ai_assessment: bool = True,  # Ask the AI when the heuristic is unsure
         jev_run=None,
     ):
         """Initialize the spec orchestrator.
@@ -76,7 +76,8 @@ class SpecOrchestrator:
             model: The model to use for agent execution
             thinking_level: Thinking level (none, low, medium, high, ultrathink)
             complexity_override: Force a specific complexity level
-            use_ai_assessment: Whether to use AI for complexity assessment
+            use_ai_assessment: Whether the AI may be asked when the heuristic
+                is unsure (False: the heuristic always decides)
         """
         self.project_dir = Path(project_dir)
         from integrations.jev.models import JevContext
@@ -581,8 +582,30 @@ class SpecOrchestrator:
             # Manual override
             self.assessment = self._create_override_assessment()
         elif self.use_ai_assessment:
-            # Run AI assessment
-            self.assessment = await self._run_ai_assessment(task_logger)
+            # The heuristic is free; the complexity_assessor session is not.
+            # Ask the model only when the heuristic cannot tell.
+            heuristic = self._heuristic_assessment()
+            threshold = complexity.AI_ASSESSMENT_CONFIDENCE_THRESHOLD
+            if complexity.needs_ai_assessment(heuristic, threshold):
+                task_logger.log(
+                    f"Complexity heuristic unsure ({heuristic.confidence:.0%} < "
+                    f"{threshold:.0%}): asking the complexity assessor.",
+                    LogEntryType.INFO,
+                    LogPhase.PLANNING,
+                )
+                self.assessment = await self._run_ai_assessment(
+                    task_logger, fallback=heuristic
+                )
+            else:
+                task_logger.log(
+                    f"Complexity heuristic confident ({heuristic.confidence:.0%} >= "
+                    f"{threshold:.0%}): {heuristic.complexity.value}, "
+                    "complexity assessor skipped.",
+                    LogEntryType.INFO,
+                    LogPhase.PLANNING,
+                )
+                self.assessment = heuristic
+                self._print_assessment_info()
         else:
             # Use heuristic assessment
             self.assessment = self._heuristic_assessment()
@@ -643,15 +666,21 @@ class SpecOrchestrator:
             complexity=comp,
             confidence=1.0,
             reasoning=f"Manual override: {self.complexity_override}",
+            assessed_by="override",
         )
         print_status(f"Complexity override: {comp.value.upper()}", "success")
         return assessment
 
-    async def _run_ai_assessment(self, task_logger) -> complexity.ComplexityAssessment:
+    async def _run_ai_assessment(
+        self,
+        task_logger,
+        fallback: complexity.ComplexityAssessment | None = None,
+    ) -> complexity.ComplexityAssessment:
         """Run AI-based complexity assessment.
 
         Args:
             task_logger: The task logger instance
+            fallback: The heuristic verdict to keep if the session fails
 
         Returns:
             The complexity assessment
@@ -676,7 +705,7 @@ class SpecOrchestrator:
             print_status(
                 "AI assessment failed, falling back to heuristics...", "warning"
             )
-            return self._heuristic_assessment()
+            return fallback or self._heuristic_assessment()
 
     def _print_assessment_info(
         self, assessment: complexity.ComplexityAssessment | None = None
@@ -689,8 +718,9 @@ class SpecOrchestrator:
         if assessment is None:
             assessment = self.assessment
 
+        who = "AI" if assessment.assessed_by == "complexity_assessor" else "Heuristic"
         print_status(
-            f"AI assessed complexity: {highlight(assessment.complexity.value.upper())}",
+            f"{who} assessed complexity: {highlight(assessment.complexity.value.upper())}",
             "success",
         )
         print_key_value("Confidence", f"{assessment.confidence:.0%}")
@@ -723,8 +753,17 @@ class SpecOrchestrator:
             with open(auto_build_index, encoding="utf-8") as f:
                 project_index = json.load(f)
 
+        requirements = None
+        requirements_file = self.spec_dir / "requirements.json"
+        if requirements_file.exists():
+            try:
+                with open(requirements_file, encoding="utf-8") as f:
+                    requirements = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                requirements = None
+
         analyzer = complexity.ComplexityAnalyzer(project_index)
-        return analyzer.analyze(self.task_description or "")
+        return analyzer.analyze(self.task_description or "", requirements)
 
     def _print_completion_summary(
         self, results: list[phases.PhaseResult], phases_executed: list[str]
