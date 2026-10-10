@@ -1028,6 +1028,8 @@ const getReviewReasonLabel = (
 			return { label: t("reviewReason.hasErrors"), variant: "destructive" };
 		case "qa_rejected":
 			return { label: t("reviewReason.qaIssues"), variant: "warning" };
+		case "qa_unverified":
+			return { label: t("reviewReason.qaUnverified"), variant: "warning" };
 		case "plan_review":
 			return { label: t("reviewReason.approvePlan"), variant: "warning" };
 		case "stopped":

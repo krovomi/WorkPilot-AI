@@ -125,7 +125,8 @@
 		"qaIssues": "Problèmes QA",
 		"approvePlan": "Approuver le plan",
 		"plan_review": "Approuver le plan",
-		"stopped": "Arrêté"
+		"stopped": "Arrêté",
+		"qaUnverified": "QA non vérifiée"
 	},
 	"tooltips": {
 		"archiveTask": "Archiver la tâche",
@@ -161,6 +162,9 @@
 		},
 		"error": {
 			"title": "Tâche échouée"
+		},
+		"qa_unverified": {
+			"title": "Prête pour révision — QA non vérifiée"
 		}
 	},
 	"columns": {
@@ -1106,7 +1110,8 @@
 			"hasErrors": "Contient des erreurs",
 			"approvePlan": "Approuver le plan",
 			"stopped": "Arrêté",
-			"qaIssues": "Problèmes QA"
+			"qaIssues": "Problèmes QA",
+			"qaUnverified": "QA non vérifiée"
 		},
 		"move": {
 			"trigger": "Déplacer la tâche vers une autre colonne",
@@ -1849,5 +1854,10 @@
 			"pass": "Vérifié",
 			"fail": "Vérif. en échec"
 		}
+	},
+	"qaUnverified": {
+		"title": "La QA n'a pas pu valider cette tâche",
+		"unknown": "L'agent QA s'est arrêté sans indiquer de raison. Ouvrez l'onglet Journaux pour voir les dernières sorties.",
+		"hint": "Le travail est terminé ; seule la vérification automatique manque. Relisez les changements vous-même avant de fusionner, ou relancez la tâche pour repasser la QA."
 	}
 }

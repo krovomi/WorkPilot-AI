@@ -112,14 +112,16 @@ export function TaskHeader({
 									className="text-xs"
 								>
 									{task.reviewReason === "completed"
-										? "Completed"
+										? t("tasks:reviewReason.completed")
 										: task.reviewReason === "errors"
-											? "Has Errors"
+											? t("tasks:reviewReason.hasErrors")
 											: task.reviewReason === "plan_review"
-												? "Approve Plan"
+												? t("tasks:reviewReason.approvePlan")
 												: task.reviewReason === "stopped"
-													? "Stopped"
-													: "QA Issues"}
+													? t("tasks:reviewReason.stopped")
+													: task.reviewReason === "qa_unverified"
+														? t("tasks:reviewReason.qaUnverified")
+														: t("tasks:reviewReason.qaIssues")}
 								</Badge>
 							)}
 						</>

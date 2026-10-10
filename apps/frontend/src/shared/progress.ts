@@ -34,7 +34,8 @@ export function isSubtaskDone(status: string): boolean {
  * plan). The task's terminal state is the reliable signal.
  *
  * `human_review` counts ONLY when the review is for a COMPLETED build
- * (`reviewReason === "completed"`) — not a `plan_review` (coding hasn't started),
+ * (`reviewReason === "completed"`, or `"qa_unverified"`: every subtask done,
+ * only the automatic QA verdict missing) — not a `plan_review` (coding hasn't started),
  * `errors`, or `qa_rejected` hand-off where real work still remains.
  */
 export function isTaskEffectivelyComplete(
@@ -42,7 +43,11 @@ export function isTaskEffectivelyComplete(
 	reviewReason?: string,
 ): boolean {
 	if (status === "done" || status === "pr_created") return true;
-	if (status === "human_review" && reviewReason === "completed") return true;
+	if (
+		status === "human_review" &&
+		(reviewReason === "completed" || reviewReason === "qa_unverified")
+	)
+		return true;
 	return false;
 }
 
