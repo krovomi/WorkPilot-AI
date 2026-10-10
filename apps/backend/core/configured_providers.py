@@ -1,11 +1,11 @@
 """Single-source-of-truth loader for ``config/configured_providers.json``.
 
 Both the Python backend and the Electron/TypeScript frontend read the
-same JSON file. On the TS side a generated module
-(``apps/frontend/src/shared/types/providers.generated.ts``) gives the
-renderer a typed view — see ``scripts/generate-provider-types.js``.
+same JSON file. The renderer reads it at runtime over IPC
+(``providers:getConfiguredProviders``, see
+``apps/frontend/src/shared/services/providerService.ts``).
 
-This module gives the Python backend an equivalent typed surface:
+This module gives the Python backend a typed surface:
 
 * ``ConfiguredProvider`` — typed dataclass matching the JSON shape.
 * ``load_configured_providers()`` — cached read + validation.
