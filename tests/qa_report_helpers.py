@@ -30,7 +30,6 @@ _mocked_module_names: list[str] = [
     "progress",
     "task_logger",
     "linear_updater",
-    "client",
 ]
 
 
@@ -106,11 +105,6 @@ def setup_qa_report_mocks() -> None:
     mock_linear.linear_qa_rejected = MagicMock()
     mock_linear.linear_qa_max_iterations = MagicMock()
     sys.modules["linear_updater"] = mock_linear
-
-    # Mock client module
-    mock_client = MagicMock()
-    mock_client.create_client = MagicMock()
-    sys.modules["client"] = mock_client
 
     # Add auto-claude path for imports
     sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
