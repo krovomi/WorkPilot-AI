@@ -130,7 +130,6 @@ _PROTECTED_PACKAGES = [
     # Prompts
     "prompts",
     "prompts_pkg",
-    "prompt_generator",
     # Config & phases
     "phase_config",
     "phase_event",

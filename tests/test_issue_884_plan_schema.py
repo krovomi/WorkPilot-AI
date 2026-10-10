@@ -20,7 +20,7 @@ backend_path = Path(__file__).parent.parent / "apps" / "backend"
 sys.path.insert(0, str(backend_path))
 
 from core.progress import get_next_subtask
-from prompt_generator import generate_planner_prompt
+from prompts_pkg.prompt_generator import generate_planner_prompt
 from spec.validate_pkg import SpecValidator, auto_fix_plan
 
 

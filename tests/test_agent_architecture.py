@@ -68,7 +68,7 @@ _mocked_module_names = [
     "prompts_pkg.prompts",
     "prompts_pkg",
     "prompts_pkg.project_context",
-    "prompt_generator",
+    "prompts_pkg.prompt_generator",
     # Security
     "security",
     "security.constants",

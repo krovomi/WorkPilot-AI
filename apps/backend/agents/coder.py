@@ -65,7 +65,7 @@ from phase_config import (
     get_phase_thinking_budget,
     load_task_metadata,
 )
-from prompt_generator import (
+from prompts_pkg.prompt_generator import (
     format_context_for_prompt,
     generate_planner_prompt,
     generate_subtask_prompt,

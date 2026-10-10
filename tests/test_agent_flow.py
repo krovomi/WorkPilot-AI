@@ -535,7 +535,7 @@ class TestHandoffDataPreservation:
 
     def test_subtask_context_loading(self, test_env):
         """Test that subtask context is properly loaded for coder."""
-        from prompt_generator import load_subtask_context
+        from prompts_pkg.prompt_generator import load_subtask_context
 
         _, spec_dir, project_dir = test_env
 
