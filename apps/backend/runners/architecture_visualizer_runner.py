@@ -79,24 +79,30 @@ def _make_session(
     a model, and so provider, phase model and thinking budget are resolved in
     one place — through `create_agent_client`, never `anthropic.Anthropic()`.
     """
-    from core.client import create_agent_client
-    from phase_config import get_phase_model, get_phase_thinking_budget
-
-    # The map is a reading-and-writing pass over a finished codebase, which is
-    # the `qa` phase's budget shape rather than `coding`'s.
-    resolved_model = get_phase_model(spec_dir, "qa", cli_model=model)
-    budget = get_phase_thinking_budget(spec_dir, "qa", cli_thinking=thinking)
+    # Resolved on the first prompt, not here: the session is handed to
+    # `run_task_delta` before significance is assessed, and a run that maps
+    # nothing should not read — or fail on — the model settings it never uses.
+    resolved: dict[str, object] = {}
 
     async def session(prompt: str) -> str:
         from agents.session import run_agent_session
+        from core.client import create_agent_client
+        from phase_config import get_phase_model, get_phase_thinking_budget
         from task_logger import LogPhase
 
+        if not resolved:
+            # The map is a reading-and-writing pass over a finished codebase,
+            # which is the `qa` phase's budget shape rather than `coding`'s.
+            resolved["model"] = get_phase_model(spec_dir, "qa", cli_model=model)
+            resolved["budget"] = get_phase_thinking_budget(
+                spec_dir, "qa", cli_thinking=thinking
+            )
         client = create_agent_client(
             project_dir=project_dir,
             spec_dir=spec_dir,
-            model=resolved_model,
+            model=resolved["model"],
             agent_type="architecture_visualizer",
-            max_thinking_tokens=budget,
+            max_thinking_tokens=resolved["budget"],
         )
         async with client:
             _status, response, _metadata = await run_agent_session(

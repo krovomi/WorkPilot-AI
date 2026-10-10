@@ -30,6 +30,9 @@ AGENT_TYPE = "architecture_visualizer"
 #: carries the baseline and the changed files, which are what decide the model.
 _SUMMARY_CHARS = 1200
 
+#: Diagnostics copied into the phase report when authoring gave up.
+_REPORT_DIAGNOSTICS = 10
+
 
 def task_summary(spec_dir: Path) -> str:
     """What the task set out to do, in a few lines: the request as typed, else
@@ -68,11 +71,44 @@ def _report(status, record_dir: Path, session_errors: list[str]) -> str:
     lines.append(f"Record: {status_path(record_dir)}")
     for error in session_errors[-2:]:
         lines.append(f"Session error: {error[:300]}")
+    # The record keeps the sentence a person reads; the authoring loop's own
+    # refusals are what a maintainer needs, and this report is where they land.
+    diagnostics = status.diagnostics or []
+    if diagnostics:
+        lines.append("")
+        lines.append("Unresolved diagnostics:")
+        for item in diagnostics[:_REPORT_DIAGNOSTICS]:
+            if isinstance(item, dict):
+                code = item.get("code", "?")
+                message = item.get("message") or item.get("subject") or ""
+            else:
+                code, message = "?", item
+            lines.append(f"- `{code}` {str(message)[:200]}")
+        if len(diagnostics) > _REPORT_DIAGNOSTICS:
+            lines.append(f"- … {len(diagnostics) - _REPORT_DIAGNOSTICS} more")
     return "\n".join(lines) + "\n"
 
 
 async def run_architecture_map_phase(resolved, ctx):
-    """Map the task against the baseline and report it. Never raises."""
+    """Map the task against the baseline and report it. Never raises.
+
+    Everything — resolving the provider, building the runner, the delta, the
+    report — sits under one guard: a phase that cannot run reports why and the
+    build goes on, whichever of its steps it was that failed.
+    """
+    from workflows.runner import PhaseOutcome
+
+    phase = resolved.phase
+    try:
+        return await _run(resolved, ctx)
+    except Exception as exc:  # noqa: BLE001 - a phase reports, it does not abort
+        logger.warning("architecture-map failed to run: %s", exc)
+        return PhaseOutcome(
+            phase.id, phase.impl, resolved.dispatch, None, detail=str(exc)[:200]
+        )
+
+
+async def _run(resolved, ctx):
     from workflows.runner import (
         CONFIG_PHASE,
         PhaseOutcome,
@@ -125,22 +161,16 @@ async def run_architecture_map_phase(resolved, ctx):
     def _log(message: str) -> None:
         print(f"  {message}", flush=True)
 
-    try:
-        status = await task_delta.run_task_delta(
-            project_dir,
-            spec_dir,
-            session=session,
-            baseline_project_dir=baseline_project,
-            changed_files=ctx.changed_files,
-            task_summary=task_summary(spec_dir),
-            progress=_log,
-            record_dir=record_dir,
-        )
-    except Exception as exc:  # noqa: BLE001 - a phase reports, it does not abort
-        logger.warning("architecture-map failed to run: %s", exc)
-        return PhaseOutcome(
-            phase.id, phase.impl, resolved.dispatch, None, detail=str(exc)[:200]
-        )
+    status = await task_delta.run_task_delta(
+        project_dir,
+        spec_dir,
+        session=session,
+        baseline_project_dir=baseline_project,
+        changed_files=ctx.changed_files,
+        task_summary=task_summary(spec_dir),
+        progress=_log,
+        record_dir=record_dir,
+    )
 
     output = _write_output(ctx, phase.id, _report(status, record_dir, session_errors))
 

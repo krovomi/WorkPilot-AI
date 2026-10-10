@@ -55,7 +55,12 @@ from pathlib import Path
 # Add the backend package root to the path (mirrors the other runners).
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.project_brief import IGNORED_TOP_LEVEL, build_project_brief, read_head
+from core.project_brief import (
+    IGNORED_TOP_LEVEL,
+    build_project_brief,
+    project_file,
+    read_head,
+)
 
 STATUS_MARKER = "__STATUS__:"
 DELTA_MARKER = "__DELTA__:"
@@ -343,8 +348,12 @@ def pick_sample(
         )
         if is_test != (snippet_type == "test"):
             continue
+        # A link is not one of the project's files: it may lead anywhere.
+        path = project_file(project_dir, relative)
+        if path is None:
+            continue
         try:
-            size = (project_dir / relative).stat().st_size
+            size = path.stat().st_size
         except OSError:
             continue
         if not SAMPLE_MIN_BYTES <= size <= SAMPLE_MAX_BYTES:
@@ -368,7 +377,7 @@ def _has_secret(text: str, label: str) -> bool:
 
 
 def _style_section(project_dir: Path) -> tuple[str, list[str]]:
-    present = [name for name in STYLE_CONFIG_FILES if (project_dir / name).is_file()]
+    present = [name for name in STYLE_CONFIG_FILES if project_file(project_dir, name)]
     if not present:
         return "", []
     lines = ["Formatter / linter configuration present: " + ", ".join(present)]

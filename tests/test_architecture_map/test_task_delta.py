@@ -493,6 +493,66 @@ class TestTheWorkflowPhase:
         assert outcome.succeeded is None
         assert "disk full" in outcome.detail
 
+    def test_a_setup_error_is_unknown_never_raised(self, tmp_path: Path, monkeypatch):
+        """Resolving the provider happens before the delta; it is guarded too."""
+        import workflows.runner as runner
+        from architecture_visualizer.archify.phase import run_architecture_map_phase
+
+        def broken(*_a, **_k):
+            raise ValueError("task_metadata.json is unreadable")
+
+        monkeypatch.setattr(runner, "phase_provider", broken)
+        ctx = phase_context(tmp_path, changed_files=["src/api/routes.py"])
+        resolved = architecture_map_phase(changed_files=ctx.changed_files)
+
+        outcome = asyncio.run(run_architecture_map_phase(resolved, ctx))
+
+        assert outcome.succeeded is None
+        assert "unreadable" in outcome.detail
+
+    def test_a_report_error_is_unknown_never_raised(
+        self, tmp_path: Path, agent_stack, monkeypatch
+    ):
+        from architecture_visualizer.archify import phase as phase_module
+
+        def broken(*_a, **_k):
+            raise TypeError("unserialisable summary")
+
+        monkeypatch.setattr(phase_module, "_report", broken)
+        ctx = phase_context(tmp_path, changed_files=["tests/test_orders.py"])
+        resolved = architecture_map_phase(changed_files=ctx.changed_files)
+
+        outcome = asyncio.run(phase_module.run_architecture_map_phase(resolved, ctx))
+
+        assert outcome.succeeded is None
+        assert "unserialisable" in outcome.detail
+
+    def test_the_report_carries_the_authoring_diagnostics(
+        self, tmp_path: Path, agent_stack, monkeypatch
+    ):
+        """The record keeps one sentence; the refusals land in the phase report."""
+        from architecture_visualizer.archify.phase import run_architecture_map_phase
+
+        async def fail(**_kwargs):
+            return authoring.AuthoringResult(
+                ok=False,
+                error="the model is invalid",
+                diagnostics=[
+                    {"code": "ir/unknown-component", "message": "api-gateway"}
+                ],
+            )
+
+        monkeypatch.setattr(authoring, "author", fail)
+        ctx = phase_context(tmp_path, changed_files=["src/api/routes.py"])
+        resolved = architecture_map_phase(changed_files=ctx.changed_files)
+
+        outcome = asyncio.run(run_architecture_map_phase(resolved, ctx))
+
+        report = outcome.output_path.read_text(encoding="utf-8")
+        assert "ir/unknown-component" in report
+        assert "api-gateway" in report
+        assert "diagnostics" not in recorded(ctx.source_spec_dir)
+
 
 # --------------------------------------------------------------------------- #
 # The runner and the build
@@ -591,6 +651,24 @@ class TestTheRunnerDelegates:
         assert unreliable["status"] == "error"
         assert unreliable["error"] == "renamed"
         assert "diagnostics" not in unreliable
+
+    def test_the_session_reads_model_settings_only_when_prompted(
+        self, runner_module, monkeypatch
+    ):
+        """A delta that maps nothing never asks for a model, nor for its settings."""
+        import phase_config
+
+        def unreadable(*_a, **_k):
+            raise ValueError("settings are unreadable")
+
+        monkeypatch.setattr(phase_config, "get_phase_model", unreadable)
+        monkeypatch.setattr(phase_config, "get_phase_thinking_budget", unreadable)
+
+        session = runner_module._make_session(Path("/p"), Path("/s"), None, None)
+
+        assert callable(session)
+        with pytest.raises(ValueError, match="unreadable"):
+            asyncio.run(session("map it"))
 
 
 class TestTheBuildCarriesItBack:

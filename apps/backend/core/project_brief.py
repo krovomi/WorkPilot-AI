@@ -96,6 +96,24 @@ class ProjectBrief:
     files: list[str] = field(default_factory=list)
 
 
+def project_file(project_dir: Path, relative: str) -> Path | None:
+    """``relative`` under ``project_dir``, when it is a regular file of the project.
+
+    A link is refused, and so is anything that resolves outside the project:
+    what is read here is sent to a model, and a ``README.md`` linked to
+    ``~/.ssh/config`` is not the project's README.
+    """
+    path = project_dir / relative
+    try:
+        if path.is_symlink() or not path.is_file():
+            return None
+        if not path.resolve().is_relative_to(project_dir.resolve()):
+            return None
+    except (OSError, ValueError):
+        return None
+    return path
+
+
 def read_head(path: Path, limit: int) -> str:
     """The first ``limit`` characters of a text file, ending on a line boundary."""
     try:
@@ -184,16 +202,16 @@ def build_project_brief(project_dir: Path) -> ProjectBrief:
         sections.append("Top-level layout: " + ", ".join(layout))
 
     for name in CONVENTION_FILES:
-        path = project_dir / name
-        if path.is_file():
+        path = project_file(project_dir, name)
+        if path is not None:
             excerpt = read_head(path, DOC_EXCERPT)
             if excerpt:
                 sections.append(f"Excerpt of {name} (project conventions):\n{excerpt}")
                 files.append(name)
 
     for name in README_FILES:
-        path = project_dir / name
-        if path.is_file():
+        path = project_file(project_dir, name)
+        if path is not None:
             excerpt = read_head(path, DOC_EXCERPT)
             if excerpt:
                 sections.append(f"Excerpt of {name}:\n{excerpt}")

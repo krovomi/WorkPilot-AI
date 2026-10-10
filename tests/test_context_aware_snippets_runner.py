@@ -392,3 +392,35 @@ def test_the_optimizer_still_exposes_the_shared_brief():
     from core import project_brief
 
     assert module.gather_project_context is project_brief.gather_project_context
+
+
+def _link_or_skip(link: Path, target: Path) -> None:
+    link.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symbolic links cannot be created here")
+
+
+def test_a_linked_readme_is_not_sent(runner, tmp_path):
+    """What the brief reads goes to a model: a link may lead outside the project."""
+    outside = write(tmp_path / "outside" / "notes.txt", "PRIVATE-NOTES\n")
+    project = tmp_path / "project"
+    write(project / "src" / "util.py", "x = 1\n" * 60)
+    _link_or_skip(project / "README.md", outside)
+
+    context = runner.gather_snippet_context(project, "function", "python")
+
+    assert "PRIVATE-NOTES" not in context.text
+    assert "README.md" not in context.sources
+
+
+def test_a_linked_sample_is_not_sent(runner, tmp_path):
+    outside = write(tmp_path / "outside" / "other.py", "PRIVATE = 1\n" * 60)
+    project = tmp_path / "project"
+    _link_or_skip(project / "src" / "util.py", outside)
+
+    context = runner.gather_snippet_context(project, "function", "python")
+
+    assert "PRIVATE" not in context.text
+    assert "<code_sample" not in context.text
