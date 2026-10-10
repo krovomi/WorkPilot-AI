@@ -32,6 +32,10 @@ import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+# `detect_api_stack` lives in the project stack facade (audit lot L11, F26);
+# imported here for the readers that still reach it through this module.
+from project.stack import detect_api_stack
+
 from .api_capture import PLACEHOLDER, ApiExchange
 from .orm import _sources
 
@@ -81,27 +85,6 @@ def _read(path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return ""
-
-
-def detect_api_stack(project_dir: Path) -> tuple[str, str]:
-    """(stack, language) of the project's HTTP API, or ("", "")."""
-    from test_generation.stack_aware import detect_stack, iter_project_files
-
-    profile = detect_stack(project_dir)
-    if profile.aspnet:
-        return "aspnetcore", "csharp"
-    for manifest in iter_project_files(
-        project_dir, ("pom.xml", "build.gradle", "build.gradle.kts")
-    ):
-        if "spring-boot" in _read(manifest):
-            return "spring", "java"
-    if profile.python_api_framework:
-        return profile.python_api_framework.lower(), "python"
-    if profile.node_api_framework:
-        return "node", "typescript"
-    if (project_dir / "go.mod").is_file():
-        return "go", "go"
-    return "", ""
 
 
 # ---------------------------------------------------------------------------

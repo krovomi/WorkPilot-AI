@@ -8,7 +8,7 @@ verified.
 The detectors already in the repository are reused rather than repeated:
 `AppEmulatorRunner` (the Kanban preview's answer for Node, Python, Go, Rust),
 `mobile.stacks.detect_stack` (every phone framework) and
-`docintel.api_tests.detect_api_stack`. What they did not cover is added here
+`project.stack.detect_api_stack`. What they did not cover is added here
 and nowhere else: an ASP.NET Core project, an API written in Node (the
 preview treats every `package.json` as a page), Spring Boot, and a monorepo
 whose apps live one or two directories down.
@@ -444,7 +444,7 @@ def _go_target(directory: Path, project_dir: Path) -> Target | None:
 
 
 def _api_stack(directory: Path) -> tuple[str, str]:
-    from docintel.api_tests import detect_api_stack
+    from project.stack import detect_api_stack
 
     return detect_api_stack(directory)
 

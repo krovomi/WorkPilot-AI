@@ -37,6 +37,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from project.stack import detect_languages
+
 from .languages import LanguageOverlay, overlays_for
 from .mobile import overlay_for as mobile_overlay_for
 from .phases import PHASE_ALIASES, phase_defaults, sdk_available
@@ -48,40 +50,11 @@ __all__ = ["resolve", "merge_with_user_agents", "detect_languages", "MAX_ROSTER"
 MAX_ROSTER = 7
 
 #: The roles that run the project's tests, and so learn its commands from the
-#: overlays: the build's `test-runner` and the QA roster's `qa-test-evidence`
-#: (`qa_reviewer`, `qa_fixer`, `verifier`). The second one used to rediscover
-#: the framework on every QA pass the first had already been told about.
-_TEST_ROLES = ("test-runner", "qa-test-evidence")
-
-# Stack detection touches the filesystem; the answer does not change during a
-# run, and create_client is called once per phase.
-_STACK_CACHE: dict[str, list[str]] = {}
-
-
-def detect_languages(project_dir: Path | str | None) -> list[str]:
-    """Languages present in ``project_dir``, or [] when it cannot be determined.
-
-    Reuses ``detect_project_stack`` rather than adding a fourth stack detector
-    to this repo. Import failures degrade to "no overlay", never to an error:
-    a missing specialisation is a worse roster, a raised exception is a broken
-    build.
-    """
-    if not project_dir:
-        return []
-    key = str(Path(project_dir).resolve())
-    if key in _STACK_CACHE:
-        return _STACK_CACHE[key]
-
-    languages: list[str] = []
-    try:
-        from runners.pipeline_generator_runner import detect_project_stack
-
-        languages = list(detect_project_stack(Path(key)).get("languages") or [])
-    except Exception as exc:
-        logger.debug("stack detection unavailable for %s: %s", key, exc)
-
-    _STACK_CACHE[key] = languages
-    return languages
+#: overlays. One since lot L11: the QA roster (`qa_reviewer`, `qa_fixer`,
+#: `verifier`) carried a `qa-test-evidence` that was the board's `test-runner`
+#: under another prompt, and it used to rediscover the framework on every QA
+#: pass the build's runner had already been told about.
+_TEST_ROLES = ("test-runner",)
 
 
 def _specialise_test_runner(
