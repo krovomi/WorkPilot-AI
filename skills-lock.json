@@ -547,6 +547,14 @@
 			"contentSha256": "416839340cfc48e6d1c7d4fc017a27bcd81652eb619c8993ccba3f30850b1d94",
 			"targets": {}
 		},
+		"brainstorm-approaches": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/brainstorm-approaches/SKILL.md",
+			"contentSha256": "7b555143c7550f5cb0eeff0eded7709290d440c6f18a67df052bf3edfd9155ad",
+			"targets": {}
+		},
 		"brand-guidelines": {
 			"kind": "skill",
 			"pack": "comms",
@@ -778,6 +786,14 @@
 			"contentSha256": "9879a67fefdfb47022c92eabf3dfca80868c54d78bb1d6bd27d56742d0f65ea4",
 			"targets": {}
 		},
+		"review-lenses": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/review-lenses/SKILL.md",
+			"contentSha256": "ce06cbd5a99e10ebe2762c6120620a7c52d8258014748e6b841f5716b639d513",
+			"targets": {}
+		},
 		"sdlc-review": {
 			"kind": "skill",
 			"pack": "hermes",
@@ -816,6 +832,14 @@
 			"packVersion": "0.0.1",
 			"source": "skills/hermes/systematic-debugging/SKILL.md",
 			"contentSha256": "f4810745cc5b78f2760e8f04f0f4795364e2de097419803fc1ec442993e5000f",
+			"targets": {}
+		},
+		"tdd-cycle": {
+			"kind": "skill",
+			"pack": "tooling",
+			"packVersion": "1.0.0",
+			"source": "skills/tooling/tdd-cycle/SKILL.md",
+			"contentSha256": "834f9aaedc48db7039e2f64d457cc8b4eef75c16545a8038a9904581cddc8bce",
 			"targets": {}
 		},
 		"testcontainers-integration": {
@@ -1125,6 +1149,7 @@
 		".agents/skills/bmad-walkthrough/step-03-detail-pass.md",
 		".agents/skills/bmad-walkthrough/step-04-testing.md",
 		".agents/skills/bmad-walkthrough/step-05-wrapup.md",
+		".agents/skills/brainstorm-approaches/SKILL.md",
 		".agents/skills/brand-guidelines/SKILL.md",
 		".agents/skills/brand-guidelines/examples/business-report-template.md",
 		".agents/skills/business-comms/SKILL.md",
@@ -1172,11 +1197,13 @@
 		".agents/skills/node-inspect-debugger/SKILL.md",
 		".agents/skills/opencode/SKILL.md",
 		".agents/skills/python-debugpy/SKILL.md",
+		".agents/skills/review-lenses/SKILL.md",
 		".agents/skills/sdlc-review/SKILL.md",
 		".agents/skills/simplify-code/SKILL.md",
 		".agents/skills/spec-analyze/SKILL.md",
 		".agents/skills/spike/SKILL.md",
 		".agents/skills/systematic-debugging/SKILL.md",
+		".agents/skills/tdd-cycle/SKILL.md",
 		".agents/skills/testcontainers-integration/SKILL.md",
 		".agents/skills/testcontainers-integration/reference.md",
 		".agents/skills/ui-ux-pro-max/LICENSE",
@@ -1290,6 +1317,7 @@
 		".gemini/commands/bmad-ux.toml",
 		".gemini/commands/bmad-validate-prd.toml",
 		".gemini/commands/bmad-walkthrough.toml",
+		".gemini/commands/brainstorm-approaches.toml",
 		".gemini/commands/brand-guidelines.toml",
 		".gemini/commands/business-comms.toml",
 		".gemini/commands/claude-code.toml",
@@ -1315,11 +1343,13 @@
 		".gemini/commands/opencode.toml",
 		".gemini/commands/performance-analyst.toml",
 		".gemini/commands/python-debugpy.toml",
+		".gemini/commands/review-lenses.toml",
 		".gemini/commands/sdlc-review.toml",
 		".gemini/commands/simplify-code.toml",
 		".gemini/commands/spec-analyze.toml",
 		".gemini/commands/spike.toml",
 		".gemini/commands/systematic-debugging.toml",
+		".gemini/commands/tdd-cycle.toml",
 		".gemini/commands/testcontainers-integration.toml",
 		".gemini/commands/ui-ux-pro-max.toml",
 		".gemini/commands/verify.toml",
