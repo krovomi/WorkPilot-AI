@@ -44,7 +44,6 @@ export * from "./self-healing-api";
 export * from "./shell-api";
 export * from "./smart-estimation-api";
 export * from "./team-bot-api";
-export * from "./team-sync-api";
 export * from "./tech-debt-api";
 export * from "./test-generation-api";
 export * from "./voice-control-api";

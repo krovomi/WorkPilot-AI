@@ -2326,24 +2326,6 @@
 			"createTest": "Créez un test depuis la Palette de Commandes ou depuis la vue de détail de la tâche."
 		}
 	},
-	"memoryLifecycle": {
-		"title": "Gestionnaire du Cycle de Vie Mémoire",
-		"description": "Gérer la mémoire Graphiti — élagage, politiques de rétention, contrôle de fraîcheur",
-		"status": "Statut",
-		"episodeCount": "Épisodes stockés",
-		"diskUsage": "Espace disque utilisé",
-		"retentionDays": "Rétention (jours)",
-		"maxEpisodes": "Épisodes maximum",
-		"pruneStrategy": "Stratégie d'élagage",
-		"autoPrune": "Élagage automatique",
-		"runPrune": "Lancer l'élagage",
-		"export": "Exporter les mémoires",
-		"pruneStrategies": {
-			"lru": "LRU (moins récemment utilisé)",
-			"oldest": "Plus anciens en premier",
-			"duplicates": "Doublons uniquement"
-		}
-	},
 	"cicdTriggers": {
 		"title": "Déclencheurs CI/CD",
 		"description": "Déclencher automatiquement des pipelines de déploiement après la création d'une PR par l'agent",

@@ -26,7 +26,6 @@ import {
 import { Separator } from "../ui/separator";
 import { Switch } from "../ui/switch";
 import { GUIDE_ANCHORS } from "../guided-tour/anchors";
-import { MemoryLifecycleSection } from "./MemoryLifecycleSection";
 
 interface SecuritySettingsProps {
 	readonly envConfig: ProjectEnvConfig | null;
@@ -35,7 +34,6 @@ interface SecuritySettingsProps {
 		React.SetStateAction<ProjectSettingsType>
 	>;
 	readonly updateEnvConfig: (updates: Partial<ProjectEnvConfig>) => void;
-	readonly projectPath?: string;
 
 	// Password visibility
 	readonly showOpenAIKey: boolean;
@@ -51,7 +49,6 @@ export function SecuritySettings({
 	settings,
 	setSettings,
 	updateEnvConfig,
-	projectPath,
 	showOpenAIKey,
 	setShowOpenAIKey,
 	expanded,
@@ -603,10 +600,6 @@ export function SecuritySettings({
 									}
 								/>
 							</div>
-
-							{projectPath && (
-								<MemoryLifecycleSection projectPath={projectPath} />
-							)}
 						</>
 					)}
 				</div>

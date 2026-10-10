@@ -899,19 +899,6 @@ export const IPC_CHANNELS = {
 	CONTEXT_MESH_COMPLETE: "contextMesh:complete",
 	CONTEXT_MESH_ERROR: "contextMesh:error",
 
-	// Team Knowledge Sync (Feature 31) — Shared Graphiti memory across team members
-	TEAM_SYNC_GET_STATUS: "teamSync:getStatus",
-	TEAM_SYNC_PUSH: "teamSync:push",
-	TEAM_SYNC_PULL: "teamSync:pull",
-	TEAM_SYNC_LIST_PEERS: "teamSync:listPeers",
-	TEAM_SYNC_GET_PEER_EPISODES: "teamSync:getPeerEpisodes",
-	TEAM_SYNC_CONFIGURE: "teamSync:configure",
-	TEAM_SYNC_START_SERVER: "teamSync:startServer",
-	TEAM_SYNC_STOP_SERVER: "teamSync:stopServer",
-	// Team Sync events (main -> renderer)
-	TEAM_SYNC_SERVER_STATUS: "teamSync:serverStatus",
-	TEAM_SYNC_SYNC_PROGRESS: "teamSync:syncProgress",
-
 	// Live Development Companion — Real-time pair programming
 	LIVE_COMPANION_START: "liveCompanion:start",
 	LIVE_COMPANION_STOP: "liveCompanion:stop",

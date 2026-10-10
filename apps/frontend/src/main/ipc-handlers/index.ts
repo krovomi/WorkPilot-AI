@@ -92,7 +92,6 @@ import { registerLiveCompanionHandlers } from "./live-companion-handlers";
 import { registerMcpHandlers } from "./mcp-handlers";
 import { registerMcpMarketplaceHandlers } from "./mcp-marketplace-handlers";
 import { registerMemoryHandlers } from "./memory-handlers";
-import { registerMemoryLifecycleHandlers } from "./memory-lifecycle-handlers";
 import { registerMultiRepoHandlers } from "./multi-repo-handlers";
 import { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 import { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
@@ -133,7 +132,6 @@ import { registerSpecRefinementHandlers } from "./spec-refinement-handlers";
 import { registerPhase35FeatureHandlers } from "./phase35-features-handlers";
 import { registerPipelineHandlers } from "./pipeline-handlers";
 import { registerTaskHandlers } from "./task-handlers";
-import { registerTeamSyncHandlers } from "./team-sync-handlers";
 import { registerTerminalWorktreeIpcHandlers } from "./terminal";
 import { registerTerminalHandlers } from "./terminal-handlers";
 import { registerDesignToCodeHandlers } from "./design-to-code-handlers";
@@ -213,7 +211,6 @@ export { registerLiveCompanionHandlers } from "./live-companion-handlers";
 export { registerMcpHandlers } from "./mcp-handlers";
 export { registerMcpMarketplaceHandlers } from "./mcp-marketplace-handlers";
 export { registerMemoryHandlers } from "./memory-handlers";
-export { registerMemoryLifecycleHandlers } from "./memory-lifecycle-handlers";
 export { registerMultiRepoHandlers } from "./multi-repo-handlers";
 export { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 export { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
@@ -249,7 +246,6 @@ export { registerInjectionGuardHandlers } from "./injection-guard-handlers";
 export { registerSpecApprovalHandlers } from "./spec-approval-handlers";
 export { registerSpecRefinementHandlers } from "./spec-refinement-handlers";
 export { registerTaskHandlers } from "./task-handlers";
-export { registerTeamSyncHandlers } from "./team-sync-handlers";
 export { registerTerminalWorktreeIpcHandlers } from "./terminal";
 export { registerTerminalHandlers } from "./terminal-handlers";
 export { setupTestGenerationHandlers } from "./test-generation-handlers";
@@ -467,17 +463,11 @@ export function setupIpcHandlers(
 	registerPipelineGeneratorHandlers();
 	setupPipelineGeneratorEventForwarding(getMainWindow);
 
-	// Team Knowledge Sync handlers (Feature 31)
-	registerTeamSyncHandlers();
-
 	// Plugin Marketplace handlers (Feature 37)
 	registerPluginMarketplaceHandlers();
 
 	// Arena Mode handlers (Feature 9) — Blind A/B model comparison
 	registerArenaHandlers(getMainWindow);
-
-	// Memory Lifecycle Manager handlers (Feature 43)
-	registerMemoryLifecycleHandlers();
 
 	// CI/CD Deployment Triggers handlers (Feature 44)
 	registerCICDTriggersHandlers();

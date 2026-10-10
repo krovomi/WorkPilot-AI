@@ -14,7 +14,6 @@ export { useProjectSettings } from "./hooks/useProjectSettings";
 export { InfrastructureStatus } from "./InfrastructureStatus";
 export { IntegrationSettings } from "./IntegrationSettings";
 export { LinearIntegrationSection } from "./LinearIntegrationSection";
-export { MemoryLifecycleSection } from "./MemoryLifecycleSection";
 export { NotificationsSection } from "./NotificationsSection";
 export { PasswordInput } from "./PasswordInput";
 export { SecuritySettings } from "./SecuritySettings";

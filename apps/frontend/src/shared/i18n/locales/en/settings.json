@@ -2301,24 +2301,6 @@
 			"createTest": "Create a test from the Command Palette or from the task detail view."
 		}
 	},
-	"memoryLifecycle": {
-		"title": "Memory Lifecycle Manager",
-		"description": "Manage Graphiti memory — pruning, retention policies, freshness control",
-		"status": "Status",
-		"episodeCount": "Episodes stored",
-		"diskUsage": "Disk usage",
-		"retentionDays": "Retention (days)",
-		"maxEpisodes": "Max episodes",
-		"pruneStrategy": "Prune strategy",
-		"autoPrune": "Auto-prune",
-		"runPrune": "Run Prune Now",
-		"export": "Export Memories",
-		"pruneStrategies": {
-			"lru": "LRU (least recently used)",
-			"oldest": "Oldest first",
-			"duplicates": "Duplicates only"
-		}
-	},
 	"specApproval": {
 		"title": "Spec Approval Workflow",
 		"description": "Review and approve AI-generated specifications before execution",
