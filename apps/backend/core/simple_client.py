@@ -5,8 +5,11 @@ Simple Claude SDK Client Factory
 Factory for creating minimal Claude SDK clients for single-turn utility operations
 like commit message generation, merge conflict resolution, and batch analysis.
 
-These clients don't need full security configurations, MCP servers, or hooks.
-Use `create_client()` from `core.client` for full agent sessions with security.
+These clients install no security hook, so they serve only agent types that
+declare neither a write nor a shell tool (`hooked_grants`); anything else is
+refused. Use `create_client()` from `core.client` for full agent sessions with
+security. This module and `core.client` are the only places that build
+`ClaudeAgentOptions` (`tests/test_sdk_options_factories.py`).
 
 Example usage:
     from core.simple_client import create_simple_client
@@ -28,6 +31,8 @@ from pathlib import Path
 from agents.tools_pkg import (
     get_agent_config,
     get_default_thinking_level,
+    hooked_grants,
+    mcp_tools_for_servers,
     undeclared_builtin_tools,
 )
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
@@ -77,6 +82,7 @@ def create_simple_client(
     max_turns: int = 1,
     max_thinking_tokens: int | None = None,
     output_format: dict | None = None,
+    mcp_servers: dict[str, dict] | None = None,
 ) -> ClaudeSDKClient:
     """
     Create a minimal Claude SDK client for single-turn utility operations.
@@ -98,13 +104,45 @@ def create_simple_client(
         max_turns: Maximum conversation turns (default: 1 for single-turn)
         max_thinking_tokens: Override thinking budget (None = use agent default from
                             AGENT_CONFIGS, converted using phase_config.THINKING_BUDGET_MAP)
+        mcp_servers: Connection details for MCP servers, keyed by server name.
+                    Only servers the type declares in its `mcp_servers` are
+                    accepted, and their tools are approved; the type decides
+                    what the session reaches, the caller says how.
 
     Returns:
         Configured ClaudeSDKClient for single-turn operations
 
     Raises:
-        ValueError: If agent_type is not found in AGENT_CONFIGS
+        ValueError: If agent_type is not found in AGENT_CONFIGS, declares a
+            tool only `create_client` guards (Write, Edit, Bash), or is handed
+            an MCP server it does not declare
     """
+    # Get agent configuration (raises ValueError if unknown type)
+    config = get_agent_config(agent_type)
+
+    # No hook is installed here: no `bash_security_hook`, no write-path guard,
+    # no guardrails. A type that declares a command or a write would run them
+    # unchecked, so it belongs to `create_client`. Refused before anything
+    # else is configured, so the mistake surfaces at the call site, not as an
+    # authentication or offline-policy error.
+    if hooked := hooked_grants(agent_type):
+        raise ValueError(
+            f"agent_type '{agent_type}' declares {', '.join(hooked)}, which only "
+            "create_client() hands over behind its security hooks"
+        )
+
+    # Built-in tools from the declaration, and the tools of the MCP servers the
+    # caller connects — each of which the type must declare.
+    allowed_tools = list(config.get("tools", []))
+    if mcp_servers:
+        undeclared = sorted(set(mcp_servers) - set(config.get("mcp_servers", [])))
+        if undeclared:
+            raise ValueError(
+                f"agent_type '{agent_type}' does not declare the MCP server(s) "
+                f"{', '.join(undeclared)}"
+            )
+        allowed_tools.extend(mcp_tools_for_servers(list(mcp_servers)))
+
     from core.offline_policy import guard_cloud_client
 
     guard_cloud_client(cwd or Path.cwd(), os.environ.get("AUTO_CLAUDE_PROJECT_DIR"))
@@ -118,12 +156,6 @@ def create_simple_client(
 
     # Configure SDK authentication (OAuth or API profile mode)
     configure_sdk_authentication(config_dir)
-
-    # Get agent configuration (raises ValueError if unknown type)
-    config = get_agent_config(agent_type)
-
-    # Get tools from config (no MCP tools for simple clients)
-    allowed_tools = list(config.get("tools", []))
 
     # Determine thinking budget using the single source of truth (phase_config.py)
     if max_thinking_tokens is None:
@@ -140,6 +172,9 @@ def create_simple_client(
         "cwd": str(cwd.resolve()) if cwd else None,
         "env": sdk_env,
     }
+
+    if mcp_servers:
+        options_kwargs["mcp_servers"] = mcp_servers
 
     # A simple client loads the user's and the project's own settings files,
     # whose allow rules can grant what the type does not declare: deny it,
