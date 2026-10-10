@@ -139,7 +139,7 @@ def _resolve_workflow_profile(
 
     On by default; set WORKPILOT_WORKFLOW_ENGINE=0 to run the pre-engine
     pipeline. The flag flipped once the engine executed the phases it declares
-    rather than only pruning them: while eight of eleven phases were played by
+    rather than only pruning them: while most of its phases were played by
     a hard-coded sequence the engine did not drive, switching it on bought the
     printed profile and little else, and the honest default for that is off.
     Now the declared workflow is the pipeline, so the honest default is on.
@@ -183,13 +183,10 @@ def _resolve_workflow_profile(
         try:
             from skills_registry.packs import load_packs
 
-            from workflows import validate_impls
+            from workflows import pack_inventory, validate_impls
 
-            available = {
-                p.name: {s.name for s in p.skills()}
-                for p in load_packs(repo_root / "skills")
-            }
-            for miss in validate_impls(workflow, available):
+            available, gated = pack_inventory(load_packs(repo_root / "skills"))
+            for miss in validate_impls(workflow, available, gated=gated):
                 if profile.will_run(miss.phase_id):
                     print(f"  ⚠ {miss.phase_id}: {miss.reason}")
         except Exception as exc:  # noqa: BLE001 - advisory only
@@ -290,8 +287,18 @@ def _phase_context(
     model: str,
     verbose: bool,
     changed_files: list[str] | None,
+    *,
+    source_project_dir: Path | None = None,
+    source_spec_dir: Path | None = None,
 ):
-    """Assemble what a skill phase needs, or None when the engine is off."""
+    """Assemble what a skill phase needs, or None when the engine is off.
+
+    ``project_dir`` / ``spec_dir`` are where the phase works — the worktree in
+    an isolated build. ``source_project_dir`` / ``source_spec_dir`` are the
+    main project and the spec directory the Kanban reads: `architecture-map`
+    finds the baseline under the first (`.workpilot/` is gitignored, so no
+    worktree has one) and records its answer in the second.
+    """
     if profile is None:
         return None
     try:
@@ -305,6 +312,8 @@ def _phase_context(
             effort=profile.effort,
             verbose=verbose,
             changed_files=changed_files,
+            source_project_dir=source_project_dir,
+            source_spec_dir=source_spec_dir,
         )
     except Exception as exc:  # noqa: BLE001 - never block a build
         from debug import debug_warning
@@ -316,9 +325,9 @@ def _phase_context(
 def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None):
     """Execute the skill-backed phases in one window of the declared order.
 
-    This is what "the workflow is the pipeline" finally means: `brainstorm`,
-    `spec`, `review`, `adversarial-review`, `spec-conformance` and `verify`
-    were declared in `workflow.yaml` from the start and executed by nothing.
+    This is what "the workflow is the pipeline" finally means: the
+    skill-backed phases were declared in `workflow.yaml` from the start and
+    executed by nothing.
     The window is expressed by phase id, so inserting a phase into the YAML
     between two existing ones is picked up here with no change to this file.
 
@@ -341,6 +350,30 @@ def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None)
 
         debug_warning("run.py", f"Workflow phases skipped: {exc}")
         return None
+
+
+def _sync_spec_back(spec_dir: Path, source_spec_dir: Path | None, moment: str) -> None:
+    """Copy the worktree's spec directory back to the main one. Never raises.
+
+    The phases after `qa` write into the worktree's copy of the spec —
+    `workflow/*.md`, `verify/`, `architecture/` — and the only sync used to
+    run *before* them, at the end of QA. What they wrote stayed in a directory
+    the Kanban does not read and the merge deletes. `sync_spec_to_source`
+    copies subdirectories too, and does nothing in a direct build, where the
+    two directories are one.
+    """
+    if source_spec_dir is None:
+        return
+    try:
+        from agents.utils import sync_spec_to_source
+        from debug import debug_info
+
+        if sync_spec_to_source(spec_dir, source_spec_dir):
+            debug_info("run.py", f"Spec directory synced to main project {moment}")
+    except Exception as exc:  # noqa: BLE001 - a copy never fails a build
+        from debug import debug_warning
+
+        debug_warning("run.py", f"Spec sync {moment} skipped: {exc}")
 
 
 def _project_dir(spec_dir: Path) -> Path:
@@ -819,7 +852,14 @@ def handle_build_command(
         # — which is the point: what the effort level buys is now the phases
         # that actually run, not a line in a printed plan.
         _pre_ctx = _phase_context(
-            _profile, working_dir, spec_dir, model, verbose, changed_files=None
+            _profile,
+            working_dir,
+            spec_dir,
+            model,
+            verbose,
+            changed_files=None,
+            source_project_dir=project_dir,
+            source_spec_dir=source_spec_dir,
         )
         if _pre_ctx is not None:
             _pre_ctx.jev_run = jev_run
@@ -882,7 +922,14 @@ def handle_build_command(
             else None
         )
         _post_ctx = _phase_context(
-            _post_profile, working_dir, spec_dir, model, verbose, _changed
+            _post_profile,
+            working_dir,
+            spec_dir,
+            model,
+            verbose,
+            _changed,
+            source_project_dir=project_dir,
+            source_spec_dir=source_spec_dir,
         )
 
         # `design-check`. The workflow declares it immediately after `coding`
@@ -976,13 +1023,18 @@ def handle_build_command(
                 except Exception:
                     pass  # Best-effort
 
-        # Everything the workflow declares after `qa`: the two ultrathink
-        # readings and `verify`. They run here rather than earlier because
-        # each is a question about the finished branch — `adversarial-review`
-        # attacks the code, `spec-conformance` asks whether it is the thing
-        # that was asked for, and `verify` checks the work before the build
-        # claims to be done.
+        # Everything the workflow declares after `qa`: `store-readiness`,
+        # `architecture-map` and `verify-replay`. Each is a question about the
+        # finished branch, so it runs once QA has corrected it. Nothing after
+        # this point feeds a fixer, which is why the reviews that should change
+        # the build (`review`, `verify`) are declared before `qa`.
         _run_workflow_phases(_post_profile, _post_ctx, after="qa", before=None)
+
+        # Those phases wrote into the worktree's copy of the spec, after the
+        # QA sync above. Without this second copy their reports — and the
+        # architecture delta's head model — never reach the spec directory the
+        # Kanban reads, and are deleted with the worktree at merge.
+        _sync_spec_back(spec_dir, source_spec_dir, "after the post-QA phases")
 
         # Hard gates. `verify` declares `hard_gate: tests-pass`, which until
         # now only kept the phase out of the effort pruner — nothing checked

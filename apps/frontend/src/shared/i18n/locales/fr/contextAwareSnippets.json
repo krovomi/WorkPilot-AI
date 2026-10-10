@@ -33,9 +33,11 @@
 		"placeholder": "Sélectionnez un langage"
 	},
 	"status": {
-		"analyzing": "Analyse du contexte du projet...",
-		"generating": "Génération de l'extrait...",
-		"error": "Erreur de génération"
+		"generating": "Écriture de l'extrait…",
+		"error": "Erreur de génération",
+		"context": "Lecture du projet…",
+		"parsing": "Finalisation…",
+		"backgroundHint": "Vous pouvez fermer cette fenêtre : la génération continue et l'extrait vous attendra à la réouverture."
 	},
 	"result": {
 		"snippet": "Extrait généré",
@@ -51,10 +53,32 @@
 		"close": "Fermer",
 		"copy": "Copier",
 		"copied": "Copié !",
-		"tryAgain": "Réessayer"
+		"tryAgain": "Réessayer",
+		"runInBackground": "Continuer en arrière-plan",
+		"newSnippet": "Nouvel extrait"
 	},
 	"errors": {
 		"noProject": "Veuillez sélectionner un projet pour analyser son contexte.",
-		"generic": "Une erreur est survenue lors de la génération de l'extrait."
+		"details": "Détails techniques",
+		"codes": {
+			"auth": "Le fournisseur IA a refusé les identifiants. Vérifiez votre compte ou votre clé API dans les Paramètres.",
+			"rate_limit": "La limite de débit du fournisseur est atteinte. Réessayez dans quelques instants.",
+			"quota": "Le quota du fournisseur est épuisé pour ce compte.",
+			"network": "Le fournisseur IA est injoignable. Vérifiez votre connexion.",
+			"timeout": "Le fournisseur IA a mis trop de temps à répondre.",
+			"provider_unavailable": "Le fournisseur par défaut n'est pas disponible. Choisissez-en un autre dans Paramètres → Agent.",
+			"provider_error": "Le fournisseur IA a renvoyé une erreur.",
+			"empty_response": "Le modèle a renvoyé une réponse vide. Réessayez ou choisissez un autre modèle.",
+			"invalid_response": "La réponse du modèle ne contenait aucun code. Réessayez ou reformulez la description.",
+			"empty_description": "Décrivez l'extrait à générer.",
+			"invalid_input": "La demande était incomplète. Vérifiez le type d'extrait et la description.",
+			"runner_missing": "Le composant backend du générateur d'extraits est absent de cette installation.",
+			"python_missing": "Aucun environnement Python n'a été trouvé pour exécuter le générateur d'extraits.",
+			"project_not_found": "Le projet sélectionné est introuvable.",
+			"spawn_failed": "Le générateur d'extraits n'a pas pu être démarré.",
+			"process_failed": "Le générateur d'extraits s'est arrêté de façon inattendue.",
+			"ipc_failed": "La demande n'a pas pu atteindre l'application. Redémarrez WorkPilot AI et réessayez.",
+			"generic": "Une erreur est survenue lors de la génération de l'extrait."
+		}
 	}
 }

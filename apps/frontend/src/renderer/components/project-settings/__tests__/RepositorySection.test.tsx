@@ -252,7 +252,14 @@ describe("RepositorySection", () => {
 			baseSettings,
 		);
 
+		// "origin" is also the field's initial value: the remote's values are
+		// copied into the fields by an effect once they load. Wait for the URL
+		// that effect writes, or on a slow runner it lands after the edit,
+		// resets the name to "origin", and Save is disabled when clicked.
 		const nameInput = await waitFor(() => {
+			expect((getByLabelText("Remote URL") as HTMLInputElement).value).toBe(
+				"https://github.com/krovomi/WorkPilot-AI.git",
+			);
 			const el = getByLabelText("Remote name") as HTMLInputElement;
 			expect(el.value).toBe("origin");
 			return el;

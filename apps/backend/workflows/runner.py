@@ -1,11 +1,10 @@
 """Executing the phases a resolved profile keeps.
 
-Until now the engine resolved a profile and executed three of its eleven
-phases: the deterministic gates, `observe`, and `qa` — which it could only
-*remove*. `planning` and `coding` were an internal sequence inside
-`run_autonomous_agent`, and the six skill-backed phases (`brainstorm`, `spec`,
-`review`, `adversarial-review`, `spec-conformance`, `verify`) were declared and
-never run at all. `workflow.yaml` was a plan the build did not follow.
+The engine used to resolve a profile and execute three of its phases: the
+deterministic gates, `observe`, and `qa` — which it could only *remove*.
+`planning` and `coding` were an internal sequence inside
+`run_autonomous_agent`, and the skill-backed phases were declared and never run
+at all. `workflow.yaml` was a plan the build did not follow.
 
 This module is the missing half. It runs a phase whose implementation is a
 skill rather than WorkPilot Python: it loads the skill's procedure, hands it to
@@ -81,7 +80,7 @@ __all__ = [
 # Phases WorkPilot executes itself, by **phase id** rather than by `impl`.
 #
 # That distinction is the whole point of the file being declarative, and it is
-# easy to get backwards. `coding` names `superpowers/test-driven-development`:
+# easy to get backwards. `coding` names `tooling/tdd-cycle`:
 # the skill is the *methodology*, the coder loop is the *executor*. Keying this
 # set on the impl string would mean the day someone swaps TDD for another
 # methodology, the coding phase stops being recognised as built in and the
@@ -114,27 +113,23 @@ _ELSEWHERE = frozenset({"design-check", "observe"})
 DETERMINISTIC_EXECUTORS = frozenset({"ui-design-system"})
 
 # A workflow phase id -> the phase_config vocabulary it resolves model and
-# effort under. `phase_config` knows four phases; the workflow declares eleven.
+# effort under. `phase_config` knows four phases; the workflow declares more.
 # Rather than invent a fifth config phase per new workflow phase — which would
 # mean a new column in every model selector in the UI — each phase says which
 # of the four it is *paid for as*. A reviewer is a QA cost; a brainstorm is a
 # spec cost.
 CONFIG_PHASE = {
     "brainstorm": "spec",
-    "spec": "spec",
     "planning": "planning",
     "analyze": "planning",
     # A design review before the code exists is a planning cost, not a QA one:
     # nothing has been built yet for it to judge.
     "mobile-design": "planning",
-    "frontend-design": "planning",
     # No model runs in it; listed so its log entries land under planning.
     "ui-design-system": "planning",
     "coding": "coding",
     "review": "qa",
     "qa": "qa",
-    "adversarial-review": "qa",
-    "spec-conformance": "qa",
     "store-readiness": "qa",
     "verify": "qa",
     "verify-replay": "qa",
@@ -197,18 +192,19 @@ def execution_phase_for(phase_id: str) -> str | None:
 # code it is reviewing is not reviewing it.
 SKILL_PHASE_AGENTS = {
     "brainstorm": "spec_critic",
-    "spec": "spec_writer",
     "analyze": "spec_validation",
     "mobile-design": "pr_reviewer",
-    "frontend-design": "pr_reviewer",
     "store-readiness": "pr_reviewer",
     "review": "pr_reviewer",
-    "adversarial-review": "pr_reviewer",
-    "spec-conformance": "spec_validation",
     # The verification loop drives the app and may fix it: `verifier` writes,
     # like `qa_fixer`, and gets the `verify_*` tools on every provider.
     "verify": "verifier",
     "verify-replay": "verifier",
+    # Run by its own executor (`CUSTOM_EXECUTORS`), which authors under this
+    # agent. Listed anyway so that, were the phase ever to reach the one-shot
+    # path, it would run under the agent allowed to write the model rather
+    # than the read-only default.
+    "architecture-map": "architecture_visualizer",
 }
 _DEFAULT_AGENT = "analyzer"
 
@@ -220,10 +216,16 @@ OUTPUT_DIRNAME = "workflow"
 # concatenate silently, so a wrapped paragraph and a forgotten comma look
 # exactly alike to a reader and to CodeQL. Naming them removes the ambiguity
 # and keeps the prompt body a list of one element per line.
+#
+# Every skill phase runs under a read-only agent type, and `_write_output`
+# saves the answer to `workflow/<id>.md` itself. "Write the file" asked for a
+# tool the phase does not have, and a model told to write and unable to spends
+# its turns trying.
 _REPORTING = (
     "End your turn with a written result: what you did, what you found, and"
     " whether the phase's objective was met. If the procedure asks you to"
-    " produce a document, write the file and say where it is."
+    " produce a document, put it in your answer: the phase saves your answer"
+    " as its report."
 )
 
 # The hard gate reads this line out of the phase's report. Stating the exact
@@ -267,6 +269,14 @@ class PhaseContext:
     changed_files: list[str] | None = None
     task_logger: object | None = None
     jev_run: object | None = None
+    # In an isolated build `project_dir` and `spec_dir` are the worktree and its
+    # copy of the spec. These are the main project and its spec directory; None
+    # means "the same as above" — a direct build, or a caller whose window has
+    # no phase that needs them. A phase needs them for what a worktree does not
+    # carry (`.workpilot/` is gitignored) and for what must outlive it: the
+    # Kanban reads the main spec directory, and the worktree is removed at merge.
+    source_project_dir: Path | None = None
+    source_spec_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -479,9 +489,9 @@ def _uiux(spec_dir: Path, phase_id: str) -> str:
     """`prompts.uiux_section`, deferred for the same reason as the above.
 
     The design system `ui-design-system` settled, for the phases that judge or
-    shape an interface: `frontend-design` designs against it instead of beside
-    it, and a reviewer holds the diff to it. Empty on every task that is not
-    about the interface.
+    shape an interface: `mobile-design` reads it before coding, and a reviewer
+    holds the diff to it. Empty on every task that is not about the
+    interface.
     """
     role = "qa" if CONFIG_PHASE.get(phase_id) == "qa" else "phase"
     try:
@@ -762,12 +772,7 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
     # — the coder loop's own resume must survive a review pass running between
     # two of its iterations.
     jev_advice = ""
-    if ctx.jev_run is not None and phase.id in (
-        "review",
-        "adversarial-review",
-        "spec-conformance",
-        "verify",
-    ):
+    if ctx.jev_run is not None and phase.id in ("review", "verify"):
         from integrations.jev.adapters import assess_build
         from integrations.jev.rubrics import advice_text
 
@@ -859,6 +864,21 @@ async def _run_verify_replay(resolved, ctx: PhaseContext) -> PhaseOutcome:
     return await run_replay_phase(resolved, ctx)
 
 
+async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `architecture-map` phase: `archify.phase`, imported when it runs."""
+    try:
+        from architecture_visualizer.archify.phase import run_architecture_map_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_architecture_map_phase(resolved, ctx)
+
+
 # Skill phases whose procedure is *driven* by WorkPilot's Python rather than
 # handed to a single one-shot session. `verify` names its skill like any other
 # phase — that is what the provider overlays and the slash command read — but
@@ -867,7 +887,16 @@ async def _run_verify_replay(resolved, ctx: PhaseContext) -> PhaseOutcome:
 # must get identically, so the loop owns them and the skill drives only the
 # part a model is needed for. Keyed by phase id, for the reason
 # `BUILTIN_EXECUTORS` is.
-CUSTOM_EXECUTORS = {"verify": _run_verify_loop, "verify-replay": _run_verify_replay}
+#
+# `architecture-map` is the same shape: the significance pass, archify's
+# validate/deliver/compare and the record the Delta tab reads are Python; only
+# authoring the head model needs a session. As a one-shot session it answered
+# in prose, mapped nothing, and left the tab empty.
+CUSTOM_EXECUTORS = {
+    "verify": _run_verify_loop,
+    "verify-replay": _run_verify_replay,
+    "architecture-map": _run_architecture_map,
+}
 
 
 async def run_skill_phases(
@@ -920,9 +949,9 @@ class BuiltinPlan:
     impls: dict[str, str] = field(default_factory=dict)
     """Phase id -> the ``<pack>/<skill>`` methodology it declares.
 
-    `coding` declares `superpowers/test-driven-development` and nothing ever
-    loaded it: the phase named a methodology, the coder loop ran the same way
-    regardless, and swapping the `impl:` line changed nothing at all. Carrying
+    `coding` declared a methodology and nothing ever loaded it: the phase named
+    it, the coder loop ran the same way regardless, and swapping the `impl:`
+    line changed nothing at all. Carrying
     it here is what makes "the methodologies become interchangeable phase
     implementations" true of the two phases that do the actual work.
     """

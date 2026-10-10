@@ -176,7 +176,7 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 def cmd_workflow(args: argparse.Namespace) -> int:
     """Show how a workflow resolves here, and which phases cannot run yet."""
-    from workflows import load_workflow, resolve_profile, validate_impls
+    from workflows import load_workflow, pack_inventory, resolve_profile, validate_impls
 
     project_dir = Path(args.project_dir).resolve()
     path = REPO_ROOT / "workflows" / args.workflow / "workflow.yaml"
@@ -186,8 +186,8 @@ def cmd_workflow(args: argparse.Namespace) -> int:
     print(profile.describe())
 
     packs, _ = _load(project_dir)
-    available = {p.name: {s.name for s in p.skills()} for p in packs}
-    missing = validate_impls(workflow, available)
+    available, gated = pack_inventory(packs)
+    missing = validate_impls(workflow, available, gated=gated)
     if missing:
         print(f"\n{len(missing)} phase(s) cannot run yet:")
         for m in missing:
