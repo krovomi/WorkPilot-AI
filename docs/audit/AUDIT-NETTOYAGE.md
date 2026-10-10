@@ -118,14 +118,14 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L9 | P2 | Code mort backend | F29, F30, F32, F33, F25 (back) | — |
 | L10 | P3 | Tokens à haut effort | F10, F11, F17 | L6 |
 | L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
-| L12 | P3 | Gouvernance | F12, F13 | L9 (F25) pour F13 |
+| L12 | P3 | Gouvernance — **fait** | F12, F13 | L9 (F25) pour F13 |
 | L13 | P4 | Surface produit | F19 | tous |
 | L14 | P1 | Événements et appels IPC perdus en silence — **fait** | F37 | — |
 | L15 | P1 | Droits effectifs et succès silencieux — **fait** | F39, F40 | L5 |
 | L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
 | L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L4, L5, L6, L14, L15, L16, L17 (faits) → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L4, L5, L6, L12, L14, L15, L16, L17 (faits) → L7, L8, L9 → L10, L11 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -729,6 +729,9 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
 
 ### Lot L12 — Gouvernance (P3)
 
+**Fait.** `hermes-learned` ne peut plus atteindre les harness par la configuration, et la barre de
+commandes ne consomme plus le choix « reprendre avec X ». `core/client.py` n'est pas touché (lot L9).
+
 #### F12 · `hermes-learned` listé dans `[packs]` contre la règle documentée
 
 - `.workpilot/skills.toml` liste `hermes-learned = "latest"` et `claude-mem = "latest"`. La doc fait de
@@ -736,11 +739,40 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
   harness sans relecture.
 - **Étape** : retirer les deux lignes ; `python3 scripts/skills_cli.py build` ; ajouter un test qui
   interdit `hermes-learned` dans `[packs]`.
+- **Corrigé par le lot L12.**
+  - Les deux lignes sont retirées ; un commentaire dans `[packs]` dit pourquoi elles n'y sont pas.
+  - `claude-mem` vérifié avant retrait : le pack n'a que son `pack.json` (optionnel, `skills/README.md`,
+    `shared_docs/architecture/brain.md`). La ligne n'émettait **aucun skill** ; le build retire seulement
+    l'entrée vide `workpilot-claude-mem` de `.claude-plugin/marketplace.json` et sa ligne de
+    `skills-lock.json`. `skills:bootstrap --pack claude-mem` lit `skills/`, pas `[packs]` : l'opt-in
+    documenté reste valable (lister le pack ensuite).
+  - `tests/test_skills_toml_packs.py` : `hermes-learned` absent de `[packs]`, `[packs]` non vide
+    (un `[packs]` vide admet tous les packs, l'absence seule ne prouverait rien), et un skill adopté
+    est rejeté à la porte `pack-pin` sous la configuration du dépôt.
+  - **Écart constaté, hors lot** : sur `develop`, `skills_cli.py build --check` signalait déjà
+    `.agents/skills/bmad-brainstorming/assets/brain-methods.csv` (source CRLF, miroir normalisé LF par
+    `.gitattributes`). Le build réécrit le fichier, git le renormalise : aucun diff commité.
 
 #### F13 · La barre de commandes résout encore son provider avec `_get_active_provider`
 
 - `slash_commands/api.py:417` (exécution) ; la résolution des surcharges l.205 utilise déjà
   `peek_active_provider`. Remplacer ; disparaît de toute façon avec F25.
+- **Corrigé par le lot L12.**
+  - `_agent_workflow_call` lit le provider avec `peek_active_provider`. Même cas évident corrigé :
+    `runners/insights_runner.run_with_sdk` (un tour de chat décide, il ne démarre pas la session
+    visée par le marqueur).
+  - `tests/test_slash_commands_provider_peek.py` : avec un marqueur `RESUME_WITH_PROVIDER`, la commande
+    et le chat tournent sur le provider qu'il nomme et le marqueur reste en place (les deux tests
+    échouent sans le correctif).
+  - Portée réelle : le marqueur est écrit dans le dossier de spec, ces deux chemins résolvent sur la
+    racine du projet ; la consommation n'y touchait donc qu'un marqueur posé à la racine. Le correctif
+    applique la règle §0.1, il ne répare pas une perte observée.
+  - **Signalés, non corrigés** (hors cas évident) : `core/oneshot.oneshot_completion` appelle
+    `_resolve_active_provider` en mode consommant quand un `spec_dir` est passé (`commit_message.py`,
+    `runners/oneshot_completion_runner.py`) ; `create_agent_client` sans `provider` consomme aussi.
+    `services/design_to_code_service.py` appelle `_get_active_provider()` sans `spec_dir`, donc ne
+    consomme rien. `agents/session.py` et `spec/pipeline/agent_runner.py` sont le chemin de build.
+    Tout cela disparaît avec F25 (lot L9).
 
 ### Lot L13 — Surface produit (P4)
 
