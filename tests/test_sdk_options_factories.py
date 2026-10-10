@@ -46,12 +46,7 @@ FACTORIES = {
 #: Builders that are not factories but are known and dated. Each entry names
 #: the lot that removes it; the test fails once the file is gone, so the
 #: exemption goes with it.
-KNOWN_OUTSIDERS = {
-    # F32 (lot L9): a second provider registry. `generate` calls
-    # `ClaudeSDKClient.query_sync`, which the SDK has never had, so the
-    # options it builds never reach a session.
-    Path("src/connectors/llm_claude.py"),
-}
+KNOWN_OUTSIDERS: set[Path] = set()
 
 _BUILDERS = {"ClaudeAgentOptions", "ClaudeSDKClient"}
 

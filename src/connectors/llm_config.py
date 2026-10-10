@@ -21,7 +21,10 @@ try:
 except ImportError:  # pragma: no cover - dépend du sys.path de l'appelant
     from apps.backend.core.auth import get_auth_token
 
-from .llm_base import DEFAULT_CLAUDE_MODEL
+#: Modèle Claude par défaut d'une configuration de provider — le repli quand
+#: l'utilisateur n'en a pas choisi. Il vivait dans ``llm_base.py``, retiré avec
+#: les connecteurs ``llm_*`` au lot L9 de l'audit.
+DEFAULT_CLAUDE_MODEL = "claude-opus-5"
 
 logger = logging.getLogger(__name__)
 
