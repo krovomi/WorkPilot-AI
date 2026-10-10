@@ -60,7 +60,7 @@ bandit>=1.9.4
 # pip-audit for dependency vulnerability scanning (optional but recommended)
 # Install separately: pip install pip-audit
 
-fastapi>=0.141.1
+fastapi>=0.142.2
 uvicorn[standard]>=0.54.0
 slowapi>=0.1.10
 
