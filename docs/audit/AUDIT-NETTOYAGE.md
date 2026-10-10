@@ -116,7 +116,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L7 | P2 | Une seule mémoire | F6, F7, F14, F34 | L1 (insight_extractor) |
 | L8 | P2 | Code mort frontend | F28, F25 (front) | L3 |
 | L9 | P2 | Code mort backend | F29, F30, F32, F33, F25 (back) | — |
-| L10 | P3 | Tokens à haut effort | F10, F11, F17 | L6 |
+| L10 | P3 | Tokens à haut effort — **fait** | F10, F11, F17 | L6 |
 | L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
 | L12 | P3 | Gouvernance | F12, F13 | L9 (F25) pour F13 |
 | L13 | P4 | Surface produit | F19 | tous |
@@ -125,7 +125,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
 | L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L4, L5, L6, L14, L15, L16, L17 (faits) → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L4, L5, L6, L10, L14, L15, L16, L17 (faits) → L7, L8, L9 → L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -137,10 +137,10 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L14, L15, L16, L17 (faits) → L7, L
 | Fichiers frontend sans importeur de production | 57 (~16,5 k lignes) | 0 |
 | Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) | 0 |
 | Shims racine `apps/backend/*.py` | 25 | 0 (hors points d'entrée) |
-| Prompts orphelins | 11 (~51 Ko) | 0 |
+| Prompts orphelins | 11 (~51 Ko) ; 0 après le lot L10 (+ `coder.md`, 35 Ko, trouvé orphelin et retiré) | 0 |
 | Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
 | Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) | ≤ 7 |
-| Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) | ≤ 4 |
+| Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) ; 4 après le lot L10 sur une tâche de code (5 sur une tâche mobile), sans les 3 sous-agents du roster de review | ≤ 4 |
 | Détecteurs de pile | ≥ 11 | 1 façade |
 | Écritures par merge | 4 magasins | 1 événement |
 
@@ -647,6 +647,58 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
   (adapter le dernier une fois le marqueur retiré).
 
 ### Lot L10 — Tokens à haut effort (P3)
+
+**Fait.** Douze prompts sans lecteur retirés (~86 Ko), `complexity_assessor` appelé seulement quand
+l'heuristique doute, une revue dont le moteur choisit les lentilles et qui ne délègue plus, un
+budget de QA qui suit l'effort. Mesuré avec la méthode « Profil réel d'un build, par effort » (§0.3)
+et figé par `tests/test_review_lenses.py`.
+
+- **F10.** Les onze orphelins de l'annexe A.3 sont supprimés (preuve : aucun chargement par nom ni
+  par chemin dynamique — `prompts_dir`, `_load_prompt_file`, gestionnaires de prompts GitHub,
+  `run_agent` du pipeline de spec — ni dans le YAML, `skills/` ou le frontend ; les runners
+  homonymes n'ouvrent aucun prompt). `scripts/wiki/generate_inventories.py` perd leurs catégories.
+  `complexity_assessor` ne tourne plus que sous `AI_ASSESSMENT_CONFIDENCE_THRESHOLD` (0,8) : la
+  valeur par défaut de l'heuristique (standard, 0,75) appelle encore le modèle, ses verdicts nets
+  (simple 0,9, complex 0,85) non ; la décision est écrite dans le journal de la tâche, et
+  `complexity_assessment.json` dit qui a décidé (`assessed_by`). L'heuristique lit désormais
+  `requirements.json` (`services_involved`), qu'elle acceptait sans que l'orchestrateur le lui passe.
+- **F11.** Le moteur choisit les lentilles (`workflows.runner.REVIEW_LENSES_BY_EFFORT`, ligne
+  `LENSES:` du prompt ; le tableau du skill est tenu au même par un test) et `review` déclare
+  `roster: solo` : sous `pr_reviewer`, elle recevait security-auditor, regression-hunter et
+  test-coverage-auditor, trois sous-sessions qui relisaient le diff pour reposer la question d'une
+  lentille. Sessions qui relisent le diff, sur le profil résolu : 1 à `none` et `low` (QA), 4 à
+  `medium`, `high` et `ultrathink` sur une tâche de code (`review`, session `verifier`, première
+  passe QA, `architecture-map`), 5 sur une tâche mobile (`store-readiness`). La reprise après pause
+  et le profil affiché ne changent pas : aucune phase n'est ajoutée ni retirée.
+- **F17.** Plafond selon l'effort de la phase QA (`QA_ITERATIONS_BY_EFFORT` : 3, 5, 8, 12, 20),
+  `WORKPILOT_QA_MAX_ITERATIONS` pour le surcharger sous l'ancien plafond de 50, qui reste le
+  plafond absolu. Le budget est celui de la tâche (`qa_session` continue après une pause) ; un retour
+  humain (`QA_FIX_REQUEST.md` écrit par une personne) en ouvre un nouveau. Le seuil d'escalade sur
+  problème récurrent est borné par le plafond, sinon il ne pouvait jamais se déclencher à `none`,
+  `low` ou `medium` (8 > 3, 5) : un problème présent à chaque passe finit sur `QA_ESCALATION.md`.
+- **Trouvé pendant le lot L10 :**
+  - `coder.md` (35 Ko) n'était servi à **aucune** session : la boucle du coder prompte chaque
+    sous-tâche avec `prompts_pkg.prompt_generator.generate_subtask_prompt`, et `get_coding_prompt`
+    n'avait pas d'appelant. Retiré avec lui ; « le découper en noyau + modules » était donc sans
+    objet — c'est le prompt servi qui est déjà un noyau plus des modules par pile (.NET, plan de
+    tests, règles UI), et `tests/test_coder_prompt_assembly.py` tient cet assemblage. Le prompt
+    servi renvoyait à « la section PATH CONFUSION PREVENTION du prompt coder », absente : corrigé.
+  - L'« auto-revue par sous-tâche » comptée par F11 n'a jamais tourné : c'était l'étape 6.5 de
+    `coder.md`, et `agents/self_review.py` est opt-in et écrit un résumé de `git diff` sans modèle.
+  - `prompts_pkg.prompts.get_planner_prompt` n'a pas d'appelant non plus (`generate_planner_prompt`
+    sert le planner) : relève du lot L9.
+- **Écarts, questions au mainteneur :**
+  - Les règles de `coder.md` absentes du prompt servi (auto-critique avant de marquer une sous-tâche
+    terminée, ne jamais pousser, ne pas modifier la config git, écrire les insights de session) :
+    les reprendre dans `generate_subtask_prompt`, ou les laisser hors du prompt payé par sous-tâche ?
+  - Tâche mobile à ultrathink : 5 sessions. `store-readiness` tourne après la QA et son rapport n'a
+    pas de consommateur (F38) ; en faire une lentille de `review` quand la tâche touche le mobile, ou
+    la déplacer avant la QA ? Choix produit, et le lot L11 ancre les globs mobiles sur ces phases.
+  - `qa-acceptance-checker` reste offert au `verifier` (`roster: qa`) et au QA reviewer, alors que la
+    conformité est une lentille de `review` à `high` : retirer la conformité du roster du verifier ?
+    Touche la consolidation des sous-agents (lot L11).
+  - `self_review.py` : le supprimer (L9), ou le brancher sur un vrai client — ce qui ajouterait une
+    session par build ?
 
 #### F10 · Prompts volumineux et onze prompts orphelins
 
@@ -1186,4 +1238,4 @@ le câblage étant un chantier à part (décrit ci-dessous).
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.
