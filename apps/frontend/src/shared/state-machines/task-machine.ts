@@ -169,9 +169,14 @@ export const taskMachine = createMachine(
 						target: "error",
 						actions: ["setReviewReasonErrors", "setError"],
 					},
+					// QA only runs once every subtask is done. When its agent fails
+					// to reach a verdict the build is still complete — what is
+					// missing is the automatic validation, not the work. That is a
+					// review the user does by hand, not a failed task: the card
+					// stays out of `error`, and the message travels as a warning.
 					QA_AGENT_ERROR: {
-						target: "error",
-						actions: ["setReviewReasonErrors", "setError"],
+						target: "human_review",
+						actions: ["setReviewReasonQaUnverified", "setError"],
 					},
 					USER_STOPPED: {
 						target: "human_review",
@@ -200,8 +205,8 @@ export const taskMachine = createMachine(
 						actions: ["setReviewReasonErrors", "setError"],
 					},
 					QA_AGENT_ERROR: {
-						target: "error",
-						actions: ["setReviewReasonErrors", "setError"],
+						target: "human_review",
+						actions: ["setReviewReasonQaUnverified", "setError"],
 					},
 					USER_STOPPED: {
 						target: "human_review",
@@ -274,11 +279,16 @@ export const taskMachine = createMachine(
 			setReviewReasonStopped: assign({ reviewReason: () => "stopped" }),
 			setReviewReasonQaRejected: assign({ reviewReason: () => "qa_rejected" }),
 			setReviewReasonErrors: assign({ reviewReason: () => "errors" }),
+			setReviewReasonQaUnverified: assign({
+				reviewReason: () => "qa_unverified",
+			}),
 			clearReviewReason: assign({
 				reviewReason: () => undefined,
 				error: () => undefined,
 			}),
-			// Every event that lands the task in `error` names the failure.
+			// Every event that lands the task in `error` names the failure, and
+			// QA_AGENT_ERROR — which lands it in review — names what QA could
+			// not check.
 			//
 			// Before, only PLANNING_FAILED and CODING_FAILED did — and those two
 			// were the paths the backend never emitted. Every real failure

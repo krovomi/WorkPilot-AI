@@ -1,4 +1,4 @@
-import { AlertOctagon, Copy } from "lucide-react";
+import { AlertOctagon, AlertTriangle, Copy } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Task } from "../../../shared/types";
@@ -21,6 +21,11 @@ interface TaskFailureBannerProps {
  *
  * Renders nothing when the task did not fail: a permanently-present "no errors"
  * strip is a strip nobody reads.
+ *
+ * A finished build whose QA agent could not reach a verdict
+ * (`reviewReason === "qa_unverified"`) gets the same sentence, as a warning:
+ * the work is done and reviewable, so the red "this task failed" read as a
+ * blocking failure on a task the board also showed at 100%.
  */
 export function TaskFailureBanner({ task }: TaskFailureBannerProps) {
 	const { t } = useTranslation(["tasks"]);
@@ -29,7 +34,12 @@ export function TaskFailureBanner({ task }: TaskFailureBannerProps) {
 	const failed =
 		task.status === "error" ||
 		(task.status === "human_review" && task.reviewReason === "errors");
-	if (!failed) return null;
+	const unverified =
+		task.status === "human_review" && task.reviewReason === "qa_unverified";
+	if (!failed && !unverified) return null;
+
+	const ns = unverified ? "qaUnverified" : "failure";
+	const Icon = unverified ? AlertTriangle : AlertOctagon;
 
 	const message = task.errorMessage?.trim();
 
@@ -47,14 +57,22 @@ export function TaskFailureBanner({ task }: TaskFailureBannerProps) {
 
 	return (
 		<div
-			role="alert"
-			className="mx-4 mb-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3"
+			role={unverified ? "status" : "alert"}
+			className={
+				unverified
+					? "mx-4 mb-3 rounded-lg border border-warning/40 bg-warning/10 p-3"
+					: "mx-4 mb-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3"
+			}
 		>
 			<div className="flex items-start gap-2">
-				<AlertOctagon className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+				<Icon
+					className={`mt-0.5 h-4 w-4 shrink-0 ${unverified ? "text-warning" : "text-destructive"}`}
+				/>
 				<div className="min-w-0 flex-1">
-					<p className="text-sm font-medium text-destructive">
-						{t("tasks:failure.title")}
+					<p
+						className={`text-sm font-medium ${unverified ? "text-warning" : "text-destructive"}`}
+					>
+						{t(`tasks:${ns}.title`)}
 					</p>
 					{message ? (
 						<pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-foreground/90">
@@ -66,11 +84,11 @@ export function TaskFailureBanner({ task }: TaskFailureBannerProps) {
 						// detail is in the logs rather than leaving them to wonder
 						// whether the UI simply failed to render it.
 						<p className="mt-1 text-xs text-muted-foreground">
-							{t("tasks:failure.unknown")}
+							{t(`tasks:${ns}.unknown`)}
 						</p>
 					)}
 					<p className="mt-2 text-xs text-muted-foreground">
-						{t("tasks:failure.hint")}
+						{t(`tasks:${ns}.hint`)}
 					</p>
 				</div>
 				{message && (
