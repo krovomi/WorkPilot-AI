@@ -370,16 +370,6 @@
 			"contentSha256": "ba461f1eada3372601ad7e76491b44fdd32e492bd7b915730c218076ef678857",
 			"targets": {}
 		},
-		"bmad-net-architect": {
-			"kind": "agent",
-			"pack": "dotnet",
-			"packVersion": "1.0.0",
-			"source": "skills/dotnet/agents/bmad-net-architect.md",
-			"contentSha256": "ab589f80ed759b912b88cc2b72e38a062085abd83c4be60e889d98db68746307",
-			"targets": {
-				"dotnet": ">=10.0"
-			}
-		},
 		"bmad-party-mode": {
 			"kind": "skill",
 			"pack": "bmad",
@@ -387,16 +377,6 @@
 			"source": "skills/bmad/bmad-party-mode/SKILL.md",
 			"contentSha256": "ed0871ed93b6d8dffa41bb84baf7bbc3dc8c1f7d86bb680aa82e87a7f475b875",
 			"targets": {}
-		},
-		"bmad-performance-analyst": {
-			"kind": "agent",
-			"pack": "dotnet",
-			"packVersion": "1.0.0",
-			"source": "skills/dotnet/agents/bmad-performance-analyst.md",
-			"contentSha256": "3c78ac19ff989eb7fef61755d7741b464f2e887e462a886373bc7ecaac6b0202",
-			"targets": {
-				"dotnet": ">=10.0"
-			}
 		},
 		"bmad-prd": {
 			"kind": "skill",
@@ -695,17 +675,6 @@
 				"ios": ">=16.0"
 			}
 		},
-		"mobile-release-manager": {
-			"kind": "agent",
-			"pack": "mobile",
-			"packVersion": "1.0.0",
-			"source": "skills/mobile/agents/mobile-release-manager.md",
-			"contentSha256": "7557ea0275571da64e7cc9f2fb79bfb61122e22e473155ad0f1b0bf940aeec36",
-			"targets": {
-				"android": ">=8.0",
-				"ios": ">=16.0"
-			}
-		},
 		"mobile-store-readiness": {
 			"kind": "skill",
 			"pack": "mobile",
@@ -876,29 +845,28 @@
 		".agents/agents/ai-triage-reviewer.md",
 		".agents/agents/android-engineer.md",
 		".agents/agents/architecture-analyst.md",
-		".agents/agents/bmad-net-architect.md",
-		".agents/agents/bmad-performance-analyst.md",
 		".agents/agents/code-reviewer.md",
 		".agents/agents/codebase-fit-reviewer.md",
-		".agents/agents/codebase-surveyor.md",
+		".agents/agents/comment-analyzer.md",
 		".agents/agents/constraint-collector.md",
 		".agents/agents/dependency-tracer.md",
+		".agents/agents/device-runner.md",
 		".agents/agents/evidence-collector.md",
 		".agents/agents/finding-validator.md",
 		".agents/agents/ios-engineer.md",
 		".agents/agents/logic-reviewer.md",
 		".agents/agents/mobile-architect.md",
-		".agents/agents/mobile-release-manager.md",
 		".agents/agents/net-architect.md",
+		".agents/agents/new-code-reviewer.md",
 		".agents/agents/performance-analyst.md",
 		".agents/agents/prior-art-finder.md",
 		".agents/agents/qa-acceptance-checker.md",
-		".agents/agents/qa-test-evidence.md",
 		".agents/agents/quality-reviewer.md",
 		".agents/agents/regression-hunter.md",
+		".agents/agents/resolution-verifier.md",
 		".agents/agents/security-auditor.md",
 		".agents/agents/security-reviewer.md",
-		".agents/agents/spec-explorer.md",
+		".agents/agents/store-readiness-auditor.md",
 		".agents/agents/test-coverage-auditor.md",
 		".agents/agents/test-runner.md",
 		".agents/skills/akka-net-patterns/SKILL.md",
@@ -1291,9 +1259,7 @@
 		".gemini/commands/bmad-generate-project-context.toml",
 		".gemini/commands/bmad-help.toml",
 		".gemini/commands/bmad-market-research.toml",
-		".gemini/commands/bmad-net-architect.toml",
 		".gemini/commands/bmad-party-mode.toml",
-		".gemini/commands/bmad-performance-analyst.toml",
 		".gemini/commands/bmad-prd.toml",
 		".gemini/commands/bmad-prfaq.toml",
 		".gemini/commands/bmad-product-brief.toml",
@@ -1329,7 +1295,6 @@
 		".gemini/commands/mobile-architect.toml",
 		".gemini/commands/mobile-design-review.toml",
 		".gemini/commands/mobile-device-testing.toml",
-		".gemini/commands/mobile-release-manager.toml",
 		".gemini/commands/mobile-store-readiness.toml",
 		".gemini/commands/net-advanced.toml",
 		".gemini/commands/net-architect.toml",
