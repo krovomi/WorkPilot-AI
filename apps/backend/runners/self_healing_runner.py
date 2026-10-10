@@ -36,6 +36,12 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 
+def _print_reason(operation) -> None:
+    """Say why an operation produced no fix, as the incident records it."""
+    if operation.incident and operation.incident.error_message:
+        print(f"   {operation.incident.error_message}")
+
+
 class SelfHealingRunner:
     """Runner for the Self-Healing Codebase + Incident Responder."""
 
@@ -99,9 +105,9 @@ class SelfHealingRunner:
             if operation.incident.fix_pr_url:
                 print(f"   PR: {operation.incident.fix_pr_url}")
             return True
-        else:
-            print("❌ Healing failed. Incident escalated for manual review.")
-            return False
+        print("❌ No fix applied. The incident needs manual review.")
+        _print_reason(operation)
+        return False
 
     async def run_production(
         self,
@@ -139,9 +145,9 @@ class SelfHealingRunner:
                 f"✅ Incident resolved! Fix in branch: {operation.incident.fix_branch}"
             )
             return True
-        else:
-            print("❌ Incident requires manual review.")
-            return False
+        print("❌ No fix applied. The incident needs manual review.")
+        _print_reason(operation)
+        return False
 
     async def run_proactive(
         self, risk_threshold: float = 40.0, top_n: int = 10, json_output: bool = False
