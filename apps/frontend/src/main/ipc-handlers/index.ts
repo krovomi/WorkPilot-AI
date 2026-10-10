@@ -14,7 +14,10 @@ import { notificationService } from "../notification-service";
 import type { PythonEnvManager } from "../python-env-manager";
 import type { TerminalManager } from "../terminal-manager";
 import { registerAccessibilityHandlers } from "./accessibility-handlers";
-import { registerAutoRefactorHandlers } from "./auto-refactor-handlers";
+import {
+	registerAutoRefactorHandlers,
+	setupAutoRefactorEventForwarding,
+} from "./auto-refactor-handlers";
 import { registerContinuousAIHandlers } from "./continuous-ai-handlers";
 import { getAutoBuildSourcePath } from "./context/utils";
 import { registerQueueRoutingHandlers } from "./queue-routing-handlers";
@@ -39,10 +42,7 @@ import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 import { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
 import { registerChangelogHandlers } from "./changelog-handlers";
-import {
-	registerCICDTriggersHandlers,
-	setupCICDTriggersEventForwarding,
-} from "./cicd-triggers-handlers";
+import { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
 import { registerClaudeCodeHandlers } from "./claude-code-handlers";
 import { registerComplianceHandlers } from "./compliance-handlers";
 import {
@@ -92,10 +92,7 @@ import { registerLiveCompanionHandlers } from "./live-companion-handlers";
 import { registerMcpHandlers } from "./mcp-handlers";
 import { registerMcpMarketplaceHandlers } from "./mcp-marketplace-handlers";
 import { registerMemoryHandlers } from "./memory-handlers";
-import {
-	registerMemoryLifecycleHandlers,
-	setupMemoryLifecycleEventForwarding,
-} from "./memory-lifecycle-handlers";
+import { registerMemoryLifecycleHandlers } from "./memory-lifecycle-handlers";
 import { registerMultiRepoHandlers } from "./multi-repo-handlers";
 import { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 import { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
@@ -167,10 +164,7 @@ export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 export { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
 export { registerChangelogHandlers } from "./changelog-handlers";
-export {
-	registerCICDTriggersHandlers,
-	setupCICDTriggersEventForwarding,
-} from "./cicd-triggers-handlers";
+export { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
 export { registerClaudeCodeHandlers } from "./claude-code-handlers";
 export { registerComplianceHandlers } from "./compliance-handlers";
 export {
@@ -218,10 +212,7 @@ export { registerLiveCompanionHandlers } from "./live-companion-handlers";
 export { registerMcpHandlers } from "./mcp-handlers";
 export { registerMcpMarketplaceHandlers } from "./mcp-marketplace-handlers";
 export { registerMemoryHandlers } from "./memory-handlers";
-export {
-	registerMemoryLifecycleHandlers,
-	setupMemoryLifecycleEventForwarding,
-} from "./memory-lifecycle-handlers";
+export { registerMemoryLifecycleHandlers } from "./memory-lifecycle-handlers";
 export { registerMultiRepoHandlers } from "./multi-repo-handlers";
 export { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers";
 export { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
@@ -447,19 +438,19 @@ export function setupIpcHandlers(
 
 	// Architecture Visualizer handlers
 	registerArchitectureVisualizerHandlers();
-	setupArchitectureVisualizerEventForwarding();
+	setupArchitectureVisualizerEventForwarding(getMainWindow);
 
 	// Code Migration Agent handlers
 	registerCodeMigrationHandlers();
-	setupCodeMigrationEventForwarding();
+	setupCodeMigrationEventForwarding(getMainWindow);
 
 	// Performance Profiler Agent handlers
 	registerPerformanceProfilerHandlers();
-	setupPerformanceProfilerEventForwarding();
+	setupPerformanceProfilerEventForwarding(getMainWindow);
 
 	// Documentation Agent handlers
 	registerDocumentationAgentHandlers();
-	setupDocumentationAgentEventForwarding();
+	setupDocumentationAgentEventForwarding(getMainWindow);
 
 	// Agent Decision Logger handlers (Feature 30)
 	registerDecisionLoggerHandlers();
@@ -482,11 +473,9 @@ export function setupIpcHandlers(
 
 	// Memory Lifecycle Manager handlers (Feature 43)
 	registerMemoryLifecycleHandlers();
-	setupMemoryLifecycleEventForwarding(getMainWindow);
 
 	// CI/CD Deployment Triggers handlers (Feature 44)
 	registerCICDTriggersHandlers();
-	setupCICDTriggersEventForwarding(getMainWindow);
 
 	// Cross-Language Translation Agent handlers (Feature 41)
 	registerCrossLanguageTranslationHandlers();
@@ -513,7 +502,7 @@ export function setupIpcHandlers(
 
 	// Code Playground handlers (AI sandbox code generation)
 	registerCodePlaygroundHandlers();
-	setupCodePlaygroundEventForwarding();
+	setupCodePlaygroundEventForwarding(getMainWindow);
 
 	// Context Mesh handlers (Cross-Project Intelligence)
 	registerContextMeshHandlers(getMainWindow);
@@ -610,6 +599,7 @@ export function setupIpcHandlers(
 
 	// Auto-Refactor handlers (analysis → plan → optional execution)
 	registerAutoRefactorHandlers();
+	setupAutoRefactorEventForwarding(getMainWindow);
 
 	// Swarm handlers (parallel subtask execution in dependency waves)
 	registerSwarmHandlers(

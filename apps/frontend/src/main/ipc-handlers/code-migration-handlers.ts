@@ -1,8 +1,9 @@
-import { ipcMain } from "electron";
+import { type BrowserWindow, ipcMain } from "electron";
 import {
 	type CodeMigrationRequest,
 	codeMigrationService,
 } from "../code-migration-service";
+import { IPC_CHANNELS } from "../../shared/constants";
 
 export function registerCodeMigrationHandlers(): void {
 	ipcMain.handle(
@@ -55,39 +56,33 @@ export function registerCodeMigrationHandlers(): void {
 	);
 }
 
-export function setupCodeMigrationEventForwarding(): void {
-	codeMigrationService.on("status", (status: string) => {
-		const mainWindow = globalThis.mainWindow;
+/**
+ * Forward the service's events to the renderer, on the `IPC_CHANNELS` the
+ * preload listens on.
+ */
+export function setupCodeMigrationEventForwarding(
+	getMainWindow: () => BrowserWindow | null,
+): void {
+	const send = (channel: string, payload: unknown): void => {
+		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("codeMigration:status", status);
+			mainWindow.webContents.send(channel, payload);
 		}
-	});
+	};
 
-	codeMigrationService.on("stream-chunk", (chunk: string) => {
-		const mainWindow = globalThis.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("codeMigration:stream-chunk", chunk);
-		}
-	});
-
-	codeMigrationService.on("error", (error: string) => {
-		const mainWindow = globalThis.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("codeMigration:error", error);
-		}
-	});
-
-	codeMigrationService.on("complete", (result) => {
-		const mainWindow = globalThis.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("codeMigration:complete", result);
-		}
-	});
-
-	codeMigrationService.on("task-progress", (progress) => {
-		const mainWindow = globalThis.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("codeMigration:task-progress", progress);
-		}
-	});
+	codeMigrationService.on("status", (status: string) =>
+		send(IPC_CHANNELS.CODE_MIGRATION_STATUS, status),
+	);
+	codeMigrationService.on("stream-chunk", (chunk: string) =>
+		send(IPC_CHANNELS.CODE_MIGRATION_STREAM_CHUNK, chunk),
+	);
+	codeMigrationService.on("error", (error: string) =>
+		send(IPC_CHANNELS.CODE_MIGRATION_ERROR, error),
+	);
+	codeMigrationService.on("complete", (result) =>
+		send(IPC_CHANNELS.CODE_MIGRATION_COMPLETE, result),
+	);
+	codeMigrationService.on("task-progress", (progress) =>
+		send(IPC_CHANNELS.CODE_MIGRATION_TASK_PROGRESS, progress),
+	);
 }
