@@ -211,27 +211,33 @@ describe("RepositorySection", () => {
 		});
 	});
 
-	it("configures a remote on a checkout that has none", async () => {
+		it("configures a remote on a checkout that has none", async () => {
 		detectRepoProvider.mockResolvedValue({
 			success: true,
 			data: { provider: "unknown", remoteName: "origin" },
 		});
 		const project = createProject();
-		const { getByLabelText, getAllByText } = renderSection(
+
+		// Destructurer avec findByLabelText au lieu de getByLabelText
+		const { findByLabelText, getAllByText } = renderSection(
 			project,
 			baseSettings,
 		);
 
-		const urlInput = await waitFor(
-			() => getByLabelText("Remote URL") as HTMLInputElement,
-		);
+		// findByLabelText attend automatiquement que l'élément soit rendu et disponible
+		const urlInput = await findByLabelText("Remote URL") as HTMLInputElement;
 		expect(urlInput.value).toBe("");
 
 		fireEvent.change(urlInput, {
 			target: { value: "git@github.com:krovomi/WorkPilot-AI.git" },
 		});
-		// Two "Save" buttons can exist (name edit is collapsed, so only the
-		// remote's is rendered); take the last to be explicit about which.
+
+		// Attendre également un court instant pour s'assurer que le bouton Save lié à l'input est à jour
+		await waitFor(() => {
+			const saveButtons = getAllByText("Save");
+			expect(saveButtons.length).toBeGreaterThan(0);
+		});
+
 		const saveButtons = getAllByText("Save");
 		fireEvent.click(saveButtons[saveButtons.length - 1]);
 
