@@ -582,11 +582,18 @@ export function PluginCreatorWizard({ onClose }: PluginCreatorWizardProps) {
 		}
 	}, [form]);
 
-	const handleOpenFolder = useCallback(() => {
-		if (createdPath) {
-			globalThis.electronAPI?.invoke("shell:openPath", createdPath);
+	const handleOpenFolder = useCallback(async () => {
+		if (!createdPath) return;
+		const result = await globalThis.electronAPI?.invoke(
+			"pluginMarketplace:openLocalFolder",
+			createdPath,
+		);
+		if (!result?.success) {
+			setError(
+				result?.error || t("common:pluginMarketplace.creator.openFolderFailed"),
+			);
 		}
-	}, [createdPath]);
+	}, [createdPath, t]);
 
 	return (
 		<div className="flex flex-col h-full overflow-y-auto">
@@ -670,6 +677,7 @@ export function PluginCreatorWizard({ onClose }: PluginCreatorWizardProps) {
 								{createdPath}
 							</p>
 						)}
+						{error && <p className="text-xs text-destructive">{error}</p>}
 						<div className="flex gap-3 mt-4">
 							{createdPath && (
 								<button

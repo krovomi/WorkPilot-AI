@@ -1,5 +1,7 @@
 /**
- * Every channel the preload invokes must have someone listening in main.
+ * Every channel the preload invokes must have someone listening in main — and
+ * so must every channel the renderer names through the generic
+ * `electronAPI.invoke/send` bridge.
  *
  * Five preload methods — `scanOllamaModels`, `downloadOllamaModel`,
  * `submitOAuthCode`, `initializeClaudeProfile`, `getAzureDevOpsProjects` —
@@ -34,6 +36,7 @@ const SRC = path.resolve(import.meta.dirname, "..", "..", "..");
 const MAIN_DIR = path.join(SRC, "main");
 const MAIN_ENTRY = path.join(MAIN_DIR, "index.ts");
 const PRELOAD_DIR = path.join(SRC, "preload");
+const RENDERER_DIR = path.join(SRC, "renderer");
 const IPC_CONSTANTS = path.join(SRC, "shared", "constants", "ipc.ts");
 
 /**
@@ -61,6 +64,12 @@ const DYNAMIC_FORWARDERS = new Set([
 
 const PRELOAD_CALL =
 	/(?<![\w$])(?<!function\s+)(?:ipcRenderer\s*\.\s*(?:invoke|send|sendSync)|invokeIpc|sendIpc)\b/g;
+/**
+ * `electronAPI.invoke("…")` / `.send("…")`: the generic bridge the renderer
+ * names a channel through itself. The preload forwards whatever it is given, so
+ * these calls are checked where the channel is written — in the renderer.
+ */
+const RENDERER_CALL = /(?<![\w$])electronAPI\s*\??\.\s*(?:invoke|send)\b/g;
 const MAIN_REGISTRATION =
 	/(?<![\w$])ipcMain\s*\.\s*(?:handle|handleOnce|on|once)\b/g;
 
@@ -76,17 +85,18 @@ interface Unresolved {
 	line: number;
 }
 
-/** Every `.ts` source under `dir`, tests excluded. */
-function sourceFiles(dir: string): string[] {
+/** Every `.ts` (and, when asked, `.tsx`) source under `dir`, tests excluded. */
+function sourceFiles(dir: string, withTsx = false): string[] {
 	const out: string[] = [];
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const full = path.join(dir, entry.name);
 		if (entry.isDirectory()) {
 			if (entry.name === "__tests__" || entry.name === "node_modules") continue;
-			out.push(...sourceFiles(full));
+			out.push(...sourceFiles(full, withTsx));
 		} else if (
-			entry.name.endsWith(".ts") &&
-			!entry.name.endsWith(".test.ts") &&
+			(entry.name.endsWith(".ts") ||
+				(withTsx && entry.name.endsWith(".tsx"))) &&
+			!/\.test\.tsx?$/.test(entry.name) &&
 			!entry.name.endsWith(".d.ts")
 		) {
 			out.push(full);
@@ -382,9 +392,14 @@ function reachableFromMainEntry(): Set<string> {
 
 const where = (use: { file: string; line: number }) => `${use.file}:${use.line}`;
 
-describe("IPC channel parity (preload → main)", () => {
+describe("IPC channel parity (preload and renderer → main)", () => {
 	const constants = ipcChannelConstants();
 	const preload = collect(sourceFiles(PRELOAD_DIR), PRELOAD_CALL, constants);
+	const renderer = collect(
+		sourceFiles(RENDERER_DIR, true),
+		RENDERER_CALL,
+		constants,
+	);
 	const main = collect(sourceFiles(MAIN_DIR), MAIN_REGISTRATION, constants);
 	const reachable = reachableFromMainEntry();
 
@@ -393,7 +408,7 @@ describe("IPC channel parity (preload → main)", () => {
 		handlersOf.set(use.channel, [...(handlersOf.get(use.channel) ?? []), use]);
 	}
 	const invoked = new Map<string, ChannelUse[]>();
-	for (const use of preload.uses) {
+	for (const use of [...preload.uses, ...renderer.uses]) {
 		invoked.set(use.channel, [...(invoked.get(use.channel) ?? []), use]);
 	}
 
@@ -402,6 +417,7 @@ describe("IPC channel parity (preload → main)", () => {
 		// rather than turn the checks below into vacuous passes.
 		expect(constants.size).toBeGreaterThan(500);
 		expect(invoked.size).toBeGreaterThan(400);
+		expect(renderer.uses.length).toBeGreaterThan(50);
 		expect(handlersOf.size).toBeGreaterThan(500);
 		expect(reachable.size).toBeGreaterThan(100);
 	});
@@ -409,6 +425,9 @@ describe("IPC channel parity (preload → main)", () => {
 	it("resolves the channel of every IPC call", () => {
 		const report = (u: Unresolved) => `${where(u)}  ${u.argument}`;
 		expect(preload.unresolved.map(report), "preload calls").toEqual([]);
+		expect(renderer.unresolved.map(report), "renderer generic calls").toEqual(
+			[],
+		);
 		expect(main.unresolved.map(report), "main registrations").toEqual([]);
 	});
 
@@ -423,7 +442,7 @@ describe("IPC channel parity (preload → main)", () => {
 		expect(handlersOf.has("channel")).toBe(false);
 	});
 
-	it("has a main-process handler for every channel the preload invokes", () => {
+	it("has a main-process handler for every channel the preload or renderer invokes", () => {
 		const missing = [...invoked]
 			.filter(([channel]) => !handlersOf.has(channel))
 			.map(([channel, uses]) => `${channel}  (${uses.map(where).join(", ")})`)
@@ -431,7 +450,7 @@ describe("IPC channel parity (preload → main)", () => {
 
 		expect(
 			missing,
-			"invoked by the preload, handled by nothing in src/main",
+			"invoked by the preload or the renderer, handled by nothing in src/main",
 		).toEqual([]);
 	});
 
