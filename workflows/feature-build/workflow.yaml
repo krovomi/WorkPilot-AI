@@ -2,8 +2,11 @@ name: feature-build
 description: >-
   The default build pipeline. Replaces the sequence hard-coded in
   cli/build_commands.py, and is what arbitrates between the methodology packs:
-  each phase names an implementation, so BMAD, superpowers and mattpocock stop
-  being three competing methodologies and become interchangeable parts.
+  each phase names an implementation, so a methodology is an interchangeable
+  part rather than a competing pipeline. Every implementation named here
+  resolves on a fresh clone (`validate_impls` is empty at every effort): a
+  phase whose skill is not on disk is printed in the profile and run by
+  nobody, which is the one thing this file must never describe.
 
 # Phase ids reuse the vocabulary phase_config already knows (spec, planning,
 # coding, qa), so per-phase model and effort resolution keeps working unchanged.
@@ -19,31 +22,30 @@ phases:
       about those APIs.
 
   - id: brainstorm
-    impl: superpowers/brainstorming
+    impl: tooling/brainstorm-approaches
     min_effort: high
     description: >-
-      Refuse to write code until the design has been questioned and agreed.
-      Expensive in turns, so it earns its place only at high effort.
+      Two or three ways of doing the task, side by side — files, precedent in
+      the code, risks, conformance to the project's rules — and one
+      recommended, before the planner commits to the first plan that comes to
+      mind. Non-interactive: what the inputs cannot settle is written down as
+      `[NEEDS CLARIFICATION]`. The report is handed to the planner
+      (`workflows.handoff`), which is the only reason it is worth a session.
 
-  - id: spec
-    impl: bmad/bmad-prd
-    min_effort: medium
-    description: >-
-      Product artefact — what we are building and why. `bmad-prd` is the skill
-      BMAD v6 consolidated `create-prd`, `edit-prd` and `validate-prd` into; it
-      reads the intent from the conversation. The name this phase used to
-      declare, `bmad-bmm-create-prd`, was a v6.0 wrapper pointing at
-      `_bmad/bmm/workflows/…/workflow-create-prd.md` — a path no version of the
-      installer writes any more, so the phase spent a full session looking for
-      a file that was never going to be there.
+      There is no `spec` phase: the spec pipeline has written `spec.md` before
+      this file is read. The BMAD PRD skill it used to run needs the `_bmad/`
+      runtime, so it never opened a session — and would have written a second
+      product document nobody reads.
 
   - id: planning
     impl: workpilot/planner
-    min_effort: low
     gate: human
     description: >-
       The existing planner. Human approval before implementation starts is a
-      deliberate stop, not a formality.
+      deliberate stop, not a formality. Never pruned by effort: a build cannot
+      code without a plan, so the coder loop plans whatever the profile says —
+      and a profile that announced planning as skipped at effort `none` was
+      describing a build that does not exist.
 
   - id: analyze
     impl: tooling/spec-analyze
@@ -80,8 +82,8 @@ phases:
 
       Les règles du stack touché (React, Next.js, WPF, WinUI, Avalonia,
       SwiftUI, Compose, Flutter…) s'y ajoutent. Le coder ne les reçoit que sur
-      les sous-tâches dont les fichiers sont UI ; `frontend-design` et la QA
-      jugent contre le même design system. Déterministe et gratuit : jamais
+      les sous-tâches dont les fichiers sont UI ; la QA juge contre le même
+      design system, et `design-check` note le code une fois écrit. Déterministe et gratuit : jamais
       élagué par l'effort. La liste de fichiers est celle de
       `apps/backend/uiux/surface.py`, et un test garde les deux identiques.
 
@@ -98,57 +100,45 @@ phases:
       parce qu'un écran mal découpé se corrige en une phrase à ce moment-là et
       en un cycle complet après la QA.
 
-  - id: frontend-design
-    impl: impeccable/impeccable
-    min_effort: medium
-    when: &frontend_surface touches("**/*.tsx,**/*.jsx,**/*.css,**/*.scss,**/*.vue,**/*.svelte,**/*.astro,**/*.html,**/*.less,**/*.sass,**/*.razor,**/*.cshtml")
-    dispatch: fresh-context
-    description: >-
-      Interfaces web, et avant le codage pour exactement la raison que
-      `mobile-design` donne au-dessus : une hiérarchie visuelle bancale, un
-      écran dont personne n'a dessiné les états vide et erreur, un libellé qui
-      ment — tout cela se corrige en une phrase ici et en un cycle complet
-      après la QA.
-
-      C'est la moitié manquante d'impeccable. `design-check`, plus bas, est son
-      détecteur : 59 règles locales qui notent le code une fois écrit. Aucune
-      d'elles ne juge une mise en page que personne n'a pensée, et un détecteur
-      ne parle jamais à celui qui écrit — il parle au relecteur. Le pack porte
-      aussi 23 commandes de conception, `shape` en tête, et rien ne les lisait :
-      une skill déclarée par une phase que le runner sautait parce que son pack
-      était marqué « exécuté ailleurs ».
-
-      Contexte neuf : la direction artistique d'un écran n'est pas une relecture
-      du plan qui vient d'être écrit.
-
   - id: coding
-    impl: superpowers/test-driven-development
+    impl: tooling/tdd-cycle
     dispatch: subagent-per-task
     description: >-
       Red-green-refactor. Degrades to sequential execution with a context reset
-      on providers that cannot run subagents.
+      on providers that cannot run subagents. The skill is the methodology and
+      the coder loop is the executor: the engine names the skill file in the
+      prompt rather than pasting it into every subtask session.
 
   - id: design-check
     impl: impeccable/impeccable
-    when: *frontend_surface
+    when: &frontend_surface touches("**/*.tsx,**/*.jsx,**/*.css,**/*.scss,**/*.vue,**/*.svelte,**/*.astro,**/*.html,**/*.less,**/*.sass,**/*.razor,**/*.cshtml")
     description: >-
       Frontend only. impeccable's 59 detector rules run locally with no API
       call, so this is never pruned by effort — skipping it would save nothing.
+      The implementation is the pack's `gate` command (`skills/impeccable/
+      pack.json`), not a skill: nothing has to be bootstrapped for it to run.
 
-      The other half of the same pack runs before `coding`, as
-      `frontend-design`. This one grades the code once it exists; that one
-      tells the writer what to aim for. Both are conditional on the same glob
-      list, declared once above and aliased here: two copies of "what counts
-      as frontend" is how a surface ends up reviewed before coding and
-      ungraded after it.
+      What to aim for before coding is `ui-design-system`'s answer, which is
+      deterministic and free. A `frontend-design` session used to sit before
+      `coding` as well; its skill was never on disk, so it never opened, and
+      what it would have written was read by nobody.
 
   - id: review
-    impl: mattpocock/code-review
+    impl: tooling/review-lenses
     min_effort: medium
     dispatch: fresh-context
     description: >-
-      A reviewer that did not write the code. At low effort the coding phase's
-      own self-review is what there is.
+      A reviewer that did not write the code, before QA, with lenses the
+      effort chooses: correctness and tests and security at medium; conformance
+      to the acceptance criteria and `traceability.json` from high; the
+      adversarial reading at ultrathink. The report is handed to the QA
+      reviewer (`workflows.handoff`), which decides. At low effort the coding
+      phase's own self-review is what there is.
+
+      One review instead of three: `adversarial-review` and `spec-conformance`
+      used to run after QA, where no fixer reads anything, on BMAD skills that
+      need the `_bmad/` runtime and so never opened a session. Their questions
+      are lenses here, asked while an answer can still change the build.
 
   - id: verify
     impl: tooling/verify
@@ -183,53 +173,6 @@ phases:
     description: >-
       The existing QA reviewer/fixer loop. A reasoning effort of none reduces
       model thinking, not validation: completed coding still requires QA.
-
-  - id: adversarial-review
-    impl: bmad/bmad-review
-    min_effort: ultrathink
-    dispatch: fresh-context
-    description: >-
-      A reader whose job is to find what is wrong, not to agree. Only at the
-      top effort level: it is a second full pass over the same code, and the
-      point of paying for ultrathink is buying the pass that disagrees with the
-      first one. Runs in a fresh context so it inherits none of the reasoning
-      it is supposed to attack.
-
-      `bmad-review` rather than the `bmad-review-adversarial-general` this
-      declared before: BMAD v6 folded the adversarial critique into a lens of
-      one review skill, and kept the old name only as a shim that forwards to
-      it. Naming the shim would buy a deprecation notice and an extra hop for
-      the same pass. The adversarial lens is the one whose contract is that an
-      empty finding list is a signal to look again, which is exactly the
-      posture this phase is paying for.
-
-  - id: spec-conformance
-    impl: bmad/bmad-walkthrough
-    min_effort: ultrathink
-    dispatch: fresh-context
-    roster: qa
-    description: >-
-      The second of the two ultrathink readings, and a different question from
-      the one above: not "is this good code" but "is this the thing that was
-      asked for". Green tests are evidence about the tests that exist, not
-      about the acceptance criteria nobody wrote a test for. The
-      `qa-acceptance-checker` subagent does this inside the QA loop; this is
-      the same audit run against the finished branch with nothing else in
-      context — so `roster: qa` hands it that subagent, which this description
-      has named since the phase was written and the phase was not getting.
-
-      `bmad-walkthrough` is the nearest thing BMAD v6 still ships: it reads a
-      finished change and asks what it is for, what deserves a close look and
-      how to test it. The `bmad-bmm-check-implementation-readiness` this named
-      before does not exist upstream any more — and had not been runnable for
-      as long as the wrapper it pointed at was stale, which was the whole
-      time.
-
-      Declared as `roster:` rather than `agent: qa_reviewer`, because the two
-      are different questions. `spec_validation` is in `create_client`'s
-      read-only set and `qa_reviewer` is not: switching the agent to reach the
-      right specialists would have given a read-only audit the right to edit
-      the code it is auditing.
 
   - id: store-readiness
     impl: mobile/mobile-store-readiness
@@ -284,12 +227,14 @@ phases:
       Zéro jeton, donc jamais élaguée.
 
   - id: observe
-    impl: task-observer/task-observer
+    impl: workpilot/observe
     always: true
     description: >-
       Watches for corrections the user made, work no skill covered, and its own
       blind spots. Writes candidates to skills/_proposed/ and never edits a
-      skill directly. Near-free, so it runs at every effort level.
+      skill directly. Near-free, so it runs at every effort level. Run by
+      `learning_loop/observe.py` — WorkPilot's own, hence `workpilot/`: the
+      `task-observer` skill this named was never read by it.
 
       This is also where the hermes-agent cycle turns (`hermes.loop`, surface
       `build`): what hermes authored from its own experience — on Telegram, on

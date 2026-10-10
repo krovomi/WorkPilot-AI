@@ -92,7 +92,10 @@ class TestResolution:
     def test_each_level_is_priced(self, project):
         res = ask(project, effort="medium")
         counts = {lvl["effort"]: lvl["count"] for lvl in res["profile"]["levels"]}
-        assert counts["low"] < counts["medium"] < counts["high"] < counts["ultrathink"]
+        assert counts["low"] < counts["medium"] < counts["high"]
+        # The top level buys the review's adversarial lens, not a phase: one
+        # review with more lenses rather than a second pass after QA.
+        assert counts["ultrathink"] == counts["high"]
 
     def test_levels_can_be_left_out(self, project):
         res = ask(project, effort="medium", includeLevels="false")

@@ -1,0 +1,88 @@
+---
+name: brainstorm-approaches
+description: Avant la planification, met deux ou trois façons de faire la tâche face à face — fichiers touchés, risques, accord avec les conventions et les ADR du projet — et en recommande une. Non interactif et en lecture seule ; les hypothèses non tranchées sont marquées [NEEDS CLARIFICATION]. Le rapport est remis au planner.
+metadata:
+  workpilot:
+    provenance: "inspiré de obra/superpowers — brainstorming (texte original, non interactif)"
+---
+
+# brainstorm-approaches — choisir avant de planifier
+
+Le planner écrit **un** plan. Sans cette phase, c'est le premier qui lui vient :
+celui qui ressemble le plus à la description, pas forcément celui qui s'accorde
+avec le code existant. Cette phase met les alternatives sur la table **avant**
+que le plan ne les rende coûteuses : changer d'approche ici coûte un paragraphe,
+après le codage un build entier.
+
+Personne ne répond à tes questions pendant cette phase. Ce que tu ne peux pas
+trancher devient une hypothèse explicite, pas une question en suspens.
+
+## Entrées
+
+| Fichier | Ce qu'on y cherche |
+|---|---|
+| `<spec_dir>/spec.md` | ce qui doit être construit, critères, exigences `FR-###` |
+| `<spec_dir>/requirements.json` | la demande telle qu'elle a été tapée |
+| `<spec_dir>/context.json` | les fichiers que le pipeline de spec a jugés pertinents |
+| le code du projet | comment les problèmes voisins y sont déjà résolus |
+| `AGENTS.md` / `CLAUDE.md`, ADR, constitution | ce que le projet impose — reproduits plus haut dans ce prompt quand ils existent |
+
+Lis le code avant d'imaginer : la meilleure approche est souvent celle que le
+projet a déjà prise ailleurs pour un problème semblable. Cite ce précédent.
+
+## Méthode
+
+1. **Reformule le problème** en deux phrases : ce qui change pour l'utilisateur,
+   et la contrainte la plus forte (performance, compatibilité, sécurité, délai
+   de revue).
+2. **Propose deux ou trois approches réellement différentes** — pas trois
+   variantes de nommage. Pour chacune :
+   - le principe en une phrase ;
+   - les fichiers ou modules touchés (chemins réels du dépôt) ;
+   - le précédent dans le code, s'il existe ;
+   - les risques : régression, migration de données, surface de sécurité,
+     dépendance nouvelle ;
+   - l'accord avec les conventions, ADR ou règles du projet — une approche qui en
+     viole une le dit et cite la règle.
+3. **Recommande-en une** et dis pourquoi les autres perdent. Un critère, pas un
+   ressenti : « réutilise le pipeline existant de X », « ne touche pas au schéma ».
+4. **Liste les hypothèses** que la recommandation suppose et que les entrées ne
+   tranchent pas, chacune sous la forme `[NEEDS CLARIFICATION: <question>]`. Une
+   question à laquelle le code ou `context.json` répond n'en est pas une.
+
+À effort `high`, deux approches suffisent quand la troisième ne serait qu'un
+remplissage ; à `ultrathink`, cherche activement l'approche qui contredit la
+description, et dis si elle gagne.
+
+## Rapport
+
+Termine par ceci, et rien d'autre :
+
+```markdown
+## Approches
+
+### A — <nom court>
+Principe : …
+Fichiers : `…`, `…`
+Précédent : `…` (ou « aucun »)
+Risques : …
+Conventions : conforme | viole <règle>
+
+### B — …
+
+## Recommandation
+
+<A|B|C> — <raison décisive>. Écartées : <B> parce que …
+
+## Hypothèses
+
+- [NEEDS CLARIFICATION: …]
+```
+
+## Ce que cette phase ne fait pas
+
+- **Elle n'écrit rien** dans le dépôt ni dans le spec : en lecture seule.
+- **Elle ne planifie pas.** Pas de sous-tâches, pas d'ordre d'exécution : c'est
+  le travail du planner, qui reçoit ce rapport.
+- **Elle n'invente pas d'exigence.** Une approche qui ajoute une fonctionnalité
+  non demandée le dit comme un risque, pas comme un bonus.

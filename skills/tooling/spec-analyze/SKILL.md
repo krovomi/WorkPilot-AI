@@ -94,6 +94,6 @@ Verdict : PRÊT | PRÊT AVEC RÉSERVES | À CORRIGER AVANT CODAGE
   tourne en lecture seule : un relecteur qui peut réécrire le document qu'il relit finit
   par relire le sien.
 - **Elle ne conçoit pas.** « J'aurais fait autrement » n'est pas un constat de cohérence.
-  Le désaccord de fond a sa propre phase (`review`, `adversarial-review`).
+  Le désaccord de fond a sa propre phase (`review` et ses lentilles).
 - **Elle n'invente pas d'exigence.** Ce qui manque au spec est un `[NEEDS CLARIFICATION]`
   à signaler, pas un besoin à ajouter soi-même.

@@ -456,9 +456,10 @@ class TestWorkflow:
     def test_the_plan_takes_frontend_phases_off_a_backend_task(self, api_project):
         spec = _spec(api_project, "endpoint", [["Controllers/X.cs"]])
         profile = resolve_profile(load_workflow(WORKFLOW), "high")
-        assert profile.will_run("frontend-design")
+        assert profile.will_run("mobile-design")
+        assert profile.will_run("ui-design-system")
         narrowed = narrow_to_forecast(profile, planned_files(spec))
-        assert not narrowed.will_run("frontend-design")
+        assert not narrowed.will_run("mobile-design")
         assert not narrowed.will_run("ui-design-system")
         assert narrowed.will_run("analyze")  # unconditional phases are untouched
 

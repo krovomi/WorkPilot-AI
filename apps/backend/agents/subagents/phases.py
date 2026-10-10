@@ -477,11 +477,11 @@ def phase_specs(agent_type: str, roster: str | None = None) -> dict[str, AgentSp
     question has nothing to do with.
 
     ``roster`` names one of `_BUILDERS` directly, for a caller that knows better
-    than the alias table. A workflow phase is that caller: `analyze` and
-    `spec-conformance` both run under the read-only `spec_validation` config —
-    they must, since neither may write — but one reads a plan before any code
-    exists and the other audits a finished branch, and the alias table has one
-    key per agent_type and so cannot answer both. An unknown name falls back
+    than the alias table. A workflow phase is that caller: `analyze` runs under
+    the read-only `spec_validation` config — it must not write — but reads a
+    plan before any code exists, which is the planner's question rather than
+    QA's, and the alias table has one key per agent_type and so cannot answer
+    a second phase under the same config differently. An unknown name falls back
     rather than raising: a typo in a workflow file should cost the right roster,
     not the build.
     """

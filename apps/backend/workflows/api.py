@@ -177,15 +177,12 @@ def _missing_impls(workflow, profile) -> list:
     try:
         from skills_registry.packs import load_packs
 
-        from .engine import validate_impls
+        from .engine import pack_inventory, validate_impls
 
-        available = {
-            p.name: {s.name for s in p.skills()}
-            for p in load_packs(_REPO_ROOT / "skills")
-        }
+        available, gated = pack_inventory(load_packs(_REPO_ROOT / "skills"))
         return [
             m
-            for m in validate_impls(workflow, available)
+            for m in validate_impls(workflow, available, gated=gated)
             if profile.will_run(m.phase_id)
         ]
     except Exception as exc:  # noqa: BLE001 - advisory only

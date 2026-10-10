@@ -77,6 +77,5 @@ paths-ignore:
   - skills/superpowers/**
   - skills/mattpocock/**
   - skills/impeccable/**
-  - skills/task-observer/**
   - skills/claude-mem/**
   - skills/hermes/**

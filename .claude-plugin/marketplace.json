@@ -59,12 +59,6 @@
 			"description": "Agentic development methodology: brainstorming, git worktrees, written plans, subagent-driven TDD, code review, branch completion."
 		},
 		{
-			"name": "workpilot-task-observer",
-			"source": "./skills/task-observer",
-			"version": "0.0.1",
-			"description": "Meta-skill that watches a session for corrections, uncovered work and its own blind spots, and writes candidates for the learning loop. Never edits a skill directly."
-		},
-		{
 			"name": "workpilot-tooling",
 			"source": "./skills/tooling",
 			"version": "1.0.0",

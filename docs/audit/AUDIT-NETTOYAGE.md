@@ -112,7 +112,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L3 | P0 | Features cassées (frontend) — **fait** | F21, F22 | — |
 | L4 | P1 | Contexte de développement | F23, F18 | — |
 | L5 | P1 | Droits et rosters minimaux | F4, F5, F9, F16 | L1 |
-| L6 | P1 | Pipeline payé = pipeline exécuté | F2, F3, F15, F35 | — |
+| L6 | P1 | Pipeline payé = pipeline exécuté — **fait** | F2, F3, F15, F35, F38 | — |
 | L7 | P2 | Une seule mémoire | F6, F7, F14, F34 | L1 (insight_extractor) |
 | L8 | P2 | Code mort frontend | F28, F25 (front) | L3 |
 | L9 | P2 | Code mort backend | F29, F30, F32, F33, F25 (back) | — |
@@ -122,7 +122,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L13 | P4 | Surface produit | F19 | tous |
 | L14 | P1 | Événements et appels IPC perdus en silence | F37 | — |
 
-Ordre recommandé : L1, L2, L3 (faits) → L4, L14 en parallèle → L5, L6 → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L6 (faits) → L4, L14 en parallèle → L5 → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -135,9 +135,9 @@ Ordre recommandé : L1, L2, L3 (faits) → L4, L14 en parallèle → L5, L6 → 
 | Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) | 0 |
 | Shims racine `apps/backend/*.py` | 25 | 0 (hors points d'entrée) |
 | Prompts orphelins | 11 (~51 Ko) | 0 |
-| Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) | 0 |
+| Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
 | Sous-agents du plus gros roster | 9 | ≤ 7 |
-| Sessions qui relisent le diff à ultrathink | jusqu'à 7 | ≤ 4 |
+| Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) | ≤ 4 |
 | Détecteurs de pile | ≥ 11 | 1 façade |
 | Écritures par merge | 4 magasins | 1 événement |
 
@@ -396,52 +396,63 @@ Ordre recommandé : L1, L2, L3 (faits) → L4, L14 en parallèle → L5, L6 → 
 
 ### Lot L6 — Pipeline payé = pipeline exécuté (P1)
 
+**Fait.** Le profil affiché est ce qui s'exécute, et chaque phase skill qui tourne est lue par
+l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementations` dans
+`tests/test_workflow_engine.py`) ; le workflow passe de 19 à 15 phases déclarées.
+
 #### F2 · Cinq phases du workflow pointent encore vers des packs vides
 
-- **Sévérité** haute · **partiel** (verify corrigé, profil honnête) · **vérifié** (`validate_impls`)
-- **Preuve** : `validate_impls` signale `brainstorm` (superpowers/brainstorming), `frontend-design`
-  et `design-check` (impeccable/impeccable), `coding` (superpowers/test-driven-development), `review`
-  (mattpocock/code-review), `observe` (task-observer). Les packs `skills/{superpowers,impeccable,
-  mattpocock,task-observer,claude-mem}` ne contiennent que `pack.json`. `design-check` tourne quand
-  même via la commande `gate` de `skills/impeccable/pack.json` (`npx --yes impeccable detect --json`) ;
-  `observe` est exécuté par `learning_loop/observe.py` (impl décorative).
-- **Étapes** (une décision par pack, documentée dans la PR)
-  1. `superpowers` : vendoriser **seulement** `brainstorming` et `test-driven-development` (script
-     `scripts/vendor_pack.py` existant, résultat committé comme `ui-ux-pro-max`), ou écrire leurs
-     équivalents natifs sous `skills/tooling/`.
-  2. `mattpocock/code-review` : vendoriser, ou remplacer par la revue à lentilles de F11.
-  3. `impeccable` : vendoriser `impeccable/SKILL.md` ou appliquer F35.
-  4. `observe` : changer l'impl en `workpilot/observe` (pack builtin), retirer `task-observer` de `[packs]`.
-  5. Test : toute phase non élaguée à `medium` a une implémentation résoluble (`validate_impls` vide).
-- **À préserver** : les phases déclarées et leur position.
-- **Vérification** : `pytest tests/test_workflow_engine.py tests/test_workflow_runner.py tests/test_workflow_profile_api.py -q` ;
-  `python3 scripts/skills_cli.py build --check`.
+- **Corrigé par le lot L6.** Skills natifs sous `skills/tooling/`, sans vendorisation (aucune
+  licence amont déclarée) : `coding` → `tooling/tdd-cycle`, `brainstorm` →
+  `tooling/brainstorm-approaches` (non interactif), `review` → `tooling/review-lenses`. `observe` →
+  `workpilot/observe` (exécuté par `learning_loop/observe.py`) et le pack `task-observer` est retiré
+  de `[packs]`. `design-check` garde `impeccable/impeccable` : `validate_impls` reçoit les packs à
+  `gate` (`engine.pack_inventory`), et une phase déterministe dont le pack déclare une gate est
+  implémentée par elle. `superpowers`, `mattpocock`, `impeccable` et `claude-mem` restent opt-in.
 
 #### F3 · Les phases BMAD ne tournent presque jamais, et « spec » double le pipeline de spec
 
-- **Sévérité** haute · **ouvert** · **lu**
-- **Preuve** : `.agents/skills/bmad-prd/SKILL.md:8` (`requires.runtime: _bmad/scripts/resolve_customization.py`),
-  l.23 (`_bmad/scripts/memlog.py`) ; même `_bmad/` à la racine de WorkPilot ne contient que
-  `resolve_customization.py`. Phases `spec` (medium), `adversarial-review`, `spec-conformance` (ultrathink).
-- **Étapes** : supprimer la phase `spec` de `workflows/feature-build/workflow.yaml` (le pipeline de spec
-  a déjà produit `spec.md`) ; remplacer `adversarial-review` et `spec-conformance` par des lentilles de
-  la revue unique (F11), via un skill natif sans runtime. Mettre à jour `SKILL_PHASE_AGENTS`,
-  `CONFIG_PHASE` et les tests de fenêtres (`test_every_skill_phase_belongs_to_a_window`).
-- **À préserver** : les 50 skills BMAD dans la palette / barre de commandes pour les projets qui ont `_bmad/`.
+- **Corrigé par le lot L6.** `spec`, `adversarial-review` et `spec-conformance` sont retirées du
+  workflow. Leur intention devient des lentilles de `review-lenses`, choisies par l'effort :
+  correction et tests et sécurité à `medium`, conformité aux critères d'acceptation et à
+  `traceability.json` à `high`, lecture adversariale à `ultrathink`. La revue tourne avant la QA,
+  là où un fixer peut encore agir ; les deux passes retirées tournaient après. C'est l'amorce de F11.
+  Les 50 skills BMAD restent dans la palette pour les projets qui ont `_bmad/`.
 
 #### F15 · Effort `none` : planning annoncé élagué, exécuté quand même
 
-- **Sévérité** basse · **atténué** (avertissement `agents/coder.py:904-913`)
-- **Étape** : retirer `min_effort: low` de la phase `planning` dans `workflow.yaml` (le profil devient exact).
+- **Corrigé par le lot L6.** `min_effort: low` est retiré de `planning`. Le profil dit désormais
+  que `none` et `low` exécutent les mêmes phases, et c'est vrai : ils diffèrent par le budget de
+  réflexion. De même `high` et `ultrathink`, qui diffèrent par les lentilles de la revue. Le test
+  de l'échelle d'effort épingle ces marches au lieu d'exiger une phase de plus à chaque niveau.
 
 #### F35 · `frontend-design` et `ui-design-system` visent la même chose avant le coding
 
-- **Sévérité** basse · **nouveau** · **lu**
-- **Preuve** : sur une tâche web, `ui-design-system` (déterministe, gratuit) fixe le design system, puis
-  `frontend-design` (impeccable, vide sur un clone) ouvre une session `pr_reviewer` pour dire « ce qu'il faut viser ».
-- **Étape** : si impeccable n'est pas vendorisé (F2), adosser `frontend-design` au design system
-  ui-ux-pro-max (impl `ui-ux-pro-max/ui-ux-pro-max` en mode revue) ou retirer la phase au profit de
-  `ui-design-system` + `design-check`.
+- **Corrigé par le lot L6.** `frontend-design` est retirée : son skill n'était jamais sur le disque,
+  et sa sortie n'aurait été lue par personne. `ui-design-system` (déterministe) fixe la cible avant
+  le code, `design-check` (gate impeccable) note le code après. L'ancre `&frontend_surface` est
+  désormais définie sur `design-check`.
+
+#### F38 · Les rapports des phases skill ne sont lus par personne
+
+- **Sévérité** haute · **nouveau** (trouvé pendant le lot L6) · **corrigé par le lot L6**
+- **Preuve** : `run_skill_phase` écrit `<spec_dir>/workflow/<phase>.md`. Seul `workflow/verify.md`
+  était relu (`build_commands._tests_went_green`). Aucun prompt de planner, de coder ou de QA ne
+  lisait les rapports de `brainstorm`, `analyze`, `mobile-design` ou `review` : chaque session était
+  payée, et sa sortie n'était utilisée par personne.
+- **Correction** : `workflows/handoff.py`. La règle découle de l'ordre déclaré, sans table : un
+  rapport va au consommateur intégré suivant.
+  - `planning` reçoit le rapport en ligne dans le prompt du planner.
+  - `coding` reçoit l'en-tête et le chemin dans chaque sous-tâche, pour borner le coût.
+  - `qa` reçoit le rapport en ligne dans le prompt du QA reviewer, avec la consigne de vérifier
+    chaque constat.
+  - Le texte est nettoyé, scanné par `injection_guard` (seul `blocked` retient), borné à 4 000 et
+    8 000 caractères, et clôturé comme données.
+  - Les phases qui ont déjà leur lecteur (`verify`, `ui-design-system`, `architecture-map`) ne sont
+    pas transmises deux fois.
+  - Le QA fixer n'est pas consommateur : il travaille sur la décision du reviewer.
+- **Reste ouvert** : les phases déclarées après `qa` (`store-readiness`) n'ont pas de consommateur
+  dans le build ; leur rapport n'est pas affiché dans l'UI.
 
 ### Lot L7 — Une seule mémoire (P2)
 
@@ -881,4 +892,4 @@ Ordre recommandé : L1, L2, L3 (faits) → L4, L14 en parallèle → L5, L6 → 
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3) ; F37 trouvé pendant L3.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6) ; F37 trouvé pendant L3, F38 pendant L6.
