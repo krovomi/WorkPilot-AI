@@ -29,6 +29,7 @@ import {
 	DEFAULT_FEATURE_MODELS,
 	DEFAULT_FEATURE_THINKING,
 	getModelsForProvider,
+	isModelForeignToProvider,
 	resolveModelForProviderCatalog,
 } from "../constants/models";
 import type {
@@ -149,10 +150,18 @@ export function resolvePageLlm(
 			: "default";
 
 	// --- Modèle : la page, puis les réglages, puis le défaut du dépôt.
+	// Un modèle de page a été pris dans la liste d'un fournisseur. Quand il
+	// appartient de façon certaine à un autre que celui de la page — Ollama
+	// choisi, puis Claude, et `gemma4:12b` resté derrière —, ce n'est plus un
+	// choix mais un reste : la page retombe sur le modèle hérité, ramené au
+	// catalogue du fournisseur, plutôt que d'envoyer à Claude un tag Ollama.
+	const pageModel =
+		override.model && !isModelForeignToProvider(override.model, provider)
+			? override.model
+			: undefined;
 	const settingsModel = settings?.featureModels?.[feature];
-	let model =
-		override.model ?? settingsModel ?? DEFAULT_FEATURE_MODELS[feature];
-	let modelSource: PageLlmSource = override.model
+	let model = pageModel ?? settingsModel ?? DEFAULT_FEATURE_MODELS[feature];
+	let modelSource: PageLlmSource = pageModel
 		? "page"
 		: settingsModel
 			? "settings"
@@ -160,8 +169,8 @@ export function resolvePageLlm(
 
 	// Inherited feature/default models must match the effective provider,
 	// whether it comes from the page or the global provider selector.
-	// Explicit page models remain authoritative (including custom IDs).
-	if (!override.model && provider) {
+	// A page model kept above remains authoritative (including custom IDs).
+	if (!pageModel && provider) {
 		const coerced = resolveModelForProviderCatalog(
 			model,
 			getModelsForProvider(provider),
@@ -195,17 +204,39 @@ export function resolvePageLlm(
  * qui fait qu'« aucun choix » et « le même choix que les réglages » restent
  * deux états distincts, et que changer le fournisseur global bouge bien la
  * page qui n'a rien choisi.
+ *
+ * Un modèle de page voyage avec son fournisseur. Il a été pris dans la liste
+ * d'un fournisseur précis : le choisir épingle ce fournisseur sur la page, et
+ * changer de fournisseur — ou revenir à celui des réglages — le retire. Sans
+ * cela, Ollama + `gemma4:12b` puis Claude laissait `claude · gemma4:12b`, que
+ * le CLI refuse.
+ *
+ * @param inheritedProvider le fournisseur que la page suit tant qu'elle n'en
+ *   nomme aucun (la liste « Fournisseur IA »), sous le nom que le sélecteur
+ *   utilise : c'est celui dans la liste duquel un modèle est alors choisi.
  */
 export function setPageLlmOverride(
 	current: Record<string, PageLlmOverride> | undefined,
 	page: PageLlmPage,
 	patch: PageLlmOverride,
+	inheritedProvider?: string,
 ): Record<string, PageLlmOverride> {
 	const next: Record<string, PageLlmOverride> = { ...(current ?? {}) };
-	const merged: PageLlmOverride = { ...(next[page] ?? {}), ...patch };
+	const previous = next[page] ?? {};
+	const merged: PageLlmOverride = { ...previous, ...patch };
 
 	for (const key of ["provider", "model", "thinking"] as const) {
 		if (key in patch && !patch[key]) delete merged[key];
+	}
+
+	if (patch.model) {
+		if (!merged.provider && inheritedProvider?.trim()) {
+			merged.provider = inheritedProvider.trim();
+		}
+	} else if ("provider" in patch && merged.model) {
+		const before = normalizeProviderId(previous.provider || inheritedProvider);
+		const after = normalizeProviderId(merged.provider);
+		if (!after || after !== before) delete merged.model;
 	}
 
 	if (!merged.provider && !merged.model && !merged.thinking) {

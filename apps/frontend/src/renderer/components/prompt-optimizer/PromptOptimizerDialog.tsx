@@ -82,6 +82,7 @@ const KNOWN_ERROR_CODES = new Set([
 	"network",
 	"timeout",
 	"provider_unavailable",
+	"model_unavailable",
 	"provider_error",
 	"empty_response",
 	"runner_missing",
