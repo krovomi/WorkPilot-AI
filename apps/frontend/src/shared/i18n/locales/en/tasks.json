@@ -125,7 +125,8 @@
 		"qaIssues": "QA Issues",
 		"approvePlan": "Approve Plan",
 		"plan_review": "Approve Plan",
-		"stopped": "Stopped"
+		"stopped": "Stopped",
+		"qaUnverified": "QA not verified"
 	},
 	"tooltips": {
 		"archiveTask": "Archive task",
@@ -161,6 +162,9 @@
 		},
 		"error": {
 			"title": "Task Failed"
+		},
+		"qa_unverified": {
+			"title": "Ready for review — QA could not verify"
 		}
 	},
 	"columns": {
@@ -1106,7 +1110,8 @@
 			"hasErrors": "Has Errors",
 			"approvePlan": "Approve Plan",
 			"stopped": "Stopped",
-			"qaIssues": "QA Issues"
+			"qaIssues": "QA Issues",
+			"qaUnverified": "QA not verified"
 		},
 		"move": {
 			"trigger": "Move task to another column",
@@ -1849,5 +1854,10 @@
 			"pass": "Verified",
 			"fail": "Verify failed"
 		}
+	},
+	"qaUnverified": {
+		"title": "QA could not verify this task",
+		"unknown": "The QA agent stopped without reporting why. Open the Logs tab for the last output.",
+		"hint": "The work is complete; only the automatic check is missing. Review the changes yourself before merging, or relaunch the task to run QA again."
 	}
 }
