@@ -240,9 +240,13 @@ class TestTheReadOnlySearch:
         (tmp_path / "src" / "orders.py").write_text(
             "def create_order():\n    return 42\n", encoding="utf-8"
         )
-        (tmp_path / "README.md").write_text("create_order is documented\n")
+        (tmp_path / "README.md").write_text(
+            "create_order is documented\n", encoding="utf-8"
+        )
         (tmp_path / "node_modules").mkdir()
-        (tmp_path / "node_modules" / "dep.js").write_text("create_order()\n")
+        (tmp_path / "node_modules" / "dep.js").write_text(
+            "create_order()\n", encoding="utf-8"
+        )
         (tmp_path / "blob.bin").write_bytes(b"create_order\x00\x01")
         return tmp_path
 
@@ -292,7 +296,7 @@ class TestTheReadOnlySearch:
         from core.runtimes.tool_executor import ToolExecutor
 
         outside = tmp_path_factory.mktemp("outside")
-        (outside / "secret.txt").write_text("create_order secret\n")
+        (outside / "secret.txt").write_text("create_order secret\n", encoding="utf-8")
         try:
             (project / "link").symlink_to(outside, target_is_directory=True)
         except OSError:
