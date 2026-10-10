@@ -205,8 +205,6 @@ skills/mattpocock/*
 !skills/mattpocock/pack.json
 skills/impeccable/*
 !skills/impeccable/pack.json
-skills/task-observer/*
-!skills/task-observer/pack.json
 _bmad-output/
 .claude/
 /.github/agents

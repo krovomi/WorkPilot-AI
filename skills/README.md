@@ -29,11 +29,11 @@ skills/
 |---|---|
 | `dotnet` | .NET: modern stack (C# 14 / ASP.NET Core 10) plus a .NET Framework 4.8 specialist |
 | `mobile` | smartphone applications: Android (Kotlin/Compose), Apple (Swift/SwiftUI), the cross-platform stacks, device testing and store readiness |
-| `tooling` | toolchain-agnostic: building MCP servers, driving web apps under test |
+| `tooling` | toolchain-agnostic: building MCP servers, driving web apps under test, and the methodology of the build phases (`tdd-cycle`, `brainstorm-approaches`, `review-lenses`, `spec-analyze`, `verify`) |
 | `comms` | business communication and brand guidelines |
 | `bmad` | BMAD Method v6, vendored by `scripts/vendor_bmad.py` and pinned in `skills/bmad/VENDOR.json` — the skills are committed, the `_bmad/` runtime they read is installed per project by `skills:bootstrap` |
 | `ui-ux-pro-max` | UI/UX design data (Basic edition, MIT): design system generator and the rules of 22 UI stacks, searched locally. Vendored and committed by `scripts/vendor_ui_ux_pro_max.py` (one path rewritten for portability, receipt in `VENDOR.json`); read by `apps/backend/uiux/` only on tasks that touch the interface |
-| `superpowers`, `mattpocock`, `impeccable`, `task-observer` | upstream packs, fetched on demand; only their `pack.json` is committed |
+| `superpowers`, `mattpocock`, `impeccable` | upstream packs, fetched on demand; only their `pack.json` is committed. No workflow phase depends on their skills — `impeccable`'s `gate` command is what `design-check` runs |
 | `claude-mem`, `hermes` | declared **optional** — see below |
 
 ## Authoring a skill

@@ -2351,8 +2351,8 @@ A task judged not-UI gets no prompt section, no MCP server, no tool definition
 (tool definitions are context a model reads on every turn), and no card.
 
 **A phase between planning and coding, with no session.** `ui-design-system`
-is declared in `workflow.yaml` after `analyze` and before `mobile-design` /
-`frontend-design`, with `when: *ui_surface` — the anchor holds exactly
+is declared in `workflow.yaml` after `analyze` and before `mobile-design`,
+with `when: *ui_surface` — the anchor holds exactly
 `uiux.surface.UI_GLOBS`, and `tests/test_uiux.py` keeps the two equal. It is in
 `DETERMINISTIC_PHASES` (never pruned: it saves nothing to drop it) and in the
 runner's `DETERMINISTIC_EXECUTORS`, so `run_skill_phase` calls
@@ -2360,8 +2360,9 @@ runner's `DETERMINISTIC_EXECUTORS`, so `run_skill_phase` calls
 
 **The plan narrows the window — for every conditional phase.** The profile a
 build starts with is resolved before planning, with no change set, and
-`_touched` answers "unknown — run": `frontend-design` and `mobile-design` used
-to run on every backend task at medium effort. Once the plan validates,
+`_touched` answers "unknown — run": `mobile-design` (and the `frontend-design`
+phase the workflow declared then) used to run on every backend task at medium
+effort. Once the plan validates,
 `agents/coder.py` narrows the profile to the plan's files
 (`workflows.forecast.planned_files`, `engine.narrow_to_forecast`) before
 running the planning→coding window. It only ever removes, and no forecast
@@ -2387,7 +2388,7 @@ recorded reason.
 | Reader | What |
 |---|---|
 | coder | `uiux_section(spec_dir, subtask)` — only on subtasks whose declared files are UI; a full-stack task pays for it on its front end only |
-| skill phases | `frontend-design` designs against it rather than beside it; review phases hold the diff to it |
+| skill phases | `mobile-design` designs against it rather than beside it; `review` holds the diff to it |
 | QA reviewer | the design system plus upstream's canonical pre-delivery checklist |
 | any agent of a UI task | `uiux_search`, `uiux_stack_guidelines`, `uiux_design_system`, `uiux_project_design_system` — over MCP for Claude (`get_required_mcp_servers` adds `uiux`, `AGENT_MCP_<agent>_REMOVE=uiux` removes it), in-process in `tool_executor` for Copilot, OpenAI/Codex, Gemini, Ollama… |
 
@@ -2915,13 +2916,27 @@ pnpm run skills:workflow -- --effort low --provider mistral
 
 **On by default.** Set `WORKPILOT_WORKFLOW_ENGINE=0` in `.env-files/.env` to
 run the pre-engine pipeline. The default flipped once the engine executed the
-phases it declares rather than only pruning them: while eight of eleven were
+phases it declares rather than only pruning them: while most of them were
 played by a hard-coded sequence, switching it on bought the printed profile and
 little else.
 
+**What the profile shows is what runs.** Every `impl:` of the default workflow
+resolves on a fresh clone: `validate_impls` is empty at every effort, and
+`tests/test_workflow_engine.py::TestImplementations` fails the build otherwise.
+It was not: `brainstorm`, `frontend-design` and `review` named skills of packs
+that ship only their `pack.json`, so they were printed in the profile and
+answered "could not run"; `spec`, `adversarial-review` and `spec-conformance`
+named BMAD skills that need the `_bmad/` runtime in the project being built, so
+they stopped before their session on almost every build; and `planning` was
+announced pruned at effort `none` while the coder loop planned anyway. The
+methodology of the build phases is now WorkPilot's own (`skills/tooling/`:
+`tdd-cycle`, `brainstorm-approaches`, `review-lenses`), the upstream packs stay
+opt-in through `skills:bootstrap`, and a deterministic phase whose pack declares
+a `gate` command is implemented by that gate (`pack_inventory`).
+
 | Phase | Who runs it |
 |---|---|
-| `brainstorm`, `spec`, `analyze`, `frontend-design`, `review`, `adversarial-review`, `spec-conformance` | the engine (`workflows/runner.py`), as one-shot skill sessions |
+| `brainstorm`, `analyze`, `review` | the engine (`workflows/runner.py`), as one-shot skill sessions |
 | `verify`, `verify-replay`, `architecture-map` | the engine, through a dedicated executor (`CUSTOM_EXECUTORS`): Python drives the deterministic steps and opens a session only where a model is needed — `verify/phase.py`, `verify/replay.py` (no model at all), `architecture_visualizer/archify/phase.py` |
 | `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
@@ -2936,23 +2951,17 @@ by phase id in the **declared** order, so inserting a phase into
 `workflow.yaml` between two existing ones needs no Python change — and pruning
 a phase that bounds a window does not hand its work to the neighbouring one.
 
-**A pack is not a phase.** impeccable ships two things — 23 design commands a
-model reads, and 59 detector rules that run locally — and the workflow declares
-one phase for each: `frontend-design` before `coding`, `design-check` after it.
-Both the engine's `DETERMINISTIC_PHASES` and the runner's `_ELSEWHERE` used to
-be keyed on the *pack*, which made "this check costs no tokens" and "the gate
-runner owns this phase" true of everything impeccable implements. The second
-phase would have been resolved, printed in the profile the user is shown, and
-executed by nobody — `test_every_skill_phase_belongs_to_a_window` watches the
-declaration, not that door. Both sets are keyed by phase id, and the pack still
-owns the gate *command* (`pack.json` → `gate`), which is a different question.
-
-The order is the point, and it is the same argument `mobile-design` makes one
-row above: a detector grades code that exists, and by then a layout nobody
-designed costs a full fix cycle rather than a sentence. Both phases read the
-same glob list, declared once in `workflow.yaml` as a YAML anchor and aliased
-by the second — two copies of "what counts as frontend" is how a surface ends
-up designed before coding and ungraded after it.
+**A pack is not a phase.** impeccable ships two things — design commands a
+model reads, and 59 detector rules that run locally. Both the engine's
+`DETERMINISTIC_PHASES` and the runner's `_ELSEWHERE` used to be keyed on the
+*pack*, which made "this check costs no tokens" and "the gate runner owns this
+phase" true of everything impeccable implements. Both sets are keyed by phase
+id, and the pack still owns the gate *command* (`pack.json` → `gate`), which is
+a different question. Only the detector is declared now, as `design-check`
+after `coding`: what to aim for before coding is `ui-design-system`'s answer,
+deterministic and free, and the `frontend-design` session that used to sit
+there never opened — its skill was not on disk — and would have been read by
+nobody.
 
 There are **four** windows: before `planning`, between `planning` and `coding`,
 between `coding` and `qa`, and after `qa`. The second one is opened from inside
@@ -2961,6 +2970,31 @@ which is also why it did not exist until a phase needed it. A phase declared
 where no window opens is resolved, printed in the profile the user is shown, and
 run by nobody; `test_every_skill_phase_belongs_to_a_window` is what keeps that
 from happening quietly.
+
+**One review, with lenses the effort chooses.** `review` runs between `coding`
+and `qa` on `tooling/review-lenses`: correctness and tests, and security, at
+`medium`; conformance to the acceptance criteria and `traceability.json` from
+`high`; the adversarial reading at `ultrathink`. It replaces three passes —
+`review` itself, and `adversarial-review` / `spec-conformance`, which ran after
+QA, where nothing they found reached a fixer. So `ultrathink` buys a deeper
+review rather than a phase, and the profile says so: `high` and `ultrathink`
+run the same phases, as do `none` and `low` (planning runs at every level; the
+two differ in thinking budget only).
+
+**Every skill phase is read by the agent that comes next** (`workflows/handoff.py`).
+`run_skill_phase` writes each report to `<spec_dir>/workflow/<phase>.md`; until
+the handoff, only `workflow/verify.md` was ever read back. The rule is the
+declared order, so a phase inserted into `workflow.yaml` needs no Python change:
+a report goes to the next of `planning` (the planner prompt), `coding` (each
+coder subtask, as its head and path, since that prompt is paid per subtask) and
+`qa` (the QA reviewer, told that each finding is a claim to verify). Phases with
+a reader of their own (`ui-design-system` → `uiux_section`, `verify` →
+`verify_section`, `architecture-map` → its record) are not handed over twice,
+and a phase declared after `qa` has no consumer in the build. What is handed
+over is cleaned, scanned by `injection_guard` (only `blocked` withholds — a
+security review quoting suspicious code is `suspect` by nature), bounded
+(4 000 characters per report, 8 000 per section) and fenced as data. The QA
+fixer is not a consumer: it works from what the reviewer decided.
 
 `analyze` is the phase in that second window: `spec.md` and
 `implementation_plan.json` read together, once, before any code exists. The
@@ -2974,7 +3008,7 @@ reasoning is not a second opinion, and a reviewer who can rewrite the document
 ends up reviewing his own.
 
 `impl:` reaches the two built-in phases as well. `coding` declares
-`superpowers/test-driven-development`: the skill is the *methodology*, the
+`tooling/tdd-cycle`: the skill is the *methodology*, the
 coder loop is the *executor*, and the engine names the skill file in the
 prompt rather than pasting ten kilobytes of it into every subtask session.
 Builtins are recognised by **phase id**, never by their impl string — keying on
@@ -2995,12 +3029,13 @@ Three phases were falling through `PHASE_ALIASES` to the Kanban default, which i
 |---|---|---|---|
 | `brainstorm` | `spec_critic` | a `test-runner`, before any code exists | `spec` — `prior-art-finder`, `constraint-collector` |
 | `analyze` | `spec_validation` | a `test-runner`, before any code exists | `planner` — `architecture-analyst` answers "does this plan break the project's conventions" |
-| `spec-conformance` | `spec_validation` | not `qa-acceptance-checker` | `qa` — the subagent its own description in `workflow.yaml` had named since the phase was written |
+| `spec-conformance` (since removed) | `spec_validation` | not `qa-acceptance-checker` | `qa` — the subagent its own description in `workflow.yaml` had named since the phase was written |
 
-`spec_critic` now maps in `PHASE_ALIASES`; `spec_validation` cannot, because `analyze`
-reads a plan before any code exists and `spec-conformance` audits a finished branch, and
-the alias table has one key per agent_type. Those two declare `roster:` in the workflow
-file instead. An unknown roster name logs and falls back rather than raising: a typo in a
+`spec_critic` now maps in `PHASE_ALIASES`; `spec_validation` does not, because `analyze`
+reads a plan before any code exists, which is the planner's question rather than QA's.
+It declares `roster: planner` in the workflow file instead, and `verify` declares
+`roster: qa`, which is how `qa-acceptance-checker` reaches a phase before QA now that
+the acceptance audit is a lens of `review` rather than a pass after QA. An unknown roster name logs and falls back rather than raising: a typo in a
 workflow file should cost the right specialists, not the build.
 
 This matters beyond tidiness — the roster is context the parent pays for on **every
