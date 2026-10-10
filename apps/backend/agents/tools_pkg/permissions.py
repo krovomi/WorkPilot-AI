@@ -79,12 +79,12 @@ def get_allowed_tools(
         tools.extend(config.get("auto_claude_tools", []))
 
     # Add MCP tool names based on required servers
-    tools.extend(_get_mcp_tools_for_servers(required_servers))
+    tools.extend(mcp_tools_for_servers(required_servers))
 
     return tools
 
 
-def _get_mcp_tools_for_servers(servers: list[str]) -> list[str]:
+def mcp_tools_for_servers(servers: list[str]) -> list[str]:
     """
     Get the list of MCP tools for a list of required servers.
 
@@ -170,6 +170,27 @@ def undeclared_builtin_tools(agent_type: str) -> list[str]:
     if declared is None:
         return []
     return [tool for tool, grant in GUARDED_TOOLS.items() if grant not in declared]
+
+
+#: The declarations whose tools `create_client` puts behind a hook: a command
+#: goes through `bash_security_hook` and the guardrails, a write through the
+#: write-path guard, the guardrails and the watermark cleaner. A factory that
+#: installs none of them cannot serve a type that declares one of these.
+HOOKED_GRANTS: frozenset[str] = frozenset({"Write", "Edit", "Bash"})
+
+
+def hooked_grants(agent_type: str) -> list[str]:
+    """What `agent_type` declares that only `create_client` may hand over.
+
+    `create_simple_client` installs no hook, so a type it serves runs every
+    command and every write it declares unchecked. It refuses a type for which
+    this list is not empty. An unknown type answers ``[]``, like
+    `undeclared_builtin_tools`: the simple client refuses those on its own.
+    """
+    declared = declared_tools(agent_type)
+    if declared is None:
+        return []
+    return sorted(declared & HOOKED_GRANTS)
 
 
 def get_all_agent_types() -> list[str]:
