@@ -670,8 +670,8 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		return { success: false, error: "Not available in browser mode" };
 	},
 
-	// Generic listeners. `credentialService` subscribes to three channels at
-	// startup, so a missing entry here takes the preview down with it.
+	// Generic listeners: the bridge defines them, so the preview must too —
+	// a caller subscribing at startup would otherwise take it down.
 	on: () => () => {
 		/* noop */
 	},
