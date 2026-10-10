@@ -31,7 +31,7 @@ from core.progress import (
     is_build_complete,
 )
 from insight_extractor import extract_session_insights
-from linear_updater import (
+from integrations.linear.updater import (
     linear_subtask_completed,
     linear_subtask_failed,
 )

@@ -42,7 +42,7 @@ sys.modules["claude_agent_sdk.types"] = _mock_sdk.types
 # These are direct imports in session.py that trigger heavy chains.
 for _mod_name in [
     "insight_extractor",
-    "linear_updater",
+    "integrations.linear.updater",
     "services.recovery",
 ]:
     sys.modules[_mod_name] = MagicMock()

@@ -17,7 +17,7 @@ from core.debug import debug, debug_error, debug_section, debug_success, debug_w
 from core.pause_state import is_paused, read_pause_state
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
-from linear_updater import (
+from integrations.linear.updater import (
     LinearTaskState,
     is_linear_enabled,
     linear_qa_approved,

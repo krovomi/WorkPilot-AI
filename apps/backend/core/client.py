@@ -241,7 +241,7 @@ except ImportError:
 
 
 from docintel.read_guard import make_read_guard_hook
-from linear_updater import is_linear_enabled
+from integrations.linear.updater import is_linear_enabled
 from prompts_pkg.project_context import detect_project_capabilities, load_project_index
 from rtk import rtk_rewrite_hook
 from rtk import settings as rtk_settings
@@ -2343,7 +2343,7 @@ def create_agent_client(
 
         # Get allowed tools for the agent type
         _, project_capabilities = _get_cached_project_data(project_dir)
-        from linear_updater import is_linear_enabled as _is_linear_enabled
+        from integrations.linear.updater import is_linear_enabled as _is_linear_enabled
 
         mcp_config = load_project_mcp_config(project_dir)
         allowed_tools_list = get_allowed_tools(

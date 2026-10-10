@@ -29,7 +29,7 @@ _mocked_module_names: list[str] = [
     "ui",
     "core.progress",
     "task_logger",
-    "linear_updater",
+    "integrations.linear.updater",
 ]
 
 
@@ -104,7 +104,7 @@ def setup_qa_report_mocks() -> None:
     mock_linear.linear_qa_approved = MagicMock()
     mock_linear.linear_qa_rejected = MagicMock()
     mock_linear.linear_qa_max_iterations = MagicMock()
-    sys.modules["linear_updater"] = mock_linear
+    sys.modules["integrations.linear.updater"] = mock_linear
 
     # Add auto-claude path for imports
     sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))

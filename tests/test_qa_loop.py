@@ -53,7 +53,7 @@ _mocked_module_names = [
     "ui",
     "ui.capabilities",
     "task_logger",
-    "linear_updater",
+    "integrations.linear.updater",
     "core.progress",
     # Prompts
     "prompts_pkg",
@@ -71,7 +71,6 @@ _mocked_module_names = [
     # Integrations
     "integrations",
     "integrations.linear",
-    "integrations.linear.updater",
 ]
 
 for name in _mocked_module_names:

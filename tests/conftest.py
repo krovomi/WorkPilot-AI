@@ -138,7 +138,6 @@ _PROTECTED_PACKAGES = [
     "task_logger",
     "progress",
     "ui",
-    "linear_updater",
     # Memory & graph
     "memory",
     "graphiti_config",

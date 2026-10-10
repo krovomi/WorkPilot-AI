@@ -51,7 +51,7 @@ from core.progress import (
     print_progress_summary,
     print_session_header,
 )
-from linear_updater import (
+from integrations.linear.updater import (
     LinearTaskState,
     is_linear_enabled,
     linear_build_complete,
