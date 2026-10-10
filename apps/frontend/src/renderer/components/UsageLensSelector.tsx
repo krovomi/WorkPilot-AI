@@ -1,4 +1,5 @@
 import { Eye } from "lucide-react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useConfiguredProviders } from "../hooks/useConfiguredProviders";
 import { useProviderContext } from "./ProviderContext";
@@ -27,6 +28,14 @@ export function UsageLensSelector() {
 	const { usageProvider, usageProviderChoice, setUsageProviderChoice, runningProviders } =
 		useProviderContext();
 	const { providers } = useConfiguredProviders();
+	// The tooltip is portaled above everything (z-100), so left to itself it
+	// stays over the open list and hides the providers under it. It is shut
+	// while the list is open, and kept shut after the list closes until the
+	// pointer leaves: closing the list hands focus back to the trigger, and
+	// that focus alone would bring the tooltip back.
+	const [selectOpen, setSelectOpen] = useState(false);
+	const [tooltipOpen, setTooltipOpen] = useState(false);
+	const tooltipSuppressed = useRef(false);
 
 	const labelOf = (name: string) =>
 		providers.find((p) => p.name === name)?.label ?? name;
@@ -40,10 +49,26 @@ export function UsageLensSelector() {
 	}
 
 	return (
-		<Tooltip>
+		<Tooltip
+			open={tooltipOpen && !selectOpen}
+			onOpenChange={(next) => {
+				if (next && (selectOpen || tooltipSuppressed.current)) return;
+				setTooltipOpen(next);
+			}}
+		>
 			<TooltipTrigger asChild>
-				<div>
+				<div
+					onPointerLeave={() => {
+						tooltipSuppressed.current = false;
+					}}
+				>
 					<Select
+						open={selectOpen}
+						onOpenChange={(next) => {
+							setSelectOpen(next);
+							setTooltipOpen(false);
+							if (!next) tooltipSuppressed.current = true;
+						}}
 						value={usageProviderChoice ?? AUTO}
 						onValueChange={(value) =>
 							setUsageProviderChoice(value === AUTO ? null : value)
