@@ -29,7 +29,7 @@ const mockSaveClaudeProfile = vi.fn();
 const mockDeleteClaudeProfile = vi.fn();
 const mockRenameClaudeProfile = vi.fn();
 const mockSetActiveClaudeProfile = vi.fn();
-const mockInitializeClaudeProfile = vi.fn();
+const mockAuthenticateClaudeProfile = vi.fn();
 const mockSetClaudeProfileToken = vi.fn();
 const mockOnTerminalOAuthToken = vi.fn();
 
@@ -45,7 +45,8 @@ describe("OAuthStep Profile Management Logic", () => {
 			window.electronAPI.deleteClaudeProfile = mockDeleteClaudeProfile;
 			window.electronAPI.renameClaudeProfile = mockRenameClaudeProfile;
 			window.electronAPI.setActiveClaudeProfile = mockSetActiveClaudeProfile;
-			window.electronAPI.initializeClaudeProfile = mockInitializeClaudeProfile;
+			window.electronAPI.authenticateClaudeProfile =
+				mockAuthenticateClaudeProfile;
 			window.electronAPI.setClaudeProfileToken = mockSetClaudeProfileToken;
 			window.electronAPI.onTerminalOAuthToken = mockOnTerminalOAuthToken;
 		}
@@ -167,7 +168,7 @@ describe("OAuthStep Profile Management Logic", () => {
 			expect(result.success).toBe(true);
 		});
 
-		it("should call initializeClaudeProfile after saving profile", async () => {
+		it("should call authenticateClaudeProfile after saving profile", async () => {
 			const newProfile = {
 				id: "profile-new",
 				name: "New Profile",
@@ -181,13 +182,16 @@ describe("OAuthStep Profile Management Logic", () => {
 				data: newProfile,
 			});
 
-			mockInitializeClaudeProfile.mockResolvedValue({ success: true });
+			mockAuthenticateClaudeProfile.mockResolvedValue({
+				success: true,
+				data: { terminalId: "auth-terminal-1", configDir: newProfile.configDir },
+			});
 
 			await window.electronAPI.saveClaudeProfile(newProfile);
-			await window.electronAPI.initializeClaudeProfile(newProfile.id);
+			await window.electronAPI.authenticateClaudeProfile(newProfile.id);
 
 			expect(mockSaveClaudeProfile).toHaveBeenCalled();
-			expect(mockInitializeClaudeProfile).toHaveBeenCalledWith(newProfile.id);
+			expect(mockAuthenticateClaudeProfile).toHaveBeenCalledWith(newProfile.id);
 		});
 
 		it("should generate profile slug from name", () => {
@@ -215,26 +219,31 @@ describe("OAuthStep Profile Management Logic", () => {
 	});
 
 	describe("OAuth Authentication Flow", () => {
-		it("should call initializeClaudeProfile to trigger OAuth flow", async () => {
-			mockInitializeClaudeProfile.mockResolvedValue({ success: true });
+		it("should call authenticateClaudeProfile to open the auth terminal", async () => {
+			mockAuthenticateClaudeProfile.mockResolvedValue({
+				success: true,
+				data: { terminalId: "auth-terminal-1", configDir: "~/.claude" },
+			});
 
 			const profileId = "profile-1";
 			const result =
-				await window.electronAPI.initializeClaudeProfile(profileId);
+				await window.electronAPI.authenticateClaudeProfile(profileId);
 
-			expect(mockInitializeClaudeProfile).toHaveBeenCalledWith(profileId);
+			expect(mockAuthenticateClaudeProfile).toHaveBeenCalledWith(profileId);
 			expect(result.success).toBe(true);
+			expect(result.data?.terminalId).toBe("auth-terminal-1");
 		});
 
-		it("should handle initializeClaudeProfile failure", async () => {
-			mockInitializeClaudeProfile.mockResolvedValue({
+		it("should handle authenticateClaudeProfile failure", async () => {
+			mockAuthenticateClaudeProfile.mockResolvedValue({
 				success: false,
-				error: "Browser failed to open",
+				error: "Failed to create auth terminal",
 			});
 
 			const result =
-				await window.electronAPI.initializeClaudeProfile("profile-1");
+				await window.electronAPI.authenticateClaudeProfile("profile-1");
 			expect(result.success).toBe(false);
+			expect(result.data).toBeUndefined();
 		});
 
 		it("should register OAuth token callback", () => {

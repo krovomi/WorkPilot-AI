@@ -513,10 +513,6 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	listLogFiles: async () => [],
 
 	// Azure DevOps Operations
-	getAzureDevOpsProjects: async () => ({
-		success: true,
-		data: [],
-	}),
 	listAzureDevOpsRepositories: async () => ({
 		success: true,
 		data: [],

@@ -1092,6 +1092,7 @@
 			"successTitle": "Plugin created!",
 			"successDesc": "Your plugin \"{{name}}\" has been scaffolded successfully.",
 			"openFolder": "Open folder",
+			"openFolderFailed": "Could not open the plugin folder",
 			"done": "Done"
 		}
 	},
