@@ -1718,7 +1718,7 @@ async def get_provider_usage(provider: str):
             }
     elif provider == "anthropic" or provider == "claude":
         try:
-            from connectors.llm_anthropic_usage import get_anthropic_usage_metrics
+            from core.anthropic_usage import get_anthropic_usage_metrics
 
             usage_data = get_anthropic_usage_metrics()
 

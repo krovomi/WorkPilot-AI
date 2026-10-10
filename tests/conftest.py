@@ -34,10 +34,10 @@ GIT_CONFIG_USER_EMAIL = "user.email"
 GIT_CONFIG_USER_NAME = "user.name"
 INITIAL_COMMIT_MESSAGE = "Initial commit"
 
-# The project root must come before the backend root: both ship a `src`
-# package, and only the project one has `src.connectors.llm_config` —
-# azure_devops tests likewise rely on ``from src.config.settings import
-# Settings``. The backend root is on the path so `core`, `review`, etc. import
+# The project root must come before the backend root: `src.connectors.llm_config`
+# lives under the project root (apps/backend/src/ used to shadow it; it was
+# removed in audit lot L9) — azure_devops tests likewise rely on
+# ``from src.config.settings import Settings``. The backend root is on the path so `core`, `review`, etc. import
 # without an `apps.backend.` prefix.
 #
 # This used to be two `if <root> not in sys.path` inserts, which enforce
