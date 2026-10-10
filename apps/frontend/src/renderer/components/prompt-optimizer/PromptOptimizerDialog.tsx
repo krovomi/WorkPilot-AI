@@ -29,6 +29,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { PromptOptimizerStatus } from "../../../shared/types/prompt-optimizer";
 import { resolvePageLlm } from "../../../shared/utils/page-llm";
+import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { cn } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import type { AgentType } from "../../stores/prompt-optimizer-store";
@@ -111,7 +112,7 @@ interface PromptOptimizerDialogProps {
 export function PromptOptimizerDialog({
 	onUsePrompt,
 }: PromptOptimizerDialogProps) {
-	const { t } = useTranslation(["promptOptimizer", "common"]);
+	const { t } = useTranslation(["promptOptimizer", "common", "dialogs"]);
 
 	const {
 		isOpen,
@@ -135,6 +136,20 @@ export function PromptOptimizerDialog({
 		() => resolvePageLlm(settings, "prompt-optimizer"),
 		[settings],
 	);
+	// The live catalogue names the model as the settings do ("Claude Sonnet
+	// 5.5", not its id). Read only while the dialog is open: it is mounted for
+	// the life of the window, and an empty provider fetches nothing.
+	const { models: engineModels } = useProviderModelCatalog(
+		isOpen ? engine.provider : "",
+	);
+	const engineModel =
+		engineModels.find((m) => m.value === engine.model)?.label ?? engine.model;
+	// The runner applies an effort on Claude only (`core.oneshot`): naming one
+	// for another provider would announce what the run ignores.
+	const engineEffort =
+		engine.provider === "claude"
+			? t(`dialogs:pageLlm.effort.${engine.thinking}`)
+			: undefined;
 
 	const [editablePrompt, setEditablePrompt] = useState("");
 	const [editedResult, setEditedResult] = useState("");
@@ -212,7 +227,8 @@ export function PromptOptimizerDialog({
 					</DialogDescription>
 					<EngineChip
 						provider={engine.provider}
-						model={engine.model}
+						model={engineModel}
+						effort={engineEffort}
 						label={t("promptOptimizer:engine.label")}
 						fallback={t("promptOptimizer:engine.default")}
 					/>
@@ -387,15 +403,19 @@ type T = (key: string, options?: Record<string, unknown>) => string;
 function EngineChip({
 	provider,
 	model,
+	effort,
 	label,
 	fallback,
 }: {
 	readonly provider: string;
 	readonly model: string;
+	readonly effort?: string;
 	readonly label: string;
 	readonly fallback: string;
 }) {
-	const text = [provider || fallback, model].filter(Boolean).join(" · ");
+	const text = [provider || fallback, model, effort]
+		.filter(Boolean)
+		.join(" · ");
 	return (
 		<div className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
 			<Cpu className="h-3.5 w-3.5" />
