@@ -1,8 +1,10 @@
 # Changelog
 
-All notable changes to WorkPilot AI are documented here. The full historical
-detail (including the complete 1.0.0 notes) lives in
-[docs/CHANGELOG.md](docs/CHANGELOG.md).
+All notable changes to WorkPilot AI are documented here. This is the only
+changelog: `scripts/bump-version.js` and the release workflow read it. The
+complete 1.0.0 notes and the upstream 2.x history lived in a second file,
+`docs/CHANGELOG.md`, removed in audit lot L9; it remains in the git history
+([last version](https://github.com/krovomi/WorkPilot-AI/blob/f385fe1/docs/CHANGELOG.md)).
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
@@ -212,5 +214,5 @@ autonomous agents and integrations. 150+ features and 150+ fixes since 1.0.0.
 
 ## 1.0.0 - Initial WorkPilot AI Release
 
-Initial public release. See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the
-complete 1.0.0 feature list.
+Initial public release. The complete 1.0.0 feature list is in the
+[git history](https://github.com/krovomi/WorkPilot-AI/blob/f385fe1/docs/CHANGELOG.md).
