@@ -81,6 +81,7 @@
 			"network": "The AI provider could not be reached. Check your connection.",
 			"timeout": "The AI provider took too long to answer.",
 			"provider_unavailable": "The selected provider is not available. Pick another one in the provider list.",
+			"model_unavailable": "The provider does not know the selected model, or your account cannot use it. Pick another model in the page's model selector.",
 			"provider_error": "The AI provider returned an error.",
 			"empty_response": "The model returned an empty answer. Try again, or pick another model.",
 			"runner_missing": "The optimizer's backend component is missing from this installation.",
