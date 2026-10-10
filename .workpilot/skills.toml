@@ -25,12 +25,20 @@ mobile = "latest"
 superpowers = "latest"
 mattpocock = "latest"
 impeccable = "latest"
-claude-mem = "latest"
 hermes = "latest"
-hermes-learned = "latest"
 ui-ux-pro-max = "latest"   # UI/UX design intelligence (Basic) — contextual: only UI tasks pay for it
 
 # Add one and run `pnpm run skills:build` to pull it into this repo's palette.
+#
+# Deliberately absent:
+#   hermes-learned -- the loop's own output (learning_loop/hermes_adopt.py).
+#     Leaving it out is the gate that keeps agent-authored prose away from
+#     every harness until a person lists it, with the pack in front of them
+#     (shared_docs/architecture/hermes.md). tests/test_skills_toml_packs.py
+#     fails if it appears here.
+#   claude-mem -- an optional pack (skills/README.md): only its pack.json is
+#     committed and it emits nothing. `pnpm run skills:bootstrap --pack
+#     claude-mem`, then list it here, for the real thing.
 
 # Harnesses to materialise. Omit to use the defaults from
 # capabilities/harnesses.yaml (agnostic + gemini).
