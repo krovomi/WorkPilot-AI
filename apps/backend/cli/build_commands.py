@@ -139,7 +139,7 @@ def _resolve_workflow_profile(
 
     On by default; set WORKPILOT_WORKFLOW_ENGINE=0 to run the pre-engine
     pipeline. The flag flipped once the engine executed the phases it declares
-    rather than only pruning them: while eight of eleven phases were played by
+    rather than only pruning them: while most of its phases were played by
     a hard-coded sequence the engine did not drive, switching it on bought the
     printed profile and little else, and the honest default for that is off.
     Now the declared workflow is the pipeline, so the honest default is on.
@@ -183,13 +183,10 @@ def _resolve_workflow_profile(
         try:
             from skills_registry.packs import load_packs
 
-            from workflows import validate_impls
+            from workflows import pack_inventory, validate_impls
 
-            available = {
-                p.name: {s.name for s in p.skills()}
-                for p in load_packs(repo_root / "skills")
-            }
-            for miss in validate_impls(workflow, available):
+            available, gated = pack_inventory(load_packs(repo_root / "skills"))
+            for miss in validate_impls(workflow, available, gated=gated):
                 if profile.will_run(miss.phase_id):
                     print(f"  ⚠ {miss.phase_id}: {miss.reason}")
         except Exception as exc:  # noqa: BLE001 - advisory only
@@ -328,9 +325,9 @@ def _phase_context(
 def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None):
     """Execute the skill-backed phases in one window of the declared order.
 
-    This is what "the workflow is the pipeline" finally means: `brainstorm`,
-    `spec`, `review`, `adversarial-review`, `spec-conformance` and `verify`
-    were declared in `workflow.yaml` from the start and executed by nothing.
+    This is what "the workflow is the pipeline" finally means: the
+    skill-backed phases were declared in `workflow.yaml` from the start and
+    executed by nothing.
     The window is expressed by phase id, so inserting a phase into the YAML
     between two existing ones is picked up here with no change to this file.
 
@@ -1026,12 +1023,11 @@ def handle_build_command(
                 except Exception:
                     pass  # Best-effort
 
-        # Everything the workflow declares after `qa`: the two ultrathink
-        # readings and `verify`. They run here rather than earlier because
-        # each is a question about the finished branch — `adversarial-review`
-        # attacks the code, `spec-conformance` asks whether it is the thing
-        # that was asked for, and `verify` checks the work before the build
-        # claims to be done.
+        # Everything the workflow declares after `qa`: `store-readiness`,
+        # `architecture-map` and `verify-replay`. Each is a question about the
+        # finished branch, so it runs once QA has corrected it. Nothing after
+        # this point feeds a fixer, which is why the reviews that should change
+        # the build (`review`, `verify`) are declared before `qa`.
         _run_workflow_phases(_post_profile, _post_ctx, after="qa", before=None)
 
         # Those phases wrote into the worktree's copy of the spec, after the

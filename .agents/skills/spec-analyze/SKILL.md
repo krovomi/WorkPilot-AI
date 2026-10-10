@@ -7,7 +7,7 @@ metadata:
     provenance: adapté de github/spec-kit — /speckit.analyze (MIT)
     pack: tooling
     version: 1.0.0
-    content_sha256: 52123e8ba3c45cb2ea80eaa49c779ee811db4c1f4b86fa215fbe843733ae01ea
+    content_sha256: 2a89fe3236f8a4a00a589e62996581d16d407ee2b36fa4c0cc257fca73ffa343
 ---
 
 # spec-analyze — la dernière relecture avant le code
@@ -98,6 +98,6 @@ Verdict : PRÊT | PRÊT AVEC RÉSERVES | À CORRIGER AVANT CODAGE
   tourne en lecture seule : un relecteur qui peut réécrire le document qu'il relit finit
   par relire le sien.
 - **Elle ne conçoit pas.** « J'aurais fait autrement » n'est pas un constat de cohérence.
-  Le désaccord de fond a sa propre phase (`review`, `adversarial-review`).
+  Le désaccord de fond a sa propre phase (`review` et ses lentilles).
 - **Elle n'invente pas d'exigence.** Ce qui manque au spec est un `[NEEDS CLARIFICATION]`
   à signaler, pas un besoin à ajouter soi-même.
