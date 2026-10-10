@@ -4,6 +4,7 @@ This directory contains shared documentation and architecture references for the
 
 ## Files
 
+- **architecture/** - Design rationale of each feature, one file per feature, moved out of `docs/CLAUDE.md` (which indexes them and stays normative)
 - **FEATURE_IDEAS.md** - Collection of feature ideas and improvement suggestions
 - **github-copilot-architecture-complete.md** - Complete GitHub Copilot provider architecture and workflows
 - **claude-code-architecture-complete.md** - Complete Claude Code system architecture and workflows

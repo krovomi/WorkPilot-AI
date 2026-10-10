@@ -184,7 +184,7 @@ class RequirementsPhaseMixin:
         research_file = self.spec_dir / "research.json"
         requirements_file = self.spec_dir / "requirements.json"
 
-        if research_file.exists():
+        if research_file.exists() and not validator.is_placeholder(research_file):
             self.ui.print_status("research.json already exists", "success")
             return PhaseResult("research", True, [str(research_file)], [], 0)
 
@@ -228,16 +228,34 @@ Output your findings to research.json.
                 return PhaseResult("research", True, [str(research_file)], [], attempt)
 
             if success and not research_file.exists():
+                reason = "Agent completed but created no findings"
                 validator.create_minimal_research(
-                    self.spec_dir,
-                    reason="Agent completed but created no findings",
+                    self.spec_dir, reason=reason, placeholder=True
                 )
-                return PhaseResult("research", True, [str(research_file)], [], attempt)
+                self.ui.print_status(
+                    f"research.json is a placeholder: {reason}", "warning"
+                )
+                return PhaseResult(
+                    "research",
+                    True,
+                    [str(research_file)],
+                    [],
+                    attempt,
+                    warnings=[f"research.json is a placeholder: {reason}"],
+                )
 
             errors.append(f"Attempt {attempt + 1}: Research agent failed")
 
+        reason = "Research agent failed after retries"
         validator.create_minimal_research(
-            self.spec_dir,
-            reason="Research agent failed after retries",
+            self.spec_dir, reason=reason, placeholder=True
         )
-        return PhaseResult("research", True, [str(research_file)], errors, MAX_RETRIES)
+        self.ui.print_status(f"research.json is a placeholder: {reason}", "warning")
+        return PhaseResult(
+            "research",
+            True,
+            [str(research_file)],
+            errors,
+            MAX_RETRIES,
+            warnings=[f"research.json is a placeholder: {reason}"],
+        )

@@ -15,7 +15,6 @@ import { type ChildProcess, spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
@@ -278,11 +277,4 @@ export function registerCrossLanguageTranslationHandlers(): void {
 			}
 		},
 	);
-}
-
-export function setupCrossLanguageTranslationEventForwarding(
-	_getMainWindow: () => BrowserWindow | null,
-): void {
-	// Events are sent directly to the requesting window via event.sender.send() in the handlers.
-	// No persistent main→renderer forwarding needed.
 }

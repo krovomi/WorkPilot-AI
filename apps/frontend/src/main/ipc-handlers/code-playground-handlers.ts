@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { type BrowserWindow, ipcMain } from "electron";
 import {
 	codePlaygroundService,
 	type PlaygroundResult,
@@ -45,32 +45,26 @@ export function registerCodePlaygroundHandlers(): void {
 /**
  * Setup event forwarding from code playground service to renderer
  */
-export function setupCodePlaygroundEventForwarding(): void {
-	codePlaygroundService.on("status", (status: string) => {
-		const mainWindow = global.mainWindow;
+export function setupCodePlaygroundEventForwarding(
+	getMainWindow: () => BrowserWindow | null,
+): void {
+	const send = (channel: string, payload: unknown): void => {
+		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("code-playground:status", status);
+			mainWindow.webContents.send(channel, payload);
 		}
-	});
+	};
 
-	codePlaygroundService.on("stream-chunk", (chunk: string) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("code-playground:stream-chunk", chunk);
-		}
-	});
-
-	codePlaygroundService.on("error", (error: string) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("code-playground:error", error);
-		}
-	});
-
-	codePlaygroundService.on("complete", (result: PlaygroundResult) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("code-playground:complete", result);
-		}
-	});
+	codePlaygroundService.on("status", (status: string) =>
+		send("code-playground:status", status),
+	);
+	codePlaygroundService.on("stream-chunk", (chunk: string) =>
+		send("code-playground:stream-chunk", chunk),
+	);
+	codePlaygroundService.on("error", (error: string) =>
+		send("code-playground:error", error),
+	);
+	codePlaygroundService.on("complete", (result: PlaygroundResult) =>
+		send("code-playground:complete", result),
+	);
 }

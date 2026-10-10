@@ -32,11 +32,12 @@ Toute interaction LLM passe par ces fichiers. Les modifier touche l'ensemble du 
 
 | Fichier | Rôle |
 |---|---|
-| `agents/kanban_subagents.py` | sous-agents par défaut d'une carte Kanban |
-| `agents/planner_subagents.py` | pour `planner` / `architect` |
-| `agents/qa_subagents.py` | pour `qa_reviewer` / `qa_fixer` |
-| `runners/github/services/parallel_orchestrator_reviewer.py` | 6 relecteurs définis en ligne |
-| `prompts/` | les prompts système réels (38 + 22 sous `github/`) |
+| `agents/subagents/__init__.py` | `resolve` : le roster servi à un `agent_type` (défauts de phase, overlays, cap) |
+| `agents/subagents/phases.py` | sous-agents par défaut par phase (Kanban, planner, QA…) |
+| `agents/subagents/languages/` | overlays par langage (.NET, Python, TypeScript, Java, Go, Rust) |
+| `agents/subagents/pr_review.py` | les relecteurs de PR, prompts sous `prompts/github/` |
+| `agents/subagents/mobile.py` | `device-runner` et `store-readiness-auditor` |
+| `prompts/` | les prompts système réels (39 + 18 sous `github/`) |
 
 La sélection se fait par `agent_type` dans `core/client.py`. L'appelant peut passer son
 propre dict `agents` : **il gagne sur les défauts**.

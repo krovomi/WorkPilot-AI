@@ -150,7 +150,10 @@ export type TaskLogEntryType =
 	| "phase_end"
 	| "error"
 	| "success"
-	| "info";
+	| "info"
+	// The step went on with something missing (a placeholder file, a
+	// fallback): neither an error nor a success.
+	| "warning";
 
 export interface TaskLogEntry {
 	timestamp: string;

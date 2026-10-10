@@ -70,11 +70,14 @@ _BASE_PROMPT_RULES = (
 )
 
 # Extra paragraph for providers whose tool calling needs an explicit nudge
-# (Windsurf text-based tool calling, OpenAI REST loop).
+# (Windsurf text-based tool calling, OpenAI REST loop). It names no tool: what
+# an agent is offered depends on its type (`get_tool_definitions`), and a
+# read-only reviewer told to use `write_file` spends its turns on a tool it
+# was never given.
 _TOOL_USE_HINT = (
     "\n\n"
-    "You MUST use the provided tools (read_file, write_file, list_files, run_command) "
-    "to interact with the filesystem and execute commands. Do not just describe what to do — "
+    "You MUST use the provided tools to read the project and, when you are given "
+    "them, to write files and run commands. Do not just describe what to do — "
     "actually do it by calling the tools."
 )
 
