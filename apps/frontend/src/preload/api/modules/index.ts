@@ -34,7 +34,6 @@ export * from "./jira-api";
 export * from "./linear-api";
 export * from "./mcp-api";
 export * from "./multi-repo-api";
-export * from "./natural-language-git-api";
 export * from "./performance-profiler-api";
 export * from "./pipeline-generator-api";
 export * from "./prompt-optimizer-api";
