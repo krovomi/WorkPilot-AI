@@ -426,8 +426,8 @@ def check_existing_build(project_dir: Path, spec_name: str) -> bool:
         sys.exit(0)
 
     # Import merge function only when needed to avoid circular imports
-    # merge_existing_build is in the parent workspace.py module
-    import workspace as ws
+    # merge_existing_build lives in core/workspace.py, re-exported by the package
+    import core.workspace as ws
 
     if choice == "continue":
         return True  # Continue with existing

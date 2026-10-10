@@ -78,6 +78,12 @@ _MODULES_TO_PRESERVE = [
     "core.agent_client",
     "core.platform",
     "core.auth",
+    # Four files mock core.workspace and core.workspace.models. Deleting the
+    # mock instead of restoring re-imported models (a new WorkspaceMode class)
+    # while core.workspace.workspace_setup kept the old one, so
+    # `mode == WorkspaceMode.DIRECT` was False in test_workspace.py.
+    "core.workspace",
+    "core.workspace.models",
     "review",
     "review.state",
 ]

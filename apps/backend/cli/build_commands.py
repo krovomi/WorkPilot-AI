@@ -18,6 +18,15 @@ if str(_PARENT_DIR) not in sys.path:
 # Heavy imports are lazy-loaded in functions to avoid import errors
 from core.build_signals import BuildHalted, BuildPaused
 from core.progress import print_paused_banner
+from core.workspace import (
+    WorkspaceMode,
+    check_existing_build,
+    choose_workspace,
+    finalize_workspace,
+    get_existing_build_worktree,
+    handle_workspace_choice,
+    setup_workspace,
+)
 from review import ReviewState
 from ui import (
     BuildState,
@@ -33,15 +42,6 @@ from ui import (
     select_menu,
     success,
     warning,
-)
-from workspace import (
-    WorkspaceMode,
-    check_existing_build,
-    choose_workspace,
-    finalize_workspace,
-    get_existing_build_worktree,
-    handle_workspace_choice,
-    setup_workspace,
 )
 
 from .input_handlers import (
