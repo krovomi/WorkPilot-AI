@@ -81,6 +81,11 @@ def test_validation_tools_use_spec_directory_and_preserve_project_boundary(tmp_p
         '{"task_description":"namespace"}', encoding="utf-8"
     )
     (tmp_path / "context.json").write_text("wrong project file", encoding="utf-8")
+    # A Python project, so the command allowlist the executor applies (as the
+    # SDK's `bash_security_hook` does) lets `python` run.
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\nname = 'x'\n", encoding="utf-8"
+    )
     client = LocalAgentClient(
         model="qwen2.5-coder:7b", project_dir=str(tmp_path), offline_only=True
     )

@@ -22,13 +22,12 @@ from core.dependency_validator import validate_platform_dependencies
 from phase_config import get_thinking_budget, resolve_model_id
 
 try:
-    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+    # Availability only: the client comes from `create_simple_client`.
+    import claude_agent_sdk  # noqa: F401
 
     SDK_AVAILABLE = True
 except ImportError:
     SDK_AVAILABLE = False
-    ClaudeAgentOptions = None
-    ClaudeSDKClient = None
 
 validate_platform_dependencies()
 
@@ -168,24 +167,25 @@ Respond with a structured JSON object containing:
 - integrationNotes: Instructions for integration
 """
 
-    def _create_claude_client(self, system_prompt: str) -> ClaudeSDKClient:
+    def _create_claude_client(self, system_prompt: str):
         """Create and configure Claude SDK client"""
-        max_thinking_tokens = get_thinking_budget(self.thinking_level)
+        from core.simple_client import create_simple_client
 
-        options_kwargs: dict = {
-            "model": self.model,
-            "system_prompt": system_prompt,
-            "max_turns": 5,
-            "cwd": str(self.project_dir),
-        }
-        if max_thinking_tokens is not None:
-            options_kwargs["max_thinking_tokens"] = max_thinking_tokens
+        # These options named no tool at all, so the session had the CLI's
+        # whole default set in the project directory, granted by whatever the
+        # settings files allowed. `code_playground` declares none: the answer
+        # is the JSON object. A `None` budget is the "none" level, which is
+        # also the type's default.
+        return create_simple_client(
+            agent_type="code_playground",
+            model=self.model,
+            system_prompt=system_prompt,
+            cwd=self.project_dir,
+            max_turns=5,
+            max_thinking_tokens=get_thinking_budget(self.thinking_level),
+        )
 
-        return ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
-
-    async def _execute_claude_query(
-        self, client: ClaudeSDKClient, user_prompt: str
-    ) -> str:
+    async def _execute_claude_query(self, client, user_prompt: str) -> str:
         """Execute Claude query and collect response text"""
         response_text = ""
 

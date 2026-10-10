@@ -292,6 +292,18 @@ class ToolExecutor:
 
         file_path = self._resolve_within_project(path)
 
+        # The user's guardrails, which the SDK applies to every write tool
+        # (`.workpilot/guardrails.yaml`: a path no agent may touch, content no
+        # file may hold). Judged on what the model sent, before the cleaning
+        # below — the SDK's order, where the watermark hook runs last.
+        from security.hooks import guardrail_refusal
+
+        if refusal := await guardrail_refusal(
+            "Write", {"file_path": path, "content": content or ""}, self.project_dir
+        ):
+            logger.info("write refused by a guardrail: %s", refusal)
+            return f"Write refused by the project's guardrails: {refusal}"
+
         # The other half of the product. Providers that do not use the Claude
         # SDK never reach `create_client`'s PreToolUse hooks, so the same
         # cleaning is applied at the one place their writes go through —
@@ -506,19 +518,30 @@ class ToolExecutor:
 
         Note: uses subprocess shell mode intentionally so the agent can issue
         composite commands (pipes, redirections) needed by the prompt template.
-        The cwd is constrained to project_dir; the command itself is not
-        sanitized — callers must ensure the LLM is constrained by the system
-        prompt and untrusted output is not relayed back into tool args.
+        The cwd is constrained to project_dir, and the command must pass the
+        checks the SDK's `Bash` hooks apply (`security.hooks.command_refusal`).
         """
         if not command:
             raise ValueError("Command is required for run_command")
+
+        # The project's allowlist and the user's guardrails, which the SDK
+        # applies in `bash_security_hook` and the guardrails hook. Every other
+        # provider runs its commands here, and until lot L16 they ran whatever
+        # the model wrote. Refused as a result, like an undeclared tool, so
+        # the model reads why and tries something the project allows.
+        from security.hooks import command_refusal
+
+        if refusal := await command_refusal(command, self.project_dir):
+            logger.info("command refused by the security policy: %s", refusal)
+            return f"Command refused by the project's security policy: {refusal}"
 
         # rtk — the non-Claude half of the same optimisation the SDK gets from
         # `rtk.hook`. Copilot, Windsurf, OpenAI and the local runtimes all
         # execute their shell commands here, and they pay for the output the
         # same way. The rewrite preserves behaviour and exit code; when rtk is
         # absent or has no filter for this command, `command` comes back
-        # unchanged.
+        # unchanged. After the validation, as on the SDK, where the rtk hook is
+        # registered behind the two that decide whether the command runs.
         command = rtk_rewrite(command).command
 
         work_dir = self._resolve_within_project(cwd) if cwd else self.working_directory

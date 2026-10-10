@@ -21,12 +21,10 @@ Usage:
     # Get allowed tools for a specific agent type
     allowed_tools = get_allowed_tools("coder")
 
-    # Use in ClaudeAgentOptions
-    options = ClaudeAgentOptions(
-        mcp_servers={"workpilot": mcp_server},
-        allowed_tools=allowed_tools,
-        ...
-    )
+    # Never build ClaudeAgentOptions yourself: `core.client.create_client` (or
+    # `core.simple_client.create_simple_client`) is the one place that turns
+    # a type's declaration into rights, denials and hooks.
+    client = create_client(project_dir, spec_dir, model, agent_type="coder")
 """
 
 from .models import (
@@ -59,6 +57,8 @@ from .permissions import (
     declared_tools,
     get_all_agent_types,
     get_allowed_tools,
+    hooked_grants,
+    mcp_tools_for_servers,
     undeclared_builtin_tools,
 )
 from .registry import create_auto_claude_mcp_server, is_tools_available
@@ -69,6 +69,8 @@ __all__ = [
     "get_allowed_tools",
     "declared_tools",
     "undeclared_builtin_tools",
+    "hooked_grants",
+    "mcp_tools_for_servers",
     "is_tools_available",
     # Agent configuration registry
     "AGENT_CONFIGS",
