@@ -1916,7 +1916,9 @@ class CopilotAgentClient(AgentClient):
                 )
 
                 self._tool_executor = ToolExecutor(
-                    self.cwd, spec_dir=getattr(self, "_spec_dir", None)
+                    self.cwd,
+                    spec_dir=getattr(self, "_spec_dir", None),
+                    agent_type=self._agent_type,
                 )
                 self._tool_definitions = get_tool_definitions(
                     self._agent_type, getattr(self, "_spec_dir", None)
@@ -2062,6 +2064,7 @@ class OpenAIAgentClient(AgentClient):
                     self._project_dir,
                     getattr(self, "_tool_working_directory", None),
                     spec_dir=getattr(self, "_spec_dir", None),
+                    agent_type=self._agent_type,
                 )
                 self._tool_definitions = get_tool_definitions(
                     self._agent_type, getattr(self, "_spec_dir", None)
@@ -4601,7 +4604,9 @@ class WindsurfAgentClient(AgentClient):
                 )
 
                 self._tool_executor = ToolExecutor(
-                    self._project_dir, spec_dir=getattr(self, "_spec_dir", None)
+                    self._project_dir,
+                    spec_dir=getattr(self, "_spec_dir", None),
+                    agent_type=self._agent_type,
                 )
                 self._tool_definitions = get_tool_definitions(
                     self._agent_type, getattr(self, "_spec_dir", None)
