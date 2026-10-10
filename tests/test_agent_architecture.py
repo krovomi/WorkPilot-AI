@@ -106,7 +106,7 @@ _mocked_module_names = [
     "graphiti_config",
     "graphiti_providers",
     # Recovery & misc
-    "recovery",
+    "services.recovery",
     "insight_extractor",
     # Integrations
     "integrations",

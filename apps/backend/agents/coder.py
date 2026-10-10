@@ -79,8 +79,8 @@ from prompts_pkg.prompts import (
     uiux_section,
     workflow_reports_section,
 )
-from recovery import RecoveryManager
 from security.constants import PROJECT_DIR_ENV_VAR
+from services.recovery import RecoveryManager
 from task_logger import (
     LogEntryType,
     LogPhase,

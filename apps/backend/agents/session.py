@@ -35,8 +35,8 @@ from linear_updater import (
     linear_subtask_completed,
     linear_subtask_failed,
 )
-from recovery import RecoveryManager
 from security.tool_input_validator import get_safe_tool_input
+from services.recovery import RecoveryManager
 from task_logger import (
     LogEntryType,
     LogPhase,

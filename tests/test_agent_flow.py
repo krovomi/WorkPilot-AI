@@ -217,7 +217,7 @@ class TestPostSessionProcessing:
     def test_completed_subtask_records_success(self, test_env):
         """Test that completed subtask is recorded as successful."""
         from agents.session import post_session_processing
-        from recovery import RecoveryManager
+        from services.recovery import RecoveryManager
 
         _, spec_dir, project_dir = test_env
 
@@ -272,7 +272,7 @@ class TestPostSessionProcessing:
     def test_in_progress_subtask_records_failure(self, test_env):
         """Test that in_progress subtask is recorded as incomplete."""
         from agents.session import post_session_processing
-        from recovery import RecoveryManager
+        from services.recovery import RecoveryManager
 
         _, spec_dir, project_dir = test_env
 
@@ -327,7 +327,7 @@ class TestPostSessionProcessing:
     def test_pending_subtask_records_failure(self, test_env):
         """Test that pending (no progress) subtask is recorded as failure."""
         from agents.session import post_session_processing
-        from recovery import RecoveryManager
+        from services.recovery import RecoveryManager
 
         _, spec_dir, project_dir = test_env
 
@@ -573,7 +573,7 @@ class TestHandoffDataPreservation:
 
     def test_recovery_hints_passed_to_coder(self, test_env):
         """Test that recovery hints are available for retry attempts."""
-        from recovery import RecoveryManager
+        from services.recovery import RecoveryManager
 
         _, spec_dir, project_dir = test_env
 
@@ -599,7 +599,7 @@ class TestHandoffDataPreservation:
 
     def test_commit_tracking_across_sessions(self, test_env):
         """Test that commit tracking works across sessions."""
-        from recovery import RecoveryManager
+        from services.recovery import RecoveryManager
 
         _, spec_dir, project_dir = test_env
 

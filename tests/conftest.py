@@ -138,7 +138,7 @@ _PROTECTED_PACKAGES = [
     "graphiti_config",
     "graphiti_providers",
     # Recovery & analysis
-    "recovery",
+    "services.recovery",
     "insight_extractor",
     "review",
     "analysis",

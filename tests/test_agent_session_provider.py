@@ -43,7 +43,7 @@ sys.modules["claude_agent_sdk.types"] = _mock_sdk.types
 for _mod_name in [
     "insight_extractor",
     "linear_updater",
-    "recovery",
+    "services.recovery",
 ]:
     sys.modules[_mod_name] = MagicMock()
 
