@@ -47,7 +47,7 @@ _mocked_module_names = [
     "security.qa_scanner",
     # Config & phases
     "phase_config",
-    "phase_event",
+    "core.phase_event",
     # Logging & UI
     "core.debug",
     "ui",

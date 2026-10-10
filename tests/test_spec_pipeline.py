@@ -44,7 +44,7 @@ _mocked_module_names = [
     "init",
     # Config & phases
     "phase_config",
-    "phase_event",
+    "core.phase_event",
     # Logging & UI
     "core.debug",
     "ui",

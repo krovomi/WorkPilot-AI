@@ -15,6 +15,7 @@ from core.build_signals import BuildPaused
 from core.client import create_agent_client
 from core.debug import debug, debug_error, debug_section, debug_success, debug_warning
 from core.pause_state import is_paused, read_pause_state
+from core.phase_event import ExecutionPhase, emit_phase
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
 from integrations.linear.updater import (
@@ -30,7 +31,6 @@ from phase_config import (
     get_phase_provider,
     get_phase_thinking_budget,
 )
-from phase_event import ExecutionPhase, emit_phase
 from security.constants import PROJECT_DIR_ENV_VAR
 from security.qa_scanner import run_qa_security_scan
 from task_logger import (

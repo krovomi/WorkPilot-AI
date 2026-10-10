@@ -41,6 +41,7 @@ try:
     )
 except ImportError:
     _ut_start_build = _ut_finish_build = _ut_record_task = None  # type: ignore[assignment]
+from core.phase_event import ExecutionPhase, emit_phase
 from core.progress import (
     count_subtasks,
     count_subtasks_detailed,
@@ -64,7 +65,6 @@ from phase_config import (
     get_phase_thinking_budget,
     load_task_metadata,
 )
-from phase_event import ExecutionPhase, emit_phase
 from prompt_generator import (
     format_context_for_prompt,
     generate_planner_prompt,
