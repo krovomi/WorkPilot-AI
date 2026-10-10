@@ -55,7 +55,7 @@ from .report import (
     run_visual_qa,
     write_visual_qa_report,
 )
-from .reviewer import run_qa_agent_session
+from .reviewer import classify_qa_error, run_qa_agent_session
 
 
 def _ensure_fix_request_file(
@@ -370,7 +370,7 @@ async def run_qa_validation_loop(
             print(f"\n❌ Failed to create fixer client: {e}")
             task_event_emitter.emit(
                 "QA_AGENT_ERROR",
-                {"iteration": 0, "consecutiveErrors": 1},
+                {"iteration": 0, "consecutiveErrors": 1, "error": str(e)[:500]},
             )
             return False
 
@@ -613,6 +613,7 @@ async def run_qa_validation_loop(
                 {
                     "iteration": qa_iteration,
                     "consecutiveErrors": 1,
+                    "error": str(e)[:500],
                 },
             )
             return False
@@ -712,6 +713,7 @@ async def run_qa_validation_loop(
                     "iteration": qa_iteration,
                     "consecutiveErrors": 1,
                     "reason": "local_model_no_tools",
+                    "error": halt_msg,
                 },
             )
             if task_logger:
@@ -1273,8 +1275,9 @@ async def run_qa_validation_loop(
             )
 
             # Build error context for self-correction in next iteration
+            error_type = classify_qa_error(response)
             last_error_context = {
-                "error_type": "missing_implementation_plan_update",
+                "error_type": error_type,
                 "error_message": response,
                 "consecutive_errors": consecutive_errors,
                 "expected_action": "You MUST update implementation_plan.json with a qa_signoff object containing 'status': 'approved' or 'status': 'rejected'",
@@ -1290,15 +1293,17 @@ async def run_qa_validation_loop(
                 print(
                     f"\n⚠️  {MAX_CONSECUTIVE_ERRORS} consecutive errors without progress."
                 )
-                print(
-                    "The QA agent is unable to properly update implementation_plan.json."
-                )
+                print(f"Last error: {response}")
                 print("Escalating to human review.")
+                # The last pass's own error travels with the event: the card
+                # used to say only "failed 3 time(s) in a row", and the reason
+                # was in the task logs alone.
                 task_event_emitter.emit(
                     "QA_AGENT_ERROR",
                     {
                         "iteration": qa_iteration,
                         "consecutiveErrors": consecutive_errors,
+                        "error": response[:500],
                     },
                 )
 
@@ -1308,8 +1313,12 @@ async def run_qa_validation_loop(
                 # message name the likely cause so the user knows to switch model
                 # instead of assuming a code bug.
                 fail_message = (
-                    f"QA agent failed {MAX_CONSECUTIVE_ERRORS} consecutive times "
-                    "- unable to update implementation_plan.json"
+                    f"QA agent failed {MAX_CONSECUTIVE_ERRORS} consecutive times"
+                    + (
+                        f" - the session itself failed: {response[:300]}"
+                        if error_type == "session_error"
+                        else " - unable to update implementation_plan.json"
+                    )
                 )
                 try:
                     provider = client.provider_name()

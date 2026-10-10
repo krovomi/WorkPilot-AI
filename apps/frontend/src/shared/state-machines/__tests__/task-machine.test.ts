@@ -680,6 +680,24 @@ describe("taskMachine", () => {
 			);
 		});
 
+		it("names the QA agent's last error, not only how many times it failed", () => {
+			const snapshot = runEvents(
+				[
+					{
+						type: "QA_AGENT_ERROR",
+						iteration: 3,
+						consecutiveErrors: 3,
+						error: "Agent session error: overloaded",
+					},
+				],
+				"qa_review",
+			);
+
+			expect(snapshot.context.error).toBe(
+				"The QA agent failed 3 time(s) in a row on review pass 3. Last error: Agent session error: overloaded",
+			);
+		});
+
 		it("clears the message when the user relaunches", () => {
 			const snapshot = runEvents(
 				[
