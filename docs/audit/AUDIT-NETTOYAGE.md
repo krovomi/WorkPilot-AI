@@ -361,7 +361,7 @@ ci-dessous plutôt que suivies.
   `critique_report.json`. Sans fichier, `create_minimal_research` / `create_minimal_critique` le
   remplacent et la phase rend un succès (F39). La mention « réflexion `high` au lieu de `ultrathink` »
   était fausse aussi : dans ce pipeline le budget est calculé une fois et passé explicitement
-  (`spec/pipeline/orchestrator.py:175`) ; l'`agent_type` ne le change pas.
+  (`spec/pipeline/orchestrator.py:176`) ; l'`agent_type` ne le change pas.
 - **Le vrai défaut** était l'inverse : les deux prompts appellent `mcp__context7__*` et le web, que
   `spec_writer` n'accorde pas. La recherche « validait » de mémoire.
 - **Correction** :
