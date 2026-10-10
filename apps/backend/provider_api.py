@@ -1623,7 +1623,7 @@ async def get_provider_usage(provider: str):
             }
     elif provider == "copilot":
         try:
-            from src.connectors.llm_copilot import get_copilot_usage_metrics
+            from core.copilot_usage import get_copilot_usage_metrics
 
             usage_data = get_copilot_usage_metrics()
 
