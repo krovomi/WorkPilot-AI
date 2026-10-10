@@ -2,6 +2,7 @@
  * Documentation Agent API module
  */
 
+import { IPC_CHANNELS } from "../../../shared/constants";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 
 export interface DocumentationAgentRequest {
@@ -59,12 +60,15 @@ export function createDocumentationAgentAPI(): DocumentationAgentAPI {
 		configureDocumentationAgent: (config) =>
 			invokeIpc("documentationAgent:configure", config),
 		onDocumentationAgentStatus: (callback) =>
-			createIpcListener("documentationAgent:status", callback),
+			createIpcListener(IPC_CHANNELS.DOCUMENTATION_AGENT_STATUS, callback),
 		onDocumentationAgentStreamChunk: (callback) =>
-			createIpcListener("documentationAgent:streamChunk", callback),
+			createIpcListener(
+				IPC_CHANNELS.DOCUMENTATION_AGENT_STREAM_CHUNK,
+				callback,
+			),
 		onDocumentationAgentError: (callback) =>
-			createIpcListener("documentationAgent:error", callback),
+			createIpcListener(IPC_CHANNELS.DOCUMENTATION_AGENT_ERROR, callback),
 		onDocumentationAgentComplete: (callback) =>
-			createIpcListener("documentationAgent:complete", callback),
+			createIpcListener(IPC_CHANNELS.DOCUMENTATION_AGENT_COMPLETE, callback),
 	};
 }

@@ -14,7 +14,6 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
@@ -315,11 +314,4 @@ export function registerMemoryLifecycleHandlers(): void {
 			}
 		},
 	);
-}
-
-export function setupMemoryLifecycleEventForwarding(
-	_getMainWindow: () => BrowserWindow | null,
-): void {
-	// Memory lifecycle is request-response; no persistent event stream needed.
-	// Future: could emit 'memoryLifecycle:pruneProgress' events for long prune runs.
 }

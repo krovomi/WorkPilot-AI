@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { ipcMain } from "electron";
+import { type BrowserWindow, ipcMain } from "electron";
 import {
 	type ArchitectureDeltaRequest,
 	type ArchitectureDeltaStatus,
@@ -153,9 +153,11 @@ export function registerArchitectureVisualizerHandlers(): void {
  * with nothing to catch the mismatch: the preload and the constants agreed
  * with each other and only the emitter disagreed with both.
  */
-export function setupArchitectureVisualizerEventForwarding(): void {
+export function setupArchitectureVisualizerEventForwarding(
+	getMainWindow: () => BrowserWindow | null,
+): void {
 	const send = (channel: string, payload: unknown): void => {
-		const mainWindow = global.mainWindow;
+		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
 			mainWindow.webContents.send(channel, payload);
 		}

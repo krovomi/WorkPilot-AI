@@ -2,6 +2,7 @@
  * Code Migration Agent API module
  */
 
+import { IPC_CHANNELS } from "../../../shared/constants";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 
 export interface CodeMigrationRequest {
@@ -62,14 +63,14 @@ export function createCodeMigrationAPI(): CodeMigrationAPI {
 		configureCodeMigration: (config) =>
 			invokeIpc("codeMigration:configure", config),
 		onCodeMigrationStatus: (callback) =>
-			createIpcListener("codeMigration:status", callback),
+			createIpcListener(IPC_CHANNELS.CODE_MIGRATION_STATUS, callback),
 		onCodeMigrationStreamChunk: (callback) =>
-			createIpcListener("codeMigration:streamChunk", callback),
+			createIpcListener(IPC_CHANNELS.CODE_MIGRATION_STREAM_CHUNK, callback),
 		onCodeMigrationError: (callback) =>
-			createIpcListener("codeMigration:error", callback),
+			createIpcListener(IPC_CHANNELS.CODE_MIGRATION_ERROR, callback),
 		onCodeMigrationComplete: (callback) =>
-			createIpcListener("codeMigration:complete", callback),
+			createIpcListener(IPC_CHANNELS.CODE_MIGRATION_COMPLETE, callback),
 		onCodeMigrationTaskProgress: (callback) =>
-			createIpcListener("codeMigration:taskProgress", callback),
+			createIpcListener(IPC_CHANNELS.CODE_MIGRATION_TASK_PROGRESS, callback),
 	};
 }

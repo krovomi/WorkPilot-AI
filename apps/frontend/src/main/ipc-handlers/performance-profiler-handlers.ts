@@ -1,8 +1,9 @@
-import { ipcMain } from "electron";
+import { type BrowserWindow, ipcMain } from "electron";
 import {
 	type PerformanceProfilerRequest,
 	performanceProfilerService,
 } from "../performance-profiler-service";
+import { IPC_CHANNELS } from "../../shared/constants";
 
 export function registerPerformanceProfilerHandlers(): void {
 	ipcMain.handle(
@@ -55,42 +56,33 @@ export function registerPerformanceProfilerHandlers(): void {
 	);
 }
 
-export function setupPerformanceProfilerEventForwarding(): void {
-	performanceProfilerService.on("status", (status: string) => {
-		const mainWindow = global.mainWindow;
+/**
+ * Forward the service's events to the renderer, on the `IPC_CHANNELS` the
+ * preload listens on.
+ */
+export function setupPerformanceProfilerEventForwarding(
+	getMainWindow: () => BrowserWindow | null,
+): void {
+	const send = (channel: string, payload: unknown): void => {
+		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("performanceProfiler:status", status);
+			mainWindow.webContents.send(channel, payload);
 		}
-	});
+	};
 
-	performanceProfilerService.on("stream-chunk", (chunk: string) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("performanceProfiler:stream-chunk", chunk);
-		}
-	});
-
-	performanceProfilerService.on("error", (error: string) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("performanceProfiler:error", error);
-		}
-	});
-
-	performanceProfilerService.on("complete", (result) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("performanceProfiler:complete", result);
-		}
-	});
-
-	performanceProfilerService.on("implementation-complete", (result) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send(
-				"performanceProfiler:implementation-complete",
-				result,
-			);
-		}
-	});
+	performanceProfilerService.on("status", (status: string) =>
+		send(IPC_CHANNELS.PERFORMANCE_PROFILER_STATUS, status),
+	);
+	performanceProfilerService.on("stream-chunk", (chunk: string) =>
+		send(IPC_CHANNELS.PERFORMANCE_PROFILER_STREAM_CHUNK, chunk),
+	);
+	performanceProfilerService.on("error", (error: string) =>
+		send(IPC_CHANNELS.PERFORMANCE_PROFILER_ERROR, error),
+	);
+	performanceProfilerService.on("complete", (result) =>
+		send(IPC_CHANNELS.PERFORMANCE_PROFILER_COMPLETE, result),
+	);
+	performanceProfilerService.on("implementation-complete", (result) =>
+		send(IPC_CHANNELS.PERFORMANCE_PROFILER_IMPLEMENTATION_COMPLETE, result),
+	);
 }

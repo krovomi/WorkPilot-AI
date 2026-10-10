@@ -2,6 +2,7 @@
  * Performance Profiler Agent API module
  */
 
+import { IPC_CHANNELS } from "../../../shared/constants";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 
 export interface PerformanceProfilerRequest {
@@ -60,16 +61,19 @@ export function createPerformanceProfilerAPI(): PerformanceProfilerAPI {
 		configurePerformanceProfiler: (config) =>
 			invokeIpc("performanceProfiler:configure", config),
 		onPerformanceProfilerStatus: (callback) =>
-			createIpcListener("performanceProfiler:status", callback),
+			createIpcListener(IPC_CHANNELS.PERFORMANCE_PROFILER_STATUS, callback),
 		onPerformanceProfilerStreamChunk: (callback) =>
-			createIpcListener("performanceProfiler:streamChunk", callback),
+			createIpcListener(
+				IPC_CHANNELS.PERFORMANCE_PROFILER_STREAM_CHUNK,
+				callback,
+			),
 		onPerformanceProfilerError: (callback) =>
-			createIpcListener("performanceProfiler:error", callback),
+			createIpcListener(IPC_CHANNELS.PERFORMANCE_PROFILER_ERROR, callback),
 		onPerformanceProfilerComplete: (callback) =>
-			createIpcListener("performanceProfiler:complete", callback),
+			createIpcListener(IPC_CHANNELS.PERFORMANCE_PROFILER_COMPLETE, callback),
 		onPerformanceProfilerImplementationComplete: (callback) =>
 			createIpcListener(
-				"performanceProfiler:implementationComplete",
+				IPC_CHANNELS.PERFORMANCE_PROFILER_IMPLEMENTATION_COMPLETE,
 				callback,
 			),
 	};
