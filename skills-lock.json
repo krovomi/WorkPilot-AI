@@ -51,11 +51,6 @@
 			"source": "obra/superpowers",
 			"path": "skills/superpowers"
 		},
-		"task-observer": {
-			"version": "0.0.1",
-			"source": "rebelytics/one-skill-to-rule-them-all",
-			"path": "skills/task-observer"
-		},
 		"tooling": {
 			"version": "1.0.0",
 			"source": "local",
@@ -815,7 +810,7 @@
 			"pack": "tooling",
 			"packVersion": "1.0.0",
 			"source": "skills/tooling/spec-analyze/SKILL.md",
-			"contentSha256": "52123e8ba3c45cb2ea80eaa49c779ee811db4c1f4b86fa215fbe843733ae01ea",
+			"contentSha256": "2a89fe3236f8a4a00a589e62996581d16d407ee2b36fa4c0cc257fca73ffa343",
 			"targets": {}
 		},
 		"spike": {

@@ -1059,8 +1059,8 @@ async def run_autonomous_agent(
             # The profile was resolved before planning, with no change set, so
             # every conditional phase in this window read "unknown — run".
             # The plan now names its files: narrow the profile to that
-            # forecast, which is what keeps `frontend-design`, `mobile-design`
-            # and `ui-design-system` off a backend task. No forecast keeps the
+            # forecast, which is what keeps `mobile-design` and
+            # `ui-design-system` off a backend task. No forecast keeps the
             # profile as it was.
             window_profile = narrow_to_forecast(profile, planned_files(spec_dir))
             kept = {
