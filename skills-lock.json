@@ -786,7 +786,7 @@
 			"pack": "tooling",
 			"packVersion": "1.0.0",
 			"source": "skills/tooling/review-lenses/SKILL.md",
-			"contentSha256": "55d47b11d262c5a6195faf742aad46638275542bca8567e2eeb37338bf5ffac9",
+			"contentSha256": "c67851fa11b1c6277b0b1bfa053deb620c94b42d7472a29dac54a740af852cee",
 			"targets": {}
 		},
 		"sdlc-review": {

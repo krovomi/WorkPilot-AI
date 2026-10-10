@@ -127,6 +127,7 @@ phases:
     impl: tooling/review-lenses
     min_effort: medium
     dispatch: fresh-context
+    roster: solo
     description: >-
       A reviewer that did not write the code, before QA, with lenses the
       effort chooses: correctness and tests and security at medium; conformance
@@ -139,6 +140,13 @@ phases:
       used to run after QA, where no fixer reads anything, on BMAD skills that
       need the `_bmad/` runtime and so never opened a session. Their questions
       are lenses here, asked while an answer can still change the build.
+
+      `roster: solo` because the lenses are the specialists. Under
+      `pr_reviewer` the phase was handed the review roster — a
+      security-auditor, a regression-hunter, a test-coverage-auditor — each a
+      session that re-reads the same diff to answer a lens's question again.
+      The engine picks the lenses (`workflows.runner.REVIEW_LENSES_BY_EFFORT`)
+      and names them in the prompt.
 
   - id: verify
     impl: tooling/verify
