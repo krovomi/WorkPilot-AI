@@ -68,7 +68,7 @@ sequenceDiagram
     CA->>CR: run_autonomous_agent(spec)
     CR->>SM: get_relevant_skills(task)
     SM-->>CR: Skills list
-    CR->>MM: get_graphiti_context()
+    CR->>MM: get_memory_context()
     MM-->>CR: Context data
     CR->>CR: execute_subtask_session()
     CR->>MM: save_session_memory()
@@ -244,7 +244,7 @@ sequenceDiagram
     U->>CA: run_autonomous_agent(spec)
     CA->>SM: get_relevant_skills(task)
     SM-->>CA: Skills list
-    CA->>MM: get_graphiti_context()
+    CA->>MM: get_memory_context()
     MM-->>CA: Context data
     CA->>SES: run_agent_session()
     SES-->>CA: Session result
@@ -356,7 +356,7 @@ sequenceDiagram
     participant FM as File Memory
     participant FS as File System
     
-    U->>MM: get_graphiti_context(query)
+    U->>MM: get_memory_context(query)
     MM->>GM: query_context(query)
     GM-->>MM: Context data
     
@@ -855,7 +855,7 @@ sequenceDiagram
     CA->>CR: run_autonomous_agent(spec)
     CR->>SM: get_relevant_skills(spec)
     SM-->>CR: relevant_skills
-    CR->>MM: get_graphiti_context(spec)
+    CR->>MM: get_memory_context(spec)
     MM-->>CR: context_data
     CR->>SES: run_agent_session(prompt, tools)
     SES-->>CR: session_result

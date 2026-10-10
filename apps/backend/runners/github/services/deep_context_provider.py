@@ -404,12 +404,9 @@ class DeepContextProvider:
     ) -> dict:
         """Query the project's memory (the shared brain) for historical insights."""
         try:
-            from context.graphiti_integration import (
-                fetch_graph_hints,
-                is_graphiti_enabled,
-            )
+            from context.memory_hints import fetch_graph_hints, is_memory_enabled
 
-            if not is_graphiti_enabled():
+            if not is_memory_enabled():
                 return {"insights": [], "past_bugs": [], "regression_risks": []}
 
             # Query for general insights about this area

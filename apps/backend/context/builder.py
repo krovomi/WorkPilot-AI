@@ -12,8 +12,8 @@ from pathlib import Path
 
 from .categorizer import FileCategorizer
 from .dependency_graph import DependencyAnalyzer, DependencyGraphCache
-from .graphiti_integration import fetch_graph_hints, is_graphiti_enabled
 from .keyword_extractor import KeywordExtractor
+from .memory_hints import fetch_graph_hints, is_memory_enabled
 from .models import FileMatch, TaskContext
 from .pattern_discovery import PatternDiscoverer
 from .search import CodeSearcher
@@ -112,7 +112,7 @@ class ContextBuilder:
 
         # Get graph hints (synchronously wrap async call)
         graph_hints = []
-        if include_graph_hints and is_graphiti_enabled():
+        if include_graph_hints and is_memory_enabled():
             try:
                 # Run the async function in a new event loop if necessary
                 try:

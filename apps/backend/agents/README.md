@@ -40,11 +40,10 @@ apps/backend/agents/
 - Workspace sync: `sync_spec_to_source()`
 
 ### `memory.py` (13 KB)
-- Dual-layer memory system (Graphiti primary, file-based fallback)
+- Session memory in the shared brain (`memory.store.get_project_memory`)
 - `debug_memory_system_status()` - Memory system diagnostics
-- `get_graphiti_context()` - Retrieve relevant context for subtasks
+- `get_memory_context()` - Retrieve relevant context for subtasks
 - `save_session_memory()` - Save session insights to memory
-- `save_session_to_graphiti()` - Backwards compatibility wrapper
 
 ### `session.py` (17 KB)
 - `run_agent_session()` - Execute a single agent session
@@ -74,7 +73,7 @@ from agents import (
     run_followup_planner,
     # Memory functions
     save_session_memory,
-    get_graphiti_context,
+    get_memory_context,
     # Session management
     run_agent_session,
     post_session_processing,
@@ -113,7 +112,7 @@ All existing imports continue to work without changes.
 ```
 coder.py
   ├── session.py (run_agent_session, post_session_processing)
-  ├── memory.py (get_graphiti_context, debug_memory_system_status)
+  ├── memory.py (get_memory_context, debug_memory_system_status)
   └── utils.py (git operations, plan management)
 
 session.py
@@ -149,7 +148,7 @@ No migration needed! The refactoring maintains 100% backwards compatibility.
 ```python
 # Use focused imports for clarity
 from agents.coder import run_autonomous_agent
-from agents.memory import save_session_memory, get_graphiti_context
+from agents.memory import save_session_memory, get_memory_context
 from agents.session import run_agent_session
 ```
 
