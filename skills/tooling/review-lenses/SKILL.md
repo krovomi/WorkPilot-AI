@@ -29,8 +29,8 @@ coder sur sa propre sous-tâche est ce qu'il y a.
 
 ## Entrées
 
-- les fichiers listés sous `FILES CHANGED BY THIS TASK`, et `git diff` de la
-  branche contre sa base ;
+- les fichiers listés sous `FILES CHANGED BY THIS TASK` : lis-les. La phase est
+  en lecture seule et n'exécute aucune commande, pas même git diff ;
 - `<spec_dir>/spec.md` et `<spec_dir>/implementation_plan.json` ;
 - `<spec_dir>/traceability.json` quand il existe (lentille 3) ;
 - les règles du projet reproduites plus haut dans ce prompt (constitution, ADR,

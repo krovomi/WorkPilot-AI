@@ -7,7 +7,7 @@ metadata:
     provenance: WorkPilot — revue unique à lentilles (audit F3/F11) ; la lentille adversariale reprend l'intention de bmad-review
     pack: tooling
     version: 1.0.0
-    content_sha256: ce06cbd5a99e10ebe2762c6120620a7c52d8258014748e6b841f5716b639d513
+    content_sha256: 55d47b11d262c5a6195faf742aad46638275542bca8567e2eeb37338bf5ffac9
 ---
 
 # review-lenses — une revue, plusieurs questions
@@ -33,8 +33,8 @@ coder sur sa propre sous-tâche est ce qu'il y a.
 
 ## Entrées
 
-- les fichiers listés sous `FILES CHANGED BY THIS TASK`, et `git diff` de la
-  branche contre sa base ;
+- les fichiers listés sous `FILES CHANGED BY THIS TASK` : lis-les. La phase est
+  en lecture seule et n'exécute aucune commande, pas même git diff ;
 - `<spec_dir>/spec.md` et `<spec_dir>/implementation_plan.json` ;
 - `<spec_dir>/traceability.json` quand il existe (lentille 3) ;
 - les règles du projet reproduites plus haut dans ce prompt (constitution, ADR,

@@ -34,6 +34,13 @@ A blanket `if not get_auth_token()` is how a task configured for Ollama got acce
 the frontend — which asks the same question and answers it correctly — and refused by
 the backend one second later, over a service it never talks to.
 
+**An agent has the tools it declares** — `AGENT_CONFIGS[agent_type]["tools"]` is enforced on
+every provider: `create_client` and `create_simple_client` pass `undeclared_builtin_tools` as
+`disallowed_tools`, `ToolExecutor(agent_type=…)` offers and runs only what the type declares,
+and Codex runs `--sandbox read-only` for a type that neither writes nor runs commands. A prompt
+that uses a tool its type does not declare fails `tests/test_agent_tool_declarations.py`:
+declare the tool, do not lean on the settings file's blanket grants.
+
 **PR target** — Always target the `develop` branch for PRs to krovomi/WorkPilot-AI, NOT `main`.
 
 ## Project Structure
@@ -97,6 +104,7 @@ Why each feature is built the way it is. Read the file before changing the featu
 |---|---|---|
 | Product overview | [product-overview.md](../shared_docs/architecture/product-overview.md) | The full feature list. |
 | Agent prompts | [agent-prompts.md](../shared_docs/architecture/agent-prompts.md) | Which prompt in `apps/backend/prompts/` serves which agent. |
+| Agent tool rights | [agent-tool-rights.md](../shared_docs/architecture/agent-tool-rights.md) | A declared tool list is a right on both halves: `disallowed_tools` on the SDK, the executor's gate, Codex's sandbox. |
 | Spec pipeline | [spec-pipeline.md](../shared_docs/architecture/spec-pipeline.md) | Plan recovery, `FR-###` traceability and `[NEEDS CLARIFICATION]`, spec-kit constitutions. Reshaping a plan never invents a description. |
 | Skills | [skills.md](../shared_docs/architecture/skills.md) | `skills/` is the source and `scripts/skills_cli.py` the only writer; frontmatter is read only through `skills_registry.frontmatter.parse_frontmatter`. |
 | hermes-agent | [hermes.md](../shared_docs/architecture/hermes.md) | Ingest, triage and adoption of hermes-authored skills, and `SOUL.md`. Nothing grants trust on someone's behalf. |

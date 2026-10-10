@@ -31,11 +31,25 @@ more:
 | everything else | `spec_writer` | they write files, and `planner.md` / `spec_quick.md` ask for the `Write` tool non-Claude providers only expose under `planner` and `spec_writer` |
 
 A read-only config is the wrong fix for a prompt that writes its output, and the
-failure is silent: with no file on disk the phase stands a placeholder in
-(`create_minimal_research`, `create_minimal_critique`) and reports success.
+failure used to be silent: with no file on disk the phase stood a placeholder in
+(`create_minimal_research`, `create_minimal_critique`) and reported success.
 `spec_critic` itself stays read-only — it is what the workflow's `brainstorm` runs
 under. `tests/test_spec_agent_configuration.py` reads each prompt the pipeline
 runs from its call site and checks its config grants what the prompt uses.
+
+**A phase that produced nothing says so.** The pipeline still moves on when the
+researcher or the critic writes no file, or fails every attempt — what changed
+is that nothing pretends otherwise:
+
+| Where | What it says |
+|---|---|
+| the file | `"placeholder": true` (`validator.is_placeholder`; an unreadable file counts as one). A placeholder critique no longer claims `no_issues_found: true` — nobody looked |
+| the resume | a resumed build runs research and self-critique again over a placeholder, where it used to skip them because a file existed |
+| `PhaseResult.warnings` | the reason, beside the `errors` a successful result may carry |
+| the task log | `orchestrator._report_phase_warnings` writes each one (`phase_notes`) as a `LogEntryType.WARNING` entry of the planning phase, rendered as an amber row in the Logs tab. The orchestrator used to drop the `errors` of a successful result |
+
+The quick spec's `create_minimal_plan` stand-in is reported the same way. The
+task card itself shows nothing yet: the Logs tab is where the warning is read.
 
 Duplicate detection and issue auto-fix are listed as features above but are not
 prompt-driven: `runners/github/duplicates.py` compares embeddings, and
