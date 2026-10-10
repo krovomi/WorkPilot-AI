@@ -2081,10 +2081,14 @@ class OpenAIAgentClient(AgentClient):
             return self
         # Bridge configured MCP servers (best-effort) so their tools are exposed
         # alongside the built-in toolset. Never fail client setup on MCP errors.
+        # Only the servers this type may reach: the same per-agent answer the
+        # Claude SDK gets from `create_client`.
         try:
-            from core.mcp_tools import MCPToolManager, load_mcp_server_configs
+            from core.mcp_tools import MCPToolManager, load_mcp_server_configs_for
 
-            servers = load_mcp_server_configs(self._project_dir)
+            servers = load_mcp_server_configs_for(
+                self._agent_type, self._project_dir, getattr(self, "_spec_dir", None)
+            )
             if servers:
                 manager = MCPToolManager(self._project_dir, servers)
                 await manager.connect()
