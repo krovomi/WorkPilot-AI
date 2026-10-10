@@ -25,6 +25,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# `detect_project_type` lives in the project stack facade (audit lot L11, F26);
+# imported here for the readers that still reach it through this module.
+from project.stack import detect_project_type
 from risk_classifier import RiskClassifier
 
 # =============================================================================
@@ -126,75 +129,6 @@ PROJECT_TYPE_INDICATORS = {
         "files": ["Gemfile"],
     },
 }
-
-
-def detect_project_type(project_dir: Path) -> str:
-    """
-    Detect the project type based on files and dependencies.
-
-    Args:
-        project_dir: Path to the project directory
-
-    Returns:
-        Project type string (e.g., "react_spa", "python_api", "nodejs")
-    """
-    project_dir = Path(project_dir)
-
-    # Check for specific frameworks first
-    package_json = project_dir / "package.json"
-    if package_json.exists():
-        try:
-            with open(package_json, encoding="utf-8") as f:
-                pkg = json.load(f)
-            deps = pkg.get("dependencies", {})
-            dev_deps = pkg.get("devDependencies", {})
-            all_deps = {**deps, **dev_deps}
-
-            if "electron" in all_deps:
-                return "electron"
-            if "next" in all_deps:
-                return "nextjs"
-            if "react" in all_deps:
-                return "react_spa"
-            if "vue" in all_deps:
-                return "vue_spa"
-            if "@angular/core" in all_deps:
-                return "angular_spa"
-            return "nodejs"
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-            return "nodejs"
-
-    # Check for Python projects
-    pyproject = project_dir / "pyproject.toml"
-    requirements = project_dir / "requirements.txt"
-    if pyproject.exists() or requirements.exists():
-        # Try to detect API framework
-        deps_text = ""
-        if requirements.exists():
-            deps_text = requirements.read_text(encoding="utf-8").lower()
-        if pyproject.exists():
-            deps_text += pyproject.read_text(encoding="utf-8").lower()
-
-        if "fastapi" in deps_text or "flask" in deps_text or "django" in deps_text:
-            return "python_api"
-        if "click" in deps_text or "typer" in deps_text or "argparse" in deps_text:
-            return "python_cli"
-        return "python"
-
-    # Check for other languages
-    if (project_dir / "Cargo.toml").exists():
-        return "rust"
-    if (project_dir / "go.mod").exists():
-        return "go"
-    if (project_dir / "Gemfile").exists():
-        return "ruby"
-
-    # Check for simple HTML/CSS
-    html_files = list(project_dir.glob("*.html"))
-    if html_files:
-        return "html_css"
-
-    return "unknown"
 
 
 # =============================================================================
