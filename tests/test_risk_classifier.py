@@ -19,7 +19,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 
-from risk_classifier import (
+from analysis.risk_classifier import (
     AssessmentFlags,
     ComplexityAnalysis,
     InfrastructureAnalysis,
