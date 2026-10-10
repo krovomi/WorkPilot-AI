@@ -402,6 +402,47 @@ export function resolveModelForProviderCatalog(
 	);
 }
 
+/**
+ * Un identifiant que le fournisseur Claude sait servir : un id `claude-*`
+ * (éventuellement préfixé Bedrock / Vertex, `us.anthropic.claude-…`) ou un
+ * alias de famille (`opus`, `sonnet[1m]`, `opusplan`…). Le catalogue live
+ * d'Anthropic ne garde que la première forme (`provider_models_catalog.py`).
+ */
+const CLAUDE_MODEL_ID =
+	/^(?:[a-z0-9-]+\.)*claude-|^(?:opus|sonnet|haiku|fable|mythos|opusplan|default)(?:$|[-[])/i;
+
+/**
+ * Vrai quand `model` appartient, sans doute possible, à un autre fournisseur
+ * que `provider`.
+ *
+ * Deux preuves seulement, toutes deux déjà établies ailleurs :
+ *  - Claude ne sert que des modèles Claude. Le CLI répond à `gemma4:12b` par
+ *    « There's an issue with the selected model », et rien d'autre.
+ *  - un identifiant Claude au format natif (tirets) n'est servi que par
+ *    Anthropic (`isAnthropicNativeVersionedModelId`, la même règle que
+ *    `phase_config._resolve_provider_model`).
+ *
+ * Un modèle que le catalogue statique ne connaît pas n'en est **pas** une : une
+ * sortie récente lue dans le catalogue live, un tag Ollama tiré à la main ou
+ * une passerelle (Copilot, Windsurf) qui propose les modèles d'autres éditeurs
+ * le proposent légitimement. Dans le doute, le choix de la personne tient.
+ */
+export function isModelForeignToProvider(
+	model: string,
+	provider: string,
+): boolean {
+	const id = model.trim();
+	const name = provider.trim().toLowerCase();
+	if (!id || !name) return false;
+
+	const key = getCanonicalModelKey(id);
+	if (getModelsForProvider(name).some((m) => getCanonicalModelKey(m.value) === key))
+		return false;
+
+	if (name === "claude" || name === "anthropic") return !CLAUDE_MODEL_ID.test(id);
+	return isAnthropicNativeVersionedModelId(id);
+}
+
 // Maps thinking levels to budget tokens (null = no extended thinking)
 export const THINKING_BUDGET_MAP: Record<string, number | null> = {
 	none: null,
