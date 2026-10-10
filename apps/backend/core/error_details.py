@@ -33,6 +33,7 @@ QUOTA = "quota"
 NETWORK = "network"
 TIMEOUT = "timeout"
 PROVIDER_UNAVAILABLE = "provider_unavailable"
+MODEL_UNAVAILABLE = "model_unavailable"
 EMPTY_RESPONSE = "empty_response"
 FILE_NOT_FOUND = "file_not_found"
 WRITE_FAILED = "write_failed"
@@ -123,6 +124,18 @@ _SIGNATURES: tuple[tuple[str, tuple[str, ...]], ...] = (
             "credit balance",
             "payment required",
             "402",
+        ),
+    ),
+    (
+        # The provider is reachable and the credentials are fine: it is the
+        # model id it does not know. Choosing another model is the fix, which
+        # neither "auth" nor "provider unavailable" would tell the user.
+        MODEL_UNAVAILABLE,
+        (
+            "model_not_found",
+            "model not found",
+            "issue with the selected model",  # Claude CLI
+            "try pulling it first",  # Ollama: model "x" not found, try pulling it first
         ),
     ),
     (TIMEOUT, ("timeout", "timed out", "deadline exceeded")),

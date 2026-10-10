@@ -106,6 +106,18 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 		t("dialogs:pageLlm.providerUnset");
 	const modelLabel =
 		models.find((m) => m.value === resolved.model)?.label ?? resolved.model;
+	// Un modèle de page que le résolveur a écarté (il appartient à un autre
+	// fournisseur) ne s'affiche pas comme le choix de la page : c'est l'héritage
+	// qui s'applique, et c'est lui que la liste doit montrer.
+	const pageModel =
+		resolved.modelSource === "page" ? override.model : undefined;
+
+	// Le fournisseur que la page suit sans surcharge, sous le nom de la liste :
+	// un modèle choisi tant que la page n'en nomme aucun l'épingle.
+	const globalProvider = normalizeProviderId(settings.selectedProvider);
+	const inheritedProvider =
+		providers.find((p) => normalizeProviderId(p.name) === globalProvider)
+			?.name ?? (globalProvider === "claude" ? "anthropic" : globalProvider);
 
 	const patch = async (
 		field: "provider" | "model" | "thinking",
@@ -122,6 +134,7 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 							? (value as ThinkingLevel)
 							: value,
 			},
+			inheritedProvider,
 		);
 		await saveSettings({ pageLlmOverrides: next });
 	};
@@ -201,7 +214,7 @@ export const PageLlmSelector: React.FC<PageLlmSelectorProps> = ({ page }) => {
 						{t("dialogs:pageLlm.model")}
 					</Label>
 					<Select
-						value={override.model ?? INHERIT}
+						value={pageModel ?? INHERIT}
 						onValueChange={(value) => patch("model", value)}
 					>
 						<SelectTrigger className="h-9">
