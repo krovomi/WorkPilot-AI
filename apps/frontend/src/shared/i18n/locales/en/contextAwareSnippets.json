@@ -33,9 +33,11 @@
 		"placeholder": "Select a language"
 	},
 	"status": {
-		"analyzing": "Analyzing project context...",
-		"generating": "Generating snippet...",
-		"error": "Generation error"
+		"generating": "Writing the snippet…",
+		"error": "Generation error",
+		"context": "Reading the project…",
+		"parsing": "Finalizing…",
+		"backgroundHint": "You can close this window: the generation keeps running and the snippet will be waiting when you reopen it."
 	},
 	"result": {
 		"snippet": "Generated Snippet",
@@ -51,10 +53,32 @@
 		"close": "Close",
 		"copy": "Copy",
 		"copied": "Copied!",
-		"tryAgain": "Try Again"
+		"tryAgain": "Try Again",
+		"runInBackground": "Continue in background",
+		"newSnippet": "New snippet"
 	},
 	"errors": {
 		"noProject": "Please select a project to analyze its context.",
-		"generic": "An error occurred while generating the snippet."
+		"details": "Technical details",
+		"codes": {
+			"auth": "The AI provider refused the credentials. Check your account or API key in Settings.",
+			"rate_limit": "The provider's rate limit was reached. Try again in a few moments.",
+			"quota": "The provider's quota is exhausted for this account.",
+			"network": "The AI provider could not be reached. Check your connection.",
+			"timeout": "The AI provider took too long to answer.",
+			"provider_unavailable": "The default provider is not available. Pick another one in Settings → Agent.",
+			"provider_error": "The AI provider returned an error.",
+			"empty_response": "The model returned an empty answer. Try again, or pick another model.",
+			"invalid_response": "The model's answer contained no code. Try again, or rephrase the description.",
+			"empty_description": "Describe the snippet to generate.",
+			"invalid_input": "The request was incomplete. Check the snippet type and description.",
+			"runner_missing": "The snippet generator's backend component is missing from this installation.",
+			"python_missing": "No Python environment was found to run the snippet generator.",
+			"project_not_found": "The selected project could not be found.",
+			"spawn_failed": "The snippet generator could not be started.",
+			"process_failed": "The snippet generator stopped unexpectedly.",
+			"ipc_failed": "The request could not reach the application. Restart WorkPilot AI and try again.",
+			"generic": "An error occurred while generating the snippet."
+		}
 	}
 }

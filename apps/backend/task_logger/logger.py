@@ -338,6 +338,10 @@ class TaskLogger:
         """Log an info message."""
         self.log(content, LogEntryType.INFO, phase)
 
+    def log_warning(self, content: str, phase: LogPhase | None = None) -> None:
+        """Log a warning: the step went on, with something missing."""
+        self.log(content, LogEntryType.WARNING, phase)
+
     def log_with_detail(
         self,
         content: str,

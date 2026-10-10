@@ -25,6 +25,10 @@ class LogEntryType(str, Enum):
     ERROR = "error"
     SUCCESS = "success"
     INFO = "info"
+    # A step that went on but stood something in for what it could not
+    # produce — a placeholder file, a fallback. Neither an error (the build
+    # continues) nor a success (something is missing).
+    WARNING = "warning"
 
 
 @dataclass

@@ -555,7 +555,6 @@ function createWindow(): void {
 	// Clean up on close
 	mainWindow.on("closed", () => {
 		mainWindow = null;
-		globalThis.mainWindow = null;
 	});
 }
 

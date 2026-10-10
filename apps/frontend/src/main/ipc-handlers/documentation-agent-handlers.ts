@@ -1,8 +1,9 @@
-import { ipcMain } from "electron";
+import { type BrowserWindow, ipcMain } from "electron";
 import {
 	type DocumentationAgentRequest,
 	documentationAgentService,
 } from "../documentation-agent-service";
+import { IPC_CHANNELS } from "../../shared/constants";
 
 export function registerDocumentationAgentHandlers(): void {
 	ipcMain.handle(
@@ -55,32 +56,30 @@ export function registerDocumentationAgentHandlers(): void {
 	);
 }
 
-export function setupDocumentationAgentEventForwarding(): void {
-	documentationAgentService.on("status", (status: string) => {
-		const mainWindow = global.mainWindow;
+/**
+ * Forward the service's events to the renderer, on the `IPC_CHANNELS` the
+ * preload listens on.
+ */
+export function setupDocumentationAgentEventForwarding(
+	getMainWindow: () => BrowserWindow | null,
+): void {
+	const send = (channel: string, payload: unknown): void => {
+		const mainWindow = getMainWindow();
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("documentationAgent:status", status);
+			mainWindow.webContents.send(channel, payload);
 		}
-	});
+	};
 
-	documentationAgentService.on("stream-chunk", (chunk: string) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("documentationAgent:stream-chunk", chunk);
-		}
-	});
-
-	documentationAgentService.on("error", (error: string) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("documentationAgent:error", error);
-		}
-	});
-
-	documentationAgentService.on("complete", (result) => {
-		const mainWindow = global.mainWindow;
-		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.webContents.send("documentationAgent:complete", result);
-		}
-	});
+	documentationAgentService.on("status", (status: string) =>
+		send(IPC_CHANNELS.DOCUMENTATION_AGENT_STATUS, status),
+	);
+	documentationAgentService.on("stream-chunk", (chunk: string) =>
+		send(IPC_CHANNELS.DOCUMENTATION_AGENT_STREAM_CHUNK, chunk),
+	);
+	documentationAgentService.on("error", (error: string) =>
+		send(IPC_CHANNELS.DOCUMENTATION_AGENT_ERROR, error),
+	);
+	documentationAgentService.on("complete", (result) =>
+		send(IPC_CHANNELS.DOCUMENTATION_AGENT_COMPLETE, result),
+	);
 }
