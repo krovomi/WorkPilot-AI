@@ -338,15 +338,19 @@ class TestPRReviewRoster:
             "You are a security expert. Find vulnerabilities."
         )
 
-    def test_the_runner_builds_the_same_roster(self):
-        """The move must be behaviour-preserving: same names, same tools."""
+    def test_the_runner_declares_no_roster_inline(self):
+        """The roster lives in the registry, never inline in the runner.
+
+        The runner used to hand `pr_review_agents(...)` to an SDK client in
+        `_create_sdk_client`; nothing called it (lot L9), the live path runs
+        each specialist as its own `pr_reviewer` session.
+        """
         from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
 
         source = (
             REPO_ROOT
             / "apps/backend/runners/github/services/parallel_orchestrator_reviewer.py"
         ).read_text(encoding="utf-8")
-        assert "pr_review_agents(" in source
         assert "AgentDefinition(" not in source, (
             "a definition is being declared inline again"
         )
