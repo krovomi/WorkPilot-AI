@@ -61,3 +61,24 @@ def test_the_execution_path_no_longer_imports_the_consuming_resolver():
         encoding="utf-8"
     )
     assert "_get_active_provider" not in source
+
+
+def test_an_insights_chat_turn_leaves_the_resume_marker_in_place(tmp_path, monkeypatch):
+    """Same case outside the palette: the insights chat decides, it does not start."""
+    from runners import insights_runner
+
+    marker = tmp_path / RESUME_WITH_PROVIDER_FILE
+    marker.write_text("copilot", encoding="utf-8")
+    seen: list[str] = []
+
+    async def fake_run_with_agent_client(*args):
+        seen.append(args[-1])
+
+    monkeypatch.setattr(
+        insights_runner, "run_with_agent_client", fake_run_with_agent_client
+    )
+
+    asyncio.run(insights_runner.run_with_sdk(str(tmp_path), "hello", []))
+
+    assert seen == ["copilot"]
+    assert marker.read_text(encoding="utf-8") == "copilot"
