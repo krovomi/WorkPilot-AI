@@ -51,7 +51,7 @@ _mocked_module_names = [
     "ui.capabilities",
     "task_logger",
     "linear_updater",
-    "progress",
+    "core.progress",
     # Prompts
     "prompts_pkg",
     "prompts_pkg.project_context",

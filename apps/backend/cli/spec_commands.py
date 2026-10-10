@@ -13,7 +13,7 @@ _PARENT_DIR = Path(__file__).parent.parent
 if str(_PARENT_DIR) not in sys.path:
     sys.path.insert(0, str(_PARENT_DIR))
 
-from progress import count_subtasks
+from core.progress import count_subtasks
 from workspace import get_existing_build_worktree
 
 from .utils import get_specs_dir

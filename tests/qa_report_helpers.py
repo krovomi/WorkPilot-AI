@@ -27,7 +27,7 @@ _mocked_module_names: list[str] = [
     "claude_agent_sdk.client",
     "claude_agent_sdk.query",
     "ui",
-    "progress",
+    "core.progress",
     "task_logger",
     "linear_updater",
 ]
@@ -87,7 +87,7 @@ def setup_qa_report_mocks() -> None:
     mock_progress = MagicMock()
     mock_progress.count_subtasks = MagicMock(return_value=(3, 3))
     mock_progress.is_build_complete = MagicMock(return_value=True)
-    sys.modules["progress"] = mock_progress
+    sys.modules["core.progress"] = mock_progress
 
     # Mock task_logger
     mock_task_logger = MagicMock()

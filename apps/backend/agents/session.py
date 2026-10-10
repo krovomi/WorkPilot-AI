@@ -26,14 +26,14 @@ from core.agent_client import (
 )
 from core.conversation_log import append_message as _log_append_message
 from core.debug import debug, debug_detailed, debug_error, debug_section, debug_success
+from core.progress import (
+    count_subtasks_detailed,
+    is_build_complete,
+)
 from insight_extractor import extract_session_insights
 from linear_updater import (
     linear_subtask_completed,
     linear_subtask_failed,
-)
-from progress import (
-    count_subtasks_detailed,
-    is_build_complete,
 )
 from recovery import RecoveryManager
 from security.tool_input_validator import get_safe_tool_input

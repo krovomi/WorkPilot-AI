@@ -44,7 +44,7 @@ _mocked_module_names = [
     # Logging & utilities
     "core.debug",
     "ui",
-    "progress",
+    "core.progress",
     "task_logger",
     "linear_updater",
     "prompts_pkg",
@@ -68,7 +68,7 @@ for name in _mocked_module_names:
     sys.modules[name] = MagicMock()
 
 # Keep references to mocks used by tests
-mock_progress = sys.modules["progress"]
+mock_progress = sys.modules["core.progress"]
 
 # Now we can safely add the auto-claude path and import
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))

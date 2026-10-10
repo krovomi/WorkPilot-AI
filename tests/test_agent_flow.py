@@ -114,7 +114,7 @@ class TestPlannerToCoderTransition:
 
     def test_transition_from_planning_to_coding_phase(self, test_env):
         """Test that planning phase transitions to coding phase correctly."""
-        from progress import get_next_subtask
+        from core.progress import get_next_subtask
 
         _, spec_dir, _ = test_env
 
@@ -141,7 +141,7 @@ class TestPlannerToCoderTransition:
 
     def test_planner_completion_enables_coder_session(self, test_env):
         """Test that planner completion (plan created) enables coder session."""
-        from progress import count_subtasks, is_build_complete
+        from core.progress import count_subtasks, is_build_complete
 
         _, spec_dir, _ = test_env
 
@@ -477,7 +477,7 @@ class TestSubtaskStateTransitions:
 
     def test_get_next_subtask_skips_completed(self, test_env):
         """Test that get_next_subtask skips completed subtasks."""
-        from progress import get_next_subtask
+        from core.progress import get_next_subtask
 
         _, spec_dir, _ = test_env
 
@@ -503,7 +503,7 @@ class TestSubtaskStateTransitions:
 
     def test_build_complete_when_all_subtasks_done(self, test_env):
         """Test that build is complete when all subtasks are completed."""
-        from progress import is_build_complete
+        from core.progress import is_build_complete
 
         _, spec_dir, _ = test_env
 
@@ -641,7 +641,7 @@ class TestPlannerOutputValidation:
 
     def test_plan_must_have_pending_subtasks(self, test_env):
         """Test that valid plan has at least one pending subtask."""
-        from progress import get_next_subtask
+        from core.progress import get_next_subtask
 
         _, spec_dir, _ = test_env
 
@@ -656,7 +656,7 @@ class TestPlannerOutputValidation:
 
     def test_plan_without_phases_returns_none(self, test_env):
         """Test that plan without phases returns None for next subtask."""
-        from progress import get_next_subtask
+        from core.progress import get_next_subtask
 
         _, spec_dir, _ = test_env
 
@@ -675,7 +675,7 @@ class TestPlannerOutputValidation:
 
     def test_missing_plan_returns_none(self, test_env):
         """Test that missing plan file returns None."""
-        from progress import get_next_subtask
+        from core.progress import get_next_subtask
 
         _, spec_dir, _ = test_env
 
@@ -694,7 +694,7 @@ class TestSubtaskCompletionDetection:
 
     def test_count_subtasks_basic(self, test_env):
         """Test basic subtask counting."""
-        from progress import count_subtasks
+        from core.progress import count_subtasks
 
         _, spec_dir, _ = test_env
 
@@ -714,7 +714,7 @@ class TestSubtaskCompletionDetection:
 
     def test_count_subtasks_empty_plan(self, test_env):
         """Test counting with empty plan returns zeros."""
-        from progress import count_subtasks
+        from core.progress import count_subtasks
 
         _, spec_dir, _ = test_env
 
@@ -725,7 +725,7 @@ class TestSubtaskCompletionDetection:
 
     def test_count_subtasks_detailed_all_statuses(self, test_env):
         """Test detailed counting with all status types."""
-        from progress import count_subtasks_detailed
+        from core.progress import count_subtasks_detailed
 
         _, spec_dir, _ = test_env
 
@@ -749,7 +749,7 @@ class TestSubtaskCompletionDetection:
 
     def test_count_subtasks_detailed_unknown_status_treated_as_pending(self, test_env):
         """Test that unknown status values are treated as pending."""
-        from progress import count_subtasks_detailed
+        from core.progress import count_subtasks_detailed
 
         _, spec_dir, _ = test_env
 
@@ -773,7 +773,7 @@ class TestSubtaskCompletionDetection:
 
     def test_is_build_complete_true_when_all_done(self, test_env):
         """Test is_build_complete returns True when all subtasks completed."""
-        from progress import is_build_complete
+        from core.progress import is_build_complete
 
         _, spec_dir, _ = test_env
 
@@ -789,7 +789,7 @@ class TestSubtaskCompletionDetection:
 
     def test_is_build_complete_false_with_in_progress(self, test_env):
         """Test is_build_complete returns False with in_progress subtask."""
-        from progress import is_build_complete
+        from core.progress import is_build_complete
 
         _, spec_dir, _ = test_env
 
@@ -807,7 +807,7 @@ class TestSubtaskCompletionDetection:
 
     def test_is_build_complete_false_with_failed(self, test_env):
         """Test is_build_complete returns False with failed subtask."""
-        from progress import is_build_complete
+        from core.progress import is_build_complete
 
         _, spec_dir, _ = test_env
 
@@ -825,7 +825,7 @@ class TestSubtaskCompletionDetection:
 
     def test_is_build_complete_false_with_empty_plan(self, test_env):
         """Test is_build_complete returns False for empty plan."""
-        from progress import is_build_complete
+        from core.progress import is_build_complete
 
         _, spec_dir, _ = test_env
 
@@ -849,7 +849,7 @@ class TestSubtaskCompletionDetection:
 
     def test_get_progress_percentage(self, test_env):
         """Test progress percentage calculation."""
-        from progress import get_progress_percentage
+        from core.progress import get_progress_percentage
 
         _, spec_dir, _ = test_env
 
@@ -867,7 +867,7 @@ class TestSubtaskCompletionDetection:
 
     def test_get_progress_percentage_empty_plan(self, test_env):
         """Test progress percentage for empty plan is 0."""
-        from progress import get_progress_percentage
+        from core.progress import get_progress_percentage
 
         _, spec_dir, _ = test_env
 
@@ -878,7 +878,7 @@ class TestSubtaskCompletionDetection:
     def test_subtask_status_transition_to_completed(self, test_env):
         """Test detecting subtask transition from pending to completed."""
         from agents.utils import find_subtask_in_plan, load_implementation_plan
-        from progress import is_build_complete
+        from core.progress import is_build_complete
 
         _, spec_dir, _ = test_env
 
@@ -907,7 +907,7 @@ class TestSubtaskCompletionDetection:
     def test_subtask_status_transition_through_in_progress(self, test_env):
         """Test detecting subtask transition through in_progress state."""
         from agents.utils import find_subtask_in_plan, load_implementation_plan
-        from progress import count_subtasks_detailed
+        from core.progress import count_subtasks_detailed
 
         _, spec_dir, _ = test_env
 
@@ -943,7 +943,7 @@ class TestSubtaskCompletionDetection:
 
     def test_multiple_subtasks_completion_sequence(self, test_env):
         """Test completion detection as subtasks complete one by one."""
-        from progress import count_subtasks, is_build_complete
+        from core.progress import count_subtasks, is_build_complete
 
         _, spec_dir, _ = test_env
 
@@ -1005,7 +1005,7 @@ class TestSubtaskCompletionDetection:
 
     def test_get_next_subtask_returns_first_pending_after_completed(self, test_env):
         """Test get_next_subtask returns correct subtask after completions."""
-        from progress import get_next_subtask
+        from core.progress import get_next_subtask
 
         _, spec_dir, _ = test_env
 
@@ -1025,7 +1025,7 @@ class TestSubtaskCompletionDetection:
 
     def test_get_next_subtask_none_when_all_complete(self, test_env):
         """Test get_next_subtask returns None when all complete."""
-        from progress import get_next_subtask
+        from core.progress import get_next_subtask
 
         _, spec_dir, _ = test_env
 
@@ -1042,7 +1042,7 @@ class TestSubtaskCompletionDetection:
 
     def test_completion_detection_with_multi_phase_plan(self, test_env):
         """Test completion detection across multiple phases."""
-        from progress import count_subtasks, is_build_complete
+        from core.progress import count_subtasks, is_build_complete
 
         _, spec_dir, _ = test_env
 

@@ -17,7 +17,7 @@ if str(_PARENT_DIR) not in sys.path:
 # Import only what we need at module level
 # Heavy imports are lazy-loaded in functions to avoid import errors
 from core.build_signals import BuildHalted, BuildPaused
-from progress import print_paused_banner
+from core.progress import print_paused_banner
 from review import ReviewState
 from ui import (
     BuildState,
@@ -1009,7 +1009,7 @@ def handle_build_command(
             # QA skipped — if the build is complete but QA was already approved,
             # emit QA_PASSED so that frontend XState transitions from qa_review →
             # human_review instead of leaving the kanban card stuck.
-            from progress import is_build_complete
+            from core.progress import is_build_complete
 
             if is_build_complete(spec_dir) and is_qa_approved(spec_dir):
                 try:

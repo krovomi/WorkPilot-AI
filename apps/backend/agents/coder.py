@@ -41,6 +41,16 @@ try:
     )
 except ImportError:
     _ut_start_build = _ut_finish_build = _ut_record_task = None  # type: ignore[assignment]
+from core.progress import (
+    count_subtasks,
+    count_subtasks_detailed,
+    get_current_phase,
+    get_next_subtask,
+    is_build_complete,
+    print_build_complete_banner,
+    print_progress_summary,
+    print_session_header,
+)
 from linear_updater import (
     LinearTaskState,
     is_linear_enabled,
@@ -55,16 +65,6 @@ from phase_config import (
     load_task_metadata,
 )
 from phase_event import ExecutionPhase, emit_phase
-from progress import (
-    count_subtasks,
-    count_subtasks_detailed,
-    get_current_phase,
-    get_next_subtask,
-    is_build_complete,
-    print_build_complete_banner,
-    print_progress_summary,
-    print_session_header,
-)
 from prompt_generator import (
     format_context_for_prompt,
     generate_planner_prompt,

@@ -54,7 +54,7 @@ _mocked_module_names = [
     "ui.capabilities",
     "task_logger",
     "linear_updater",
-    "progress",
+    "core.progress",
     # Prompts
     "prompts_pkg",
     "prompts_pkg.project_context",
@@ -86,7 +86,7 @@ for name in _mocked_module_names:
         sys.modules[name] = MagicMock()
 
 # Set up specific mock attributes needed by tests
-mock_progress = sys.modules["progress"]
+mock_progress = sys.modules["core.progress"]
 
 
 # Configure the progress module mock to properly handle is_build_complete
