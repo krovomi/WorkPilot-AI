@@ -92,6 +92,21 @@ réglages est ramené au catalogue de ce fournisseur
 global, et demander `claude-opus-4-6` à Ollama échoue à l'appel, avec un message
 qui parle d'un modèle inconnu plutôt que du choix.
 
+Ramené **sur preuve seulement** (`adaptInheritedModelToProvider`). Le catalogue
+statique est généré et retarde sur le catalogue live, qui alimente la liste des
+réglages : le prendre pour la liste de ce que sert le fournisseur remplaçait
+« Claude Sonnet 5.5 », choisi dans les réglages, par le modèle phare
+(`claude-fable-5-1`), faute d'entrée dans le fichier généré. Un modèle hérité
+n'est remplacé que s'il est étranger au fournisseur (`isModelForeignToProvider`)
+ou, hors Claude, proposé par le catalogue d'un autre fournisseur et pas par le
+sien ; sinon il est gardé, sous la graphie du fournisseur quand le catalogue la
+connaît.
+
+L'effort résolu est transmis au runner (`--thinking-level`). L'optimiseur de
+prompts l'applique sur Claude (`core.oneshot`, `max_thinking_tokens`, 0 pour
+« aucun »), le seul client one-shot doté d'un budget de réflexion, et son chip
+« Moteur » ne l'annonce que là.
+
 **Un modèle de page voyage avec son fournisseur.** Il a été pris dans la liste
 d'un fournisseur précis : le choisir épingle ce fournisseur sur la page, et
 changer de fournisseur — ou revenir à celui des réglages — le retire
