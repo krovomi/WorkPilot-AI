@@ -684,9 +684,12 @@ Analyze this follow-up review context and provide your structured response.
         if advice := context_advice(context):
             user_message += "\n\n" + advice
         try:
-            # Use Claude Agent SDK query() with structured outputs
+            # Structured outputs through the factory: `pr_followup_reviewer`
+            # declares no tool. The options used to be built here, with an
+            # empty `allowed_tools` that denied nothing — on a prompt made of
+            # commits and comments anyone can push to the PR.
             # Reference: https://platform.claude.com/docs/en/agent-sdk/structured-outputs
-            from claude_agent_sdk import ClaudeAgentOptions, query
+            from core.simple_client import create_simple_client
             from phase_config import get_thinking_budget, resolve_model_id
 
             model_shorthand = self.config.model or "sonnet"
@@ -701,74 +704,78 @@ Analyze this follow-up review context and provide your structured response.
             )
             safe_print(f"[Followup] SDK query with output_format, model={model}")
 
-            # Iterate through messages from the query
             # Note: max_turns=2 because structured output uses a tool call + response
-            async for message in query(
-                prompt=user_message,
-                options=ClaudeAgentOptions(
-                    model=model,
-                    system_prompt="You are a code review assistant. Analyze the provided context and provide structured feedback.",
-                    allowed_tools=[],
-                    max_turns=2,  # Need 2 turns for structured output tool call
-                    max_thinking_tokens=thinking_budget,
-                    output_format={
-                        "type": "json_schema",
-                        "schema": schema,
-                    },
-                ),
-            ):
-                msg_type = type(message).__name__
+            client = create_simple_client(
+                agent_type="pr_followup_reviewer",
+                model=model,
+                system_prompt="You are a code review assistant. Analyze the provided context and provide structured feedback.",
+                max_turns=2,  # Need 2 turns for structured output tool call
+                max_thinking_tokens=thinking_budget,
+                output_format={
+                    "type": "json_schema",
+                    "schema": schema,
+                },
+            )
 
-                # SDK delivers structured output via ToolUseBlock named 'StructuredOutput'
-                # in an AssistantMessage
-                if msg_type == "AssistantMessage":
-                    content = getattr(message, "content", [])
-                    for block in content:
-                        block_type = type(block).__name__
-                        if block_type == "ToolUseBlock":
-                            tool_name = getattr(block, "name", "")
-                            if tool_name == "StructuredOutput":
-                                # Extract structured data from tool input
-                                structured_data = getattr(block, "input", None)
-                                if structured_data:
-                                    logger.info(
-                                        "[Followup] Found StructuredOutput tool use"
-                                    )
-                                    safe_print(
-                                        "[Followup] Using SDK structured output",
-                                        flush=True,
-                                    )
-                                    # Validate with Pydantic and convert
-                                    result = FollowupReviewResponse.model_validate(
-                                        structured_data
-                                    )
-                                    return self._convert_structured_to_internal(result)
+            # Iterate through messages from the session. A `return` inside
+            # the loop leaves through `async with`, which disconnects.
+            async with client:
+                await client.query(user_message)
+                async for message in client.receive_response():
+                    msg_type = type(message).__name__
 
-                    # Also check for direct structured_output attribute (SDK validated JSON)
-                    if (
-                        hasattr(message, "structured_output")
-                        and message.structured_output
-                    ):
-                        logger.info(
-                            "[Followup] Found structured_output attribute on message"
-                        )
-                        safe_print(
-                            "[Followup] Using SDK structured output (direct attribute)",
-                            flush=True,
-                        )
-                        result = FollowupReviewResponse.model_validate(
-                            message.structured_output
-                        )
-                        return self._convert_structured_to_internal(result)
+                    # SDK delivers structured output via ToolUseBlock named 'StructuredOutput'
+                    # in an AssistantMessage
+                    if msg_type == "AssistantMessage":
+                        content = getattr(message, "content", [])
+                        for block in content:
+                            block_type = type(block).__name__
+                            if block_type == "ToolUseBlock":
+                                tool_name = getattr(block, "name", "")
+                                if tool_name == "StructuredOutput":
+                                    # Extract structured data from tool input
+                                    structured_data = getattr(block, "input", None)
+                                    if structured_data:
+                                        logger.info(
+                                            "[Followup] Found StructuredOutput tool use"
+                                        )
+                                        safe_print(
+                                            "[Followup] Using SDK structured output",
+                                            flush=True,
+                                        )
+                                        # Validate with Pydantic and convert
+                                        result = FollowupReviewResponse.model_validate(
+                                            structured_data
+                                        )
+                                        return self._convert_structured_to_internal(
+                                            result
+                                        )
 
-                # Handle ResultMessage for errors
-                if msg_type == "ResultMessage":
-                    subtype = getattr(message, "subtype", None)
-                    if subtype == "error_max_structured_output_retries":
-                        logger.warning(
-                            "Claude could not produce valid structured output after retries"
-                        )
-                        return None
+                        # Also check for direct structured_output attribute (SDK validated JSON)
+                        if (
+                            hasattr(message, "structured_output")
+                            and message.structured_output
+                        ):
+                            logger.info(
+                                "[Followup] Found structured_output attribute on message"
+                            )
+                            safe_print(
+                                "[Followup] Using SDK structured output (direct attribute)",
+                                flush=True,
+                            )
+                            result = FollowupReviewResponse.model_validate(
+                                message.structured_output
+                            )
+                            return self._convert_structured_to_internal(result)
+
+                    # Handle ResultMessage for errors
+                    if msg_type == "ResultMessage":
+                        subtype = getattr(message, "subtype", None)
+                        if subtype == "error_max_structured_output_retries":
+                            logger.warning(
+                                "Claude could not produce valid structured output after retries"
+                            )
+                            return None
 
             logger.warning("No structured output received from AI")
             return None

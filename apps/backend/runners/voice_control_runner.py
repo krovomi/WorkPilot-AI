@@ -32,13 +32,12 @@ from debug import (
 from phase_config import get_thinking_budget, resolve_model_id
 
 try:
-    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+    # Availability only: clients come from `create_simple_client`.
+    import claude_agent_sdk  # noqa: F401
 
     SDK_AVAILABLE = True
 except ImportError:
     SDK_AVAILABLE = False
-    ClaudeAgentOptions = None
-    ClaudeSDKClient = None
 
 validate_platform_dependencies()
 
@@ -59,11 +58,17 @@ class VoiceControlProcessor:
         self.model_id = model_id
         self.thinking_budget = thinking_budget
         self.project_dir = project_dir
-        self.client = None
+        self.ready = False
         self.setup_client()
 
     def setup_client(self):
-        """Setup Claude SDK client"""
+        """Check the Claude SDK and a token are there for the AI path.
+
+        This used to build a client from its own options and keep it on
+        `self.client`, where nothing ever read it but `main`'s readiness
+        check. The keyword classifier `process_command` uses needs no client;
+        the AI path builds one per command (`_create_ai_client`).
+        """
         if not SDK_AVAILABLE:
             debug_error("VoiceControl", "Claude SDK not available")
             return
@@ -74,12 +79,8 @@ class VoiceControlProcessor:
                 debug_error("VoiceControl", "No authentication token available")
                 return
 
-            options = ClaudeAgentOptions(
-                model=self.model_id,
-                max_thinking_tokens=self.thinking_budget,
-            )
-            self.client = ClaudeSDKClient(options)
-            debug_success("VoiceControl", "Claude SDK client initialized")
+            self.ready = True
+            debug_success("VoiceControl", "Claude SDK available")
         except Exception as e:
             debug_error("VoiceControl", f"Failed to setup Claude client: {e}")
 
@@ -265,15 +266,19 @@ Required JSON format:
         print('__TOOL_END__:{"tool":"claude_sdk"}')
         return response_text
 
-    def _create_ai_client(self, system_prompt: str) -> ClaudeSDKClient:
+    def _create_ai_client(self, system_prompt: str):
         """Create and configure AI client for command classification (no thinking needed)"""
-        options = ClaudeAgentOptions(
+        from core.simple_client import create_simple_client
+
+        # `voice_command` declares no tool: a transcript in, a JSON command out.
+        return create_simple_client(
+            agent_type="voice_command",
             model=self.model_id,
             system_prompt=system_prompt,
+            cwd=Path(self.project_dir) if self.project_dir else None,
         )
-        return ClaudeSDKClient(options)
 
-    async def _get_ai_response(self, client: ClaudeSDKClient, user_prompt: str) -> str:
+    async def _get_ai_response(self, client, user_prompt: str) -> str:
         """Get response from AI client"""
         response_text = ""
         async with client:
@@ -391,7 +396,7 @@ async def main():
         model_id=model_id, thinking_budget=thinking_budget, project_dir=args.project_dir
     )
 
-    if not processor.client:
+    if not processor.ready:
         debug_error("VoiceControl", "Failed to initialize voice processor")
         sys.exit(1)
 

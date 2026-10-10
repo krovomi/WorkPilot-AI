@@ -59,23 +59,30 @@ CONTEXT7_TOOLS = [
 ]
 
 # Linear MCP tools for project management (when LINEAR_API_KEY is set)
+#
+# The prefix is the key the server is registered under, and every
+# registration (`create_client`, the Linear updater) names it "linear". The
+# list used to say `mcp__linear-server__…`, the name from Linear's own setup
+# guide: none of the sixteen entries matched a tool the session had, so none
+# was approved, and in a session with no one to ask every Linear call was
+# refused.
 LINEAR_TOOLS = [
-    "mcp__linear-server__list_teams",
-    "mcp__linear-server__get_team",
-    "mcp__linear-server__list_projects",
-    "mcp__linear-server__get_project",
-    "mcp__linear-server__create_project",
-    "mcp__linear-server__update_project",
-    "mcp__linear-server__list_issues",
-    "mcp__linear-server__get_issue",
-    "mcp__linear-server__create_issue",
-    "mcp__linear-server__update_issue",
-    "mcp__linear-server__list_comments",
-    "mcp__linear-server__create_comment",
-    "mcp__linear-server__list_issue_statuses",
-    "mcp__linear-server__list_issue_labels",
-    "mcp__linear-server__list_users",
-    "mcp__linear-server__get_user",
+    "mcp__linear__list_teams",
+    "mcp__linear__get_team",
+    "mcp__linear__list_projects",
+    "mcp__linear__get_project",
+    "mcp__linear__create_project",
+    "mcp__linear__update_project",
+    "mcp__linear__list_issues",
+    "mcp__linear__get_issue",
+    "mcp__linear__create_issue",
+    "mcp__linear__update_issue",
+    "mcp__linear__list_comments",
+    "mcp__linear__create_comment",
+    "mcp__linear__list_issue_statuses",
+    "mcp__linear__list_issue_labels",
+    "mcp__linear__list_users",
+    "mcp__linear__get_user",
 ]
 
 # Graphiti MCP tools for knowledge graph memory (when GRAPHITI_MCP_URL is set)
@@ -254,7 +261,10 @@ AGENT_CONFIGS = {
         "thinking_default": "high",
     },
     "spec_compaction": {
-        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS,
+        # spec/compaction.py — one phase output in the prompt, a summary out as
+        # text, in one turn. It declared Write, Edit and Bash it never used,
+        # through `create_simple_client`, which installs no hook.
+        "tools": [],
         "mcp_servers": [],
         "auto_claude_tools": [],
         "thinking_default": "medium",
@@ -420,6 +430,17 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "high",
     },
+    "pr_followup_reviewer": {
+        # runners/github/services/followup_reviewer.py — the commits, comments
+        # and reviews since the last pass are in the prompt; the verdict comes
+        # back as structured output in two turns. All of it is text other
+        # people wrote, so the session gets no tool to act on it with.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        # The caller passes the thinking level the user picked.
+        "thinking_default": "none",
+    },
     "pr_finding_validator": {
         # Standalone validator for re-checking findings against actual code
         # Called separately from orchestrator to validate findings with fresh context
@@ -509,6 +530,48 @@ AGENT_CONFIGS = {
         "mcp_servers": [],
         "auto_claude_tools": [],
         "thinking_default": "medium",
+    },
+    # ═══════════════════════════════════════════════════════════════════════
+    # ONE-SHOT FEATURES
+    # ═══════════════════════════════════════════════════════════════════════
+    # Each built its own ClaudeAgentOptions until lot L16: no denial, so the
+    # user's and the project's settings files decided what they could do.
+    # They answer in text the runner parses; none of them needs a tool.
+    "voice_command": {
+        # runners/voice_control_runner.py — one transcript in, one JSON
+        # navigation command out.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
+    "git_command": {
+        # runners/natural_language_git_runner.py — a sentence and the
+        # repository's status in the prompt, one git command out. The runner
+        # executes it, without a shell and only if it starts with `git`; the
+        # model runs nothing.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
+    "code_playground": {
+        # runners/code_playground_runner.py — an idea in, one JSON object with
+        # the playground's files out, which the runner hands to the UI as
+        # they are. The caller passes the thinking level the user picked.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
+    "linear_updater": {
+        # integrations/linear/updater.py — a focused Linear operation through
+        # Linear's MCP server, and nothing else. The server is declared rather
+        # than optional: the updater only runs once LINEAR_API_KEY is set.
+        "tools": [],
+        "mcp_servers": ["linear"],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
     },
     # ═══════════════════════════════════════════════════════════════════════
     # ROADMAP & IDEATION

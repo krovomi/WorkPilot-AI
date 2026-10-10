@@ -86,17 +86,7 @@ async def bash_security_hook(
     if not cwd:
         cwd = os.getcwd()
 
-    # Get or create security profile
-    # Note: In actual use, spec_dir would be passed through context
-    try:
-        profile = get_security_profile(Path(cwd))
-    except Exception as e:
-        # If profile creation fails, fall back to base commands only
-        print(f"Warning: Could not load security profile: {e}")
-        profile = SecurityProfile()
-        profile.base_commands = BASE_COMMANDS.copy()
-
-    allowed, reason = validate_command_line(command, profile)
+    allowed, reason = validate_command_line(command, _profile_for(Path(cwd)))
     if not allowed:
         return {
             "hookSpecificOutput": {
@@ -107,6 +97,55 @@ async def bash_security_hook(
         }
 
     return {}
+
+
+def _profile_for(project_dir: Path) -> SecurityProfile:
+    """The project's security profile, or the base commands when it cannot be
+    built: failing closed on the project's own additions, not on `ls`."""
+    # Note: In actual use, spec_dir would be passed through context
+    try:
+        return get_security_profile(project_dir)
+    except Exception as e:
+        print(f"Warning: Could not load security profile: {e}")
+        profile = SecurityProfile()
+        profile.base_commands = BASE_COMMANDS.copy()
+        return profile
+
+
+async def guardrail_refusal(
+    tool_name: str, tool_input: dict[str, Any], project_dir: Path
+) -> str | None:
+    """Why the user's guardrails deny this call, or ``None``.
+
+    `guardrails_hook`'s answer — `create_client` registers it on `Bash` and on
+    every write tool — for the providers that never reach the hook.
+    """
+    from .guardrails import guardrails_hook
+
+    verdict = await guardrails_hook(
+        {"tool_name": tool_name, "tool_input": tool_input},
+        project_root=project_dir,
+    )
+    output = verdict.get("hookSpecificOutput") or {}
+    if output.get("permissionDecision") == "deny":
+        return output.get("permissionDecisionReason") or "Refused by a guardrail"
+    return None
+
+
+async def command_refusal(command: str, project_dir: Path) -> str | None:
+    """Why `command` may not run in `project_dir`, or ``None`` when it may.
+
+    The answer `create_client`'s two `Bash` hooks give — the project's command
+    allowlist (`bash_security_hook`), then the user's guardrails — for the
+    providers that never reach them: Copilot, OpenAI and its kin, Windsurf and
+    LiteLLM run their commands through `ToolExecutor._run_command`, which
+    validated nothing. Judged on the command as the model wrote it; the
+    allowlist sees through an `rtk` prefix itself.
+    """
+    allowed, reason = validate_command_line(command, _profile_for(project_dir))
+    if not allowed:
+        return reason
+    return await guardrail_refusal("Bash", {"command": command}, project_dir)
 
 
 def validate_command(

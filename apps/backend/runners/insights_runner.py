@@ -31,13 +31,12 @@ from learning import ExplanationLevel, LearningMode, LearningModeConfig
 from phase_config import get_thinking_budget, resolve_model_id
 
 try:
-    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+    # Availability only: the client itself comes from `create_simple_client`.
+    import claude_agent_sdk  # noqa: F401
 
     SDK_AVAILABLE = True
 except ImportError:
     SDK_AVAILABLE = False
-    ClaudeAgentOptions = None
-    ClaudeSDKClient = None
 
 validate_platform_dependencies()
 
@@ -419,21 +418,21 @@ Current question: {message}"""
     )
 
     try:
-        # Build options dict - only include max_thinking_tokens if not None
-        options_kwargs = {
-            "model": resolve_model_id(model),  # Resolve via API Profile if configured
-            "system_prompt": system_prompt,
-            "allowed_tools": ["Read", "Glob", "Grep"],
-            "max_turns": 30,  # Allow sufficient turns for codebase exploration
-            "cwd": str(project_path),
-        }
+        from core.simple_client import create_simple_client
 
-        # Only add thinking tokens if the thinking level is not "none"
-        if max_thinking_tokens is not None:
-            options_kwargs["max_thinking_tokens"] = max_thinking_tokens
-
-        # Create Claude SDK client with appropriate settings for insights
-        client = ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
+        # The same `insights` declaration the other providers run under
+        # (`run_with_agent_client`). These options used to be built here, with
+        # nothing denied: the user's and the project's settings files decided
+        # what an insights chat could run. A `None` budget is the "none" level,
+        # which is also the type's default.
+        client = create_simple_client(
+            agent_type="insights",
+            model=resolve_model_id(model),  # Resolve via API Profile if configured
+            system_prompt=system_prompt,
+            cwd=project_path,
+            max_turns=30,  # Allow sufficient turns for codebase exploration
+            max_thinking_tokens=max_thinking_tokens,
+        )
 
         # Use async context manager pattern
         async with client:

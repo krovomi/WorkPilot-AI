@@ -236,7 +236,7 @@ def _copilot_fallback_model(model: str) -> str:
 
 
 # Planner/spec_writer sessions MUST finish by writing their output file
-# (implementation_plan.json) via the Write tool. On large brownfield codebases
+# (`_REQUIRED_OUTPUT_FILE`) via the Write tool. On large brownfield codebases
 # the model can burn its whole turn budget on investigation (run_command /
 # read_file / list_files) and never write the plan, making the planning phase
 # fail with "Did not create plan file". When this many turns (or fewer) remain
@@ -245,6 +245,32 @@ def _copilot_fallback_model(model: str) -> str:
 _WRITE_NUDGE_TURNS_REMAINING = 8
 # Tool names that satisfy the "produced the required output file" condition.
 _FILE_WRITE_TOOL_NAMES = ("Write", "write_file")
+# The sessions the nudges are for, and the file each must end by writing. They
+# used to fire for any session offered a write tool, and named the plan: a
+# coder or a QA fixer short of turns was told to write "implementation_plan.json
+# … with the COMPLETE JSON content" over the plan it was executing. The planner
+# has one output. `spec_writer` runs several prompts — `spec_writer.md` ends in
+# spec.md, `planner.md` and `spec_quick.md` in the plan, `complexity_assessor.md`
+# in its assessment — so its nudge points at the instructions instead of
+# guessing a name.
+_REQUIRED_OUTPUT_FILE: dict[str, str | None] = {
+    "planner": "implementation_plan.json",
+    "spec_writer": None,
+}
+
+
+def _required_output(agent_type: str | None) -> tuple[bool, str]:
+    """Whether a session of `agent_type` must end by writing a file, and how
+    a nudge names it."""
+    if agent_type not in _REQUIRED_OUTPUT_FILE:
+        return False, ""
+    name = _REQUIRED_OUTPUT_FILE[agent_type]
+    return True, (
+        f"the required output file ({name})"
+        if name
+        else "the output file your instructions require"
+    )
+
 
 # Per-request HTTP timeouts for the Copilot chat-completions call. Without an
 # explicit timeout a genuinely hung response freezes the whole agent loop
@@ -1229,10 +1255,12 @@ class CopilotAgentClient(AgentClient):
 
         session = self._get_http_client()
 
-        # Track whether this session must end by writing an output file (planner/
-        # spec_writer sessions expose the Write tool) and whether it has done so.
-        # Used to inject a budget-aware "write now" nudge before turns run out.
-        has_write_tool = any(
+        # Track whether this session must end by writing an output file (a
+        # planner or spec_writer session that was offered a write tool) and
+        # whether it has done so. Used to inject a budget-aware "write now"
+        # nudge before turns run out.
+        must_write, output_file = _required_output(self._agent_type)
+        has_write_tool = must_write and any(
             td.get("name") in _FILE_WRITE_TOOL_NAMES for td in self._tool_definitions
         )
         write_tool_used = False
@@ -1282,11 +1310,10 @@ class CopilotAgentClient(AgentClient):
                         "content": (
                             "You are about to run out of turns. STOP investigating "
                             "now — do not run any more exploration commands. "
-                            "Immediately call the Write tool to create the required "
-                            "output file (implementation_plan.json) in the spec "
-                            "directory with the COMPLETE JSON content, based on what "
-                            "you already know. This is mandatory: if you do not write "
-                            "the file now, the whole task fails."
+                            f"Immediately call the Write tool to create {output_file} "
+                            "in the spec directory with its COMPLETE content, based "
+                            "on what you already know. This is mandatory: if you do "
+                            "not write the file now, the whole task fails."
                         ),
                     }
                 )
@@ -1677,11 +1704,11 @@ class CopilotAgentClient(AgentClient):
                     continue  # retry — don't return early
 
                 # The model wants to STOP. For planner/spec_writer sessions the
-                # output file (implementation_plan.json) is mandatory, yet the
-                # model often "finishes" by DESCRIBING the plan in prose without
-                # ever calling the Write tool — leaving the planning phase to fail
-                # with "Did not create plan file". If Write is required and still
-                # unused, refuse the early stop once and force the model to write.
+                # output file is mandatory, yet the model often "finishes" by
+                # DESCRIBING the plan in prose without ever calling the Write
+                # tool — leaving the planning phase to fail with "Did not create
+                # plan file". If Write is required and still unused, refuse the
+                # early stop once and force the model to write.
                 if (
                     has_write_tool
                     and not write_tool_used
@@ -1695,11 +1722,11 @@ class CopilotAgentClient(AgentClient):
                             "role": "user",
                             "content": (
                                 "You have NOT yet created the required output file. "
-                                "Do not stop and do not just describe the plan in "
-                                "text. You MUST call the Write tool now to create "
-                                "implementation_plan.json in the spec directory with "
-                                "the COMPLETE JSON content, based on your "
-                                "investigation so far. Call the Write tool now."
+                                "Do not stop and do not just describe it in text. "
+                                "You MUST call the Write tool now to create "
+                                f"{output_file} in the spec directory with its "
+                                "COMPLETE content, based on your investigation so "
+                                "far. Call the Write tool now."
                             ),
                         }
                     )
@@ -2081,10 +2108,14 @@ class OpenAIAgentClient(AgentClient):
             return self
         # Bridge configured MCP servers (best-effort) so their tools are exposed
         # alongside the built-in toolset. Never fail client setup on MCP errors.
+        # Only the servers this type may reach: the same per-agent answer the
+        # Claude SDK gets from `create_client`.
         try:
-            from core.mcp_tools import MCPToolManager, load_mcp_server_configs
+            from core.mcp_tools import MCPToolManager, load_mcp_server_configs_for
 
-            servers = load_mcp_server_configs(self._project_dir)
+            servers = load_mcp_server_configs_for(
+                self._agent_type, self._project_dir, getattr(self, "_spec_dir", None)
+            )
             if servers:
                 manager = MCPToolManager(self._project_dir, servers)
                 await manager.connect()

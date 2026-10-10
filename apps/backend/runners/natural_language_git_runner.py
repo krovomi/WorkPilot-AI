@@ -25,13 +25,12 @@ from core.dependency_validator import validate_platform_dependencies
 from phase_config import resolve_model_id
 
 try:
-    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+    # Availability only: the client comes from `create_simple_client`.
+    import claude_agent_sdk  # noqa: F401
 
     SDK_AVAILABLE = True
 except ImportError:
     SDK_AVAILABLE = False
-    ClaudeAgentOptions = None
-    ClaudeSDKClient = None
 
 validate_platform_dependencies()
 
@@ -116,15 +115,18 @@ class NaturalLanguageGitRunner:
             user_prompt = f"Convert this natural language command to a Git command: '{self.command}'"
 
             async def _run_async() -> str:
-                options_kwargs = {
-                    "model": resolve_model_id(self.model),
-                    "system_prompt": system_prompt,
-                    "allowed_tools": [],  # No tools needed, just text generation
-                    "max_turns": 1,
-                    "cwd": str(self.project_path),
-                }
+                from core.simple_client import create_simple_client
 
-                client = ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
+                # `git_command` declares no tool: an empty `allowed_tools` here
+                # denied nothing, so the settings files decided what the
+                # session could run before the runner ran anything itself.
+                client = create_simple_client(
+                    agent_type="git_command",
+                    model=resolve_model_id(self.model),
+                    system_prompt=system_prompt,
+                    cwd=self.project_path,
+                    max_turns=1,
+                )
 
                 async with client:
                     await client.query(user_prompt)

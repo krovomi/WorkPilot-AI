@@ -139,8 +139,39 @@ def test_resume_targets_exact_thread_id(tmp_path: Path) -> None:
         "resume",
         "thread-123",
         "--json",
+        "-c",
+        'sandbox_mode="workspace-write"',
         "-",
     ]
+
+
+def test_resume_keeps_the_sandbox_of_the_type(tmp_path: Path) -> None:
+    """`exec resume` refuses `--sandbox`; without the override a resumed
+    `pr_reviewer` ran under whatever the user's config.toml said."""
+    args = build_codex_exec_args(
+        executable="codex",
+        project_dir=tmp_path,
+        model=None,
+        reasoning_effort=None,
+        prompt="continue",
+        thread_id="thread-123",
+        sandbox="read-only",
+    )
+    assert "--sandbox" not in args
+    assert args[args.index("-c") + 1] == 'sandbox_mode="read-only"'
+
+
+def test_resume_never_passes_an_unknown_sandbox(tmp_path: Path) -> None:
+    args = build_codex_exec_args(
+        executable="codex",
+        project_dir=tmp_path,
+        model=None,
+        reasoning_effort=None,
+        prompt="continue",
+        thread_id="thread-123",
+        sandbox="danger-full-access",
+    )
+    assert 'sandbox_mode="workspace-write"' in args
 
 
 def test_resume_applies_selected_model_and_effort(tmp_path: Path) -> None:

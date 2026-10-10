@@ -113,22 +113,23 @@ def build_codex_exec_args(
     # by cmd.exe on Windows.
     del project_dir, prompt
 
+    mode = sandbox if sandbox in CODEX_SANDBOXES else "workspace-write"
     if thread_id:
+        # `codex exec resume` has no `--sandbox` (codex-cli 0.162: "unexpected
+        # argument"), so the resumed session inherited the user's own setting
+        # and a `pr_reviewer` picked up again could write. The config override
+        # is read and validated there like any `sandbox_mode` in config.toml.
         args = [
             executable,
             "exec",
             "resume",
             _validated_option(thread_id, "thread id"),
             "--json",
+            "-c",
+            f'sandbox_mode="{mode}"',
         ]
     else:
-        args = [
-            executable,
-            "exec",
-            "--json",
-            "--sandbox",
-            sandbox if sandbox in CODEX_SANDBOXES else "workspace-write",
-        ]
+        args = [executable, "exec", "--json", "--sandbox", mode]
     if model:
         args.extend(["--model", _validated_option(model, "model")])
     if reasoning_effort:

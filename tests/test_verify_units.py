@@ -461,10 +461,10 @@ class TestTools:
 
     def test_the_verifier_gets_the_mcp_server_on_the_claude_path(self):
         from agents.tools_pkg.models import AGENT_CONFIGS, VERIFY_TOOLS
-        from agents.tools_pkg.permissions import _get_mcp_tools_for_servers
+        from agents.tools_pkg.permissions import mcp_tools_for_servers
 
         assert "verify" in AGENT_CONFIGS["verifier"]["mcp_servers"]
-        assert set(_get_mcp_tools_for_servers(["verify"])) == set(VERIFY_TOOLS)
+        assert set(mcp_tools_for_servers(["verify"])) == set(VERIFY_TOOLS)
         assert {t.rsplit("__", 1)[1] for t in VERIFY_TOOLS} == TOOL_NAMES
 
 
