@@ -81,6 +81,7 @@
 			"network": "Le fournisseur IA est injoignable. Vérifiez votre connexion.",
 			"timeout": "Le fournisseur IA a mis trop de temps à répondre.",
 			"provider_unavailable": "Le fournisseur sélectionné n'est pas disponible. Choisissez-en un autre dans la liste des fournisseurs.",
+			"model_unavailable": "Ce fournisseur ne connaît pas le modèle sélectionné, ou votre compte n'y a pas accès. Choisissez un autre modèle dans le sélecteur de la page.",
 			"provider_error": "Le fournisseur IA a renvoyé une erreur.",
 			"empty_response": "Le modèle a renvoyé une réponse vide. Réessayez, ou choisissez un autre modèle.",
 			"runner_missing": "Le composant backend de l'optimiseur est absent de cette installation.",
