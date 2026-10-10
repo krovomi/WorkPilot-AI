@@ -201,7 +201,7 @@ class TestAgentEntryPoint:
     @_skip_needs_real
     def test_no_parallel_parameters(self):
         """Agent entry point should not accept parallel configuration."""
-        from agent import run_autonomous_agent
+        from core.agent import run_autonomous_agent
 
         sig = inspect.signature(run_autonomous_agent)
         param_names = list(sig.parameters.keys())
@@ -217,7 +217,7 @@ class TestAgentEntryPoint:
     @_skip_needs_real
     def test_required_parameters(self):
         """Agent entry point has required parameters."""
-        from agent import run_autonomous_agent
+        from core.agent import run_autonomous_agent
 
         sig = inspect.signature(run_autonomous_agent)
         param_names = list(sig.parameters.keys())
@@ -229,18 +229,11 @@ class TestAgentEntryPoint:
     @_skip_needs_real
     def test_is_async(self):
         """Agent entry point is async."""
-        from agent import run_autonomous_agent
+        from core.agent import run_autonomous_agent
 
         assert inspect.iscoroutinefunction(run_autonomous_agent), (
             "run_autonomous_agent should be async"
         )
-
-    def test_agent_module_exists(self):
-        """Agent module file exists with correct structure."""
-        agent_path = Path(__file__).parent.parent / "apps" / "backend" / "agent.py"
-        assert agent_path.exists(), "agent.py should exist"
-        content = agent_path.read_text(encoding="utf-8")
-        assert "core.agent" in content, "agent.py should import from core.agent"
 
     def test_no_parallel_in_source(self):
         """Agent source code does not define parallel parameters."""
@@ -291,9 +284,9 @@ class TestModuleIntegrity:
     def test_agent_module_imports(self):
         """Agent module imports without errors."""
         try:
-            import agent  # noqa: F401
+            import core.agent  # noqa: F401
         except ImportError as e:
-            pytest.fail(f"agent.py failed to import: {e}")
+            pytest.fail(f"core/agent.py failed to import: {e}")
 
     def test_run_module_valid_syntax(self):
         """Run module has valid Python syntax."""

@@ -651,7 +651,7 @@ def handle_build_command(
     jev_run = jev_run or JevRun.from_env(
         JevContext("feature-build", project_dir, spec_dir)
     )
-    from agent import run_autonomous_agent, sync_spec_to_source
+    from core.agent import run_autonomous_agent, sync_spec_to_source
     from core.debug import (
         debug,
         debug_info,
@@ -1165,7 +1165,7 @@ def _handle_build_interrupt(
             one that was announced is the kind of surprise this whole refactor
             exists to remove.
     """
-    from agent import run_autonomous_agent
+    from core.agent import run_autonomous_agent
 
     # Print paused banner
     print_paused_banner(spec_dir, spec_dir.name, has_worktree=bool(worktree_manager))
