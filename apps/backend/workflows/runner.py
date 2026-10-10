@@ -452,7 +452,7 @@ def _constitution(project_dir: Path) -> str:
     its own imports for the same reason.
     """
     try:
-        from prompts import constitution_section
+        from prompts_pkg.prompts import constitution_section
 
         return constitution_section(project_dir)
     except Exception:  # noqa: BLE001 - a missing section never stops a phase
@@ -462,7 +462,7 @@ def _constitution(project_dir: Path) -> str:
 def _docintel(project_dir: Path, spec_dir: Path | None) -> str:
     """`prompts.docintel_section`, deferred for the same reason as the above."""
     try:
-        from prompts import docintel_section
+        from prompts_pkg.prompts import docintel_section
 
         return docintel_section(project_dir, spec_dir)
     except Exception:  # noqa: BLE001 - a missing section never stops a phase
@@ -478,7 +478,7 @@ def _mobile(project_dir: Path) -> str:
     that does not exist.
     """
     try:
-        from prompts import mobile_section
+        from prompts_pkg.prompts import mobile_section
 
         return mobile_section(project_dir)
     except Exception:  # noqa: BLE001 - a missing section never stops a phase
@@ -495,7 +495,7 @@ def _uiux(spec_dir: Path, phase_id: str) -> str:
     """
     role = "qa" if CONFIG_PHASE.get(phase_id) == "qa" else "phase"
     try:
-        from prompts import uiux_section
+        from prompts_pkg.prompts import uiux_section
 
         return uiux_section(spec_dir, role=role)
     except Exception:  # noqa: BLE001 - a missing section never stops a phase

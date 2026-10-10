@@ -109,7 +109,7 @@ async def run_followup_planner(
     from integrations.jev.models import JevContext
     from integrations.jev.rubrics import advice_text, classification_hint
     from integrations.jev.runtime import JevRun
-    from prompts import get_followup_planner_prompt
+    from prompts_pkg.prompts import get_followup_planner_prompt
 
     jev_run = jev_run or JevRun.from_env(
         JevContext("feature-build", project_dir, spec_dir)

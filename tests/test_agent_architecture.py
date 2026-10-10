@@ -65,7 +65,7 @@ _mocked_module_names = [
     "linear_updater",
     "core.progress",
     # Prompts
-    "prompts",
+    "prompts_pkg.prompts",
     "prompts_pkg",
     "prompts_pkg.project_context",
     "prompt_generator",

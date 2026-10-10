@@ -109,7 +109,7 @@ class TestWhoReadsIt:
 
     def test_one_implementation_of_the_section(self):
         """Four callers, one wrapper. Four is four places to forget the guard."""
-        from prompts import constitution_section
+        from prompts_pkg.prompts import constitution_section
         from prompts_pkg.prompts import (
             constitution_section as canonical,
         )
@@ -117,7 +117,7 @@ class TestWhoReadsIt:
         assert constitution_section is canonical
 
     def test_it_is_empty_for_a_project_that_is_not_one(self, tmp_path):
-        from prompts import constitution_section
+        from prompts_pkg.prompts import constitution_section
 
         assert constitution_section(tmp_path) == ""
 

@@ -71,7 +71,7 @@ from prompt_generator import (
     generate_subtask_prompt,
     load_subtask_context,
 )
-from prompts import (
+from prompts_pkg.prompts import (
     constitution_section,
     docintel_section,
     is_first_run,

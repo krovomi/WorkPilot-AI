@@ -97,7 +97,7 @@ class TestPlannerToCoderTransition:
 
     def test_first_run_flag_indicates_planner_mode(self, test_env):
         """Test that first_run=True indicates planner mode."""
-        from prompts import is_first_run
+        from prompts_pkg.prompts import is_first_run
 
         _, spec_dir, _ = test_env
 
