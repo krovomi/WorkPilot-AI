@@ -20,6 +20,9 @@ What is behind the door:
     and the pipeline generator read; ``detect_languages`` caches per project.
 ``detect_project_type``
     The application kind the validation strategy is chosen by.
+``detect_markers``
+    Which of a caller's marker rules appear anywhere in the tree — the flaky
+    test scan's "which test report does this stack emit".
 ``detect_api_stack``
     The HTTP framework (ASP.NET Core, Spring, FastAPI…), for API test drafts
     and the verify loop's endpoints.
@@ -36,6 +39,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +48,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "detect_api_stack",
     "detect_languages",
+    "detect_markers",
     "detect_project_stack",
     "detect_project_type",
     "frameworks",
@@ -56,6 +61,36 @@ __all__ = [
 # Stack detection touches the filesystem; the answer does not change during a
 # run, and create_client is called once per phase.
 _STACK_CACHE: dict[str, list[str]] = {}
+
+
+def detect_markers(
+    project_dir: Path | str,
+    rules: list[tuple[str, tuple[str, ...]]],
+    ignores: set[str] | frozenset[str] = frozenset(),
+    max_files: int = 20000,
+) -> list[str]:
+    """Labels of ``rules`` whose markers appear anywhere in the tree, in order.
+
+    A marker is a file name (``go.mod``) or an extension glob (``*.csproj``).
+    One pruned walk serves every rule, and it stops once ``max_files`` names
+    have been seen: enough to identify a stack on a very large monorepo.
+    """
+    filenames: set[str] = set()
+    extensions: set[str] = set()
+    for _dirpath, dirnames, files in os.walk(project_dir):
+        dirnames[:] = [d for d in dirnames if d not in ignores]
+        for name in files:
+            filenames.add(name)
+            extensions.add(Path(name).suffix.lower())
+        if len(filenames) > max_files:
+            break
+
+    def _hit(marker: str) -> bool:
+        if marker.startswith("*."):
+            return marker[1:].lower() in extensions
+        return marker in filenames
+
+    return [label for label, markers in rules if any(_hit(m) for m in markers)]
 
 
 def _read(path: Path) -> str:
@@ -297,7 +332,7 @@ def detect_api_stack(project_dir: Path) -> tuple[str, str]:
 def detect_languages(project_dir: Path | str | None) -> list[str]:
     """Languages present in ``project_dir``, or [] when it cannot be determined.
 
-    Reuses ``detect_project_stack`` rather than adding a fourth stack detector
+    Reads ``detect_project_stack`` rather than adding another stack detector
     to this repo. Import failures degrade to "no overlay", never to an error:
     a missing specialisation is a worse roster, a raised exception is a broken
     build.
@@ -310,8 +345,6 @@ def detect_languages(project_dir: Path | str | None) -> list[str]:
 
     languages: list[str] = []
     try:
-        from runners.pipeline_generator_runner import detect_project_stack
-
         languages = list(detect_project_stack(Path(key)).get("languages") or [])
     except Exception as exc:
         logger.debug("stack detection unavailable for %s: %s", key, exc)

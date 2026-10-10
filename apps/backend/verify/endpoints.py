@@ -271,7 +271,8 @@ def touched_operations(
         return []
     try:
         from docintel.api_capture import ApiExchange
-        from docintel.api_tests import detect_api_stack, find_handler
+        from docintel.api_tests import find_handler
+        from project.stack import detect_api_stack
     except Exception:  # noqa: BLE001
         return []
     app_dir = Path(project_dir) / root

@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -278,34 +277,18 @@ _LANGUAGE_REPORT_HINTS: list[tuple[str, tuple[str, ...], str]] = [
 _MAX_SCANNED_FILES = 20000
 
 
-def _scan_markers(project_path: Path) -> tuple[set[str], set[str]]:
-    """Single pruned walk collecting seen filenames and extensions."""
-    filenames: set[str] = set()
-    extensions: set[str] = set()
-    for dirpath, dirnames, files in os.walk(project_path):
-        dirnames[:] = [d for d in dirnames if d not in DEFAULT_IGNORES]
-        for name in files:
-            filenames.add(name)
-            extensions.add(Path(name).suffix.lower())
-        if len(filenames) > _MAX_SCANNED_FILES:
-            break
-    return filenames, extensions
-
-
-def _marker_matches(marker: str, filenames: set[str], extensions: set[str]) -> bool:
-    if marker.startswith("*."):
-        return marker[1:].lower() in extensions
-    return marker in filenames
-
-
 def _detect_languages(project_path: Path) -> list[tuple[str, str]]:
     """Detect project languages, returning ``(label, report_command)``."""
-    filenames, extensions = _scan_markers(project_path)
-    detected: list[tuple[str, str]] = []
-    for label, markers, command in _LANGUAGE_REPORT_HINTS:
-        if any(_marker_matches(m, filenames, extensions) for m in markers):
-            detected.append((label, command))
-    return detected
+    from project.stack import detect_markers
+
+    commands = {label: command for label, _markers, command in _LANGUAGE_REPORT_HINTS}
+    found = detect_markers(
+        project_path,
+        [(label, markers) for label, markers, _command in _LANGUAGE_REPORT_HINTS],
+        ignores=DEFAULT_IGNORES,
+        max_files=_MAX_SCANNED_FILES,
+    )
+    return [(label, commands[label]) for label in found]
 
 
 def _no_reports_message(project_path: Path) -> str:
