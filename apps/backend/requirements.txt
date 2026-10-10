@@ -2,7 +2,7 @@
 # SDK 0.1.25+ required for improved tool use concurrency handling
 # Earlier versions had 400 errors when tool_use blocks had partial failures
 # Utiliser le nom correct du package (tiret) pour l'installation via pip
-claude-agent-sdk>=0.2.157
+claude-agent-sdk>=0.2.163
 python-dotenv>=1.2.4
 
 # Local multilingual Kanban dictation (explicit model download from the UI).
@@ -60,7 +60,7 @@ bandit>=1.9.4
 # pip-audit for dependency vulnerability scanning (optional but recommended)
 # Install separately: pip install pip-audit
 
-fastapi>=0.141.1
+fastapi>=0.142.2
 uvicorn[standard]>=0.54.0
 slowapi>=0.1.10
 
@@ -92,7 +92,7 @@ msrest>=0.7.1           # Required by azure-devops SDK
 defusedxml>=0.7.1
 
 # Anthropic SDK for Claude API integration
-anthropic>=1.8.0
+anthropic>=1.11.0
 
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:
