@@ -92,6 +92,24 @@ réglages est ramené au catalogue de ce fournisseur
 global, et demander `claude-opus-4-6` à Ollama échoue à l'appel, avec un message
 qui parle d'un modèle inconnu plutôt que du choix.
 
+**Un modèle de page voyage avec son fournisseur.** Il a été pris dans la liste
+d'un fournisseur précis : le choisir épingle ce fournisseur sur la page, et
+changer de fournisseur — ou revenir à celui des réglages — le retire
+(`setPageLlmOverride`). Avant, Ollama + `gemma4:12b` puis Claude laissait
+`claude · gemma4:12b` dans `pageLlmOverrides`, et l'optimiseur de prompts
+recevait du CLI « There's an issue with the selected model ». Les réglages déjà
+écrits ainsi sont lus avec la même règle : un modèle de page qui appartient
+**sans doute possible** à un autre fournisseur (`isModelForeignToProvider` : un
+non-`claude-*` pour Claude, un id Anthropic natif ailleurs) est écarté au profit
+du modèle hérité. Un modèle simplement absent du catalogue statique ne l'est
+pas — un tag Ollama tiré à la main, une sortie récente du catalogue live ou une
+passerelle comme Copilot le proposent légitimement.
+
+Côté backend, `core.oneshot` ne prend plus le message d'erreur que le CLI Claude
+émet à la place d'une réponse (un message assistant marqué `error`, par exemple
+`model_not_found`) pour la complétion : c'est une erreur, remontée par
+`on_error` avec son code (`model_unavailable` pour un modèle inconnu).
+
 **Le jeu de pages est fermé** (`PAGE_LLM_FEATURES`). Une page y entre le jour où
 son runner lit la réponse ; un sélecteur qui promet ce que le runner ignore est
 pire que pas de sélecteur. Aujourd'hui : `insights`, `ideation`, `roadmap`,
