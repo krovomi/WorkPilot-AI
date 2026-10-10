@@ -292,10 +292,10 @@ export function AgentProfileSettings() {
 		return model?.label || modelValue;
 	};
 
-	const getThinkingLabel = (thinkingValue: string): string => {
-		const level = THINKING_LEVELS.find((l) => l.value === thinkingValue);
-		return level?.label || thinkingValue;
-	};
+	const getThinkingLabel = (thinkingValue: string): string =>
+		THINKING_LEVELS.some((l) => l.value === thinkingValue)
+			? t(`general.thinkingLevels.${thinkingValue}`)
+			: thinkingValue;
 
 	/**
 	 * Render a single profile card (Claude only)
@@ -591,7 +591,7 @@ export function AgentProfileSettings() {
 																	key={level.value}
 																	value={level.value}
 																>
-																	{level.label}
+																	{t(`general.thinkingLevels.${level.value}`)}
 																</SelectItem>
 															))}
 														</SelectContent>

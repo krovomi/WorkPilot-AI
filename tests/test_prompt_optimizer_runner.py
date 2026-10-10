@@ -199,3 +199,24 @@ def test_context_is_bounded(runner, tmp_path):
     from core.project_brief import CONTEXT_BUDGET
 
     assert len(runner.gather_project_context(tmp_path)) <= CONTEXT_BUDGET + 5
+
+
+def test_the_page_effort_reaches_the_completion(runner, monkeypatch, capsys, tmp_path):
+    # `--thinking-level` used to be "accepted for parity; unused": the dialog
+    # could show an effort the run never applied.
+    _, _, seen = drive(
+        runner,
+        monkeypatch,
+        capsys,
+        [
+            "--project-dir",
+            str(tmp_path),
+            "--prompt",
+            "ajoute users",
+            "--thinking-level",
+            "none",
+        ],
+        chunks=[TAGGED],
+    )
+
+    assert seen["kwargs"]["thinking_level"] == "none"
