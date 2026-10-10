@@ -603,13 +603,13 @@ class TestCopilotWriteNowNudge:
     turns remain — and must NOT inject it once the plan has been written.
     """
 
-    def _make_client(self, max_turns: int):
+    def _make_client(self, max_turns: int, agent_type: str = "spec_writer"):
         client = CopilotAgentClient(
             model="claude-sonnet-4.6",
             cwd=".",
             max_turns=max_turns,
             github_token="ghp_test",
-            agent_type="spec_writer",
+            agent_type=agent_type,
         )
         # Expose the Write tool, as get_tool_definitions does for spec_writer.
         client._tool_definitions = [
@@ -811,6 +811,59 @@ class TestCopilotWriteNowNudge:
             call.args[0] for call in client._tool_executor.execute.await_args_list
         ]
         assert "Write" in executed_tools
+
+    def _investigate_then_stop(self, agent_type: str) -> list:
+        """Investigate past the nudge window, stop once in prose, then for
+        good; return every payload sent."""
+        client = self._make_client(20, agent_type)
+        responses = [("", self._run_command_call(i), "tool_calls") for i in range(14)]
+        responses += [("done", [], "stop"), ("done", [], "stop")]
+        captured: list = []
+        client._get_http_client = lambda: self._fake_session(responses, captured)
+
+        async def _drive():
+            client._pending_query = "work"
+            async for _ in client.receive_response():
+                pass
+
+        asyncio.run(_drive())
+        return [msg for payload in captured for msg in payload]
+
+    @pytest.mark.parametrize("agent_type", ["coder", "qa_fixer", "ideation"])
+    def test_a_session_with_no_required_file_is_never_told_to_write_the_plan(
+        self, agent_type
+    ):
+        """Audit F45. A coder short of turns was told to write
+        implementation_plan.json "with the COMPLETE JSON content" — over the
+        plan it was executing."""
+        messages = self._investigate_then_stop(agent_type)
+        nudges = [
+            m
+            for m in messages
+            if m.get("role") == "user"
+            and (
+                "STOP investigating" in m.get("content", "")
+                or "call the write tool now" in m.get("content", "").lower()
+            )
+        ]
+        assert not nudges
+
+    def test_the_planner_is_told_the_plan(self):
+        messages = self._investigate_then_stop("planner")
+        nudge = next(
+            m for m in messages if "STOP investigating" in m.get("content", "")
+        )
+        assert "implementation_plan.json" in nudge["content"]
+
+    def test_the_spec_writer_is_pointed_at_its_instructions(self):
+        """`spec_writer` runs spec_writer.md (spec.md), planner.md (the plan),
+        complexity_assessor.md…: the nudge cannot name one file for all."""
+        messages = self._investigate_then_stop("spec_writer")
+        nudge = next(
+            m for m in messages if "STOP investigating" in m.get("content", "")
+        )
+        assert "implementation_plan.json" not in nudge["content"]
+        assert "your instructions require" in nudge["content"]
 
 
 class TestCopilotRequestRetry:

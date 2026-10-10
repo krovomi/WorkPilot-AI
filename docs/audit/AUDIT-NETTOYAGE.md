@@ -122,9 +122,10 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L13 | P4 | Surface produit | F19 | tous |
 | L14 | P1 | Événements et appels IPC perdus en silence — **fait** | F37 | — |
 | L15 | P1 | Droits effectifs et succès silencieux — **fait** | F39, F40 | L5 |
-| L16 | P1 | Droits hors de `create_client` | F41, F42, F43, F44, F45 | L15 |
+| L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
+| L17 | P0 | Self-healing : un correctif annoncé sans avoir été fait | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L6, L5, L14, L4, L15 (faits) → L16 → L7, L8, L9 → L10, L11, L12 → L13.
+Ordre recommandé : L1, L2, L3, L6, L5, L14, L4, L15, L16 (faits) → L17 → L7, L8, L9 → L10, L11, L12 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -578,6 +579,9 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
       chargé par rien (`requirements.json` est construit en Python) ;
     - `ParallelOrchestratorReviewer._create_sdk_client` et `_define_specialist_agents` ne sont
       appelés nulle part.
+  - Trouvé pendant le lot L16 : le chemin IA du runner vocal (`_process_with_ai`,
+    `_create_ai_client`, `_build_user_prompt`, `_parse_ai_response`) n'est appelé que par ses tests,
+    le classement se fait par mots-clés (`_classify_command`).
 - **Vérification** : `pytest tests/ -q`, `ruff check apps/backend/`.
 
 #### F30 · 25 shims de compatibilité à la racine du backend
@@ -848,61 +852,145 @@ rejoue. Les droits construits hors de `create_client` sont le lot L16.
 
 ### Lot L16 — Droits hors de `create_client` (P1)
 
-Trouvés pendant L15 : ce que le lot n'a pas touché parce que ces chemins ne passent ni par
-`create_client` ni par la déclaration d'un type.
+**Fait.** Un seul endroit construit les options du SDK, et ce que le SDK vérifie (liste autorisée,
+garde-fous de l'utilisateur, serveurs MCP par type, sandbox) est vérifié aussi chez les
+fournisseurs qui ne passent pas par lui. Deux défauts trouvés en chemin sont corrigés dans le
+même lot (F46, F47) ; un troisième, hors du thème, ouvre le lot L17.
 
 #### F41 · Huit constructions de `ClaudeAgentOptions` hors de `create_client`
 
-- **Sévérité** moyenne · **nouveau** (trouvé pendant L15) · **lu**
-- **Preuve** : `runners/insights_runner.py:436`, `runners/voice_control_runner.py:77` et `:270`,
-  `integrations/linear/updater.py:144`, `runners/natural_language_git_runner.py:127`,
-  `runners/code_playground_runner.py:184`, `runners/github/services/followup_reviewer.py:708`,
-  `agents/tools_pkg/__init__.py:25`. Aucun ne passe `disallowed_tools`, ni les hooks de sécurité de
-  `create_client` ; leur `allowed_tools` n'est qu'une approbation.
-- **Étapes** : passer par `create_client` (ou `create_simple_client`) avec un `agent_type`
-  enregistré ; à défaut, appeler `undeclared_builtin_tools` et poser les hooks.
-- **Garde-fou** : un test qui interdit `ClaudeAgentOptions(` hors de `core/client.py` et
-  `core/simple_client.py`.
+- **Corrigé par le lot L16.**
+- **Ce que le cahier ne voyait pas** :
+  - `create_simple_client` n'installe aucun hook, et deux chemins y menaient des types qui
+    écrivent ou lancent des commandes : `spec_compaction` déclarait Write, Edit et Bash pour
+    résumer un texte en un tour, et le planner de suivi (`agents/planner.py`) passait par
+    `create_agent_runtime` → `ClaudeSDKRuntime` → `create_simple_client(agent_type="planner")`
+    (F46) ;
+  - `agents/tools_pkg/__init__.py:25` est un exemple de docstring, pas un appel ;
+  - `src/connectors/llm_claude.py` en construit une neuvième ; elle n'atteint aucune session
+    (`ClaudeSDKClient.query_sync` n'existe pas) et part avec F32 (lot L9).
+- **Correction** :
+  - Chaque site passe par `create_simple_client` avec un type enregistré, sans outil : `insights`
+    (déjà utilisé par le chemin hors Claude du même runner), `voice_command`, `git_command`,
+    `code_playground`, `linear_updater` (le serveur Linear déclaré), `pr_followup_reviewer`
+    (sortie structurée, aucun outil sur un prompt fait de commentaires de PR). Rosters : `solo`.
+  - `create_simple_client` refuse un type qui déclare Write, Edit ou Bash (`hooked_grants`) avant
+    toute configuration, et n'accepte un serveur MCP que si le type le déclare ; ses outils sont
+    alors approuvés. `spec_compaction` ne déclare plus rien.
+  - Le runner vocal gardait un client que personne n'utilisait, comme drapeau de disponibilité :
+    c'est un booléen, et le client est créé par commande.
+- **Garde-fous** : `tests/test_sdk_options_factories.py` — aucun appel à `ClaudeAgentOptions(` ni
+  à `ClaudeSDKClient(` hors des deux fabriques (exemption datée pour `llm_claude.py`, qui tombe
+  avec le fichier) ; tout type à hooks refusé ; tout `create_simple_client(agent_type=…)` et tout
+  `create_agent_runtime(agent_type=…)` littéral sans hooks ; options capturées des sites migrés.
 
 #### F42 · Le pont MCP hors SDK offre tous les serveurs personnalisés à tous les types
 
-- **Sévérité** moyenne · **nouveau** (trouvé pendant L15) · **lu**
-- **Preuve** : `OpenAIAgentClient.__aenter__` (`core/agent_client.py:2082-2100`) charge
-  `load_mcp_server_configs` (`CUSTOM_MCP_SERVERS`) et ajoute tous leurs outils, quel que soit le
-  type. Côté SDK, `create_client` n'ajoute un serveur personnalisé que si `get_required_mcp_servers`
-  le retient pour ce type (`AGENT_MCP_<type>_ADD`, `core/client.py:1286-1293`).
-- **Étapes** : filtrer les serveurs du pont par `get_required_mcp_servers(agent_type, …)`, la même
-  réponse que le SDK.
+- **Corrigé par le lot L16.**
+- **Ce que le cahier ne voyait pas** : le pont validait les serveurs avec son propre contrôle,
+  qui acceptait n'importe quelle commande (`bash -c …`, un chemin, `python -c`, un champ `env`).
+  Le SDK les passe par `_validate_custom_mcp_server` (`id` et `name`, lanceur parmi npx, node,
+  python, uv…, aucun drapeau qui évalue du code, aucun champ hors schéma) et refuse de les
+  démarrer.
+- **Correction** : `core/mcp_tools.load_mcp_server_configs_for(agent_type, …)` applique les deux
+  étapes du SDK — le validateur, puis `get_required_mcp_servers` (un serveur rejoint un type que
+  le projet lui ajoute, `AGENT_MCP_<type>_ADD`, le réglage par agent du panneau Agent Tools).
+  `OpenAIAgentClient` et ses héritiers ne connectent plus que ceux-là.
+- **Changement visible** : un serveur personnalisé n'atteint plus un agent hors SDK sans être
+  ajouté à cet agent, comme sur Claude.
+- **Garde-fou** : `tests/test_non_sdk_rights.py` (`TestTheBridgeOffersWhatTheTypeIsGiven`),
+  dont la comparaison directe avec la réponse du SDK pour quatre types.
 
 #### F43 · `run_command` n'a aucun validateur de sécurité hors SDK
 
-- **Sévérité** haute · **nouveau** (trouvé pendant L15) · **lu**
-- **Preuve** : `ToolExecutor._run_command` (`core/runtimes/tool_executor.py:504`) exécute la commande
-  en shell ; son docstring dit « the command itself is not sanitized ». Côté SDK,
-  `bash_security_hook` juge chaque commande contre la liste autorisée du projet.
-- **Étapes** : appeler le même validateur (`security/`) avant `create_subprocess_shell`, et
-  renvoyer son refus au modèle comme le fait déjà le refus d'outil non déclaré.
-- **À préserver** : la réécriture rtk, qui doit rester appliquée après la validation de la
-  commande déballée (`unwrap_rtk_prefixes`).
+- **Corrigé par le lot L16.**
+- **Ce que le cahier ne voyait pas** : `create_client` pose deux hooks sur `Bash` — la liste
+  autorisée et les garde-fous de l'utilisateur (`.workpilot/guardrails.yaml`) — et le second
+  aussi sur chaque outil d'écriture. Hors SDK, ni l'un ni l'autre.
+- **Correction** :
+  - `security.hooks.command_refusal` : `validate_command_line` sur le profil du projet (repli sur
+    les commandes de base, comme le hook), puis `guardrail_refusal("Bash", …)`, qui appelle
+    `guardrails_hook` lui-même. `ToolExecutor._run_command` l'interroge avant de lancer quoi que
+    ce soit et renvoie le refus au modèle, comme pour un outil non déclaré.
+  - La réécriture rtk vient après le verdict, comme sur le SDK où son hook est enregistré
+    derrière les deux qui décident ; la liste autorisée voit à travers un préfixe `rtk`.
+  - `_write_file` passe par `guardrail_refusal("Write", …)` avant le nettoyage des filigranes,
+    l'ordre du SDK.
+- **Effet de bord** : `tests/test_local_command_execution.py` lançait `python -c` dans un
+  répertoire vide, ce que la liste autorisée refuse ; ses tests de processus tournent désormais
+  dans un projet Python.
+- **Garde-fou** : `tests/test_non_sdk_rights.py` (`TestACommandPassesTheChecksTheSdkApplies`,
+  `TestAWritePassesTheGuardrailsTheSdkApplies`) — même raison que `bash_security_hook`, commande
+  refusée jamais lancée, préfixe `rtk` sans effet, garde-fou de commande, de chemin et de contenu,
+  réécriture seulement après le verdict.
 
 #### F44 · La reprise Codex n'a pas de sandbox
 
-- **Sévérité** moyenne · **nouveau** (trouvé pendant L15) · **lu**
-- **Preuve** : `build_codex_exec_args` (`core/codex_cli_client.py`) ne passe `--sandbox` que sans
-  `thread_id` ; `codex exec resume` hérite du réglage de l'utilisateur. Un `pr_reviewer` repris
-  peut donc écrire. `test_codex_cli_client` fige l'absence de drapeau.
-- **Étapes** : vérifier quel réglage `codex exec resume` accepte (`--sandbox` ou
-  `-c sandbox_mode=…`) sur la version installée, le passer, mettre à jour le test.
+- **Corrigé par le lot L16.** Vérifié sur codex-cli 0.162.1 : `codex exec resume --sandbox …`
+  échoue (« unexpected argument »), `-c sandbox_mode="…"` est lu et validé (une valeur inconnue
+  est rejetée).
+- **Correction** : `build_codex_exec_args` passe `-c sandbox_mode="<mode>"` à la reprise, avec le
+  mode de `codex_sandbox_for` ; une nouvelle session garde `--sandbox`.
+- **Garde-fou** : `tests/test_codex_cli_client.py` (la reprise porte le mode du type, jamais un
+  mode inconnu).
 
 #### F45 · Copilot demande `implementation_plan.json` à toute session qui peut écrire
 
-- **Sévérité** basse · **nouveau** (trouvé pendant L15) · **lu**
-- **Preuve** : `has_write_tool` (`core/agent_client.py:1235`) vaut pour tout type à qui `Write` ou
-  `write_file` est offert, et les deux relances (`:1280-1290`, `:1695-1702`) exigent
-  `implementation_plan.json`. Depuis L15, un type en lecture seule n'est plus relancé ; un `coder`,
-  un `qa_fixer` ou l'idéation le sont encore, vers le mauvais fichier.
-- **Étapes** : relancer seulement `planner` et `spec_writer`, ou nommer le fichier de sortie que la
-  session attend.
+- **Corrigé par le lot L16.**
+- **Ce que le cahier ne voyait pas** : la relance n'était pas seulement inutile, elle était
+  dangereuse — un `coder` ou un `qa_fixer` à court de tours recevait l'ordre d'écrire
+  `implementation_plan.json` « avec le contenu JSON COMPLET », soit le plan qu'il exécutait. Et
+  `spec_writer` n'a pas un fichier de sortie : `spec_writer.md` finit par `spec.md`, `planner.md`
+  et `spec_quick.md` par le plan, `complexity_assessor.md` par son évaluation.
+- **Correction** : `_REQUIRED_OUTPUT_FILE` — les relances visent `planner` (qui reçoit le nom
+  du plan) et `spec_writer` (renvoyé au fichier que ses instructions exigent), rien d'autre.
+- **Garde-fou** : `tests/test_copilot_integration.py` (`TestCopilotWriteNowNudge`) — ni
+  `coder`, ni `qa_fixer`, ni `ideation` relancés ; le planner nommé ; `spec_writer` sans nom.
+
+#### F46 · Le planner de suivi n'a jamais tourné
+
+- **Sévérité** haute · **nouveau** (trouvé pendant L16) · **corrigé par le lot L16**
+- **Preuve** : `run_followup_planner` (`agents/planner.py`, `--followup` du CLI) passait le
+  résultat de `create_agent_runtime` à `run_agent_session`. Aucun `AgentRuntime`
+  (`ClaudeSDKRuntime`, `LiteLLMRuntime`, `CopilotRuntime`) n'a `query` ni `receive_response` :
+  la session échouait au premier appel, sur tous les fournisseurs. Sur Claude, le runtime
+  construisait en outre un `create_simple_client(agent_type="planner")` — Write, Edit et Bash
+  sans aucun hook — limité à dix tours.
+- **Correction** : `_create_planning_client` — `create_agent_client(agent_type="planner")`, la
+  fabrique de la première planification (`agents/coder.py`), avec la même résolution du
+  fournisseur ; un client par tentative, si bien qu'une reprise après limite de débit ou un
+  changement de moteur à chaud ouvre sa propre session.
+- **Reste** : `create_agent_runtime` ne sert plus qu'à l'extracteur d'insights, qui appelle
+  `run_session` ; candidat à la consolidation (L11).
+
+#### F47 · Aucun outil Linear n'était approuvé
+
+- **Sévérité** moyenne · **nouveau** (trouvé pendant L16) · **corrigé par le lot L16**
+- **Preuve** : `LINEAR_TOOLS` nommait `mcp__linear-server__…` (le nom du guide de Linear) alors
+  que `create_client` et la mise à jour Linear enregistrent le serveur sous `linear` : aucune des
+  seize approbations ne désignait un outil existant, et dans une session sans personne à qui
+  demander, chaque appel Linear était refusé. Les prompts citaient les mêmes noms.
+- **Correction** : préfixe `mcp__linear__` dans la liste et dans les prompts
+  (`integrations/linear/`).
+- **Garde-fou** : `TestEveryApprovedMcpToolNamesAServerTheSessionHas` — sur `create_client`, tout
+  outil MCP approuvé nomme un serveur de la session.
+
+### Lot L17 — Self-healing : un correctif annoncé sans avoir été fait (P0)
+
+#### F48 · Le pipeline de self-healing rapporte un correctif, une QA et une PR qu'il n'a pas faits
+
+- **Sévérité** haute · **nouveau** (trouvé pendant L16) · **lu**
+- **Preuve** : `self_healing/incident_responder/orchestrator.py` — l'étape « Generating fix in
+  isolated worktree » se termine `completed` sans lancer d'agent (« This is a placeholder for the
+  pipeline integration point »), « Running QA validation » se termine « QA validation passed »
+  sans rien valider, « Creating pull request » se termine « PR created » sans en créer, puis
+  l'incident reçoit `resolved_at` et `finalize(success=True)`. Seule la vérification d'exécution
+  (`_verify_runtime`) est réelle.
+- **Étapes** : câbler l'étape de correctif (session `create_agent_client` dans un worktree, puis
+  la boucle QA existante et la création de PR du runner GitHub) **ou** marquer ces étapes
+  `skipped` et l'incident non résolu tant qu'elles ne sont pas câblées. Une étape qui n'a rien
+  fait ne s'affiche jamais `completed`.
+- **À préserver** : la détection d'incidents, la vérification d'exécution et le cycle hermes.
 
 ---
 
@@ -1049,4 +1137,4 @@ Trouvés pendant L15 : ce que le lot n'a pas touché parce que ces chemins ne pa
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F39 et F40 (L15) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.
