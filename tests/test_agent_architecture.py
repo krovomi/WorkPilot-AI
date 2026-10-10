@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 # ---------------------------------------------------------------------------
 # Module-level sys.modules mocking
 # ---------------------------------------------------------------------------
-# Several test classes import `agent` and `auto_claude_tools`, which pull in
+# Several test classes import `core.agent` and `agents.tools_pkg`, which pull in
 # deep dependency chains (core.agent, agents.tools_pkg, etc.) that require
 # packages not installed in the CI test environment.  Pre-populate
 # sys.modules so Python's import machinery never attempts real resolution.
@@ -358,7 +358,7 @@ class TestElectronToolScoping:
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
 
         # Re-import to pick up env change
-        from auto_claude_tools import ELECTRON_TOOLS, get_allowed_tools
+        from agents.tools_pkg import ELECTRON_TOOLS, get_allowed_tools
 
         # Must pass is_electron=True for Electron tools to be included
         qa_tools = get_allowed_tools(
@@ -381,7 +381,7 @@ class TestElectronToolScoping:
         """QA fixer gets Electron tools when ELECTRON_MCP_ENABLED=true and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
 
-        from auto_claude_tools import ELECTRON_TOOLS, get_allowed_tools
+        from agents.tools_pkg import ELECTRON_TOOLS, get_allowed_tools
 
         qa_fixer_tools = get_allowed_tools(
             "qa_fixer", project_capabilities={"is_electron": True}
@@ -401,7 +401,7 @@ class TestElectronToolScoping:
         """Coder should NOT get Electron tools even when enabled and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
 
-        from auto_claude_tools import get_allowed_tools
+        from agents.tools_pkg import get_allowed_tools
 
         coder_tools = get_allowed_tools(
             "coder", project_capabilities={"is_electron": True}
@@ -418,7 +418,7 @@ class TestElectronToolScoping:
         """Planner should NOT get Electron tools even when enabled and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
 
-        from auto_claude_tools import get_allowed_tools
+        from agents.tools_pkg import get_allowed_tools
 
         planner_tools = get_allowed_tools(
             "planner", project_capabilities={"is_electron": True}
@@ -435,7 +435,7 @@ class TestElectronToolScoping:
         """No agent gets Electron tools when ELECTRON_MCP_ENABLED is not set."""
         monkeypatch.delenv("ELECTRON_MCP_ENABLED", raising=False)
 
-        from auto_claude_tools import get_allowed_tools
+        from agents.tools_pkg import get_allowed_tools
 
         for agent_type in ["planner", "coder", "qa_reviewer", "qa_fixer"]:
             tools = get_allowed_tools(
