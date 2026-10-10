@@ -51,8 +51,8 @@ class ComplexityAssessment:
             return self.recommended_phases
 
         # Otherwise fall back to default phase sets
-        # Note: historical_context runs early (after discovery) if Graphiti is enabled
-        # It's included by default but gracefully skips if not configured
+        # Note: historical_context runs early (after discovery) and reads the
+        # shared brain; it is included by default and skips when memory is off
         if self.complexity == Complexity.SIMPLE:
             return ["discovery", "historical_context", "quick_spec", "validation"]
         elif self.complexity == Complexity.STANDARD:

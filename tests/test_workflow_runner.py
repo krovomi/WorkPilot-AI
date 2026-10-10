@@ -70,48 +70,41 @@ class TestPhaseWindows:
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
 
-        # `mobile-design`, `frontend-design` and `store-readiness` are
-        # conditional on their files being touched, and an unknown change set
-        # runs a conditional phase — erring towards running is the safe
-        # direction the engine documents.
-        assert [r.id for r in pre] == ["brainstorm", "spec"]
+        # `mobile-design` and `store-readiness` are conditional on their files
+        # being touched, and an unknown change set runs a conditional phase —
+        # erring towards running is the safe direction the engine documents.
+        assert [r.id for r in pre] == ["brainstorm"]
         assert [r.id for r in planned] == [
             "analyze",
             "ui-design-system",
             "mobile-design",
-            "frontend-design",
         ]
         # `design-check` sits between `coding` and `qa` in the file and is
         # absent here on purpose: `gates.run_deterministic_gates` runs it.
         assert [r.id for r in mid] == ["review", "verify"]
         assert [r.id for r in post] == [
-            "adversarial-review",
-            "spec-conformance",
             "store-readiness",
             "architecture-map",
             "verify-replay",
         ]
 
-    def test_a_pack_with_two_phases_is_split_by_phase_not_by_pack(self, workflow):
-        """impeccable ships guidance *and* a detector, and they run elsewhere.
+    def test_the_detector_is_run_by_the_gates_not_by_a_window(self, workflow):
+        """impeccable's detector runs through its pack's `gate` command.
 
         `_ELSEWHERE` used to hold pack names, so marking the detector as
         "executed by the gate runner" silently marked every other phase the
-        same pack implements. `frontend-design` would have been resolved,
-        printed in the profile the user is shown, and executed by nobody.
+        same pack implements. Keyed by phase id, only the detector is stepped
+        over — and it is the only impeccable phase left.
         """
         profile = profile_at(workflow, "ultrathink")
         impeccable = [r.id for r in profile.run if r.phase.pack == "impeccable"]
-        assert impeccable == ["frontend-design", "design-check"]
-
-        planned = phases_between(profile, after="planning", before="coding")
-        assert "frontend-design" in [r.id for r in planned]
+        assert impeccable == ["design-check"]
 
         everywhere = [
             r.id
             for window in (
                 phases_between(profile, after=None, before="planning"),
-                planned,
+                phases_between(profile, after="planning", before="coding"),
                 phases_between(profile, after="coding", before="qa"),
                 phases_between(profile, after="qa", before=None),
             )
@@ -120,9 +113,12 @@ class TestPhaseWindows:
         assert "design-check" not in everywhere
 
     def test_the_design_guidance_runs_before_the_code_it_judges(self, workflow):
-        """A detector that only grades finished code cannot shape it."""
+        """A detector that only grades finished code cannot shape it.
+
+        What to aim for is `ui-design-system`'s answer, settled before coding.
+        """
         declared = list(workflow_phase_ids(workflow))
-        assert declared.index("frontend-design") < declared.index("coding")
+        assert declared.index("ui-design-system") < declared.index("coding")
         assert declared.index("coding") < declared.index("design-check")
 
     def test_every_skill_phase_belongs_to_a_window(self, workflow):
@@ -168,8 +164,8 @@ class TestPhaseWindows:
 
         `qa` is prunable. Looking the boundary up in what survived resolution
         would make `before="qa"` mean "to the end of the list" on a build with
-        no QA pass, so `review` and the two ultrathink readings would all run
-        in the pre-QA window — and then again in the post-QA one.
+        no QA pass, so `review` and every post-QA phase would all run in the
+        pre-QA window — and then again in the post-QA one.
         """
         profile = profile_at(workflow, "ultrathink")
         profile.run = [r for r in profile.run if r.id != "qa"]
@@ -180,8 +176,6 @@ class TestPhaseWindows:
         post = phases_between(profile, after="qa", before=None)
         assert [r.id for r in mid] == ["review", "verify"]
         assert [r.id for r in post] == [
-            "adversarial-review",
-            "spec-conformance",
             "store-readiness",
             "architecture-map",
             "verify-replay",
@@ -229,14 +223,14 @@ class TestPhaseWindows:
             assert phase_id in declared, f"{phase_id} is not a phase of the workflow"
 
     def test_builtins_are_recognised_by_id_not_by_implementation(self, workflow):
-        """`coding` names a superpowers skill and is run by the coder loop.
+        """`coding` names a methodology skill and is run by the coder loop.
 
         Keying the builtin set on the impl string would mean swapping the
         methodology in the YAML silently demotes `coding` to a one-shot skill
         session — losing the entire coder loop to a one-line edit.
         """
         coding = workflow.phase("coding")
-        assert coding.impl == "superpowers/test-driven-development"
+        assert coding.impl == "tooling/tdd-cycle"
         assert "coding" in BUILTIN_EXECUTORS
         assert coding.impl not in BUILTIN_EXECUTORS
 
@@ -321,7 +315,7 @@ class TestMethodologyReachesTheBuiltins:
 
     def test_the_declared_methodology_is_named(self, workflow):
         plan = builtin_plan(profile_at(workflow, "high"))
-        assert "superpowers/test-driven-development" in effort_preamble(plan, "coding")
+        assert "tooling/tdd-cycle" in effort_preamble(plan, "coding")
 
     def test_workpilots_own_implementation_is_not_announced_as_a_methodology(
         self, workflow
@@ -333,10 +327,10 @@ class TestMethodologyReachesTheBuiltins:
         self, workflow, tmp_path
     ):
         body = "Red, green, refactor. " * 500
-        _write_skill(tmp_path, "test-driven-development", body)
+        _write_skill(tmp_path, "tdd-cycle", body)
         plan = builtin_plan(profile_at(workflow, "high"))
         text = effort_preamble(plan, "coding", tmp_path)
-        assert ".agents/skills/test-driven-development/SKILL.md" in text
+        assert ".agents/skills/tdd-cycle/SKILL.md" in text
         # A ten-kilobyte procedure pasted into every subtask prompt is a
         # four-figure token bill per build to say what one line can.
         assert body not in text
@@ -348,7 +342,7 @@ class TestMethodologyReachesTheBuiltins:
         plan = builtin_plan(profile_at(workflow, "high"))
         text = effort_preamble(plan, "coding", tmp_path)
         assert "SKILL.md" not in text
-        assert "superpowers/test-driven-development" in text
+        assert "tooling/tdd-cycle" in text
 
 
 class TestSkillLookup:
@@ -412,7 +406,7 @@ class TestRunSkillPhase:
         """
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "code-review", "Read the diff.")
+        _write_skill(tmp_path, "review-lenses", "Read the diff.")
 
         monkeypatch.setenv("AUTO_CLAUDE_RESUME_SESSION_ID", "sess-42")
         profile = profile_at(workflow, "high")
@@ -429,7 +423,7 @@ class TestRunSkillPhase:
     ):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "code-review", "Look for defects, not for style.")
+        _write_skill(tmp_path, "review-lenses", "Look for defects, not for style.")
 
         profile = profile_at(workflow, "high")
         review = next(r for r in profile.run if r.id == "review")
@@ -452,7 +446,7 @@ class TestRunSkillPhase:
         )
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "test-driven-development", "Red, green, refactor.")
+        _write_skill(tmp_path, "tdd-cycle", "Red, green, refactor.")
 
         profile = profile_at(workflow, "high", provider="mistral")
         coding = next(r for r in profile.run if r.id == "coding")
@@ -466,7 +460,7 @@ class TestRunSkillPhase:
     ):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen, status="error")
-        _write_skill(tmp_path, "code-review", "Read the diff.")
+        _write_skill(tmp_path, "review-lenses", "Read the diff.")
 
         profile = profile_at(workflow, "high")
         review = next(r for r in profile.run if r.id == "review")
@@ -478,17 +472,17 @@ class TestRunSkillPhase:
     ):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen, response="Tests: pass")
-        _write_skill(tmp_path, "bmad-review", "Read the diff.")
+        _write_skill(tmp_path, "review-lenses", "Read the diff.")
 
         # `verify` is driven by the verification loop (`CUSTOM_EXECUTORS`);
         # an ordinary skill phase is what this pins: its report is kept where
-        # the next reader looks.
-        profile = profile_at(workflow, "ultrathink")
-        phase = next(r for r in profile.run if r.id == "adversarial-review")
+        # the next reader (`workflows.handoff`) looks.
+        profile = profile_at(workflow, "high")
+        phase = next(r for r in profile.run if r.id == "review")
         outcome = asyncio.run(run_skill_phase(phase, self._ctx(tmp_path)))
 
         assert outcome.output_path is not None
-        assert outcome.output_path.name == "adversarial-review.md"
+        assert outcome.output_path.name == "review.md"
         assert "Tests: pass" in outcome.output_path.read_text(encoding="utf-8")
 
 
@@ -530,7 +524,13 @@ def _write_skill(
 def _install_fake_agent_stack(
     monkeypatch, seen: dict, *, status="complete", response="done"
 ):
-    import core.client as core_client
+    import importlib
+
+    # The module `from core.client import …` resolves, i.e. `sys.modules`. A
+    # test elsewhere that swaps that entry leaves the `core.client` package
+    # attribute on the old module, and `import core.client as x` returns the
+    # attribute: patching it would leave the runner on the real client.
+    core_client = importlib.import_module("core.client")
 
     class _FakeClient:
         async def __aenter__(self):
@@ -553,8 +553,7 @@ def _install_fake_agent_stack(
 
     monkeypatch.setattr(core_client, "create_agent_client", _fake_create)
 
-    import agents.session as agent_session
-
+    agent_session = importlib.import_module("agents.session")
     monkeypatch.setattr(agent_session, "run_agent_session", _fake_session)
 
 
@@ -648,13 +647,13 @@ class TestRuntimeGateAtRunTime:
         )
 
     def test_the_requires_block_travels_with_the_body(self, tmp_path):
-        _write_skill(tmp_path, "code-review", "Read it.", runtime="_rt/engine.py")
-        _body, _path, requires = find_skill_body(tmp_path, "mattpocock", "code-review")
+        _write_skill(tmp_path, "review-lenses", "Read it.", runtime="_rt/engine.py")
+        _body, _path, requires = find_skill_body(tmp_path, "tooling", "review-lenses")
         assert requires == {"runtime": "_rt/engine.py"}
 
     def test_a_skill_with_no_gate_reports_an_empty_one(self, tmp_path):
-        _write_skill(tmp_path, "code-review", "Read it.")
-        _body, _path, requires = find_skill_body(tmp_path, "mattpocock", "code-review")
+        _write_skill(tmp_path, "review-lenses", "Read it.")
+        _body, _path, requires = find_skill_body(tmp_path, "tooling", "review-lenses")
         assert requires == {}
 
     def test_an_absent_runtime_stops_the_phase_before_the_session(
@@ -662,7 +661,7 @@ class TestRuntimeGateAtRunTime:
     ):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "code-review", "Read it.", runtime="_rt/engine.py")
+        _write_skill(tmp_path, "review-lenses", "Read it.", runtime="_rt/engine.py")
         ctx = self._ctx(tmp_path)
         ctx.project_dir.mkdir(parents=True, exist_ok=True)
 
@@ -687,7 +686,7 @@ class TestRuntimeGateAtRunTime:
         """
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "code-review", "Read it.", runtime="_rt/engine.py")
+        _write_skill(tmp_path, "review-lenses", "Read it.", runtime="_rt/engine.py")
         (tmp_path / "_rt").mkdir(parents=True, exist_ok=True)
         (tmp_path / "_rt" / "engine.py").write_text("pass\n", encoding="utf-8")
         ctx = self._ctx(tmp_path)
@@ -702,7 +701,7 @@ class TestRuntimeGateAtRunTime:
     def test_a_satisfied_runtime_runs_normally(self, workflow, tmp_path, monkeypatch):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "code-review", "Read it.", runtime="_rt/engine.py")
+        _write_skill(tmp_path, "review-lenses", "Read it.", runtime="_rt/engine.py")
         ctx = self._ctx(tmp_path)
         (ctx.project_dir / "_rt").mkdir(parents=True, exist_ok=True)
         (ctx.project_dir / "_rt" / "engine.py").write_text("pass\n", encoding="utf-8")
@@ -713,59 +712,64 @@ class TestRuntimeGateAtRunTime:
 
         assert outcome.succeeded is True
 
-    def test_every_bmad_phase_the_workflow_declares_exists_in_the_pack(self, workflow):
-        """A phase naming a skill nobody ships is a phase that cannot run.
+    def test_no_phase_of_the_default_workflow_needs_a_per_project_runtime(
+        self, workflow
+    ):
+        """A skill gated on a runtime the project must install rarely runs.
 
-        This is what went unnoticed: the three BMAD phases named v6.0 wrapper
-        names, upstream consolidated and renamed them, and nothing in the build
-        compared the two lists.
+        The three BMAD phases this workflow declared needed `_bmad/` in the
+        project being built. Almost no project has it, so each was resolved,
+        printed in the profile, and stopped before its session on every build.
+        A methodology that needs a runtime belongs to the projects that have
+        it — the command palette offers it there — not to the default pipeline.
         """
         for phase in workflow.phases:
-            if phase.pack != "bmad":
+            found = find_skill_body(REPO_ROOT, phase.pack, phase.skill)
+            if found is None:
                 continue
-            assert (
-                REPO_ROOT / "skills" / "bmad" / phase.skill / "SKILL.md"
-            ).is_file(), f"{phase.id} names {phase.impl}, which the pack does not hold"
+            _body, _path, requires = found
+            assert not requires.get("runtime"), (
+                f"{phase.id} names {phase.impl}, which needs {requires['runtime']}"
+            )
 
 
 class TestPhaseLabels:
     """Which phase of the build a skill phase says it is.
 
     Every one of them reported `LogPhase.CODING` and emitted no execution
-    phase, so a build that ran `docs`, `brainstorm` and `spec` before planning
-    filed all three under "coding" in the log viewer — and the Kanban card,
+    phase, so a build that ran `docs` and `brainstorm` before planning
+    filed both under "coding" in the log viewer — and the Kanban card,
     which turns an in-progress task with no reported phase into the coding
     column, agreed. The phases ran in the declared order throughout; the two
     labels were both defaults.
     """
 
     def test_a_phase_paid_for_as_spec_is_logged_as_planning(self):
-        assert log_phase_for("spec") == "PLANNING"
         assert log_phase_for("brainstorm") == "PLANNING"
         assert log_phase_for("analyze") == "PLANNING"
 
     def test_a_review_is_logged_as_validation_not_as_coding(self):
         assert log_phase_for("review") == "VALIDATION"
-        assert log_phase_for("adversarial-review") == "VALIDATION"
+        assert log_phase_for("store-readiness") == "VALIDATION"
         assert log_phase_for("verify") == "VALIDATION"
 
     def test_an_unknown_phase_falls_back_rather_than_raising(self):
         assert log_phase_for("a-phase-nobody-declared") == "CODING"
 
     def test_only_the_phases_before_the_coder_loop_announce_themselves(self):
-        assert execution_phase_for("spec") == "PLANNING"
+        assert execution_phase_for("brainstorm") == "PLANNING"
         assert execution_phase_for("analyze") == "PLANNING"
         # After coding the card is already past what this would describe, and
         # `wouldPhaseRegress` would refuse it anyway.
         assert execution_phase_for("review") is None
         assert execution_phase_for("architecture-map") is None
 
-    def test_the_spec_phase_logs_under_planning_end_to_end(
+    def test_the_brainstorm_phase_logs_under_planning_end_to_end(
         self, workflow, tmp_path, monkeypatch
     ):
         seen = {}
         _install_fake_agent_stack(monkeypatch, seen)
-        _write_skill(tmp_path, "bmad-prd", "Write the PRD.")
+        _write_skill(tmp_path, "brainstorm-approaches", "Compare approaches.")
 
         spec_dir = tmp_path / "spec"
         spec_dir.mkdir(parents=True, exist_ok=True)
@@ -777,8 +781,8 @@ class TestPhaseLabels:
             effort="high",
         )
         profile = profile_at(workflow, "high")
-        spec = next(r for r in profile.run if r.id == "spec")
-        asyncio.run(run_skill_phase(spec, ctx))
+        brainstorm = next(r for r in profile.run if r.id == "brainstorm")
+        asyncio.run(run_skill_phase(brainstorm, ctx))
 
         from task_logger import LogPhase
 

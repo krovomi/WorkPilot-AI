@@ -16,7 +16,6 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
@@ -313,11 +312,4 @@ export function registerCICDTriggersHandlers(): void {
 			]);
 		},
 	);
-}
-
-export function setupCICDTriggersEventForwarding(
-	_getMainWindow: () => BrowserWindow | null,
-): void {
-	// CI/CD triggers are request-response; pipeline events are polled via listRuns.
-	// Future: webhook listener could push 'cicdTriggers:runUpdate' events.
 }

@@ -15,11 +15,18 @@ Three layers, in order, each able to override the one before it:
    `merge_with_user_agents` functions this module replaces, and it is preserved
    exactly.
 
-The roster is capped. Three to five concurrent subagents is where the
+An overlay specialises the roster a phase already has; it does not give one to
+a phase that has none. A `solo` call (a commit message, an archify model, a PR
+orchestrator that brings its own specialists) stays empty on a phone project
+too: the mobile specialists are for the phases that build, review or verify it.
+
+The roster is capped, and the cap counts everything the parent pays for —
+the caller's agents included. Three to five concurrent subagents is where the
 parallelism still pays; past seven, reconciling the summaries costs more than
 it saves. When the cap bites, generic phase defaults are dropped before
 specialised or caller-supplied ones — the specific entry is the one carrying
-information the parent does not already have.
+information the parent does not already have. A roster made only of entries
+the caller named can stay above the cap: each one was a decision.
 
 Providers that cannot run subagents get ``None``, not a roster nobody reads.
 """
@@ -39,6 +46,12 @@ logger = logging.getLogger(__name__)
 __all__ = ["resolve", "merge_with_user_agents", "detect_languages", "MAX_ROSTER"]
 
 MAX_ROSTER = 7
+
+#: The roles that run the project's tests, and so learn its commands from the
+#: overlays: the build's `test-runner` and the QA roster's `qa-test-evidence`
+#: (`qa_reviewer`, `qa_fixer`, `verifier`). The second one used to rediscover
+#: the framework on every QA pass the first had already been told about.
+_TEST_ROLES = ("test-runner", "qa-test-evidence")
 
 # Stack detection touches the filesystem; the answer does not change during a
 # run, and create_client is called once per phase.
@@ -71,8 +84,10 @@ def detect_languages(project_dir: Path | str | None) -> list[str]:
     return languages
 
 
-def _specialise_test_runner(base: Any, overlays: list[LanguageOverlay]) -> Any:
-    """Fold concrete commands into the generic `test-runner` prompt."""
+def _specialise_test_runner(
+    base: Any, overlays: list[LanguageOverlay], role: str = "test-runner"
+) -> Any:
+    """Fold concrete commands into the prompt of a role that runs the tests."""
     if not overlays or base is None:
         return base
 
@@ -105,7 +120,8 @@ def _specialise_test_runner(base: Any, overlays: list[LanguageOverlay]) -> Any:
         # A silent downgrade is how you end up wondering why the roster stopped
         # helping.
         logger.warning(
-            "could not specialise test-runner, falling back to the generic prompt: %s",
+            "could not specialise %s, falling back to the generic prompt: %s",
+            role,
             exc,
         )
         return base
@@ -167,6 +183,9 @@ def resolve(
         return user_agents or None
 
     roster: dict[str, Any] = phase_defaults(agent_type, roster_name)
+    # Read before any overlay adds to it: an empty phase roster is a decision
+    # (`solo`), and an overlay specialises a roster, it does not start one.
+    phase_has_roster = bool(roster)
 
     overlays = overlays_for(detect_languages(project_dir))
     mobile = mobile_overlay_for(project_dir)
@@ -178,23 +197,26 @@ def resolve(
         overlays = [*overlays, _as_language_overlay(mobile)]
 
     if overlays:
-        if "test-runner" in roster:
-            roster["test-runner"] = _specialise_test_runner(
-                roster["test-runner"], overlays
-            )
-        for overlay in overlays:
-            roster.update(overlay.extra_agents)
-
-    # A mobile specialist is never dropped for a generic phase default: it is
-    # the only entry in the roster that knows the project is a phone app, and
-    # the cap exists to shed the entries that carry nothing the parent lacks.
-    protected = {"test-runner"} | set(user_agents or {})
-    if mobile:
-        protected |= set(mobile.extra_agents)
-    roster = _apply_cap(roster, protected)
+        for role in _TEST_ROLES:
+            if role in roster:
+                roster[role] = _specialise_test_runner(roster[role], overlays, role)
+        if phase_has_roster:
+            for overlay in overlays:
+                roster.update(overlay.extra_agents)
 
     if user_agents:
         roster.update(user_agents)  # caller wins, always
+
+    # The cap runs on what the parent will actually carry, the caller's agents
+    # included — applied before the merge, it let a PR orchestrator's six
+    # specialists sit on top of a full roster. Nothing the caller named is
+    # dropped, and neither is a mobile specialist: it is the only entry that
+    # knows the project is a phone app, and the cap exists to shed the entries
+    # that carry nothing the parent lacks.
+    protected = set(_TEST_ROLES) | set(user_agents or {})
+    if mobile and phase_has_roster:
+        protected |= set(mobile.extra_agents)
+    roster = _apply_cap(roster, protected)
 
     return roster or None
 

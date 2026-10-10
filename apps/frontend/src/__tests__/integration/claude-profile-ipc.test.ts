@@ -1,6 +1,6 @@
 /**
  * Integration tests for Claude Profile IPC handlers
- * Tests CLAUDE_PROFILE_SAVE and CLAUDE_PROFILE_INITIALIZE IPC handlers
+ * Tests the CLAUDE_PROFILE_SAVE IPC handler
  */
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -267,18 +267,9 @@ describe("Claude Profile IPC Integration", () => {
 		});
 	});
 
-	// Note: CLAUDE_PROFILE_INITIALIZE tests were removed.
-	// The handler was deprecated as part of the migration from setup-token to the
-	// new /login OAuth flow. Profile initialization now happens automatically
-	// during the /login flow in claude-code-handlers.ts.
-
 	describe("IPC handler registration", () => {
 		it("should register CLAUDE_PROFILE_SAVE handler", () => {
 			expect(handlers.has("claude:profileSave")).toBe(true);
 		});
-
-		// Note: CLAUDE_PROFILE_INITIALIZE handler was removed as part of the
-		// OAuth /login flow migration. Profile initialization now happens
-		// automatically during the /login flow in claude-code-handlers.ts
 	});
 });
