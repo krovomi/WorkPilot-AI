@@ -67,6 +67,29 @@ class TestAgentConfigs:
                 f"Expected agent type '{agent_type}' not found"
             )
 
+    def test_the_spec_prompts_that_write_and_look_up_docs_have_both(self):
+        """spec_researcher.md and spec_critic.md ask Context7 and write their
+        own file; spec_writer has neither Context7 nor the web, which is the
+        config both ran under before."""
+        from agents.tools_pkg.models import AGENT_CONFIGS
+
+        researcher = AGENT_CONFIGS["spec_researcher"]
+        assert {"Write", "Bash", "WebFetch", "WebSearch"} <= set(researcher["tools"])
+        assert "context7" in researcher["mcp_servers"]
+
+        critique = AGENT_CONFIGS["spec_self_critique"]
+        assert {"Write", "Edit", "Bash"} <= set(critique["tools"])
+        assert "context7" in critique["mcp_servers"]
+
+        # `spec_critic` stays the read-only reviewer `brainstorm` runs under.
+        assert set(AGENT_CONFIGS["spec_critic"]["tools"]) == {"Read", "Glob", "Grep"}
+
+    def test_spec_types_nothing_creates_are_gone(self):
+        from agents.tools_pkg.models import AGENT_CONFIGS
+
+        assert "spec_discovery" not in AGENT_CONFIGS
+        assert "spec_context" not in AGENT_CONFIGS
+
     def test_thinking_defaults_are_valid(self):
         """All thinking_default values should be valid levels."""
         from agents.tools_pkg.models import AGENT_CONFIGS

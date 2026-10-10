@@ -82,6 +82,14 @@ class TestRoutingIsDeliberate:
             ("architecture_visualizer", "solo"),
             ("roadmap_discovery", "research"),
             ("competitor_analysis", "research"),
+            # The PR orchestrators bring their own specialists.
+            ("pr_orchestrator_parallel", "solo"),
+            ("pr_followup_parallel", "solo"),
+            ("analysis", "research"),
+            ("batch_analysis", "research"),
+            ("batch_validation", "research"),
+            ("spec_researcher", "spec"),
+            ("spec_self_critique", "spec"),
         ],
     )
     def test_agent_type_routes_to_its_phase(self, agent_type: str, phase: str):
@@ -93,6 +101,14 @@ class TestRoutingIsDeliberate:
         # `coder` is the ordinary board card, which is what the Kanban roster
         # was built for. Everything else names its phase.
         assert fell_through == {"coder"}
+
+    def test_every_agent_config_names_its_roster(self):
+        """The list above is kept by hand and missed nine configs, the PR
+        orchestrators among them. AGENT_CONFIGS is what `create_client`
+        accepts, so it is what has to be covered."""
+        from agents.tools_pkg.models import AGENT_CONFIGS
+
+        assert {t for t in AGENT_CONFIGS if t not in PHASE_ALIASES} == {"coder"}
 
     def test_every_alias_names_a_real_builder(self):
         assert set(PHASE_ALIASES.values()) <= set(all_specs())

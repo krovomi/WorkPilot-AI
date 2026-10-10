@@ -73,8 +73,9 @@ class AgentSpec:
         return AgentDefinition(**kwargs)
 
 
-# agent_type -> phase. Everything unlisted still falls through to "kanban",
-# which is the roster for an ordinary board card.
+# agent_type -> phase. Every AGENT_CONFIGS entry but `coder` is listed — the
+# ordinary board card, which "kanban" was built for and which an unlisted
+# agent_type still falls through to. `test_subagents_coverage` holds the rule.
 #
 # The table used to hold five entries, so twenty-one of the twenty-five
 # agent_types in the product landed on "kanban" — an `ideation` run was offered
@@ -99,6 +100,12 @@ PHASE_ALIASES: dict[str, str] = {
     "pr_reviewer": "review",
     "architecture_reviewer": "review",
     "pr_finding_validator": "review",
+    # The PR orchestrators bring their own specialists (`pr_review.py`, the
+    # follow-up's four). Falling through to "kanban" stacked a code-reviewer,
+    # a test-runner and a spec-explorer on top of them: nine and seven
+    # entries, three of them answering what a specialist already answers.
+    "pr_orchestrator_parallel": "solo",
+    "pr_followup_parallel": "solo",
     # Surveying a codebase to produce findings rather than a verdict. The
     # generic `code-reviewer` is the wrong tool here: nothing is under review.
     "ideation": "research",
@@ -112,10 +119,21 @@ PHASE_ALIASES: dict[str, str] = {
     # build card. It ran as `coder` until the executor named its agent_type.
     "roadmap_discovery": "research",
     "competitor_analysis": "research",
+    # Issue analysis and batching. They run through `create_simple_client`,
+    # which composes no roster today; the entry says which one they want the
+    # day they move to `create_client`.
+    "analysis": "research",
+    "batch_analysis": "research",
+    "batch_validation": "research",
     # Writing or questioning the spec, while there is still no code to point at.
     "spec_writer": "spec",
     "spec_gatherer": "spec",
     "spec_critic": "spec",
+    # The two spec prompts that run under their own config
+    # (spec/pipeline/agent_runner.py); they ran under `spec_writer` before and
+    # keep the roster they had.
+    "spec_researcher": "spec",
+    "spec_self_critique": "spec",
     # Reading a spec and a plan against each other. Unmapped, this fell through
     # to "kanban" and was handed a `test-runner` by a phase that runs before a
     # line of code exists. A workflow phase that wants another roster says so
