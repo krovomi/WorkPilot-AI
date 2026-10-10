@@ -216,7 +216,7 @@ def run_gen_tests_check(
     Requires:
       * ``junit_xml`` — path to a JUnit XML produced by the test runner.
       * At least one prior generation in
-        ``<project>/.workpilot/generational-tests/``.
+        ``<project>/.workpilot/generational_tests/``.
 
     Both missing → exit 0 (nothing to compare).
     """
