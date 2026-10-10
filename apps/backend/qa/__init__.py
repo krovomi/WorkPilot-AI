@@ -64,7 +64,12 @@ from .fixer import (
 )
 
 # Main loop
-from .loop import MAX_QA_ITERATIONS, run_qa_validation_loop
+from .loop import (
+    MAX_QA_ITERATIONS,
+    QA_ITERATIONS_BY_EFFORT,
+    qa_iteration_cap,
+    run_qa_validation_loop,
+)
 
 # Report & tracking
 from .report import (
@@ -90,6 +95,8 @@ from .reviewer import run_qa_agent_session
 __all__ = [
     # Configuration
     "MAX_QA_ITERATIONS",
+    "QA_ITERATIONS_BY_EFFORT",
+    "qa_iteration_cap",
     "RECURRING_ISSUE_THRESHOLD",
     "ISSUE_SIMILARITY_THRESHOLD",
     "DEFAULT_MAX_AUTO_FIX_ATTEMPTS",

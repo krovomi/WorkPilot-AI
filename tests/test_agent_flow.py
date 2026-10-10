@@ -1249,7 +1249,7 @@ class TestQAFixerInteraction:
 
     def test_fixer_should_not_run_at_max_iterations(self, test_env):
         """Fixer should not run when max iterations reached."""
-        from qa import MAX_QA_ITERATIONS
+        from qa import qa_iteration_cap
         from qa.criteria import save_implementation_plan, should_run_fixes
 
         _, spec_dir, _ = test_env
@@ -1258,7 +1258,7 @@ class TestQAFixerInteraction:
             "feature": "Test Feature",
             "qa_signoff": {
                 "status": "rejected",
-                "qa_session": MAX_QA_ITERATIONS,
+                "qa_session": qa_iteration_cap(spec_dir),
                 "issues_found": [{"title": "Recurring issue", "type": "unit_test"}],
             },
         }
@@ -1523,7 +1523,7 @@ class TestQALoopWorkflow:
 
     def test_qa_workflow_multiple_rejections(self, test_env):
         """Test QA workflow with multiple rejections until max iterations."""
-        from qa import MAX_QA_ITERATIONS
+        from qa import qa_iteration_cap
         from qa.criteria import (
             get_qa_iteration_count,
             is_qa_rejected,
@@ -1532,11 +1532,12 @@ class TestQALoopWorkflow:
         )
 
         _, spec_dir, _ = test_env
+        cap = qa_iteration_cap(spec_dir)
 
         plan = {"feature": "Test Feature", "phases": []}
 
         # Simulate multiple rejections
-        for i in range(1, MAX_QA_ITERATIONS + 1):
+        for i in range(1, cap + 1):
             plan["qa_signoff"] = {
                 "status": "rejected",
                 "qa_session": i,
@@ -1549,7 +1550,7 @@ class TestQALoopWorkflow:
             )
             assert get_qa_iteration_count(spec_dir) == i, f"Should be iteration {i}"
 
-            if i < MAX_QA_ITERATIONS:
+            if i < cap:
                 assert should_run_fixes(spec_dir) is True, (
                     f"Fixer should run at iteration {i}"
                 )

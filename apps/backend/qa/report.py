@@ -306,6 +306,9 @@ async def escalate_to_human(
     spec_dir: Path,
     recurring_issues: list[dict[str, Any]],
     iteration: int,
+    *,
+    max_iterations: int | None = None,
+    threshold: int = RECURRING_ISSUE_THRESHOLD,
 ) -> None:
     """
     Create human escalation file for recurring issues.
@@ -314,8 +317,13 @@ async def escalate_to_human(
         spec_dir: Spec directory
         recurring_issues: Issues that have recurred
         iteration: Current iteration number
+        max_iterations: The run's pass budget (defaults to the task's cap)
+        threshold: The occurrence count that made these issues recurring
     """
-    from .loop import MAX_QA_ITERATIONS
+    if max_iterations is None:
+        from .loop import qa_iteration_cap
+
+        max_iterations = qa_iteration_cap(spec_dir)
 
     history = get_iteration_history(spec_dir)
     summary = get_recurring_issue_summary(history)
@@ -325,8 +333,8 @@ async def escalate_to_human(
     content = f"""# QA Escalation - Human Intervention Required
 
 **Generated**: {datetime.now(timezone.utc).isoformat()}
-**Iteration**: {iteration}/{MAX_QA_ITERATIONS}
-**Reason**: Recurring issues detected ({RECURRING_ISSUE_THRESHOLD}+ occurrences)
+**Iteration**: {iteration}/{max_iterations}
+**Reason**: Recurring issues detected ({threshold}+ occurrences)
 
 ## Summary
 
@@ -337,7 +345,7 @@ async def escalate_to_human(
 
 ## Recurring Issues
 
-These issues have appeared {RECURRING_ISSUE_THRESHOLD}+ times without being resolved:
+These issues have appeared {threshold}+ times without being resolved:
 
 """
 

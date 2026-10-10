@@ -129,7 +129,11 @@ The QA validation loop:
 1. **QA Reviewer** checks all acceptance criteria
 2. If issues found → creates `QA_FIX_REQUEST.md`
 3. **QA Fixer** applies fixes
-4. Loop repeats until approved (up to 50 iterations)
+4. Loop repeats until approved, within a budget set by the QA phase's effort:
+   3 passes at `none`, 5 at `low`, 8 at `medium`, 12 at `high`, 20 at
+   `ultrathink` (`WORKPILOT_QA_MAX_ITERATIONS` overrides it, up to 50). An issue
+   that keeps coming back escalates to a human (`QA_ESCALATION.md`) before the
+   budget runs out; feedback a person writes opens a new budget.
 
 ## Workspace Management
 
