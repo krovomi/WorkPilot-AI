@@ -116,8 +116,8 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L7 | P2 | Une seule mémoire — **fait** | F6, F7, F14, F34 | L1 (insight_extractor) |
 | L8 | P2 | Code mort frontend — **fait** | F28, F25 (front) | L3 |
 | L9 | P2 | Code mort backend — **fait** | F29, F30, F32, F33, F25 (back) | — |
-| L10 | P3 | Tokens à haut effort | F10, F11, F17 | L6 |
-| L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
+| L10 | P3 | Tokens à haut effort — **fait** | F10, F11, F17 | L6 |
+| L11 | P3 | Consolidation — **fait** | F8, F26, F27, F31, F36 | L5 |
 | L12 | P3 | Gouvernance — **fait** | F12, F13 | L9 (F25) pour F13 |
 | L13 | P4 | Surface produit | F19 | tous |
 | L14 | P1 | Événements et appels IPC perdus en silence — **fait** | F37 | — |
@@ -125,7 +125,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
 | L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L4, L5, L6, L7, L8, L9, L12, L14, L15, L16, L17 (faits) → L10, L11 → L13.
+Ordre recommandé : L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11, L12, L14, L15, L16, L17 (faits) → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -137,11 +137,12 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L7, L8, L9, L12, L14, L15, L16, L17 
 | Fichiers frontend sans importeur de production | 57 (~16,5 k lignes) ; 29 (~6,1 k lignes) après le lot L8, tous en attente d'une décision (voir le lot) | 0 |
 | Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) ; **0 après le lot L9** | 0 |
 | Shims racine `apps/backend/*.py` | 25 (27 recomptés) ; **3 après le lot L9** (`insight_extractor.py`, `graphiti_config.py`, `graphiti_providers.py`) ; **1 après le lot L7** (`insight_extractor.py`) | 0 (hors points d'entrée) |
-| Prompts orphelins | 11 (~51 Ko) | 0 |
+| Prompts orphelins | 11 (~51 Ko) ; 0 après le lot L10 (+ `coder.md`, 35 Ko, trouvé orphelin et retiré) | 0 |
 | Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
-| Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) | ≤ 7 |
-| Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) | ≤ 4 |
-| Détecteurs de pile | ≥ 11 | 1 façade |
+| Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) ; 5 servis sans agents d'appelant au lot L11 (projet mobile), 6 pour l'orchestrateur | ≤ 7 |
+| Définitions de sous-agents | 26 déclarations (25 noms) à cinq endroits, + 9 agents de packs ; 22 dans le registre après le lot L11 (11 de phase, 9 de PR, 2 mobiles), + 6 agents de packs | ~14 |
+| Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) ; 4 après le lot L10 sur une tâche de code (5 sur une tâche mobile), sans les 3 sous-agents du roster de review | ≤ 4 |
+| Détecteurs de pile | ≥ 11 ; 1 façade `project/stack.py` après le lot L11 (4 détecteurs derrière elle, 5 lecteurs encore directs) | 1 façade |
 | Écritures par merge | 4 magasins ; 1 événement, 4 abonnés après le lot L7 | 1 événement |
 
 ---
@@ -852,6 +853,58 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 
 ### Lot L10 — Tokens à haut effort (P3)
 
+**Fait.** Douze prompts sans lecteur retirés (~86 Ko), `complexity_assessor` appelé seulement quand
+l'heuristique doute, une revue dont le moteur choisit les lentilles et qui ne délègue plus, un
+budget de QA qui suit l'effort. Mesuré avec la méthode « Profil réel d'un build, par effort » (§0.3)
+et figé par `tests/test_review_lenses.py`.
+
+- **F10.** Les onze orphelins de l'annexe A.3 sont supprimés (preuve : aucun chargement par nom ni
+  par chemin dynamique — `prompts_dir`, `_load_prompt_file`, gestionnaires de prompts GitHub,
+  `run_agent` du pipeline de spec — ni dans le YAML, `skills/` ou le frontend ; les runners
+  homonymes n'ouvrent aucun prompt). `scripts/wiki/generate_inventories.py` perd leurs catégories.
+  `complexity_assessor` ne tourne plus que sous `AI_ASSESSMENT_CONFIDENCE_THRESHOLD` (0,8) : la
+  valeur par défaut de l'heuristique (standard, 0,75) appelle encore le modèle, ses verdicts nets
+  (simple 0,9, complex 0,85) non ; la décision est écrite dans le journal de la tâche, et
+  `complexity_assessment.json` dit qui a décidé (`assessed_by`). L'heuristique lit désormais
+  `requirements.json` (`services_involved`), qu'elle acceptait sans que l'orchestrateur le lui passe.
+- **F11.** Le moteur choisit les lentilles (`workflows.runner.REVIEW_LENSES_BY_EFFORT`, ligne
+  `LENSES:` du prompt ; le tableau du skill est tenu au même par un test) et `review` déclare
+  `roster: solo` : sous `pr_reviewer`, elle recevait security-auditor, regression-hunter et
+  test-coverage-auditor, trois sous-sessions qui relisaient le diff pour reposer la question d'une
+  lentille. Sessions qui relisent le diff, sur le profil résolu : 1 à `none` et `low` (QA), 4 à
+  `medium`, `high` et `ultrathink` sur une tâche de code (`review`, session `verifier`, première
+  passe QA, `architecture-map`), 5 sur une tâche mobile (`store-readiness`). La reprise après pause
+  et le profil affiché ne changent pas : aucune phase n'est ajoutée ni retirée.
+- **F17.** Plafond selon l'effort de la phase QA (`QA_ITERATIONS_BY_EFFORT` : 3, 5, 8, 12, 20),
+  `WORKPILOT_QA_MAX_ITERATIONS` pour le surcharger sous l'ancien plafond de 50, qui reste le
+  plafond absolu. Le budget est celui de la tâche (`qa_session` continue après une pause) ; un retour
+  humain (`QA_FIX_REQUEST.md` écrit par une personne) en ouvre un nouveau. Le seuil d'escalade sur
+  problème récurrent est borné par le plafond, sinon il ne pouvait jamais se déclencher à `none`,
+  `low` ou `medium` (8 > 3, 5) : un problème présent à chaque passe finit sur `QA_ESCALATION.md`.
+- **Trouvé pendant le lot L10 :**
+  - `coder.md` (35 Ko) n'était servi à **aucune** session : la boucle du coder prompte chaque
+    sous-tâche avec `prompts_pkg.prompt_generator.generate_subtask_prompt`, et `get_coding_prompt`
+    n'avait pas d'appelant. Retiré avec lui ; « le découper en noyau + modules » était donc sans
+    objet — c'est le prompt servi qui est déjà un noyau plus des modules par pile (.NET, plan de
+    tests, règles UI), et `tests/test_coder_prompt_assembly.py` tient cet assemblage. Le prompt
+    servi renvoyait à « la section PATH CONFUSION PREVENTION du prompt coder », absente : corrigé.
+  - L'« auto-revue par sous-tâche » comptée par F11 n'a jamais tourné : c'était l'étape 6.5 de
+    `coder.md`, et `agents/self_review.py` est opt-in et écrit un résumé de `git diff` sans modèle.
+  - `prompts_pkg.prompts.get_planner_prompt` n'a pas d'appelant non plus (`generate_planner_prompt`
+    sert le planner), et le lot L9, fusionné entre-temps, l'a laissé : à retirer dans un suivi.
+- **Écarts, questions au mainteneur :**
+  - Les règles de `coder.md` absentes du prompt servi (auto-critique avant de marquer une sous-tâche
+    terminée, ne jamais pousser, ne pas modifier la config git, écrire les insights de session) :
+    les reprendre dans `generate_subtask_prompt`, ou les laisser hors du prompt payé par sous-tâche ?
+  - Tâche mobile à ultrathink : 5 sessions. `store-readiness` tourne après la QA et son rapport n'a
+    pas de consommateur (F38) ; en faire une lentille de `review` quand la tâche touche le mobile, ou
+    la déplacer avant la QA ? Choix produit, et le lot L11 ancre les globs mobiles sur ces phases.
+  - `qa-acceptance-checker` reste offert au `verifier` (`roster: qa`) et au QA reviewer, alors que la
+    conformité est une lentille de `review` à `high` : retirer la conformité du roster du verifier ?
+    Touche la consolidation des sous-agents (lot L11).
+  - `self_review.py` : le supprimer, ou le brancher sur un vrai client — ce qui ajouterait une
+    session par build ?
+
 #### F10 · Prompts volumineux et onze prompts orphelins
 
 - **Orphelins** (aucune référence par nom dans le code, le YAML ou le frontend ; annexe A.3) :
@@ -883,6 +936,13 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 
 ### Lot L11 — Consolidation (P3)
 
+**Fait** (PR #322 pour F27, F8, F26 ; la PR suivante pour F31, F36 et cette mise à jour). Un rôle
+de sous-agent = une définition, et les rosters listent des noms ; une porte unique pour « avec quoi
+ce projet est-il construit » ; une ancre par liste de surface ; tous les tests du backend sous
+`tests/`, une seule configuration pytest ; les deux fichiers Python et quatre des cinq fichiers
+frontend géants découpés par responsabilité, à l'identique. Les écarts sont notés sous chaque
+constat.
+
 #### F8 · Sous-agents qui répondent à la même question, déclarés à cinq endroits
 
 - Couples : security-auditor / security-reviewer ; code-reviewer / quality-reviewer ; test-runner /
@@ -893,6 +953,22 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 - Les trois sous-agents du suivi PR sont déclarés en ligne (`parallel_followup_reviewer.py:222-262`).
 - **Étape** : ~14 définitions, toutes dans `agents/subagents/` ; rosters par nom ; les agents des packs
   `skills/dotnet/agents/` et `skills/mobile/agents/` dédoublonnés.
+- **Corrigé par le lot L11.**
+  - `phases.SPECS` déclare chaque rôle une fois, `ROSTERS` liste des noms. `qa-test-evidence` est
+    fusionné dans `test-runner`, que l'overlay langage/mobile spécialise toujours ;
+    `spec-explorer` et `codebase-surveyor` sont fusionnés dans `architecture-analyst`.
+  - `pr_review.PR_SPECIALISTS` et `PR_ROSTERS` : les trois spécialistes du suivi PR quittent
+    `parallel_followup_reviewer.py`, et `finding-validator` n'est plus déclaré qu'une fois.
+  - `mobile.MOBILE_SPECS` et les spécialistes du suivi sont émis vers les harness. Les doublons
+    des packs sont retirés (`mobile-release-manager`, `bmad-net-architect`,
+    `bmad-performance-analyst`) ; sorties régénérées par `scripts/skills_cli.py`.
+  - Roster servi avant/après (méthode §0.3, 5 projets × 31 agent_types × 7 rosters) : seules les
+    trois fusions changent des noms, aucune taille ne bouge (5 au plus, 6 pour l'orchestrateur).
+- **Écart** : 22 définitions, pas ~14. `security-auditor` / `security-reviewer`,
+  `code-reviewer` / `quality-reviewer` et `evidence-collector` / `finding-validator` restent
+  distincts : les seconds sont des sessions de revue PR, avec un prompt fichier
+  (`prompts/github/`) préfixé du worktree ; les premiers sont des entrées de roster en ligne.
+  Les fusionner change le prompt des revues PR, ce qui ne relève plus d'une consolidation.
 
 #### F26 · Au moins onze détecteurs de pile
 
@@ -904,6 +980,20 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
   `StackDetector` + `FrameworkDetector`, avec `mobile.stacks` et `uiux.stack` comme sous-modules ;
   migrer d'abord `detect_languages`, `detect_api_stack`, `validation_strategy`, `pipeline_generator`,
   `flaky_tests`.
+- **Corrigé par le lot L11.** `project/stack.py` : `technology_stack` et `frameworks`
+  (`StackDetector`, `FrameworkDetector`), `detect_project_stack`, `detect_languages` (cache),
+  `detect_project_type`, `detect_api_stack`, `detect_markers`, et des portes paresseuses vers
+  `uiux.stack`, `mobile.stacks` et `test_generation.stack_aware`. Les quatre détecteurs listés
+  y sont déplacés à l'identique et réexportés depuis leur ancien module. Le scan de marqueurs
+  du runner flaky-tests passe par `detect_markers`, la boucle verify demande la pile API à la
+  façade, et `detect_languages` n'importe plus le runner du générateur de pipelines (ni son
+  dotenv). `tests/test_project_stack.py` épingle les réponses de chaque détecteur sur 17
+  projets fixtures, capturées avant le déplacement.
+- **Écart** : `uiux/stack.py` et `mobile/stacks.py` restent physiquement dans leur paquet
+  (portes paresseuses, pas de sous-modules déplacés) ; `runners/app_emulator_runner.py`,
+  `migration/analyzer.py`, `analysis/analyzers/project_analyzer_module.py` et
+  `docintel/tables.py` lisent encore leur détecteur directement. Leurs vocabulaires diffèrent ;
+  les unifier change des réponses, ce qui demande une décision par consommateur.
 
 #### F27 · Cinq listes de globs « surface »
 
@@ -912,6 +1002,12 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
   `uiux/surface.py` duplique `&ui_surface` (gardé égal par `tests/test_uiux.py`).
 - **Étape** : ancre `&mobile_surface` ; documenter ou supprimer l'écart ui/frontend ; générer
   `UI_GLOBS` depuis le YAML (ou l'inverse).
+- **Corrigé par le lot L11.** `mobile-design` porte `&mobile_surface`, `store-readiness` l'alias.
+  L'écart est documenté dans `design-check` : impeccable ne lit que le balisage web, et
+  `tests/test_uiux.py` tient `&frontend_surface` pour un sous-ensemble de `UI_GLOBS`. `UI_GLOBS`
+  reste la source (il est livré, `workflows/` non) ; `scripts/sync_surface_globs.py` réécrit
+  l'ancre, et le test d'égalité nomme le script. La liste d'`architecture-map` est unique et
+  reste en place.
 
 #### F31 · Tests dispersés et deux configurations pytest contradictoires
 
@@ -921,6 +1017,20 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 - `pytest.ini` (racine) collecte `tests`, `apps/backend`, `src` ; `apps/backend/pyproject.toml:4`
   déclare `testpaths = ["tests"]`, dossier inexistant.
 - **Étape** : déplacer vers `tests/<paquet>/` (git mv, imports ajustés), une seule configuration.
+- **Corrigé par le lot L11.** 112 fichiers déplacés par `git mv` (chemins relatifs à `__file__`
+  et imports relatifs ajustés). `apps/backend/pytest.ini` et `apps/backend/pyproject.toml`
+  supprimés : le `pytest.ini` racine est la seule configuration, et la CI lance pytest depuis
+  la racine (son `pythonpath` remplace le `PYTHONPATH` du pas). Les fixtures autouse
+  d'`apps/backend/conftest.py` passent dans le `conftest.py` racine. `staged-tests.js` lance pytest
+  depuis la racine ; `tests/test_test_discovery.py` lit le `pytest.ini` racine et vérifie qu'il
+  est seul. Collecte : 11 107 tests (11 072 avant le lot).
+- **Écart** : restent dans `apps/backend` les tests Graphiti (lot L7),
+  `runners/github/test_context_gatherer.py` (conservé par le lot L9) et six modules de
+  production qui portent seulement le préfixe `test_` (`agents/test_generator.py`,
+  `analysis/test_discovery.py`, `browser_agent/test_executor.py`,
+  `regression_guardian/test_generator.py`, `runners/test_generation_runner.py`,
+  `services/test_generation_service.py`). Pytest les collecte sans y trouver de test ; les
+  renommer touche leurs importeurs.
 
 #### F36 · Fichiers géants
 
@@ -930,6 +1040,42 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
   `renderer/components/KanbanBoard.tsx` (4 297, index local `kanban/AGENTS.md`),
   `renderer/components/api-explorer/ApiExplorer.tsx` (3 707), `main/ipc-handlers/github/pr-handlers.ts`
   (3 480), `core/worktree.py` (3 382) → découper par responsabilité, interfaces publiques inchangées.
+- **Corrigé par le lot L11.** Chaque définition est déplacée à l'identique (vérifié par AST
+  pour Python, par `tsc` pour TypeScript), et l'ancien module réexporte ce qu'il exportait.
+  - `core/agent_client.py` (5 568) → `core/agent_clients/{base,claude,copilot,openai,google,compatible,local,windsurf}.py` ;
+    le module réexporte tout, noms privés compris, et les modules loguent sous l'ancien nom.
+  - `core/worktree.py` (3 382 → 1 452) : `worktree_common.py` (helpers, types) et
+    `worktree_pr.py` (`WorktreePRMixin`, dont hérite `WorktreeManager`).
+  - `worktree-handlers.ts` (5 665 → 3 599) : `worktree-ide-terminal.ts`, `worktree-git-refs.ts`,
+    `worktree-pr-helpers.ts`.
+  - `KanbanBoard.tsx` (4 297 → 3 249) : colonnes dans `kanban/KanbanColumn.tsx`.
+  - `ApiExplorer.tsx` (3 707 → 730) : `RequestPanel.tsx`, `EnvironmentManager.tsx`,
+    `ExportDialog.tsx`, `api-explorer-shared.tsx`.
+  - `pr-handlers.ts` (3 480 → 2 516) : `pr-graphql.ts`, `pr-logs.ts`, `pr-ci-wait.ts`.
+  - Les tests qui patchent une constante ou une fonction de module visent le module qui la lit.
+- **Écart** : `usage-monitor.ts` (4 609) n'est pas découpé : c'est une seule classe dont les
+  méthodes passent toutes par `this`, et la découper revient à introduire des collaborateurs,
+  ce qui n'est plus un déplacement. Restent aussi de très longues fonctions uniques :
+  `registerWorktreeHandlers` (~3 250 lignes), `KanbanBoard` (~3 050), `registerPRHandlers` (~1 950).
+
+#### Trouvé pendant le lot L11
+
+- **La boucle d'apprentissage classait les leçons de planning sous `spec-explorer`**, un rôle que
+  le planner n'a jamais porté (son roster est `architecture-analyst` + `dependency-tracer`).
+  Corrigé avec la fusion.
+- **Le registre n'émettait ni les spécialistes mobiles ni ceux du suivi PR** vers les harness :
+  le pack mobile en portait sa propre copie. Corrigé.
+- **Un `conftest.py` qui place le dossier du runner GitHub en tête de `sys.path`** masque le
+  paquet `services` du backend pour toute la session. Les tests déplacés l'ajoutent en fin.
+- **Le `conftest.py` racine ne doit rien importer du backend** : le job d'éval des skills
+  n'installe que trois paquets, et `runners.github.rate_limiter` sort de l'interpréteur sans
+  `python-dotenv`. La réinitialisation lit `sys.modules`.
+- **`tests/test_oneshot_provider_errors.py::test_the_claude_client_applies_the_chosen_effort`
+  dépend de l'ordre** : il échoue sous `pytest -n 8` sur `develop` comme sur cette branche, et
+  passe seul. Non corrigé ici.
+- **`services/test_generation_service.py` n'a aucun importeur** : candidat au lot L9.
+- **`src/main/__tests__/config-path-validator.test.ts` échoue quand la suite tourne en `root`**
+  (`HOME=/root`) ; environnement, pas code.
 
 ### Lot L12 — Gouvernance (P3)
 
@@ -1422,4 +1568,4 @@ le câblage étant un chantier à part (décrit ci-dessous).
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.

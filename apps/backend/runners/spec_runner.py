@@ -7,9 +7,10 @@ Dynamic spec creation with complexity-based phase selection.
 The orchestrator uses AI to evaluate task complexity and adapts its process accordingly.
 
 Complexity Assessment:
-- By default, uses AI (complexity_assessor.md prompt) to analyze the task
-- AI considers: scope, integrations, infrastructure, knowledge requirements, risk
-- Falls back to heuristic analysis if AI assessment fails
+- The heuristic (spec/complexity.py) decides alone when it is confident
+  (AI_ASSESSMENT_CONFIDENCE_THRESHOLD); otherwise the AI (complexity_assessor.md)
+  settles it, considering scope, integrations, infrastructure, knowledge and risk
+- Falls back to the heuristic verdict if AI assessment fails
 - Use --no-ai-assessment to skip AI and use heuristics only
 
 Complexity Tiers:

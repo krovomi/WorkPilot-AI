@@ -34,10 +34,15 @@ from phase_config import (
 from security.constants import PROJECT_DIR_ENV_VAR
 from security.qa_scanner import run_qa_security_scan
 from task_logger import (
+    LogEntryType,
     LogPhase,
     get_task_logger,
 )
 
+from .budget import (
+    qa_iteration_cap,
+    recurring_issue_threshold,
+)
 from .criteria import (
     get_qa_iteration_count,
     get_qa_signoff_status,
@@ -150,7 +155,6 @@ def _ensure_fix_request_file(
 
 
 # Configuration
-MAX_QA_ITERATIONS = 50
 MAX_CONSECUTIVE_ERRORS = 3  # Stop after 3 consecutive errors without progress
 
 
@@ -289,6 +293,8 @@ async def run_qa_validation_loop(
         except OSError:
             pass
 
+    qa_cap = qa_iteration_cap(spec_dir)
+
     debug_section("qa_loop", "QA Validation Loop")
     debug(
         "qa_loop",
@@ -296,7 +302,7 @@ async def run_qa_validation_loop(
         project_dir=str(project_dir),
         spec_dir=str(spec_dir),
         model=model,
-        max_iterations=MAX_QA_ITERATIONS,
+        max_iterations=qa_cap,
     )
 
     print("\n" + "=" * 70)
@@ -320,7 +326,7 @@ async def run_qa_validation_loop(
     emit_phase(ExecutionPhase.QA_REVIEW, "Starting QA validation")
     task_event_emitter.emit(
         "QA_STARTED",
-        {"iteration": 1, "maxIterations": MAX_QA_ITERATIONS},
+        {"iteration": 1, "maxIterations": qa_cap},
     )
 
     # Check if there's pending human feedback that needs to be processed
@@ -494,11 +500,25 @@ async def run_qa_validation_loop(
             print("Linear task moved to 'In Review'")
 
     qa_iteration = get_qa_iteration_count(spec_dir)
+    # The budget is the task's, not the run's: a build paused and resumed in
+    # the middle of QA continues the count rather than starting a new one. A
+    # person's feedback is what opens a new budget — they have read the
+    # result and asked for more.
+    max_iterations = qa_iteration + qa_cap if has_human_feedback else qa_cap
+    recurring_threshold = recurring_issue_threshold(qa_cap)
+    if task_logger:
+        task_logger.log(
+            f"QA budget: {max_iterations - qa_iteration} review pass(es) "
+            f"(effort-based cap {qa_cap}); an issue seen {recurring_threshold} "
+            "times escalates to a human.",
+            LogEntryType.INFO,
+            LogPhase.VALIDATION,
+        )
     consecutive_errors = 0
     last_error_context = None  # Track error for self-correction feedback
     max_iterations_emitted = False
 
-    while qa_iteration < MAX_QA_ITERATIONS:
+    while qa_iteration < max_iterations:
         # Cooperative pause, checked between passes. QA is a loop of long
         # sessions, so "pause" without a checkpoint here meant the user waited
         # for the current pass to end and then watched the next one start.
@@ -517,18 +537,18 @@ async def run_qa_validation_loop(
         debug_section("qa_loop", f"QA Iteration {qa_iteration}")
         debug(
             "qa_loop",
-            f"Starting iteration {qa_iteration}/{MAX_QA_ITERATIONS}",
+            f"Starting iteration {qa_iteration}/{max_iterations}",
             iteration=qa_iteration,
-            max_iterations=MAX_QA_ITERATIONS,
+            max_iterations=max_iterations,
         )
 
-        print(f"\n--- QA Iteration {qa_iteration}/{MAX_QA_ITERATIONS} ---")
+        print(f"\n--- QA Iteration {qa_iteration}/{max_iterations} ---")
         emit_phase(
             ExecutionPhase.QA_REVIEW, f"Running QA review iteration {qa_iteration}"
         )
         # Sous-étape de la phase de validation, affichée dans la barre de phase
         # de l'UI (équivalent des « phase N: NOM » de la planification).
-        # On n'affiche PAS "/{MAX_QA_ITERATIONS}" : ce max est un garde-fou, pas
+        # On n'affiche PAS "/{max_iterations}" : ce max est un garde-fou, pas
         # un objectif — la QA s'arrête dès qu'elle approuve. Le montrer comme
         # "PASS 2/50" se lisait à tort comme "2 sur 50 faites" (~4%) alors que la
         # phase était terminée. Le frontend reformate en "QA — vérification N".
@@ -626,7 +646,7 @@ async def run_qa_validation_loop(
                     project_dir,  # Pass project_dir for capability-based tool injection
                     spec_dir,
                     qa_iteration,
-                    MAX_QA_ITERATIONS,
+                    max_iterations,
                     verbose,
                     jev_advice=jev_advice,
                     previous_error=last_error_context,  # Pass error context for self-correction
@@ -1052,7 +1072,7 @@ async def run_qa_validation_loop(
                 iteration=qa_iteration,
                 duration=f"{iteration_duration:.1f}s",
             )
-            print(f"\n❌ QA found issues. Iteration {qa_iteration}/{MAX_QA_ITERATIONS}")
+            print(f"\n❌ QA found issues. Iteration {qa_iteration}/{max_iterations}")
 
             # Get issues from QA report
             qa_status = get_qa_signoff_status(spec_dir)
@@ -1086,7 +1106,7 @@ async def run_qa_validation_loop(
             # This prevents the current issues from matching themselves in history
             history = get_iteration_history(spec_dir)
             has_recurring, recurring_issues = has_recurring_issues(
-                current_issues, history
+                current_issues, history, threshold=recurring_threshold
             )
 
             # Record rejected iteration AFTER checking for recurring issues
@@ -1095,21 +1115,25 @@ async def run_qa_validation_loop(
             )
 
             if has_recurring:
-                from .report import RECURRING_ISSUE_THRESHOLD
-
                 debug_error(
                     "qa_loop",
                     "Recurring issues detected - escalating to human",
                     recurring_count=len(recurring_issues),
-                    threshold=RECURRING_ISSUE_THRESHOLD,
+                    threshold=recurring_threshold,
                 )
                 print(
-                    f"\n⚠️  Recurring issues detected ({len(recurring_issues)} issue(s) appeared {RECURRING_ISSUE_THRESHOLD}+ times)"
+                    f"\n⚠️  Recurring issues detected ({len(recurring_issues)} issue(s) appeared {recurring_threshold}+ times)"
                 )
                 print("Escalating to human review due to recurring issues...")
 
                 # Create escalation file
-                await escalate_to_human(spec_dir, recurring_issues, qa_iteration)
+                await escalate_to_human(
+                    spec_dir,
+                    recurring_issues,
+                    qa_iteration,
+                    max_iterations=max_iterations,
+                    threshold=recurring_threshold,
+                )
 
                 # End validation phase
                 if task_logger:
@@ -1127,7 +1151,7 @@ async def run_qa_validation_loop(
                     )
                 task_event_emitter.emit(
                     "QA_MAX_ITERATIONS",
-                    {"iteration": qa_iteration, "maxIterations": MAX_QA_ITERATIONS},
+                    {"iteration": qa_iteration, "maxIterations": max_iterations},
                 )
                 max_iterations_emitted = True
 
@@ -1138,7 +1162,7 @@ async def run_qa_validation_loop(
                 issues_count = len(current_issues)
                 await linear_qa_rejected(spec_dir, issues_count, qa_iteration)
 
-            if qa_iteration >= MAX_QA_ITERATIONS:
+            if qa_iteration >= max_iterations:
                 print("\n⚠️  Maximum QA iterations reached.")
                 print("Escalating to human review.")
                 if not max_iterations_emitted:
@@ -1146,7 +1170,7 @@ async def run_qa_validation_loop(
                         "QA_MAX_ITERATIONS",
                         {
                             "iteration": qa_iteration,
-                            "maxIterations": MAX_QA_ITERATIONS,
+                            "maxIterations": max_iterations,
                         },
                     )
                     max_iterations_emitted = True
@@ -1347,18 +1371,18 @@ async def run_qa_validation_loop(
     if not max_iterations_emitted:
         task_event_emitter.emit(
             "QA_MAX_ITERATIONS",
-            {"iteration": qa_iteration, "maxIterations": MAX_QA_ITERATIONS},
+            {"iteration": qa_iteration, "maxIterations": max_iterations},
         )
     debug_error(
         "qa_loop",
         "QA VALIDATION INCOMPLETE - max iterations reached",
         iterations=qa_iteration,
-        max_iterations=MAX_QA_ITERATIONS,
+        max_iterations=max_iterations,
     )
     print("\n" + "=" * 70)
     print("  ⚠️  QA VALIDATION INCOMPLETE")
     print("=" * 70)
-    print(f"\nReached maximum iterations ({MAX_QA_ITERATIONS}) without approval.")
+    print(f"\nReached maximum iterations ({max_iterations}) without approval.")
     print("\nRemaining issues require human review:")
 
     # Show iteration summary

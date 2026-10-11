@@ -113,11 +113,15 @@ Plusieurs fichiers dépassent 3 000 lignes. **Ne pas les ouvrir en entier** : ci
 
 | Fichier | Lignes | Index local |
 |---|---|---|
-| `apps/frontend/src/main/ipc-handlers/task/worktree-handlers.ts` | ~5 700 | — |
-| `apps/frontend/src/main/claude-profile/usage-monitor.ts` | ~4 500 | — |
-| `apps/frontend/src/renderer/components/KanbanBoard.tsx` | ~4 200 | [`kanban/AGENTS.md`](apps/frontend/src/renderer/components/kanban/AGENTS.md) |
-| `apps/backend/core/client.py` | ~2 200 | — |
-| `apps/backend/agents/coder.py` | ~2 200 | — |
+| `apps/frontend/src/main/claude-profile/usage-monitor.ts` | ~4 600 | — (une seule classe ; non découpé au lot L11) |
+| `apps/frontend/src/main/ipc-handlers/task/worktree-handlers.ts` | ~3 600 | voisins `worktree-ide-terminal.ts`, `worktree-git-refs.ts`, `worktree-pr-helpers.ts` |
+| `apps/frontend/src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](apps/frontend/src/renderer/components/kanban/AGENTS.md) |
+| `apps/backend/agents/coder.py` | ~2 700 | — |
+| `apps/backend/core/client.py` | ~2 700 | — |
+
+`core/agent_client.py` (5 500 lignes jusqu'au lot L11) ne fait plus que réexporter
+`core/agent_clients/<provider>.py` ; `core/worktree.py` délègue la création de PR à
+`core/worktree_pr.py`.
 
 Index par domaine : [`apps/backend/AGENTS.md`](apps/backend/AGENTS.md) · [`apps/frontend/AGENTS.md`](apps/frontend/AGENTS.md)
 

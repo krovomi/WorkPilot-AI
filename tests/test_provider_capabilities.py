@@ -76,14 +76,17 @@ class TestMatrix:
 
     def test_every_provider_with_an_adapter_names_a_real_class(self):
         """Guards against the matrix drifting away from core/client.py."""
-        source = (
-            REPO_ROOT / "apps" / "backend" / "core" / "agent_client.py"
-        ).read_text(encoding="utf-8")
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(
+                (REPO_ROOT / "apps" / "backend" / "core" / "agent_clients").glob("*.py")
+            )
+        )
         for name, caps in load_providers(REPO_ROOT).items():
             if caps.adapter:
                 assert f"class {caps.adapter}" in source, (
                     f"{name} declares adapter {caps.adapter}, "
-                    "which does not exist in core/agent_client.py"
+                    "which does not exist in core/agent_clients/"
                 )
 
 

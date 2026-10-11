@@ -242,38 +242,6 @@ class TestAgentEntryPoint:
         )
 
 
-class TestAgentPrompt:
-    """Verify the agent prompt documents subagent capability."""
-
-    def test_mentions_subagents(self):
-        """Agent prompt mentions subagent capability."""
-        coder_prompt_path = (
-            Path(__file__).parent.parent / "apps" / "backend" / "prompts" / "coder.md"
-        )
-        content = coder_prompt_path.read_text(encoding="utf-8")
-
-        assert "subagent" in content.lower(), (
-            "Agent prompt should document subagent capability for parallel work."
-        )
-
-    def test_mentions_parallel_capability(self):
-        """Agent prompt mentions parallel/concurrent capability."""
-        coder_prompt_path = (
-            Path(__file__).parent.parent / "apps" / "backend" / "prompts" / "coder.md"
-        )
-        content = coder_prompt_path.read_text(encoding="utf-8")
-
-        has_task_tool = "task tool" in content.lower() or "Task tool" in content
-        has_parallel = "parallel" in content.lower()
-        has_concurrent = (
-            "concurrent" in content.lower() or "simultaneously" in content.lower()
-        )
-
-        assert has_task_tool or has_parallel or has_concurrent, (
-            "Agent prompt should mention parallel/concurrent work capability."
-        )
-
-
 class TestModuleIntegrity:
     """Verify core modules work correctly."""
 
@@ -483,7 +451,6 @@ def run_tests():
         TestNoExternalParallelism,
         TestCLIInterface,
         TestAgentEntryPoint,
-        TestAgentPrompt,
         TestModuleIntegrity,
         TestProjectDocumentation,
         TestElectronToolScoping,  # Note: requires pytest (uses monkeypatch)

@@ -11,10 +11,11 @@ Toute interaction LLM passe par ces fichiers. Les modifier touche l'ensemble du 
 
 | Fichier | Lignes | Rôle |
 |---|---|---|
-| `core/client.py` | ~2 000 | **la fabrique**. `create_client()` (SDK Claude) et `create_agent_client()` (multi-provider). Résout modèle, outils, serveurs MCP, sous-agents. |
-| `core/agent_client.py` | ~4 500 | les clients par provider : Copilot, Windsurf, Claude, locaux |
+| `core/client.py` | ~2 700 | **la fabrique**. `create_client()` (SDK Claude) et `create_agent_client()` (multi-provider). Résout modèle, outils, serveurs MCP, sous-agents. |
+| `core/agent_clients/` | ~5 700 | un module par provider (`base`, `claude`, `copilot`, `openai`, `google`, `compatible`, `local`, `windsurf`) ; `core/agent_client.py` les réexporte |
+| `core/worktree.py` + `worktree_pr.py` + `worktree_common.py` | ~3 400 | worktrees par spec ; la création de PR/MR est le mixin `WorktreePRMixin` |
 | `agents/session.py` | ~2 200 | la boucle de session : streaming, reprise, erreurs, rate limits |
-| `agents/coder.py` | ~2 200 | l'agent d'implémentation, découpage en sous-tâches |
+| `agents/coder.py` | ~2 700 | l'agent d'implémentation, découpage en sous-tâches |
 | `cli/build_commands.py` | ~540 | enchaîne les phases d'un build : planning → coding → QA |
 | `qa/loop.py` | ~1 350 | boucle de validation QA |
 | `provider_api.py` | ~2 000 | monte tous les routeurs FastAPI du domaine |
@@ -90,9 +91,11 @@ réponses sur des projets fixtures.
 
 - **Jamais `anthropic.Anthropic()` en direct.** Toujours `create_client()`.
 - **Type hints partout**, `ruff` 0.15.7 (`ruff check apps/backend/`, `ruff format --check`).
-- Les tests vivent dans `../../tests/`, pas ici — quelques `test_*.py` traînent encore
-  dans les packages, c'est un reliquat.
-- `pytest.ini` fixe `pythonpath = . ./src` : les imports sont plats
+- Les tests vivent dans `../../tests/<paquet>/` (lot L11). Il reste ici ceux de
+  Graphiti (lot L7) et `runners/github/test_context_gatherer.py` ; six modules de production portent
+  seulement le préfixe `test_` (`agents/test_generator.py`, `analysis/test_discovery.py`…).
+- **Une seule configuration pytest** : le `pytest.ini` de la racine, lancé depuis la
+  racine (CI comprise). Son `pythonpath = apps/backend . ./src` rend les imports plats
   (`from phase_config import …`, `from agents.coder import …`).
 - **Importer le module réel, jamais un fichier de la racine qui le réexporte.**
   Les shims de compatibilité de la racine (`debug.py`, `progress.py`,
