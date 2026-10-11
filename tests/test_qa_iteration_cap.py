@@ -29,7 +29,7 @@ _QA_NAMES = (
 _REPORT_NAMES = ("RECURRING_ISSUE_THRESHOLD", "escalate_to_human", "record_iteration")
 
 # Bound by `_qa_modules` before any test runs.
-qa_loop = save_implementation_plan = should_run_fixes = None
+qa_budget = save_implementation_plan = should_run_fixes = None
 MAX_QA_ITERATIONS = QA_ITERATIONS_BY_EFFORT = QA_MAX_ITERATIONS_ENV = None
 qa_iteration_cap = recurring_issue_threshold = None
 RECURRING_ISSUE_THRESHOLD = escalate_to_human = record_iteration = None
@@ -39,21 +39,22 @@ RECURRING_ISSUE_THRESHOLD = escalate_to_human = record_iteration = None
 def _qa_modules():
     """Import `qa` for this module only, and leave `sys.modules` as found.
 
-    `qa.loop` pulls in the real `core.*`. Imported at collection, those copies
+    `qa` pulls in the real `core.*`. Imported at collection, those copies
     sit in `sys.modules` while `test_qa_loop` swaps `core.*` for mocks, and the
     spec-configuration tests that follow end up patching one `core.client`
     while the code under test calls another.
     """
     before = dict(sys.modules)
+    import qa.budget as budget
     import qa.criteria as criteria
-    import qa.loop as loop
+    import qa.loop  # noqa: F401 - the loop is what runs under this budget
     import qa.report as report
 
     namespace = globals()
-    namespace["qa_loop"] = loop
+    namespace["qa_budget"] = budget
     namespace["save_implementation_plan"] = criteria.save_implementation_plan
     namespace["should_run_fixes"] = criteria.should_run_fixes
-    namespace.update({name: getattr(loop, name) for name in _QA_NAMES})
+    namespace.update({name: getattr(budget, name) for name in _QA_NAMES})
     namespace.update({name: getattr(report, name) for name in _REPORT_NAMES})
     yield
     for name in set(sys.modules) - set(before):
@@ -91,14 +92,14 @@ class TestCapByEffort:
         assert qa_iteration_cap(spec) == QA_ITERATIONS_BY_EFFORT[effort]
 
     def test_an_unknown_effort_gets_the_default_cap(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(qa_loop, "get_phase_thinking", lambda *_a: "extreme")
+        monkeypatch.setattr(qa_budget, "get_phase_thinking", lambda *_a: "extreme")
         assert qa_iteration_cap(_spec(tmp_path)) == QA_ITERATIONS_BY_EFFORT["high"]
 
     def test_an_unreadable_effort_gets_the_default_cap(self, tmp_path, monkeypatch):
         def boom(*_a):
             raise OSError("unreadable")
 
-        monkeypatch.setattr(qa_loop, "get_phase_thinking", boom)
+        monkeypatch.setattr(qa_budget, "get_phase_thinking", boom)
         assert qa_iteration_cap(_spec(tmp_path)) == QA_ITERATIONS_BY_EFFORT["high"]
 
 

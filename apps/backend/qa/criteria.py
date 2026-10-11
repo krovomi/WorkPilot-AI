@@ -12,6 +12,8 @@ from pathlib import Path
 
 from core.progress import is_build_complete
 
+from .budget import qa_iteration_cap
+
 # =============================================================================
 # IMPLEMENTATION PLAN I/O
 # =============================================================================
@@ -195,8 +197,6 @@ def should_run_fixes(spec_dir: Path) -> bool:
     - QA has rejected the build
     - Max iterations not reached
     """
-    from .loop import qa_iteration_cap
-
     if not is_qa_rejected(spec_dir):
         return False
 

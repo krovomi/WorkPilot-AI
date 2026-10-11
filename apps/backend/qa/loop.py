@@ -29,7 +29,6 @@ from integrations.linear.updater import (
 from phase_config import (
     get_phase_model,
     get_phase_provider,
-    get_phase_thinking,
     get_phase_thinking_budget,
 )
 from security.constants import PROJECT_DIR_ENV_VAR
@@ -40,6 +39,10 @@ from task_logger import (
     get_task_logger,
 )
 
+from .budget import (
+    qa_iteration_cap,
+    recurring_issue_threshold,
+)
 from .criteria import (
     get_qa_iteration_count,
     get_qa_signoff_status,
@@ -152,54 +155,7 @@ def _ensure_fix_request_file(
 
 
 # Configuration
-# The ceiling no effort level and no override goes past. It used to be the cap
-# itself, at every effort: fifty reviewer + fixer rounds, each re-reading the
-# diff, before anything stopped a loop that was not converging (audit F17).
-MAX_QA_ITERATIONS = 50
 MAX_CONSECUTIVE_ERRORS = 3  # Stop after 3 consecutive errors without progress
-
-# How many review passes the task's QA effort buys. The effort is the QA
-# phase's own (`phaseThinking.qa`, default `high`): the knob the user turns for
-# how hard QA works is the one that decides how long it may keep going.
-QA_ITERATIONS_BY_EFFORT: dict[str, int] = {
-    "none": 3,
-    "low": 5,
-    "medium": 8,
-    "high": 12,
-    "ultrathink": 20,
-}
-# A budget that wins over the effort (any build, any task), bounded by
-# MAX_QA_ITERATIONS.
-QA_MAX_ITERATIONS_ENV = "WORKPILOT_QA_MAX_ITERATIONS"
-
-
-def qa_iteration_cap(spec_dir: Path) -> int:
-    """The number of QA review passes this task may run."""
-    raw = os.environ.get(QA_MAX_ITERATIONS_ENV, "").strip()
-    if raw:
-        try:
-            override = int(raw)
-        except ValueError:
-            override = 0
-        if override >= 1:
-            return min(override, MAX_QA_ITERATIONS)
-    try:
-        effort = get_phase_thinking(spec_dir, "qa")
-    except Exception:  # noqa: BLE001 - an unreadable metadata file is not a reason to loop 50 times
-        effort = "high"
-    return QA_ITERATIONS_BY_EFFORT.get(str(effort), QA_ITERATIONS_BY_EFFORT["high"])
-
-
-def recurring_issue_threshold(cap: int) -> int:
-    """Occurrences that escalate an issue to a human, within a budget of ``cap``.
-
-    The default threshold (8) is more passes than `none`, `low` or `medium` buy:
-    unclamped, an issue present in every pass would end on "maximum iterations"
-    without the escalation report that says which issue kept coming back.
-    """
-    from .report import RECURRING_ISSUE_THRESHOLD
-
-    return max(2, min(RECURRING_ISSUE_THRESHOLD, cap))
 
 
 async def _run_dotnet_tests(project_dir: Path) -> bool:

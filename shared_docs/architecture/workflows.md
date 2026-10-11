@@ -97,7 +97,7 @@ the first QA pass (the decision) and `architecture-map` (after QA, past its
 significance filter). Five on a phone app, where `store-readiness` reads the
 manifests after QA. At `none` and `low`, one: QA. Further QA passes are
 bounded by the QA budget, which follows the QA phase's effort
-(`qa.loop.QA_ITERATIONS_BY_EFFORT`, 3 to 20 passes, `WORKPILOT_QA_MAX_ITERATIONS`
+(`qa.budget.QA_ITERATIONS_BY_EFFORT`, 3 to 20 passes, `WORKPILOT_QA_MAX_ITERATIONS`
 to override within the old ceiling of 50). The audit's count included a
 per-subtask self-review: it never ran — `coder.md`, which prescribed it, was
 given to no session, and `agents/self_review.py` is opt-in and writes a stub

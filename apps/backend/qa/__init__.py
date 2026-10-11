@@ -42,6 +42,13 @@ from .auto_fix_metrics import (
     record_auto_fix_run,
 )
 
+# QA budget
+from .budget import (
+    MAX_QA_ITERATIONS,
+    QA_ITERATIONS_BY_EFFORT,
+    qa_iteration_cap,
+)
+
 # Configuration constants
 # Criteria & status
 from .criteria import (
@@ -64,12 +71,7 @@ from .fixer import (
 )
 
 # Main loop
-from .loop import (
-    MAX_QA_ITERATIONS,
-    QA_ITERATIONS_BY_EFFORT,
-    qa_iteration_cap,
-    run_qa_validation_loop,
-)
+from .loop import run_qa_validation_loop
 
 # Report & tracking
 from .report import (

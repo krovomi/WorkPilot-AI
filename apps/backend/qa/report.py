@@ -7,38 +7,16 @@ and report generation.
 """
 
 import json
-import os
 from collections import Counter
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
+from .budget import RECURRING_ISSUE_THRESHOLD, qa_iteration_cap
 from .criteria import load_implementation_plan, save_implementation_plan
 
-
-def _read_int_env(name: str, default: int, *, minimum: int = 1) -> int:
-    """Lit une variable d'env entière, retombe sur ``default`` si invalide."""
-    raw = os.environ.get(name)
-    if not raw:
-        return default
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
-        return default
-    return value if value >= minimum else default
-
-
 # Configuration
-# Seuil par défaut : 8 occurrences avant escalade humaine. L'ancien seuil de 3
-# faisait escalader la boucle dès la 3ᵉ itération sur 50, dès qu'une issue
-# persistait — y compris des faux positifs non-actionables comme « Cannot
-# verify without runtime ». 8 laisse au fixer une vraie chance de converger
-# tout en gardant un garde-fou contre les boucles infinies. Surchargeable via
-# ``WORKPILOT_QA_RECURRING_THRESHOLD``.
-RECURRING_ISSUE_THRESHOLD = _read_int_env(
-    "WORKPILOT_QA_RECURRING_THRESHOLD", default=8, minimum=2
-)
 ISSUE_SIMILARITY_THRESHOLD = 0.8  # Consider issues "same" if similarity >= this
 
 
@@ -321,8 +299,6 @@ async def escalate_to_human(
         threshold: The occurrence count that made these issues recurring
     """
     if max_iterations is None:
-        from .loop import qa_iteration_cap
-
         max_iterations = qa_iteration_cap(spec_dir)
 
     history = get_iteration_history(spec_dir)
