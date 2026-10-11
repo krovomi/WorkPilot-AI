@@ -13,8 +13,8 @@ import pytest
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-from .streaming_manager import StreamingManager
-from .websocket_server import StreamingWebSocketServer
+from streaming.streaming_manager import StreamingManager
+from streaming.websocket_server import StreamingWebSocketServer
 
 
 class TestStreamingManager:

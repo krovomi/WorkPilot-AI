@@ -18,7 +18,7 @@ from pathlib import Path
 
 # Make `from security.git_validators import ...` work when running
 # pytest directly from this directory.
-_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+_BACKEND_ROOT = Path(__file__).resolve().parents[2] / "apps" / "backend"
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 

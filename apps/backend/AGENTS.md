@@ -88,7 +88,10 @@ réponses sur des projets fixtures.
 
 - **Jamais `anthropic.Anthropic()` en direct.** Toujours `create_client()`.
 - **Type hints partout**, `ruff` 0.15.7 (`ruff check apps/backend/`, `ruff format --check`).
-- Les tests vivent dans `../../tests/`, pas ici — quelques `test_*.py` traînent encore
-  dans les packages, c'est un reliquat.
-- `pytest.ini` fixe `pythonpath = . ./src` : les imports sont plats
+- Les tests vivent dans `../../tests/<paquet>/` (lot L11). Il reste ici ceux que
+  d'autres lots déplacent ou suppriment (`sandbox/`, `integrations/graphiti/`,
+  `runners/github/test_context_gatherer.py`) ; six modules de production portent
+  seulement le préfixe `test_` (`agents/test_generator.py`, `analysis/test_discovery.py`…).
+- **Une seule configuration pytest** : le `pytest.ini` de la racine, lancé depuis la
+  racine (CI comprise). Son `pythonpath = apps/backend . ./src` rend les imports plats
   (`from phase_config import …`, `from agents.coder import …`).

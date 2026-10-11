@@ -202,7 +202,7 @@ def test_record_helpers_write_to_root_from_worktree(tmp_path: Path) -> None:
 
 def _load_runner():
     runner_path = (
-        Path(__file__).resolve().parents[1] / "runners" / "consensus_arbiter_runner.py"
+        Path(__file__).resolve().parents[2] / "apps" / "backend" / "runners" / "consensus_arbiter_runner.py"
     )
     spec = importlib.util.spec_from_file_location("_ca_runner_test", runner_path)
     assert spec and spec.loader

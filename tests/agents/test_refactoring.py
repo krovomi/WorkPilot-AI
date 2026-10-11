@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 # Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "apps" / "backend"))
 
 
 def test_imports():
@@ -118,7 +118,7 @@ def test_module_structure():
 
     from pathlib import Path
 
-    agents_dir = Path(__file__).parent
+    agents_dir = Path(__file__).resolve().parents[2] / "apps" / "backend" / "agents"
 
     required_files = [
         "__init__.py",

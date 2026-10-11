@@ -22,8 +22,7 @@ import tempfile
 from pathlib import Path
 
 # Add the backend directory to the path so we can import modules
-SCRIPT_DIR = Path(__file__).resolve().parent
-BACKEND_DIR = SCRIPT_DIR.parent
+BACKEND_DIR = Path(__file__).resolve().parents[2] / "apps" / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 

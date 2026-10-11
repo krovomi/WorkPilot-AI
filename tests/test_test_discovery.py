@@ -40,14 +40,25 @@ EXCLUDED = {
 def _testpaths() -> list[Path]:
     """Les chemins que la CI collecte, lus dans la configuration qu'elle utilise.
 
-    La CI lance pytest depuis `apps/backend`, donc c'est ce `pytest.ini` qui la
-    configure — pas celui de la racine. Les lire plutôt que les recopier évite
-    qu'un élargissement de l'un laisse ce test derrière.
+    Une seule configuration depuis le lot L11 : le `pytest.ini` de la racine,
+    d'où la CI lance pytest. Les lire plutôt que les recopier évite qu'un
+    élargissement laisse ce test derrière.
     """
     parser = configparser.ConfigParser()
-    parser.read(BACKEND / "pytest.ini", encoding="utf-8")
+    parser.read(REPO_ROOT / "pytest.ini", encoding="utf-8")
     raw = parser.get("pytest", "testpaths")
-    return [(BACKEND / entry).resolve() for entry in raw.split() if entry.strip()]
+    return [(REPO_ROOT / entry).resolve() for entry in raw.split() if entry.strip()]
+
+
+def test_there_is_one_pytest_configuration() -> None:
+    """Trois configurations se contredisaient ; laquelle s'appliquait dépendait
+    du répertoire de lancement."""
+    assert not (BACKEND / "pytest.ini").exists()
+    assert not (BACKEND / "pyproject.toml").exists()
+    for name in ("setup.cfg", "tox.ini"):
+        path = REPO_ROOT / name
+        if path.exists():
+            assert "pytest" not in path.read_text(encoding="utf-8")
 
 
 #: Arbres tiers vendorisés. Leurs tests sont ceux de l'amont, lancés par
@@ -93,7 +104,7 @@ def test_every_test_file_is_collected() -> None:
     ]
 
     assert stranded == [], (
-        "fichiers de test hors des `testpaths` d'apps/backend/pytest.ini — "
+        "fichiers de test hors des `testpaths` du pytest.ini racine — "
         "ils ne tourneront nulle part :\n" + "\n".join(sorted(stranded))
     )
 
@@ -109,10 +120,10 @@ def test_package_qualified_backend_import_survives_collection_mock_pollution() -
             "pytest",
             "--collect-only",
             "-q",
-            "core/test_conversation_log.py",
-            "../../tests/backend/test_ssrf_protection.py",
+            "tests/core/test_conversation_log.py",
+            "tests/backend/test_ssrf_protection.py",
         ],
-        cwd=BACKEND,
+        cwd=REPO_ROOT,
         env=env,
         capture_output=True,
         text=True,
