@@ -23,22 +23,12 @@ Consumers:
   (typed loader with validation) and [provider_api.py](../apps/backend/provider_api.py#L1).
   Validated against `ConfiguredProvider` at load time — malformed entries
   raise immediately instead of silently propagating empty strings.
-- **Frontend TypeScript** — a typed module is **generated** from the JSON
-  at [apps/frontend/src/shared/types/providers.generated.ts](../apps/frontend/src/shared/types/providers.generated.ts).
-  It exposes `ConfiguredProvider`, `ProviderName` (union of every known
-  ID), `CONFIGURED_PROVIDERS`, and `isProviderName()` as a type guard.
-
-**Regenerate after editing the JSON:**
-
-```bash
-pnpm run generate:provider-types
-```
-
-**CI check** — fails if the generated file drifts from the JSON:
-
-```bash
-pnpm run validate:provider-types
-```
+- **Frontend TypeScript** — read at runtime over IPC
+  (`providers:getConfiguredProviders`) by
+  [`shared/services/providerService.ts`](../apps/frontend/src/shared/services/providerService.ts),
+  which falls back to `providerRegistry` when the bridge is absent. A generated
+  `providers.generated.ts` (and its `generate:provider-types` script) existed but
+  nothing imported it; audit lot L8 removed both.
 
 The file must not be duplicated. A previous copy at
 `utils/config/configured_providers.json` has been removed; any reference

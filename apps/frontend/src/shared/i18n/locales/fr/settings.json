@@ -503,8 +503,6 @@
 			"tokenPlaceholder": "sk-ant-oat01-..."
 		},
 		"customEndpoints": {
-			"activeBadge": "Actif",
-			"addButton": "Ajouter un profil",
 			"buttons": {
 				"activate": "Activer",
 				"activating": "Activation...",
@@ -512,20 +510,6 @@
 				"deactivating": "Basculement...",
 				"delete": "Supprimer",
 				"edit": "Modifier"
-			},
-			"customModels": "Modèles personnalisés : {{models}}",
-			"description": "Configurer des endpoints API compatibles Anthropic",
-			"dialog": {
-				"cancel": "Annuler",
-				"delete": "Supprimer",
-				"deleteDescription": "Êtes-vous sûr de vouloir supprimer « {{name}} » ? Cette action est irréversible.",
-				"deleteTitle": "Supprimer le profil",
-				"deleting": "Suppression..."
-			},
-			"empty": {
-				"action": "Ajouter un profil",
-				"description": "Configurez des endpoints API compatibles Anthropic pour utiliser des fournisseurs alternatifs.",
-				"title": "Aucun endpoint personnalisé"
 			},
 			"sections": {
 				"customized": {
@@ -543,49 +527,22 @@
 					"description": "Configurer les clés API des fournisseurs LLM standard (OpenAI, Google, Meta, etc.)",
 					"title": "Fournisseurs standard"
 				}
-			},
-			"setActive": {
-				"label": "Définir actif",
-				"loading": "Configuration..."
-			},
-			"switchToOauth": {
-				"label": "Utiliser l'authentification IA",
-				"loading": "Basculement..."
-			},
-			"tooltips": {
-				"deleteActive": "Impossible de supprimer l'endpoint actif",
-				"deleteInactive": "Supprimer",
-				"edit": "Modifier"
 			}
 		},
-		"description": "Gérer les comptes Claude et les endpoints API",
 		"form": {
-			"addAccount": "Ajouter un compte {{provider}}",
 			"apiKey": "Clé API",
 			"apiKeyPlaceholder": "sk-...",
 			"baseUrl": "URL de base (optionnelle)",
 			"baseUrlPlaceholder": "https://api.example.com",
-			"cancel": "Annuler",
-			"chooseModel": "-- Choisir un modèle --",
 			"name": "Nom du compte",
 			"namePlaceholder": "Nom du compte",
 			"oauthToken": "Jeton OAuth",
-			"oauthTokenPlaceholder": "Jeton OAuth (si requis)",
-			"save": "Enregistrer"
+			"oauthTokenPlaceholder": "Jeton OAuth (si requis)"
 		},
 		"multiConnector": {
 			"title": "Gestion des fournisseurs IA",
 			"description": "Connectez et gérez plusieurs fournisseurs IA (Claude, OpenAI, Mistral, etc...).",
-			"buttons": {
-				"addProvider": "Ajouter un fournisseur",
-				"refresh": "Actualiser"
-			},
-			"loadingProviders": "Chargement des fournisseurs...",
-			"stats": {
-				"configured": "{{count}} configuré(s)",
-				"errors": "{{count}} erreur(s)",
-				"total": "{{count}} au total"
-			}
+			"loadingProviders": "Chargement des fournisseurs..."
 		},
 		"priority": {
 			"active": "Actif",
@@ -627,26 +584,7 @@
 		},
 		"tabs": {
 			"aiProvider": "Authentification IA",
-			"customEndpoints": "Endpoints personnalisés",
 			"llmProviders": "Fournisseurs LLM"
-		},
-		"title": "Comptes",
-		"toast": {
-			"addProfileFailed": "Échec de l'ajout du profil",
-			"deleteProfileFailed": "Échec de la suppression du profil",
-			"loadProfilesFailed": "Échec du chargement des profils",
-			"renameProfileFailed": "Échec du renommage du profil",
-			"setActiveProfileFailed": "Échec de la définition du profil actif",
-			"settingsUpdateFailed": "Échec de la mise à jour des paramètres",
-			"tokenSaveFailed": "Échec de l'enregistrement du jeton",
-			"tokenSaved": "Jeton enregistré",
-			"tokenSavedDescription": "Votre jeton a été enregistré avec succès.",
-			"tryAgain": "Veuillez réessayer.",
-			"authFailed": "Échec de l'authentification",
-			"checkFilePermissions": "Vérifiez les permissions du fichier et réessayez.",
-			"checkPath": "Vérifiez que le chemin existe et réessayez.",
-			"pathNotFound": "Chemin introuvable",
-			"permissionDenied": "Permission refusée"
 		}
 	},
 	"actions": {
@@ -792,25 +730,10 @@
 			"save": "Enregistrer le profil",
 			"saving": "Enregistrement..."
 		},
-		"activeBadge": "Actif",
-		"addButton": "Ajouter un profil",
-		"customModels": "Modèles personnalisés : {{models}}",
-		"deleteAriaLabel": "Supprimer le profil {{name}}",
-		"description": "Configurer des endpoints API compatibles Anthropic",
 		"dialog": {
-			"cancel": "Annuler",
 			"createTitle": "Ajouter un profil API",
-			"delete": "Supprimer",
-			"deleteDescription": "Êtes-vous sûr de vouloir supprimer « {{name}} » ? Cette action est irréversible.",
-			"deleteTitle": "Supprimer le profil ?",
-			"deleting": "Suppression...",
 			"description": "Configurer un endpoint API compatible Anthropic pour vos builds.",
 			"editTitle": "Modifier le profil"
-		},
-		"empty": {
-			"action": "Créer un premier profil",
-			"description": "Créez un profil pour configurer des endpoints API personnalisés pour vos builds.",
-			"title": "Aucun profil API configuré"
 		},
 		"fields": {
 			"apiKey": "Clé API",
@@ -853,49 +776,21 @@
 			"cohere": "Cohere",
 			"openrouter": "OpenRouter"
 		},
-		"setActive": {
-			"label": "Définir actif",
-			"loading": "Configuration..."
-		},
-		"switchToOauth": {
-			"label": "Basculer vers OAuth",
-			"loading": "Basculement..."
-		},
 		"testConnection": {
 			"failure": "Échec de connexion",
 			"label": "Tester la connexion",
 			"success": "Connexion réussie",
 			"testing": "Test en cours..."
 		},
-		"title": "Profils API",
 		"toast": {
 			"create": {
 				"description": "« {{name}} » a été ajouté avec succès.",
 				"title": "Profil créé"
 			},
-			"delete": {
-				"description": "« {{name}} » a été supprimé.",
-				"errorFallback": "Une erreur est survenue lors de la suppression du profil.",
-				"errorTitle": "Échec de la suppression du profil",
-				"title": "Profil supprimé"
-			},
-			"switch": {
-				"errorFallback": "Une erreur est survenue lors du changement de méthode d'authentification.",
-				"errorTitle": "Échec du changement d'authentification",
-				"oauthDescription": "Utilisation de l'authentification OAuth",
-				"oauthTitle": "Basculé vers OAuth",
-				"profileDescription": "Utilisation de {{name}}",
-				"profileTitle": "Profil activé"
-			},
 			"update": {
 				"description": "« {{name}} » a été mis à jour avec succès.",
 				"title": "Profil mis à jour"
 			}
-		},
-		"tooltips": {
-			"deleteActive": "Basculez vers OAuth avant de supprimer",
-			"deleteInactive": "Supprimer le profil",
-			"edit": "Modifier le profil"
 		},
 		"validation": {
 			"apiKeyInvalid": "Format de clé API invalide",
@@ -1002,9 +897,6 @@
 		"description": "Sélectionnez les éléments de travail Azure DevOps à importer dans WorkPilot AI",
 		"done": "Terminé",
 		"dragInstructions": "Sélectionnez les éléments puis glissez-les vers une colonne",
-		"dropToColumn": "Déposer dans la colonne {{column}}",
-		"dropZone": "Déposer les éléments ici",
-		"dropZoneItems": "{{count}} élément(s) à importer",
 		"emptySubtitle": "Essayez d'ajuster vos filtres",
 		"emptyTitle": "Aucun élément de travail trouvé",
 		"errorCheckConnectionFailed": "Échec de la vérification de connexion",
@@ -1047,36 +939,6 @@
 	"collaboration": {
 		"description": "Paramètres de collaboration multi-utilisateurs",
 		"title": "Collaboration"
-	},
-	"copilotOAuth": {
-		"addProfile": "Ajouter un profil",
-		"addedDate": "Ajouté le {{date}}",
-		"authenticateButton": "S'authentifier avec GitHub",
-		"authenticated": "Authentifié",
-		"authenticatedProfiles": "Profils authentifiés",
-		"authenticating": "Authentification...",
-		"checkingStatus": "Vérification du statut d'authentification...",
-		"defaultUser": "Utilisateur GitHub",
-		"description": "Authentification web via GitHub OAuth",
-		"descriptionNoCli": "Authentification web via GitHub OAuth (pas de CLI requis)",
-		"noAuthFound": "Aucune authentification trouvée",
-		"noAuthFoundDesc": "Connectez-vous à GitHub Copilot via l'authentification OAuth",
-		"notAuthenticated": "Non authentifié",
-		"openingBrowser": "Ouverture du navigateur...",
-		"readyToUse": "Prêt à utiliser GitHub Copilot",
-		"serverUnavailable": "Serveur OAuth non disponible",
-		"serverUnavailableHint": "Veuillez redémarrer l'application ou vérifier votre connexion réseau",
-		"title": "Authentification GitHub Copilot",
-		"toast": {
-			"authFailed": "Échec de l'authentification",
-			"authRevoked": "Authentification révoquée",
-			"authRevokedDesc": "Authentification révoquée avec succès pour {{username}}",
-			"authSuccess": "Authentification réussie",
-			"authSuccessDesc": "Authentifié avec succès en tant que {{username}}",
-			"oauthStarted": "OAuth démarré",
-			"oauthStartedDesc": "Veuillez terminer l'authentification dans votre navigateur",
-			"revokeFailed": "Échec de la révocation"
-		}
 	},
 	"debug": {
 		"copied": "Copié !",
@@ -1989,7 +1851,6 @@
 			"add": "Ajouter",
 			"refresh": "Actualiser"
 		},
-		"description": "Connectez et gérez plusieurs fournisseurs IA (Claude, OpenAI, Mistral, etc...).",
 		"filters": {
 			"all": "Tous",
 			"configured": "Configurés",
@@ -2017,8 +1878,7 @@
 			"configured": "{{count}} configuré(s)",
 			"errors": "{{count}} erreur(s)",
 			"total": "{{count}} au total"
-		},
-		"title": "Gestion des fournisseurs IA"
+		}
 	},
 	"scale": {
 		"comfortable": "Confortable",
@@ -2331,8 +2191,6 @@
 		}
 	},
 	"llmRouter": {
-		"title": "Routeur LLM",
-		"description": "Configurez le routage intelligent des fournisseurs avec chaînes de secours, tests A/B et sélection basée sur la stratégie.",
 		"routingStrategy": {
 			"title": "Stratégie de Routage par Défaut",
 			"description": "Comment le routeur sélectionne un fournisseur lorsque plusieurs sont disponibles.",
@@ -2344,31 +2202,6 @@
 			"lowestLatencyDescription": "Temps de réponse le plus rapide",
 			"roundRobin": "Round Robin",
 			"roundRobinDescription": "Distribution équitable"
-		},
-		"registeredProviders": {
-			"title": "Fournisseurs Enregistrés",
-			"description": "Fournisseurs disponibles pour le routage. Configurez les comptes dans Paramètres > Comptes.",
-			"table": {
-				"providerModel": "Fournisseur / Modèle",
-				"capabilities": "Capacités",
-				"priority": "Priorité",
-				"status": "Statut"
-			},
-			"status": {
-				"active": "Actif",
-				"disabled": "Désactivé",
-				"local": "local"
-			}
-		},
-		"fallbackChains": {
-			"title": "Chaînes de Secours",
-			"description": "Si le fournisseur principal est limité en débit ou indisponible, le routeur bascule automatiquement vers le suivant dans la chaîne."
-		},
-		"abTesting": {
-			"title": "Tests A/B",
-			"description": "Comparez deux fournisseurs sur le même type de tâche. Le routeur alterne entre eux et suit la qualité, la latence et le coût.",
-			"noActiveTests": "Aucun test A/B actif",
-			"createTest": "Créez un test depuis la Palette de Commandes ou depuis la vue de détail de la tâche."
 		}
 	},
 	"memoryLifecycle": {

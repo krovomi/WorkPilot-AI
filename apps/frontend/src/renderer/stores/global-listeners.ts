@@ -9,7 +9,6 @@ import { setupArchitectureDeltaListeners } from "./architecture-delta-store";
 import {
 	setupArchitectureVisualizerListeners,
 } from "./architecture-visualizer-store";
-import { setupAutoRefactorListeners } from "./auto-refactor-store";
 import { setupCarbonProfilerListeners } from "./carbon-profiler-store";
 import { setupCodeMigrationListeners } from "./code-migration-store";
 import { setupCodePlaygroundListeners } from "./code-playground-store";
@@ -20,7 +19,6 @@ import {
 	setupContextAwareSnippetsListeners,
 } from "./context-aware-snippets-store";
 import { setupDocDriftListeners } from "./doc-drift-store";
-import { setupDocumentationAgentListeners } from "./documentation-agent-store";
 import { setupFlakyTestsListeners } from "./flaky-tests-store";
 import { setupGitSurgeonListeners } from "./git-surgeon-store";
 import { setupIdeationListeners } from "./ideation-store";
@@ -75,7 +73,6 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["AppEmulator", setupAppEmulatorListeners],
 	["ArchitectureDelta", setupArchitectureDeltaListeners],
 	["ArchitectureVisualizer", setupArchitectureVisualizerListeners],
-	["AutoRefactor", setupAutoRefactorListeners],
 	["CarbonProfiler", setupCarbonProfilerListeners],
 	["CodeMigration", setupCodeMigrationListeners],
 	["CodePlayground", setupCodePlaygroundListeners],
@@ -84,7 +81,6 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["ConsensusArbiter", setupConsensusArbiterListeners],
 	["ContextAwareSnippets", setupContextAwareSnippetsListeners],
 	["DocDrift", setupDocDriftListeners],
-	["DocumentationAgent", setupDocumentationAgentListeners],
 	["FlakyTests", setupFlakyTestsListeners],
 	["GitSurgeon", setupGitSurgeonListeners],
 	["Ideation", setupIdeationListeners],

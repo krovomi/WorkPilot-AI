@@ -6,7 +6,7 @@
  * Replaces:
  *   - auth-failure-store.ts
  *   - rate-limit-store.ts
- *   - provider-refresh-store.ts
+ *   - provider-refresh-store.ts (its wrapper had no caller left; removed)
  *
  * All property names are prefixed by slice to avoid collisions
  * (e.g. authFailure_isModalOpen vs rateLimit_isModalOpen).
