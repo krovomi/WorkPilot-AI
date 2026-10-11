@@ -808,7 +808,7 @@ et figé par `tests/test_review_lenses.py`.
   - L'« auto-revue par sous-tâche » comptée par F11 n'a jamais tourné : c'était l'étape 6.5 de
     `coder.md`, et `agents/self_review.py` est opt-in et écrit un résumé de `git diff` sans modèle.
   - `prompts_pkg.prompts.get_planner_prompt` n'a pas d'appelant non plus (`generate_planner_prompt`
-    sert le planner) : relève du lot L9.
+    sert le planner), et le lot L9, fusionné entre-temps, l'a laissé : à retirer dans un suivi.
 - **Écarts, questions au mainteneur :**
   - Les règles de `coder.md` absentes du prompt servi (auto-critique avant de marquer une sous-tâche
     terminée, ne jamais pousser, ne pas modifier la config git, écrire les insights de session) :
@@ -819,7 +819,7 @@ et figé par `tests/test_review_lenses.py`.
   - `qa-acceptance-checker` reste offert au `verifier` (`roster: qa`) et au QA reviewer, alors que la
     conformité est une lentille de `review` à `high` : retirer la conformité du roster du verifier ?
     Touche la consolidation des sous-agents (lot L11).
-  - `self_review.py` : le supprimer (L9), ou le brancher sur un vrai client — ce qui ajouterait une
+  - `self_review.py` : le supprimer, ou le brancher sur un vrai client — ce qui ajouterait une
     session par build ?
 
 #### F10 · Prompts volumineux et onze prompts orphelins

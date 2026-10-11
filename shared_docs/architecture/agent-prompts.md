@@ -5,7 +5,7 @@
 
 ## Agent Prompts (`apps/backend/prompts/`)
 
-29 root-level prompts + 16 GitHub-specific prompts in `prompts/github/`, plus the
+28 root-level prompts + 16 GitHub-specific prompts in `prompts/github/`, plus the
 MCP-tool sections in `prompts/mcp_tools/` and `prompts/teams/`.
 
 | Category | Prompts |
