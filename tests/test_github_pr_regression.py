@@ -133,7 +133,7 @@ class TestGitHubPRRouting:
         )
 
         # Import the actual module to patch it directly
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         with (
             patch.object(
@@ -188,7 +188,7 @@ class TestGitHubPRRouting:
         )
 
         # Import the actual module to patch it directly
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         with (
             patch.object(
@@ -252,7 +252,7 @@ class TestGitHubCLIInvocation:
         )
 
         # Import the actual module to patch it directly
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         with (
             patch.object(manager, "get_worktree_info", return_value=mock_worktree_info),
@@ -322,7 +322,7 @@ class TestGitHubCLIInvocation:
         )
 
         # Import the actual module to patch it directly
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         with (
             patch.object(manager, "get_worktree_info", return_value=mock_worktree_info),
@@ -378,7 +378,7 @@ class TestGitHubErrorHandling:
         )
 
         # Import the actual module to patch it directly
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         with (
             patch.object(manager, "get_worktree_info", return_value=mock_worktree_info),
@@ -430,7 +430,7 @@ class TestGitHubErrorHandling:
         )
 
         # Import the actual module to patch it directly
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         with (
             patch.object(manager, "get_worktree_info", return_value=mock_worktree_info),

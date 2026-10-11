@@ -27,7 +27,7 @@ class TestCreateMergeRequest:
     def test_successful_mr_creation(self, worktree_manager, temp_project_dir):
         """Test successful MR creation with glab CLI."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -79,7 +79,7 @@ class TestCreateMergeRequest:
     def test_mr_already_exists(self, worktree_manager, temp_project_dir):
         """Test MR already exists scenario."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -134,7 +134,7 @@ class TestCreateMergeRequest:
     def test_missing_glab_cli(self, worktree_manager, temp_project_dir):
         """Test error when glab CLI is not installed."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -173,7 +173,7 @@ class TestCreateMergeRequest:
     def test_mr_with_draft_flag(self, worktree_manager, temp_project_dir):
         """Test MR creation with draft flag."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -220,7 +220,7 @@ class TestCreateMergeRequest:
     def test_network_error_retry(self, worktree_manager, temp_project_dir):
         """Test retry logic for network errors."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -274,7 +274,7 @@ class TestCreateMergeRequest:
                 "_inject_impact_block",
                 side_effect=lambda spec_name, body, **kw: body,
             ),
-            patch.object(worktree_module.time, "sleep"),  # Skip sleep in tests
+            patch("time.sleep"),  # Skip sleep in tests
         ):
             result = worktree_manager.create_merge_request(spec_name=spec_name)
 
@@ -289,7 +289,7 @@ class TestPushAndCreatePR:
     def test_gitlab_routing(self, worktree_manager, temp_project_dir):
         """Test routing to create_merge_request for GitLab repos."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -340,7 +340,7 @@ class TestPushAndCreatePR:
     def test_unknown_provider_error(self, worktree_manager, temp_project_dir):
         """Test error handling for unknown git providers."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -391,7 +391,7 @@ class TestPushAndCreatePR:
     def test_draft_pr_flag(self, worktree_manager, temp_project_dir):
         """Test draft flag is passed through correctly."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -428,7 +428,7 @@ class TestPushAndCreatePR:
     def test_force_push_flag(self, worktree_manager, temp_project_dir):
         """Test force push flag is passed to push_branch."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -465,7 +465,7 @@ class TestPushAndCreatePR:
     def test_custom_target_branch(self, worktree_manager, temp_project_dir):
         """Test custom target branch is passed through."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
         custom_target = "develop"
@@ -507,7 +507,7 @@ class TestProviderIntegration:
     def test_self_hosted_gitlab_routing(self, worktree_manager, temp_project_dir):
         """Test that self-hosted GitLab instances route to glab CLI."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -544,7 +544,7 @@ class TestProviderIntegration:
     def test_pr_already_exists_propagation(self, worktree_manager, temp_project_dir):
         """Test that already_exists flag propagates correctly."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
@@ -582,7 +582,7 @@ class TestProviderIntegration:
     ):
         """Test that errors from PR/MR creation propagate correctly."""
         # Import the actual module to patch it directly (handles importlib shim)
-        import core.worktree as worktree_module
+        import core.worktree_pr as worktree_module  # the PR half (lot L11, F36)
 
         spec_name = "test-feature"
 
