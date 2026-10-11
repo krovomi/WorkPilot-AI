@@ -262,9 +262,12 @@ class TestAutoPullGuard:
         ran `ollama pull` on. For a hosted id it is a round trip that can only
         answer "file does not exist", so it is refused with the real cause.
         """
-        source = (
-            REPO_ROOT / "apps" / "backend" / "core" / "agent_client.py"
-        ).read_text(encoding="utf-8")
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(
+                (REPO_ROOT / "apps" / "backend" / "core" / "agent_clients").glob("*.py")
+            )
+        )
         assert "if is_hosted_only_model(self.model):" in source
         # …and the pull that IS legitimate streams its progress instead of
         # freezing the log for the duration of a multi-gigabyte download.
