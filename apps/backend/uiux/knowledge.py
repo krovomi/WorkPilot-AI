@@ -78,3 +78,9 @@ def record_merged_design_system(project_dir: Path, spec_name: str) -> str | None
             "uiux: could not file the design system (%s)", type(exc).__name__
         )
         return None
+
+
+def on_merge(event) -> None:
+    """`core.merge_event` subscriber: file the design system the merge brought."""
+    if rel := record_merged_design_system(event.project_dir, event.spec_name):
+        print(f"  brain: design system filed in {rel}")

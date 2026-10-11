@@ -45,8 +45,6 @@ export interface UseProjectSettingsReturn {
 	setShowClaudeToken: React.Dispatch<React.SetStateAction<boolean>>;
 	showLinearKey: boolean;
 	setShowLinearKey: React.Dispatch<React.SetStateAction<boolean>>;
-	showOpenAIKey: boolean;
-	setShowOpenAIKey: React.Dispatch<React.SetStateAction<boolean>>;
 	showGitHubToken: boolean;
 	setShowGitHubToken: React.Dispatch<React.SetStateAction<boolean>>;
 
@@ -138,7 +136,6 @@ export function useProjectSettings(
 	// Password visibility toggles
 	const [showClaudeToken, setShowClaudeToken] = useState(false);
 	const [showLinearKey, setShowLinearKey] = useState(false);
-	const [showOpenAIKey, setShowOpenAIKey] = useState(false);
 
 	// Collapsible sections
 	const [expandedSections, setExpandedSections] = useState<
@@ -147,7 +144,6 @@ export function useProjectSettings(
 		claude: true,
 		linear: false,
 		github: false,
-		graphiti: false,
 	});
 
 	// GitHub state
@@ -629,8 +625,6 @@ export function useProjectSettings(
 		setShowClaudeToken,
 		showLinearKey,
 		setShowLinearKey,
-		showOpenAIKey,
-		setShowOpenAIKey,
 		showGitHubToken,
 		setShowGitHubToken,
 		expandedSections,

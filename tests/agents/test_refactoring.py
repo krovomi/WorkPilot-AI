@@ -37,7 +37,7 @@ def test_imports():
     from agents import memory
 
     assert hasattr(memory, "save_session_memory")
-    assert hasattr(memory, "get_graphiti_context")
+    assert hasattr(memory, "get_memory_context")
     print("  ✓ agents.memory")
 
     # Test session module
@@ -73,7 +73,7 @@ def test_public_api():
         "run_autonomous_agent",
         "run_followup_planner",
         "save_session_memory",
-        "get_graphiti_context",
+        "get_memory_context",
         "run_agent_session",
         "post_session_processing",
         "get_latest_commit",

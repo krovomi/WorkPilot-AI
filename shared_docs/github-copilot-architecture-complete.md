@@ -215,7 +215,7 @@ sequenceDiagram
     U->>AA: run_autonomous_agent()
     AA->>SM: get_relevant_skills(task)
     SM-->>AA: Skills list
-    AA->>MM: get_graphiti_context()
+    AA->>MM: get_memory_context()
     MM-->>AA: Context data
     AA->>CR: run_session(prompt, tools)
     CR-->>AA: Session result
@@ -888,7 +888,7 @@ sequenceDiagram
     U->>AA: run_autonomous_agent(spec)
     AA->>SM: get_relevant_skills(spec)
     SM-->>AA: relevant_skills
-    AA->>MM: get_graphiti_context(spec)
+    AA->>MM: get_memory_context(spec)
     MM-->>AA: context_data
     AA->>CR: run_session(prompt, tools)
     CR->>GH: gh copilot suggest -t shell prompt

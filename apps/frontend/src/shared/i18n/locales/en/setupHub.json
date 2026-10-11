@@ -54,10 +54,6 @@
 			"label": "Linear",
 			"desc": "Import Linear issues as tasks and sync status in real time."
 		},
-		"memory": {
-			"label": "Memory (Graphiti)",
-			"desc": "Enable persistent memory so agents keep context across sessions."
-		},
 		"cicd": {
 			"label": "CI/CD pipeline",
 			"desc": "Watch your pipelines and let WorkPilot auto-fix failing builds."

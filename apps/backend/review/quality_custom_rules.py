@@ -223,16 +223,25 @@ def load_project_rules(project_dir: Path) -> CustomRuleEngine:
 
     Cherche dans:
     - .quality-rules.yml
-    - .workpilot/quality-rules.yml
+    - .workpilot/quality/rules.yml (la feature qualité n'a qu'un dossier sous
+      .workpilot/ ; un ancien .workpilot/quality-rules.yml y est déplacé)
     """
+    from core.workpilot_layout import move_legacy
+
     engine = CustomRuleEngine()
+    quality_dir = project_dir / ".workpilot" / "quality"
+    for ext in ("yml", "yaml"):
+        move_legacy(
+            project_dir / ".workpilot" / f"quality-rules.{ext}",
+            quality_dir / f"rules.{ext}",
+        )
 
     # Essayer les différents emplacements
     locations = [
         project_dir / ".quality-rules.yml",
         project_dir / ".quality-rules.yaml",
-        project_dir / ".workpilot" / "quality-rules.yml",
-        project_dir / ".workpilot" / "quality-rules.yaml",
+        quality_dir / "rules.yml",
+        quality_dir / "rules.yaml",
     ]
 
     for location in locations:

@@ -103,16 +103,6 @@
 				"desc": "Collez une clé API Linear (linear.app ▸ Settings ▸ API)."
 			}
 		},
-		"memory": {
-			"enable": {
-				"title": "Activer la mémoire",
-				"desc": "Activez la mémoire persistante (Graphiti) pour que les agents conservent le contexte entre les sessions."
-			},
-			"embeddingProvider": {
-				"title": "Fournisseur d'embeddings",
-				"desc": "Choisissez le fournisseur d'embeddings (Ollama local, OpenAI, Voyage…), puis renseignez sa clé si nécessaire. Optionnel."
-			}
-		},
 		"cicd": {
 			"provider": {
 				"title": "Fournisseur CI/CD",

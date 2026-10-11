@@ -68,7 +68,7 @@ sequenceDiagram
     CA->>CR: run_autonomous_agent(spec)
     CR->>SM: get_relevant_skills(task)
     SM-->>CR: Skills list
-    CR->>MM: get_graphiti_context()
+    CR->>MM: get_memory_context()
     MM-->>CR: Context data
     CR->>CR: execute_subtask_session()
     CR->>MM: save_session_memory()
@@ -244,7 +244,7 @@ sequenceDiagram
     U->>CA: run_autonomous_agent(spec)
     CA->>SM: get_relevant_skills(task)
     SM-->>CA: Skills list
-    CA->>MM: get_graphiti_context()
+    CA->>MM: get_memory_context()
     MM-->>CA: Context data
     CA->>SES: run_agent_session()
     SES-->>CA: Session result
@@ -352,20 +352,11 @@ sequenceDiagram
 sequenceDiagram
     participant U as Agent System
     participant MM as MemoryManager
-    participant GM as Graphiti Memory
-    participant FM as File Memory
-    participant FS as File System
+    participant BM as Shared brain (vault)
     
-    U->>MM: get_graphiti_context(query)
-    MM->>GM: query_context(query)
-    GM-->>MM: Context data
-    
-    alt Graphiti unavailable
-        MM->>FM: load_file_memory()
-        FM->>FS: read_memory_files()
-        FS-->>FM: Memory data
-        FM-->>MM: Fallback context
-    end
+    U->>MM: get_memory_context(query)
+    MM->>BM: get_patterns_and_gotchas / get_relevant_context
+    BM-->>MM: Notes of the project's memory
     
     MM-->>U: Context data
     
@@ -855,7 +846,7 @@ sequenceDiagram
     CA->>CR: run_autonomous_agent(spec)
     CR->>SM: get_relevant_skills(spec)
     SM-->>CR: relevant_skills
-    CR->>MM: get_graphiti_context(spec)
+    CR->>MM: get_memory_context(spec)
     MM-->>CR: context_data
     CR->>SES: run_agent_session(prompt, tools)
     SES-->>CR: session_result
@@ -968,19 +959,13 @@ sequenceDiagram
 sequenceDiagram
     participant U as Agent System
     participant MM as MemoryManager
-    participant GM as Graphiti Memory
-    participant FM as File Memory
+    participant BM as Shared brain (vault)
     participant SM as SkillManager
     participant CC as Core Client
     
     U->>MM: get_context_for_task(query)
-    MM->>GM: query_graphiti_context()
-    GM-->>MM: graphiti_context
-    
-    alt Graphiti unavailable
-        MM->>FM: load_file_memory()
-        FM-->>MM: file_context
-    end
+    MM->>BM: get_memory_context()
+    BM-->>MM: memory_context
     
     MM->>SM: enrich_with_skill_context()
     SM-->>MM: skill_context
@@ -989,8 +974,7 @@ sequenceDiagram
     MM-->>U: enriched_context
     
     U->>MM: save_task_result(result)
-    MM->>GM: save_to_graphiti()
-    MM->>FM: save_file_backup()
+    MM->>BM: save_session_memory()
     MM-->>U: save_complete
 ```
 

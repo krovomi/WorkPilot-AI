@@ -16,9 +16,16 @@ It used to be three. Graphiti / LadybugDB was the "primary" store when
 otherwise, and the vault held what agents wrote themselves — so the coder, the
 `get_session_context` tool, the Memories tab and the MCP server each read a
 different one, and a gotcha recorded by one surface was invisible to the next.
-`GRAPHITI_ENABLED` no longer selects a store, and no agent gets the Graphiti MCP
-server by default (`AGENT_MCP_<agent>_ADD=graphiti` still adds it for someone
-who asks by name). `integrations/graphiti/` remains only as legacy code.
+Graphiti / LadybugDB is gone (audit lot L7): `integrations/graphiti/`,
+`query_memory.py`, the Graphiti MCP server, Team Sync, Memory lifecycle, the
+onboarding memory step and the *Memory (Graphiti)* settings section were
+removed, with `graphiti-core`, `real_ladybug` and `pandas`. Sharing memory
+with a team is the brain's git remote (`brain/sync.py`).
+
+The learning loop's patterns were a fourth store
+(`.workpilot/learning_loop/patterns.json`), injected into the same prompts as
+the vault's. They are notes of the vault now — see
+[*Les patterns du learning loop*](#les-patterns-du-learning-loop-learning_looppattern_storagepy).
 
 ## Le cerveau partagé (Obsidian + Graphify + MCP)
 
@@ -383,10 +390,12 @@ le coder lit. **La mémoire est par projet, pas par spec** : la tâche suivante 
 même projet part de ce que celle-ci a appris.
 
 **L'API est celle qu'avaient les appelants.** `ProjectMemory` répond aux
-méthodes de `GraphitiMemory` (`save_gotcha`, `get_patterns_and_gotchas`,
-`get_session_history`, `close`…) ; `memory.store.get_project_memory` est la
-seule porte, et `memory.graphiti_helpers.get_graphiti_memory` n'en est plus
-qu'un alias. Coder, QA reviewer, QA fixer, auto-fix, outils des agents,
+méthodes qu'avait l'ancien `GraphitiMemory` (`save_gotcha`,
+`get_patterns_and_gotchas`, `get_session_history`, `close`…) ;
+`memory.store.get_project_memory` est la seule porte (les alias
+`memory.graphiti_helpers`, `get_graphiti_context`, `save_session_to_graphiti`
+et `context/graphiti_integration.py` ont disparu au lot L7 : leurs appelants
+ouvrent `memory.store` et `context/memory_hints.py`). Coder, QA reviewer, QA fixer, auto-fix, outils des agents,
 pipeline de spec, idéation, roadmap, context builder, runners de revue,
 `mem_search` (`BrainSource`) et l'onglet Mémoires (`GET /api/brain/memories`)
 passent tous par là.
@@ -405,10 +414,39 @@ dossier (`attempt_history.json`, `build_commits.json`) est de l'état
 d'exécution, pas de la connaissance : il reste où il est. Pour tout importer
 d'un coup : `brain_runner.py --action import-legacy --project-dir <projet>`.
 
+### Les patterns du learning loop (`learning_loop/pattern_storage.py`)
+
+Un pattern distillé par le learning loop est une note de `patterns/`, nommée
+par son `pattern_id`, ses preuves dans le frontmatter sous `learning:`
+(confiance, occurrences, applications, succès après application, builds
+sources, `enabled`). L'API de `PatternStorage` n'a pas changé : les portes de
+promotion (`observe`, `skill_proposer`) et le replay A/B lisent ce qu'ils
+lisaient.
+
+- **Un seul injecteur.** `PatternApplicator` est le seul chemin de ces notes
+  vers un prompt, derrière son seuil de confiance et dans `MAX_TOKENS` (des
+  patterns entiers, les meilleurs d'abord). Le contexte mémoire de session
+  (`get_patterns_and_gotchas`, `load_patterns`) les laisse de côté ; l'onglet
+  Mémoires et `brain_recall` les voient comme les autres.
+- **Migration.** L'ancien `.workpilot/learning_loop/patterns.json` est importé
+  au premier usage puis rangé dans
+  `.workpilot/learning/patterns.json.migrated-to-brain` (`core/workpilot_layout.py`).
+- **Le desktop passe par le backend** : `GET /api/brain/learning-patterns`,
+  `POST …/toggle`, `POST …/delete`, par nom de projet.
+- Mémoire coupée (`BRAIN_ENABLED=false`) : lectures vides, écritures ignorées.
+
+### Un merge, un événement (`core/merge_event.py`)
+
+Un merge est publié une fois (`MergeEvent`) ; chaque feature s'y abonne avec
+son `on_merge` : `core.usage_tracker` (le snapshot du tableau de bord),
+`learning_loop.observe` (le registre), `brain.learn` (la note de build
+acceptée), `uiux.knowledge` (le design system). Un abonné qui échoue n'arrête
+pas les autres et ne fait jamais échouer le merge.
+
 ## Memory Search (`mem-search`)
 
 Three-layer progressive retrieval over the records that already exist — `learning_loop`
-patterns, the project's memory in the shared brain (`BrainSource`, read from the
+patterns (`PatternSource`, read through `PatternStorage`; `BrainSource` skips them), the project's memory in the shared brain (`BrainSource`, read from the
 vault's `graph.json`) and `task_logger` traces — so an agent can ask "have we hit this before?"
 without paying for every candidate to discard most of them.
 

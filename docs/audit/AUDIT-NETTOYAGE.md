@@ -113,7 +113,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L4 | P1 | Contexte de développement — **fait** | F23, F18 | — |
 | L5 | P1 | Droits et rosters minimaux — **fait** | F4, F5, F9, F16 | L1 |
 | L6 | P1 | Pipeline payé = pipeline exécuté — **fait** | F2, F3, F15, F35, F38 | — |
-| L7 | P2 | Une seule mémoire | F6, F7, F14, F34 | L1 (insight_extractor) |
+| L7 | P2 | Une seule mémoire — **fait** | F6, F7, F14, F34 | L1 (insight_extractor) |
 | L8 | P2 | Code mort frontend — **fait** | F28, F25 (front) | L3 |
 | L9 | P2 | Code mort backend — **fait** | F29, F30, F32, F33, F25 (back) | — |
 | L10 | P3 | Tokens à haut effort — **fait** | F10, F11, F17 | L6 |
@@ -125,7 +125,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
 | L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L9, L10, L11, L12, L14, L15, L16, L17 (faits) → L7 → L13.
+Ordre recommandé : L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11, L12, L14, L15, L16, L17 (faits) → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -133,17 +133,17 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L9, L10, L11, L12, L14, L15, L16
 |---|---|---|
 | `docs/CLAUDE.md` chargé à chaque session Claude Code | 268 Ko (~67 k tokens) | < 20 Ko |
 | agent_types non enregistrés | 7 (0 après le lot L1) | 0 |
-| Références Graphiti/LadybugDB hors `integrations/graphiti` | 214 (45 fichiers) | 0 |
+| Références Graphiti/LadybugDB hors `integrations/graphiti` | 214 (45 fichiers) ; 0 après le lot L7 hors mentions historiques et Graphiti cité comme bibliothèque tierce (paquet supprimé) | 0 |
 | Fichiers frontend sans importeur de production | 57 (~16,5 k lignes) ; 29 (~6,1 k lignes) après le lot L8, tous en attente d'une décision (voir le lot) | 0 |
 | Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) ; **0 après le lot L9** | 0 |
-| Shims racine `apps/backend/*.py` | 25 (27 recomptés) ; **3 après le lot L9** (`insight_extractor.py`, `graphiti_config.py`, `graphiti_providers.py`) | 0 (hors points d'entrée) |
+| Shims racine `apps/backend/*.py` | 25 (27 recomptés) ; **3 après le lot L9** (`insight_extractor.py`, `graphiti_config.py`, `graphiti_providers.py`) ; **1 après le lot L7** (`insight_extractor.py`) | 0 (hors points d'entrée) |
 | Prompts orphelins | 11 (~51 Ko) ; 0 après le lot L10 (+ `coder.md`, 35 Ko, trouvé orphelin et retiré) | 0 |
 | Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
 | Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) ; 5 servis sans agents d'appelant au lot L11 (projet mobile), 6 pour l'orchestrateur | ≤ 7 |
 | Définitions de sous-agents | 26 déclarations (25 noms) à cinq endroits, + 9 agents de packs ; 22 dans le registre après le lot L11 (11 de phase, 9 de PR, 2 mobiles), + 6 agents de packs | ~14 |
 | Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) ; 4 après le lot L10, tâche de code ou mobile, sans les 3 sous-agents du roster de review ni le `qa-acceptance-checker` du verifier | ≤ 4 |
 | Détecteurs de pile | ≥ 11 ; 1 façade `project/stack.py` après le lot L11 (4 détecteurs derrière elle, 5 lecteurs encore directs) | 1 façade |
-| Écritures par merge | 4 magasins | 1 événement |
+| Écritures par merge | 4 magasins ; 1 événement, 4 abonnés après le lot L7 | 1 événement |
 
 ---
 
@@ -474,6 +474,14 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
 
 ### Lot L7 — Une seule mémoire (P2)
 
+**Fait.** Le vault est la seule mémoire : Graphiti / LadybugDB est retiré (−12,8 k lignes,
+`graphiti-core`, `real_ladybug` et `pandas` sortis de `requirements.txt`), les patterns du
+learning loop sont des notes du vault avec un seul injecteur plafonné, un merge est un
+événement, et `.workpilot/` n'a plus qu'un nom par feature. Un commit par étape.
+Vérifié : `pytest tests/` complet (9 125 passés),
+`pnpm run typecheck`, `pnpm run lint`, `pnpm test` (seuls échecs : les deux tests
+`config-path-validator` qui échouent aussi sur `develop` dans cet environnement root).
+
 #### F6 · ~12,6 k lignes Graphiti / LadybugDB encore câblées, et en hausse
 
 - **Sévérité** haute · **aggravé** (214 références dans 45 fichiers contre 181) · **lu**
@@ -506,6 +514,47 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
   ne renvoie que des mentions historiques documentées ; `pip install -r apps/backend/requirements.txt`
   n'installe plus `graphiti-core`.
 - **Vérification** : `pytest tests/test_brain*.py tests/test_brain_project_memory.py -q` ; `pnpm run typecheck && pnpm test`.
+- **Fait (lot L7)**, dans l'ordre des cinq étapes :
+  1. `main/ipc-handlers/ollama-handlers.ts` (déplacement à l'identique, test de pull repointé).
+  2. `context/graphiti_integration.py` → `context/memory_hints.py` (`is_memory_enabled`) ;
+     `get_graphiti_context`, `save_session_to_graphiti`, `is_graphiti_memory_enabled` retirés
+     des façades. Les appelants de `get_graphiti_memory` étaient déjà passés sur
+     `memory.store` : le constat ne tenait plus que par les alias.
+  3. Team Sync et Memory lifecycle : runners, `integrations/graphiti/team_sync/`, handlers,
+     store, `TeamSyncPanel`, `MemoryLifecycleSection` (rendue dans la section mémoire des
+     réglages), API preload, canaux `TEAM_SYNC_*`, `teamSync.json` (jamais enregistré dans
+     i18n) et `settings:memoryLifecycle` en + fr.
+  4. `MemoryStep` : le chemin « clé API » de l'onboarding saute désormais à l'étape finale.
+  5. Le reste : paquet, `query_memory.py`, shims racine, `memory/graphiti_helpers.py`,
+     `scripts/test_memory_save.py`, serveur MCP graphiti (`GRAPHITI_MCP_TOOLS`, entrées
+     d'`AGENT_CONFIGS` et de `_map_mcp_server_name`, `core/client.py`), `memory-service.ts`,
+     `memory-handlers.ts`, `memory-env-builder.ts`, `api-validation-service.ts`, les
+     méthodes preload sans appelant, `infrastructure-mock.ts`, les tests Graphiti, les types
+     et réglages `graphiti*`/`memory*`, les clés i18n en + fr.
+- **Écarts** :
+  - La section de réglages **« Mémoire (Graphiti) »** (`SecuritySettings`,
+    `InfrastructureStatus`, entrée de navigation, parcours de visite guidée, item du Setup
+    Hub) n'était pas nommée par le cahier ; elle ne configurait que Graphiti et est retirée.
+    L'entrée « Cerveau partagé » est juste à côté. Question au mainteneur dans la PR.
+  - `pandas` retiré (seul lecteur : `real_ladybug`) ; **`pywin32` gardé** : la bibliothèque
+    MCP importe `win32api` et `core/dependency_validator.py` le vérifie.
+  - Le gabarit `.workpilot/.env` garde les clés de providers lues ailleurs (OpenAI, Azure,
+    Voyage, Google, `OLLAMA_BASE_URL`) et ne perd que les variables `GRAPHITI_*` et
+    d'embeddings.
+  - Mentions conservées, documentées : historique dans `brain/project_memory.py`,
+    `memory/__init__.py`, `agents/memory_manager.py`, `runners/roadmap/graph_integration.py`,
+    `context/brain-memory.ts`, `memory-status-handlers.ts` ; Graphiti **comme bibliothèque
+    tierce d'exemple** dans `spec/complexity.py` (détection d'intégration dans le texte d'une
+    tâche) et ses tests, et dans les prompts `complexity_assessor.md`, `spec_researcher.md`,
+    `spec_critic.md` ; `prompts/documentation_agent.md` est orphelin (lot L10).
+- **Trouvé pendant le lot L7** :
+  - `pr-handlers.ts` copiait chaque revue de PR dans LadybugDB (`savePRReviewToMemory`) en
+    plus du backend, qui les classe déjà dans le cerveau (`store_review_learnings`) :
+    écriture morte supprimée. Les handlers `GITHUB_PR_MEMORY_GET/SEARCH` (fichiers, aucun
+    appelant renderer) restent pour le lot L8.
+  - `provider_api` publiait un sous-système `graphiti_memory` que personne ne lit (retiré).
+  - `getMemoriesDir()` (`config-paths.ts`, le dossier `memories` de LadybugDB) n'a plus
+    d'autre lecteur que `getAppPath("memories")` depuis que le lot L8 a retiré `fs-utils.ts`.
 
 #### F7 · Deux magasins de « patterns » injectés dans le même prompt
 
@@ -519,6 +568,20 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
   un seul injecteur plafonné en tokens ; migrer `patterns.json` au premier lancement ; adapter
   `context_mesh` pour lire le vault.
 - **À préserver** : les gates de promotion et le replay A/B du learning loop.
+- **Fait (lot L7).** `PatternStorage` garde son API et écrit une note par pattern
+  (`knowledge/projects/<p>/memory/patterns/<pattern_id>.md`, preuves sous `learning:`) via
+  `ProjectMemory.record_learned_pattern` ; seuls les patterns modifiés sont réécrits, et
+  `record_application` laisse le commit à la synchronisation suivante. Un seul injecteur :
+  `PatternApplicator` (`MAX_TOKENS = 600`, patterns entiers, les meilleurs d'abord) ; le
+  contexte mémoire de session les ignore. `patterns.json` est importé au premier usage puis
+  rangé (F34). Le context mesh et mem_search lisent le vault ; `BrainSource` ne les liste pas
+  deux fois. Tests : `tests/test_learning_pattern_vault.py`.
+- **Écart** : mémoire coupée (`BRAIN_ENABLED=false`), le learning loop ne retient rien
+  (comme toute la mémoire) et laisse l'ancien fichier en place.
+- **Trouvé pendant le lot L7** : la page Learning Loop lisait `patterns.json` elle-même et
+  attendait `{ patterns: [...] }` là où le backend écrivait une liste : elle n'affichait
+  jamais rien. Elle passe par `GET /api/brain/learning-patterns` et `POST …/toggle|delete`
+  (projet désigné par son nom). `context_mesh/mesh_service.py` avait le même défaut.
 
 #### F14 · Un merge écrit dans quatre magasins
 
@@ -527,6 +590,17 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
   tient un cinquième compteur.
 - **Étape** : un événement `merge` publié une fois (ex. `services/hooks/hook_service.py`), des abonnés
   enregistrés par feature.
+- **Fait (lot L7).** `core/merge_event.py` (plutôt que le bus de hooks, dont les déclencheurs
+  sont ceux de l'utilisateur) : `MergeEvent` publié par `handle_merge_command`, quatre
+  `on_merge` (usage_tracker, learning_loop.observe, brain.learn, uiux.knowledge) résolus à
+  l'usage, isolés. Mêmes écritures, même ordre, mêmes lignes de console. Tests :
+  `tests/test_merge_event.py`.
+- **Écart** : `scheduling/dashboard_metrics.record_merge` n'est pas abonné : il n'a aucun
+  appelant de production, et le tableau de bord lit le snapshot qu'écrit `usage_tracker`.
+- **Trouvé pendant le lot L7** : deux autres producteurs de merge ne publient pas
+  l'événement — le bus de hooks (`PR_MERGED`, ne crédite que le learning loop) et le choix
+  « merge » de `core/workspace/finalization.py` (aucune écriture). Les brancher changerait le
+  comportement : décision du mainteneur.
 
 #### F34 · ~60 sous-dossiers `.workpilot/` dont des doublons de nommage
 
@@ -535,6 +609,14 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
   (`review/quality_integration.py`) / `quality-rules` (`review/quality_custom_rules.py`) ;
   `generational_tests` (écrit) / `generational-tests` (documenté seulement).
 - **Étape** : un nom par feature, migration au premier lancement (déplacer, ne pas supprimer).
+- **Fait (lot L7).** `core/workpilot_layout.py` (`move_legacy`, `move_aside` : jamais de
+  suppression ni d'écrasement). `learning_loop/` n'est plus écrit ; l'ancien `patterns.json`
+  est rangé dans `learning/`. `quality-rules.yml` → `quality/rules.yml`. `memory`/`memories`
+  sont partis avec F6.
+- **Constat devenu faux** : `generational-tests` n'est plus documenté comme dossier (seule
+  l'URL `/api/generational-tests` subsiste).
+- **Trouvé pendant le lot L7** : `review/quality_integration.py` et
+  `load_project_rules` n'ont aucun appelant de production (lot L9).
 
 ### Lot L8 — Code mort frontend (P2)
 
@@ -1389,7 +1471,7 @@ le câblage étant un chantier à part (décrit ci-dessous).
 | ~~`renderer/components/cost-predictor/CostPredictorDialog.tsx`~~ | 233 | aucun importeur | **supprimé (L8)** |
 | ~~`renderer/components/decision-logger/DecisionTimeline.tsx`~~ | 323 | aucun importeur | **supprimé (L8)** |
 | ~~`renderer/components/documentation-agent/DocumentationAgentDashboard.tsx`~~ | 312 | aucun importeur | **supprimé (L8)** |
-| `renderer/components/memory/TeamSyncPanel.tsx` | 580 | aucun importeur, Graphiti | supprimer (lot L7) |
+| ~~`renderer/components/memory/TeamSyncPanel.tsx`~~ | 580 | aucun importeur, Graphiti | **supprimé (L7)** |
 | ~~`renderer/components/task-detail/ResumeWithProviderDropdown.tsx`~~ | 204 | aucun importeur | **supprimé (L8)** |
 | ~~`renderer/components/task-detail/TaskDetailModalHandlers.tsx`~~ | 212 | aucun importeur | **supprimé (L8)** |
 | ~~`renderer/components/task-detail/task-review/TerminalDropdown.tsx`~~ | 55 | aucun importeur | **supprimé (L8)** |
@@ -1458,7 +1540,7 @@ le câblage étant un chantier à part (décrit ci-dessous).
 | `azure_devops_integration.py`, `client.py`, `critique.py`, `linear_config.py` | 0 | supprimer |
 | `debug.py` | 58 | `core.debug` |
 | `progress.py` | 32 | `core.progress` |
-| `graphiti_config.py`, `graphiti_providers.py` | 32, 15 | lot L7 |
+| ~~`graphiti_config.py`, `graphiti_providers.py`~~ | 0 au moment du lot | **supprimés (L7)** |
 | `worktree.py` | 15 | `core.worktree` (chargé par importlib, voir F30) |
 | `project_analyzer.py` | 13 | `project` |
 | `prompts.py` | 9 | `prompts_pkg.prompts` |
@@ -1480,7 +1562,7 @@ le câblage étant un chantier à part (décrit ci-dessous).
 | `docs/CHANGELOG.md` | 107 Ko | fusionner avec `CHANGELOG.md` |
 | `docs/pr-1575-fixes.md` | 9 Ko | archiver |
 | `docs/superpowers/plans/`, `docs/superpowers/specs/` | 112 Ko | archiver |
-| `apps/backend/scripts/test_memory_save.py` | — | supprimer (lot L7) |
+| ~~`apps/backend/scripts/test_memory_save.py`~~ | — | **supprimé (L7)** |
 | `.security-reports/` | vide | supprimer |
 | `runners/github/test_context_gatherer.py` (racine) | — | déplacer dans `tests/` |
 
@@ -1497,4 +1579,4 @@ le câblage étant un chantier à part (décrit ci-dessous).
 
 Statut des constats de l'audit précédent : F1, F3, F4, F5, F7, F8, F9, F10, F12, F16, F17, F19 **ouverts** ;
 F2, F13 **partiels** ; F6, F11, F14, F18 **aggravés** ; F15 **atténué**. Nouveaux : F20 à F36.
-Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.
+Depuis : F1 et F24 corrigés (L1), F20 (L2), F21 et F22 (L3), F2, F3, F15, F35 et F38 (L6), F4, F5, F9 et F16 (L5), F6, F7, F14 et F34 (L7), F10, F11 et F17 (L10), F39 et F40 (L15), F41 à F47 (L16) ; F37 trouvé pendant L3, F38 pendant L6, F39 et F40 pendant L5, F41 à F45 pendant L15, F46 à F48 pendant L16.

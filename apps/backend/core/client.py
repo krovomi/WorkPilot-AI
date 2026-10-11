@@ -136,7 +136,6 @@ def invalidate_project_cache(project_dir: Path | None = None) -> None:
 from agents.tools_pkg import (
     CONTEXT7_TOOLS,
     ELECTRON_TOOLS,
-    GRAPHITI_MCP_TOOLS,
     LINEAR_TOOLS,
     PUPPETEER_TOOLS,
     create_auto_claude_mcp_server,
@@ -577,21 +576,6 @@ def load_project_mcp_config(project_dir: Path) -> dict:
     return config
 
 
-def is_graphiti_mcp_enabled() -> bool:
-    """
-    Check if Graphiti MCP server integration is enabled.
-
-    Requires GRAPHITI_MCP_URL to be set (e.g., http://localhost:9000/mcp/)
-    This is separate from GRAPHITI_ENABLED which controls the Python library integration.
-    """
-    return bool(os.environ.get("GRAPHITI_MCP_URL"))
-
-
-def get_graphiti_mcp_url() -> str:
-    """Get the Graphiti MCP server URL."""
-    return os.environ.get("GRAPHITI_MCP_URL", "http://localhost:9000/mcp/")
-
-
 def is_electron_mcp_enabled() -> bool:
     """
     Check if Electron MCP server integration is enabled.
@@ -916,9 +900,6 @@ def create_client(
         spec_dir=spec_dir,
     )
 
-    # Check if Graphiti MCP is enabled (already filtered by get_required_mcp_servers)
-    graphiti_mcp_enabled = "graphiti" in required_servers
-
     # Determine browser tools for permissions (already in allowed_tools_list)
     browser_tools_permissions = []
     if "electron" in required_servers:
@@ -1017,11 +998,6 @@ def create_client(
                     else []
                 ),
                 *(
-                    [f"{tool}(*)" for tool in GRAPHITI_MCP_TOOLS]
-                    if graphiti_mcp_enabled
-                    else []
-                ),
-                *(
                     [f"{tool}(*)" for tool in _brain_mcp_tools()]
                     if "brain" in required_servers
                     else []
@@ -1064,8 +1040,6 @@ def create_client(
         mcp_servers_list.append("puppeteer (browser automation)")
     if "linear" in required_servers:
         mcp_servers_list.append("linear (project management)")
-    if graphiti_mcp_enabled:
-        mcp_servers_list.append("graphiti-memory (knowledge graph)")
     if "brain" in required_servers:
         mcp_servers_list.append("workpilot-brain (shared brain)")
     if "uiux" in required_servers:
@@ -1155,13 +1129,6 @@ def create_client(
             "type": "http",
             "url": "https://mcp.linear.app/mcp",
             "headers": {"Authorization": f"Bearer {linear_api_key}"},
-        }
-
-    # Graphiti MCP server for knowledge graph memory
-    if graphiti_mcp_enabled:
-        mcp_servers["graphiti-memory"] = {
-            "type": "http",
-            "url": get_graphiti_mcp_url(),
         }
 
     if "github" in required_servers:

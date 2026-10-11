@@ -315,18 +315,17 @@ class ContextMeshService:
                 except Exception:
                     pass
 
-            # Read .workpilot learning patterns if available
-            patterns_file = path / ".workpilot" / "learning_loop" / "patterns.json"
-            if patterns_file.exists():
-                try:
-                    data = json.loads(patterns_file.read_text(encoding="utf-8"))
-                    patterns = data.get("patterns", [])
-                    if patterns:
-                        section += f"- Learning patterns ({len(patterns)}):\n"
-                        for p in patterns[:5]:
-                            section += f"  - [{p.get('category', '')}] {p.get('description', '')[:100]}\n"
-                except Exception:
-                    pass
+            # The project's learning patterns, from its memory in the vault
+            try:
+                from learning_loop.pattern_storage import PatternStorage
+
+                patterns = PatternStorage(path).load_patterns()
+                if patterns:
+                    section += f"- Learning patterns ({len(patterns)}):\n"
+                    for p in patterns[:5]:
+                        section += f"  - [{p.category.value}] {p.description[:100]}\n"
+            except Exception as exc:  # noqa: BLE001 - patterns are optional context
+                logger.debug("learning patterns unavailable for %s: %s", path, exc)
 
             # Read project structure (top-level dirs)
             if path.is_dir():

@@ -8,8 +8,7 @@ gotchas, and patterns.
 One store: the shared Obsidian vault (`brain.project_memory`). A discovery or a
 gotcha recorded here is a note under ``knowledge/projects/<project>/memory/``,
 recalled by the next session of any spec of the project and by every agent
-connected to the brain. It used to be written twice — a file in the spec
-directory and, when enabled, Graphiti — and read back from the file only.
+connected to the brain.
 """
 
 from pathlib import Path

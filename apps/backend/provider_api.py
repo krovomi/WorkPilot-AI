@@ -1410,33 +1410,7 @@ def health_check():
             provider_status[name] = False
     subsystems["providers"] = {"status": "ok", "available": provider_status}
 
-    # 3. Graphiti Memory (optional — only if enabled)
-    graphiti_enabled = os.getenv("GRAPHITI_ENABLED", "").lower() == "true"
-    if graphiti_enabled:
-        try:
-            from integrations.graphiti.config import get_graphiti_config
-
-            gconfig = get_graphiti_config()
-            subsystems["graphiti_memory"] = {
-                "status": "ok",
-                "enabled": True,
-                "llm_provider": gconfig.llm_provider
-                if hasattr(gconfig, "llm_provider")
-                else "unknown",
-                "embedder_provider": gconfig.embedder_provider
-                if hasattr(gconfig, "embedder_provider")
-                else "unknown",
-            }
-        except Exception as e:
-            subsystems["graphiti_memory"] = {
-                "status": "error",
-                "enabled": True,
-                "error": _safe_error_message(e),
-            }
-    else:
-        subsystems["graphiti_memory"] = {"status": "disabled", "enabled": False}
-
-    # 4. configured_providers.json file
+    # 3. configured_providers.json file
     config_path = os.path.abspath(
         os.path.join(
             os.path.dirname(__file__), "../../config/configured_providers.json"
@@ -1446,7 +1420,7 @@ def health_check():
         "status": "ok" if os.path.exists(config_path) else "missing"
     }
 
-    # 5. System info
+    # 4. System info
     subsystems["system"] = {
         "python_version": platform.python_version(),
         "platform": platform.platform(),

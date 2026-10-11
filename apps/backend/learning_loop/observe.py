@@ -418,3 +418,11 @@ def _replay_candidate(
 def golden_corpus(repo_root: Path, agent_id: str = ""):
     """The archived episodes available to grade a candidate against."""
     return load_episodes(repo_root / GOLDEN_RELPATH, agent_id=agent_id)
+
+
+def on_merge(event) -> None:
+    """`core.merge_event` subscriber: credit the merge to the build's ledger."""
+    repo_root = Path(__file__).resolve().parents[3]
+    credited = record_merge_outcome(repo_root, event.spec_name)
+    if credited:
+        print(f"  learning: merge credited to {credited} ledger entrie(s)")

@@ -383,6 +383,67 @@ def memories(project_dir: str = "", query: str = "", limit: int = 20) -> dict:
     return {"success": True, "memories": list_memories(project, limit=limit)}
 
 
+class LearningPatternRequest(BaseModel):
+    project_dir: str = ""
+    pattern_id: str = ""
+
+
+def _learning_storage(project_dir: str):
+    from learning_loop.pattern_storage import PatternStorage
+
+    from .learn import project_name_from
+
+    project = project_name_from(project_dir)
+    return PatternStorage(project=project) if project else None
+
+
+@router.get("/learning-patterns")
+def learning_patterns(project_dir: str = "") -> dict:
+    """The learning loop's patterns of a project, and their summary.
+
+    They are notes of the project's memory (`learning_loop.pattern_storage`);
+    the project is a name read out of the path, as for ``/memories``.
+    """
+    if _refused():
+        return _DESKTOP_ONLY
+    storage = _learning_storage(project_dir)
+    if storage is None:
+        return {"success": False, "error": "project_dir is required"}
+    from learning_loop.service import summarise
+
+    patterns = storage.load_patterns()
+    return {
+        "success": True,
+        "patterns": [p.to_dict() for p in patterns],
+        "summary": summarise(patterns),
+    }
+
+
+@router.post("/learning-patterns/toggle")
+def toggle_learning_pattern(request: LearningPatternRequest) -> dict:
+    if _refused():
+        return _DESKTOP_ONLY
+    storage = _learning_storage(request.project_dir)
+    if storage is None or not request.pattern_id:
+        return {"success": False, "error": "project_dir and pattern_id are required"}
+    enabled = storage.toggle_pattern(request.pattern_id)
+    if enabled is None:
+        return {"success": False, "error": "Pattern not found"}
+    return {"success": True, "enabled": enabled}
+
+
+@router.post("/learning-patterns/delete")
+def delete_learning_pattern(request: LearningPatternRequest) -> dict:
+    if _refused():
+        return _DESKTOP_ONLY
+    storage = _learning_storage(request.project_dir)
+    if storage is None or not request.pattern_id:
+        return {"success": False, "error": "project_dir and pattern_id are required"}
+    if not storage.delete_pattern(request.pattern_id):
+        return {"success": False, "error": "Pattern not found"}
+    return {"success": True}
+
+
 @router.post("/instruction")
 def instruction(request: InstructionRequest) -> dict:
     """A person activates, or turns down, an instruction an agent proposed."""

@@ -3,6 +3,11 @@ Pattern Applicator for the Autonomous Agent Learning Loop.
 
 Generates prompt augmentations from stored patterns and injects them
 into agent system prompts before each build.
+
+This is the one injector of the learning loop's patterns: the session memory
+context (`agents.memory_manager.get_memory_context`) reads the same vault
+folder but leaves these notes to it, so a pattern reaches a prompt once, behind
+its confidence gate and inside ``MAX_TOKENS``.
 """
 
 import logging
@@ -19,6 +24,8 @@ class PatternApplicator:
     MAX_PATTERNS_PER_SECTION = 5
     MAX_TOTAL_PATTERNS = 10
     MIN_CONFIDENCE = 0.6
+    MAX_TOKENS = 600
+    CHARS_PER_TOKEN = 4
 
     def __init__(self, storage: PatternStorage):
         self.storage = storage
@@ -80,14 +87,30 @@ class PatternApplicator:
         if not all_selected:
             return ""
 
+        # Hold the block to its token budget: whole patterns, best first, and
+        # never a truncated instruction.
+        budget = self.MAX_TOKENS * self.CHARS_PER_TOKEN
+        kept: list = []
+        used = 0
+        for p in sorted(all_selected, key=lambda p: p.confidence, reverse=True):
+            cost = len(p.actionable_instruction) + 32
+            if kept and used + cost > budget:
+                continue
+            kept.append(p)
+            used += cost
+        kept_ids = {p.pattern_id for p in kept}
+        success_patterns = [p for p in success_patterns if p.pattern_id in kept_ids]
+        failure_patterns = [p for p in failure_patterns if p.pattern_id in kept_ids]
+        optimization_patterns = [
+            p for p in optimization_patterns if p.pattern_id in kept_ids
+        ]
+
         # Track which patterns are being applied
-        applied_ids = [p.pattern_id for p in all_selected]
+        applied_ids = [p.pattern_id for p in kept]
         self.storage.record_application(applied_ids)
 
         # Build the instruction block
-        total_builds = max(
-            len(set(bid for p in all_selected for bid in p.source_build_ids)), 1
-        )
+        total_builds = max(len(set(bid for p in kept for bid in p.source_build_ids)), 1)
         lines = [
             f"\n## Learning Insights (auto-generated from {total_builds} previous builds)\n"
         ]

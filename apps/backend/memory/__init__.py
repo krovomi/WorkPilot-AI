@@ -27,7 +27,7 @@ learned.
 
 Public API (unchanged):
     - get_project_memory(spec_dir, project_dir=None) -> ProjectMemory | None
-    - is_memory_enabled() / is_graphiti_memory_enabled() -> bool
+    - is_memory_enabled() -> bool
     - save_session_insights / load_all_insights
     - update_codebase_map / load_codebase_map
     - append_pattern / load_patterns / append_gotcha / load_gotchas
@@ -37,7 +37,6 @@ Public API (unchanged):
 
 # Codebase map
 from .codebase_map import load_codebase_map, update_codebase_map
-from .graphiti_helpers import is_graphiti_memory_enabled
 
 # Directory management
 from .paths import clear_memory, get_memory_dir, get_session_insights_dir
@@ -61,7 +60,6 @@ __all__ = [
     # The store
     "get_project_memory",
     "is_memory_enabled",
-    "is_graphiti_memory_enabled",
     # Directory management
     "get_memory_dir",
     "get_session_insights_dir",

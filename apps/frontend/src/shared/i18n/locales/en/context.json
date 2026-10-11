@@ -91,11 +91,6 @@
 		"noMemoriesYet": "No memories recorded yet. Builds, QA sessions and PR reviews write what they learn to the shared brain.",
 		"noMatchingMemories": "No memories match the selected filter.",
 		"showAll": "Show all memories",
-		"reasons.notConfigured": "Graphiti not configured",
-		"reasons.openaiKeyNotSet": "OPENAI_API_KEY not set (required for OpenAI embeddings)",
-		"reasons.googleKeyNotSet": "GOOGLE_API_KEY not set (required for Google AI embeddings)",
-		"reasons.voyageKeyNotSet": "VOYAGE_API_KEY not set (required for Voyage AI embeddings)",
-		"reasons.azureKeyNotSet": "AZURE_OPENAI_API_KEY not set (required for Azure OpenAI embeddings)",
 		"brainHint": "Every build writes what it learns to the shared brain — an Obsidian vault every agent reads. It is created on the first write; to use an existing vault or a git remote, open Settings → Integrations → Shared brain.",
 		"reasons.brainNotCreated": "The shared brain does not exist yet",
 		"reasons.brainUnreachable": "The backend could not be reached to read the shared brain"

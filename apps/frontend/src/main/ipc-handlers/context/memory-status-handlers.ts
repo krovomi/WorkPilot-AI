@@ -1,7 +1,7 @@
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
-import type { GraphitiMemoryStatus, IPCResult } from "../../../shared/types";
+import type { MemoryStatus, IPCResult } from "../../../shared/types";
 import { projectStore } from "../../project-store";
 import { fetchBrainMemoryStatus } from "./brain-memory";
 
@@ -17,7 +17,7 @@ export function registerMemoryStatusHandlers(
 ): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_MEMORY_STATUS,
-		async (_, projectId: string): Promise<IPCResult<GraphitiMemoryStatus>> => {
+		async (_, projectId: string): Promise<IPCResult<MemoryStatus>> => {
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };

@@ -234,7 +234,7 @@ async def run_qa_fixer_session(
     if fixer_memory_context:
         prompt += "\n\n" + fixer_memory_context
         print("✓ Memory context loaded for QA fixer")
-        debug_success("qa_fixer", "Graphiti memory context loaded for fixer")
+        debug_success("qa_fixer", "Memory context loaded for fixer")
 
     # Learning Loop: inject patterns learned from previous builds (qa_fixing phase)
     try:

@@ -27,7 +27,6 @@ from agents import (
     find_phase_for_subtask,
     find_subtask_in_plan,
     get_commit_count,
-    get_graphiti_context,
     # Utility functions
     get_latest_commit,
     get_memory_context,
@@ -39,7 +38,6 @@ from agents import (
     run_autonomous_agent,
     run_followup_planner,
     save_session_memory,
-    save_session_to_graphiti,
     sync_spec_to_source,
 )
 
@@ -49,9 +47,7 @@ __all__ = [
     "run_followup_planner",
     "debug_memory_system_status",
     "get_memory_context",
-    "get_graphiti_context",
     "save_session_memory",
-    "save_session_to_graphiti",
     "run_agent_session",
     "post_session_processing",
     "get_latest_commit",

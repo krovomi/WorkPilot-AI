@@ -41,10 +41,9 @@ Usage Examples:
     from memory import append_pattern
     append_pattern(spec_dir, "Use try/except with specific exceptions, log errors with context")
 
-    # Check if Graphiti is enabled
-    from memory import is_graphiti_memory_enabled
-    if is_graphiti_memory_enabled():
-        # Graphiti will automatically store data alongside file-based memory
+    # Check whether memory (the shared brain) is on
+    from memory import is_memory_enabled
+    if is_memory_enabled():
         pass
 """
 
@@ -56,7 +55,7 @@ from memory import (
     get_memory_dir,
     get_memory_summary,
     get_session_insights_dir,
-    is_graphiti_memory_enabled,
+    is_memory_enabled,
     load_all_insights,
     load_codebase_map,
     load_gotchas,
@@ -67,7 +66,7 @@ from memory import (
 
 # Make all functions available for import
 __all__ = [
-    "is_graphiti_memory_enabled",
+    "is_memory_enabled",
     "get_memory_dir",
     "get_session_insights_dir",
     "save_session_insights",

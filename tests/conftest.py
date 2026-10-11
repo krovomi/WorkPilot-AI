@@ -139,8 +139,6 @@ _PROTECTED_PACKAGES = [
     "ui",
     # Memory & graph
     "memory",
-    "graphiti_config",
-    "graphiti_providers",
     # Recovery & analysis
     "services.recovery",
     "insight_extractor",

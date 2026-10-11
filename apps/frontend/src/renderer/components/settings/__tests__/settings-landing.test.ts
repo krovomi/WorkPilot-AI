@@ -80,10 +80,10 @@ describe("resolveSettingsLanding", () => {
 		// Deep links (the guided tour) fire while the dialog is already open.
 		expect(
 			resolveSettingsLanding({
-				initialProjectSection: "memory",
+				initialProjectSection: "linear",
 				hasProjectToShow: true,
 				hasLanded: true,
 			}),
-		).toEqual({ topLevel: "project", projectSection: "memory", landed: true });
+		).toEqual({ topLevel: "project", projectSection: "linear", landed: true });
 	});
 });

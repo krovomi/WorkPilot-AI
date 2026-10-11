@@ -192,7 +192,7 @@ describe("OnboardingWizard Integration Tests", () => {
 
 			// When profile is created via API key path, should skip oauth
 			// This is tested via component behavior - the wizard should advance
-			// directly to graphiti step, bypassing oauth
+			// directly to the completion step, bypassing oauth
 			const oauthStepText = screen.queryByText(/OAuth Authentication/);
 			// Before API key selection, oauth text from different context shouldn't be visible
 			expect(oauthStepText).toBeNull();
@@ -204,7 +204,7 @@ describe("OnboardingWizard Integration Tests", () => {
 			render(<OnboardingWizard {...defaultProps} />);
 
 			// This test verifies that when oauth is bypassed (API key path taken),
-			// going back from graphiti returns to auth-choice, not oauth
+			// going back from completion returns to auth-choice, not oauth
 
 			// Navigate: welcome → auth-choice
 			fireEvent.click(screen.getByText(/Get Started/));
@@ -216,7 +216,7 @@ describe("OnboardingWizard Integration Tests", () => {
 
 			// The back button behavior is controlled by oauthBypassed state
 			// When API key path is taken, oauthBypassed=true
-			// Going back from graphiti should skip oauth step
+			// Going back from completion should skip oauth step
 			const authChoiceHeading = screen.getByText(
 				/Choose Your Authentication Method/,
 			);
@@ -330,7 +330,7 @@ describe("OnboardingWizard Integration Tests", () => {
 			});
 
 			// Check for step labels in progress indicator
-			const steps = ["Welcome", "Auth Method", "OAuth", "Memory", "Done"];
+			const steps = ["Welcome", "Auth Method", "OAuth", "Done"];
 
 			// At least some step labels should be present (not all may be visible at current step)
 			const visibleSteps = steps.filter((step) => screen.queryByText(step));

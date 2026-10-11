@@ -59,12 +59,14 @@ propre dict `agents` : **il gagne sur les défauts**.
 
 | Package | Rôle |
 |---|---|
-| `learning_loop/` | extrait les patterns succès/échec des builds, les injecte dans les prompts |
+| `learning_loop/` | extrait les patterns succès/échec des builds — des notes du vault (`pattern_storage.py`) — et les injecte, un seul injecteur plafonné en tokens |
 | `learning_loop/observe.py` | la phase `observe` : écrit sous `skills/_proposed/`, ne touche jamais un pack |
 | `learning_loop/replay.py` | replay A/B sur les épisodes dorés — la porte que `tests/skills_eval/` exécute |
 | `mem_search/` | récupération par paliers (index ~100 tokens → timeline → détail par ID), vault compris (`BrainSource`) |
 | `brain/` | le cerveau partagé entre agents : vault Obsidian, `graph.json` Graphify, sync git, serveur MCP `workpilot-brain` (`runners/brain_runner.py`, `runners/brain_mcp.py`) |
-| `brain/project_memory.py` + `memory/store.py` | **la seule mémoire** : ce que les builds apprennent, dans le vault. `memory/`, `agents/memory_manager.py` et les outils `record_*` passent par là ; Graphiti n'est plus un magasin |
+| `brain/project_memory.py` + `memory/store.py` | **la seule mémoire** : ce que les builds apprennent, dans le vault. `memory/`, `agents/memory_manager.py` et les outils `record_*` passent par là ; Graphiti a été retiré (lot L7) |
+| `core/merge_event.py` | un merge publié une fois ; usage_tracker, learning loop, cerveau et `uiux.knowledge` s'y abonnent |
+| `core/workpilot_layout.py` | un dossier par feature sous `.workpilot/` : les anciens noms sont déplacés, jamais supprimés |
 | `libdocs/` | phase `docs` : télécharge via Context7 la doc des bibliothèques dont le dépôt n'a aucun exemple, avant le planning |
 | `mobile/` | apps smartphone : `stacks` (Android/Apple/Flutter/RN/MAUI/KMP/Capacitor + commandes), `devices` (émulateurs et simulateurs réels), `readiness` (constructible ici ?), `prompt` (la section donnée à chaque phase) |
 | `verify/` | la boucle de vérification (`/verify`) : `detect`, `launch`, `errors`, `devtools` (Chrome DevTools MCP piloté en Python), `endpoints`, `loop`, `replay` ; outils `verify_*` servis par `tool_executor` et par le serveur MCP `workpilot-verify` |
@@ -102,6 +104,6 @@ réponses sur des projets fixtures.
   À la racine restent des modules propres (`phase_config.py`,
   `models_registry.py`…), des points d'entrée lancés par chemin ou par uvicorn (`run.py`,
   `start_backend.py`, `provider_api.py`, `websocket_server.py`, `analyzer.py`,
-  `commit_message.py`…) et trois réexports en sursis : `insight_extractor.py`
-  (sa cible charge `analysis/__init__.py`, qui n'est pas paresseux) et
-  `graphiti_config.py` / `graphiti_providers.py` (lot L7).
+  `commit_message.py`…) et un réexport en sursis : `insight_extractor.py`
+  (sa cible charge `analysis/__init__.py`, qui n'est pas paresseux). Les shims Graphiti
+  sont partis avec le paquet (lot L7).

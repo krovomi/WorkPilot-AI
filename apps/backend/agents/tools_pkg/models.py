@@ -9,7 +9,7 @@ the Claude Agent SDK client. Tool lists are organized by category:
 
 - Base tools: Core file operations (Read, Write, Edit, etc.)
 - Web tools: Documentation and research (WebFetch, WebSearch)
-- MCP tools: External integrations (Context7, Linear, Graphiti, etc.)
+- MCP tools: External integrations (Context7, Linear, etc.)
 - WorkPilot AI tools: Custom build management tools
 """
 
@@ -83,16 +83,6 @@ LINEAR_TOOLS = [
     "mcp__linear__list_issue_labels",
     "mcp__linear__list_users",
     "mcp__linear__get_user",
-]
-
-# Graphiti MCP tools for knowledge graph memory (when GRAPHITI_MCP_URL is set)
-# See: https://github.com/getzep/graphiti
-GRAPHITI_MCP_TOOLS = [
-    "mcp__graphiti-memory__search_nodes",  # Search entity summaries
-    "mcp__graphiti-memory__search_facts",  # Search relationships between entities
-    "mcp__graphiti-memory__add_episode",  # Add data to knowledge graph
-    "mcp__graphiti-memory__get_episodes",  # Retrieve recent episodes
-    "mcp__graphiti-memory__get_entity_edge",  # Get specific entity/relationship
 ]
 
 # =============================================================================
@@ -264,12 +254,12 @@ AGENT_CONFIGS = {
         "thinking_default": "medium",
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # BUILD PHASES (Full tools + Graphiti memory)
+    # BUILD PHASES (Full tools; memory is the shared brain, added to every agent)
     # Note: "linear" is conditional on project setting "update_linear_with_tasks"
     # ═══════════════════════════════════════════════════════════════════════
     "planner": {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7", "graphiti", "workpilot"],
+        "mcp_servers": ["context7", "workpilot"],
         "mcp_servers_optional": ["linear"],  # Only if project setting enabled
         "auto_claude_tools": [
             TOOL_GET_BUILD_PROGRESS,
@@ -280,7 +270,7 @@ AGENT_CONFIGS = {
     },
     "coder": {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7", "graphiti", "workpilot", "chrome-devtools"],
+        "mcp_servers": ["context7", "workpilot", "chrome-devtools"],
         "mcp_servers_optional": ["linear"],
         "auto_claude_tools": [
             TOOL_UPDATE_SUBTASK_STATUS,
@@ -292,7 +282,7 @@ AGENT_CONFIGS = {
         "thinking_default": "none",  # Coding doesn't use extended thinking
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # QA PHASES (Read + test + browser + Graphiti memory)
+    # QA PHASES (Read + test + browser)
     # ═══════════════════════════════════════════════════════════════════════
     "qa_reviewer": {
         # Read + Write/Edit (for QA reports and plan updates) + Bash (for tests)
@@ -300,7 +290,6 @@ AGENT_CONFIGS = {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
         "mcp_servers": [
             "context7",
-            "graphiti",
             "workpilot",
             "browser",
             "chrome-devtools",
@@ -317,7 +306,6 @@ AGENT_CONFIGS = {
         "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
         "mcp_servers": [
             "context7",
-            "graphiti",
             "workpilot",
             "browser",
             "chrome-devtools",
@@ -635,8 +623,6 @@ def _map_mcp_server_name(
         "workpilot-uiux": "uiux",
         "ui-ux-pro-max": "uiux",
         "context7": "context7",
-        "graphiti-memory": "graphiti",
-        "graphiti": "graphiti",
         "linear": "linear",
         "electron": "electron",
         "puppeteer": "puppeteer",
@@ -676,7 +662,6 @@ def get_required_mcp_servers(
     Handles dynamic server selection:
     - "browser" → electron (if is_electron) or puppeteer (if is_web_frontend)
     - "linear" → only if in mcp_servers_optional AND linear_enabled is True
-    - "graphiti" → never by default: the shared brain is the one memory
     - Respects per-project MCP config overrides from .workpilot/.env
     - Applies per-agent ADD/REMOVE overrides from AGENT_MCP_<agent>_ADD/REMOVE
 
@@ -733,12 +718,6 @@ def get_required_mcp_servers(
             elif is_web_frontend and not is_electron:
                 if str(puppeteer_enabled).lower() == "true":
                     servers.append("puppeteer")
-
-    # The Graphiti MCP server was a second memory an agent could write to,
-    # beside the vault every other surface reads. The shared brain's own server
-    # (added just below) is the memory now; AGENT_MCP_<agent>_ADD=graphiti is
-    # still honoured for someone who asks for it by name.
-    servers = [s for s in servers if s != "graphiti"]
 
     # The shared brain reaches every agent that has tools at all, in every
     # feature, the moment a brain exists on this machine (`brain/runtime.py`).

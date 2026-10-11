@@ -710,3 +710,8 @@ def record_merge(project_dir: Path, automatic: bool) -> None:
             _atomic_write(snap_path, json.dumps(snap, indent=2))
     except Exception as exc:
         logger.warning("[usage_tracker] record_merge failed: %s", exc)
+
+
+def on_merge(event) -> None:
+    """`core.merge_event` subscriber: count the merge for the dashboard."""
+    record_merge(event.project_dir, automatic=event.automatic)

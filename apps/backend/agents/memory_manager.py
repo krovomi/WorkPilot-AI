@@ -161,10 +161,6 @@ async def get_memory_context(
     return "\n".join(sections)
 
 
-# The name the coder and the QA fixer imported when the context came from Graphiti.
-get_graphiti_context = get_memory_context
-
-
 async def save_session_memory(
     spec_dir: Path,
     project_dir: Path,
@@ -239,26 +235,3 @@ async def save_session_memory(
         return False, "none"
     finally:
         await memory.close()
-
-
-# Keep the old function name as an alias for backwards compatibility
-async def save_session_to_graphiti(
-    spec_dir: Path,
-    project_dir: Path,
-    subtask_id: str,
-    session_num: int,
-    success: bool,
-    subtasks_completed: list[str],
-    discoveries: dict | None = None,
-) -> bool:
-    """Backwards compatibility wrapper for save_session_memory."""
-    result, _ = await save_session_memory(
-        spec_dir,
-        project_dir,
-        subtask_id,
-        session_num,
-        success,
-        subtasks_completed,
-        discoveries,
-    )
-    return result

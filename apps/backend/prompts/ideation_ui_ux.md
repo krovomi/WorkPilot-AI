@@ -58,7 +58,7 @@ lsof -i :3000 2>/dev/null | head -3
 lsof -i :5173 2>/dev/null | head -3
 lsof -i :8080 2>/dev/null | head -3
 
-# Check for graph hints (historical insights from Graphiti)
+# Check for graph hints (historical insights from the shared brain)
 cat graph_hints.json 2>/dev/null || echo "No graph hints available"
 ```
 

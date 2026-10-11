@@ -139,7 +139,6 @@ function createProject(): Project {
 		autoBuildPath: ".workpilot",
 		settings: {
 			model: "default",
-			memoryBackend: "file",
 			linearSync: false,
 			notifications: {
 				onTaskComplete: false,
@@ -147,7 +146,6 @@ function createProject(): Project {
 				onReviewNeeded: false,
 				sound: false,
 			},
-			graphitiMcpEnabled: false,
 			useClaudeMd: true,
 		},
 		createdAt: new Date(),

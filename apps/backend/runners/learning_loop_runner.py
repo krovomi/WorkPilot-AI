@@ -54,8 +54,8 @@ async def record_outcome(
     Record a task outcome (human verdict or CI failure) for the learning loop.
 
     Writes task_outcome.json into the spec directory (read by the pattern
-    extractor) and, when Graphiti memory is enabled, stores a task_outcome
-    episode so future tasks can retrieve similar outcomes.
+    extractor) and stores the outcome in the project's memory (the shared
+    brain) so future tasks can retrieve similar outcomes.
 
     Returns the spec directory, or None if it does not exist.
     """

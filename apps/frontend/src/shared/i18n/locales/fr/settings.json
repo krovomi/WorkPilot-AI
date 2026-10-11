@@ -1206,7 +1206,6 @@
 		"needsAuth": "Auth requise",
 		"noAccountsYet": "Aucun compte configuré",
 		"openaiKey": "Clé API OpenAI",
-		"openaiKeyDescription": "Requise pour le backend mémoire Graphiti (embeddings)",
 		"proactiveDescription": "Vérifier l'utilisation régulièrement et basculer avant d'atteindre les limites",
 		"proactiveMonitoring": "Surveillance proactive",
 		"reactiveDescription": "Basculement auto en cas de limite de débit inattendue",
@@ -1531,11 +1530,6 @@
 				"description": "Automatisation d'app desktop via Chrome DevTools",
 				"name": "Electron"
 			},
-			"graphiti": {
-				"description": "Graphe de connaissances pour le contexte inter-sessions",
-				"name": "Mémoire Graphiti",
-				"notConfigured": "Nécessite la configuration de la mémoire (voir Paramètres mémoire)"
-			},
 			"linear": {
 				"description": "Intégration de gestion de projet",
 				"name": "Linear",
@@ -1760,26 +1754,6 @@
 			"syncDescription": "Synchroniser avec Linear pour le suivi des issues",
 			"tasksAvailable": "{{count}}+ tâches disponibles à importer",
 			"title": "Linear"
-		},
-		"memory": {
-			"description": "Backend mémoire Graphiti",
-			"title": "Mémoire (Graphiti)",
-			"integrationTitle": "Paramètres de mémoire",
-			"integrationDescription": "Configurer le backend mémoire Graphiti pour le contexte inter-sessions",
-			"syncDescription": "Activer la mémoire persistante entre les sessions d'agents",
-			"enableMemory": "Activer la mémoire",
-			"enableMemoryDescription": "Mémoire persistante inter-sessions utilisant LadybugDB (base de données intégrée)",
-			"fileBasedMemoryDescription": "Utilisation de la mémoire basée sur fichiers. Les insights de session sont stockés localement dans des fichiers JSON. Activez la mémoire pour un contexte persistant inter-sessions avec recherche sémantique.",
-			"enableAgentMemoryAccess": "Activer l'accès mémoire agent",
-			"enableAgentMemoryAccessDescription": "Permettre aux agents de rechercher et d'ajouter au graphe de connaissances via MCP",
-			"graphitiMcpServerUrl": "URL du serveur MCP Graphiti",
-			"graphitiMcpServerUrlDescription": "URL du serveur MCP Graphiti pour l'accès mémoire des agents",
-			"embeddingProvider": "Fournisseur d'embeddings",
-			"embeddingProviderDescription": "Fournisseur pour la recherche sémantique (optionnel - la recherche par mots-clés fonctionne sans)",
-			"databaseName": "Nom de la base de données",
-			"databaseNameDescription": "Stocké dans ~/.workpilot/memories/",
-			"databasePath": "Chemin de la base de données (Optionnel)",
-			"databasePathDescription": "Emplacement de stockage personnalisé. Par défaut : ~/.workpilot/memories/"
 		},
 		"phaseConfigNoteProvider": "Ces paramètres de modèle s'appliquent au fournisseur {{provider}}. Ils sont enregistrés indépendamment et restaurés lorsque vous revenez à ce fournisseur.",
 		"phases": {
@@ -2202,24 +2176,6 @@
 			"lowestLatencyDescription": "Temps de réponse le plus rapide",
 			"roundRobin": "Round Robin",
 			"roundRobinDescription": "Distribution équitable"
-		}
-	},
-	"memoryLifecycle": {
-		"title": "Gestionnaire du Cycle de Vie Mémoire",
-		"description": "Gérer la mémoire Graphiti — élagage, politiques de rétention, contrôle de fraîcheur",
-		"status": "Statut",
-		"episodeCount": "Épisodes stockés",
-		"diskUsage": "Espace disque utilisé",
-		"retentionDays": "Rétention (jours)",
-		"maxEpisodes": "Épisodes maximum",
-		"pruneStrategy": "Stratégie d'élagage",
-		"autoPrune": "Élagage automatique",
-		"runPrune": "Lancer l'élagage",
-		"export": "Exporter les mémoires",
-		"pruneStrategies": {
-			"lru": "LRU (moins récemment utilisé)",
-			"oldest": "Plus anciens en premier",
-			"duplicates": "Doublons uniquement"
 		}
 	},
 	"cicdTriggers": {

@@ -543,7 +543,6 @@ def handle_doctor_command() -> None:
 
     optional_deps = [
         ("secretstorage", "Linux Secret Service (credential storage)"),
-        ("graphiti_core", "Graph-based memory (Graphiti)"),
         ("google.generativeai", "Google Gemini provider"),
         ("openai", "OpenAI / Azure OpenAI provider"),
         ("anthropic", "Anthropic SDK"),

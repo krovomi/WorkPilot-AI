@@ -103,7 +103,7 @@ Changelog generation:
 Project context and memory:
 - `CONTEXT_GET` - Get project context
 - `CONTEXT_REFRESH_INDEX` - Refresh project index
-- `CONTEXT_MEMORY_STATUS` - Get Graphiti memory status
+- `CONTEXT_MEMORY_STATUS` - Get the shared brain memory status
 - `CONTEXT_SEARCH_MEMORIES` - Search memory episodes
 - `CONTEXT_GET_MEMORIES` - Get memory episodes
 
