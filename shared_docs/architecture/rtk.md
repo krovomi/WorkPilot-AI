@@ -87,7 +87,7 @@ switch: `git status --porcelain` feeds a parser, `git diff --numstat` feeds a
 counter, and condensing either saves nothing — none of it is ever sent to a
 model — while breaking the caller. A call site opts in by calling
 `rtk.capture_for_model`, which is a statement about where its output is going.
-`agents/self_review.py` is the example to copy: three git calls, and only the
+`virtual_reviewer/diff.py` is the example to copy: three git calls, and only the
 `git diff HEAD` excerpt that reaches the model goes through rtk. The test
 runners in `qa/auto_fix_loop.py` and `self_healing/incident_responder/
 cicd_mode.py` are the counter-example and stay raw, because their output feeds

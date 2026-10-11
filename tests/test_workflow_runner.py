@@ -70,7 +70,7 @@ class TestPhaseWindows:
         mid = phases_between(profile, after="coding", before="qa")
         post = phases_between(profile, after="qa", before=None)
 
-        # `mobile-design` and `store-readiness` are conditional on their files
+        # `mobile-design` is conditional on its files
         # being touched, and an unknown change set runs a conditional phase —
         # erring towards running is the safe direction the engine documents.
         assert [r.id for r in pre] == ["brainstorm"]
@@ -83,7 +83,6 @@ class TestPhaseWindows:
         # absent here on purpose: `gates.run_deterministic_gates` runs it.
         assert [r.id for r in mid] == ["review", "verify"]
         assert [r.id for r in post] == [
-            "store-readiness",
             "architecture-map",
             "verify-replay",
         ]
@@ -176,7 +175,6 @@ class TestPhaseWindows:
         post = phases_between(profile, after="qa", before=None)
         assert [r.id for r in mid] == ["review", "verify"]
         assert [r.id for r in post] == [
-            "store-readiness",
             "architecture-map",
             "verify-replay",
         ]
@@ -750,7 +748,6 @@ class TestPhaseLabels:
 
     def test_a_review_is_logged_as_validation_not_as_coding(self):
         assert log_phase_for("review") == "VALIDATION"
-        assert log_phase_for("store-readiness") == "VALIDATION"
         assert log_phase_for("verify") == "VALIDATION"
 
     def test_an_unknown_phase_falls_back_rather_than_raising(self):

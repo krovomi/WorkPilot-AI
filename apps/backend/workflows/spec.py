@@ -86,6 +86,10 @@ class Phase:
     agent: str | None = None
     roster: str | None = None
     description: str = ""
+    # Lenses applied only when the task touches their files, as
+    # ``((name, globs), ...)``: ``lenses: {store-readiness: touches("…")}``.
+    # Which names exist is the executor's business (`workflows.runner`).
+    conditional_lenses: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @property
     def prunable(self) -> bool:
@@ -126,6 +130,17 @@ def _parse_when(raw: Any, phase_id: str) -> tuple[str, ...]:
     return tuple(g.strip() for g in m.group("globs").split(",") if g.strip())
 
 
+def _parse_lenses(raw: Any, phase_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, dict):
+        raise WorkflowError(f"phase {phase_id!r}: 'lenses' must be a mapping")
+    return tuple(
+        (str(name), _parse_when(when, f"{phase_id}.lenses.{name}"))
+        for name, when in raw.items()
+    )
+
+
 def _parse_phase(raw: Any, index: int) -> Phase:
     if not isinstance(raw, dict):
         raise WorkflowError(f"phase #{index}: expected a mapping")
@@ -164,6 +179,7 @@ def _parse_phase(raw: Any, index: int) -> Phase:
         agent=(str(raw["agent"]) if raw.get("agent") else None),
         roster=(str(raw["roster"]) if raw.get("roster") else None),
         description=str(raw.get("description", "")),
+        conditional_lenses=_parse_lenses(raw.get("lenses"), str(phase_id)),
     )
 
 

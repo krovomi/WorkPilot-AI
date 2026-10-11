@@ -132,15 +132,15 @@ def test_the_capture_never_runs_through_a_shell():
     assert "shell=True" not in source
 
 
-def test_self_review_only_condenses_the_excerpt_a_model_reads(fake_rtk, tmp_path):
+def test_the_diff_summary_only_condenses_the_excerpt_a_model_reads(fake_rtk, tmp_path):
     """`--name-only` and `--numstat` feed a parser and must stay raw.
 
     Condensing them would save nothing — neither is ever sent to a model — and
     would silently break the file list and the insertion counter.
     """
-    import agents.self_review as self_review
+    import virtual_reviewer.diff as diff
 
-    source = Path(self_review.__file__).read_text(encoding="utf-8")
+    source = Path(diff.__file__).read_text(encoding="utf-8")
 
     # One opt-in, on the one call whose output reaches a prompt.
     assert source.count("for_model=True") == 1

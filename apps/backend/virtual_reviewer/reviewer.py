@@ -78,9 +78,8 @@ def compute_review_summary(spec_dir: Path, project_dir: Path) -> VirtualReviewSu
     qa_report = _read_text(spec_dir / "qa_report.md")
     self_review = (spec_dir / "self_review.md").exists()
 
-    # Reuse self_review's diff helper rather than re-implementing.
     try:
-        from agents.self_review import compute_diff_summary
+        from .diff import compute_diff_summary
 
         diff_summary = compute_diff_summary(spec_dir, project_dir)
         diff_excerpt = diff_summary.diff_excerpt[:_MAX_DIFF_CHARS]

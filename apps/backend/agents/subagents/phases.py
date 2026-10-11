@@ -89,8 +89,8 @@ PHASE_ALIASES: dict[str, str] = {
     # Judging finished work against acceptance criteria.
     "qa_reviewer": "qa",
     "qa_fixer": "qa",
-    # Running the app the task changed and judging what it shows.
-    "verifier": "qa",
+    # Running the app the task changed: proof of execution, not acceptance.
+    "verifier": "verify",
     "qa": "qa",
     # Deciding what to do before anything is written. `impact_analyzer` belongs
     # here rather than in "review": its question is blast radius, which is what
@@ -397,6 +397,12 @@ ROSTERS: dict[str, tuple[str, ...]] = {
     # subagents into its context, and vice versa.
     "planner": ("architecture-analyst", "dependency-tracer"),
     "qa": ("qa-acceptance-checker", "test-runner"),
+    # The verifier proves the change runs; whether it meets its acceptance
+    # criteria is the review's conformance lens (from `high`) and QA's
+    # decision. Its acceptance checker was a third reading of the same diff
+    # for the same question (audit F11, lot L10). `test-runner` stays: the
+    # language and mobile overlays fold the project's commands into it.
+    "verify": ("test-runner",),
     # For an agent reading code it did not write, with no spec to check it
     # against. Deliberately not the `kanban` roster: `code-reviewer` there is a
     # generalist that reports everything it notices. A review pass wants the
