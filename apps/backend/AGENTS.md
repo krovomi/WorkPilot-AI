@@ -101,6 +101,6 @@ réponses sur des projets fixtures.
   À la racine restent des modules propres (`phase_config.py`,
   `models_registry.py`…), des points d'entrée lancés par chemin ou par uvicorn (`run.py`,
   `start_backend.py`, `provider_api.py`, `websocket_server.py`, `analyzer.py`,
-  `commit_message.py`…) et trois réexports en sursis : `insight_extractor.py`
-  (sa cible charge `analysis/__init__.py`, qui n'est pas paresseux) et
-  `graphiti_config.py` / `graphiti_providers.py` (lot L7).
+  `commit_message.py`…) et un réexport en sursis : `insight_extractor.py`
+  (sa cible charge `analysis/__init__.py`, qui n'est pas paresseux). Les shims Graphiti
+  sont partis avec le paquet (lot L7).
