@@ -604,10 +604,6 @@
 		"forProject": "pour {{name}}",
 		"availableTools": "Outils disponibles",
 		"textOnly": "Texte uniquement (sans outils)",
-		"spec_gatherer": {
-			"label": "Collecteur de spec",
-			"description": "Collecte les exigences initiales de l'utilisateur"
-		},
 		"spec_researcher": {
 			"label": "Chercheur de spec",
 			"description": "Valide les intégrations externes et les APIs"
@@ -659,10 +655,6 @@
 		"insights": {
 			"label": "Insights",
 			"description": "Extrait des informations du code"
-		},
-		"analysis": {
-			"label": "Analyse",
-			"description": "Analyse du code avec recherche contextuelle"
 		},
 		"batch_analysis": {
 			"label": "Analyse en lot",

@@ -56,18 +56,6 @@ def test_imports():
         print(f"✗ qa package export failed: {e}")
         raise
 
-    try:
-        from qa_loop import (
-            DEFAULT_MAX_AUTO_FIX_ATTEMPTS,
-            AutoFixLoop,
-            run_auto_fix_loop,
-        )
-
-        print("✓ qa_loop facade exports OK")
-    except ImportError as e:
-        print(f"✗ qa_loop facade export failed: {e}")
-        raise
-
 
 def test_classes():
     """Test that classes can be instantiated."""

@@ -34,10 +34,10 @@ GIT_CONFIG_USER_EMAIL = "user.email"
 GIT_CONFIG_USER_NAME = "user.name"
 INITIAL_COMMIT_MESSAGE = "Initial commit"
 
-# The project root must come before the backend root: both ship a `src`
-# package, and only the project one has `src.connectors.llm_config` —
-# azure_devops tests likewise rely on ``from src.config.settings import
-# Settings``. The backend root is on the path so `core`, `review`, etc. import
+# The project root must come before the backend root: `src.connectors.llm_config`
+# lives under the project root (apps/backend/src/ used to shadow it; it was
+# removed in audit lot L9) — azure_devops tests likewise rely on
+# ``from src.config.settings import Settings``. The backend root is on the path so `core`, `review`, etc. import
 # without an `apps.backend.` prefix.
 #
 # This used to be two `if <root> not in sys.path` inserts, which enforce
@@ -78,6 +78,12 @@ _MODULES_TO_PRESERVE = [
     "core.agent_client",
     "core.platform",
     "core.auth",
+    # Four files mock core.workspace and core.workspace.models. Deleting the
+    # mock instead of restoring re-imported models (a new WorkspaceMode class)
+    # while core.workspace.workspace_setup kept the old one, so
+    # `mode == WorkspaceMode.DIRECT` was False in test_workspace.py.
+    "core.workspace",
+    "core.workspace.models",
     "review",
     "review.state",
 ]
@@ -124,7 +130,6 @@ _PROTECTED_PACKAGES = [
     # Prompts
     "prompts",
     "prompts_pkg",
-    "prompt_generator",
     # Config & phases
     "phase_config",
     "phase_event",
@@ -132,19 +137,17 @@ _PROTECTED_PACKAGES = [
     "task_logger",
     "progress",
     "ui",
-    "linear_updater",
     # Memory & graph
     "memory",
     "graphiti_config",
     "graphiti_providers",
     # Recovery & analysis
-    "recovery",
+    "services.recovery",
     "insight_extractor",
     "review",
     "analysis",
     # QA system
     "qa",
-    "qa_loop",
     # Integrations
     "integrations",
     # Utilities
@@ -156,12 +159,11 @@ _PROTECTED_PACKAGES = [
 # Modules that must always be evicted (even if they're real ModuleType objects)
 # because they import from protected packages at module level and their bound
 # names become stale after a protected package mock is cleaned up.
-# For example, qa_loop.get_iteration_history was bound to mock_qa.get_iteration_history
-# when qa was a MagicMock; evicting qa_loop forces a fresh re-import with real bindings.
+# For example, qa.loop.get_iteration_history was bound to mock_qa.get_iteration_history
+# when qa was a MagicMock; evicting qa.loop forces a fresh re-import with real bindings.
 # qa.criteria imports from `progress` which is frequently mocked; evicting it lets
 # test files that mock progress get the correct is_build_complete binding.
 _DEPENDENT_EVICT = {
-    "qa_loop",
     "qa.criteria",
     "qa.report",
     "qa.loop",

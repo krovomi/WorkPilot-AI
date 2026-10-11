@@ -52,26 +52,11 @@ try:
 except ImportError:  # pragma: no cover - alternate package layout
     from apps.backend.models_registry import get_default
 
-# Import specific exception for provider validation failures
-try:
-    from integrations.graphiti.providers_pkg.exceptions import ProviderError
-except ImportError:
-    # Fallback if the module is not available
-    class ProviderError(Exception):
-        """Raised when a provider cannot be initialized or validated."""
-
-        pass
-
-
 # Constants
 PROVIDER_CONFIG_NOT_FOUND = "Provider config not found"
-PROVIDER_CLASS_NOT_FOUND = "Provider class not found"
 API_KEY_VALIDATION_FAILED_INVALID = "API key validation failed: invalid key"
 API_KEY_VALIDATION_FAILED_ERROR = "API key validation failed: {e}"
 HOOK_NOT_FOUND = "Hook not found"
-PROMPT_REQUIRED = "Prompt is required"
-PROVIDER_TEST_FAILED = "Provider test failed: {e}"
-GENERATION_FAILED = "Generation failed: {e}"
 TEMPLATE_NOT_FOUND = "Template not found"
 GITHUB_CLI_AUTH_SUCCESS = "Logged in to github.com"
 API_MODELS_ENDPOINT = "/v1/models"
@@ -160,18 +145,9 @@ PRIVATE_IP_RANGES = [
 ]
 
 
-# Lazy import: llm_discovery is only needed by endpoint functions, not at module init.
-# Importing it eagerly breaks other modules (agent_runner, client) that import
-# provider_api just for get_selected_provider() but don't have src.connectors on sys.path.
-def get_provider_by_name(name: str):
-    from src.connectors.llm_discovery import (
-        get_provider_by_name as _get_provider_by_name,
-    )
-
-    return _get_provider_by_name(name)
-
-
-# Lazy imports for llm_config functions (same reason as llm_discovery above)
+# Lazy imports for llm_config functions: importing them eagerly breaks modules
+# (agent_runner, client) that import provider_api just for
+# get_selected_provider() but don't have src.connectors on sys.path.
 def _get_llm_config():
     from src.connectors.llm_config import (
         delete_provider_config,
@@ -737,31 +713,6 @@ def get_selected_provider() -> str | None:
         return _selected_provider
 
 
-@app.post(
-    "/providers/test/{provider}",
-    responses={
-        404: {"description": PROVIDER_CONFIG_NOT_FOUND},
-        400: {"description": "Provider test failed"},
-    },
-)
-@limiter.limit("5/minute")
-def test_provider(request: Request, provider: str):
-    config = load_provider_config(provider)
-    if not config:
-        raise HTTPException(status_code=404, detail=PROVIDER_CONFIG_NOT_FOUND)
-    provider_cls = get_provider_by_name(provider)
-    if not provider_cls:
-        raise HTTPException(status_code=404, detail=PROVIDER_CLASS_NOT_FOUND)
-    try:
-        instance = provider_cls(**config)
-        instance.connect()
-        if not instance.validate():
-            raise ProviderError("Validation failed")
-        return {"status": "ok"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=PROVIDER_TEST_FAILED.format(e=e))
-
-
 def validate_url_ssrf(provider: str, url: str) -> str:
     """
     Public wrapper for SSRF URL validation - intended for testing purposes.
@@ -1204,7 +1155,7 @@ def get_provider_models(provider: str, refresh: bool = False):
 
     Backed by the dynamic catalog (live API call → cache → static fallback).
     Kept as a string list for backwards compatibility with existing callers
-    (App.tsx, ProviderManager.tsx, AccountForm.tsx). For the rich format
+    (App.tsx, AccountForm.tsx). For the rich format
     (label, tier, supportsThinking, source provenance) use
     `/providers/models/{provider}/catalog`.
     """
@@ -1285,64 +1236,6 @@ def get_agentic_capabilities():
             for name, caps in load_providers().items()
         }
     }
-
-
-@app.get("/providers/capabilities/{provider}")
-def get_provider_capabilities(provider: str):
-    provider_cls = get_provider_by_name(provider)
-    if not provider_cls:
-        return {"error": "Provider not found"}
-    from src.connectors.llm_config import load_provider_config
-
-    config = load_provider_config(provider) or get_env_provider_config(provider) or {}
-    try:
-        instance = provider_cls(**config)
-        instance.connect()
-        return instance.get_capabilities()
-    except Exception as e:
-        return {"error": _safe_error_message(e)}
-
-
-@app.get("/providers/schema/{provider}")
-def get_provider_schema(provider: str):
-    provider_cls = get_provider_by_name(provider)
-    if not provider_cls:
-        return {"error": "Provider not found"}
-    from src.connectors.llm_config import load_provider_config
-
-    config = load_provider_config(provider) or get_env_provider_config(provider) or {}
-    try:
-        instance = provider_cls(**config)
-        return instance.get_config_schema()
-    except Exception as e:
-        return {"error": _safe_error_message(e)}
-
-
-@app.post(
-    "/providers/generate/{provider}",
-    responses={
-        404: {"description": PROVIDER_CONFIG_NOT_FOUND},
-        400: {"description": "Generation failed"},
-    },
-)
-@limiter.limit("30/minute")
-def generate_with_provider(request: Request, provider: str, payload: dict[str, Any]):
-    provider_cls = get_provider_by_name(provider)
-    if not provider_cls:
-        raise HTTPException(status_code=404, detail=PROVIDER_CLASS_NOT_FOUND)
-    config = load_provider_config(provider)
-    if not config:
-        raise HTTPException(status_code=404, detail=PROVIDER_CONFIG_NOT_FOUND)
-    prompt = payload.get("prompt")
-    if not prompt:
-        raise HTTPException(status_code=400, detail=PROMPT_REQUIRED)
-    try:
-        instance = provider_cls(**config)
-        instance.connect()
-        result = instance.generate(prompt, **payload.get("params", {}))
-        return {"result": result}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=GENERATION_FAILED.format(e=e))
 
 
 # Per-provider key-validation specs. Keep this in sync with AUTHORIZED_URLS above.
@@ -1623,7 +1516,7 @@ async def get_provider_usage(provider: str):
             }
     elif provider == "copilot":
         try:
-            from src.connectors.llm_copilot import get_copilot_usage_metrics
+            from core.copilot_usage import get_copilot_usage_metrics
 
             usage_data = get_copilot_usage_metrics()
 
@@ -1718,7 +1611,7 @@ async def get_provider_usage(provider: str):
             }
     elif provider == "anthropic" or provider == "claude":
         try:
-            from connectors.llm_anthropic_usage import get_anthropic_usage_metrics
+            from core.anthropic_usage import get_anthropic_usage_metrics
 
             usage_data = get_anthropic_usage_metrics()
 

@@ -12,7 +12,7 @@ from datetime import datetime, time
 from pathlib import Path
 
 try:
-    from debug import debug, debug_section, debug_success
+    from core.debug import debug, debug_section, debug_success
 except ImportError:
 
     def debug(module: str, message: str, **kwargs):

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Voice Control Runner - AI-powered voice command processing using Claude SDK
+Voice Control Runner - voice command processing
 
-This script provides voice control functionality with speech-to-text
-processing and AI-powered command interpretation.
+This script provides voice control functionality: speech-to-text, then
+keyword classification of the transcript into a navigation command.
 """
 
 import argparse
@@ -22,13 +22,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # trigger graphiti_core -> real_ladybug -> pywintypes import chain (ACS-253)
 from cli.utils import import_dotenv
 from core.auth import ensure_claude_code_oauth_token, get_auth_token
-from core.dependency_validator import validate_platform_dependencies
-from debug import (
+from core.debug import (
     debug,
     debug_error,
     debug_section,
     debug_success,
 )
+from core.dependency_validator import validate_platform_dependencies
 from phase_config import get_thinking_budget, resolve_model_id
 
 try:
@@ -62,12 +62,11 @@ class VoiceControlProcessor:
         self.setup_client()
 
     def setup_client(self):
-        """Check the Claude SDK and a token are there for the AI path.
+        """Check the Claude SDK and a token are there.
 
         This used to build a client from its own options and keep it on
         `self.client`, where nothing ever read it but `main`'s readiness
-        check. The keyword classifier `process_command` uses needs no client;
-        the AI path builds one per command (`_create_ai_client`).
+        check. The keyword classifier `process_command` uses needs no client.
         """
         if not SDK_AVAILABLE:
             debug_error("VoiceControl", "Claude SDK not available")
@@ -217,148 +216,6 @@ class VoiceControlProcessor:
             "parameters": {},
             "confidence": 0.3,
         }
-
-    def _create_error_result(
-        self, transcript: str, message: str, error: str = None
-    ) -> dict[str, Any]:
-        """Create standardized error result"""
-        debug_error("VoiceControl", message)
-        result = {
-            "transcript": transcript,
-            "command": transcript,
-            "action": "error",
-            "parameters": {},
-            "confidence": 0.0,
-        }
-        if error:
-            result["error"] = error
-        return result
-
-    def _build_user_prompt(self, transcript: str) -> str:
-        """Build user prompt with transcript"""
-        return f"""Classify this voice command into a JSON object. Reply with ONLY the JSON, nothing else.
-
-Voice command: "{transcript}"
-
-Use action "navigate" for any command about going to, showing, or opening a view.
-Destinations: kanban, terminals, analytics, settings, insights, roadmap, context, code-review, documentation, dashboard, ideation, changelog, cost-estimator.
-
-Required JSON format:
-{{
-  "command": "{transcript}",
-  "action": "navigate",
-  "parameters": {{
-    "destination": "<matching destination>"
-  }},
-  "confidence": 0.95
-}}"""
-
-    async def _process_with_ai(self, system_prompt: str, user_prompt: str) -> str:
-        """Process command with Claude SDK"""
-        debug("VoiceControl", "Processing command with AI...")
-        print('__TOOL_START__:{"tool":"claude_sdk","action":"process_command"}')
-
-        # Create client and process
-        client = self._create_ai_client(system_prompt)
-        response_text = await self._get_ai_response(client, user_prompt)
-
-        debug("VoiceControl", f"AI raw response: {response_text[:200]}")
-        print('__TOOL_END__:{"tool":"claude_sdk"}')
-        return response_text
-
-    def _create_ai_client(self, system_prompt: str):
-        """Create and configure AI client for command classification (no thinking needed)"""
-        from core.simple_client import create_simple_client
-
-        # `voice_command` declares no tool: a transcript in, a JSON command out.
-        return create_simple_client(
-            agent_type="voice_command",
-            model=self.model_id,
-            system_prompt=system_prompt,
-            cwd=Path(self.project_dir) if self.project_dir else None,
-        )
-
-    async def _get_ai_response(self, client, user_prompt: str) -> str:
-        """Get response from AI client"""
-        response_text = ""
-        async with client:
-            await client.query(user_prompt)
-            async for msg in client.receive_response():
-                response_text += self._process_message(msg)
-        return response_text
-
-    def _process_message(self, msg) -> str:
-        """Process individual message from AI"""
-        msg_type = type(msg).__name__
-
-        if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-            return self._process_assistant_message(msg)
-        elif msg_type == "ResultMessage" and hasattr(msg, "result"):
-            return self._process_result_message(msg)
-
-        return ""
-
-    def _process_assistant_message(self, msg) -> str:
-        """Process AssistantMessage content"""
-        text = ""
-        for block in msg.content:
-            if type(block).__name__ == "TextBlock" and hasattr(block, "text"):
-                text += block.text
-        return text
-
-    def _process_result_message(self, msg) -> str:
-        """Process ResultMessage content"""
-        if isinstance(msg.result, str):
-            return msg.result
-        return ""
-
-    def _build_system_prompt(self) -> str:
-        """Build system prompt for command interpretation"""
-        base_prompt = "You are a voice command classifier for WorkPilot AI. Respond only with a JSON object, no explanation or markdown."
-
-        if self.project_dir:
-            base_prompt += f"\n\nCurrent project context: {self.project_dir}"
-
-        return base_prompt
-
-    def _parse_ai_response(self, response: str, transcript: str) -> dict[str, Any]:
-        """Parse AI response and ensure valid structure"""
-        try:
-            # Try to extract JSON from response
-            import re
-
-            json_match = re.search(r"\{.*\}", response, re.DOTALL)
-
-            if json_match:
-                parsed = json.loads(json_match.group())
-
-                # Ensure required fields
-                result = {
-                    "transcript": transcript,
-                    "command": parsed.get("command", transcript),
-                    "action": parsed.get("action", "unknown"),
-                    "parameters": parsed.get("parameters", {}),
-                    "confidence": float(parsed.get("confidence", 0.5)),
-                }
-
-                # Validate confidence range
-                result["confidence"] = max(0.0, min(1.0, result["confidence"]))
-
-                return result
-            else:
-                debug_error("VoiceControl", "No JSON found in AI response")
-                raise ValueError("Invalid response format")
-
-        except Exception as e:
-            debug_error("VoiceControl", f"Error parsing AI response: {e}")
-            # Fallback response
-            return {
-                "transcript": transcript,
-                "command": transcript,
-                "action": "unknown",
-                "parameters": {},
-                "confidence": 0.3,
-            }
 
 
 async def main():

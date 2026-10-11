@@ -115,7 +115,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L6 | P1 | Pipeline payé = pipeline exécuté — **fait** | F2, F3, F15, F35, F38 | — |
 | L7 | P2 | Une seule mémoire | F6, F7, F14, F34 | L1 (insight_extractor) |
 | L8 | P2 | Code mort frontend — **fait** | F28, F25 (front) | L3 |
-| L9 | P2 | Code mort backend | F29, F30, F32, F33, F25 (back) | — |
+| L9 | P2 | Code mort backend — **fait** | F29, F30, F32, F33, F25 (back) | — |
 | L10 | P3 | Tokens à haut effort | F10, F11, F17 | L6 |
 | L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
 | L12 | P3 | Gouvernance — **fait** | F12, F13 | L9 (F25) pour F13 |
@@ -125,7 +125,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
 | L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L12, L14, L15, L16, L17 (faits) → L7, L9 → L10, L11 → L13.
+Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L9, L12, L14, L15, L16, L17 (faits) → L7, L8 → L10, L11 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -135,8 +135,8 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L12, L14, L15, L16, L17 (faits) 
 | agent_types non enregistrés | 7 (0 après le lot L1) | 0 |
 | Références Graphiti/LadybugDB hors `integrations/graphiti` | 214 (45 fichiers) | 0 |
 | Fichiers frontend sans importeur de production | 57 (~16,5 k lignes) ; 29 (~6,1 k lignes) après le lot L8, tous en attente d'une décision (voir le lot) | 0 |
-| Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) | 0 |
-| Shims racine `apps/backend/*.py` | 25 | 0 (hors points d'entrée) |
+| Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) ; **0 après le lot L9** | 0 |
+| Shims racine `apps/backend/*.py` | 25 (27 recomptés) ; **3 après le lot L9** (`insight_extractor.py`, `graphiti_config.py`, `graphiti_providers.py`) | 0 (hors points d'entrée) |
 | Prompts orphelins | 11 (~51 Ko) | 0 |
 | Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
 | Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) | ≤ 7 |
@@ -610,6 +610,82 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
   personne, remplacé par `TaskPauseControls` (#290).
 
 ### Lot L9 — Code mort backend (P2)
+
+> **Fait** (branche `claude/audit-lot-L9`) : ~18 400 lignes retirées, dont ~9 800 de
+> Python sous `apps/backend/` et `src/`. Un commit par étape, un par shim pour F30. Les fichiers
+> supprimés restent dans l'historique : dernier commit de `develop` qui les porte, `f385fe1`.
+>
+> - **F29** — toute l'annexe A.2 est supprimée (aucun constat n'avait changé depuis `b46a031`),
+>   avec les tests de `sandbox/`. Les configs `spec_gatherer` et `analysis` partent avec leur
+>   routage (`subagents/phases.py`, `core/client.py`, `learning_loop/prompt_injection.py`), le
+>   prompt `spec_gatherer.md` et leurs deux cartes de la page Agent Tools (clés en/fr).
+>   `ParallelOrchestratorReviewer` perd `_create_sdk_client`, `_define_specialist_agents`, et
+>   trois méthodes de la même chaîne morte : `_build_orchestrator_prompt`,
+>   `_extract_structured_output`, `_normalize_confidence`. Le runner vocal perd son chemin IA
+>   (neuf méthodes), `_create_error_result` (appelé par ses seuls tests) et l'agent_type
+>   `voice_command`, dont c'était le seul appelant.
+> - **F30** — 23 shims retirés : 5 sans importeur (`azure_devops_integration`, `client`,
+>   `critique`, `linear_config`, et `security.py`, inimportable car masqué par le paquet
+>   `security/`), puis 18 codemods, du plus importé au moins importé. La précaution sur
+>   `worktree.py` ne tenait plus : `core/__init__.py` est déjà paresseux (`__getattr__`), et
+>   `-X importtime` donne 68 ms par le shim contre 76 ms en direct (bruit). `analyzer.py` est lancé
+>   par chemin (frontend, spec, roadmap, ideation) : ses deux importeurs lisent
+>   `analysis.analyzer` et le fichier ne garde que `main()`. Restent `insight_extractor.py` (sa
+>   cible charge `analysis/__init__.py`, qui importe ses analyseurs au chargement ; le rendre
+>   paresseux est un préalable) et les deux shims Graphiti (lot L7). Les tests qui posaient un
+>   `MagicMock` sur le nom du shim le posent sur la cible, et `tests/conftest.py` protège ces
+>   cibles.
+> - **F32** — `llm_anthropic_usage.py` devient `core/anthropic_usage.py` ; `apps/backend/src/`
+>   disparaît, et avec lui le hack `sys.path` de `start_backend.py` et le masquage de
+>   `src.connectors` que trois commentaires décrivaient. `llm_copilot.py` ne déclarait aucun
+>   provider : c'est un lecteur d'usage, devenu `core/copilot_usage.py`. Le registre `llm_*`
+>   n'avait plus que deux lecteurs, tous deux morts : l'option `--provider-action` de `run.py`
+>   (parsée, jamais dispatchée — `handle_provider_command` n'avait aucun appelant) et quatre
+>   endpoints `/providers/{test,capabilities,schema,generate}/{provider}` dont le seul client
+>   était `ProviderManager.tsx`, importé par personne. Endpoints, composant, export du baril et
+>   espace i18n `providers` (jamais enregistré) partent ensemble, avec `llm_base`,
+>   `llm_discovery` et les onze connecteurs, dont `llm_anthropic.py` (`anthropic.Anthropic()`)
+>   et `llm_claude.py` (dernier `KNOWN_OUTSIDERS` de `test_sdk_options_factories.py`). Les
+>   capacités se lisent dans `capabilities/providers.yaml`
+>   (`/providers/agentic-capabilities`), les modèles dans `models_registry`.
+>   `DEFAULT_CLAUDE_MODEL` passe dans `llm_config.py`, conservé.
+> - **F33** — `utils/` supprimé et retiré du job ruff **et** du hook `scripts/pre-push.js` (qui le
+>   passait aussi à ruff) ; `docs/pr-1575-fixes.md` et `docs/superpowers/` supprimés.
+>   `.security-reports/` n'était pas vide mais ne portait qu'un `.gitignore` que
+>   `security/auto_integration.py` recrée lui-même : il n'est plus suivi, la règle est dans le
+>   `.gitignore` racine. `runners/github/test_context_gatherer.py` (racine) était une copie des
+>   neuf tests de `apps/backend/runners/github/test_context_gatherer.py` : supprimé plutôt que
+>   déplacé, et retiré des `testpaths`. Un seul changelog : `CHANGELOG.md` racine, le seul que
+>   lisent `bump-version.js` et `prepare-release.yml` ; `docs/CHANGELOG.md` (notes complètes de
+>   1.0.0, historique 2.x de l'amont) est supprimé, la racine pointe vers sa dernière version.
+>   `shared_docs/FEATURE_IDEAS*.md` : non traité, décision du mainteneur.
+> - **F25 (backend)** — aucune release depuis #290 (dernière : v1.2.1, 27 août 2026 ; #290 est du
+>   3 octobre) : la lecture du marqueur reste, datée dans `core/client.py` (« à retirer après la
+>   première release qui suit 1.2.1 ») avec la liste de ce qu'il faudra retirer.
+>
+> **Écarts au cahier.** `.security-reports/` n'était pas vide ; la copie racine du test de
+> `context_gatherer` est supprimée et non déplacée ; `utils/` est aussi retiré de `pre-push.js` ;
+> `insight_extractor.py` reste (préalable : `analysis/__init__.py` paresseux) ; `run.py` refuse
+> désormais `--provider-action`, `--provider` et `--config` au lieu de les ignorer (commit à part).
+>
+> **Trouvé pendant le lot L9 :**
+> - `ParallelOrchestratorReviewer._build_orchestrator_prompt` était le seul lecteur de
+>   `prompts/github/pr_parallel_orchestrator.md` (33 Ko, listé en F10 comme « gros prompt
+>   vivant ») : le prompt est désormais orphelin, et la config `pr_orchestrator_parallel`
+>   d'`AGENT_CONFIGS` n'a plus d'appelant (lots L10 / L11). `agents/subagents/pr_review.py:
+>   pr_review_agents` n'est plus appelé par le runner, seulement par le registre et les tests.
+> - `apps/backend/spec_contract.json` n'est lu par rien et décrit encore `spec_gatherer.md`.
+> - Le runner vocal exige toujours le SDK Claude et un jeton OAuth (`setup_client`) alors qu'il ne
+>   parle plus à aucun modèle — même défaut que la règle « Auth belongs to the provider ».
+> - `core/workspace.py` (2 248 l.) est masqué par le paquet `core/workspace/`, qui le charge par
+>   `importlib` : vivant, mais à résorber avec le découpage du lot L11.
+> - Isolément, `tests/test_qa_criteria.py`, `test_qa_loop.py` et `test_spec_pipeline.py` échouent
+>   à la collecte (`core.build_signals` sous un `core` mocké) ; ils ne passent que grâce à l'ordre
+>   de la suite complète. `tests/conftest.py` restaure désormais `core.workspace` et
+>   `core.workspace.models` au lieu de les supprimer : sans cela, deux classes `WorkspaceMode`
+>   coexistaient une fois les shims retirés.
+> - `services/provider_registry.py` (lu par `list_providers.py`) est un troisième registre de
+>   providers, à côté de `capabilities/providers.yaml` et `models_registry`.
 
 #### F29 · Paquets et modules backend sans importeur (~6,7 k lignes)
 

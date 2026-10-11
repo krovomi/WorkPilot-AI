@@ -39,7 +39,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from project_analyzer import is_command_allowed
+from project import is_command_allowed
 
 from .exec_validators import eval_inner_command, find_exec_command_lines
 from .parser import (
@@ -52,7 +52,7 @@ from .parser import (
 from .validator import VALIDATORS
 
 if TYPE_CHECKING:  # pragma: no cover - import is for typing only
-    from project_analyzer import SecurityProfile
+    from project import SecurityProfile
 
 __all__ = ["MAX_SUBSTITUTION_DEPTH", "validate_command_line"]
 

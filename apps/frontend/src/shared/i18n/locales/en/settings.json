@@ -1565,10 +1565,6 @@
 		"forProject": "for {{name}}",
 		"availableTools": "Available Tools",
 		"textOnly": "Text-only (no tools)",
-		"spec_gatherer": {
-			"label": "Spec Gatherer",
-			"description": "Collects initial requirements from user"
-		},
 		"spec_researcher": {
 			"label": "Spec Researcher",
 			"description": "Validates external integrations and APIs"
@@ -1620,10 +1616,6 @@
 		"insights": {
 			"label": "Insights",
 			"description": "Extracts code insights"
-		},
-		"analysis": {
-			"label": "Analysis",
-			"description": "Codebase analysis with context lookup"
 		},
 		"batch_analysis": {
 			"label": "Batch Analysis",

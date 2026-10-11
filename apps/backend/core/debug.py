@@ -10,7 +10,7 @@ Controlled via environment variables:
   - DEBUG_LOG_FILE=path Optional file output
 
 Usage:
-    from debug import debug, debug_detailed, debug_verbose, is_debug_enabled
+    from core.debug import debug, debug_detailed, debug_verbose, is_debug_enabled
 
     debug("run.py", "Starting task execution", task_id="001")
     debug_detailed("agent", "Agent response received", response_length=1234)

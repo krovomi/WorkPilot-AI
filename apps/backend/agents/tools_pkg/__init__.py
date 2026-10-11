@@ -13,7 +13,7 @@ Benefits:
 - Each agent only sees tools relevant to their role via allowed_tools
 
 Usage:
-    from auto_claude_tools import create_auto_claude_mcp_server, get_allowed_tools
+    from agents.tools_pkg import create_auto_claude_mcp_server, get_allowed_tools
 
     # Create the MCP server
     mcp_server = create_auto_claude_mcp_server(spec_dir, project_dir)

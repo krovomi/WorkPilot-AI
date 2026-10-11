@@ -15,7 +15,7 @@ _PARENT_DIR = Path(__file__).parent.parent
 if str(_PARENT_DIR) not in sys.path:
     sys.path.insert(0, str(_PARENT_DIR))
 
-from progress import count_subtasks, is_build_complete
+from core.progress import count_subtasks, is_build_complete
 from ui import (
     Icons,
     MenuOption,
@@ -233,7 +233,7 @@ def handle_followup_command(
         verbose: Enable verbose output
     """
     # Lazy imports to avoid loading heavy modules
-    from agent import run_followup_planner
+    from core.agent import run_followup_planner
 
     from .utils import print_banner, validate_environment
 

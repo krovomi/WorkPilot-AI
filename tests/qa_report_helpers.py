@@ -27,10 +27,9 @@ _mocked_module_names: list[str] = [
     "claude_agent_sdk.client",
     "claude_agent_sdk.query",
     "ui",
-    "progress",
+    "core.progress",
     "task_logger",
-    "linear_updater",
-    "client",
+    "integrations.linear.updater",
 ]
 
 
@@ -88,7 +87,7 @@ def setup_qa_report_mocks() -> None:
     mock_progress = MagicMock()
     mock_progress.count_subtasks = MagicMock(return_value=(3, 3))
     mock_progress.is_build_complete = MagicMock(return_value=True)
-    sys.modules["progress"] = mock_progress
+    sys.modules["core.progress"] = mock_progress
 
     # Mock task_logger
     mock_task_logger = MagicMock()
@@ -105,12 +104,7 @@ def setup_qa_report_mocks() -> None:
     mock_linear.linear_qa_approved = MagicMock()
     mock_linear.linear_qa_rejected = MagicMock()
     mock_linear.linear_qa_max_iterations = MagicMock()
-    sys.modules["linear_updater"] = mock_linear
-
-    # Mock client module
-    mock_client = MagicMock()
-    mock_client.create_client = MagicMock()
-    sys.modules["client"] = mock_client
+    sys.modules["integrations.linear.updater"] = mock_linear
 
     # Add auto-claude path for imports
     sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
