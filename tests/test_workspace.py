@@ -20,7 +20,7 @@ import pytest
 backend_path = Path(__file__).parent.parent / "apps" / "backend"
 sys.path.insert(0, str(backend_path))
 
-from workspace import (
+from core.workspace import (
     WorkspaceChoice,
     WorkspaceMode,
     get_current_branch,
@@ -28,7 +28,7 @@ from workspace import (
     has_uncommitted_changes,
     setup_workspace,
 )
-from worktree import WorktreeError, WorktreeManager
+from core.worktree import WorktreeError, WorktreeManager
 
 # Test constant - in the new per-spec architecture, each spec has its own worktree
 # named after the spec itself. This constant is used for test assertions.

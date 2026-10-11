@@ -240,7 +240,7 @@ except ImportError:
 
 
 from docintel.read_guard import make_read_guard_hook
-from linear_updater import is_linear_enabled
+from integrations.linear.updater import is_linear_enabled
 from prompts_pkg.project_context import detect_project_capabilities, load_project_index
 from rtk import rtk_rewrite_hook
 from rtk import settings as rtk_settings
@@ -745,7 +745,7 @@ def create_client(
         spec_dir: Directory containing the spec (for settings file)
         model: Claude model to use
         agent_type: Agent type identifier from AGENT_CONFIGS
-                   (e.g., 'coder', 'planner', 'qa_reviewer', 'spec_gatherer')
+                   (e.g., 'coder', 'planner', 'qa_reviewer', 'spec_writer')
         max_thinking_tokens: Token budget for extended thinking (None = disabled)
                             - ultrathink: 16000 (spec creation)
                             - high: 10000 (QA review)
@@ -1586,7 +1586,6 @@ def create_client(
     if "opus" in (model or "").lower():
         _effort_map = {
             "explorer": "low",
-            "spec_gatherer": "low",
             "lint": "low",
             "status": "low",
             "documenter": "medium",
@@ -1625,10 +1624,21 @@ def create_client(
 # =============================================================================
 
 
-# Filename for the single-shot "resume task X under provider Y" marker. The
-# frontend writes this when the user picks a different provider from the
-# paused-task modal. _get_active_provider() consumes it on the very next
-# session start and deletes the file so it doesn't keep overriding.
+# Filename for the single-shot "resume task X under provider Y" marker.
+# _get_active_provider() consumes it on the very next session start and
+# deletes the file so it doesn't keep overriding.
+#
+# TO REMOVE after the first release that follows 1.2.1 (audit F25, lot L9).
+# Nothing writes the marker since #290: TASK_RESUME_WITH_PROVIDER records the
+# engine in task_metadata.json and deletes the marker. The read stays for one
+# version so a task paused under 1.2.1, whose marker is still on disk, resumes
+# with the provider the user picked. No release has shipped since #290 (the
+# last is v1.2.1, 2026-08-27). Remove then: this constant,
+# _consume_resume_with_provider_marker, the `consume` parameter of
+# _get_active_provider and the comments that cite the marker (agents/coder.py,
+# workflows/api.py, cli/build_commands.py, cli/utils.py), and adapt
+# core/test_resume_with_provider.py and test_e2e_provider_switch_resume.py;
+# peek_active_provider can then become an alias of _get_active_provider.
 RESUME_WITH_PROVIDER_FILE = "RESUME_WITH_PROVIDER"
 
 
@@ -2104,7 +2114,6 @@ _EFFORT_PHASE: dict[str, str] = {
     "qa_fixer": "qa",
     "verifier": "qa",
     "spec_writer": "spec",
-    "spec_gatherer": "spec",
     "spec_researcher": "spec",
     "spec_self_critique": "spec",
 }
@@ -2312,7 +2321,7 @@ def create_agent_client(
 
         # Get allowed tools for the agent type
         _, project_capabilities = _get_cached_project_data(project_dir)
-        from linear_updater import is_linear_enabled as _is_linear_enabled
+        from integrations.linear.updater import is_linear_enabled as _is_linear_enabled
 
         mcp_config = load_project_mcp_config(project_dir)
         allowed_tools_list = get_allowed_tools(

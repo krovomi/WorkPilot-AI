@@ -19,14 +19,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # trigger a pywintypes import (the MCP library imports win32api; ACS-253)
 from cli.utils import import_dotenv
 from core.auth import ensure_claude_code_oauth_token, get_auth_token
-from core.dependency_validator import validate_platform_dependencies
-from debug import (
+from core.debug import (
     debug,
     debug_detailed,
     debug_error,
     debug_section,
     debug_success,
 )
+from core.dependency_validator import validate_platform_dependencies
 from learning import ExplanationLevel, LearningMode, LearningModeConfig
 from phase_config import get_thinking_budget, resolve_model_id
 
@@ -325,9 +325,10 @@ async def run_with_sdk(
     fallback (used for Claude, and if the provider-agnostic path fails).
     """
     try:
-        from core.client import _get_active_provider
+        from core.client import peek_active_provider
 
-        active_provider = _get_active_provider(Path(project_dir).resolve())
+        # Peeked: a chat turn is not the session a "resume with X" was for.
+        active_provider = peek_active_provider(Path(project_dir).resolve())
     except Exception:
         active_provider = "claude"
 

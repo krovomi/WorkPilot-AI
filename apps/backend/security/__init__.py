@@ -59,7 +59,7 @@ Validators:
 """
 
 # Import from parent modules
-from project_analyzer import (
+from project import (
     BASE_COMMANDS,
     SecurityProfile,
     is_command_allowed,

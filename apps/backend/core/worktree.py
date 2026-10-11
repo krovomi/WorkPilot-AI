@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, TypedDict, TypeVar
 if TYPE_CHECKING:
     from agents.impact_analyzer import ImpactAnalysis
 
+from core.debug import debug_warning
 from core.gh_executable import get_gh_executable, invalidate_gh_cache
 from core.git_executable import get_git_executable, get_isolated_git_env, run_git
 from core.git_provider import (
@@ -42,7 +43,6 @@ from core.git_provider import (
 )
 from core.glab_executable import get_glab_executable, invalidate_glab_cache
 from core.model_config import get_utility_model_config
-from debug import debug_warning
 
 logger = logging.getLogger(__name__)
 

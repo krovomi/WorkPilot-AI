@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 # ---------------------------------------------------------------------------
 # Module-level sys.modules mocking
 # ---------------------------------------------------------------------------
-# Several test classes import `agent` and `auto_claude_tools`, which pull in
+# Several test classes import `core.agent` and `agents.tools_pkg`, which pull in
 # deep dependency chains (core.agent, agents.tools_pkg, etc.) that require
 # packages not installed in the CI test environment.  Pre-populate
 # sys.modules so Python's import machinery never attempts real resolution.
@@ -56,19 +56,19 @@ _mocked_module_names = [
     "client",
     # Config & phases
     "phase_config",
-    "phase_event",
+    "core.phase_event",
     # Logging & UI
-    "debug",
+    "core.debug",
     "ui",
     "ui.capabilities",
     "task_logger",
-    "linear_updater",
-    "progress",
+    "integrations.linear.updater",
+    "core.progress",
     # Prompts
-    "prompts",
+    "prompts_pkg.prompts",
     "prompts_pkg",
     "prompts_pkg.project_context",
-    "prompt_generator",
+    "prompts_pkg.prompt_generator",
     # Security
     "security",
     "security.constants",
@@ -103,12 +103,11 @@ _mocked_module_names = [
     # Memory
     "memory",
     # Recovery & misc
-    "recovery",
+    "services.recovery",
     "insight_extractor",
     # Integrations
     "integrations",
     "integrations.linear",
-    "integrations.linear.updater",
 ]
 for _name in _mocked_module_names:
     sys.modules[_name] = MagicMock()
@@ -198,7 +197,7 @@ class TestAgentEntryPoint:
     @_skip_needs_real
     def test_no_parallel_parameters(self):
         """Agent entry point should not accept parallel configuration."""
-        from agent import run_autonomous_agent
+        from core.agent import run_autonomous_agent
 
         sig = inspect.signature(run_autonomous_agent)
         param_names = list(sig.parameters.keys())
@@ -214,7 +213,7 @@ class TestAgentEntryPoint:
     @_skip_needs_real
     def test_required_parameters(self):
         """Agent entry point has required parameters."""
-        from agent import run_autonomous_agent
+        from core.agent import run_autonomous_agent
 
         sig = inspect.signature(run_autonomous_agent)
         param_names = list(sig.parameters.keys())
@@ -226,18 +225,11 @@ class TestAgentEntryPoint:
     @_skip_needs_real
     def test_is_async(self):
         """Agent entry point is async."""
-        from agent import run_autonomous_agent
+        from core.agent import run_autonomous_agent
 
         assert inspect.iscoroutinefunction(run_autonomous_agent), (
             "run_autonomous_agent should be async"
         )
-
-    def test_agent_module_exists(self):
-        """Agent module file exists with correct structure."""
-        agent_path = Path(__file__).parent.parent / "apps" / "backend" / "agent.py"
-        assert agent_path.exists(), "agent.py should exist"
-        content = agent_path.read_text(encoding="utf-8")
-        assert "core.agent" in content, "agent.py should import from core.agent"
 
     def test_no_parallel_in_source(self):
         """Agent source code does not define parallel parameters."""
@@ -288,9 +280,9 @@ class TestModuleIntegrity:
     def test_agent_module_imports(self):
         """Agent module imports without errors."""
         try:
-            import agent  # noqa: F401
+            import core.agent  # noqa: F401
         except ImportError as e:
-            pytest.fail(f"agent.py failed to import: {e}")
+            pytest.fail(f"core/agent.py failed to import: {e}")
 
     def test_run_module_valid_syntax(self):
         """Run module has valid Python syntax."""
@@ -363,7 +355,7 @@ class TestElectronToolScoping:
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
 
         # Re-import to pick up env change
-        from auto_claude_tools import ELECTRON_TOOLS, get_allowed_tools
+        from agents.tools_pkg import ELECTRON_TOOLS, get_allowed_tools
 
         # Must pass is_electron=True for Electron tools to be included
         qa_tools = get_allowed_tools(
@@ -386,7 +378,7 @@ class TestElectronToolScoping:
         """QA fixer gets Electron tools when ELECTRON_MCP_ENABLED=true and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
 
-        from auto_claude_tools import ELECTRON_TOOLS, get_allowed_tools
+        from agents.tools_pkg import ELECTRON_TOOLS, get_allowed_tools
 
         qa_fixer_tools = get_allowed_tools(
             "qa_fixer", project_capabilities={"is_electron": True}
@@ -406,7 +398,7 @@ class TestElectronToolScoping:
         """Coder should NOT get Electron tools even when enabled and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
 
-        from auto_claude_tools import get_allowed_tools
+        from agents.tools_pkg import get_allowed_tools
 
         coder_tools = get_allowed_tools(
             "coder", project_capabilities={"is_electron": True}
@@ -423,7 +415,7 @@ class TestElectronToolScoping:
         """Planner should NOT get Electron tools even when enabled and project is Electron."""
         monkeypatch.setenv("ELECTRON_MCP_ENABLED", "true")
 
-        from auto_claude_tools import get_allowed_tools
+        from agents.tools_pkg import get_allowed_tools
 
         planner_tools = get_allowed_tools(
             "planner", project_capabilities={"is_electron": True}
@@ -440,7 +432,7 @@ class TestElectronToolScoping:
         """No agent gets Electron tools when ELECTRON_MCP_ENABLED is not set."""
         monkeypatch.delenv("ELECTRON_MCP_ENABLED", raising=False)
 
-        from auto_claude_tools import get_allowed_tools
+        from agents.tools_pkg import get_allowed_tools
 
         for agent_type in ["planner", "coder", "qa_reviewer", "qa_fixer"]:
             tools = get_allowed_tools(

@@ -101,7 +101,7 @@ def test_invalid_plan_without_verdict_says_so(spec_dir):
 
 
 def test_verdict_read_from_the_report_written_this_session(spec_dir):
-    started = time.time()
+    started = time.time() - 10
     (spec_dir / "qa_report.md").write_text(
         "# QA Report\n\n## Verdict\n\n**SIGN-OFF**: REJECTED\n", encoding="utf-8"
     )

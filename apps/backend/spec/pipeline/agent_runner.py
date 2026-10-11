@@ -12,7 +12,7 @@ from ui.capabilities import configure_safe_encoding
 
 configure_safe_encoding()
 
-from debug import debug, debug_detailed, debug_error, debug_section, debug_success
+from core.debug import debug, debug_detailed, debug_error, debug_section, debug_success
 from security.tool_input_validator import get_safe_tool_input
 from task_logger import (
     LogEntryType,

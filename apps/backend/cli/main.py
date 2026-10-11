@@ -6,7 +6,6 @@ Command-line interface for the WorkPilot AI autonomous coding framework.
 """
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
@@ -392,25 +391,6 @@ Environment Variables:
         help="Streaming session ID for live coding (connects to existing session)",
     )
 
-    # Provider management commands
-    provider_group = parser.add_argument_group("Provider management")
-    provider_group.add_argument(
-        "--provider-action",
-        type=str,
-        choices=["list", "select", "add", "delete", "test"],
-        help="Action to perform on LLM providers",
-    )
-    provider_group.add_argument(
-        "--provider",
-        type=str,
-        help="Name of the provider",
-    )
-    provider_group.add_argument(
-        "--config",
-        type=str,
-        help="JSON config for adding a new provider",
-    )
-
     # Cost Intelligence Engine commands
     cost_group = parser.add_argument_group("Cost Intelligence")
     cost_group.add_argument(
@@ -543,58 +523,6 @@ Environment Variables:
     return parser.parse_args(argv)
 
 
-def handle_provider_command(args):
-    from src.connectors.llm_config import (
-        delete_provider_config,
-        get_active_provider,
-        list_provider_configs,
-        load_provider_config,
-        save_provider_config,
-        set_active_provider,
-    )
-    from src.connectors.llm_discovery import discover_llm_providers
-
-    if args.action == "list":
-        active = get_active_provider()
-        print("Providers disponibles:")
-        for cls in discover_llm_providers():
-            name = cls().get_name()
-            marker = " (actif)" if name == active else ""
-            print(f"- {name}{marker}")
-        print("Configurations enregistrées:")
-        for name in list_provider_configs():
-            marker = " (actif)" if name == active else ""
-            print(f"- {name}{marker}")
-    elif args.action == "select":
-        set_active_provider(args.provider)
-        print(f"Provider sélectionné et persisté: {args.provider}")
-    elif args.action == "add":
-        config = json.loads(args.config)
-        save_provider_config(args.provider, config)
-        print(f"Config enregistrée pour {args.provider}")
-    elif args.action == "delete":
-        delete_provider_config(args.provider)
-        print(f"Config supprimée pour {args.provider}")
-    elif args.action == "test":
-        config = load_provider_config(args.provider)
-        if not config:
-            print("Aucune config trouvée pour ce provider.")
-            return
-        for cls in discover_llm_providers():
-            if cls().get_name() == args.provider:
-                try:
-                    instance = cls(**config)
-                    instance.connect()
-                    if not instance.validate():
-                        print("Validation échouée.")
-                        return
-                    print("Provider OK.")
-                except Exception as e:
-                    print(f"Erreur: {e}")
-                return
-        print("Provider non trouvé.")
-
-
 def handle_doctor_command() -> None:
     """Print a health report for optional dependencies and environment.
 
@@ -684,7 +612,7 @@ def _run_cli(argv=None, jev_run=None) -> None:
     args = parse_args(argv) if argv is not None else parse_args()
 
     # Import debug functions after environment setup
-    from debug import debug, debug_error, debug_section, debug_success
+    from core.debug import debug, debug_error, debug_section, debug_success
 
     debug_section("run.py", "Starting WorkPilot AI Framework")
     debug("run.py", "Arguments parsed", args=vars(args))

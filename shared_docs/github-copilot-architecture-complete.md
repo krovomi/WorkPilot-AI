@@ -160,7 +160,7 @@ sequenceDiagram
 ## Connecteur d'Usage
 
 ### CopilotUsageConnector
-**Fichier** : `src/connectors/llm_copilot.py`
+**Fichier** : `apps/backend/core/copilot_usage.py`
 
 **Description** : Récupération des métriques d'utilisation GitHub Copilot.
 
@@ -855,7 +855,7 @@ sequenceDiagram
     participant U as User
     participant GCC as GitHubCopilotConfig
     participant GCS as GitHubCopilotService
-    participant CT as CopilotAuthTerminal
+    participant CT as GitHubCopilotAuthTerminal
     
     U->>GCC: open_copilot_settings()
     GCC->>GCS: get_current_config()

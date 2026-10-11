@@ -1,26 +1,13 @@
 #!/usr/bin/env python3
 """
-Analyzer facade module.
+Project analyzer entry point.
 
-Provides backward compatibility for scripts that import from analyzer.py at the root.
-Actual implementation is in analysis/analyzer.py.
+Launched by path (`python analyzer.py --output <file>`) by the frontend's
+project-context handler, spec discovery, the roadmap and ideation phases.
+The implementation is in analysis/analyzer.py; import from there.
 """
 
-from analysis.analyzer import (
-    ProjectAnalyzer,
-    ServiceAnalyzer,
-    analyze_project,
-    analyze_service,
-    main,
-)
-
-__all__ = [
-    "ServiceAnalyzer",
-    "ProjectAnalyzer",
-    "analyze_project",
-    "analyze_service",
-    "main",
-]
+from analysis.analyzer import main
 
 if __name__ == "__main__":
     main()

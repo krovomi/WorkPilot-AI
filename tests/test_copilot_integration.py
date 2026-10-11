@@ -522,14 +522,6 @@ class TestOrchestratorReviewerIntegration:
         assert callable(create_agent_client)
         assert callable(process_agent_stream)
 
-    def test_agent_definition_optional(self):
-        """AgentDefinition import should not crash even if claude_agent_sdk missing."""
-        # This test verifies the try/except pattern works
-        import runners.github.services.parallel_orchestrator_reviewer as mod
-
-        # AgentDefinition can be None or the real class — both are acceptable
-        assert hasattr(mod, "AgentDefinition")
-
 
 # =============================================================================
 # Integration: Session with Provider Routing

@@ -235,7 +235,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--agent-type", default="general", choices=AGENT_TYPES)
     parser.add_argument("--model", help="Model id; defaults to the provider's own")
-    parser.add_argument("--thinking-level", help="Accepted for parity; unused")
+    parser.add_argument(
+        "--thinking-level",
+        help="Effort (none/low/medium/high/ultrathink); applied on Claude",
+    )
     args = parser.parse_args(argv)
 
     project_dir = Path(args.project_dir)
@@ -273,6 +276,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_turns=1,
                 on_delta=on_delta,
                 on_error=errors.append,
+                thinking_level=args.thinking_level or None,
             )
         )
     except Exception as exc:  # noqa: BLE001 — the dialog needs a sentence, not a trace

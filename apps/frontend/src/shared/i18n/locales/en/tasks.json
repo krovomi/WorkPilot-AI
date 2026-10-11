@@ -125,7 +125,8 @@
 		"qaIssues": "QA Issues",
 		"approvePlan": "Approve Plan",
 		"plan_review": "Approve Plan",
-		"stopped": "Stopped"
+		"stopped": "Stopped",
+		"qaUnverified": "QA not verified"
 	},
 	"tooltips": {
 		"archiveTask": "Archive task",
@@ -161,6 +162,9 @@
 		},
 		"error": {
 			"title": "Task Failed"
+		},
+		"qa_unverified": {
+			"title": "Ready for review — QA could not verify"
 		}
 	},
 	"columns": {
@@ -398,16 +402,6 @@
 			"saved": "Queue settings saved",
 			"saveFailed": "Failed to save queue settings",
 			"retry": "Please try again"
-		},
-		"autoSwap": {
-			"title": "Profile Swapped",
-			"description": "Switched from {{from}} to {{to}} ({{reason}})",
-			"batchTitle": "{{count}} Profile Swaps",
-			"batchDescription": "Tasks redistributed to: {{profiles}}"
-		},
-		"blocked": {
-			"title": "Queue Blocked",
-			"description": "All profiles are at capacity. Tasks will resume when a profile becomes available."
 		}
 	},
 	"execution": {
@@ -1049,9 +1043,6 @@
 			"resumeTask": "Resume Task",
 			"resumeSession": "Resume Session",
 			"resumeWithProvider": "Resume with…",
-			"resumingWithProvider": "Resuming…",
-			"resumeWithProviderTooltip": "Resume this task with a different LLM provider",
-			"resumeWithProviderMenuLabel": "Pick a provider",
 			"resumeWithProviderSuccessTitle": "Resuming with {{provider}}",
 			"resumeWithProviderSuccessDesc": "The previous conversation will be replayed into the new provider.",
 			"resumeWithProviderErrorTitle": "Resume failed",
@@ -1106,7 +1097,8 @@
 			"hasErrors": "Has Errors",
 			"approvePlan": "Approve Plan",
 			"stopped": "Stopped",
-			"qaIssues": "QA Issues"
+			"qaIssues": "QA Issues",
+			"qaUnverified": "QA not verified"
 		},
 		"move": {
 			"trigger": "Move task to another column",
@@ -1181,13 +1173,6 @@
 	"plan": {
 		"changesSaved": "Plan saved",
 		"saveError": "Could not save the plan"
-	},
-	"decisionLogger": {
-		"title": "Decision Timeline",
-		"loading": "Loading decision log…",
-		"empty": "No decisions recorded yet",
-		"emptyHint": "Decisions appear here while the agent is running.",
-		"noMatch": "No entries match the current filter."
 	},
 	"codeEditor": {
 		"deleteFile": "Delete file",
@@ -1849,5 +1834,10 @@
 			"pass": "Verified",
 			"fail": "Verify failed"
 		}
+	},
+	"qaUnverified": {
+		"title": "QA could not verify this task",
+		"unknown": "The QA agent stopped without reporting why. Open the Logs tab for the last output.",
+		"hint": "The work is complete; only the automatic check is missing. Review the changes yourself before merging, or relaunch the task to run QA again."
 	}
 }

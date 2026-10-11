@@ -36,7 +36,7 @@ env_file = Path(__file__).parent.parent.parent.parent / ".env-files" / ".env"
 if env_file.exists():
     load_dotenv(env_file)
 
-from debug import debug, debug_error, debug_warning
+from core.debug import debug, debug_error, debug_warning
 
 # Import from refactored roadmap package (now a subpackage of runners)
 from runners.roadmap import RoadmapOrchestrator

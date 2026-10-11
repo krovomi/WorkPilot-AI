@@ -168,7 +168,7 @@ def _agents_for(pattern: Any) -> list[str]:
     # match the subagent rosters; nothing writes those phases, so the rows
     # could never fire and only made the table look more complete than it was.
     phase_agents = {
-        "planning": ["spec-explorer", "dependency-tracer"],
+        "planning": ["architecture-analyst", "dependency-tracer"],
         "coding": ["code-reviewer", "test-runner"],
         "qa_review": ["qa-acceptance-checker", "test-runner"],
         "qa_fixing": ["test-runner"],

@@ -8,7 +8,6 @@ export * from "./EnvConfigModal";
 export * from "./GitHubIssues";
 export * from "./Ideation";
 export * from "./KanbanBoard";
-export { ProviderManager } from "./ProviderManager";
 export { ProviderSelector } from "./ProviderSelector";
 export * from "./Sidebar";
 export * from "./streaming";

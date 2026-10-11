@@ -2,8 +2,10 @@
 
 Every reader asks here: relevance (does this task touch the UI), the prompt
 (does this subtask), and the workflow's ``&ui_surface`` anchor, which
-`tests/test_uiux_relevance.py` holds equal to `UI_GLOBS`. Two copies of "what
-counts as UI" is how a phase runs on a task its prompt section then skips.
+`scripts/sync_surface_globs.py` writes from `UI_GLOBS` and `tests/test_uiux.py`
+holds equal to it. This tuple is the source because it ships in every build,
+where the repository's `workflows/` does not. Two copies of "what counts as UI"
+drifting apart is how a phase runs on a task its prompt section then skips.
 
 Globs rather than extensions because a few surfaces are named, not typed
 (`Info.plist`, a `.xcodeproj` directory). `.ts` and `.js` are deliberately not

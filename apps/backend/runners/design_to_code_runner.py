@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from cli.utils import import_dotenv
-from debug import (
+from core.debug import (
     debug,
     debug_error,
     debug_section,

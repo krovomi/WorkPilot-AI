@@ -26,11 +26,10 @@
  */
 
 import {
+	adaptInheritedModelToProvider,
 	DEFAULT_FEATURE_MODELS,
 	DEFAULT_FEATURE_THINKING,
-	getModelsForProvider,
 	isModelForeignToProvider,
-	resolveModelForProviderCatalog,
 } from "../constants/models";
 import type {
 	AppSettings,
@@ -168,14 +167,12 @@ export function resolvePageLlm(
 			: "default";
 
 	// Inherited feature/default models must match the effective provider,
-	// whether it comes from the page or the global provider selector.
+	// whether it comes from the page or the global provider selector — but a
+	// model the generated catalogue merely does not know yet (a release the
+	// live list already offers) is not a mismatch.
 	// A page model kept above remains authoritative (including custom IDs).
 	if (!pageModel && provider) {
-		const coerced = resolveModelForProviderCatalog(
-			model,
-			getModelsForProvider(provider),
-			provider,
-		);
+		const coerced = adaptInheritedModelToProvider(model, provider);
 		if (coerced && coerced !== model) {
 			model = coerced;
 			modelSource = "default";

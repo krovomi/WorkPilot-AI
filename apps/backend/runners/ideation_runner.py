@@ -23,12 +23,9 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add both the backend dir and project root to sys.path.
-# Project root MUST come first so that `src/connectors/llm_config.py` (in the
-# real project root src/) takes precedence over apps/backend/src/__init__.py.
-# If apps/backend is inserted first, Python caches sys.modules['src'] pointing
-# to apps/backend/src/ (which lacks llm_config.py) and all later `from src.*`
-# imports fail even after the project root is added to sys.path.
+# Add both the backend dir and project root to sys.path; `src.connectors`
+# lives under the project root. (apps/backend/src/ used to shadow it when the
+# backend dir came first; it was removed in audit lot L9.)
 _backend_dir = Path(__file__).parent.parent
 _project_root = _backend_dir.parent.parent
 sys.path.insert(0, str(_backend_dir))

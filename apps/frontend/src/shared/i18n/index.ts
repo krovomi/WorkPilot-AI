@@ -78,7 +78,6 @@ import enOnboarding from "./locales/en/onboarding.json";
 import enPairProgramming from "./locales/en/pairProgramming.json";
 import enPipelineGenerator from "./locales/en/pipelineGenerator.json";
 import enPixelOffice from "./locales/en/pixelOffice.json";
-import enProjectInitModal from "./locales/en/projectInitModal.json";
 import enPromptOptimizer from "./locales/en/promptOptimizer.json";
 import enQualityScore from "./locales/en/qualityScore.json";
 import enRefactoring from "./locales/en/refactoring.json";
@@ -176,7 +175,6 @@ import frOnboarding from "./locales/fr/onboarding.json";
 import frPairProgramming from "./locales/fr/pairProgramming.json";
 import frPipelineGenerator from "./locales/fr/pipelineGenerator.json";
 import frPixelOffice from "./locales/fr/pixelOffice.json";
-import frProjectInitModal from "./locales/fr/projectInitModal.json";
 import frPromptOptimizer from "./locales/fr/promptOptimizer.json";
 import frQualityScore from "./locales/fr/qualityScore.json";
 import frRefactoring from "./locales/fr/refactoring.json";
@@ -276,7 +274,6 @@ export const resources = {
 		navigation: enNavigation,
 		onboarding: enOnboarding,
 		promptOptimizer: enPromptOptimizer,
-		projectInitModal: enProjectInitModal,
 		replay: enReplay,
 		refactoring: enRefactoring,
 		roadmap: enRoadmap,
@@ -374,7 +371,6 @@ export const resources = {
 		navigation: frNavigation,
 		onboarding: frOnboarding,
 		promptOptimizer: frPromptOptimizer,
-		projectInitModal: frProjectInitModal,
 		replay: frReplay,
 		refactoring: frRefactoring,
 		roadmap: frRoadmap,
@@ -479,7 +475,6 @@ i18n.use(initReactI18next).init({
 		"navigation",
 		"onboarding",
 		"promptOptimizer",
-		"projectInitModal",
 		"replay",
 		"refactoring",
 		"roadmap",

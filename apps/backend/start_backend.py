@@ -110,10 +110,6 @@ def main():
     project_root = os.path.dirname(backend_dir)
     sys.path.insert(0, project_root)
 
-    # Ajouter le dossier src du backend au path
-    src_dir = os.path.join(backend_dir, "src")
-    sys.path.insert(0, src_dir)
-
     # Messages colorés de démarrage
     log("🚀 Starting WorkPilot AI Backend Services", "bright")
     log("=============================================", "cyan")

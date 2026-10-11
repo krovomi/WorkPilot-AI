@@ -125,7 +125,8 @@
 		"qaIssues": "Problèmes QA",
 		"approvePlan": "Approuver le plan",
 		"plan_review": "Approuver le plan",
-		"stopped": "Arrêté"
+		"stopped": "Arrêté",
+		"qaUnverified": "QA non vérifiée"
 	},
 	"tooltips": {
 		"archiveTask": "Archiver la tâche",
@@ -161,6 +162,9 @@
 		},
 		"error": {
 			"title": "Tâche échouée"
+		},
+		"qa_unverified": {
+			"title": "Prête pour révision — QA non vérifiée"
 		}
 	},
 	"columns": {
@@ -398,16 +402,6 @@
 			"saved": "Paramètres de la file d'attente enregistrés",
 			"saveFailed": "Échec de l'enregistrement des paramètres",
 			"retry": "Veuillez réessayer"
-		},
-		"autoSwap": {
-			"title": "Profil basculé",
-			"description": "Bascule de {{from}} vers {{to}} ({{reason}})",
-			"batchTitle": "{{count}} bascules de profil",
-			"batchDescription": "Tâches redistribuées vers : {{profiles}}"
-		},
-		"blocked": {
-			"title": "File bloquée",
-			"description": "Tous les profils sont saturés. Les tâches reprendront dès qu'un profil se libère."
 		}
 	},
 	"execution": {
@@ -1049,9 +1043,6 @@
 			"resumeTask": "Reprendre la tâche",
 			"resumeSession": "Reprendre la session",
 			"resumeWithProvider": "Reprendre avec…",
-			"resumingWithProvider": "Reprise en cours…",
-			"resumeWithProviderTooltip": "Reprendre cette tâche avec un autre provider LLM",
-			"resumeWithProviderMenuLabel": "Choisir un provider",
 			"resumeWithProviderSuccessTitle": "Reprise avec {{provider}}",
 			"resumeWithProviderSuccessDesc": "La conversation précédente sera rejouée vers le nouveau provider.",
 			"resumeWithProviderErrorTitle": "Échec de la reprise",
@@ -1106,7 +1097,8 @@
 			"hasErrors": "Contient des erreurs",
 			"approvePlan": "Approuver le plan",
 			"stopped": "Arrêté",
-			"qaIssues": "Problèmes QA"
+			"qaIssues": "Problèmes QA",
+			"qaUnverified": "QA non vérifiée"
 		},
 		"move": {
 			"trigger": "Déplacer la tâche vers une autre colonne",
@@ -1181,13 +1173,6 @@
 	"plan": {
 		"changesSaved": "Plan enregistré",
 		"saveError": "Impossible d'enregistrer le plan"
-	},
-	"decisionLogger": {
-		"title": "Journal des décisions",
-		"loading": "Chargement du journal des décisions…",
-		"empty": "Aucune décision enregistrée pour l'instant",
-		"emptyHint": "Les décisions apparaissent ici pendant que l'agent tourne.",
-		"noMatch": "Aucune entrée ne correspond au filtre actuel."
 	},
 	"codeEditor": {
 		"deleteFile": "Supprimer le fichier",
@@ -1849,5 +1834,10 @@
 			"pass": "Vérifié",
 			"fail": "Vérif. en échec"
 		}
+	},
+	"qaUnverified": {
+		"title": "La QA n'a pas pu valider cette tâche",
+		"unknown": "L'agent QA s'est arrêté sans indiquer de raison. Ouvrez l'onglet Journaux pour voir les dernières sorties.",
+		"hint": "Le travail est terminé ; seule la vérification automatique manque. Relisez les changements vous-même avant de fusionner, ou relancez la tâche pour repasser la QA."
 	}
 }

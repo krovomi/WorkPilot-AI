@@ -49,7 +49,6 @@ KNOWN_AGENT_TYPES = {
     "learning_analyzer",
     "live_companion_analyzer",
     "spec_writer",
-    "spec_gatherer",
     "commit_message",
     "pr_template_filler",
     "spec_compaction",
@@ -85,7 +84,6 @@ class TestRoutingIsDeliberate:
             # The PR orchestrators bring their own specialists.
             ("pr_orchestrator_parallel", "solo"),
             ("pr_followup_parallel", "solo"),
-            ("analysis", "research"),
             ("batch_analysis", "research"),
             ("batch_validation", "research"),
             ("spec_researcher", "spec"),
@@ -125,7 +123,7 @@ class TestRostersFitTheirWork:
     def test_research_gets_no_code_reviewer(self):
         """Nothing is under review during ideation."""
         roster = set(phase_specs("ideation"))
-        assert roster == {"codebase-surveyor", "evidence-collector"}
+        assert roster == {"architecture-analyst", "evidence-collector"}
 
     def test_spec_agents_get_prior_art_and_constraints(self):
         assert set(phase_specs("spec_writer")) == {
@@ -143,10 +141,12 @@ class TestRostersFitTheirWork:
 
     def test_the_build_rosters_are_unchanged(self):
         """The three original rosters must survive the widening untouched."""
+        # Names as of lot L11: `spec-explorer` and `qa-test-evidence` folded
+        # into `architecture-analyst` and `test-runner`.
         assert set(phase_specs("coder")) == {
             "code-reviewer",
             "test-runner",
-            "spec-explorer",
+            "architecture-analyst",
         }
         assert set(phase_specs("planner")) == {
             "architecture-analyst",
@@ -154,7 +154,7 @@ class TestRostersFitTheirWork:
         }
         assert set(phase_specs("qa_reviewer")) == {
             "qa-acceptance-checker",
-            "qa-test-evidence",
+            "test-runner",
         }
 
 

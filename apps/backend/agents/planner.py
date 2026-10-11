@@ -9,13 +9,13 @@ import logging
 from pathlib import Path
 
 from core.client import create_agent_client
+from core.phase_event import ExecutionPhase, emit_phase
 from phase_config import (
     get_phase_model,
     get_phase_provider,
     get_phase_thinking_budget,
     load_task_metadata,
 )
-from phase_event import ExecutionPhase, emit_phase
 from task_logger import (
     LogPhase,
     get_task_logger,
@@ -109,7 +109,7 @@ async def run_followup_planner(
     from integrations.jev.models import JevContext
     from integrations.jev.rubrics import advice_text, classification_hint
     from integrations.jev.runtime import JevRun
-    from prompts import get_followup_planner_prompt
+    from prompts_pkg.prompts import get_followup_planner_prompt
 
     jev_run = jev_run or JevRun.from_env(
         JevContext("feature-build", project_dir, spec_dir)

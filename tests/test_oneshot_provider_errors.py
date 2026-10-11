@@ -120,3 +120,26 @@ def test_classify_names_an_unknown_model_whichever_provider_said_it():
         classify('model "gemma4:12b" not found, try pulling it first')
         == MODEL_UNAVAILABLE
     )
+
+
+def test_the_claude_client_applies_the_chosen_effort(monkeypatch):
+    # "none" must reach the SDK as 0: None would mean "the agent type's
+    # default", and a page set to no thinking would think anyway.
+    from core import oneshot, simple_client
+
+    budgets = []
+
+    def fake_create_simple_client(**kwargs):
+        budgets.append(kwargs.get("max_thinking_tokens"))
+        return object()
+
+    monkeypatch.setattr(
+        simple_client, "create_simple_client", fake_create_simple_client
+    )
+
+    for level in (None, "none", "high"):
+        oneshot._claude_client("claude-sonnet-5", None, None, level)
+
+    from phase_config import get_thinking_budget
+
+    assert budgets == [None, 0, get_thinking_budget("high")]
