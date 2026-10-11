@@ -27,6 +27,11 @@ from spec.complexity import (  # noqa: E402
     needs_ai_assessment,
 )
 
+# Imported at collection, like the spec modules above: importing it inside a
+# test runs after other test modules have swapped `core.*` for mocks, and binds
+# the orchestrator to those copies for every test that follows.
+from spec.pipeline.orchestrator import SpecOrchestrator  # noqa: E402
+
 
 def _verdict(task: str, requirements: dict | None = None) -> ComplexityAssessment:
     return ComplexityAnalyzer().analyze(task, requirements)
@@ -35,18 +40,18 @@ def _verdict(task: str, requirements: dict | None = None) -> ComplexityAssessmen
 class TestThreshold:
     def test_a_clearly_small_task_needs_no_model(self):
         verdict = _verdict("fix a typo in the button label")
-        assert verdict.complexity is Complexity.SIMPLE
+        assert verdict.complexity.value == "simple"
         assert not needs_ai_assessment(verdict)
 
     def test_a_clearly_large_task_needs_no_model(self):
         verdict = _verdict("integrate stripe and auth0, add a docker deployment")
-        assert verdict.complexity is Complexity.COMPLEX
+        assert verdict.complexity.value == "complex"
         assert not needs_ai_assessment(verdict)
 
     def test_the_fall_through_asks_the_model(self):
         # Nothing decided it: no simple keyword, no strong complex signal.
         verdict = _verdict("add a page that lists the orders")
-        assert verdict.complexity is Complexity.STANDARD
+        assert verdict.complexity.value == "standard"
         assert verdict.confidence < AI_ASSESSMENT_CONFIDENCE_THRESHOLD
         assert needs_ai_assessment(verdict)
 
@@ -70,8 +75,6 @@ class TestThreshold:
 
 
 def _orchestrator(tmp_path: Path, task: str):
-    from spec.pipeline.orchestrator import SpecOrchestrator
-
     orch = object.__new__(SpecOrchestrator)
     orch.spec_dir = tmp_path / "spec"
     orch.spec_dir.mkdir()
@@ -89,7 +92,12 @@ def _orchestrator(tmp_path: Path, task: str):
 
 def _run(orch) -> list[str]:
     logger = MagicMock()
-    with patch("spec.pipeline.orchestrator.get_task_logger", return_value=logger):
+    # The method's own globals, not a module name: the full suite can hold two
+    # copies of `spec.pipeline.orchestrator`, and a dotted patch target picks one.
+    namespace = (
+        SpecOrchestrator._phase_complexity_assessment_with_requirements.__globals__
+    )
+    with patch.dict(namespace, {"get_task_logger": lambda *_a, **_k: logger}):
         asyncio.run(orch._phase_complexity_assessment_with_requirements())
     return [c.args[0] for c in logger.log.call_args_list]
 
@@ -112,7 +120,7 @@ class TestOrchestrator:
         orch._run_ai_assessment.assert_awaited_once()
         # The heuristic verdict is what a failed session falls back to.
         fallback = orch._run_ai_assessment.await_args.kwargs["fallback"]
-        assert fallback.complexity is Complexity.STANDARD
+        assert fallback.complexity.value == "standard"
         assert orch.assessment.assessed_by == "complexity_assessor"
         assert any("asking the complexity assessor" in line for line in lines)
 
@@ -131,7 +139,7 @@ class TestOrchestrator:
         )
         _run(orch)
         orch._run_ai_assessment.assert_not_awaited()
-        assert orch.assessment.complexity is Complexity.COMPLEX
+        assert orch.assessment.complexity.value == "complex"
 
     def test_without_ai_the_heuristic_always_decides(self, tmp_path):
         orch = _orchestrator(tmp_path, "add a page that lists the orders")
