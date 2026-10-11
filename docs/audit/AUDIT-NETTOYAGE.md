@@ -119,13 +119,13 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L10 | P3 | Tokens à haut effort — **fait** | F10, F11, F17 | L6 |
 | L11 | P3 | Consolidation — **fait** | F8, F26, F27, F31, F36 | L5 |
 | L12 | P3 | Gouvernance — **fait** | F12, F13 | L9 (F25) pour F13 |
-| L13 | P4 | Surface produit | F19 | tous |
+| L13 | P4 | Surface produit — **instrumenté** | F19 | tous |
 | L14 | P1 | Événements et appels IPC perdus en silence — **fait** | F37 | — |
 | L15 | P1 | Droits effectifs et succès silencieux — **fait** | F39, F40 | L5 |
 | L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
 | L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11, L12, L14, L15, L16, L17 (faits) → L13.
+Ordre recommandé : L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11, L12, L14, L15, L16, L17 (faits) → L13 (instrumenté, décision en attente).
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -1136,6 +1136,13 @@ commandes ne consomme plus le choix « reprendre avec X ». `core/client.py` n'e
     Tout cela disparaît avec F25 (lot L9).
 
 ### Lot L13 — Surface produit (P4)
+
+**Instrumenté, décision en attente.** `renderer/stores/view-usage-store.ts` compte les visites et le
+temps passé par vue (plafonné à 30 min par visite), en `localStorage`, sans rien envoyer. `App.tsx`
+l'alimente à chaque changement de vue ; Réglages → Debug & Logs affiche le classement et permet de
+le remettre à zéro. Garde-fou : `stores/__tests__/view-usage-store.test.ts`. **Aucune vue n'est
+retirée ou regroupée** : le cahier l'interdit sans donnée d'usage, et choisir quelles pages
+regrouper ou passer en plugin revient au mainteneur une fois les données collectées.
 
 #### F19 · Surface produit très large
 
