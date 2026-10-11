@@ -10,8 +10,9 @@ Obsidian and the context mesh read the same notes the prompts are built from.
 
 They used to live in ``.workpilot/learning_loop/patterns.json``, a second
 pattern store beside the vault, injected into the same prompts. That file is
-imported on first use and moved aside (``patterns.json.migrated-to-brain``),
-never deleted.
+imported on first use and moved aside, never deleted — into
+``.workpilot/learning/`` (``patterns.json.migrated-to-brain``), the one folder
+the learning loop keeps under ``.workpilot/`` (`core.workpilot_layout`).
 
 Handles deduplication by merging similar patterns and increasing confidence.
 When memory is off (``BRAIN_ENABLED=false``) there is nowhere to remember:
@@ -32,6 +33,10 @@ LEGACY_PATTERNS = Path(".workpilot") / "learning_loop" / "patterns.json"
 """The store the patterns had before the vault, relative to the project."""
 
 LEGACY_MIGRATED_SUFFIX = ".migrated-to-brain"
+
+LEARNING_DIR = Path(".workpilot") / "learning"
+"""The learning loop's one folder under ``.workpilot/`` (conventions, and the
+old pattern file once migrated)."""
 
 
 def _evidence(pattern: LearningPattern) -> dict[str, Any]:
@@ -132,16 +137,11 @@ class PatternStorage:
         if not self._write(memory, list(known.values())):
             logger.warning("Learning patterns not migrated: the vault write failed")
             return
-        target = self.legacy_file.with_name(
-            self.legacy_file.name + LEGACY_MIGRATED_SUFFIX
+        from core.workpilot_layout import move_aside
+
+        target = move_aside(
+            self.legacy_file, self.project_dir / LEARNING_DIR, LEGACY_MIGRATED_SUFFIX
         )
-        n = 1
-        while target.exists():
-            n += 1
-            target = self.legacy_file.with_name(
-                f"{self.legacy_file.name}{LEGACY_MIGRATED_SUFFIX}.{n}"
-            )
-        self.legacy_file.rename(target)
         logger.info(
             f"Learning patterns: {len(legacy)} moved into the shared brain; "
             f"the old file is kept as {target.name}"

@@ -7,7 +7,8 @@ What has to hold (audit lot L7, F7):
   and every operation the loop had (merge, toggle, delete, applications,
   outcomes) reads and writes that note;
 * the old ``.workpilot/learning_loop/patterns.json`` is **imported on first
-  use and moved aside**, never deleted, and never re-imported;
+  use and moved aside** into ``.workpilot/learning/`` (the loop's one folder
+  there, F34), never deleted, and never re-imported;
 * the patterns reach a prompt **once**: the learning loop's injector, held to
   its token budget, and not a second time through the session memory context;
 * the desktop reads them **through the backend**, by project name.
@@ -141,20 +142,21 @@ class TestTheOldFileIsMigrated:
         loaded = PatternStorage(project).load_patterns()
 
         assert {p.pattern_id for p in loaded} == {p.pattern_id for p in old}
-        assert not legacy.exists()
-        kept = legacy.with_name("patterns.json.migrated-to-brain")
+        assert not legacy.parent.exists()
+        kept = project / ".workpilot" / "learning" / "patterns.json.migrated-to-brain"
         assert json.loads(kept.read_text(encoding="utf-8"))[0]["pattern_id"] == (
             old[0].pattern_id
         )
 
     def test_a_second_old_file_is_not_written_over_the_first(self, vault, project):
         legacy = project / ".workpilot" / "learning_loop" / "patterns.json"
-        legacy.parent.mkdir(parents=True)
         for _ in range(2):
+            legacy.parent.mkdir(parents=True, exist_ok=True)
             legacy.write_text(json.dumps([_pattern().to_dict()]), encoding="utf-8")
             PatternStorage(project).load_patterns()
 
-        assert sorted(p.name for p in legacy.parent.iterdir()) == [
+        learning = project / ".workpilot" / "learning"
+        assert sorted(p.name for p in learning.iterdir()) == [
             "patterns.json.migrated-to-brain",
             "patterns.json.migrated-to-brain.2",
         ]
@@ -236,3 +238,32 @@ class TestTheDesktopReadsThroughTheBackend:
         ).json()
         assert body["patterns"] == []
         assert legacy.is_file()
+
+
+class TestOneNamePerFeature:
+    """``.workpilot/`` keeps one folder per feature; older names are moved (F34)."""
+
+    def test_quality_rules_move_into_the_quality_folder(self, tmp_path):
+        from review.quality_custom_rules import load_project_rules
+
+        old = tmp_path / ".workpilot" / "quality-rules.yml"
+        old.parent.mkdir(parents=True)
+        old.write_text("rules: []\n", encoding="utf-8")
+
+        load_project_rules(tmp_path)
+
+        new = tmp_path / ".workpilot" / "quality" / "rules.yml"
+        assert not old.exists()
+        assert new.read_text(encoding="utf-8") == "rules: []\n"
+
+    def test_an_existing_new_file_is_never_written_over(self, tmp_path):
+        from core.workpilot_layout import move_legacy
+
+        old = tmp_path / "old.yml"
+        new = tmp_path / "quality" / "rules.yml"
+        new.parent.mkdir()
+        old.write_text("old", encoding="utf-8")
+        new.write_text("new", encoding="utf-8")
+
+        assert move_legacy(old, new) == old
+        assert (old.read_text("utf-8"), new.read_text("utf-8")) == ("old", "new")
