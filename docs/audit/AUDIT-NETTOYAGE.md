@@ -141,7 +141,7 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L9, L10, L11, L12, L14, L15, L16
 | Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
 | Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) ; 5 servis sans agents d'appelant au lot L11 (projet mobile), 6 pour l'orchestrateur | ≤ 7 |
 | Définitions de sous-agents | 26 déclarations (25 noms) à cinq endroits, + 9 agents de packs ; 22 dans le registre après le lot L11 (11 de phase, 9 de PR, 2 mobiles), + 6 agents de packs | ~14 |
-| Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) ; 4 après le lot L10 sur une tâche de code (5 sur une tâche mobile), sans les 3 sous-agents du roster de review | ≤ 4 |
+| Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) ; 4 après le lot L10, tâche de code ou mobile, sans les 3 sous-agents du roster de review ni le `qa-acceptance-checker` du verifier | ≤ 4 |
 | Détecteurs de pile | ≥ 11 ; 1 façade `project/stack.py` après le lot L11 (4 détecteurs derrière elle, 5 lecteurs encore directs) | 1 façade |
 | Écritures par merge | 4 magasins | 1 événement |
 
@@ -469,8 +469,8 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
   - Les phases qui ont déjà leur lecteur (`verify`, `ui-design-system`, `architecture-map`) ne sont
     pas transmises deux fois.
   - Le QA fixer n'est pas consommateur : il travaille sur la décision du reviewer.
-- **Reste ouvert** : les phases déclarées après `qa` (`store-readiness`) n'ont pas de consommateur
-  dans le build ; leur rapport n'est pas affiché dans l'UI.
+- **Reste ouvert** : aucun rapport de phase n'est affiché dans l'UI. (`store-readiness`, qui tournait
+  après la QA sans consommateur, est devenue une lentille de `review` au lot L10.)
 
 ### Lot L7 — Une seule mémoire (P2)
 
@@ -791,8 +791,8 @@ et figé par `tests/test_review_lenses.py`.
   test-coverage-auditor, trois sous-sessions qui relisaient le diff pour reposer la question d'une
   lentille. Sessions qui relisent le diff, sur le profil résolu : 1 à `none` et `low` (QA), 4 à
   `medium`, `high` et `ultrathink` sur une tâche de code (`review`, session `verifier`, première
-  passe QA, `architecture-map`), 5 sur une tâche mobile (`store-readiness`). La reprise après pause
-  et le profil affiché ne changent pas : aucune phase n'est ajoutée ni retirée.
+  passe QA, `architecture-map`), 4 aussi sur une tâche mobile (voir les décisions ci-dessous). La
+  reprise après pause ne change pas.
 - **F17.** Plafond selon l'effort de la phase QA (`QA_ITERATIONS_BY_EFFORT` : 3, 5, 8, 12, 20),
   `WORKPILOT_QA_MAX_ITERATIONS` pour le surcharger sous l'ancien plafond de 50, qui reste le
   plafond absolu. Le budget est celui de la tâche (`qa_session` continue après une pause) ; un retour
@@ -807,21 +807,32 @@ et figé par `tests/test_review_lenses.py`.
     tests, règles UI), et `tests/test_coder_prompt_assembly.py` tient cet assemblage. Le prompt
     servi renvoyait à « la section PATH CONFUSION PREVENTION du prompt coder », absente : corrigé.
   - L'« auto-revue par sous-tâche » comptée par F11 n'a jamais tourné : c'était l'étape 6.5 de
-    `coder.md`, et `agents/self_review.py` est opt-in et écrit un résumé de `git diff` sans modèle.
+    `coder.md`, et `agents/self_review.py` était opt-in et n'écrivait qu'un résumé de `git diff`, sans
+    modèle (supprimé, voir les décisions).
   - `prompts_pkg.prompts.get_planner_prompt` n'a pas d'appelant non plus (`generate_planner_prompt`
     sert le planner), et le lot L9, fusionné entre-temps, l'a laissé : à retirer dans un suivi.
-- **Écarts, questions au mainteneur :**
-  - Les règles de `coder.md` absentes du prompt servi (auto-critique avant de marquer une sous-tâche
-    terminée, ne jamais pousser, ne pas modifier la config git, écrire les insights de session) :
-    les reprendre dans `generate_subtask_prompt`, ou les laisser hors du prompt payé par sous-tâche ?
-  - Tâche mobile à ultrathink : 5 sessions. `store-readiness` tourne après la QA et son rapport n'a
-    pas de consommateur (F38) ; en faire une lentille de `review` quand la tâche touche le mobile, ou
-    la déplacer avant la QA ? Choix produit, et le lot L11 ancre les globs mobiles sur ces phases.
-  - `qa-acceptance-checker` reste offert au `verifier` (`roster: qa`) et au QA reviewer, alors que la
-    conformité est une lentille de `review` à `high` : retirer la conformité du roster du verifier ?
-    Touche la consolidation des sous-agents (lot L11).
-  - `self_review.py` : le supprimer, ou le brancher sur un vrai client — ce qui ajouterait une
-    session par build ?
+- **Décisions prises après la PR #326** (le mainteneur a délégué les quatre questions qu'elle posait) :
+  - **Règles de `coder.md` absentes du prompt servi.** Seules les deux règles git entrent dans
+    `generate_subtask_prompt` (ne jamais `git push`, ne pas modifier la configuration git), en deux
+    lignes. L'auto-critique y est déjà : c'est la « Quality Checklist » qui termine le prompt ; les
+    insights de session sont extraits par Python après chaque session (`extract_session_insights`).
+  - **`store-readiness` devient la lentille 5 de `review`**, déclarée dans le workflow
+    (`lenses: {store-readiness: *mobile_surface}`) et appliquée quand la tâche touche le mobile ; le
+    prompt nomme la lentille et la procédure `mobile/mobile-store-readiness`. La phase après la QA
+    était une cinquième session sur le diff, dont personne ne lisait le rapport (F38) ; ses constats
+    arrivent maintenant au QA reviewer, quand un fixer peut encore agir. Une tâche mobile relit le
+    diff 4 fois à `ultrathink`, comme les autres ; le profil compte une phase de moins.
+  - **Le verifier perd `qa-acceptance-checker`** : `roster: verify` = `test-runner` seul (les
+    overlays langage et mobile le spécialisent). La conformité est la lentille 3 de `review` (dès
+    `high`) et la décision de la QA ; le verifier prouve que ça tourne.
+  - **`self_review.py` est supprimé** (écrivain, drapeau d'environnement, hook du coder) ; le brancher
+    sur un vrai client aurait ajouté une session par build sur le diff que les lentilles lisent déjà.
+    `compute_diff_summary`, utilisé par le virtual reviewer, passe dans `virtual_reviewer/diff.py`.
+    Le bonus de +5 d'auto-promotion pour la présence de `self_review.md` disparaît avec lui (le score
+    maximal d'un build propre passe de 100 à 95).
+  - Reste : les indicateurs d'affichage `has_self_review` (variations) et `self_review_present`
+    (virtual reviewer) lisent toujours la présence du fichier, que plus rien n'écrit ; les retirer
+    touche le frontend (`VariationsDialog`, `VirtualReviewerDialog`, `agent-tools-api.ts`).
 
 #### F10 · Prompts volumineux et onze prompts orphelins
 

@@ -174,8 +174,8 @@ class TestTheRoster:
     def test_the_phases_that_build_review_or_verify_keep_the_specialists(
         self, android_app, agent_type
     ):
-        """`pr_reviewer` is the agent the `mobile-design` and `store-readiness`
-        workflow phases run under."""
+        """`pr_reviewer` is the agent the `mobile-design` workflow phase runs
+        under."""
         from agents.subagents import resolve
         from agents.subagents.phases import sdk_available
 
@@ -219,6 +219,23 @@ class TestTheRoster:
         assert "Edit" not in agents["store-readiness-auditor"].tools
 
 
+def _store_lens(profile, changed: list[str]) -> bool:
+    """Whether the review prompt of this profile names the store lens."""
+    from workflows.runner import PhaseContext, conditional_lenses
+
+    review = next(r for r in profile.run if r.id == "review")
+    ctx = PhaseContext(
+        project_dir=REPO_ROOT,
+        spec_dir=REPO_ROOT,
+        model="m",
+        repo_root=REPO_ROOT,
+        changed_files=changed,
+    )
+    return any(
+        name == "store-readiness" for name, *_ in conditional_lenses(review.phase, ctx)
+    )
+
+
 class TestTheWorkflowPhases:
     @pytest.fixture
     def workflow(self):
@@ -228,19 +245,24 @@ class TestTheWorkflowPhases:
             REPO_ROOT / "workflows" / "feature-build" / "workflow.yaml"
         )
 
-    def test_both_mobile_phases_are_declared(self, workflow):
+    def test_the_mobile_design_phase_and_the_store_lens_are_declared(self, workflow):
         ids = [p.id for p in workflow.phases]
         assert "mobile-design" in ids
-        assert "store-readiness" in ids
+        # The store audit is a lens of `review` since lot L10: a phase after QA
+        # was a fifth session reading the diff, and nothing read its report.
+        assert "store-readiness" not in ids
+        review = workflow.phase("review")
+        assert dict(review.conditional_lenses)["store-readiness"]
 
     def test_the_design_review_runs_before_the_code_is_written(self, workflow):
         """The window a phase runs in is its declared position, not its description."""
         ids = [p.id for p in workflow.phases]
         assert ids.index("mobile-design") < ids.index("coding")
 
-    def test_the_store_audit_runs_after_qa(self, workflow):
+    def test_the_store_audit_runs_before_qa(self, workflow):
+        """Where a fixer can still act on what it finds."""
         ids = [p.id for p in workflow.phases]
-        assert ids.index("store-readiness") > ids.index("qa")
+        assert ids.index("review") < ids.index("qa")
 
     def test_neither_runs_on_a_change_that_touches_no_mobile_file(self, workflow):
         from workflows.engine import resolve_profile
@@ -250,7 +272,7 @@ class TestTheWorkflowPhases:
         )
         running = {r.phase.id for r in profile.run}
         assert "mobile-design" not in running
-        assert "store-readiness" not in running
+        assert not _store_lens(profile, ["apps/backend/api/routes.py"])
 
     @pytest.mark.parametrize(
         "changed",
@@ -268,14 +290,14 @@ class TestTheWorkflowPhases:
         profile = resolve_profile(workflow, "high", changed_files=[changed])
         running = {r.phase.id for r in profile.run}
         assert "mobile-design" in running
-        assert "store-readiness" in running
+        assert _store_lens(profile, [changed])
 
     def test_both_are_read_only_reviewers(self, workflow):
         from workflows.runner import SKILL_PHASE_AGENTS
 
         # `pr_reviewer` is what `create_client` puts in permission_mode "plan".
         assert SKILL_PHASE_AGENTS["mobile-design"] == "pr_reviewer"
-        assert SKILL_PHASE_AGENTS["store-readiness"] == "pr_reviewer"
+        assert SKILL_PHASE_AGENTS["review"] == "pr_reviewer"
 
     def test_every_declared_phase_is_paid_for_as_one_of_the_four(self, workflow):
         from workflows.runner import _ELSEWHERE, BUILTIN_EXECUTORS, CONFIG_PHASE

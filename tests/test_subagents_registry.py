@@ -170,8 +170,14 @@ class TestSpecialisation:
         roster = resolve(agent_type, project_dir=tmp_path)
         section = self._overlay_section(roster["test-runner"].prompt)
         assert "pytest -x" in section and "### python" in section
-        before = phase_defaults(agent_type)["qa-acceptance-checker"].prompt
-        assert roster["qa-acceptance-checker"].prompt == before
+        defaults = phase_defaults(agent_type)
+        if "qa-acceptance-checker" in defaults:
+            # The verifier's roster has none since lot L10 (`roster: verify`).
+            before = defaults["qa-acceptance-checker"].prompt
+            assert roster["qa-acceptance-checker"].prompt == before
+        else:
+            assert agent_type == "verifier"
+            assert "qa-acceptance-checker" not in roster
 
 
 class TestCallerPrecedence:
