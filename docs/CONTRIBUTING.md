@@ -883,10 +883,10 @@ WorkPilot AI consists of two main parts:
 The core autonomous coding framework:
 
 - **Entry Points**: `run.py` (build runner), `spec_runner.py` (spec creator)
-- **Agent System**: `agent.py`, `client.py`, `prompts/`
-- **Execution**: `coordinator.py` (parallel), `worktree.py` (isolation)
+- **Agent System**: `core/agent.py`, `core/client.py`, `prompts/`
+- **Execution**: `coordinator.py` (parallel), `core/worktree.py` (isolation)
 - **Memory**: `memory.py` (file-based), `graphiti_memory.py` (graph-based)
-- **QA**: `qa_loop.py`, `prompts/qa_*.md`
+- **QA**: `qa/loop.py`, `prompts/qa_*.md`
 
 ### Electron Frontend (`apps/frontend/`)
 

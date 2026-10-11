@@ -9,6 +9,7 @@ Functions for finalizing workspaces and handling user choices after build comple
 import sys
 from pathlib import Path
 
+from core.worktree import WorktreeInfo, WorktreeManager
 from ui import (
     Icons,
     MenuOption,
@@ -23,7 +24,6 @@ from ui import (
     success,
     warning,
 )
-from worktree import WorktreeInfo, WorktreeManager
 
 from .display import show_build_summary, show_changed_files
 from .git_utils import get_existing_build_worktree
@@ -426,8 +426,8 @@ def check_existing_build(project_dir: Path, spec_name: str) -> bool:
         sys.exit(0)
 
     # Import merge function only when needed to avoid circular imports
-    # merge_existing_build is in the parent workspace.py module
-    import workspace as ws
+    # merge_existing_build lives in core/workspace.py, re-exported by the package
+    import core.workspace as ws
 
     if choice == "continue":
         return True  # Continue with existing

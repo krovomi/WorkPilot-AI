@@ -23,22 +23,12 @@ Consumers:
   (typed loader with validation) and [provider_api.py](../apps/backend/provider_api.py#L1).
   Validated against `ConfiguredProvider` at load time — malformed entries
   raise immediately instead of silently propagating empty strings.
-- **Frontend TypeScript** — a typed module is **generated** from the JSON
-  at [apps/frontend/src/shared/types/providers.generated.ts](../apps/frontend/src/shared/types/providers.generated.ts).
-  It exposes `ConfiguredProvider`, `ProviderName` (union of every known
-  ID), `CONFIGURED_PROVIDERS`, and `isProviderName()` as a type guard.
-
-**Regenerate after editing the JSON:**
-
-```bash
-pnpm run generate:provider-types
-```
-
-**CI check** — fails if the generated file drifts from the JSON:
-
-```bash
-pnpm run validate:provider-types
-```
+- **Frontend TypeScript** — read at runtime over IPC
+  (`providers:getConfiguredProviders`) by
+  [`shared/services/providerService.ts`](../apps/frontend/src/shared/services/providerService.ts),
+  which falls back to `providerRegistry` when the bridge is absent. A generated
+  `providers.generated.ts` (and its `generate:provider-types` script) existed but
+  nothing imported it; audit lot L8 removed both.
 
 The file must not be duplicated. A previous copy at
 `utils/config/configured_providers.json` has been removed; any reference
@@ -72,26 +62,21 @@ If you add a new provider field, update both consumers in the same PR:
 **Owner:** [src/connectors/llm_config.py](../src/connectors/llm_config.py).
 
 Stores user-specific provider settings (API keys, base URLs, model
-overrides) and the currently **active** provider. Managed from the CLI:
+overrides) and the currently **active** provider. Managed from the app's
+settings through `provider_api.py`:
 
-```bash
-# List providers (the active one is marked "(actif)")
-python -m apps.backend.cli provider list
+| Endpoint | Does |
+|---|---|
+| `GET /providers/configs` | list the saved configurations |
+| `POST /providers/config/{provider}` | save a provider's configuration |
+| `DELETE /providers/config/{provider}` | delete it |
+| `POST /providers/select` · `GET /providers/selected` | set / read the active provider |
+| `POST /providers/test-key/{provider}` | check an API key against the provider |
 
-# Select the active provider (persisted)
-python -m apps.backend.cli provider select --provider openai
-
-# Save a provider configuration
-python -m apps.backend.cli provider add \
-    --provider openai \
-    --config '{"api_key":"sk-...","model":"gpt-4o"}'
-
-# Test a provider
-python -m apps.backend.cli provider test --provider openai
-
-# Delete a provider's saved config
-python -m apps.backend.cli provider delete --provider openai
-```
+The `python -m apps.backend.cli provider …` commands this section used to
+list never existed (there is no `cli/__main__.py`), and the `--provider-action`
+option of `run.py` that they stood for was parsed and never dispatched; it was
+removed in audit lot L9.
 
 Internally, the active provider is stored under the reserved key
 `__active_provider__`. That key is filtered out of `list_provider_configs()`,

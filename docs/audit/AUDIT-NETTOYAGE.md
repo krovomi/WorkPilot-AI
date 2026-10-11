@@ -114,8 +114,8 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L5 | P1 | Droits et rosters minimaux — **fait** | F4, F5, F9, F16 | L1 |
 | L6 | P1 | Pipeline payé = pipeline exécuté — **fait** | F2, F3, F15, F35, F38 | — |
 | L7 | P2 | Une seule mémoire | F6, F7, F14, F34 | L1 (insight_extractor) |
-| L8 | P2 | Code mort frontend | F28, F25 (front) | L3 |
-| L9 | P2 | Code mort backend | F29, F30, F32, F33, F25 (back) | — |
+| L8 | P2 | Code mort frontend — **fait** | F28, F25 (front) | L3 |
+| L9 | P2 | Code mort backend — **fait** | F29, F30, F32, F33, F25 (back) | — |
 | L10 | P3 | Tokens à haut effort — **fait** | F10, F11, F17 | L6 |
 | L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
 | L12 | P3 | Gouvernance — **fait** | F12, F13 | L9 (F25) pour F13 |
@@ -125,7 +125,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
 | L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L4, L5, L6, L10, L12, L14, L15, L16, L17 (faits) → L7, L8, L9 → L11 → L13.
+Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L9, L10, L12, L14, L15, L16, L17 (faits) → L7 → L11 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -134,9 +134,9 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L10, L12, L14, L15, L16, L17 (faits)
 | `docs/CLAUDE.md` chargé à chaque session Claude Code | 268 Ko (~67 k tokens) | < 20 Ko |
 | agent_types non enregistrés | 7 (0 après le lot L1) | 0 |
 | Références Graphiti/LadybugDB hors `integrations/graphiti` | 214 (45 fichiers) | 0 |
-| Fichiers frontend sans importeur de production | 57 (~16,5 k lignes) | 0 |
-| Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) | 0 |
-| Shims racine `apps/backend/*.py` | 25 | 0 (hors points d'entrée) |
+| Fichiers frontend sans importeur de production | 57 (~16,5 k lignes) ; 29 (~6,1 k lignes) après le lot L8, tous en attente d'une décision (voir le lot) | 0 |
+| Paquets/modules backend sans importeur | 3 paquets + 12 modules (~6,7 k lignes) ; **0 après le lot L9** | 0 |
+| Shims racine `apps/backend/*.py` | 25 (27 recomptés) ; **3 après le lot L9** (`insight_extractor.py`, `graphiti_config.py`, `graphiti_providers.py`) | 0 (hors points d'entrée) |
 | Prompts orphelins | 11 (~51 Ko) ; 0 après le lot L10 (+ `coder.md`, 35 Ko, trouvé orphelin et retiré) | 0 |
 | Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
 | Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) | ≤ 7 |
@@ -337,7 +337,7 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L10, L12, L14, L15, L16, L17 (faits)
     `default: true`) → le dire.
   - `docs/CLAUDE.md` : mistral/deepseek/grok « pilotés par le SDK Claude » (sections Arena et Bounty
     Board) alors que `capabilities/providers.yaml` leur donne `CompatibleProviderAgentClient` ;
-    `pty-daemon.ts` présenté comme gestionnaire de PTY (jamais démarré, F28) ; `significance.assess`
+    `pty-daemon.ts` présenté comme gestionnaire de PTY (jamais démarré, F28 ; supprimé par le lot L8) ; `significance.assess`
     décrit comme décidant dans la phase architecture-map (faux tant que F20 n'est pas corrigé).
   - `learning_loop/pattern_storage.py:4` : documente `.workpilot/learning/patterns.json`, écrit
     `.workpilot/learning_loop/patterns.json` (l.25-26).
@@ -537,6 +537,52 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
 
 ### Lot L8 — Code mort frontend (P2)
 
+**Fait.** 115 fichiers de code supprimés (≈ 26 k lignes, tests compris), par famille et un commit chacune :
+variantes d'UsageIndicator et leurs dépendances privées (`useAgnosticUsage`, `useCredentialService`,
+`credentialService`, types et convertisseur `agnostic-usage`) ; variantes de section provider et leurs
+cartes/grilles, composants `multiconnector/*.tsx` (`types.ts` et `utils.ts` restent, ils sont lus),
+`AccountSettings`, `ProfileList`, `LlmRouterSettings`, `CopilotAuthTerminal`, `CopilotOAuthAuth`,
+`provider-refresh-store` ; dialogues jamais montés et leurs stores (`hooks`, `auto-refactor`,
+`cost-predictor`, `decision-logger`, `documentation-agent` — les deux derniers sortent de
+`global-listeners.ts`, dont l'invariant tient) ; `lib/` ; `providers.generated.ts` **et** son script ;
+`pty-daemon.ts` + client + appel `shutdown()` ; modules main (`log-service`, `fs-utils`,
+`copilot-cli-utils`, `sdk-session-recovery-coordinator`) ; F25 `ResumeWithProviderDropdown.tsx`.
+Les six fichiers « test seul » partent avec leur test. i18n : 186 clés retirées de `en` et `fr`
+(chemin qu'aucun fichier restant ne cite, ni littéralement ni comme préfixe d'une clé modèle) et trois
+namespaces entiers (`hooks`, `autoRefactor` — jamais enregistrés dans `i18n/index.ts`, ces dialogues
+auraient affiché des clés brutes — et `projectInitModal`). Preuve : `knip@5 --production --include files`
+avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest complète.
+
+- **`providers.generated.ts` : supprimé plutôt qu'importé.** Le renderer charge les providers à
+  l'exécution par IPC (`providers:getConfiguredProviders`, `shared/services/providerService.ts`) comme
+  des `string`, avec repli sur `providerRegistry` dont les identifiants incluent `custom` ; typer avec
+  l'union générée serait une refonte, pas un nettoyage. Aucun job CI ne lançait `validate:provider-types`.
+- **Écarts avec l'annexe A.1** :
+  - `StreamingTest.tsx` n'existait déjà plus sur `develop`.
+  - **Conservés, question au mainteneur** : `RateLimitModal.tsx`, `SDKRateLimitModal.tsx`,
+    `AuthFailureModal.tsx`. Ils ne sont montés nulle part, mais `hooks/useIpc.ts` reçoit toujours
+    `onTerminalRateLimit`, `onSDKRateLimit` et `onAuthFailure` et ouvre ces modales dans le store, et
+    `RateLimitIndicator` (monté dans la barre latérale) « rouvre » la modale au clic : ce n'est pas du
+    code mort mais une feature cassée (un 401 ou une limite SDK n'affiche rien). Câbler (les monter
+    dans `App.tsx`) est un changement de comportement ; supprimer retire la seule UI de ces événements.
+- **Trouvé pendant le lot L8** (même constat, absent de l'annexe A.1 ; `knip` en mode production) :
+  - **supprimés** : deux façades de rétro-compatibilité que rien n'importe (`main/agent-manager.ts`,
+    `renderer/components/AppSettings.tsx`, vide) ; `main/integrations/` (architecture d'adaptateurs
+    jamais implémentée) ; `shared/types/terminal-session.ts` ; `preload/api/modules/natural-language-git-api.ts`
+    (ancienne copie de `preload/api/natural-language-git-api.ts`) ; `main/services/profile-service.ts`
+    (ancienne copie de `services/profile/profile-service.ts`, importée par son seul test) ;
+    `main/agent/parsers/` (importé par son seul test) ; 22 barrels `index.ts` sans aucun importeur, dont
+    `ipc-handlers/github/utils/index.ts`, masqué par le `utils.ts` voisin ;
+  - **conservés, question au mainteneur** (features complètes jamais montées, avec stores et tests) :
+    `components/agent-tools/*` (10 fichiers ; la page « Agent Tools » est `AgentTools.tsx`, autre
+    composant), `components/collaboration/*` + `collaboration-store.ts`, `components/multi-repo/*` +
+    `multi-repo-store.ts` ;
+  - `components/memory/TeamSyncPanel.tsx` reste au lot L7 ;
+  - les chaînes IPC / service main / runner derrière les dialogues supprimés (auto-refactor,
+    documentation-agent, decision-logger, hooks) restent en place : plus aucune UI ne les appelle ;
+  - `config-path-validator.test.ts` échoue sur `develop` quand la suite tourne en `root` (deux cas
+    « hors home ») : indépendant du lot.
+
 #### F28 · 57 fichiers frontend sans importeur de production (~16,5 k lignes)
 
 - **Sévérité** moyenne · **nouveau** · **vérifié** (recherche stricte des `import`/`import()`/`require`)
@@ -564,6 +610,82 @@ l'agent suivant. `validate_impls` est vide à tous les efforts (`TestImplementat
   personne, remplacé par `TaskPauseControls` (#290).
 
 ### Lot L9 — Code mort backend (P2)
+
+> **Fait** (branche `claude/audit-lot-L9`) : ~18 400 lignes retirées, dont ~9 800 de
+> Python sous `apps/backend/` et `src/`. Un commit par étape, un par shim pour F30. Les fichiers
+> supprimés restent dans l'historique : dernier commit de `develop` qui les porte, `f385fe1`.
+>
+> - **F29** — toute l'annexe A.2 est supprimée (aucun constat n'avait changé depuis `b46a031`),
+>   avec les tests de `sandbox/`. Les configs `spec_gatherer` et `analysis` partent avec leur
+>   routage (`subagents/phases.py`, `core/client.py`, `learning_loop/prompt_injection.py`), le
+>   prompt `spec_gatherer.md` et leurs deux cartes de la page Agent Tools (clés en/fr).
+>   `ParallelOrchestratorReviewer` perd `_create_sdk_client`, `_define_specialist_agents`, et
+>   trois méthodes de la même chaîne morte : `_build_orchestrator_prompt`,
+>   `_extract_structured_output`, `_normalize_confidence`. Le runner vocal perd son chemin IA
+>   (neuf méthodes), `_create_error_result` (appelé par ses seuls tests) et l'agent_type
+>   `voice_command`, dont c'était le seul appelant.
+> - **F30** — 23 shims retirés : 5 sans importeur (`azure_devops_integration`, `client`,
+>   `critique`, `linear_config`, et `security.py`, inimportable car masqué par le paquet
+>   `security/`), puis 18 codemods, du plus importé au moins importé. La précaution sur
+>   `worktree.py` ne tenait plus : `core/__init__.py` est déjà paresseux (`__getattr__`), et
+>   `-X importtime` donne 68 ms par le shim contre 76 ms en direct (bruit). `analyzer.py` est lancé
+>   par chemin (frontend, spec, roadmap, ideation) : ses deux importeurs lisent
+>   `analysis.analyzer` et le fichier ne garde que `main()`. Restent `insight_extractor.py` (sa
+>   cible charge `analysis/__init__.py`, qui importe ses analyseurs au chargement ; le rendre
+>   paresseux est un préalable) et les deux shims Graphiti (lot L7). Les tests qui posaient un
+>   `MagicMock` sur le nom du shim le posent sur la cible, et `tests/conftest.py` protège ces
+>   cibles.
+> - **F32** — `llm_anthropic_usage.py` devient `core/anthropic_usage.py` ; `apps/backend/src/`
+>   disparaît, et avec lui le hack `sys.path` de `start_backend.py` et le masquage de
+>   `src.connectors` que trois commentaires décrivaient. `llm_copilot.py` ne déclarait aucun
+>   provider : c'est un lecteur d'usage, devenu `core/copilot_usage.py`. Le registre `llm_*`
+>   n'avait plus que deux lecteurs, tous deux morts : l'option `--provider-action` de `run.py`
+>   (parsée, jamais dispatchée — `handle_provider_command` n'avait aucun appelant) et quatre
+>   endpoints `/providers/{test,capabilities,schema,generate}/{provider}` dont le seul client
+>   était `ProviderManager.tsx`, importé par personne. Endpoints, composant, export du baril et
+>   espace i18n `providers` (jamais enregistré) partent ensemble, avec `llm_base`,
+>   `llm_discovery` et les onze connecteurs, dont `llm_anthropic.py` (`anthropic.Anthropic()`)
+>   et `llm_claude.py` (dernier `KNOWN_OUTSIDERS` de `test_sdk_options_factories.py`). Les
+>   capacités se lisent dans `capabilities/providers.yaml`
+>   (`/providers/agentic-capabilities`), les modèles dans `models_registry`.
+>   `DEFAULT_CLAUDE_MODEL` passe dans `llm_config.py`, conservé.
+> - **F33** — `utils/` supprimé et retiré du job ruff **et** du hook `scripts/pre-push.js` (qui le
+>   passait aussi à ruff) ; `docs/pr-1575-fixes.md` et `docs/superpowers/` supprimés.
+>   `.security-reports/` n'était pas vide mais ne portait qu'un `.gitignore` que
+>   `security/auto_integration.py` recrée lui-même : il n'est plus suivi, la règle est dans le
+>   `.gitignore` racine. `runners/github/test_context_gatherer.py` (racine) était une copie des
+>   neuf tests de `apps/backend/runners/github/test_context_gatherer.py` : supprimé plutôt que
+>   déplacé, et retiré des `testpaths`. Un seul changelog : `CHANGELOG.md` racine, le seul que
+>   lisent `bump-version.js` et `prepare-release.yml` ; `docs/CHANGELOG.md` (notes complètes de
+>   1.0.0, historique 2.x de l'amont) est supprimé, la racine pointe vers sa dernière version.
+>   `shared_docs/FEATURE_IDEAS*.md` : non traité, décision du mainteneur.
+> - **F25 (backend)** — aucune release depuis #290 (dernière : v1.2.1, 27 août 2026 ; #290 est du
+>   3 octobre) : la lecture du marqueur reste, datée dans `core/client.py` (« à retirer après la
+>   première release qui suit 1.2.1 ») avec la liste de ce qu'il faudra retirer.
+>
+> **Écarts au cahier.** `.security-reports/` n'était pas vide ; la copie racine du test de
+> `context_gatherer` est supprimée et non déplacée ; `utils/` est aussi retiré de `pre-push.js` ;
+> `insight_extractor.py` reste (préalable : `analysis/__init__.py` paresseux) ; `run.py` refuse
+> désormais `--provider-action`, `--provider` et `--config` au lieu de les ignorer (commit à part).
+>
+> **Trouvé pendant le lot L9 :**
+> - `ParallelOrchestratorReviewer._build_orchestrator_prompt` était le seul lecteur de
+>   `prompts/github/pr_parallel_orchestrator.md` (33 Ko, listé en F10 comme « gros prompt
+>   vivant ») : le prompt est désormais orphelin, et la config `pr_orchestrator_parallel`
+>   d'`AGENT_CONFIGS` n'a plus d'appelant (lots L10 / L11). `agents/subagents/pr_review.py:
+>   pr_review_agents` n'est plus appelé par le runner, seulement par le registre et les tests.
+> - `apps/backend/spec_contract.json` n'est lu par rien et décrit encore `spec_gatherer.md`.
+> - Le runner vocal exige toujours le SDK Claude et un jeton OAuth (`setup_client`) alors qu'il ne
+>   parle plus à aucun modèle — même défaut que la règle « Auth belongs to the provider ».
+> - `core/workspace.py` (2 248 l.) est masqué par le paquet `core/workspace/`, qui le charge par
+>   `importlib` : vivant, mais à résorber avec le découpage du lot L11.
+> - Isolément, `tests/test_qa_criteria.py`, `test_qa_loop.py` et `test_spec_pipeline.py` échouent
+>   à la collecte (`core.build_signals` sous un `core` mocké) ; ils ne passent que grâce à l'ordre
+>   de la suite complète. `tests/conftest.py` restaure désormais `core.workspace` et
+>   `core.workspace.models` au lieu de les supprimer : sans cela, deux classes `WorkspaceMode`
+>   coexistaient une fois les shims retirés.
+> - `services/provider_registry.py` (lu par `list_providers.py`) est un troisième registre de
+>   providers, à côté de `capabilities/providers.yaml` et `models_registry`.
 
 #### F29 · Paquets et modules backend sans importeur (~6,7 k lignes)
 
@@ -1133,55 +1255,55 @@ le câblage étant un chantier à part (décrit ci-dessous).
 
 | Fichier (`apps/frontend/src/…`) | Lignes | Preuve | Action |
 |---|---:|---|---|
-| `renderer/components/UsageIndicatorAgnostic.tsx` | 558 | aucun importeur | supprimer |
-| `renderer/components/UsageIndicatorDumb.tsx` | 550 | aucun importeur | supprimer |
-| `renderer/components/UsageIndicatorSimple.tsx` | 482 | aucun importeur | supprimer |
-| `renderer/components/settings/ImprovedProviderSection.tsx` | 261 | aucun importeur | supprimer |
-| `renderer/components/settings/SophisticatedProviderSection.tsx` | 326 | aucun importeur | supprimer |
-| `renderer/components/settings/ThemedProviderSection.tsx` | 401 | aucun importeur | supprimer |
-| `renderer/components/settings/multiconnector/*` (5 fichiers) | 759 | aucun importeur | supprimer |
-| `renderer/components/settings/AccountSettings.tsx` | 2 227 | test seul | supprimer + test |
-| `renderer/components/settings/ProfileList.tsx` | 349 | test seul | supprimer + test |
-| `renderer/components/settings/LlmRouterSettings.tsx` | 380 | aucun importeur | confirmer, supprimer |
-| `renderer/components/settings/CopilotAuthTerminal.tsx` | 358 | aucun importeur | supprimer |
-| `renderer/components/hooks/HooksDialog.tsx` | 1 189 | aucun importeur | confirmer, supprimer |
-| `renderer/components/SDKRateLimitModal.tsx` | 596 | commentaire seul | confirmer, supprimer |
-| `renderer/components/RateLimitModal.tsx` | 474 | commentaire seul | confirmer, supprimer |
-| `renderer/components/AppUpdateNotification.tsx` | 365 | aucun importeur | confirmer, supprimer |
-| `renderer/components/StreamingTest.tsx` | 256 | test manuel | supprimer |
-| `renderer/components/ReferencedFilesSection.tsx` | 190 | aucun importeur | supprimer |
-| `renderer/components/AgentProfiles.tsx` | 149 | aucun importeur | supprimer |
-| `renderer/components/AuthFailureModal.tsx` | 136 | commentaire seul | confirmer, supprimer |
-| `renderer/components/ProfileBadge.tsx` | 150 | test seul | supprimer + test |
-| `renderer/components/ProjectInitModal.tsx` | 117 | test seul | supprimer + test |
-| `renderer/components/ProactiveSwapListener.tsx` | 96 | aucun importeur | supprimer |
-| `renderer/components/FolderExplorer.tsx` | 56 | aucun importeur | supprimer |
-| `renderer/components/auth/Can.tsx` | 30 | aucun importeur | supprimer |
-| `renderer/components/auto-refactor/AutoRefactorDialog.tsx` | 523 | commentaire du store seul | confirmer, supprimer (+ store) |
-| `renderer/components/azure-devops-import/AzureDevOpsDragProvider.tsx`, `AzureDevOpsDropZone.tsx` | 216 | aucun importeur | supprimer |
-| `renderer/components/cost-predictor/CostPredictorDialog.tsx` | 233 | aucun importeur | confirmer, supprimer |
-| `renderer/components/decision-logger/DecisionTimeline.tsx` | 323 | aucun importeur | confirmer, supprimer |
-| `renderer/components/documentation-agent/DocumentationAgentDashboard.tsx` | 312 | aucun importeur | confirmer, supprimer |
+| ~~`renderer/components/UsageIndicatorAgnostic.tsx`~~ | 558 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/UsageIndicatorDumb.tsx`~~ | 550 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/UsageIndicatorSimple.tsx`~~ | 482 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/settings/ImprovedProviderSection.tsx`~~ | 261 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/settings/SophisticatedProviderSection.tsx`~~ | 326 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/settings/ThemedProviderSection.tsx`~~ | 401 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/settings/multiconnector/*` (5 fichiers)~~ | 759 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/settings/AccountSettings.tsx`~~ | 2 227 | test seul | **supprimé (L8)** |
+| ~~`renderer/components/settings/ProfileList.tsx`~~ | 349 | test seul | **supprimé (L8)** |
+| ~~`renderer/components/settings/LlmRouterSettings.tsx`~~ | 380 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/settings/CopilotAuthTerminal.tsx`~~ | 358 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/hooks/HooksDialog.tsx`~~ | 1 189 | aucun importeur | **supprimé (L8)** |
+| `renderer/components/SDKRateLimitModal.tsx` | 596 | commentaire seul | **conservé (L8)** : feature cassée, pas morte — décision du mainteneur |
+| `renderer/components/RateLimitModal.tsx` | 474 | commentaire seul | **conservé (L8)** : feature cassée, pas morte — décision du mainteneur |
+| ~~`renderer/components/AppUpdateNotification.tsx`~~ | 365 | aucun importeur | **supprimé (L8)** |
+| `renderer/components/StreamingTest.tsx` | 256 | test manuel | **déjà absent** à l'ouverture du lot L8 |
+| ~~`renderer/components/ReferencedFilesSection.tsx`~~ | 190 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/AgentProfiles.tsx`~~ | 149 | aucun importeur | **supprimé (L8)** |
+| `renderer/components/AuthFailureModal.tsx` | 136 | commentaire seul | **conservé (L8)** : feature cassée, pas morte — décision du mainteneur |
+| ~~`renderer/components/ProfileBadge.tsx`~~ | 150 | test seul | **supprimé (L8)** |
+| ~~`renderer/components/ProjectInitModal.tsx`~~ | 117 | test seul | **supprimé (L8)** |
+| ~~`renderer/components/ProactiveSwapListener.tsx`~~ | 96 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/FolderExplorer.tsx`~~ | 56 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/auth/Can.tsx`~~ | 30 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/auto-refactor/AutoRefactorDialog.tsx`~~ | 523 | commentaire du store seul | **supprimé (L8)** |
+| ~~`renderer/components/azure-devops-import/AzureDevOpsDragProvider.tsx`, `AzureDevOpsDropZone.tsx`~~ | 216 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/cost-predictor/CostPredictorDialog.tsx`~~ | 233 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/decision-logger/DecisionTimeline.tsx`~~ | 323 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/documentation-agent/DocumentationAgentDashboard.tsx`~~ | 312 | aucun importeur | **supprimé (L8)** |
 | `renderer/components/memory/TeamSyncPanel.tsx` | 580 | aucun importeur, Graphiti | supprimer (lot L7) |
-| `renderer/components/task-detail/ResumeWithProviderDropdown.tsx` | 204 | aucun importeur | supprimer (F25) |
-| `renderer/components/task-detail/TaskDetailModalHandlers.tsx` | 212 | aucun importeur | supprimer |
-| `renderer/components/task-detail/task-review/TerminalDropdown.tsx` | 55 | aucun importeur | supprimer |
-| `renderer/components/ui/sheet.tsx` | 130 | aucun importeur | supprimer |
-| `renderer/components/workspace/AddWorkspaceModal.tsx` | 320 | aucun importeur | confirmer, supprimer |
-| `renderer/hooks/use-profile-swap-notifications.ts` | 195 | test seul | supprimer + test |
-| `renderer/lib/flow-controller.ts`, `scroll-controller.ts` | 287 | aucun importeur | supprimer |
-| `renderer/lib/webgl-context-manager.ts` | 205 | aucun importeur | supprimer |
-| `renderer/lib/terminal-font-settings-verification.ts` | 92 | aucun importeur | supprimer |
-| `renderer/lib/compose-refs-fix.ts` | 85 | aucun importeur | supprimer |
-| `renderer/test-logger.ts` | 16 | aucun importeur | supprimer |
-| `shared/types/providers.generated.ts` | 55 | généré, jamais importé | supprimer (+ `scripts/generate-provider-types.js`) ou utiliser |
-| `shared/utils/powershell-color-support.ts` | 102 | aucun importeur | supprimer |
-| `examples/colored-logs-example.ts` | 57 | exemple | supprimer |
-| `main/terminal/pty-daemon.ts` (+ `pty-daemon-client.ts`) | 586 | pas une entrée de build ; client jamais connecté | supprimer + appel `shutdown()` |
-| `main/services/sdk-session-recovery-coordinator.ts` | 568 | test seul | confirmer, supprimer + test |
-| `main/log-service.ts` | 364 | aucun importeur | supprimer |
-| `main/fs-utils.ts` | 155 | aucun importeur | supprimer |
-| `main/copilot-cli-utils.ts` | 86 | aucun importeur | supprimer |
+| ~~`renderer/components/task-detail/ResumeWithProviderDropdown.tsx`~~ | 204 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/task-detail/TaskDetailModalHandlers.tsx`~~ | 212 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/task-detail/task-review/TerminalDropdown.tsx`~~ | 55 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/ui/sheet.tsx`~~ | 130 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/components/workspace/AddWorkspaceModal.tsx`~~ | 320 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/hooks/use-profile-swap-notifications.ts`~~ | 195 | test seul | **supprimé (L8)** |
+| ~~`renderer/lib/flow-controller.ts`, `scroll-controller.ts`~~ | 287 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/lib/webgl-context-manager.ts`~~ | 205 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/lib/terminal-font-settings-verification.ts`~~ | 92 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/lib/compose-refs-fix.ts`~~ | 85 | aucun importeur | **supprimé (L8)** |
+| ~~`renderer/test-logger.ts`~~ | 16 | aucun importeur | **supprimé (L8)** |
+| ~~`shared/types/providers.generated.ts`~~ | 55 | généré, jamais importé | **supprimé (L8)** |
+| ~~`shared/utils/powershell-color-support.ts`~~ | 102 | aucun importeur | **supprimé (L8)** |
+| ~~`examples/colored-logs-example.ts`~~ | 57 | exemple | **supprimé (L8)** |
+| ~~`main/terminal/pty-daemon.ts` (+ `pty-daemon-client.ts`)~~ | 586 | pas une entrée de build ; client jamais connecté | **supprimé (L8)** |
+| ~~`main/services/sdk-session-recovery-coordinator.ts`~~ | 568 | test seul | **supprimé (L8)** |
+| ~~`main/log-service.ts`~~ | 364 | aucun importeur | **supprimé (L8)** |
+| ~~`main/fs-utils.ts`~~ | 155 | aucun importeur | **supprimé (L8)** |
+| ~~`main/copilot-cli-utils.ts`~~ | 86 | aucun importeur | **supprimé (L8)** |
 | ~~`main/ipc-handlers/renderer-log-handler.ts`~~ | 60 | jamais enregistré | **supprimé (L3)** |
 | `main/ipc-handlers/context-aware-snippets-handlers.ts` | 77 | jamais enregistré | **câblé (L3), conservé** |
 | ~~preload : `scanOllamaModels`, `downloadOllamaModel`, `initializeClaudeProfile`, `submitOAuthCode`, `getAzureDevOpsProjects`~~ | — | canaux sans handler | **supprimés (L3)** |

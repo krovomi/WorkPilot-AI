@@ -140,10 +140,10 @@ Test streaming functionality
         spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
 
         # Mock the agent execution to avoid actually running it.
-        # handle_build_command does a lazy import: from agent import run_autonomous_agent
-        # and wraps it in asyncio.run(), so we patch at "agent" module level with a
+        # handle_build_command does a lazy import: from core.agent import run_autonomous_agent
+        # and wraps it in asyncio.run(), so we patch at "core.agent" module level with a
         # regular (non-async) mock to avoid the "asyncio.run() in running event loop" error.
-        with patch("agent.run_autonomous_agent") as mock_run:
+        with patch("core.agent.run_autonomous_agent") as mock_run:
             mock_run.return_value = None
 
             # Call build command with streaming options
@@ -172,7 +172,7 @@ Test streaming functionality
         """Test build command without streaming options."""
         spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
 
-        with patch("agent.run_autonomous_agent") as mock_run:
+        with patch("core.agent.run_autonomous_agent") as mock_run:
             mock_run.return_value = None
 
             handle_build_command(
@@ -334,11 +334,11 @@ Test streaming functionality
         spec_dir = temp_project_dir / ".workpilot" / "specs" / "001-test-streaming"
 
         # Mock all components for full pipeline test.
-        # handle_build_command does lazy import: from agent import run_autonomous_agent
+        # handle_build_command does lazy import: from core.agent import run_autonomous_agent
         # and wraps it in asyncio.run(), so use a regular mock (not AsyncMock).
         # StreamingManager lives in streaming.streaming_manager, not websocket_server.
         with (
-            patch("agent.run_autonomous_agent") as mock_run_agent,
+            patch("core.agent.run_autonomous_agent") as mock_run_agent,
         ):
             mock_run_agent.return_value = None
 

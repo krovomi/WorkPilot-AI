@@ -1,6 +1,6 @@
 # AGENTS.md — index du frontend
 
-Electron + React + TypeScript + Vite + Zustand + Tailwind. 196 composants, 99 stores,
+Electron + React + TypeScript + Vite + Zustand + Tailwind. ~570 composants, ~110 stores,
 ~150 modules de handlers IPC. Ce fichier donne les points d'entrée.
 
 > Règles normatives : [`../../docs/CLAUDE.md`](../../docs/CLAUDE.md) · Racine : [`../../AGENTS.md`](../../AGENTS.md)

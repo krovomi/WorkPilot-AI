@@ -98,14 +98,6 @@ function getThinkingLabel(level: ThinkingLevel): string {
 
 const AGENT_CONFIGS: Record<string, AgentConfig> = {
 	// Spec Creation Phases - all use 'spec' phase settings
-	spec_gatherer: {
-		label: "Spec Gatherer",
-		description: "Collects initial requirements from user",
-		category: "spec",
-		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
-		mcp_servers: [],
-		settingsSource: { type: "phase", phase: "spec" },
-	},
 	spec_researcher: {
 		label: "Spec Researcher",
 		description: "Validates external integrations and APIs",
@@ -275,15 +267,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 		category: "utility",
 		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
 		mcp_servers: [],
-		settingsSource: { type: "feature", feature: "insights" },
-	},
-	analysis: {
-		label: "Analysis",
-		description: "Codebase analysis with context lookup",
-		category: "utility",
-		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
-		mcp_servers: ["context7"],
-		// Analysis uses same as insights
 		settingsSource: { type: "feature", feature: "insights" },
 	},
 	batch_analysis: {

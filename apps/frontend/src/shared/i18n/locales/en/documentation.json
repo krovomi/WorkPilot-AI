@@ -43,23 +43,6 @@
 		"noProject": "Select a project first"
 	},
 	"agent": {
-		"subtitle": "Generate and maintain project documentation automatically",
-		"docTypes": "Documentation types",
-		"options": "Options",
-		"insertInline": "Insert inline",
-		"insertInlineHint": "Add docstrings directly to source",
-		"outputDir": "Output directory (optional)",
-		"generate": "Generate docs",
-		"regenerate": "Regenerate",
-		"generated": "Documentation generated",
-		"generatedSummary": "{{types}} types • {{files}} files created",
-		"coverageBefore": "Coverage before",
-		"coverageAfter": "Coverage after",
-		"filesCreated": "Files created",
-		"outdatedFound": "Outdated docs found",
-		"outdatedCount_one": "{{count}} outdated documentation entry detected",
-		"outdatedCount_other": "{{count}} outdated documentation entries detected",
-		"idleHint": "Select documentation types and start a generation to create and maintain your project documentation automatically.",
 		"phase": {
 			"idle": "Ready",
 			"analyzing": "Analyzing documentation coverage…",

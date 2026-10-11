@@ -12,7 +12,7 @@ inside -c were not being validated.
 
 import shlex
 
-from project_analyzer import is_command_allowed
+from project import is_command_allowed
 
 from .parser import _cross_platform_basename, extract_commands, split_command_segments
 from .profile import resolve_active_profile

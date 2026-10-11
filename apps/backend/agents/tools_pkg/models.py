@@ -213,12 +213,6 @@ AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
     # SPEC CREATION PHASES (Minimal tools, fast startup)
     # ═══════════════════════════════════════════════════════════════════════
-    "spec_gatherer": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": [],  # No MCP needed - just reads project
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
     "spec_researcher": {
         # spec_researcher.md checks each integration against Context7 and the
         # web, then writes research.json with a heredoc — so Bash and Write
@@ -452,12 +446,6 @@ AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
     # ANALYSIS PHASES
     # ═══════════════════════════════════════════════════════════════════════
-    "analysis": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
-        "mcp_servers": ["context7"],
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
     "batch_analysis": {
         "tools": BASE_READ_TOOLS + WEB_TOOLS,
         "mcp_servers": [],
@@ -537,14 +525,6 @@ AGENT_CONFIGS = {
     # Each built its own ClaudeAgentOptions until lot L16: no denial, so the
     # user's and the project's settings files decided what they could do.
     # They answer in text the runner parses; none of them needs a tool.
-    "voice_command": {
-        # runners/voice_control_runner.py — one transcript in, one JSON
-        # navigation command out.
-        "tools": [],
-        "mcp_servers": [],
-        "auto_claude_tools": [],
-        "thinking_default": "none",
-    },
     "git_command": {
         # runners/natural_language_git_runner.py — a sentence and the
         # repository's status in the prompt, one git command out. The runner

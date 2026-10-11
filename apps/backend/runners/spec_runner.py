@@ -108,8 +108,8 @@ from core.sentry import capture_exception, init_sentry
 init_sentry(component="spec-runner")
 
 from core.build_signals import BuildPaused
+from core.debug import debug, debug_error, debug_section, debug_success
 from core.platform import is_windows
-from debug import debug, debug_error, debug_section, debug_success
 from phase_config import resolve_model_id
 from review import ReviewState
 from spec import SpecOrchestrator
