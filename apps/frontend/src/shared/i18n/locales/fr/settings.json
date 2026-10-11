@@ -956,7 +956,13 @@
 		"openLogsFolder": "Ouvrir le dossier des logs",
 		"recentErrors": "Erreurs récentes",
 		"systemInfo": "Informations système",
-		"title": "Debug & Logs"
+		"title": "Debug & Logs",
+		"viewUsage": {
+			"title": "Usage des pages",
+			"reset": "Réinitialiser",
+			"description": "Visites et temps passé par page, conservés sur cette machine uniquement.",
+			"row": "{{visits}} visites · {{minutes}} min"
+		}
 	},
 	"devtools": {
 		"autoNameClaude": {

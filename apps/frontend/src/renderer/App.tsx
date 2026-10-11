@@ -412,6 +412,7 @@ import { useTaskActivityBridge } from "./hooks/useTaskActivityBridge";
 import { useTaskNotifications } from "./hooks/useTaskNotifications";
 import type { Activity } from "./stores/activity-store";
 import { setActivityActiveView } from "./stores/activity-store";
+import { recordViewVisit } from "./stores/view-usage-store";
 import { setupGlobalListeners } from "./stores/global-listeners";
 import {
 	loadClaudeProfiles,
@@ -667,6 +668,7 @@ export function App() {
 	// Which page is on screen decides whether a result needs a badge at all.
 	useEffect(() => {
 		setActivityActiveView(activeView);
+		recordViewVisit(activeView);
 	}, [activeView]);
 
 	// Programmatic main-view navigation (e.g. the visual canvas jumps to the
