@@ -26,7 +26,7 @@ Toute interaction LLM passe par ces fichiers. Les modifier touche l'ensemble du 
 | `phase_config.py` | `MODEL_ID_MAP`, `THINKING_BUDGET_MAP` (`none`/`low`/`medium`/`high`/`ultrathink`), `DEFAULT_PHASE_MODELS`, `PROVIDER_DEFAULT_MODELS` (11 providers), `get_phase_model()`, `get_phase_thinking_budget()` |
 | `models_registry.py` | catalogue des modèles et de leurs capacités |
 | `model_router/router.py` | `TaskClass` (8 classes) × `QualityTier` (budget/balanced/premium) → choix de modèle |
-| `phase_event.py` | émission des événements de phase vers l'UI |
+| `core/phase_event.py` | émission des événements de phase vers l'UI |
 
 ## Agents et sous-agents
 
@@ -88,3 +88,13 @@ propre dict `agents` : **il gagne sur les défauts**.
   dans les packages, c'est un reliquat.
 - `pytest.ini` fixe `pythonpath = . ./src` : les imports sont plats
   (`from phase_config import …`, `from agents.coder import …`).
+- **Importer le module réel, jamais un fichier de la racine qui le réexporte.**
+  Les shims de compatibilité de la racine (`debug.py`, `progress.py`,
+  `worktree.py`, `workspace.py`…) ont été retirés au lot L9 de l'audit :
+  `from core.debug import …`, `from core.worktree import …`, `from qa import …`.
+  À la racine restent des modules propres (`phase_config.py`,
+  `models_registry.py`…), des points d'entrée lancés par chemin ou par uvicorn (`run.py`,
+  `start_backend.py`, `provider_api.py`, `websocket_server.py`, `analyzer.py`,
+  `commit_message.py`…) et trois réexports en sursis : `insight_extractor.py`
+  (sa cible charge `analysis/__init__.py`, qui n'est pas paresseux) et
+  `graphiti_config.py` / `graphiti_providers.py` (lot L7).
