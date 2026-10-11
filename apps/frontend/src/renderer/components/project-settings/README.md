@@ -26,14 +26,12 @@ project-settings/
 ├── ClaudeAuthSection.tsx             # Claude authentication configuration
 ├── LinearIntegrationSection.tsx      # Linear project management integration
 ├── GitHubIntegrationSection.tsx      # GitHub issues integration
-├── MemoryBackendSection.tsx          # Graphiti/file-based memory configuration
 ├── AgentConfigSection.tsx            # Agent model selection
 ├── NotificationsSection.tsx          # Notification preferences
 ├── CollapsibleSection.tsx            # Reusable collapsible section wrapper
 ├── PasswordInput.tsx                 # Reusable password input with toggle
 ├── StatusBadge.tsx                   # Reusable status badge component
-├── ConnectionStatus.tsx              # Reusable connection status display
-└── InfrastructureStatus.tsx          # LadybugDB memory status display
+└── ConnectionStatus.tsx              # Reusable connection status display
 
 hooks/
 ├── index.ts                          # Barrel export for all hooks
@@ -41,8 +39,7 @@ hooks/
 ├── useEnvironmentConfig.ts           # Environment configuration state
 ├── useClaudeAuth.ts                  # Claude authentication status
 ├── useLinearConnection.ts            # Linear connection status
-├── useGitHubConnection.ts            # GitHub connection status
-└── useInfrastructureStatus.ts        # LadybugDB memory status
+└── useGitHubConnection.ts            # GitHub connection status
 ```
 
 ## Component Breakdown
@@ -116,25 +113,6 @@ hooks/
 - Display connection status
 - Manage auto-sync settings
 
-#### MemoryBackendSection.tsx
-**Purpose**: Configures memory backend (Graphiti vs file-based).
-**Props**:
-- `isExpanded`: Section expand/collapse state
-- `onToggle`: Toggle handler
-- `envConfig`: Environment configuration
-- `settings`: Project settings
-- `onUpdateConfig`: Configuration update handler
-- `onUpdateSettings`: Settings update handler
-- `infrastructureStatus`: LadybugDB memory status
-- Infrastructure management handlers
-
-**Responsibilities**:
-- Toggle between Graphiti and file-based memory
-- Configure LLM and embedding providers
-- Manage LadybugDB connection settings
-- Display infrastructure status (LadybugDB)
-- Handle infrastructure startup
-
 #### AgentConfigSection.tsx
 **Purpose**: Configures agent model selection.
 **Props**:
@@ -201,15 +179,6 @@ hooks/
 
 **Usage**: Used by Linear and GitHub sections to display connection status.
 
-#### InfrastructureStatus.tsx
-**Purpose**: Displays LadybugDB memory status for Graphiti.
-**Props**:
-- `infrastructureStatus`: Status object
-- `isCheckingInfrastructure`: Loading state
-- Infrastructure action handlers
-
-**Usage**: Used by MemoryBackendSection to manage Graphiti infrastructure.
-
 ## Custom Hooks
 
 ### useProjectSettings.ts
@@ -248,13 +217,6 @@ hooks/
 **Returns**:
 - `gitHubConnectionStatus`: Connection status object
 - `isCheckingGitHub`: Loading state
-
-### useInfrastructureStatus.ts
-**Purpose**: Monitors LadybugDB memory infrastructure status.
-**Returns**:
-- `infrastructureStatus`: Status object
-- `isCheckingInfrastructure`: Loading state
-- Infrastructure management functions
 
 ## Main Component (ProjectSettings.tsx)
 

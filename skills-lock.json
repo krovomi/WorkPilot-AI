@@ -659,7 +659,7 @@
 			"pack": "tooling",
 			"packVersion": "1.0.0",
 			"source": "skills/tooling/mem-search/SKILL.md",
-			"contentSha256": "c3ac1b28906d63849cb56be3eaedc231642287913ec4cdcc6349b6016cf0318c",
+			"contentSha256": "6ecbd17c44f471bdc8581d25149aff6bc700a9b7e25ba6adcb8611d41d9bfde1",
 			"targets": {}
 		},
 		"mobile-architect": {

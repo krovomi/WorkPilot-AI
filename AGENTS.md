@@ -36,7 +36,7 @@ apps/backend/          Python. Agents, pipeline, API FastAPI (port 9000).
   cli/build_commands.py enchaînement des phases d'un build
   phase_config.py      modèle + budget de réflexion par phase et par provider
   model_router/        classification de tâche → tier qualité → modèle
-  learning_loop/       patterns depuis les builds, phase observe, replay A/B des promotions
+  learning_loop/       patterns depuis les builds (notes du vault), phase observe, replay A/B des promotions
   hermes/              hermes-agent : doctor, persona SOUL.md, cycle d'apprentissage par surface
   mem_search/          lecture de la mémoire par paliers (skill mem-search)
   brain/               le cerveau partagé : vault Obsidian + graph.json Graphify + git, servi en MCP à tous les agents

@@ -110,7 +110,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Documenter** | README, API docs, and architecture documentation generation |
 | **Migration Agent** | Framework and library migration with breaking change detection |
 | **Release Coordinator** | Orchestrates release readiness, changelog, and version bumps |
-| **Memory Manager** | Graphiti-based knowledge graph management across sessions |
+| **Memory Manager** | The shared brain: one Obsidian vault every agent reads and writes, across sessions |
 
 ### Integrations
 
@@ -176,7 +176,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 
 | Feature | Description |
 |---------|-------------|
-| **Memory System (Graphiti)** | Graph-based semantic memory — agents retain insights across sessions |
+| **Memory System (shared brain)** | One Obsidian vault + `graph.json`, served over MCP — agents retain insights across sessions |
 | **Skills System** | Provider-agnostic [Agent Skills](https://agentskills.io) packs under `.agents/skills/`, served to the Kanban command bar and mirrored per harness (Claude Code, Copilot, Codex, Cursor, Gemini) |
 | **Memory Search** | Three-layer progressive retrieval over past builds — an index costs ~100 tokens, timelines and full records are fetched only on demand |
 | **hermes-agent** | [hermes-agent](https://github.com/NousResearch/hermes-agent) skills are read from the same `.agents/skills/`; skills it authors arrive as *candidates* for review, never auto-adopted |
@@ -262,7 +262,7 @@ WorkPilot AI est une application de bureau autonome basée sur une architecture 
 - **Refactorer** - Refactoring sécurisé du code avec détection de patterns
 - **Documenter** - Génération automatique de documentation
 - **Migration Agent** - Migration de frameworks et bibliothèques
-- **Memory Manager** - Gestion de la base de connaissances Graphiti
+- **Memory Manager** - Le cerveau partagé : un vault Obsidian lu et écrit par tous les agents
 
 ### Architecture Technique
 
@@ -589,7 +589,7 @@ claude
 AUTO_BUILD_MODEL=claude-opus-5
 DEBUG=true
 LINEAR_API_KEY=votre_clé_linear
-GRAPHITI_ENABLED=true
+BRAIN_ENABLED=true
 ```
 
 ### Configuration du Projet

@@ -160,7 +160,7 @@ resolving exactly as it did.
 
 A pack whose `bootstrap` carries `"optional": true` is declared but not installed by
 default. `claude-mem` is the case this exists for: WorkPilot already keeps three
-memories (`task_logger` captures, graphiti holds the graph, `learning_loop` distils), and
+memories (`task_logger` captures, the shared brain holds the vault and its graph, `learning_loop` distils into it), and
 it would add a fourth with its own Bun worker, SQLite file and Chroma store. What it gets
 right is its three-layer retrieval, which is a query shape rather than a dependency — the
 `mem-search` skill in the `tooling` pack implements it over the stores already here.

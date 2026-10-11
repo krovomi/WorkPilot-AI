@@ -12,7 +12,7 @@ apps/backend/agents/
 ├── base.py              # Shared constants and imports
 ├── base_agent.py        # Shared base class for agent implementations
 ├── utils.py             # Git operations and plan management
-├── memory.py            # Memory management (Graphiti + file-based)
+├── memory.py            # Memory management (the shared brain)
 ├── session.py           # Agent session execution
 ├── planner.py           # Follow-up planner logic
 ├── coder.py             # Main autonomous agent loop
