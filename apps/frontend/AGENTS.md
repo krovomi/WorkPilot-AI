@@ -18,13 +18,13 @@ Electron + React + TypeScript + Vite + Zustand + Tailwind. 196 composants, 99 st
 
 | Fichier | Lignes | Index |
 |---|---|---|
-| `src/main/ipc-handlers/task/worktree-handlers.ts` | ~5 700 | — |
-| `src/main/claude-profile/usage-monitor.ts` | ~4 500 | — |
-| `src/renderer/components/KanbanBoard.tsx` | ~4 200 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) |
-| `src/renderer/components/api-explorer/ApiExplorer.tsx` | ~3 600 | — |
-| `src/main/ipc-handlers/task/execution-handlers.ts` | ~3 500 | — |
-| `src/main/ipc-handlers/github/pr-handlers.ts` | ~3 500 | — |
-| `src/main/app-emulator-service.ts` | ~3 200 | — |
+| `src/main/claude-profile/usage-monitor.ts` | ~4 600 | une seule classe, non découpée (lot L11) |
+| `src/main/ipc-handlers/task/worktree-handlers.ts` | ~3 600 | IDE/terminaux, refs git et helpers de PR dans `worktree-ide-terminal.ts`, `worktree-git-refs.ts`, `worktree-pr-helpers.ts` |
+| `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
+| `src/main/app-emulator-service.ts` | ~3 250 | — |
+| `src/main/ipc-handlers/task/execution-handlers.ts` | ~3 100 | — |
+| `src/main/ipc-handlers/github/pr-handlers.ts` | ~2 500 | GraphQL, logs de revue et attente CI dans `pr-graphql.ts`, `pr-logs.ts`, `pr-ci-wait.ts` |
+| `src/renderer/components/api-explorer/ApiExplorer.tsx` | ~730 | un fichier par panneau : `RequestPanel.tsx`, `EnvironmentManager.tsx`, `ExportDialog.tsx` |
 | `src/main/mobile-service.ts` | ~600 | pilote un émulateur Android / simulateur Apple ; toute la détection vient de `apps/backend/mobile/` |
 | `src/renderer/stores/task-store.ts` | ~1 300 | — |
 
