@@ -324,8 +324,8 @@ class ContextMeshService:
                     section += f"- Learning patterns ({len(patterns)}):\n"
                     for p in patterns[:5]:
                         section += f"  - [{p.category.value}] {p.description[:100]}\n"
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 - patterns are optional context
+                logger.debug("learning patterns unavailable for %s: %s", path, exc)
 
             # Read project structure (top-level dirs)
             if path.is_dir():
