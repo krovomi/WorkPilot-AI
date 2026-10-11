@@ -18,7 +18,6 @@ AUTO_PROMOTE_ENV_VAR = "WORKPILOT_AUTO_PROMOTE_THRESHOLD"
 # wrong.
 _BASE_SCORE_APPROVED = 80  # baseline when QA explicitly approved
 _BONUS_NO_FRICTION = 10  # +10 if approved on the first QA pass
-_BONUS_SELF_REVIEW = 5  # +5 if the coder wrote a self_review.md
 _BONUS_TINY_REPORT = 5  # +5 if qa_report.md is short (= few issues)
 _PENALTY_PER_EXTRA_SESSION = 5  # -5 per QA session beyond the first
 _PENALTY_LARGE_REPORT = 10  # -10 if qa_report.md is suspiciously long
@@ -118,11 +117,6 @@ def compute_qa_score(spec_dir: Path) -> tuple[int, dict[str, int], list[str]]:
         score -= penalty
         breakdown["session_friction"] = -penalty
         reasons.append(f"{qa_session} QA sessions: -{penalty}")
-
-    if (spec_dir / "self_review.md").exists():
-        score += _BONUS_SELF_REVIEW
-        breakdown["self_review_present"] = _BONUS_SELF_REVIEW
-        reasons.append(f"coder wrote self_review.md: +{_BONUS_SELF_REVIEW}")
 
     report_text = _read_text(spec_dir / "qa_report.md")
     report_chars = len(report_text)

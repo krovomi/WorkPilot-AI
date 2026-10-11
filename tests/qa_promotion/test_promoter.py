@@ -76,11 +76,15 @@ class TestComputeScore:
         score, _, _ = compute_qa_score(tmp_path)
         assert score == 90
 
-    def test_self_review_bonus(self, tmp_path: Path) -> None:
+    def test_a_self_review_file_earns_nothing(self, tmp_path: Path) -> None:
+        # Its writer was an opt-in stub built from `git diff` with no model
+        # (removed by audit lot L10): a file's presence says nothing about
+        # the build's quality.
         _write_plan(tmp_path, {"status": "approved", "qa_session": 1})
         (tmp_path / "self_review.md").write_text("notes", encoding="utf-8")
-        score, _, _ = compute_qa_score(tmp_path)
-        assert score == 95
+        score, breakdown, _ = compute_qa_score(tmp_path)
+        assert score == 90
+        assert "self_review_present" not in breakdown
 
     def test_tiny_report_bonus(self, tmp_path: Path) -> None:
         _write_plan(tmp_path, {"status": "approved", "qa_session": 1})
@@ -88,13 +92,12 @@ class TestComputeScore:
         score, _, _ = compute_qa_score(tmp_path)
         assert score == 95
 
-    def test_max_score_capped_at_100(self, tmp_path: Path) -> None:
+    def test_the_best_score(self, tmp_path: Path) -> None:
         _write_plan(tmp_path, {"status": "approved", "qa_session": 1})
-        (tmp_path / "self_review.md").write_text("x", encoding="utf-8")
         (tmp_path / "qa_report.md").write_text("ok", encoding="utf-8")
-        # 80 + 10 + 5 + 5 = 100.
+        # 80 + 10 + 5 = 95.
         score, _, _ = compute_qa_score(tmp_path)
-        assert score == 100
+        assert score == 95
 
     def test_friction_penalty(self, tmp_path: Path) -> None:
         _write_plan(tmp_path, {"status": "approved", "qa_session": 3})

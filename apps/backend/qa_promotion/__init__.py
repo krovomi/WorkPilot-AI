@@ -13,7 +13,6 @@ Configuration:
 The score is computed from on-disk artefacts (no SDK call):
   * qa_signoff.status — "approved" required, else score = 0
   * qa_session count — 1 = clean, 2-3 = some friction, ≥4 = penalty
-  * presence of self_review.md — small boost (coder explicitly handed off)
   * length of qa_report.md — heuristic on how many issues were noted
 
 The score is **consultative**. The decision is recorded in the audit
