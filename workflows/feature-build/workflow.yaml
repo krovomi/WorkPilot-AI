@@ -170,7 +170,7 @@ phases:
   - id: verify
     impl: tooling/verify
     agent: verifier
-    roster: qa
+    roster: verify
     dispatch: fresh-context
     hard_gate: tests-pass,app-verified
     description: >-

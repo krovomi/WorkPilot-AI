@@ -602,16 +602,16 @@ class TestPhaseRosters:
                     f"{phase.id} runs before any code is written"
                 )
 
-    def test_the_acceptance_checker_reaches_the_phase_before_qa(self):
-        """`roster: qa` on `verify` hands it `qa-acceptance-checker`.
-
-        The acceptance audit used to be a separate ultrathink phase after QA,
-        where nothing it found reached a fixer; `verify` and the review's
-        conformance lens now ask the question before QA decides.
+    def test_the_verifier_proves_execution_not_acceptance(self):
+        """`roster: verify` gives the verifier `test-runner` and no
+        `qa-acceptance-checker`: acceptance is the review's conformance lens
+        (from `high`) and QA's decision, asked before QA either way. Handing
+        it to the verifier too was a third reading of the diff (lot L10).
         """
         for phase, _, names in self._rows():
             if phase.id == "verify":
-                assert "qa-acceptance-checker" in names
+                assert "qa-acceptance-checker" not in names
+                assert "test-runner" in names
                 break
         else:  # pragma: no cover - the phase is declared
             pytest.fail("verify is not declared")
@@ -643,7 +643,7 @@ class TestPhaseRosters:
             REPO_ROOT / "workflows" / "feature-build" / "workflow.yaml"
         )
         declared = {p.id: p.roster for p in workflow.phases if p.roster}
-        assert declared == {"analyze": "planner", "review": "solo", "verify": "qa"}
+        assert declared == {"analyze": "planner", "review": "solo", "verify": "verify"}
 
 
 class TestWiredIn:

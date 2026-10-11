@@ -156,10 +156,14 @@ Three phases were falling through `PHASE_ALIASES` to the Kanban default, which i
 
 `spec_critic` now maps in `PHASE_ALIASES`; `spec_validation` does not, because `analyze`
 reads a plan before any code exists, which is the planner's question rather than QA's.
-It declares `roster: planner` in the workflow file instead, and `verify` declares
-`roster: qa`, which is how `qa-acceptance-checker` reaches a phase before QA now that
-the acceptance audit is a lens of `review` rather than a pass after QA. An unknown roster name logs and falls back rather than raising: a typo in a
-workflow file should cost the right specialists, not the build.
+It declares `roster: planner` in the workflow file instead. `verify` declares
+`roster: verify` — `test-runner` alone, which the language and mobile overlays
+specialise. It used to declare `roster: qa`, which handed the verifier
+`qa-acceptance-checker`: a third reading of the diff for a question the review's
+conformance lens (from `high`) and QA's decision already answer, before QA either
+way. The verifier proves the change runs; it does not judge it. An unknown roster
+name logs and falls back rather than raising: a typo in a workflow file should
+cost the right specialists, not the build.
 
 This matters beyond tidiness — the roster is context the parent pays for on **every
 turn**, so a mismatched roster is not merely unhelpful, it is billed. Hence three
