@@ -73,7 +73,7 @@ with `when: *ui_surface` — the anchor holds exactly
 `uiux.surface.UI_GLOBS` — `scripts/sync_surface_globs.py` writes it from
 Python, and `tests/test_uiux.py` keeps the two equal. `design-check`'s
 `&frontend_surface` is a deliberate subset (impeccable reads web markup only),
-and `mobile-design` / `store-readiness` share one `&mobile_surface`. It is in
+and `mobile-design` and the store lens of `review` share one `&mobile_surface`. It is in
 `DETERMINISTIC_PHASES` (never pruned: it saves nothing to drop it) and in the
 runner's `DETERMINISTIC_EXECUTORS`, so `run_skill_phase` calls
 `uiux.preflight.run_preflight` instead of opening a session.

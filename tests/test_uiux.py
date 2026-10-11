@@ -202,10 +202,11 @@ class TestSurface:
         assert match, "workflow.yaml declares no &frontend_surface anchor"
         assert set(match.group(1).split(",")) <= set(UI_GLOBS)
 
-    def test_both_mobile_phases_share_one_list(self):
+    def test_the_mobile_phase_and_the_store_lens_share_one_list(self):
         workflow = load_workflow(WORKFLOW)
         by_id = {p.id: p for p in workflow.phases}
-        assert by_id["mobile-design"].when_globs == by_id["store-readiness"].when_globs
+        lenses = dict(by_id["review"].conditional_lenses)
+        assert by_id["mobile-design"].when_globs == lenses["store-readiness"]
         assert by_id["mobile-design"].when_globs
         text = WORKFLOW.read_text(encoding="utf-8")
         assert text.count("&mobile_surface touches(") == 1

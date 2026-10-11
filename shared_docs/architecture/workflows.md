@@ -41,7 +41,7 @@ a `gate` command is implemented by that gate (`pack_inventory`).
 | `verify`, `verify-replay`, `architecture-map` | the engine, through a dedicated executor (`CUSTOM_EXECUTORS`): Python drives the deterministic steps and opens a session only where a model is needed — `verify/phase.py`, `verify/replay.py` (no model at all), `architecture_visualizer/archify/phase.py` |
 | `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
-| `mobile-design` and `store-readiness` | the engine (`workflows/runner.py`), when the task touches mobile files |
+| `mobile-design` | the engine (`workflows/runner.py`), when the task touches mobile files |
 | the `tests-pass` hard gate | the engine (`workflows/hard_gates.py`) |
 | `qa` | `qa_loop`, which the profile can switch off |
 | `observe` | the engine (`learning_loop/observe.py`) |
@@ -94,14 +94,15 @@ session re-reading the same diff to answer a lens's question a second time.
 profile by `tests/test_review_lenses.py`: at `ultrathink` on a code task,
 four — `review`, the `verifier` session of `verify` (the proof of execution),
 the first QA pass (the decision) and `architecture-map` (after QA, past its
-significance filter). Five on a phone app, where `store-readiness` reads the
-manifests after QA. At `none` and `low`, one: QA. Further QA passes are
+significance filter). Four on a phone app too: the store audit is lens 5 of
+`review` there (`lenses:` in the workflow, applied when the task touches
+`*mobile_surface`), where it was a `store-readiness` session after QA whose
+report nobody read. At `none` and `low`, one: QA. Further QA passes are
 bounded by the QA budget, which follows the QA phase's effort
 (`qa.budget.QA_ITERATIONS_BY_EFFORT`, 3 to 20 passes, `WORKPILOT_QA_MAX_ITERATIONS`
 to override within the old ceiling of 50). The audit's count included a
 per-subtask self-review: it never ran — `coder.md`, which prescribed it, was
-given to no session, and `agents/self_review.py` is opt-in and writes a stub
-from `git diff` without a model.
+given to no session.
 
 **Every skill phase is read by the agent that comes next** (`workflows/handoff.py`).
 `run_skill_phase` writes each report to `<spec_dir>/workflow/<phase>.md`; until
