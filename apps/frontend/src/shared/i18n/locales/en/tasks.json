@@ -402,16 +402,6 @@
 			"saved": "Queue settings saved",
 			"saveFailed": "Failed to save queue settings",
 			"retry": "Please try again"
-		},
-		"autoSwap": {
-			"title": "Profile Swapped",
-			"description": "Switched from {{from}} to {{to}} ({{reason}})",
-			"batchTitle": "{{count}} Profile Swaps",
-			"batchDescription": "Tasks redistributed to: {{profiles}}"
-		},
-		"blocked": {
-			"title": "Queue Blocked",
-			"description": "All profiles are at capacity. Tasks will resume when a profile becomes available."
 		}
 	},
 	"execution": {
@@ -1053,9 +1043,6 @@
 			"resumeTask": "Resume Task",
 			"resumeSession": "Resume Session",
 			"resumeWithProvider": "Resume with…",
-			"resumingWithProvider": "Resuming…",
-			"resumeWithProviderTooltip": "Resume this task with a different LLM provider",
-			"resumeWithProviderMenuLabel": "Pick a provider",
 			"resumeWithProviderSuccessTitle": "Resuming with {{provider}}",
 			"resumeWithProviderSuccessDesc": "The previous conversation will be replayed into the new provider.",
 			"resumeWithProviderErrorTitle": "Resume failed",
@@ -1186,13 +1173,6 @@
 	"plan": {
 		"changesSaved": "Plan saved",
 		"saveError": "Could not save the plan"
-	},
-	"decisionLogger": {
-		"title": "Decision Timeline",
-		"loading": "Loading decision log…",
-		"empty": "No decisions recorded yet",
-		"emptyHint": "Decisions appear here while the agent is running.",
-		"noMatch": "No entries match the current filter."
 	},
 	"codeEditor": {
 		"deleteFile": "Delete file",

@@ -15,8 +15,7 @@ changelog/
 ├── parser.ts               # Parsing and extraction logic
 ├── formatter.ts            # Prompt building and formatting
 ├── git-integration.ts      # Git operations (branches, tags, commits)
-├── types.ts                # Module-specific type definitions
-└── index.ts                # Clean module exports
+└── types.ts                # Module-specific type definitions
 ```
 
 ### Responsibilities
@@ -70,8 +69,6 @@ changelog/
 
 ```typescript
 import { changelogService } from './changelog-service';
-// or
-import { changelogService } from './changelog';
 ```
 
 ### Backward Compatibility

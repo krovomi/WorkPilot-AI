@@ -462,7 +462,6 @@
 		}
 	},
 	"apiProfiles": {
-		"addButton": "Add Profile",
 		"presets": {
 			"anthropic": "Anthropic",
 			"copilot": "GitHub Copilot",
@@ -524,27 +523,6 @@
 			"sonnetPlaceholder": "e.g., claude-sonnet-4-5-20250929",
 			"opusPlaceholder": "e.g., claude-opus-4-5-20251101"
 		},
-		"empty": {
-			"title": "No API profiles configured",
-			"description": "Create a profile to configure custom API endpoints for your builds.",
-			"action": "Create First Profile"
-		},
-		"switchToOauth": {
-			"label": "Switch to OAuth",
-			"loading": "Switching..."
-		},
-		"activeBadge": "Active",
-		"customModels": "Custom models: {{models}}",
-		"setActive": {
-			"label": "Set Active",
-			"loading": "Setting..."
-		},
-		"tooltips": {
-			"edit": "Edit profile",
-			"deleteActive": "Switch to OAuth before deleting",
-			"deleteInactive": "Delete profile"
-		},
-		"deleteAriaLabel": "Delete profile {{name}}",
 		"toast": {
 			"create": {
 				"title": "Profile created",
@@ -553,34 +531,13 @@
 			"update": {
 				"title": "Profile updated",
 				"description": "\"{{name}}\" has been updated successfully."
-			},
-			"delete": {
-				"title": "Profile deleted",
-				"description": "\"{{name}}\" has been removed.",
-				"errorTitle": "Failed to delete profile",
-				"errorFallback": "An error occurred while deleting the profile."
-			},
-			"switch": {
-				"oauthTitle": "Switched to OAuth",
-				"oauthDescription": "Now using OAuth authentication",
-				"profileTitle": "Profile activated",
-				"profileDescription": "Now using {{name}}",
-				"errorTitle": "Failed to switch authentication",
-				"errorFallback": "An error occurred while switching authentication method."
 			}
 		},
 		"dialog": {
 			"createTitle": "Add API Profile",
 			"editTitle": "Edit Profile",
-			"description": "Configure a custom Anthropic-compatible API endpoint for your builds.",
-			"deleteTitle": "Delete Profile?",
-			"deleteDescription": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
-			"cancel": "Cancel",
-			"delete": "Delete",
-			"deleting": "Deleting..."
-		},
-		"title": "API Profiles",
-		"description": "Configure Anthropic-compatible API endpoints"
+			"description": "Configure a custom Anthropic-compatible API endpoint for your builds."
+		}
 	},
 	"modelSelect": {
 		"placeholder": "Select a model or type manually",
@@ -1156,26 +1113,14 @@
 		}
 	},
 	"accounts": {
-		"title": "Accounts",
-		"description": "Manage Claude accounts and API endpoints",
 		"multiConnector": {
 			"title": "AI Provider Management",
 			"description": "Connect and manage multiple AI providers (Claude, OpenAI, Mistral, etc.).",
-			"stats": {
-				"total": "{{count}} total",
-				"configured": "{{count}} configured",
-				"errors": "{{count}} errors"
-			},
-			"buttons": {
-				"refresh": "Refresh",
-				"addProvider": "Add Provider"
-			},
 			"loadingProviders": "Loading providers..."
 		},
 		"tabs": {
 			"aiProvider": "AI Authentication",
-			"llmProviders": "LLM Providers",
-			"customEndpoints": "Custom Endpoints"
+			"llmProviders": "LLM Providers"
 		},
 		"aiProvider": {
 			"description": "Add multiple Claude subscriptions to automatically switch between them when you hit rate limits.",
@@ -1195,30 +1140,6 @@
 			"accountNamePlaceholder": "Account name (e.g., Work, Personal)"
 		},
 		"customEndpoints": {
-			"description": "Configure custom Anthropic-compatible API endpoints",
-			"addButton": "Add Profile",
-			"activeBadge": "Active",
-			"customModels": "Custom models: {{models}}",
-			"setActive": {
-				"label": "Set Active",
-				"loading": "Setting..."
-			},
-			"switchToOauth": {
-				"label": "Use AI Authentication",
-				"loading": "Switching..."
-			},
-			"empty": {
-				"title": "No Custom Endpoints",
-				"description": "Configure custom Anthropic-compatible API endpoints to use alternative providers.",
-				"action": "Add Profile"
-			},
-			"dialog": {
-				"deleteTitle": "Delete Profile",
-				"deleteDescription": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
-				"cancel": "Cancel",
-				"delete": "Delete",
-				"deleting": "Deleting..."
-			},
 			"sections": {
 				"customized": {
 					"title": "Custom Endpoints",
@@ -1243,11 +1164,6 @@
 				"deactivating": "Switching...",
 				"edit": "Edit",
 				"delete": "Delete"
-			},
-			"tooltips": {
-				"edit": "Edit",
-				"deleteActive": "Cannot delete active endpoint",
-				"deleteInactive": "Delete"
 			}
 		},
 		"autoSwitching": {
@@ -1304,30 +1220,12 @@
 			"up": "Move up",
 			"down": "Move down"
 		},
-		"toast": {
-			"loadProfilesFailed": "Failed to Load Profiles",
-			"addProfileFailed": "Failed to Add Profile",
-			"deleteProfileFailed": "Failed to Delete Profile",
-			"renameProfileFailed": "Failed to Rename Profile",
-			"setActiveProfileFailed": "Failed to Set Active Profile",
-			"tokenSaved": "Token Saved",
-			"tokenSavedDescription": "Your token has been saved successfully.",
-			"tokenSaveFailed": "Failed to Save Token",
-			"settingsUpdateFailed": "Failed to Update Settings",
-			"tryAgain": "Please try again.",
-			"permissionDenied": "Permission Denied",
-			"checkFilePermissions": "Please check your file permissions and try again.",
-			"pathNotFound": "Path Not Found",
-			"checkPath": "Please check the path exists and try again.",
-			"authFailed": "Authentication Failed"
-		},
 		"alerts": {
 			"profileCreatedAuthFailed": "Profile created but failed to prepare authentication: {{error}}",
 			"authPrepareFailed": "Failed to prepare authentication: {{error}}",
 			"authStartFailedMessage": "Failed to start authentication. Please try again."
 		},
 		"form": {
-			"addAccount": "Add a {{provider}} account",
 			"name": "Account name",
 			"namePlaceholder": "Account name",
 			"apiKey": "API Key",
@@ -1335,10 +1233,7 @@
 			"oauthToken": "OAuth Token",
 			"oauthTokenPlaceholder": "OAuth token (if required)",
 			"baseUrl": "Base URL (optional)",
-			"baseUrlPlaceholder": "https://api.example.com",
-			"chooseModel": "-- Choose a model --",
-			"save": "Save",
-			"cancel": "Cancel"
+			"baseUrlPlaceholder": "https://api.example.com"
 		}
 	},
 	"debug": {
@@ -1827,9 +1722,6 @@
 		"importing": "Importing...",
 		"importButton_one": "Import Work Items from Azure DevOps",
 		"importButton_other": "Import {{count}} items",
-		"dropZone": "Drop items here",
-		"dropZoneItems": "{{count}} item(s) to import",
-		"dropToColumn": "Drop to {{column}} column",
 		"moreItems": "+{{count}} more item(s)",
 		"sidePanelTitle": "Import from Azure DevOps",
 		"sidePanelDescription": "Drag and drop items into Kanban columns",
@@ -1933,36 +1825,6 @@
 		"toast": {
 			"error": "Error",
 			"errorDescription": "Unable to update settings"
-		}
-	},
-	"copilotOAuth": {
-		"title": "GitHub Copilot Authentication",
-		"description": "Web-based authentication using GitHub OAuth",
-		"descriptionNoCli": "Web-based authentication using GitHub OAuth (no CLI required)",
-		"checkingStatus": "Checking authentication status...",
-		"authenticated": "Authenticated",
-		"notAuthenticated": "Not Authenticated",
-		"defaultUser": "GitHub User",
-		"serverUnavailable": "OAuth server not available",
-		"serverUnavailableHint": "Please restart the application or check your network connection",
-		"authenticatedProfiles": "Authenticated Profiles",
-		"addedDate": "Added {{date}}",
-		"readyToUse": "Ready to use GitHub Copilot",
-		"addProfile": "Add Profile",
-		"noAuthFound": "No Authentication Found",
-		"noAuthFoundDesc": "Connect to GitHub Copilot using OAuth authentication",
-		"openingBrowser": "Opening Browser...",
-		"authenticating": "Authenticating...",
-		"authenticateButton": "Authenticate with GitHub",
-		"toast": {
-			"oauthStarted": "OAuth Started",
-			"oauthStartedDesc": "Please complete authentication in your browser",
-			"authSuccess": "Authentication Successful",
-			"authSuccessDesc": "Successfully authenticated as {{username}}",
-			"authFailed": "Authentication Failed",
-			"authRevoked": "Authentication Revoked",
-			"authRevokedDesc": "Successfully revoked authentication for {{username}}",
-			"revokeFailed": "Revoke Failed"
 		}
 	},
 	"jira": {
@@ -2191,8 +2053,6 @@
 		}
 	},
 	"providerGrid": {
-		"title": "AI Provider Management",
-		"description": "Connect and manage multiple AI providers",
 		"search": {
 			"placeholder": "Search for a provider...",
 			"results": "{{count}} result{{count > 1 ? 's' : ''}} for \"{{query}}\"",
@@ -2314,8 +2174,6 @@
 		}
 	},
 	"llmRouter": {
-		"title": "LLM Router",
-		"description": "Configure intelligent provider routing with fallback chains, A/B testing, and strategy-based selection.",
 		"routingStrategy": {
 			"title": "Default Routing Strategy",
 			"description": "How the router selects a provider when multiple are available.",
@@ -2327,31 +2185,6 @@
 			"lowestLatencyDescription": "Fastest response time",
 			"roundRobin": "Round Robin",
 			"roundRobinDescription": "Distribute evenly"
-		},
-		"registeredProviders": {
-			"title": "Registered Providers",
-			"description": "Providers available for routing. Configure accounts in Settings > Accounts.",
-			"table": {
-				"providerModel": "Provider / Model",
-				"capabilities": "Capabilities",
-				"priority": "Priority",
-				"status": "Status"
-			},
-			"status": {
-				"active": "Active",
-				"disabled": "Disabled",
-				"local": "local"
-			}
-		},
-		"fallbackChains": {
-			"title": "Fallback Chains",
-			"description": "If the primary provider is rate-limited or unavailable, the router automatically falls back to the next in the chain."
-		},
-		"abTesting": {
-			"title": "A/B Testing",
-			"description": "Compare two providers on the same task type. The router alternates between them and tracks quality, latency, and cost.",
-			"noActiveTests": "No active A/B tests",
-			"createTest": "Create a test from the Command Palette or from the task detail view."
 		}
 	},
 	"memoryLifecycle": {
