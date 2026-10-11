@@ -117,7 +117,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L8 | P2 | Code mort frontend — **fait** | F28, F25 (front) | L3 |
 | L9 | P2 | Code mort backend — **fait** | F29, F30, F32, F33, F25 (back) | — |
 | L10 | P3 | Tokens à haut effort | F10, F11, F17 | L6 |
-| L11 | P3 | Consolidation | F8, F26, F27, F31, F36 | L5 |
+| L11 | P3 | Consolidation — **fait** | F8, F26, F27, F31, F36 | L5 |
 | L12 | P3 | Gouvernance — **fait** | F12, F13 | L9 (F25) pour F13 |
 | L13 | P4 | Surface produit | F19 | tous |
 | L14 | P1 | Événements et appels IPC perdus en silence — **fait** | F37 | — |
@@ -125,7 +125,7 @@ cd apps/frontend && pnpm run typecheck && pnpm run lint && pnpm test
 | L16 | P1 | Droits hors de `create_client` — **fait** | F41, F42, F43, F44, F45 (+ F46, F47) | L15 |
 | L17 | P1 | Le self-healing ne revendique que ce qu'il fait — **fait** | F48 | — |
 
-Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L9, L12, L14, L15, L16, L17 (faits) → L7, L8 → L10, L11 → L13.
+Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L9, L11, L12, L14, L15, L16, L17 (faits) → L7 → L10 → L13.
 
 ### Chiffres de référence (pour mesurer les gains)
 
@@ -139,9 +139,10 @@ Ordre recommandé : L1, L2, L3, L4, L5, L6, L8, L9, L12, L14, L15, L16, L17 (fai
 | Shims racine `apps/backend/*.py` | 25 (27 recomptés) ; **3 après le lot L9** (`insight_extractor.py`, `graphiti_config.py`, `graphiti_providers.py`) | 0 (hors points d'entrée) |
 | Prompts orphelins | 11 (~51 Ko) | 0 |
 | Phases du workflow à implémentation absente sur un clone | 5 (+ design-check sans SKILL.md) ; 0 après le lot L6 | 0 |
-| Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) | ≤ 7 |
+| Sous-agents du plus gros roster | 9 ; 7 après le lot L5 (6 pour l'orchestrateur de PR) ; 5 servis sans agents d'appelant au lot L11 (projet mobile), 6 pour l'orchestrateur | ≤ 7 |
+| Définitions de sous-agents | 26 déclarations (25 noms) à cinq endroits, + 9 agents de packs ; 22 dans le registre après le lot L11 (11 de phase, 9 de PR, 2 mobiles), + 6 agents de packs | ~14 |
 | Sessions qui relisent le diff à ultrathink | jusqu'à 7 ; 5 après le lot L6 (adversarial-review et spec-conformance retirés) | ≤ 4 |
-| Détecteurs de pile | ≥ 11 | 1 façade |
+| Détecteurs de pile | ≥ 11 ; 1 façade `project/stack.py` après le lot L11 (4 détecteurs derrière elle, 5 lecteurs encore directs) | 1 façade |
 | Écritures par merge | 4 magasins | 1 événement |
 
 ---
@@ -801,6 +802,13 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 
 ### Lot L11 — Consolidation (P3)
 
+**Fait** (PR #322 pour F27, F8, F26 ; la PR suivante pour F31, F36 et cette mise à jour). Un rôle
+de sous-agent = une définition, et les rosters listent des noms ; une porte unique pour « avec quoi
+ce projet est-il construit » ; une ancre par liste de surface ; tous les tests du backend sous
+`tests/`, une seule configuration pytest ; les deux fichiers Python et quatre des cinq fichiers
+frontend géants découpés par responsabilité, à l'identique. Les écarts sont notés sous chaque
+constat.
+
 #### F8 · Sous-agents qui répondent à la même question, déclarés à cinq endroits
 
 - Couples : security-auditor / security-reviewer ; code-reviewer / quality-reviewer ; test-runner /
@@ -811,6 +819,22 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 - Les trois sous-agents du suivi PR sont déclarés en ligne (`parallel_followup_reviewer.py:222-262`).
 - **Étape** : ~14 définitions, toutes dans `agents/subagents/` ; rosters par nom ; les agents des packs
   `skills/dotnet/agents/` et `skills/mobile/agents/` dédoublonnés.
+- **Corrigé par le lot L11.**
+  - `phases.SPECS` déclare chaque rôle une fois, `ROSTERS` liste des noms. `qa-test-evidence` est
+    fusionné dans `test-runner`, que l'overlay langage/mobile spécialise toujours ;
+    `spec-explorer` et `codebase-surveyor` sont fusionnés dans `architecture-analyst`.
+  - `pr_review.PR_SPECIALISTS` et `PR_ROSTERS` : les trois spécialistes du suivi PR quittent
+    `parallel_followup_reviewer.py`, et `finding-validator` n'est plus déclaré qu'une fois.
+  - `mobile.MOBILE_SPECS` et les spécialistes du suivi sont émis vers les harness. Les doublons
+    des packs sont retirés (`mobile-release-manager`, `bmad-net-architect`,
+    `bmad-performance-analyst`) ; sorties régénérées par `scripts/skills_cli.py`.
+  - Roster servi avant/après (méthode §0.3, 5 projets × 31 agent_types × 7 rosters) : seules les
+    trois fusions changent des noms, aucune taille ne bouge (5 au plus, 6 pour l'orchestrateur).
+- **Écart** : 22 définitions, pas ~14. `security-auditor` / `security-reviewer`,
+  `code-reviewer` / `quality-reviewer` et `evidence-collector` / `finding-validator` restent
+  distincts : les seconds sont des sessions de revue PR, avec un prompt fichier
+  (`prompts/github/`) préfixé du worktree ; les premiers sont des entrées de roster en ligne.
+  Les fusionner change le prompt des revues PR, ce qui ne relève plus d'une consolidation.
 
 #### F26 · Au moins onze détecteurs de pile
 
@@ -822,6 +846,20 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
   `StackDetector` + `FrameworkDetector`, avec `mobile.stacks` et `uiux.stack` comme sous-modules ;
   migrer d'abord `detect_languages`, `detect_api_stack`, `validation_strategy`, `pipeline_generator`,
   `flaky_tests`.
+- **Corrigé par le lot L11.** `project/stack.py` : `technology_stack` et `frameworks`
+  (`StackDetector`, `FrameworkDetector`), `detect_project_stack`, `detect_languages` (cache),
+  `detect_project_type`, `detect_api_stack`, `detect_markers`, et des portes paresseuses vers
+  `uiux.stack`, `mobile.stacks` et `test_generation.stack_aware`. Les quatre détecteurs listés
+  y sont déplacés à l'identique et réexportés depuis leur ancien module. Le scan de marqueurs
+  du runner flaky-tests passe par `detect_markers`, la boucle verify demande la pile API à la
+  façade, et `detect_languages` n'importe plus le runner du générateur de pipelines (ni son
+  dotenv). `tests/test_project_stack.py` épingle les réponses de chaque détecteur sur 17
+  projets fixtures, capturées avant le déplacement.
+- **Écart** : `uiux/stack.py` et `mobile/stacks.py` restent physiquement dans leur paquet
+  (portes paresseuses, pas de sous-modules déplacés) ; `runners/app_emulator_runner.py`,
+  `migration/analyzer.py`, `analysis/analyzers/project_analyzer_module.py` et
+  `docintel/tables.py` lisent encore leur détecteur directement. Leurs vocabulaires diffèrent ;
+  les unifier change des réponses, ce qui demande une décision par consommateur.
 
 #### F27 · Cinq listes de globs « surface »
 
@@ -830,6 +868,12 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
   `uiux/surface.py` duplique `&ui_surface` (gardé égal par `tests/test_uiux.py`).
 - **Étape** : ancre `&mobile_surface` ; documenter ou supprimer l'écart ui/frontend ; générer
   `UI_GLOBS` depuis le YAML (ou l'inverse).
+- **Corrigé par le lot L11.** `mobile-design` porte `&mobile_surface`, `store-readiness` l'alias.
+  L'écart est documenté dans `design-check` : impeccable ne lit que le balisage web, et
+  `tests/test_uiux.py` tient `&frontend_surface` pour un sous-ensemble de `UI_GLOBS`. `UI_GLOBS`
+  reste la source (il est livré, `workflows/` non) ; `scripts/sync_surface_globs.py` réécrit
+  l'ancre, et le test d'égalité nomme le script. La liste d'`architecture-map` est unique et
+  reste en place.
 
 #### F31 · Tests dispersés et deux configurations pytest contradictoires
 
@@ -839,6 +883,20 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
 - `pytest.ini` (racine) collecte `tests`, `apps/backend`, `src` ; `apps/backend/pyproject.toml:4`
   déclare `testpaths = ["tests"]`, dossier inexistant.
 - **Étape** : déplacer vers `tests/<paquet>/` (git mv, imports ajustés), une seule configuration.
+- **Corrigé par le lot L11.** 112 fichiers déplacés par `git mv` (chemins relatifs à `__file__`
+  et imports relatifs ajustés). `apps/backend/pytest.ini` et `apps/backend/pyproject.toml`
+  supprimés : le `pytest.ini` racine est la seule configuration, et la CI lance pytest depuis
+  la racine (son `pythonpath` remplace le `PYTHONPATH` du pas). Les fixtures autouse
+  d'`apps/backend/conftest.py` passent dans le `conftest.py` racine. `staged-tests.js` lance pytest
+  depuis la racine ; `tests/test_test_discovery.py` lit le `pytest.ini` racine et vérifie qu'il
+  est seul. Collecte : 11 107 tests (11 072 avant le lot).
+- **Écart** : restent dans `apps/backend` les tests Graphiti (lot L7),
+  `runners/github/test_context_gatherer.py` (conservé par le lot L9) et six modules de
+  production qui portent seulement le préfixe `test_` (`agents/test_generator.py`,
+  `analysis/test_discovery.py`, `browser_agent/test_executor.py`,
+  `regression_guardian/test_generator.py`, `runners/test_generation_runner.py`,
+  `services/test_generation_service.py`). Pytest les collecte sans y trouver de test ; les
+  renommer touche leurs importeurs.
 
 #### F36 · Fichiers géants
 
@@ -848,6 +906,42 @@ avant/après, recherche stricte des `import`, `pnpm run typecheck`, suite vitest
   `renderer/components/KanbanBoard.tsx` (4 297, index local `kanban/AGENTS.md`),
   `renderer/components/api-explorer/ApiExplorer.tsx` (3 707), `main/ipc-handlers/github/pr-handlers.ts`
   (3 480), `core/worktree.py` (3 382) → découper par responsabilité, interfaces publiques inchangées.
+- **Corrigé par le lot L11.** Chaque définition est déplacée à l'identique (vérifié par AST
+  pour Python, par `tsc` pour TypeScript), et l'ancien module réexporte ce qu'il exportait.
+  - `core/agent_client.py` (5 568) → `core/agent_clients/{base,claude,copilot,openai,google,compatible,local,windsurf}.py` ;
+    le module réexporte tout, noms privés compris, et les modules loguent sous l'ancien nom.
+  - `core/worktree.py` (3 382 → 1 452) : `worktree_common.py` (helpers, types) et
+    `worktree_pr.py` (`WorktreePRMixin`, dont hérite `WorktreeManager`).
+  - `worktree-handlers.ts` (5 665 → 3 599) : `worktree-ide-terminal.ts`, `worktree-git-refs.ts`,
+    `worktree-pr-helpers.ts`.
+  - `KanbanBoard.tsx` (4 297 → 3 249) : colonnes dans `kanban/KanbanColumn.tsx`.
+  - `ApiExplorer.tsx` (3 707 → 730) : `RequestPanel.tsx`, `EnvironmentManager.tsx`,
+    `ExportDialog.tsx`, `api-explorer-shared.tsx`.
+  - `pr-handlers.ts` (3 480 → 2 516) : `pr-graphql.ts`, `pr-logs.ts`, `pr-ci-wait.ts`.
+  - Les tests qui patchent une constante ou une fonction de module visent le module qui la lit.
+- **Écart** : `usage-monitor.ts` (4 609) n'est pas découpé : c'est une seule classe dont les
+  méthodes passent toutes par `this`, et la découper revient à introduire des collaborateurs,
+  ce qui n'est plus un déplacement. Restent aussi de très longues fonctions uniques :
+  `registerWorktreeHandlers` (~3 250 lignes), `KanbanBoard` (~3 050), `registerPRHandlers` (~1 950).
+
+#### Trouvé pendant le lot L11
+
+- **La boucle d'apprentissage classait les leçons de planning sous `spec-explorer`**, un rôle que
+  le planner n'a jamais porté (son roster est `architecture-analyst` + `dependency-tracer`).
+  Corrigé avec la fusion.
+- **Le registre n'émettait ni les spécialistes mobiles ni ceux du suivi PR** vers les harness :
+  le pack mobile en portait sa propre copie. Corrigé.
+- **Un `conftest.py` qui place le dossier du runner GitHub en tête de `sys.path`** masque le
+  paquet `services` du backend pour toute la session. Les tests déplacés l'ajoutent en fin.
+- **Le `conftest.py` racine ne doit rien importer du backend** : le job d'éval des skills
+  n'installe que trois paquets, et `runners.github.rate_limiter` sort de l'interpréteur sans
+  `python-dotenv`. La réinitialisation lit `sys.modules`.
+- **`tests/test_oneshot_provider_errors.py::test_the_claude_client_applies_the_chosen_effort`
+  dépend de l'ordre** : il échoue sous `pytest -n 8` sur `develop` comme sur cette branche, et
+  passe seul. Non corrigé ici.
+- **`services/test_generation_service.py` n'a aucun importeur** : candidat au lot L9.
+- **`src/main/__tests__/config-path-validator.test.ts` échoue quand la suite tourne en `root`**
+  (`HOME=/root`) ; environnement, pas code.
 
 ### Lot L12 — Gouvernance (P3)
 

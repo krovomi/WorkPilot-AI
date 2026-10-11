@@ -75,30 +75,24 @@ jobs:
           install-test-deps: 'true'
 
       - name: Run all tests (including platform-specific)
-        working-directory: apps/backend
         shell: bash
-        env:
-          PYTHONPATH: ${{ github.workspace }}/apps/backend${{ runner.os == 'Windows' && ';' || ':' }}${{ github.workspace }}
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
-            source .venv/Scripts/activate
+            source apps/backend/.venv/Scripts/activate
           else
-            source .venv/bin/activate
+            source apps/backend/.venv/bin/activate
           fi
-          # Sans argument, pytest suit `testpaths` d'apps/backend/pytest.ini,
-          # qui couvre tests/, le backend et src/ — 120 fichiers de test vivaient
-          # hors de tests/ et ne tournaient nulle part.
+          # Depuis la racine, sans argument : pytest suit `testpaths` du
+          # pytest.ini racine, la seule configuration du depot (lot L11, F31),
+          # et son `pythonpath` remplace le PYTHONPATH que ce pas posait.
           pytest -v --tb=short -x
 
       - name: Run coverage (Linux + Python 3.13 only)
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
-        working-directory: apps/backend
         shell: bash
-        env:
-          PYTHONPATH: ${{ github.workspace }}/apps/backend:${{ github.workspace }}
         run: |
-          source .venv/bin/activate
-          pytest -v --cov=. --cov-report=xml --cov-report=term-missing --cov-fail-under=10
+          source apps/backend/.venv/bin/activate
+          pytest -v --cov=apps/backend --cov-report=xml:apps/backend/coverage.xml --cov-report=term-missing --cov-fail-under=10
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'

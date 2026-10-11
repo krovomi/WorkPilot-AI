@@ -492,7 +492,8 @@ class TestCopilotAgentClient:
         left. The client should ride out the short window and continue
         processing instead of surfacing a "Copilot API error (429)".
         """
-        import core.agent_client as agent_client_module
+        # The constants live with the client that reads them (lot L11, F36).
+        import core.agent_clients.copilot as agent_client_module
 
         client = CopilotAgentClient(github_token="ghp_test", max_turns=5)
         await client.query("hello")
@@ -547,7 +548,8 @@ class TestCopilotAgentClient:
     @pytest.mark.asyncio
     async def test_receive_response_429_gives_up_after_cap(self):
         """Persistent 429s eventually surface the error after the retry budget."""
-        import core.agent_client as agent_client_module
+        # The constants live with the client that reads them (lot L11, F36).
+        import core.agent_clients.copilot as agent_client_module
 
         client = CopilotAgentClient(github_token="ghp_test", max_turns=5)
         await client.query("hello")
@@ -728,7 +730,8 @@ class TestCopilotAgentClient:
     @pytest.mark.asyncio
     async def test_receive_response_empty_choices_retries_then_recovers(self):
         """A transient empty-choices response should be retried, not abort the session."""
-        import core.agent_client as agent_client_module
+        # The constants live with the client that reads them (lot L11, F36).
+        import core.agent_clients.copilot as agent_client_module
 
         client = CopilotAgentClient(github_token="ghp_test", max_turns=5)
         await client.query("hello")
@@ -781,7 +784,8 @@ class TestCopilotAgentClient:
     @pytest.mark.asyncio
     async def test_receive_response_empty_choices_gives_up_after_cap(self):
         """Persistent empty choices eventually surface the empty-response message."""
-        import core.agent_client as agent_client_module
+        # The constants live with the client that reads them (lot L11, F36).
+        import core.agent_clients.copilot as agent_client_module
 
         client = CopilotAgentClient(github_token="ghp_test", max_turns=20)
         await client.query("hello")

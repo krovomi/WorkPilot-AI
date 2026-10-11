@@ -226,8 +226,11 @@ def test_every_tool_executor_a_client_builds_is_given_a_spec_directory():
     else reports, so a call site that forgets it loses the record silently."""
     import re
 
-    source = (REPO_ROOT / "apps" / "backend" / "core" / "agent_client.py").read_text(
-        encoding="utf-8"
+    source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted(
+            (REPO_ROOT / "apps" / "backend" / "core" / "agent_clients").glob("*.py")
+        )
     )
 
     constructions = [
