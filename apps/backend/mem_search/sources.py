@@ -144,9 +144,9 @@ class TaskLogSource:
 
 
 class PatternSource:
-    """Distilled patterns, from `learning_loop`'s store.
+    """Distilled patterns, from `learning_loop`'s store (notes in the vault).
 
-    Patterns are already short, so all three layers come from the same file.
+    Patterns are already short, so all three layers come from the same record.
     The staircase still holds: the index shows the description, the timeline
     adds the evidence, and only the detail carries the full instruction.
     """
@@ -154,19 +154,21 @@ class PatternSource:
     name = "pattern"
 
     def __init__(self, project_dir: Path):
-        self.path = Path(project_dir) / ".workpilot" / "learning_loop" / "patterns.json"
+        self.project_dir = Path(project_dir)
         self._cache: list[dict] | None = None
 
     def _all(self) -> list[dict]:
         if self._cache is not None:
             return self._cache
         self._cache = []
-        if self.path.is_file():
-            try:
-                raw = json.loads(self.path.read_text(encoding="utf-8"))
-                self._cache = [p for p in raw if isinstance(p, dict)]
-            except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-                logger.debug("could not read %s: %s", self.path, exc)
+        try:
+            from learning_loop.pattern_storage import PatternStorage
+
+            self._cache = [
+                p.to_dict() for p in PatternStorage(self.project_dir).load_patterns()
+            ]
+        except Exception as exc:  # noqa: BLE001 - no patterns is an empty source
+            logger.debug("could not read the learning patterns: %s", exc)
         return self._cache
 
     def _find(self, ref_id: str) -> dict | None:
@@ -270,11 +272,15 @@ class BrainSource:
         try:
             if brain.graph_is_stale():
                 brain._refresh()
+            # The learning loop's patterns are `PatternSource`'s, with their
+            # evidence; listing them here too would show each one twice.
             self._nodes = [
                 node
                 for node in brain.graph().nodes.values()
                 if str(node.get("source_file") or "").startswith(self.prefix)
                 and str(node.get("source_file")).endswith(".md")
+                and "learning-loop"
+                not in ((node.get("metadata") or {}).get("tags") or [])
             ]
         except Exception as exc:  # noqa: BLE001
             logger.debug("could not read the brain graph: %s", exc)

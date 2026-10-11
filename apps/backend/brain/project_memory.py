@@ -69,6 +69,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "KINDS",
+    "LEARNED",
     "LEGACY_FILES",
     "LEGACY_MIGRATED",
     "has_legacy_memory",
@@ -94,6 +95,14 @@ LEGACY_FILES = ("codebase_map.json", "patterns.md", "gotchas.md", "session_insig
 """The knowledge the old store kept in ``<spec_dir>/memory/``. The directory also
 holds ``services/recovery.py``'s state (``attempt_history.json``,
 ``build_commits.json``) — execution state, not knowledge — which stays there."""
+
+LEARNED = "learning"
+"""Frontmatter key of a pattern the learning loop distilled
+(`learning_loop.pattern_storage`): the pattern itself and its evidence —
+confidence, occurrences, applications, successes, source builds. Such a note
+lives in ``patterns/`` beside the patterns sessions record, and is injected by
+the learning loop's own injector, with its confidence gate, never a second
+time by the session memory context."""
 
 LEGACY_MIGRATED = "memory.migrated-to-brain"
 """Where the imported ``LEGACY_FILES`` are moved: kept for a person to check,
@@ -340,7 +349,11 @@ class ProjectMemory:
             logger.warning("brain: memory sync failed: %s", exc)
             return False
 
-    def _notes(self, kind: str) -> list[tuple[str, dict[str, Any], str]]:
+    def _notes(
+        self, kind: str, *, learned: bool | None = None
+    ) -> list[tuple[str, dict[str, Any], str]]:
+        """The notes of *kind*. ``learned`` keeps only the learning loop's
+        patterns (``True``) or only the others (``False``); ``None`` keeps all."""
         brain = self._reader()
         if brain is None:
             return []
@@ -356,7 +369,10 @@ class ProjectMemory:
                 note = read_note(brain.root, rel)
             except (OSError, ValueError):
                 continue
-            out.append((rel, dict(note.meta), _own_text(note.body)))
+            meta = dict(note.meta)
+            if learned is not None and isinstance(meta.get(LEARNED), dict) != learned:
+                continue
+            out.append((rel, meta, _own_text(note.body)))
         return out
 
     # -- write (synchronous core) -------------------------------------------
@@ -395,6 +411,53 @@ class ProjectMemory:
             self._write("pattern", _title(text), "\n".join(lines), meta=meta)
             is not None
         )
+
+    def record_learned_pattern(
+        self, pattern: dict[str, Any], *, title: str, body: str
+    ) -> str | None:
+        """File one learning-loop pattern, its evidence in the frontmatter.
+
+        One note per ``pattern_id``: writing it again updates it in place. The
+        texts are expurgated like every other memory, the frontmatter copy too.
+        """
+        pattern_id = str(pattern.get("pattern_id") or "").strip()
+        if not pattern_id:
+            return None
+        evidence = {
+            k: (redact(v) if isinstance(v, str) else v)
+            for k, v in pattern.items()
+            if k != "effectiveness_rate"
+        }
+        return self._write(
+            "pattern",
+            title,
+            body,
+            slug=slugify(pattern_id),
+            meta={LEARNED: evidence},
+            tags=["learning-loop"],
+        )
+
+    def learned_patterns(self) -> list[dict[str, Any]]:
+        """The learning loop's patterns, oldest first, as their dicts."""
+        return [
+            dict(meta[LEARNED])
+            for _, meta, _ in self._by_date(self._notes("pattern", learned=True))
+        ]
+
+    def forget(self, kind: str, slug: str) -> bool:
+        """Remove one note of this project's memory. ``False`` when absent."""
+        brain = self._get_brain(create=False)
+        if brain is None:
+            return False
+        try:
+            path = inside(brain.root, self.base / KINDS[kind] / f"{slugify(slug)}.md")
+        except ValueError:
+            return False
+        if not path.is_file():
+            return False
+        path.unlink()
+        self._pending += 1
+        return True
 
     def record_discovery(
         self, file_path: str, description: str, *, category: str = "", changes: str = ""
@@ -557,7 +620,10 @@ class ProjectMemory:
         return [body.strip() for _, _, body in self._by_date(self._notes("gotcha"))]
 
     def load_patterns(self) -> list[str]:
-        return [body.strip() for _, _, body in self._by_date(self._notes("pattern"))]
+        return [
+            body.strip()
+            for _, _, body in self._by_date(self._notes("pattern", learned=False))
+        ]
 
     def load_codebase_map(self) -> dict[str, str]:
         out: dict[str, str] = {}
@@ -605,12 +671,13 @@ class ProjectMemory:
         kinds: tuple[str, ...] = tuple(KINDS),
         limit: int = 5,
         min_score: float = 0.0,
+        learned: bool | None = None,
     ) -> list[dict[str, Any]]:
         """Notes of this project's memory ranked by overlap with *query*."""
         terms = _terms(query)
         hits = []
         for kind in kinds:
-            for rel, meta, body in self._notes(kind):
+            for rel, meta, body in self._notes(kind, learned=learned):
                 title = str(meta.get("title") or "")
                 score = _score(terms, f"{title}\n{body}") if terms else 0.0
                 if terms and score <= 0:
@@ -726,7 +793,11 @@ class ProjectMemory:
                     "score": h["score"],
                 }
                 for h in self.search(
-                    query, kinds=("pattern",), limit=num_results, min_score=min_score
+                    query,
+                    kinds=("pattern",),
+                    limit=num_results,
+                    min_score=min_score,
+                    learned=False,
                 )
             ]
             gotchas = [
