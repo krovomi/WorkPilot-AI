@@ -90,12 +90,15 @@ python scripts/mobile_device_check.py --project-dir ../my-app --launch
 | Where | What |
 |---|---|
 | `agents/subagents/mobile.py` | `device-runner` (installs and launches, reports; the only roster entry that touches a device) and `store-readiness-auditor` (read-only; the rules Apple and Google reject on). Both are protected from the roster cap — they are the only entries that know the project is a phone app — and added only to a phase that has a roster: coder, QA, verifier and the `pr_reviewer` the mobile workflow phases run under keep them, a `solo` call (a commit message) stays empty. |
-| `workflows/feature-build/workflow.yaml` | `mobile-design` before coding, `store-readiness` after QA. Both conditional on mobile files being touched, both `fresh-context`, both read-only. |
+| `workflows/feature-build/workflow.yaml` | `mobile-design` before coding, and the store audit as lens 5 of `review` (`lenses: {store-readiness: *mobile_surface}`). Both conditional on mobile files being touched, both `fresh-context`, both read-only. |
 | `skills/mobile/` | the procedures: `android-developer`, `ios-developer`, `cross-platform-mobile`, `mobile-design-review`, `mobile-device-testing`, `mobile-store-readiness`, plus four agent definitions. |
 
 `mobile-design` sits *before* `coding` because the window a phase runs in is its
 declared position: a badly cut screen costs a sentence there and a full fix
-cycle after QA. `store-readiness` sits after QA because it audits a finished
-build — and it exists at all because store rejections cost days and **no test in
-the repository catches any of them**: they are rules about configuration files
-and about behaviours the suite does not look at.
+cycle after QA. The store audit exists at all because store rejections cost
+days and **no test in the repository catches any of them**: they are rules about
+configuration files and about behaviours the suite does not look at. It was a
+`store-readiness` phase after QA until lot L10, a fifth session reading the
+diff whose report no agent read; it is now lens 5 of `review`, which runs
+once the code is written and hands its findings to the QA reviewer, while a
+fixer can still act on them (`workflows.runner.CONDITIONAL_LENSES`).

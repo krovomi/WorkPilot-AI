@@ -130,7 +130,6 @@ CONFIG_PHASE = {
     "coding": "coding",
     "review": "qa",
     "qa": "qa",
-    "store-readiness": "qa",
     "verify": "qa",
     "verify-replay": "qa",
     # Architecture mapping runs after QA and describes the system topology changes.
@@ -194,7 +193,6 @@ SKILL_PHASE_AGENTS = {
     "brainstorm": "spec_critic",
     "analyze": "spec_validation",
     "mobile-design": "pr_reviewer",
-    "store-readiness": "pr_reviewer",
     "review": "pr_reviewer",
     # The verification loop drives the app and may fix it: `verifier` writes,
     # like `qa_fixer`, and gets the `verify_*` tools on every provider.
@@ -221,6 +219,14 @@ REVIEW_LENSES: dict[int, str] = {
     3: "Conformité à la demande",
     4: "Adversariale",
 }
+# Lenses a phase declares under `lenses:` in the workflow, applied only when the
+# task touches their files: (number, title, the procedure the lens follows).
+# `store-readiness` was a phase of its own after QA — a fifth session reading
+# the diff on a phone app, whose report no agent read (F38). As a lens its
+# findings reach the QA reviewer with the rest of the review.
+CONDITIONAL_LENSES: dict[str, tuple[int, str, str]] = {
+    "store-readiness": (5, "Publication mobile", "mobile/mobile-store-readiness"),
+}
 REVIEW_LENSES_BY_EFFORT: dict[str, tuple[int, ...]] = {
     "none": (),
     "low": (),
@@ -228,6 +234,25 @@ REVIEW_LENSES_BY_EFFORT: dict[str, tuple[int, ...]] = {
     "high": (1, 2, 3),
     "ultrathink": (1, 2, 3, 4),
 }
+
+
+def conditional_lenses(phase, ctx) -> list[tuple[str, int, str, str]]:
+    """The declared conditional lenses whose files this task touches.
+
+    An unknown change set applies them, as `when:` runs a phase it cannot rule
+    out: one more lens costs less than a store rejection that ships.
+    """
+    from .engine import _touched
+
+    applied = []
+    for name, globs in getattr(phase, "conditional_lenses", ()):
+        known = CONDITIONAL_LENSES.get(name)
+        if known is None:
+            logger.warning("phase %s: unknown lens %r ignored", phase.id, name)
+            continue
+        if _touched(globs, ctx.changed_files):
+            applied.append((name, *known))
+    return applied
 
 
 def review_lenses(effort: str) -> tuple[int, ...]:
@@ -548,12 +573,21 @@ def _build_prompt(resolved, body: str, ctx: PhaseContext) -> str:
         f"DISPATCH: {resolved.dispatch}",
     ]
     if phase.id == "review":
-        lenses = review_lenses(ctx.effort)
+        titles = {n: REVIEW_LENSES[n] for n in review_lenses(ctx.effort)}
+        procedures: list[str] = []
+        for name, number, title, impl in conditional_lenses(phase, ctx):
+            titles[number] = title
+            located = _locate_skill(ctx.repo_root, impl)
+            procedures.append(
+                f"Lens {number} ({name}) follows `{located or impl}`: read it "
+                f"and apply its checklist to the files this task changed."
+            )
         lines.append(
             "LENSES: "
-            + ", ".join(f"{n}. {REVIEW_LENSES[n]}" for n in lenses)
+            + ", ".join(f"{n}. {titles[n]}" for n in sorted(titles))
             + " — apply these and no other."
         )
+        lines += procedures
     if resolved.degraded_from:
         lines.append(
             f"NOTE: this phase asked for `{resolved.degraded_from}` and was "

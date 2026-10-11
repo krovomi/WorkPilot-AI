@@ -7,7 +7,7 @@ metadata:
     provenance: WorkPilot — revue unique à lentilles (audit F3/F11) ; la lentille adversariale reprend l'intention de bmad-review
     pack: tooling
     version: 1.0.0
-    content_sha256: c67851fa11b1c6277b0b1bfa053deb620c94b42d7472a29dac54a740af852cee
+    content_sha256: df02c45210310676944fe9f5cfdcefdad093092ac10a299898b2e5427f4e451c
 ---
 
 # review-lenses — une revue, plusieurs questions
@@ -28,6 +28,10 @@ ligne `LENSES:` en tête de ce prompt les nomme, et fait foi. Sans elle, lis
 | 2. Sécurité | ✔ | ✔ | ✔ |
 | 3. Conformité à la demande | | ✔ | ✔ |
 | 4. Adversariale | | | ✔ |
+
+Une cinquième lentille, **5. Publication mobile**, ne dépend pas de l'effort mais
+des fichiers : elle s'applique quand la tâche touche une application smartphone,
+et la ligne `LENSES:` la nomme alors, avec la procédure qu'elle suit.
 
 À un effort inférieur à `medium` cette phase ne tourne pas : la relecture du
 coder sur sa propre sous-tâche est ce qu'il y a.
@@ -77,6 +81,15 @@ Lis le code pour le casser, pas pour l'approuver : valeurs limites (vide, nul,
 ordre d'appel inattendu, reprise après interruption. **Une liste vide est un
 signal pour relire, pas une conclusion** : si tu ne trouves rien, dis ce que tu
 as essayé.
+
+### 5. Publication mobile (si la ligne `LENSES:` la nomme)
+
+Ce sur quoi le Play Store et l'App Store rejettent et qu'aucun test du dépôt
+n'attrape. Lis la procédure que la ligne `LENSES:` désigne
+(`mobile-store-readiness`) et applique sa liste aux fichiers de la tâche :
+permission déclarée jamais demandée, chaîne d'usage absente d'`Info.plist`,
+signature de debug, déclaration de confidentialité en retard sur ce que le code
+envoie. Un rejet de store probable est un constat `HIGH`.
 
 ## Sévérité
 

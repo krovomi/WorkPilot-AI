@@ -1023,8 +1023,8 @@ def handle_build_command(
                 except Exception:
                     pass  # Best-effort
 
-        # Everything the workflow declares after `qa`: `store-readiness`,
-        # `architecture-map` and `verify-replay`. Each is a question about the
+        # Everything the workflow declares after `qa`: `architecture-map` and
+        # `verify-replay`. Each is a question about the
         # finished branch, so it runs once QA has corrected it. Nothing after
         # this point feeds a fixer, which is why the reviews that should change
         # the build (`review`, `verify`) are declared before `qa`.

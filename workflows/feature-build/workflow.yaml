@@ -136,6 +136,8 @@ phases:
     min_effort: medium
     dispatch: fresh-context
     roster: solo
+    lenses:
+      store-readiness: *mobile_surface
     description: >-
       A reviewer that did not write the code, before QA, with lenses the
       effort chooses: correctness and tests and security at medium; conformance
@@ -156,10 +158,19 @@ phases:
       The engine picks the lenses (`workflows.runner.REVIEW_LENSES_BY_EFFORT`)
       and names them in the prompt.
 
+      On a phone app, a fifth lens: what the Play Store and the App Store
+      reject on and no test in the repository catches — a permission declared
+      and never requested, a missing usage string in Info.plist, an artefact
+      signed with the debug key, a privacy declaration behind what the code
+      sends (`mobile/mobile-store-readiness`). It was a `store-readiness`
+      phase after QA: a fifth session reading the diff, whose report no agent
+      read. As a lens, its findings reach the QA reviewer while a fixer can
+      still act on them.
+
   - id: verify
     impl: tooling/verify
     agent: verifier
-    roster: qa
+    roster: verify
     dispatch: fresh-context
     hard_gate: tests-pass,app-verified
     description: >-
@@ -189,19 +200,6 @@ phases:
     description: >-
       The existing QA reviewer/fixer loop. A reasoning effort of none reduces
       model thinking, not validation: completed coding still requires QA.
-
-  - id: store-readiness
-    impl: mobile/mobile-store-readiness
-    min_effort: medium
-    when: *mobile_surface
-    dispatch: fresh-context
-    description: >-
-      Ce sur quoi le Play Store et l'App Store rejettent, et qu'aucun test du
-      dépôt n'attrape : une permission déclarée jamais demandée, une chaîne
-      d'usage manquante dans Info.plist, un artefact signé avec la clé de debug,
-      une déclaration de confidentialité en retard sur ce que le code envoie.
-      Un rejet coûte des jours ; le même constat posé ici coûte une ligne. En
-      lecture seule — le correctif appartient à la phase de codage.
 
   - id: architecture-map
     impl: tooling/architecture-map
