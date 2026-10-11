@@ -34,10 +34,6 @@ const ABSTRACTION = ["main/platform", "shared/platform.ts"];
  */
 const ALLOWED = new Map<string, string>([
 	[
-		"shared/utils/powershell-color-support.ts:52",
-		"objet de diagnostic : rapporte la plateforme brute",
-	],
-	[
 		"main/ipc-handlers/settings-handlers.ts:382",
 		"console.warn de diagnostic",
 	],

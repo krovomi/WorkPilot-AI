@@ -98,7 +98,6 @@ import { isMacOS, isWindows } from "./platform";
 import { pythonEnvManager } from "./python-env-manager";
 import { initSentryMain } from "./sentry";
 import { readSettingsFile } from "./settings-utils";
-import { ptyDaemonClient } from "./terminal/pty-daemon-client";
 import { TerminalManager } from "./terminal-manager";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1287,11 +1286,6 @@ app.on("before-quit", (event) => {
 			if (terminalManager) {
 				await terminalManager.killAll();
 			}
-
-			// Shut down PTY daemon client AFTER terminal cleanup completes,
-			// ensuring all kill commands reach PTY processes before the daemon disconnects
-			ptyDaemonClient.shutdown();
-			console.warn("[main] PTY daemon client shutdown complete");
 		} catch (error) {
 			console.error("[main] Error during pre-quit cleanup:", error);
 		} finally {

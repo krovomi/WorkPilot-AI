@@ -26,7 +26,7 @@ interface ChannelNotificationsIntegrationProps {
 	readonly updateEnvConfig: (updates: Partial<ProjectEnvConfig>) => void;
 }
 
-/** Backend API base (same one used by hooks-store). */
+/** Backend API base (the FastAPI server, port 9000). */
 const BACKEND_URL = "http://localhost:9000";
 
 type ChannelKey = "teams" | "slack" | "discord" | "googleChat" | "webhook";
