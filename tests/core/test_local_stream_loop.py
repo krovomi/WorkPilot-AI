@@ -333,7 +333,7 @@ async def test_a_silent_turn_reports_where_the_model_is_loaded(
     complaint.
     """
     monkeypatch.setattr(
-        "core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
+        "core.agent_clients.local._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
     )
 
     class _SlowFirstChunk(_FakeResponse):
@@ -387,7 +387,7 @@ async def test_a_model_still_loading_is_asked_again(monkeypatch):
     session — exactly the sessions that need it most.
     """
     monkeypatch.setattr(
-        "core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
+        "core.agent_clients.local._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
     )
 
     class _SlowFirstChunk(_FakeResponse):
@@ -436,9 +436,11 @@ async def test_a_model_absent_from_api_ps_is_reported(monkeypatch):
     """`ollama ps` empty while a request is in flight is the surprising fact,
     and the first version of the probe printed nothing for it."""
     monkeypatch.setattr(
-        "core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
+        "core.agent_clients.local._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
     )
-    monkeypatch.setattr("core.agent_client._LOCAL_NOT_LOADED_GRACE", 0, raising=True)
+    monkeypatch.setattr(
+        "core.agent_clients.local._LOCAL_NOT_LOADED_GRACE", 0, raising=True
+    )
 
     class _SlowFirstChunk(_FakeResponse):
         @property
@@ -480,7 +482,7 @@ async def test_a_cold_start_is_not_flagged_before_the_grace_period(monkeypatch):
     """A large model is legitimately absent from /api/ps while its weights are
     read off disk. Warning on the first heartbeat would cry wolf every run."""
     monkeypatch.setattr(
-        "core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
+        "core.agent_clients.local._LOCAL_HEARTBEAT_SECONDS", 0.01, raising=True
     )
 
     class _SlowFirstChunk(_FakeResponse):
@@ -554,7 +556,7 @@ async def test_stalled_stream_is_terminal_and_reader_is_cancelled(monkeypatch):
 
             return stream()
 
-    monkeypatch.setattr("core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.005)
+    monkeypatch.setattr("core.agent_clients.local._LOCAL_HEARTBEAT_SECONDS", 0.005)
     client = _client(_FakeSession([Stalled(200, [])]))
     client._model_max_ctx = 16384
     client._generation_idle_timeout = 0.02
@@ -587,7 +589,7 @@ async def test_slow_but_continuous_stream_has_a_total_deadline(monkeypatch):
 
             return stream()
 
-    monkeypatch.setattr("core.agent_client._LOCAL_HEARTBEAT_SECONDS", 0.005)
+    monkeypatch.setattr("core.agent_clients.local._LOCAL_HEARTBEAT_SECONDS", 0.005)
     client = _client(_FakeSession([Endless(200, [])]))
     client._model_max_ctx = 16384
     client._request_timeout = 0.02

@@ -249,7 +249,7 @@ class TestResolveLocalBaseUrl:
     def test_default_when_nothing_set(self, monkeypatch):
         # No env, and force the saved-config lookup to yield nothing.
         monkeypatch.setattr(
-            "core.agent_client._resolve_local_base_url",
+            "core.agent_clients.local._resolve_local_base_url",
             _resolve_local_base_url,
         )
         # load_provider_config may or may not exist on the host; the result must
