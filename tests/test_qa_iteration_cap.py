@@ -17,25 +17,52 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "apps" / "backend"))
 
-from qa import loop as qa_loop  # noqa: E402
-from qa.criteria import save_implementation_plan, should_run_fixes  # noqa: E402
-from qa.loop import (  # noqa: E402
-    MAX_QA_ITERATIONS,
-    QA_ITERATIONS_BY_EFFORT,
-    QA_MAX_ITERATIONS_ENV,
-    qa_iteration_cap,
-    recurring_issue_threshold,
-)
-from qa.report import (  # noqa: E402
-    RECURRING_ISSUE_THRESHOLD,
-    escalate_to_human,
-    record_iteration,
-)
 from workflows.spec import EFFORT_ORDER  # noqa: E402
+
+_QA_NAMES = (
+    "MAX_QA_ITERATIONS",
+    "QA_ITERATIONS_BY_EFFORT",
+    "QA_MAX_ITERATIONS_ENV",
+    "qa_iteration_cap",
+    "recurring_issue_threshold",
+)
+_REPORT_NAMES = ("RECURRING_ISSUE_THRESHOLD", "escalate_to_human", "record_iteration")
+
+# Bound by `_qa_modules` before any test runs.
+qa_loop = save_implementation_plan = should_run_fixes = None
+MAX_QA_ITERATIONS = QA_ITERATIONS_BY_EFFORT = QA_MAX_ITERATIONS_ENV = None
+qa_iteration_cap = recurring_issue_threshold = None
+RECURRING_ISSUE_THRESHOLD = escalate_to_human = record_iteration = None
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _qa_modules():
+    """Import `qa` for this module only, and leave `sys.modules` as found.
+
+    `qa.loop` pulls in the real `core.*`. Imported at collection, those copies
+    sit in `sys.modules` while `test_qa_loop` swaps `core.*` for mocks, and the
+    spec-configuration tests that follow end up patching one `core.client`
+    while the code under test calls another.
+    """
+    before = dict(sys.modules)
+    import qa.criteria as criteria
+    import qa.loop as loop
+    import qa.report as report
+
+    namespace = globals()
+    namespace["qa_loop"] = loop
+    namespace["save_implementation_plan"] = criteria.save_implementation_plan
+    namespace["should_run_fixes"] = criteria.should_run_fixes
+    namespace.update({name: getattr(loop, name) for name in _QA_NAMES})
+    namespace.update({name: getattr(report, name) for name in _REPORT_NAMES})
+    yield
+    for name in set(sys.modules) - set(before):
+        del sys.modules[name]
+    sys.modules.update(before)
 
 
 @pytest.fixture(autouse=True)
-def _no_override(monkeypatch):
+def _no_override(monkeypatch, _qa_modules):
     monkeypatch.delenv(QA_MAX_ITERATIONS_ENV, raising=False)
 
 
