@@ -232,18 +232,24 @@ class TestAgentClientParity:
     """
 
     def test_the_stream_verifies_before_reporting_a_failure(self):
-        source = (
-            REPO_ROOT / "apps" / "backend" / "core" / "agent_client.py"
-        ).read_text(encoding="utf-8")
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(
+                (REPO_ROOT / "apps" / "backend" / "core" / "agent_clients").glob("*.py")
+            )
+        )
         assert "async def _model_is_installed" in source
         # Both the in-stream error and the transport error consult it.
         assert source.count("if await self._model_is_installed():") >= 2
 
     def test_the_two_installed_checks_agree_on_tags(self):
         """A bare name is `:latest` on both sides, or a pull lies once."""
-        source = (
-            REPO_ROOT / "apps" / "backend" / "core" / "agent_client.py"
-        ).read_text(encoding="utf-8")
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(
+                (REPO_ROOT / "apps" / "backend" / "core" / "agent_clients").glob("*.py")
+            )
+        )
         assert 'if name == wanted or name == f"{wanted}:latest":' in source
         assert 'name.split(":", 1)[0] == wanted' not in source
 

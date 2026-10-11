@@ -82,16 +82,10 @@ const pytestTargets = selectPytestTargets(ROOT, staged, {
 if (pytestTargets.length > 0) {
 	const pytest = findVenvBin(ROOT, "pytest");
 	if (pytest) {
-		// pytest runs from apps/backend (same cwd as CI) with repo-root-relative
-		// targets rewritten to ../../
-		const backendCwd = path.join(ROOT, "apps", "backend");
-		const args = [
-			...pytestTargets.map((t) => path.join("..", "..", t)),
-			"-q",
-			"--tb=short",
-			"-x",
-		];
-		if (!run("backend pytest (staged)", pytest, args, backendCwd)) {
+		// pytest runs from the repository root, like CI: the root pytest.ini is
+		// the only configuration (audit lot L11, F31).
+		const args = [...pytestTargets, "-q", "--tb=short", "-x"];
+		if (!run("backend pytest (staged)", pytest, args, ROOT)) {
 			failed = true;
 		}
 	} else {
