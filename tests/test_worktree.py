@@ -23,7 +23,7 @@ import pytest
 backend_path = Path(__file__).parent.parent / "apps" / "backend"
 sys.path.insert(0, str(backend_path))
 
-from worktree import WorktreeManager
+from core.worktree import WorktreeManager
 
 
 class TestWorktreeManagerInitialization:

@@ -20,7 +20,7 @@ The security system has three layers:
 2. Stack commands - Detected from project structure (frameworks, languages)
 3. Custom commands - User-defined allowlist
 
-See project_analyzer.py for the detection logic.
+See the project/ package for the detection logic.
 """
 
 # Import everything from the security module to maintain backward compatibility

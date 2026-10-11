@@ -20,8 +20,7 @@ import pytest
 # Add auto-claude directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 
-from core.workspace import _run_parallel_merges
-from workspace import ParallelMergeResult, ParallelMergeTask
+from core.workspace import ParallelMergeResult, ParallelMergeTask, _run_parallel_merges
 
 
 class TestParallelMergeDataclasses:

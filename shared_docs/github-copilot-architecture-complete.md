@@ -160,7 +160,7 @@ sequenceDiagram
 ## Connecteur d'Usage
 
 ### CopilotUsageConnector
-**Fichier** : `src/connectors/llm_copilot.py`
+**Fichier** : `apps/backend/core/copilot_usage.py`
 
 **Description** : Récupération des métriques d'utilisation GitHub Copilot.
 

@@ -38,7 +38,13 @@ except ImportError:
     ContentBlockType = None  # type: ignore[assignment,misc]
 
 try:
-    from debug import debug, debug_detailed, debug_error, debug_section, debug_success
+    from core.debug import (
+        debug,
+        debug_detailed,
+        debug_error,
+        debug_section,
+        debug_success,
+    )
 except ImportError:
 
     def debug(*args, **kwargs):

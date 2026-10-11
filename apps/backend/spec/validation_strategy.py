@@ -25,10 +25,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from analysis.risk_classifier import RiskClassifier
+
 # `detect_project_type` lives in the project stack facade (audit lot L11, F26);
 # imported here for the readers that still reach it through this module.
 from project.stack import detect_project_type
-from risk_classifier import RiskClassifier
 
 # =============================================================================
 # DATA CLASSES

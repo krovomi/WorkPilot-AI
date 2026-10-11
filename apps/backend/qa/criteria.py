@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from progress import is_build_complete
+from core.progress import is_build_complete
 
 # =============================================================================
 # IMPLEMENTATION PLAN I/O

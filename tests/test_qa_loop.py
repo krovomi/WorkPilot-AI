@@ -47,14 +47,14 @@ _mocked_module_names = [
     "security.qa_scanner",
     # Config & phases
     "phase_config",
-    "phase_event",
+    "core.phase_event",
     # Logging & UI
-    "debug",
+    "core.debug",
     "ui",
     "ui.capabilities",
     "task_logger",
-    "linear_updater",
-    "progress",
+    "integrations.linear.updater",
+    "core.progress",
     # Prompts
     "prompts_pkg",
     "prompts_pkg.project_context",
@@ -71,7 +71,6 @@ _mocked_module_names = [
     # Integrations
     "integrations",
     "integrations.linear",
-    "integrations.linear.updater",
 ]
 
 for name in _mocked_module_names:
@@ -86,7 +85,7 @@ for name in _mocked_module_names:
         sys.modules[name] = MagicMock()
 
 # Set up specific mock attributes needed by tests
-mock_progress = sys.modules["progress"]
+mock_progress = sys.modules["core.progress"]
 
 
 # Configure the progress module mock to properly handle is_build_complete

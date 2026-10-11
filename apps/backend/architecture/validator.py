@@ -13,7 +13,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from debug import debug, debug_error, debug_section, debug_success, debug_warning
+from core.debug import debug, debug_error, debug_section, debug_success, debug_warning
 
 from .config import infer_architecture_config, load_architecture_config
 from .models import ArchitectureViolation

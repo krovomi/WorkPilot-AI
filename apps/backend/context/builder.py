@@ -47,7 +47,7 @@ class ContextBuilder:
                 pass
 
         # Try to create one
-        from analyzer import analyze_project
+        from analysis.analyzer import analyze_project
 
         return analyze_project(self.project_dir)
 

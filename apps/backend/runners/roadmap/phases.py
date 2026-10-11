@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from debug import (
+from core.debug import (
     debug,
     debug_detailed,
     debug_error,

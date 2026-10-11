@@ -87,31 +87,6 @@ def test_public_api():
     print("\n✓ All public API functions accessible!\n")
 
 
-def test_backwards_compatibility():
-    """Test that the old agent.py facade maintains backwards compatibility."""
-    print("Testing backwards compatibility...")
-
-    # Test that agent.py can be imported
-    import agent
-
-    required_functions = [
-        "run_autonomous_agent",
-        "run_followup_planner",
-        "save_session_memory",
-        "save_session_to_graphiti",
-        "run_agent_session",
-        "post_session_processing",
-    ]
-
-    for func_name in required_functions:
-        assert hasattr(agent, func_name), (
-            f"Missing function in agent module: {func_name}"
-        )
-        print(f"  ✓ agent.{func_name}")
-
-    print("\n✓ Backwards compatibility maintained!\n")
-
-
 def test_module_structure():
     """Test that the module structure is correct."""
     print("Testing module structure...")
@@ -143,7 +118,6 @@ if __name__ == "__main__":
         test_module_structure()
         test_imports()
         test_public_api()
-        test_backwards_compatibility()
 
         print("=" * 60)
         print("✓ ALL TESTS PASSED - Refactoring verified!")

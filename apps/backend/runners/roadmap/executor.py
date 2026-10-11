@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from debug import debug, debug_detailed, debug_error, debug_success
+from core.debug import debug, debug_detailed, debug_error, debug_success
 
 # Which AGENT_CONFIGS entry each roadmap prompt runs under. Without a name the
 # factory falls back to `coder` — Edit, the Kanban roster with a test-runner —

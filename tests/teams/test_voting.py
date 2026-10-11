@@ -19,7 +19,6 @@ from unittest.mock import MagicMock
 
 sys.modules["claude_agent_sdk"] = MagicMock()
 sys.modules["core.client"] = MagicMock()
-sys.modules["debug"] = MagicMock()
 
 from teams.config import DebateStrategy
 from teams.voting import Vote, VoteChoice, VotingSystem
