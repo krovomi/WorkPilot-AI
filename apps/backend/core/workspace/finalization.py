@@ -437,7 +437,12 @@ def check_existing_build(project_dir: Path, spec_name: str) -> bool:
         input("Press Enter to continue building...")
         return True
     elif choice == "merge":
-        ws.merge_existing_build(project_dir, spec_name)
+        if ws.merge_existing_build(project_dir, spec_name):
+            # The same merge as `run.py --merge`: the usage counters, the
+            # learning loop, the brain and the design-system knowledge hear it.
+            from core.merge_event import MergeEvent, publish
+
+            publish(MergeEvent(project_dir, spec_name, automatic=False))
         return False  # Start fresh after merge
     elif choice == "fresh":
         discarded = discard_existing_build(project_dir, spec_name)

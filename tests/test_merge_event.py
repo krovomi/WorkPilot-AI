@@ -77,3 +77,22 @@ def test_the_cli_publishes_once_on_success_only(monkeypatch, tmp_path, merged):
 
     assert workspace_commands.handle_merge_command(tmp_path, "001-login") is merged
     assert published == ([MergeEvent(tmp_path, "001-login")] if merged else [])
+
+
+@pytest.mark.parametrize("merged", [True, False])
+def test_the_interactive_merge_choice_publishes_too(monkeypatch, tmp_path, merged):
+    """`check_existing_build`'s "Add to my project now" is the same merge as
+    `run.py --merge`, and was the one merge path that told no one."""
+    import core.workspace as ws
+    from core.workspace import finalization
+
+    published: list[MergeEvent] = []
+    monkeypatch.setattr(
+        finalization, "get_existing_build_worktree", lambda *a: tmp_path / "wt"
+    )
+    monkeypatch.setattr(finalization, "select_menu", lambda **k: "merge")
+    monkeypatch.setattr(ws, "merge_existing_build", lambda *a, **k: merged)
+    monkeypatch.setattr(merge_event, "publish", published.append)
+
+    assert finalization.check_existing_build(tmp_path, "001-login") is False
+    assert published == ([MergeEvent(tmp_path, "001-login")] if merged else [])
