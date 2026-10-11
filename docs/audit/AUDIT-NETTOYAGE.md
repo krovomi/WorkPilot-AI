@@ -525,6 +525,9 @@ Vérifié : `pytest tests/` complet (9 125 passés),
      réglages), API preload, canaux `TEAM_SYNC_*`, `teamSync.json` (jamais enregistré dans
      i18n) et `settings:memoryLifecycle` en + fr.
   4. `MemoryStep` : le chemin « clé API » de l'onboarding saute désormais à l'étape finale.
+     **Confirmé après la PR #328** : l'étape ne montrait plus que `BrainSettings`, réglage
+     facultatif (la mémoire fonctionne sans rien configurer) ; le garder aurait ajouté une
+     étape à un premier lancement pour une décision qui peut attendre Réglages → Intégrations.
   5. Le reste : paquet, `query_memory.py`, shims racine, `memory/graphiti_helpers.py`,
      `scripts/test_memory_save.py`, serveur MCP graphiti (`GRAPHITI_MCP_TOOLS`, entrées
      d'`AGENT_CONFIGS` et de `_map_mcp_server_name`, `core/client.py`), `memory-service.ts`,
@@ -535,7 +538,10 @@ Vérifié : `pytest tests/` complet (9 125 passés),
   - La section de réglages **« Mémoire (Graphiti) »** (`SecuritySettings`,
     `InfrastructureStatus`, entrée de navigation, parcours de visite guidée, item du Setup
     Hub) n'était pas nommée par le cahier ; elle ne configurait que Graphiti et est retirée.
-    L'entrée « Cerveau partagé » est juste à côté. Question au mainteneur dans la PR.
+    L'entrée « Cerveau partagé » est juste à côté. **Décidé après la PR #328 : pas de
+    remplacement.** Il n'y a plus rien à configurer par projet pour que la mémoire marche ;
+    le vault, son dossier et son distant git sont des réglages de la machine, servis par
+    l'entrée « Cerveau partagé ».
   - `pandas` retiré (seul lecteur : `real_ladybug`) ; **`pywin32` gardé** : la bibliothèque
     MCP importe `win32api` et `core/dependency_validator.py` le vérifie.
   - Le gabarit `.workpilot/.env` garde les clés de providers lues ailleurs (OpenAI, Azure,
@@ -577,7 +583,9 @@ Vérifié : `pytest tests/` complet (9 125 passés),
   rangé (F34). Le context mesh et mem_search lisent le vault ; `BrainSource` ne les liste pas
   deux fois. Tests : `tests/test_learning_pattern_vault.py`.
 - **Écart** : mémoire coupée (`BRAIN_ENABLED=false`), le learning loop ne retient rien
-  (comme toute la mémoire) et laisse l'ancien fichier en place.
+  (comme toute la mémoire) et laisse l'ancien fichier en place. **Confirmé après la PR
+  #328** : un repli sur un fichier refonderait le second magasin que F7 a retiré, et
+  `BRAIN_ENABLED=false` est précisément la demande de ne rien retenir.
 - **Trouvé pendant le lot L7** : la page Learning Loop lisait `patterns.json` elle-même et
   attendait `{ patterns: [...] }` là où le backend écrivait une liste : elle n'affichait
   jamais rien. Elle passe par `GET /api/brain/learning-patterns` et `POST …/toggle|delete`
@@ -599,8 +607,12 @@ Vérifié : `pytest tests/` complet (9 125 passés),
   appelant de production, et le tableau de bord lit le snapshot qu'écrit `usage_tracker`.
 - **Trouvé pendant le lot L7** : deux autres producteurs de merge ne publient pas
   l'événement — le bus de hooks (`PR_MERGED`, ne crédite que le learning loop) et le choix
-  « merge » de `core/workspace/finalization.py` (aucune écriture). Les brancher changerait le
-  comportement : décision du mainteneur.
+  « merge » de `core/workspace/finalization.py` (aucune écriture). **Décidé après la PR
+  #328** : le choix « Ajouter à mon projet maintenant » est le même merge que
+  `run.py --merge` et publie désormais l'événement (`tests/test_merge_event.py`). Le
+  `PR_MERGED` du bus de hooks reste un crédit du learning loop seul : il arrive de
+  l'extérieur avec un `project_id` et sans checkout, et le publier aux quatre abonnés
+  obligerait le serveur à en résoudre un.
 
 #### F34 · ~60 sous-dossiers `.workpilot/` dont des doublons de nommage
 

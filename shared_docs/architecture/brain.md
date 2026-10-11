@@ -443,6 +443,12 @@ son `on_merge` : `core.usage_tracker` (le snapshot du tableau de bord),
 acceptée), `uiux.knowledge` (le design system). Un abonné qui échoue n'arrête
 pas les autres et ne fait jamais échouer le merge.
 
+Deux producteurs publient l'événement : `run.py --merge` (`handle_merge_command`)
+et le choix « Ajouter à mon projet maintenant » d'une construction existante
+(`core/workspace/finalization.py`). Le `PR_MERGED` du bus de hooks n'en est pas un :
+il arrive de l'extérieur avec un `project_id` et sans checkout, et ne crédite que le
+registre du learning loop (`services/hooks/hook_service.py`).
+
 ## Memory Search (`mem-search`)
 
 Three-layer progressive retrieval over the records that already exist — `learning_loop`
